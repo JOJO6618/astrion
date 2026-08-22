@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>登录 - Astrion</title>
+    <link rel="icon" type="image/svg+xml" href="/static/astrion-avatar.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <script>
+      (function () {
+        try {
+          var key = window.localStorage.getItem('agents_ui_theme');
+          var theme = key === 'light' || key === 'dark' || key === 'classic' ? key : 'classic';
+          document.documentElement.setAttribute('data-theme', theme);
+          document.body && document.body.setAttribute('data-theme', theme);
+        } catch (_e) {
+          document.documentElement.setAttribute('data-theme', 'classic');
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/dist/assets/auth.css" />
+  </head>
+  <body>
+    <div id="auth-app"></div>
+    <script src="/static/security.js"></script>
+    <script type="module" src="/static/dist/assets/login.js"></script>
+  </body>
+</html>

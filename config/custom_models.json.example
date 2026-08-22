@@ -1,0 +1,43 @@
+{
+  "models": [
+    {
+      "model_name": "Kimi-K3",
+      "description": "Kimi K3，月之暗面最新旗舰模型",
+      "visible": true,
+      "url": "${API_BASE_KIMI}",
+      "apikey": "${API_KEY_KIMI}",
+      "multimodal": "image,video",
+      "reasoning_capability": "fast,thinking",
+      "reasoning_effort": true,
+      "context_window": 1048576,
+      "max_output_tokens": 64000,
+      "thinkmode_status": {
+        "type": "param_toggle",
+        "model_id": "k3",
+        "fast_extra_parameter": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "thinking_extra_parameter": {
+          "thinking": {
+            "effort": "max"
+          }
+        }
+      },
+      "extra_parameter": {},
+      "model_description": "你是Kimi-K3，月之暗面最新旗舰模型，很贵，但也很强。"
+    },
+    {
+      "model_name": "deepseek-chat",
+      "description": "DeepSeek 官方 API（最小配置示例：仅 model_name / url / apikey / model_id 必填，其余字段均有默认值）",
+      "visible": true,
+      "url": "https://api.deepseek.com",
+      "apikey": "${API_KEY_DEEPSEEK}",
+      "thinkmode_status": {
+        "type": "param_toggle",
+        "model_id": "deepseek-chat"
+      }
+    }
+  ]
+}

@@ -1,0 +1,335 @@
+/* 设计 Token —— 两层结构：语义层（按主题取值）+ 兼容别名层 */
+/* 规范见 doc/frontend/color_token_spec.md。本文件为结构重构产物，值与重构前逐一致（零视觉变化）。 */
+
+:root {
+  color-scheme: light;
+  /* 主题无关的布局变量 */
+  --app-viewport: 100vh;
+  --app-bottom-inset: env(safe-area-inset-bottom, 0px);
+
+  /* 装饰色（主题无关，固定品牌色）：macOS 风格窗口关闭红绿灯 */
+  --mac-close: #ff5f57;
+  --mac-close-hover: #ff3b30;
+  --mac-close-border: #e0443e;
+  /* 媒体上的文字可读性阴影（主题无关，需固定强暗影压住任意底图） */
+  --text-shadow-legible: rgba(0, 0, 0, 0.8);
+  /* 彩蛋装饰色（主题无关，固定festive色） */
+  --decorative-gold: #ffd700;
+  --decorative-pink: #ff69b4;
+  /* 玻璃质感/实验视觉装饰光斑（主题无关，固定品牌渐变色，刻意不随主题变） */
+  --glass-tint-blue: rgba(104, 147, 255, 0.2);
+  --glass-tint-blue-soft: rgba(128, 183, 255, 0.18);
+  --glass-tint-blue-mid: rgba(140, 180, 255, 0.35);
+  --glass-tint-amber: rgba(255, 200, 150, 0.22);
+  --glass-base-deep: rgba(28, 27, 41, 0.95);
+  --glass-shadow-deep: rgba(24, 20, 37, 0.45);
+  /* 进度环未完成轨道（主题无关，固定中性灰） */
+  --progress-track: rgba(127, 135, 146, 0.28);
+  /* 拖拽预览浮层投影（主题无关，固定黑投影） */
+  --drag-preview-shadow: rgba(0, 0, 0, 0.35);
+
+  /* 图片大图预览浮层（主题无关，固定在深色遮罩之上） */
+  --lightbox-text: #ffffff;
+  --lightbox-btn-bg: rgba(0, 0, 0, 0.45);
+  --lightbox-btn-bg-hover: rgba(0, 0, 0, 0.65);
+
+  /* 文件类型身份色（主题无关，固定功能指示色）：文件附加块 FileChips 类型图标底色 */
+  --file-kind-word: #5b7fc4;
+  --file-kind-excel: #529658;
+  --file-kind-ppt: #c9734b;
+  --file-kind-pdf: #c25e52;
+  --file-kind-text: #71808f;
+  --file-kind-code: #8a6fc0;
+  --file-kind-archive: #a08255;
+  --file-kind-generic: #8b887f;
+
+  /* 推理强度档位色（主题无关，固定功能指示色）：EffortSlider 滑块填充与动效 */
+  --effort-low: #f5c542;
+  --effort-medium: #3fd07c;
+  --effort-high: #4f8ef7;
+  --effort-xhigh: #a55df0;
+  --effort-xhigh-shine: rgba(255, 255, 255, 0.55);
+  --effort-max-red: #ff3b5c;
+  --effort-max-orange: #ff9f2e;
+  --effort-max-yellow: #ffe93b;
+  --effort-max-green: #3ddc68;
+  --effort-max-cyan: #2fd4ff;
+  --effort-max-purple: #7a5cff;
+  --effort-max-pink: #ff4fd8;
+  --effort-knob-bg: #ffffff;
+  --effort-knob-shadow: rgba(0, 0, 0, 0.28);
+  --effort-dot-covered: rgba(255, 255, 255, 0.55);
+  --effort-dot-uncovered: rgba(0, 0, 0, 0.28);
+
+  /* === 兼容别名（旧 token 名 → 新语义 token），迁移完成后删除 === */
+  --theme-surface-card: var(--surface-card);
+  --theme-surface-strong: var(--surface-raised);
+  --theme-surface-soft: var(--surface-soft);
+  --theme-surface-muted: var(--surface-muted);
+  --theme-card-border-strong: var(--border-card-strong);
+  --theme-chip-border: var(--chip-border);
+  --theme-tab-active: var(--tab-active);
+  --theme-chip-bg: var(--chip-bg);
+  --theme-badge-bg: var(--badge-bg);
+  --theme-switch-track: var(--switch-track);
+  --theme-shadow-soft: var(--shadow-soft);
+  --theme-shadow-mid: var(--shadow-mid);
+  --theme-shadow-strong: var(--shadow-strong);
+  --theme-overlay-scrim: var(--overlay-scrim);
+  --theme-mobile-menu: var(--mobile-menu);
+  --theme-mobile-menu-shadow: var(--mobile-menu-shadow);
+  --git-diff-add-text: var(--diff-add-text);
+  --git-diff-del-text: var(--diff-del-text);
+  /* 合并项：下列旧名与上面某新名同值，统一指向合并后的语义 token */
+  --theme-control-border: var(--border-default);
+  --theme-control-border-strong: var(--border-strong);
+}
+
+:root[data-theme='classic'] {
+  color-scheme: light;
+  /* Surface 表面层级 —— 亮色暖奶油盘（canvas<soft<card<cream-strong，raised纯白浮起） */
+  --effort-track-bg: var(--surface-muted);
+  --surface-base: #faf9f5;
+  --surface-panel: #faf9f5;
+  --surface-rail: #f5f0e8;
+  --surface-sidebar: #f5f0e8;
+  --surface-card: #efe9de;
+  --surface-raised: #ffffff;
+  --surface-soft: #f5f0e8;
+  --surface-muted: #e8e0d2;
+  /* Text 文字 */
+  --text-primary: #141413;
+  --text-secondary: #3d3d3a;
+  --text-tertiary: #6c6a64;
+  --text-muted: rgba(108, 106, 100, 0.55);
+  /* Border 边框 —— hairline */
+  --border-default: #e6dfd8;
+  --border-strong: #d8cfc4;
+  --border-card-strong: #e6dfd8;
+  --chip-border: #ebe6df;
+  /* Accent 强调 —— primary，克制 CTA-only */
+  --accent: #cc785c;
+  --accent-strong: #a9583e;
+  --accent-hover: #bd6a4f;
+  --accent-active: #a9583e;
+  --accent-deep: #6c6a64;
+  --accent-deep-strong: #3d3d3a;
+  --on-accent: #ffffff;
+  /* State 状态 —— semantic */
+  --state-success: #10b981;
+  --state-warning: #f59e0b;
+  --state-danger: #dc2626;
+  --state-danger-strong: #b91c1c;
+  --status-offline: #dc2626;
+  --state-info: #5db8a6;
+  /* Highlight / 交互态 —— 中性暖灰（不带橙） */
+  --highlight: rgba(20, 20, 19, 0.05);
+  --tab-active: rgba(20, 20, 19, 0.07);
+  --chip-bg: #f5f0e8;
+  --badge-bg: #efe9de;
+  --switch-track: #d8cfc4;
+  --hover-bg: rgba(20, 20, 19, 0.05);
+  --pulse-ring: rgba(0, 0, 0, 0.1);
+  /* Shadow 阴影 */
+  --shadow-card: 0 14px 36px rgba(61, 57, 41, 0.12);
+  --shadow-soft: 0 12px 24px rgba(38, 28, 18, 0.12);
+  --shadow-mid: 0 20px 45px rgba(16, 24, 40, 0.08);
+  --shadow-strong: 0 28px 60px rgba(38, 28, 18, 0.25);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  /* Overlay / 移动端 */
+  --overlay-scrim: rgba(33, 24, 14, 0.55);
+  --mobile-menu: #f5f0e8;
+  --mobile-menu-shadow: 0 12px 30px rgba(38, 28, 18, 0.15);
+  /* 专用色 */
+  --diff-add-text: #00e000;
+  --diff-del-text: #ff1a1a;
+  --diff-add-bg: rgba(22, 163, 74, 0.12);
+  --diff-del-bg: rgba(220, 38, 38, 0.12);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --effort-track-bg: var(--surface-muted);
+  /* Surface 表面层级 —— ChatGPT 亮色冷白盘 */
+  --surface-base: #ffffff;
+  --surface-panel: #ffffff;
+  --surface-rail: #f9f9f9;
+  --surface-sidebar: #f9f9f9;
+  --surface-card: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-soft: #f9f9f9;
+  --surface-muted: #f3f3f3;
+  /* Text 文字 —— ChatGPT */
+  --text-primary: #0d0d0d;
+  --text-secondary: #5d5d5d;
+  --text-tertiary: #8f8f8f;
+  --text-muted: rgba(13, 13, 13, 0.35);
+  /* Border 边框 —— ChatGPT hairline */
+  --border-default: rgba(13, 13, 13, 0.1);
+  --border-strong: rgba(13, 13, 13, 0.15);
+  --border-card-strong: rgba(13, 13, 13, 0.1);
+  --chip-border: rgba(13, 13, 13, 0.05);
+  /* Accent 强调 —— ChatGPT primary（近黑，克制 CTA-only） */
+  --accent: #181818;
+  --accent-strong: #181818;
+  --accent-hover: #303030;
+  --accent-active: #414141;
+  --accent-deep: #5d5d5d;
+  --accent-deep-strong: #414141;
+  --on-accent: #ffffff;
+  /* State 状态 —— ChatGPT semantic */
+  --state-success: #10b981;
+  --state-warning: #f59e0b;
+  --state-danger: #dc2626;
+  --state-danger-strong: #b91c1c;
+  --status-offline: #dc2626;
+  --state-info: #0285ff;
+  /* Highlight / 交互态 —— 中性冷灰 */
+  --highlight: rgba(13, 13, 13, 0.05);
+  --tab-active: rgba(13, 13, 13, 0.05);
+  --chip-bg: #f3f3f3;
+  --badge-bg: #f3f3f3;
+  --switch-track: #ececec;
+  --hover-bg: rgba(13, 13, 13, 0.05);
+  --pulse-ring: rgba(0, 0, 0, 0.1);
+  /* Shadow 阴影 */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-mid: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  /* Overlay / 移动端 */
+  --overlay-scrim: rgba(0, 0, 0, 0.5);
+  --mobile-menu: #ffffff;
+  --mobile-menu-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  /* 专用色 */
+  --diff-add-text: #00e000;
+  --diff-del-text: #ff1a1a;
+  --diff-add-bg: rgba(22, 163, 74, 0.12);
+  --diff-del-bg: rgba(220, 38, 38, 0.12);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  /* 推理强度滑槽（深色下需可见灰，不用近黑 surface-muted） */
+  --effort-track-bg: #3a3a3c;
+  /* Surface 表面层级（深色下层次向提亮方向拉开，禁近黑压暗，见 AGENTS.md §5.5-11） */
+  --surface-base: #1a1a1a;
+  --surface-panel: #1a1a1a;
+  --surface-rail: #181818;
+  --surface-sidebar: #181818;
+  --surface-card: #262626;
+  --surface-raised: #1a1a1a;
+  --surface-soft: #212121;
+  --surface-muted: #2b2b2b;
+  /* Text 文字 */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #707070;
+  --text-muted: rgba(255, 255, 255, 0.3);
+  /* Border 边框 */
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-card-strong: rgba(255, 255, 255, 0.1);
+  --chip-border: rgba(255, 255, 255, 0.08);
+  /* Accent 强调（含运行模式 deep） */
+  --accent: #606060;
+  --accent-strong: #505050;
+  --accent-hover: #707070;
+  --accent-active: #505050;
+  --accent-deep: #808080;
+  --accent-deep-strong: #606060;
+  --on-accent: #ffffff;
+  /* State 状态 */
+  --state-success: #10b981;
+  --state-warning: #f59e0b;
+  --state-danger: #dc2626;
+  --state-danger-strong: #b91c1c;
+  --status-offline: #e34d4d;
+  --state-info: #60a5fa;
+  /* Highlight / 交互态 */
+  --highlight: rgba(255, 255, 255, 0.05);
+  --tab-active: rgba(255, 255, 255, 0.05);
+  --chip-bg: #2a2a2a;
+  --badge-bg: #2a2a2a;
+  --switch-track: #2a2a2a;
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --pulse-ring: rgba(255, 255, 255, 0.1);
+  /* Shadow 阴影 */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-mid: 0 3px 8px rgba(0, 0, 0, 0.5);
+  --shadow-strong: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  /* Overlay / 移动端 */
+  --overlay-scrim: rgba(0, 0, 0, 0.8);
+  --mobile-menu: rgba(10, 10, 10, 0.95);
+  --mobile-menu-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  /* 专用色 */
+  --diff-add-text: #00e000;
+  --diff-del-text: #ff1a1a;
+  --diff-add-bg: rgba(22, 163, 74, 0.12);
+  --diff-del-bg: rgba(220, 38, 38, 0.12);
+}
+
+/* 首屏（JS 设置 data-theme 之前）回退到 classic 取值 */
+:root:not([data-theme]) {
+  --effort-track-bg: var(--surface-muted);
+  /* Surface 表面层级 —— 同 classic（亮色暖奶油盘） */
+  --surface-base: #faf9f5;
+  --surface-panel: #faf9f5;
+  --surface-rail: #f5f0e8;
+  --surface-sidebar: #f5f0e8;
+  --surface-card: #efe9de;
+  --surface-raised: #ffffff;
+  --surface-soft: #f5f0e8;
+  --surface-muted: #e8e0d2;
+  /* Text 文字 */
+  --text-primary: #141413;
+  --text-secondary: #3d3d3a;
+  --text-tertiary: #6c6a64;
+  --text-muted: rgba(108, 106, 100, 0.55);
+  /* Border 边框 */
+  --border-default: #e6dfd8;
+  --border-strong: #d8cfc4;
+  --border-card-strong: #e6dfd8;
+  --chip-border: #ebe6df;
+  /* Accent 强调 */
+  --accent: #cc785c;
+  --accent-strong: #a9583e;
+  --accent-hover: #bd6a4f;
+  --accent-active: #a9583e;
+  --accent-deep: #6c6a64;
+  --accent-deep-strong: #3d3d3a;
+  --on-accent: #ffffff;
+  /* State 状态 */
+  --state-success: #10b981;
+  --state-warning: #f59e0b;
+  --state-danger: #dc2626;
+  --state-danger-strong: #b91c1c;
+  --status-offline: #dc2626;
+  --state-info: #5db8a6;
+  /* Highlight / 交互态 —— 中性暖灰 */
+  --highlight: rgba(20, 20, 19, 0.05);
+  --tab-active: rgba(20, 20, 19, 0.07);
+  --chip-bg: #f5f0e8;
+  --badge-bg: #efe9de;
+  --switch-track: #d8cfc4;
+  --hover-bg: rgba(20, 20, 19, 0.05);
+  --pulse-ring: rgba(0, 0, 0, 0.1);
+  /* Shadow 阴影 */
+  --shadow-card: 0 14px 36px rgba(61, 57, 41, 0.12);
+  --shadow-soft: 0 12px 24px rgba(38, 28, 18, 0.12);
+  --shadow-mid: 0 20px 45px rgba(16, 24, 40, 0.08);
+  --shadow-strong: 0 28px 60px rgba(38, 28, 18, 0.25);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  /* Overlay / 移动端 */
+  --overlay-scrim: rgba(33, 24, 14, 0.55);
+  --mobile-menu: #f5f0e8;
+  --mobile-menu-shadow: 0 12px 30px rgba(38, 28, 18, 0.15);
+  /* 专用色 */
+  --diff-add-text: #00e000;
+  --diff-del-text: #ff1a1a;
+  --diff-add-bg: rgba(22, 163, 74, 0.12);
+  --diff-del-bg: rgba(220, 38, 38, 0.12);
+}

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>管理员策略配置</title>
+    <link rel="icon" type="image/svg+xml" href="/static/astrion-avatar.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/dist/assets/adminPolicy.css" />
+    <!-- 共享组件 SecondaryGate 被多入口抽为独立 chunk，其 CSS 需显式引入 -->
+    <link rel="stylesheet" href="/static/dist/assets/SecondaryGate.css" />
+    <script src="/static/security.js"></script>
+  </head>
+  <body>
+    <div id="admin-policy-app"></div>
+    <script type="module" src="/static/dist/assets/adminPolicy.js"></script>
+  </body>
+</html>

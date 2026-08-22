@@ -1,0 +1,24 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.8"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <!-- 顶部圆节点 -->
+  <circle cx="12" cy="4.6" r="2.6" />
+  <!-- 圆 → 菱形 竖直连线 -->
+  <path d="M12 7.2 V10.1" />
+  <!-- 中部菱形（扁平：半宽3.5 / 半高2.2） -->
+  <path d="M8.5 12.3 L12 10.1 L15.5 12.3 L12 14.5 Z" stroke-linejoin="miter" />
+  <!-- 左右连接线（圆弧弯） -->
+  <path d="M8.5 12.3 H6.1 Q4.5 12.3 4.5 13.9 V16.3" />
+  <path d="M15.5 12.3 H17.9 Q19.5 12.3 19.5 13.9 V16.3" />
+  <!-- 底部圆角方块 -->
+  <rect x="2.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
+  <rect x="17.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
+</svg>

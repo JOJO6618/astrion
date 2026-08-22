@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -4 200 200" aria-hidden="true">
+  <style>
+    .sa-frame, .sa-eye {
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    .sa-frame {
+      stroke-width: 12;
+    }
+    .sa-eye {
+      stroke-width: 10;
+    }
+    @media (prefers-color-scheme: dark) {
+      .sa-frame, .sa-eye {
+        stroke: #ffffff;
+      }
+    }
+  </style>
+  <path
+    class="sa-frame"
+    d="M 175.959,107.000 Q 180.000,100.000 175.959,93.000 L 144.041,37.718 Q 140.000,30.718 131.917,30.718 L 68.083,30.718 Q 60.000,30.718 55.959,37.718 L 24.041,93.000 Q 20.000,100.000 24.041,107.000 L 55.959,162.282 Q 60.000,169.282 68.083,169.282 L 131.917,169.282 Q 140.000,169.282 144.041,162.282 Z"
+  />
+  <path
+    class="sa-eye"
+    d="M 0,-11 Q 0,-5.5 0,0 Q 0,5.5 0,11 Q 0,5.5 0,0 Q 0,-5.5 0,-11"
+    transform="translate(84, 96)"
+  />
+  <path
+    class="sa-eye"
+    d="M 0,-11 Q 0,-5.5 0,0 Q 0,5.5 0,11 Q 0,5.5 0,0 Q 0,-5.5 0,-11"
+    transform="translate(116, 96)"
+  />
+</svg>

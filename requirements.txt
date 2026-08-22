@@ -1,0 +1,12 @@
+# 运行时直接依赖（人读、宽松，不锁版本，便于开发期升级）。
+# 可复现安装 / release 打包请用 requirements.lock.txt（精确版本）。
+flask
+flask-socketio
+flask-cors
+werkzeug
+httpx[http2]
+openai
+cryptography
+pillow
+websockets
+pyyaml>=6.0

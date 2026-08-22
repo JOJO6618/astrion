@@ -1,0 +1,15 @@
+// 覆盖 prismjs 默认主题（prism.css）的运算符底色。
+//
+// 默认主题中 `.token.operator / .entity / .url`（含 `.language-css .token.string`）
+// 带有 `background: hsla(0, 0%, 100%, .5)` 半透明白底——浅色主题下几乎不可见，
+// 深色主题下会渲染成一层灰色色块（典型如 `=` / `==` 出现灰底）。
+// 这里只去掉底色、保留字符变色，高亮颜色本身仍由 prism.css 提供。
+// 该覆盖全局生效：代码块、show_file 卡片、快捷窗口文件预览共用同一套 Prism 主题。
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  background: none;
+}

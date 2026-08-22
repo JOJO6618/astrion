@@ -1,0 +1,15 @@
+/* 主体容器，让三栏布局占满视口 */
+.main-container {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  height: var(--app-viewport);
+  align-items: stretch;
+  background: var(--surface-base);
+  color: var(--text-primary);
+}
+
+#app {
+  min-height: var(--app-viewport);
+  background: var(--surface-base);
+}

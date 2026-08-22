@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API 管理面板</title>
+    <link rel="stylesheet" href="/static/dist/assets/adminApi.css" />
+    <!-- 共享组件 SecondaryGate 被多入口抽为独立 chunk，其 CSS 需显式引入 -->
+    <link rel="stylesheet" href="/static/dist/assets/SecondaryGate.css" />
+    <script src="/static/security.js"></script>
+  </head>
+  <body>
+    <div id="admin-api-app"></div>
+    <script type="module" src="/static/dist/assets/adminApi.js"></script>
+  </body>
+</html>

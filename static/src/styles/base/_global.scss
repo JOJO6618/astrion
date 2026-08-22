@@ -1,0 +1,73 @@
+/* Global typography + helpers */
+
+html,
+body {
+    height: var(--app-viewport);
+}
+
+body {
+    font-family: 'Iowan Old Style', ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    background: var(--surface-base);
+    color: var(--text-primary);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+    font-family: "SF Pro Text", "Helvetica Neue", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+body[data-theme='dark'] {
+    background: var(--surface-base);
+    color: var(--text-primary);
+}
+
+/* Remove iOS/Android WebView default tap highlight */
+html,
+body,
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Global icon utility */
+.icon {
+    --icon-size: 1em;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    display: inline-block;
+    vertical-align: middle;
+    background-color: currentColor;
+    mask-image: var(--icon-src);
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    -webkit-mask-image: var(--icon-src);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+}
+
+.icon-sm {
+    --icon-size: 16px;
+}
+
+.icon-md {
+    --icon-size: 20px;
+}
+
+.icon-lg {
+    --icon-size: 24px;
+}
+
+.icon-xl {
+    --icon-size: 32px;
+}
+
+.icon-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}

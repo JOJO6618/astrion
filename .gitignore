@@ -1,0 +1,112 @@
+# OS & tools
+.DS_Store
+*.swp
+*.swo
+*.tmp
+*.log
+
+# Python artifacts
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime data (main agent)
+# 注意：运行态数据默认已迁出源码树到 ~/.astrion/astrion/<mode>/。
+# 以下条目用于忽略「通过具体目录变量指回源码树」或历史遗留的运行态目录。
+.wsl-poc/
+.astrion/
+.agents/
+logs/
+data/
+project/
+users/
+api/
+webapp.pid
+
+# Runtime data (sub agent)
+# 旧版 sub_agent/ 子项目已移除，子智能体逻辑现统一在 easyagent/。
+sub_agent_results/
+
+# Misc
+*.pid
+.env
+node_modules/
+static/dist/
+*.tsbuildinfo
+user_upload/
+skills/
+
+# 本地实验残留与历史文档归档（不进仓库）
+_experiments/
+
+# Ignore docs
+doc/
+
+# 部署级配置（含密钥引用 / 机器特定，本地保留，仓库仅留 .example 种子）
+config/host_workspaces.json
+config/custom_models.json
+config/auto_approval.json
+config/goal_review.json
+config/host_sandbox_policy.json
+
+# Claude Code local artifacts (settings, worktrees)
+.claude/
+easyagent/models.json
+
+# Playwright MCP 调试快照（工具自动生成，不进仓库）
+.playwright-mcp/
+
+# 子智能体交付物（过程材料，不进仓库）
+sub_agent_results/
+
+# ========= 公开发布排除项（本地保留使用，不纳入仓库）=========
+# 第三方技能包 / 旧版实现 / 实验 demo
+easyagent/
+demo/
+cli-react-demo/
+static/demo/
+static/liquid-glass-demo/
+static/liquid-glass-demo.html
+static/liquid-glass-kube.html
+static/old_version_backup/
+static/debug-theme.html
+
+# 个人开发笔记与研究资料
+docs/papers/
+docs/code_block_demo.html
+docs/sidebar_overlay_demo.html
+docs/sidebar_workspace_demo.html
+docs/cli_slash_commands_spec.md
+docs/cli_ui_display_spec.md
+docs/conversation_level_terminal_design.md
+docs/mcp-tool-config-guide.md
+docs/multi_agent_mode/05_data_model.md
+research/
+
+# 含私人信息 / 个人工作流约定（脱敏前不进仓库）
+CLAUDE.md
+api_doc/
+android-webview-app/
+config/host_workspaces.json.example
+upload_android_apk.sh
+scripts/zip_agents.sh
+scripts/qq_bot/
+test/test_mcp_integration.py
+.easyagent/
+
+# 实验 / 一次性脚本与测试残留
+scripts/kimi_usage_demo.py
+scripts/kimi_cache_test.py
+scripts/kimi_official_raw.py
+scripts/stream_chunk_probe.py
+scripts/mock_aliyun_quota_server.py
+scripts/api_tool_role_experiment.py
+test/upload_samples/
+test/all_icons/
+test/demo.html
+test/snake.html
+test/deepseek_ocr_tutorial.md
+
+# 运行态缓存
+cache/

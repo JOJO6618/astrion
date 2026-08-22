@@ -1,0 +1,11 @@
+{
+  "forbidden_commands": [
+    "rm -rf /",
+    "rm -rf ~",
+    "format",
+    "shutdown",
+    "reboot",
+    "kill -9",
+    "dd if="
+  ]
+}

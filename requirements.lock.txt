@@ -1,0 +1,21 @@
+# 锁定版本依赖（构建 / release 打包用）。由 scripts/gen_requirements_lock.py 生成。
+#
+# 与 requirements.txt 的关系：
+# - requirements.txt   人读、宽松，列出运行时直接依赖（不锁版本）
+# - requirements.lock.txt（本文件）  精确版本，供便携 release 打包与可复现安装
+#
+# 安装：pip install -r requirements.lock.txt
+# 更新：在已验证可用的环境执行 python -m scripts.gen_requirements_lock
+#
+# 注：这里只锁项目运行时直接依赖；其传递依赖由 pip 在安装时解析。
+
+flask==2.3.3
+flask-socketio==5.3.6
+flask-cors==3.0.10
+werkzeug==2.3.7
+httpx[http2]==0.28.1
+h2==4.1.0  # 由 httpx[http2] 引入
+openai==2.8.1
+cryptography==43.0.3
+pillow==9.3.0
+websockets==10.4

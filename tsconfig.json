@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "types": [
+      "vite/client"
+    ],
+    "paths": {
+      "@/*": ["static/src/*"]
+    }
+  },
+  "include": ["static/src/**/*.ts", "static/src/**/*.d.ts", "static/src/**/*.vue"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

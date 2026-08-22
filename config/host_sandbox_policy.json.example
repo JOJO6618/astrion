@@ -1,0 +1,28 @@
+{
+  "macos_writable_paths": [],
+  "macos_readable_extra_paths": [],
+  "macos_deny_read_paths": [
+    "~/.ssh",
+    "~/.aws",
+    "~/.azure",
+    "~/.gcp",
+    "~/.google",
+    "~/.kube",
+    "~/.docker",
+    "~/.gnupg",
+    "~/.npmrc",
+    "~/.netrc",
+    "~/.pypirc",
+    "~/.git-credentials",
+    "~/.bash_history",
+    "~/.zsh_history",
+    "~/.psql_history",
+    "~/.mysql_history",
+    "~/.pgpass",
+    "/Library/Keychains",
+    "~/Library/Keychains"
+  ],
+  "macos_deny_read_regexes": [
+    "^/.*\\.env(\\.[^/]*)?$"
+  ]
+}

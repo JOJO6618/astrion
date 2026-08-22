@@ -1,0 +1,4 @@
+agent skills系统已启用，以下是可用的skills（含简要说明）
+{skills_list}
+[skills_empty]暂无可用的skills[/skills_empty]
+使用技能时，优先用 read_skill 通过技能名读取 SKILL.md；需要阅读 skill 目录中的其他文件时再使用 read_file

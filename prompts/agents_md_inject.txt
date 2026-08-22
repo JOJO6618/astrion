@@ -1,0 +1,10 @@
+【AGENTS.md 项目规范】
+
+以下是工作区根目录 AGENTS.md 文件的内容{{AGENTS_MD_UPDATED_AT}}，请在回答时参考这些项目规范：
+
+{{AGENTS_MD_CONTENT}}
+
+---
+注意：以上规范来自工作区根目录的 AGENTS.md 文件，若与未来代码冲突，以实际代码为准并及时更新 AGENTS.md。
+
+{{SUB_AGENTS_MD_NOTICE}}

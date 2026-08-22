@@ -1,0 +1,105 @@
+// 拖拽上传覆盖层样式 - 多主题适配
+// 经典色: 橙色 accent | 浅色: 黑色 | 深色: 白色
+
+.drag-upload-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--theme-overlay-scrim);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.drag-upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 64px;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background: var(--highlight);
+  animation: drag-pulse 1.5s ease-in-out infinite;
+}
+
+.drag-upload-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--accent);
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.drag-upload-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.drag-upload-hint {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+// 动画 - 使用主题色的脉冲效果（颜色走 --pulse-ring，随主题自动适配）
+@keyframes drag-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--pulse-ring);
+  }
+  50% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+// 过渡动画
+.drag-overlay-fade-enter-active,
+.drag-overlay-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.drag-overlay-fade-enter-from,
+.drag-overlay-fade-leave-to {
+  opacity: 0;
+}
+
+// 浅色主题(light) - 使用黑色强调
+:root[data-theme='light'] {
+  .drag-upload-content {
+    border-color: var(--text-primary);
+    background: var(--highlight);
+  }
+
+  .drag-upload-icon {
+    color: var(--text-primary);
+  }
+
+  .drag-upload-hint {
+    color: var(--text-primary);
+  }
+}
+
+// 经典色主题(classic) - 提示文字改为黑色
+:root[data-theme='classic'],
+:root:not([data-theme]) {
+  .drag-upload-hint {
+    color: var(--text-primary);
+  }
+}
+
+// 深色主题(dark) - 使用白色强调
+:root[data-theme='dark'] {
+  .drag-upload-content {
+    border-color: var(--text-primary);
+    background: var(--highlight);
+  }
+
+  .drag-upload-icon {
+    color: var(--text-primary);
+  }
+}

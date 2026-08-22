@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>移动端半覆盖面板（浮动按钮）</title>
+    <style>
+      :root {
+        --bg: #f4efe7;
+        --card: #fffdf8;
+        --accent: #e06a3a;
+        --text: #2f251b;
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        font-family: 'SF Pro Display', 'PingFang SC', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-area {
+        flex: 1;
+        padding: 18px 18px calc(90px + env(safe-area-inset-bottom, 0px));
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .chat-headline {
+        font-size: 22px;
+        margin: 0 0 8px;
+      }
+
+      .message {
+        padding: 12px 14px;
+        border-radius: 16px;
+        line-height: 1.55;
+        max-width: 90%;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .message.bot {
+        background: var(--card);
+      }
+
+      .message.user {
+        background: #fff;
+        margin-left: auto;
+      }
+
+      .composer-placeholder {
+        position: sticky;
+        bottom: 0;
+        background: linear-gradient(180deg, rgba(244, 239, 231, 0), rgba(244, 239, 231, 0.95));
+        padding: 12px 0 0;
+      }
+
+      .composer-shell {
+        background: #fff;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
+      .composer-shell textarea {
+        flex: 1;
+        border: none;
+        resize: none;
+        font-size: 15px;
+        outline: none;
+      }
+
+      .composer-shell button {
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+      }
+
+      /* 悬浮主按钮 */
+      .fab {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 60;
+      }
+
+      .fab-toggle {
+        width: 52px;
+        height: 52px;
+        border-radius: 26px;
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        font-size: 22px;
+        box-shadow: 0 14px 38px rgba(224, 106, 58, 0.35);
+        cursor: pointer;
+      }
+
+      .fab-menu {
+        position: absolute;
+        top: 64px;
+        left: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 16px;
+        background: rgba(47, 37, 27, 0.95);
+        box-shadow: 0 18px 48px rgba(8, 6, 4, 0.45);
+        transform-origin: top left;
+        transform: scale(0.8) translateY(-10px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+
+      .fab-menu.open {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        pointer-events: auto;
+      }
+
+      .fab-menu button {
+        border: none;
+        background: transparent;
+        color: #fff;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border-radius: 12px;
+      }
+
+      .fab-menu button span {
+        font-size: 13px;
+        opacity: 0.8;
+      }
+
+      .fab-menu button:hover,
+      .fab-menu button.active {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .sheet {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        visibility: hidden;
+        transition: visibility 0.2s;
+      }
+
+      .sheet.is-visible {
+        pointer-events: auto;
+        visibility: visible;
+      }
+
+      .sheet-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(11, 8, 5, 0.35);
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+
+      .sheet.is-visible .sheet-backdrop {
+        opacity: 1;
+      }
+
+      .sheet-panel {
+        position: absolute;
+        top: clamp(12px, 3vh, 28px);
+        bottom: clamp(12px, 3vh, 28px);
+        width: min(420px, 88vw);
+        border-radius: 22px;
+        background: #fffdf8;
+        box-shadow: 0 24px 60px rgba(20, 12, 4, 0.35);
+        display: flex;
+        flex-direction: column;
+        transform: translateX(-120%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .sheet[data-side='left'] .sheet-panel {
+        left: clamp(12px, 3vw, 24px);
+      }
+
+      .sheet[data-side='right'] .sheet-panel {
+        right: clamp(12px, 3vw, 24px);
+        transform: translateX(120%);
+      }
+
+      .sheet.is-visible .sheet-panel {
+        transform: translateX(0);
+      }
+
+      .sheet-header {
+        padding: 18px 22px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .sheet-title {
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .close-btn {
+        border: none;
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 999px;
+        width: 34px;
+        height: 34px;
+        font-size: 18px;
+        cursor: pointer;
+      }
+
+      .sheet-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .section-card {
+        border-radius: 16px;
+        background: rgba(47, 37, 27, 0.04);
+        border: 1px solid rgba(47, 37, 27, 0.08);
+        padding: 14px 16px;
+      }
+
+      .status-pill {
+        font-size: 13px;
+        color: rgba(0, 0, 0, 0.55);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="fab">
+      <button class="fab-toggle" id="fabToggle">☰</button>
+      <div class="fab-menu" id="fabMenu">
+        <button data-open="conversation-sheet">
+          📚
+          <div>
+            对话记录
+            <span>历史 + 搜索</span>
+          </div>
+        </button>
+        <button data-open="workspace-sheet">
+          🧰
+          <div>
+            工作台
+            <span>文件 / 待办 / 子体</span>
+          </div>
+        </button>
+        <button data-open="focus-sheet">
+          👁️
+          <div>
+            聚焦面板
+            <span>最多 3 个文件</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <main class="chat-area">
+      <h1 class="chat-headline">对话区域</h1>
+      <div class="message bot">你好！移动端默认只显示聊天内容。</div>
+      <div class="message user">其它面板怎么进入？</div>
+      <div class="message bot">点击左上角的悬浮按钮，展开二级菜单即可。</div>
+      <div class="message bot">每个选项会以半覆盖弹层的方式显示对应面板。</div>
+
+      <div class="composer-placeholder">
+        <div class="composer-shell">
+          <textarea rows="1" placeholder="输入内容…"></textarea>
+          <button>↗</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- 对话记录 -->
+    <section class="sheet" data-side="left" id="conversation-sheet">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel">
+        <div class="sheet-header">
+          <div>
+            <div class="sheet-title">对话记录</div>
+            <div class="status-pill">最近 10 条 · 可搜索</div>
+          </div>
+          <button class="close-btn" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="section-card">
+            <strong>新建对话</strong>
+            <p>用于创建新的任务空间</p>
+          </div>
+          <div class="section-card">
+            <p>#1243 Bug 跟踪 · 刚刚</p>
+          </div>
+          <div class="section-card">
+            <p>#1235 UI 迭代 · 30 分钟前</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 三合一工作台 -->
+    <section class="sheet" data-side="left" id="workspace-sheet">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel">
+        <div class="sheet-header">
+          <div>
+            <div class="sheet-title">三合一工作台</div>
+            <div class="status-pill">Logo 卡片 + 文件 + 待办 + 子体</div>
+          </div>
+          <button class="close-btn" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="section-card">
+            <strong>Astrion v2.4</strong>
+            <p>思考模式 · 已连接</p>
+          </div>
+          <div class="section-card">
+            <h4>项目文件</h4>
+            <p>/src/App.vue</p>
+            <p>/stores/ui.ts</p>
+          </div>
+          <div class="section-card">
+            <h4>待办</h4>
+            <p>1. 适配移动端布局</p>
+            <p>2. 补充交互说明</p>
+          </div>
+          <div class="section-card">
+            <h4>子智能体</h4>
+            <p>#07 日志总结 · 进行中</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 聚焦面板 -->
+    <section class="sheet" data-side="right" id="focus-sheet">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel">
+        <div class="sheet-header">
+          <div>
+            <div class="sheet-title">聚焦面板</div>
+            <div class="status-pill">最多 3 个热点文件</div>
+          </div>
+          <button class="close-btn" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="section-card">
+            <h4>App.vue</h4>
+            <p>移动端 Teleport 逻辑</p>
+          </div>
+          <div class="section-card">
+            <h4>ui.ts</h4>
+            <p>activeMobileSheet 状态</p>
+          </div>
+          <div class="section-card">
+            <h4>styles/_responsive.scss</h4>
+            <p>半覆盖动画与遮罩</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const fabToggle = document.getElementById('fabToggle');
+      const fabMenu = document.getElementById('fabMenu');
+      const sheetButtons = document.querySelectorAll('.fab-menu [data-open]');
+      const sheets = document.querySelectorAll('.sheet');
+
+      const closeAllSheets = () => {
+        sheets.forEach(sheet => sheet.classList.remove('is-visible'));
+        sheetButtons.forEach(btn => btn.classList.remove('active'));
+      };
+
+      fabToggle.addEventListener('click', () => {
+        fabMenu.classList.toggle('open');
+      });
+
+      sheetButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.getAttribute('data-open');
+          const sheet = document.getElementById(targetId);
+          if (!sheet) return;
+          const alreadyOpen = sheet.classList.contains('is-visible');
+          closeAllSheets();
+          fabMenu.classList.remove('open');
+          if (!alreadyOpen) {
+            sheet.classList.add('is-visible');
+            btn.classList.add('active');
+          }
+        });
+      });
+
+      document.querySelectorAll('[data-close]').forEach(el => {
+        el.addEventListener('click', () => {
+          const sheet = el.closest('.sheet');
+          if (!sheet) return;
+          sheet.classList.remove('is-visible');
+          sheetButtons.forEach(btn => {
+            if (btn.getAttribute('data-open') === sheet.id) {
+              btn.classList.remove('active');
+            }
+          });
+        });
+      });
+
+      document.addEventListener('click', event => {
+        if (!fabMenu.contains(event.target) && event.target !== fabToggle) {
+          fabMenu.classList.remove('open');
+        }
+      });
+    </script>
+  </body>
+</html>

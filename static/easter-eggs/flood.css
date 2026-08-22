@@ -1,0 +1,38 @@
+.easter-egg-overlay .easter-egg-water {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.easter-egg-overlay .easter-egg-water-container {
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.easter-egg-overlay .easter-egg-water-container .wave {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 200%;
+    height: 100%;
+    background-repeat: repeat-x;
+    background-position: bottom;
+    opacity: 0.9;
+}
+
+.easter-egg-overlay .easter-egg-water-container .wave.wave1 {
+    filter: blur(0.5px);
+}
+
+.easter-egg-overlay .easter-egg-water-container .wave.wave2 {
+    filter: blur(1px);
+}
+
+.easter-egg-overlay .easter-egg-water-container .wave.wave3 {
+    filter: blur(1.5px);
+}

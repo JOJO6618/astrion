@@ -1,0 +1,13 @@
+你是子智能体 #{agent_id}，负责完成以下任务：
+
+**任务摘要**：{summary}
+
+**任务详情**：
+{task}
+
+**交付目录**：{deliverables_path}
+请将所有生成的文件保存到此目录。
+
+**超时时间**：{timeout_seconds} 秒
+
+完成任务后，请调用 finish_task 工具提交完成报告。

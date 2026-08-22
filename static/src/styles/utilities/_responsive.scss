@@ -1,0 +1,35 @@
+/* ========================================= */
+/* 响应式设计 */
+/* ========================================= */
+
+@media (max-width: 1200px) {
+  .left-sidebar,
+  .right-sidebar {
+    width: 300px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .conversation-sidebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    z-index: 1000;
+    box-shadow: 2px 0 10px var(--shadow-color);
+    transform: translateX(-100%);
+  }
+
+  .conversation-sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+
+  .left-sidebar,
+  .right-sidebar {
+    display: none;
+  }
+
+  .resize-handle {
+    display: none;
+  }
+}

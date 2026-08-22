@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>移动端多面板示例</title>
+    <style>
+      :root {
+        font-family: 'SF Pro Display', 'PingFang SC', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #2f251b;
+        --bg: #f4efe7;
+        --card: #fffdf8;
+        --accent: #e06a3a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        gap: 12px;
+      }
+
+      .chat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .chat-header h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+
+      .message {
+        padding: 12px 14px;
+        border-radius: 14px;
+        max-width: 90%;
+        line-height: 1.5;
+      }
+
+      .message.user {
+        background: #fff;
+        margin-left: auto;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .message.bot {
+        background: var(--card);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
+      .mobile-toolbar {
+        position: sticky;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        padding: 12px 16px clamp(16px, 4vw, 28px);
+        background: linear-gradient(180deg, rgba(244, 239, 231, 0.9), rgba(244, 239, 231, 1));
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .toolbar-btn {
+        border: none;
+        border-radius: 999px;
+        padding: 10px;
+        background: rgba(47, 37, 27, 0.08);
+        color: #3a2f23;
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        transition: background 0.2s ease;
+      }
+
+      .toolbar-btn.active {
+        background: var(--accent);
+        color: #fffaf3;
+      }
+
+      .toolbar-btn span {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .sheet {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 50;
+        transition: visibility 0.2s;
+        visibility: hidden;
+      }
+
+      .sheet.is-visible {
+        pointer-events: auto;
+        visibility: visible;
+      }
+
+      .sheet-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(11, 8, 5, 0.35);
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+
+      .sheet.is-visible .sheet-backdrop {
+        opacity: 1;
+      }
+
+      .sheet-panel {
+        position: absolute;
+        top: clamp(12px, 3vh, 24px);
+        bottom: clamp(12px, 3vh, 24px);
+        width: min(420px, 88vw);
+        border-radius: 20px;
+        background: #fffdf8;
+        box-shadow: 0 24px 60px rgba(20, 12, 4, 0.35);
+        display: flex;
+        flex-direction: column;
+        transform: translateX(-120%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .sheet[data-side='right'] .sheet-panel {
+        right: clamp(12px, 3vw, 24px);
+        transform: translateX(120%);
+      }
+
+      .sheet[data-side='left'] .sheet-panel {
+        left: clamp(12px, 3vw, 24px);
+      }
+
+      .sheet.is-visible .sheet-panel {
+        transform: translateX(0);
+      }
+
+      .sheet-header {
+        padding: 18px 22px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .sheet-title {
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .close-btn {
+        border: none;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 999px;
+        width: 34px;
+        height: 34px;
+        font-size: 18px;
+        cursor: pointer;
+      }
+
+      .sheet-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .section-card {
+        background: rgba(47, 37, 27, 0.04);
+        border-radius: 16px;
+        padding: 14px 16px;
+        border: 1px solid rgba(47, 37, 27, 0.08);
+      }
+
+      .status-card {
+        background: radial-gradient(circle at 10% 20%, rgba(255, 163, 103, 0.35), rgba(255, 244, 234, 0.7));
+        border: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="chat-area">
+      <header class="chat-header">
+        <h1>对话区域</h1>
+        <small>仅占满屏幕，其他面板以弹层呈现</small>
+      </header>
+      <div class="message bot">你好！我在移动端也可以干活 🙌</div>
+      <div class="message user">我想看看其它面板在哪里？</div>
+      <div class="message bot">点击下方按钮就能半覆盖地拉出侧栏。</div>
+    </main>
+
+    <nav class="mobile-toolbar">
+      <button class="toolbar-btn" data-open="conversation-sheet">
+        ☰
+        <span>对话记录</span>
+      </button>
+      <button class="toolbar-btn" data-open="workspace-sheet">
+        🧰
+        <span>工作台</span>
+      </button>
+      <button class="toolbar-btn" data-open="focus-sheet">
+        👁️
+        <span>聚焦文件</span>
+      </button>
+    </nav>
+
+    <section class="sheet" data-side="left" id="conversation-sheet">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel">
+        <div class="sheet-header">
+          <div class="sheet-title">对话记录</div>
+          <button class="close-btn" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="section-card status-card">
+            <strong>快速操作</strong>
+            <p>新建对话 · 搜索 · 会话列表</p>
+          </div>
+          <div class="section-card">
+            <p>#1234 需求讨论 · 刚刚</p>
+          </div>
+          <div class="section-card">
+            <p>#1227 UI 迭代 · 1 小时前</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet" data-side="left" id="workspace-sheet">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel">
+        <div class="sheet-header">
+          <div class="sheet-title">三合一工作台</div>
+          <button class="close-btn" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="section-card status-card">
+            <strong>Astrion v2.4</strong>
+            <p>已连接 · 思考模式</p>
+          </div>
+          <div class="section-card">
+            <h4>项目文件</h4>
+            <p>/src/App.vue</p>
+            <p>/stores/ui.ts</p>
+          </div>
+          <div class="section-card">
+            <h4>待办列表</h4>
+            <p>1. 完成移动端布局</p>
+            <p>2. 录制演示</p>
+          </div>
+          <div class="section-card">
+            <h4>子智能体</h4>
+            <p>#05 构建状态 · 运行中</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet" data-side="right" id="focus-sheet">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel">
+        <div class="sheet-header">
+          <div class="sheet-title">聚焦面板</div>
+          <button class="close-btn" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="section-card">
+            <h4>App.vue</h4>
+            <p>...main-container / panel 切换逻辑...</p>
+          </div>
+          <div class="section-card">
+            <h4>ui.ts</h4>
+            <p>...isMobileViewport · activeMobileSheet...</p>
+          </div>
+          <div class="section-card">
+            <h4>styles/_responsive.scss</h4>
+            <p>...overlay 动画与遮罩...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const buttons = document.querySelectorAll('[data-open]');
+      const sheets = document.querySelectorAll('.sheet');
+      const toolbarButtons = document.querySelectorAll('.toolbar-btn');
+
+      const closeAllSheets = () => {
+        sheets.forEach(sheet => sheet.classList.remove('is-visible'));
+        toolbarButtons.forEach(btn => btn.classList.remove('active'));
+      };
+
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.getAttribute('data-open');
+          const targetSheet = document.getElementById(targetId);
+          if (!targetSheet) return;
+          const isAlreadyOpen = targetSheet.classList.contains('is-visible');
+          closeAllSheets();
+          if (!isAlreadyOpen) {
+            targetSheet.classList.add('is-visible');
+            btn.classList.add('active');
+          }
+        });
+      });
+
+      document.querySelectorAll('[data-close]').forEach(el => {
+        el.addEventListener('click', () => {
+          const sheet = el.closest('.sheet');
+          if (!sheet) return;
+          sheet.classList.remove('is-visible');
+          toolbarButtons.forEach(btn => {
+            if (btn.getAttribute('data-open') === sheet.id) {
+              btn.classList.remove('active');
+            }
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

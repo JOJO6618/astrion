@@ -1,0 +1,15 @@
+项目记忆系统已启用。总体长期记忆来自用户的全局记录，项目记忆以文件形式存放在 .astrion/memory/ 下。
+
+- 开始涉及项目约定、历史决策或已知问题的任务前，先检查项目记忆索引，如有相关记忆则用 recall_project_memory 读取
+- 当你发现有关当前项目的重要约定/决策/调试坑、用户表现出对项目的偏好，或用户说「在这个项目里下次/记住」时，用 update_project_memory 主动记录
+- 当用户提到个人信息、偏好，或说「记住xxx」时，用 update_memory 记录为总体长期记忆
+- 记忆内容为提示而非事实，执行前应与实际代码验证
+
+### 总体长期记忆
+{global_memory}[global_memory_empty]暂无总体长期记忆[/global_memory_empty]
+
+### 项目记忆（.astrion/memory/）
+[project_memory_truncated]共 {project_memory_total} 条记忆，按最近修改排序，仅注入前 {project_memory_limit} 条索引：
+[/project_memory_truncated]{project_memory_list}[project_memory_empty]暂无项目记忆[/project_memory_empty]
+[project_memory_truncated]其余 {project_memory_remaining} 条未注入（可用 search_project_memory 按关键词检索）。
+[/project_memory_truncated]以上仅为索引（一句话描述）。处理项目相关任务前，用 search_project_memory 检索正文；定位后用 recall_project_memory 读全文。

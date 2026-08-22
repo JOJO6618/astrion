@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Web Speech API 诊断</title>
+  <style>
+    body { font-family: system-ui; padding: 24px; line-height: 1.6; }
+    button { padding: 12px 24px; font-size: 16px; cursor: pointer; }
+    #log { margin-top: 20px; padding: 16px; background: #f5f5f5; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+    .ok { color: #16a34a; }
+    .err { color: #dc2626; }
+    .warn { color: #d97706; }
+  </style>
+</head>
+<body>
+  <h2>Web Speech API 诊断</h2>
+  <p>点击按钮后对着麦克风说话，等待 3-5 秒，观察下方日志。</p>
+  <button id="btn" onclick="startTest()">开始录音测试</button>
+  <button onclick="stopTest()">停止</button>
+  <div id="log"></div>
+
+  <script>
+    let r = null;
+    const logEl = document.getElementById('log');
+
+    function log(msg, type) {
+      const t = type ? ` class="${type}"` : '';
+      logEl.innerHTML += `<span${t}>[${new Date().toLocaleTimeString()}] ${msg}</span>\n`;
+    }
+
+    function startTest() {
+      logEl.innerHTML = '';
+      log('检测支持...');
+
+      const hasSR = 'SpeechRecognition' in window;
+      const hasWebkit = 'webkitSpeechRecognition' in window;
+      log(`SpeechRecognition: ${hasSR}, webkitSpeechRecognition: ${hasWebkit}`);
+
+      if (!hasSR && !hasWebkit) {
+        log('浏览器不支持 SpeechRecognition', 'err');
+        return;
+      }
+
+      const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      r = new Ctor();
+      r.lang = 'zh-CN';
+      r.continuous = true;
+      r.interimResults = true;
+      r.maxAlternatives = 1;
+
+      let resultCount = 0;
+
+      r.onstart = () => log('✅ onstart: 录音已开始', 'ok');
+      r.onaudiostart = () => log('✅ onaudiostart: 音频捕获开始', 'ok');
+      r.onsoundstart = () => log('✅ onsoundstart: 检测到声音', 'ok');
+      r.onspeechstart = () => log('✅ onspeechstart: 检测到语音', 'ok');
+
+      r.onresult = (event) => {
+        resultCount++;
+        log(`✅ onresult #${resultCount}: ${event.results.length} 条结果`);
+        for (let i = 0; i < event.results.length; i++) {
+          const alt = event.results[i][0];
+          const isFinal = event.results[i].isFinal;
+          log(`  result[${i}]: "${alt.transcript}" (final=${isFinal}, conf=${alt.confidence?.toFixed(2) ?? '?'})`);
+        }
+      };
+
+      r.onspeechend = () => log('onspeechend: 语音结束');
+      r.onsoundend = () => log('onsoundend: 声音结束');
+      r.onaudioend = () => log('onaudioend: 音频捕获结束');
+
+      r.onerror = (event) => {
+        log(`❌ onerror: ${event.error}`, 'err');
+        if (event.error === 'not-allowed') {
+          log('提示: 麦克风权限被拒绝，请检查浏览器权限设置', 'warn');
+        }
+        if (event.error === 'network') {
+          log('提示: 网络错误，Chrome 的语音识别依赖 Google 云端服务', 'warn');
+        }
+        if (event.error === 'no-speech') {
+          log('提示: 没有检测到语音，请确保麦克风正常工作且说话清晰', 'warn');
+        }
+      };
+
+      r.onend = () => {
+        log(`onend: 录音结束 (共收到 ${resultCount} 次 onresult)`);
+        if (resultCount === 0) {
+          log('⚠️ 警告: 录音已结束但没有任何识别结果！', 'warn');
+          log('可能原因:', 'warn');
+          log('  1. 网络无法访问 Google Speech API (在中国大陆最常见)', 'warn');
+          log('  2. 说话时间太短或音量太低', 'warn');
+          log('  3. Chrome 语音识别服务暂时不可用', 'warn');
+        }
+      };
+
+      try {
+        r.start();
+        log('r.start() 调用成功');
+      } catch (e) {
+        log(`❌ start() 失败: ${e.message}`, 'err');
+      }
+    }
+
+    function stopTest() {
+      if (r) {
+        try { r.stop(); log('r.stop() 调用成功'); } catch (e) { log(`stop() 失败: ${e.message}`); }
+      }
+    }
+  </script>
+</body>
+</html>

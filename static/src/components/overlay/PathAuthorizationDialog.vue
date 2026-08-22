@@ -1,0 +1,96 @@
+<template>
+  <transition name="path-auth-fade">
+    <div v-if="open" class="overlay-backdrop">
+      <div class="overlay-card">
+        <div class="overlay-header">
+          <h3>路径授权</h3>
+          <button type="button" @click="$emit('close')">×</button>
+        </div>
+        <div class="mode-switch">
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: mode === 'writable' }"
+            @click="$emit('update:mode', 'writable')"
+          >
+            可读可写
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: mode === 'readable' }"
+            @click="$emit('update:mode', 'readable')"
+          >
+            仅可读
+          </button>
+        </div>
+        <p class="hint">
+          {{
+            mode === 'writable'
+              ? '可读可写路径在 workspace-write 沙箱中可写入，只读沙箱中仅可读。'
+              : '仅可读路径在只读沙箱中会被加入允许读取列表；工作区可写沙箱默认已可读。'
+          }}
+        </p>
+        <textarea
+          class="path-input"
+          :value="value"
+          @input="$emit('update:value', ($event.target as HTMLTextAreaElement).value)"
+          :placeholder="
+            mode === 'writable'
+              ? '每行一个路径，例如：~/Desktop/agents-export'
+              : '每行一个路径，例如：~/Documents/reference'
+          "
+        />
+        <div class="actions">
+          <button type="button" class="btn" @click="$emit('save')" :disabled="saving">保存</button>
+          <button type="button" class="btn btn-muted" @click="$emit('close')">取消</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+</template>
+
+<script setup lang="ts">
+defineProps<{ open: boolean; value: string; mode: 'writable' | 'readable'; saving?: boolean }>();
+defineEmits<{
+  (e: 'close'): void;
+  (e: 'save'): void;
+  (e: 'update:value', v: string): void;
+  (e: 'update:mode', v: 'writable' | 'readable'): void;
+}>();
+</script>
+
+<style scoped>
+.overlay-backdrop { position: fixed; inset: 0; background: var(--overlay-scrim); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.overlay-card { width: min(680px, 92vw); background: var(--theme-surface-soft); border: 1px solid var(--theme-control-border); border-radius: 12px; padding: 12px; }
+.overlay-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.overlay-header h3 { margin: 0; font-size: 16px; }
+.overlay-header button { border: none; background: transparent; font-size: 20px; cursor: pointer; }
+.hint { font-size: 12px; color: var(--text-secondary); margin: 0 0 8px 0; }
+.mode-switch { display: inline-flex; border: 1px solid var(--theme-control-border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.mode-btn { border: none; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+.mode-btn.active { background: var(--theme-tab-active); font-weight: 600; }
+.path-input { width: 100%; min-height: 220px; resize: vertical; border: 1px solid var(--theme-control-border); border-radius: 8px; padding: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.actions { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+.btn { border: 1px solid var(--theme-control-border); background: var(--theme-tab-active); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.btn-muted { background: transparent; }
+
+.path-auth-fade-enter-active,
+.path-auth-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.path-auth-fade-enter-from,
+.path-auth-fade-leave-to {
+  opacity: 0;
+}
+
+.path-auth-fade-enter-from .overlay-card,
+.path-auth-fade-leave-to .overlay-card {
+  transform: translateY(8px) scale(0.98);
+}
+
+.overlay-card {
+  transition: transform 0.2s ease;
+}
+</style>

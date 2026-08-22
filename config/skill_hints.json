@@ -1,0 +1,69 @@
+{
+  "terminal-guide": {
+    "keywords": [
+      "终端", "terminal", "会话", "session", "持久", "持久化终端",
+      "terminal_session", "terminal_input", "terminal_snapshot", "output_wait",
+      "开发服务器", "npm run dev", "常驻服务", "日志跟踪", "tail -f",
+      "cd 后执行", "多步命令", "环境变量后执行", "虚拟环境后执行",
+      "dev server", "persistent terminal", "tail -f", "multi-step shell"
+    ],
+    "hint": "检测到用户可能需要持久化终端（会话状态、多步串行或常驻服务）。如果情况符合，必须先阅读 terminal-guide skill。"
+  },
+  "sub-agent-guide": {
+    "keywords": [
+      "并行", "同时", "一起", "分别", "多个任务", "子智能体", "sub agent",
+      "调研", "搜集", "收集信息", "分析多个", "批量","调查","逐一",
+      "parallel", "simultaneously", "multiple tasks", "sub-agent",
+      "research", "gather", "collect", "analyze multiple"
+    ],
+    "hint": "检测到用户可能需要并行处理多个独立任务，可能创建子智能体为最优解。如果情况符合，必须先阅读 sub-agent-guide skill。"
+  },
+  "run-command-guide": {
+    "keywords": [
+      "run_command", "runcommand", "后台指令", "后台命令", "命令后台运行", "后台执行","git","下载","仓库",
+      "command_id", "wait_runcommand_id", "sleep wait_runcommand_id", "run_in_background",
+      "超时", "timeout", "终端命令", "shell命令", "执行命令",
+      "npm run build", "pip install", "brew install", "apt install", "cargo build", "mvn package",
+      "长时间命令", "长时间任务", "构建任务", "安装依赖", "后台等待",
+      "background command", "run command", "background run_command"
+    ],
+    "hint": "检测到用户可能需要使用 run_command（尤其是后台模式处理长时间命令，如构建/安装；以及 command_id 与 sleep(wait_runcommand_id)）。如果情况符合，必须先阅读 run-command-guide skill。"
+  },
+  "docx": {
+    "keywords": [
+      "word", "docx", "文档", "报告", "合同", "简历", "信函", "备忘录",
+      "模板", "格式化", "表格", "目录", "页眉", "页脚", "修订", "批注",
+      "document", "report", "contract", "resume", "letter", "memo",
+      "template", "formatting", "table", "toc", "header", "footer",
+      "tracked changes", "comments"
+    ],
+    "hint": "检测到用户可能需要处理 Word 文档。如果情况符合，必须先阅读 docx skill。"
+  },
+  "frontend-design": {
+    "keywords": [
+      "网页", "前端", "界面", "UI", "页面", "组件", "网站", "落地页",
+      "仪表板", "dashboard", "react", "vue", "html", "css", "样式",
+      "美化", "设计","画",
+      "webpage", "frontend", "interface", "page", "component", "website",
+      "landing page", "styling", "beautify", "design"
+    ],
+    "hint": "检测到用户需要构建web前端界面。如果情况符合，必须先阅读 frontend-design skill。"
+  },
+  "skill-creator": {
+    "keywords": [
+      "创建技能", "新技能", "agent skill", "扩展能力", "自定义功能", "打包",
+      "技能开发",
+      "create skill", "new skill", "extend capability",
+      "custom functionality", "package", "skill development"
+    ],
+    "hint": "检测到用户想要创建新的 skill。建议先阅读 skill-creator skill。"
+  },
+  "workflow-authoring": {
+    "keywords": [
+      "工作流", "workflow", "WORKFLOW.md", "流程编排", "审核节点", "分支节点",
+      "创建工作流", "新建工作流", "修改工作流", "工作流文档", "save_workflow",
+      "create workflow", "workflow pipeline", "review node", "branch node"
+    ],
+    "hint": "检测到用户可能需要创建或修改工作流（WORKFLOW.md）。如果情况符合，必须先阅读 workflow-authoring skill。"
+  }
+}

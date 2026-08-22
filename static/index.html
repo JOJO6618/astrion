@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Astrion</title>
+        <link rel="icon" type="image/svg+xml" href="/static/astrion-avatar.svg">
+        <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+        <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+        <link rel="stylesheet" href="/static/style.css">
+        <link rel="stylesheet" href="/static/easter-eggs/flood.css">
+        <link rel="stylesheet" href="/static/easter-eggs/snake.css">
+    </head>
+    <body>
+        <div id="app"></div>
+        <script>
+        // 全局复制代码块函数
+        function decodeHtmlEntities(text) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = text || '';
+            return textarea.value;
+        }
+        function copyCodeBlock(blockId) {
+            const codeElement = document.querySelector(`[data-code-id="${blockId}"]`);
+            if (!codeElement) return;
+            const button = document.querySelector(`[data-code="${blockId}"]`);
+            if (button && button.classList.contains('copied')) return;
+            const raw = codeElement?.dataset?.originalCode || codeElement?.textContent || '';
+            const codeContent = decodeHtmlEntities(raw);
+            if (!button) {
+                navigator.clipboard.writeText(codeContent).catch((err) => console.error('复制失败:', err));
+                return;
+            }
+            if (!button.dataset.originalLabel) {
+                button.dataset.originalLabel = button.getAttribute('aria-label') || '复制代码';
+            }
+            navigator.clipboard.writeText(codeContent).then(() => {
+                button.classList.add('copied');
+                button.setAttribute('aria-label', '已复制');
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.setAttribute('aria-label', button.dataset.originalLabel);
+                }, 2000);
+            }).catch((err) => {
+                console.error('复制失败:', err);
+                button.classList.remove('copied');
+                button.setAttribute('aria-label', button.dataset.originalLabel || '复制代码');
+            });
+        }
+        </script>
+        <script src="/static/easter-eggs/registry.js"></script>
+        <script src="/static/easter-eggs/flood.js"></script>
+        <script src="/static/easter-eggs/snake.js"></script>
+        <script src="/static/security.js"></script>
+        <script type="module" src="/static/dist/assets/main.js"></script>
+    </body>
+</html>

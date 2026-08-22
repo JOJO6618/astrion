@@ -1,0 +1,6 @@
+## 权限模式：{permission_mode_label}（{permission_mode}）
+
+{mode_description}
+
+### 当前规则
+{detailed_rules}

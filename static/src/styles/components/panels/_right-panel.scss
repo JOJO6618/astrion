@@ -1,0 +1,861 @@
+/* 聚焦文件面板 */
+.sidebar.right-sidebar {
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-surface-soft);
+    transition:
+        width 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        min-width 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.22s ease,
+        transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.right-sidebar .sidebar-header {
+    padding: 16px 20px 8px;
+    border-bottom: none;
+    background: transparent;
+    position: static;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sidebar.right-sidebar .sidebar-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.focused-files {
+    flex: 1 1 auto;
+    padding: 10px 20px 20px;
+    overflow-y: auto;
+}
+
+.approval-panel-body {
+    flex: 1 1 auto;
+    padding: 10px 20px 20px;
+    overflow-y: auto;
+}
+
+.focus-close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 16px;
+    background: var(--hover-bg);
+    color: var(--text-primary);
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.approval-close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 16px;
+    background: var(--hover-bg);
+    color: var(--text-primary);
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.git-changes-panel {
+    flex: 0 0 auto;
+    min-width: 340px;
+    max-width: min(600px, 52vw);
+    height: var(--app-viewport);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-rail);
+    border-left: 1px solid var(--border-default);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+.git-changes-panel__header {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.git-changes-panel__title {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.git-changes-panel__branch,
+.git-changes-panel__upstream {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.git-changes-panel__upstream,
+.git-changes-panel__arrow {
+    color: var(--text-secondary);
+}
+
+.git-changes-panel__summary,
+.git-change-file__stats {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.git-changes-panel__add {
+    color: var(--git-diff-add-text);
+}
+
+.git-changes-panel__del {
+    color: var(--git-diff-del-text);
+}
+
+.git-changes-panel__close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.git-changes-panel__close:hover {
+    background: var(--theme-tab-active);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.git-changes-panel__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+    scrollbar-color: color-mix(in srgb, var(--text-secondary) 55%, transparent)
+        color-mix(in srgb, var(--theme-surface-muted) 70%, transparent);
+    scrollbar-width: thin;
+}
+
+.git-changes-panel * {
+    scrollbar-color: color-mix(in srgb, var(--text-secondary) 55%, transparent)
+        color-mix(in srgb, var(--theme-surface-muted) 70%, transparent);
+    scrollbar-width: thin;
+}
+
+.git-changes-panel::-webkit-scrollbar,
+.git-changes-panel ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.git-changes-panel::-webkit-scrollbar-track,
+.git-changes-panel ::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--theme-surface-muted) 70%, transparent);
+    border-radius: 999px;
+    margin: 8px;
+}
+
+.git-changes-panel::-webkit-scrollbar-thumb,
+.git-changes-panel ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.git-changes-panel__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+
+    &-svg {
+        width: 36px;
+        height: 36px;
+        color: var(--text-tertiary);
+        opacity: 0.55;
+    }
+}
+
+.git-changes-panel__empty--error {
+    color: var(--state-danger);
+}
+
+.git-change-file {
+    margin-bottom: 14px;
+}
+
+.git-change-file__header {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.git-change-file__title {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+
+.git-change-file__open-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.git-change-file__open-btn {
+    width: 48px;
+    height: 26px;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    justify-items: center;
+    padding: 0;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.git-change-file__open-btn:hover,
+.git-change-file__open-btn.open {
+    background: var(--theme-tab-active);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.git-change-file__open-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+}
+
+.git-change-file__open-btn:disabled:hover {
+    background: transparent;
+    box-shadow: none;
+}
+
+.git-change-file__open-icon,
+.git-change-file__open-option-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    filter: var(--theme-icon-filter, none);
+}
+
+html[data-theme='dark'] .git-change-file__open-icon,
+body[data-theme='dark'] .git-change-file__open-icon {
+    filter: invert(1) opacity(0.78);
+}
+
+.git-change-file__open-caret {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.git-change-file__open-caret::before {
+    content: '›';
+    display: block;
+    font-size: 16px;
+    line-height: 14px;
+    transform: rotate(90deg);
+}
+
+.git-change-file__open-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 80;
+    min-width: 190px;
+    max-width: min(280px, 70vw);
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    background: var(--theme-surface-muted);
+    box-shadow: none;
+}
+
+.git-change-file__open-option {
+    width: 100%;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 9px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.git-change-file__open-option-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    filter: none;
+}
+
+.git-change-file__open-option:hover {
+    background: var(--theme-tab-active);
+    box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.git-change-file__open-empty {
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+.git-change-file__path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.git-change-file__reset {
+    flex: 0 0 auto;
+    height: 24px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.git-change-file__reset:hover {
+    background: var(--theme-tab-active);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.git-change-file__diff {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: auto;
+}
+
+.git-change-file__diff-inner {
+    display: inline-grid;
+    grid-template-columns: minmax(100%, max-content);
+    width: max-content;
+    min-width: 100%;
+}
+
+.git-change-file__fold {
+    width: auto;
+    min-width: 0;
+    height: 34px;
+    margin: 4px 0;
+    padding: 0 10px;
+    display: block;
+    border: none;
+    border-radius: 9px;
+    background: var(--theme-surface-muted);
+    color: var(--text-secondary);
+    font: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.git-change-file__fold-content {
+    position: sticky;
+    left: 10px;
+    width: max-content;
+    max-width: calc(100vw - 40px);
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.git-change-file__fold:hover {
+    background: var(--theme-tab-active);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.git-change-file__fold-icon {
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 16px;
+    color: var(--text-tertiary);
+    text-align: center;
+    line-height: 1;
+}
+
+.git-change-file__fold-icon::before {
+    content: '›';
+    display: block;
+    font-size: 18px;
+    line-height: 16px;
+    transform-origin: center;
+}
+
+.git-change-file__fold-icon--up::before {
+    transform: rotate(-90deg) translateX(0.5px);
+}
+
+.git-change-file__fold-icon--down::before {
+    transform: rotate(90deg) translateX(0.5px);
+}
+
+.git-change-file__hunk-header {
+    padding: 3px 8px;
+    color: var(--text-tertiary);
+    white-space: pre;
+}
+
+.git-change-line {
+    display: grid;
+    grid-template-columns: 5ch 1ch max-content;
+    column-gap: 8px;
+    width: auto;
+    min-width: 0;
+    min-height: 22px;
+    padding: 2px 8px;
+    align-items: start;
+    white-space: pre;
+}
+
+.git-change-line__num {
+    color: var(--text-tertiary);
+    text-align: right;
+    user-select: none;
+}
+
+.git-change-line__marker {
+    color: var(--text-secondary);
+    text-align: center;
+    user-select: none;
+}
+
+.git-change-line__text {
+    min-width: 0;
+}
+
+.git-change-line--add {
+    background: var(--diff-add-bg);
+    color: var(--state-success);
+}
+
+.git-change-line--delete {
+    background: var(--diff-del-bg);
+    color: var(--state-danger);
+}
+
+/* === 外层容器：width 滑入/滑出（长写属性，不覆盖 grid 过渡） === */
+
+/* 基础过渡：只用于 grid-template-rows */
+.right-panels {
+    transition-property: grid-template-rows;
+    transition-duration: 0.28s;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* enter/leave 时追加 width/opacity/transform 过渡 */
+.right-panels-slide-enter-active,
+.right-panels-slide-leave-active {
+    transition-property: width, min-width, opacity, transform;
+    transition-duration: 0.22s, 0.22s, 0.18s, 0.22s;
+    transition-timing-function: ease, ease, ease, ease;
+}
+
+.right-panels-slide-enter-from,
+.right-panels-slide-leave-to {
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0;
+    transform: translateX(18px);
+}
+
+/* leave 时强制收缩 grid，配合过渡 */
+.right-panels-slide-leave-to {
+    grid-template-rows: 0fr 0px 0fr !important;
+}
+
+/* === 右侧面板容器（Grid 布局，grid-template-rows 过渡） === */
+.right-panels {
+    display: grid;
+    min-width: 340px;
+    max-width: min(600px, 52vw);
+    height: var(--app-viewport);
+    overflow: hidden;
+}
+
+.right-panels__slot {
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* 强制 Git 面板始终在第 3 行，即使 split-handle 不渲染 */
+.right-panels__slot:last-child {
+    grid-row: 3;
+}
+
+.right-panels .git-changes-panel,
+.right-panels .terminal-panel {
+    width: auto !important;
+    min-width: 0;
+    max-width: none;
+    height: 100% !important;
+}
+
+/* 上下分割拖拽条：纯交互层，分隔线由 Git 面板 border-top 提供 */
+.right-panels__split-handle {
+    cursor: row-resize;
+}
+
+/* 右侧面板左右拖拽手柄：基础样式曾随 _left-panel.scss 在 b593d638 中被误删，
+   导致手柄零宽不可见、git/终端面板无法拖宽；此处按现代 token 恢复。
+   视觉 4px 透明条，::before 向两侧扩 3px 热区便于瞄准，hover/拖拽时高亮 */
+.resize-handle--right-panels {
+    width: 4px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    position: relative;
+    background: transparent;
+    transition: background 0.2s;
+}
+
+.resize-handle--right-panels::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    right: -3px;
+}
+
+.resize-handle--right-panels:hover,
+.resize-handle--right-panels:active {
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+/* 拖拽期间禁用所有过渡，确保跟手 */
+.right-panels--resizing {
+    transition: none !important;
+}
+
+/* Git 面板上边线 */
+.right-panels .git-changes-panel {
+    border-top: 1px solid var(--border-default);
+}
+
+.no-files {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 60px 20px;
+    font-size: 14px;
+}
+
+.file-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.file-tab {
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface-soft);
+    box-shadow: 0 12px 28px var(--shadow-color);
+}
+
+.tab-header {
+    background: var(--theme-chip-bg);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.file-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.file-size {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.file-content {
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--surface-raised);
+}
+
+.file-content pre {
+    margin: 0;
+    padding: 16px;
+}
+
+.file-content code {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.tool-approval-panel .approval-panel-body {
+    padding-top: 14px;
+}
+
+.approval-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.approval-card {
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    background: var(--theme-surface-soft);
+    box-shadow: var(--theme-shadow-soft);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.approval-card__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.approval-card__summary {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.approval-path {
+    font-size: 12px;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.approval-lines {
+    margin: 0;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.45;
+    overflow: auto;
+    max-height: 200px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--theme-surface-muted);
+    color: var(--text-primary);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.approval-lines::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.approval-diff {
+    margin-top: 12px;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    padding: 8px;
+    background: color-mix(in srgb, transparent 99%, var(--text-primary));
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.approval-diff::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.approval-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--theme-surface-muted);
+    border: 1px solid var(--theme-control-border);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.approval-kv strong {
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
+.approval-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    color: var(--text-primary);
+}
+
+.approval-note {
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.approval-lines--old {
+    background: color-mix(in srgb, var(--state-warning) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--state-warning) 50%, transparent);
+    color: var(--text-primary);
+}
+
+.approval-lines--new {
+    background: color-mix(in srgb, var(--state-success) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--state-success) 50%, transparent);
+    color: var(--text-primary);
+}
+
+.approval-lines--cmd,
+.approval-lines--generic {
+    background: var(--theme-surface-muted);
+    color: var(--text-primary);
+}
+
+.tool-approval-panel .diff-line {
+    padding: 2px 4px;
+    margin: 1px 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.tool-approval-panel .diff-remove {
+    background: var(--diff-del-bg);
+    color: var(--state-danger);
+}
+
+.tool-approval-panel .diff-add {
+    background: var(--diff-add-bg);
+    color: var(--state-success);
+}
+
+.approval-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.approval-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.approval-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.approval-btn--approve {
+    color: var(--theme-surface-strong);
+    background: var(--state-success);
+}
+
+.approval-btn--switch {
+    color: var(--on-accent);
+    background: var(--state-danger);
+}
+
+.approval-btn--reject {
+    color: var(--theme-surface-strong);
+    background: var(--accent-strong);
+}
+
+/* ========== 深色主题变体（右侧面板组件） ========== */
+body[data-theme='dark'] {
+  /* 聚焦文件面板 */
+  .file-tab {
+    background: var(--surface-panel);
+    border-color: var(--border-card-strong);
+  }
+
+  .tab-header {
+    background: var(--badge-bg);
+  }
+
+  .file-content {
+    background: var(--surface-base);
+  }
+
+  .focus-close-btn {
+    background: var(--badge-bg);
+  }
+
+  .focus-close-btn:hover {
+    background: var(--surface-muted);
+  }
+
+  .approval-close-btn {
+    background: var(--badge-bg);
+  }
+
+  .approval-close-btn:hover {
+    background: var(--surface-muted);
+  }
+}
