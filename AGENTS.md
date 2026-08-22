@@ -410,7 +410,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ### 11.2 子智能体执行机制
 
-- 子智能体在主进程内 `asyncio.Task`，跑在独立后台事件循环线程里（避开 Flask-SocketIO threading 冲突）。工具调用复用主进程沙箱/容器链路，网络调用走 `utils.api_client.DeepSeekClient`。
+- 子智能体在主进程内 `asyncio.Task`，跑在独立后台事件循环线程里（避开 Flask-SocketIO threading 冲突）。工具调用复用主进程沙箱/容器链路，网络调用走 `utils.api_client.APIClient`。
 - 子智能体在多智能体模式下：
   - `create_sub_agent` 强制 `run_in_background=False`，不触发 `sub_agent_waiting` 事件，不阻塞前端输入区。
   - 子智能体自然的 assistant 输出结束（无 tool_calls）即本轮任务结束，进入 `idle`，上下文保留，不算 failed。

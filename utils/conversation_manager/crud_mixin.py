@@ -4,7 +4,6 @@ import json
 import os
 import time
 import tempfile
-import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -24,77 +23,9 @@ try:
 except Exception:
     perf_log = None
 
-try:
-    from config import LOGS_DIR as _CONV_SAVE_LOG_DIR
-except Exception:
-    _CONV_SAVE_LOG_DIR = None
-
 
 # save_conversation 专用哨兵：区分「不更新该字段」与「显式清除为 None」
 _KEEP = object()
-
-
-def _debug_conversation_save_trace(conversation_id: str, file_path, data: Dict):
-    """[临时调试] 记录每次对话文件写入，重点捕获「非空被空覆盖」的调用栈。
-
-    输出: logs/conversation_save_debug.log （JSONL）
-    排查完「对话消息被清空」问题后应移除。
-    """
-    try:
-        import traceback
-        new_msgs = data.get("messages") if isinstance(data, dict) else None
-        new_len = len(new_msgs) if isinstance(new_msgs, list) else -1
-        old_len = None
-        try:
-            p = Path(file_path)
-            if p.exists():
-                old_data = json.loads(p.read_text(encoding="utf-8"))
-                old_msgs = old_data.get("messages")
-                old_len = len(old_msgs) if isinstance(old_msgs, list) else None
-        except Exception:
-            old_len = None
-        wipe_suspect = bool(old_len and new_len == 0)
-        shrink_suspect = bool(old_len and 0 < new_len < old_len)
-        # 只保留项目内调用帧，排除标准库/第三方
-        try:
-            repo_root = Path(__file__).resolve().parents[2]
-        except Exception:
-            repo_root = None
-        frames = []
-        for fr in traceback.extract_stack()[:-2]:
-            fn = str(fr.filename)
-            if repo_root and not fn.startswith(str(repo_root)):
-                continue
-            # Windows 下调用帧文件名用反斜杠，统一归一化再匹配
-            fn_norm = fn.replace("\\", "/")
-            if "/.astrion/" in fn_norm or "site-packages" in fn_norm:
-                continue
-            rel = fn[len(str(repo_root)) + 1:] if repo_root and fn.startswith(str(repo_root)) else fn
-            frames.append(f"{rel}:{fr.lineno}:{fr.name}")
-        record = {
-            "ts": datetime.now().isoformat(),
-            "event": "conversation_save",
-            "conversation_id": conversation_id,
-            "old_msg_len": old_len,
-            "new_msg_len": new_len,
-            "wipe_suspect": wipe_suspect,
-            "shrink_suspect": shrink_suspect,
-            "title": (data.get("title") if isinstance(data, dict) else None),
-            "thread": threading.current_thread().name,
-            "stack_tail": frames[-14:],
-        }
-        if _CONV_SAVE_LOG_DIR:
-            log_dir = Path(_CONV_SAVE_LOG_DIR)
-        else:
-            log_dir = Path(DATA_DIR).parent / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        with open(log_dir / "conversation_save_debug.log", "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        if wipe_suspect or shrink_suspect:
-            kind = "空列表覆盖" if wipe_suspect else f"缩减 {old_len}->{new_len}"
-            print(f"🚨 [ConvSaveDebug] 对话 {conversation_id} 消息将被{kind}！栈: {frames[-14:]}")
-    except Exception:
-        pass
 
 @dataclass
 class ConversationMetadata:
@@ -266,7 +197,6 @@ class CrudMixin:
         try:
             # 确保Token统计数据有效
             data = self._validate_token_statistics(data)
-            _debug_conversation_save_trace(conversation_id, file_path, data)
             with self._io_lock:
                 self._atomic_write_json(file_path, data)
         except Exception as e:
