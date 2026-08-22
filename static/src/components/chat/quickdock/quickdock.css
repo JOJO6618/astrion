@@ -247,7 +247,8 @@
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  line-height: 1;
+  /* 不能压成 1：瘦高字体的下伸部（g/p/y 等）会超出行盒被 overflow 裁掉 */
+  line-height: 1.4;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -1161,7 +1162,8 @@
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  line-height: 1;
+  /* 同 .qd-todo-text：line-height 压 1 会裁掉下伸字母 */
+  line-height: 1.4;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
