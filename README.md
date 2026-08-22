@@ -4,6 +4,8 @@
 
 > 命名：`Astr-`（星）+ `-ion`（粒子）。Agent 像星际间传递信号的粒子，把人类意图传递到工具、文件、终端与子智能体之间。
 
+![Astrion 主界面](screenshots/main-ui.png)
+
 ---
 
 ## ⚠️ 重要声明
@@ -257,8 +259,7 @@ npm --prefix cli run typecheck && npm --prefix cli run build # CLI
 
 ## 许可证
 
-<!-- TODO: 选择许可证后替换（MIT / Apache-2.0 / …），并添加 LICENSE 文件 -->
-待定（发布前补充）。
+[MIT](LICENSE)
 
 ---
 
