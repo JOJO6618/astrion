@@ -40,8 +40,10 @@ skills/
 # 本地实验残留与历史文档归档（不进仓库）
 _experiments/
 
-# Ignore docs
+# Ignore docs（doc/ 与 docs/ 均为本地文档，不纳入版本控制）
 doc/
+docs/
+workflow_research/
 
 # 部署级配置（含密钥引用 / 机器特定，本地保留，仓库仅留 .example 种子）
 config/host_workspaces.json
@@ -73,15 +75,6 @@ static/old_version_backup/
 static/debug-theme.html
 
 # 个人开发笔记与研究资料
-docs/papers/
-docs/code_block_demo.html
-docs/sidebar_overlay_demo.html
-docs/sidebar_workspace_demo.html
-docs/cli_slash_commands_spec.md
-docs/cli_ui_display_spec.md
-docs/conversation_level_terminal_design.md
-docs/mcp-tool-config-guide.md
-docs/multi_agent_mode/05_data_model.md
 research/
 
 # 含私人信息 / 个人工作流约定（脱敏前不进仓库）
