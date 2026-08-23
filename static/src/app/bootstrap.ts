@@ -143,20 +143,61 @@ function collectShowImageOrder(root: ParentNode | null = document) {
   return tokens.slice(0, 200);
 }
 
+/* host/docker 模式缓存读取：键名与 app/state.ts 的 WORKSPACE_MODE_STORAGE_KEY 一致。
+   模式是部署级属性几乎不变，socket 连接后会校正回写 localStorage，这里直接读缓存即可。 */
+function getShowImageWorkspaceMode(): 'host' | 'docker' {
+  try {
+    return window.localStorage.getItem('agents_workspace_mode') === 'host' ? 'host' : 'docker';
+  } catch {
+    return 'docker';
+  }
+}
+
+/**
+ * 归一化 show_image 的 src：
+ * - http(s) 网络链接、/user_upload/ 上传文件：原样使用；
+ * - 其余一律视为本地文件路径，统一走 /api/file/content 通道（inline 预览，MIME 白名单由服务端控制）：
+ *   - docker/web 模式：仅工作区内相对路径，越界（../、项目外绝对路径）由后端 _validate_path 拒绝；
+ *   - host 模式：工作区相对路径或任意绝对路径均可（后端 _validate_path host 分支全放行）。
+ * 无法识别时返回空串，由调用方渲染可见的错误占位（不再静默吞掉）。
+ */
 function normalizeShowImageSrc(src: string) {
   if (!src) return '';
-  const trimmed = src.trim();
+  let trimmed = src.trim();
+  if (!trimmed) return '';
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // file:// 前缀剥离按本地路径处理（浏览器禁止 http 页面直接加载 file:// 资源）
+  if (/^file:\/\//i.test(trimmed)) {
+    trimmed = trimmed.replace(/^file:\/\//i, '');
+    // Windows file:///C:/... → C:/...
+    trimmed = trimmed.replace(/^\/(?=[A-Za-z]:\/)/, '');
+  }
   if (trimmed.startsWith('/user_upload/')) return trimmed;
   // 兼容容器内部路径：/workspace/.../user_upload/xxx.png 或 /workspace/user_upload/xxx
   const idx = trimmed.toLowerCase().indexOf('/user_upload/');
   if (idx >= 0) {
     return '/user_upload/' + trimmed.slice(idx + '/user_upload/'.length);
   }
-  if (trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../')) {
-    return trimmed;
+  // /workspace 前缀是容器内绝对路径写法，剥掉后按工作区相对路径处理
+  if (trimmed === '/workspace') return '';
+  if (trimmed.startsWith('/workspace/')) {
+    trimmed = trimmed.slice('/workspace/'.length);
   }
-  return '';
+  // 前导 ./ 语义等同工作区相对路径，剥掉保持整洁
+  if (trimmed.startsWith('./')) {
+    trimmed = trimmed.slice(2);
+  }
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/')) {
+    if (getShowImageWorkspaceMode() === 'host') {
+      // host 模式保留绝对路径语义（如 /Users/xxx/img.png），后端全放行
+      return `/api/file/content?path=${encodeURIComponent(trimmed)}`;
+    }
+    // docker 模式下前导 / 视为工作区根相对路径（真绝对路径会被后端拒绝）
+    trimmed = trimmed.replace(/^\/+/, '');
+    if (!trimmed) return '';
+  }
+  return `/api/file/content?path=${encodeURIComponent(trimmed)}`;
 }
 
 function parsePixelSize(raw: string | null, fallback: number) {
@@ -555,6 +596,17 @@ function renderShowImages(root: ParentNode | null = document) {
     const rawSrc = node.getAttribute('src') || '';
     const mappedSrc = normalizeShowImageSrc(rawSrc);
     if (!mappedSrc) {
+      // 不再静默吞掉：渲染可见错误占位，方便定位路径问题
+      const figure = document.createElement('figure');
+      figure.className =
+        'chat-inline-card chat-inline-card--image chat-inline-image chat-inline-card--error chat-inline-image--error';
+      const tip = document.createElement('div');
+      tip.className = 'chat-inline-card__error chat-inline-image__error';
+      tip.textContent = rawSrc
+        ? `无法显示图片：不支持的图片路径 ${rawSrc}`
+        : '无法显示图片：缺少图片路径';
+      figure.appendChild(tip);
+      node.replaceChildren(figure);
       node.setAttribute('data-rendered', '1');
       node.setAttribute('data-rendered-error', 'invalid-src');
       if (verbose) debugShowImageLog('render:invalid-src', { renderId, rawSrc });
