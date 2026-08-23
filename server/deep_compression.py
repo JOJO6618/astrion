@@ -296,12 +296,11 @@ def _build_inject_guide_message(
     current_record: Dict[str, Any],
     previous_records: List[Dict[str, Any]],
     user_inputs: List[str],
-    latest_user_input: str,
     runtime_state_lines: Optional[List[str]] = None,
 ) -> str:
     """生成直接注入模式的引导语：把历次压缩总结、用户输入按顺序拼入正文。"""
     lines: List[str] = [
-        f"当前对话已被第{compression_index}次压缩。以下为按时间顺序汇总的用户输入、历次压缩总结以及最近一次输入，请据此继续工作。",
+        f"当前对话已被第{compression_index}次压缩。以下为按时间顺序汇总的用户输入、历次压缩总结，请据此继续工作。",
         "",
         "用户的所有输入",
     ]
@@ -315,12 +314,6 @@ def _build_inject_guide_message(
         compression_index,
     )
     lines.extend(summary_lines)
-    lines.append("")
-    lines.append("用户的最近一次输入：")
-    if (latest_user_input or "").strip():
-        lines.append(latest_user_input.strip())
-    else:
-        lines.append("（无）")
     if runtime_state_lines:
         lines.append("")
         lines.append("当前运行时状态")
@@ -398,7 +391,6 @@ def _write_compact_file(
     compression_index: int,
     summary_text: str,
     user_inputs: List[str],
-    latest_user_input: str,
     previous_records: List[Dict[str, Any]],
     runtime_state_lines: Optional[List[str]] = None,
 ) -> str:
@@ -422,12 +414,6 @@ def _write_compact_file(
         compression_index,
     )
     lines.extend(summary_lines)
-    lines.append("")
-    lines.append("## 用户最新的一次输入")
-    if (latest_user_input or "").strip():
-        lines.append(latest_user_input.strip())
-    else:
-        lines.append("（无）")
     if runtime_state_lines:
         lines.append("")
         lines.append("## 当前运行时状态")
@@ -566,7 +552,6 @@ async def run_deep_compression(
         compression_index=target_count,
         summary_text=summary_text,
         user_inputs=user_inputs,
-        latest_user_input=latest_user_input,
         previous_records=previous_records,
         runtime_state_lines=runtime_state_lines,
     )
@@ -622,7 +607,6 @@ async def run_deep_compression(
             current_record=current_record,
             previous_records=previous_records,
             user_inputs=user_inputs,
-            latest_user_input=latest_user_input,
             runtime_state_lines=runtime_state_lines,
         )
     else:
