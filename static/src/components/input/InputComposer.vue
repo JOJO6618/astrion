@@ -1597,7 +1597,7 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
     {
       id: 'run-mode',
       label: '思考模式',
-      description: '切换 fast / thinking / deep',
+      description: '切换 fast / thinking',
       disabled: !props.isConnected || props.streamingMessage,
       mode: 'run-mode'
     },
@@ -3839,6 +3839,15 @@ onBeforeUnmount(() => {
 :global(html[data-theme='dark'] .floating-project-status__submenu button:hover),
 :global(body[data-theme='dark'] .floating-project-status__submenu button:hover) {
   box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+/* 经典主题：git 状态栏及子菜单与输入栏壳体对齐为纯白 --surface-raised
+   （基础 --theme-surface-soft 在经典为米色 #f5f0e8，与白色输入栏不一致） */
+:global(html[data-theme='classic'] .floating-project-status),
+:global(body[data-theme='classic'] .floating-project-status),
+:global(html[data-theme='classic'] .floating-project-status__submenu),
+:global(body[data-theme='classic'] .floating-project-status__submenu) {
+  background: var(--surface-raised);
 }
 
 .floating-status-motion-enter-active,

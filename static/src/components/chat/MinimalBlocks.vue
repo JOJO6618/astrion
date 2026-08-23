@@ -1257,6 +1257,29 @@ onBeforeUnmount(() => {
   }
 }
 
+/* ===== 明亮主题：摘要行降为三级文字色，与正文（text-primary）拉开层级 ===== */
+/* hover 反馈不做特化：与经典/深色保持一致（基础 hover 底色在三主题下均等于底色，均无可见反馈） */
+
+body[data-theme='light'] .summary-content-wrapper,
+body[data-theme='light'] .summary-tool-reel-item {
+  color: var(--text-tertiary);
+}
+
+body[data-theme='light'] .summary-line-text.running .summary-char {
+  color: var(--text-tertiary);
+  animation-name: summaryPassLight;
+}
+
+@keyframes summaryPassLight {
+  0%,
+  100% {
+    color: var(--text-tertiary);
+  }
+  50% {
+    color: var(--accent);
+  }
+}
+
 /* 步骤容器 */
 .steps-container {
   display: grid;

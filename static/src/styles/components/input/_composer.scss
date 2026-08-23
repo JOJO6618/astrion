@@ -396,9 +396,16 @@ body[data-theme='light'] {
     color: var(--state-info);
   }
 
-  /* 发送按钮 - 黑底白三角，浅阴影做层次 */
+  /* 输入栏壳体 - 与 git 状态栏同色的浅灰（基础 --surface-raised 在本主题为纯白，与对话底同色无层次；无法比白更浅，反向用略浅灰让壳体浮起） */
+  .stadium-shell,
+  .stadium-shell.is-focused,
+  .stadium-shell.has-text {
+    background: var(--surface-soft);
+  }
+
+  /* 发送按钮 - 柔化黑底白三角（78% 黑），hover 加深为实黑，浅阴影做层次 */
   .stadium-btn.send-btn {
-    background: var(--text-primary);
+    background: color-mix(in srgb, var(--text-primary) 78%, transparent);
     color: var(--surface-raised);
     box-shadow: 0 1px 3px var(--shadow-color);
   }

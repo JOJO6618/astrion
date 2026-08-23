@@ -2523,3 +2523,41 @@ body[data-theme='dark'] {
     background: var(--surface-muted) !important;
   }
 }
+
+
+/* ========== 明亮主题变体（对话区组件） ========== */
+/* 背景：浅色主题表面 token 阶梯近乎纯平（base/card/raised 全为 #ffffff），
+   基础样式中代码块白底落白底、表格 #f9f9f9 落白底均不可见；
+   参照上方深色覆盖块的做法，按用户确认的方向做组件级补偿：
+   代码块仅头部着色、代码区与对话底保持同色；表格白体+浅灰表头+可见边框。 */
+body[data-theme='light'] {
+  /* 代码块 - 头部浅灰、代码区与对话底同为白色，外框加强到可见 */
+  .code-block-wrapper {
+    border-color: var(--border-strong);
+  }
+
+  .code-block-header {
+    background: var(--surface-muted);
+    border-bottom-color: var(--border-strong);
+  }
+
+  /* 表格 - 白体 + 浅灰表头 + 可见边框 */
+  .text-output .text-content table {
+    background: var(--surface-raised);
+  }
+
+  .text-output .text-content thead {
+    background: var(--surface-muted);
+  }
+
+  .text-output .text-content th,
+  .text-output .text-content td {
+    border-color: var(--border-strong);
+  }
+
+  .text-output .text-content .md-table-scroll,
+  .text-output .text-content [data-md-table-scroll='1'] {
+    border-color: var(--border-strong);
+    background: var(--surface-raised);
+  }
+}
