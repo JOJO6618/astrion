@@ -2397,7 +2397,9 @@ function getGeneratingLetters(message: any) {
 }
 
 // ===== 左侧用户输入快捷跳转导航 =====
-// 数据口径与深度压缩一致：role === 'user' 且 metadata.message_source === 'user'（引导/通知/压缩等不计入）
+// 口径：用户亲手输入 = metadata.message_source 为 'user'（直接发送）或 'presend'（提前输入排队后转正），
+// 字段缺失的老消息视为 'user'；guidance（手动引导）/notify/compression 等运行期注入消息不计入。
+// 与深度压缩 _collect_user_texts（server/deep_compression.py）口径保持一致。
 const shellRef = ref<HTMLElement | null>(null);
 const virtualizerRef = ref<any>(null);
 const quickNavActiveIndex = ref(-1);
@@ -2407,7 +2409,8 @@ const isRealUserNavMessage = (msg: any): boolean => {
   if (!msg || msg.role !== 'user') {
     return false;
   }
-  return String(msg?.metadata?.message_source || 'user').trim().toLowerCase() === 'user';
+  const source = String(msg?.metadata?.message_source || 'user').trim().toLowerCase();
+  return source === 'user' || source === 'presend';
 };
 
 function extractUserFirstLine(msg: any): string {

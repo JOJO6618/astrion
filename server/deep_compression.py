@@ -340,12 +340,16 @@ def _extract_text_only(content: Any) -> str:
 
 
 def _collect_user_texts(messages: List[Dict[str, Any]]) -> List[str]:
+    # 口径：用户亲手输入 = message_source 为 'user'（直接发送）或 'presend'（提前输入排队后转正），
+    # 字段缺失的老消息视为 'user'；guidance（手动引导）/notify/compression 等运行期注入消息不计入。
+    # 与前端左侧输入导航 isRealUserNavMessage（ChatArea.vue）口径保持一致。
     result: List[str] = []
     for msg in messages:
         if msg.get("role") != "user":
             continue
         metadata = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
-        if str(metadata.get("message_source") or "").strip().lower() != "user":
+        source = str(metadata.get("message_source") or "user").strip().lower()
+        if source not in ("user", "presend"):
             continue
         text = _extract_text_only(msg.get("content"))
         if text.strip():

@@ -47,6 +47,23 @@ from server.monitor import get_cached_monitor_snapshot
 
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 
+
+def _save_conversation_meta_via_disk(ctx, conversation_id: str, **meta_kwargs) -> None:
+    """设置类端点保存对话元数据的统一入口。
+
+    工作区级服务实例不挂载消息历史（conversation_history 恒空），直接拿内存保存会把
+    空/陈旧历史写回；这里读磁盘消息回传（merge 语义下消息保持不变），仅更新元数据。
+    """
+    if not conversation_id:
+        return
+    manager = ctx._get_conversation_manager_for_id(conversation_id)
+    existing = manager.load_conversation(conversation_id) or {}
+    manager.save_conversation(
+        conversation_id=conversation_id,
+        messages=existing.get("messages") or [],
+        **meta_kwargs,
+    )
+
 @chat_bp.route('/api/thinking-mode', methods=['POST'])
 @api_login_required
 @with_terminal
@@ -67,20 +84,19 @@ def update_thinking_mode(terminal: WebTerminal, workspace: UserWorkspace, userna
         terminal.set_run_mode(target_mode)
         session['thinking_mode'] = terminal.thinking_mode
         session['run_mode'] = terminal.run_mode
-        # 更新当前对话的元数据
+        # 更新当前对话的元数据（服务实例不挂载历史：读磁盘回传，仅更新元数据）
         ctx = terminal.context_manager
         if ctx.current_conversation_id:
             try:
-                ctx.conversation_manager.save_conversation(
-                    conversation_id=ctx.current_conversation_id,
-                    messages=ctx.conversation_history,
+                _save_conversation_meta_via_disk(
+                    ctx,
+                    ctx.current_conversation_id,
                     project_path=str(ctx.project_path),
-                    todo_list=ctx.todo_list,
                     thinking_mode=terminal.thinking_mode,
                     run_mode=terminal.run_mode,
                     model_key=getattr(terminal, "model_key", None),
                     has_images=getattr(ctx, "has_images", False),
-                    has_videos=getattr(ctx, "has_videos", False)
+                    has_videos=getattr(ctx, "has_videos", False),
                 )
             except Exception as exc:
                 logger.error(f"[API] 保存思考模式到对话失败: {exc}")
@@ -123,21 +139,20 @@ def update_reasoning_effort(terminal: WebTerminal, workspace: UserWorkspace, use
         if is_current_target:
             terminal.set_reasoning_effort(effort)
         save_conversation_id = target_conversation_id or ctx.current_conversation_id
-        # 更新对话的元数据
+        # 更新对话的元数据（服务实例不挂载历史：统一读磁盘回传，仅更新元数据）
         if save_conversation_id:
             try:
                 if is_current_target:
-                    ctx.conversation_manager.save_conversation(
-                        conversation_id=save_conversation_id,
-                        messages=ctx.conversation_history,
+                    _save_conversation_meta_via_disk(
+                        ctx,
+                        save_conversation_id,
                         project_path=str(ctx.project_path),
-                        todo_list=ctx.todo_list,
                         thinking_mode=terminal.thinking_mode,
                         run_mode=terminal.run_mode,
                         reasoning_effort=effort,
                         model_key=getattr(terminal, "model_key", None),
                         has_images=getattr(ctx, "has_images", False),
-                        has_videos=getattr(ctx, "has_videos", False)
+                        has_videos=getattr(ctx, "has_videos", False),
                     )
                 else:
                     # 所属对话已不是当前对话：只更新推理强度 meta。
@@ -212,17 +227,16 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
         if requested_cid and current_cid:
             if current_cid == requested_cid:
                 try:
-                    ctx.conversation_manager.save_conversation(
-                        conversation_id=current_cid,
-                        messages=ctx.conversation_history,
+                    _save_conversation_meta_via_disk(
+                        ctx,
+                        current_cid,
                         project_path=str(ctx.project_path),
-                        todo_list=ctx.todo_list,
                         thinking_mode=terminal.thinking_mode,
                         run_mode=terminal.run_mode,
                         reasoning_effort=terminal.reasoning_effort,
                         model_key=terminal.model_key,
                         has_images=getattr(ctx, "has_images", False),
-                        has_videos=getattr(ctx, "has_videos", False)
+                        has_videos=getattr(ctx, "has_videos", False),
                     )
                 except Exception as exc:
                     logger.error(f"[API] 保存模型到对话失败: {exc}")
@@ -338,11 +352,10 @@ def update_personalization_settings(terminal: WebTerminal, workspace: UserWorksp
             ctx = getattr(terminal, 'context_manager', None)
             if ctx and getattr(ctx, 'current_conversation_id', None):
                 try:
-                    ctx.conversation_manager.save_conversation(
-                        conversation_id=ctx.current_conversation_id,
-                        messages=ctx.conversation_history,
+                    _save_conversation_meta_via_disk(
+                        ctx,
+                        ctx.current_conversation_id,
                         project_path=str(ctx.project_path),
-                        todo_list=ctx.todo_list,
                         thinking_mode=terminal.thinking_mode,
                         run_mode=terminal.run_mode
                     )

@@ -214,6 +214,41 @@ def _normalize_conv_id(conversation_id: str) -> str:
     return conv if conv.startswith("conv_") else f"conv_{conv}"
 
 
+def _sync_restored_conversation_memory(conversation_id: str) -> None:
+    """版本回溯后同步内存实例：把绑定该对话的对话级 terminal 内存替换为磁盘最新。
+
+    回溯用 allow_shrink 覆写裁短磁盘；若持有旧（更长）历史的对话级实例之后保存，
+    merge-on-save 会把被裁消息当作「内存独有」追加救回，回溯随即被撤销
+    （此前用户只能回溯后立刻重启进程的根因）。工作区级服务实例不挂载历史，
+    天然无需处理（见 WebTerminal.load_conversation 的 attach_history 分流）。
+    """
+    from copy import deepcopy
+    from server import state as server_state
+
+    normalized = _normalize_conv_id(conversation_id)
+    user_terminals = getattr(server_state, "user_terminals", None) or {}
+    for term_key, term in list(user_terminals.items()):
+        try:
+            bound = getattr(term, "_bound_conversation_id", None)
+            if not bound or _normalize_conv_id(str(bound)) != normalized:
+                continue
+            ctx = getattr(term, "context_manager", None)
+            if ctx is None:
+                continue
+            target_manager = ctx._get_conversation_manager_for_id(normalized)
+            data = target_manager.load_conversation(normalized) or {}
+            ctx.conversation_history = list(data.get("messages") or [])
+            ctx.conversation_metadata = deepcopy(data.get("metadata") or {})
+            todo_data = data.get("todo_list")
+            ctx.todo_list = deepcopy(todo_data) if todo_data else None
+            debug_log(
+                f"[Versioning][Restore] synced in-memory history term={term_key} "
+                f"messages={len(ctx.conversation_history)}"
+            )
+        except Exception as exc:
+            debug_log(f"[Versioning][Restore] sync memory failed for term={term_key}: {exc}")
+
+
 def _normalize_versioning_tracking_mode(value: Optional[str]) -> str:
     return ConversationVersioningManager.normalize_tracking_mode(value)
 
@@ -1632,16 +1667,13 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
             terminal, workspace, normalized_id, target_conversation_id, seq, tracking_mode, host_mode, backup_mode
         )
 
-        # overwrite 场景需要清空内存历史避免反向覆写；copy 场景目标是新对话，无需处理。
+        # overwrite 场景：回溯已裁短磁盘，必须同步所有持有该对话的内存实例（对话级
+        # terminal 常驻 24h），否则旧内存后续保存经 merge 会把被裁消息「救回」，回溯被撤销。
+        # copy 场景目标是新对话，无缓存实例，无需处理。
         if restore_mode == "overwrite":
-            try:
-                current_loaded_id = getattr(terminal.context_manager, "current_conversation_id", None)
-                if current_loaded_id == normalized_id:
-                    terminal.context_manager.conversation_history = []
-                    debug_log(f"[Versioning][Restore] cleared in-memory history before reload conv={normalized_id}")
-            except Exception as exc:
-                debug_log(f"[Versioning][Restore] clear in-memory history failed: {exc}")
+            _sync_restored_conversation_memory(target_conversation_id)
 
+        # 恢复模式与焦点到当前（工作区级）terminal；服务实例不挂载历史，仅读磁盘元数据
         terminal.load_conversation(target_conversation_id)
         debug_log(
             f"[Versioning][Restore] reload done conv={target_conversation_id} "
@@ -1898,7 +1930,12 @@ def list_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, username: s
         announced = terminal._announced_sub_agent_tasks
         notified_from_history = set()
         try:
-            history = getattr(terminal.context_manager, "conversation_history", []) or []
+            # 服务实例（工作区级）不挂载历史：通知去重标记以磁盘对话为准
+            history = []
+            if conversation_id:
+                notify_manager = terminal.context_manager._get_conversation_manager_for_id(conversation_id)
+                notify_conv_data = notify_manager.load_conversation(conversation_id) or {}
+                history = notify_conv_data.get("messages") or []
             for msg in history:
                 meta = msg.get("metadata") or {}
                 task_id = meta.get("task_id")

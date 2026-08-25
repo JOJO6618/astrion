@@ -120,12 +120,16 @@ def api_activate_workflow(terminal, workspace, username):
 
     try:
         # 激活提示消息将追加到历史末尾，阶段消息游标取当前长度 + 1。
-        # 新建对话：激活消息是第 1 条，游标固定为 1（服务 terminal 的 history 长度不可信）。
+        # 新建对话：激活消息是第 1 条，游标固定为 1。
+        # 服务实例（工作区级）不挂载历史：非新建时游标以磁盘消息数为准。
         if created_new:
             msg_index = 1
         else:
             try:
-                msg_index = len(getattr(terminal.context_manager, "conversation_history", []) or []) + 1
+                cm_router = getattr(terminal, "context_manager", None)
+                wf_manager = cm_router._get_conversation_manager_for_id(conversation_id) if cm_router else None
+                conv_data = wf_manager.load_conversation(conversation_id) if wf_manager else None
+                msg_index = len((conv_data or {}).get("messages") or []) + 1
             except Exception:
                 msg_index = 0
         result = activate_workflow(

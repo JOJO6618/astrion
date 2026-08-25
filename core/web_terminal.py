@@ -39,8 +39,10 @@ class WebTerminal(MainTerminal):
         对话级 terminal 只服务绑定对话，必须恢复该对话保存的模型
         （restore_model=True），否则重启后新建的对话级 terminal 会用默认
         模型跑任务/回写 metadata，把用户切换的模型覆盖掉。
-        工作区级 terminal（未绑定）：保持原有“最近对话”行为，且刻意不恢复
-        模型（restore_model=False），避免 /new 页面显示旧对话的模型。
+        工作区级 terminal（未绑定）：保持原有“最近对话”行为（恢复焦点与模式），
+        且刻意不恢复模型（restore_model=False），避免 /new 页面显示旧对话的模型。
+        经由 load_conversation 的 attach_history 分流，工作区级不挂载消息历史——
+        历史权威在磁盘 + 对话级实例（防 merge-on-save 旧内存写回污染源）。
         """
         if self.context_manager.current_conversation_id:
             return
@@ -107,6 +109,15 @@ class WebTerminal(MainTerminal):
             container_session=container_session,
             usage_tracker=usage_tracker
         )
+
+        # 工作区级服务实例标记：不持有/不回写对话消息历史（历史权威在磁盘 + 对话级实例）。
+        # 工作区级挂载历史只会成为 merge-on-save 的污染源（版本回溯被旧内存“救回”覆盖的事故根因）。
+        # 注意必须在 super().__init__ 之后设置（context_manager 由父类创建）；
+        # 而 load 分流不依赖此标记（用 _bound_conversation_id，super 之前已设），初始化时序安全。
+        try:
+            self.context_manager._service_instance_no_history = conversation_id is None
+        except Exception:
+            pass
         
         # Web特有属性
         self.message_callback = message_callback
@@ -417,7 +428,12 @@ class WebTerminal(MainTerminal):
             Dict: 加载结果
         """
         try:
-            success = self.context_manager.load_conversation_by_id(conversation_id)
+            # 工作区级服务实例（_bound_conversation_id 为空）：仅恢复会话焦点
+            # （current_conversation_id）与运行模式，不挂载消息历史——历史权威在磁盘
+            # 与对话级实例，服务实例持历史只会成为 merge-on-save 的写回污染源。
+            # 对话级实例（绑定对话）：挂载历史，供任务执行链路使用。
+            attach_history = bool(getattr(self, "_bound_conversation_id", None))
+            success = self.context_manager.load_conversation_by_id(conversation_id, attach_history=attach_history)
             if success:
                 # 根据对话元数据同步运行模式与推理强度
                 try:
@@ -516,7 +532,8 @@ class WebTerminal(MainTerminal):
                     "success": True,
                     "conversation_id": conversation_id,
                     "title": conversation_data.get("title", "未知对话"),
-                    "messages_count": len(self.context_manager.conversation_history),
+                    # 消息数以磁盘数据为准：服务实例不挂载历史，len(conversation_history) 恒为 0
+                    "messages_count": len(conversation_data.get("messages") or []),
                     "run_mode": self.run_mode,
                     "thinking_mode": self.thinking_mode,
                     "model_key": getattr(self, "model_key", None),
@@ -630,6 +647,7 @@ class WebTerminal(MainTerminal):
             "context": {
                 "usage_percent": context_status['usage_percent'],
                 "total_size": context_status['sizes']['total'],
+                # 本实例内存上下文中的消息数；工作区级服务实例不挂载历史，恒为 0（前端不消费该字段）
                 "conversation_count": len(self.context_manager.conversation_history)
             },
             "focused_files": focused_files_dict,

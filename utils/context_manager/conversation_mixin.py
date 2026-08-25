@@ -179,12 +179,16 @@ class ConversationMixin:
         print(f"📝 开始新对话: {conversation_id}")
         return conversation_id
 
-    def load_conversation_by_id(self, conversation_id: str) -> bool:
+    def load_conversation_by_id(self, conversation_id: str, attach_history: bool = True) -> bool:
         """
         加载指定对话
         
         Args:
             conversation_id: 对话ID
+            attach_history: 是否把消息历史/元数据挂载到内存。工作区级服务实例应传 False
+                （仅恢复焦点 current_conversation_id 与运行模式）：对话历史的权威载体是
+                磁盘 + 对话级 terminal，服务实例挂载历史只会成为 merge-on-save 的污染源
+                （版本回溯被旧内存“救回”覆盖即此机制事故）。
         
         Returns:
             bool: 加载是否成功
@@ -221,12 +225,18 @@ class ConversationMixin:
         
         # 更新当前状态
         self.current_conversation_id = conversation_id
-        self.conversation_history = conversation_data.get("messages", [])
-        todo_data = conversation_data.get("todo_list")
-        self.todo_list = deepcopy(todo_data) if todo_data else None
-        self.conversation_metadata = deepcopy(conversation_data.get("metadata", {}) or {})
+        if attach_history:
+            self.conversation_history = conversation_data.get("messages", [])
+            todo_data = conversation_data.get("todo_list")
+            self.todo_list = deepcopy(todo_data) if todo_data else None
+            self.conversation_metadata = deepcopy(conversation_data.get("metadata", {}) or {})
+        else:
+            # 服务实例：仅焦点，不挂载消息/元数据（保持空内存，merge 语义下任何保存都不会回写消息）
+            self.conversation_history = []
+            self.todo_list = None
+            self.conversation_metadata = {}
         # 恢复项目文件树快照（如已存在）
-        meta = self.conversation_metadata
+        meta = deepcopy(conversation_data.get("metadata", {}) or {})
         if meta.get("project_file_tree"):
             self.project_snapshot = {
                 "file_tree": meta.get("project_file_tree"),
@@ -264,7 +274,7 @@ class ConversationMixin:
         model_key = metadata.get("model_key")
         self.has_images = metadata.get("has_images", False)
         self.has_videos = metadata.get("has_videos", False)
-        if not self.has_images or not self.has_videos:
+        if attach_history and (not self.has_images or not self.has_videos):
             for msg in self.conversation_history:
                 if not isinstance(msg, dict):
                     continue
@@ -321,6 +331,13 @@ class ConversationMixin:
         
         return True
 
+    def _is_service_instance_no_history(self) -> bool:
+        """是否为「不持有对话历史」的工作区级服务实例（由 WebTerminal 初始化时打标）。
+
+        服务实例不挂载/不回写消息历史：历史权威在磁盘与对话级 terminal。
+        """
+        return bool(getattr(self, "_service_instance_no_history", False))
+
     def save_current_conversation(self) -> bool:
         """
         保存当前对话
@@ -328,6 +345,9 @@ class ConversationMixin:
         Returns:
             bool: 保存是否成功
         """
+        if self._is_service_instance_no_history():
+            # 服务实例不持有历史，保存无语义；直接跳过，防止任何路径把空/陈旧内存写回
+            return False
         if not self.current_conversation_id:
             print("⚠️ 没有当前对话ID，无法保存")
             return False
@@ -362,6 +382,8 @@ class ConversationMixin:
 
     def auto_save_conversation(self, force: bool = False):
         """自动保存对话（静默模式，减少日志输出）"""
+        if self._is_service_instance_no_history():
+            return
         if not self.auto_save_enabled or not self.current_conversation_id:
             return
         if not force and not self.conversation_history:
