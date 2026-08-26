@@ -207,6 +207,21 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                 "message": "被管理员强制禁用"
             }), 403
 
+        # /new 页面语义：请求未携带 conversation_id 且为工作区级 terminal 时，
+        # 用户处于“待创建干净新对话”状态。此时 terminal 上的 has_images/has_videos
+        # 是启动时自动加载最近对话留下的残留焦点状态（attach_history=False，不持历史），
+        # 不代表任何用户正在编辑的对话，不应拦截模型切换——与 create_new_conversation
+        # “新对话视为干净会话，清除图片限制”的语义一致。清除是安全的：
+        # 之后显式打开对话时 load_conversation_by_id 会从 metadata 重新恢复。
+        requested_cid = str(data.get("conversation_id") or "").strip()
+        if requested_cid and not requested_cid.startswith("conv_"):
+            requested_cid = f"conv_{requested_cid}"
+        if not requested_cid and not getattr(terminal, "_bound_conversation_id", None):
+            _new_ctx = getattr(terminal, "context_manager", None)
+            if _new_ctx is not None:
+                _new_ctx.has_images = False
+                _new_ctx.has_videos = False
+
         terminal.set_model(model_key)
         # fast-only 时 run_mode 可能被强制为 fast
         session["model_key"] = terminal.model_key
@@ -219,9 +234,6 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
         # 盲目保存会把模型写到错误对话，或用陈旧 history 覆盖新消息。
         # /new 页面（无 conversation_id）不持久化，新对话在首个任务时
         # 由前端随任务传入的 model_key 落盘。
-        requested_cid = str(data.get("conversation_id") or "").strip()
-        if requested_cid and not requested_cid.startswith("conv_"):
-            requested_cid = f"conv_{requested_cid}"
         ctx = terminal.context_manager
         current_cid = getattr(ctx, "current_conversation_id", None)
         if requested_cid and current_cid:
