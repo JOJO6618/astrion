@@ -388,6 +388,35 @@ export const useChatStore = defineStore('chat', {
       msg.currentStreamingType = null;
       delete (msg as any).__splitByShowHtml;
     },
+    // 清理异常中断（断网 / API 错误 / 任务停止）残留的流式状态。
+    // 正常流程由 completeThinking/completeText 收尾；异常路径不会有
+    // thinking_end/text_end，残留的 currentStreamingType/activeThinkingId
+    // 会让状态头像（avatarStatus）的 isThinking 永久为真，卡在「思考中」。
+    // 注意：若需同时清理空占位 assistant 消息，必须先调
+    // cleanupTrailingEmptyAssistantPlaceholder（它依赖 awaitingFirstContent
+    // 判定占位），再调本方法。
+    clearStreamingResidualState() {
+      for (const msg of this.messages) {
+        if (!msg || msg.role !== 'assistant') continue;
+        msg.currentStreamingType = null;
+        msg.activeThinkingId = null;
+        msg.streamingThinking = '';
+        msg.streamingText = '';
+        msg.awaitingFirstContent = false;
+        msg.generatingLabel = '';
+        if (Array.isArray(msg.actions)) {
+          for (const action of msg.actions) {
+            if (
+              action &&
+              (action.type === 'thinking' || action.type === 'text') &&
+              action.streaming === true
+            ) {
+              action.streaming = false;
+            }
+          }
+        }
+      }
+    },
     addSystemMessage(content: string, meta: any = null) {
       // 与历史重建保持一致：子智能体/后台完成通知作为独立 assistant 消息渲染，
       // 避免运行时与刷新后在垂直间距上不一致。

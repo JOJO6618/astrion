@@ -41,6 +41,14 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             last_finish_reason = None
             tool_call_stream_active = False
 
+        # 通知前端：API 请求已发出、尚未收到首个响应（每次重试前都会重新触发）。
+        # 前端据此驱动状态形象的「等待 API 响应…」文案；响应开始（thinking_start/
+        # text_start/tool_preparing）或 error/任务终结时由前端清除。
+        sender('api_request_start', {
+            'attempt': api_attempt + 1,
+            'max_attempts': max_api_retries + 1,
+        })
+
         # 收集流式响应
         async for chunk in web_terminal.api_client.chat(messages, tools, stream=True):
             chunk_count += 1

@@ -25,6 +25,11 @@ export const stateMethods = {
     });
 
     // 重置消息和流状态
+    // 先清消息内残留的流式字段（currentStreamingType/activeThinkingId/streaming
+    // action），否则异常中断后状态头像会一直卡在「思考中」（avatarStatus 的
+    // isThinking 只认这两个字段，与任务标志无关）
+    this.chatClearStreamingResidualState();
+    this.apiRequestPending = false;
     this.streamingMessage = false;
     this.currentMessageIndex = -1;
     this.stopRequested = false;

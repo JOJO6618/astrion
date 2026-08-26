@@ -1127,6 +1127,18 @@ export async function initializeLegacySocket(ctx: any) {
       }
     });
 
+    // API 请求已发出、尚未收到首个响应：状态头像显示「等待 API 响应…」
+    ctx.socket.on('api_request_start', (data) => {
+      if (data?.conversation_id && data.conversation_id !== ctx.currentConversationId) {
+        return;
+      }
+      // 轮询模式下该状态由任务事件流维护
+      if (ctx.usePollingMode && !ctx.waitingForSubAgent) {
+        return;
+      }
+      ctx.apiRequestPending = true;
+    });
+
     // 思考流开始
     ctx.socket.on('thinking_start', (data) => {
       // 对话定向事件：只响应当前对话，避免运行中对话的流式输出渲染到 /new 等空白页。
@@ -1140,6 +1152,8 @@ export async function initializeLegacySocket(ctx: any) {
         return;
       }
       socketLog('思考开始');
+      // 响应已开始，清除「等待 API 响应」状态（含 ignoreThinking 分支，故放最前）
+      ctx.apiRequestPending = false;
       const ignoreThinking = ctx.runMode === 'fast' || ctx.thinkingMode === false;
       streamingState.ignoreThinking = ignoreThinking;
       if (ignoreThinking) {
@@ -1227,6 +1241,7 @@ export async function initializeLegacySocket(ctx: any) {
         return;
       }
       socketLog('文本开始');
+      ctx.apiRequestPending = false;
       logStreamingDebug('socket:text_start');
       finalizeStreamingText({ force: true });
       resetStreamingBuffer();
@@ -1354,6 +1369,8 @@ export async function initializeLegacySocket(ctx: any) {
         socketLog('跳过tool_preparing(对话不匹配)', data.conversation_id);
         return;
       }
+      // 工具流式收集即 API 响应已开始，清除「等待 API 响应」状态
+      ctx.apiRequestPending = false;
       const msg = ctx.chatEnsureAssistantMessage();
       if (!msg) {
         return;
@@ -1861,7 +1878,9 @@ export async function initializeLegacySocket(ctx: any) {
         }
       }
       if (shouldRetry) {
-        // 错误后保持停止按钮态，用户可手动停止或等待自动重试
+        // 错误后保持停止按钮态，用户可手动停止或等待自动重试；
+        // 重试间隔不算「等待 API 响应」，重试发起时后端会重新发 api_request_start
+        ctx.apiRequestPending = false;
         ctx.stopRequested = false;
         ctx.taskInProgress = true;
         ctx.streamingMessage = true;
@@ -1874,15 +1893,13 @@ export async function initializeLegacySocket(ctx: any) {
         );
       }
 
-      // 最后一次报错：恢复输入状态并清理提示动画
-      const msgIndex = typeof ctx.currentMessageIndex === 'number' ? ctx.currentMessageIndex : -1;
-      if (msgIndex >= 0 && Array.isArray(ctx.messages)) {
-        const currentMessage = ctx.messages[msgIndex];
-        if (currentMessage && currentMessage.role === 'assistant') {
-          currentMessage.awaitingFirstContent = false;
-          currentMessage.generatingLabel = '';
-        }
+      // 最后一次报错：恢复输入状态并清理提示动画/流式残留
+      // （统一清理 currentStreamingType/activeThinkingId 等字段，
+      // 否则 avatarStatus 的 isThinking 永久为真，状态头像卡在「思考中」）
+      if (typeof ctx.chatClearStreamingResidualState === 'function') {
+        ctx.chatClearStreamingResidualState();
       }
+      ctx.apiRequestPending = false;
       if (typeof ctx.chatClearThinkingLocks === 'function') {
         ctx.chatClearThinkingLocks();
       }

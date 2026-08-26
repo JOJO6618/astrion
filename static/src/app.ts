@@ -92,7 +92,8 @@ const appOptions = {
       chatAppendTextChunk: 'appendTextChunk',
       chatCompleteTextAction: 'completeText',
       chatAddSystemMessage: 'addSystemMessage',
-      chatEnsureAssistantMessage: 'ensureAssistantMessage'
+      chatEnsureAssistantMessage: 'ensureAssistantMessage',
+      chatClearStreamingResidualState: 'clearStreamingResidualState'
     }),
     ...mapActions(useInputStore, {
       inputSetFocused: 'setInputFocused',

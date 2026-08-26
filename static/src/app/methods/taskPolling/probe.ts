@@ -146,6 +146,9 @@ export const probeMethods = {
     this.stopRequested = false;
     this.waitingForSubAgent = false;
     this.waitingForBackgroundCommand = false;
+    this.apiRequestPending = false;
+    // 同步清理消息内残留的流式状态（思考/文本），避免状态头像卡在「思考中」
+    this.chatClearStreamingResidualState?.();
     if (typeof this.clearPendingTools === 'function') {
       this.clearPendingTools('reconcile_auto_clear');
     }

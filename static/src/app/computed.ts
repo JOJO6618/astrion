@@ -367,9 +367,11 @@ export const computed = {
 
     const intentEnabled = !!usePersonalizationStore().form?.tool_intent_enabled;
 
-    // 1) 思考中
+    // 1) 思考中（防御：仅在任务仍运行时采信流式字段——异常中断后字段可能残留，
+    //    虽有各终结路径的统一清理兑底，这里再加一层保险避免永久卡「思考中」）
     const isThinking =
       !!lastAssistant &&
+      (this.taskInProgress || this.streamingMessage) &&
       (lastAssistant.currentStreamingType === 'thinking' || lastAssistant.activeThinkingId != null);
 
     // 2) 工具执行中（取最后一段并行工具，过滤未完成的）
@@ -438,6 +440,11 @@ export const computed = {
     if (running) {
       // 工作态：等 API / 后台运行 / 流式输出正文
       let text = bgText;
+      // 「等待 API 响应…」优先于随机等待文案：后端已发出请求、尚未开始回复
+      // （api_request_start 事件驱动，覆盖首轮与工具轮次间的每一次等待）
+      if (!text && this.apiRequestPending) {
+        return { mode: 'work', toolKeys: [], toolTexts: [], text: '等待 API 响应…', tracking: false, apiWaiting: true };
+      }
       if (!text) {
         const awaitingMsg = lastAssistant && lastAssistant.awaitingFirstContent ? lastAssistant : null;
         if (awaitingMsg) {

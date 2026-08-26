@@ -183,8 +183,28 @@ export const lifecycleMethods = {
 
     debugLog(`[TaskPolling] 处理事件 #${eventIdx}: ${eventType}`, eventData);
 
+    // 「等待 API 响应」状态维护：api_request_start 置位；任何「响应开始」
+    // （thinking_start/text_start/tool_preparing）或任务终结信号都清除。
+    // 历史事件重放时按序经过此处，最终状态自然收敛正确。
+    if (eventType === 'api_request_start') {
+      this.apiRequestPending = true;
+    } else if (
+      eventType === 'thinking_start' ||
+      eventType === 'text_start' ||
+      eventType === 'tool_preparing' ||
+      eventType === 'task_complete' ||
+      eventType === 'task_stopped' ||
+      eventType === 'error'
+    ) {
+      this.apiRequestPending = false;
+    }
+
     // 根据事件类型调用对应的处理方法
     switch (eventType) {
+      case 'api_request_start':
+        // 状态已在上方统一维护，无其他处理
+        break;
+
       case 'ai_message_start':
         this.handleAiMessageStart(eventData, eventIdx);
         break;
@@ -426,6 +446,9 @@ export const lifecycleMethods = {
     // 同步处理状态更新
     this.streamingMessage = false;
     this.stopRequested = false;
+    // 兜底清理可能残留的流式状态（正常流程 thinking_end/text_end 已清，此处幂等）
+    this.chatClearStreamingResidualState?.();
+    this.apiRequestPending = false;
     if (!hasRunningSubAgents && !hasRunningMultiAgent) {
       this.markLatestUserWorkCompleted();
     }
@@ -526,6 +549,8 @@ export const lifecycleMethods = {
     });
 
     this.cleanupTrailingEmptyAssistantPlaceholder('task_stopped');
+    this.chatClearStreamingResidualState?.();
+    this.apiRequestPending = false;
     this.streamingMessage = false;
     this.stopRequested = false;
 
@@ -668,7 +693,13 @@ export const lifecycleMethods = {
       duration: 8000
     });
 
-    // 清理状态
+    // 清理状态（顺序：先清依赖 awaitingFirstContent 判定的空占位，再清残留流式字段）
+    this.cleanupTrailingEmptyAssistantPlaceholder?.('task_error');
+    this.chatClearStreamingResidualState?.();
+    if (typeof this.clearPendingTools === 'function') {
+      this.clearPendingTools('task_error');
+    }
+    this.apiRequestPending = false;
     this.markLatestUserWorkCompleted();
     this.streamingMessage = false;
     this.taskInProgress = false;

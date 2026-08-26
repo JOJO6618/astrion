@@ -80,6 +80,10 @@ export function dataState() {
     toolStacks: new Map(),
     // 当前任务是否仍在进行中（用于保持输入区的"停止"状态）
     taskInProgress: false,
+    // 等待 API 响应：对话运行期间后端已发出 API 请求、尚未收到首个响应事件
+    // （由后端 api_request_start 事件置位，thinking_start/text_start/tool_preparing/
+    // error/任务终结时清除），用于状态头像显示「等待 API 响应…」
+    apiRequestPending: false,
     // 对话运行状态对账定时器（事件为主、2.5s 对账纠偏，冲突以对账为准）
     runningStateReconcileTimer: null,
     // 对账清理方向的连续空闲确认计数（防 notice/idle dispatch 间隙误清）

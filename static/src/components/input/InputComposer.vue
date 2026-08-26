@@ -818,6 +818,8 @@ const props = defineProps<{
     toolTexts?: string[];
     text: string;
     tracking?: boolean;
+    /** true 时表示当前文案是「等待 API 响应…」（work 模式下仅此类文案显示在头像旁） */
+    apiWaiting?: boolean;
   } | null;
 }>();
 
@@ -1074,6 +1076,11 @@ const composerAvatarText = computed(() => {
   if (props.avatarStatus.mode === 'tool' || props.avatarStatus.mode === 'think') {
     return props.avatarStatus.text || '';
   }
+  // work 模式仅显示「等待 API 响应…」（apiWaiting 标记）；
+  // 后台计数/随机等待文案不在头像旁重复显示（后者已在消息区等待动画中体现）
+  if (props.avatarStatus.mode === 'work' && props.avatarStatus.apiWaiting) {
+    return props.avatarStatus.text || '';
+  }
   return '';
 });
 
@@ -1083,6 +1090,7 @@ const composerAvatarTextKey = computed(() => {
   const s = props.avatarStatus;
   if (!s) return 'avatar-none';
   if (s.mode === 'tool') return `avatar-tool-${s.toolKeys?.[0] || ''}`;
+  if (s.mode === 'work' && s.apiWaiting) return 'avatar-work-api-waiting';
   return `avatar-${s.mode}`;
 });
 
