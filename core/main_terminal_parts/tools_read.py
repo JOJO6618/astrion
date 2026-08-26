@@ -21,6 +21,7 @@ try:
         CUSTOM_TOOLS_ENABLED,
         WORKSPACE_SKILLS_DIRNAME,
         WORKSPACE_MEMORY_DIRNAME,
+        PROJECT_AGENTS_SKILLS_DIRNAME,
     )
 except ImportError:
     import sys
@@ -43,6 +44,7 @@ except ImportError:
         CUSTOM_TOOLS_ENABLED,
         WORKSPACE_SKILLS_DIRNAME,
         WORKSPACE_MEMORY_DIRNAME,
+        PROJECT_AGENTS_SKILLS_DIRNAME,
     )
 
 from modules.file_manager import FileManager
@@ -92,9 +94,10 @@ class MainTerminalToolsReadMixin:
                 if not raw:
                     return ""
                 normalized = raw.replace("\\", "/").strip("/")
-                prefix = f"{WORKSPACE_SKILLS_DIRNAME}/"
-                if normalized.lower().startswith(prefix):
-                    normalized = normalized[len(prefix):]
+                for prefix in (f"{WORKSPACE_SKILLS_DIRNAME}/", f"{PROJECT_AGENTS_SKILLS_DIRNAME}/"):
+                    if normalized.lower().startswith(prefix):
+                        normalized = normalized[len(prefix):]
+                        break
                 if normalized.lower().endswith("/skill.md"):
                     normalized = normalized[: -len("/SKILL.md")]
                 return normalized.strip()
@@ -108,7 +111,16 @@ class MainTerminalToolsReadMixin:
                     personalization = load_personalization_config(self.data_dir)
                 except Exception:
                     personalization = {}
-                catalog = get_skills_catalog(private_dir=infer_private_skills_dir(self.data_dir))
+                scan_project_agents = (
+                    bool(personalization.get("agents_skills_scan_enabled", True))
+                    if isinstance(personalization, dict)
+                    else True
+                )
+                catalog = get_skills_catalog(
+                    private_dir=infer_private_skills_dir(self.data_dir),
+                    project_path=self.project_path,
+                    scan_project_agents=scan_project_agents,
+                )
                 enabled_skills = merge_enabled_skills(
                     personalization.get("enabled_skills") if isinstance(personalization, dict) else None,
                     catalog,
@@ -119,10 +131,28 @@ class MainTerminalToolsReadMixin:
 
                 normalized_lower = normalized_input.lower()
 
+                def _resolve_item(item: Dict[str, str]) -> Dict[str, Any]:
+                    sid = item.get("id")
+                    primary_dir = str(item.get("display_dir") or WORKSPACE_SKILLS_DIRNAME).strip("/")
+                    conflict_dir = str(item.get("conflict_dir") or "").strip("/")
+                    if conflict_dir:
+                        # 同名冲突：报错并引导改用 read_file 按具体路径查看
+                        return {
+                            "success": False,
+                            "error": (
+                                f"技能 '{sid}' 存在同名重复：{primary_dir}/{sid}/SKILL.md 与 "
+                                f"{conflict_dir}/{sid}/SKILL.md 均存在，read_skill 无法确定读取哪一份。\n"
+                                f"请改用 read_file 工具按具体路径读取查看（可分别读取 "
+                                f"{primary_dir}/{sid}/SKILL.md 与 {conflict_dir}/{sid}/SKILL.md 对比），"
+                                f"或告知用户删除/重命名其中一份以消除重复。"
+                            ),
+                        }
+                    return {"success": True, "skill_id": sid, "display_dir": primary_dir}
+
                 # 1) 优先按 skill id 精确匹配（忽略大小写）
-                id_map = {str(item.get("id", "")).lower(): item.get("id") for item in filtered_catalog if item.get("id")}
+                id_map = {str(item.get("id", "")).lower(): item for item in filtered_catalog if item.get("id")}
                 if normalized_lower in id_map:
-                    return {"success": True, "skill_id": id_map[normalized_lower]}
+                    return _resolve_item(id_map[normalized_lower])
 
                 # 2) 再按 label 匹配（忽略大小写）
                 label_matches: List[str] = []
@@ -131,7 +161,7 @@ class MainTerminalToolsReadMixin:
                     if label and label == normalized_lower and item.get("id"):
                         label_matches.append(item["id"])
                 if len(label_matches) == 1:
-                    return {"success": True, "skill_id": label_matches[0]}
+                    return _resolve_item(id_map[label_matches[0].lower()])
                 if len(label_matches) > 1:
                     return {
                         "success": False,
@@ -147,8 +177,9 @@ class MainTerminalToolsReadMixin:
                     return resolved
 
                 skill_id = resolved["skill_id"]
+                display_dir = str(resolved.get("display_dir") or WORKSPACE_SKILLS_DIRNAME).strip("/")
                 read_args = {
-                    "path": f"{WORKSPACE_SKILLS_DIRNAME}/{skill_id}/SKILL.md",
+                    "path": f"{display_dir}/{skill_id}/SKILL.md",
                     "type": "read",
                 }
                 result = self._handle_read_tool(read_args)

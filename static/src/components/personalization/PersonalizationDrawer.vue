@@ -933,6 +933,38 @@
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
+                          ><span class="settings-row-title">CLAUDE.md 自动注入</span
+                          ><span class="settings-row-desc"
+                            >工作区根目录存在 CLAUDE.md 时自动注入系统提示词（默认关闭，与 AGENTS.md 并列注入）</span
+                          ></span
+                        ><input
+                          type="checkbox"
+                          :checked="form.claude_md_auto_inject"
+                          @change="
+                            personalization.updateField({
+                              key: 'claude_md_auto_inject',
+                              value: $event.target.checked
+                            })
+                          " /><FancyCheck :checked="form.claude_md_auto_inject" /></label>
+
+                      <label class="settings-toggle-row"
+                        ><span class="settings-row-copy"
+                          ><span class="settings-row-title">扫描 .agents/skills/ 技能目录</span
+                          ><span class="settings-row-desc"
+                            >自动扫描工作区 .agents/skills/ 下的行业通用技能（Agent Skills 开放标准路径），与 .astrion/skills/ 技能一并列出；同名重复时 read_skill 会报错并提示按具体路径读取</span
+                          ></span
+                        ><input
+                          type="checkbox"
+                          :checked="form.agents_skills_scan_enabled"
+                          @change="
+                            personalization.updateField({
+                              key: 'agents_skills_scan_enabled',
+                              value: $event.target.checked
+                            })
+                          " /><FancyCheck :checked="form.agents_skills_scan_enabled" /></label>
+
+                      <label class="settings-toggle-row"
+                        ><span class="settings-row-copy"
                           ><span class="settings-row-title">文件修改留痕</span
                           ><span class="settings-row-desc"
                             >每次任务完成后，把本轮 write/edit 的文件修改以 diff 形式保存到工作区

@@ -88,18 +88,18 @@ logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 
 
-def _build_sub_agents_md_notice(sub_paths: List[str], total: int) -> str:
-    """构建子目录 AGENTS.md 路径通知文案（只列相对路径，不注入内容）。无子目录文件时返回空串。"""
+def _build_sub_md_notice(filename: str, sub_paths: List[str], total: int) -> str:
+    """构建子目录指令文件路径通知文案（只列相对路径，不注入内容）。无子目录文件时返回空串。"""
     if not sub_paths:
         return ""
-    lines = ["另外，工作区以下子目录也存在 AGENTS.md 规范文件：", ""]
+    lines = [f"另外，工作区以下子目录也存在 {filename} 规范文件：", ""]
     for p in sub_paths:
         lines.append(f"- `{p}`")
     if total > len(sub_paths):
         lines.append("")
         lines.append(f"...共 {total} 个")
     lines.append("")
-    lines.append("这些子目录规范仅适用于其所在目录范围。若你的操作涉及上述目录，请先自行读取对应 AGENTS.md 了解局部规范后再动手，不得将子目录规范当作全局规范套用。")
+    lines.append(f"这些子目录规范仅适用于其所在目录范围。若你的操作涉及上述目录，请先自行读取对应 {filename} 了解局部规范后再动手，不得将子目录规范当作全局规范套用。")
     return "\n".join(lines)
 
 
@@ -181,7 +181,7 @@ class MessagesMixin:
             personalization_config = getattr(self.context_manager, "custom_personalization_config", None) or load_personalization_config(self.data_dir)
             shallow_replace_enabled = bool(personalization_config.get("auto_shallow_compress_enabled", False)) if isinstance(personalization_config, dict) else False
 
-            # 顺序：主prompt → 权限模式 → 执行环境 → 最近对话 → 个性化配置 → 工作区信息 → AGENTS.md → skills → 记忆 → 自定义 → 禁用提示
+            # 顺序：主prompt → 权限模式 → 执行环境 → 最近对话 → 个性化配置 → 工作区信息 → AGENTS.md → CLAUDE.md → skills → 记忆 → 自定义 → 禁用提示
 
             # 权限模式
             permission_mode_message = self._get_or_init_frozen_mode_prompt(
@@ -275,7 +275,7 @@ class MessagesMixin:
                     return ""
                 # 子目录 AGENTS.md 只通知相对路径，不注入内容
                 sub_paths, sub_total = self._load_sub_agents_md_paths()
-                sub_notice = _build_sub_agents_md_notice(sub_paths, sub_total)
+                sub_notice = _build_sub_md_notice("AGENTS.md", sub_paths, sub_total)
                 agents_md_template = self.load_prompt("agents_md_inject").strip()
                 if agents_md_template and "{{AGENTS_MD_CONTENT}}" in agents_md_template:
                     text = agents_md_template.replace("{{AGENTS_MD_CONTENT}}", agents_md_content)
@@ -300,8 +300,48 @@ class MessagesMixin:
                 if agents_md_text:
                     messages.append({"role": "system", "content": agents_md_text})
 
+            # CLAUDE.md（默认关闭，开启后与 AGENTS.md 并列注入）
+            def _build_claude_md_prompt() -> str:
+                claude_md_content = self._load_root_md_content("CLAUDE.md")
+                if not claude_md_content:
+                    return ""
+                # 子目录 CLAUDE.md 只通知相对路径，不注入内容
+                sub_paths, sub_total = self._load_sub_md_paths("CLAUDE.md")
+                sub_notice = _build_sub_md_notice("CLAUDE.md", sub_paths, sub_total)
+                claude_md_template = self.load_prompt("claude_md_inject").strip()
+                if claude_md_template and "{{CLAUDE_MD_CONTENT}}" in claude_md_template:
+                    text = claude_md_template.replace("{{CLAUDE_MD_CONTENT}}", claude_md_content)
+                    text = text.replace("{{CLAUDE_MD_UPDATED_AT}}", self._load_root_md_updated_at("CLAUDE.md"))
+                    text = text.replace("{{SUB_CLAUDE_MD_NOTICE}}", sub_notice)
+                    return text
+                # 模板缺失/无占位符时的兜底格式
+                text = f"【CLAUDE.md 项目规范】{self._load_root_md_updated_at('CLAUDE.md')}\n\n{claude_md_content}\n\n---\n请注意：以上规范来自工作区根目录的 CLAUDE.md 文件，若有冲突请以 CLAUDE.md 为准。"
+                return f"{text}\n\n{sub_notice}" if sub_notice else text
+
+            # 与 AGENTS.md 同理，只在开启时生成并缓存
+            claude_md_inject_enabled = (
+                bool(personalization_config.get("claude_md_auto_inject", False))
+                if isinstance(personalization_config, dict)
+                else False
+            )
+            if claude_md_inject_enabled:
+                claude_md_text = self._get_or_init_frozen_prompt(
+                    "frozen_claude_md_prompt",
+                    _build_claude_md_prompt,
+                )
+                if claude_md_text:
+                    messages.append({"role": "system", "content": claude_md_text})
+
             # skills 列表
-            skills_catalog = get_skills_catalog(private_dir=infer_private_skills_dir(self.data_dir))
+            skills_catalog = get_skills_catalog(
+                private_dir=infer_private_skills_dir(self.data_dir),
+                project_path=self.project_path,
+                scan_project_agents=(
+                    bool(personalization_config.get("agents_skills_scan_enabled", True))
+                    if isinstance(personalization_config, dict)
+                    else True
+                ),
+            )
             enabled_skills = merge_enabled_skills(
                 personalization_config.get("enabled_skills") if isinstance(personalization_config, dict) else None,
                 skills_catalog,

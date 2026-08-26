@@ -132,6 +132,8 @@ interface PersonalForm {
   deep_compress_trigger_tokens: number | null;
   deep_compress_form: 'file' | 'inject';
   agents_md_auto_inject: boolean;
+  claude_md_auto_inject: boolean;
+  agents_skills_scan_enabled: boolean;
   new_chat_button_behavior: 'route' | 'blank';
   group_sidebar_by_workspace: boolean;
   sidebar_pinned_workspaces: string[];
@@ -336,6 +338,8 @@ const defaultForm = (): PersonalForm => ({
   deep_compress_trigger_tokens: null,
   deep_compress_form: 'file',
   agents_md_auto_inject: false,
+  claude_md_auto_inject: false,
+  agents_skills_scan_enabled: true,
   new_chat_button_behavior: 'route',
   group_sidebar_by_workspace: false,
   sidebar_pinned_workspaces: [],
@@ -600,6 +604,8 @@ export const usePersonalizationStore = defineStore('personalization', {
         ),
         deep_compress_form: data.deep_compress_form === 'inject' ? 'inject' : 'file',
         agents_md_auto_inject: !!data.agents_md_auto_inject,
+        claude_md_auto_inject: !!data.claude_md_auto_inject,
+        agents_skills_scan_enabled: data.agents_skills_scan_enabled === undefined ? true : !!data.agents_skills_scan_enabled,
         new_chat_button_behavior: data.new_chat_button_behavior === 'blank' ? 'blank' : 'route',
         group_sidebar_by_workspace: !!data.group_sidebar_by_workspace,
         sidebar_pinned_workspaces: Array.isArray(data.sidebar_pinned_workspaces)

@@ -1,0 +1,10 @@
+【CLAUDE.md 项目规范】
+
+以下是工作区根目录 CLAUDE.md 文件的内容{{CLAUDE_MD_UPDATED_AT}}，请在回答时参考这些项目规范：
+
+{{CLAUDE_MD_CONTENT}}
+
+---
+注意：以上规范来自工作区根目录的 CLAUDE.md 文件，若与未来代码冲突，以实际代码为准。
+
+{{SUB_CLAUDE_MD_NOTICE}}

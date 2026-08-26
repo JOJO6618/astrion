@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from config import AGENT_SKILLS_DIR, CUSTOM_SKILLS_DIR, IS_HOST_MODE, WORKSPACE_SKILLS_DIRNAME
+from config import AGENT_SKILLS_DIR, CUSTOM_SKILLS_DIR, IS_HOST_MODE, PROJECT_AGENTS_SKILLS_DIRNAME, WORKSPACE_SKILLS_DIRNAME
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -282,8 +282,15 @@ def _scan_skills_catalog(root: Path) -> List[Dict[str, str]]:
 def get_skills_catalog(
     base_dir: Optional[str] = None,
     private_dir: Optional[str | Path] = None,
+    project_path: Optional[str | Path] = None,
+    scan_project_agents: bool = True,
 ) -> List[Dict[str, str]]:
-    """List available skills from global library plus optional private library."""
+    """List available skills from global library plus optional private library.
+
+    来源标注：item["source"] = global（仓库 agentskills/）/ private（用户私有）/ agents（工作区 .agents/skills/）；
+    item["display_dir"] 为该 skill 在工作区内的可读路径前缀（global/private 经同步复制后在 .astrion/skills/，
+    agents 原地读取在 .agents/skills/）。同名冲突时保留已有条目并打 conflict_dir 标记，由 read_skill 报错引导。
+    """
     roots: List[Path] = [Path(base_dir or AGENT_SKILLS_DIR).expanduser().resolve()]
     if private_dir:
         private_root = Path(private_dir).expanduser().resolve()
@@ -292,15 +299,43 @@ def get_skills_catalog(
 
     merged: Dict[str, Dict[str, str]] = {}
     order: List[str] = []
-    for root in roots:
+    for index, root in enumerate(roots):
+        source = "global" if index == 0 else "private"
         for item in _scan_skills_catalog(root):
             skill_id = item.get("id")
             if not skill_id:
                 continue
             if skill_id not in merged:
                 order.append(skill_id)
+            item["source"] = source
+            item["display_dir"] = WORKSPACE_SKILLS_DIRNAME
             # Later roots (private) override metadata for same id.
             merged[skill_id] = item
+
+    # 行业通用目录：工作区 .agents/skills/（Agent Skills 开放标准路径；原地读取，不参与同步复制）
+    if project_path and scan_project_agents:
+        try:
+            agents_root = (Path(project_path).expanduser().resolve() / PROJECT_AGENTS_SKILLS_DIRNAME).resolve()
+        except Exception:
+            agents_root = None
+        if agents_root and agents_root not in roots:
+            for item in _scan_skills_catalog(agents_root):
+                skill_id = item.get("id")
+                if not skill_id:
+                    continue
+                if skill_id in merged:
+                    # 同名冲突：保留已有（.astrion/skills）条目，仅打冲突标记；
+                    # prompt 列表与 read_skill 据此提示用户用 read_file 按具体路径查看
+                    merged[skill_id]["conflict_dir"] = PROJECT_AGENTS_SKILLS_DIRNAME
+                    logger.warning(
+                        "[skills] 技能 %s 同时存在于 %s 与 %s，已标记同名冲突",
+                        skill_id, WORKSPACE_SKILLS_DIRNAME, PROJECT_AGENTS_SKILLS_DIRNAME,
+                    )
+                    continue
+                item["source"] = "agents"
+                item["display_dir"] = PROJECT_AGENTS_SKILLS_DIRNAME
+                order.append(skill_id)
+                merged[skill_id] = item
     return [merged[skill_id] for skill_id in order if skill_id in merged]
 
 
@@ -353,20 +388,41 @@ def build_skills_list(
     catalog: Sequence[Dict[str, str]],
     enabled_skill_ids: Sequence[str],
 ) -> List[str]:
-    """Build skills list lines / 生成 skills 列表行。"""
+    """Build skills list lines / 生成 skills 列表行。
+
+    列表行直接使用该 skill 在工作区内的真实路径前缀（.astrion/skills/ 或 .agents/skills/）；
+    .agents/skills/ 来源与同名冲突会在列表尾部附说明行。
+    """
     if not enabled_skill_ids:
         return []
     lookup = {item.get("id"): item for item in catalog if item.get("id")}
     lines: List[str] = []
+    has_agents_source = False
+    has_conflict = False
     for skill_id in enabled_skill_ids:
         meta = lookup.get(skill_id)
         if not meta:
             continue
+        display_dir = (meta.get("display_dir") or WORKSPACE_SKILLS_DIRNAME).strip("/")
+        if meta.get("source") == "agents":
+            has_agents_source = True
         description = (meta.get("description") or "").strip()
-        if description:
-            lines.append(f".astrion/skills/{skill_id}：{description}")
-        else:
-            lines.append(f".astrion/skills/{skill_id}")
+        line = f"{display_dir}/{skill_id}：{description}" if description else f"{display_dir}/{skill_id}"
+        conflict_dir = (meta.get("conflict_dir") or "").strip("/")
+        if conflict_dir:
+            has_conflict = True
+            line += f"（⚠️ 同名重复：{conflict_dir}/{skill_id} 也存在，read_skill 会报错，请改用 read_file 按具体路径读取）"
+        lines.append(line)
+    if has_agents_source:
+        lines.append(
+            f"注：以 {PROJECT_AGENTS_SKILLS_DIRNAME}/ 开头的技能来自工作区 {PROJECT_AGENTS_SKILLS_DIRNAME}/ 目录"
+            "（行业通用技能目录，由项目仓库提供，非 Astrion 管理），同样可用 read_skill 读取。"
+        )
+    if has_conflict:
+        lines.append(
+            f"注：标注同名重复的技能在 {WORKSPACE_SKILLS_DIRNAME}/ 与 {PROJECT_AGENTS_SKILLS_DIRNAME}/ 各有一份，"
+            "内容可能不同；read_skill 对重复名会报错，此时请改用 read_file 读取具体路径查看。"
+        )
     return lines
 
 

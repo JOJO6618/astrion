@@ -168,6 +168,8 @@ CUSTOM_ROLES_DIR = str(Path(RUNTIME_ROOT) / _MODE / "mutiagents" / "agents")
 # web 模式预设角色目录（web 模式下使用，host 模式下不用）
 WEB_PRESET_ROLES_DIR = str(Path(RUNTIME_ROOT) / "web" / "mutiagents" / "agents")
 WORKSPACE_SKILLS_DIRNAME = ".astrion/skills"
+# 行业通用技能目录（Agent Skills 开放标准，工作区根目录下，扫描不同步复制）
+PROJECT_AGENTS_SKILLS_DIRNAME = ".agents/skills"
 WORKSPACE_MEMORY_DIRNAME = ".astrion/memory"
 WORKSPACE_REVIEW_DIRNAME = ".astrion/review"
 HOST_WORKSPACES_FILE = _resolve_repo_path(
@@ -193,6 +195,7 @@ __all__ = [
     "LOGS_DIR",
     "AGENT_SKILLS_DIR",
     "WORKSPACE_SKILLS_DIRNAME",
+    "PROJECT_AGENTS_SKILLS_DIRNAME",
     "WORKSPACE_MEMORY_DIRNAME",
     "WORKSPACE_REVIEW_DIRNAME",
     "IS_HOST_MODE",

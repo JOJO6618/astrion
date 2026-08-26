@@ -112,6 +112,8 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "versioning_backup_mode": "shallow",  # 文件备份方式：shallow-浅备份（只备份AI编辑的文件）/ full-完全备份（整个工作区）
     "versioning_restore_mode": "overwrite",  # 版本回溯模式固定为 overwrite
     "agents_md_auto_inject": False,  # AGENTS.md 自动注入开关
+    "claude_md_auto_inject": False,  # CLAUDE.md 自动注入开关（默认关闭）
+    "agents_skills_scan_enabled": True,  # 自动扫描工作区 .agents/skills/ 行业通用技能目录（默认开启）
     "new_chat_button_behavior": "route",  # 新建对话按钮行为：route-跳转空白新对话页 / blank-立即创建空对话
     "default_hide_workspace": False,  # 默认隐藏工作区
     "hide_quick_dock": False,  # 隐藏快捷窗口（对话区右侧的待办/子智能体/后台指令/文件窗口列）
@@ -547,6 +549,18 @@ def sanitize_personalization_payload(
         base["agents_md_auto_inject"] = bool(data.get("agents_md_auto_inject"))
     else:
         base["agents_md_auto_inject"] = bool(base.get("agents_md_auto_inject", False))
+
+    # CLAUDE.md 自动注入开关（默认关闭）
+    if "claude_md_auto_inject" in data:
+        base["claude_md_auto_inject"] = bool(data.get("claude_md_auto_inject"))
+    else:
+        base["claude_md_auto_inject"] = bool(base.get("claude_md_auto_inject", False))
+
+    # .agents/skills/ 行业通用技能目录扫描开关（默认开启）
+    if "agents_skills_scan_enabled" in data:
+        base["agents_skills_scan_enabled"] = bool(data.get("agents_skills_scan_enabled"))
+    else:
+        base["agents_skills_scan_enabled"] = bool(base.get("agents_skills_scan_enabled", True))
 
     # 新建对话按钮行为：route-跳转空白新对话页 / blank-立即创建空对话
     new_chat_behavior = data.get("new_chat_button_behavior", base.get("new_chat_button_behavior"))

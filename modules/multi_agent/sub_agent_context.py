@@ -131,27 +131,75 @@ def _build_agents_md_section(workspace_path: str) -> str:
     )
 
 
+def _build_claude_md_section(workspace_path: str, data_dir: str = "") -> str:
+    """构建 CLAUDE.md 项目规范段（遵循 claude_md_auto_inject 开关，默认关闭）。"""
+    try:
+        from modules.personalization_manager import load_personalization_config
+
+        try:
+            personalization = load_personalization_config(data_dir) if data_dir else {}
+        except Exception:
+            personalization = {}
+        enabled = (
+            bool(personalization.get("claude_md_auto_inject", False))
+            if isinstance(personalization, dict)
+            else False
+        )
+        if not enabled:
+            return ""
+        claude_file = Path(workspace_path) / "CLAUDE.md"
+        if not claude_file.is_file():
+            return ""
+        content = claude_file.read_text(encoding="utf-8").strip()
+        if not content:
+            return ""
+        return (
+            f"## CLAUDE.md 项目规范\n\n"
+            f"> 以下是工作区根目录的 CLAUDE.md 文件内容，请在回答时参考这些项目规范：\n\n"
+            f"{content}\n\n"
+            f"---\n"
+            f"注意：以上规范来自工作区根目录的 CLAUDE.md 文件，若与未来代码冲突，以实际代码为准。\n"
+        )
+    except Exception:
+        return ""
+
+
 def _build_skills_section(workspace_path: str, data_dir: str = "") -> str:
     """构建可用 skill 列表段。"""
     try:
+        from modules.personalization_manager import load_personalization_config
         from modules.skills_manager import (
             get_skills_catalog,
             build_skills_list,
+            resolve_enabled_skills,
             infer_private_skills_dir,
         )
 
         private_dir = infer_private_skills_dir(data_dir) if data_dir else None
-        catalog = get_skills_catalog(private_dir=private_dir)
+        try:
+            personalization = load_personalization_config(data_dir) if data_dir else {}
+        except Exception:
+            personalization = {}
+        scan_project_agents = (
+            bool(personalization.get("agents_skills_scan_enabled", True))
+            if isinstance(personalization, dict)
+            else True
+        )
+        catalog = get_skills_catalog(
+            private_dir=private_dir,
+            project_path=workspace_path,
+            scan_project_agents=scan_project_agents,
+        )
         # 子智能体不区分 enabled/disabled，列出全部可用 skill
-        skills_list = build_skills_list(catalog, enabled=None)
+        skills_list = build_skills_list(catalog, resolve_enabled_skills(None, catalog))
         if not skills_list:
             return ""
         return (
-            f"## 可用 AgentSkill\n\n"
-            f"agent skills 系统已启用，以下是可用的 skills（含简要说明）：\n\n"
-            f"{skills_list}\n\n"
-            f"使用技能时，优先用 read_skill 通过技能名读取 SKILL.md；"
-            f"需要阅读 skill 目录中的其他文件时再使用 read_file\n"
+            "## 可用 AgentSkill\n\n"
+            "agent skills 系统已启用，以下是可用的 skills（含简要说明）：\n\n"
+            + "\n".join(skills_list)
+            + "\n\n使用技能时，优先用 read_skill 通过技能名读取 SKILL.md；"
+            "需要阅读 skill 目录中的其他文件时再使用 read_file\n"
         )
     except Exception:
         return ""
@@ -233,6 +281,11 @@ def build_sub_agent_dynamic_context(
     agents_md = _build_agents_md_section(workspace_path)
     if agents_md:
         sections.append(agents_md)
+
+    # 4.5 CLAUDE.md（遵循 claude_md_auto_inject 开关，默认关闭）
+    claude_md = _build_claude_md_section(workspace_path, data_dir=data_dir)
+    if claude_md:
+        sections.append(claude_md)
 
     # 5. 可用 skill
     skills = _build_skills_section(workspace_path, data_dir=data_dir)
