@@ -286,12 +286,6 @@ export const sendMethods = {
         targetConversationId = createResult.conversation_id;
         // 创建即定型：落地对话类型（与后端 metadata 保持一致）
         this.currentConversationType = isMultiAgent ? 'multi_agent' : 'normal';
-        try {
-          const { useConversationStore } = await import('../../../stores/conversation');
-          useConversationStore().$patch({ multiAgentMode: isMultiAgent });
-        } catch (_e) {
-          // ignore
-        }
         this.skipConversationHistoryReload = true;
         this.currentConversationId = targetConversationId;
         this.currentConversationTitle = '新对话';
@@ -302,36 +296,61 @@ export const sendMethods = {
           total_messages: 0,
           total_tools: 0
         };
-        this.conversations.splice(
-          0,
-          this.conversations.length,
-          newPlaceholder,
-          ...this.conversations.filter((conv) => conv && conv.id !== targetConversationId)
-        );
-
-        // 分组视图下同步到当前工作区
+        // 新建对话的类型同时决定侧边栏过滤器目标类型
+        const targetType = isMultiAgent ? 'multi_agent' : 'normal';
         try {
           const { useConversationStore } = await import('../../../stores/conversation');
           const conversationStore = useConversationStore();
-          const currentWorkspaceId = this.currentHostWorkspaceId;
-          if (currentWorkspaceId) {
-            conversationStore.ensureWorkspaceGroup(currentWorkspaceId);
-            const group = conversationStore.workspaceGroups.find(
-              (g: any) => g.workspaceId === currentWorkspaceId
-            );
-            if (group) {
-              group.conversations.splice(
-                0,
-                group.conversations.length,
-                newPlaceholder,
-                ...group.conversations.filter((conv: any) => conv.id !== targetConversationId)
+          conversationStore.$patch({ multiAgentMode: isMultiAgent });
+
+          // 占位对话按「新建类型」插入对应过滤器缓存（而非当前过滤器类型的缓存），
+          // 并同步切换侧边栏「智能体/多智能体」过滤器，避免创建后错位显示（需刷新才归位）。
+          const targetCache = conversationStore.conversationsCache[targetType];
+          targetCache.list.splice(
+            0,
+            targetCache.list.length,
+            newPlaceholder,
+            ...targetCache.list.filter((conv: any) => conv && conv.id !== targetConversationId)
+          );
+          if (conversationStore.sidebarConversationType !== targetType) {
+            conversationStore.setSidebarConversationType(targetType);
+          }
+
+          // 分组视图下同步到当前工作区（同样按目标类型缓存落位）
+          try {
+            const currentWorkspaceId = this.currentHostWorkspaceId;
+            if (currentWorkspaceId) {
+              conversationStore.ensureWorkspaceGroup(currentWorkspaceId);
+              const group = conversationStore.workspaceGroups.find(
+                (g: any) => g.workspaceId === currentWorkspaceId
               );
-              group.expanded = true;
-              group.visibleOffset = 0;
-              group.visibleLimit = 5;
+              if (group) {
+                const groupList = group.conversationsByType?.[targetType];
+                if (groupList) {
+                  groupList.splice(
+                    0,
+                    groupList.length,
+                    newPlaceholder,
+                    ...groupList.filter((conv: any) => conv && conv.id !== targetConversationId)
+                  );
+                }
+                group.expanded = true;
+                group.visibleOffset = 0;
+                group.visibleLimit = 5;
+              }
+            }
+          } catch (_err) {
+            // ignore
+          }
+
+          // 目标类型缓存从未加载过时走切换补载：placeholder 会被真实列表全量覆盖，
+          // 新创建对话在后端 updated_at 最新仍在顶部，不会重复也不会丢失。
+          if (!conversationStore.conversationsCache[targetType].loaded) {
+            if (typeof this.handleSidebarConversationTypeChange === 'function') {
+              this.handleSidebarConversationTypeChange(targetType).catch(() => {});
             }
           }
-        } catch (_err) {
+        } catch (_e) {
           // ignore
         }
 

@@ -138,11 +138,24 @@ export const modeMethods = {
       this.inputCloseMenus?.();
     }
   },
-  handleSelectNewConversationType(type) {
+  async handleSelectNewConversationType(type) {
     const normalized = type === 'multi_agent' ? 'multi_agent' : 'agent';
     this.newConversationType = normalized;
     persistNewConversationType(normalized);
     this.agentTypeMenuOpen = false;
+    // 选择即联动：同步切换侧边栏「智能体/多智能体」过滤器（纯本地引用交换、零请求）。
+    // 选择器仅在空对话可用（有对话时禁用展示态），此处置空判断作防御；
+    // 进入已有对话后两个状态保持解耦，互不干扰。
+    if (!this.currentConversationId) {
+      try {
+        const { useConversationStore } = await import('../../../stores/conversation');
+        useConversationStore().setSidebarConversationType(
+          normalized === 'multi_agent' ? 'multi_agent' : 'normal'
+        );
+      } catch (_e) {
+        // ignore
+      }
+    }
   },
   toggleModeMenu() {
     if (!this.isConnected || this.streamingMessage) {
