@@ -170,7 +170,7 @@ class ToolsDefinitionTerminalToolsMixin:
                         "type": "function",
 	                "function": {
 	                    "name": "run_command",
-	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。",
+	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。",
 	                    "parameters": {
 	                        "type": "object",
 	                        "properties": self._inject_intent({
@@ -181,7 +181,7 @@ class ToolsDefinitionTerminalToolsMixin:
                                     },
                                     "run_in_background": {
                                         "type": "boolean",
-                                        "description": "是否后台运行。true 时先等待5秒返回已有输出，并在后台持续执行直至结束。"
+                                        "description": "是否后台运行。true 时先等待5秒返回已有输出，并在后台持续执行直至结束。禁止用于启动后台服务（如常驻服务进程、watch 类命令）。"
                                     }
                                 }),
                                 "required": ["command", "timeout"]

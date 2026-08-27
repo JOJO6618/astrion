@@ -192,6 +192,8 @@ function renderDefaultResult(result: any, args: any, name: string): string {
     'file_path',
     'agent_id',
     'target_agent_id',
+    'display_name',
+    'target_display_name',
     'question',
     'role_id',
     'url'
@@ -204,6 +206,8 @@ function renderDefaultResult(result: any, args: any, name: string): string {
         file_path: '路径',
         agent_id: '子智能体 ID',
         target_agent_id: '目标子智能体 ID',
+        display_name: '子智能体',
+        target_display_name: '目标子智能体',
         question: '问题',
         role_id: '角色 ID',
         url: 'URL'
@@ -827,9 +831,9 @@ function renderSleep(result: any, args: any): string {
       html += `<div><strong>原因：</strong>${escapeHtml(String(args.reason))}</div>`;
     }
   } else if (mode === 'wait_sub_agent_output') {
-    const agentId = result?.agent_id ?? args?.wait_sub_agent_output_ids ?? '';
-    if (agentId !== '') {
-      html += `<div><strong>等待子智能体：</strong>#${escapeHtml(String(agentId))}</div>`;
+    const targetName = result?.display_name ?? args?.wait_sub_agent_output ?? '';
+    if (targetName !== '') {
+      html += `<div><strong>等待子智能体：</strong>${escapeHtml(String(targetName))}</div>`;
     }
   } else if (mode === 'wait_sub_agent_ids') {
     const agentIds = Array.isArray(result?.agent_ids) ? result.agent_ids : [];
@@ -1454,6 +1458,8 @@ function renderEasterEgg(result: any, args: any): string {
 function renderCreateSubAgent(result: any, args: any): string {
   const status = formatToolStatusLabel(result, '✓ 已创建', '✗ 创建失败');
   const agentId = result.agent_id ?? args.agent_id ?? '';
+  // 多智能体模式：只展示角色内编号显示名，全局 agent_id/task_id 不暴露
+  const displayName = result.display_name ?? '';
   const taskId = result.task_id ?? '';
   const deliverablesDir = result.deliverables_dir ?? '';
   const taskDescription = args.task ?? '';
@@ -1474,13 +1480,15 @@ function renderCreateSubAgent(result: any, args: any): string {
 
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>状态：</strong>${status}</div>`;
-  if (agentId !== '') {
+  if (displayName) {
+    html += `<div><strong>子智能体：</strong>${escapeHtml(String(displayName))}</div>`;
+  } else if (agentId !== '') {
     html += `<div><strong>子智能体 ID：</strong>${escapeHtml(String(agentId))}</div>`;
   }
-  if (taskId !== '') {
+  if (taskId !== '' && !displayName) {
     html += `<div><strong>任务 ID：</strong>${escapeHtml(String(taskId))}</div>`;
   }
-  if (deliverablesDir !== '') {
+  if (deliverablesDir !== '' && !displayName) {
     html += `<div><strong>交付目录：</strong>${escapeHtml(String(deliverablesDir))}</div>`;
   }
   if (taskDescription) {
@@ -1518,16 +1526,19 @@ function renderCreateSubAgent(result: any, args: any): string {
 
 function renderTerminateSubAgent(result: any, args: any): string {
   const status = formatToolStatusLabel(result, '✓ 已关闭', '✗ 关闭失败');
+  const displayName = result.display_name ?? args.display_name ?? '';
   const agentId = result.agent_id ?? args.agent_id ?? '';
   const taskId = result.task_id ?? '';
   const message = result.message ?? result.system_message ?? '';
 
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>状态：</strong>${status}</div>`;
-  if (agentId !== '') {
+  if (displayName) {
+    html += `<div><strong>子智能体：</strong>${escapeHtml(String(displayName))}</div>`;
+  } else if (agentId !== '') {
     html += `<div><strong>子智能体 ID：</strong>${escapeHtml(String(agentId))}</div>`;
   }
-  if (taskId !== '') {
+  if (taskId !== '' && !displayName) {
     html += `<div><strong>任务 ID：</strong>${escapeHtml(String(taskId))}</div>`;
   }
   html += '</div>';
@@ -1561,7 +1572,9 @@ function renderGetSubAgentStatus(result: any): string {
     const summary = item.summary ?? item.final_result?.message ?? item.final_result?.summary ?? '';
 
     html += '<div class="sub-agent-status-item">';
-    html += `<div class="sub-agent-status-header">子智能体 #${escapeHtml(String(agentId))}</div>`;
+    const itemDisplayName = item.display_name || '';
+    const itemHeader = itemDisplayName || `子智能体 #${agentId}`;
+    html += `<div class="sub-agent-status-header">${escapeHtml(String(itemHeader))}</div>`;
 
     if (!found) {
       html += '<div class="tool-result-meta">';
@@ -1580,7 +1593,7 @@ function renderGetSubAgentStatus(result: any): string {
       } else {
         html += `<div><strong>状态：</strong>${escapeHtml(status || '未知')}</div>`;
       }
-      if (taskId !== '') {
+      if (taskId !== '' && !itemDisplayName) {
         html += `<div><strong>任务 ID：</strong>${escapeHtml(String(taskId))}</div>`;
       }
       html += '</div>';
@@ -1601,11 +1614,14 @@ function renderGetSubAgentStatus(result: any): string {
 
 function renderSendMessageToSubAgent(result: any, args: any): string {
   const status = formatToolStatusLabel(result, '✓ 已发送', '✗ 发送失败');
+  const displayName = args.display_name ?? result.display_name ?? '';
   const agentId = args.agent_id ?? result.agent_id ?? '';
 
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>状态：</strong>${status}</div>`;
-  if (agentId !== '') {
+  if (displayName) {
+    html += `<div><strong>子智能体：</strong>${escapeHtml(String(displayName))}</div>`;
+  } else if (agentId !== '') {
     html += `<div><strong>子智能体 ID：</strong>${escapeHtml(String(agentId))}</div>`;
   }
   if (!result?.success && result?.error) {
@@ -1727,7 +1743,8 @@ function renderListActiveSubAgents(result: any): string {
     const lastOutput = agent.last_output || '';
 
     html += '<div class="sub-agent-status-item">';
-    html += `<div class="sub-agent-status-header">#${escapeHtml(String(agentId))} ${escapeHtml(displayName)} [${escapeHtml(status)}]</div>`;
+    // 只展示角色内编号显示名，不暴露全局 agent_id
+    html += `<div class="sub-agent-status-header">${escapeHtml(displayName)} [${escapeHtml(status)}]</div>`;
     html += '<div class="tool-result-meta">';
     if (summary) {
       html += `<div><strong>任务：</strong>${escapeHtml(String(summary))}</div>`;

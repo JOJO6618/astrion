@@ -403,7 +403,8 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 ### 11.1 角色与实例
 
 - 主智能体显示名固定为 `Team Leader`，不需要专门的预置角色文件。
-- 子智能体 = `role_id`（如 `ui-operator` / `full-stack-engineer` / `code-reviewer` / `researcher`）+ `agent_id`（同一 role_id 下从 1 递增）。显示名格式 `{Role Name}_{agent_id}`，例如 `UI Operator_1`，后缀永远带数字。
+- 子智能体 = `role_id`（如 `ui-operator` / `full-stack-engineer` / `code-reviewer` / `researcher`）+ 角色内编号（同一 role_id 下从 1 递增）。显示名格式 `{Role Name}_{角色内编号}`，例如 `UI Operator_1`，后缀永远带数字。
+- **编号暴露原则（2026-08-26 起）**：角色内编号显示名是**唯一**对模型和用户暴露的身份；全局 `agent_id` 是纯内部实现细节（任务字典 key / task_id 生成），由系统自动分配对话级最小空闲正整数，不接受模型指定、不出现在工具参数/结果文案/前端展示中。所有寻址类工具（send_message/stop/terminate/get_sub_agent_status/sleep 的 wait_sub_agent_output、子侧 ask_other_agent）一律用显示名。
 - 主→子 / 子→主 / 子→子三种通信通过工具完成，工具签名见 `modules/multi_agent/tools.py`。
 - **`send_message_to_sub_agent` 与 `ask_sub_agent` 语义不同，必须保留两者**：前者插入引导消息不阻塞，后者阻塞等待一轮回答。
 - 子智能体间通信要求同时向主智能体输出汇报，不允许「偷偷沟通」。
@@ -411,6 +412,8 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 ### 11.2 子智能体执行机制
 
 - 子智能体在主进程内 `asyncio.Task`，跑在独立后台事件循环线程里（避开 Flask-SocketIO threading 冲突）。工具调用复用主进程沙箱/容器链路，网络调用走 `utils.api_client.APIClient`。
+- **模型请求重试（2026-08-26 起）**：`_run_loop` 对 `_call_model` 包重试循环，与主智能体 `run_streaming_attempts` 同构——最多 5 次尝试（`_SUB_AGENT_MAX_API_RETRIES=4`）、间隔 10s（`_SUB_AGENT_RETRY_DELAY_SECONDS`，用 `asyncio.sleep` 分段等待并响应软停止/取消）。重试条件：**仅当零接收**（未收到任何文本/思考/工具调用）才重试；已开始收到内容后断流（`SubAgentModelCallError.received_any=True`）直接失败。失败终态分模式：多智能体模式下 5 次全失败 → 转为 idle + `_forward_output_to_master` 报错（等 Team Leader 重新下达指令），输出期间断开 → 直接 failed 并同步向主智能体报错；传统模式一律 `_write_failure`。
+- **工具「正在调用」进度事件（2026-08-26 起）**：`_call_model` 在工具名+id 首个流式 chunk 到达时即 emit `status="calling"` 进度事件（与后续 running/completed 共用同一 tool_call id），前端按 id 原地更新条目；`RunnerDetailPanel.vue` / `SubAgentActivityDialog.vue` 的 normalizeStatus 识别 `calling`（显示 spinner + 「调用中」），并支持同一 id 历史条目跨组原地更新（多工具 calling 事件交错场景）。
 - 子智能体在多智能体模式下：
   - `create_sub_agent` 强制 `run_in_background=False`，不触发 `sub_agent_waiting` 事件，不阻塞前端输入区。
   - 子智能体自然的 assistant 输出结束（无 tool_calls）即本轮任务结束，进入 `idle`，上下文保留，不算 failed。
@@ -508,7 +511,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 - 子智能体对话存在 `~/.astrion/astrion/host/host/data/sub_agents/`。重启后走 `manager.restore_sub_agent` 恢复实例引用。
 - **`MultiAgentState` 是进程级全局单例**（2026-07 重构）：存放在 `modules/multi_agent/state.py` 的 `GLOBAL_MULTI_AGENT_STATES`（key=`conversation_id`），所有 `SubAgentManager` 实例共享；`manager.multi_agent_states` 只是该全局 dict 的引用。此前它是 manager 实例属性，对话级 terminal 缓存重建会产生多个 manager，各自的 `_load_state` 都从磁盘快照 `from_snapshot` 出一份独立副本，导致 terminate 只标记其中一份、前端轮询落到其他副本显示陈旧 idle。`get_or_create` / `drop` / `_load_state` restore 均通过 `GLOBAL_MULTI_AGENT_STATES_LOCK`（RLock）互斥。
 - **进程重启后的状态校准**（2026-07 新增）：`_load_state` 恢复 ma 快照后，会用任务记录（持久真相）校准实例终态——任务记录是 terminated/终态而快照里还是 idle 的，一律校准为终态；同处还有存量 `_None` 后缀显示名的自愈迁移（按「对话×角色×创建时间」重编号）。
-- **显示名编号语义**：显示名后缀（如 `Full-Stack Engineer_1`）是**角色内编号**（`next_agent_id_for_role`，每次创建必递增），与内部 `agent_id`（LLM 可手动指定，如 10001）是两套独立命名空间，创建路径 `tools_execution.py` 中不得混用。
+- **显示名编号语义**：显示名后缀（如 `Full-Stack Engineer_1`）是**角色内编号**，创建路径 `tools_execution.py` 中通过 `peek_agent_id_for_role` + `commit_agent_id_for_role` 两步走——先 peek 构造显示名，创建成功后才提交计数器，**失败不消耗编号**（避免跳号）；全局 `agent_id` 由 `manager.next_free_agent_id()` 自动分配（对话级最小空闲正整数），两者是两套独立命名空间，不得混用。
 
 ---
 

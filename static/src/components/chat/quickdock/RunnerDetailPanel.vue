@@ -33,7 +33,7 @@
           :class="[item.kind === 'tool' ? 'feed-tool' : 'feed-text', { 'is-new': animatedKeys.has(item.key) }]"
         >
           <template v-if="item.kind === 'tool'">
-            <span v-if="item.state === 'running'" class="qd-tool-spinner"></span>
+            <span v-if="item.state === 'running' || item.state === 'calling'" class="qd-tool-spinner"></span>
             <span v-else class="qd-tool-done">{{ item.state === 'failed' ? '✕' : '✓' }}</span>
             <span class="tool-name">{{ item.toolName }}</span>
             <span class="tool-param" :title="item.text">{{ item.text }}</span>
@@ -257,6 +257,7 @@ const tokensTitle = computed(() => `上下文 ${currentTokens.value.toLocaleStri
 
 function normalizeStatus(status?: string) {
   if (status === 'running' || status === 'in_progress') return 'running';
+  if (status === 'calling') return 'calling';
   if (status === 'completed' || status === 'done' || status === 'success') return 'completed';
   if (status === 'failed' || status === 'error') return 'failed';
   return status || 'running';
@@ -324,11 +325,24 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
       typeof entry.content === 'string'
     ) {
       flushToolGroup();
-      rawItems.push({
+      // 语义顺序修正：工具「正在调用」事件在流式期间先于文本 output 落盘，
+      // 但 assistant 消息里文本永远在 tool_calls 之前——把 output 插入到
+      // 尾部连续的非终态工具条目（同一条 assistant 消息发起的调用）之前
+      const outputItem: OutputTimelineItem = {
         kind: 'output',
         key: `output-${entry.ts || index}`,
         content: entry.content
-      });
+      };
+      let cut = rawItems.length;
+      while (cut > 0) {
+        const tail = rawItems[cut - 1];
+        if (tail.kind === 'tool' && !isEntryTerminal(tail.entry?.status)) {
+          cut -= 1;
+        } else {
+          break;
+        }
+      }
+      rawItems.splice(cut, 0, outputItem);
       return;
     }
 
@@ -344,6 +358,19 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
     ) {
       currentToolGroup.entry = { ...currentToolGroup.entry, ...entry };
       return;
+    }
+
+    // 同一 tool_call id 的历史条目仍非终态时原地更新（「正在调用」事件可能与其他
+    // 工具的调用事件交错到达），避免出现永远转圈的重复条目
+    if (entry.id) {
+      const prior = rawItems.find(
+        (item) =>
+          item.kind === 'tool' && item.entry.id === entry.id && !isEntryTerminal(item.entry.status)
+      );
+      if (prior && prior.kind === 'tool') {
+        prior.entry = { ...prior.entry, ...entry };
+        return;
+      }
     }
 
     flushToolGroup();
@@ -367,7 +394,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
       kind: 'tool' as const,
       key: item.key,
       state,
-      stateLabel: state === 'completed' ? '完成' : state === 'failed' ? '失败' : '进行中',
+      stateLabel: state === 'completed' ? '完成' : state === 'failed' ? '失败' : state === 'calling' ? '调用中' : '进行中',
       toolName: item.entry.tool || '工具',
       text: buildText(item.entry)
     };

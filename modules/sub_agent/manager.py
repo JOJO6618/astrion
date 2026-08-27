@@ -260,6 +260,13 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             return {"success": False, "error": "缺少对话ID，无法创建子智能体"}
 
         if not self._ensure_agent_slot_available(conversation_id, agent_id):
+            # 多智能体模式的 agent_id 由系统自动分配且不对外暴露，
+            # 走到这里说明自动分配与其他写入路径竞争出错，不应把内部编号抛给模型
+            if multi_agent_mode:
+                return {
+                    "success": False,
+                    "error": "内部错误：实例编号分配冲突，请重试创建。"
+                }
             return {
                 "success": False,
                 "error": f"该对话已使用过编号 {agent_id}，请更换新的子智能体代号。"
@@ -354,7 +361,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 multi_agent_state.register_instance(inst)
             except ValueError:
                 shutil.rmtree(task_root, ignore_errors=True)
-                return {"success": False, "error": f"agent_id {agent_id} 已在该会话中使用"}
+                # 多智能体模式的 agent_id 是内部编号，不把具体值抛给模型
+                return {"success": False, "error": "内部错误：实例注册冲突，请重试创建。"}
 
         sub_agent = SubAgentTask(
             manager=self,
@@ -427,7 +435,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
 
         message = f"子智能体{agent_id} 已创建，任务ID: {task_id}"
         if multi_agent_mode and display_name:
-            message = f"{display_name} 已创建，任务ID: {task_id}"
+            # 多智能体模式：对用户/模型只暴露显示名，task_id 为内部细节不进文案
+            message = f"{display_name} 已创建。"
         print(f"{OUTPUT_FORMATS['info']} {message}")
         ma_debug(
             "manager_create_sub_agent",
@@ -607,11 +616,13 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             agent_id=real_agent_id,
             had_instance=bool(sub_agent),
         )
+        display_name = task.get("display_name") or f"子智能体{real_agent_id}"
         return {
             "success": True,
             "task_id": real_task_id,
             "agent_id": real_agent_id,
-            "message": f"子智能体{real_agent_id} 已暂停，可用 send_message_to_sub_agent 重新激活。",
+            "display_name": task.get("display_name") or None,
+            "message": f"{display_name} 已暂停，可用 send_message_to_sub_agent 重新激活。",
         }
 
     def terminate_sub_agent(
@@ -853,6 +864,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 "task_id": task["task_id"],
                 "status": status,
                 "summary": task.get("summary"),
+                "display_name": task.get("display_name"),
                 "created_at": task.get("created_at"),
                 "updated_at": task.get("updated_at"),
                 "deliverables_dir": task.get("deliverables_dir"),

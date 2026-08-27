@@ -141,9 +141,13 @@ def _format_sub_agent_stats(stats: Optional[Dict[str, Any]]) -> str:
 def _format_create_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("create_sub_agent", result_data)
+    # 多智能体模式：对模型只暴露角色内编号显示名，全局 agent_id/task_id 为内部细节
+    display_name = result_data.get("display_name")
+    status = result_data.get("status")
+    if display_name:
+        return f"{display_name} 已创建（状态 {status or 'running'}）。"
     agent_id = result_data.get("agent_id")
     task_id = result_data.get("task_id")
-    status = result_data.get("status")
     refs = result_data.get("copied_references") or []
     ref_note = f"，附带 {len(refs)} 份参考文件" if refs else ""
     deliver_dir = result_data.get("deliverables_dir")
@@ -203,9 +207,11 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
         return "未找到子智能体状态。"
     blocks = []
     for item in results:
+        # 多智能体模式：优先使用角色内编号显示名，不暴露全局 agent_id
         agent_id = item.get("agent_id")
+        label = item.get("display_name") or f"#{agent_id}"
         if not item.get("found"):
-            blocks.append(f"子智能体 #{agent_id} 不存在。")
+            blocks.append(f"子智能体 {label} 不存在。")
             continue
         status = item.get("status")
         summary = None
@@ -221,13 +227,13 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
         stats_text = _format_sub_agent_stats(item.get("stats"))
 
         if status == "completed":
-            lines = [f"子智能体 #{agent_id} 已完成"]
+            lines = [f"子智能体 {label} 已完成"]
         elif status == "terminated":
-            lines = [f"子智能体 #{agent_id} 已终止"]
+            lines = [f"子智能体 {label} 已终止"]
         elif status in {"failed", "timeout"}:
-            lines = [f"⚠️ 子智能体 #{agent_id} 状态 {status}"]
+            lines = [f"⚠️ 子智能体 {label} 状态 {status}"]
         else:
-            lines = [f"子智能体 #{agent_id} 状态: {status}"]
+            lines = [f"子智能体 {label} 状态: {status}"]
         if stats_text:
             lines.append(stats_text)
         if status == "completed" and isinstance(elapsed_seconds, (int, float)):
@@ -250,6 +256,9 @@ def _format_close_sub_agent(result_data: Dict[str, Any]) -> str:
 def _format_terminate_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("terminate_sub_agent", result_data)
+    display_name = result_data.get("display_name")
+    if display_name:
+        return f"已强制关闭子智能体 {display_name}。"
     agent_id = result_data.get("agent_id")
     task_id = result_data.get("task_id")
     message = result_data.get("message") or "子智能体已被强制关闭。"
@@ -261,6 +270,9 @@ def _format_terminate_sub_agent(result_data: Dict[str, Any]) -> str:
 def _format_send_message_to_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("send_message_to_sub_agent", result_data)
+    display_name = result_data.get("display_name")
+    if display_name:
+        return f"已向 {display_name} 发送消息。"
     agent_id = result_data.get("agent_id")
     if agent_id is not None:
         return f"已向子智能体 #{agent_id} 发送消息。"
@@ -270,8 +282,12 @@ def _format_send_message_to_sub_agent(result_data: Dict[str, Any]) -> str:
 def _format_stop_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("stop_sub_agent", result_data)
-    agent_id = result_data.get("agent_id")
+    display_name = result_data.get("display_name")
     message = result_data.get("message") or "子智能体已暂停。"
+    if display_name:
+        # manager 返回的 message 已是「{显示名} 已暂停…」格式，直接返回避免重复
+        return message
+    agent_id = result_data.get("agent_id")
     if agent_id is not None:
         return f"已暂停子智能体 #{agent_id}。{message}"
     return message
@@ -332,7 +348,8 @@ def _format_active_sub_agents_list(agents: List[Dict[str, Any]]) -> str:
         status = agent.get("status") or "unknown"
         summary = agent.get("summary") or ""
         last_output = agent.get("last_output") or ""
-        lines.append(f"#{agent_id} {display_name} [{status}]")
+        # 只暴露角色内编号显示名，不暴露全局 agent_id
+        lines.append(f"{display_name} [{status}]")
         if summary:
             lines.append(f"   任务：{summary}")
         if last_output:

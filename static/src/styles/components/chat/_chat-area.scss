@@ -2519,8 +2519,9 @@ body[data-theme='dark'] {
     box-shadow: none !important;
   }
 
+  /* hover 与输入栏按钮一致（--hover-bg），与菜单底色拉开对比 */
   .dropdown-item:hover:not(.disabled) {
-    background: var(--surface-muted) !important;
+    background: var(--hover-bg) !important;
   }
 }
 

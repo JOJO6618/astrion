@@ -1382,7 +1382,7 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "sleep":
                         seconds = arguments.get("seconds")
                         wait_sub_agent_ids = arguments.get("wait_sub_agent_ids")
-                        wait_sub_agent_output_ids = arguments.get("wait_sub_agent_output_ids")
+                        wait_sub_agent_output = arguments.get("wait_sub_agent_output")
                         wait_runcommand_id = arguments.get("wait_runcommand_id")
                         reason = arguments.get("reason", "等待操作完成")
 
@@ -1391,67 +1391,65 @@ class MainTerminalToolsExecutionMixin:
                             provided += 1
                         if wait_sub_agent_ids:
                             provided += 1
-                        if wait_sub_agent_output_ids:
+                        if wait_sub_agent_output:
                             provided += 1
                         if wait_runcommand_id:
                             provided += 1
                         if provided == 0:
                             result = {
                                 "success": False,
-                                "error": "sleep 至少需要提供一个参数：seconds / wait_sub_agent_ids / wait_sub_agent_output_ids / wait_runcommand_id"
+                                "error": "sleep 至少需要提供一个参数：seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id"
                             }
                         elif provided > 1:
                             result = {
                                 "success": False,
-                                "error": "sleep 的等待参数互斥：seconds / wait_sub_agent_ids / wait_sub_agent_output_ids / wait_runcommand_id 只能提供一个"
+                                "error": "sleep 的等待参数互斥：seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id 只能提供一个"
                             }
-                        elif wait_sub_agent_output_ids:
+                        elif wait_sub_agent_output:
                             if not getattr(self, "multi_agent_mode", False):
-                                result = {"success": False, "error": "wait_sub_agent_output_ids 仅在多智能体模式下可用"}
-                            elif not isinstance(wait_sub_agent_output_ids, list) or len(wait_sub_agent_output_ids) != 1:
-                                result = {"success": False, "error": "wait_sub_agent_output_ids 必须包含且仅包含一个子智能体编号"}
+                                result = {"success": False, "error": "wait_sub_agent_output 仅在多智能体模式下可用"}
                             else:
-                                try:
-                                    agent_id = int(wait_sub_agent_output_ids[0])
-                                    if agent_id <= 0:
-                                        raise ValueError()
-                                except Exception:
-                                    result = {"success": False, "error": "wait_sub_agent_output_ids 必须是正整数"}
+                                display_name = str(wait_sub_agent_output or "").strip()
+                                manager = getattr(self, "sub_agent_manager", None)
+                                if not manager:
+                                    result = {"success": False, "error": "子智能体管理器不可用"}
                                 else:
-                                    manager = getattr(self, "sub_agent_manager", None)
-                                    if not manager:
-                                        result = {"success": False, "error": "子智能体管理器不可用"}
+                                    state = manager.get_multi_agent_state(getattr(self.context_manager, "current_conversation_id", None))
+                                    if not state:
+                                        result = {"success": False, "error": "当前对话没有多智能体状态"}
                                     else:
-                                        state = manager.get_multi_agent_state(getattr(self.context_manager, "current_conversation_id", None))
-                                        if not state:
-                                            result = {"success": False, "error": "当前对话没有多智能体状态"}
+                                        # 显示名寻址：模型只传显示名，内部解析为全局 agent_id
+                                        inst = state.get_instance_by_display_name(display_name)
+                                        if not inst:
+                                            available = "、".join(state.list_display_names()) or "（无）"
+                                            result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available}"}
                                         else:
                                             try:
                                                 loop = asyncio.get_running_loop()
-                                                fut = state.register_output_wait(agent_id, loop)
+                                                fut = state.register_output_wait(inst.agent_id, loop)
                                                 msg = await asyncio.wait_for(fut, timeout=300)
                                                 result = {
                                                     "success": True,
                                                     "mode": "wait_sub_agent_output",
-                                                    "agent_id": agent_id,
+                                                    "display_name": inst.display_name,
                                                     "message": msg,
                                                 }
                                             except asyncio.TimeoutError:
-                                                result = {"success": False, "error": f"等待子智能体 {agent_id} 输出超时（5分钟）。可用 send_message_to_sub_agent 重新激活。"}
+                                                result = {"success": False, "error": f"等待 {inst.display_name} 输出超时（5分钟）。可用 send_message_to_sub_agent 重新激活。"}
                                             except asyncio.CancelledError:
-                                                result = {"success": False, "error": f"等待子智能体 {agent_id} 被取消。该子智能体现在不可用，可用 send_message_to_sub_agent 重新激活。"}
+                                                result = {"success": False, "error": f"等待 {inst.display_name} 被取消。该子智能体现在不可用，可用 send_message_to_sub_agent 重新激活。"}
                                             except RuntimeError as exc:
                                                 error_msg = str(exc)
                                                 if "send_message_to_sub_agent" not in error_msg:
                                                     error_msg += " 可用 send_message_to_sub_agent 重新激活。"
                                                 result = {"success": False, "error": error_msg}
                                             except Exception as exc:
-                                                result = {"success": False, "error": f"等待子智能体 {agent_id} 输出失败: {exc}。可用 send_message_to_sub_agent 重新激活。"}
+                                                result = {"success": False, "error": f"等待 {inst.display_name} 输出失败: {exc}。可用 send_message_to_sub_agent 重新激活。"}
                         elif wait_sub_agent_ids:
                             if getattr(self, "multi_agent_mode", False):
                                 result = {
                                     "success": False,
-                                    "error": "多智能体模式下 sleep 工具不支持 wait_sub_agent_ids，请使用 wait_sub_agent_output_ids。"
+                                    "error": "多智能体模式下 sleep 工具不支持 wait_sub_agent_ids，请使用 wait_sub_agent_output。"
                                 }
                             elif not isinstance(wait_sub_agent_ids, list) or not wait_sub_agent_ids:
                                 result = {"success": False, "error": "wait_sub_agent_ids 必须是非空数组"}
@@ -2152,14 +2150,15 @@ class MainTerminalToolsExecutionMixin:
                                     else:
                                         conv_id = self.context_manager.current_conversation_id
                                         multi_agent_state = self.sub_agent_manager.get_or_create_multi_agent_state(conv_id)
-                                        # 角色内编号：每次创建都递增，作为显示名后缀
-                                        # （如 Full-Stack Engineer_1）。它与内部 agent_id 是两套
-                                        # 独立命名空间——agent_id 可被 LLM 手动指定（如 10001），
-                                        # 显示名后缀永远用角色内编号。
-                                        role_seq = multi_agent_state.next_agent_id_for_role(role_id)
-                                        agent_id = arguments.get("agent_id")
-                                        if not agent_id:
-                                            agent_id = role_seq
+                                        # 角色内编号：显示名后缀（如 UI Operator_1），是唯一对模型/用户
+                                        # 暴露的编号。采用 peek + commit：先预取构造显示名，创建成功后才
+                                        # 提交计数器，失败不消耗编号，避免跳号。
+                                        role_seq = multi_agent_state.peek_agent_id_for_role(role_id)
+                                        # 全局 agent_id 是纯内部实现细节（任务字典 key / task_id 生成），
+                                        # 不暴露给模型与用户，也不接受模型指定：自动分配对话级最小空闲正整数。
+                                        agent_id = self.sub_agent_manager.next_free_agent_id(
+                                            conv_id, extra_used=set(multi_agent_state.agents.keys())
+                                        )
                                         # 构造显示名
                                         display_name = role.display_name(int(role_seq))
                                         # 构造多智能体版系统提示词（含动态上下文注入）
@@ -2194,7 +2193,7 @@ class MainTerminalToolsExecutionMixin:
                                             pass
                                         # 走原行 发事件创建（避免后期重建提供重复工能重费，直接使用 multi_agent_mode=True 调用）
                                         result = self.sub_agent_manager.create_sub_agent(
-                                            agent_id=int(agent_id),
+                                            agent_id=agent_id,
                                             summary=summary_text,
                                             task=arguments.get("task", ""),
                                             run_in_background=False,
@@ -2211,6 +2210,9 @@ class MainTerminalToolsExecutionMixin:
                                         )
                                         # 在多智能体模式下，子智能体是团队协作成员，不是传统后台任务。
                                         # run_in_background=False 避免触发后台完成通知轮询，保持主对话输入区可用。
+                                        if result.get("success"):
+                                            # 创建成功才提交角色内编号；失败时 peek 未提交，编号不被消耗
+                                            multi_agent_state.commit_agent_id_for_role(role_id, role_seq)
                                 except Exception as exc:
                                     logger.exception("[multi_agent] create_sub_agent failed")
                                     result = {"success": False, "error": str(exc)}
@@ -2277,29 +2279,60 @@ class MainTerminalToolsExecutionMixin:
                                     pass
 
                     elif tool_name == "terminate_sub_agent":
-                        result = self.sub_agent_manager.terminate_sub_agent(
-                            agent_id=arguments.get("agent_id")
-                        )
+                        if getattr(self, "multi_agent_mode", False):
+                            # 多智能体模式：按显示名寻址，内部解析为全局 agent_id
+                            conv_id = self.context_manager.current_conversation_id
+                            state = self.sub_agent_manager.get_multi_agent_state(conv_id)
+                            display_name = str(arguments.get("display_name") or "").strip()
+                            inst = state.get_instance_by_display_name(display_name) if state else None
+                            if not inst:
+                                available = "、".join(state.list_display_names()) if state else ""
+                                result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available or '（无）'}"}
+                            else:
+                                result = self.sub_agent_manager.terminate_sub_agent(agent_id=inst.agent_id)
+                                if isinstance(result, dict):
+                                    result["display_name"] = inst.display_name
+                                    state.mark_status(inst.agent_id, "terminated")
+                        else:
+                            result = self.sub_agent_manager.terminate_sub_agent(
+                                agent_id=arguments.get("agent_id")
+                            )
                         # 主智能体主动终结时，tool 结果（message）已包含结论，
                         # 摘掉 system_message 避免工具循环再注入一条冗余 user 消息
                         # （且「已被手动关闭」措辞对此场景是误导）。
                         # 前端 UI 手动终止走 server/conversation.py API 直调 manager，不受影响。
                         if isinstance(result, dict):
                             result.pop("system_message", None)
-                        # 多智能体模式：同步状态到 MultiAgentState
-                        if getattr(self, "multi_agent_mode", False):
-                            try:
-                                conv_id = self.context_manager.current_conversation_id
-                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                                if state:
-                                    state.mark_status(int(arguments.get("agent_id")), "terminated")
-                            except Exception:
-                                pass
 
                     elif tool_name == "get_sub_agent_status":
-                        result = self.sub_agent_manager.get_sub_agent_status(
-                            agent_ids=arguments.get("agent_ids", [])
-                        )
+                        if getattr(self, "multi_agent_mode", False):
+                            # 多智能体模式：按显示名列表查询，内部解析为全局 agent_id
+                            names = arguments.get("display_names")
+                            if not isinstance(names, list) or not names:
+                                result = {"success": False, "error": "display_names 必须是非空数组（子智能体显示名，如 UI Operator_1）"}
+                            else:
+                                conv_id = self.context_manager.current_conversation_id
+                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
+                                agent_ids = []
+                                not_found_names = []
+                                for name in names:
+                                    inst = state.get_instance_by_display_name(str(name)) if state else None
+                                    if inst:
+                                        agent_ids.append(inst.agent_id)
+                                    else:
+                                        not_found_names.append(str(name))
+                                results = []
+                                if agent_ids:
+                                    # agent_ids 非空时 manager 侧总是返回 success=True
+                                    r = self.sub_agent_manager.get_sub_agent_status(agent_ids=agent_ids)
+                                    results.extend(r.get("results") or [])
+                                for name in not_found_names:
+                                    results.append({"found": False, "display_name": name, "error": "子智能体不存在"})
+                                result = {"success": True, "results": results}
+                        else:
+                            result = self.sub_agent_manager.get_sub_agent_status(
+                                agent_ids=arguments.get("agent_ids", [])
+                            )
 
                     # 多智能体模式专属工具：send_message_to_sub_agent / stop_sub_agent / answer_sub_agent_question / create_custom_agent / list_agents / list_active_sub_agents
                     elif tool_name == "send_message_to_sub_agent":
@@ -2308,38 +2341,47 @@ class MainTerminalToolsExecutionMixin:
                         else:
                             try:
                                 from modules.multi_agent.state import build_master_message_to_sub_agent
-                                agent_id = int(arguments.get("agent_id", 0))
+                                display_name = str(arguments.get("display_name") or "").strip()
                                 message = arguments.get("message", "")
                                 conv_id = self.context_manager.current_conversation_id
                                 state = self.sub_agent_manager.get_multi_agent_state(conv_id)
                                 if not state:
                                     result = {"success": False, "error": "多智能体状态未就绪"}
                                 else:
-                                    # 构造消息文本并插入子对话
-                                    text = build_master_message_to_sub_agent(message)
-                                    ma_debug(
-                                        "tool_send_message_to_sub_agent",
-                                        agent_id=agent_id,
-                                        raw_message=str(message)[:500],
-                                        wrapped_message_preview=text[:500],
-                                        conversation_id=conv_id,
-                                    )
-                                    ok = self.sub_agent_manager.inject_message_to_sub_agent(agent_id, text)
-                                    if not ok:
-                                        latest = self.sub_agent_manager._latest_task_for_agent(agent_id)
-                                        if latest and latest.get("status") == "terminated":
-                                            result = {"success": False, "error": f"子智能体 {agent_id} 已被手动终结，无法再接收消息。如需继续工作，请创建新的子智能体。"}
-                                        else:
-                                            result = {"success": False, "error": f"子智能体 {agent_id} 不存在或已结束"}
+                                    # 显示名寻址：模型只知道角色内编号显示名（如 UI Operator_1），
+                                    # 全局 agent_id 在内部解析，不暴露给模型
+                                    inst = state.get_instance_by_display_name(display_name)
+                                    if not inst:
+                                        available = "、".join(state.list_display_names()) or "（无）"
+                                        result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available}"}
                                     else:
-                                        result = {"success": True, "agent_id": agent_id}
-                                    ma_debug(
-                                        "tool_send_message_to_sub_agent_result",
-                                        agent_id=agent_id,
-                                        conversation_id=conv_id,
-                                        ok=ok,
-                                        result=result,
-                                    )
+                                        agent_id = inst.agent_id
+                                        # 构造消息文本并插入子对话
+                                        text = build_master_message_to_sub_agent(message)
+                                        ma_debug(
+                                            "tool_send_message_to_sub_agent",
+                                            agent_id=agent_id,
+                                            display_name=display_name,
+                                            raw_message=str(message)[:500],
+                                            wrapped_message_preview=text[:500],
+                                            conversation_id=conv_id,
+                                        )
+                                        ok = self.sub_agent_manager.inject_message_to_sub_agent(agent_id, text)
+                                        if not ok:
+                                            latest = self.sub_agent_manager._latest_task_for_agent(agent_id)
+                                            if latest and latest.get("status") == "terminated":
+                                                result = {"success": False, "error": f"{display_name} 已被手动终结，无法再接收消息。如需继续工作，请创建新的子智能体。"}
+                                            else:
+                                                result = {"success": False, "error": f"{display_name} 不存在或已结束"}
+                                        else:
+                                            result = {"success": True, "display_name": display_name}
+                                        ma_debug(
+                                            "tool_send_message_to_sub_agent_result",
+                                            agent_id=agent_id,
+                                            conversation_id=conv_id,
+                                            ok=ok,
+                                            result=result,
+                                        )
                             except Exception as exc:
                                 logger.exception("[multi_agent] send_message_to_sub_agent failed")
                                 result = {"success": False, "error": str(exc)}
@@ -2349,8 +2391,17 @@ class MainTerminalToolsExecutionMixin:
                             result = {"success": False, "error": "该工具仅在多智能体模式下可用"}
                         else:
                             try:
-                                agent_id = int(arguments.get("agent_id", 0))
-                                result = self.sub_agent_manager.stop_sub_agent(agent_id=agent_id)
+                                display_name = str(arguments.get("display_name") or "").strip()
+                                conv_id = self.context_manager.current_conversation_id
+                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
+                                inst = state.get_instance_by_display_name(display_name) if state else None
+                                if not inst:
+                                    available = "、".join(state.list_display_names()) if state else ""
+                                    result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available or '（无）'}"}
+                                else:
+                                    result = self.sub_agent_manager.stop_sub_agent(agent_id=inst.agent_id)
+                                    if isinstance(result, dict):
+                                        result["display_name"] = inst.display_name
                             except Exception as exc:
                                 logger.exception("[multi_agent] stop_sub_agent failed")
                                 result = {"success": False, "error": str(exc)}

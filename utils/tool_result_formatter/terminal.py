@@ -144,8 +144,7 @@ def _format_sleep(result_data: Dict[str, Any]) -> str:
     mode = result_data.get("mode")
     if mode == "wait_sub_agent_output":
         message = result_data.get("message") or ""
-        agent_id = result_data.get("agent_id")
-        header = f"已收到子智能体 {agent_id} 的输出"
+        header = f"已收到 {result_data.get('display_name') or '子智能体'} 的输出"
         if message:
             return f"{header}\n\n{message}"
         return header

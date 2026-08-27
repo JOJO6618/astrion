@@ -49,10 +49,6 @@ def _master_tool_create_sub_agent() -> Dict[str, Any]:
                         "type": "string",
                         "description": "要交给该子智能体执行的任务描述。要求包含：目标、范围、产出、注意事项。",
                     },
-                    "agent_id": {
-                        "type": "integer",
-                        "description": "（可选）手动指定实例编号；不传时自动递增。",
-                    },
                     "thinking_mode": {
                         "type": "string",
                         "enum": ["fast", "thinking"],
@@ -74,9 +70,9 @@ def _master_tool_stop_sub_agent() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
-                    "agent_id": {"type": "integer", "description": "要暂停的子智能体编号。"},
+                    "display_name": {"type": "string", "description": "要暂停的子智能体显示名（如 UI Operator_1）。"},
                 }),
-                "required": ["agent_id"],
+                "required": ["display_name"],
             },
         },
     }
@@ -91,9 +87,9 @@ def _master_tool_terminate_sub_agent() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
-                    "agent_id": {"type": "integer", "description": "要终止的子智能体编号。"},
+                    "display_name": {"type": "string", "description": "要终止的子智能体显示名（如 UI Operator_1）。"},
                 }),
-                "required": ["agent_id"],
+                "required": ["display_name"],
             },
         },
     }
@@ -112,10 +108,10 @@ def _master_tool_send_message_to_sub_agent() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
-                    "agent_id": {"type": "integer", "description": "目标子智能体编号。"},
+                    "display_name": {"type": "string", "description": "目标子智能体显示名（如 UI Operator_1）。"},
                     "message": {"type": "string", "description": "要插入的消息或新任务正文。"},
                 }),
-                "required": ["agent_id", "message"],
+                "required": ["display_name", "message"],
             },
         },
     }
@@ -183,7 +179,7 @@ def _master_tool_list_active_sub_agents() -> Dict[str, Any]:
         "type": "function",
         "function": {
             "name": "list_active_sub_agents",
-            "description": "列出当前多智能体会话中所有活跃/已创建的子智能体实例（agent_id/role/display_name/status）。",
+            "description": "列出当前多智能体会话中所有已创建的子智能体实例（显示名/角色/状态/任务摘要）。",
             "parameters": {"type": "object", "properties": _inject_intent({})},
         },
     }
@@ -198,9 +194,9 @@ def _master_tool_get_sub_agent_status() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
-                    "agent_ids": {"type": "array", "items": {"type": "integer"}, "description": "要查询的子智能体编号列表。"},
+                    "display_names": {"type": "array", "items": {"type": "string"}, "description": "要查询的子智能体显示名列表（如 [\"UI Operator_1\", \"Researcher_2\"]）。"},
                 }),
-                "required": ["agent_ids"],
+                "required": ["display_names"],
             },
         },
     }
@@ -254,11 +250,11 @@ def _sub_tool_ask_other_agent() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
-                    "target_agent_id": {"type": "integer", "description": "目标子智能体编号。"},
+                    "target_display_name": {"type": "string", "description": "目标子智能体显示名（如 Researcher_2），可先用 list_active_sub_agents 查看。"},
                     "question": {"type": "string", "description": "提问内容。"},
                     "question_id": {"type": "string", "description": "（可选）问题 id。"},
                 }),
-                "required": ["target_agent_id", "question"],
+                "required": ["target_display_name", "question"],
             },
         },
     }
@@ -276,11 +272,10 @@ def _sub_tool_answer_other_agent() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
-                    "source_agent_id": {"type": "integer", "description": "提问方 agent_id。"},
                     "question_id": {"type": "string", "description": "提问消息中的 id。"},
                     "answer": {"type": "string", "description": "回答内容。"},
                 }),
-                "required": ["source_agent_id", "question_id", "answer"],
+                "required": ["question_id", "answer"],
             },
         },
     }

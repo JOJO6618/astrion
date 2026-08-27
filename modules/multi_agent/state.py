@@ -287,19 +287,46 @@ class MultiAgentState:
         # 一个 agent 可能同时只阻塞在一个 ask 工具上（最简实现）
         # key = agent_id, value = question_id（表示当前 agent 正阻塞等待）
         self.agent_blocking_question: Dict[int, str] = {}
-        # 主智能体通过 sleep(wait_sub_agent_output_ids) 等待某个子智能体下一次输出
+        # 主智能体通过 sleep(wait_sub_agent_output) 等待某个子智能体下一次输出
         # key = agent_id, value = asyncio.Future（结果为完整消息文本）
         self.output_waits: Dict[int, asyncio.Future] = {}
-        # 角色实例计数：role_id -> 已分配的最大 agent_id（数字）
-        # 用于创建新实例时自动递增编号，但允许调用方显式指定
+        # 角色实例计数：role_id -> 已成功创建实例使用的最大角色内编号
+        # 角色内编号是显示名后缀（如 UI Operator_1），也是唯一对模型/用户暴露的编号；
+        # 全局 agent_id 为内部实现细节，不对外暴露。
+        # 采用 peek + commit 两步：创建失败不消耗编号，避免跳号。
         self.role_counters: Dict[str, int] = {}
 
     # ----- 创建/查询 -----
-    def next_agent_id_for_role(self, role_id: str) -> int:
-        """为指定角色分配下一个 agent_id 编号。"""
-        n = self.role_counters.get(role_id, 0) + 1
-        self.role_counters[role_id] = n
-        return n
+    def peek_agent_id_for_role(self, role_id: str) -> int:
+        """预取指定角色的下一个角色内编号（不递增计数器）。
+
+        创建子智能体时先 peek 构造显示名，创建成功后必须调
+        commit_agent_id_for_role 提交；失败则不提交，编号不被消耗。
+        """
+        return self.role_counters.get(role_id, 0) + 1
+
+    def commit_agent_id_for_role(self, role_id: str, seq: int) -> None:
+        """创建成功后提交角色内编号（单调递增，不回退）。"""
+        if seq > self.role_counters.get(role_id, 0):
+            self.role_counters[role_id] = seq
+
+    def get_instance_by_display_name(self, display_name: str) -> Optional[AgentInstance]:
+        """按显示名（如 UI Operator_1）查找实例；精确匹配优先，大小写不敏感兜底。"""
+        name = (display_name or "").strip()
+        if not name:
+            return None
+        for a in self.agents.values():
+            if a.display_name == name:
+                return a
+        lowered = name.lower()
+        for a in self.agents.values():
+            if a.display_name.lower() == lowered:
+                return a
+        return None
+
+    def list_display_names(self) -> List[str]:
+        """返回当前所有实例的显示名（用于错误提示）。"""
+        return [a.display_name for a in self.agents.values()]
 
     def register_instance(self, instance: AgentInstance) -> None:
         if instance.agent_id in self.agents:
@@ -339,7 +366,7 @@ class MultiAgentState:
         a.status = status
         if last_output:
             a.last_output = last_output
-        # 当子智能体进入终态/idle 时，立即取消 sleep(wait_sub_agent_output_ids) 的等待
+        # 当子智能体进入终态/idle 时，立即取消 sleep(wait_sub_agent_output) 的等待
         if status in ("failed", "terminated", "idle"):
             self._cancel_output_wait(agent_id, status)
 
@@ -348,12 +375,14 @@ class MultiAgentState:
         fut = self.output_waits.pop(agent_id, None)
         if not fut or fut.done():
             return
+        inst = self.agents.get(agent_id)
+        name = inst.display_name if inst else str(agent_id)
         if status == "terminated":
-            msg = f"子智能体 {agent_id} 已终止，无法继续等待输出。"
+            msg = f"子智能体 {name} 已终止，无法继续等待输出。"
         elif status == "failed":
-            msg = f"子智能体 {agent_id} 已失败，无法继续等待输出。该子智能体可被复活，可用 send_message_to_sub_agent 重新激活。"
+            msg = f"子智能体 {name} 已失败，无法继续等待输出。该子智能体可被复活，可用 send_message_to_sub_agent 重新激活。"
         else:
-            msg = f"子智能体 {agent_id} 已进入空闲状态，无法继续等待输出。可用 send_message_to_sub_agent 重新激活。"
+            msg = f"子智能体 {name} 已进入空闲状态，无法继续等待输出。可用 send_message_to_sub_agent 重新激活。"
         try:
             loop = fut.get_loop()
             if loop and not loop.is_closed():
@@ -394,7 +423,7 @@ class MultiAgentState:
     def has_pending_master_messages(self) -> bool:
         return len(self.pending_master_messages) > 0
 
-    # ----- 等待子智能体输出（sleep wait_sub_agent_output_ids） -----
+    # ----- 等待子智能体输出（sleep wait_sub_agent_output） -----
     def register_output_wait(
         self, agent_id: int, loop: AbstractEventLoop
     ) -> asyncio.Future:
@@ -406,13 +435,13 @@ class MultiAgentState:
         fut: asyncio.Future = loop.create_future()
         inst = self.agents.get(agent_id)
         if not inst:
-            fut.set_exception(ValueError(f"未找到子智能体 {agent_id}"))
+            fut.set_exception(ValueError("未找到该子智能体"))
             return fut
 
         if inst.status in ("terminated", "failed"):
             fut.set_exception(
                 RuntimeError(
-                    f"子智能体 {agent_id} 当前状态为 {inst.status}，无法等待输出"
+                    f"子智能体 {inst.display_name} 当前状态为 {inst.status}，无法等待输出"
                 )
             )
             return fut

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from config import SUB_AGENT_DEFAULT_TIMEOUT, SUB_AGENT_MAX_ACTIVE
 
@@ -52,6 +52,36 @@ class SubAgentCreationMixin:
     def _ensure_agent_slot_available(self, conversation_id: str, agent_id: int) -> bool:
         used = self.conversation_agents.setdefault(conversation_id, [])
         return agent_id not in used
+
+    def next_free_agent_id(self, conversation_id: Optional[str], extra_used: Optional[Set[int]] = None) -> int:
+        """分配对话级全局最小空闲 agent_id。
+
+        agent_id 是对话全局唯一的内部编号（不对外暴露：模型与用户只看到
+        角色内编号显示名）。多智能体模式下创建实例时由系统自动分配，
+        不接受调用方指定。
+        """
+        used: Set[int] = set()
+        if conversation_id:
+            for aid in self.conversation_agents.get(conversation_id, []) or []:
+                try:
+                    used.add(int(aid))
+                except (TypeError, ValueError):
+                    continue
+        for task in self.tasks.values():
+            if conversation_id and task.get("conversation_id") != conversation_id:
+                continue
+            try:
+                aid = task.get("agent_id")
+                if aid is not None:
+                    used.add(int(aid))
+            except (TypeError, ValueError):
+                continue
+        if extra_used:
+            used.update(extra_used)
+        n = 1
+        while n in used:
+            n += 1
+        return n
 
     def _mark_agent_id_used(self, conversation_id: str, agent_id: int):
         used = self.conversation_agents.setdefault(conversation_id, [])

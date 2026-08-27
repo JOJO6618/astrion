@@ -31,6 +31,26 @@ from modules.multi_agent.debug_logger import ma_debug
 
 logger = setup_logger(__name__)
 
+
+class SubAgentModelCallError(RuntimeError):
+    """子智能体模型请求失败。
+
+    received_any=False：请求阶段失败（未收到任何文本/思考/工具调用），可重试；
+    received_any=True：已开始收到流内容后断开（输出期间断开），直接失败不重试。
+    语义与主智能体 run_streaming_attempts 的 can_retry 判定一致
+    （not full_response and not tool_calls and not current_thinking）。
+    """
+
+    def __init__(self, message: str, *, received_any: bool = False):
+        super().__init__(message)
+        self.received_any = received_any
+
+
+# 模型请求失败重试策略（与主智能体 max_api_retries=4 / retry_delay_seconds=10 对齐：
+# 最多重试 4 次，即共 5 次尝试，重试间隔 10 秒）
+_SUB_AGENT_MAX_API_RETRIES = 4
+_SUB_AGENT_RETRY_DELAY_SECONDS = 10
+
 # 多智能体模式下额外加载的工具定义
 def _load_multi_agent_sub_agent_tools() -> List[Dict[str, Any]]:
     try:
@@ -310,7 +330,80 @@ class SubAgentTask:
             # 安全点：写入延迟的上下文通知（不触发新一轮工作，仅让下一轮模型调用看到）
             self._flush_pending_notifications()
 
-            assistant_message, reasoning, tool_calls, usage = await self._call_model(client, model_key, tools)
+            # 模型请求（带失败重试，与主智能体同构：最多 5 次尝试、重试间隔 10s、
+            # 仅当零接收——未收到任何文本/思考/工具调用——时重试；
+            # 已开始收到内容后断开属于输出期间故障，直接失败不重试）
+            assistant_message = ""
+            reasoning = ""
+            tool_calls = []
+            usage = None
+            call_error: Optional[SubAgentModelCallError] = None
+            for api_attempt in range(_SUB_AGENT_MAX_API_RETRIES + 1):
+                if self._cancelled:
+                    raise asyncio.CancelledError()
+                try:
+                    assistant_message, reasoning, tool_calls, usage = await self._call_model(client, model_key, tools)
+                    call_error = None
+                    break
+                except SubAgentModelCallError as exc:
+                    call_error = exc
+                    can_retry = api_attempt < _SUB_AGENT_MAX_API_RETRIES and not exc.received_any
+                    ma_debug(
+                        "sub_agent_api_attempt_failed",
+                        task_id=self.task_id,
+                        agent_id=self.agent_id,
+                        display_name=self.display_name,
+                        turn=turn,
+                        attempt=api_attempt + 1,
+                        max_attempts=_SUB_AGENT_MAX_API_RETRIES + 1,
+                        received_any=exc.received_any,
+                        can_retry=can_retry,
+                        error=str(exc)[:500],
+                    )
+                    if not can_retry:
+                        break
+                    # 重试本身也是一次额外 API 请求
+                    self.stats["api_calls"] += 1
+                    # 重试等待期间必须响应软停止/硬取消
+                    wait_until = time.time() + _SUB_AGENT_RETRY_DELAY_SECONDS
+                    while time.time() < wait_until:
+                        if self._cancelled:
+                            raise asyncio.CancelledError()
+                        if self._soft_stop:
+                            break
+                        await asyncio.sleep(0.2)
+                    continue
+
+            if call_error is not None:
+                if self.multi_agent_mode and not call_error.received_any:
+                    # 5 次尝试全部失败（均为零接收）：子智能体不终止，转为 idle
+                    # 并向 Team Leader 汇报错误，等待检查网络后重新下达指令
+                    error_report = (
+                        f"⚠️ 模型请求连续 {_SUB_AGENT_MAX_API_RETRIES + 1} 次失败（网络或 API 异常）："
+                        f"{call_error}。本轮任务无法继续，我已进入空闲状态，请检查网络/模型服务后重新给我下达指令。"
+                    )
+                    ma_debug(
+                        "sub_agent_api_retries_exhausted_idle",
+                        task_id=self.task_id,
+                        agent_id=self.agent_id,
+                        display_name=self.display_name,
+                        turn=turn,
+                    )
+                    self._forward_output_to_master(error_report, is_final=True)
+                    self._mark_idle()
+                    self._idle = True
+                    self._persist_conversation(partial_summary=error_report[:200])
+                    continue
+                # 输出期间断开（已开始收到内容）或传统后台模式：直接失败，
+                # 异常上抛由 run() 捕获后 _write_failure 落盘 failed 状态
+                if self.multi_agent_mode:
+                    # 同步把失败状态告知 Team Leader，避免主智能体无感知空等
+                    self._forward_output_to_master(
+                        f"⚠️ 模型输出中断（收到部分内容后连接断开）：{call_error}。本轮任务失败。",
+                        is_final=True,
+                    )
+                raise call_error
+
             if usage:
                 self._apply_usage(usage)
 
@@ -443,7 +536,7 @@ class SubAgentTask:
         try:
             from modules.multi_agent.state import build_sub_agent_output_text
             msg = build_sub_agent_output_text(self.display_name, output_text.strip(), is_final=is_final)
-            # 如果该 agent 正被 sleep(wait_sub_agent_output_ids) 等待，把输出交给等待方，
+            # 如果该 agent 正被 sleep(wait_sub_agent_output) 等待，把输出交给等待方，
             # 不再插入主对话（避免同一条消息出现两遍）
             if self.multi_agent_state.claim_output_wait(self.agent_id, msg):
                 ma_debug(
@@ -651,53 +744,96 @@ class SubAgentTask:
         model_key: str,
         tools: List[Dict[str, Any]],
     ) -> tuple:
-        """调用模型并解析 assistant 消息。"""
+        """调用模型并解析 assistant 消息。
+
+        失败时抛出 SubAgentModelCallError，携带 received_any 标记区分
+        「请求阶段失败（可重试）」与「输出期间断开（直接失败）」。
+        """
         assistant_message = ""
         reasoning = ""
         tool_calls: List[Dict[str, Any]] = []
         usage = None
+        # 是否已收到任何实质内容（文本/思考/工具调用）
+        received_any = False
+        # 已发出「正在调用」进度事件的 tool_call index（避免重复发）
+        calling_emitted: Set[int] = set()
 
-        async for chunk in client.chat(self.messages, tools=tools, stream=True):
-            if self._soft_stop:
-                # 软停止：优雅中断当前模型调用，后续由 _run_loop 丢弃半成品并进入 idle
-                break
-            if self._cancelled:
-                # 硬取消：立即抛出 CancelledError，确保不会返回半成品的 tool_calls 继续执行
-                raise asyncio.CancelledError()
-            if chunk.get("error"):
-                raise RuntimeError(f"API 调用失败: {chunk.get('error')}")
-            choice = (chunk.get("choices") or [{}])[0]
-            delta = choice.get("delta") or {}
-            if delta.get("content"):
-                assistant_message += delta["content"]
-            if delta.get("reasoning_content"):
-                reasoning += delta["reasoning_content"]
-            elif delta.get("reasoning_details"):
-                rd = delta["reasoning_details"]
-                if isinstance(rd, list):
-                    reasoning += "".join(str(d.get("text") or "") for d in rd)
-                elif isinstance(rd, str):
-                    reasoning += rd
-                elif isinstance(rd, dict):
-                    reasoning += str(rd.get("text") or "")
+        try:
+            async for chunk in client.chat(self.messages, tools=tools, stream=True):
+                if self._soft_stop:
+                    # 软停止：优雅中断当前模型调用，后续由 _run_loop 丢弃半成品并进入 idle
+                    break
+                if self._cancelled:
+                    # 硬取消：立即抛出 CancelledError，确保不会返回半成品的 tool_calls 继续执行
+                    raise asyncio.CancelledError()
+                if chunk.get("error"):
+                    error_info = chunk.get("error")
+                    if isinstance(error_info, dict):
+                        error_text = (
+                            error_info.get("error_message")
+                            or error_info.get("error_text")
+                            or str(error_info)
+                        )
+                    else:
+                        error_text = str(error_info)
+                    raise SubAgentModelCallError(f"API 调用失败: {error_text}", received_any=received_any)
+                choice = (chunk.get("choices") or [{}])[0]
+                delta = choice.get("delta") or {}
+                if delta.get("content"):
+                    assistant_message += delta["content"]
+                    received_any = True
+                if delta.get("reasoning_content"):
+                    reasoning += delta["reasoning_content"]
+                    received_any = True
+                elif delta.get("reasoning_details"):
+                    received_any = True
+                    rd = delta["reasoning_details"]
+                    if isinstance(rd, list):
+                        reasoning += "".join(str(d.get("text") or "") for d in rd)
+                    elif isinstance(rd, str):
+                        reasoning += rd
+                    elif isinstance(rd, dict):
+                        reasoning += str(rd.get("text") or "")
 
-            for tc in delta.get("tool_calls") or []:
-                idx = tc.get("index")
-                if idx is None:
-                    continue
-                while len(tool_calls) <= idx:
-                    tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
-                existing = tool_calls[idx]
-                if tc.get("id"):
-                    existing["id"] = tc["id"]
-                fn = tc.get("function") or {}
-                if fn.get("name"):
-                    existing["function"]["name"] += fn["name"]
-                if fn.get("arguments"):
-                    existing["function"]["arguments"] += fn["arguments"]
+                for tc in delta.get("tool_calls") or []:
+                    idx = tc.get("index")
+                    if idx is None:
+                        continue
+                    received_any = True
+                    while len(tool_calls) <= idx:
+                        tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                    existing = tool_calls[idx]
+                    if tc.get("id"):
+                        existing["id"] = tc["id"]
+                    fn = tc.get("function") or {}
+                    if fn.get("name"):
+                        existing["function"]["name"] += fn["name"]
+                    if fn.get("arguments"):
+                        existing["function"]["arguments"] += fn["arguments"]
+                    # 工具名与 id 就位后立刻发出「正在调用」进度事件，让前端在参数
+                    # 流式生成期间就能显示该工具条目（与主智能体的「正在调用工具」对齐）。
+                    # 与后续 running/completed 事件共用同一 tool_call id，前端按 id 更新同一条目
+                    if (
+                        idx not in calling_emitted
+                        and existing["function"]["name"]
+                        and existing.get("id")
+                    ):
+                        calling_emitted.add(idx)
+                        self.emit("progress", {
+                            "id": existing["id"],
+                            "tool": existing["function"]["name"],
+                            "status": "calling",
+                            "args": {},
+                            "ts": int(time.time() * 1000),
+                        })
 
-            if chunk.get("usage"):
-                usage = chunk["usage"]
+                if chunk.get("usage"):
+                    usage = chunk["usage"]
+        except (asyncio.CancelledError, SubAgentModelCallError):
+            raise
+        except Exception as exc:
+            # chat 流本身抛出的漏网异常（如底层连接错误未被转为 error chunk 时）
+            raise SubAgentModelCallError(f"API 调用异常: {exc}", received_any=received_any) from exc
 
         return assistant_message, reasoning, tool_calls, usage
 
@@ -757,7 +893,7 @@ class SubAgentTask:
                 return {"success": True, "answer": answer, "question_id": question_id}
 
             if name == "ask_other_agent":
-                target_id = int(args.get("target_agent_id") or 0)
+                target_name = str(args.get("target_display_name") or "").strip()
                 question = str(args.get("question") or "").strip()
                 question_id = str(args.get("question_id") or f"ask_other_{uuid.uuid4().hex[:10]}")
                 ma_debug(
@@ -765,21 +901,25 @@ class SubAgentTask:
                     task_id=self.task_id,
                     agent_id=self.agent_id,
                     display_name=self.display_name,
-                    target_agent_id=target_id,
+                    target_display_name=target_name,
                     question_id=question_id,
                     question=question[:500],
                 )
-                if not target_id or not question:
+                if not target_name or not question:
                     return {"success": False, "error": "参数缺失"}
-                # 查找目标实例
-                target_inst = state.get_instance(target_id)
+                # 显示名寻址：子智能体只知道对方的角色内编号显示名，
+                # 全局 agent_id 在内部解析，不暴露给模型
+                target_inst = state.get_instance_by_display_name(target_name)
                 if not target_inst:
-                    return {"success": False, "error": f"agent {target_id} 不存在"}
+                    available = "、".join(
+                        n for n in state.list_display_names() if n != self.display_name
+                    ) or "（无）"
+                    return {"success": False, "error": f"未找到子智能体「{target_name}」。当前可用: {available}"}
                 # 构造提问消息并插入到目标子对话；同时要求其在下一轮调用 answer_other_agent
                 from modules.multi_agent.state import build_sub_agent_ask_other_text
                 target_display = target_inst.display_name
                 msg = build_sub_agent_ask_other_text(self.display_name, target_display, question, question_id)
-                self.manager.inject_message_to_sub_agent(target_id, msg)
+                self.manager.inject_message_to_sub_agent(target_inst.agent_id, msg)
                 # 阻塞等待回答
                 try:
                     answer = await state.wait_for_answer(question_id, self.agent_id, timeout=float(args.get("timeout_seconds") or 600))
@@ -788,7 +928,7 @@ class SubAgentTask:
                 return {"success": True, "answer": answer, "question_id": question_id}
 
             if name == "answer_other_agent":
-                source_id = int(args.get("source_agent_id") or 0)
+                # question_id 全局唯一，足以定位等待方，无需提问方编号
                 question_id = str(args.get("question_id") or "")
                 answer = str(args.get("answer") or "").strip()
                 if not question_id or not answer:

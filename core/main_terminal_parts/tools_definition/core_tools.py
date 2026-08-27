@@ -99,7 +99,7 @@ class ToolsDefinitionCoreToolsMixin:
                 "type": "function",
                 "function": {
                     "name": "sleep",
-                    "description": "等待工具。三种模式三选一：1) seconds：短暂延迟；2) wait_runcommand_id：等待指定后台 run_command 结束并直接返回结果；3) wait_sub_agent_output_ids：等待指定子智能体下一次输出并直接返回该消息（多智能体模式专用）。若同时提供多个等待参数会报错。",
+                    "description": "等待工具。三种模式三选一：1) seconds：短暂延迟；2) wait_runcommand_id：等待指定后台 run_command 结束并直接返回结果；3) wait_sub_agent_output：等待指定子智能体下一次输出并直接返回该消息（多智能体模式专用）。若同时提供多个等待参数会报错。",
                     "parameters": {
                         "type": "object",
                         "properties": self._inject_intent({
@@ -111,10 +111,9 @@ class ToolsDefinitionCoreToolsMixin:
                                 "type": "string",
                                 "description": "等待指定后台 run_command 的 command_id 结束后返回。"
                             },
-                            "wait_sub_agent_output_ids": {
-                                "type": "array",
-                                "items": {"type": "integer"},
-                                "description": "等待指定子智能体下一次输出并直接返回该消息。多智能体模式专用，且一次只能包含一个编号。"
+                            "wait_sub_agent_output": {
+                                "type": "string",
+                                "description": "等待指定子智能体下一次输出并直接返回该消息。多智能体模式专用，传子智能体显示名（如 UI Operator_1）。"
                             },
                             "reason": {
                                 "type": "string",

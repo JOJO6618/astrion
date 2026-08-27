@@ -66,9 +66,10 @@
   - 工具会阻塞等待 Team Leader 通过 `answer_sub_agent_question` 给出回答
   - 你的 question 会以 XML「提问」格式被插入主对话
   - 提问要具体、可回答，不要问开放式问题让 Team Leader 猜你的意思
-- **要问其他子智能体时**：调用 `ask_other_agent`，传入 target_agent_id 与 question
+- **要问其他子智能体时**：调用 `ask_other_agent`，传入 target_display_name（对方显示名，如 Researcher_2）与 question
   - 等待对方调用 `answer_other_agent` 回答
-- **要回答其他子智能体的提问时**：调用 `answer_other_agent`，传入 source_agent_id 与 question_id 和 answer
+  - 不确定有哪些队友时，先调用 `list_active_sub_agents` 查看
+- **要回答其他子智能体的提问时**：调用 `answer_other_agent`，传入 question_id 和 answer
   - 你的回答直接作为对方 `ask_other_agent` 工具的结果返回（不会以 user 消息插入对话）
 - **查询当前活跃子智能体**：调用 `list_active_sub_agents`
 
