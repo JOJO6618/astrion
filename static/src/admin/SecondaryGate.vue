@@ -2,27 +2,27 @@
   <div class="secondary-overlay">
     <!-- 未配置二级密码：设置引导页（verify 恒 401，给输入框是死锁） -->
     <div v-if="!configured" class="secondary-card secondary-card--guide">
-      <h3>尚未设置二级密码</h3>
-      <p class="muted">
-        管理面板的敏感操作（邀请码、密码管理、策略配置等）由二级密码保护。
-        当前服务端尚未配置二级密码，请先完成设置：
-      </p>
+      <h3>{{ $t('adminCustomTools.gate.notConfiguredTitle') }}</h3>
+      <p class="muted">{{ $t('adminCustomTools.gate.notConfiguredDesc') }}</p>
       <ol class="guide-steps">
         <li>
-          <span class="step-text">在服务器上生成密码哈希：</span>
-          <code class="step-code">python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('你的二级密码'))"</code>
+          <span class="step-text">{{ $t('adminCustomTools.gate.step1Text') }}</span>
+          <code class="step-code">{{ $t('adminCustomTools.gate.step1Code') }}</code>
         </li>
         <li>
-          <span class="step-text">将输出写入 settings.json 的 <code>admin</code> 段：</span>
+          <span class="step-text"
+            >{{ $t('adminCustomTools.gate.step2TextPre') }} <code>admin</code
+            >{{ $t('adminCustomTools.gate.step2TextPost') }}</span
+          >
           <code class="step-code">"admin": { "secondary_password_hash": "pbkdf2:sha256:..." }</code>
         </li>
         <li>
-          <span class="step-text">重启服务，然后点击下方「重新检测」。</span>
+          <span class="step-text">{{ $t('adminCustomTools.gate.step3Text') }}</span>
         </li>
       </ol>
       <div class="secondary-actions">
         <button type="button" :disabled="loading" @click="$emit('recheck')">
-          {{ loading ? '检测中...' : '重新检测' }}
+          {{ loading ? $t('adminCustomTools.gate.rechecking') : $t('adminCustomTools.gate.recheck') }}
         </button>
       </div>
       <p v-if="error" class="secondary-error">{{ error }}</p>
@@ -30,22 +30,22 @@
 
     <!-- 已配置：常规的二级密码输入框 -->
     <div v-else class="secondary-card">
-      <h3>请输入管理员二级密码</h3>
-      <p class="muted">{{ description }}</p>
+      <h3>{{ $t('adminCustomTools.gate.title') }}</h3>
+      <p class="muted">{{ description || $t('adminCustomTools.gate.defaultDescription') }}</p>
       <input
         class="secondary-input"
         type="password"
         v-model="password"
         :disabled="loading"
-        placeholder="二级密码"
+        :placeholder="$t('adminCustomTools.gate.passwordPlaceholder')"
         @keyup.enter="submit"
       />
       <div class="secondary-actions">
         <button type="button" :disabled="loading" @click="submit">
-          {{ loading ? '校验中...' : '确认进入' }}
+          {{ loading ? $t('adminCustomTools.gate.verifying') : $t('adminCustomTools.gate.confirmEnter') }}
         </button>
         <button type="button" class="ghost-btn" :disabled="loading" @click="$emit('recheck')">
-          重新检测
+          {{ $t('adminCustomTools.gate.recheck') }}
         </button>
       </div>
       <p v-if="error" class="secondary-error">{{ error }}</p>
@@ -63,7 +63,7 @@ const props = withDefaults(
     error: string | null;
     description?: string;
   }>(),
-  { description: '为保护敏感数据，需二级校验后查看。' }
+  { description: '' }
 );
 
 const emit = defineEmits<{

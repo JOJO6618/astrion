@@ -5,7 +5,7 @@
       :configured="secondaryConfigured"
       :loading="secondaryLoading"
       :error="secondaryError"
-      description="输入管理员二级密码后可管理自定义工具。"
+      :description="$t('adminCustomTools.gateDescription')"
       @verify="handleVerifySecondary"
       @recheck="checkSecondary"
     />
@@ -13,42 +13,48 @@
     <template v-if="!editorPageMode">
       <header class="page-header">
         <div>
-          <h1>自定义工具管理</h1>
-          <p>每个工具一个文件夹，三层文件独立存放；仅管理员可见并可调用。</p>
+          <h1>{{ $t('adminCustomTools.main.title') }}</h1>
+          <p>{{ $t('adminCustomTools.main.subtitle') }}</p>
         </div>
         <div class="actions">
-          <button type="button" class="primary" @click="openCreateModal">新建工具</button>
+          <button type="button" class="primary" @click="openCreateModal">
+            {{ $t('adminCustomTools.main.newTool') }}
+          </button>
           <button type="button" class="ghost" @click="refresh" :disabled="loading">
-            {{ loading ? '刷新中...' : '刷新列表' }}
+            {{ loading ? $t('common.refreshing') : $t('adminCustomTools.main.refreshList') }}
           </button>
           <a class="ghost" href="/static/custom_tools/guide.html" target="_blank" rel="noopener"
-            >查看开发指南</a
+            >{{ $t('adminCustomTools.main.viewGuide') }}</a
           >
-          <a class="ghost" href="/admin/monitor" target="_blank" rel="noopener">返回监控</a>
-          <a class="ghost" href="/admin/policy" target="_blank" rel="noopener">策略配置</a>
+          <a class="ghost" href="/admin/monitor" target="_blank" rel="noopener"
+            >{{ $t('adminCustomTools.main.backToMonitor') }}</a
+          >
+          <a class="ghost" href="/admin/policy" target="_blank" rel="noopener"
+            >{{ $t('adminCustomTools.main.policyConfig') }}</a
+          >
         </div>
       </header>
 
       <section class="panel" v-if="error">
-        <p class="error">加载失败：{{ error }}</p>
+        <p class="error">{{ $t('adminCustomTools.loadFailedWith', { message: error }) }}</p>
       </section>
 
       <section class="panel" v-else>
         <div class="tool-list-header">
-          <h2>工具列表</h2>
-          <span class="muted">共 {{ tools.length }} 个</span>
+          <h2>{{ $t('adminCustomTools.main.toolList') }}</h2>
+          <span class="muted">{{ $t('adminCustomTools.main.toolCount', { count: tools.length }) }}</span>
         </div>
-        <div v-if="!tools.length" class="empty">暂无自定义工具</div>
+        <div v-if="!tools.length" class="empty">{{ $t('adminCustomTools.main.emptyTools') }}</div>
         <div class="tool-grid">
           <div v-for="tool in tools" :key="tool.id" class="tool-card" @click="openEditorPage(tool)">
             <div class="tool-card-title">
               <strong>{{ tool.id }}</strong>
               <span class="tag">{{ tool.category || 'custom' }}</span>
             </div>
-            <p class="desc">{{ tool.description || '暂无描述' }}</p>
+            <p class="desc">{{ tool.description || $t('adminCustomTools.main.noDescription') }}</p>
             <div class="meta">
-              <span>参数：{{ paramCount(tool) }} 个</span>
-              <span>超时：{{ tool.timeout || 30 }}s</span>
+              <span>{{ $t('adminCustomTools.main.params', { count: paramCount(tool) }) }}</span>
+              <span>{{ $t('adminCustomTools.main.timeout', { seconds: tool.timeout || 30 }) }}</span>
             </div>
             <div class="files">
               <span>{{ tool.execution_file || 'execution.py' }}</span>
@@ -63,9 +69,9 @@
     <section v-else class="editor-page">
       <div class="editor-page-header">
         <div class="breadcrumbs">
-          <a class="ghost" href="/admin/custom-tools">返回列表</a>
+          <a class="ghost" href="/admin/custom-tools">{{ $t('adminCustomTools.backToList') }}</a>
         </div>
-        <div class="status" v-if="loading">加载中...</div>
+        <div class="status" v-if="loading">{{ $t('common.loading') }}</div>
         <div class="status error" v-else-if="error">{{ error }}</div>
       </div>
 
@@ -73,14 +79,16 @@
         <header class="drawer-header">
           <div>
             <h3>{{ activeTool.id }}</h3>
-            <p>{{ activeTool.description || '未填写描述' }}</p>
+            <p>{{ activeTool.description || $t('adminCustomTools.editor.noDescription') }}</p>
           </div>
           <div class="drawer-actions">
             <button type="button" class="primary" @click="saveAll" :disabled="saving">
-              {{ saving ? '保存中...' : '保存' }}
+              {{ saving ? $t('common.saving') : $t('common.save') }}
             </button>
-            <button type="button" class="danger" @click="openDeleteConfirm()">删除</button>
-            <button type="button" class="ghost" @click="closeEditor">关闭</button>
+            <button type="button" class="danger" @click="openDeleteConfirm()">
+              {{ $t('common.delete') }}
+            </button>
+            <button type="button" class="ghost" @click="closeEditor">{{ $t('common.close') }}</button>
           </div>
         </header>
 
@@ -116,27 +124,30 @@
 
         <div class="hint">
           <p>
-            提示：execution.py 中的字典/集合需要用
-            <code v-pre>{{ ... }}</code> 包裹，避免被模板替换。
+            {{ $t('adminCustomTools.editor.hint1Pre') }}
+            <code v-pre>{{ ... }}</code>
+            {{ $t('adminCustomTools.editor.hint1Post') }}
           </p>
-          <p>保存后无需重启，系统会自动 reload 自定义工具。</p>
+          <p>{{ $t('adminCustomTools.editor.hint2') }}</p>
         </div>
       </div>
 
-      <div v-else-if="!error" class="empty">正在加载工具...</div>
+      <div v-else-if="!error" class="empty">{{ $t('adminCustomTools.editor.loadingTool') }}</div>
     </section>
 
     <!-- 创建工具弹窗 -->
     <transition name="fade">
       <div v-if="createModal" class="modal-backdrop">
         <div class="modal">
-          <h3>创建新工具</h3>
-          <label>工具 ID（小写/下划线）：<input v-model="createForm.id" /></label>
-          <label>描述：<input v-model="createForm.description" /></label>
+          <h3>{{ $t('adminCustomTools.create.title') }}</h3>
+          <label>{{ $t('adminCustomTools.create.toolIdLabel') }}<input v-model="createForm.id" /></label>
+          <label>{{ $t('adminCustomTools.create.descriptionLabel') }}<input v-model="createForm.description" /></label>
           <div class="modal-actions">
-            <button type="button" class="ghost" @click="createModal = false">取消</button>
+            <button type="button" class="ghost" @click="createModal = false">
+              {{ $t('common.cancel') }}
+            </button>
             <button type="button" class="primary" @click="createTool" :disabled="creating">
-              {{ creating ? '创建中...' : '创建' }}
+              {{ creating ? $t('adminCustomTools.create.creating') : $t('adminCustomTools.create.create') }}
             </button>
           </div>
         </div>
@@ -147,14 +158,18 @@
     <transition name="fade">
       <div v-if="confirmDeleteModal" class="modal-backdrop">
         <div class="modal">
-          <h3>确认删除</h3>
+          <h3>{{ $t('adminCustomTools.delete.title') }}</h3>
           <p class="delete-tip">
-            确定删除工具 <strong>{{ deleteTargetId }}</strong> 吗？该操作不可恢复。
+            {{ $t('adminCustomTools.delete.confirmPre') }}
+            <strong>{{ deleteTargetId }}</strong>
+            {{ $t('adminCustomTools.delete.confirmPost') }}
           </p>
           <div class="modal-actions">
-            <button type="button" class="ghost" @click="confirmDeleteModal = false">取消</button>
+            <button type="button" class="ghost" @click="confirmDeleteModal = false">
+              {{ $t('common.cancel') }}
+            </button>
             <button type="button" class="danger" @click="performDelete" :disabled="deleting">
-              {{ deleting ? '删除中...' : '确认删除' }}
+              {{ deleting ? $t('adminCustomTools.delete.deleting') : $t('adminCustomTools.delete.title') }}
             </button>
           </div>
         </div>
@@ -165,6 +180,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue';
+import { t } from '@/locales';
 import { useSecondaryPass } from './useSecondaryPass';
 import SecondaryGate from './SecondaryGate.vue';
 
@@ -211,18 +227,18 @@ const refresh = async () => {
   try {
     const res = await fetch('/api/admin/custom-tools', { credentials: 'same-origin' });
     const data = await res.json();
-    if (!data.success) throw new Error(data.error || '加载失败');
-    tools.value = (data.data || []).map((t: any) => ({
-      ...t,
-      execution_file: (t.execution && t.execution.file) || 'execution.py',
-      return_file: t.return ? 'return.json' : '（无返回层）'
+    if (!data.success) throw new Error(data.error || t('common.loadFailed'));
+    tools.value = (data.data || []).map((item: any) => ({
+      ...item,
+      execution_file: (item.execution && item.execution.file) || 'execution.py',
+      return_file: item.return ? 'return.json' : t('adminCustomTools.main.noReturnLayer')
     }));
     if (pendingOpenId.value) {
-      const target = tools.value.find((t) => t.id === pendingOpenId.value);
+      const target = tools.value.find((tool) => tool.id === pendingOpenId.value);
       if (target) {
         await openEditorInline(target);
       } else {
-        error.value = `未找到工具 ${pendingOpenId.value}`;
+        error.value = t('adminCustomTools.main.toolNotFound', { id: pendingOpenId.value });
       }
       pendingOpenId.value = '';
     }
@@ -299,7 +315,7 @@ const saveFile = async (id: string, name: string, content: string) => {
     body: JSON.stringify({ id, name, content })
   });
   const data = await res.json();
-  if (!data.success) throw new Error(data.error || `保存 ${name} 失败`);
+  if (!data.success) throw new Error(data.error || t('adminCustomTools.save.failed', { name }));
 };
 
 const reloadRegistry = async () => {
@@ -323,7 +339,7 @@ const performDelete = async () => {
       { method: 'DELETE', credentials: 'same-origin' }
     );
     const data = await res.json();
-    if (!data.success) throw new Error(data.error || '删除失败');
+    if (!data.success) throw new Error(data.error || t('adminCustomTools.delete.failed'));
     activeTool.value = null;
     confirmDeleteModal.value = false;
     deleteTargetId.value = '';
@@ -344,12 +360,12 @@ const createTool = async () => {
   if (!secondaryVerified.value) return;
   const id = createForm.id.trim();
   if (!id) {
-    error.value = '请填写工具 ID';
+    error.value = t('adminCustomTools.create.idRequired');
     return;
   }
   const idPattern = /^[A-Za-z][A-Za-z0-9_-]*$/;
   if (!idPattern.test(id)) {
-    error.value = '工具 ID 需以字母开头，可包含字母/数字/_/-';
+    error.value = t('adminCustomTools.create.idInvalid');
     return;
   }
   creating.value = true;
@@ -368,7 +384,7 @@ const createTool = async () => {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.error || '创建失败');
+    if (!data.success) throw new Error(data.error || t('adminCustomTools.create.failed'));
     createModal.value = false;
     activeTool.value = null;
     await refresh();

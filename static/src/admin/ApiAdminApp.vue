@@ -5,21 +5,21 @@
       :configured="secondaryConfigured"
       :loading="secondaryLoading"
       :error="secondaryError"
-      description="请输入管理员二级密码后查看 API 调用与账户。"
+      :description="$t('adminApi.gateDescription')"
       @verify="handleVerifySecondary"
       @recheck="checkSecondary"
     />
 
     <header class="api-header">
       <div>
-        <h1>API 管理面板</h1>
-        <p>监控 Token / 容器 / 上传审计，并管理 API 账户。</p>
-        <small class="muted">数据时间：{{ timeAgo(snapshot?.generated_at) }}</small>
+        <h1>{{ $t('adminApi.title') }}</h1>
+        <p>{{ $t('adminApi.subtitle') }}</p>
+        <small class="muted">{{ $t('adminApi.dataTime', { time: timeAgo(snapshot?.generated_at) }) }}</small>
       </div>
       <div class="header-actions">
-        <label><input type="checkbox" v-model="autoRefresh" /> 自动刷新</label>
+        <label><input type="checkbox" v-model="autoRefresh" /> {{ $t('adminApi.autoRefresh') }}</label>
         <button type="button" :disabled="loading" @click="fetchAll">
-          {{ loading ? '刷新中...' : '手动刷新' }}
+          {{ loading ? $t('common.refreshing') : $t('adminApi.manualRefresh') }}
         </button>
       </div>
     </header>
@@ -27,26 +27,32 @@
     <section class="panel">
       <div class="metrics-grid">
         <div class="metric-card">
-          <p>API 用户数</p>
+          <p>{{ $t('adminApi.metricUsers') }}</p>
           <strong>{{ overview.totals?.users || 0 }}</strong>
         </div>
         <div class="metric-card">
-          <p>总请求</p>
+          <p>{{ $t('adminApi.metricTotalRequests') }}</p>
           <strong>{{ formatNumber(totalRequests) }}</strong>
         </div>
         <div class="metric-card">
-          <p>累计 Token</p>
+          <p>{{ $t('adminApi.metricTotalTokens') }}</p>
           <strong>{{ formatNumber(overview.token_totals?.total_tokens || 0) }}</strong>
           <span class="muted"
-            >输入 {{ formatNumber(overview.token_totals?.input_tokens || 0) }} / 输出
-            {{ formatNumber(overview.token_totals?.output_tokens || 0) }}</span
+            >{{
+              $t('adminApi.tokenInOut', {
+                input: formatNumber(overview.token_totals?.input_tokens || 0),
+                output: formatNumber(overview.token_totals?.output_tokens || 0)
+              })
+            }}</span
           >
         </div>
         <div class="metric-card">
-          <p>活动容器</p>
+          <p>{{ $t('adminApi.metricActiveContainers') }}</p>
           <strong>{{ overview.totals?.containers_active || 0 }}</strong>
           <span class="muted"
-            >可用槽位 {{ overview.totals?.available_container_slots ?? '—' }}</span
+            >{{
+              $t('adminApi.availableSlots', { slots: overview.totals?.available_container_slots ?? '—' })
+            }}</span
           >
         </div>
       </div>
@@ -54,12 +60,12 @@
 
     <section class="panel">
       <div class="section-head">
-        <h2>API 账户管理</h2>
+        <h2>{{ $t('adminApi.accountManagement') }}</h2>
         <div class="create-form">
-          <input v-model="createForm.username" type="text" placeholder="新账号名 (小写英数/-/_)" />
-          <input v-model="createForm.note" type="text" placeholder="备注（可选）" />
+          <input v-model="createForm.username" type="text" :placeholder="$t('adminApi.usernamePlaceholder')" />
+          <input v-model="createForm.note" type="text" :placeholder="$t('adminApi.notePlaceholder')" />
           <button type="button" :disabled="creating" @click="createUser">
-            {{ creating ? '创建中...' : '创建账号' }}
+            {{ creating ? $t('adminApi.creating') : $t('adminApi.createAccount') }}
           </button>
         </div>
       </div>
@@ -67,21 +73,21 @@
         <table>
           <thead>
             <tr>
-              <th>账号</th>
-              <th>备注</th>
-              <th>创建时间</th>
-              <th>请求</th>
-              <th>最近调用</th>
-              <th>Token 累计</th>
-              <th>存储</th>
-              <th>容器</th>
-              <th>密钥</th>
-              <th>操作</th>
+              <th>{{ $t('adminApi.tableUsername') }}</th>
+              <th>{{ $t('adminApi.tableNote') }}</th>
+              <th>{{ $t('adminApi.tableCreatedAt') }}</th>
+              <th>{{ $t('adminApi.tableRequests') }}</th>
+              <th>{{ $t('adminApi.tableLastCall') }}</th>
+              <th>{{ $t('adminApi.tableTotalTokens') }}</th>
+              <th>{{ $t('adminApi.tableStorage') }}</th>
+              <th>{{ $t('adminApi.tableContainer') }}</th>
+              <th>{{ $t('adminApi.tableToken') }}</th>
+              <th>{{ $t('adminApi.tableActions') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!users.length">
-              <td colspan="10">暂无 API 账号</td>
+              <td colspan="10">{{ $t('adminApi.emptyAccounts') }}</td>
             </tr>
             <tr v-for="u in users" :key="u.username">
               <td>
@@ -94,8 +100,8 @@
               <td>{{ formatNumber(u.tokens?.total_tokens || 0) }}</td>
               <td>{{ formatBytes(u.storage?.total_bytes) }}</td>
               <td>
-                <span v-if="u.container?.running" class="status-badge online">运行中</span>
-                <span v-else class="status-badge offline">未运行</span>
+                <span v-if="u.container?.running" class="status-badge online">{{ $t('common.running') }}</span>
+                <span v-else class="status-badge offline">{{ $t('common.notRunning') }}</span>
               </td>
               <td class="token-cell">
                 <span class="token-text">
@@ -133,7 +139,7 @@
                   @click="deleteUser(u.username)"
                   :disabled="deleting === u.username"
                 >
-                  删除
+                  {{ $t('common.delete') }}
                 </button>
               </td>
             </tr>
@@ -146,24 +152,24 @@
     <section class="panel grid">
       <div>
         <div class="section-head">
-          <h3>容器状态</h3>
-          <small class="muted">实时抓取</small>
+          <h3>{{ $t('adminApi.containerSection') }}</h3>
+          <small class="muted">{{ $t('adminApi.realtimeFetch') }}</small>
         </div>
         <div class="table-wrapper small scrollable">
           <table>
             <thead>
               <tr>
-                <th>Key</th>
-                <th>CPU</th>
-                <th>内存%</th>
-                <th>内存</th>
-                <th>网络 RX/TX</th>
-                <th>状态</th>
+                <th>{{ $t('adminApi.tableKey') }}</th>
+                <th>{{ $t('adminApi.tableCpu') }}</th>
+                <th>{{ $t('adminApi.tableMemPercent') }}</th>
+                <th>{{ $t('adminApi.tableMemory') }}</th>
+                <th>{{ $t('adminApi.tableNetIo') }}</th>
+                <th>{{ $t('adminApi.tableStatus') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="!containerItems.length">
-                <td colspan="6">暂无容器</td>
+                <td colspan="6">{{ $t('adminApi.emptyContainers') }}</td>
               </tr>
               <tr v-for="c in containerItems" :key="c.key">
                 <td>{{ c.key }}</td>
@@ -176,7 +182,7 @@
                 </td>
                 <td>
                   <span :class="['status-badge', c.running ? 'online' : 'offline']">
-                    {{ c.running ? '运行中' : '未运行' }}
+                    {{ c.running ? $t('common.running') : $t('common.notRunning') }}
                   </span>
                 </td>
               </tr>
@@ -186,23 +192,28 @@
       </div>
       <div>
         <div class="section-head">
-          <h3>上传审计</h3>
-          <small class="muted">来自隔离区日志</small>
+          <h3>{{ $t('adminApi.uploadSection') }}</h3>
+          <small class="muted">{{ $t('adminApi.uploadSourceNote') }}</small>
         </div>
         <ul class="upload-feed scrollable">
-          <li v-if="!uploads.recent_events?.length" class="upload-item">暂无记录</li>
+          <li v-if="!uploads.recent_events?.length" class="upload-item">{{ $t('adminApi.emptyRecords') }}</li>
           <li v-for="item in uploads.recent_events || []" :key="item.upload_id" class="upload-item">
             <div>
-              <strong>{{ item.original_name || '未命名文件' }}</strong>
+              <strong>{{ item.original_name || $t('adminApi.unnamedFile') }}</strong>
               <div class="muted small">
-                用户 {{ item.username }} · {{ formatBytes(item.size) }} ·
-                {{ item.source || 'unknown' }}
+                {{
+                  $t('adminApi.uploadMeta', {
+                    username: item.username,
+                    size: formatBytes(item.size),
+                    source: item.source || 'unknown'
+                  })
+                }}
               </div>
             </div>
             <div class="muted small">
               {{ timeAgo(item.timestamp) }}
               <span :class="['status-badge', item.accepted ? 'online' : 'danger']">
-                {{ item.accepted ? '通过' : '阻断' }}
+                {{ item.accepted ? $t('adminApi.accepted') : $t('adminApi.blocked') }}
               </span>
             </div>
           </li>
@@ -217,6 +228,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useSecondaryPass } from './useSecondaryPass';
 import SecondaryGate from './SecondaryGate.vue';
+import { t } from '@/locales';
 
 const {
   verified: secondaryVerified,
@@ -283,12 +295,12 @@ const timeAgo = (iso?: string) => {
   if (!Number.isFinite(ts)) return '—';
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins} 分钟前`;
+  if (mins < 1) return t('adminApi.justNow');
+  if (mins < 60) return t('adminApi.minutesAgo', { count: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('adminApi.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  return `${days} 天前`;
+  return t('adminApi.daysAgo', { count: days });
 };
 const formatPercentNumber = (v: any) => {
   if (v === null || v === undefined) return '—';
@@ -303,7 +315,7 @@ const fetchDashboard = async () => {
   try {
     const resp = await fetch('/api/admin/api-dashboard', { credentials: 'same-origin' });
     const data = await resp.json();
-    if (!resp.ok || !data.success) throw new Error(data.error || '加载失败');
+    if (!resp.ok || !data.success) throw new Error(data.error || t('common.loadFailed'));
     snapshot.value = data.data;
   } catch (err: any) {
     console.error(err);
@@ -317,7 +329,7 @@ const fetchUsers = async () => {
   try {
     const resp = await fetch('/api/admin/api-users', { credentials: 'same-origin' });
     const data = await resp.json();
-    if (!resp.ok || !data.success) throw new Error(data.error || '加载失败');
+    if (!resp.ok || !data.success) throw new Error(data.error || t('common.loadFailed'));
     const map: Record<string, any> = {};
     users.value = (data.data || []).map((u: any) => ({
       ...u,
@@ -353,12 +365,12 @@ const createUser = async () => {
   createError.value = '';
   const username = createForm.value.username.trim().toLowerCase();
   if (!username) {
-    createError.value = '请输入账号名';
+    createError.value = t('adminApi.usernameRequired');
     return;
   }
   const pattern = /^[a-z0-9_-]{3,32}$/;
   if (!pattern.test(username)) {
-    createError.value = '账号名需为 3-32 位小写字母/数字/_/-';
+    createError.value = t('adminApi.usernameInvalid');
     return;
   }
   creating.value = true;
@@ -370,12 +382,12 @@ const createUser = async () => {
       body: JSON.stringify({ username, note: createForm.value.note })
     });
     const data = await resp.json();
-    if (!resp.ok || !data.success) throw new Error(data.error || '创建失败');
+    if (!resp.ok || !data.success) throw new Error(data.error || t('adminApi.createFailed'));
     await fetchUsers();
     revealTokens.value[username] = { token: data.data.token, visible: true };
     createForm.value = { username: '', note: '' };
   } catch (err: any) {
-    createError.value = err.message || '创建失败';
+    createError.value = err.message || t('adminApi.createFailed');
   } finally {
     creating.value = false;
   }
@@ -383,7 +395,7 @@ const createUser = async () => {
 
 const deleteUser = async (username: string) => {
   if (!secondaryVerified.value) return;
-  if (!confirm(`确认删除 API 用户 ${username} 吗？`)) return;
+  if (!confirm(t('adminApi.deleteConfirm', { username }))) return;
   deleting.value = username;
   try {
     const resp = await fetch(`/api/admin/api-users/${encodeURIComponent(username)}`, {
@@ -391,10 +403,10 @@ const deleteUser = async (username: string) => {
       credentials: 'same-origin'
     });
     const data = await resp.json();
-    if (!resp.ok || !data.success) throw new Error(data.error || '删除失败');
+    if (!resp.ok || !data.success) throw new Error(data.error || t('adminApi.deleteFailed'));
     await fetchUsers();
   } catch (err: any) {
-    alert(err.message || '删除失败');
+    alert(err.message || t('adminApi.deleteFailed'));
   } finally {
     deleting.value = '';
   }
@@ -412,10 +424,10 @@ const toggleReveal = async (username: string) => {
       credentials: 'same-origin'
     });
     const data = await resp.json();
-    if (!resp.ok || !data.success) throw new Error(data.error || '获取失败');
+    if (!resp.ok || !data.success) throw new Error(data.error || t('adminApi.fetchFailed'));
     revealTokens.value[username] = { token: data.data.token, visible: true };
   } catch (err: any) {
-    alert(err.message || '获取 token 失败');
+    alert(err.message || t('adminApi.fetchTokenFailed'));
   } finally {
     revealLoading.value = '';
   }

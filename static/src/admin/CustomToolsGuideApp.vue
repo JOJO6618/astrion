@@ -3,17 +3,19 @@
     <header class="guide-header">
       <div class="title-block">
         <p class="eyebrow">Custom Tools</p>
-        <h1>开发指南</h1>
-        <p class="desc">如何编写、组织与调试自定义工具的完整说明。</p>
+        <h1>{{ $t('adminCustomTools.guide.title') }}</h1>
+        <p class="desc">{{ $t('adminCustomTools.guide.subtitle') }}</p>
       </div>
       <div class="actions">
-        <a class="ghost" href="/admin/custom-tools" target="_blank" rel="noopener">返回列表</a>
+        <a class="ghost" href="/admin/custom-tools" target="_blank" rel="noopener"
+          >{{ $t('adminCustomTools.backToList') }}</a
+        >
       </div>
     </header>
 
     <section class="panel">
       <div v-if="error" class="status error">{{ error }}</div>
-      <div v-else-if="loading" class="status">加载中...</div>
+      <div v-else-if="loading" class="status">{{ $t('common.loading') }}</div>
       <article v-else class="markdown" v-html="html"></article>
     </section>
   </div>
@@ -21,6 +23,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { t } from '@/locales';
 import { renderMarkdown } from '@/composables/useMarkdownRenderer';
 import guideMd from './custom_tools_guide.md?raw';
 
@@ -32,7 +35,7 @@ onMounted(() => {
   try {
     html.value = renderMarkdown(guideMd);
   } catch (e: any) {
-    error.value = e.message || '渲染指南失败';
+    error.value = e.message || t('adminCustomTools.renderFailed');
   } finally {
     loading.value = false;
   }

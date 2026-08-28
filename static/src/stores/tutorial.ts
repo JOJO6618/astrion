@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { useModelStore } from './model';
+import { t, currentLocale } from '@/locales';
 
 export type TutorialPlacement = 'auto' | 'top' | 'right' | 'bottom' | 'left' | 'center';
 export type TutorialStepMode = 'info' | 'must_click';
@@ -21,23 +22,38 @@ export interface TutorialStep {
   condition?: TutorialCondition;
 }
 
+// 内部步骤定义：文案只存 key（titleKey/descriptionKey），由 activeStep getter 经 t() 解析。
+// 避免在模块顶层常量里调用 t() 固化语言（i18n_spec.md §3.2 响应式陷阱）；
+// activeStep 读取 currentLocale 建立依赖，切换语言时自动重新解析。
+interface TutorialStepDef {
+  id: string;
+  titleKey: string;
+  descriptionKey: string;
+  target: string | null;
+  mode: TutorialStepMode;
+  autoClick?: boolean;
+  autoOutsideClick?: boolean;
+  placement?: TutorialPlacement;
+  condition?: TutorialCondition;
+}
+
 const STORAGE_COMPLETED_KEY = 'agents_tutorial_completed_v1';
 const STORAGE_VERSION_KEY = 'agents_tutorial_version';
 const TUTORIAL_VERSION = 'v1';
 
-const DEFAULT_STEPS: TutorialStep[] = [
+const TUTORIAL_STEP_DEFS: TutorialStepDef[] = [
   {
     id: 'welcome',
-    title: '欢迎使用 Astrion',
-    description: '我们将用 2-3 分钟带你快速了解核心功能。',
+    titleKey: 'tutorial.welcomeTitle',
+    descriptionKey: 'tutorial.welcomeDesc',
     target: null,
     mode: 'info',
     placement: 'center'
   },
   {
     id: 'sidebar-conversations-open',
-    title: '展开对话记录',
-    description: '下一步会自动点击展开对话记录。',
+    titleKey: 'tutorial.sidebarConversationsOpenTitle',
+    descriptionKey: 'tutorial.sidebarConversationsOpenDesc',
     target: '[data-tutorial="conversation-menu"]',
     mode: 'info',
     autoClick: true,
@@ -46,8 +62,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'sidebar-conversations-close',
-    title: '折叠对话记录',
-    description: '下一步会自动点击折叠按钮收起对话记录。',
+    titleKey: 'tutorial.sidebarConversationsCloseTitle',
+    descriptionKey: 'tutorial.sidebarConversationsCloseDesc',
     target: '[data-tutorial="conversation-collapse"]',
     mode: 'info',
     autoClick: true,
@@ -56,8 +72,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'sidebar-new-chat',
-    title: '新建对话',
-    description: '下一步会自动新建并进入一个对话。',
+    titleKey: 'tutorial.newChatTitle',
+    descriptionKey: 'tutorial.sidebarNewChatDesc',
     target: '[data-tutorial="quick-new-conversation"]',
     mode: 'info',
     autoClick: true,
@@ -66,8 +82,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'sidebar-workspace-toggle',
-    title: '工作区折叠',
-    description: '显示/隐藏左侧工作区面板。',
+    titleKey: 'tutorial.sidebarWorkspaceToggleTitle',
+    descriptionKey: 'tutorial.sidebarWorkspaceToggleDesc',
     target: '[data-tutorial="workspace-toggle"]',
     mode: 'info',
     placement: 'right',
@@ -75,8 +91,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'sidebar-monitor-toggle',
-    title: '虚拟显示器',
-    description: '切换到虚拟显示器模式。',
+    titleKey: 'tutorial.sidebarMonitorToggleTitle',
+    descriptionKey: 'tutorial.sidebarMonitorToggleDesc',
     target: '[data-tutorial="monitor-toggle"]',
     mode: 'info',
     placement: 'right',
@@ -84,8 +100,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'workspace-panel-switch',
-    title: '工作区面板切换',
-    description: '下一步会自动展开面板切换菜单。',
+    titleKey: 'tutorial.workspacePanelSwitchTitle',
+    descriptionKey: 'tutorial.workspacePanelSwitchDesc',
     target: '[data-tutorial="panel-menu-toggle"]',
     mode: 'info',
     autoClick: true,
@@ -94,8 +110,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'workspace-panel-options',
-    title: '四合一面板',
-    description: '这里可以切换文件 / 待办 / 子智能体 / 后台指令。',
+    titleKey: 'tutorial.workspacePanelOptionsTitle',
+    descriptionKey: 'tutorial.workspacePanelOptionsDesc',
     target: '[data-tutorial="panel-menu"]',
     mode: 'info',
     placement: 'right',
@@ -103,8 +119,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'workspace-mode-indicator',
-    title: '思考模式',
-    description: '点击切换快速 / 思考。',
+    titleKey: 'tutorial.workspaceModeIndicatorTitle',
+    descriptionKey: 'tutorial.workspaceModeIndicatorDesc',
     target: '[data-tutorial="run-mode-indicator"]',
     mode: 'info',
     placement: 'right',
@@ -112,8 +128,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'workspace-connection-indicator',
-    title: '连接状态指示灯',
-    description: '绿色表示连接正常；红色表示与后端断开连接。',
+    titleKey: 'tutorial.workspaceConnectionIndicatorTitle',
+    descriptionKey: 'tutorial.workspaceConnectionIndicatorDesc',
     target: '[data-tutorial="connection-indicator"]',
     mode: 'info',
     placement: 'right',
@@ -121,8 +137,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'header-model-selector',
-    title: '模型与模式选择',
-    description: '下一步会自动展开模型与运行模式弹窗。',
+    titleKey: 'tutorial.headerModelSelectorTitle',
+    descriptionKey: 'tutorial.headerModelSelectorDesc',
     target: '[data-tutorial="header-model-selector"]',
     mode: 'info',
     autoClick: true,
@@ -131,8 +147,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'header-model-options',
-    title: '模型列表',
-    description: '这里是可用模型列表。',
+    titleKey: 'tutorial.modelListTitle',
+    descriptionKey: 'tutorial.headerModelOptionsDesc',
     target: '[data-tutorial="header-model-options"]',
     mode: 'info',
     placement: 'bottom',
@@ -140,8 +156,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'header-runmode-options',
-    title: '运行模式列表',
-    description: '这里可切换快速 / 思考。',
+    titleKey: 'tutorial.headerRunmodeOptionsTitle',
+    descriptionKey: 'tutorial.headerRunmodeOptionsDesc',
     target: '[data-tutorial="header-runmode-options"]',
     mode: 'info',
     placement: 'bottom',
@@ -149,8 +165,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'header-menu-close',
-    title: '关闭模型菜单',
-    description: '下一步会自动点击空白区域关闭菜单。',
+    titleKey: 'tutorial.headerMenuCloseTitle',
+    descriptionKey: 'tutorial.headerMenuCloseDesc',
     target: '.model-mode-dropdown',
     mode: 'info',
     autoOutsideClick: true,
@@ -159,8 +175,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-open-conversation',
-    title: '打开菜单',
-    description: '下一步会自动打开左上角菜单。',
+    titleKey: 'tutorial.openMenuTitle',
+    descriptionKey: 'tutorial.mobileMenuOpenConversationDesc',
     target: '[data-tutorial="mobile-menu-trigger"]',
     mode: 'info',
     autoClick: true,
@@ -169,8 +185,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-conversation',
-    title: '对话记录',
-    description: '下一步会自动进入对话记录。',
+    titleKey: 'tutorial.mobileMenuConversationTitle',
+    descriptionKey: 'tutorial.mobileMenuConversationDesc',
     target: '[data-tutorial="mobile-menu-conversation"]',
     mode: 'info',
     autoClick: true,
@@ -179,8 +195,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-conversation-close',
-    title: '关闭对话记录',
-    description: '下一步会自动关闭对话记录面板。',
+    titleKey: 'tutorial.mobileConversationCloseTitle',
+    descriptionKey: 'tutorial.mobileConversationCloseDesc',
     target: '[data-tutorial="conversation-collapse"]',
     mode: 'info',
     autoClick: true,
@@ -189,8 +205,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-open-workspace',
-    title: '再次打开菜单',
-    description: '下一步会自动打开菜单。',
+    titleKey: 'tutorial.openMenuAgainTitle',
+    descriptionKey: 'tutorial.mobileMenuOpenWorkspaceDesc',
     target: '[data-tutorial="mobile-menu-trigger"]',
     mode: 'info',
     autoClick: true,
@@ -199,8 +215,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-workspace',
-    title: '工作文件',
-    description: '下一步会自动进入工作文件。',
+    titleKey: 'tutorial.mobileMenuWorkspaceTitle',
+    descriptionKey: 'tutorial.mobileMenuWorkspaceDesc',
     target: '[data-tutorial="mobile-menu-workspace"]',
     mode: 'info',
     autoClick: true,
@@ -209,8 +225,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-workspace-panel-switch',
-    title: '工作区面板切换',
-    description: '下一步会自动展开切换弹窗。',
+    titleKey: 'tutorial.workspacePanelSwitchTitle',
+    descriptionKey: 'tutorial.mobileWorkspacePanelSwitchDesc',
     target: '[data-tutorial="panel-menu-toggle"]',
     mode: 'info',
     autoClick: true,
@@ -219,8 +235,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-workspace-panel-options',
-    title: '切换弹窗选项',
-    description: '这里可切换文件 / 待办 / 子智能体 / 后台指令。',
+    titleKey: 'tutorial.mobileWorkspacePanelOptionsTitle',
+    descriptionKey: 'tutorial.mobileWorkspacePanelOptionsDesc',
     target: '[data-tutorial="panel-menu"]',
     mode: 'info',
     placement: 'bottom',
@@ -228,8 +244,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-workspace-close',
-    title: '关闭工作文件',
-    description: '下一步会自动关闭工作文件面板。',
+    titleKey: 'tutorial.mobileWorkspaceCloseTitle',
+    descriptionKey: 'tutorial.mobileWorkspaceCloseDesc',
     target: '[data-tutorial="mobile-workspace-close"]',
     mode: 'info',
     autoClick: true,
@@ -238,8 +254,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-open-newchat',
-    title: '再次打开菜单',
-    description: '下一步会自动打开菜单。',
+    titleKey: 'tutorial.openMenuAgainTitle',
+    descriptionKey: 'tutorial.mobileMenuOpenNewchatDesc',
     target: '[data-tutorial="mobile-menu-trigger"]',
     mode: 'info',
     autoClick: true,
@@ -248,8 +264,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-new-chat',
-    title: '新建对话',
-    description: '下一步会自动新建对话。',
+    titleKey: 'tutorial.newChatTitle',
+    descriptionKey: 'tutorial.mobileMenuNewChatDesc',
     target: '[data-tutorial="mobile-menu-new-chat"]',
     mode: 'info',
     autoClick: true,
@@ -258,8 +274,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-model-selector-open',
-    title: '模型与思考模式',
-    description: '下一步会自动展开手机端模型/思考模式选择。',
+    titleKey: 'tutorial.mobileModelSelectorOpenTitle',
+    descriptionKey: 'tutorial.mobileModelSelectorOpenDesc',
     target: '[data-tutorial="header-model-selector-mobile"]',
     mode: 'info',
     autoClick: true,
@@ -268,8 +284,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-model-options',
-    title: '模型列表',
-    description: '这里是手机端可选模型。',
+    titleKey: 'tutorial.modelListTitle',
+    descriptionKey: 'tutorial.mobileModelOptionsDesc',
     target: '[data-tutorial="header-model-options"]',
     mode: 'info',
     placement: 'bottom',
@@ -277,8 +293,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-runmode-options',
-    title: '思考模式列表',
-    description: '这里可切换快速 / 思考。',
+    titleKey: 'tutorial.mobileRunmodeOptionsTitle',
+    descriptionKey: 'tutorial.mobileRunmodeOptionsDesc',
     target: '[data-tutorial="header-runmode-options"]',
     mode: 'info',
     placement: 'bottom',
@@ -286,8 +302,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-model-selector-close',
-    title: '关闭选择菜单',
-    description: '下一步会自动点击空白区域关闭菜单。',
+    titleKey: 'tutorial.mobileModelSelectorCloseTitle',
+    descriptionKey: 'tutorial.mobileModelSelectorCloseDesc',
     target: '.model-mode-dropdown',
     mode: 'info',
     autoOutsideClick: true,
@@ -296,8 +312,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'open-quick-menu',
-    title: '打开 + 菜单',
-    description: '将自动为你展开快捷菜单。',
+    titleKey: 'tutorial.openQuickMenuTitle',
+    descriptionKey: 'tutorial.openQuickMenuDesc',
     target: '[data-tutorial="quick-menu-open"]',
     mode: 'info',
     autoClick: true,
@@ -305,24 +321,24 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'quick-upload',
-    title: '上传文件',
-    description: '上传本地文件到当前工作区。',
+    titleKey: 'tutorial.quickUploadTitle',
+    descriptionKey: 'tutorial.quickUploadDesc',
     target: '[data-tutorial="quick-upload"]',
     mode: 'info',
     placement: 'left'
   },
   {
     id: 'quick-review',
-    title: '对话回顾',
-    description: '回顾并压缩上下文。',
+    titleKey: 'tutorial.quickReviewTitle',
+    descriptionKey: 'tutorial.quickReviewDesc',
     target: '[data-tutorial="quick-review"]',
     mode: 'info',
     placement: 'left'
   },
   {
     id: 'quick-send-image',
-    title: '发送图片',
-    description: '当前模型支持时，可发送图片给 AI 分析。',
+    titleKey: 'tutorial.quickSendImageTitle',
+    descriptionKey: 'tutorial.quickSendImageDesc',
     target: '[data-tutorial="quick-send-image"]',
     mode: 'info',
     placement: 'left',
@@ -330,8 +346,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'quick-send-video',
-    title: '发送视频',
-    description: '当前模型支持时，可发送视频给 AI 分析。',
+    titleKey: 'tutorial.quickSendVideoTitle',
+    descriptionKey: 'tutorial.quickSendVideoDesc',
     target: '[data-tutorial="quick-send-video"]',
     mode: 'info',
     placement: 'left',
@@ -339,24 +355,24 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'quick-tool-disable',
-    title: '工具禁用',
-    description: '临时禁用工具分类，控制模型行为范围。',
+    titleKey: 'tutorial.quickToolDisableTitle',
+    descriptionKey: 'tutorial.quickToolDisableDesc',
     target: '[data-tutorial="quick-tool-menu"]',
     mode: 'info',
     placement: 'left'
   },
   {
     id: 'quick-settings',
-    title: '设置菜单',
-    description: '这里可快速访问常用功能。',
+    titleKey: 'tutorial.quickSettingsTitle',
+    descriptionKey: 'tutorial.quickSettingsDesc',
     target: '[data-tutorial="quick-settings-menu"]',
     mode: 'info',
     placement: 'left'
   },
   {
     id: 'open-settings-submenu',
-    title: '打开设置子菜单',
-    description: '下一步会自动展开设置子菜单。',
+    titleKey: 'tutorial.openSettingsSubmenuTitle',
+    descriptionKey: 'tutorial.openSettingsSubmenuDesc',
     target: '[data-tutorial="quick-settings-menu"]',
     mode: 'info',
     autoClick: true,
@@ -364,8 +380,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'open-token-panel',
-    title: '打开用量统计',
-    description: '下一步会自动打开用量统计面板。',
+    titleKey: 'tutorial.openTokenPanelTitle',
+    descriptionKey: 'tutorial.openTokenPanelDesc',
     target: '[data-tutorial="settings-token-panel"]',
     mode: 'info',
     autoClick: true,
@@ -373,16 +389,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'token-panel',
-    title: 'Token 统计面板',
-    description: '这里可以查看上下文、额度和资源统计。',
+    titleKey: 'tutorial.tokenPanelTitle',
+    descriptionKey: 'tutorial.tokenPanelDesc',
     target: '[data-tutorial="token-drawer"]',
     mode: 'info',
     placement: 'left'
   },
   {
     id: 'close-token-panel',
-    title: '关闭统计面板',
-    description: '下一步会自动关闭统计面板。',
+    titleKey: 'tutorial.closeTokenPanelTitle',
+    descriptionKey: 'tutorial.closeTokenPanelDesc',
     target: '[data-tutorial="token-close"]',
     mode: 'info',
     autoClick: true,
@@ -390,8 +406,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'open-personal-space',
-    title: '打开个人空间',
-    description: '下一步会自动打开个人空间。',
+    titleKey: 'tutorial.openPersonalSpaceTitle',
+    descriptionKey: 'tutorial.openPersonalSpaceDesc',
     target: '[data-tutorial="open-personal-space"]',
     mode: 'info',
     autoClick: true,
@@ -400,8 +416,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-open-personal',
-    title: '打开菜单',
-    description: '下一步会自动打开菜单。',
+    titleKey: 'tutorial.openMenuTitle',
+    descriptionKey: 'tutorial.mobileMenuOpenPersonalDesc',
     target: '[data-tutorial="mobile-menu-trigger"]',
     mode: 'info',
     autoClick: true,
@@ -410,8 +426,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'mobile-menu-personal',
-    title: '进入个人空间',
-    description: '下一步会自动进入个人空间。',
+    titleKey: 'tutorial.mobileMenuPersonalTitle',
+    descriptionKey: 'tutorial.mobileMenuPersonalDesc',
     target: '[data-tutorial="mobile-menu-personal"]',
     mode: 'info',
     autoClick: true,
@@ -420,16 +436,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'personal-overview',
-    title: '个人空间总览',
-    description: '这里是个性化设置与高级配置中心。',
+    titleKey: 'tutorial.personalOverviewTitle',
+    descriptionKey: 'tutorial.personalOverviewDesc',
     target: '[data-tutorial="personal-card"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-preferences',
-    title: '个性化设置',
-    description: '下一步自动切换到“个性化设置”。',
+    titleKey: 'tutorial.tabPreferencesTitle',
+    descriptionKey: 'tutorial.tabPreferencesDesc',
     target: '[data-tutorial="personal-tab-preferences"]',
     mode: 'info',
     autoClick: true,
@@ -437,16 +453,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-preferences',
-    title: '个性化设置内容',
-    description: '可配置昵称、语气、职业和必备信息。',
+    titleKey: 'tutorial.pagePreferencesTitle',
+    descriptionKey: 'tutorial.pagePreferencesDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-model',
-    title: '模型偏好',
-    description: '下一步自动切换到“模型偏好”。',
+    titleKey: 'tutorial.tabModelTitle',
+    descriptionKey: 'tutorial.tabModelDesc',
     target: '[data-tutorial="personal-tab-model"]',
     mode: 'info',
     autoClick: true,
@@ -454,16 +470,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-model',
-    title: '模型偏好内容',
-    description: '可设置默认模型、默认运行模式和思考频率。',
+    titleKey: 'tutorial.pageModelTitle',
+    descriptionKey: 'tutorial.pageModelDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-usage',
-    title: '用量统计',
-    description: '下一步自动切换到“用量统计”。',
+    titleKey: 'tutorial.tabUsageTitle',
+    descriptionKey: 'tutorial.tabUsageDesc',
     target: '[data-tutorial="personal-tab-usage"]',
     mode: 'info',
     autoClick: true,
@@ -471,16 +487,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-usage',
-    title: '用量统计内容',
-    description: '可查看累计 Token、对话数和工具调用数据。',
+    titleKey: 'tutorial.pageUsageTitle',
+    descriptionKey: 'tutorial.pageUsageDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-app-update',
-    title: '软件更新',
-    description: '移动端将自动切换到“软件更新”。',
+    titleKey: 'tutorial.tabAppUpdateTitle',
+    descriptionKey: 'tutorial.tabAppUpdateDesc',
     target: '[data-tutorial="personal-tab-app-update"]',
     mode: 'info',
     autoClick: true,
@@ -489,8 +505,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-app-update',
-    title: '软件更新内容',
-    description: '这里会展示最新版本和更新说明。',
+    titleKey: 'tutorial.pageAppUpdateTitle',
+    descriptionKey: 'tutorial.pageAppUpdateDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right',
@@ -498,8 +514,8 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'tab-behavior',
-    title: '智能体行为',
-    description: '下一步自动切换到“智能体行为”。',
+    titleKey: 'tutorial.tabBehaviorTitle',
+    descriptionKey: 'tutorial.tabBehaviorDesc',
     target: '[data-tutorial="personal-tab-behavior"]',
     mode: 'info',
     autoClick: true,
@@ -507,16 +523,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-behavior',
-    title: '智能体行为内容',
-    description: '可配置工具显示、压缩策略等高级选项。',
+    titleKey: 'tutorial.pageBehaviorTitle',
+    descriptionKey: 'tutorial.pageBehaviorDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-skills',
-    title: 'Skills',
-    description: '下一步自动切换到“Skills”。',
+    titleKey: 'tutorial.tabSkillsTitle',
+    descriptionKey: 'tutorial.tabSkillsDesc',
     target: '[data-tutorial="personal-tab-skills"]',
     mode: 'info',
     autoClick: true,
@@ -524,16 +540,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-skills',
-    title: 'Skills 内容',
-    description: '可启用/禁用技能并同步到工作区。',
+    titleKey: 'tutorial.pageSkillsTitle',
+    descriptionKey: 'tutorial.pageSkillsDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-image',
-    title: '图片压缩',
-    description: '下一步自动切换到“图片压缩”。',
+    titleKey: 'tutorial.tabImageTitle',
+    descriptionKey: 'tutorial.tabImageDesc',
     target: '[data-tutorial="personal-tab-image"]',
     mode: 'info',
     autoClick: true,
@@ -541,16 +557,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-image',
-    title: '图片压缩内容',
-    description: '可选择原图、1080p、720p、540p 压缩策略。',
+    titleKey: 'tutorial.pageImageTitle',
+    descriptionKey: 'tutorial.pageImageDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'tab-theme',
-    title: '主题切换',
-    description: '下一步自动切换到“主题切换”。',
+    titleKey: 'tutorial.tabThemeTitle',
+    descriptionKey: 'tutorial.tabThemeDesc',
     target: '[data-tutorial="personal-tab-theme"]',
     mode: 'info',
     autoClick: true,
@@ -558,16 +574,16 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'page-theme',
-    title: '主题切换内容',
-    description: '可在经典、明亮、夜间主题间切换。',
+    titleKey: 'tutorial.pageThemeTitle',
+    descriptionKey: 'tutorial.pageThemeDesc',
     target: '[data-tutorial="personal-content-shell"]',
     mode: 'info',
     placement: 'right'
   },
   {
     id: 'close-personal-space',
-    title: '关闭个人空间',
-    description: '下一步自动关闭个人空间并结束导览。',
+    titleKey: 'tutorial.closePersonalSpaceTitle',
+    descriptionKey: 'tutorial.closePersonalSpaceDesc',
     target: '[data-tutorial="personal-close"]',
     mode: 'info',
     autoClick: true,
@@ -575,19 +591,32 @@ const DEFAULT_STEPS: TutorialStep[] = [
   },
   {
     id: 'done',
-    title: '教程完成！',
-    description: '恭喜你完成新手教程。可随时在个人空间「新手教程」再次查看。',
+    titleKey: 'tutorial.doneTitle',
+    descriptionKey: 'tutorial.doneDesc',
     target: null,
     mode: 'info',
     placement: 'center'
   }
 ];
 
+// 把步骤定义解析为带本地化文案的步骤（调用时求值）
+const resolveTutorialStep = (def: TutorialStepDef): TutorialStep => ({
+  id: def.id,
+  title: t(def.titleKey),
+  description: t(def.descriptionKey),
+  target: def.target,
+  mode: def.mode,
+  autoClick: def.autoClick,
+  autoOutsideClick: def.autoOutsideClick,
+  placement: def.placement,
+  condition: def.condition
+});
+
 interface TutorialState {
   running: boolean;
   completed: boolean;
   currentIndex: number;
-  steps: TutorialStep[];
+  steps: TutorialStepDef[];
   activeSelector: string | null;
 }
 
@@ -603,7 +632,7 @@ const detectMobileViewport = () => {
   return window.innerWidth <= 768;
 };
 
-const shouldIncludeStepByCondition = (step: TutorialStep): boolean => {
+const shouldIncludeStepByCondition = (step: TutorialStepDef): boolean => {
   if (!step.condition) return true;
   if (step.condition === 'is_app_shell') {
     return detectAppShell();
@@ -654,12 +683,15 @@ export const useTutorialStore = defineStore('tutorial', {
     running: false,
     completed: readCompletedState(),
     currentIndex: 0,
-    steps: DEFAULT_STEPS,
+    steps: TUTORIAL_STEP_DEFS,
     activeSelector: null
   }),
   getters: {
     activeStep(state): TutorialStep | null {
-      return state.steps[state.currentIndex] || null;
+      const def = state.steps[state.currentIndex] || null;
+      // 读取 currentLocale 建立语言依赖：切换语言时 getter 重新求值并解析文案（i18n_spec §3.2）
+      void currentLocale.value;
+      return def ? resolveTutorialStep(def) : null;
     },
     totalVisibleSteps(state): number {
       return state.steps.filter((step) => shouldIncludeStepByCondition(step)).length;
@@ -677,7 +709,7 @@ export const useTutorialStore = defineStore('tutorial', {
     }
   },
   actions: {
-    shouldIncludeStep(step: TutorialStep): boolean {
+    shouldIncludeStep(step: TutorialStepDef): boolean {
       return shouldIncludeStepByCondition(step);
     },
     startTutorial() {

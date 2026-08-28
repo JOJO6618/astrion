@@ -22,14 +22,14 @@
             class="runtime-queue-item__action"
             @click.stop="$emit('guide-runtime-message', entry.id)"
           >
-            引导
+            {{ $t('input.guide') }}
           </button>
           <button
             type="button"
             class="runtime-queue-item__action runtime-queue-item__action--danger"
             @click.stop="$emit('delete-runtime-message', entry.id)"
           >
-            删除
+            {{ $t('common.delete') }}
           </button>
         </div>
       </div>
@@ -139,9 +139,9 @@
                   @click.stop
                 >
                   <button type="button" @click.stop="openProjectInFileManager">
-                    在文件管理器中打开
+                    {{ $t('input.openInFileManager') }}
                   </button>
-                  <button type="button" @click.stop="copyProjectPath">复制地址</button>
+                  <button type="button" @click.stop="copyProjectPath">{{ $t('input.copyPath') }}</button>
                 </div>
               </span>
               <span class="floating-project-status__menu-wrap">
@@ -160,14 +160,16 @@
                   class="floating-project-status__submenu floating-project-status__submenu--branch"
                   @click.stop
                 >
-                  <button type="button" @click.stop="copyProjectBranch">复制分支名称</button>
+                  <button type="button" @click.stop="copyProjectBranch">
+                    {{ $t('input.copyBranchName') }}
+                  </button>
                 </div>
               </span>
             </span>
             <span class="floating-project-status__right">
-              <span v-if="goalRunning" class="floating-project-status__notice">目标模式运行中</span>
+              <span v-if="goalRunning" class="floating-project-status__notice">{{ $t('input.goalModeRunning') }}</span>
               <span v-else-if="goalModeArmed" class="floating-project-status__notice"
-                >目标模式就绪</span
+                >{{ $t('input.goalModeReady') }}</span
               >
               <button
                 v-if="pendingUserQuestionCount > 0"
@@ -175,7 +177,7 @@
                 class="floating-project-status__notice floating-project-status__notice--button"
                 @click.stop="$emit('restore-user-question')"
               >
-                等待回答问题
+                {{ $t('input.waitingForQuestion') }}
               </button>
               <button
                 v-if="(activeSubAgentCount || 0) > 0"
@@ -183,7 +185,7 @@
                 class="floating-project-status__notice floating-project-status__notice--button"
                 @click.stop="$emit('stop-all-sub-agents')"
               >
-                {{ activeSubAgentCount }} 个子智能体运行中
+                {{ $t('input.subAgentsRunning', { n: activeSubAgentCount }) }}
               </button>
               <button
                 v-if="terminalCount > 0"
@@ -191,7 +193,7 @@
                 class="floating-project-status__terminal"
                 @click.stop="$emit('realtime-terminal')"
               >
-                {{ terminalCount }} 个终端
+                {{ $t('input.terminalsRunning', { n: terminalCount }) }}
               </button>
               <button
                 v-if="projectGitSummaryForRender"
@@ -308,7 +310,7 @@
               data-tutorial="quick-menu-open"
               @click.stop="$emit('toggle-quick-menu')"
               :disabled="!isConnected"
-              aria-label="快捷菜单"
+              :aria-label="$t('input.quickMenuAriaLabel')"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -359,7 +361,7 @@
                 :disabled="!isConnected || workModeLocked"
                 :aria-expanded="workModeMenuOpen"
                 aria-haspopup="true"
-                :title="workModeLocked ? '对话运行中，运行模式只能在空闲时切换' : '运行模式'"
+                :title="workModeLocked ? $t('input.workModeLockedTitle') : $t('input.workModeTitle')"
               >
                 <span>{{ workModeLabel }}</span>
                 <span class="agent-type-switcher__caret" :class="{ open: workModeMenuOpen }" aria-hidden="true">›</span>
@@ -487,14 +489,14 @@
           :disabled="!isConnected || streamingMessage"
           @click="$emit('open-versioning-dialog')"
         >
-          <span>版本控制</span>
+          <span>{{ $t('input.versionControl') }}</span>
         </button>
         <div class="permission-switcher__block">
           <button
             type="button"
             class="permission-switcher__btn"
             :disabled="!isConnected"
-            :title="permissionLockedByPlan ? '计划模式下权限与执行环境已锁定，网络权限仍可调整' : (executionLockedByReadonly ? '只读模式下执行环境已锁定为沙箱' : '')"
+            :title="permissionLockedByPlan ? $t('input.permissionLockedByPlanTitle') : (executionLockedByReadonly ? $t('input.executionLockedReadonlyTitle') : '')"
             @click="$emit('toggle-permission-menu')"
           >
             <svg
@@ -533,7 +535,7 @@
               :class="{ 'permission-switcher__group--disabled': permissionLockedByPlan }"
             >
               <div class="permission-switcher__group-title">
-                权限<span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">计划模式锁定</span>
+                {{ $t('input.permissionGroup') }}<span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{ $t('input.planModeLocked') }}</span>
               </div>
               <button
                 v-for="option in permissionOptions"
@@ -554,9 +556,9 @@
               :class="{ 'permission-switcher__group--disabled': executionModeLocked }"
             >
               <div class="permission-switcher__group-title">
-                执行环境
-                <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">计划模式锁定</span>
-                <span v-else-if="executionLockedByReadonly" class="permission-switcher__group-lock">只读模式锁定</span>
+                {{ $t('input.executionEnv') }}
+                <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{ $t('input.planModeLocked') }}</span>
+                <span v-else-if="executionLockedByReadonly" class="permission-switcher__group-lock">{{ $t('input.readonlyModeLocked') }}</span>
               </div>
               <button
                 v-for="option in executionModeOptions"
@@ -580,7 +582,7 @@
               class="permission-switcher__group"
               :class="{ 'permission-switcher__group--disabled': currentExecutionMode === 'direct' }"
             >
-              <div class="permission-switcher__group-title">网络权限</div>
+              <div class="permission-switcher__group-title">{{ $t('input.networkPermission') }}</div>
               <button
                 v-for="option in networkPermissionOptions"
                 :key="`network-${option.value}`"
@@ -620,7 +622,7 @@
           </span>
         </button>
         <div class="context-usage-switcher__tooltip">
-          <div>{{ contextUsagePercentLabel }}已用</div>
+          <div>{{ $t('input.usedPercent', { n: contextUsagePercentLabel }) }}</div>
           <div>{{ contextUsageCompactText }}</div>
         </div>
       </div>
@@ -653,6 +655,7 @@ import { useInputStore } from '@/stores/input';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useUiStore } from '@/stores/ui';
 import { useWorkflowStore } from '@/stores/workflow';
+import { t, currentLocale } from '@/locales';
 
 defineOptions({ name: 'InputComposer' });
 
@@ -897,28 +900,32 @@ let fileAtSearchTimer: number | null = null;
 
 const avatarPokeText = ref('');
 let avatarPokeTimer: number | null = null;
-const STATUS_AVATAR_POKE_TEXTS = [
-  '不要！',
-  '停下来！',
-  '别戳啦！',
-  '哎呀！',
-  '你戳到我了！',
-  '轻一点嘛！',
-  '我不是按钮！',
-  '不许乱点！',
-  '呜……别戳我了……',
-  '六边形也是会痛的！',
-  '再戳我要变形了！',
-  '我会紧张的……',
-  '正在假装镇定……',
-  'Token 掉了一地！',
-  '上下文被你戳乱了！',
-  '防戳模式启动失败',
-  '系统提示：AI 被戳了一下',
-  '警告：检测到手欠行为',
-  '我记住你了！',
-  '戳回去！'
-];
+/** 戳头像随机文案（响应式：随语言切换刷新） */
+const avatarPokeTexts = computed(() => {
+  void currentLocale.value;
+  return [
+    t('input.pokeStop'),
+    t('input.pokeHalt'),
+    t('input.pokeDontPoke'),
+    t('input.pokeOops'),
+    t('input.pokeYouPokedMe'),
+    t('input.pokeGentle'),
+    t('input.pokeNotButton'),
+    t('input.pokeNoClicking'),
+    t('input.pokeWhimper'),
+    t('input.pokeHexagonHurt'),
+    t('input.pokeDeform'),
+    t('input.pokeNervous'),
+    t('input.pokePretendCalm'),
+    t('input.pokeTokensFell'),
+    t('input.pokeContextMessy'),
+    t('input.pokeAntiPokeFailed'),
+    t('input.pokeSystemHint'),
+    t('input.pokeWarning'),
+    t('input.pokeRemembered'),
+    t('input.pokePokeBack')
+  ];
+});
 
 const slashHighlightStyle = computed(() => {
   if (slashManualScrolled.value) return { display: 'none' };
@@ -1213,8 +1220,8 @@ const clearAvatarPokeText = () => {
 
 const handleAvatarPoke = () => {
   if (!props.avatarStatus || props.avatarStatus.mode !== 'idle') return;
-  const texts = STATUS_AVATAR_POKE_TEXTS;
-  avatarPokeText.value = texts[Math.floor(Math.random() * texts.length)] || '不要！';
+  const texts = avatarPokeTexts.value;
+  avatarPokeText.value = texts[Math.floor(Math.random() * texts.length)] || t('input.pokeStop');
   if (avatarPokeTimer !== null) window.clearTimeout(avatarPokeTimer);
   avatarPokeTimer = window.setTimeout(() => {
     avatarPokeText.value = '';
@@ -1480,39 +1487,44 @@ const executeSlashAction = (action: () => void) => {
 };
 
 const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const items: SlashMenuItem[] = [
     {
       id: 'new',
-      label: '新建对话',
-      description: '开始一个新的对话（new / clear）',
+      label: t('common.newConversation'),
+      description: t('input.newConversationDesc'),
       disabled: !props.isConnected,
       action: () => emit('new-conversation')
     },
     {
       id: 'upload',
-      label: '上传文件',
-      description: props.uploading ? '上传中...' : '选择本地文件上传',
+      label: t('input.uploadFile'),
+      description: props.uploading ? t('input.uploadingDesc') : t('input.selectFileDesc'),
       disabled: !props.isConnected || props.uploading || props.blockUpload,
       action: () => emit('quick-upload')
     },
     {
       id: 'image',
-      label: '发送图片',
-      description: currentModelSupportsImage.value ? '选择图片并附加到消息' : '当前模型不支持图片',
+      label: t('input.sendImage'),
+      description: currentModelSupportsImage.value
+        ? t('input.sendImageDesc')
+        : t('input.imageNotSupported'),
       disabled: !props.isConnected || props.streamingMessage || !currentModelSupportsImage.value,
       action: () => emit('pick-images')
     },
     {
       id: 'video',
-      label: '发送视频',
-      description: currentModelSupportsVideo.value ? '选择视频并附加到消息' : '当前模型不支持视频',
+      label: t('input.sendVideo'),
+      description: currentModelSupportsVideo.value
+        ? t('input.sendVideoDesc')
+        : t('input.videoNotSupported'),
       disabled: !props.isConnected || props.streamingMessage || !currentModelSupportsVideo.value,
       action: () => emit('pick-video')
     },
     {
       id: 'compress',
-      label: '压缩对话',
-      description: props.compressing ? '压缩中...' : '手动压缩当前对话上下文',
+      label: t('input.compressConversation'),
+      description: props.compressing ? t('input.compressingDesc') : t('input.compressDesc'),
       disabled:
         !props.isConnected ||
         props.compressing ||
@@ -1522,106 +1534,106 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
     },
     {
       id: 'skills',
-      label: '选择 AgentSkill',
-      description: '插入一个 AgentSkill 引用（// 快捷直达）',
+      label: t('input.selectAgentSkill'),
+      description: t('input.selectAgentSkillDesc'),
       mode: 'skills'
     },
     {
       id: 'workflows',
-      label: '工作流',
+      label: t('input.workflows'),
       description: workflowStore.isActive
-        ? `进行中：${workflowStore.snapshot.name} · 查看或退出`
-        : '激活一个工作流，让智能体按流程推进',
+        ? t('input.workflowRunningDesc', { name: workflowStore.snapshot.name })
+        : t('input.workflowActivateDesc'),
       disabled: !props.isConnected,
       mode: 'workflows'
     },
     {
       id: 'conversation-type',
-      label: '对话类型',
-      description: 'agent / multi-agent · 智能体 / 多智能体（仅新对话可切换）',
+      label: t('input.conversationType'),
+      description: t('input.conversationTypeDesc'),
       disabled: !props.isConnected,
       mode: 'conversation-type'
     },
     {
       id: 'work-mode',
-      label: '切换工作模式',
-      description: 'plan / ask / execute · 计划 / 询问 / 执行',
+      label: t('input.switchWorkMode'),
+      description: t('input.switchWorkModeDesc'),
       disabled: !props.isConnected || props.streamingMessage,
       mode: 'work-mode'
     },
     {
       id: 'theme',
-      label: '切换主题',
-      description: '经典 / 明亮 / 夜间',
+      label: t('input.switchTheme'),
+      description: t('input.switchThemeDesc'),
       mode: 'theme'
     },
     {
       id: 'review',
-      label: '对话回顾',
-      description: '打开当前对话回顾',
+      label: t('input.conversationReview'),
+      description: t('input.conversationReviewDesc'),
       disabled: !props.isConnected || props.streamingMessage || props.blockConversationReview,
       action: () => emit('open-review')
     },
     {
       id: 'tokens',
-      label: '用量统计',
-      description: '打开上下文与 token 用量面板',
+      label: t('input.usageStats'),
+      description: t('input.usageStatsDesc'),
       disabled: !props.currentConversationId || props.blockTokenPanel,
       action: () => emit('toggle-token-panel', true)
     },
     {
       id: 'goal',
-      label: '目标模式',
+      label: t('input.goalMode'),
       description: props.goalRunning
-        ? '目标模式运行中'
+        ? t('input.goalModeRunning')
         : props.goalModeArmed
-          ? '目标模式已就绪'
-          : '切换目标模式',
+          ? t('input.goalModeArmed')
+          : t('input.goalModeToggleDesc'),
       disabled: !props.isConnected,
       action: () => emit('toggle-goal-mode')
     },
     {
       id: 'personalization',
-      label: '个人设置',
-      description: '打开个人空间设置',
+      label: t('input.personalSettings'),
+      description: t('input.personalSettingsDesc'),
       action: () => {
         void personalizationStore.openDrawer();
       }
     },
     {
       id: 'terminal',
-      label: '实时终端',
-      description: '打开实时终端面板',
+      label: t('input.realtimeTerminal'),
+      description: t('input.realtimeTerminalDesc'),
       disabled: !props.isConnected || props.blockRealtimeTerminal,
       action: () => emit('realtime-terminal')
     },
     {
       id: 'model',
-      label: '切换模型',
-      description: '选择对话使用的模型',
+      label: t('input.switchModel'),
+      description: t('input.switchModelDesc'),
       disabled: !props.isConnected || props.streamingMessage,
       mode: 'model'
     },
     {
       id: 'run-mode',
-      label: '思考模式',
-      description: '切换 fast / thinking',
+      label: t('input.thinkingMode'),
+      description: t('input.thinkingModeDesc'),
       disabled: !props.isConnected || props.streamingMessage,
       mode: 'run-mode'
     },
     {
       id: 'permission',
-      label: '权限模式',
-      description: '切换 readonly / approval / auto / unrestricted',
+      label: t('input.permissionMode'),
+      description: t('input.permissionModeDesc'),
       disabled: !props.isConnected || props.streamingMessage,
       mode: 'permission'
     },
     {
       id: 'network',
-      label: '网络权限',
+      label: t('input.networkPermission'),
       description: props.networkPermissionEnabled
-        ? 'restricted / full · 受限 / 完整'
-        : '当前环境不支持网络权限切换',
+        ? t('input.networkPermissionDesc')
+        : t('input.networkUnsupportedDesc'),
       disabled: !props.isConnected || props.streamingMessage || !props.networkPermissionEnabled,
       mode: 'network'
     },
@@ -1629,8 +1641,8 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       ? [
           {
             id: 'execution',
-            label: '执行环境',
-            description: '切换 sandbox / direct',
+            label: t('input.executionEnv'),
+            description: t('input.executionEnvDesc'),
             disabled: !props.isConnected || props.streamingMessage,
             mode: 'execution'
           } as SlashMenuItem
@@ -1640,8 +1652,11 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       ? [
           {
             id: 'workspace',
-            label: props.workspaceKind === 'project' ? '切换项目' : '切换工作区',
-            description: 'workspace / project · 工作区 / 项目',
+            label:
+              props.workspaceKind === 'project'
+                ? t('input.switchProject')
+                : t('input.switchWorkspace'),
+            description: t('input.workspaceDesc'),
             disabled: !props.isConnected || props.streamingMessage,
             mode: 'workspace'
           } as SlashMenuItem
@@ -1649,16 +1664,18 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       : []),
     {
       id: 'versioning',
-      label: '版本控制',
-      description: props.versioningEnabled ? '当前：开启' : '当前：关闭',
+      label: t('input.versionControl'),
+      description: props.versioningEnabled ? t('input.versioningOn') : t('input.versioningOff'),
       disabled: !props.isConnected || props.streamingMessage,
       action: () => emit('open-versioning-dialog')
     },
     {
       id: 'git-bar',
-      label: 'Git 状态栏',
+      label: t('input.gitStatusBar'),
       description:
-        personalizationStore?.form?.show_git_status_bar !== false ? '当前：显示' : '当前：隐藏',
+        personalizationStore?.form?.show_git_status_bar !== false
+          ? t('input.gitStatusBarShown')
+          : t('input.gitStatusBarHidden'),
       action: () => {
         const currentValue = personalizationStore?.form?.show_git_status_bar !== false;
         const newValue = !currentValue;
@@ -1674,15 +1691,15 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
     },
     {
       id: 'path-auth',
-      label: '路径授权',
-      description: '查看和管理路径授权',
+      label: t('input.pathAuth'),
+      description: t('input.pathAuthDesc'),
       disabled: !props.isConnected,
       action: () => emit('open-path-authorization')
     },
     {
       id: 'approval',
-      label: '审批面板',
-      description: '查看审批记录',
+      label: t('input.approvalPanel'),
+      description: t('input.approvalPanelDesc'),
       disabled: !props.isConnected,
       action: () => emit('toggle-approval-panel')
     }
@@ -1698,23 +1715,24 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
 });
 
 const themeSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const themes: Array<SlashMenuItem & { theme: 'classic' | 'light' | 'dark' }> = [
     {
       id: 'theme-classic',
-      label: '经典',
-      description: '米色质感，柔和高对比',
+      label: t('input.themeClassic'),
+      description: t('input.themeClassicDesc'),
       theme: 'classic'
     },
     {
       id: 'theme-light',
-      label: '明亮',
-      description: '纯白底色 + 优雅灰，简洁清爽',
+      label: t('input.themeLight'),
+      description: t('input.themeLightDesc'),
       theme: 'light'
     },
     {
       id: 'theme-dark',
-      label: '夜间',
-      description: '深灰 + 黑，低亮度显示',
+      label: t('input.themeDark'),
+      description: t('input.themeDarkDesc'),
       theme: 'dark'
     }
   ];
@@ -1727,6 +1745,7 @@ const themeSlashMenuItems = computed<SlashMenuItem[]>(() => {
 });
 
 const permissionSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const options = props.permissionOptions || [];
   const current = String(props.currentPermissionMode || '');
   const lockedByPlan = props.currentWorkMode === 'plan';
@@ -1734,14 +1753,17 @@ const permissionSlashMenuItems = computed<SlashMenuItem[]>(() => {
     id: `perm:${opt.value}`,
     label: opt.label,
     description: lockedByPlan
-      ? '计划模式下权限锁定为只读'
-      : `${opt.value === current ? '当前 · ' : ''}${opt.description || ''}`,
+      ? t('input.permissionLockedReadonlyDesc')
+      : opt.value === current
+        ? t('input.optionWithCurrent', { desc: opt.description || '' })
+        : opt.description || '',
     disabled: lockedByPlan,
     action: () => emit('change-permission-mode', opt.value)
   }));
 });
 
 const executionSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const options = props.executionModeOptions || [];
   const current = String(props.currentExecutionMode || '');
   const lockedByPlan = props.currentWorkMode === 'plan';
@@ -1749,84 +1771,106 @@ const executionSlashMenuItems = computed<SlashMenuItem[]>(() => {
     id: `exec:${opt.value}`,
     label: opt.label,
     description: lockedByPlan
-      ? '计划模式下执行环境锁定为沙箱'
-      : `${opt.value === current ? '当前 · ' : ''}${opt.description || ''}`,
+      ? t('input.executionLockedSandboxDesc')
+      : opt.value === current
+        ? t('input.optionWithCurrent', { desc: opt.description || '' })
+        : opt.description || '',
     disabled: lockedByPlan,
     action: () => emit('change-execution-mode', opt.value)
   }));
 });
 
 const modelSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const list = Array.isArray(props.modelOptions) ? props.modelOptions : [];
   const current = String(props.currentModelKey || '');
   return list.map((model) => ({
     id: `model:${model.key}`,
     label: model.label,
-    description: `${model.key === current ? '当前 · ' : ''}${model.description || ''}`,
+    description:
+      model.key === current
+        ? t('input.optionWithCurrent', { desc: model.description || '' })
+        : model.description || '',
     disabled: !!model.disabled,
     action: () => emit('select-model', model.key)
   }));
 });
 
 const runModeSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const modes: Array<{ value: string; label: string }> = [
-    { value: 'fast', label: '快速' },
-    { value: 'thinking', label: '思考' }
+    { value: 'fast', label: t('input.runModeFast') },
+    { value: 'thinking', label: t('input.runModeThinking') }
   ];
   const current = String(props.runMode || '');
   return modes.map((mode) => ({
     id: `runmode:${mode.value}`,
     label: mode.label,
-    description: mode.value === current ? '当前' : '',
+    description: mode.value === current ? t('input.currentMark') : '',
     action: () => emit('select-run-mode', mode.value)
   }));
 });
 
 const networkSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const options = props.networkPermissionOptions || [];
   const current = String(props.currentNetworkPermission || '');
   return options.map((opt) => ({
     id: `network:${opt.value}`,
     label: opt.label,
-    description: `${opt.value === current ? '当前 · ' : ''}${opt.description || ''}`,
+    description:
+      opt.value === current
+        ? t('input.optionWithCurrent', { desc: opt.description || '' })
+        : opt.description || '',
     action: () => emit('change-network-permission', opt.value)
   }));
 });
 
 const workModeSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const options = props.workModeOptions || [];
   const current = String(props.currentWorkMode || '');
   return options.map((opt) => ({
     id: `workmode:${opt.value}`,
     label: opt.label,
-    description: `${opt.value === current ? '当前 · ' : ''}${opt.description || ''}`,
+    description:
+      opt.value === current
+        ? t('input.optionWithCurrent', { desc: opt.description || '' })
+        : opt.description || '',
     action: () => emit('change-work-mode', opt.value)
   }));
 });
 
 const workspaceSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const list = Array.isArray(props.hostWorkspaces) ? props.hostWorkspaces : [];
   const current = String(props.currentHostWorkspaceId || '');
   const switching = !!props.hostWorkspaceSwitching;
   return list.map((ws) => ({
     id: `workspace:${ws.workspace_id}`,
     label: ws.label,
-    description: `${ws.workspace_id === current ? '当前 · ' : ''}${ws.path || ''}`,
+    description:
+      ws.workspace_id === current
+        ? t('input.optionWithCurrent', { desc: ws.path || '' })
+        : ws.path || '',
     disabled: switching || ws.workspace_id === current,
     action: () => emit('switch-host-workspace', ws.workspace_id)
   }));
 });
 
 const conversationTypeSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   // 已打开对话时类型不可变（类型是创建时确定的对话属性），子菜单项整体锁定
   const locked = agentTypeLocked.value;
   const current = String(props.newConversationType || 'agent');
-  return agentTypeOptions.map((opt) => ({
+  return agentTypeOptions.value.map((opt) => ({
     id: `convtype:${opt.value}`,
     label: opt.label,
     description: locked
-      ? '对话类型创建后不可变，仅新对话可切换'
-      : `${opt.value === current ? '当前 · ' : ''}${opt.description || ''}`,
+      ? t('input.conversationTypeLockedDesc')
+      : opt.value === current
+        ? t('input.optionWithCurrent', { desc: opt.description || '' })
+        : opt.description || '',
     disabled: locked,
     action: () => emit('select-new-conversation-type', opt.value as 'agent' | 'multi_agent')
   }));
@@ -1879,35 +1923,37 @@ const activeSlashMenuItems = computed<SlashMenuItem[]>(() => {
 });
 
 const slashMenuAriaLabel = computed(() => {
-  if (slashMenuMode.value === 'skills') return '可用 AgentSkills';
-  if (slashMenuMode.value === 'workflows') return '工作流选项';
-  if (slashMenuMode.value === 'theme') return '主题选项';
-  if (slashMenuMode.value === 'permission') return '权限模式选项';
-  if (slashMenuMode.value === 'execution') return '执行环境选项';
-  if (slashMenuMode.value === 'model') return '模型选项';
-  if (slashMenuMode.value === 'run-mode') return '思考模式选项';
-  if (slashMenuMode.value === 'network') return '网络权限选项';
-  if (slashMenuMode.value === 'work-mode') return '工作模式选项';
+  void currentLocale.value;
+  if (slashMenuMode.value === 'skills') return t('input.slashSkillsAria');
+  if (slashMenuMode.value === 'workflows') return t('input.slashWorkflowsAria');
+  if (slashMenuMode.value === 'theme') return t('input.slashThemeAria');
+  if (slashMenuMode.value === 'permission') return t('input.slashPermissionAria');
+  if (slashMenuMode.value === 'execution') return t('input.slashExecutionAria');
+  if (slashMenuMode.value === 'model') return t('input.slashModelAria');
+  if (slashMenuMode.value === 'run-mode') return t('input.slashRunModeAria');
+  if (slashMenuMode.value === 'network') return t('input.slashNetworkAria');
+  if (slashMenuMode.value === 'work-mode') return t('input.slashWorkModeAria');
   if (slashMenuMode.value === 'workspace')
-    return props.workspaceKind === 'project' ? '项目选项' : '工作区选项';
-  if (slashMenuMode.value === 'conversation-type') return '对话类型选项';
-  return '快捷指令';
+    return props.workspaceKind === 'project' ? t('input.slashProjectAria') : t('input.slashWorkspaceAria');
+  if (slashMenuMode.value === 'conversation-type') return t('input.slashConversationTypeAria');
+  return t('input.slashRootAria');
 });
 
 const slashMenuEmptyText = computed(() => {
+  void currentLocale.value;
   if (slashMenuMode.value === 'skills')
-    return skillsLoading.value ? '正在加载 skills...' : '没有匹配的 skill';
+    return skillsLoading.value ? t('input.skillsLoadingEmpty') : t('input.skillsEmpty');
   if (slashMenuMode.value === 'workflows')
-    return workflowsLoading.value ? '正在加载工作流...' : '暂无可用工作流（可去 /workflows 创建）';
-  if (slashMenuMode.value === 'permission') return '无可用权限模式';
-  if (slashMenuMode.value === 'execution') return '无可用执行环境';
-  if (slashMenuMode.value === 'model') return '无可用模型';
-  if (slashMenuMode.value === 'network') return '无可用网络权限选项';
-  if (slashMenuMode.value === 'work-mode') return '无可用工作模式';
+    return workflowsLoading.value ? t('input.workflowsLoadingEmpty') : t('input.workflowsEmpty');
+  if (slashMenuMode.value === 'permission') return t('input.permissionEmpty');
+  if (slashMenuMode.value === 'execution') return t('input.executionEmpty');
+  if (slashMenuMode.value === 'model') return t('input.modelEmpty');
+  if (slashMenuMode.value === 'network') return t('input.networkEmpty');
+  if (slashMenuMode.value === 'work-mode') return t('input.workModeEmpty');
   if (slashMenuMode.value === 'workspace')
-    return props.workspaceKind === 'project' ? '暂无其他项目' : '暂无其他工作区';
-  if (slashMenuMode.value === 'conversation-type') return '无可用对话类型';
-  return '没有匹配的指令';
+    return props.workspaceKind === 'project' ? t('input.projectEmpty') : t('input.workspaceEmpty');
+  if (slashMenuMode.value === 'conversation-type') return t('input.conversationTypeEmpty');
+  return t('input.commandEmpty');
 });
 
 const skillSlashMenuOpen = computed(
@@ -1923,7 +1969,7 @@ const loadSkills = async () => {
     const response = await fetch('/api/skills');
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.success) {
-      throw new Error(data?.error || '加载 skills 失败');
+      throw new Error(data?.error || t('input.loadSkillsFailed'));
     }
     availableSkills.value = Array.isArray(data.skills)
       ? data.skills
@@ -1953,7 +1999,7 @@ const loadWorkflows = async (force = false) => {
     const response = await fetch('/api/workflows');
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data?.error || '加载工作流列表失败');
+      throw new Error(data?.error || t('input.loadWorkflowsFailed'));
     }
     availableWorkflows.value = Array.isArray(data.workflows)
       ? data.workflows
@@ -1994,20 +2040,24 @@ const activateWorkflow = async (name: string) => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.success) {
-      throw new Error(data?.error || '激活工作流失败');
+      throw new Error(data?.error || t('input.activateWorkflowFailed'));
     }
     // 快照随响应返回：立即写入 store（socketio 广播在轮询架构下不可靠，
     // 任务事件流的首个进度事件要等模型首次汇报才发出）
     if (data?.snapshot) {
       workflowStore.setWorkflow(data.snapshot, true);
     }
-    useUiStore().pushToast({ title: `工作流「${name}」已激活`, type: 'success' });
+    useUiStore().pushToast({ title: t('input.workflowActivated', { name }), type: 'success' });
     const newCid = String(data?.conversation_id || '').trim();
     if (newCid && newCid !== conversationId) {
       emit('workflow-activated', newCid);
     }
   } catch (error: any) {
-    useUiStore().pushToast({ title: '激活工作流失败', message: String(error?.message || error || ''), type: 'error' });
+    useUiStore().pushToast({
+      title: t('input.activateWorkflowFailed'),
+      message: String(error?.message || error || ''),
+      type: 'error'
+    });
   } finally {
     workflowActionPending.value = false;
   }
@@ -2028,13 +2078,20 @@ const deactivateWorkflow = async () => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.success) {
-      throw new Error(data?.error || '退出工作流失败');
+      throw new Error(data?.error || t('input.exitWorkflowFailed'));
     }
     // 摘牌成功：写 live=true 的空快照，触发窗口退出动画（与出现对称），而非瞬间卸载
     workflowStore.setWorkflow(null, true);
-    useUiStore().pushToast({ title: `已退出工作流「${data?.workflow_name || ''}」`, type: 'success' });
+    useUiStore().pushToast({
+      title: t('input.workflowExited', { name: data?.workflow_name || '' }),
+      type: 'success'
+    });
   } catch (error: any) {
-    useUiStore().pushToast({ title: '退出工作流失败', message: String(error?.message || error || ''), type: 'error' });
+    useUiStore().pushToast({
+      title: t('input.exitWorkflowFailed'),
+      message: String(error?.message || error || ''),
+      type: 'error'
+    });
   } finally {
     workflowActionPending.value = false;
   }
@@ -2042,13 +2099,14 @@ const deactivateWorkflow = async () => {
 
 /** 工作流子菜单项：激活中首项为「退出当前工作流」，其后为可激活列表。 */
 const workflowSlashMenuItems = computed<SlashMenuItem[]>(() => {
+  void currentLocale.value;
   const items: SlashMenuItem[] = [];
   const activeName = workflowStore.isActive ? String(workflowStore.snapshot.name || '') : '';
   if (activeName) {
     items.push({
       id: 'workflow-deactivate',
-      label: `退出当前工作流`,
-      description: `进行中：${activeName} · 摘牌退出（不打断当前工作）`,
+      label: t('input.exitCurrentWorkflow'),
+      description: t('input.workflowRunningExitDesc', { name: activeName }),
       disabled: workflowActionPending.value,
       action: () => {
         void deactivateWorkflow();
@@ -2068,8 +2126,11 @@ const workflowSlashMenuItems = computed<SlashMenuItem[]>(() => {
       id: `workflow-activate-${wf.name}`,
       label: wf.name,
       description: isCurrent
-        ? '当前激活中'
-        : `${wf.description || '（无描述）'}${wf.source === 'builtin' ? ' · 内置' : ''}`,
+        ? t('input.workflowCurrentActive')
+        : t('input.workflowItemDesc', {
+            desc: wf.description || t('input.workflowNoDesc'),
+            builtinSuffix: wf.source === 'builtin' ? t('input.workflowBuiltinSuffix') : ''
+          }),
       disabled: activateDisabled || !!isCurrent,
       action: () => {
         void activateWorkflow(wf.name);
@@ -2345,7 +2406,7 @@ const editor = useEditor({
       horizontalRule: false
     }),
     Placeholder.configure({
-      placeholder: '输入消息... (Ctrl+Enter 发送)'
+      placeholder: t('input.messagePlaceholder')
     }),
     Mention.configure({
       HTMLAttributes: {
@@ -2382,7 +2443,7 @@ const editor = useEditor({
   editorProps: {
     attributes: {
       class: 'stadium-input-editor',
-      'data-placeholder': '输入消息... (Ctrl+Enter 发送)'
+      'data-placeholder': t('input.messagePlaceholder')
     },
     handleKeyDown(_view, event) {
       if (event.ctrlKey && event.key === 'Enter') {
@@ -2436,10 +2497,12 @@ const isVoiceInputSupported = computed(() => {
 });
 
 const voiceButtonTitle = computed(() => {
-  if (voiceModelStatus.value === 'downloading') return `模型下载中 ${voiceDownloadPercent.value}%`;
-  if (voiceModelStatus.value === 'model_not_ready') return '模型未下载，请在个人空间下载';
-  if (isRecording.value) return '停止录音';
-  return '语音输入';
+  void currentLocale.value;
+  if (voiceModelStatus.value === 'downloading')
+    return t('input.voiceModelDownloading', { percent: voiceDownloadPercent.value });
+  if (voiceModelStatus.value === 'model_not_ready') return t('input.voiceModelNotReady');
+  if (isRecording.value) return t('input.stopRecording');
+  return t('input.voiceInput');
 });
 
 // 注册全局回调（Android Bridge 会调用这些函数）
@@ -3011,9 +3074,10 @@ const goalBannerCollapsed = computed(
 );
 
 const goalBannerTitle = computed(() => {
-  if (props.goalRunning) return '目标模式运行中';
-  if (goalCompleted.value) return '目标模式完成';
-  return '目标模式已就绪';
+  void currentLocale.value;
+  if (props.goalRunning) return t('input.goalModeRunning');
+  if (goalCompleted.value) return t('input.goalModeCompleted');
+  return t('input.goalModeArmed');
 });
 
 const collectComposerVisualHeight = () => {
@@ -3262,29 +3326,33 @@ const currentPermissionLabel = computed(() => {
   return matched ? matched.label : props.currentPermissionMode;
 });
 
-/** 对话类型选择器：选项定义 */
-const agentTypeOptions = [
-  {
-    value: 'agent' as const,
-    label: '智能体',
-    description: '单智能体对话'
-  },
-  {
-    value: 'multi_agent' as const,
-    label: '多智能体',
-    description: 'Team Leader + 子智能体协作'
-  }
-];
+/** 对话类型选择器：选项定义（响应式：随语言切换刷新） */
+const agentTypeOptions = computed(() => {
+  void currentLocale.value;
+  return [
+    {
+      value: 'agent' as const,
+      label: t('input.agentType'),
+      description: t('input.agentTypeDesc')
+    },
+    {
+      value: 'multi_agent' as const,
+      label: t('input.multiAgentType'),
+      description: t('input.multiAgentTypeDesc')
+    }
+  ];
+});
 
 /** 已打开对话时类型不可变（类型是创建时确定的对话属性） */
 const agentTypeLocked = computed(() => !!props.currentConversationId);
 
 /** 按钮文案：有对话显示对话类型，空对话显示待创建类型 */
 const agentTypeLabel = computed(() => {
+  void currentLocale.value;
   if (props.currentConversationId) {
-    return props.currentConversationType === 'multi_agent' ? '多智能体' : '智能体';
+    return props.currentConversationType === 'multi_agent' ? t('input.multiAgentType') : t('input.agentType');
   }
-  return props.newConversationType === 'multi_agent' ? '多智能体' : '智能体';
+  return props.newConversationType === 'multi_agent' ? t('input.multiAgentType') : t('input.agentType');
 });
 
 /** 运行模式：对话运行中不可切换（后端也会 409 拒绝，UI 侧先锁定避免误点） */
@@ -3292,10 +3360,11 @@ const workModeLocked = computed(() => !!props.streamingMessage);
 
 /** 运行模式按钮文案 */
 const workModeLabel = computed(() => {
+  void currentLocale.value;
   const matched = (props.workModeOptions || []).find(
     (item) => item.value === props.currentWorkMode
   );
-  return matched ? matched.label : props.currentWorkMode || '计划';
+  return matched ? matched.label : props.currentWorkMode || t('input.workModePlanFallback');
 });
 
 /** 计划模式下权限被锁定为只读（UI 禁用 + 后端强制） */
@@ -3310,9 +3379,10 @@ const executionModeLocked = computed(
 );
 
 const currentExecutionShortLabel = computed(() => {
+  void currentLocale.value;
   const mode = String(props.currentExecutionMode || '');
-  if (mode === 'direct') return '完全访问';
-  if (mode === 'sandbox') return '沙箱';
+  if (mode === 'direct') return t('input.executionFullAccess');
+  if (mode === 'sandbox') return t('input.executionSandbox');
   return mode;
 });
 

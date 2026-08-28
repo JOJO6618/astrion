@@ -226,6 +226,18 @@
 - **复用现有 logger**：优先复用项目已有 logger（如 `utils/logger.py`、`modules/multi_agent/debug_logger.py` 等），按模块落到 `~/.astrion/astrion/<mode>/logs/` 下。
 - **关键状态转换必打**：多智能体、子智能体、任务轮询等复杂链路应在关键状态转换点写结构化日志，便于复现问题后按时间线追溯。
 
+## 5.8) 前端多语言（i18n）文案规范（强制，2026-08 新增）
+
+> 详细规范：`doc/frontend/i18n_spec.md`。约束级别与 §5.5 同级：写新 UI 或改动 UI 文案时必须遵守。
+
+- **引擎**：vue-i18n v10（Composition 模式）；文案唯一定义在 `static/src/locales/{zh-CN,en-US}/<namespace>.ts`，中文为源语言。
+- **使用**：模板用 `$t('ns.key')`（全局注入、响应式）；SFC script / 纯 TS 用 `import { t } from '@/locales'`（调用时求值、非响应式；响应式标签用 `useI18n()` 或读取 `currentLocale`）。
+- **公共词**：高频通用词唯一来源是 `common` 命名空间，禁止在各域重复定义。
+- **key 奇偶强校验**：en-US 聚合器用 `DeepString<typeof zhCN>` 约束，en 缺/多 key 直接 tsc 报错；新增命名空间须在 `zh-CN.ts` / `en-US.ts` 同步注册。
+- **防回退栏杆**：`npm run lint` 先跑 `scripts/i18n_audit.mjs`（剥离注释后查裸中文，独立命令 `lint:text`）；存量文件列在 `scripts/i18n_baseline.txt`，**迁移完一个文件就删一行**，删除后该文件永久受栏杆保护。
+- **语言切换**：个人空间 → 外观 → 界面语言；默认 zh-CN（不跟随浏览器），持久化 key `agents_ui_locale`。
+- **边界**：后端下发文字（API error、通知、工具结果摘要）不做多语言，前端原样显示；CLI 暂不纳入。
+
 ## 6) Git 工作流（开发 + Review）
 
 ### 6.1 核心原则

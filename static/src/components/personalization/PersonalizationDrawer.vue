@@ -16,7 +16,7 @@
           type="button"
           class="settings-close-button"
           data-tutorial="personal-close"
-          aria-label="关闭个人空间"
+          :aria-label="$t('personalization.closePersonalSpaceAriaLabel')"
           @click="personalization.closeDrawer()"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round">
@@ -27,7 +27,7 @@
         <div class="personalization-body settings-redesign-body" v-if="!loading">
           <form class="personal-form settings-redesign-form">
             <div class="settings-redesign-layout">
-              <nav class="settings-redesign-tabs" aria-label="个人空间分组切换">
+              <nav class="settings-redesign-tabs" :aria-label="$t('personalization.tabAriaLabel')">
                 <button
                   v-for="tab in personalTabs"
                   :key="tab.id"
@@ -70,7 +70,7 @@
                     :style="settingsTabIconStyle(tab.icon)"
                     aria-hidden="true"
                   ></span>
-                  <span>{{ tab.label }}</span>
+                  <span>{{ $t(tab.labelKey) }}</span>
                 </button>
               </nav>
 
@@ -85,8 +85,8 @@
                     <section v-if="activeTab === 'general'" key="general" class="settings-page">
                       <label class="settings-toggle-row">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">自动生成对话标题</span>
-                          <span class="settings-row-desc">默认开启；关闭后标题将沿用首条消息</span>
+                          <span class="settings-row-title">{{ $t('personalization.autoTitleTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.autoTitleDesc') }}</span>
                         </span>
                         <input
                           type="checkbox"
@@ -102,9 +102,9 @@
                       </label>
                       <div class="settings-action-row">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">新手教程</span>
+                          <span class="settings-row-title">{{ $t('personalization.tutorialTitle') }}</span>
                           <span class="settings-row-desc"
-                            >通过高亮与说明窗了解主要功能入口和常用设置</span
+                            >{{ $t('personalization.tutorialDesc') }}</span
                           >
                         </span>
                         <button
@@ -112,15 +112,14 @@
                           class="settings-secondary-button"
                           @click="startTutorial"
                         >
-                          开始教程
+                          {{ $t('personalization.tutorialButton') }}
                         </button>
                       </div>
                       <div class="settings-action-row" v-if="isAppShell">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">软件更新</span>
+                          <span class="settings-row-title">{{ $t('personalization.appUpdateTitle') }}</span>
                           <span class="settings-row-desc"
-                            >当前版本：{{ appCurrentVersionText }} ·
-                            {{ appUpdateCheckedText }}</span
+                            >{{ $t('personalization.appUpdateDesc', { version: appCurrentVersionText, checked: appUpdateCheckedText }) }}</span
                           >
                         </span>
                         <div class="settings-inline-actions">
@@ -133,7 +132,7 @@
                             :disabled="appUpdateChecking"
                             @click="checkAppUpdate"
                           >
-                            {{ appUpdateChecking ? '检查中...' : '检查更新' }}
+                            {{ appUpdateChecking ? $t('personalization.appChecking') : $t('personalization.appCheckUpdate') }}
                           </button>
                           <button
                             v-if="appHasUpdate"
@@ -141,21 +140,21 @@
                             class="settings-primary-button"
                             @click="downloadLatestApp"
                           >
-                            下载
+                            {{ $t('common.download') }}
                           </button>
                         </div>
                       </div>
                       <div class="settings-action-row danger-zone">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">退出登录</span>
-                          <span class="settings-row-desc">结束当前账号会话</span>
+                          <span class="settings-row-title">{{ $t('personalization.logoutTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.logoutDesc') }}</span>
                         </span>
                         <button
                           type="button"
                           class="settings-secondary-button danger"
                           @click="personalization.logout()"
                         >
-                          退出登录
+                          {{ $t('personalization.logoutTitle') }}
                         </button>
                       </div>
                     </section>
@@ -168,8 +167,8 @@
                     >
                       <label class="settings-toggle-row">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">启用个性化提示</span>
-                          <span class="settings-row-desc">开启后才会注入您的偏好</span>
+                          <span class="settings-row-title">{{ $t('personalization.preferencesTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.preferencesDesc') }}</span>
                         </span>
                         <input
                           type="checkbox"
@@ -180,12 +179,12 @@
                         <FancyCheck :checked="form.enabled" />
                       </label>
                       <label class="settings-input-row">
-                        <span class="settings-row-title">AI 智能体自称</span>
+                        <span class="settings-row-title">{{ $t('personalization.selfIdentifyTitle') }}</span>
                         <input
                           type="text"
                           :value="form.self_identify"
                           maxlength="20"
-                          placeholder="如：小秘、助理小A"
+                          :placeholder="$t('personalization.selfIdentifyPlaceholder')"
                           @input="
                             personalization.updateField({
                               key: 'self_identify',
@@ -196,12 +195,12 @@
                         />
                       </label>
                       <label class="settings-input-row">
-                        <span class="settings-row-title">用户称呼</span>
+                        <span class="settings-row-title">{{ $t('personalization.userNameTitle') }}</span>
                         <input
                           type="text"
                           :value="form.user_name"
                           maxlength="20"
-                          placeholder="如：Jojo、老师"
+                          :placeholder="$t('personalization.userNamePlaceholder')"
                           @input="
                             personalization.updateField({
                               key: 'user_name',
@@ -212,12 +211,12 @@
                         />
                       </label>
                       <label class="settings-input-row">
-                        <span class="settings-row-title">职业</span>
+                        <span class="settings-row-title">{{ $t('personalization.professionTitle') }}</span>
                         <input
                           type="text"
                           :value="form.profession"
                           maxlength="20"
-                          placeholder="如：产品经理、设计师"
+                          :placeholder="$t('personalization.professionPlaceholder')"
                           @input="
                             personalization.updateField({
                               key: 'profession',
@@ -228,13 +227,13 @@
                         />
                       </label>
                       <div class="settings-input-row stackable">
-                        <span class="settings-row-title">交流语气</span>
+                        <span class="settings-row-title">{{ $t('personalization.toneTitle') }}</span>
                         <div class="settings-input-stack">
                           <input
                             type="text"
                             :value="form.tone"
                             maxlength="20"
-                            placeholder="请选择或输入语气"
+                            :placeholder="$t('personalization.tonePlaceholder')"
                             @input="
                               personalization.updateField({
                                 key: 'tone',
@@ -257,14 +256,14 @@
                       </div>
                       <div class="settings-textarea-row">
                         <div class="settings-row-copy">
-                          <span class="settings-row-title">回答时必须考虑的信息</span>
-                          <span class="settings-row-desc">每次回答前都会参考这些背景信息</span>
+                          <span class="settings-row-title">{{ $t('personalization.considerationsTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.considerationsDesc') }}</span>
                         </div>
                         <textarea
                           :value="form.considerations"
                           rows="6"
                           maxlength="2000"
-                          placeholder="例如：用户家有一只泰迪犬，棕色，公狗，2014年开始养的..."
+                          :placeholder="$t('personalization.considerationsPlaceholder')"
                           @input="personalization.updateConsiderations($event.target.value)"
                           @focus="personalization.clearFeedback()"
                         ></textarea>
@@ -274,8 +273,8 @@
                         class="settings-toggle-row"
                       >
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">隐藏块间边线</span>
-                          <span class="settings-row-desc">去掉堆叠块之间的分割线，更简洁</span>
+                          <span class="settings-row-title">{{ $t('personalization.hideBlockBordersTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.hideBlockBordersDesc') }}</span>
                         </span>
                         <input
                           type="checkbox"
@@ -289,8 +288,8 @@
                         class="settings-toggle-row"
                       >
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">限制展开高度</span>
-                          <span class="settings-row-desc">极简模式展开摘要行时限制最大高度，超出可在内部滚动</span>
+                          <span class="settings-row-title">{{ $t('personalization.minimalExpandHeightTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.minimalExpandHeightDesc') }}</span>
                         </span>
                         <input
                           type="checkbox"
@@ -301,8 +300,8 @@
                       </label>
                       <div class="settings-select-row">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">智能体交流风格</span>
-                          <span class="settings-row-desc">智能体和您交流时使用何种形式</span>
+                          <span class="settings-row-title">{{ $t('personalization.communicationStyleTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.communicationStyleDesc') }}</span>
                         </span>
                         <div
                           class="settings-select-wrap"
@@ -327,7 +326,7 @@
                               :class="{ selected: form.communication_style === 'default' }"
                               @click="selectCommunicationStyle('default')"
                             >
-                              <strong>默认</strong><span>标准 AI 风格</span
+                              <strong>{{ $t('personalization.communicationDefault') }}</strong><span>{{ $t('personalization.communicationDefaultDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                             <button
@@ -336,7 +335,7 @@
                               :class="{ selected: form.communication_style === 'human_like' }"
                               @click="selectCommunicationStyle('human_like')"
                             >
-                              <strong>拟人</strong><span>像聊天一样模仿人类语言风格</span
+                              <strong>{{ $t('personalization.communicationHumanLike') }}</strong><span>{{ $t('personalization.communicationHumanLikeDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                             <button
@@ -345,7 +344,7 @@
                               :class="{ selected: form.communication_style === 'auto' }"
                               @click="selectCommunicationStyle('auto')"
                             >
-                              <strong>自动</strong><span>聊天时自然，复杂问题正常结构化回答</span
+                              <strong>{{ $t('personalization.communicationAuto') }}</strong><span>{{ $t('personalization.communicationAutoDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -353,8 +352,8 @@
                       </div>
                       <div class="settings-select-row">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">对话连续性</span>
-                          <span class="settings-row-desc">控制智能体延续历史对话和记忆的程度</span>
+                          <span class="settings-row-title">{{ $t('personalization.conversationContinuityTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.conversationContinuityDesc') }}</span>
                         </span>
                         <div
                           class="settings-select-wrap"
@@ -379,7 +378,7 @@
                               :class="{ selected: form.conversation_continuity === 'high' }"
                               @click="selectConversationContinuity('high')"
                             >
-                              <strong>高</strong><span>更积极延续历史、记忆与项目背景</span
+                              <strong>{{ $t('personalization.continuityHigh') }}</strong><span>{{ $t('personalization.continuityHighDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                             <button
@@ -388,7 +387,7 @@
                               :class="{ selected: form.conversation_continuity === 'medium' }"
                               @click="selectConversationContinuity('medium')"
                             >
-                              <strong>中</strong><span>当前对话优先，必要时参考历史</span
+                              <strong>{{ $t('personalization.continuityMedium') }}</strong><span>{{ $t('personalization.continuityMediumDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                             <button
@@ -397,7 +396,7 @@
                               :class="{ selected: form.conversation_continuity === 'low' }"
                               @click="selectConversationContinuity('low')"
                             >
-                              <strong>低</strong><span>当前对话尽量独立，少主动翻历史</span
+                              <strong>{{ $t('personalization.continuityLow') }}</strong><span>{{ $t('personalization.continuityLowDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -413,9 +412,9 @@
                     >
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">默认模型</span
+                          ><span class="settings-row-title">{{ $t('personalization.defaultModelTitle') }}</span
                           ><span class="settings-row-desc"
-                            >为新对话/登录后首次请求选择首选模型</span
+                            >{{ $t('personalization.defaultModelDesc') }}</span
                           ></span
                         >
                         <div
@@ -447,8 +446,8 @@
                               :disabled="option.disabled"
                               @click="selectDefaultModel(option.value)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.disabled ? '已被管理员禁用' : option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ option.disabled ? $t('personalization.modelDisabled') : option.desc }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -456,9 +455,9 @@
                       </div>
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">默认运行模式</span
+                          ><span class="settings-row-title">{{ $t('personalization.defaultRunModeTitle') }}</span
                           ><span class="settings-row-desc"
-                            >登录或新建任务时的初始运行模式</span
+                            >{{ $t('personalization.defaultRunModeDesc') }}</span
                           ></span
                         >
                         <div
@@ -486,8 +485,8 @@
                               :class="{ selected: isRunModeActive(option.value) }"
                               @click="selectDefaultRunMode(option.value)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -495,9 +494,9 @@
                       </div>
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">默认推理强度</span
+                          ><span class="settings-row-title">{{ $t('personalization.reasoningEffortTitle') }}</span
                           ><span class="settings-row-desc"
-                            >思考模式下请求模型时附带的推理强度参数</span
+                            >{{ $t('personalization.reasoningEffortDesc') }}</span
                           ></span
                         >
                         <div
@@ -525,8 +524,8 @@
                               :class="{ selected: isEffortActive(option.value) }"
                               @click="selectDefaultReasoningEffort(option.value)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -541,8 +540,8 @@
                     >
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">主题切换</span
-                          ><span class="settings-row-desc">在经典、明亮和夜间之间切换</span></span
+                          ><span class="settings-row-title">{{ $t('personalization.themeTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.themeDesc') }}</span></span
                         >
                         <div
                           class="settings-select-wrap"
@@ -568,8 +567,47 @@
                               :class="{ selected: activeTheme === option.id }"
                               @click="selectThemeOption(option.id)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
+                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="settings-select-row">
+                        <span class="settings-row-copy"
+                          ><span class="settings-row-title">{{ $t('common.settingsLanguage') }}</span
+                          ><span class="settings-row-desc">{{
+                            $t('common.settingsLanguageDesc')
+                          }}</span></span
+                        >
+                        <div
+                          class="settings-select-wrap"
+                          :class="{ open: activeDropdown === 'language' }"
+                          @click.stop
+                        >
+                          <button
+                            type="button"
+                            class="settings-select-button"
+                            @click="toggleDropdown('language')"
+                          >
+                            {{ localeLabel }}
+                            <span class="select-chevron" aria-hidden="true"></span>
+                          </button>
+                          <div
+                            :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+                            :style="activeDropdown ? floatingMenuStyle : undefined"
+                          >
+                            <button
+                              v-for="option in localeOptions"
+                              :key="option.id"
+                              type="button"
+                              class="settings-menu-option"
+                              :class="{ selected: locale === option.id }"
+                              @click="selectLocaleOption(option.id)"
+                            >
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -577,9 +615,9 @@
                       </div>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">按项目分组对话</span
+                          ><span class="settings-row-title">{{ $t('personalization.groupByWorkspaceTitle') }}</span
                           ><span class="settings-row-desc"
-                            >侧边栏对话记录按工作区/项目折叠展示</span
+                            >{{ $t('personalization.groupByWorkspaceDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -592,9 +630,9 @@
                           " /><FancyCheck :checked="form.group_sidebar_by_workspace" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">新建对话跳转空白页</span
+                          ><span class="settings-row-title">{{ $t('personalization.newChatBlankTitle') }}</span
                           ><span class="settings-row-desc"
-                            >开启后点击「新建对话」跳转新对话页，发送首条消息时才创建；关闭则立即创建空对话</span
+                            >{{ $t('personalization.newChatBlankDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -607,9 +645,9 @@
                           " /><FancyCheck :checked="form.new_chat_button_behavior === 'route'" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">使用自定义称呼</span
+                          ><span class="settings-row-title">{{ $t('personalization.useCustomNamesTitle') }}</span
                           ><span class="settings-row-desc"
-                            >对话区域使用个性化设置中的自称和称呼</span
+                            >{{ $t('personalization.useCustomNamesDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -622,9 +660,9 @@
                           " /><FancyCheck :checked="form.use_custom_names" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">增强工具显示</span
+                          ><span class="settings-row-title">{{ $t('personalization.enhancedToolDisplayTitle') }}</span
                           ><span class="settings-row-desc"
-                            >工具块显示格式化内容，关闭则显示原始 JSON</span
+                            >{{ $t('personalization.enhancedToolDisplayDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -637,9 +675,9 @@
                           " /><FancyCheck :checked="form.enhanced_tool_display" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">显示助手状态形象</span
+                          ><span class="settings-row-title">{{ $t('personalization.showStatusAvatarTitle') }}</span
                           ><span class="settings-row-desc"
-                            >在欢迎页和对话末尾显示空闲、思考、工具调用等状态动画</span
+                            >{{ $t('personalization.showStatusAvatarDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -652,9 +690,9 @@
                           " /><FancyCheck :checked="form.show_status_avatar" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">显示 Git 状态栏</span
+                          ><span class="settings-row-title">{{ $t('personalization.showGitStatusBarTitle') }}</span
                           ><span class="settings-row-desc"
-                            >工作区存在 Git 仓库时，在输入栏上方显示分支和变更统计</span
+                            >{{ $t('personalization.showGitStatusBarDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -667,9 +705,9 @@
                           " /><FancyCheck :checked="form.show_git_status_bar" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">自动打开终端面板</span
+                          ><span class="settings-row-title">{{ $t('personalization.autoOpenTerminalTitle') }}</span
                           ><span class="settings-row-desc"
-                            >创建终端时自动打开侧边栏终端面板</span
+                            >{{ $t('personalization.autoOpenTerminalDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -682,9 +720,9 @@
                           " /><FancyCheck :checked="form.auto_open_terminal_panel" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">快捷窗口自动展开</span
+                          ><span class="settings-row-title">{{ $t('personalization.quickDockAutoExpandTitle') }}</span
                           ><span class="settings-row-desc"
-                            >有内容时自动展开快捷窗口；关闭后只能通过右侧按钮手动展开</span
+                            >{{ $t('personalization.quickDockAutoExpandDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -697,9 +735,9 @@
                           " /><FancyCheck :checked="form.quick_dock_auto_expand" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">编辑摘要实时显示</span
+                          ><span class="settings-row-title">{{ $t('personalization.editSummaryLiveTitle') }}</span
                           ><span class="settings-row-desc"
-                            >工作运行期间实时显示本次编辑过的文件；关闭时仅在每次工作完成后显示</span
+                            >{{ $t('personalization.editSummaryLiveDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -712,9 +750,9 @@
                           " /><FancyCheck :checked="form.edit_summary_live_display" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">预览窗口自动换行显示</span
+                          ><span class="settings-row-title">{{ $t('personalization.filePreviewWrapTitle') }}</span
                           ><span class="settings-row-desc"
-                            >文件预览按面板宽度自动换行；关闭时长行横向滚动</span
+                            >{{ $t('personalization.filePreviewWrapDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -727,8 +765,8 @@
                           " /><FancyCheck :checked="form.file_preview_auto_wrap" /></label>
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">堆叠块显示模式</span
-                          ><span class="settings-row-desc">选择思考/工具块的显示方式</span></span
+                          ><span class="settings-row-title">{{ $t('personalization.blockDisplayModeTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.blockDisplayModeDesc') }}</span></span
                         >
                         <div
                           class="settings-select-wrap"
@@ -755,8 +793,8 @@
                               :class="{ selected: currentBlockDisplayMode === option.value }"
                               @click="selectBlockDisplayMode(option.value)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -767,8 +805,8 @@
                         class="settings-toggle-row"
                       >
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">隐藏块间边线</span>
-                          <span class="settings-row-desc">去掉堆叠块之间的分割线，更简洁</span>
+                          <span class="settings-row-title">{{ $t('personalization.hideBlockBordersTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.hideBlockBordersDesc') }}</span>
                         </span>
                         <input
                           type="checkbox"
@@ -782,8 +820,8 @@
                         class="settings-toggle-row"
                       >
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">限制展开高度</span>
-                          <span class="settings-row-desc">极简模式展开摘要行时限制最大高度，超出可在内部滚动</span>
+                          <span class="settings-row-title">{{ $t('personalization.minimalExpandHeightTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.minimalExpandHeightDesc') }}</span>
                         </span>
                         <input
                           type="checkbox"
@@ -794,9 +832,9 @@
                       </label>
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">简略消息显示</span
+                          ><span class="settings-row-title">{{ $t('personalization.compactMessageTitle') }}</span
                           ><span class="settings-row-desc"
-                            >审核、子智能体等紧凑系统消息的显示形式</span
+                            >{{ $t('personalization.compactMessageDesc') }}</span
                           ></span
                         >
                         <div
@@ -824,8 +862,8 @@
                               :class="{ selected: currentCompactMessageDisplay === option.value }"
                               @click="selectCompactMessageDisplay(option.value)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -841,8 +879,8 @@
                     >
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">默认权限</span
-                          ><span class="settings-row-desc">新建对话时的默认权限模式</span></span
+                          ><span class="settings-row-title">{{ $t('personalization.defaultPermissionTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.defaultPermissionDesc') }}</span></span
                         >
                         <div
                           class="settings-select-wrap"
@@ -869,8 +907,8 @@
                               :class="{ selected: form.default_permission_mode === option.id }"
                               @click="selectDefaultPermissionMode(option.id)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -878,9 +916,9 @@
                       </div>
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">默认运行模式</span
+                          ><span class="settings-row-title">{{ $t('personalization.defaultRunModeTitle') }}</span
                           ><span class="settings-row-desc"
-                            >新建对话时的默认运行模式；计划模式下权限锁定为只读</span
+                            >{{ $t('personalization.workRunModeDesc') }}</span
                           ></span
                         >
                         <div
@@ -908,8 +946,8 @@
                               :class="{ selected: form.default_work_mode === option.id }"
                               @click="selectDefaultWorkMode(option.id)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -917,9 +955,9 @@
                       </div>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">AGENTS.md 自动注入</span
+                          ><span class="settings-row-title">{{ $t('personalization.agentsMdInjectTitle') }}</span
                           ><span class="settings-row-desc"
-                            >工作区根目录存在 AGENTS.md 时自动注入系统提示词</span
+                            >{{ $t('personalization.agentsMdInjectDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -933,9 +971,9 @@
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">CLAUDE.md 自动注入</span
+                          ><span class="settings-row-title">{{ $t('personalization.claudeMdInjectTitle') }}</span
                           ><span class="settings-row-desc"
-                            >工作区根目录存在 CLAUDE.md 时自动注入系统提示词（默认关闭，与 AGENTS.md 并列注入）</span
+                            >{{ $t('personalization.claudeMdInjectDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -949,9 +987,9 @@
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">扫描 .agents/skills/ 技能目录</span
+                          ><span class="settings-row-title">{{ $t('personalization.agentsSkillsScanTitle') }}</span
                           ><span class="settings-row-desc"
-                            >自动扫描工作区 .agents/skills/ 下的行业通用技能（Agent Skills 开放标准路径），与 .astrion/skills/ 技能一并列出；同名重复时 read_skill 会报错并提示按具体路径读取</span
+                            >{{ $t('personalization.agentsSkillsScanDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -965,10 +1003,9 @@
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">文件修改留痕</span
+                          ><span class="settings-row-title">{{ $t('personalization.modifyHistoryTitle') }}</span
                           ><span class="settings-row-desc"
-                            >每次任务完成后，把本轮 write/edit 的文件修改以 diff 形式保存到工作区
-                            .astrion/modify_history/，误操作（如被 git checkout 覆盖）后可据此人工恢复</span
+                            >{{ $t('personalization.modifyHistoryDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -981,14 +1018,14 @@
                           " /><FancyCheck :checked="form.modify_history_enabled" /></label>
 
                       <div class="settings-section-divider">
-                        <span class="settings-section-divider__label">版本控制</span>
+                        <span class="settings-section-divider__label">{{ $t('personalization.versionControlDivider') }}</span>
                       </div>
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">新对话默认开启版本控制</span
+                          ><span class="settings-row-title">{{ $t('personalization.versioningByDefaultTitle') }}</span
                           ><span class="settings-row-desc"
-                            >创建新对话时自动启用，可在输入栏下方手动关闭</span
+                            >{{ $t('personalization.versioningByDefaultDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1002,9 +1039,9 @@
 
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">文件备份方式</span
+                          ><span class="settings-row-title">{{ $t('personalization.backupModeTitle') }}</span
                           ><span class="settings-row-desc"
-                            >浅备份只记录 AI 编辑的文件，完全备份会保存整个工作区快照</span
+                            >{{ $t('personalization.backupModeDesc') }}</span
                           ></span
                         >
                         <div
@@ -1030,7 +1067,7 @@
                               :class="{ selected: form.versioning_backup_mode === 'shallow' }"
                               @click="selectVersioningBackupMode('shallow')"
                             >
-                              <strong>浅备份</strong><span>速度快，只回溯被编辑过的文件</span
+                              <strong>{{ $t('personalization.shallowBackup') }}</strong><span>{{ $t('personalization.shallowBackupDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                             <button
@@ -1039,7 +1076,7 @@
                               :class="{ selected: form.versioning_backup_mode === 'full' }"
                               @click="selectVersioningBackupMode('full')"
                             >
-                              <strong>完全备份</strong><span>完整工作区快照，首次创建可能较慢</span
+                              <strong>{{ $t('personalization.fullBackup') }}</strong><span>{{ $t('personalization.fullBackupDesc') }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -1047,14 +1084,14 @@
                       </div>
 
                       <div class="settings-section-divider">
-                        <span class="settings-section-divider__label">目标模式</span>
+                        <span class="settings-section-divider__label">{{ $t('personalization.goalModeDivider') }}</span>
                       </div>
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">审核智能体主动取证</span
+                          ><span class="settings-row-title">{{ $t('personalization.goalReviewActiveTitle') }}</span
                           ><span class="settings-row-desc"
-                            >开启后可运行只读命令核实目标，关闭则仅依据对话判断</span
+                            >{{ $t('personalization.goalReviewActiveDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1068,9 +1105,9 @@
 
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">最大自动续命轮数</span
+                          ><span class="settings-row-title">{{ $t('personalization.goalMaxTurnsTitle') }}</span
                           ><span class="settings-row-desc"
-                            >主模型停下后最多自动继续 1-100 轮</span
+                            >{{ $t('personalization.goalMaxTurnsDesc') }}</span
                           ></span
                         >
                         <input
@@ -1090,9 +1127,9 @@
 
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">启用累计 token 上限</span
+                          ><span class="settings-row-title">{{ $t('personalization.goalTokenLimitTitle') }}</span
                           ><span class="settings-row-desc"
-                            >累计输入输出超过上限时停止目标模式</span
+                            >{{ $t('personalization.goalTokenLimitDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1101,8 +1138,8 @@
 
                       <div v-if="goalTokenLimitEnabled" class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">累计 token 上限</span
-                          ><span class="settings-row-desc">达到该累计消耗即停止目标模式</span></span
+                          ><span class="settings-row-title">{{ $t('personalization.goalTokenLimitValueTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.goalTokenLimitValueDesc') }}</span></span
                         >
                         <input
                           type="number"
@@ -1127,9 +1164,9 @@
                     >
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">最近对话提示</span
+                          ><span class="settings-row-title">{{ $t('personalization.recentConversationsTitle') }}</span
                           ><span class="settings-row-desc"
-                            >把当前工作区最近若干个非空对话注入系统提示词</span
+                            >{{ $t('personalization.recentConversationsDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1144,7 +1181,7 @@
                         class="settings-input-row"
                         v-if="form.recent_conversations_prompt_enabled"
                       >
-                        <span class="settings-row-title">最近对话注入数量</span>
+                        <span class="settings-row-title">{{ $t('personalization.recentConversationsCountTitle') }}</span>
                         <div class="settings-number-row">
                           <input
                             type="number"
@@ -1153,36 +1190,34 @@
                             :value="form.recent_conversations_prompt_limit"
                             @input="handleRecentConversationsPromptLimitInput"
                             @blur="commitRecentConversationsPromptLimitInput"
-                          /><button type="button" @click="restoreRecentConversationsPromptLimit">
-                            恢复默认
+                          /><button type="button" @click="restoreRecentConversationsPromptLimit">{{ $t('personalization.restoreDefault') }}
                           </button>
                         </div>
                       </div>
                       <div class="settings-input-row">
-                        <span class="settings-row-title">最大记忆注入</span>
+                        <span class="settings-row-title">{{ $t('personalization.maxMemoryInjectTitle') }}</span>
                         <div class="settings-number-row">
                           <input
                             type="number"
                             :min="projectMemoryInjectLimitMin"
                             :value="form.project_memory_inject_limit ?? ''"
-                            placeholder="无上限"
+                            ::placeholder="$t('personalization.noLimitPlaceholder')"
                             @input="handleProjectMemoryInjectLimitInput"
                             @blur="commitProjectMemoryInjectLimitInput"
-                          /><button type="button" @click="restoreProjectMemoryInjectLimit">
-                            恢复默认
+                          /><button type="button" @click="restoreProjectMemoryInjectLimit">{{ $t('personalization.restoreDefault') }}
                           </button>
                         </div>
                       </div>
                       <div class="settings-group-block">
                         <div class="settings-group-title">
-                          <span class="settings-row-title">上下文压缩策略</span
+                          <span class="settings-row-title">{{ $t('personalization.compressionStrategyTitle') }}</span
                           ><span class="settings-row-desc"
-                            >可分别控制自动浅层压缩与自动深层压缩</span
+                            >{{ $t('personalization.compressionStrategyDesc') }}</span
                           >
                         </div>
                         <label class="settings-toggle-row inner"
                           ><span class="settings-row-copy"
-                            ><span class="settings-row-title">自动浅层压缩</span></span
+                            ><span class="settings-row-title">{{ $t('personalization.autoShallowCompressTitle') }}</span></span
                           ><input
                             type="checkbox"
                             :checked="form.auto_shallow_compress_enabled"
@@ -1194,7 +1229,7 @@
                             " /><FancyCheck :checked="form.auto_shallow_compress_enabled" /></label>
                         <label class="settings-toggle-row inner"
                           ><span class="settings-row-copy"
-                            ><span class="settings-row-title">自动深层压缩</span></span
+                            ><span class="settings-row-title">{{ $t('personalization.autoDeepCompressTitle') }}</span></span
                           ><input
                             type="checkbox"
                             :checked="form.auto_deep_compress_enabled"
@@ -1206,7 +1241,7 @@
                             " /><FancyCheck :checked="form.auto_deep_compress_enabled" /></label>
                         <div class="settings-compression-grid">
                           <label
-                            ><span>浅压缩触发上下文</span
+                            ><span>{{ $t('personalization.shallowTriggerTokens') }}</span
                             ><input
                               type="number"
                               :value="form.shallow_compress_trigger_tokens ?? ''"
@@ -1218,7 +1253,7 @@
                               "
                           /></label>
                           <label
-                            ><span>浅压缩保留最近工具数</span
+                            ><span>{{ $t('personalization.shallowKeepRecentTools') }}</span
                             ><input
                               type="number"
                               :value="form.shallow_compress_keep_recent_tools ?? ''"
@@ -1230,7 +1265,7 @@
                               "
                           /></label>
                           <label
-                            ><span>浅压缩保留当前轮工具数</span
+                            ><span>{{ $t('personalization.shallowKeepTurnTools') }}</span
                             ><input
                               type="number"
                               :value="form.shallow_compress_keep_user_turn_tools ?? ''"
@@ -1242,7 +1277,7 @@
                               "
                           /></label>
                           <label
-                            ><span>每轮最大替换数量</span
+                            ><span>{{ $t('personalization.shallowMaxReplace') }}</span
                             ><input
                               type="number"
                               :value="form.shallow_compress_max_replace_per_round ?? ''"
@@ -1254,7 +1289,7 @@
                               "
                           /></label>
                           <label
-                            ><span>工具调用间隔触发</span
+                            ><span>{{ $t('personalization.shallowToolInterval') }}</span
                             ><input
                               type="number"
                               :value="form.shallow_compress_trigger_tool_calls_interval ?? ''"
@@ -1266,7 +1301,7 @@
                               "
                           /></label>
                           <label
-                            ><span>深压缩触发上下文</span
+                            ><span>{{ $t('personalization.deepTriggerTokens') }}</span
                             ><input
                               type="number"
                               :value="form.deep_compress_trigger_tokens ?? ''"
@@ -1277,9 +1312,9 @@
                         </div>
                         <label class="settings-toggle-row inner"
                           ><span class="settings-row-copy"
-                            ><span class="settings-row-title">深压缩直接注入</span
+                            ><span class="settings-row-title">{{ $t('personalization.deepCompressInjectTitle') }}</span
                             ><span class="settings-row-desc"
-                              >开启后直接注入历次压缩全文，关闭则只提示文件位置</span
+                              >{{ $t('personalization.deepCompressInjectDesc') }}</span
                             ></span
                           ><input
                             type="checkbox"
@@ -1295,8 +1330,7 @@
                             type="button"
                             class="settings-secondary-button"
                             @click="restoreCompressionDefaults"
-                          >
-                            恢复压缩默认值
+                          >{{ $t('personalization.restoreCompressionDefaults') }}
                           </button>
                         </div>
                       </div>
@@ -1305,9 +1339,9 @@
                     <section v-else-if="activeTab === 'tools'" key="tools" class="settings-page">
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">静默禁用工具</span
+                          ><span class="settings-row-title">{{ $t('personalization.silentToolDisableTitle') }}</span
                           ><span class="settings-row-desc"
-                            >禁用工具时不再注入提示消息，模型不会感知被禁用项</span
+                            >{{ $t('personalization.silentToolDisableDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1320,9 +1354,9 @@
                           " /><FancyCheck :checked="form.silent_tool_disable" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">隐藏工具审核面板</span
+                          ><span class="settings-row-title">{{ $t('personalization.hideToolApprovalTitle') }}</span
                           ><span class="settings-row-desc"
-                            >自动审核模式下，后台审核工具时不再自动展开审核面板</span
+                            >{{ $t('personalization.hideToolApprovalDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1335,9 +1369,9 @@
                           " /><FancyCheck :checked="form.hide_tool_approval_panel" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">工具意图提示</span
+                          ><span class="settings-row-title">{{ $t('personalization.toolIntentTitle') }}</span
                           ><span class="settings-row-desc"
-                            >调用工具时先用简短文字告诉你要做什么</span
+                            >{{ $t('personalization.toolIntentDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1350,9 +1384,9 @@
                           " /><FancyCheck :checked="form.tool_intent_enabled" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">Skill 提示系统</span
+                          ><span class="settings-row-title">{{ $t('personalization.skillHintsTitle') }}</span
                           ><span class="settings-row-desc"
-                            >检测到特定关键词时自动提示模型阅读相关 skill</span
+                            >{{ $t('personalization.skillHintsDesc') }}</span
                           ></span
                         ><input
                           type="checkbox"
@@ -1365,11 +1399,11 @@
                           " /><FancyCheck :checked="form.skill_hints_enabled" /></label>
                       <div class="settings-group-block">
                         <div class="settings-group-title">
-                          <span class="settings-row-title">强约束系统</span
-                          ><span class="settings-row-desc">仅对个人空间中已启用的 skill 生效</span>
+                          <span class="settings-row-title">{{ $t('personalization.strictSkillTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.strictSkillDesc') }}</span>
                         </div>
                         <label class="settings-toggle-row inner"
-                          ><span class="settings-row-title">Terminal 系列工具</span
+                          ><span class="settings-row-title">{{ $t('personalization.terminalToolsTitle') }}</span
                           ><input
                             type="checkbox"
                             :checked="form.skill_strict_terminal_enabled"
@@ -1380,7 +1414,7 @@
                               })
                             " /><FancyCheck :checked="form.skill_strict_terminal_enabled" /></label>
                         <label class="settings-toggle-row inner"
-                          ><span class="settings-row-title">子智能体系列工具</span
+                          ><span class="settings-row-title">{{ $t('personalization.subAgentToolsTitle') }}</span
                           ><input
                             type="checkbox"
                             :checked="form.skill_strict_sub_agent_enabled"
@@ -1391,7 +1425,7 @@
                               })
                             " /><FancyCheck :checked="form.skill_strict_sub_agent_enabled" /></label>
                         <label class="settings-toggle-row inner"
-                          ><span class="settings-row-title">run_command 前台模式</span
+                          ><span class="settings-row-title">{{ $t('personalization.runCommandFgTitle') }}</span
                           ><input
                             type="checkbox"
                             :checked="form.skill_strict_run_command_foreground_enabled"
@@ -1402,7 +1436,7 @@
                               })
                             " /><FancyCheck :checked="form.skill_strict_run_command_foreground_enabled" /></label>
                         <label class="settings-toggle-row inner"
-                          ><span class="settings-row-title">run_command 后台模式</span
+                          ><span class="settings-row-title">{{ $t('personalization.runCommandBgTitle') }}</span
                           ><input
                             type="checkbox"
                             :checked="form.skill_strict_run_command_background_enabled"
@@ -1415,10 +1449,9 @@
                       </div>
                       <div class="settings-group-block" v-if="skillsCatalog.length">
                         <div class="settings-group-title">
-                          <span class="settings-row-title">可用 Skills</span
+                          <span class="settings-row-title">{{ $t('personalization.availableSkillsTitle') }}</span
                           ><span class="settings-row-desc"
-                            >勾选后会注入 system prompt，并同步到工作区的 .astrion/skills/
-                            目录</span
+                            >{{ $t('personalization.availableSkillsDesc') }}</span
                           >
                         </div>
                         <div class="settings-check-grid">
@@ -1435,8 +1468,8 @@
                       </div>
                       <div class="settings-group-block" v-if="toolCategories.length">
                         <div class="settings-group-title">
-                          <span class="settings-row-title">默认禁用工具类别</span
-                          ><span class="settings-row-desc">选择后，这些类别在新任务中保持关闭</span>
+                          <span class="settings-row-title">{{ $t('personalization.disabledToolCategoriesTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.disabledToolCategoriesDesc') }}</span>
                         </div>
                         <div class="settings-check-grid">
                           <label
@@ -1460,9 +1493,9 @@
                     >
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">图片压缩</span
+                          ><span class="settings-row-title">{{ $t('personalization.imageCompressionTitle') }}</span
                           ><span class="settings-row-desc"
-                            >发送图片或调用 view_image 时自动等比缩放</span
+                            >{{ $t('personalization.imageCompressionDesc') }}</span
                           ></span
                         >
                         <div
@@ -1490,8 +1523,8 @@
                               :class="{ selected: form.image_compression === option.id }"
                               @click="selectImageCompression(option.id)"
                             >
-                              <strong>{{ option.label }}</strong
-                              ><span>{{ option.desc }}</span
+                              <strong>{{ $t(option.labelKey) }}</strong
+                              ><span>{{ $t(option.descKey) }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>
                           </div>
@@ -1508,22 +1541,21 @@
                       <div class="usage-summary-card settings-stats-card">
                         <div class="usage-summary-header">
                           <div>
-                            <p class="usage-summary-eyebrow">对话用量</p>
-                            <h3>用量统计</h3>
-                            <p class="usage-summary-desc">
-                              累计统计所有对话的输入/输出 Token、对话数量、用户消息与工具调用
+                            <p class="usage-summary-eyebrow">{{ $t('personalization.usageEyebrow') }}</p>
+                            <h3>{{ $t('personalization.usageTitle') }}</h3>
+                            <p class="usage-summary-desc">{{ $t('personalization.usageDesc') }}
                             </p>
                           </div>
                         </div>
                         <div class="usage-summary-grid usage-summary-grid--tokens">
                           <div class="usage-summary-item">
-                            <div class="label">累计输入</div>
+                            <div class="label">{{ $t('personalization.usageInputLabel') }}</div>
                             <div class="value value--success">
                               {{ formatTokenCount(usageSummary.total_input_tokens) }}
                             </div>
                           </div>
                           <div class="usage-summary-item">
-                            <div class="label">累计输出</div>
+                            <div class="label">{{ $t('personalization.usageOutputLabel') }}</div>
                             <div class="value value--warning">
                               {{ formatTokenCount(usageSummary.total_output_tokens) }}
                             </div>
@@ -1531,19 +1563,19 @@
                         </div>
                         <div class="usage-summary-grid usage-summary-grid--counts">
                           <div class="usage-summary-item">
-                            <div class="label">总对话数</div>
+                            <div class="label">{{ $t('personalization.usageConversationsLabel') }}</div>
                             <div class="value">
                               {{ formatTokenCount(usageSummary.total_conversations) }}
                             </div>
                           </div>
                           <div class="usage-summary-item">
-                            <div class="label">用户消息数</div>
+                            <div class="label">{{ $t('personalization.usageMessagesLabel') }}</div>
                             <div class="value">
                               {{ formatTokenCount(usageSummary.total_user_messages) }}
                             </div>
                           </div>
                           <div class="usage-summary-item">
-                            <div class="label">工具调用次数</div>
+                            <div class="label">{{ $t('personalization.usageToolsLabel') }}</div>
                             <div class="value">
                               {{ formatTokenCount(usageSummary.total_tools) }}
                             </div>
@@ -1551,15 +1583,15 @@
                         </div>
                         <div class="usage-summary-meta">
                           <span v-if="usageError" class="usage-summary-error">{{ usageError }}</span
-                          ><span v-else-if="usageLoading">正在同步最新统计...</span
-                          ><span v-else>最近更新：{{ usageUpdatedText }}</span
+                          ><span v-else-if="usageLoading">{{ $t('personalization.usageSyncing') }}</span
+                          ><span v-else>{{ $t('personalization.usageUpdated', { time: usageUpdatedText }) }}</span
                           ><button
                             type="button"
                             class="usage-summary-refresh"
                             @click="fetchUsageSummary"
                             :disabled="usageLoading"
                           >
-                            {{ usageLoading ? '刷新中...' : '刷新数据' }}
+                            {{ usageLoading ? $t('personalization.usageRefreshing') : $t('personalization.usageRefresh') }}
                           </button>
                         </div>
                       </div>
@@ -1575,23 +1607,21 @@
                             font-size: 13px;
                             line-height: 1.6;
                           "
-                        >
-                          端侧语音识别模型（SenseVoice int8），支持中英混说 + 自动标点。 模型约
-                          228MB，仅在手机本地运行，无需网络。
+                        >{{ $t('personalization.voiceModelIntro') }}
                         </p>
                       </div>
                       <div class="settings-action-row">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">语音识别模型</span>
+                          <span class="settings-row-title">{{ $t('personalization.voiceModelTitle') }}</span>
                           <span class="settings-row-desc">
-                            <template v-if="voiceModelReady">已下载 (228MB)</template>
+                            <template v-if="voiceModelReady">{{ $t('personalization.voiceModelReady') }}</template>
                             <template v-else-if="voiceDownloading"
-                              >下载中 {{ voiceDownloadPercent }}% — {{ voiceDownloadMsg }}</template
+                              >{{ $t('personalization.voiceModelDownloading', { percent: voiceDownloadPercent, msg: voiceDownloadMsg }) }}</template
                             >
                             <template v-else-if="voiceModelPartial"
-                              >下载不完整，请重新下载</template
+                              >{{ $t('personalization.voiceModelPartial') }}</template
                             >
-                            <template v-else>未下载 — 点击下载</template>
+                            <template v-else>{{ $t('personalization.voiceModelNotDownloaded') }}</template>
                           </span>
                         </span>
                         <div style="display: flex; gap: 6px">
@@ -1603,10 +1633,10 @@
                           >
                             {{
                               voiceDownloading
-                                ? '下载中...'
+                                ? $t('personalization.voiceDownloadingBtn')
                                 : voiceModelReady
-                                  ? '重新下载'
-                                  : '下载模型'
+                                  ? $t('personalization.voiceRedownload')
+                                  : $t('personalization.voiceDownloadModel')
                             }}
                           </button>
                           <button
@@ -1617,7 +1647,7 @@
                             :disabled="voiceDownloading"
                             @click="deleteVoiceModel"
                           >
-                            删除
+                            {{ $t('common.delete') }}
                           </button>
                         </div>
                       </div>
@@ -1643,16 +1673,14 @@
                       key="sub-agents"
                       class="settings-page"
                     >
-                      <div class="settings-section-desc" style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6">
-                        管理多智能体模式下的子智能体角色。预设角色可编辑（创建自定义覆盖），自定义角色可创建/编辑/删除。
+                      <div class="settings-section-desc" style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6">{{ $t('personalization.subAgentsIntro') }}
                       </div>
 
                       <!-- 压缩阈值配置 -->
                       <div class="settings-action-row" style="margin-bottom: 16px">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">上下文压缩阈值</span>
-                          <span class="settings-row-desc">
-                            子智能体上下文 tokens 超过此值时触发深度压缩（默认 150000）
+                          <span class="settings-row-title">{{ $t('personalization.compressThresholdTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.compressThresholdDesc') }}
                           </span>
                         </span>
                         <div style="display: flex; gap: 6px; align-items: center">
@@ -1670,7 +1698,7 @@
                             :disabled="subAgentSettingsSaving"
                             @click="saveSubAgentSettings"
                           >
-                            {{ subAgentSettingsSaving ? '保存中...' : '保存' }}
+                            {{ subAgentSettingsSaving ? $t('personalization.saving') : $t('common.save') }}
                           </button>
                         </div>
                       </div>
@@ -1678,9 +1706,8 @@
                       <!-- 最大执行轮次配置 -->
                       <div class="settings-action-row" style="margin-bottom: 16px">
                         <span class="settings-row-copy">
-                          <span class="settings-row-title">最大执行轮次</span>
-                          <span class="settings-row-desc">
-                            传统后台子智能体单次任务的最大执行轮次（一轮 = 一次模型调用）。留空默认 50 轮；填 0 表示无上限（慎用，失控任务会持续消耗 API 额度）。多智能体模式的团队成员是长期协作角色，不受此限制
+                          <span class="settings-row-title">{{ $t('personalization.maxTurnsTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('personalization.maxTurnsDesc') }}
                           </span>
                         </span>
                         <div style="display: flex; gap: 6px; align-items: center">
@@ -1699,26 +1726,25 @@
                             :disabled="subAgentSettingsSaving"
                             @click="saveSubAgentSettings"
                           >
-                            {{ subAgentSettingsSaving ? '保存中...' : '保存' }}
+                            {{ subAgentSettingsSaving ? $t('personalization.saving') : $t('common.save') }}
                           </button>
                         </div>
                       </div>
 
                       <!-- 角色列表 -->
                       <div class="settings-section-header" style="margin-bottom: 8px">
-                        <span class="settings-section-title">角色列表</span>
+                        <span class="settings-section-title">{{ $t('personalization.roleListTitle') }}</span>
                         <button
                           type="button"
                           class="settings-secondary-button"
                           @click="openRoleEditor()"
                         >
-                          + 新建角色
+                          {{ $t('personalization.newRole') }}
                         </button>
                       </div>
 
-                      <div v-if="subAgentRolesLoading" class="settings-empty-hint">加载中...</div>
-                      <div v-else-if="subAgentRoles.length === 0" class="settings-empty-hint">
-                        暂无角色
+                      <div v-if="subAgentRolesLoading" class="settings-empty-hint">{{ $t('common.loading') }}</div>
+                      <div v-else-if="subAgentRoles.length === 0" class="settings-empty-hint">{{ $t('personalization.noRoles') }}
                       </div>
 
                       <div v-else class="sub-agent-role-list">
@@ -1734,12 +1760,12 @@
                                 class="sub-agent-role-tag"
                                 :class="role.is_custom ? 'tag-custom' : 'tag-preset'"
                               >
-                                {{ role.is_custom ? '自定义' : '预设' }}
+                                {{ role.is_custom ? $t('personalization.customTag') : $t('personalization.presetTag') }}
                               </span>
                             </div>
-                            <div class="sub-agent-role-desc">{{ role.description || '无描述' }}</div>
+                            <div class="sub-agent-role-desc">{{ role.description || $t('personalization.noDescription') }}</div>
                             <div class="sub-agent-role-meta">
-                              ID: {{ role.role_id }} · 思考模式: {{ role.thinking_mode }}<template v-if="role.model_key"> · 模型: {{ role.model_key }}</template>
+                              {{ $t('personalization.roleMetaId', { id: role.role_id, mode: role.thinking_mode }) }}<template v-if="role.model_key">{{ $t('personalization.roleMetaModel', { model: role.model_key }) }}</template>
                             </div>
                           </div>
                           <div class="sub-agent-role-actions">
@@ -1747,13 +1773,13 @@
                               type="button"
                               class="settings-secondary-button"
                               @click="openRoleEditor(role)"
-                            >编辑</button>
+                            >{{ $t('personalization.edit') }}</button>
                             <button
                               v-if="role.is_custom"
                               type="button"
                               class="settings-secondary-button danger"
                               @click="deleteRole(role)"
-                            >删除</button>
+                            >{{ $t('common.delete') }}</button>
                           </div>
                         </div>
                       </div>
@@ -1769,46 +1795,46 @@
                         >
                           <div class="role-editor-drawer-card settings-redesign-card" style="padding: 30px 42px 24px; border-radius: 32px;" @click.stop>
                             <div class="role-editor-header">
-                              <h2>{{ editingRole ? '编辑角色' : '新建角色' }}</h2>
-                              <button type="button" class="settings-secondary-button" @click="closeRoleEditor">关闭</button>
+                              <h2>{{ editingRole ? $t('personalization.roleEditorEditTitle') : $t('personalization.roleEditorCreateTitle') }}</h2>
+                              <button type="button" class="settings-secondary-button" @click="closeRoleEditor">{{ $t('common.close') }}</button>
                             </div>
                             <div class="role-editor-body" @click="closeDropdown">
                               <label class="settings-input-row">
-                                <span class="settings-row-title">角色 ID</span>
+                                <span class="settings-row-title">{{ $t('personalization.roleIdTitle') }}</span>
                                 <input
                                   v-if="!editingRole"
                                   type="text"
                                   :value="roleForm.role_id"
                                   maxlength="40"
-                                  placeholder="英文小写下划线，如 api-designer"
+                                  ::placeholder="$t('personalization.roleIdPlaceholder')"
                                   @input="roleForm.role_id = ($event.target as HTMLInputElement).value"
                                 />
                                 <span v-else class="settings-row-desc" style="text-align: right; font-size: 14px;">{{ roleForm.role_id }}</span>
                               </label>
                               <label class="settings-input-row">
-                                <span class="settings-row-title">显示名</span>
+                                <span class="settings-row-title">{{ $t('personalization.roleNameTitle') }}</span>
                                 <input
                                   type="text"
                                   :value="roleForm.name"
                                   maxlength="40"
-                                  placeholder="如 API Designer"
+                                  ::placeholder="$t('personalization.roleNamePlaceholder')"
                                   @input="roleForm.name = ($event.target as HTMLInputElement).value"
                                 />
                               </label>
                               <label class="settings-input-row">
-                                <span class="settings-row-title">描述</span>
+                                <span class="settings-row-title">{{ $t('personalization.roleDescTitle') }}</span>
                                 <input
                                   type="text"
                                   :value="roleForm.description"
                                   maxlength="100"
-                                  placeholder="一句话描述职责"
+                                  ::placeholder="$t('personalization.roleDescPlaceholder')"
                                   @input="roleForm.description = ($event.target as HTMLInputElement).value"
                                 />
                               </label>
                               <div class="settings-select-row">
                                 <span class="settings-row-copy">
-                                  <span class="settings-row-title">思考模式</span>
-                                  <span class="settings-row-desc">fast = 快速响应，thinking = 思考推理</span>
+                                  <span class="settings-row-title">{{ $t('personalization.thinkingModeTitle') }}</span>
+                                  <span class="settings-row-desc">{{ $t('personalization.roleThinkingDesc') }}</span>
                                 </span>
                                 <div
                                   class="settings-select-wrap"
@@ -1833,7 +1859,7 @@
                                       :class="{ selected: roleForm.thinking_mode === 'fast' }"
                                       @click="roleForm.thinking_mode = 'fast'; closeDropdown()"
                                     >
-                                      <strong>fast</strong><span>快速响应模式</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                      <strong>fast</strong><span>{{ $t('personalization.fastResponseMode') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                                     </button>
                                     <button
                                       type="button"
@@ -1841,15 +1867,15 @@
                                       :class="{ selected: roleForm.thinking_mode === 'thinking' }"
                                       @click="roleForm.thinking_mode = 'thinking'; closeDropdown()"
                                     >
-                                      <strong>thinking</strong><span>思考推理模式</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                      <strong>thinking</strong><span>{{ $t('personalization.thinkingReasoningMode') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                                     </button>
                                   </div>
                                 </div>
                               </div>
                               <div class="settings-select-row">
                                 <span class="settings-row-copy">
-                                  <span class="settings-row-title">模型</span>
-                                  <span class="settings-row-desc">留空则使用默认模型</span>
+                                  <span class="settings-row-title">{{ $t('personalization.modelTitle') }}</span>>
+                                  <span class="settings-row-desc">{{ $t('personalization.roleModelEmptyDesc') }}</span>
                                 </span>
                                 <div
                                   class="settings-select-wrap"
@@ -1861,7 +1887,7 @@
                                     class="settings-select-button"
                                     @click="toggleDropdown('role-model')"
                                   >
-                                    {{ roleForm.model_key || '默认模型' }}
+                                    {{ roleForm.model_key || $t('personalization.defaultModelOption') }}
                                     <span class="select-chevron" aria-hidden="true"></span>
                                   </button>
                                   <div
@@ -1874,7 +1900,7 @@
                                       :class="{ selected: !roleForm.model_key }"
                                       @click="roleForm.model_key = ''; closeDropdown()"
                                     >
-                                      <strong>默认模型</strong><span>使用配置文件中的 default_model</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                      <strong>{{ $t('personalization.defaultModelOption') }}</strong><span>{{ $t('personalization.roleDefaultModelDesc') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                                     </button>
                                     <button
                                       v-for="m in subAgentModels"
@@ -1884,29 +1910,29 @@
                                       :class="{ selected: roleForm.model_key === m.name }"
                                       @click="roleForm.model_key = m.name; closeDropdown()"
                                     >
-                                      <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || '纯文本' }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                      <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || $t('personalization.textOnly') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                                     </button>
                                   </div>
                                 </div>
                               </div>
                               <div class="settings-textarea-row">
-                                <span class="settings-row-title">Prompt Body（Markdown）</span>
+                                <span class="settings-row-title">{{ $t('personalization.promptBodyTitle') }}</span>
                                 <textarea
                                   :value="roleForm.body_prompt"
-                                  placeholder="角色的自定义 prompt body..."
+                                  ::placeholder="$t('personalization.promptBodyPlaceholder')"
                                   @input="roleForm.body_prompt = ($event.target as HTMLTextAreaElement).value"
                                 ></textarea>
                               </div>
                             </div>
                             <div class="role-editor-footer">
-                              <button type="button" class="settings-secondary-button" @click="closeRoleEditor">取消</button>
+                              <button type="button" class="settings-secondary-button" @click="closeRoleEditor">{{ $t('common.cancel') }}</button>
                               <button
                                 type="button"
                                 class="settings-primary-button"
                                 :disabled="roleSaving || !roleForm.role_id || !roleForm.name || !roleForm.body_prompt"
                                 @click="saveRole"
                               >
-                                {{ roleSaving ? '保存中...' : '保存' }}
+                                {{ roleSaving ? $t('personalization.saving') : $t('common.save') }}
                               </button>
                             </div>
                           </div>
@@ -1919,22 +1945,21 @@
                       key="review-agents"
                       class="settings-page"
                     >
-                      <div class="settings-section-desc" style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6">
-                        统一配置三个审核智能体的模型与运行参数。模型与子智能体共用模型库，留空则使用模型库默认模型。
+                      <div class="settings-section-desc" style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6">{{ $t('personalization.reviewIntro') }}
                       </div>
 
                       <template v-for="agent in reviewAgentDefs" :key="agent.key">
                         <div class="settings-section-divider">
-                          <span class="settings-section-divider__label">{{ agent.name }}</span>
+                          <span class="settings-section-divider__label">{{ $t(agent.nameKey) }}</span>
                         </div>
                         <div style="margin: -4px 0 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.5">
-                          {{ agent.desc }}
+                          {{ $t(agent.descKey) }}
                         </div>
 
                         <div class="settings-select-row">
                           <span class="settings-row-copy">
-                            <span class="settings-row-title">模型</span>
-                            <span class="settings-row-desc">留空则使用模型库默认模型</span>
+                            <span class="settings-row-title">{{ $t('personalization.modelTitle') }}</span>
+                            <span class="settings-row-desc">{{ $t('personalization.reviewModelEmptyDesc') }}</span>
                           </span>
                           <div
                             class="settings-select-wrap"
@@ -1946,7 +1971,7 @@
                               class="settings-select-button"
                               @click="toggleDropdown(`review-model-${agent.key}`)"
                             >
-                              {{ reviewAgentOf(agent.key).model || '默认模型' }}
+                              {{ reviewAgentOf(agent.key).model || $t('personalization.defaultModelOption') }}
                               <span class="select-chevron" aria-hidden="true"></span>
                             </button>
                             <div
@@ -1959,7 +1984,7 @@
                                 :class="{ selected: !reviewAgentOf(agent.key).model }"
                                 @click="updateReviewAgent(agent.key, { model: '' }); closeDropdown()"
                               >
-                                <strong>默认模型</strong><span>使用模型库的 default_model</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                <strong>{{ $t('personalization.defaultModelOption') }}</strong><span>{{ $t('personalization.reviewDefaultModelDesc') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                               </button>
                               <button
                                 v-for="m in subAgentModels"
@@ -1969,7 +1994,7 @@
                                 :class="{ selected: reviewAgentOf(agent.key).model === m.name }"
                                 @click="updateReviewAgent(agent.key, { model: m.name }); closeDropdown()"
                               >
-                                <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || '纯文本' }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || $t('personalization.textOnly') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                               </button>
                             </div>
                           </div>
@@ -1977,8 +2002,8 @@
 
                         <div class="settings-select-row">
                           <span class="settings-row-copy">
-                            <span class="settings-row-title">思考模式</span>
-                            <span class="settings-row-desc">模型不支持思考时自动回落快速模式</span>
+                            <span class="settings-row-title">{{ $t('personalization.thinkingModeTitle') }}</span>
+                            <span class="settings-row-desc">{{ $t('personalization.reviewThinkingDesc') }}</span>
                           </span>
                           <div
                             class="settings-select-wrap"
@@ -2003,7 +2028,7 @@
                                 :class="{ selected: !reviewAgentOf(agent.key).thinking }"
                                 @click="updateReviewAgent(agent.key, { thinking: false }); closeDropdown()"
                               >
-                                <strong>fast</strong><span>快速响应模式</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                <strong>fast</strong><span>{{ $t('personalization.fastResponseMode') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                               </button>
                               <button
                                 type="button"
@@ -2011,7 +2036,7 @@
                                 :class="{ selected: reviewAgentOf(agent.key).thinking }"
                                 @click="updateReviewAgent(agent.key, { thinking: true }); closeDropdown()"
                               >
-                                <strong>thinking</strong><span>思考推理模式</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                <strong>thinking</strong><span>{{ $t('personalization.thinkingReasoningMode') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                               </button>
                             </div>
                           </div>
@@ -2019,8 +2044,8 @@
 
                         <div class="settings-select-row">
                           <span class="settings-row-copy">
-                            <span class="settings-row-title">审核请求超时</span>
-                            <span class="settings-row-desc">单次模型请求超时（5-3600 秒）</span>
+                            <span class="settings-row-title">{{ $t('personalization.timeoutTitle') }}</span>
+                            <span class="settings-row-desc">{{ $t('personalization.timeoutDesc') }}</span>
                           </span>
                           <input
                             type="number"
@@ -2034,8 +2059,8 @@
 
                         <div class="settings-select-row">
                           <span class="settings-row-copy">
-                            <span class="settings-row-title">最大审核轮次</span>
-                            <span class="settings-row-desc">超过该轮次未产出结论时按兜底处理（1-50 轮）</span>
+                            <span class="settings-row-title">{{ $t('personalization.maxRoundsTitle') }}</span>
+                            <span class="settings-row-desc">{{ $t('personalization.maxRoundsDesc') }}</span>
                           </span>
                           <input
                             type="number"
@@ -2049,8 +2074,8 @@
 
                         <div class="settings-select-row" style="margin-bottom: 8px">
                           <span class="settings-row-copy">
-                            <span class="settings-row-title">取证命令超时</span>
-                            <span class="settings-row-desc">只读取证命令的单次超时（1-600 秒）</span>
+                            <span class="settings-row-title">{{ $t('personalization.commandTimeoutTitle') }}</span>
+                            <span class="settings-row-desc">{{ $t('personalization.commandTimeoutDesc') }}</span>
                           </span>
                           <input
                             type="number"
@@ -2070,54 +2095,54 @@
                     >
                       <div class="settings-action-row" v-if="showMcpConfigEntry">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">MCP 服务器管理</span
+                          ><span class="settings-row-title">{{ $t('personalization.mcpConfigTitle') }}</span
                           ><span class="settings-row-desc"
-                            >统一配置 MCP Server，集中管理工具扩展能力</span
+                            >{{ $t('personalization.mcpConfigDesc') }}</span
                           ></span
                         ><button
                           type="button"
                           class="settings-secondary-button"
                           @click="openMcpConfig"
                         >
-                          打开
+                          {{ $t('personalization.open') }}
                         </button>
                       </div>
                       <div class="settings-action-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">管理员监控入口</span
+                          ><span class="settings-row-title">{{ $t('personalization.adminMonitorTitle') }}</span
                           ><span class="settings-row-desc"
-                            >展示配额趋势、容器运行、项目存储与上传安全</span
+                            >{{ $t('personalization.adminMonitorDesc') }}</span
                           ></span
                         ><button
                           type="button"
                           class="settings-secondary-button"
                           @click="openAdminPanel"
                         >
-                          打开
+                          {{ $t('personalization.open') }}
                         </button>
                       </div>
                       <div class="settings-action-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">API 管理</span
-                          ><span class="settings-row-desc">管理 API 调用与账户</span></span
+                          ><span class="settings-row-title">{{ $t('personalization.apiAdminTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.apiAdminDesc') }}</span></span
                         ><button
                           type="button"
                           class="settings-secondary-button"
                           @click="openApiAdmin"
                         >
-                          打开
+                          {{ $t('personalization.open') }}
                         </button>
                       </div>
                       <div class="settings-action-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">自定义工具管理</span
-                          ><span class="settings-row-desc">在线创建/编辑自定义工具文件</span></span
+                          ><span class="settings-row-title">{{ $t('personalization.customToolsAdminTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.customToolsAdminDesc') }}</span></span
                         ><button
                           type="button"
                           class="settings-secondary-button"
                           @click="openCustomTools"
                         >
-                          打开
+                          {{ $t('personalization.open') }}
                         </button>
                       </div>
                     </section>
@@ -2137,7 +2162,7 @@
             </div>
           </form>
         </div>
-        <div class="personalization-loading" v-else>正在加载个性化配置...</div>
+        <div class="personalization-loading" v-else>{{ $t('personalization.loadingPersonalization') }}</div>
       </div>
     </div>
   </transition>
@@ -2158,6 +2183,8 @@ import { formatTokenCount } from '@/utils/formatters';
 import { ICONS } from '@/utils/icons';
 import { useTheme } from '@/utils/theme';
 import type { ThemeKey } from '@/utils/theme';
+import { t, currentLocale, useLocale } from '@/locales';
+import type { LocaleKey } from '@/locales';
 
 defineOptions({ name: 'PersonalizationDrawer' });
 
@@ -2223,19 +2250,19 @@ type PersonalTab =
   | 'admin';
 
 const baseTabs = [
-  { id: 'general', label: '常规', icon: 'settings' },
-  { id: 'preferences', label: '个性化', icon: 'userPen' },
-  { id: 'model', label: '模型与思考', icon: 'brainCog' },
-  { id: 'appearance', label: '外观与显示', icon: 'monitor' },
-  { id: 'workspace', label: '工作区与权限', icon: 'folder' },
-  { id: 'context', label: '上下文', icon: 'chatBubble' },
-  { id: 'tools', label: '工具与 Skills', icon: 'wrench' },
-  { id: 'files', label: '文件与图片', icon: 'file' },
-  { id: 'data', label: '数据管理', icon: 'layers' },
-  { id: 'voice', label: '语音模型', icon: 'mic' },
-  { id: 'sub-agents', label: '子智能体', icon: 'bot' },
-  { id: 'review-agents', label: '审核智能体', icon: 'checkbox' }
-] as const satisfies ReadonlyArray<{ id: PersonalTab; label: string; icon: IconKey }>;
+  { id: 'general', labelKey: 'personalization.tabGeneral', icon: 'settings' },
+  { id: 'preferences', labelKey: 'personalization.tabPreferences', icon: 'userPen' },
+  { id: 'model', labelKey: 'personalization.tabModel', icon: 'brainCog' },
+  { id: 'appearance', labelKey: 'personalization.tabAppearance', icon: 'monitor' },
+  { id: 'workspace', labelKey: 'personalization.tabWorkspace', icon: 'folder' },
+  { id: 'context', labelKey: 'personalization.tabContext', icon: 'chatBubble' },
+  { id: 'tools', labelKey: 'personalization.tabTools', icon: 'wrench' },
+  { id: 'files', labelKey: 'personalization.tabFiles', icon: 'file' },
+  { id: 'data', labelKey: 'personalization.tabData', icon: 'layers' },
+  { id: 'voice', labelKey: 'personalization.tabVoice', icon: 'mic' },
+  { id: 'sub-agents', labelKey: 'personalization.tabSubAgents', icon: 'bot' },
+  { id: 'review-agents', labelKey: 'personalization.tabReviewAgents', icon: 'checkbox' }
+] as const satisfies ReadonlyArray<{ id: PersonalTab; labelKey: string; icon: IconKey }>;
 
 const sessionRole = ref('');
 const sessionHostMode = ref(false);
@@ -2261,9 +2288,9 @@ const isAppShell = computed(() => {
 });
 
 const personalTabs = computed(() => {
-  const tabs: Array<{ id: PersonalTab; label: string; icon: IconKey }> = [...baseTabs];
+  const tabs: Array<{ id: PersonalTab; labelKey: string; icon: IconKey }> = [...baseTabs];
   if (isAdmin.value) {
-    tabs.push({ id: 'admin', label: '管理员', icon: 'wrench' });
+    tabs.push({ id: 'admin', labelKey: 'personalization.tabAdmin', icon: 'wrench' });
   }
   return tabs;
 });
@@ -2273,7 +2300,9 @@ const activeDropdown = ref<string | null>(null);
 const floatingMenuStyle = ref<Record<string, string>>({});
 
 const activeTabLabel = computed(() => {
-  return personalTabs.value.find((tab) => tab.id === activeTab.value)?.label || '常规';
+  void currentLocale.value;
+  const tab = personalTabs.value.find((tab) => tab.id === activeTab.value);
+  return tab ? t(tab.labelKey) : t('personalization.tabGeneral');
 });
 
 // ── 语音模型下载 ──
@@ -2302,12 +2331,12 @@ const checkVoiceModel = () => {
 const downloadVoiceModel = () => {
   const bridge = (window as any)?.AndroidVoiceBridge;
   if (!bridge) {
-    alert('仅在 App 内支持下载语音模型');
+    alert(t('personalization.voiceAppOnlyAlert'));
     return;
   }
   voiceDownloading.value = true;
   voiceDownloadPercent.value = 0;
-  voiceDownloadMsg.value = '准备下载...';
+  voiceDownloadMsg.value = t('personalization.voicePreparing');
   voiceModelPartial.value = false;
 
   (window as any).__onVoiceDownloadProgress = (pct: number, msg: string) => {
@@ -2450,90 +2479,93 @@ type CompressionField =
 
 const runModeOptions: Array<{
   id: string;
-  label: string;
-  desc: string;
+  labelKey: string;
+  descKey: string;
   value: RunModeValue;
-  badge?: string;
 }> = [
-  { id: 'fast', label: '快速模式', desc: '追求响应速度，跳过思考模型', value: 'fast' },
-  { id: 'thinking', label: '思考模式', desc: '整轮对话都使用思考模型', value: 'thinking' }
+  { id: 'fast', labelKey: 'personalization.runModeFast', descKey: 'personalization.runModeFastDesc', value: 'fast' },
+  { id: 'thinking', labelKey: 'personalization.runModeThinking', descKey: 'personalization.runModeThinkingDesc', value: 'thinking' }
 ];
 
 const reasoningEffortOptions: Array<{
   id: string;
-  label: string;
-  desc: string;
+  labelKey: string;
+  descKey: string;
   value: ReasoningEffortValue;
 }> = [
-  { id: 'default', label: '默认', desc: '不指定强度，使用 API 默认行为', value: null },
-  { id: 'low', label: 'low', desc: '最低推理，响应最快', value: 'low' },
-  { id: 'medium', label: 'medium', desc: '较低推理', value: 'medium' },
-  { id: 'high', label: 'high', desc: '均衡推理', value: 'high' },
-  { id: 'xhigh', label: 'xhigh', desc: '更高推理', value: 'xhigh' },
-  { id: 'max', label: 'max', desc: '最高推理，适合最复杂任务', value: 'max' }
+  { id: 'default', labelKey: 'personalization.effortDefault', descKey: 'personalization.effortDefaultDesc', value: null },
+  { id: 'low', labelKey: 'personalization.effortLow', descKey: 'personalization.effortLowDesc', value: 'low' },
+  { id: 'medium', labelKey: 'personalization.effortMedium', descKey: 'personalization.effortMediumDesc', value: 'medium' },
+  { id: 'high', labelKey: 'personalization.effortHigh', descKey: 'personalization.effortHighDesc', value: 'high' },
+  { id: 'xhigh', labelKey: 'personalization.effortXhigh', descKey: 'personalization.effortXhighDesc', value: 'xhigh' },
+  { id: 'max', labelKey: 'personalization.effortMax', descKey: 'personalization.effortMaxDesc', value: 'max' }
 ];
 
 const permissionModeOptions: Array<{
   id: PermissionModeValue;
-  label: string;
-  desc: string;
+  labelKey: string;
+  descKey: string;
 }> = [
-  { id: 'readonly', label: '只读', desc: '仅允许读取/检索类工具，修改操作将被拒绝' },
-  { id: 'approval', label: '批准', desc: '对工作区文件进行修改的工具需人工批准后执行' },
+  { id: 'readonly', labelKey: 'personalization.permissionReadonly', descKey: 'personalization.permissionReadonlyDesc' },
+  { id: 'approval', labelKey: 'personalization.permissionApproval', descKey: 'personalization.permissionApprovalDesc' },
   {
     id: 'auto_approval',
-    label: '自动审核',
-    desc: '工作区内写入直通；高风险操作由后台审核智能体自动审批'
+    labelKey: 'personalization.permissionAutoApproval',
+    descKey: 'personalization.permissionAutoApprovalDesc'
   },
-  { id: 'unrestricted', label: '无限制', desc: '工具按常规流程直接执行' }
+  { id: 'unrestricted', labelKey: 'personalization.permissionUnrestricted', descKey: 'personalization.permissionUnrestrictedDesc' }
 ];
 
 type WorkModeValue = 'plan' | 'ask' | 'execute';
 const workModeOptions: Array<{
   id: WorkModeValue;
-  label: string;
-  desc: string;
+  labelKey: string;
+  descKey: string;
 }> = [
-  { id: 'plan', label: '计划', desc: '只制定计划，批准后执行' },
-  { id: 'ask', label: '询问', desc: '先讨论确认，再开工' },
-  { id: 'execute', label: '执行', desc: '自行补全细节，直接开工' }
+  { id: 'plan', labelKey: 'personalization.workModePlan', descKey: 'personalization.workModePlanDesc' },
+  { id: 'ask', labelKey: 'personalization.workModeAsk', descKey: 'personalization.workModeAskDesc' },
+  { id: 'execute', labelKey: 'personalization.workModeExecute', descKey: 'personalization.workModeExecuteDesc' }
 ];
 
 const policyStore = usePolicyStore();
 const modelStore = useModelStore();
 
-const filteredModelOptions = computed(() =>
-  (modelStore.models || []).map((opt: any) => {
+const filteredModelOptions = computed(() => {
+  void currentLocale.value;
+  return (modelStore.models || []).map((opt: any) => {
     const multimodal = String(opt.multimodal || 'none');
     return {
       id: opt.key,
       value: opt.key,
       label: opt.label,
       desc: opt.description || '',
-      badge: multimodal === 'image,video' ? '图文' : opt.thinkingOnly ? '思考' : undefined,
+      badge: multimodal === 'image,video' ? t('personalization.badgeTextOnly') : opt.thinkingOnly ? t('personalization.badgeThinking') : undefined,
       thinkingOnly: !!opt.thinkingOnly,
       fastOnly: !!opt.fastOnly,
       disabled: policyStore.disabledModelSet.has(opt.key)
     };
-  })
-);
+  });
+});
 
 const imageCompressionOptions = [
-  { id: 'original', label: '原图', desc: '不压缩' },
-  { id: '1080p', label: '1080p', desc: '最长边不超过 1080p 等比缩放' },
-  { id: '720p', label: '720p', desc: '最长边不超过 720p 等比缩放' },
-  { id: '540p', label: '540p', desc: '最长边不超过 540p 等比缩放' }
+  { id: 'original', labelKey: 'personalization.imageOriginal', descKey: 'personalization.imageOriginalDesc' },
+  { id: '1080p', labelKey: 'personalization.image1080p', descKey: 'personalization.image1080pDesc' },
+  { id: '720p', labelKey: 'personalization.image720p', descKey: 'personalization.image720pDesc' },
+  { id: '540p', labelKey: 'personalization.image540p', descKey: 'personalization.image540pDesc' }
 ] as const;
 
 const defaultModelLabel = computed(() => {
+  void currentLocale.value;
   return (
     filteredModelOptions.value.find((option: any) => option.value === form.value.default_model)
-      ?.label || '未设置'
+      ?.label || t('common.unset')
   );
 });
 
 const runModeLabel = computed(() => {
-  return runModeOptions.find((option) => isRunModeActive(option.value))?.label || '未设置';
+  void currentLocale.value;
+  const found = runModeOptions.find((option) => isRunModeActive(option.value));
+  return found ? t(found.labelKey) : t('common.unset');
 });
 
 const isEffortActive = (value: ReasoningEffortValue) => {
@@ -2544,9 +2576,9 @@ const isEffortActive = (value: ReasoningEffortValue) => {
 };
 
 const reasoningEffortLabel = computed(() => {
-  return (
-    reasoningEffortOptions.find((option) => isEffortActive(option.value))?.label || '默认'
-  );
+  void currentLocale.value;
+  const found = reasoningEffortOptions.find((option) => isEffortActive(option.value));
+  return found ? t(found.labelKey) : t('personalization.effortDefault');
 });
 
 const selectDefaultReasoningEffort = (value: ReasoningEffortValue) => {
@@ -2555,41 +2587,41 @@ const selectDefaultReasoningEffort = (value: ReasoningEffortValue) => {
 };
 
 const permissionModeLabel = computed(() => {
-  return (
-    permissionModeOptions.find((option) => option.id === form.value.default_permission_mode)
-      ?.label || '未设置'
-  );
+  void currentLocale.value;
+  const found = permissionModeOptions.find((option) => option.id === form.value.default_permission_mode);
+  return found ? t(found.labelKey) : t('common.unset');
 });
 
 const workModeLabel = computed(() => {
-  return (
-    workModeOptions.find((option) => option.id === form.value.default_work_mode)?.label ||
-    '未设置'
-  );
+  void currentLocale.value;
+  const found = workModeOptions.find((option) => option.id === form.value.default_work_mode);
+  return found ? t(found.labelKey) : t('common.unset');
 });
 
 const versioningBackupModeLabel = computed(() => {
-  if (form.value.versioning_backup_mode === 'full') return '完全备份';
-  return '浅备份';
+  void currentLocale.value;
+  if (form.value.versioning_backup_mode === 'full') return t('personalization.fullBackup');
+  return t('personalization.shallowBackup');
 });
 
 const imageCompressionLabel = computed(() => {
-  return (
-    imageCompressionOptions.find((option) => option.id === form.value.image_compression)?.label ||
-    '未设置'
-  );
+  void currentLocale.value;
+  const found = imageCompressionOptions.find((option) => option.id === form.value.image_compression);
+  return found ? t(found.labelKey) : t('common.unset');
 });
 
 const communicationStyleLabel = computed(() => {
-  if (form.value.communication_style === 'human_like') return '拟人';
-  if (form.value.communication_style === 'auto') return '自动';
-  return '默认';
+  void currentLocale.value;
+  if (form.value.communication_style === 'human_like') return t('personalization.communicationHumanLike');
+  if (form.value.communication_style === 'auto') return t('personalization.communicationAuto');
+  return t('personalization.communicationDefault');
 });
 
 const conversationContinuityLabel = computed(() => {
-  if (form.value.conversation_continuity === 'high') return '高';
-  if (form.value.conversation_continuity === 'low') return '低';
-  return '中';
+  void currentLocale.value;
+  if (form.value.conversation_continuity === 'high') return t('personalization.continuityHigh');
+  if (form.value.conversation_continuity === 'low') return t('personalization.continuityLow');
+  return t('personalization.continuityMedium');
 });
 
 const currentBlockDisplayMode = computed(() => experiments.value.blockDisplayMode);
@@ -2598,20 +2630,19 @@ const stackedHideBorders = computed(() => form.value.stacked_hide_borders);
 const minimalExpandHeightLimited = computed(() => form.value.minimal_expand_height_limited);
 
 const blockDisplayLabel = computed(() => {
-  return (
-    blockDisplayOptions.find((option) => option.value === currentBlockDisplayMode.value)?.label ||
-    '堆叠动画'
-  );
+  void currentLocale.value;
+  const found = blockDisplayOptions.find((option) => option.value === currentBlockDisplayMode.value);
+  return found ? t(found.labelKey) : t('personalization.blockDisplayStacked');
 });
 
 const currentCompactMessageDisplay = computed(() => form.value.compact_message_display || 'full');
 
 const compactMessageDisplayLabel = computed(() => {
-  return (
-    compactMessageDisplayOptions.find(
-      (option) => option.value === currentCompactMessageDisplay.value
-    )?.label || '完整信息'
+  void currentLocale.value;
+  const found = compactMessageDisplayOptions.find(
+    (option) => option.value === currentCompactMessageDisplay.value
   );
+  return found ? t(found.labelKey) : t('personalization.compactMessageFull');
 });
 
 const usageSummary = ref({
@@ -2626,14 +2657,15 @@ const usageError = ref('');
 const usageUpdatedAt = ref<string | null>(null);
 
 const usageUpdatedText = computed(() => {
+  void currentLocale.value;
   if (!usageUpdatedAt.value) {
-    return '尚未刷新';
+    return t('personalization.usageNeverRefreshed');
   }
   const date = new Date(usageUpdatedAt.value);
   if (Number.isNaN(date.getTime())) {
-    return '时间未知';
+    return t('personalization.usageUnknownTime');
   }
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(currentLocale.value === 'en-US' ? 'en-US' : 'zh-CN', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -2701,7 +2733,8 @@ const hydrateAppVersionFromBridge = () => {
 };
 
 const appCurrentVersionText = computed(() => {
-  return appCurrentVersionName.value || '未知';
+  void currentLocale.value;
+  return appCurrentVersionName.value || t('personalization.appVersionUnknown');
 });
 
 const appHasUpdate = computed(() => {
@@ -2714,15 +2747,23 @@ const appHasUpdate = computed(() => {
 const appDownloadUrl = computed(() => appUpdateInfo.value?.apkUrl || '');
 
 const appUpdateStateText = computed(() => {
-  if (!appUpdateInfo.value) return '未检查';
-  return appHasUpdate.value ? '发现新版本' : '已是最新';
+  void currentLocale.value;
+  if (!appUpdateInfo.value) return t('personalization.appUpdateNotChecked');
+  return appHasUpdate.value ? t('personalization.appUpdateFound') : t('personalization.appUpdateLatest');
 });
 
 const appUpdateCheckedText = computed(() => {
-  if (!appUpdateCheckedAt.value) return '尚未检查更新';
+  void currentLocale.value;
+  if (!appUpdateCheckedAt.value) return t('personalization.appUpdateNeverChecked');
   const d = new Date(appUpdateCheckedAt.value);
-  if (Number.isNaN(d.getTime())) return '刚刚检查过';
-  return `最近检查：${d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+  if (Number.isNaN(d.getTime())) return t('personalization.appUpdateJustChecked');
+  const formatted = d.toLocaleString(currentLocale.value === 'en-US' ? 'en-US' : 'zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  return t('personalization.appUpdateCheckedAt', { time: formatted });
 });
 
 const fetchUsageSummary = async () => {
@@ -2735,7 +2776,7 @@ const fetchUsageSummary = async () => {
     const response = await fetch('/api/conversations/statistics');
     const payload = await response.json();
     if (!response.ok || !payload.success) {
-      throw new Error(payload.error || payload.message || '获取用量统计失败');
+      throw new Error(payload.error || payload.message || t('personalization.usageFetchFailed'));
     }
     const data = payload.data || {};
     const tokenStats = data.token_statistics || {};
@@ -2748,7 +2789,7 @@ const fetchUsageSummary = async () => {
     };
     usageUpdatedAt.value = new Date().toISOString();
   } catch (error: any) {
-    usageError.value = error?.message || '获取用量统计失败';
+    usageError.value = error?.message || t('personalization.usageFetchFailed');
   } finally {
     usageLoading.value = false;
   }
@@ -2768,7 +2809,7 @@ const checkAppUpdate = async () => {
     const resp = await fetch(`/api/app/version${suffix}`);
     const payload = await resp.json();
     if (!resp.ok || !payload?.success) {
-      throw new Error(payload?.error || '检查更新失败');
+      throw new Error(payload?.error || t('personalization.appUpdateFailed'));
     }
     const data = payload?.data || {};
     appUpdateInfo.value = {
@@ -2782,7 +2823,7 @@ const checkAppUpdate = async () => {
     };
     appUpdateCheckedAt.value = new Date().toISOString();
   } catch (error: any) {
-    appUpdateError.value = error?.message || '检查更新失败';
+    appUpdateError.value = error?.message || t('personalization.appUpdateFailed');
   } finally {
     appUpdateChecking.value = false;
   }
@@ -2791,7 +2832,7 @@ const checkAppUpdate = async () => {
 const downloadLatestApp = () => {
   const url = appDownloadUrl.value;
   if (!url) {
-    appUpdateError.value = '未拿到下载地址';
+    appUpdateError.value = t('personalization.appUpdateNoUrl');
     return;
   }
   window.location.href = url;
@@ -2885,10 +2926,10 @@ const loadSubAgentModels = async () => {
 };
 
 // ----- 审核智能体（模型与运行参数统一配置，模型库复用子智能体模型列表） -----
-const reviewAgentDefs: Array<{ key: ReviewAgentKey; name: string; desc: string }> = [
-  { key: 'auto_approval', name: '自动审批智能体', desc: '自动审批模式下判断工具调用是否越权/危险' },
-  { key: 'goal_review', name: '目标审核智能体', desc: '目标模式下判断长期目标是否真正达成' },
-  { key: 'workflow_review', name: '工作流审核智能体', desc: '工作流审核节点判断阶段产出是否达标' }
+const reviewAgentDefs: Array<{ key: ReviewAgentKey; nameKey: string; descKey: string }> = [
+  { key: 'auto_approval', nameKey: 'personalization.reviewAgentAutoApproval', descKey: 'personalization.reviewAgentAutoApprovalDesc' },
+  { key: 'goal_review', nameKey: 'personalization.reviewAgentGoalReview', descKey: 'personalization.reviewAgentGoalReviewDesc' },
+  { key: 'workflow_review', nameKey: 'personalization.reviewAgentWorkflowReview', descKey: 'personalization.reviewAgentWorkflowReviewDesc' }
 ];
 
 const reviewAgentOf = (key: ReviewAgentKey): ReviewAgentSetting => {
@@ -3017,7 +3058,7 @@ const saveRole = async () => {
 };
 
 const deleteRole = async (role: any) => {
-  if (!confirm(`确认删除角色「${role.name}」？`)) return;
+  if (!confirm(t('personalization.deleteRoleConfirm', { name: role.name }))) return;
   try {
     const resp = await fetch(`/api/multiagent/roles/${role.role_id}`, {
       method: 'DELETE',
@@ -3068,8 +3109,8 @@ const setDefaultRunMode = (value: RunModeValue) => {
 const setDefaultModel = (value: string) => {
   if (policyStore.disabledModelSet.has(value)) {
     uiStore.pushToast({
-      title: '模型被禁用',
-      message: '已被管理员禁用，无法选择',
+      title: t('personalization.modelDisabledTitle'),
+      message: t('personalization.modelDisabledMessage'),
       type: 'warning'
     });
     return;
@@ -3141,14 +3182,14 @@ const checkModeModelConflict = (mode: RunModeValue, model: string | null): boole
   const found = (filteredModelOptions.value || []).find((item: any) => item.value === model);
   const warnings: string[] = [];
   if (found?.thinkingOnly && mode && mode !== 'thinking') {
-    warnings.push(`${found.label} 仅支持思考模式，已保持原设置。`);
+    warnings.push(t('personalization.modelThinkingOnlyWarning', { label: found.label }));
   }
   if (found?.fastOnly && mode && mode !== 'fast') {
-    warnings.push(`${found.label} 仅支持快速模式，已保持原设置。`);
+    warnings.push(t('personalization.modelFastOnlyWarning', { label: found.label }));
   }
   if (warnings.length) {
     uiStore.pushToast({
-      title: '模型/思考模式不兼容',
+      title: t('personalization.modelModeConflictTitle'),
       message: warnings.join(' '),
       type: 'warning',
       duration: 6000
@@ -3238,23 +3279,23 @@ const toggleCategory = (categoryId: string) => {
 const blockDisplayOptions = [
   {
     id: 'traditional',
-    label: '传统列表',
-    desc: '按时间顺序垂直排列，经典样式',
+    labelKey: 'personalization.blockDisplayTraditional',
+    descKey: 'personalization.blockDisplayTraditionalDesc',
     value: 'traditional' as const
   },
   {
     id: 'stacked',
-    label: '堆叠动画',
-    desc: '超过 6 条自动收纳为"更多"，动态展示',
+    labelKey: 'personalization.blockDisplayStacked',
+    descKey: 'personalization.blockDisplayStackedDesc',
     value: 'stacked' as const,
-    badge: '推荐'
+    badgeKey: 'personalization.badgeRecommended'
   },
   {
     id: 'minimal',
-    label: '极简模式',
-    desc: '摘要行 + 无缝展开，流式输出效果',
+    labelKey: 'personalization.blockDisplayMinimal',
+    descKey: 'personalization.blockDisplayMinimalDesc',
     value: 'minimal' as const,
-    badge: '新'
+    badgeKey: 'personalization.badgeNew'
   }
 ];
 
@@ -3281,14 +3322,14 @@ const handleMinimalExpandHeightLimitedChange = (event: Event) => {
 const compactMessageDisplayOptions = [
   {
     id: 'full',
-    label: '完整信息',
-    desc: '审核、子智能体等系统消息显示完整原始内容',
+    labelKey: 'personalization.compactMessageFull',
+    descKey: 'personalization.compactMessageFullDesc',
     value: 'full' as const
   },
   {
     id: 'brief',
-    label: '简略信息',
-    desc: '用一行横线概要替代系统消息',
+    labelKey: 'personalization.compactMessageBrief',
+    descKey: 'personalization.compactMessageBriefDesc',
     value: 'brief' as const
   }
 ];
@@ -3320,23 +3361,23 @@ const openMcpConfig = () => {
 
 // ===== 主题切换 =====
 const { setTheme, loadTheme } = useTheme();
-const themeOptions: Array<{ id: ThemeKey; label: string; desc: string; swatches: string[] }> = [
+const themeOptions: Array<{ id: ThemeKey; labelKey: string; descKey: string; swatches: string[] }> = [
   {
     id: 'classic',
-    label: '经典',
-    desc: '米色质感，柔和高对比',
+    labelKey: 'personalization.themeClassic',
+    descKey: 'personalization.themeClassicDesc',
     swatches: ['#eeece2', '#f7f3ea', '#da7756']
   },
   {
     id: 'light',
-    label: '明亮',
-    desc: '纯白底色 + 优雅灰，简洁清爽',
+    labelKey: 'personalization.themeLight',
+    descKey: 'personalization.themeLightDesc',
     swatches: ['#ffffff', '#f7f7f8', '#6b7280']
   },
   {
     id: 'dark',
-    label: '夜间',
-    desc: '深灰 + 黑，低亮度并保持彩色点缀',
+    labelKey: 'personalization.themeDark',
+    descKey: 'personalization.themeDarkDesc',
     swatches: ['#1a1a1a', '#2a2a2a', '#3a3a3a']
   }
 ];
@@ -3344,7 +3385,9 @@ const themeOptions: Array<{ id: ThemeKey; label: string; desc: string; swatches:
 const activeTheme = ref<ThemeKey>(loadTheme());
 
 const themeLabel = computed(() => {
-  return themeOptions.find((option) => option.id === activeTheme.value)?.label || '经典';
+  void currentLocale.value;
+  const found = themeOptions.find((option) => option.id === activeTheme.value);
+  return found ? t(found.labelKey) : t('personalization.themeClassic');
 });
 
 // 监听store中的theme变化，同步到activeTheme（用于从后端加载主题后更新UI）
@@ -3361,6 +3404,24 @@ watch(
 
 const selectThemeOption = (theme: ThemeKey) => {
   applyThemeOption(theme);
+  closeDropdown();
+};
+
+// ===== 界面语言切换 =====
+const { locale, setLocale } = useLocale();
+const localeOptions: Array<{ id: LocaleKey; labelKey: string; descKey: string }> = [
+  { id: 'zh-CN', labelKey: 'personalization.localeZhCN', descKey: 'personalization.localeChineseDesc' },
+  { id: 'en-US', labelKey: 'personalization.localeEnglish', descKey: 'personalization.localeEnglishDesc' }
+];
+
+const localeLabel = computed(() => {
+  void currentLocale.value;
+  const found = localeOptions.find((option) => option.id === locale.value);
+  return found ? t(found.labelKey) : t('personalization.localeZhCN');
+});
+
+const selectLocaleOption = (nextLocale: LocaleKey) => {
+  setLocale(nextLocale);
   closeDropdown();
 };
 

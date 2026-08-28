@@ -5,14 +5,14 @@
       :configured="secondaryConfigured"
       :loading="secondaryLoading"
       :error="secondaryError"
-      description="请输入管理员二级密码后继续配置策略。"
+      :description="$t('adminPolicy.gateDescription')"
       @verify="handleVerifySecondary"
       @recheck="checkSecondary"
     />
     <header class="policy-header">
       <div>
-        <h1>管理员策略配置</h1>
-        <p>控制工具分类、模型与前端功能禁用。最新保存：{{ lastUpdated || '—' }}</p>
+        <h1>{{ $t('adminPolicy.title') }}</h1>
+        <p>{{ $t('adminPolicy.subtitle', { time: lastUpdated || '—' }) }}</p>
       </div>
       <div class="header-actions">
         <div class="dropdown" :class="{ open: targetMenuOpen }">
@@ -22,7 +22,7 @@
           </button>
           <div class="dropdown-menu" v-if="targetMenuOpen">
             <button
-              v-for="opt in targetOptions"
+              v-for="opt in targetOptions()"
               :key="opt.value"
               type="button"
               @click="pickTargetType(opt.value)"
@@ -39,9 +39,9 @@
             type="text"
           />
         </div>
-        <button type="button" class="ghost-btn" @click="loadScope">载入</button>
+        <button type="button" class="ghost-btn" @click="loadScope">{{ $t('adminPolicy.load') }}</button>
         <button type="button" class="primary" :disabled="saving" @click="savePolicy">
-          {{ saving ? '保存中...' : '保存' }}
+          {{ saving ? $t('common.saving') : $t('common.save') }}
         </button>
       </div>
     </header>
@@ -55,17 +55,17 @@
 
     <section class="panel">
       <div class="panel-title">
-        <h2>工具分类</h2>
-        <button type="button" @click="addCategory">新增分类</button>
+        <h2>{{ $t('adminPolicy.categorySection') }}</h2>
+        <button type="button" @click="addCategory">{{ $t('adminPolicy.addCategory') }}</button>
       </div>
       <div class="category-table">
         <div class="category-row category-head">
-          <span>分类 ID</span>
-          <span>名称</span>
-          <span>工具列表</span>
-          <span>默认启用</span>
-          <span>强制状态</span>
-          <span>操作</span>
+          <span>{{ $t('adminPolicy.catId') }}</span>
+          <span>{{ $t('adminPolicy.catName') }}</span>
+          <span>{{ $t('adminPolicy.catTools') }}</span>
+          <span>{{ $t('adminPolicy.catDefaultEnabled') }}</span>
+          <span>{{ $t('adminPolicy.catForced') }}</span>
+          <span>{{ $t('adminPolicy.tableActions') }}</span>
         </div>
         <div class="category-row" v-for="cat in categoryList" :key="cat.id">
           <input v-model="cat.id" class="id-input" />
@@ -75,12 +75,12 @@
               <span v-if="cat.tools.length" class="tool-badges">
                 <span class="tool-badge" v-for="tool in cat.tools" :key="tool">{{ tool }}</span>
               </span>
-              <span v-else class="muted">选择工具</span>
+              <span v-else class="muted">{{ $t('adminPolicy.selectTools') }}</span>
               <span class="caret">▾</span>
             </button>
             <div class="tool-select-menu" v-if="openToolMenu === cat.id" @click.stop>
               <div class="tool-select-search">
-                <input v-model="toolSearch" type="text" placeholder="搜索或添加工具 ID" />
+                <input v-model="toolSearch" type="text" :placeholder="$t('adminPolicy.toolSearchPlaceholder')" />
               </div>
               <div class="tool-select-options">
                 <label v-for="tool in filteredToolOptions(cat)" :key="tool">
@@ -91,7 +91,7 @@
                   />
                   <span>{{ tool }}</span>
                 </label>
-                <p v-if="!filteredToolOptions.length" class="muted tiny">未找到匹配的工具</p>
+                <p v-if="!filteredToolOptions.length" class="muted tiny">{{ $t('adminPolicy.noMatchingTool') }}</p>
               </div>
               <button
                 v-if="toolSearch.trim() && !toolOptionsSet.has(toolSearch.trim())"
@@ -99,7 +99,7 @@
                 class="link small"
                 @click="addCustomTool(cat)"
               >
-                添加自定义工具 “{{ toolSearch.trim() }}”
+                {{ $t('adminPolicy.addCustomToolWith', { id: toolSearch.trim() }) }}
               </button>
             </div>
           </div>
@@ -110,7 +110,7 @@
               @change="setCategoryDefault(cat.id, $event.target.checked)"
             />
             <FancyCheck :checked="getCategoryDefault(cat.id)" accent-checked />
-            <span>{{ cat.default_enabled ? '开' : '关' }}</span>
+            <span>{{ cat.default_enabled ? $t('adminPolicy.enabledOn') : $t('adminPolicy.enabledOff') }}</span>
           </label>
           <div class="dropdown" :class="{ open: openForceMenu === cat.id }">
             <button type="button" class="ghost-btn" @click="toggleForceMenu(cat.id)">
@@ -118,12 +118,14 @@
               <span class="caret">▾</span>
             </button>
             <div class="dropdown-menu" v-if="openForceMenu === cat.id">
-              <button type="button" @click="setForced(cat.id, null)">不强制</button>
-              <button type="button" @click="setForced(cat.id, true)">强制启用</button>
-              <button type="button" @click="setForced(cat.id, false)">强制禁用</button>
+              <button type="button" @click="setForced(cat.id, null)">{{ $t('adminPolicy.forcedNone') }}</button>
+              <button type="button" @click="setForced(cat.id, true)">{{ $t('adminPolicy.forcedEnable') }}</button>
+              <button type="button" @click="setForced(cat.id, false)">{{ $t('adminPolicy.forcedDisable') }}</button>
             </div>
           </div>
-          <button type="button" class="link danger" @click="removeCategory(cat.id)">删除</button>
+          <button type="button" class="link danger" @click="removeCategory(cat.id)">
+            {{ $t('common.delete') }}
+          </button>
         </div>
       </div>
     </section>
@@ -131,7 +133,7 @@
     <section class="panel grid-2">
       <div>
         <div class="panel-title">
-          <h2>模型禁用</h2>
+          <h2>{{ $t('adminPolicy.modelDisable') }}</h2>
         </div>
         <div class="toggle-grid">
           <label v-for="model in defaults.models" :key="model" class="toggle-row">
@@ -143,7 +145,7 @@
       </div>
       <div>
         <div class="panel-title">
-          <h2>前端禁用项</h2>
+          <h2>{{ $t('adminPolicy.uiBlockSection') }}</h2>
         </div>
         <div class="toggle-grid">
           <label v-for="key in defaults.ui_block_keys" :key="key" class="toggle-row">
@@ -161,28 +163,28 @@
 
     <section class="panel">
       <div class="panel-title">
-        <h2>MCP 服务配置（统一工具扩展）</h2>
+        <h2>{{ $t('adminPolicy.mcpSection') }}</h2>
         <div class="header-actions">
           <button type="button" class="ghost-btn" :disabled="mcpLoading" @click="fetchMcpServers">
-            {{ mcpLoading ? '刷新中...' : '刷新' }}
+            {{ mcpLoading ? $t('common.refreshing') : $t('adminPolicy.refresh') }}
           </button>
           <button type="button" class="ghost-btn" :disabled="mcpSyncing" @click="syncAllMcpServers">
-            {{ mcpSyncing ? '同步中...' : '同步全部工具' }}
+            {{ mcpSyncing ? $t('adminPolicy.syncing') : $t('adminPolicy.syncAll') }}
           </button>
-          <button type="button" @click="addMcpServer">新增 MCP 服务</button>
+          <button type="button" @click="addMcpServer">{{ $t('adminPolicy.addMcpServer') }}</button>
         </div>
       </div>
-      <div v-if="!mcpServers.length" class="muted">暂无 MCP 服务，点击“新增 MCP 服务”开始配置。</div>
+      <div v-if="!mcpServers.length" class="muted">{{ $t('adminPolicy.emptyMcpServers') }}</div>
       <div class="mcp-list" v-else>
         <div class="mcp-item" v-for="(server, idx) in mcpServers" :key="server.id || `new-${idx}`">
           <div class="mcp-grid">
             <label>
-              <span>ID</span>
-              <input v-model="server.id" placeholder="如 demo_stdio" />
+              <span>{{ $t('adminPolicy.mcpId') }}</span>
+              <input v-model="server.id" :placeholder="$t('adminPolicy.mcpIdPlaceholder')" />
             </label>
             <label>
-              <span>名称</span>
-              <input v-model="server.name" placeholder="显示名称（可选）" />
+              <span>{{ $t('adminPolicy.mcpName') }}</span>
+              <input v-model="server.name" :placeholder="$t('adminPolicy.mcpNamePlaceholder')" />
             </label>
             <label>
               <span>Transport</span>
@@ -192,7 +194,7 @@
               </select>
             </label>
             <label>
-              <span>启用</span>
+              <span>{{ $t('adminPolicy.mcpEnabled') }}</span>
               <select v-model="server.enabledText">
                 <option value="true">true</option>
                 <option value="false">false</option>
@@ -200,62 +202,70 @@
             </label>
             <label v-if="server.transport === 'stdio'" class="wide">
               <span>command</span>
-              <input v-model="server.command" placeholder="如 python3" />
+              <input v-model="server.command" :placeholder="$t('adminPolicy.mcpCommandPlaceholder')" />
             </label>
             <label v-if="server.transport === 'stdio'" class="wide">
-              <span>args（每行一个，留空=无）</span>
+              <span>{{ $t('adminPolicy.mcpArgs') }}</span>
               <textarea
                 v-model="server.argsText"
                 rows="3"
-                placeholder="如\n/abs/path/mcp_server.py"
+                :placeholder="$t('adminPolicy.mcpArgsPlaceholder')"
               ></textarea>
             </label>
             <label v-if="server.transport === 'stdio'" class="wide">
-              <span>cwd（可选）</span>
-              <input v-model="server.cwd" placeholder="工作目录" />
+              <span>{{ $t('adminPolicy.mcpCwd') }}</span>
+              <input v-model="server.cwd" :placeholder="$t('adminPolicy.mcpCwdPlaceholder')" />
             </label>
             <label v-if="server.transport === 'streamable_http'" class="wide">
               <span>url</span>
-              <input v-model="server.url" placeholder="如 http://127.0.0.1:8000/mcp" />
+              <input v-model="server.url" :placeholder="$t('adminPolicy.mcpUrlPlaceholder')" />
             </label>
             <label class="wide">
-              <span>headers（JSON，可选）</span>
+              <span>{{ $t('adminPolicy.mcpHeaders') }}</span>
               <textarea
                 v-model="server.headersText"
                 rows="2"
-                placeholder='如 {"Authorization":"Bearer xxx"}'
+                :placeholder="$t('adminPolicy.mcpHeadersPlaceholder')"
               ></textarea>
             </label>
             <label class="wide">
-              <span>env（JSON，可选，stdio 有效）</span>
-              <textarea v-model="server.envText" rows="2" placeholder='如 {"PYTHONUNBUFFERED":"1"}'></textarea>
+              <span>{{ $t('adminPolicy.mcpEnv') }}</span>
+              <textarea v-model="server.envText" rows="2" :placeholder="$t('adminPolicy.mcpEnvPlaceholder')"></textarea>
             </label>
             <label>
               <span>timeout(s)</span>
               <input v-model="server.timeoutText" placeholder="25" />
             </label>
             <label class="wide">
-              <span>include_tools（逗号分隔，可选）</span>
-              <input v-model="server.includeToolsText" placeholder="如 echo,read_db" />
+              <span>{{ $t('adminPolicy.mcpIncludeTools') }}</span>
+              <input v-model="server.includeToolsText" :placeholder="$t('adminPolicy.mcpIncludeToolsPlaceholder')" />
             </label>
             <label class="wide">
-              <span>exclude_tools（逗号分隔，可选）</span>
-              <input v-model="server.excludeToolsText" placeholder="如 dangerous_tool" />
+              <span>{{ $t('adminPolicy.mcpExcludeTools') }}</span>
+              <input v-model="server.excludeToolsText" :placeholder="$t('adminPolicy.mcpExcludeToolsPlaceholder')" />
             </label>
             <label class="wide">
-              <span>说明（可选）</span>
-              <input v-model="server.description" placeholder="备注说明" />
+              <span>{{ $t('adminPolicy.mcpDescription') }}</span>
+              <input v-model="server.description" :placeholder="$t('adminPolicy.mcpDescriptionPlaceholder')" />
             </label>
           </div>
           <div class="mcp-meta">
-            <span>最近同步：{{ server.tools_cache_updated_at || '未同步' }}</span>
-            <span v-if="server.last_error" class="error-text">错误：{{ server.last_error }}</span>
-            <span>缓存工具数：{{ server.tools_cache_count }}</span>
+            <span>
+              {{ $t('adminPolicy.mcpLastSync', { time: server.tools_cache_updated_at || $t('adminPolicy.mcpNotSynced') }) }}
+            </span>
+            <span v-if="server.last_error" class="error-text"
+              >{{ $t('adminPolicy.mcpError', { message: server.last_error }) }}</span
+            >
+            <span>{{ $t('adminPolicy.mcpCacheCount', { count: server.tools_cache_count }) }}</span>
           </div>
           <div class="mcp-actions">
-            <button type="button" class="primary" @click="saveMcpServer(server)">保存</button>
-            <button type="button" class="ghost-btn" @click="syncMcpServer(server.id)">同步工具</button>
-            <button type="button" class="link danger" @click="deleteMcpServer(server.id, idx)">删除</button>
+            <button type="button" class="primary" @click="saveMcpServer(server)">{{ $t('common.save') }}</button>
+            <button type="button" class="ghost-btn" @click="syncMcpServer(server.id)">
+              {{ $t('adminPolicy.syncTools') }}
+            </button>
+            <button type="button" class="link danger" @click="deleteMcpServer(server.id, idx)">
+              {{ $t('common.delete') }}
+            </button>
           </div>
         </div>
       </div>
@@ -263,10 +273,10 @@
 
     <section class="panel">
       <div class="panel-title">
-        <h2>已删除分类</h2>
+        <h2>{{ $t('adminPolicy.removedCategories') }}</h2>
       </div>
       <div class="chips">
-        <span v-if="!form.config.remove_categories.length" class="muted">无</span>
+        <span v-if="!form.config.remove_categories.length" class="muted">{{ $t('adminPolicy.none') }}</span>
         <span v-for="cid in form.config.remove_categories" :key="cid" class="chip">
           {{ cid }}
           <button type="button" @click="undoRemove(cid)">×</button>
@@ -275,11 +285,11 @@
     </section>
 
     <section class="panel muted-info">
-      <p>说明：</p>
+      <p>{{ $t('adminPolicy.notesLabel') }}</p>
       <ul>
-        <li>优先级：用户 &gt; 邀请码 &gt; 角色 &gt; 全局。</li>
-        <li>分类“强制状态”会覆盖用户侧的工具开关，并在前端提示“被管理员强制”。</li>
-        <li>UI 禁用项会在用户操作时弹出右上角提示。</li>
+        <li>{{ $t('adminPolicy.notePriority') }}</li>
+        <li>{{ $t('adminPolicy.noteForced') }}</li>
+        <li>{{ $t('adminPolicy.noteUiBlocks') }}</li>
       </ul>
     </section>
   </div>
@@ -290,6 +300,7 @@ import { computed, reactive, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useSecondaryPass } from './useSecondaryPass';
 import SecondaryGate from './SecondaryGate.vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
+import { t, currentLocale } from '@/locales';
 
 type TargetType = 'global' | 'role' | 'user' | 'invite';
 
@@ -364,22 +375,24 @@ const mcpLoading = ref(false);
 const mcpSyncing = ref(false);
 
 const targetPlaceholder = computed(() => {
-  if (form.target_type === 'role') return '如：admin / user';
-  if (form.target_type === 'invite') return '邀请码';
-  if (form.target_type === 'user') return '用户名（小写）';
+  void currentLocale.value;
+  if (form.target_type === 'role') return t('adminPolicy.placeholderRole');
+  if (form.target_type === 'invite') return t('adminPolicy.placeholderInvite');
+  if (form.target_type === 'user') return t('adminPolicy.placeholderUsername');
   return '';
 });
 
-const targetOptions = [
-  { value: 'global', label: '全局' },
-  { value: 'role', label: '按角色' },
-  { value: 'user', label: '指定用户' },
-  { value: 'invite', label: '邀请码' }
+const targetOptions = () => [
+  { value: 'global', label: t('adminPolicy.scopeGlobal') },
+  { value: 'role', label: t('adminPolicy.scopeRole') },
+  { value: 'user', label: t('adminPolicy.scopeUser') },
+  { value: 'invite', label: t('adminPolicy.scopeInvite') }
 ] as const;
 
-const targetTypeLabel = computed(
-  () => targetOptions.find((o) => o.value === form.target_type)?.label || '全局'
-);
+const targetTypeLabel = computed(() => {
+  void currentLocale.value;
+  return targetOptions().find((o) => o.value === form.target_type)?.label || t('adminPolicy.scopeGlobal');
+});
 const targetMenuOpen = ref(false);
 const openForceMenu = ref<string | null>(null);
 const openToolMenu = ref<string | null>(null);
@@ -446,9 +459,9 @@ const toggleForceMenu = (id: string) => {
 };
 
 const forcedLabel = (value: boolean | null) => {
-  if (value === true) return '强制启用';
-  if (value === false) return '强制禁用';
-  return '不强制';
+  if (value === true) return t('adminPolicy.forcedEnable');
+  if (value === false) return t('adminPolicy.forcedDisable');
+  return t('adminPolicy.forcedNone');
 };
 
 const setForced = (id: string, value: boolean | null) => {
@@ -471,7 +484,7 @@ const toggleToolInCategory = (cat: CategoryFormItem, tool: string) => {
   const owners = toolAssignments.value[tool] || [];
   const conflict = owners.find((id) => id !== cat.id);
   if (conflict) {
-    banner.message = `工具 ${tool} 已在分类 ${conflict} 中，请先移除后再分配`;
+    banner.message = t('adminPolicy.toolConflict', { tool, category: conflict });
     banner.type = 'error';
     return;
   }
@@ -490,7 +503,7 @@ const addCustomTool = (cat: CategoryFormItem) => {
   const owners = toolAssignments.value[val] || [];
   const conflict = owners.find((id) => id !== cat.id);
   if (conflict) {
-    banner.message = `工具 ${val} 已在分类 ${conflict} 中，请先移除后再分配`;
+    banner.message = t('adminPolicy.toolConflict', { tool: val, category: conflict });
     banner.type = 'error';
     return;
   }
@@ -537,19 +550,19 @@ const setCategoryDefault = (id: string, enabled: boolean) => {
 
 function uiBlockLabel(key: string) {
   const map: Record<string, string> = {
-    collapse_workspace: '折叠工作区',
-    block_file_manager: '禁止文件管理器',
-    block_personal_space: '禁止个人空间',
-    block_upload: '禁止上传',
-    block_conversation_review: '禁止对话引用',
-    block_tool_toggle: '禁止工具禁用',
-    block_realtime_terminal: '禁止实时终端',
-    block_focus_panel: '禁止聚焦面板',
-    block_token_panel: '禁止用量统计',
-    block_compress_conversation: '禁止压缩对话',
-    block_virtual_monitor: '禁止虚拟显示器'
+    collapse_workspace: 'uiBlockCollapseWorkspace',
+    block_file_manager: 'uiBlockFileManager',
+    block_personal_space: 'uiBlockPersonalSpace',
+    block_upload: 'uiBlockUpload',
+    block_conversation_review: 'uiBlockConversationReview',
+    block_tool_toggle: 'uiBlockToolToggle',
+    block_realtime_terminal: 'uiBlockRealtimeTerminal',
+    block_focus_panel: 'uiBlockFocusPanel',
+    block_token_panel: 'uiBlockTokenPanel',
+    block_compress_conversation: 'uiBlockCompressConversation',
+    block_virtual_monitor: 'uiBlockVirtualMonitor'
   };
-  return map[key] || key;
+  return map[key] ? t(`adminPolicy.${map[key]}`) : key;
 }
 
 function toggleUiBlock(key: string, event: Event) {
@@ -634,10 +647,10 @@ function parseJsonDict(label: string, raw: string): Record<string, string> {
   try {
     parsed = JSON.parse(text);
   } catch (error: any) {
-    throw new Error(`${label} 不是合法 JSON：${error?.message || error}`);
+    throw new Error(t('adminPolicy.jsonInvalid', { label, message: error?.message || error }));
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`${label} 必须是 JSON 对象`);
+    throw new Error(t('adminPolicy.jsonMustBeObject', { label }));
   }
   const output: Record<string, string> = {};
   Object.entries(parsed).forEach(([k, v]) => {
@@ -675,7 +688,7 @@ function mapMcpServer(raw: any): MCPServerFormItem {
 
 function normalizeMcpPayload(server: MCPServerFormItem) {
   const id = server.id.trim();
-  if (!id) throw new Error('MCP 服务 ID 不能为空');
+  if (!id) throw new Error(t('adminPolicy.mcpIdRequired'));
   return {
     id,
     name: server.name.trim() || id,
@@ -701,11 +714,11 @@ async function fetchMcpServers() {
     const resp = await fetch('/api/admin/mcp-servers', { credentials: 'same-origin' });
     const data = await resp.json();
     if (!resp.ok || !data.success) {
-      throw new Error(data.error || '加载 MCP 服务失败');
+      throw new Error(data.error || t('adminPolicy.loadMcpFailed'));
     }
     mcpServers.value = (data.data || []).map((item: any) => mapMcpServer(item));
   } catch (error: any) {
-    banner.message = error?.message || '加载 MCP 服务失败';
+    banner.message = error?.message || t('adminPolicy.loadMcpFailed');
     banner.type = 'error';
   } finally {
     mcpLoading.value = false;
@@ -736,13 +749,13 @@ async function saveMcpServer(server: MCPServerFormItem) {
     });
     const data = await resp.json();
     if (!resp.ok || !data.success) {
-      throw new Error(data.error || '保存 MCP 服务失败');
+      throw new Error(data.error || t('adminPolicy.saveMcpFailed'));
     }
-    banner.message = `MCP 服务 ${payload.id} 已保存`;
+    banner.message = t('adminPolicy.mcpSaved', { id: payload.id });
     banner.type = 'success';
     await syncMcpServer(payload.id, true);
   } catch (error: any) {
-    banner.message = error?.message || '保存 MCP 服务失败';
+    banner.message = error?.message || t('adminPolicy.saveMcpFailed');
     banner.type = 'error';
   }
 }
@@ -761,14 +774,14 @@ async function deleteMcpServer(id: string, idx: number) {
     });
     const data = await resp.json();
     if (!resp.ok || !data.success) {
-      throw new Error(data.error || '删除 MCP 服务失败');
+      throw new Error(data.error || t('adminPolicy.deleteMcpFailed'));
     }
-    banner.message = `已删除 MCP 服务 ${target}`;
+    banner.message = t('adminPolicy.mcpDeleted', { id: target });
     banner.type = 'success';
     await fetchMcpServers();
     await fetchDefaults();
   } catch (error: any) {
-    banner.message = error?.message || '删除 MCP 服务失败';
+    banner.message = error?.message || t('adminPolicy.deleteMcpFailed');
     banner.type = 'error';
   }
 }
@@ -777,7 +790,7 @@ async function syncMcpServer(id?: string, silent = false) {
   if (!secondaryVerified.value) return;
   const target = String(id || '').trim();
   if (typeof id !== 'undefined' && !target) {
-    banner.message = '请先保存服务后再同步工具';
+    banner.message = t('adminPolicy.syncRequiresSave');
     banner.type = 'error';
     return;
   }
@@ -791,16 +804,16 @@ async function syncMcpServer(id?: string, silent = false) {
     });
     const data = await resp.json();
     if (!resp.ok || !data.success) {
-      throw new Error(data.error || '同步 MCP 工具失败');
+      throw new Error(data.error || t('adminPolicy.syncMcpFailed'));
     }
     if (!silent) {
-      banner.message = target ? `已同步 ${target}` : '已同步全部 MCP 服务';
+      banner.message = target ? t('adminPolicy.mcpSyncedWith', { id: target }) : t('adminPolicy.mcpSyncedAll');
       banner.type = 'success';
     }
     await fetchMcpServers();
     await fetchDefaults();
   } catch (error: any) {
-    banner.message = error?.message || '同步 MCP 工具失败';
+    banner.message = error?.message || t('adminPolicy.syncMcpFailed');
     banner.type = 'error';
   } finally {
     if (!silent) mcpSyncing.value = false;
@@ -816,7 +829,7 @@ async function fetchDefaults() {
   const resp = await fetch('/api/admin/policy', { credentials: 'same-origin' });
   const data = await resp.json();
   if (!resp.ok || !data.success) {
-    throw new Error(data.error || '加载默认配置失败');
+    throw new Error(data.error || t('adminPolicy.loadDefaultsFailed'));
   }
   defaults.categories = data.defaults?.categories || {};
   defaults.models = data.defaults?.models || [];
@@ -884,14 +897,14 @@ async function savePolicy() {
     });
     const result = await resp.json();
     if (!resp.ok || !result.success) {
-      throw new Error(result.error || '保存失败');
+      throw new Error(result.error || t('adminPolicy.saveFailed'));
     }
     policyCache.value = result.data;
     lastUpdated.value = result.data?.updated_at || null;
-    banner.message = '保存成功';
+    banner.message = t('adminPolicy.savedSuccess');
     banner.type = 'success';
   } catch (error: any) {
-    banner.message = error?.message || '保存失败';
+    banner.message = error?.message || t('adminPolicy.saveFailed');
     banner.type = 'error';
   } finally {
     saving.value = false;
@@ -903,7 +916,7 @@ const handleVerifySecondary = async (password: string) => {
   if (secondaryVerified.value) {
     Promise.all([fetchDefaults(), fetchMcpServers()]).catch((err) => {
       console.error(err);
-      banner.message = err?.message || '加载策略失败';
+      banner.message = err?.message || t('adminPolicy.loadPolicyFailed');
       banner.type = 'error';
     });
   }
@@ -915,7 +928,7 @@ onMounted(async () => {
   if (secondaryVerified.value) {
     Promise.all([fetchDefaults(), fetchMcpServers()]).catch((err) => {
       console.error(err);
-      banner.message = err?.message || '加载策略失败';
+      banner.message = err?.message || t('adminPolicy.loadPolicyFailed');
       banner.type = 'error';
     });
   }
@@ -925,7 +938,7 @@ watch(secondaryVerified, (val) => {
   if (val) {
     Promise.all([fetchDefaults(), fetchMcpServers()]).catch((err) => {
       console.error(err);
-      banner.message = err?.message || '加载策略失败';
+      banner.message = err?.message || t('adminPolicy.loadPolicyFailed');
       banner.type = 'error';
     });
   }

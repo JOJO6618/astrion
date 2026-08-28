@@ -1,5 +1,7 @@
 // 工具增强显示的渲染函数
 
+import { t } from '@/locales';
+
 export function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
@@ -15,34 +17,44 @@ export function formatBytes(bytes: number): string {
 }
 
 function formatDuration(seconds: number): string {
-  if (seconds <= 0) return '0 秒';
-  if (seconds < 60) return `${seconds} 秒`;
+  if (seconds <= 0) return t('toolResults.duration.zero');
+  if (seconds < 60) return t('toolResults.duration.seconds', { seconds });
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   if (minutes < 60) {
-    return remainingSeconds > 0 ? `${minutes} 分 ${remainingSeconds} 秒` : `${minutes} 分`;
+    return remainingSeconds > 0
+      ? t('toolResults.duration.minutesSeconds', { minutes, seconds: remainingSeconds })
+      : t('toolResults.duration.minutes', { minutes });
   }
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   if (remainingMinutes === 0 && remainingSeconds === 0) {
-    return `${hours} 小时`;
+    return t('toolResults.duration.hours', { hours });
   }
-  return `${hours} 小时 ${remainingMinutes} 分 ${remainingSeconds} 秒`;
+  return t('toolResults.duration.hoursMinutesSeconds', {
+    hours,
+    minutes: remainingMinutes,
+    seconds: remainingSeconds,
+  });
 }
 
-function formatToolStatusLabel(result: any, successLabel: string, failedLabel = '✗ 失败'): string {
+function formatToolStatusLabel(
+  result: any,
+  successLabel: string,
+  failedLabel = t('toolResults.status.failedMark')
+): string {
   const state = String(result?.status || '').toLowerCase();
   if (state === 'awaiting_user_answer') {
-    return '等待回答';
+    return t('toolResults.status.awaitingUserAnswer');
   }
   if (state === 'awaiting_approval' || state === 'pending_approval' || state === 'pending') {
-    return '待审批';
+    return t('toolResults.status.awaitingApproval');
   }
   if (state === 'rejected') {
-    return '✗ 已拒绝';
+    return t('toolResults.status.rejected');
   }
   if (state === 'cancelled') {
-    return '✗ 已取消';
+    return t('toolResults.status.cancelled');
   }
   return result?.success ? successLabel : failedLabel;
 }
@@ -182,10 +194,10 @@ export function renderEnhancedToolResult(
 }
 
 function renderDefaultResult(result: any, args: any, name: string): string {
-  const status = formatToolStatusLabel(result, '✓ 完成', '✗ 失败');
+  const status = formatToolStatusLabel(result, t('toolResults.status.completed'), t('toolResults.status.failedMark'));
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>工具：</strong>${escapeHtml(name)}</div>`;
-  html += `<div><strong>状态：</strong>${escapeHtml(status)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.tool'))}</strong>${escapeHtml(name)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(status)}</div>`;
 
   const importantKeys = [
     'path',
@@ -201,26 +213,31 @@ function renderDefaultResult(result: any, args: any, name: string): string {
   importantKeys.forEach((key) => {
     const value = args?.[key] ?? result?.[key];
     if (value !== undefined && value !== '' && value !== null) {
-      const labelMap: Record<string, string> = {
-        path: '路径',
-        file_path: '路径',
-        agent_id: '子智能体 ID',
-        target_agent_id: '目标子智能体 ID',
-        display_name: '子智能体',
-        target_display_name: '目标子智能体',
-        question: '问题',
-        role_id: '角色 ID',
-        url: 'URL'
+      // 结构性字段名映射：值为完整 i18n key（含冒号语义，见 fields.* 与 values.colon）
+      const fieldLabelKeys: Record<string, string> = {
+        path: 'toolResults.fields.path',
+        file_path: 'toolResults.fields.filePath',
+        agent_id: 'toolResults.fields.agentId',
+        target_agent_id: 'toolResults.fields.targetAgentId',
+        display_name: 'toolResults.fields.displayName',
+        target_display_name: 'toolResults.fields.targetDisplayName',
+        question: 'toolResults.fields.question',
+        role_id: 'toolResults.fields.roleId',
+        url: 'toolResults.fields.url',
       };
       const displayValue = typeof value === 'string' ? value : JSON.stringify(value);
       const preview = String(displayValue).slice(0, 200);
       const suffix = String(displayValue).length > 200 ? '…' : '';
-      html += `<div><strong>${escapeHtml(labelMap[key] || key)}：</strong>${escapeHtml(preview + suffix)}</div>`;
+      const colon = t('toolResults.values.colon');
+      const label = fieldLabelKeys[key]
+        ? t(fieldLabelKeys[key]) + colon
+        : key + colon;
+      html += `<div><strong>${escapeHtml(label)}</strong>${escapeHtml(preview + suffix)}</div>`;
     }
   });
 
   if (!result?.success && result?.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
@@ -238,7 +255,7 @@ function renderDefaultResult(result: any, args: any, name: string): string {
     html += '</div>';
   } else if (result?.success) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="tool-result-empty">工具执行完成，无额外可展示内容。</div>';
+    html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.emptyResult'))}</div>`;
     html += '</div>';
   }
 
@@ -259,29 +276,29 @@ function renderWebSearch(
   const results = result.results || [];
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>搜索内容：</strong>${escapeHtml(query)}</div>`;
-  html += `<div><strong>主题：</strong>${escapeHtml(formatSearchTopic(filters))}</div>`;
-  html += `<div><strong>时间范围：</strong>${escapeHtml(formatSearchTime(filters))}</div>`;
-  html += `<div><strong>限定网站：</strong>${escapeHtml(formatSearchDomains(filters))}</div>`;
-  html += `<div><strong>结果数量：</strong>${totalResults}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.query'))}</strong>${escapeHtml(query)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.topic'))}</strong>${escapeHtml(formatSearchTopic(filters))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.timeRange'))}</strong>${escapeHtml(formatSearchTime(filters))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.domains'))}</strong>${escapeHtml(formatSearchDomains(filters))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.resultCount'))}</strong>${totalResults}</div>`;
   html += '</div>';
 
   if (results.length > 0) {
     html += '<div class="search-result-list">';
     results.forEach((item: any) => {
       html += '<div class="search-result-item">';
-      html += `<div class="search-result-title">${escapeHtml(item.title || '无标题')}</div>`;
+      html += `<div class="search-result-title">${escapeHtml(item.title || t('toolResults.values.noTitle'))}</div>`;
       html += '<div class="search-result-url">';
       if (item.url) {
         html += `<a href="${escapeHtml(item.url)}" target="_blank">${escapeHtml(item.url)}</a>`;
       } else {
-        html += '<span>无可用链接</span>';
+        html += `<span>${escapeHtml(t('toolResults.values.noLink'))}</span>`;
       }
       html += '</div></div>';
     });
     html += '</div>';
   } else {
-    html += '<div class="tool-result-empty">未返回详细的搜索结果。</div>';
+    html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noSearchResults'))}</div>`;
   }
 
   return html;
@@ -289,12 +306,12 @@ function renderWebSearch(
 
 function renderExtractWebpage(result: any, args: any): string {
   const url = args.url || result.url || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
   const content = result.content || result.text || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>URL：</strong>${escapeHtml(url)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.url'))}</strong>${escapeHtml(url)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += '</div>';
 
   if (content) {
@@ -309,12 +326,12 @@ function renderExtractWebpage(result: any, args: any): string {
 function renderSaveWebpage(result: any, args: any): string {
   const url = args.url || result.url || '';
   const path = result.path || args.save_path || '';
-  const status = formatToolStatusLabel(result, '✓ 已保存');
+  const status = formatToolStatusLabel(result, t('toolResults.status.saved'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>URL：</strong>${escapeHtml(url)}</div>`;
-  html += `<div><strong>保存路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.url'))}</strong>${escapeHtml(url)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.savePath'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += '</div>';
 
   return html;
@@ -323,11 +340,11 @@ function renderSaveWebpage(result: any, args: any): string {
 // 文件编辑类渲染函数
 function renderCreateFile(result: any, args: any): string {
   const path = args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 已创建');
+  const status = formatToolStatusLabel(result, t('toolResults.status.created'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += '</div>';
 
   return html;
@@ -335,26 +352,26 @@ function renderCreateFile(result: any, args: any): string {
 
 function renderWriteFile(result: any, args: any): string {
   const path = args.file_path || args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 已写入');
+  const status = formatToolStatusLabel(result, t('toolResults.status.written'));
   const appendFlag = typeof args.append === 'boolean' ? args.append : null;
   const modeRaw = String(result.mode || '').toLowerCase();
   const writeMode =
     appendFlag === true || modeRaw === 'a'
-      ? '追加'
+      ? t('toolResults.values.append')
       : appendFlag === false || modeRaw === 'w'
-        ? '覆盖'
-        : '无';
+        ? t('toolResults.values.overwrite')
+        : t('toolResults.values.none');
   const content =
     appendFlag === true || modeRaw === 'a'
       ? args.content || ''
       : (result.new_file ?? args.content ?? '');
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>模式：</strong>${writeMode}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${writeMode}</div>`;
   if (!result.success && result.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
@@ -373,7 +390,7 @@ function renderWriteFile(result: any, args: any): string {
 
 function renderEditFile(result: any, args: any): string {
   const path = args.file_path || args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 已编辑');
+  const status = formatToolStatusLabel(result, t('toolResults.status.edited'));
   const foundCount =
     typeof result.found_matches === 'number'
       ? result.found_matches
@@ -387,13 +404,13 @@ function renderEditFile(result: any, args: any): string {
     : [];
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>替换组数：</strong>${(result.replacement_groups ?? details.length) || '无'}</div>`;
-  html += `<div><strong>找到：</strong>${foundCount ?? '无'}处</div>`;
-  html += `<div><strong>替换：</strong>${replacedCount ?? '无'}处</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.replacementGroups'))}</strong>${escapeHtml((result.replacement_groups ?? details.length) || t('toolResults.values.none'))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.found'))}</strong>${escapeHtml(t('toolResults.counts.foundValue', { n: foundCount ?? t('toolResults.values.none') }))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.replaced'))}</strong>${escapeHtml(t('toolResults.counts.replacedValue', { n: replacedCount ?? t('toolResults.values.none') }))}</div>`;
   if (!result.success && result.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
@@ -572,11 +589,11 @@ function renderEditFile(result: any, args: any): string {
 
 function renderDeleteFile(result: any, args: any): string {
   const path = args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 已删除');
+  const status = formatToolStatusLabel(result, t('toolResults.status.deleted'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += '</div>';
 
   return html;
@@ -585,12 +602,12 @@ function renderDeleteFile(result: any, args: any): string {
 function renderRenameFile(result: any, args: any): string {
   const oldPath = args.old_path || args.source || result.old_path || '';
   const newPath = args.new_path || args.destination || result.new_path || '';
-  const status = formatToolStatusLabel(result, '✓ 已重命名');
+  const status = formatToolStatusLabel(result, t('toolResults.status.renamed'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(oldPath)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>重命名：</strong>${escapeHtml(oldPath)} → ${escapeHtml(newPath)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(oldPath)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.rename'))}</strong>${escapeHtml(oldPath)} → ${escapeHtml(newPath)}</div>`;
   html += '</div>';
 
   return html;
@@ -599,18 +616,18 @@ function renderRenameFile(result: any, args: any): string {
 // 阅读聚焦类渲染函数
 function renderReadFile(result: any, args: any): string {
   const path = args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
   const size = result.size || result.file_size || 0;
   const readType = result.type || 'read';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (size > 0) {
-    html += `<div><strong>大小：</strong>${formatBytes(size)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.size'))}</strong>${formatBytes(size)}</div>`;
   }
   if (readType !== 'read') {
-    html += `<div><strong>模式：</strong>${escapeHtml(readType)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(readType)}</div>`;
   }
   html += '</div>';
 
@@ -630,8 +647,8 @@ function renderReadFile(result: any, args: any): string {
 
     if (query) {
       html += '<div class="tool-result-meta">';
-      html += `<div><strong>搜索关键词：</strong>${escapeHtml(query)}</div>`;
-      html += `<div><strong>匹配数量：</strong>${matches.length}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.searchKeyword'))}</strong>${escapeHtml(query)}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.matchCount'))}</strong>${matches.length}</div>`;
       html += '</div>';
     }
 
@@ -644,13 +661,13 @@ function renderReadFile(result: any, args: any): string {
           match.line_start === match.line_end
             ? `${match.line_start}`
             : `${match.line_start}-${match.line_end}`;
-        html += `<div class="search-match-line">行 ${lineLabel}</div>`;
+        html += `<div class="search-match-line">${escapeHtml(t('toolResults.values.line', { line: lineLabel }))}</div>`;
         html += `<pre>${escapeHtml(match.snippet || match.content || '')}</pre>`;
         html += '</div>';
       });
       html += '</div>';
     } else {
-      html += '<div class="tool-result-empty">未找到匹配内容</div>';
+      html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noMatches'))}</div>`;
     }
   }
   // 处理提取模式
@@ -659,7 +676,7 @@ function renderReadFile(result: any, args: any): string {
 
     if (segments.length > 0) {
       html += '<div class="tool-result-meta">';
-      html += `<div><strong>提取片段数：</strong>${segments.length}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.segmentCount'))}</strong>${segments.length}</div>`;
       html += '</div>';
 
       html += '<div class="tool-result-content scrollable">';
@@ -668,13 +685,13 @@ function renderReadFile(result: any, args: any): string {
         html += '<div class="segment-item">';
         const startLine = segment.start_line || segment.line_start || '?';
         const endLine = segment.end_line || segment.line_end || '?';
-        html += `<div class="segment-range">行 ${startLine}-${endLine}</div>`;
+        html += `<div class="segment-range">${escapeHtml(t('toolResults.values.line', { line: `${startLine}-${endLine}` }))}</div>`;
         html += `<pre>${escapeHtml(segment.content || segment.text || '')}</pre>`;
         html += '</div>';
       });
       html += '</div>';
     } else {
-      html += '<div class="tool-result-empty">未提取到内容</div>';
+      html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noExtractedContent'))}</div>`;
     }
   }
 
@@ -683,17 +700,17 @@ function renderReadFile(result: any, args: any): string {
 
 function renderVlmAnalyze(result: any, args: any): string {
   const path = args.image_path || args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
   const analysis = result.analysis || result.result || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += '</div>';
 
   if (analysis) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">分析结果：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.analysis'))}</div>`;
     html += `<pre>${escapeHtml(analysis)}</pre>`;
     html += '</div>';
   }
@@ -703,26 +720,26 @@ function renderVlmAnalyze(result: any, args: any): string {
 
 function renderOcrImage(result: any, args: any): string {
   const path = args.image_path || args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
   const size = result.size || result.file_size || 0;
   const text = result.text || result.ocr_text || '';
   const imageUrl = result.image_url || result.url || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (size > 0) {
-    html += `<div><strong>大小：</strong>${formatBytes(size)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.size'))}</strong>${formatBytes(size)}</div>`;
   }
   html += '</div>';
 
   if (imageUrl) {
-    html += `<div class="tool-result-image"><img src="${escapeHtml(imageUrl)}" alt="OCR图片" style="max-width: 100%; height: auto;" /></div>`;
+    html += `<div class="tool-result-image"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(t('toolResults.media.ocrImgAlt'))}" style="max-width: 100%; height: auto;" /></div>`;
   }
 
   if (text) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">识别文本：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.ocrText'))}</div>`;
     html += `<pre>${escapeHtml(text)}</pre>`;
     html += '</div>';
   }
@@ -732,7 +749,7 @@ function renderOcrImage(result: any, args: any): string {
 
 function renderViewImage(result: any, args: any): string {
   const path = args.image_path || args.path || result.path || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
   const size = result.size || result.file_size || 0;
   // 优先用结果自带 URL；否则按 path 走文件内容接口加载原图
   // （host 模式支持绝对路径，docker/web 模式限工作区相对路径，与工具本身的路径约束一致）
@@ -742,16 +759,16 @@ function renderViewImage(result: any, args: any): string {
   }
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>路径：</strong>${escapeHtml(path)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.path'))}</strong>${escapeHtml(path)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (size > 0) {
-    html += `<div><strong>大小：</strong>${formatBytes(size)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.size'))}</strong>${formatBytes(size)}</div>`;
   }
   html += '</div>';
 
   if (imageUrl) {
     const safeUrl = escapeHtml(imageUrl);
-    html += `<div class="tool-result-image"><a href="${safeUrl}" target="_blank" rel="noopener" title="在新窗口查看原图"><img src="${safeUrl}" alt="查看图片" loading="lazy" /></a></div>`;
+    html += `<div class="tool-result-image"><a href="${safeUrl}" target="_blank" rel="noopener" title="${escapeHtml(t('toolResults.media.viewImgTitle'))}"><img src="${safeUrl}" alt="${escapeHtml(t('toolResults.media.viewImgAlt'))}" loading="lazy" /></a></div>`;
   }
 
   return html;
@@ -761,12 +778,12 @@ function renderViewImage(result: any, args: any): string {
 function renderTerminalSession(result: any, args: any): string {
   const operation = args.operation || args.action || 'start';
   const sessionName = args.session_name || args.name || result.session_name || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>操作：</strong>${escapeHtml(operation)}</div>`;
-  html += `<div><strong>终端名：</strong>${escapeHtml(sessionName)}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.operation'))}</strong>${escapeHtml(operation)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.terminalName'))}</strong>${escapeHtml(sessionName)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += '</div>';
 
   return html;
@@ -778,13 +795,13 @@ function renderTerminalInput(result: any, args: any): string {
   const output = result.output || result.result || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>指令：</strong>${escapeHtml(command)}</div>`;
-  html += `<div><strong>等待时间：</strong>${outputWait}秒</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.command'))}</strong>${escapeHtml(command)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.waitTime'))}</strong>${escapeHtml(t('toolResults.duration.seconds', { seconds: outputWait }))}</div>`;
   html += '</div>';
 
   if (output) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">输出：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.output'))}</div>`;
     html += `<pre>${escapeHtml(output)}</pre>`;
     html += '</div>';
   }
@@ -794,22 +811,22 @@ function renderTerminalInput(result: any, args: any): string {
 
 function renderTerminalSnapshot(result: any, args: any): string {
   const sessionName = args.session_name || args.name || result.session_name || '';
-  const status = formatToolStatusLabel(result, '✓ 成功');
+  const status = formatToolStatusLabel(result, t('toolResults.status.successMark'));
   const startLine = args.start_line || 0;
   const endLine = args.end_line || 0;
   const content = result.content || result.output || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>终端名：</strong>${escapeHtml(sessionName)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.terminalName'))}</strong>${escapeHtml(sessionName)}</div>`;
   if (startLine || endLine) {
-    html += `<div><strong>行范围：</strong>${startLine} - ${endLine}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.lineRange'))}</strong>${startLine} - ${endLine}</div>`;
   }
   html += '</div>';
 
   if (content) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">获取的内容：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.fetchedContent'))}</div>`;
     html += `<pre>${escapeHtml(content)}</pre>`;
     html += '</div>';
   }
@@ -818,41 +835,41 @@ function renderTerminalSnapshot(result: any, args: any): string {
 }
 
 function renderSleep(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 完成');
+  const status = formatToolStatusLabel(result, t('toolResults.status.completed'));
   const mode = result?.mode || 'seconds';
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>模式：</strong>${escapeHtml(mode)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(mode)}</div>`;
 
   if (mode === 'seconds' || mode === '' || mode === null) {
     const seconds = args.seconds || args.duration || 0;
-    html += `<div><strong>等待时间：</strong>${seconds}秒</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.waitTime'))}</strong>${escapeHtml(t('toolResults.duration.seconds', { seconds }))}</div>`;
     if (args.reason) {
-      html += `<div><strong>原因：</strong>${escapeHtml(String(args.reason))}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.reason'))}</strong>${escapeHtml(String(args.reason))}</div>`;
     }
   } else if (mode === 'wait_sub_agent_output') {
     const targetName = result?.display_name ?? args?.wait_sub_agent_output ?? '';
     if (targetName !== '') {
-      html += `<div><strong>等待子智能体：</strong>${escapeHtml(String(targetName))}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.waitSubAgent'))}</strong>${escapeHtml(String(targetName))}</div>`;
     }
   } else if (mode === 'wait_sub_agent_ids') {
     const agentIds = Array.isArray(result?.agent_ids) ? result.agent_ids : [];
     if (agentIds.length > 0) {
-      html += `<div><strong>等待子智能体：</strong>${agentIds.map(String).join(', ')}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.waitSubAgent'))}</strong>${agentIds.map(String).join(', ')}</div>`;
     }
     const taskIds = Array.isArray(result?.waited_task_ids) ? result.waited_task_ids : [];
     if (taskIds.length > 0) {
-      html += `<div><strong>任务 ID：</strong>${taskIds.map(String).join(', ')}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${taskIds.map(String).join(', ')}</div>`;
     }
   } else if (mode === 'wait_runcommand_id') {
     const commandId = result?.command_id ?? args?.wait_runcommand_id ?? '';
     if (commandId !== '') {
-      html += `<div><strong>后台命令 ID：</strong>${escapeHtml(String(commandId))}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.backgroundCommandId'))}</strong>${escapeHtml(String(commandId))}</div>`;
     }
   }
 
   if (!result?.success && result?.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
@@ -861,7 +878,7 @@ function renderSleep(result: any, args: any): string {
     const message = result?.message || '';
     if (message) {
       html += '<div class="tool-result-content scrollable">';
-      html += `<div class="content-label">结果：</div>`;
+      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.result'))}</div>`;
       html += `<pre>${escapeHtml(String(message))}</pre>`;
       html += '</div>';
     }
@@ -869,7 +886,7 @@ function renderSleep(result: any, args: any): string {
     const message = result?.message || '';
     if (message) {
       html += '<div class="tool-result-content scrollable">';
-      html += '<div class="content-label">子智能体输出：</div>';
+      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.subAgentOutput'))}</div>`;
       html += `<pre>${escapeHtml(String(message))}</pre>`;
       html += '</div>';
     }
@@ -877,7 +894,7 @@ function renderSleep(result: any, args: any): string {
     const results = Array.isArray(result?.results) ? result.results : [];
     if (results.length > 0) {
       html += '<div class="tool-result-content scrollable">';
-      html += `<div class="content-label">已等待 ${results.length} 个子智能体：</div>`;
+      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.waitedSubAgents', { n: results.length }))}</div>`;
       results.forEach((item: any) => {
         if (!item || typeof item !== 'object') return;
         const agentId = item.agent_id ?? '?';
@@ -885,11 +902,13 @@ function renderSleep(result: any, args: any): string {
         const itemStatus = item.status ?? 'unknown';
         const success = item.success === true;
         html += '<div class="sub-agent-result-item">';
-        html += `<div><strong>子智能体 #${escapeHtml(String(agentId))}</strong>（任务 ${escapeHtml(String(taskId))}）· ${escapeHtml(String(itemStatus))} · ${success ? '✓ 成功' : '✗ 失败'}</div>`;
+        const outcome = success ? t('toolResults.status.successMark') : t('toolResults.status.failedMark');
+        html += `<div><strong>${escapeHtml(t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) }))}</strong>${escapeHtml(t('toolResults.sentences.subAgentResultMeta', { taskId: String(taskId), status: String(itemStatus), outcome }))}</div>`;
         const itemMessage = item.message || item.error || '';
         if (itemMessage) {
           const runtime = item.runtime_seconds ?? item.elapsed_seconds ?? null;
-          const runtimeNote = runtime !== null ? `运行 ${Math.round(Number(runtime))} 秒` : '';
+          const runtimeNote =
+            runtime !== null ? t('toolResults.duration.runtimeNote', { n: Math.round(Number(runtime)) }) : '';
           const stats = item.stats;
           if (runtimeNote || stats) {
             html += '<div class="sub-agent-meta">';
@@ -898,12 +917,12 @@ function renderSleep(result: any, args: any): string {
             }
             if (stats && typeof stats === 'object') {
               const statParts = [];
-              if (stats.api_calls != null) statParts.push(`调用 ${stats.api_calls} 次`);
-              if (stats.files_read != null) statParts.push(`阅读 ${stats.files_read} 次`);
-              if (stats.edit_files != null) statParts.push(`编辑 ${stats.edit_files} 次`);
-              if (stats.searches != null) statParts.push(`搜索 ${stats.searches} 次`);
-              if (stats.web_pages != null) statParts.push(`网页 ${stats.web_pages} 个`);
-              if (stats.commands != null) statParts.push(`命令 ${stats.commands} 个`);
+              if (stats.api_calls != null) statParts.push(t('toolResults.counts.statApiCalls', { n: stats.api_calls }));
+              if (stats.files_read != null) statParts.push(t('toolResults.counts.statFilesRead', { n: stats.files_read }));
+              if (stats.edit_files != null) statParts.push(t('toolResults.counts.statEditFiles', { n: stats.edit_files }));
+              if (stats.searches != null) statParts.push(t('toolResults.counts.statSearches', { n: stats.searches }));
+              if (stats.web_pages != null) statParts.push(t('toolResults.counts.statWebPages', { n: stats.web_pages }));
+              if (stats.commands != null) statParts.push(t('toolResults.counts.statCommands', { n: stats.commands }));
               if (statParts.length > 0) {
                 html += `<span>${escapeHtml(statParts.join(' | '))}</span>`;
               }
@@ -922,14 +941,14 @@ function renderSleep(result: any, args: any): string {
       const output = nested.output || nested.stdout || '';
       const exitCode = nested.exit_code !== undefined ? nested.exit_code : nested.returncode;
       html += '<div class="tool-result-content scrollable">';
-      html += '<div class="content-label">后台命令输出：</div>';
+      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.backgroundCommandOutput'))}</div>`;
       if (exitCode !== undefined) {
-        html += `<div><strong>退出码：</strong>${escapeHtml(String(exitCode))}</div>`;
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.exitCode'))}</strong>${escapeHtml(String(exitCode))}</div>`;
       }
       if (output) {
         html += `<pre>${escapeHtml(String(output))}</pre>`;
       } else {
-        html += '<div class="tool-result-empty">[无输出]</div>';
+        html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noOutput'))}</div>`;
       }
       html += '</div>';
     }
@@ -946,16 +965,16 @@ function renderRunCommand(result: any, args: any): string {
   const exitCode = result.exit_code !== undefined ? result.exit_code : result.returncode;
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>指令：</strong>${escapeHtml(command)}</div>`;
-  html += `<div><strong>超时时间：</strong>${timeout}秒</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.command'))}</strong>${escapeHtml(command)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.timeout'))}</strong>${escapeHtml(t('toolResults.duration.seconds', { seconds: timeout }))}</div>`;
   if (exitCode !== undefined) {
-    html += `<div><strong>退出码：</strong>${exitCode}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.exitCode'))}</strong>${exitCode}</div>`;
   }
   html += '</div>';
 
   if (output) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">输出：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.output'))}</div>`;
     html += `<pre>${escapeHtml(output)}</pre>`;
     html += '</div>';
   }
@@ -973,14 +992,14 @@ function renderUpdateMemory(result: any, args: any): string {
   let html = '<div class="tool-result-meta">';
 
   if (operation === 'append') {
-    html += `<div>新增记忆</div>`;
+    html += `<div>${escapeHtml(t('toolResults.sentences.memoryAdd'))}</div>`;
     html += `<div>${count}. ${escapeHtml(content)}</div>`;
   } else if (operation === 'replace') {
-    html += `<div>更新记忆</div>`;
+    html += `<div>${escapeHtml(t('toolResults.sentences.memoryUpdate'))}</div>`;
     html += `<div>${index}. ${escapeHtml(content)}</div>`;
   } else if (operation === 'delete') {
-    html += `<div>删除记忆</div>`;
-    html += `<div>${index}. ${escapeHtml(content || '已删除')}</div>`;
+    html += `<div>${escapeHtml(t('toolResults.sentences.memoryDelete'))}</div>`;
+    html += `<div>${index}. ${escapeHtml(content || t('toolResults.values.deleted'))}</div>`;
   }
 
   html += '</div>';
@@ -990,12 +1009,12 @@ function renderUpdateMemory(result: any, args: any): string {
 
 function renderRecallProjectMemory(result: any, args: any): string {
   const name = args.name || result.memory_name || '';
-  const status = formatToolStatusLabel(result, '✓ 已读取');
+  const status = formatToolStatusLabel(result, t('toolResults.status.read'));
   const content = result.content || result.text || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>记忆：</strong>${escapeHtml(name)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.memory'))}</strong>${escapeHtml(name)}</div>`;
   html += '</div>';
 
   if (result.success && content) {
@@ -1016,20 +1035,20 @@ function renderSearchProjectMemory(result: any, args: any): string {
       ? args.keywords
       : [];
   const results = Array.isArray(result?.results) ? result.results : [];
-  const status = formatToolStatusLabel(result, '✓ 完成');
+  const status = formatToolStatusLabel(result, t('toolResults.status.completed'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>关键词：</strong>${escapeHtml(keywords.join(' / ') || '（未指定）')}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>命中记忆：</strong>${results.length} 条</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.keywords'))}</strong>${escapeHtml(keywords.join(' / ') || t('toolResults.values.notSpecified'))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div>${escapeHtml(t('toolResults.counts.memoryHits', { n: results.length }))}</div>`;
   if (!result?.success && result?.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
   if (!results.length) {
     if (result?.success) {
-      html += '<div class="tool-result-empty">未找到匹配的项目记忆。</div>';
+      html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noMatchesMemory'))}</div>`;
     }
     return html;
   }
@@ -1039,7 +1058,7 @@ function renderSearchProjectMemory(result: any, args: any): string {
     html += '<div class="search-result-item">';
     html += `<div class="search-result-title">${escapeHtml(item.name || item.file || '')}</div>`;
     if (item.description) {
-      html += `<div><strong>描述：</strong>${escapeHtml(item.description)}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.description'))}</strong>${escapeHtml(item.description)}</div>`;
     }
     const snippets = Array.isArray(item.snippets) ? item.snippets : [];
     if (snippets.length > 0) {
@@ -1063,22 +1082,22 @@ function renderUpdateProjectMemory(result: any, args: any): string {
   const name = args.name || result.memory_name || '';
   const description = args.description || '';
   const content = args.content || '';
-  const status = formatToolStatusLabel(result, '✓ 已更新');
+  const status = formatToolStatusLabel(result, t('toolResults.status.updated'));
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>记忆：</strong>${escapeHtml(name)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.memory'))}</strong>${escapeHtml(name)}</div>`;
   if (description) {
-    html += `<div><strong>描述：</strong>${escapeHtml(description)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.description'))}</strong>${escapeHtml(description)}</div>`;
   }
   if (!result.success && result.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
   if (result.success && content) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">记忆内容：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.memoryContent'))}</div>`;
     html += `<pre>${escapeHtml(content)}</pre>`;
     html += '</div>';
   }
@@ -1095,28 +1114,28 @@ function renderConversationSearch(result: any, args: any): string {
       : [];
   const keywordText = keywords.length
     ? keywords.join(' / ')
-    : result?.query || args?.query || '（未指定）';
+    : result?.query || args?.query || t('toolResults.values.notSpecified');
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>关键词：</strong>${escapeHtml(keywordText)}</div>`;
-  html += `<div><strong>日期范围：</strong>${escapeHtml(result?.start_date || args?.start_date || '不限')} ~ ${escapeHtml(result?.end_date || args?.end_date || '不限')}</div>`;
-  html += '<div><strong>范围：</strong>当前工作区历史对话（已排除当前对话）</div>';
-  html += `<div><strong>结果数量：</strong>${results.length}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.keywords'))}</strong>${escapeHtml(keywordText)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.dateRange'))}</strong>${escapeHtml(result?.start_date || args?.start_date || t('toolResults.values.unlimited'))} ~ ${escapeHtml(result?.end_date || args?.end_date || t('toolResults.values.unlimited'))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.scope'))}</strong>${escapeHtml(t('toolResults.sentences.conversationScope'))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.resultCount'))}</strong>${results.length}</div>`;
   html += '</div>';
   if (!results.length) {
-    html += '<div class="tool-result-empty">未找到匹配对话。</div>';
+    html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noMatchesConversation'))}</div>`;
     return html;
   }
   html += '<div class="search-result-list">';
   results.forEach((item: any) => {
     html += '<div class="search-result-item">';
-    html += `<div class="search-result-title">${escapeHtml(item.title || '未命名对话')}</div>`;
-    html += `<div><strong>ID：</strong>${escapeHtml(item.id || '')}</div>`;
-    html += `<div><strong>规模：</strong>${escapeHtml(String(item.total_messages || 0))} 条消息，${escapeHtml(String(item.total_tools || 0))} 个工具</div>`;
+    html += `<div class="search-result-title">${escapeHtml(item.title || t('toolResults.values.unnamedConversation'))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.id'))}</strong>${escapeHtml(item.id || '')}</div>`;
+    html += `<div>${escapeHtml(t('toolResults.counts.conversationScale', { n: String(item.total_messages || 0), m: String(item.total_tools || 0) }))}</div>`;
     if (item.first_user_message) {
-      html += `<div><strong>首条用户消息：</strong>${escapeHtml(item.first_user_message)}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.firstUserMessage'))}</strong>${escapeHtml(item.first_user_message)}</div>`;
     }
     if (item.updated_at) {
-      html += `<div><strong>更新时间：</strong>${escapeHtml(item.updated_at)}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.updatedAt'))}</strong>${escapeHtml(item.updated_at)}</div>`;
     }
     html += '</div>';
   });
@@ -1125,30 +1144,33 @@ function renderConversationSearch(result: any, args: any): string {
 }
 
 function renderConversationReview(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, result?.mode === 'read' ? '✓ 已返回' : '✓ 已生成');
+  const status = formatToolStatusLabel(
+    result,
+    result?.mode === 'read' ? t('toolResults.status.returned') : t('toolResults.status.generated')
+  );
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>对话 ID：</strong>${escapeHtml(result?.conversation_id || args?.conversation_id || '')}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>模式：</strong>${escapeHtml(result?.mode || args?.mode || '')}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.conversationId'))}</strong>${escapeHtml(result?.conversation_id || args?.conversation_id || '')}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(result?.mode || args?.mode || '')}</div>`;
   if (result?.title) {
-    html += `<div><strong>标题：</strong>${escapeHtml(result.title)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.title'))}</strong>${escapeHtml(result.title)}</div>`;
   }
   if (result?.path) {
-    html += `<div><strong>回顾文件：</strong>${escapeHtml(result.path)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.reviewFile'))}</strong>${escapeHtml(result.path)}</div>`;
   }
   if (result?.char_count !== undefined) {
-    html += `<div><strong>字符数：</strong>${escapeHtml(String(result.char_count))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.charCount'))}</strong>${escapeHtml(String(result.char_count))}</div>`;
   }
   html += '</div>';
   if (!result?.success && result?.error) {
     html += `<div class="tool-result-error">${escapeHtml(result.error)}</div>`;
   }
   if (result?.too_long && result?.path) {
-    html += '<div class="tool-result-warning">内容太长，已保存到文件，请分段或查找阅读。</div>';
+    html += `<div class="tool-result-warning">${escapeHtml(t('toolResults.sentences.tooLongSaved'))}</div>`;
   }
   if (result?.content) {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">回顾内容：</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.reviewContent'))}</div>`;
     html += `<pre>${escapeHtml(result.content)}</pre>`;
     html += '</div>';
   }
@@ -1156,11 +1178,11 @@ function renderConversationReview(result: any, args: any): string {
 }
 
 function renderCreateSkill(result: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已归档');
+  const status = formatToolStatusLabel(result, t('toolResults.status.archived'));
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (result?.skill_name) {
-    html += `<div><strong>Skill：</strong>${escapeHtml(result.skill_name)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.skill'))}</strong>${escapeHtml(result.skill_name)}</div>`;
   }
   html += '</div>';
   if (!result?.success && result?.error) {
@@ -1174,7 +1196,7 @@ function renderCreateSkill(result: any): string {
 
 function renderListWorkflows(result: any, args: any): string {
   if (!result?.success) {
-    const error = result?.error ?? '查询失败';
+    const error = result?.error ?? t('toolResults.sentences.queryFailed');
     return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
   }
 
@@ -1182,7 +1204,7 @@ function renderListWorkflows(result: any, args: any): string {
   const detailName = String(args?.name || result?.workflow_name || '');
   if (detailName) {
     let html = '<div class="tool-result-meta">';
-    html += `<div><strong>工作流：</strong>${escapeHtml(detailName)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.workflow'))}</strong>${escapeHtml(detailName)}</div>`;
     html += '</div>';
     const doc = String(result?.message || '');
     if (doc) {
@@ -1196,21 +1218,21 @@ function renderListWorkflows(result: any, args: any): string {
   // 列表形态
   const items = Array.isArray(result?.workflows) ? result.workflows : [];
   if (items.length === 0) {
-    return '<div class="tool-result-empty">当前没有可用工作流。</div>';
+    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noWorkflows'))}</div>`;
   }
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>工作流数量：</strong>${items.length}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.workflowCount'))}</strong>${items.length}</div>`;
   html += '</div>';
   html += '<div class="search-result-list">';
   items.forEach((item: any) => {
-    const name = escapeHtml(String(item?.name || '未命名'));
-    const desc = escapeHtml(String(item?.description || '（无描述）'));
-    const source = item?.source === 'builtin' ? '内置' : '用户';
+    const name = escapeHtml(String(item?.name || t('toolResults.values.unnamed')));
+    const desc = escapeHtml(String(item?.description || t('toolResults.values.noDescription')));
+    const source = item?.source === 'builtin' ? t('toolResults.values.builtin') : t('toolResults.values.user');
     const nodeCount = Number(item?.nodeCount || 0);
     html += '<div class="search-result-item">';
     html += `<div class="search-result-title">${name}</div>`;
     html += `<div>${desc}</div>`;
-    html += `<div><strong>来源：</strong>${source} | <strong>节点：</strong>${nodeCount}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.source'))}</strong>${source} | <strong>${escapeHtml(t('toolResults.labels.nodeCount'))}</strong>${nodeCount}</div>`;
     html += '</div>';
   });
   html += '</div>';
@@ -1218,23 +1240,23 @@ function renderListWorkflows(result: any, args: any): string {
 }
 
 function renderSaveWorkflow(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已归档');
+  const status = formatToolStatusLabel(result, t('toolResults.status.archived'));
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   const sourceDir = String(args?.source_dir || '');
   if (sourceDir) {
-    html += `<div><strong>源目录：</strong>${escapeHtml(sourceDir)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.sourceDir'))}</strong>${escapeHtml(sourceDir)}</div>`;
   }
   if (result?.workflow_name) {
-    html += `<div><strong>工作流：</strong>${escapeHtml(String(result.workflow_name))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.workflow'))}</strong>${escapeHtml(String(result.workflow_name))}</div>`;
   }
   if (result?.success && typeof result?.node_count === 'number') {
-    html += `<div><strong>节点数：</strong>${result.node_count}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.nodeCountTotal'))}</strong>${result.node_count}</div>`;
   }
   if (result?.success && result?.overwritten) {
-    html += '<div><strong>模式：</strong>覆盖已有版本</div>';
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(t('toolResults.sentences.overwrittenVersion'))}</div>`;
   } else if (result?.success && result?.shadows_builtin) {
-    html += '<div><strong>模式：</strong>用户副本（遮蔽同名内置）</div>';
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(t('toolResults.sentences.userCopyShadow'))}</div>`;
   }
   html += '</div>';
   if (!result?.success && result?.error) {
@@ -1248,47 +1270,52 @@ function renderSaveWorkflow(result: any, args: any): string {
   return html;
 }
 
+// 个性化字段名 → i18n key（函数内 t() 按调用时求值）
+const personalizationFieldLabelKeys: Record<string, string> = {
+  self_identify: 'toolResults.personalization.fieldLabels.selfIdentify',
+  user_name: 'toolResults.personalization.fieldLabels.userName',
+  profession: 'toolResults.personalization.fieldLabels.profession',
+  tone: 'toolResults.personalization.fieldLabels.tone',
+  considerations: 'toolResults.personalization.fieldLabels.considerations',
+  theme: 'toolResults.personalization.fieldLabels.theme',
+  communication_style: 'toolResults.personalization.fieldLabels.communicationStyle',
+  conversation_continuity: 'toolResults.personalization.fieldLabels.conversationContinuity',
+  enabled: 'toolResults.personalization.fieldLabels.enabled',
+};
+
 function formatPersonalizationFieldLabel(field: string): string {
-  const labelMap: Record<string, string> = {
-    self_identify: 'AI 自称',
-    user_name: '用户称呼',
-    profession: '用户职业',
-    tone: '交流语气',
-    considerations: '注意事项',
-    theme: '主题',
-    communication_style: '交流风格',
-    conversation_continuity: '对话连续性',
-    enabled: '个性化开关'
-  };
-  return labelMap[field] || field;
+  const key = personalizationFieldLabelKeys[field];
+  return key ? t(key) : field;
 }
 
 function formatPersonalizationFieldValue(field: string, value: any): string {
   if (value === null || value === undefined || value === '') {
-    return '未设置';
+    return t('common.unset');
   }
   if (field === 'enabled') {
-    return value ? '开启' : '关闭';
+    return value
+      ? t('toolResults.personalization.values.enabled')
+      : t('toolResults.personalization.values.disabled');
   }
   if (field === 'considerations') {
     if (typeof value !== 'string' || value.trim() === '') {
-      return '未设置';
+      return t('common.unset');
     }
     return value.trim();
   }
   if (field === 'communication_style') {
     const styleMap: Record<string, string> = {
-      default: 'default（标准 AI 风格）',
-      human_like: 'human_like（拟人聊天风格）',
-      auto: 'auto（自动）'
+      default: t('toolResults.personalization.values.styleDefault'),
+      human_like: t('toolResults.personalization.values.styleHumanLike'),
+      auto: t('toolResults.personalization.values.styleAuto'),
     };
     return styleMap[String(value)] || String(value);
   }
   if (field === 'conversation_continuity') {
     const independenceMap: Record<string, string> = {
-      low: 'low（低）',
-      medium: 'medium（中）',
-      high: 'high（高）'
+      low: t('toolResults.personalization.values.independenceLow'),
+      medium: t('toolResults.personalization.values.independenceMedium'),
+      high: t('toolResults.personalization.values.independenceHigh'),
     };
     return independenceMap[String(value)] || String(value);
   }
@@ -1298,17 +1325,17 @@ function formatPersonalizationFieldValue(field: string, value: any): string {
 function renderAskUser(result: any, args: any): string {
   const question = args.question || result.question || '';
   const context = args.context || result.context || '';
-  const status = formatToolStatusLabel(result, '✓ 已回答');
+  const status = formatToolStatusLabel(result, t('toolResults.status.answered'));
   const answerText =
     result.status === 'answered' ? String(result.answer_text || result.message || '').trim() : '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${escapeHtml(status)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(status)}</div>`;
   if (question) {
-    html += `<div><strong>问题：</strong>${escapeHtml(String(question))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.question'))}</strong>${escapeHtml(String(question))}</div>`;
   }
   if (context) {
-    html += `<div><strong>说明：</strong>${escapeHtml(String(context))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.context'))}</strong>${escapeHtml(String(context))}</div>`;
   }
   html += '</div>';
 
@@ -1316,9 +1343,9 @@ function renderAskUser(result: any, args: any): string {
   if (options.length > 0) {
     html += '<div class="tool-result-content">';
     html += '<div class="tool-result-meta">';
-    html += '<div><strong>提供的选项：</strong></div>';
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.providedOptions'))}</strong></div>`;
     options.forEach((option: any, idx: number) => {
-      const label = String(option?.label || option?.id || `选项 ${idx + 1}`);
+      const label = String(option?.label || option?.id || t('toolResults.values.optionLabel', { n: idx + 1 }));
       const desc = String(option?.description || '').trim();
       html += `<div>${idx + 1}. ${escapeHtml(label)}${desc ? ` — ${escapeHtml(desc)}` : ''}</div>`;
     });
@@ -1339,7 +1366,7 @@ function renderAskUser(result: any, args: any): string {
           const value = line.slice(separator + 1);
           html += `<div><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`;
         } else {
-          html += `<div><strong>用户回答：</strong>${escapeHtml(line)}</div>`;
+          html += `<div><strong>${escapeHtml(t('toolResults.labels.userAnswer'))}</strong>${escapeHtml(line)}</div>`;
         }
       });
     html += '</div></div>';
@@ -1350,28 +1377,31 @@ function renderAskUser(result: any, args: any): string {
 
 function renderManagePersonalization(result: any, args: any): string {
   const action = String(args.action || result.action || 'read');
-  const status = formatToolStatusLabel(result, action === 'update' ? '✓ 已更新' : '✓ 已读取');
+  const status = formatToolStatusLabel(
+    result,
+    action === 'update' ? t('toolResults.status.updated') : t('toolResults.status.read')
+  );
   const field = String(result.updated_field || args.field || '');
   const newValue = result.updated_value ?? args.value;
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>操作：</strong>${escapeHtml(action === 'update' ? '更新配置' : '读取配置')}</div>`;
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.operation'))}</strong>${escapeHtml(action === 'update' ? t('toolResults.personalization.actionUpdate') : t('toolResults.personalization.actionRead'))}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
 
   if (!result?.success) {
     if (result?.error) {
-      html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
     }
     if (Array.isArray(result?.validation_errors) && result.validation_errors.length > 0) {
-      html += `<div><strong>校验：</strong>${escapeHtml(result.validation_errors.join('；'))}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.validation'))}</strong>${escapeHtml(result.validation_errors.join('；'))}</div>`;
     }
     html += '</div>';
     return html;
   }
 
   if (action === 'update' && field) {
-    html += `<div><strong>修改项：</strong>${escapeHtml(formatPersonalizationFieldLabel(field))}</div>`;
-    html += `<div><strong>修改后：</strong>${escapeHtml(formatPersonalizationFieldValue(field, newValue))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.updatedField'))}</strong>${escapeHtml(formatPersonalizationFieldLabel(field))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.updatedValue'))}</strong>${escapeHtml(formatPersonalizationFieldValue(field, newValue))}</div>`;
   }
 
   html += '</div>';
@@ -1380,14 +1410,14 @@ function renderManagePersonalization(result: any, args: any): string {
 
 // 待办事项类渲染函数
 function renderTodoCreate(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已创建');
+  const status = formatToolStatusLabel(result, t('toolResults.status.created'));
   const todoList = result.todo_list || {};
   const title = todoList.title || args.title || '';
   const tasks = todoList.tasks || args.tasks || [];
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>标题：</strong>${escapeHtml(title)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.title'))}</strong>${escapeHtml(title)}</div>`;
   html += '</div>';
 
   if (tasks.length > 0) {
@@ -1406,14 +1436,14 @@ function renderTodoCreate(result: any, args: any): string {
 }
 
 function renderTodoUpdate(result: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已更新');
+  const status = formatToolStatusLabel(result, t('toolResults.status.updated'));
   const todoList = result.todo_list || {};
   const title = todoList.title || '';
   const tasks = todoList.tasks || [];
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>标题：</strong>${escapeHtml(title)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.title'))}</strong>${escapeHtml(title)}</div>`;
   html += '</div>';
 
   if (tasks.length > 0) {
@@ -1436,13 +1466,13 @@ function renderTodoUpdate(result: any): string {
 
 // 彩蛋类渲染函数
 function renderEasterEgg(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已触发');
+  const status = formatToolStatusLabel(result, t('toolResults.status.triggered'));
   const type = result.type || args.type || '';
   const content = result.content || result.message || '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
-  html += `<div><strong>类型：</strong>${escapeHtml(type)}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.type'))}</strong>${escapeHtml(type)}</div>`;
   html += '</div>';
 
   if (content) {
@@ -1456,7 +1486,7 @@ function renderEasterEgg(result: any, args: any): string {
 
 // 子智能体类渲染函数
 function renderCreateSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已创建', '✗ 创建失败');
+  const status = formatToolStatusLabel(result, t('toolResults.status.created'), t('toolResults.status.createFailed'));
   const agentId = result.agent_id ?? args.agent_id ?? '';
   // 多智能体模式：只展示角色内编号显示名，全局 agent_id/task_id 不暴露
   const displayName = result.display_name ?? '';
@@ -1479,42 +1509,42 @@ function renderCreateSubAgent(result: any, args: any): string {
   const hasStats = runtimeSeconds > 0 || apiCalls > 0 || toolCount > 0;
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (displayName) {
-    html += `<div><strong>子智能体：</strong>${escapeHtml(String(displayName))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
   } else if (agentId !== '') {
-    html += `<div><strong>子智能体 ID：</strong>${escapeHtml(String(agentId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
   }
   if (taskId !== '' && !displayName) {
-    html += `<div><strong>任务 ID：</strong>${escapeHtml(String(taskId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
   }
   if (deliverablesDir !== '' && !displayName) {
-    html += `<div><strong>交付目录：</strong>${escapeHtml(String(deliverablesDir))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.deliverablesDir'))}</strong>${escapeHtml(String(deliverablesDir))}</div>`;
   }
   if (taskDescription) {
     const preview = String(taskDescription).slice(0, 200);
     const suffix = String(taskDescription).length > 200 ? '…' : '';
-    html += `<div><strong>任务：</strong>${escapeHtml(preview + suffix)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.task'))}</strong>${escapeHtml(preview + suffix)}</div>`;
   }
   html += '</div>';
 
   if (message || hasStats) {
     html += '<div class="tool-result-content scrollable">';
     if (hasStats) {
-      html += '<div class="content-label">执行统计</div>';
+      html += `<div class="content-label">${escapeHtml(t('toolResults.sectionLabels.executionStats'))}</div>`;
       if (runtimeSeconds > 0) {
-        html += `<div><strong>工作时间：</strong>${formatDuration(runtimeSeconds)}</div>`;
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.workTime'))}</strong>${formatDuration(runtimeSeconds)}</div>`;
       }
       if (apiCalls > 0) {
-        html += `<div><strong>调用次数：</strong>${apiCalls} 次</div>`;
+        html += `<div>${escapeHtml(t('toolResults.counts.apiCalls', { n: apiCalls }))}</div>`;
       }
       if (toolCount > 0) {
-        html += `<div><strong>工具次数：</strong>${toolCount} 次</div>`;
+        html += `<div>${escapeHtml(t('toolResults.counts.toolCalls', { n: toolCount }))}</div>`;
       }
     }
     if (message) {
       if (hasStats) {
-        html += '<div class="content-label">最终回复</div>';
+        html += `<div class="content-label">${escapeHtml(t('toolResults.sectionLabels.finalReply'))}</div>`;
       }
       html += `<div>${escapeHtml(String(message))}</div>`;
     }
@@ -1525,21 +1555,21 @@ function renderCreateSubAgent(result: any, args: any): string {
 }
 
 function renderTerminateSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已关闭', '✗ 关闭失败');
+  const status = formatToolStatusLabel(result, t('toolResults.status.closed'), t('toolResults.status.closeFailed'));
   const displayName = result.display_name ?? args.display_name ?? '';
   const agentId = result.agent_id ?? args.agent_id ?? '';
   const taskId = result.task_id ?? '';
   const message = result.message ?? result.system_message ?? '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (displayName) {
-    html += `<div><strong>子智能体：</strong>${escapeHtml(String(displayName))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
   } else if (agentId !== '') {
-    html += `<div><strong>子智能体 ID：</strong>${escapeHtml(String(agentId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
   }
   if (taskId !== '' && !displayName) {
-    html += `<div><strong>任务 ID：</strong>${escapeHtml(String(taskId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
   }
   html += '</div>';
 
@@ -1554,13 +1584,13 @@ function renderTerminateSubAgent(result: any, args: any): string {
 
 function renderGetSubAgentStatus(result: any): string {
   if (!result.success) {
-    const error = result.error ?? '查询失败';
+    const error = result.error ?? t('toolResults.sentences.queryFailed');
     return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
   }
 
   const results = Array.isArray(result.results) ? result.results : [];
   if (results.length === 0) {
-    return '<div class="tool-result-empty">未返回子智能体状态。</div>';
+    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noSubAgentStatus'))}</div>`;
   }
 
   let html = '<div class="sub-agent-status-list">';
@@ -1573,28 +1603,28 @@ function renderGetSubAgentStatus(result: any): string {
 
     html += '<div class="sub-agent-status-item">';
     const itemDisplayName = item.display_name || '';
-    const itemHeader = itemDisplayName || `子智能体 #${agentId}`;
+    const itemHeader = itemDisplayName || t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) });
     html += `<div class="sub-agent-status-header">${escapeHtml(String(itemHeader))}</div>`;
 
     if (!found) {
       html += '<div class="tool-result-meta">';
-      html += '<div><strong>状态：</strong>不存在</div>';
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.notFound'))}</div>`;
       html += '</div>';
     } else {
       html += '<div class="tool-result-meta">';
       if (status === 'completed') {
-        html += '<div><strong>状态：</strong>已完成</div>';
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.done'))}</div>`;
       } else if (status === 'terminated') {
-        html += '<div><strong>状态：</strong>已终止</div>';
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.terminated'))}</div>`;
       } else if (status === 'running') {
-        html += '<div><strong>状态：</strong>运行中</div>';
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('common.running'))}</div>`;
       } else if (status === 'pending') {
-        html += '<div><strong>状态：</strong>等待中</div>';
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.waiting'))}</div>`;
       } else {
-        html += `<div><strong>状态：</strong>${escapeHtml(status || '未知')}</div>`;
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(status || t('toolResults.values.unknown'))}</div>`;
       }
       if (taskId !== '' && !itemDisplayName) {
-        html += `<div><strong>任务 ID：</strong>${escapeHtml(String(taskId))}</div>`;
+        html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
       }
       html += '</div>';
 
@@ -1613,19 +1643,19 @@ function renderGetSubAgentStatus(result: any): string {
 }
 
 function renderSendMessageToSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已发送', '✗ 发送失败');
+  const status = formatToolStatusLabel(result, t('toolResults.status.sent'), t('toolResults.status.sendFailed'));
   const displayName = args.display_name ?? result.display_name ?? '';
   const agentId = args.agent_id ?? result.agent_id ?? '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (displayName) {
-    html += `<div><strong>子智能体：</strong>${escapeHtml(String(displayName))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
   } else if (agentId !== '') {
-    html += `<div><strong>子智能体 ID：</strong>${escapeHtml(String(agentId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
   }
   if (!result?.success && result?.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
@@ -1633,23 +1663,23 @@ function renderSendMessageToSubAgent(result: any, args: any): string {
 }
 
 function renderAnswerSubAgentQuestion(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, '✓ 已回复', '✗ 回复失败');
+  const status = formatToolStatusLabel(result, t('toolResults.status.replied'), t('toolResults.status.replyFailed'));
   const questionId = args.question_id ?? result.question_id ?? '';
   const answer = args.answer ?? '';
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (questionId) {
-    html += `<div><strong>问题 ID：</strong>${escapeHtml(String(questionId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.questionId'))}</strong>${escapeHtml(String(questionId))}</div>`;
   }
   if (!result?.success && result?.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
   if (answer && typeof answer === 'string') {
     html += '<div class="tool-result-content scrollable">';
-    html += '<div class="content-label">回复内容</div>';
+    html += `<div class="content-label">${escapeHtml(t('toolResults.sectionLabels.replyContent'))}</div>`;
     const preview = String(answer).slice(0, 500);
     const suffix = String(answer).length > 500 ? '…' : '';
     html += `<pre>${escapeHtml(preview + suffix)}</pre>`;
@@ -1662,21 +1692,23 @@ function renderAnswerSubAgentQuestion(result: any, args: any): string {
 function renderCreateCustomAgent(result: any, args: any): string {
   const overwritten = !!result?.overwritten;
   const status = result?.success
-    ? (overwritten ? '✓ 已覆盖更新' : '✓ 已创建')
-    : '✗ 创建失败';
+    ? overwritten
+      ? t('toolResults.status.overwrittenUpdated')
+      : t('toolResults.status.created')
+    : t('toolResults.status.createFailed');
   const roleId = args.role_id ?? result.role_id ?? '';
   const name = args.name ?? result.name ?? roleId;
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>状态：</strong>${status}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   if (roleId !== '') {
-    html += `<div><strong>角色 ID：</strong>${escapeHtml(String(roleId))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.roleId'))}</strong>${escapeHtml(String(roleId))}</div>`;
   }
   if (name && name !== roleId) {
-    html += `<div><strong>角色名：</strong>${escapeHtml(String(name))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.roleName'))}</strong>${escapeHtml(String(name))}</div>`;
   }
   if (!result?.success && result?.error) {
-    html += `<div><strong>错误：</strong>${escapeHtml(String(result.error))}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
 
@@ -1685,33 +1717,33 @@ function renderCreateCustomAgent(result: any, args: any): string {
 
 function renderListAgents(result: any): string {
   if (!result?.success) {
-    const error = result?.error ?? '查询失败';
+    const error = result?.error ?? t('toolResults.sentences.queryFailed');
     return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
   }
 
   const roles = Array.isArray(result.roles) ? result.roles : [];
   if (roles.length === 0) {
-    return '<div class="tool-result-empty">当前没有可用角色。</div>';
+    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noRoles'))}</div>`;
   }
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>角色数量：</strong>${roles.length}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.roleCount'))}</strong>${roles.length}</div>`;
   html += '</div>';
 
   html += '<div class="search-result-list">';
   roles.forEach((role: any) => {
-    const roleId = role.role_id || '未知';
+    const roleId = role.role_id || t('toolResults.values.unknown');
     const name = role.name || roleId;
     const description = role.description || '';
     const thinkingMode = role.thinking_mode || 'fast';
-    const isCustom = role.is_custom ? '是' : '否';
+    const isCustom = role.is_custom ? t('toolResults.values.yes') : t('toolResults.values.no');
 
     html += '<div class="search-result-item">';
     html += `<div class="search-result-title">${escapeHtml(roleId)} — ${escapeHtml(name)}</div>`;
     if (description) {
       html += `<div>${escapeHtml(description)}</div>`;
     }
-    html += `<div><strong>思考模式：</strong>${escapeHtml(thinkingMode)} | <strong>自定义：</strong>${escapeHtml(isCustom)}</div>`;
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.thinkingMode'))}</strong>${escapeHtml(thinkingMode)} | <strong>${escapeHtml(t('toolResults.labels.custom'))}</strong>${escapeHtml(isCustom)}</div>`;
     html += '</div>';
   });
   html += '</div>';
@@ -1721,17 +1753,17 @@ function renderListAgents(result: any): string {
 
 function renderListActiveSubAgents(result: any): string {
   if (!result?.success) {
-    const error = result?.error ?? '查询失败';
+    const error = result?.error ?? t('toolResults.sentences.queryFailed');
     return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
   }
 
   const agents = Array.isArray(result.agents) ? result.agents : [];
   if (agents.length === 0) {
-    return '<div class="tool-result-empty">当前会话没有活跃子智能体。</div>';
+    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noActiveSubAgents'))}</div>`;
   }
 
   let html = '<div class="tool-result-meta">';
-  html += `<div><strong>活跃数量：</strong>${agents.length}</div>`;
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.activeCount'))}</strong>${agents.length}</div>`;
   html += '</div>';
 
   html += '<div class="sub-agent-status-list">';
@@ -1747,12 +1779,12 @@ function renderListActiveSubAgents(result: any): string {
     html += `<div class="sub-agent-status-header">${escapeHtml(displayName)} [${escapeHtml(status)}]</div>`;
     html += '<div class="tool-result-meta">';
     if (summary) {
-      html += `<div><strong>任务：</strong>${escapeHtml(String(summary))}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.task'))}</strong>${escapeHtml(String(summary))}</div>`;
     }
     if (lastOutput) {
       const preview = String(lastOutput).slice(0, 120);
       const suffix = String(lastOutput).length > 120 ? '…' : '';
-      html += `<div><strong>最近输出：</strong>${escapeHtml(preview + suffix)}</div>`;
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.lastOutput'))}</strong>${escapeHtml(preview + suffix)}</div>`;
     }
     html += '</div>';
     html += '</div>';

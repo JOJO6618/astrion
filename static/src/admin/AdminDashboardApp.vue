@@ -1,7 +1,7 @@
 <template>
   <div v-if="isInitialLoading" class="admin-loading">
     <div class="spinner" />
-    <p>正在加载监控数据...</p>
+    <p>{{ $t('adminDashboard.loadingMonitor') }}</p>
   </div>
   <div v-else class="admin-page">
     <SecondaryGate
@@ -9,27 +9,29 @@
       :configured="secondaryConfigured"
       :loading="secondaryLoading"
       :error="secondaryError"
-      description="为保护敏感监控数据，需二级校验后查看。"
+      :description="$t('adminDashboard.gateDescription')"
       @verify="handleVerifySecondary"
       @recheck="checkSecondary"
     />
     <header class="admin-header">
       <div>
-        <h1>管理员监控面板</h1>
-        <p>最近更新：{{ timeAgo(snapshot?.generated_at || overview.generated_at) }}</p>
+        <h1>{{ $t('adminDashboard.title') }}</h1>
+        <p>
+          {{ $t('adminDashboard.lastUpdated', { time: timeAgo(snapshot?.generated_at || overview.generated_at) }) }}
+        </p>
       </div>
       <div class="header-actions">
-        <label> <input type="checkbox" v-model="autoRefresh" /> 自动刷新 </label>
+        <label> <input type="checkbox" v-model="autoRefresh" /> {{ $t('adminDashboard.autoRefresh') }} </label>
         <button type="button" :disabled="refreshing" @click="handleManualRefresh">
-          {{ refreshing ? '刷新中...' : '立即刷新' }}
+          {{ refreshing ? $t('common.refreshing') : $t('adminDashboard.refreshNow') }}
         </button>
-        <a class="link-btn" href="/admin/policy" target="_blank" rel="noopener">策略配置</a>
-        <a class="link-btn" href="/admin/api" target="_blank" rel="noopener">API 管理</a>
+        <a class="link-btn" href="/admin/policy" target="_blank" rel="noopener">{{ $t('adminDashboard.policyConfig') }}</a>
+        <a class="link-btn" href="/admin/api" target="_blank" rel="noopener">{{ $t('adminDashboard.apiAdmin') }}</a>
       </div>
     </header>
 
     <section v-if="bannerError" class="banner-error">
-      <strong>刷新失败：</strong>
+      <strong>{{ $t('adminDashboard.refreshFailed') }}</strong>
       <span>{{ bannerError }}</span>
     </section>
 
@@ -57,40 +59,40 @@
             </div>
           </section>
           <section v-else-if="activeSection === 'usage'" key="usage" class="panel">
-            <h2>模型配额与趋势</h2>
+            <h2>{{ $t('adminDashboard.usageTitle') }}</h2>
             <div class="stats-row">
-              <span>快速模式：{{ usageTotals.fast || 0 }}</span>
-              <span>思考模式：{{ usageTotals.thinking || 0 }}</span>
-              <span>搜索：{{ usageTotals.search || 0 }}</span>
+              <span>{{ $t('adminDashboard.fastMode', { count: usageTotals.fast || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.thinkingMode', { count: usageTotals.thinking || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.searchMode', { count: usageTotals.search || 0 }) }}</span>
             </div>
             <div class="token-summary">
               <div class="token-card">
-                <p>累计输入 Token</p>
+                <p>{{ $t('adminDashboard.totalInputTokens') }}</p>
                 <strong>{{ formatNumber(tokenTotals.input_tokens) }}</strong>
               </div>
               <div class="token-card">
-                <p>累计输出 Token</p>
+                <p>{{ $t('adminDashboard.totalOutputTokens') }}</p>
                 <strong>{{ formatNumber(tokenTotals.output_tokens) }}</strong>
               </div>
               <div class="token-card">
-                <p>总计 Token</p>
+                <p>{{ $t('adminDashboard.totalTokens') }}</p>
                 <strong>{{ formatNumber(tokenTotals.total_tokens) }}</strong>
               </div>
             </div>
             <div class="token-breakdown">
               <div class="token-breakdown-header">
-                <h3>按用户累计 Token</h3>
-                <span>实时拉取 · 按总量降序</span>
+                <h3>{{ $t('adminDashboard.tokenBreakdownTitle') }}</h3>
+                <span>{{ $t('adminDashboard.tokenBreakdownSub') }}</span>
               </div>
               <div class="token-table-wrapper" v-if="tokenBreakdown.length">
                 <table class="token-table">
                   <thead>
                     <tr>
-                      <th>用户</th>
-                      <th>角色</th>
-                      <th>输入 Token</th>
-                      <th>输出 Token</th>
-                      <th>累计 Token</th>
+                      <th>{{ $t('adminDashboard.tableUser') }}</th>
+                      <th>{{ $t('adminDashboard.tableRole') }}</th>
+                      <th>{{ $t('adminDashboard.tableInputTokens') }}</th>
+                      <th>{{ $t('adminDashboard.tableOutputTokens') }}</th>
+                      <th>{{ $t('adminDashboard.tableTotalTokens') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -106,13 +108,13 @@
                   </tbody>
                 </table>
               </div>
-              <p class="token-empty" v-else>暂无 token 统计数据</p>
+              <p class="token-empty" v-else>{{ $t('adminDashboard.noTokenStats') }}</p>
             </div>
             <div class="usage-leaders">
               <div v-for="block in leaderBlocks" :key="block.key" class="leader-card">
                 <h3>{{ block.label }}</h3>
                 <ul>
-                  <li v-if="!block.items.length" class="muted">暂无数据</li>
+                  <li v-if="!block.items.length" class="muted">{{ $t('common.noData') }}</li>
                   <li v-for="item in block.items" :key="item.username">
                     <strong>{{ item.username }}</strong>
                     <span>{{ item.count }} / {{ item.limit ?? '∞' }}</span>
@@ -122,25 +124,25 @@
             </div>
           </section>
           <section v-else-if="activeSection === 'users'" key="users" class="panel">
-            <h2>用户与配额</h2>
+            <h2>{{ $t('adminDashboard.usersTitle') }}</h2>
             <div class="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>用户</th>
-                    <th>角色</th>
-                    <th>状态</th>
-                    <th>项目占用</th>
+                    <th>{{ $t('adminDashboard.tableUser') }}</th>
+                    <th>{{ $t('adminDashboard.tableRole') }}</th>
+                    <th>{{ $t('adminDashboard.tableStatus') }}</th>
+                    <th>{{ $t('adminDashboard.tableProjectUsage') }}</th>
                     <th>Fast</th>
                     <th>Thinking</th>
                     <th>Search</th>
-                    <th>项目体积</th>
-                    <th>最近活跃</th>
+                    <th>{{ $t('adminDashboard.tableProjectSize') }}</th>
+                    <th>{{ $t('adminDashboard.tableLastActive') }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!users.length">
-                    <td colspan="9">暂无用户</td>
+                    <td colspan="9">{{ $t('adminDashboard.emptyUsers') }}</td>
                   </tr>
                   <tr v-for="user in users" :key="user.username">
                     <td>
@@ -150,7 +152,7 @@
                     <td>{{ user.role || 'user' }}</td>
                     <td>
                       <span :class="['status-badge', user.status?.online ? 'online' : 'offline']">
-                        {{ user.status?.online ? '在线' : '离线' }}
+                        {{ user.status?.online ? $t('adminDashboard.online') : $t('adminDashboard.offline') }}
                       </span>
                     </td>
                     <td>
@@ -172,26 +174,26 @@
             </div>
           </section>
           <section v-else-if="activeSection === 'containers'" key="containers" class="panel">
-            <h2>容器运行状态</h2>
+            <h2>{{ $t('adminDashboard.containersTitle') }}</h2>
             <div class="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>用户</th>
-                    <th>模式</th>
-                    <th>容器名</th>
-                    <th>CPU</th>
-                    <th>内存%</th>
-                    <th>内存使用</th>
-                    <th>内存上限</th>
-                    <th>网络 RX/TX</th>
-                    <th>状态</th>
-                    <th>最近活跃</th>
+                    <th>{{ $t('adminDashboard.tableUser') }}</th>
+                    <th>{{ $t('adminDashboard.tableMode') }}</th>
+                    <th>{{ $t('adminDashboard.tableContainerName') }}</th>
+                    <th>{{ $t('adminDashboard.tableCpu') }}</th>
+                    <th>{{ $t('adminDashboard.tableMemPercent') }}</th>
+                    <th>{{ $t('adminDashboard.tableMemUsage') }}</th>
+                    <th>{{ $t('adminDashboard.tableMemLimit') }}</th>
+                    <th>{{ $t('adminDashboard.tableNetIo') }}</th>
+                    <th>{{ $t('adminDashboard.tableStatus') }}</th>
+                    <th>{{ $t('adminDashboard.tableLastActive') }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!containers.length">
-                    <td colspan="10">暂无容器运行</td>
+                    <td colspan="10">{{ $t('adminDashboard.emptyContainers') }}</td>
                   </tr>
                   <tr v-for="item in containers" :key="item.username">
                     <td>{{ item.username }}</td>
@@ -207,7 +209,7 @@
                     </td>
                     <td>
                       <span :class="['status-badge', containerStatusClass(item)]">
-                        {{ item.state?.status || (item.state?.running ? '运行中' : '未知') }}
+                        {{ item.state?.status || (item.state?.running ? $t('common.running') : $t('adminDashboard.unknown')) }}
                       </span>
                     </td>
                     <td>{{ timeAgo(item.last_active) }}</td>
@@ -217,34 +219,34 @@
             </div>
           </section>
           <section v-else-if="activeSection === 'uploads'" key="uploads" class="panel">
-            <h2>上传安全审计</h2>
+            <h2>{{ $t('adminDashboard.uploadsTitle') }}</h2>
             <div class="stats-row">
-              <span>最近24小时：{{ uploadStats.last_24h || 0 }}</span>
-              <span>阻断：{{ uploadStats.blocked_last_24h || 0 }}</span>
-              <span>跳过扫描：{{ uploadStats.skipped_scan_last_24h || 0 }}</span>
-              <span>隔离区占用：{{ formatBytes(uploadStats.quarantine_bytes) }}</span>
+              <span>{{ $t('adminDashboard.last24h', { count: uploadStats.last_24h || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.blocked', { count: uploadStats.blocked_last_24h || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.skippedScan', { count: uploadStats.skipped_scan_last_24h || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.quarantineUsage', { size: formatBytes(uploadStats.quarantine_bytes) }) }}</span>
             </div>
             <div class="stats-row">
-              <span v-if="!uploadSources.length">暂无来源统计</span>
+              <span v-if="!uploadSources.length">{{ $t('adminDashboard.noSourceStats') }}</span>
               <span v-for="source in uploadSources" :key="source.source">
                 {{ source.source }}：{{ source.count }}
               </span>
             </div>
             <ul class="upload-feed">
-              <li v-if="!recentUploads.length" class="upload-item">暂无近期上传</li>
+              <li v-if="!recentUploads.length" class="upload-item">{{ $t('adminDashboard.noRecentUploads') }}</li>
               <li v-for="upload in recentUploads" :key="upload.upload_id" class="upload-item">
                 <div>
-                  <strong>{{ upload.original_name || '未命名文件' }}</strong>
+                  <strong>{{ upload.original_name || $t('adminDashboard.unnamedFile') }}</strong>
                   <div class="upload-meta">
-                    <span>用户：{{ upload.username }}</span>
-                    <span>来源：{{ upload.source || 'unknown' }}</span>
-                    <span>大小：{{ formatBytes(upload.size) }}</span>
+                    <span>{{ $t('adminDashboard.uploadUser', { name: upload.username }) }}</span>
+                    <span>{{ $t('adminDashboard.uploadSource', { name: upload.source || 'unknown' }) }}</span>
+                    <span>{{ $t('adminDashboard.uploadSize', { size: formatBytes(upload.size) }) }}</span>
                   </div>
                 </div>
                 <div class="upload-meta">
                   <span>{{ timeAgo(upload.timestamp) }}</span>
                   <span :class="['status-badge', upload.accepted ? 'online' : 'danger']">
-                    {{ upload.accepted ? '通过' : '阻断' }}
+                    {{ upload.accepted ? $t('adminDashboard.accepted') : $t('adminDashboard.blockedBadge') }}
                   </span>
                   <span v-if="upload.error?.message" class="status-badge danger">{{
                     upload.error.message
@@ -254,19 +256,19 @@
             </ul>
           </section>
           <section v-else-if="activeSection === 'invites'" key="invites" class="panel">
-            <h2>邀请码</h2>
+            <h2>{{ $t('adminDashboard.invitesTitle') }}</h2>
             <div class="stats-row">
-              <span>总计：{{ inviteSummary.total || 0 }}</span>
-              <span>可用：{{ inviteSummary.active || 0 }}</span>
-              <span>已用：{{ inviteSummary.consumed || 0 }}</span>
-              <span>无限制：{{ inviteSummary.unlimited || 0 }}</span>
+              <span>{{ $t('adminDashboard.inviteTotal', { count: inviteSummary.total || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.inviteActive', { count: inviteSummary.active || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.inviteConsumed', { count: inviteSummary.consumed || 0 }) }}</span>
+              <span>{{ $t('adminDashboard.inviteUnlimited', { count: inviteSummary.unlimited || 0 }) }}</span>
             </div>
             <div class="invite-manage">
               <input
                 v-model.trim="newInviteCode"
                 class="invite-input"
                 type="text"
-                placeholder="新邀请码"
+                :placeholder="$t('adminDashboard.newInvitePlaceholder')"
                 :disabled="inviteSubmitting"
               />
               <input
@@ -274,20 +276,20 @@
                 class="invite-input short"
                 type="number"
                 min="0"
-                placeholder="剩余次数"
+                :placeholder="$t('adminDashboard.remainingPlaceholder')"
                 :disabled="inviteSubmitting || newInviteUnlimited"
               />
               <label class="invite-check">
                 <input type="checkbox" v-model="newInviteUnlimited" :disabled="inviteSubmitting" />
-                不限次数
+                {{ $t('adminDashboard.unlimitedLabel') }}
               </label>
               <button type="button" :disabled="inviteSubmitting" @click="createInvite">
-                {{ inviteSubmitting ? '处理中...' : '新增邀请码' }}
+                {{ inviteSubmitting ? $t('adminDashboard.processing') : $t('adminDashboard.addInvite') }}
               </button>
             </div>
             <p v-if="inviteError" class="secondary-error">{{ inviteError }}</p>
             <div class="invite-grid">
-              <div v-if="!inviteCodes.length" class="invite-card">暂无邀请码数据</div>
+              <div v-if="!inviteCodes.length" class="invite-card">{{ $t('adminDashboard.noInviteData') }}</div>
               <div v-for="code in inviteCodes" :key="code.code" class="invite-card">
                 <h4>{{ code.code }}</h4>
                 <span>{{ inviteStatus(code.remaining) }}</span>
@@ -298,7 +300,7 @@
                     :disabled="inviteSubmitting"
                     @click="editInvite(code)"
                   >
-                    调整次数
+                    {{ $t('adminDashboard.adjustRemaining') }}
                   </button>
                   <button
                     type="button"
@@ -306,19 +308,19 @@
                     :disabled="inviteSubmitting"
                     @click="removeInvite(code.code)"
                   >
-                    删除
+                    {{ $t('common.delete') }}
                   </button>
                 </div>
               </div>
             </div>
           </section>
           <section v-else-if="activeSection === 'passwords'" key="passwords" class="panel">
-            <h2>密码管理</h2>
-            <p class="muted">管理员可重置任意用户的登录密码（包括自己）。</p>
+            <h2>{{ $t('adminDashboard.passwordManagement') }}</h2>
+            <p class="muted">{{ $t('adminDashboard.passwordHint') }}</p>
 
             <div class="password-form">
               <div class="password-field">
-                <label>选择用户</label>
+                <label>{{ $t('adminDashboard.selectUser') }}</label>
                 <div class="user-search-wrapper" ref="userSearchRef">
                   <div
                     class="user-search-trigger"
@@ -329,7 +331,7 @@
                       <strong>{{ passwordTargetUser }}</strong>
                       <span class="user-search-email">{{ selectedUserEmail }}</span>
                     </span>
-                    <span v-else class="user-search-placeholder">搜索用户名或邮箱...</span>
+                    <span v-else class="user-search-placeholder">{{ $t('adminDashboard.userSearchPlaceholder') }}</span>
                     <span class="user-search-arrow">▾</span>
                   </div>
                   <div v-if="passwordDropdownOpen" class="user-search-dropdown">
@@ -338,7 +340,7 @@
                       class="user-search-input"
                       type="text"
                       v-model="passwordSearchQuery"
-                      placeholder="输入关键词筛选..."
+                      :placeholder="$t('adminDashboard.filterPlaceholder')"
                       @keydown.escape="passwordDropdownOpen = false"
                     />
                     <div class="user-search-list">
@@ -351,23 +353,23 @@
                       >
                         <span class="user-search-name">{{ user.username }}</span>
                         <span class="user-search-email">{{ user.email || '—' }}</span>
-                        <span v-if="user.role === 'admin'" class="user-search-role">管理员</span>
+                        <span v-if="user.role === 'admin'" class="user-search-role">{{ $t('adminDashboard.adminRole') }}</span>
                       </div>
                       <div v-if="!filteredUsers.length" class="user-search-empty">
-                        无匹配用户
+                        {{ $t('adminDashboard.noMatchingUsers') }}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="password-field">
-                <label>新密码（至少 8 位）</label>
+                <label>{{ $t('adminDashboard.newPasswordLabel') }}</label>
                 <input
                   class="password-input"
                   type="password"
                   v-model="passwordNewValue"
                   :disabled="passwordSubmitting"
-                  placeholder="输入新密码"
+                  :placeholder="$t('adminDashboard.newPasswordPlaceholder')"
                   @keyup.enter="handleResetPassword"
                 />
               </div>
@@ -377,7 +379,7 @@
                   :disabled="!passwordTargetUser || !passwordNewValue || passwordSubmitting"
                   @click="handleResetPassword"
                 >
-                  {{ passwordSubmitting ? '重置中...' : '重置密码' }}
+                  {{ passwordSubmitting ? $t('adminDashboard.resetting') : $t('adminDashboard.resetPassword') }}
                 </button>
                 <button
                   type="button"
@@ -385,7 +387,7 @@
                   :disabled="passwordSubmitting"
                   @click="passwordTargetUser = ''; passwordNewValue = ''; passwordResult = ''; passwordError = ''"
                 >
-                  清空
+                  {{ $t('adminDashboard.clear') }}
                 </button>
               </div>
               <p v-if="passwordResult" class="password-success">{{ passwordResult }}</p>
@@ -397,15 +399,16 @@
     </div>
 
     <div v-else class="admin-error">
-      <strong>加载失败</strong>
-      <p>{{ errorMessage || '无法加载监控数据' }}</p>
-      <button type="button" @click="handleRetry">重试</button>
+      <strong>{{ $t('common.loadFailed') }}</strong>
+      <p>{{ errorMessage || $t('adminDashboard.cannotLoadData') }}</p>
+      <button type="button" @click="handleRetry">{{ $t('common.retry') }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { t } from '@/locales';
 import { useSecondaryPass } from './useSecondaryPass';
 import SecondaryGate from './SecondaryGate.vue';
 
@@ -446,13 +449,13 @@ const userSearchRef = ref<HTMLElement | null>(null);
 const passwordSearchInputRef = ref<HTMLInputElement | null>(null);
 
 const sectionTabs: Array<{ id: SectionId; label: string }> = [
-  { id: 'overview', label: '系统总览' },
-  { id: 'usage', label: '配额趋势' },
-  { id: 'users', label: '用户' },
-  { id: 'containers', label: '容器' },
-  { id: 'uploads', label: '上传审计' },
-  { id: 'invites', label: '邀请码' },
-  { id: 'passwords', label: '密码管理' }
+  { id: 'overview', label: t('adminDashboard.tabOverview') },
+  { id: 'usage', label: t('adminDashboard.tabUsage') },
+  { id: 'users', label: t('adminDashboard.tabUsers') },
+  { id: 'containers', label: t('adminDashboard.tabContainers') },
+  { id: 'uploads', label: t('adminDashboard.tabUploads') },
+  { id: 'invites', label: t('adminDashboard.tabInvites') },
+  { id: 'passwords', label: t('adminDashboard.passwordManagement') }
 ];
 
 const isInitialLoading = computed(() => loading.value && !snapshot.value);
@@ -470,11 +473,11 @@ const fetchDashboard = async (background = false) => {
   try {
     const resp = await fetch('/api/admin/dashboard', { credentials: 'same-origin' });
     if (!resp.ok) {
-      throw new Error(`请求失败：${resp.status}`);
+      throw new Error(t('adminDashboard.requestFailed', { status: resp.status }));
     }
     const payload = await resp.json();
     if (!payload.success) {
-      throw new Error(payload.error || '未知错误');
+      throw new Error(payload.error || t('common.unknownError'));
     }
     // 额外调试：若后台返回 debug 字段，打印到控制台便于问题定位（仅开发模式会看到）
     if (import.meta.env.DEV && payload.data?.debug) {
@@ -516,12 +519,12 @@ const handleRetry = () => fetchDashboard(false);
 const fetchCsrfToken = async (): Promise<string> => {
   const resp = await fetch('/api/csrf-token', { credentials: 'same-origin' });
   if (!resp.ok) {
-    throw new Error(`获取 CSRF Token 失败：${resp.status}`);
+    throw new Error(t('adminDashboard.csrfFailed', { status: resp.status }));
   }
   const payload = await resp.json();
   const token = payload?.token;
   if (!token || typeof token !== 'string') {
-    throw new Error('获取 CSRF Token 失败：响应无 token');
+    throw new Error(t('adminDashboard.csrfNoToken'));
   }
   return token;
 };
@@ -535,14 +538,14 @@ const parseInviteRemaining = (raw: unknown): number | null => {
     text === 'unlimited' ||
     text === 'null' ||
     text === 'none' ||
-    text === '不限' ||
-    text === '无限制'
+    text === '\u4e0d\u9650' ||
+    text === '\u65e0\u9650\u5236'
   ) {
     return null;
   }
   const parsed = Number(text);
   if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
-    throw new Error('剩余次数必须是大于等于 0 的整数，或留空表示不限次数');
+    throw new Error(t('adminDashboard.remainingInvalid'));
   }
   return parsed;
 };
@@ -550,7 +553,7 @@ const parseInviteRemaining = (raw: unknown): number | null => {
 const createInvite = async () => {
   const code = newInviteCode.value.trim();
   if (!code) {
-    inviteError.value = '请输入邀请码';
+    inviteError.value = t('adminDashboard.inviteCodeRequired');
     return;
   }
   inviteSubmitting.value = true;
@@ -571,7 +574,7 @@ const createInvite = async () => {
     });
     const payload = await resp.json();
     if (!resp.ok || !payload.success) {
-      throw new Error(payload.error || `请求失败：${resp.status}`);
+      throw new Error(payload.error || t('adminDashboard.requestFailed', { status: resp.status }));
     }
     newInviteCode.value = '';
     newInviteRemaining.value = '1';
@@ -589,7 +592,7 @@ const handleResetPassword = async () => {
   const password = passwordNewValue.value.trim();
   if (!username || !password) return;
   if (password.length < 8) {
-    passwordError.value = '密码长度至少 8 位';
+    passwordError.value = t('adminDashboard.passwordTooShort');
     passwordResult.value = '';
     return;
   }
@@ -609,9 +612,9 @@ const handleResetPassword = async () => {
     });
     const payload = await resp.json();
     if (!resp.ok || !payload.success) {
-      throw new Error(payload.error || `请求失败：${resp.status}`);
+      throw new Error(payload.error || t('adminDashboard.requestFailed', { status: resp.status }));
     }
-    passwordResult.value = `用户 ${username} 的密码已成功重置`;
+    passwordResult.value = t('adminDashboard.passwordResetSuccess', { username });
     passwordNewValue.value = '';
   } catch (error) {
     passwordError.value = error instanceof Error ? error.message : String(error);
@@ -661,7 +664,7 @@ const handleClickOutside = (event: MouseEvent) => {
 const editInvite = async (item: any) => {
   const current = item?.remaining;
   const seed = current === null || typeof current === 'undefined' ? 'unlimited' : String(current);
-  const value = window.prompt('请输入新的剩余次数（留空或输入 unlimited 表示不限次数）', seed);
+  const value = window.prompt(t('adminDashboard.promptRemaining'), seed);
   if (value === null) return;
   inviteSubmitting.value = true;
   inviteError.value = null;
@@ -679,7 +682,7 @@ const editInvite = async (item: any) => {
     });
     const payload = await resp.json();
     if (!resp.ok || !payload.success) {
-      throw new Error(payload.error || `请求失败：${resp.status}`);
+      throw new Error(payload.error || t('adminDashboard.requestFailed', { status: resp.status }));
     }
     await fetchDashboard(true);
   } catch (error) {
@@ -691,7 +694,7 @@ const editInvite = async (item: any) => {
 
 const removeInvite = async (code: string) => {
   if (!code) return;
-  if (!window.confirm(`确认删除邀请码 ${code}？`)) return;
+  if (!window.confirm(t('adminDashboard.deleteInviteConfirm', { code }))) return;
   inviteSubmitting.value = true;
   inviteError.value = null;
   try {
@@ -707,7 +710,7 @@ const removeInvite = async (code: string) => {
     });
     const payload = await resp.json();
     if (!resp.ok || !payload.success) {
-      throw new Error(payload.error || `请求失败：${resp.status}`);
+      throw new Error(payload.error || t('adminDashboard.requestFailed', { status: resp.status }));
     }
     await fetchDashboard(true);
   } catch (error) {
@@ -765,9 +768,9 @@ const tokenTotals = computed(() => overview.value.token_totals ?? {});
 const leaderBlocks = computed(() => {
   const leaders = overview.value.usage_leaders ?? {};
   return [
-    { key: 'fast', label: '快速模式 TOP', items: leaders.fast || [] },
-    { key: 'thinking', label: '思考模式 TOP', items: leaders.thinking || [] },
-    { key: 'search', label: '搜索调用 TOP', items: leaders.search || [] }
+    { key: 'fast', label: t('adminDashboard.leaderFast'), items: leaders.fast || [] },
+    { key: 'thinking', label: t('adminDashboard.leaderThinking'), items: leaders.thinking || [] },
+    { key: 'search', label: t('adminDashboard.leaderSearch'), items: leaders.search || [] }
   ];
 });
 const storage = computed(() => overview.value.storage ?? {});
@@ -794,45 +797,48 @@ const tokenBreakdown = computed(() => {
 
 const metricCards = computed(() => [
   {
-    title: '注册用户',
+    title: t('adminDashboard.metricRegisteredUsers'),
     value: totals.value.users || 0,
-    sub: `${totals.value.active_users || 0} 个活跃`
+    sub: t('adminDashboard.metricActiveUsers', { count: totals.value.active_users || 0 })
   },
   {
-    title: '容器使用',
+    title: t('adminDashboard.metricContainerUsage'),
     value: `${containerSummary.value.active || 0}/${containerSummary.value.max_containers ?? '∞'}`,
     sub:
       containerSummary.value.available_slots === null ||
       containerSummary.value.available_slots === undefined
-        ? '无限制'
-        : `${containerSummary.value.available_slots} 个空闲`
+        ? t('adminDashboard.unlimited')
+        : t('adminDashboard.freeSlots', { count: containerSummary.value.available_slots })
   },
   {
-    title: '资源告警',
+    title: t('adminDashboard.metricStorageWarnings'),
     value: (storage.value.warning_users || []).length,
-    sub: '达到预警阈值的工作区'
+    sub: t('adminDashboard.storageWarningSub')
   },
   {
-    title: '上传审计 (24h)',
+    title: t('adminDashboard.metricUploadAudit'),
     value: uploadStats.value.last_24h || 0,
-    sub: `${uploadStats.value.blocked_last_24h || 0} 条被阻断`
+    sub: t('adminDashboard.blockedCount', { count: uploadStats.value.blocked_last_24h || 0 })
   },
   {
-    title: '配额调用 (fast / thinking / search)',
+    title: t('adminDashboard.metricQuotaCalls'),
     value: `${usageTotals.value.fast || 0} / ${usageTotals.value.thinking || 0} / ${usageTotals.value.search || 0}`,
-    sub: '窗口内累计调用'
+    sub: t('adminDashboard.windowCalls')
   },
   {
-    title: '邀请码',
+    title: t('adminDashboard.metricInvites'),
     value: invitesOverview.value.total || 0,
-    sub: `${invitesOverview.value.active || 0} 个可用 · ${invitesOverview.value.consumed || 0} 已用`
+    sub: t('adminDashboard.inviteMetricsSub', {
+      active: invitesOverview.value.active || 0,
+      consumed: invitesOverview.value.consumed || 0
+    })
   },
   {
-    title: '存储占用',
+    title: t('adminDashboard.metricStorage'),
     value: formatBytes(storage.value.total_bytes || 0),
     sub: storage.value.per_user_limit_bytes
-      ? `单用户上限 ${formatBytes(storage.value.per_user_limit_bytes)}`
-      : '未设置上限'
+      ? t('adminDashboard.perUserLimit', { size: formatBytes(storage.value.per_user_limit_bytes) })
+      : t('adminDashboard.noLimitSet')
   }
 ]);
 
@@ -869,17 +875,17 @@ const formatPercentNumber = (value?: number | null) => {
 };
 
 const timeAgo = (input?: string | number | null) => {
-  if (!input) return '未知时间';
+  if (!input) return t('adminDashboard.unknownTime');
   const date = new Date(input);
   if (Number.isNaN(date.getTime())) return String(input);
   const diff = Date.now() - date.getTime();
-  if (diff < 60_000) return '刚刚';
+  if (diff < 60_000) return t('adminDashboard.justNow');
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 60) return t('adminDashboard.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('adminDashboard.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  return `${days} 天前`;
+  return t('adminDashboard.daysAgo', { count: days });
 };
 
 const usageBadge = (status?: string) => {
@@ -895,9 +901,9 @@ const containerStatusClass = (item: any) => {
 };
 
 const inviteStatus = (remaining: number | null | undefined) => {
-  if (remaining === null || remaining === undefined) return '无限制';
-  if (remaining > 0) return `剩余 ${remaining}`;
-  return '已用完';
+  if (remaining === null || remaining === undefined) return t('adminDashboard.unlimited');
+  if (remaining > 0) return t('adminDashboard.remainingLeft', { count: remaining });
+  return t('adminDashboard.usedUp');
 };
 </script>
 

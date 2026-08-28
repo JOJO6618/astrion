@@ -1,4 +1,5 @@
 import { TOOL_ICON_MAP } from './icons';
+import { t } from '@/locales';
 
 type ToolPayload = Record<string, any> | null | undefined;
 
@@ -31,54 +32,60 @@ const RUNNING_ANIMATIONS: Record<string, string> = {
   ask_user: 'default-animation'
 };
 
-const RUNNING_STATUS_TEXTS: Record<string, string> = {
-  create_file: '正在创建文件...',
-  sleep: '正在等待...',
-  delete_file: '正在删除文件...',
-  rename_file: '正在重命名文件...',
-  write_file: '正在写入文件...',
-  edit_file: '正在编辑文件...',
-  create_folder: '正在创建文件夹...',
-  web_search: '正在搜索网络...',
-  extract_webpage: '正在提取网页...',
-  save_webpage: '正在保存网页...',
-  run_command: '调用 run_command',
-  update_memory: '正在更新记忆...',
-  recall_project_memory: '正在回顾项目记忆...',
-  search_project_memory: '正在检索项目记忆...',
-  update_project_memory: '正在更新项目记忆...',
-  terminal_session: '正在管理终端会话...',
-  terminal_input: '调用 terminal_input',
-  terminal_snapshot: '正在获取终端快照...',
-  read_skill: '正在读取技能...',
-  create_skill: '正在归档技能...',
-  ask_user: '等待用户回答...'
-};
+// 运行中状态文案映射：改成函数、在调用时求值 t()，避免模块顶层固化语言（语言切换后重取新译文）
+function getRunningStatusTexts(): Record<string, string> {
+  return {
+    create_file: t('toolResults.runningStatus.createFile'),
+    sleep: t('toolResults.runningStatus.sleep'),
+    delete_file: t('toolResults.runningStatus.deleteFile'),
+    rename_file: t('toolResults.runningStatus.renameFile'),
+    write_file: t('toolResults.runningStatus.writeFile'),
+    edit_file: t('toolResults.runningStatus.editFile'),
+    create_folder: t('toolResults.runningStatus.createFolder'),
+    web_search: t('toolResults.runningStatus.webSearch'),
+    extract_webpage: t('toolResults.runningStatus.extractWebpage'),
+    save_webpage: t('toolResults.runningStatus.saveWebpage'),
+    run_command: t('toolResults.runningStatus.runCommand'),
+    update_memory: t('toolResults.runningStatus.updateMemory'),
+    recall_project_memory: t('toolResults.runningStatus.recallProjectMemory'),
+    search_project_memory: t('toolResults.runningStatus.searchProjectMemory'),
+    update_project_memory: t('toolResults.runningStatus.updateProjectMemory'),
+    terminal_session: t('toolResults.runningStatus.terminalSession'),
+    terminal_input: t('toolResults.runningStatus.terminalInput'),
+    terminal_snapshot: t('toolResults.runningStatus.terminalSnapshot'),
+    read_skill: t('toolResults.runningStatus.readSkill'),
+    create_skill: t('toolResults.runningStatus.createSkill'),
+    ask_user: t('toolResults.runningStatus.askUser'),
+  };
+}
 
-const COMPLETED_STATUS_TEXTS: Record<string, string> = {
-  create_file: '文件创建成功',
-  delete_file: '文件删除成功',
-  sleep: '等待完成',
-  rename_file: '文件重命名成功',
-  write_file: '文件写入完成',
-  edit_file: '文件编辑完成',
-  create_folder: '文件夹创建成功',
-  web_search: '搜索完成',
-  extract_webpage: '网页提取完成',
-  save_webpage: '网页保存完成（纯文本）',
-  vlm_analyze: '图片解析完成',
-  run_command: '命令执行完成',
-  update_memory: '记忆更新成功',
-  recall_project_memory: '项目记忆已读取',
-  search_project_memory: '项目记忆检索完成',
-  update_project_memory: '项目记忆已更新',
-  terminal_session: '终端操作完成',
-  terminal_input: '终端输入完成',
-  terminal_snapshot: '终端快照已返回',
-  read_skill: '技能读取完成',
-  create_skill: '技能归档完成',
-  ask_user: '用户已回答'
-};
+// 完成状态文案映射：同上，函数化避免语言固化
+function getCompletedStatusTexts(): Record<string, string> {
+  return {
+    create_file: t('toolResults.completedStatus.createFile'),
+    delete_file: t('toolResults.completedStatus.deleteFile'),
+    sleep: t('toolResults.completedStatus.sleep'),
+    rename_file: t('toolResults.completedStatus.renameFile'),
+    write_file: t('toolResults.completedStatus.writeFile'),
+    edit_file: t('toolResults.completedStatus.editFile'),
+    create_folder: t('toolResults.completedStatus.createFolder'),
+    web_search: t('toolResults.completedStatus.webSearch'),
+    extract_webpage: t('toolResults.completedStatus.extractWebpage'),
+    save_webpage: t('toolResults.completedStatus.saveWebpage'),
+    vlm_analyze: t('toolResults.completedStatus.vlmAnalyze'),
+    run_command: t('toolResults.completedStatus.runCommand'),
+    update_memory: t('toolResults.completedStatus.updateMemory'),
+    recall_project_memory: t('toolResults.completedStatus.recallProjectMemory'),
+    search_project_memory: t('toolResults.completedStatus.searchProjectMemory'),
+    update_project_memory: t('toolResults.completedStatus.updateProjectMemory'),
+    terminal_session: t('toolResults.completedStatus.terminalSession'),
+    terminal_input: t('toolResults.completedStatus.terminalInput'),
+    terminal_snapshot: t('toolResults.completedStatus.terminalSnapshot'),
+    read_skill: t('toolResults.completedStatus.readSkill'),
+    create_skill: t('toolResults.completedStatus.createSkill'),
+    ask_user: t('toolResults.completedStatus.askUser'),
+  };
+}
 
 const LANGUAGE_CLASS_MAP: Record<string, string> = {
   py: 'language-python',
@@ -90,18 +97,22 @@ const LANGUAGE_CLASS_MAP: Record<string, string> = {
   txt: 'language-plain'
 };
 
-const SEARCH_TOPIC_MAP: Record<string, string> = {
-  general: '通用',
-  news: '新闻',
-  finance: '金融'
-};
+function getSearchTopicMap(): Record<string, string> {
+  return {
+    general: t('toolResults.search.topicGeneral'),
+    news: t('toolResults.search.topicNews'),
+    finance: t('toolResults.search.topicFinance'),
+  };
+}
 
-const RELATIVE_TIME_RANGE_MAP: Record<string, string> = {
-  day: '过去24小时',
-  week: '过去7天',
-  month: '过去30天',
-  year: '过去365天'
-};
+function getRelativeTimeRangeMap(): Record<string, string> {
+  return {
+    day: t('toolResults.search.timeLast24h'),
+    week: t('toolResults.search.timeLast7d'),
+    month: t('toolResults.search.timeLast30d'),
+    year: t('toolResults.search.timeLast365d'),
+  };
+}
 
 export function getToolIcon(tool: any): string {
   const toolName = typeof tool === 'string' ? tool : tool?.name;
@@ -129,16 +140,16 @@ export function getToolAnimationClass(tool: any): string {
 
 function describeReadFileResult(tool: any): string {
   if (!tool?.result || typeof tool.result !== 'object') {
-    return '文件读取完成';
+    return t('toolResults.completedStatus.readFile');
   }
   const readType = String(tool.result.type || 'read').toLowerCase();
   if (readType === 'search') {
-    const query = tool.result.query ? `「${tool.result.query}」` : '';
+    const query = tool.result.query ? t('toolResults.sentences.searchQuote', { text: tool.result.query }) : '';
     const count =
       typeof tool.result.returned_matches === 'number'
         ? tool.result.returned_matches
         : tool.result.actual_matches || 0;
-    return `搜索${query}，得到${count}个结果`;
+    return t('toolResults.sentences.readSearch', { query, count });
   }
   if (readType === 'extract') {
     const segments = Array.isArray(tool.result.segments) ? tool.result.segments : [];
@@ -151,9 +162,9 @@ function describeReadFileResult(tool: any): string {
       return sum + (end - start + 1);
     }, 0);
     const displayLines = totalLines || tool.result.char_count || 0;
-    return `提取了${displayLines}行`;
+    return t('toolResults.sentences.readExtract', { n: displayLines });
   }
-  return '文件读取完成';
+  return t('toolResults.completedStatus.readFile');
 }
 
 function isMcpTool(tool: any): boolean {
@@ -168,7 +179,7 @@ function getMcpToolDisplayName(tool: any): string {
   }
   const name = String(tool?.name || '').trim();
   if (!name.startsWith('mcp__')) {
-    return name || 'MCP 工具';
+    return name || t('toolResults.mcpTool');
   }
   const parts = name.split('__').filter(Boolean);
   if (parts.length >= 3) {
@@ -177,7 +188,7 @@ function getMcpToolDisplayName(tool: any): string {
       return remoteName;
     }
   }
-  return name || 'MCP 工具';
+  return name || t('toolResults.mcpTool');
 }
 
 export function getToolStatusText(tool: any, opts?: { intentEnabled?: boolean }): string {
@@ -198,7 +209,7 @@ export function getToolStatusText(tool: any, opts?: { intentEnabled?: boolean })
 
   // MCP 工具完成态统一显示：<工具名> 执行完成（避免刷新前后文案不一致）
   if (tool.status === 'completed' && isMcpTool(tool)) {
-    return `${getMcpToolDisplayName(tool)} 执行完成`;
+    return t('toolResults.sentences.mcpDone', { name: getMcpToolDisplayName(tool) });
   }
 
   // 开启时：有 intent 就只显示 intent
@@ -211,10 +222,10 @@ export function getToolStatusText(tool: any, opts?: { intentEnabled?: boolean })
     return tool.message;
   }
   if (tool.status === 'hinted') {
-    return `可能需要 ${tool.name}...`;
+    return t('toolResults.sentences.hinted', { name: tool.name });
   }
   if (tool.status === 'preparing') {
-    return `准备调用 ${tool.name}...`;
+    return t('toolResults.sentences.preparing', { name: tool.name });
   }
   if (tool.status === 'running') {
     if (tool.name === 'read_file' || tool.name === 'read_skill') {
@@ -222,30 +233,30 @@ export function getToolStatusText(tool: any, opts?: { intentEnabled?: boolean })
         tool.argumentSnapshot?.type || tool.arguments?.type || 'read'
       ).toLowerCase();
       const runningMap: Record<string, string> = {
-        read: '正在读取文件...',
-        search: '正在执行搜索...',
-        extract: '正在提取内容...'
+        read: t('toolResults.runningStatus.readFile'),
+        search: t('toolResults.runningStatus.readSearch'),
+        extract: t('toolResults.runningStatus.readExtract'),
       };
-      return runningMap[readType] || '正在读取文件...';
+      return runningMap[readType] || t('toolResults.runningStatus.readFile');
     }
-    const label = RUNNING_STATUS_TEXTS[tool.name] || tool.display_name || tool.name || '';
-    return label ? label : '调用工具中';
+    const label = getRunningStatusTexts()[tool.name] || tool.display_name || tool.name || '';
+    return label ? label : t('toolResults.runningStatus.fallback');
   }
   if (tool.status === 'awaiting_user_answer') {
-    return '等待回答';
+    return t('toolResults.status.awaitingUserAnswer');
   }
   if (
     tool.status === 'awaiting_approval' ||
     tool.status === 'pending_approval' ||
     tool.status === 'pending'
   ) {
-    return '等待审批...';
+    return t('toolResults.status.awaitingApprovalDots');
   }
   if (tool.status === 'completed') {
     if (tool.name === 'read_file' || tool.name === 'read_skill') {
       return describeReadFileResult(tool);
     }
-    return COMPLETED_STATUS_TEXTS[tool.name] || '执行完成';
+    return getCompletedStatusTexts()[tool.name] || t('toolResults.completedStatus.fallback');
   }
   if (tool.status) {
     return `${tool.name} - ${tool.status}`;
@@ -306,7 +317,7 @@ export function buildToolLabel(args: any): string {
     return String(args.question);
   }
   if (typeof args.seconds !== 'undefined') {
-    return `${args.seconds} 秒`;
+    return t('toolResults.duration.seconds', { seconds: args.seconds });
   }
   if (args.name) {
     return args.name;
@@ -316,33 +327,39 @@ export function buildToolLabel(args: any): string {
 
 export function formatSearchTopic(filters: ToolPayload): string {
   const topic = filters?.topic ? String(filters.topic).toLowerCase() : 'general';
-  return SEARCH_TOPIC_MAP[topic] || '通用';
+  return getSearchTopicMap()[topic] || t('toolResults.search.topicGeneral');
 }
 
 export function formatSearchTime(filters: ToolPayload): string {
   if (!filters) {
-    return '未限定时间';
+    return t('toolResults.search.timeUnlimited');
   }
   if (filters.time_range) {
     const key = String(filters.time_range).toLowerCase();
-    return RELATIVE_TIME_RANGE_MAP[key] || `相对范围：${filters.time_range}`;
+    return (
+      getRelativeTimeRangeMap()[key] ||
+      t('toolResults.search.timeRelative', { range: filters.time_range })
+    );
   }
   if (typeof filters.days === 'number') {
-    return `过去${filters.days}天`;
+    return t('toolResults.search.timeLastDays', { n: filters.days });
   }
   if (filters.start_date && filters.end_date) {
-    return `${filters.start_date} 至 ${filters.end_date}`;
+    return t('toolResults.search.timeRangeTo', {
+      start: filters.start_date,
+      end: filters.end_date,
+    });
   }
-  return '未限定时间';
+  return t('toolResults.search.timeUnlimited');
 }
 
 export function formatSearchDomains(filters: ToolPayload): string {
   const domains = filters?.include_domains;
   if (!Array.isArray(domains) || domains.length === 0) {
-    return '未限定网站';
+    return t('toolResults.search.domainsUnlimited');
   }
   const normalized = domains.map((item) => String(item || '').trim()).filter(Boolean);
-  return normalized.length ? normalized.join(', ') : '未限定网站';
+  return normalized.length ? normalized.join(', ') : t('toolResults.search.domainsUnlimited');
 }
 
 export function getLanguageClass(path: string): string {

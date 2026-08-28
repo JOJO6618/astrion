@@ -1,5 +1,6 @@
 import type { MonitorBubbleOptions, MonitorDriver, MonitorSceneRuntime } from './types';
 import { getSceneProgressLabel } from './progressMap';
+import { t } from '@/locales';
 
 type SceneHandler = (payload: Record<string, any>, runtime: MonitorSceneRuntime) => Promise<void>;
 
@@ -140,14 +141,15 @@ const terminalMenuDebug = (...args: any[]) => {
   console.warn('[TerminalMenu]', ...args);
 };
 
-const DESKTOP_APPS: Array<{ id: string; label: string; assetKey: string }> = [
-  { id: 'browser', label: '浏览器', assetKey: 'browser' },
-  { id: 'terminal', label: '终端', assetKey: 'terminal' },
-  { id: 'command', label: '命令行', assetKey: 'command' },
-  { id: 'python', label: 'Python', assetKey: 'python' },
-  { id: 'memory', label: '记忆', assetKey: 'memory' },
-  { id: 'todo', label: '待办事项', assetKey: 'todo' },
-  { id: 'subagent', label: '子代理', assetKey: 'subagent' }
+// 桌面应用图标标签存 key，渲染处再 t(labelKey) 解析（i18n_spec §3.2：避免顶层常量固化语言）
+const DESKTOP_APPS: Array<{ id: string; labelKey: string; assetKey: string }> = [
+  { id: 'browser', labelKey: 'monitor.appBrowser', assetKey: 'browser' },
+  { id: 'terminal', labelKey: 'monitor.appTerminal', assetKey: 'terminal' },
+  { id: 'command', labelKey: 'monitor.appCommand', assetKey: 'command' },
+  { id: 'python', labelKey: 'monitor.appPython', assetKey: 'python' },
+  { id: 'memory', labelKey: 'monitor.appMemory', assetKey: 'memory' },
+  { id: 'todo', labelKey: 'monitor.appTodo', assetKey: 'todo' },
+  { id: 'subagent', labelKey: 'monitor.appSubagent', assetKey: 'subagent' }
 ];
 
 const WINDOW_PADDING = 18;
@@ -187,7 +189,6 @@ type TerminalLine = {
   role: 'prompt' | 'output' | 'note';
 };
 
-const TERMINAL_NAME_PREFIX = '终端';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -357,11 +358,11 @@ export class MonitorDirector implements MonitorDriver {
     }
     if (!preserveWindows) {
       this.elements.browserSearchText.textContent = '';
-      this.elements.browserStatus.textContent = '准备搜索...';
+      this.elements.browserStatus.textContent = t('monitor.browserReady');
       this.elements.browserResults.innerHTML = '';
       this.browserResultMap.clear();
       this.elements.extractionSummary.innerHTML = '';
-      this.elements.extractionState.textContent = '等待提取';
+      this.elements.extractionState.textContent = t('monitor.extractWaiting');
       this.elements.folderBody.innerHTML = '';
       this.elements.editorBody.innerHTML = '';
       this.elements.terminalBody.innerHTML = '';
@@ -497,7 +498,7 @@ export class MonitorDirector implements MonitorDriver {
     bubble.classList.add('info');
     this.elements.bubbleIconSlot.classList.remove('show');
     this.elements.bubbleIconSlot.innerHTML = '';
-    this.startThinkingBubble('思考中');
+    this.startThinkingBubble(t('monitor.thinkLabel'));
     this.positionBubble();
     requestAnimationFrame(() => {
       bubble.classList.add('visible');
@@ -569,7 +570,7 @@ export class MonitorDirector implements MonitorDriver {
         payload?.error ||
         payload?.result?.message ||
         payload?.message ||
-        '工具执行错误';
+        t('monitor.toolError');
       this.stopProgressBubble();
       this.showSpeechBubble(message, { variant: 'error', duration: 2600 });
       monitorLifecycleDebug('playScene:skip-on-error', { scene: name, status: preStatus, message });
@@ -641,7 +642,7 @@ export class MonitorDirector implements MonitorDriver {
             preResult?.error ||
             payload?.result?.error ||
             payload?.error ||
-            '工具执行错误';
+            t('monitor.toolError');
           this.stopProgressBubble();
           this.showSpeechBubble(message, { variant: 'error', duration: 2600 });
           monitorLifecycleDebug('playScene:skip-after-prefetch-error', { scene: name, message });
@@ -650,7 +651,7 @@ export class MonitorDirector implements MonitorDriver {
       } catch (error: any) {
         monitorLifecycleDebug('playScene:prefetch-error', { scene: name, error: String(error) });
         this.stopProgressBubble();
-        this.showSpeechBubble('工具执行错误', { variant: 'error', duration: 2600 });
+        this.showSpeechBubble(t('monitor.toolError'), { variant: 'error', duration: 2600 });
         return;
       }
     }
@@ -693,7 +694,7 @@ export class MonitorDirector implements MonitorDriver {
               result?.error ||
               payload?.result?.error ||
               payload?.error ||
-              '工具执行错误';
+              t('monitor.toolError');
             this.stopProgressBubble();
             this.showSpeechBubble(message, { variant: 'error', duration: 2600 });
             throw new Error('tool-failed');
@@ -806,7 +807,7 @@ export class MonitorDirector implements MonitorDriver {
   private startThinkingBubble(text: string) {
     this.clearThinkingBubbleTimer();
     // 直接复用等待气泡的动画逻辑，保证与“等待回复”一致
-    this.showWaitingBubble(text || '思考中');
+    this.showWaitingBubble(text || t('monitor.thinkLabel'));
     // 但保留独立的计时器引用，方便后续清理
     this.thinkingBubbleTimer = this.waitingBubbleTimer;
   }
@@ -819,7 +820,7 @@ export class MonitorDirector implements MonitorDriver {
     this.thinkingBubblePhase = 0;
   }
 
-  showWaitingBubble(text = '等待回复') {
+  showWaitingBubble(text = t('monitor.waitingReply')) {
     this.dismissBubble(true, { force: true });
     const bubble = this.elements.speechBubble;
     bubble.classList.remove('error', 'thinking', 'progress');
@@ -1259,10 +1260,10 @@ export class MonitorDirector implements MonitorDriver {
       div.dataset.appId = app.id;
       const img = document.createElement('img');
       img.src = this.assets.apps[app.assetKey] || this.assets.apps.browser;
-      img.alt = app.label;
+      img.alt = t(app.labelKey);
       div.appendChild(img);
       const span = document.createElement('span');
-      span.textContent = app.label;
+      span.textContent = t(app.labelKey);
       div.appendChild(span);
       this.elements.appsGrid.appendChild(div);
       this.appIcons.set(app.id, div);
@@ -1421,7 +1422,7 @@ export class MonitorDirector implements MonitorDriver {
     });
     const title = document.createElement('span');
     title.className = 'window-title';
-    title.textContent = '网页提取';
+    title.textContent = t('monitor.extractTitle');
     header.appendChild(title);
     windowEl.appendChild(header);
     const body = document.createElement('div');
@@ -1431,7 +1432,7 @@ export class MonitorDirector implements MonitorDriver {
     body.appendChild(url);
     const status = document.createElement('div');
     status.className = 'extract-status';
-    status.textContent = '等待提取';
+    status.textContent = t('monitor.extractWaiting');
     body.appendChild(status);
     const summary = document.createElement('div');
     summary.className = 'extract-summary';
@@ -1455,7 +1456,7 @@ export class MonitorDirector implements MonitorDriver {
     this.extractionWindows.set(key, instance);
     const displayIndex = this.extractionWindows.size;
     if (instance.titleEl) {
-      const baseTitle = meta?.title && meta.title.trim().length ? meta.title.trim() : '网页提取';
+      const baseTitle = meta?.title && meta.title.trim().length ? meta.title.trim() : t('monitor.extractTitle');
       instance.titleEl.textContent = displayIndex > 1 ? `${baseTitle} #${displayIndex}` : baseTitle;
     }
     if (meta?.url) {
@@ -1526,7 +1527,7 @@ export class MonitorDirector implements MonitorDriver {
     return top === instance.element;
   }
 
-  private resetCommandWindow(title = '命令行', options: { clearOutput?: boolean } = {}) {
+  private resetCommandWindow(title = t('monitor.commandTitle'), options: { clearOutput?: boolean } = {}) {
     if (this.elements.commandTitle) {
       this.elements.commandTitle.textContent = title;
     }
@@ -1540,7 +1541,7 @@ export class MonitorDirector implements MonitorDriver {
   }
 
   private async revealCommandWindow(
-    title = '命令行',
+    title = t('monitor.commandTitle'),
     options: { reset?: boolean; focusInput?: boolean } = {}
   ) {
     const { reset = true, focusInput = false } = options;
@@ -1827,7 +1828,7 @@ export class MonitorDirector implements MonitorDriver {
       this.elements.memoryCount.textContent = String(count);
     }
     if (this.elements.memoryStatus) {
-      this.elements.memoryStatus.textContent = '记忆已同步';
+      this.elements.memoryStatus.textContent = t('monitor.memorySynced');
     }
     if (this.elements.memoryTime) {
       this.elements.memoryTime.textContent = new Date().toLocaleTimeString('zh-CN', {
@@ -1953,7 +1954,7 @@ export class MonitorDirector implements MonitorDriver {
     await this.click();
     this.showWindow(instance.element);
     if (instance.titleEl) {
-      instance.titleEl.textContent = '终端';
+      instance.titleEl.textContent = t('monitor.terminalTitle');
     }
     this.terminalLastFocusedAt = Date.now();
   }
@@ -2072,7 +2073,7 @@ export class MonitorDirector implements MonitorDriver {
       const { bodyEl } = this.getTerminalInstance();
       bodyEl.innerHTML = '';
       const hint = document.createElement('pre');
-      hint.textContent = '尚未创建终端，点击 + 新建';
+      hint.textContent = t('monitor.terminalEmptyHint');
       hint.className = 'session-terminal-note-line';
       bodyEl.appendChild(hint);
     }
@@ -2122,10 +2123,10 @@ export class MonitorDirector implements MonitorDriver {
   private nextTerminalName() {
     const existing = Array.from(this.terminalSessions.values()).map((s) => s.name);
     let idx = existing.length + 1;
-    let candidate = `${TERMINAL_NAME_PREFIX}${idx}`;
+    let candidate = t('monitor.terminalName', { n: idx });
     while (existing.includes(candidate)) {
       idx += 1;
-      candidate = `${TERMINAL_NAME_PREFIX}${idx}`;
+      candidate = t('monitor.terminalName', { n: idx });
     }
     return candidate;
   }
@@ -2198,7 +2199,7 @@ export class MonitorDirector implements MonitorDriver {
     const record = this.terminalSessions.get(sessionId) || this.ensureSessionRecord(sessionId);
     const { element, bodyEl, titleEl } = this.getTerminalInstance();
     if (titleEl) {
-      titleEl.textContent = '终端';
+      titleEl.textContent = t('monitor.terminalTitle');
     }
     this.activeTerminalSessionId = sessionId;
     this.lastTerminalSessionId = sessionId;
@@ -2534,7 +2535,7 @@ export class MonitorDirector implements MonitorDriver {
 
   private setupScenes() {
     this.sceneHandlers.browserSearch = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'browserSearch', '正在搜索');
+      this.applySceneStatus(runtime, 'browserSearch', t('monitor.searchStatus'));
       const browserVisible = this.isWindowVisible(this.elements.browserWindow);
       if (!browserVisible) {
         await this.movePointerToApp('browser');
@@ -2547,24 +2548,24 @@ export class MonitorDirector implements MonitorDriver {
         await this.movePointerToElement(searchBar, { offsetX: -40 });
         await this.click();
       }
-      const query = payload?.arguments?.query || payload?.argumentSnapshot?.query || '搜索内容';
+      const query = payload?.arguments?.query || payload?.argumentSnapshot?.query || t('monitor.defaultSearchQuery');
       await this.typeSearchQuery(query);
-      this.elements.browserStatus.textContent = '正在搜索...';
+      this.elements.browserStatus.textContent = t('monitor.browserSearching');
       const completion = await runtime.waitForResult(payload.executionId || payload.id);
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '搜索失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.searchFailed'))) {
         return;
       }
       const results = Array.isArray(completion?.result?.results) ? completion.result.results : [];
       this.renderSearchResults(results);
       this.elements.browserStatus.textContent =
-        completion?.status === 'completed' ? '搜索完成，已加载结果' : '搜索未完成';
+        completion?.status === 'completed' ? t('monitor.searchCompleted') : t('monitor.searchIncomplete');
       await sleep(320);
       await this.simulateResultBrowsing();
       this.pushWindowToStack(this.elements.browserWindow);
     };
 
     this.sceneHandlers.webExtract = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'webExtract', '正在提取');
+      this.applySceneStatus(runtime, 'webExtract', t('monitor.statusExtracting'));
       const targetUrl =
         payload?.arguments?.url ||
         payload?.arguments?.target_url ||
@@ -2602,7 +2603,9 @@ export class MonitorDirector implements MonitorDriver {
           payload?.arguments?.title ||
           'https://example.com';
         await this.typeSearchQuery(navigateInput);
-        this.elements.browserStatus.textContent = targetUrl ? '正在打开网页...' : '正在搜索...';
+        this.elements.browserStatus.textContent = targetUrl
+          ? t('monitor.browserOpening')
+          : t('monitor.browserSearching');
         await sleep(900);
       }
       const extractionId = String(payload?.executionId || payload?.id || this.nextExtractionId());
@@ -2618,7 +2621,7 @@ export class MonitorDirector implements MonitorDriver {
         payload?.result?.source ||
         '';
       extractionInstance.urlEl.textContent = displayUrl;
-      extractionInstance.stateEl.textContent = '提取中...';
+      extractionInstance.stateEl.textContent = t('monitor.extractInProgress');
       extractionInstance.stateEl.classList.remove('complete');
       extractionInstance.summaryEl.innerHTML = '';
       let completion: any = null;
@@ -2627,7 +2630,7 @@ export class MonitorDirector implements MonitorDriver {
       } catch (error) {
         console.warn('[MonitorDirector] webExtract waitForResult error', error);
       }
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '网页提取失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.extractFailed'))) {
         return;
       }
       const resolvedResult = completion?.result ?? payload?.result ?? null;
@@ -2638,21 +2641,22 @@ export class MonitorDirector implements MonitorDriver {
       const finalStatus = this.resolveExtractionStatus(completion, payload, resolvedResult);
       const computedStatus = finalStatus || (hasError ? 'failed' : hasContent ? 'completed' : null);
       if (computedStatus === 'failed') {
-        extractionInstance.stateEl.textContent = '提取失败';
+        extractionInstance.stateEl.textContent = t('monitor.extractStateFailed');
         extractionInstance.stateEl.classList.remove('complete');
       } else {
-        extractionInstance.stateEl.textContent = '提取完成';
+        extractionInstance.stateEl.textContent = t('monitor.extractStateComplete');
         extractionInstance.stateEl.classList.add('complete');
       }
       await sleep(400);
     };
 
     this.sceneHandlers.createFolder = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'createFolder', '正在创建文件夹');
+      this.applySceneStatus(runtime, 'createFolder', t('monitor.statusCreatingFolder'));
       this.lockDesktopRender();
-      const rawPath = payload?.arguments?.path || payload?.arguments?.target_path || '新建文件夹';
+      const rawPath =
+        payload?.arguments?.path || payload?.arguments?.target_path || t('monitor.defaultFolderName');
       const segments = this.normalizePathSegments(rawPath);
-      const folderName = segments.pop() || '新建文件夹';
+      const folderName = segments.pop() || t('monitor.defaultFolderName');
       const parentKey = this.composePath(segments);
       const pendingPath = this.composePath([parentKey, folderName].filter(Boolean));
       this.markPendingCreation(pendingPath);
@@ -2700,7 +2704,7 @@ export class MonitorDirector implements MonitorDriver {
           this.hideContextMenus();
         }
         completion = await resultPromise;
-        if (!this.ensureSuccessOrErrorBubble(completion, payload, '创建文件夹失败')) {
+        if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.createFolderFailed'))) {
           return;
         }
         const resolvedPath = this.resolveResultPath(completion, rawPath);
@@ -2737,11 +2741,11 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.createFile = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'createFile', '正在创建文件');
+      this.applySceneStatus(runtime, 'createFile', t('monitor.statusCreatingFile'));
       this.lockDesktopRender();
       const rawPath = payload?.arguments?.path || payload?.arguments?.target_path || 'new-file.txt';
       const segments = this.normalizePathSegments(rawPath);
-      const filename = segments.pop() || '新建文件';
+      const filename = segments.pop() || t('monitor.defaultFileName');
       const parentKey = this.composePath(segments);
       const pendingPath = this.composePath([parentKey, filename].filter(Boolean));
       this.markPendingCreation(pendingPath);
@@ -2789,7 +2793,7 @@ export class MonitorDirector implements MonitorDriver {
           this.hideContextMenus();
         }
         completion = await resultPromise;
-        if (!this.ensureSuccessOrErrorBubble(completion, payload, '创建文件失败')) {
+        if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.createFileFailed'))) {
           return;
         }
         const resolvedPath = this.resolveResultPath(completion, rawPath);
@@ -2823,7 +2827,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.renameFile = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'renameFile', '正在重命名');
+      this.applySceneStatus(runtime, 'renameFile', t('monitor.statusRenaming'));
       this.lockDesktopRender();
       const sourcePath =
         payload?.arguments?.path ||
@@ -2862,7 +2866,7 @@ export class MonitorDirector implements MonitorDriver {
         console.warn('[MonitorDirector] renameFile waitForResult error', error);
         completion = null;
       }
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '重命名失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.renameFailed'))) {
         this.unlockDesktopRender();
         return;
       }
@@ -2954,7 +2958,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.deleteFile = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'deleteFile', '正在删除文件');
+      this.applySceneStatus(runtime, 'deleteFile', t('monitor.statusDeletingFile'));
       const rawPath = payload?.arguments?.path || payload?.arguments?.target_path;
       const segments = this.normalizePathSegments(rawPath);
       const name = segments.pop();
@@ -3027,7 +3031,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.wait = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'wait', '正在等待');
+      this.applySceneStatus(runtime, 'wait', t('monitor.statusWaiting'));
       const duration =
         Number(
           payload?.arguments?.duration ||
@@ -3058,7 +3062,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.appendFile = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'appendFile', '正在编辑');
+      this.applySceneStatus(runtime, 'appendFile', t('monitor.statusEditing'));
       const rawPath = payload?.arguments?.path || payload?.argumentSnapshot?.path || 'file.txt';
       const segments = this.normalizePathSegments(rawPath);
       const filename = segments.pop() || 'file.txt';
@@ -3083,7 +3087,7 @@ export class MonitorDirector implements MonitorDriver {
         }
       }
       this.openEditorWindow(filename);
-      this.renderEditorPlaceholder('正在读取文件内容...');
+      this.renderEditorPlaceholder(t('monitor.readingContent'));
       const payloadBeforeLines = this.resolveEditorBeforeLines(payload);
       const snapshotBeforeSource =
         typeof payload?.monitor_snapshot?.content === 'string'
@@ -3121,7 +3125,7 @@ export class MonitorDirector implements MonitorDriver {
           console.warn('[MonitorDirector] appendFile waitForResult error', error);
           return null;
         });
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '文件编辑失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.editFailed'))) {
         return;
       }
       const payloadAfterLines = this.resolveEditorAfterLines(payload, completion);
@@ -3173,7 +3177,7 @@ export class MonitorDirector implements MonitorDriver {
 
     this.sceneHandlers.runCommand = async (payload, runtime) => {
       const toolLabel = payload?.name || payload?.tool || 'run_command';
-      this.applySceneStatus(runtime, 'runCommand', `调用 ${toolLabel}`);
+      this.applySceneStatus(runtime, 'runCommand', t('monitor.statusCallingTool', { tool: toolLabel }));
       const command = payload?.arguments?.command || payload?.result?.command || 'echo "Hello"';
       const reuse = this.isWindowVisible(this.elements.commandWindow);
       if (reuse) {
@@ -3183,14 +3187,15 @@ export class MonitorDirector implements MonitorDriver {
           this.elements.commandOutput.innerHTML = '';
         }
       } else {
-        await this.revealCommandWindow('命令行', { reset: true, focusInput: true });
+        await this.revealCommandWindow(t('monitor.commandTitle'), { reset: true, focusInput: true });
       }
       await this.typeCommandText(command);
       const completion = await runtime.waitForResult(payload.executionId || payload.id);
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '命令执行失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.commandFailed'))) {
         return;
       }
-      const output = completion?.result?.output || completion?.result?.stdout || '命令执行完成';
+      const output =
+        completion?.result?.output || completion?.result?.stdout || t('monitor.commandDone');
       const lines = this.sanitizeTerminalOutput(
         typeof output === 'string'
           ? output.split('\n')
@@ -3198,20 +3203,20 @@ export class MonitorDirector implements MonitorDriver {
             ? output.map(String)
             : [String(output || '')]
       );
-      this.appendCommandOutput(lines.length ? lines : ['命令执行完成']);
+      this.appendCommandOutput(lines.length ? lines : [t('monitor.commandDone')]);
       await sleep(500);
     };
 
     this.sceneHandlers.reader = async (payload, runtime) => {
-      const targetPath = payload?.arguments?.path || payload?.result?.path || '文档';
+      const targetPath = payload?.arguments?.path || payload?.result?.path || t('monitor.defaultDocPath');
       const readMode = String(
         payload?.arguments?.type || payload?.result?.type || 'read'
       ).toLowerCase();
       const statusMap: Record<string, string> = {
-        search: '文件搜索',
-        extract: '提取片段'
+        search: t('monitor.readerModeSearch'),
+        extract: t('monitor.readerModeExtract')
       };
-      runtime.setStatus(statusMap[readMode] || '正在阅读');
+      runtime.setStatus(statusMap[readMode] || t('monitor.statusReading'));
       readerDebug('readerScene:start', {
         executionId: payload?.executionId || payload?.id,
         targetPath,
@@ -3226,7 +3231,7 @@ export class MonitorDirector implements MonitorDriver {
       }
       this.showWindow(this.elements.readerWindow);
       this.elements.readerTitle.textContent = targetPath;
-      this.renderReaderMessage('正在读取文件内容...');
+      this.renderReaderMessage(t('monitor.readingContent'));
       let completion: any = null;
       try {
         completion = await runtime.waitForResult(payload.executionId || payload.id);
@@ -3240,7 +3245,7 @@ export class MonitorDirector implements MonitorDriver {
         console.warn('[MonitorDirector] reader waitForResult error', error);
         readerDebug('readerScene:waitForResult error', error);
       }
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '阅读失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.readFailed'))) {
         return;
       }
       const { source: resultPayload, label: payloadSource } = this.resolveReaderPayload(
@@ -3265,7 +3270,7 @@ export class MonitorDirector implements MonitorDriver {
         });
       } else {
         const fallbackMessage =
-          completion?.message || payload?.result?.message || '未返回可显示内容';
+          completion?.message || payload?.result?.message || t('monitor.noDisplayContent');
         this.renderReaderMessage(fallbackMessage);
         readerDebug('readerScene:fallback message', {
           executionId: payload?.executionId || payload?.id,
@@ -3276,8 +3281,8 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.focus = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'focus', '正在聚焦文件');
-      const targetPath = payload?.arguments?.path || payload?.result?.path || '文件';
+      this.applySceneStatus(runtime, 'focus', t('monitor.statusFocusingFile'));
+      const targetPath = payload?.arguments?.path || payload?.result?.path || t('monitor.defaultFilePath');
       const entry = await this.revealFileTarget(targetPath, { spawnDesktopFile: true });
       if (entry?.element) {
         await this.click({ right: true });
@@ -3295,12 +3300,12 @@ export class MonitorDirector implements MonitorDriver {
           console.warn('[MonitorDirector] focus waitForResult error', error);
           return null;
         });
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, '聚焦文件失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.focusFailed'))) {
         return;
       }
       this.showWindow(this.elements.readerWindow);
       this.elements.readerTitle.textContent = targetPath;
-      this.renderReaderMessage('正在加载文件内容...');
+      this.renderReaderMessage(t('monitor.loadingContent'));
       let rendered = false;
       if (completion?.result) {
         const lines = this.extractReaderLines(completion.result);
@@ -3317,15 +3322,15 @@ export class MonitorDirector implements MonitorDriver {
         }
       }
       if (!rendered) {
-        this.renderReaderMessage('文件已聚焦，可在右侧聚焦面板查看');
+        this.renderReaderMessage(t('monitor.focusedReady'));
       }
       this.elements.readerWindow.classList.add('focused');
       await sleep(400);
     };
 
     this.sceneHandlers.unfocus = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'unfocus', '正在处理');
-      const targetPath = payload?.arguments?.path || payload?.result?.path || '文件';
+      this.applySceneStatus(runtime, 'unfocus', t('monitor.statusProcessing'));
+      const targetPath = payload?.arguments?.path || payload?.result?.path || t('monitor.defaultFilePath');
       const entry = await this.revealFileTarget(targetPath, { spawnDesktopFile: true });
       if (entry?.element) {
         await this.click({ right: true });
@@ -3341,21 +3346,21 @@ export class MonitorDirector implements MonitorDriver {
         console.warn('[MonitorDirector] unfocus waitForResult error', error);
         return null;
       });
-      if (!this.ensureSuccessOrErrorBubble(null, payload, '取消聚焦失败')) {
+      if (!this.ensureSuccessOrErrorBubble(null, payload, t('monitor.unfocusFailed'))) {
         return;
       }
       this.showWindow(this.elements.readerWindow);
       this.elements.readerTitle.textContent = targetPath;
       this.elements.readerWindow.classList.remove('focused');
-      this.renderReaderMessage('已取消聚焦');
+      this.renderReaderMessage(t('monitor.unfocused'));
       await sleep(400);
     };
 
     this.sceneHandlers.ocr = async (payload, runtime) => {
       await this.sceneHandlers.reader(payload, runtime);
-      this.applySceneStatus(runtime, 'ocr', '正在提取');
+      this.applySceneStatus(runtime, 'ocr', t('monitor.statusExtracting'));
       const completion = await runtime.waitForResult(payload.executionId || payload.id);
-      if (!this.ensureSuccessOrErrorBubble(completion, payload, 'OCR 失败')) {
+      if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.ocrFailed'))) {
         return;
       }
       const lines = completion?.result?.text || completion?.result?.lines || [];
@@ -3364,7 +3369,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.memoryUpdate = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'memoryUpdate', '正在同步记忆');
+      this.applySceneStatus(runtime, 'memoryUpdate', t('monitor.statusSyncingMemory'));
       const { entries: initialEntries, provided: snapshotProvided } =
         this.extractMemorySnapshotEntries(payload, 'before');
       const memoryType = (payload?.arguments?.memory_type || payload?.result?.memory_type || 'main')
@@ -3385,7 +3390,7 @@ export class MonitorDirector implements MonitorDriver {
       } else if (op === 'delete') {
         await this.animateMemoryDelete(index);
       } else {
-        await this.animateMemoryAppend(content || '新记忆');
+        await this.animateMemoryAppend(content || t('monitor.defaultMemory'));
       }
 
       this.updateMemoryMeta();
@@ -3393,13 +3398,13 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.todoCreate = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'todoCreate', '正在更新待办');
+      this.applySceneStatus(runtime, 'todoCreate', t('monitor.statusUpdatingTodo'));
       const summary =
         payload?.arguments?.summary ||
         payload?.arguments?.overview ||
         payload?.arguments?.title ||
         payload?.arguments?.task ||
-        '待办摘要';
+        t('monitor.defaultTodoSummary');
       const tasks = this.normalizeTodoTasks(payload?.arguments?.tasks || summary);
       await this.ensureTodoWindowVisible();
       this.resetTodoBoard({ summary: true, list: true });
@@ -3414,7 +3419,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.todoUpdate = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'todoUpdate', '正在调整待办');
+      this.applySceneStatus(runtime, 'todoUpdate', t('monitor.statusAdjustingTodo'));
       await this.ensureTodoWindowVisible();
       const targetText = payload?.arguments?.title || payload?.arguments?.task || null;
       const targetIndex =
@@ -3429,7 +3434,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.todoFinish = async (_payload, runtime) => {
-      this.applySceneStatus(runtime, 'todoFinish', '正在完成任务');
+      this.applySceneStatus(runtime, 'todoFinish', t('monitor.statusFinishingTask'));
       const redDot = this.elements.todoWindow.querySelector(
         '.traffic-dot.red'
       ) as HTMLElement | null;
@@ -3445,7 +3450,7 @@ export class MonitorDirector implements MonitorDriver {
     this.sceneHandlers.todoFinishConfirm = this.sceneHandlers.todoFinish;
 
     this.sceneHandlers.todoDelete = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'todoDelete', '正在移除待办');
+      this.applySceneStatus(runtime, 'todoDelete', t('monitor.statusRemovingTodo'));
       const targetText = payload?.arguments?.title || payload?.arguments?.task || null;
       const card = this.findTodoItemByText(targetText);
       if (card) {
@@ -3461,9 +3466,9 @@ export class MonitorDirector implements MonitorDriver {
     this.sceneHandlers.terminalSession = async (payload, runtime) => {
       const action = (payload?.arguments?.action || payload?.action || '').toLowerCase();
       if (action === 'reset') {
-        this.applySceneStatus(runtime, 'terminalSession', '正在重置终端');
+        this.applySceneStatus(runtime, 'terminalSession', t('monitor.statusResettingTerminal'));
       } else {
-        this.applySceneStatus(runtime, 'terminalSession', '打开终端');
+        this.applySceneStatus(runtime, 'terminalSession', t('monitor.statusOpeningTerminal'));
       }
       // 特殊处理：如果是关闭/重置终端，不要无意中新建会话
       if (action === 'close' || action === 'reset') {
@@ -3485,7 +3490,7 @@ export class MonitorDirector implements MonitorDriver {
           await this.chooseTerminalMenuAction('reset');
           this.terminalHistories.set(targetSession, [{ text: '➜ ', role: 'prompt' }]);
           this.renderTerminalHistory(targetSession);
-          this.appendTerminalNote(targetSession, '终端已重置');
+          this.appendTerminalNote(targetSession, t('monitor.terminalReset'));
           this.ensurePromptLine(targetSession);
           await sleep(300);
           return;
@@ -3533,7 +3538,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.terminalInput = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'terminalInput', '调用 terminal_input');
+      this.applySceneStatus(runtime, 'terminalInput', t('monitor.statusCallingTerminalInput'));
       const { sessionId } = await this.ensureTerminalSessionReady(payload, {
         focusPrompt: true,
         activate: true
@@ -3564,12 +3569,12 @@ export class MonitorDirector implements MonitorDriver {
             ? output.map(String)
             : [String(output || '')]
       );
-      this.appendTerminalOutputs(sessionId, command, lines.length ? lines : ['命令已发送']);
+      this.appendTerminalOutputs(sessionId, command, lines.length ? lines : [t('monitor.commandSent')]);
       await sleep(400);
     };
 
     this.sceneHandlers.terminalSnapshot = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'terminalSnapshot', '正在获取终端');
+      this.applySceneStatus(runtime, 'terminalSnapshot', t('monitor.statusGettingTerminal'));
       const { sessionId } = await this.ensureTerminalSessionReady(payload, {
         focusPrompt: false,
         activate: false
@@ -3584,7 +3589,7 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.terminalSleep = async (payload, runtime) => {
-      this.applySceneStatus(runtime, 'terminalSleep', '正在等待');
+      this.applySceneStatus(runtime, 'terminalSleep', t('monitor.statusWaiting'));
       const duration =
         Number(
           payload?.arguments?.duration ||
@@ -3617,7 +3622,7 @@ export class MonitorDirector implements MonitorDriver {
     this.sceneHandlers.sleep = this.sceneHandlers.wait;
 
     this.sceneHandlers.webSave = async (_payload, runtime) => {
-      this.applySceneStatus(runtime, 'webSave', '正在保存网页');
+      this.applySceneStatus(runtime, 'webSave', t('monitor.statusSavingWeb'));
       const targetUrl =
         _payload?.arguments?.url ||
         _payload?.arguments?.target_url ||
@@ -3655,7 +3660,7 @@ export class MonitorDirector implements MonitorDriver {
 
     this.sceneHandlers.genericTool = async (payload, runtime) => {
       const toolLabel = payload?.name || payload?.tool || 'tool';
-      this.applySceneStatus(runtime, 'genericTool', `调用 ${toolLabel}`);
+      this.applySceneStatus(runtime, 'genericTool', t('monitor.statusCallingTool', { tool: toolLabel }));
       await sleep(600);
     };
   }
@@ -3750,7 +3755,7 @@ export class MonitorDirector implements MonitorDriver {
     } else if (action === 'reset') {
       this.terminalHistories.set(sessionId, [{ text: '➜ ', role: 'prompt' }]);
       this.renderTerminalHistory(sessionId);
-      this.appendTerminalNote(sessionId, '终端已重置');
+      this.appendTerminalNote(sessionId, t('monitor.terminalReset'));
       this.ensurePromptLine(sessionId);
     } else if (action === 'close') {
       this.closeTerminalSession(sessionId);
@@ -4474,7 +4479,7 @@ export class MonitorDirector implements MonitorDriver {
         const over = Math.ceil(-remain);
         const dots = '.'.repeat(phase);
         phase = (phase + 1) % 4;
-        this.elements.waitCountdown.textContent = `等待中 +${over}s${dots}`;
+        this.elements.waitCountdown.textContent = t('monitor.waitOverrun', { n: over, dots });
       }
     };
     this.waitOverlayTimer = window.setInterval(update, 260);
@@ -4869,7 +4874,7 @@ export class MonitorDirector implements MonitorDriver {
     const normalized = this.sanitizeEditorLines(lines);
     editorDebug('prepareScene', { normalizedLength: normalized.length });
     if (!normalized.length) {
-      this.renderEditorPlaceholder('（文件当前为空）');
+      this.renderEditorPlaceholder(t('monitor.editorEmpty'));
       return;
     }
     this.renderEditorSnapshot(normalized);
@@ -4886,7 +4891,7 @@ export class MonitorDirector implements MonitorDriver {
   private renderEditorSnapshot(lines: string[]) {
     const normalized = this.sanitizeEditorLines(lines);
     if (!normalized.length) {
-      this.renderEditorPlaceholder('（文件当前为空）');
+      this.renderEditorPlaceholder(t('monitor.editorEmpty'));
       return;
     }
     this.editorScene.lines = normalized.slice();
@@ -4969,7 +4974,7 @@ export class MonitorDirector implements MonitorDriver {
     });
     if (!currentLines.length && !targetLines.length) {
       editorDebug('animate:both-empty');
-      this.renderEditorPlaceholder('（文件当前为空）');
+      this.renderEditorPlaceholder(t('monitor.editorEmpty'));
       return;
     }
     // 规则：
@@ -5008,7 +5013,7 @@ export class MonitorDirector implements MonitorDriver {
     editorDebug('animate:operations', { count: mergedOperations.length });
     if (!mergedOperations.length) {
       if (!targetLines.length) {
-        this.renderEditorPlaceholder('（文件当前为空）');
+        this.renderEditorPlaceholder(t('monitor.editorEmpty'));
       }
       editorDebug('animate:no-change');
       return;
@@ -5030,7 +5035,7 @@ export class MonitorDirector implements MonitorDriver {
     }
     if (!targetLines.length) {
       editorDebug('animate:target-empty');
-      this.renderEditorPlaceholder('（文件当前为空）');
+      this.renderEditorPlaceholder(t('monitor.editorEmpty'));
       return;
     }
     this.editorScene.lines = targetLines.slice();
@@ -5043,7 +5048,7 @@ export class MonitorDirector implements MonitorDriver {
   private async animateEditorLineFill(lines: string[]) {
     const normalized = this.sanitizeEditorLines(lines);
     if (!normalized.length) {
-      this.renderEditorPlaceholder('（文件当前为空）');
+      this.renderEditorPlaceholder(t('monitor.editorEmpty'));
       return;
     }
     const container = this.elements.editorBody;
@@ -5458,14 +5463,14 @@ export class MonitorDirector implements MonitorDriver {
     const subset = results.slice(0, 8);
     if (!subset.length) {
       const empty = document.createElement('li');
-      empty.textContent = '暂无搜索结果';
+      empty.textContent = t('monitor.noSearchResults');
       this.elements.browserResults.appendChild(empty);
     } else {
       subset.forEach((result) => {
         const li = document.createElement('li');
         const title = document.createElement('strong');
         const url = typeof result?.url === 'string' ? result.url : '';
-        title.textContent = result?.title || url || '搜索结果';
+        title.textContent = result?.title || url || t('monitor.searchResultFallback');
         const meta = document.createElement('span');
         meta.textContent = url || 'agent.local';
         li.appendChild(title);
@@ -5535,14 +5540,19 @@ export class MonitorDirector implements MonitorDriver {
         target.appendChild(block);
       });
     } else if (!hasError) {
-      appendMessage('未返回任何摘要内容');
+      appendMessage(t('monitor.noExtractionSummary'));
     }
     const failedList: Array<Record<string, any>> = Array.isArray(result?.failed_results)
       ? (result.failed_results as Array<Record<string, any>>)
       : [];
     if (failedList.length) {
       failedList.slice(0, 2).forEach((item) => {
-        appendMessage(`⚠️ ${item?.url || 'URL'}: ${item?.error || '提取失败'}`);
+        appendMessage(
+          t('monitor.extractFailedItem', {
+            url: item?.url || 'URL',
+            error: item?.error || t('monitor.extractFailedLabel')
+          })
+        );
       });
     }
     requestAnimationFrame(() => {
@@ -5618,7 +5628,7 @@ export class MonitorDirector implements MonitorDriver {
       const summaryText = pickText(source.summary);
       if (summaryText) {
         pushSection(summaryText, {
-          title: source.title || '网页摘要',
+          title: source.title || t('monitor.extractSectionTitle'),
           url: source.url || source.source
         });
       }
@@ -5628,7 +5638,7 @@ export class MonitorDirector implements MonitorDriver {
         const text = pickText(item);
         if (text) {
           pushSection(text, {
-            title: item?.title || `网页 ${index + 1}`,
+            title: item?.title || t('monitor.extractSectionItem', { n: index + 1 }),
             url: item?.url || item?.source
           });
         }
@@ -5719,7 +5729,7 @@ export class MonitorDirector implements MonitorDriver {
   private ensureSuccessOrErrorBubble(
     completion: any,
     payload?: any,
-    fallbackMessage = '工具执行错误'
+    fallbackMessage = t('monitor.toolError')
   ): boolean {
     const ok = this.toolResultSucceeded(completion ?? payload ?? null);
     if (ok) {
@@ -5774,7 +5784,7 @@ export class MonitorDirector implements MonitorDriver {
 
   private renderReaderMessage(message: string) {
     this.elements.readerLines.innerHTML = '';
-    const row = this.buildEditorLineElement(message || '暂无内容', 0);
+    const row = this.buildEditorLineElement(message || t('monitor.readerEmptyFallback'), 0);
     row.classList.add('reading-line', 'empty');
     this.elements.readerLines.appendChild(row);
   }
@@ -5782,7 +5792,7 @@ export class MonitorDirector implements MonitorDriver {
   private renderReaderLines(source: any) {
     const lines = this.extractReaderLines(source).slice(0, EDITOR_MAX_RENDER_LINES);
     if (!lines.length) {
-      this.renderReaderMessage('未返回可视内容');
+      this.renderReaderMessage(t('monitor.noVisibleContent'));
       return;
     }
     this.elements.readerLines.innerHTML = '';
@@ -5906,7 +5916,7 @@ export class MonitorDirector implements MonitorDriver {
   private renderReaderOcr(lines: any) {
     this.elements.readerOcr.innerHTML = '';
     const normalized = this.normalizeLines(lines);
-    const segments = (normalized.length ? normalized : ['OCR 内容就绪']).slice(0, 6);
+    const segments = (normalized.length ? normalized : [t('monitor.ocrReady')]).slice(0, 6);
     segments.forEach((line) => {
       const p = document.createElement('p');
       p.textContent = line;
@@ -6162,7 +6172,7 @@ export class MonitorDirector implements MonitorDriver {
     await this.movePointerToElement(this.elements.todoSummary, { duration: 420 });
     await this.click();
     this.elements.todoSummary.textContent = '';
-    const chars = Array.from(text || '暂无摘要');
+    const chars = Array.from(text || t('monitor.todoEmptySummary'));
     for (const ch of chars) {
       this.elements.todoSummary.textContent = (this.elements.todoSummary.textContent || '') + ch;
       await sleep(20);
