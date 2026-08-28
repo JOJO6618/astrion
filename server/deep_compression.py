@@ -8,6 +8,8 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from modules.i18n import tr
+
 def _load_summary_prompt(web_terminal) -> str:
     """从 prompts/deep_compression_summary.txt 加载压缩总结提示词。"""
     try:
@@ -382,11 +384,11 @@ async def _generate_summary(web_terminal, prompt: str, retries: int = 5) -> Tupl
                         response_text = content
             if response_text.strip():
                 return response_text.strip(), None
-            last_reason = "模型返回空内容"
+            last_reason = tr("deep_compression.empty_model_content")
         except Exception as exc:
             last_reason = str(exc)
         await asyncio.sleep(0.2)
-    return f"生成总结失败（{last_reason or '未知原因'}）", last_reason
+    return tr("deep_compression.summary_failed", reason=last_reason or tr("deep_compression.unknown_reason")), last_reason
 
 
 def _write_compact_file(
@@ -470,11 +472,11 @@ async def run_deep_compression(
     )
     conv_data = target_manager.load_conversation(conversation_id)
     if not conv_data:
-        return {"success": False, "error": f"对话不存在: {conversation_id}"}
+        return {"success": False, "error": tr("deep_compression.conversation_not_found", conversation_id=conversation_id)}
 
     metadata = conv_data.get("metadata", {}) or {}
     if metadata.get("compression_in_progress"):
-        return {"success": False, "error": "对话正在压缩中", "in_progress": True}
+        return {"success": False, "error": tr("deep_compression.in_progress"), "in_progress": True}
 
     # 读取个性化压缩设置：
     # - compress_form: file（生成文件，引导语提示位置） / inject（把历次压缩内容注入引导语）
@@ -498,7 +500,7 @@ async def run_deep_compression(
         try:
             web_terminal.load_conversation(conversation_id)
         except Exception as exc:
-            return {"success": False, "error": f"加载目标对话失败: {exc}"}
+            return {"success": False, "error": tr("deep_compression.load_failed", error=exc)}
 
     compression_count = int(metadata.get("compression_count", 0) or 0)
     previous_records = _normalize_deep_compression_records(metadata)
@@ -535,7 +537,7 @@ async def run_deep_compression(
     )
     summary_text, summary_fail_reason = await _generate_summary(web_terminal, summary_prompt, retries=5)
     if summary_fail_reason:
-        _emit(sender, "system_message", {"content": f"自动压缩总结失败，将使用失败占位文本：{summary_fail_reason}"})
+        _emit(sender, "system_message", {"content": tr("deep_compression.summary_failed_notice", reason=summary_fail_reason)})
 
     cm.set_compression_state(
         in_progress=True,
@@ -578,7 +580,7 @@ async def run_deep_compression(
     try:
         cm.save_current_conversation()
     except Exception as exc:
-        _emit(sender, "system_message", {"content": f"压缩标记保存失败：{exc}"})
+        _emit(sender, "system_message", {"content": tr("deep_compression.marks_save_failed", error=exc)})
 
     # 关键：重置 current_context_tokens，避免自动压缩续接后阈值判断仍读到压缩前的大值而陷入死循环。
     # 真实上下文长度会在下一次 API 响应后被重新写入。
@@ -591,7 +593,7 @@ async def run_deep_compression(
             current_context_tokens=0,
         )
     except Exception as exc:
-        _emit(sender, "system_message", {"content": f"压缩后重置上下文统计失败：{exc}"})
+        _emit(sender, "system_message", {"content": tr("deep_compression.stats_reset_failed", error=exc)})
 
     current_record = {
         "count": target_count,

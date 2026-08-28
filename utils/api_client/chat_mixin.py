@@ -32,6 +32,8 @@ except ImportError:
 
 from utils.log_rotation import append_line, prune_dir
 
+from modules.i18n import tr
+
 
 
 from utils.api_client.utils import _api_dump_enabled
@@ -242,7 +244,7 @@ class APIClientChatMixin:
                 "status_code": None,
                 "error_text": "connect_error",
                 "error_type": "connection_error",
-                "error_message": f"无法连接到API服务器: {connect_detail}",
+                "error_message": tr("api_client.connect_failed", error=connect_detail),
                 "error_detail": connect_detail,
                 "request_dump": (str(dump_path) if dump_path else None),
                 "base_url": api_config.get("base_url"),
@@ -267,7 +269,7 @@ class APIClientChatMixin:
                 "status_code": None,
                 "error_text": "timeout",
                 "error_type": "timeout",
-                "error_message": "API请求超时",
+                "error_message": tr("api_client.request_timeout"),
                 "request_dump": (str(dump_path) if dump_path else None),
                 "base_url": api_config.get("base_url"),
                 "model_id": api_config.get("model_id"),
@@ -291,7 +293,7 @@ class APIClientChatMixin:
                 "status_code": None,
                 "error_text": disconnect_detail,
                 "error_type": "connection_error",
-                "error_message": f"API服务器连接断开: {disconnect_detail}",
+                "error_message": tr("api_client.connection_lost", error=disconnect_detail),
                 "request_dump": (str(dump_path) if dump_path else None),
                 "base_url": api_config.get("base_url"),
                 "model_id": api_config.get("model_id"),
@@ -499,7 +501,7 @@ class APIClientChatMixin:
                     
                     # 如果参数过长，提供分块建议
                     if len(arguments_str) > 10000:
-                        error_response["suggestion"] = "参数过长，建议分块处理或使用更简洁的内容"
+                        error_response["suggestion"] = tr("api_client2.chunk_suggestion")
                     
                     messages.append({
                         "role": "tool",

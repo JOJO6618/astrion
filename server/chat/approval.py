@@ -42,6 +42,8 @@ from server.state import tool_approval_manager, user_question_manager, plan_appr
 from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
+from modules.i18n import tr
+
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 @chat_bp.route('/api/user-questions/pending', methods=['GET'])
 @api_login_required
@@ -76,7 +78,7 @@ def answer_user_question(terminal: WebTerminal, workspace: UserWorkspace, userna
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except KeyError:
-        return jsonify({"success": False, "error": "问题不存在"}), 404
+        return jsonify({"success": False, "error": tr("chat_approval.question_not_found")}), 404
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc)}), 403
     except Exception as exc:
@@ -119,7 +121,7 @@ def answer_plan_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except KeyError:
-        return jsonify({"success": False, "error": "计划批准请求不存在"}), 404
+        return jsonify({"success": False, "error": tr("chat_approval.plan_approval_not_found")}), 404
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc)}), 403
     except Exception as exc:
@@ -158,7 +160,7 @@ def decide_tool_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except KeyError:
-        return jsonify({"success": False, "error": "审批请求不存在"}), 404
+        return jsonify({"success": False, "error": tr("chat_approval.approval_not_found")}), 404
     except PermissionError as exc:
         return jsonify({"success": False, "error": str(exc)}), 403
     except Exception as exc:

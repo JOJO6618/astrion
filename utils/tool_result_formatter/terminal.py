@@ -5,6 +5,8 @@ from utils.tool_result_formatter.common import (
     _format_failure, _preview_text, _summarize_output_block, _summarize_todo_tasks
 )
 
+from modules.i18n import tr
+
 def _format_terminal_session(result_data: Dict[str, Any]) -> str:
     action = result_data.get("action") or result_data.get("terminal_action") or "未知操作"
     tag = f"terminal_session[{action}]"
@@ -40,7 +42,7 @@ def _format_terminal_session(result_data: Dict[str, Any]) -> str:
             working_dir = session.get("working_dir") or "未知目录"
             session_lines.append(f"{marker} {name} | {state} | {working_dir}")
         return "\n".join([header] + session_lines) if session_lines else header
-    return result_data.get("message") or f"{tag} 操作已完成。"
+    return result_data.get("message") or tr("fmt_terminal.action_done", tag=tag)
 
 def _plain_command_output(result_data: Dict[str, Any]) -> str:
     """生成纯文本输出，按需要加状态前缀。"""
@@ -150,7 +152,7 @@ def _format_sleep(result_data: Dict[str, Any]) -> str:
         return header
     if mode == "wait_sub_agent_ids":
         results = result_data.get("results") or []
-        header = result_data.get("message") or f"已等待 {len(results)} 个子智能体结束"
+        header = result_data.get("message") or tr("fmt_terminal2.waited_sub_agents", n=len(results))
         detail_blocks: List[str] = []
         for item in results:
             if not isinstance(item, dict):
@@ -174,7 +176,7 @@ def _format_sleep(result_data: Dict[str, Any]) -> str:
         return "[后台 run_command 完成]"
     reason = result_data.get("reason")
     timestamp = result_data.get("timestamp")
-    message = result_data.get("message") or "等待完成"
+    message = result_data.get("message") or tr("fmt_terminal2.wait_done")
     parts = [message]
     if reason:
         parts.append(f"原因：{reason}")
@@ -192,7 +194,7 @@ def _format_run_command(result_data: Dict[str, Any]) -> str:
 
     if status == "running_background":
         command_id = result_data.get("command_id") or "-"
-        message = result_data.get("message") or "后台命令已创建；以下为当前已捕获输出。"
+        message = result_data.get("message") or tr("fmt_terminal2.background_created")
         output = result_data.get("output") or ""
         lines = [f"[{command_id}]", f"[{message}]"]
         if output:
@@ -243,7 +245,7 @@ def _format_command_result(label: str, result_data: Dict[str, Any]) -> str:
         lines.append(_summarize_output_block(output, truncated))
         return "\n".join(lines)
 
-    error_msg = result_data.get("error") or message or "执行失败"
+    error_msg = result_data.get("error") or message or tr("fmt_terminal2.execution_failed")
     header = f"⚠️ {label} 失败"
     if command:
         header += f"（命令 `{command}`）"

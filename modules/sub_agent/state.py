@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from utils.logger import setup_logger
 from modules.multi_agent.debug_logger import ma_debug
+from modules.i18n import tr
 
 logger = setup_logger(__name__)
 TERMINAL_STATUSES = {"completed", "failed", "timeout"}
@@ -215,7 +216,7 @@ class SubAgentStateMixin:
             logger.warning(f"[check_task_status] output 文件解析失败: {exc}")
             task["status"] = "failed"
             task["updated_at"] = time.time()
-            return {"success": False, "status": "failed", "task_id": task_id, "message": f"输出文件解析失败: {exc}"}
+            return {"success": False, "status": "failed", "task_id": task_id, "message": tr("sub_agent_state.output_parse_failed", error=exc)}
 
         raw_success = output.get("success")
         success = bool(raw_success)
@@ -228,7 +229,7 @@ class SubAgentStateMixin:
             task["status"] = "terminated"
             task["updated_at"] = time.time()
             ma_debug("check_task_status_output_terminated", task_id=task_id, agent_id=task.get("agent_id"))
-            return {"success": False, "status": "terminated", "task_id": task_id, "message": summary or "子智能体已被终结"}
+            return {"success": False, "status": "terminated", "task_id": task_id, "message": summary or tr("sub_agent_state.terminated")}
 
         ma_debug(
             "check_task_status",
@@ -250,7 +251,7 @@ class SubAgentStateMixin:
             status = "timeout"
         elif output.get("max_turns_exceeded"):
             status = "failed"
-            summary = f"任务执行超过最大轮次限制。{summary}"
+            summary = tr("sub_agent_state.max_turns_exceeded", summary=summary)
         elif success:
             status = "completed"
         else:
@@ -270,7 +271,7 @@ class SubAgentStateMixin:
 
         if status == "completed":
             system_message = self._compose_sub_agent_message(
-                prefix=f"✅ 子智能体{agent_id} 任务摘要：{task_summary} 已完成。",
+                prefix=tr("sub_agent.summary_completed", agent_id=agent_id, summary=task_summary),
                 stats_summary=stats_summary,
                 summary=summary,
                 deliverables_dir=deliverables_dir,
@@ -278,13 +279,13 @@ class SubAgentStateMixin:
             )
         elif status == "timeout":
             system_message = self._compose_sub_agent_message(
-                prefix=f"⏱️ 子智能体{agent_id} 任务摘要：{task_summary} 超时未完成。",
+                prefix=tr("sub_agent.summary_timeout", agent_id=agent_id, summary=task_summary),
                 stats_summary=stats_summary,
                 summary=summary,
             )
         else:
             system_message = self._compose_sub_agent_message(
-                prefix=f"❌ 子智能体{agent_id} 任务摘要：{task_summary} 执行失败。",
+                prefix=tr("sub_agent.summary_failed", agent_id=agent_id, summary=task_summary),
                 stats_summary=stats_summary,
                 summary=summary,
             )
@@ -328,14 +329,14 @@ class SubAgentStateMixin:
                 ma_debug("check_task_status_keep_alive", task_id=task_id, status="running")
                 return {"status": "running", "task_id": task_id}
             # 句柄已结束但输出仍是运行中快照：子智能体异常退出
-            error_text = "子智能体异常退出，未写入最终执行结果"
+            error_text = tr("sub_agent_state.crashed_snapshot")
             try:
                 running_task.result(timeout=0)
             except asyncio.CancelledError:
-                error_text = "子智能体任务被取消，未写入最终执行结果"
+                error_text = tr("sub_agent_state.cancelled_snapshot")
             except BaseException as exc:  # 需要保留真实异常信息
                 detail = str(exc) or exc.__class__.__name__
-                error_text = f"子智能体异常退出：{detail}"
+                error_text = tr("sub_agent_state.crashed_with_detail", detail=detail)
             ma_debug("check_task_status_crashed_snapshot", task_id=task_id, error=error_text)
             return self._fail_task_from_snapshot(task, error_text)
         if task.get("multi_agent_mode"):
@@ -358,10 +359,7 @@ class SubAgentStateMixin:
                 snapshot_age=int(snapshot_age),
             )
             return {"status": "running", "task_id": task_id}
-        error_text = (
-            f"子智能体输出停留在运行中快照且已 {int(snapshot_age)} 秒未更新，"
-            "疑似进程中断或任务崩溃"
-        )
+        error_text = tr("sub_agent_state.stale_snapshot", seconds=int(snapshot_age))
         ma_debug("check_task_status_stale_snapshot", task_id=task_id, snapshot_age=int(snapshot_age))
         return self._fail_task_from_snapshot(task, error_text)
 
@@ -377,8 +375,12 @@ class SubAgentStateMixin:
             "message": error_text,
             "error": error_text,
             "system_message": (
-                f"❌ 子智能体{task.get('agent_id')} 任务摘要：{task.get('summary')} "
-                f"执行失败。{error_text}"
+                tr(
+                    "sub_agent.summary_failed",
+                    agent_id=task.get("agent_id"),
+                    summary=task.get("summary"),
+                )
+                + error_text
             ),
         }
         task["final_result"] = result
@@ -406,9 +408,9 @@ class SubAgentStateMixin:
                 stats = {}
         stats_summary = self._build_stats_summary(stats)
         system_message = self._compose_sub_agent_message(
-            prefix=f"⏱️ 子智能体{task.get('agent_id')} 任务摘要：{task.get('summary')} 超时未完成。",
+            prefix=tr("sub_agent.summary_timeout", agent_id=task.get("agent_id"), summary=task.get("summary")),
             stats_summary=stats_summary,
-            summary="等待超时，子智能体已被终止。",
+            summary=tr("sub_agent.timeout_terminated_note"),
         )
 
         result = {
@@ -416,7 +418,7 @@ class SubAgentStateMixin:
             "status": "timeout",
             "task_id": task_id,
             "agent_id": task.get("agent_id"),
-            "message": "等待超时，子智能体已被终止。",
+            "message": tr("sub_agent.timeout_terminated_note"),
             "stats": stats,
             "stats_summary": stats_summary,
             "system_message": system_message,
@@ -552,15 +554,15 @@ class SubAgentStateMixin:
         if self._should_force_cleanup_stale_task(task):
             return self._mark_task_terminated(
                 task,
-                message="子智能体疑似僵尸任务，已超时自动清理运行状态。",
-                system_message="⚠️ 子智能体长时间未结束，系统已自动清理运行状态。",
+                message=tr("sub_agent_state.zombie_cleanup_message"),
+                system_message=tr("sub_agent_state.zombie_cleanup_sysmsg"),
                 notified=True,
             )
 
         return self._mark_task_terminated(
             task,
-            message="检测到子智能体任务已退出，已自动清理运行状态。",
-            system_message="⚠️ 子智能体任务异常退出，系统已自动清理运行状态。",
+            message=tr("sub_agent_state.exited_cleanup_message"),
+            system_message=tr("sub_agent_state.exited_cleanup_sysmsg"),
             notified=True,
         )
 

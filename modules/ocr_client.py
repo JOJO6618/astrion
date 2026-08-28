@@ -11,6 +11,8 @@ from openai import OpenAI
 from config import OCR_API_BASE_URL, OCR_API_KEY, OCR_MODEL_ID, OCR_MAX_TOKENS
 from modules.file_manager import FileManager
 
+from modules.i18n import tr
+
 
 class OCRClient:
     """封装外部 VLM 调用逻辑。"""
@@ -56,9 +58,9 @@ class OCRClient:
         if not valid:
             return False, error, None
         if not full_path.exists():
-            return False, "文件不存在", None
+            return False, tr("ocr.file_not_exists"), None
         if not full_path.is_file():
-            return False, "不是文件", None
+            return False, tr("ocr.not_a_file"), None
         return True, "", full_path
 
     def vlm_analyze(self, path: str, prompt: str) -> Dict:
@@ -70,32 +72,32 @@ class OCRClient:
             return {"success": False, "error": error, "warnings": warnings}
 
         if not prompt or not str(prompt).strip():
-            return {"success": False, "error": "prompt 不能为空", "warnings": warnings}
+            return {"success": False, "error": tr("ocr.prompt_empty"), "warnings": warnings}
         if not OCR_API_KEY or not OCR_API_BASE_URL or not self.model:
-            return {"success": False, "error": "VLM 配置缺失，请设置 OCR_API_BASE_URL / OCR_API_KEY / OCR_MODEL_ID", "warnings": warnings}
+            return {"success": False, "error": tr("ocr.config_missing"), "warnings": warnings}
         self._ensure_client()
         if not self.client:
-            return {"success": False, "error": "VLM 客户端初始化失败", "warnings": warnings}
+            return {"success": False, "error": tr("ocr.client_init_failed"), "warnings": warnings}
 
         try:
             data = full_path.read_bytes()
         except Exception as exc:
-            return {"success": False, "error": f"读取文件失败: {exc}", "warnings": warnings}
+            return {"success": False, "error": tr("ocr.read_failed", error=str(exc)), "warnings": warnings}
 
         size = len(data)
         if size <= 0:
-            return {"success": False, "error": "文件为空，无法识别", "warnings": warnings}
+            return {"success": False, "error": tr("ocr.file_empty"), "warnings": warnings}
 
         if size > self.max_image_size:
             return {
                 "success": False,
-                "error": f"图片过大({size}字节)，上限为{self.max_image_size}字节",
+                "error": tr("ocr.image_too_large", size=size, max_size=self.max_image_size),
                 "warnings": warnings,
             }
 
         mime_type, _ = mimetypes.guess_type(str(full_path))
         if not mime_type or not mime_type.startswith("image/"):
-            warnings.append("无法确定图片类型，已按 JPEG 处理")
+            warnings.append(tr("ocr.unknown_image_type"))
             mime_type = "image/jpeg"
 
         base64_image = base64.b64encode(data).decode("utf-8")
@@ -119,7 +121,7 @@ class OCRClient:
             content = response.choices[0].message.content if response.choices else ""
             return {"success": True, "content": content or "", "warnings": warnings}
         except Exception as exc:
-            return {"success": False, "error": f"VLM 调用失败: {exc}", "warnings": warnings}
+            return {"success": False, "error": tr("ocr.vlm_call_failed", error=str(exc)), "warnings": warnings}
 
     def ocr_image(self, path: str, prompt: str) -> Dict:
         """兼容旧名，转发到 vlm_analyze。"""

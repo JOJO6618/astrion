@@ -64,6 +64,8 @@ from typing import Any, Dict, List, Optional, Set
 
 from utils.atomic_io import replace_with_retry
 
+from modules.i18n import tr
+
 
 class ShallowVersioningError(RuntimeError):
     """Raised when shallow versioning fails."""
@@ -108,7 +110,7 @@ class ShallowVersioningManager:
         self.project_path = Path(project_path).expanduser().resolve()
         self.conversation_id = str(conversation_id or "").strip()
         if not self.conversation_id:
-            raise ShallowVersioningError("缺少 conversation_id")
+            raise ShallowVersioningError(tr("shallow_ver.missing_conversation_id"))
         self.save_root = (Path(data_dir).expanduser().resolve() / "save" / self.conversation_id).resolve()
         self.backup_dir = self.save_root / "shallow_backups"
         self.state_file = self.backup_dir / "state.jsonl"
@@ -407,7 +409,7 @@ class ShallowVersioningManager:
                 target_snapshot = snapshot
                 break
         if not target_snapshot:
-            raise ShallowVersioningError(f"未找到消息 {message_id} 对应的快照")
+            raise ShallowVersioningError(tr("shallow_ver.snapshot_not_found", message_id=message_id))
 
         files_changed: List[str] = []
         for tracking_path in self._tracked_files:

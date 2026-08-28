@@ -15,6 +15,8 @@ except ImportError:
 from core.tool_config import TOOL_CATEGORIES
 from config.model_profiles import get_default_model_key, get_registered_model_keys
 
+from modules.i18n import tr
+
 ALLOWED_RUN_MODES = {"fast", "thinking"}
 ALLOWED_PERMISSION_MODES = {"readonly", "approval", "auto_approval", "unrestricted"}
 ALLOWED_WORK_MODES = {"plan", "ask", "execute"}
@@ -24,6 +26,7 @@ ALLOWED_CONVERSATION_CONTINUITY = {"low", "medium", "high"}
 ALLOWED_GOAL_REVIEW_MODES = {"readonly", "active"}
 ALLOWED_GOAL_END_CONDITIONS = {"max_turns", "max_tokens"}
 ALLOWED_BLOCK_DISPLAY_MODES = {"traditional", "stacked", "minimal"}
+ALLOWED_UI_LOCALES = {"zh-CN", "en-US"}
 GOAL_MAX_TURNS_MIN = 1
 GOAL_MAX_TURNS_MAX = 100
 GOAL_MAX_TURNS_DEFAULT = 5
@@ -125,6 +128,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "sidebar_pinned_workspaces": [],  # 分组侧边栏中永久置顶的工作区ID列表
     "sidebar_workspace_order": [],  # 分组侧边栏中非置顶工作区的显示顺序
     "theme": "classic",  # 主题配色: classic-经典/light-明亮/dark-暗黑
+    "ui_locale": "zh-CN",  # 界面语言: zh-CN / en-US（同时驱动后端用户可见消息语言）
     # 目标模式（Goal Mode）
     "goal_review_mode": "readonly",  # readonly-仅读对话判断 / active-允许审核智能体跑只读命令取证
     "goal_end_conditions": ["max_turns"],  # 结束方式，可多选：max_turns / max_tokens
@@ -202,12 +206,25 @@ def load_personalization_config(base_dir: PathLike) -> Dict[str, Any]:
             if sanitized != raw:
                 with open(path, "w", encoding="utf-8") as wf:
                     json.dump(sanitized, wf, ensure_ascii=False, indent=2)
+            _sync_ui_locale(sanitized)
             return sanitized
     except (json.JSONDecodeError, OSError):
         # 重置为默认配置，避免错误阻塞
         with open(path, "w", encoding="utf-8") as f:
             json.dump(DEFAULT_PERSONALIZATION_CONFIG, f, ensure_ascii=False, indent=2)
-        return deepcopy(DEFAULT_PERSONALIZATION_CONFIG)
+        fallback = deepcopy(DEFAULT_PERSONALIZATION_CONFIG)
+        _sync_ui_locale(fallback)
+        return fallback
+
+
+def _sync_ui_locale(config: Dict[str, Any]) -> None:
+    """把 ui_locale 推进 modules.i18n 进程级缓存（后端用户可见消息取词用）。"""
+    try:
+        from modules import i18n
+
+        i18n.sync_from_config(config)
+    except Exception:
+        pass
 
 
 def _sanitize_string_list(value: Any, max_length: int = 100) -> list:
@@ -638,6 +655,13 @@ def sanitize_personalization_payload(
     elif base.get("theme") not in ALLOWED_THEMES:
         base["theme"] = "classic"
 
+    # 界面语言（zh-CN / en-US；后端用户可见消息同步生效）
+    ui_locale_value = data.get("ui_locale", base.get("ui_locale"))
+    if isinstance(ui_locale_value, str) and ui_locale_value in ALLOWED_UI_LOCALES:
+        base["ui_locale"] = ui_locale_value
+    elif base.get("ui_locale") not in ALLOWED_UI_LOCALES:
+        base["ui_locale"] = "zh-CN"
+
     # 目标模式：审核模式
     goal_review_mode = data.get("goal_review_mode", base.get("goal_review_mode"))
     if isinstance(goal_review_mode, str) and goal_review_mode in ALLOWED_GOAL_REVIEW_MODES:
@@ -817,6 +841,7 @@ def save_personalization_config(base_dir: PathLike, payload: Dict[str, Any]) -> 
     _ensure_parent(path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+    _sync_ui_locale(config)
     return config
 
 
@@ -897,7 +922,7 @@ def validate_context_compression_settings(config: Optional[Dict[str, Any]]) -> N
         max_value=MAX_COMPRESSION_TRIGGER_TOKENS,
     ) or DEFAULT_DEEP_COMPRESS_TRIGGER_TOKENS
     if deep_trigger <= shallow_trigger:
-        raise ValueError("深压缩触发上下文必须大于浅压缩触发上下文")
+        raise ValueError(tr("personalization.deep_trigger_gt_shallow"))
 
 
 def _load_human_like_prompt() -> str:

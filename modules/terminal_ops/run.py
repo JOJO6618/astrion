@@ -40,6 +40,7 @@ from modules.host_sandbox_runner import (
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -242,7 +243,7 @@ class RunMixin:
                     return {
                         "success": False,
                         "status": "error",
-                        "error": "宿主机命令执行被拒绝：HOST_SANDBOX_ENABLED=0",
+                        "error": tr("terminal.host_sandbox_disabled"),
                         "output": "",
                         "return_code": -1,
                         "timeout": timeout,
@@ -372,9 +373,9 @@ class RunMixin:
                 "elapsed_ms": int((time.time() - start_ts) * 1000)
             }
             if not success and timed_out:
-                response["message"] = f"命令执行超时 ({timeout}秒)"
+                response["message"] = tr("terminal.exec_timeout_seconds", timeout=timeout)
             elif not success and process.returncode is not None:
-                response["message"] = f"命令执行失败 (返回码: {process.returncode})"
+                response["message"] = tr("terminal.exec_failed_code", code=process.returncode)
             if stderr_text:
                 response["stderr"] = stderr_text
             return response
@@ -382,7 +383,7 @@ class RunMixin:
             return {
                 "success": False,
                 "status": "error",
-                "error": f"宿主机沙箱不可用，拒绝执行: {str(exc)}",
+                "error": tr("terminal.host_sandbox_unavailable", error=exc),
                 "output": "",
                 "return_code": -1,
                 "timeout": timeout,
@@ -392,7 +393,7 @@ class RunMixin:
             return {
                 "success": False,
                 "status": "error",
-                "error": f"执行失败: {str(exc)}",
+                "error": tr("terminal.exec_failed_generic", error=exc),
                 "output": "",
                 "return_code": -1,
                 "timeout": timeout,
@@ -445,9 +446,9 @@ class RunMixin:
         if timeout is None or timeout <= 0:
             return {
                 "success": False,
-                "error": "timeout 参数必填且需大于0",
+                "error": tr("terminal.timeout_required"),
                 "status": "error",
-                "output": "timeout 参数缺失",
+                "output": tr("terminal.timeout_missing"),
                 "return_code": -1
             }
         # 每次执行前重置工具容器（保持隔离），但下面改用一次性子进程执行，仍保留重置以兼容后续逻辑
@@ -472,7 +473,7 @@ class RunMixin:
         except ValueError:
             return {
                 "success": False,
-                "error": "工作目录必须在项目文件夹内",
+                "error": tr("terminal.work_dir_outside_project"),
                 "output": "",
                 "return_code": -1
             }
@@ -518,7 +519,7 @@ class RunMixin:
                     if char_count > MAX_RUN_COMMAND_CHARS:
                         return {
                             "success": False,
-                            "error": f"结果内容过大，有{char_count}字符，请使用限制字符数的获取内容方式，根据程度选择10k以内的数",
+                            "error": tr("terminal.output_too_large", char_count=char_count),
                             "char_count": char_count,
                             "limit": MAX_RUN_COMMAND_CHARS,
                             "command": command
@@ -527,7 +528,7 @@ class RunMixin:
         except asyncio.CancelledError:
             return {
                 "success": False,
-                "message": "命令执行被用户取消",
+                "message": tr("terminal.command_cancelled"),
                 "output": "",
                 "status": "cancelled",
                 "return_code": -1,
@@ -546,7 +547,7 @@ class RunMixin:
             if char_count > MAX_RUN_COMMAND_CHARS:
                 return {
                     "success": False,
-                    "error": f"结果内容过大，有{char_count}字符，请使用限制字符数的获取内容方式，根据程度选择10k以内的数",
+                    "error": tr("terminal.output_too_large", char_count=char_count),
                     "char_count": char_count,
                     "limit": MAX_RUN_COMMAND_CHARS,
                     "command": command

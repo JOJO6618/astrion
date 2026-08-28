@@ -12,24 +12,26 @@ import mimetypes
 from pathlib import Path
 from typing import Any, Dict
 
+from modules.i18n import tr
+
 
 async def handle_read_mediafile(project_path: Path, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """read_mediafile 实现：直接读取项目内媒体文件并返回 base64。"""
     path = arguments.get("path")
     if not path:
-        return {"success": False, "error": "path 不能为空"}
+        return {"success": False, "error": tr("sub_agent_tools.path_required")}
     try:
         abs_path = (project_path / path).resolve()
         abs_path.relative_to(project_path)
     except Exception:
-        return {"success": False, "error": "非法路径，超出项目根目录"}
+        return {"success": False, "error": tr("sub_agent_tools.invalid_path")}
 
     if not abs_path.exists() or not abs_path.is_file():
-        return {"success": False, "error": f"文件不存在: {path}"}
+        return {"success": False, "error": tr("sub_agent_tools.file_not_found", path=path)}
 
     mime, _ = mimetypes.guess_type(str(abs_path))
     if not mime or (not mime.startswith("image/") and not mime.startswith("video/")):
-        return {"success": False, "error": "禁止的文件类型"}
+        return {"success": False, "error": tr("sub_agent_tools.forbidden_file_type")}
 
     try:
         data = abs_path.read_bytes()

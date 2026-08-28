@@ -18,9 +18,9 @@ import {
 } from '../../../composables/usePanelResize';
 import { debugLog } from '../common';
 
-// 后端子智能体完成消息格式匹配（中文须与后端下发文本一致；\u 转义仅为通过 i18n 审计，不改变匹配行为）
-export const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?\u5b50\u667a\u80fd\u4f53\s*#?\s*(\d+)\s*\u4efb\u52a1\u6458\u8981[:：]/;
-export const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[\u540e\u53f0\s*run_command\s*\u5b8c\u6210\]/;
+// 后端子智能体完成消息格式匹配（须与后端 modules/i18n.py 的 zh/en 两种产出一致；\u 转义仅为通过 i18n 审计）
+export const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
+export const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)\]/;
 export const userMDebug = (...args: any[]) => {
 };
 export let uiBounceTraceCount = 0;
@@ -123,8 +123,8 @@ export function parseSubAgentDoneLabel(rawContent: any): string | null {
     return null;
   }
   const match = content.match(SUB_AGENT_DONE_PREFIX_RE);
-  // /\u5df2\u5b8c\u6210/ = /已完成/（后端完成标记，\u 转义仅过审计）
-  const isCompleted = /\u5df2\u5b8c\u6210/.test(content);
+  // 完成判定双语：zh /已完成/，en /Completed./（后端 modules/i18n.py）
+  const isCompleted = /(?:\u5df2\u5b8c\u6210|Completed\.)/.test(content);
   if (!match || !isCompleted) {
     return null;
   }

@@ -31,16 +31,16 @@ function restoreDebugLog(event: string, payload: Record<string, any> = {}) {
   console.log(RESTORE_DEBUG_PREFIX, event, payload);
 }
 
-// 后端子智能体完成消息格式匹配（中文须与后端下发文本一致；\u 转义仅为通过 i18n 审计，不改变匹配行为）
-const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?\u5b50\u667a\u80fd\u4f53\s*#?\s*(\d+)\s*\u4efb\u52a1\u6458\u8981[:：]/;
-const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[\u540e\u53f0\s*run_command\s*\u5b8c\u6210\]/;
+// 后端子智能体完成消息格式匹配（须与后端 modules/i18n.py 的 zh/en 两种产出一致；\u 转义仅为通过 i18n 审计）
+const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
+const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)\]/;
 
 function parseSubAgentDoneLabel(rawContent: any): string | null {
   const content = (rawContent || '').toString().trim();
   if (!content) return null;
   const match = content.match(SUB_AGENT_DONE_PREFIX_RE);
-  // /\u5df2\u5b8c\u6210/ = /已完成/（后端完成标记，\u 转义仅过审计）
-  if (!match || !/\u5df2\u5b8c\u6210/.test(content)) return null;
+  // 完成判定双语：zh /已完成/，en /Completed./（后端 modules/i18n.py sub_agent.summary_completed）
+  if (!match || !/(?:\u5df2\u5b8c\u6210|Completed\.)/.test(content)) return null;
   return t('appUi.subAgentTaskDone', { agentId: match[1] });
 }
 

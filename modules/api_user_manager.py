@@ -28,6 +28,8 @@ except Exception:  # pragma: no cover - 环境缺失时给予友好提示
     Fernet = None
     InvalidToken = Exception  # type: ignore
 
+from modules.i18n import tr
+
 
 @dataclass
 class ApiUserRecord:
@@ -173,7 +175,7 @@ class ApiUserManager:
         username = self._normalize_username(username)
         with self._lock:
             if username in self._users:
-                raise ValueError("该 API 用户已存在")
+                raise ValueError(tr("api_user_mgr.user_exists"))
             record, token = self._issue_token_locked(username, note=note)
             self._save_users()
             return record, token
@@ -183,7 +185,7 @@ class ApiUserManager:
         username = self._normalize_username(username)
         with self._lock:
             if username not in self._users:
-                raise ValueError("用户不存在")
+                raise ValueError(tr("api_user_mgr.user_not_found"))
             record, token = self._issue_token_locked(username, note=note)
             self._save_users()
             return record, token
@@ -212,7 +214,7 @@ class ApiUserManager:
         with self._lock:
             token_entry = self._tokens.get(username) or {}
         if not token_entry:
-            raise ValueError("未找到 token 记录")
+            raise ValueError(tr("api_user_mgr.token_not_found"))
         # 优先使用加密存储；若无密钥或解密失败，回退到明文字段（本地后台安全场景可接受）
         enc = token_entry.get("token_enc")
         if enc:
@@ -229,7 +231,7 @@ class ApiUserManager:
         plain = token_entry.get("token_plain")
         if plain:
             return plain
-        raise RuntimeError("缺少 API_TOKEN_SECRET 且无可用明文 token")
+        raise RuntimeError(tr("api_user_mgr.missing_token_secret"))
 
     def bump_usage(self, username: str, endpoint: Optional[str] = None):
         """记录 API 请求次数与最近时间，用于后台监控。"""
@@ -293,7 +295,7 @@ class ApiUserManager:
     def _normalize_username(self, username: str) -> str:
         candidate = (username or "").strip().lower()
         if not candidate:
-            raise ValueError("用户名不能为空")
+            raise ValueError(tr("api_user_mgr.username_empty"))
         return candidate
 
     def _sha256(self, token: str) -> str:
@@ -307,7 +309,7 @@ class ApiUserManager:
         try:
             raw = json.loads(self.users_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise RuntimeError(f"无法解析 API 用户文件: {self.users_file} ({exc})")
+            raise RuntimeError(tr("api_user_mgr.users_file_parse_failed", file_path=self.users_file, error=exc))
 
         users = raw.get("users", {}) if isinstance(raw, dict) else {}
         for username, payload in users.items():

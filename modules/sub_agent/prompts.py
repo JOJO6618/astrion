@@ -19,6 +19,8 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import PROMPTS_DIR
 
+from modules.i18n import tr
+
 
 _SUB_AGENT_PROMPTS_DIR = Path(PROMPTS_DIR) / "sub_agent"
 _TEMPLATE_CACHE: dict[str, str] = {}
@@ -32,7 +34,7 @@ def _load_template(name: str) -> str:
 
     template_path = _SUB_AGENT_PROMPTS_DIR / f"{name}.txt"
     if not template_path.exists():
-        raise FileNotFoundError(f"子智能体 prompt 模板缺失: {template_path}")
+        raise FileNotFoundError(tr("sa_prompts.template_missing", path=template_path))
 
     content = template_path.read_text(encoding="utf-8")
     _TEMPLATE_CACHE[name] = content

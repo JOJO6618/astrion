@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -108,12 +109,12 @@ class PathMixin:
                 path = str(test_path.relative_to(project_root))
             except ValueError:
                 if str(original_path).replace("\\", "/").startswith("/workspace"):
-                    return False, "路径必须在项目文件夹内。请检查是否使用的是不带/workspace的相对路径。", None
-                return False, "路径必须在项目文件夹内", None
+                    return False, tr("file_manager.path_outside_workspace_detailed"), None
+                return False, tr("file_manager.path_outside_project"), None
         
         # 检查是否包含向上遍历
         if ".." in path:
-            return False, "不允许使用../向上遍历", None
+            return False, tr("file_manager.path_traversal_blocked"), None
         
         # 构建完整路径
         full_path = (project_root / path).resolve()
@@ -122,18 +123,18 @@ class PathMixin:
         try:
             full_path.relative_to(project_root)
         except ValueError:
-            return False, "路径必须在项目文件夹内", None
+            return False, tr("file_manager.path_outside_project"), None
         
         # 检查禁止的路径
         path_str = str(full_path)
         
         for forbidden_root in FORBIDDEN_ROOT_PATHS:
             if path_str == forbidden_root:
-                return False, f"禁止访问根目录: {forbidden_root}", None
+                return False, tr("file_manager.path_forbidden_root", path=forbidden_root), None
         
         for forbidden in FORBIDDEN_PATHS:
             if path_str.startswith(forbidden + os.sep) or path_str == forbidden:
-                return False, f"禁止访问系统目录: {forbidden}", None
+                return False, tr("file_manager.path_forbidden_system", path=forbidden), None
         
         return True, "", full_path
 
@@ -187,5 +188,5 @@ class PathMixin:
         if self._path_in_allowed_roots(check_target.resolve(), allowed_roots):
             return True, ""
         if access == "write":
-            return False, "目标路径不在可写授权范围内，请在路径授权中添加后重试。"
-        return False, "目标路径不在可读授权范围内，请在路径授权中添加后重试。"
+            return False, tr("file_manager.host_access_write_denied")
+        return False, tr("file_manager.host_access_read_denied")

@@ -26,6 +26,7 @@ from server.tasks import task_manager
 from server.tasks.skills import _build_skill_context_messages
 from server.tasks.helpers import _task_public_payload
 from server.tasks.media import _normalize_media_payload, _normalize_files_payload
+from modules.i18n import tr
 
 
 
@@ -63,7 +64,7 @@ def get_conversation_running_status_api(conversation_id: str):
     username = get_current_username()
     conversation_id = (conversation_id or "").strip()
     if not conversation_id:
-        return jsonify({"success": False, "error": "缺少 conversation_id"}), 400
+        return jsonify({"success": False, "error": tr("tasks.missing_conversation_id")}), 400
 
     # ① 主 task：内存中该对话是否有活动任务（取最新一条）
     active_statuses = {"pending", "running", "cancel_requested"}
@@ -117,7 +118,7 @@ def create_task_api():
     files = _normalize_files_payload(payload.get("files"))
     conversation_id = payload.get("conversation_id")
     if not message and not images and not videos:
-        return jsonify({"success": False, "error": "消息不能为空"}), 400
+        return jsonify({"success": False, "error": tr("tasks.message_empty")}), 400
     model_key = payload.get("model_key")
     thinking_mode = payload.get("thinking_mode")
     run_mode = payload.get("run_mode")
@@ -148,7 +149,7 @@ def create_task_api():
             _terminal, workspace = get_user_resources(username, workspace_id, conversation_id=conversation_id)
             if not workspace:
                 debug_log(f"[SkillsAPI] create_task workspace unavailable user={username} ws={workspace_id}")
-                return jsonify({"success": False, "error": "工作区不可用"}), 400
+                return jsonify({"success": False, "error": tr("tasks.workspace_unavailable")}), 400
             debug_log(
                 f"[SkillsAPI] create_task workspace OK project_path={getattr(workspace, 'project_path', None)!r} "
                 f"data_dir={getattr(workspace, 'data_dir', None)!r}"
@@ -161,7 +162,7 @@ def create_task_api():
         except Exception as exc:
             debug_log(f"[SkillsAPI] 读取技能上下文失败: {exc}")
             debug_log(f"[SkillsAPI] 读取技能上下文失败 traceback:\n{traceback.format_exc()}")
-            return jsonify({"success": False, "error": "读取 skill 失败"}), 500
+            return jsonify({"success": False, "error": tr("tasks.read_skill_failed")}), 500
     try:
         debug_log(
             "[TaskAPI] create_task payload "
@@ -231,7 +232,7 @@ def get_task_api(task_id: str):
         log_conn_diag(
             f"task-poll-missing req={poll_req_id} user={username} task_id={task_id}"
         )
-        return jsonify({"success": False, "error": "任务不存在"}), 404
+        return jsonify({"success": False, "error": tr("tasks.task_not_found")}), 404
     try:
         offset = int(request.args.get("from", 0))
     except Exception:
@@ -281,7 +282,7 @@ def cancel_task_api(task_id: str):
     username = get_current_username()
     rec = task_manager.get_task(username, task_id)
     if not rec:
-        return jsonify({"success": False, "error": "任务不存在"}), 404
+        return jsonify({"success": False, "error": tr("tasks.task_not_found")}), 404
     ok = task_manager.cancel_task(username, task_id)
     # 用户取消任务时，一并停止该工作区的目标模式，避免后续新对话继承旧目标。
     try:
@@ -303,16 +304,16 @@ def enqueue_runtime_guidance_api(task_id: str):
     payload = request.get_json() or {}
     message = (payload.get("message") or "").strip()
     if not message:
-        return jsonify({"success": False, "error": "引导内容不能为空"}), 400
+        return jsonify({"success": False, "error": tr("tasks.guidance_content_empty")}), 400
 
     result = task_manager.enqueue_runtime_guidance(username, task_id, message)
     if not result.get("success"):
         code = result.get("code") or "runtime_guidance_failed"
         if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or "任务不存在"}), 404
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
         if code in {"queue_full", "task_not_running"}:
-            return jsonify({"success": False, "error": result.get("error") or "任务状态不允许"}), 409
-        return jsonify({"success": False, "error": result.get("error") or "追加引导失败"}), 400
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_status_not_allowed")}), 409
+        return jsonify({"success": False, "error": result.get("error") or tr("tasks.guidance_enqueue_failed")}), 400
 
     return jsonify(
         {
@@ -331,16 +332,16 @@ def enqueue_runtime_queue_message_api(task_id: str):
     payload = request.get_json() or {}
     message = (payload.get("message") or "").strip()
     if not message:
-        return jsonify({"success": False, "error": "消息不能为空"}), 400
+        return jsonify({"success": False, "error": tr("tasks.message_empty")}), 400
     files = _normalize_files_payload(payload.get("files"))
     result = task_manager.enqueue_runtime_pending_message(username, task_id, message, files=files)
     if not result.get("success"):
         code = result.get("code") or "runtime_queue_enqueue_failed"
         if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or "任务不存在"}), 404
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
         if code in {"queue_full", "task_not_running"}:
-            return jsonify({"success": False, "error": result.get("error") or "任务状态不允许"}), 409
-        return jsonify({"success": False, "error": result.get("error") or "追加消息失败"}), 400
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_status_not_allowed")}), 409
+        return jsonify({"success": False, "error": result.get("error") or tr("tasks.message_enqueue_failed")}), 400
     return jsonify(
         {
             "success": True,
@@ -360,10 +361,10 @@ def delete_runtime_queue_message_api(task_id: str, message_id: str):
     if not result.get("success"):
         code = result.get("code") or "runtime_queue_delete_failed"
         if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or "任务不存在"}), 404
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
         if code == "message_not_found":
-            return jsonify({"success": False, "error": result.get("error") or "消息不存在"}), 404
-        return jsonify({"success": False, "error": result.get("error") or "删除失败"}), 400
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.message_not_found")}), 404
+        return jsonify({"success": False, "error": result.get("error") or tr("tasks.delete_failed")}), 400
     return jsonify(
         {
             "success": True,
@@ -382,12 +383,12 @@ def guide_runtime_queue_message_api(task_id: str, message_id: str):
     if not result.get("success"):
         code = result.get("code") or "runtime_queue_guide_failed"
         if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or "任务不存在"}), 404
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
         if code == "message_not_found":
-            return jsonify({"success": False, "error": result.get("error") or "消息不存在"}), 404
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.message_not_found")}), 404
         if code in {"guidance_queue_full", "task_not_running"}:
-            return jsonify({"success": False, "error": result.get("error") or "任务状态不允许"}), 409
-        return jsonify({"success": False, "error": result.get("error") or "引导失败"}), 400
+            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_status_not_allowed")}), 409
+        return jsonify({"success": False, "error": result.get("error") or tr("tasks.guidance_failed")}), 400
     return jsonify(
         {
             "success": True,

@@ -69,6 +69,8 @@ from core.main_terminal_parts import (
     MainTerminalToolsMixin,
 )
 
+from modules.i18n import tr
+
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
 
@@ -277,7 +279,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
     def set_network_permission(self, mode: str) -> str:
             normalized = str(mode or "").strip().lower()
             if normalized not in {"restricted", "full", "none"}:
-                raise ValueError("无效网络权限，仅支持 restricted / full / none")
+                raise ValueError(tr("main_terminal.invalid_network_permission"))
             self.host_network_permission = normalized
             return normalized
 
@@ -291,7 +293,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
     def queue_permission_mode_change(self, mode: str) -> str:
             normalized = str(mode or "").strip().lower()
             if normalized not in {"readonly", "approval", "auto_approval", "unrestricted"}:
-                raise ValueError("无效权限模式，仅支持 readonly / approval / auto_approval / unrestricted")
+                raise ValueError(tr("main_terminal.invalid_permission_mode"))
             self.pending_permission_mode = normalized
             self._persist_runtime_mode_metadata({
                 "pending_permission_mode": normalized,
@@ -301,7 +303,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
     def queue_execution_mode_change(self, mode: str) -> str:
             normalized = str(mode or "").strip().lower()
             if normalized not in {"sandbox", "direct"}:
-                raise ValueError("无效执行环境，仅支持 sandbox / direct")
+                raise ValueError(tr("main_terminal.invalid_execution_environment"))
             self.pending_execution_mode = normalized
             self._persist_runtime_mode_metadata({
                 "pending_execution_mode": normalized,
@@ -311,7 +313,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
     def queue_network_permission_change(self, mode: str) -> str:
             normalized = str(mode or "").strip().lower()
             if normalized not in {"restricted", "full", "none"}:
-                raise ValueError("无效网络权限，仅支持 restricted / full / none")
+                raise ValueError(tr("main_terminal.invalid_network_permission"))
             self.pending_network_permission = normalized
             self._persist_runtime_mode_metadata({
                 "pending_network_permission": normalized,
@@ -421,14 +423,14 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
     def set_execution_mode(self, mode: str) -> Dict:
             normalized = str(mode or "").strip().lower()
             if normalized not in {"sandbox", "direct"}:
-                raise ValueError("无效执行环境，仅支持 sandbox / direct")
+                raise ValueError(tr("main_terminal.invalid_execution_environment"))
             # 计划模式下执行环境锁死为沙箱：只读权限依赖 OS 沙箱硬限制，
             # direct 下无沙箱，只读形同虚设。解除锁定的唯一路径是
             # switch_work_mode 先切离 plan 再恢复执行环境。
             if normalized == "direct" and getattr(self, "get_work_mode", None):
                 try:
                     if self.get_work_mode() == "plan":
-                        raise ValueError("计划模式下执行环境锁定为沙箱，请先切换运行模式")
+                        raise ValueError(tr("main_terminal.plan_mode_locks_sandbox"))
                 except AttributeError:
                     pass
             # 只读模式下执行环境同样锁死为沙箱（与 plan 锁并列）：
@@ -437,7 +439,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             if normalized == "direct" and getattr(self, "get_permission_mode", None):
                 try:
                     if self.get_permission_mode() == "readonly":
-                        raise ValueError("只读模式下执行环境锁定为沙箱，请先切换权限模式")
+                        raise ValueError(tr("main_terminal.readonly_mode_locks_sandbox"))
                 except AttributeError:
                     pass
             self.host_execution_mode = normalized

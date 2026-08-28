@@ -58,6 +58,7 @@ except ImportError:
 
 from modules.persistent_terminal import PersistentTerminal
 from utils.terminal_factory import TerminalFactory
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -217,7 +218,7 @@ class TerminalManager:
         if session_name in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{session_name}' 已存在",
+                "error": tr("terminal.session_exists", session_name=session_name),
                 "existing_sessions": list(self.terminals.keys())
             }
         
@@ -225,9 +226,9 @@ class TerminalManager:
         if len(self.terminals) >= self.max_terminals:
             return {
                 "success": False,
-                "error": f"已达到最大终端数量限制 ({self.max_terminals})",
+                "error": tr("terminal.max_terminals_reached", max_terminals=self.max_terminals),
                 "existing_sessions": list(self.terminals.keys()),
-                "suggestion": "请先关闭一个终端会话"
+                "suggestion": tr("terminal.close_extra_session_hint")
             }
         
         # 确定工作目录
@@ -260,7 +261,7 @@ class TerminalManager:
         if not terminal.start():
             return {
                 "success": False,
-                "error": "终端启动失败",
+                "error": tr("terminal.start_failed"),
                 "session": session_name
             }
         
@@ -322,7 +323,7 @@ class TerminalManager:
         if session_name not in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{session_name}' 不存在",
+                "error": tr("terminal.session_not_found", session_name=session_name),
                 "existing_sessions": list(self.terminals.keys())
             }
         
@@ -373,19 +374,19 @@ class TerminalManager:
         if not target_session:
             return {
                 "success": False,
-                "error": "没有活动终端会话",
-                "suggestion": "请先使用 terminal_session 打开一个终端",
+                "error": tr("terminal.no_active_session"),
+                "suggestion": tr("terminal.open_session_hint"),
                 "status": "error",
-                "output": "没有活动终端会话"
+                "output": tr("terminal.no_active_session")
             }
         
         if target_session not in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{target_session}' 不存在",
+                "error": tr("terminal.session_not_found", session_name=target_session),
                 "existing_sessions": list(self.terminals.keys()),
                 "status": "error",
-                "output": f"终端会话 '{target_session}' 不存在"
+                "output": tr("terminal.session_not_found", session_name=target_session)
             }
         
         terminal = self.terminals[target_session]
@@ -421,7 +422,7 @@ class TerminalManager:
                 })
             return {
                 "success": False,
-                "error": f"终端会话 '{target_session}' 重置失败：无法重新启动进程",
+                "error": tr("terminal.reset_failed_restart", session_name=target_session),
                 "working_dir": working_dir
             }
         
@@ -445,7 +446,7 @@ class TerminalManager:
             "session": target_session,
             "working_dir": working_dir,
             "shell": new_terminal.shell_command or shell_command,
-            "message": "终端会话已重置并重新启动"
+            "message": tr("terminal.reset_success")
         }
     
     def switch_terminal(self, session_name: str) -> Dict:
@@ -461,7 +462,7 @@ class TerminalManager:
         if session_name not in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{session_name}' 不存在",
+                "error": tr("terminal.session_not_found", session_name=session_name),
                 "existing_sessions": list(self.terminals.keys())
             }
         
@@ -528,19 +529,19 @@ class TerminalManager:
         if not target_session:
             return {
                 "success": False,
-                "error": "没有活动终端会话",
-                "suggestion": "请先使用 terminal_session 打开一个终端",
+                "error": tr("terminal.no_active_session"),
+                "suggestion": tr("terminal.open_session_hint"),
                 "status": "error",
-                "output": "没有活动终端会话"
+                "output": tr("terminal.no_active_session")
             }
 
         if target_session not in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{target_session}' 不存在",
+                "error": tr("terminal.session_not_found", session_name=target_session),
                 "existing_sessions": list(self.terminals.keys()),
                 "status": "error",
-                "output": f"终端会话 '{target_session}' 不存在"
+                "output": tr("terminal.session_not_found", session_name=target_session)
             }
         
         # 发送命令
@@ -551,17 +552,17 @@ class TerminalManager:
             except (TypeError, ValueError):
                 return {
                     "success": False,
-                    "error": "output_wait 参数必须是数字",
+                    "error": tr("terminal.output_wait_not_number"),
                     "status": "error",
-                    "output": "output_wait 参数无效"
+                    "output": tr("terminal.output_wait_invalid")
                 }
 
         if output_wait is None or output_wait <= 0:
             return {
                 "success": False,
-                "error": "output_wait 参数必填且需大于0",
+                "error": tr("terminal.output_wait_required"),
                 "status": "error",
-                "output": "output_wait 参数缺失"
+                "output": tr("terminal.output_wait_missing")
             }
         output_wait = min(output_wait, 300)
 
@@ -636,13 +637,13 @@ class TerminalManager:
         if not target_session:
             return {
                 "success": False,
-                "error": "没有活动终端会话"
+                "error": tr("terminal.no_active_session")
             }
         
         if target_session not in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{target_session}' 不存在"
+                "error": tr("terminal.session_not_found", session_name=target_session)
             }
         
         terminal = self.terminals[target_session]
@@ -702,14 +703,14 @@ class TerminalManager:
         if not target_session:
             return {
                 "success": False,
-                "error": "没有活动终端会话",
-                "suggestion": "请先使用 terminal_session 打开一个终端"
+                "error": tr("terminal.no_active_session"),
+                "suggestion": tr("terminal.open_session_hint")
             }
         
         if target_session not in self.terminals:
             return {
                 "success": False,
-                "error": f"终端会话 '{target_session}' 不存在",
+                "error": tr("terminal.session_not_found", session_name=target_session),
                 "existing_sessions": list(self.terminals.keys())
             }
         
@@ -731,7 +732,7 @@ class TerminalManager:
         })
         
         if snapshot.get("truncated"):
-            snapshot["note"] = f"输出已截断，仅返回了末尾的 {char_limit} 个字符"
+            snapshot["note"] = tr("terminal.output_truncated_note", char_limit=char_limit)
         
         return snapshot
     

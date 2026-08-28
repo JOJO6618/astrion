@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -96,10 +97,10 @@ class CrudMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         ok, msg = self._ensure_host_access(full_path, "write")
         if not ok:
             return {"success": False, "error": msg}
@@ -140,10 +141,10 @@ class CrudMixin:
             return {"success": False, "error": error_new}
         
         if not full_old_path.exists():
-            return {"success": False, "error": "原文件不存在"}
+            return {"success": False, "error": tr("file_manager.original_not_found")}
         
         if full_new_path.exists():
-            return {"success": False, "error": "目标文件已存在"}
+            return {"success": False, "error": tr("file_manager.target_exists")}
         ok_old, msg_old = self._ensure_host_access(full_old_path, "write")
         if not ok_old:
             return {"success": False, "error": msg_old}
@@ -183,7 +184,7 @@ class CrudMixin:
             return {"success": False, "error": error}
         
         if full_path.exists():
-            return {"success": False, "error": "文件夹已存在"}
+            return {"success": False, "error": tr("file_manager.folder_exists")}
         ok, msg = self._ensure_host_access(full_path, "write")
         if not ok:
             return {"success": False, "error": msg}
@@ -210,10 +211,10 @@ class CrudMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件夹不存在"}
+            return {"success": False, "error": tr("file_manager.folder_not_found")}
         
         if not full_path.is_dir():
-            return {"success": False, "error": "不是文件夹"}
+            return {"success": False, "error": tr("file_manager.not_a_folder")}
         
         try:
             relative_path = self._relative_path(full_path)
@@ -252,7 +253,7 @@ class CrudMixin:
             if not DISABLE_LENGTH_CHECK and len(content) > 9999999999:  # 100KB限制
                 return {
                     "success": False,
-                    "error": f"内容过长({len(content)}字符)，超过100KB限制",
+                    "error": tr("file_manager.content_too_long", length=len(content)),
                     "suggestion": "请分块处理或使用部分修改方式"
                 }
             
@@ -276,7 +277,7 @@ class CrudMixin:
                 if projected_total > PROJECT_MAX_STORAGE_BYTES:
                     return {
                         "success": False,
-                        "error": "写入失败：超出项目磁盘配额",
+                        "error": tr("file_manager.storage_quota_exceeded"),
                         "limit_bytes": PROJECT_MAX_STORAGE_BYTES,
                         "project_size_bytes": current_size,
                         "attempt_size_bytes": len(content)

@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from modules.i18n import tr
 try:
     from config import DATA_DIR, HOST_WORKSPACES_FILE
 except ImportError:
@@ -68,7 +69,7 @@ class MetadataMixin:
                     if len(content) > 50:
                         title += "..."
                     return title
-        return "新对话"
+        return tr("conversation.default_title")
 
     def _extract_text_content(self, content: Any) -> str:
         """从字符串/多模态列表/字典中提取纯文本。"""

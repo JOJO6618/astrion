@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+from modules.i18n import tr
+
 
 def _format_failure(tag: str, result_data: Dict[str, Any]) -> str:
-    error = result_data.get("error") or result_data.get("message") or "未知错误"
+    error = result_data.get("error") or result_data.get("message") or tr("fmt_common.unknown_error")
     suggestion = result_data.get("suggestion")
     details = result_data.get("details")
     parts = [f"⚠️ {tag} 失败: {error}"]

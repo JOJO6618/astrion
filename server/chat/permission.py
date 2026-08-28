@@ -55,6 +55,8 @@ from server.monitor import get_cached_monitor_snapshot
 import os
 import re
 
+from modules.i18n import tr
+
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 
 
@@ -125,11 +127,11 @@ def _path_conflicts_with_deny_list(path: str) -> Optional[str]:
     for deny_path in deny_paths:
         deny_lower = _normalize_for_compare(deny_path)
         if expanded_lower == deny_lower or expanded_lower.startswith(deny_lower + os.sep):
-            return f"禁止授权敏感路径: {path}"
+            return tr("chat_permission.deny_sensitive_path", path=path)
     for pattern in deny_regexes:
         try:
             if re.search(pattern, expanded) or re.search(pattern, path):
-                return f"禁止授权敏感文件: {path}"
+                return tr("chat_permission.deny_sensitive_file", path=path)
         except re.error:
             continue
     return None
@@ -158,7 +160,7 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
     if target_mode not in PERMISSION_MODE_OPTIONS:
         return jsonify({
             "success": False,
-            "error": "无效权限模式，仅支持 readonly / approval / auto_approval / unrestricted"
+            "error": tr("chat_permission.invalid_permission_mode")
         }), 400
 
     # 判断当前是否在对话运行期间
@@ -185,7 +187,7 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
             return jsonify({
                 "success": False,
                 "error": str(exc),
-                "message": "更新权限模式失败"
+                "message": tr("chat_permission.update_failed")
             }), 500
         status = terminal.get_status()
         socketio.emit('status_update', status, room=f"user_{username}")
@@ -196,7 +198,7 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
             "options": PERMISSION_MODE_OPTIONS,
             "conversation_id": getattr(terminal.context_manager, "current_conversation_id", None),
             "state": (terminal.get_execution_mode_state() if hasattr(terminal, "get_execution_mode_state") else None),
-            "message": "权限模式将在当前工具执行完成后生效",
+            "message": tr("chat_permission.pending_effective"),
         })
 
     # 空闲期间：直接生效。切换通知由 baseline 机制在下一条真实 user 消息时补发
@@ -215,7 +217,7 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
         return jsonify({
             "success": False,
             "error": str(exc),
-            "message": "更新权限模式失败"
+            "message": tr("chat_permission.update_failed")
         }), 500
 
     session["permission_mode"] = applied_mode
@@ -228,7 +230,7 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
         "options": PERMISSION_MODE_OPTIONS,
         "conversation_id": getattr(terminal.context_manager, "current_conversation_id", None),
         "state": (terminal.get_execution_mode_state() if hasattr(terminal, "get_execution_mode_state") else None),
-        "message": "权限模式已更新并立即生效",
+        "message": tr("chat_permission.updated_immediately"),
     })
 
 @chat_bp.route('/api/execution-mode', methods=['GET'])
@@ -254,11 +256,11 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
     is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
     can_manage = is_host and getattr(terminal, "user_role", "user") == "admin"
     if not can_manage:
-        return jsonify({"success": False, "error": "仅宿主机管理员可切换执行环境"}), 403
+        return jsonify({"success": False, "error": tr("chat_permission.execution_host_admin_only")}), 403
     data = request.get_json() or {}
     target_mode = str(data.get("mode") or "").strip().lower()
     if target_mode not in EXECUTION_MODE_OPTIONS:
-        return jsonify({"success": False, "error": "无效执行环境，仅支持 sandbox / direct"}), 400
+        return jsonify({"success": False, "error": tr("chat_permission.invalid_execution_mode")}), 400
 
     # 判断当前是否在对话运行期间
     is_running = False
@@ -281,7 +283,7 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
             terminal.queue_execution_mode_change(target_mode)
             _sync_workspace_terminal_mode(username, workspace, "execution_mode", target_mode)
         except Exception as exc:
-            return jsonify({"success": False, "error": str(exc), "message": "更新执行环境失败"}), 500
+            return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.execution_update_failed")}), 500
         status = terminal.get_status()
         socketio.emit('status_update', status, room=f"user_{username}")
         return jsonify({
@@ -292,7 +294,7 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
             },
             "pending_mode": target_mode,
             "options": EXECUTION_MODE_OPTIONS,
-            "message": "执行环境将在当前工具执行完成后生效",
+            "message": tr("chat_permission.execution_pending_effective"),
         })
 
     # 空闲期间：直接生效。切换通知由 baseline 机制在下一条真实 user 消息时补发。
@@ -307,7 +309,7 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
             })
         _sync_workspace_terminal_mode(username, workspace, "execution_mode", state.get("mode", target_mode))
     except Exception as exc:
-        return jsonify({"success": False, "error": str(exc), "message": "更新执行环境失败"}), 500
+        return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.execution_update_failed")}), 500
     status = terminal.get_status()
     socketio.emit('status_update', status, room=f"user_{username}")
     return jsonify({
@@ -315,7 +317,7 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
         "state": state,
         "pending_mode": None,
         "options": EXECUTION_MODE_OPTIONS,
-        "message": "执行环境已更新并立即生效",
+        "message": tr("chat_permission.execution_updated_immediately"),
     })
 
 @chat_bp.route('/api/network-permission', methods=['GET'])
@@ -341,11 +343,11 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
     is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
     can_manage = is_host and getattr(terminal, "user_role", "user") == "admin"
     if not can_manage:
-        return jsonify({"success": False, "error": "仅宿主机管理员可切换网络权限"}), 403
+        return jsonify({"success": False, "error": tr("chat_permission.network_host_admin_only")}), 403
     data = request.get_json() or {}
     target_mode = str(data.get("mode") or "").strip().lower()
     if target_mode not in NETWORK_PERMISSION_OPTIONS:
-        return jsonify({"success": False, "error": "无效网络权限，仅支持 restricted / full"}), 400
+        return jsonify({"success": False, "error": tr("chat_permission.invalid_network_permission")}), 400
 
     is_running = False
     try:
@@ -365,7 +367,7 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
             terminal.queue_network_permission_change(target_mode)
             _sync_workspace_terminal_mode(username, workspace, "network_permission", target_mode)
         except Exception as exc:
-            return jsonify({"success": False, "error": str(exc), "message": "更新网络权限失败"}), 500
+            return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.network_update_failed")}), 500
         status = terminal.get_status()
         socketio.emit('status_update', status, room=f"user_{username}")
         return jsonify({
@@ -373,7 +375,7 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
             "mode": target_mode,
             "pending_mode": target_mode,
             "options": NETWORK_PERMISSION_OPTIONS,
-            "message": "网络权限将在当前工具执行完成后生效",
+            "message": tr("chat_permission.network_pending_effective"),
         })
 
     # 空闲期间：直接生效。切换通知由 baseline 机制在下一条真实 user 消息时补发。
@@ -388,7 +390,7 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
             })
         _sync_workspace_terminal_mode(username, workspace, "network_permission", applied)
     except Exception as exc:
-        return jsonify({"success": False, "error": str(exc), "message": "更新网络权限失败"}), 500
+        return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.network_update_failed")}), 500
     status = terminal.get_status()
     socketio.emit('status_update', status, room=f"user_{username}")
     return jsonify({
@@ -396,7 +398,7 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
         "mode": applied,
         "pending_mode": None,
         "options": NETWORK_PERMISSION_OPTIONS,
-        "message": "网络权限已更新并立即生效",
+        "message": tr("chat_permission.network_updated_immediately"),
     })
 
 @chat_bp.route('/api/work-mode', methods=['GET'])
@@ -428,7 +430,7 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
     if target_mode not in WORK_MODE_OPTIONS:
         return jsonify({
             "success": False,
-            "error": "无效运行模式，仅支持 plan / ask / execute"
+            "error": tr("chat_permission.invalid_work_mode")
         }), 400
 
     # 运行中拒绝切换（无 pending 队列——运行模式不存在「工具结果后插入」的路径）。
@@ -444,8 +446,8 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
             if conv_running:
                 return jsonify({
                     "success": False,
-                    "error": "对话运行中，运行模式只能在空闲时切换",
-                    "message": "对话运行中，运行模式只能在空闲时切换",
+                    "error": tr("chat_permission.work_mode_running_refused"),
+                    "message": tr("chat_permission.work_mode_running_refused"),
                 }), 409
     except Exception:
         pass
@@ -457,7 +459,7 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
         return jsonify({
             "success": False,
             "error": str(exc),
-            "message": "切换运行模式失败"
+            "message": tr("chat_permission.work_mode_switch_failed")
         }), 500
 
     # plan 联动可能改了权限模式：同步工作区级 terminal 的两个模式
@@ -479,7 +481,7 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
         "execution_mode": terminal.get_execution_mode() if hasattr(terminal, "get_execution_mode") else None,
         "options": WORK_MODE_OPTIONS,
         "conversation_id": getattr(terminal.context_manager, "current_conversation_id", None),
-        "message": "运行模式已更新并立即生效",
+        "message": tr("chat_permission.work_mode_updated_immediately"),
     })
 
 @chat_bp.route('/api/path-authorization', methods=['GET'])
@@ -507,20 +509,20 @@ def update_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, u
     is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
     can_manage = is_host and getattr(terminal, "user_role", "user") == "admin"
     if not can_manage:
-        return jsonify({"success": False, "error": "仅宿主机管理员可管理路径授权"}), 403
+        return jsonify({"success": False, "error": tr("chat_permission.path_auth_host_admin_only")}), 403
     data = request.get_json() or {}
     writable_items = data.get("writable_paths")
     readable_items = data.get("readable_extra_paths")
     if not isinstance(writable_items, list) or not isinstance(readable_items, list):
-        return jsonify({"success": False, "error": "writable_paths/readable_extra_paths 必须为数组"}), 400
+        return jsonify({"success": False, "error": tr("chat_permission.paths_must_be_arrays")}), 400
     writable = [str(x).strip() for x in writable_items if str(x).strip()]
     readable_extra = [str(x).strip() for x in readable_items if str(x).strip()]
     if "/" in writable or "/" in readable_extra:
-        return jsonify({"success": False, "error": "禁止授权根目录 /"}), 400
+        return jsonify({"success": False, "error": tr("chat_permission.root_path_forbidden")}), 400
     # Windows：禁止授权驱动器根目录（如 C:\、D:/），此前仅检查 POSIX 根 "/"
     drive_root_pattern = re.compile(r"^[A-Za-z]:[\\/]?$")
     if any(drive_root_pattern.match(p) for p in writable + readable_extra):
-        return jsonify({"success": False, "error": "禁止授权驱动器根目录（如 C:\\）"}), 400
+        return jsonify({"success": False, "error": tr("chat_permission.drive_root_forbidden")}), 400
     for p in writable + readable_extra:
         conflict = _path_conflicts_with_deny_list(p)
         if conflict:

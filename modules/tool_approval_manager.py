@@ -5,6 +5,8 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from modules.i18n import tr
+
 
 class ToolApprovalManager:
     def __init__(self):
@@ -71,13 +73,13 @@ class ToolApprovalManager:
     ) -> Dict[str, Any]:
         normalized = str(decision or "").strip().lower()
         if normalized not in {"approved", "rejected"}:
-            raise ValueError("decision 仅支持 approved / rejected")
+            raise ValueError(tr("tool_approval.decision_invalid"))
         with self._lock:
             item = self._items.get(approval_id)
             if not item:
-                raise KeyError("审批请求不存在")
+                raise KeyError(tr("tool_approval.request_not_found"))
             if item.get("username") != username:
-                raise PermissionError("无权限操作该审批请求")
+                raise PermissionError(tr("tool_approval.no_permission"))
             if item.get("status") != "pending":
                 return dict(item)
             item["status"] = normalized

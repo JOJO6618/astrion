@@ -38,6 +38,8 @@ from modules.host_workspace_manager import (
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
 import server.state as state
+from modules.i18n import tr
+
 def _build_docker_projects_payload(username: str, current_id: str) -> list[dict]:
     running_by_workspace = _active_task_counts(username)
     workspaces = user_manager.list_user_workspaces(username)
@@ -90,7 +92,7 @@ def _load_app_changelog(project_root: Path) -> str:
 @api_login_required
 def list_docker_projects():
     if not _is_docker_project_request():
-        return jsonify({"success": False, "error": "仅 Docker Web 模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
     username = session.get("username")
     current_id = (session.get("workspace_id") or "default").strip() or "default"
     # 默认项目用于向后兼容旧 Docker Web 文件/对话。
@@ -110,7 +112,7 @@ def list_docker_projects():
 @api_login_required
 def select_docker_project():
     if not _is_docker_project_request():
-        return jsonify({"success": False, "error": "仅 Docker Web 模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
     payload = request.get_json(silent=True) if request.method != "GET" else None
     workspace_id = (
         request.args.get("workspace_id")
@@ -118,12 +120,12 @@ def select_docker_project():
         or ""
     ).strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少项目 ID"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.missing_project_id")}), 400
     username = session.get("username")
     previous_workspace_id = session.get("workspace_id") or "default"
     known_projects = user_manager.list_user_workspaces(username)
     if workspace_id not in known_projects:
-        return jsonify({"success": False, "error": "项目不存在"}), 404
+        return jsonify({"success": False, "error": tr("status_docker.project_not_found")}), 404
     try:
         workspace = user_manager.ensure_user_workspace(username, workspace_id)
     except ValueError as exc:
@@ -160,11 +162,11 @@ def select_docker_project():
 @api_login_required
 def create_docker_project():
     if not _is_docker_project_request():
-        return jsonify({"success": False, "error": "仅 Docker Web 模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
     payload = request.get_json(silent=True) or {}
     label = (payload.get("label") or payload.get("name") or "").strip()
     if not label:
-        return jsonify({"success": False, "error": "项目名称不能为空"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.project_name_required")}), 400
     username = session.get("username")
     try:
         workspace = user_manager.create_user_workspace(username, "", label=label)
@@ -200,14 +202,14 @@ def create_docker_project():
 @api_login_required
 def rename_docker_project():
     if not _is_docker_project_request():
-        return jsonify({"success": False, "error": "仅 Docker Web 模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
     payload = request.get_json(silent=True) or {}
     workspace_id = (payload.get("workspace_id") or "").strip()
     label = (payload.get("label") or payload.get("name") or "").strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少项目 ID"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.missing_project_id")}), 400
     if not label:
-        return jsonify({"success": False, "error": "项目名称不能为空"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.project_name_required")}), 400
     username = session.get("username")
     try:
         workspace = user_manager.rename_user_workspace(username, workspace_id, label)
@@ -229,19 +231,19 @@ def rename_docker_project():
 @api_login_required
 def delete_docker_project():
     if not _is_docker_project_request():
-        return jsonify({"success": False, "error": "仅 Docker Web 模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
     payload = request.get_json(silent=True) or {}
     workspace_id = (payload.get("workspace_id") or "").strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少项目 ID"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.missing_project_id")}), 400
     if workspace_id == "default":
-        return jsonify({"success": False, "error": "默认项目不能删除"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.default_project_not_deletable")}), 400
     username = session.get("username")
     if _active_task_counts(username).get(workspace_id):
-        return jsonify({"success": False, "error": "该项目有运行中的任务，暂不能删除"}), 409
+        return jsonify({"success": False, "error": tr("status_docker.project_has_running_tasks")}), 409
     known_projects = user_manager.list_user_workspaces(username)
     if workspace_id not in known_projects:
-        return jsonify({"success": False, "error": "项目不存在"}), 404
+        return jsonify({"success": False, "error": tr("status_docker.project_not_found")}), 404
     term_key = f"{username}::{workspace_id}"
     try:
         _close_terminal_for_key(term_key)
@@ -286,12 +288,12 @@ def delete_docker_project():
 @api_login_required
 def set_default_docker_project_api():
     if not _is_docker_project_request():
-        return jsonify({"success": False, "error": "仅 Docker Web 模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
 
     payload = request.get_json(silent=True) or {}
     workspace_id = (payload.get("workspace_id") or "").strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少项目 ID"}), 400
+        return jsonify({"success": False, "error": tr("status_docker.missing_project_id")}), 400
     username = session.get("username")
     try:
         user_manager.set_default_user_workspace(username, workspace_id)

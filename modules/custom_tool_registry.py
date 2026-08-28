@@ -23,6 +23,8 @@ from config import (
     CUSTOM_TOOL_META_FILE,
 )
 
+from modules.i18n import tr
+
 
 class CustomToolRegistry:
     """文件式 registry，扫描目录结构提供增删改查。"""
@@ -132,9 +134,9 @@ class CustomToolRegistry:
         """插入或更新单个工具定义（不做深度校验，满足私有化需求）。"""
         tool_id = (payload.get("id") or "").strip()
         if not tool_id:
-            raise ValueError("id 必填")
+            raise ValueError(tr("custom_tool_reg.id_required"))
         if not self._is_valid_tool_id(tool_id):
-            raise ValueError("工具 ID 不合法：需以字母开头，可包含字母、数字、下划线、短横线")
+            raise ValueError(tr("custom_tool_reg.id_invalid"))
         tool_dir = self.root / tool_id
         tool_dir.mkdir(parents=True, exist_ok=True)
 

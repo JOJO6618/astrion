@@ -27,6 +27,7 @@ from config.model_profiles import get_registered_model_keys
 from . import state
 from .utils_common import debug_log
 from .auth_helpers import get_current_username, get_current_user_record, get_current_user_role  # will create helper module
+from modules.i18n import tr
 
 
 def make_terminal_callback(username: str):
@@ -253,7 +254,7 @@ def get_user_resources(
             selected_workspace_id = active_workspace_id
         _, host_workspace = resolve_host_workspace(selected_workspace_id)
         if not host_workspace:
-            raise NoWorkspaceError("尚未创建任何工作区，请先在工作区管理界面中手动创建工作区")
+            raise NoWorkspaceError(tr("context.no_workspace"))
         if (
             active_workspace_id
             and active_workspace_path
@@ -463,7 +464,7 @@ def get_user_resources(
     if is_api_user:
         record = None
         if workspace_id is None:
-            raise RuntimeError("API 调用缺少 workspace_id")
+            raise RuntimeError(tr("context.missing_workspace_id"))
         workspace = state.api_user_manager.ensure_workspace(username, workspace_id)
     else:
         record = get_current_user_record()
@@ -748,7 +749,7 @@ def ensure_conversation_loaded(
     if not conversation_id:
         result = terminal.create_new_conversation()
         if not result.get("success"):
-            raise RuntimeError(result.get("message", "创建对话失败"))
+            raise RuntimeError(result.get("message", tr("context.create_conversation_failed")))
         conversation_id = result["conversation_id"]
         if has_request_context():
             session['run_mode'] = terminal.run_mode
@@ -760,7 +761,7 @@ def ensure_conversation_loaded(
         if current_id != conversation_id:
             load_result = terminal.load_conversation(conversation_id)
             if not load_result.get("success"):
-                raise RuntimeError(load_result.get("message", "对话加载失败"))
+                raise RuntimeError(load_result.get("message", tr("context.load_conversation_failed")))
             write_host_workspace_debug(
                 "context.ensure_conversation_loaded.after_load",
                 terminal_id=id(terminal),

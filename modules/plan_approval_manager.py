@@ -5,6 +5,8 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from modules.i18n import tr
+
 # 计划文档内容送进弹窗/记录的最大字符数（超出截断，完整内容始终在计划文件里）
 PLAN_CONTENT_MAX_CHARS = 20000
 
@@ -87,9 +89,9 @@ class PlanApprovalManager:
         with self._lock:
             item = self._items.get(approval_id)
             if not item:
-                raise KeyError("计划批准请求不存在")
+                raise KeyError(tr("plan_approval.request_not_found"))
             if item.get("username") != username:
-                raise PermissionError("无权限处理该计划批准请求")
+                raise PermissionError(tr("plan_approval.no_permission"))
             if item.get("status") != "pending":
                 return dict(item)
             item["status"] = "approved" if approved else "rejected"

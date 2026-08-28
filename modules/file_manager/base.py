@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -94,7 +95,7 @@ class FileManagerBase:
         if not self._use_container():
             return {
                 "success": False,
-                "error": "容器未就绪，无法执行文件操作"
+                "error": tr("file_manager.container_not_ready")
             }
         return self._container_proxy.run(action, payload)
 

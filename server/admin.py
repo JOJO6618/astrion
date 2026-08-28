@@ -31,6 +31,7 @@ from .conversation_stats import summarize_invite_codes
 from modules import admin_policy_manager
 from collections import Counter
 from config import ADMIN_SECONDARY_PASSWORD_HASH, ADMIN_SECONDARY_PASSWORD, ADMIN_SECONDARY_TTL_SECONDS
+from modules.i18n import tr
 
 # CSRF 豁免：二级密码相关接口不需要 CSRF
 try:
@@ -58,7 +59,7 @@ def _is_secondary_verified() -> bool:
 def _secondary_required():
     if _is_secondary_verified():
         return None
-    return jsonify({"success": False, "error": "需要二级密码", "code": "secondary_required"}), 403
+    return jsonify({"success": False, "error": tr("admin.secondary_required_error"), "code": "secondary_required"}), 403
 
 @admin_bp.route('/admin/monitor')
 @login_required
@@ -120,7 +121,7 @@ def admin_secondary_verify():
     payload = request.get_json() or {}
     password = str(payload.get("password") or "").strip()
     if not password:
-        return jsonify({"success": False, "error": "请输入二级密码"}), 400
+        return jsonify({"success": False, "error": tr("admin.enter_secondary_password")}), 400
     try:
         if ADMIN_SECONDARY_PASSWORD_HASH:
             ok = check_password_hash(ADMIN_SECONDARY_PASSWORD_HASH, password)
@@ -129,7 +130,7 @@ def admin_secondary_verify():
     except Exception:
         ok = False
     if not ok:
-        return jsonify({"success": False, "error": "二级密码错误"}), 401
+        return jsonify({"success": False, "error": tr("admin.secondary_password_wrong")}), 401
     session["admin_secondary_verified_at"] = time.time()
     return jsonify({"success": True, "ttl": ADMIN_SECONDARY_TTL_SECONDS})
 
@@ -291,7 +292,7 @@ def admin_invites_api():
         # DELETE
         deleted = user_manager.delete_invite_code(code)
         if not deleted:
-            return jsonify({"success": False, "error": "邀请码不存在"}), 404
+            return jsonify({"success": False, "error": tr("admin.invite_code_not_found")}), 404
         return jsonify({"success": True, "data": {"deleted": code}})
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
@@ -309,16 +310,16 @@ def admin_reset_user_password(username: str):
     if guard:
         return guard
     if not username:
-        return jsonify({"success": False, "error": "缺少用户名"}), 400
+        return jsonify({"success": False, "error": tr("admin.missing_username")}), 400
     payload = request.get_json(silent=True) or {}
     new_password = (payload.get("password") or "").strip()
     if not new_password:
-        return jsonify({"success": False, "error": "新密码不能为空"}), 400
+        return jsonify({"success": False, "error": tr("admin.new_password_required")}), 400
     try:
         record = user_manager.reset_password(username, new_password)
         return jsonify({
             "success": True,
-            "data": {"username": record.username, "message": "密码已重置"}
+            "data": {"username": record.username, "message": tr("admin.password_reset")}
         })
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
@@ -494,11 +495,11 @@ def admin_custom_tools_api():
         # DELETE
         tool_id = request.args.get("id") or (request.get_json() or {}).get("id")
         if not tool_id:
-            return jsonify({"success": False, "error": "缺少 id"}), 400
+            return jsonify({"success": False, "error": tr("admin.missing_id")}), 400
         removed = custom_tool_registry.delete_tool(tool_id)
         if removed:
             return jsonify({"success": True, "data": {"deleted": tool_id}})
-        return jsonify({"success": False, "error": "未找到该工具"}), 404
+        return jsonify({"success": False, "error": tr("admin.tool_not_found")}), 404
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -516,15 +517,15 @@ def admin_custom_tools_file_api():
     if guard:
         return guard
     if not tool_id or not name:
-        return jsonify({"success": False, "error": "缺少 id 或 name"}), 400
+        return jsonify({"success": False, "error": tr("admin.missing_id_or_name")}), 400
     tool_dir = Path(custom_tool_registry.root) / tool_id
     if not tool_dir.exists():
-        return jsonify({"success": False, "error": "工具不存在"}), 404
+        return jsonify({"success": False, "error": tr("admin.tool_dir_missing")}), 404
     target = tool_dir / name
 
     if request.method == 'GET':
         if not target.exists():
-            return jsonify({"success": False, "error": "文件不存在"}), 404
+            return jsonify({"success": False, "error": tr("admin.file_not_found")}), 404
         try:
             return target.read_text(encoding="utf-8")
         except Exception as exc:
@@ -574,11 +575,11 @@ def admin_mcp_servers_api():
         # DELETE
         server_id = request.args.get("id") or (request.get_json() or {}).get("id")
         if not server_id:
-            return jsonify({"success": False, "error": "缺少 id"}), 400
+            return jsonify({"success": False, "error": tr("admin.missing_id")}), 400
         removed = mcp_server_registry.delete_server(server_id)
         if removed:
             return jsonify({"success": True, "data": {"deleted": server_id}})
-        return jsonify({"success": False, "error": "未找到该服务"}), 404
+        return jsonify({"success": False, "error": tr("admin.server_not_found")}), 404
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -664,7 +665,7 @@ def admin_api_users():
     username = (payload.get("username") or "").strip().lower()
     note = (payload.get("note") or "").strip()
     if not username:
-        return jsonify({"success": False, "error": "用户名不能为空"}), 400
+        return jsonify({"success": False, "error": tr("admin.username_required")}), 400
     try:
         record, token = state.api_user_manager.create_user(username, note=note)
         return jsonify({
@@ -691,11 +692,11 @@ def admin_api_users_delete(username: str):
     if guard:
         return guard
     if not username:
-        return jsonify({"success": False, "error": "缺少用户名"}), 400
+        return jsonify({"success": False, "error": tr("admin.missing_username")}), 400
     try:
         ok = state.api_user_manager.delete_user(username)
         if not ok:
-            return jsonify({"success": False, "error": "用户不存在"}), 404
+            return jsonify({"success": False, "error": tr("admin.user_not_found")}), 404
         return jsonify({"success": True})
     except Exception as exc:
         logging.exception("delete api user failed")

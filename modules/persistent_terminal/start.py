@@ -62,6 +62,8 @@ except ImportError:
         TERMINAL_SANDBOX_REQUIRE,
     )
 
+from modules.i18n import tr
+
 
 class StartMixin:
     """PersistentTerminal start 能力 mixin。"""
@@ -140,7 +142,7 @@ class StartMixin:
         if self.allow_direct_host_execution:
             return self._start_plain_host_terminal()
         if not host_sandbox_enabled():
-            raise RuntimeError("宿主机沙箱已禁用（HOST_SANDBOX_ENABLED=0），拒绝启动 host 终端。")
+            raise RuntimeError(tr("terminal_start.host_sandbox_disabled"))
         self.using_container = False
         self._owns_container = False
         self.is_windows = sys.platform == "win32"
@@ -235,7 +237,7 @@ class StartMixin:
         docker_bin = self.sandbox_options.get("bin") or "docker"
         docker_path = shutil.which(docker_bin)
         if not docker_path:
-            message = f"未找到容器运行时: {docker_bin}"
+            message = tr("terminal_start.runtime_not_found", runtime=docker_bin)
             if self.sandbox_required:
                 raise RuntimeError(message)
             print(f"{OUTPUT_FORMATS['warning']} {message}")
@@ -250,7 +252,7 @@ class StartMixin:
     def _start_existing_container_terminal(self, docker_path: str, container_name: str):
         """通过 docker exec 连接到已有容器。"""
         if not self._ensure_container_alive(docker_path, container_name):
-            raise RuntimeError(f"目标容器未运行: {container_name}")
+            raise RuntimeError(tr("terminal_start.container_not_running", container_name=container_name))
 
         mount_path = self.sandbox_options.get("mount_path") or "/workspace"
         container_workdir = self._resolve_container_workdir(mount_path)
@@ -299,7 +301,7 @@ class StartMixin:
         """启动全新的容器终端。"""
         image = self.sandbox_options.get("image")
         if not image:
-            raise RuntimeError("TERMINAL_SANDBOX_IMAGE 未配置")
+            raise RuntimeError(tr("terminal_start.image_not_configured"))
 
         mount_path = self.sandbox_options.get("mount_path") or "/workspace"
         working_dir = str(self.working_dir)
@@ -365,7 +367,7 @@ class StartMixin:
                 env=env
             )
         except FileNotFoundError:
-            message = f"无法执行容器运行时: {docker_path}"
+            message = tr("terminal_start.runtime_exec_failed", runtime=docker_path)
             if self.sandbox_required:
                 raise RuntimeError(message)
             print(f"{OUTPUT_FORMATS['warning']} {message}")

@@ -26,6 +26,7 @@ from config import DATA_DIR, WORKSPACE_SKILLS_DIRNAME
 from modules.goal_state_manager import GoalStateManager, REASON_USER_CANCEL
 from modules.sub_agent.state import TERMINAL_STATUSES as SUB_AGENT_TERMINAL_STATUSES
 from modules.background_command_manager import BackgroundCommandManager, TERMINAL_STATUSES as BG_COMMAND_TERMINAL_STATUSES
+from modules.i18n import tr
 
 
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
@@ -150,7 +151,7 @@ class TaskManager:
         if run_mode:
             normalized = str(run_mode).lower()
             if normalized not in {"fast", "thinking", "deep"}:
-                raise ValueError("run_mode 只支持 fast/thinking/deep")
+                raise ValueError(tr("tasks.invalid_run_mode"))
             run_mode = normalized
         normalized_task_type = str(task_type or "chat").strip().lower() or "chat"
         # 单对话互斥：普通 chat 任务禁止同一对话并发（防串写对话历史）；
@@ -168,7 +169,7 @@ class TaskManager:
                 and _norm_cid(getattr(t, "conversation_id", None)) == target_cid
             ]
             if existing:
-                raise RuntimeError("当前对话已有运行中的任务，请稍后再试。")
+                raise RuntimeError(tr("tasks.task_already_running"))
         task_id = str(uuid.uuid4())
         record = TaskRecord(task_id, username, workspace_id, message, conversation_id, model_key, thinking_mode, run_mode, max_iterations, task_type=normalized_task_type)
         # 记录当前 session 快照，便于后台线程内使用
@@ -391,20 +392,20 @@ class TaskManager:
     ) -> Dict[str, Any]:
         text = str(message or "").strip()
         if not text:
-            return {"success": False, "code": "empty_message", "error": "消息不能为空"}
+            return {"success": False, "code": "empty_message", "error": tr("tasks.message_empty")}
         limit = int(max(1, max_queue_size))
         with self._lock:
             rec = self._tasks.get(task_id)
             if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": "任务不存在"}
+                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
             if rec.status not in {"pending", "running", "cancel_requested"}:
-                return {"success": False, "code": "task_not_running", "error": "任务已结束，无法追加消息"}
+                return {"success": False, "code": "task_not_running", "error": tr("tasks.task_not_running_append_message")}
             queue = self._normalize_runtime_pending_queue(getattr(rec, "runtime_pending_queue", None))
             if len(queue) >= limit:
                 return {
                     "success": False,
                     "code": "queue_full",
-                    "error": f"堆积消息已满（最多 {limit} 条）",
+                    "error": tr("tasks.queue_full_max", limit=limit),
                 }
             item = {
                 "id": str(uuid.uuid4()),
@@ -432,11 +433,11 @@ class TaskManager:
     ) -> Dict[str, Any]:
         target_id = str(message_id or "").strip()
         if not target_id:
-            return {"success": False, "code": "invalid_message_id", "error": "消息ID无效"}
+            return {"success": False, "code": "invalid_message_id", "error": tr("tasks.invalid_message_id")}
         with self._lock:
             rec = self._tasks.get(task_id)
             if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": "任务不存在"}
+                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
             queue = self._normalize_runtime_pending_queue(getattr(rec, "runtime_pending_queue", None))
             remove_idx = -1
             for idx, item in enumerate(queue):
@@ -444,7 +445,7 @@ class TaskManager:
                     remove_idx = idx
                     break
             if remove_idx < 0:
-                return {"success": False, "code": "message_not_found", "error": "消息不存在"}
+                return {"success": False, "code": "message_not_found", "error": tr("tasks.message_not_found")}
             queue.pop(remove_idx)
             rec.runtime_pending_queue = queue
             rec.updated_at = time.time()
@@ -463,14 +464,14 @@ class TaskManager:
     ) -> Dict[str, Any]:
         target_id = str(message_id or "").strip()
         if not target_id:
-            return {"success": False, "code": "invalid_message_id", "error": "消息ID无效"}
+            return {"success": False, "code": "invalid_message_id", "error": tr("tasks.invalid_message_id")}
         guidance_limit = int(max(1, max_guidance_queue_size))
         with self._lock:
             rec = self._tasks.get(task_id)
             if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": "任务不存在"}
+                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
             if rec.status not in {"pending", "running", "cancel_requested"}:
-                return {"success": False, "code": "task_not_running", "error": "任务已结束，无法引导"}
+                return {"success": False, "code": "task_not_running", "error": tr("tasks.task_not_running_guide")}
             queue = self._normalize_runtime_pending_queue(getattr(rec, "runtime_pending_queue", None))
             guidance_queue = getattr(rec, "runtime_guidance_queue", None)
             if not isinstance(guidance_queue, list):
@@ -479,7 +480,7 @@ class TaskManager:
                 return {
                     "success": False,
                     "code": "guidance_queue_full",
-                    "error": f"引导队列已满（最多 {guidance_limit} 条）",
+                    "error": tr("tasks.guidance_queue_full_max", guidance_limit=guidance_limit),
                 }
             selected = None
             remain_queue: List[Dict[str, Any]] = []
@@ -489,10 +490,10 @@ class TaskManager:
                     continue
                 remain_queue.append(item)
             if not selected:
-                return {"success": False, "code": "message_not_found", "error": "消息不存在"}
+                return {"success": False, "code": "message_not_found", "error": tr("tasks.message_not_found")}
             selected_text = str(selected.get("text") or "").strip()
             if not selected_text:
-                return {"success": False, "code": "empty_message", "error": "消息内容为空"}
+                return {"success": False, "code": "empty_message", "error": tr("tasks.message_content_empty")}
             selected_files = selected.get("files")
             if isinstance(selected_files, list) and selected_files:
                 guidance_queue.append({"text": selected_text, "files": list(selected_files)[:9]})
@@ -527,13 +528,13 @@ class TaskManager:
     ) -> Dict[str, Any]:
         text = str(message or "").strip()
         if not text:
-            return {"success": False, "code": "empty_message", "error": "引导内容不能为空"}
+            return {"success": False, "code": "empty_message", "error": tr("tasks.guidance_content_empty")}
         with self._lock:
             rec = self._tasks.get(task_id)
             if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": "任务不存在"}
+                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
             if rec.status not in {"pending", "running", "cancel_requested"}:
-                return {"success": False, "code": "task_not_running", "error": "任务已结束，无法追加引导"}
+                return {"success": False, "code": "task_not_running", "error": tr("tasks.task_not_running_append_guidance")}
             queue = getattr(rec, "runtime_guidance_queue", None)
             if not isinstance(queue, list):
                 queue = []
@@ -542,7 +543,7 @@ class TaskManager:
                 return {
                     "success": False,
                     "code": "queue_full",
-                    "error": f"引导队列已满（最多 {int(max(1, max_queue_size))} 条）",
+                    "error": tr("tasks.guidance_queue_full_max", guidance_limit=int(max(1, max_queue_size))),
                 }
             normalized_source = str(source or "").strip().lower()
             if normalized_source:
@@ -808,7 +809,7 @@ class TaskManager:
                     pass
                 terminal, workspace = get_user_resources(username, workspace_id=workspace_id, conversation_id=rec.conversation_id)
             if not terminal or not workspace:
-                raise RuntimeError("系统未初始化")
+                raise RuntimeError(tr("tasks.system_not_initialized"))
             stop_hint = bool(stop_flags.get(rec.task_id, {}).get("stop"))
 
             def _apply_requested_model_mode():
@@ -852,7 +853,7 @@ class TaskManager:
                 conversation_id, _ = ensure_conversation_loaded(terminal, conversation_id, workspace=workspace)
                 rec.conversation_id = conversation_id
             except Exception as exc:
-                raise RuntimeError(f"对话加载失败: {exc}") from exc
+                raise RuntimeError(tr("tasks.conversation_load_failed", error=exc)) from exc
 
             # 对话加载会按会话元数据恢复历史模型/模式，这里再覆盖一次用户本次请求参数
             _apply_requested_model_mode()
@@ -1037,7 +1038,7 @@ class TaskManager:
                 try:
                     from server.extensions import socketio
                     stopped_payload = {
-                        'message': '任务已停止',
+                        'message': tr("task_main.task_stopped"),
                         'reason': 'user_requested',
                         'task_id': rec.task_id,
                         'conversation_id': rec.conversation_id,

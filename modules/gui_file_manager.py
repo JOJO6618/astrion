@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from modules.i18n import tr
+
 
 @dataclass
 class FileEntry:
@@ -78,7 +80,7 @@ class GuiFileManager:
         try:
             target.relative_to(self.base_path)
         except ValueError:
-            raise ValueError("路径越界")
+            raise ValueError(tr("gui_file.path_escape"))
         return target
 
     def _to_relative(self, absolute: Path) -> str:
@@ -122,9 +124,9 @@ class GuiFileManager:
     def list_directory(self, relative: Optional[str] = None) -> Tuple[str, List[FileEntry]]:
         directory = self._resolve(relative)
         if not directory.exists():
-            raise FileNotFoundError("目录不存在")
+            raise FileNotFoundError(tr("gui_file.dir_not_found"))
         if not directory.is_dir():
-            raise NotADirectoryError("目标不是目录")
+            raise NotADirectoryError(tr("gui_file.not_a_directory"))
 
         entries: List[FileEntry] = []
         for entry in sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
@@ -149,7 +151,7 @@ class GuiFileManager:
         try:
             directory.relative_to(self.base_path)
         except ValueError:
-            raise ValueError("路径越界")
+            raise ValueError(tr("gui_file.path_escape"))
 
         current = directory
         while True:
@@ -168,17 +170,17 @@ class GuiFileManager:
     def create_entry(self, parent_relative: Optional[str], name: str, entry_type: str) -> str:
         parent = self._resolve(parent_relative)
         if not parent.exists():
-            raise FileNotFoundError("父目录不存在")
+            raise FileNotFoundError(tr("gui_file.parent_not_found"))
         if not parent.is_dir():
-            raise NotADirectoryError("父路径不是目录")
+            raise NotADirectoryError(tr("gui_file.parent_not_directory"))
 
         sanitized = name.strip()
         if not sanitized:
-            raise ValueError("名称不能为空")
+            raise ValueError(tr("gui_file.name_empty"))
 
         target = parent / sanitized
         if target.exists():
-            raise FileExistsError("同名文件或目录已存在")
+            raise FileExistsError(tr("gui_file.name_exists"))
 
         if entry_type == "directory":
             target.mkdir(parents=False, exist_ok=False)
@@ -186,7 +188,7 @@ class GuiFileManager:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.touch()
         else:
-            raise ValueError("不支持的类型")
+            raise ValueError(tr("gui_file.unsupported_type"))
 
         return self._to_relative(target)
 
@@ -210,15 +212,15 @@ class GuiFileManager:
     def rename_entry(self, relative_path: str, new_name: str) -> str:
         target = self._resolve(relative_path)
         if not target.exists():
-            raise FileNotFoundError("目标不存在")
+            raise FileNotFoundError(tr("gui_file.target_not_found"))
 
         parent = target.parent
         sanitized = new_name.strip()
         if not sanitized:
-            raise ValueError("新名称不能为空")
+            raise ValueError(tr("gui_file.new_name_empty"))
         new_path = parent / sanitized
         if new_path.exists():
-            raise FileExistsError("目标名称已存在")
+            raise FileExistsError(tr("gui_file.target_name_exists"))
 
         target.rename(new_path)
         return self._to_relative(new_path)
@@ -226,7 +228,7 @@ class GuiFileManager:
     def copy_entries(self, relative_paths: List[str], destination_relative: str) -> Dict[str, str]:
         destination = self._resolve(destination_relative)
         if not destination.exists() or not destination.is_dir():
-            raise NotADirectoryError("目标目录不存在")
+            raise NotADirectoryError(tr("gui_file.destination_not_directory"))
 
         results: Dict[str, str] = {}
         for rel in relative_paths:
@@ -248,7 +250,7 @@ class GuiFileManager:
     def move_entries(self, relative_paths: List[str], destination_relative: str) -> Dict[str, str]:
         destination = self._resolve(destination_relative)
         if not destination.exists() or not destination.is_dir():
-            raise NotADirectoryError("目标目录不存在")
+            raise NotADirectoryError(tr("gui_file.destination_not_directory"))
 
         results: Dict[str, str] = {}
         for rel in relative_paths:
@@ -273,32 +275,32 @@ class GuiFileManager:
     def read_text(self, relative_path: str) -> Tuple[str, str]:
         target = self._resolve(relative_path)
         if not target.exists():
-            raise FileNotFoundError("文件不存在")
+            raise FileNotFoundError(tr("gui_file.file_not_found"))
         if not target.is_file():
-            raise IsADirectoryError("目标是目录")
+            raise IsADirectoryError(tr("gui_file.target_is_directory"))
 
         size = target.stat().st_size
         if size > self.MAX_TEXT_FILE_SIZE:
-            raise ValueError("文件过大，暂不支持直接编辑")
+            raise ValueError(tr("gui_file.file_too_large"))
 
         try:
             with open(target, "r", encoding="utf-8") as fh:
                 content = fh.read()
         except UnicodeDecodeError as exc:
-            raise ValueError(f"文件不是 UTF-8 编码: {exc}") from exc
+            raise ValueError(tr("gui_file.not_utf8", error=exc)) from exc
 
         return content, datetime.fromtimestamp(target.stat().st_mtime).isoformat()
 
     def write_text(self, relative_path: str, content: str) -> Dict[str, str]:
         target = self._resolve(relative_path)
         if not target.exists():
-            raise FileNotFoundError("文件不存在")
+            raise FileNotFoundError(tr("gui_file.file_not_found"))
         if not target.is_file():
-            raise IsADirectoryError("目标是目录")
+            raise IsADirectoryError(tr("gui_file.target_is_directory"))
 
         size = len(content.encode("utf-8"))
         if size > self.MAX_TEXT_FILE_SIZE:
-            raise ValueError("内容过大，超出限制")
+            raise ValueError(tr("gui_file.content_too_large"))
 
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(content)
@@ -319,10 +321,10 @@ class GuiFileManager:
         if not destination.exists():
             destination.mkdir(parents=True, exist_ok=True)
         if not destination.is_dir():
-            raise NotADirectoryError("上传目标必须是目录")
+            raise NotADirectoryError(tr("gui_file.upload_target_not_directory"))
         sanitized = filename.strip()
         if not sanitized:
-            raise ValueError("文件名不能为空")
+            raise ValueError(tr("gui_file.filename_empty"))
         target = destination / sanitized
         target = self._unique_name(destination, target.name) if target.exists() else target
         return target
@@ -330,6 +332,6 @@ class GuiFileManager:
     def prepare_download(self, relative_path: str) -> Path:
         target = self._resolve(relative_path)
         if not target.exists():
-            raise FileNotFoundError("文件不存在")
+            raise FileNotFoundError(tr("gui_file.file_not_found"))
         return target
 

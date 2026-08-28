@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 from config.paths import CUSTOM_SKILLS_DIR, IS_HOST_MODE
+from modules.i18n import tr
 
 # 内置示例种子目录（源码树 workflows/）
 BUILTIN_WORKFLOWS_DIR = Path(__file__).resolve().parent.parent / "workflows"
@@ -73,7 +74,7 @@ def _safe_name(name: str) -> str:
     """校验并返回合法的工作流目录名（slug）。"""
     cleaned = (name or "").strip()
     if not _NAME_RE.match(cleaned):
-        raise ValueError(f"工作流名称不合法：{cleaned!r}（仅限小写字母/数字/连字符，3-64 字符）")
+        raise ValueError(tr("workflow_manager.name_invalid", name=repr(cleaned)))
     return cleaned
 
 
@@ -158,7 +159,7 @@ def workflow_from_markdown(text: str, source: str) -> Dict[str, Any]:
     """WORKFLOW.md 文本 → camelCase dict。"""
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", text, re.DOTALL)
     if not match:
-        raise ValueError("WORKFLOW.md 缺少 YAML frontmatter")
+        raise ValueError(tr("workflow_manager.markdown_missing_frontmatter"))
     meta = yaml.safe_load(match.group(1)) or {}
     body = match.group(2).strip()
     return {
@@ -181,49 +182,49 @@ def validate_structure(wf: Dict[str, Any]) -> List[str]:
     """返回 error 级问题列表（空 = 可保存）。规则与前端 validateWorkflow 对齐。"""
     errors: List[str] = []
     if not str(wf.get("name") or "").strip():
-        errors.append("工作流缺少 name")
+        errors.append(tr("workflow_manager.wf_missing_name"))
     nodes = wf.get("nodes") or []
     if not nodes:
-        errors.append("至少需要一个开始节点和一个结束节点")
+        errors.append(tr("workflow_manager.min_nodes_required"))
         return errors
     by_id: Dict[str, Dict[str, Any]] = {}
     for n in nodes:
         nid = n.get("id")
         if nid in by_id:
-            errors.append(f"节点 id 重复：{nid}")
+            errors.append(tr("workflow_manager.duplicate_node_id", nid=nid))
         by_id[nid] = n
     starts = [n for n in nodes if n.get("kind") == "start"]
     ends = [n for n in nodes if n.get("kind") == "end"]
     if len(starts) == 0:
-        errors.append("缺少开始节点")
+        errors.append(tr("workflow_manager.missing_start_node"))
     elif len(starts) > 1:
-        errors.append(f"开始节点只能有一个（当前 {len(starts)} 个）")
+        errors.append(tr("workflow_manager.multiple_start_nodes", count=len(starts)))
     if not ends:
-        errors.append("缺少结束节点")
+        errors.append(tr("workflow_manager.missing_end_node"))
 
     def check_ref(owner: Dict[str, Any], target: Any, label: str) -> None:
         if not target:
-            errors.append(f"{label}未连接")
+            errors.append(tr("workflow_manager.ref_not_connected", label=label))
         elif target not in by_id:
-            errors.append(f"{label}指向不存在的节点：{target}")
+            errors.append(tr("workflow_manager.ref_target_missing", label=label, target=target))
         elif by_id[target].get("kind") == "start":
-            errors.append(f"{label}不能指向开始节点")
+            errors.append(tr("workflow_manager.ref_target_is_start", label=label))
 
     for n in nodes:
         kind = n.get("kind")
         name = n.get("name") or n.get("id")
         if kind == "start":
-            check_ref(n, n.get("next"), "开始节点")
+            check_ref(n, n.get("next"), tr("workflow_manager.label_start"))
         elif kind == "stage":
-            check_ref(n, n.get("next"), f"阶段「{name}」")
+            check_ref(n, n.get("next"), tr("workflow_manager.label_stage", name=name))
         elif kind == "review":
-            check_ref(n, n.get("next"), f"审核「{name}」的通过路由")
-            check_ref(n, n.get("rejectTo"), f"审核「{name}」的驳回路由")
+            check_ref(n, n.get("next"), tr("workflow_manager.label_review_pass_route", name=name))
+            check_ref(n, n.get("rejectTo"), tr("workflow_manager.label_review_reject_route", name=name))
             if not isinstance(n.get("maxRejects"), int) or n["maxRejects"] < 1:
-                errors.append(f"审核「{name}」驳回上限必须 ≥ 1")
+                errors.append(tr("workflow_manager.reject_limit_invalid", name=name))
         elif kind == "branch":
             for r in n.get("next") or []:
-                check_ref(n, r.get("target"), f"分支「{name}」的出线")
+                check_ref(n, r.get("target"), tr("workflow_manager.label_branch_route", name=name))
     return errors
 
 
@@ -261,7 +262,7 @@ def list_workflows(data_dir: str | Path | None) -> List[Dict[str, Any]]:
                 # 损坏文件不拖垮列表
                 merged[name] = {
                     "name": name,
-                    "description": "（文件解析失败）",
+                    "description": tr("workflow_manager.parse_failed_description"),
                     "source": source,
                     "updatedAt": "",
                     "nodeCount": 0,
@@ -280,7 +281,7 @@ def load_workflow(name: str, data_dir: str | Path | None) -> Dict[str, Any]:
     builtin_file = _workflow_file(BUILTIN_WORKFLOWS_DIR, name)
     if builtin_file.exists():
         return workflow_from_markdown(builtin_file.read_text(encoding="utf-8"), "builtin")
-    raise FileNotFoundError(f"工作流不存在：{name}")
+    raise FileNotFoundError(tr("workflow_manager.workflow_not_found", name=name))
 
 
 def save_workflow(wf: Dict[str, Any], data_dir: str | Path | None) -> Path:
@@ -288,16 +289,16 @@ def save_workflow(wf: Dict[str, Any], data_dir: str | Path | None) -> Path:
     name = _safe_name(str(wf.get("name") or ""))
     errors = validate_structure(wf)
     if errors:
-        raise ValueError("工作流结构校验未通过：" + "；".join(errors))
+        raise ValueError(tr("workflow_manager.structure_invalid", errors="；".join(errors)))
     root = infer_user_workflows_dir(data_dir)
     if not root:
-        raise ValueError("无法确定用户工作流库目录")
+        raise ValueError(tr("workflow_manager.cannot_infer_workflows_dir"))
     wf = dict(wf)
     wf["name"] = name
     wf["updatedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     target_dir = (root / name).resolve()
     if not str(target_dir).startswith(str(root.resolve())):
-        raise ValueError("非法路径")
+        raise ValueError(tr("workflow_manager.invalid_path"))
     target_dir.mkdir(parents=True, exist_ok=True)
     content = workflow_to_markdown(wf)
     fd, tmp_path = tempfile.mkstemp(dir=str(target_dir), prefix=".WORKFLOW.", suffix=".tmp")
@@ -316,15 +317,15 @@ def delete_workflow(name: str, data_dir: str | Path | None) -> None:
     _safe_name(name)
     root = infer_user_workflows_dir(data_dir)
     if not root:
-        raise ValueError("无法确定用户工作流库目录")
+        raise ValueError(tr("workflow_manager.cannot_infer_workflows_dir"))
     target_dir = (root / name).resolve()
     if not str(target_dir).startswith(str(root.resolve())):
-        raise ValueError("非法路径")
+        raise ValueError(tr("workflow_manager.invalid_path"))
     if not target_dir.exists():
         builtin_file = _workflow_file(BUILTIN_WORKFLOWS_DIR, name)
         if builtin_file.exists():
-            raise ValueError("内置示例不可删除（可复制为用户工作流后删除副本）")
-        raise FileNotFoundError(f"工作流不存在：{name}")
+            raise ValueError(tr("workflow_manager.builtin_not_deletable"))
+        raise FileNotFoundError(tr("workflow_manager.workflow_not_found", name=name))
     shutil.rmtree(target_dir)
 
 
@@ -339,7 +340,7 @@ def read_workflow_markdown(name: str, data_dir: str | Path | None) -> str:
     for wf_file in candidates:
         if wf_file.exists():
             return wf_file.read_text(encoding="utf-8")
-    raise FileNotFoundError(f"工作流不存在：{name}")
+    raise FileNotFoundError(tr("workflow_manager.workflow_not_found", name=name))
 
 
 def archive_workflow_directory(
@@ -358,15 +359,15 @@ def archive_workflow_directory(
     """
     source = Path(source_dir).expanduser().resolve()
     if not source.exists() or not source.is_dir():
-        return {"success": False, "error": "source_dir 不是目录"}
+        return {"success": False, "error": tr("workflow_manager.archive_source_not_dir")}
     wf_file = source / WORKFLOW_FILENAME
     if not wf_file.exists() or not wf_file.is_file():
-        return {"success": False, "error": f"目录中缺少 {WORKFLOW_FILENAME}"}
+        return {"success": False, "error": tr("workflow_manager.archive_missing_workflow_file", filename=WORKFLOW_FILENAME)}
 
     try:
         wf = workflow_from_markdown(wf_file.read_text(encoding="utf-8"), "user")
     except Exception as exc:
-        return {"success": False, "error": f"WORKFLOW.md 解析失败：{exc}"}
+        return {"success": False, "error": tr("workflow_manager.archive_parse_failed", error=exc)}
 
     raw_name = str(wf.get("name") or "").strip()
     try:
@@ -376,25 +377,25 @@ def archive_workflow_directory(
     if source.name != name:
         return {
             "success": False,
-            "error": f"目录名（{source.name}）必须与 WORKFLOW.md 的 name 字段（{name}）一致",
+            "error": tr("workflow_manager.archive_name_mismatch", dir_name=source.name, name=name),
         }
 
     errors = validate_structure(wf)
     if errors:
         return {
             "success": False,
-            "error": "结构校验未通过：" + "；".join(errors),
+            "error": tr("workflow_manager.archive_structure_invalid", errors="；".join(errors)),
             "validation_errors": errors,
             "workflow_name": name,
         }
 
     root = infer_user_workflows_dir(data_dir)
     if not root:
-        return {"success": False, "error": "无法确定用户工作流库目录"}
+        return {"success": False, "error": tr("workflow_manager.cannot_infer_workflows_dir")}
     root = root.resolve()
     target = (root / name).resolve()
     if not str(target).startswith(str(root)):
-        return {"success": False, "error": "非法路径"}
+        return {"success": False, "error": tr("workflow_manager.invalid_path")}
 
     existed_user = target.exists()
     existed_builtin = _workflow_file(BUILTIN_WORKFLOWS_DIR, name).exists()
@@ -402,17 +403,14 @@ def archive_workflow_directory(
         if existed_user:
             return {
                 "success": False,
-                "error": f"工作流「{name}」已存在。确认覆盖请设 overwrite=true。",
+                "error": tr("workflow_manager.archive_already_exists", name=name),
                 "already_exists": True,
                 "workflow_name": name,
             }
         if existed_builtin:
             return {
                 "success": False,
-                "error": (
-                    f"与内置工作流「{name}」同名。归档后将创建用户副本遮蔽内置版本，"
-                    "确认请设 overwrite=true。"
-                ),
+                "error": tr("workflow_manager.archive_builtin_conflict", name=name),
                 "builtin_conflict": True,
                 "workflow_name": name,
             }
@@ -423,7 +421,7 @@ def archive_workflow_directory(
         try:
             target.rename(backup)
         except Exception as exc:
-            return {"success": False, "error": f"覆盖前备份旧版本失败：{exc}"}
+            return {"success": False, "error": tr("workflow_manager.archive_backup_failed", error=exc)}
     try:
         shutil.move(str(source), str(target))
     except Exception as exc:
@@ -432,7 +430,7 @@ def archive_workflow_directory(
                 backup.rename(target)
             except Exception:
                 pass
-        return {"success": False, "error": f"归档移动失败：{exc}", "workflow_name": name}
+        return {"success": False, "error": tr("workflow_manager.archive_move_failed", error=exc), "workflow_name": name}
     if backup is not None and backup.exists():
         try:
             shutil.rmtree(backup)

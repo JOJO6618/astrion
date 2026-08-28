@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -62,21 +63,21 @@ class ReplaceMixin:
         if old_text and len(old_text) > 9999999999:
             return {
                 "success": False,
-                "error": "要替换的文本过长，可能导致性能问题",
+                "error": tr("file_manager.replace_old_text_too_long"),
                 "suggestion": "请拆分内容或使用 edit_file/逐块写入完成修改"
             }
         
         if new_text and len(new_text) > 9999999999:
             return {
                 "success": False,
-                "error": "替换的新文本过长，建议分块处理",
+                "error": tr("file_manager.replace_new_text_too_long"),
                 "suggestion": "请将大内容分成多个小的替换操作"
             }
         short_old_text_notice = bool(old_text and len(old_text.splitlines()) < 3)
 
         # 检查是否包含要替换的内容
         if old_text and old_text not in content:
-            return {"success": False, "error": "未找到要替换的内容"}
+            return {"success": False, "error": tr("file_manager.replace_not_found")}
 
         matched_lines = self._find_match_line_numbers(content, old_text) if old_text else []
         found_count = len(matched_lines) if old_text else 0
@@ -104,11 +105,16 @@ class ReplaceMixin:
                 result["matched_lines"] = matched_lines
                 if found_count > 1:
                     line_text = ",".join(str(line_no) for line_no in matched_lines)
-                    message_parts.append(f"发现{found_count}处，于{line_text}行共替换{count}处")
+                    message_parts.append(tr(
+                        "file_manager.replace_found_report",
+                        found=found_count,
+                        lines=line_text,
+                        count=count,
+                    ))
             if short_old_text_notice:
                 message_parts.insert(
                     0,
-                    "提示：old_string 少于3行，已继续执行；需要批量替换的场景可以单行或不足一行"
+                    tr("file_manager.replace_short_old_notice")
                 )
             if message_parts:
                 result["message"] = "；".join(message_parts)
@@ -123,12 +129,12 @@ class ReplaceMixin:
             return result
 
         if not isinstance(replacements, list) or not replacements:
-            return {"success": False, "error": "replacements 必须是非空数组"}
+            return {"success": False, "error": tr("file_manager.replacements_required")}
 
         if len(replacements) > 100:
             return {
                 "success": False,
-                "error": "replacements 数量过多，最多支持 100 组",
+                "error": tr("file_manager.replacements_too_many"),
                 "suggestion": "请拆分为多次 edit_file 调用"
             }
 
@@ -270,7 +276,11 @@ class ReplaceMixin:
             return {
                 "success": False,
                 "path": result.get("path") or path,
-                "error": f"第 {failed_details[0].get('index')} 组替换失败：{failed_details[0].get('reason')}",
+                "error": tr(
+                    "file_manager.replace_group_failed",
+                    index=failed_details[0].get("index"),
+                    reason=failed_details[0].get("reason"),
+                ),
                 "failed_replacement_index": failed_details[0].get("index"),
                 "failed_details": failed_details,
                 "details": details,
@@ -285,10 +295,14 @@ class ReplaceMixin:
             write_result["replacement_groups"] = len(replacements)
             write_result["details"] = details
             write_result["write_performed"] = True
-            message_parts: List[str] = [f"共 {len(replacements)} 组替换，替换 {total_replacements} 处"]
+            message_parts: List[str] = [tr(
+                "file_manager.replace_many_summary",
+                groups=len(replacements),
+                replacements=total_replacements,
+            )]
             if short_old_text_indices:
                 indices_text = ",".join(str(item) for item in short_old_text_indices)
-                message_parts.append(f"提示：第 {indices_text} 组 old_string 少于3行，已继续执行")
+                message_parts.append(tr("file_manager.replace_many_short_notice", indices=indices_text))
             write_result["message"] = "；".join(message_parts)
             print(f"{OUTPUT_FORMATS['file']} 批量替换了 {total_replacements} 处内容")
         return write_result

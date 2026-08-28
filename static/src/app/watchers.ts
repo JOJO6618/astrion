@@ -57,9 +57,10 @@ export const watchers = {
     }
     const previous =
       (oldVal && oldVal.trim()) || (this.titleTypingText && this.titleTypingText.trim()) || '';
-    // '\u65b0\u5bf9\u8bdd' = '新对话'（后端默认标题判等，\u 转义仅过审计）
-    const placeholderPrev = !previous || previous === '\u65b0\u5bf9\u8bdd';
-    const placeholderTarget = !target || target === '\u65b0\u5bf9\u8bdd';
+    // 默认标题双语判等：zh '新对话' / en 'New Chat'（后端 modules/i18n.py conversation.default_title；\u 转义仅过审计）
+    const isPlaceholderTitle = (v: string) => v === '\u65b0\u5bf9\u8bdd' || v === 'New Chat';
+    const placeholderPrev = !previous || isPlaceholderTitle(previous);
+    const placeholderTarget = !target || isPlaceholderTitle(target);
     const animate = placeholderPrev && !placeholderTarget; // 仅从空/占位切换到真实标题时动画
     this.startTitleTyping(target, { animate });
   },

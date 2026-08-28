@@ -7,6 +7,7 @@ from flask import session, redirect, jsonify
 from modules import admin_policy_manager
 from .utils_common import debug_log
 from . import state
+from modules.i18n import tr
 
 
 def is_logged_in() -> bool:
@@ -92,7 +93,7 @@ def admin_api_required(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
         if not is_admin_user():
-            return jsonify({"success": False, "error": "需要管理员权限"}), 403
+            return jsonify({"success": False, "error": tr("auth.admin_required")}), 403
         return view_func(*args, **kwargs)
     return wrapped
 

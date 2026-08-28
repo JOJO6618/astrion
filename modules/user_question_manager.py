@@ -5,6 +5,8 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from modules.i18n import tr
+
 
 class UserQuestionManager:
     """In-memory manager for blocking model-to-user questions."""
@@ -110,13 +112,13 @@ class UserQuestionManager:
         clean_option_id = str(selected_option_id or "").strip()
         clean_text = str(text or "").strip()
         if not dismissed and not clean_option_id and not clean_text:
-            raise ValueError("回答不能为空")
+            raise ValueError(tr("user_question.answer_empty"))
         with self._lock:
             item = self._items.get(question_id)
             if not item:
-                raise KeyError("问题不存在")
+                raise KeyError(tr("user_question.question_not_found"))
             if item.get("username") != username:
-                raise PermissionError("无权限回答该问题")
+                raise PermissionError(tr("user_question.no_permission"))
             if item.get("status") != "pending":
                 return dict(item)
 
@@ -134,7 +136,7 @@ class UserQuestionManager:
                         selected_option = dict(opt)
                         break
                 if selected_option is None:
-                    raise ValueError("选项不存在")
+                    raise ValueError(tr("user_question.option_not_found"))
 
             answer_type = "option_with_text" if selected_option and clean_text else "option" if selected_option else "free_text"
             answer = {

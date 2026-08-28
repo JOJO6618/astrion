@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 
 from server.auth_helpers import api_login_required
 from server.context import make_terminal_callback, with_terminal
+from modules.i18n import tr
 
 workflow_runtime_bp = Blueprint("workflow_runtime", __name__)
 
@@ -42,7 +43,7 @@ def api_activate_workflow(terminal, workspace, username):
     name = str(data.get("name") or "").strip()
     conversation_id = str(data.get("conversation_id") or "").strip() or None
     if not name:
-        return jsonify({"error": "缺少工作流名称"}), 400
+        return jsonify({"error": tr("workflow_api.missing_workflow_name")}), 400
 
     from server.main_task_gate import release_main_task_gate, try_acquire_main_task_gate
     from server.workflow_flow import activate_workflow
@@ -53,7 +54,7 @@ def api_activate_workflow(terminal, workspace, username):
         # 自动创建对话，对齐 tasks/api.py 未带 conversation_id 时的补建先例。
         cm = getattr(getattr(terminal, "context_manager", None), "conversation_manager", None)
         if cm is None:
-            return jsonify({"error": "对话管理器不可用"}), 500
+            return jsonify({"error": tr("workflow_api.conversation_manager_unavailable")}), 500
         _run_mode = str(getattr(terminal, "run_mode", "") or "fast")
         if _run_mode not in {"fast", "thinking", "deep"}:
             _run_mode = "fast"
@@ -103,7 +104,7 @@ def api_activate_workflow(terminal, workspace, username):
                 metadata_overrides=_meta_overrides,
             )
         except Exception as exc:  # noqa: BLE001
-            return jsonify({"error": f"创建对话失败：{exc}"}), 500
+            return jsonify({"error": tr("workflow_api.create_conversation_failed", error=exc)}), 500
         created_new = True
         # 恢复服务 terminal 的对话指针，避免污染共享服务 terminal 的上下文状态
         try:
@@ -116,7 +117,7 @@ def api_activate_workflow(terminal, workspace, username):
     if not created_new:
         gate_token = try_acquire_main_task_gate(terminal)
         if gate_token is None:
-            return jsonify({"error": "智能体正在工作中，工作流仅可在空闲时激活。"}), 409
+            return jsonify({"error": tr("workflow_api.busy_cannot_activate")}), 409
 
     try:
         # 激活提示消息将追加到历史末尾，阶段消息游标取当前长度 + 1。
@@ -203,7 +204,7 @@ def api_activate_workflow(terminal, workspace, username):
         })
     except Exception as exc:  # noqa: BLE001
         release_main_task_gate(terminal, gate_token)
-        return jsonify({"error": f"激活工作流失败：{exc}"}), 500
+        return jsonify({"error": tr("workflow_api.activate_failed", error=exc)}), 500
 
 
 @workflow_runtime_bp.route("/api/workflow/deactivate", methods=["POST"])
@@ -213,7 +214,7 @@ def api_deactivate_workflow(terminal, workspace, username):
     data = request.get_json(silent=True) or {}
     conversation_id = str(data.get("conversation_id") or "").strip()
     if not conversation_id:
-        return jsonify({"error": "缺少 conversation_id"}), 400
+        return jsonify({"error": tr("workflow_api.missing_conversation_id")}), 400
 
     from server.main_task_gate import release_main_task_gate, try_acquire_main_task_gate
     from server.workflow_flow import deactivate_workflow_by_user
@@ -297,11 +298,11 @@ def api_deactivate_workflow(terminal, workspace, username):
 def api_workflow_status(terminal, workspace, username):
     conversation_id = str(request.args.get("conversation_id") or "").strip()
     if not conversation_id:
-        return jsonify({"error": "缺少 conversation_id"}), 400
+        return jsonify({"error": tr("workflow_api.missing_conversation_id")}), 400
     try:
         from modules.workflow_state_manager import WorkflowStateManager
 
         wsm = WorkflowStateManager(workspace.data_dir, conversation_id)
         return jsonify({"success": True, "snapshot": wsm.progress_snapshot()})
     except Exception as exc:  # noqa: BLE001
-        return jsonify({"error": f"读取工作流状态失败：{exc}"}), 500
+        return jsonify({"error": tr("workflow_api.status_read_failed", error=exc)}), 500

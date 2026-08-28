@@ -14,6 +14,8 @@ from collections import deque
 
 from utils.perf_log import perf_log
 
+from modules.i18n import tr
+
 
 class VersioningError(RuntimeError):
     """Raised when hidden git versioning fails."""
@@ -42,7 +44,7 @@ class ConversationVersioningManager:
         self.data_dir = Path(data_dir).expanduser().resolve()
         self.conversation_id = str(conversation_id or "").strip()
         if not self.conversation_id:
-            raise VersioningError("缺少 conversation_id")
+            raise VersioningError(tr("versioning_err.missing_conversation_id"))
         self.paths = VersioningPaths(
             save_root=(self.data_dir / "save" / self.conversation_id).resolve(),
             git_dir=(self.data_dir / "save" / self.conversation_id / "git").resolve(),
@@ -70,7 +72,7 @@ class ConversationVersioningManager:
     ) -> Tuple[bool, str, str]:
         git_bin = shutil.which("git")
         if not git_bin:
-            raise VersioningError("未检测到 git 可执行文件")
+            raise VersioningError(tr("versioning_err.git_not_found"))
         cmd = [
             git_bin,
             "-c",
@@ -91,12 +93,12 @@ class ConversationVersioningManager:
                 timeout=timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
-            raise VersioningError(f"git 执行超时: {' '.join(args)}") from exc
+            raise VersioningError(tr("versioning_err.git_timeout", cmd=" ".join(args))) from exc
         ok = completed.returncode == 0
         stdout = (completed.stdout or "").strip()
         stderr = (completed.stderr or "").strip()
         if check and not ok:
-            raise VersioningError(stderr or stdout or f"git 命令失败: {' '.join(args)}")
+            raise VersioningError(stderr or stdout or tr("versioning_err.git_cmd_failed", cmd=" ".join(args)))
         return ok, stdout, stderr
 
     def _ensure_exclude_paths(self) -> None:
@@ -353,12 +355,12 @@ class ConversationVersioningManager:
 
         current_head = self._get_head_tree()
         if normalized_tracking_mode == self.TRACKING_MODE_WORKSPACE_AND_CONVERSATION and not current_head:
-            raise VersioningError("创建初始版本点失败：未获取到 commit")
+            raise VersioningError(tr("versioning_err.initial_checkpoint_failed"))
 
         row = {
             "seq": 0,
-            "message": "版本管理开启（初始状态）",
-            "message_preview": "版本管理开启（初始状态）",
+            "message": tr("versioning.initial_state"),
+            "message_preview": tr("versioning.initial_state"),
             "message_index": -1,
             "timestamp": datetime.now().isoformat(),
             "workspace_path": str(workspace_path or ""),
@@ -520,7 +522,7 @@ class ConversationVersioningManager:
             self._stage_all()
             current_head = self._get_head_tree()
             if not current_head:
-                raise VersioningError("创建版本快照失败：未获取到 tree hash")
+                raise VersioningError(tr("versioning_err.snapshot_failed"))
             # 通过 tree-to-tree diff 判断是否有变更
             _, numstat_text, _ = self._run_git(
                 ["diff", "--numstat", previous_head or self.EMPTY_TREE_HASH, current_head],
@@ -748,11 +750,11 @@ class ConversationVersioningManager:
     # ----------------------------
     def restore_to_tree(self, tree_hash: str) -> Dict[str, Any]:
         if not tree_hash:
-            raise VersioningError("缺少 tree hash")
+            raise VersioningError(tr("versioning_err.missing_tree_hash"))
         self.ensure_repo()
         ok, _, _ = self._run_git(["cat-file", "-e", tree_hash], check=False)
         if not ok:
-            raise VersioningError("目标 tree 不存在")
+            raise VersioningError(tr("versioning_err.tree_not_found"))
         # 使用 read-tree + checkout-index 恢复到指定 tree，不依赖 commit 历史
         self._run_git(["read-tree", tree_hash])
         self._run_git(["checkout-index", "-a", "-f"])

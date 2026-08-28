@@ -111,6 +111,8 @@ from config.model_profiles import (
     get_model_context_window,
 )
 
+from modules.i18n import tr
+
 logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 
@@ -169,7 +171,7 @@ class MainTerminalToolsExecutionMixin:
 
     @staticmethod
     def _mcp_disabled_message() -> str:
-                return "当前为docker模式，MCP仅支持宿主机模式"
+                return tr("tools_exec.mcp_disabled_docker_mode")
 
     def _is_mcp_disabled_in_docker_mode(self) -> bool:
                 session = getattr(self, "container_session", None)
@@ -406,7 +408,7 @@ class MainTerminalToolsExecutionMixin:
                             "allowed": False,
                             "mode": mode,
                             "code": "readonly_denied",
-                            "message": "当前处于只读模式，已拒绝会修改工作区或执行高风险操作的工具调用。"
+                            "message": tr("tools_exec.readonly_denied")
                         }
                     return {"allowed": True, "mode": mode}
 
@@ -564,7 +566,7 @@ class MainTerminalToolsExecutionMixin:
     def _handle_create_skill_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
                 source = self._resolve_create_skill_source_dir(arguments.get("source_dir"))
                 if source is None:
-                    return {"success": False, "error": "source_dir 不能为空"}
+                    return {"success": False, "error": tr("tools_exec.source_dir_empty")}
 
                 target_root = self._get_create_skill_target_root()
                 result = archive_skill_directory(source, target_root)
@@ -584,13 +586,13 @@ class MainTerminalToolsExecutionMixin:
                             private_dir=infer_private_skills_dir(self.data_dir),
                         )
                         if not sync_result.get("success"):
-                            result["sync_warning"] = "同步当前工作区 skills 失败"
+                            result["sync_warning"] = tr("tools_exec.skills_sync_failed")
                     except Exception as exc:
-                        result["sync_warning"] = "同步当前工作区 skills 失败"
+                        result["sync_warning"] = tr("tools_exec.skills_sync_failed")
 
                 if result.get("success"):
                     result["summary"] = (
-                        f"已归档 skill：{result.get('skill_name')}"
+                        tr("tools_exec.skill_archived", skill_name=result.get('skill_name'))
                     )
                     # 成功时不向模型/前端暴露宿主机或 Docker 内部路径。
                     result.pop("source_dir", None)
@@ -602,7 +604,7 @@ class MainTerminalToolsExecutionMixin:
                 from server.workflow_flow import activate_workflow
                 conversation_id = getattr(self.context_manager, "current_conversation_id", None)
                 if not conversation_id:
-                    return {"success": False, "error": "当前没有打开的对话，无法激活工作流。"}
+                    return {"success": False, "error": tr("tools_exec.workflow_no_conversation")}
                 try:
                     msg_index = len(getattr(self.context_manager, "conversation_history", []) or [])
                 except Exception:
@@ -625,7 +627,7 @@ class MainTerminalToolsExecutionMixin:
                 from server.workflow_flow import build_status_text
                 conversation_id = getattr(self.context_manager, "current_conversation_id", None)
                 if not conversation_id:
-                    return {"success": False, "error": "当前没有打开的对话。"}
+                    return {"success": False, "error": tr("tools_exec.no_open_conversation")}
                 return {
                     "success": True,
                     "message": build_status_text(data_dir=self.data_dir, conversation_id=str(conversation_id)),
@@ -650,14 +652,17 @@ class MainTerminalToolsExecutionMixin:
                         "success": True,
                         "count": 0,
                         "workflows": [],
-                        "message": "当前没有可用工作流。可阅读 workflow-authoring 技能后用 save_workflow 创建。",
+                        "message": tr("tools_exec.workflow_none"),
                     }
-                lines = [f"可用工作流（共 {len(items)} 个）："]
+                lines = [tr("tools_exec.workflows_count", count=len(items))]
                 for item in items:
-                    src = "内置" if item.get("source") == "builtin" else "用户"
+                    src = tr("tools_exec.workflow_builtin") if item.get("source") == "builtin" else tr("tools_exec.workflow_user")
                     lines.append(
-                        f"- {item.get('name')}：{item.get('description') or '（无描述）'}"
-                        f"（{src}，{item.get('nodeCount')} 节点）"
+                        tr("tools_exec.workflow_item_line",
+                           name=item.get('name'),
+                           description=item.get('description') or tr("tools_exec.workflow_no_description"),
+                           src=src,
+                           node_count=item.get('nodeCount'))
                     )
                 return {
                     "success": True,
@@ -671,20 +676,21 @@ class MainTerminalToolsExecutionMixin:
 
                 source = self._resolve_create_skill_source_dir(arguments.get("source_dir"))
                 if source is None:
-                    return {"success": False, "error": "source_dir 不能为空"}
+                    return {"success": False, "error": tr("tools_exec.source_dir_empty")}
                 result = archive_workflow_directory(
                     source,
                     self.data_dir,
                     overwrite=bool(arguments.get("overwrite")),
                 )
                 if result.get("success"):
-                    note = "（覆盖已有版本）" if result.get("overwritten") else ""
+                    note = tr("tools_exec.workflow_overwritten_note") if result.get("overwritten") else ""
                     if result.get("shadows_builtin"):
-                        note = "（用户副本，遮蔽同名内置工作流）"
-                    result["summary"] = (
-                        f"已归档工作流：{result.get('workflow_name')}"
-                        f"（{result.get('node_count')} 节点）{note}。"
-                        "可使用 activate_workflow 激活。"
+                        note = tr("tools_exec.workflow_shadows_builtin_note")
+                    result["summary"] = tr(
+                        "tools_exec.workflow_archived_summary",
+                        workflow_name=result.get('workflow_name'),
+                        node_count=result.get('node_count'),
+                        note=note,
                     )
                 return result
 
@@ -692,14 +698,14 @@ class MainTerminalToolsExecutionMixin:
                 """处理 update_project_memory：写入 .astrion/memory/{name}.md"""
                 safe_name = str(name).strip()
                 if not safe_name or "/" in safe_name or "\\" in safe_name:
-                    return {"success": False, "error": f"记忆名称不合法: {name}"}
+                    return {"success": False, "error": tr("tools_exec.memory_name_invalid", name=name)}
 
                 # 确保 .astrion/memory/ 目录存在
                 memory_dir = Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME
                 try:
                     memory_dir.mkdir(parents=True, exist_ok=True)
                 except Exception as exc:
-                    return {"success": False, "error": f"创建记忆目录失败: {exc}"}
+                    return {"success": False, "error": tr("tools_exec.memory_dir_create_failed", error=str(exc))}
 
                 # 拼接完整文件内容（YAML frontmatter + markdown）
                 full_content = f"---\nname: {safe_name}\ndescription: {description}\n---\n\n{content}\n"
@@ -708,13 +714,13 @@ class MainTerminalToolsExecutionMixin:
                 try:
                     file_path.write_text(full_content, encoding="utf-8")
                 except Exception as exc:
-                    return {"success": False, "error": f"写入记忆文件失败: {exc}"}
+                    return {"success": False, "error": tr("tools_exec.memory_file_write_failed", error=str(exc))}
 
                 return {
                     "success": True,
                     "memory_name": safe_name,
                     "path": str(file_path),
-                    "summary": f"已{'更新' if file_path.exists() else '创建'}项目记忆: {safe_name}",
+                    "summary": tr("tools_exec.memory_updated" if file_path.exists() else "tools_exec.memory_created", safe_name=safe_name),
                 }
 
     def _mark_skill_read_from_result(self, tool_name: str, arguments: Dict[str, Any], result: Dict[str, Any]) -> None:
@@ -993,11 +999,8 @@ class MainTerminalToolsExecutionMixin:
 
                 return {
                     "success": False,
-                    "error": f"调用 {tool_name} 前必须先使用 read_file 阅读目标文件",
-                    "message": (
-                        f"文件 {target_path} 尚未在当前对话中通过 read_file 阅读。"
-                        "请先使用 read_file（read/search/extract 任一模式）读取后再编辑。"
-                    ),
+                    "error": tr("tools_exec.read_before_edit_error", tool_name=tool_name),
+                    "message": tr("tools_exec.read_before_edit_message", target_path=target_path),
                     "required_tool": "read_file",
                     "required_path": str(target_path),
                     "enforcement": "read_before_edit_required",
@@ -1060,8 +1063,8 @@ class MainTerminalToolsExecutionMixin:
                 required_path = f"{WORKSPACE_SKILLS_DIRNAME}/{skill_id}/SKILL.md"
                 return {
                     "success": False,
-                    "error": f"调用 {tool_name} 前必须先阅读 {required_path}",
-                    "message": f"请先使用 read_skill（或 read_file）阅读 {required_path}，随后再调用该工具。",
+                    "error": tr("tools_exec.skill_required_error", tool_name=tool_name, required_path=required_path),
+                    "message": tr("tools_exec.skill_required_message", required_path=required_path),
                     "required_skill": skill_id,
                     "required_path": required_path,
                     "enforcement": "skill_read_required"
@@ -1085,7 +1088,7 @@ class MainTerminalToolsExecutionMixin:
                 # 检查是否需要确认
                 if tool_name in NEED_CONFIRMATION:
                     if not await self.confirm_action(tool_name, arguments):
-                        return json.dumps({"success": False, "error": "用户取消操作"})
+                        return json.dumps({"success": False, "error": tr("tools_exec.action_cancelled")})
 
                 # === 新增：预检查参数大小和格式 ===
                 try:
@@ -1094,8 +1097,8 @@ class MainTerminalToolsExecutionMixin:
                     if len(arguments_str) > 200000:  # 200KB限制
                         return json.dumps({
                             "success": False,
-                            "error": f"参数过大({len(arguments_str)}字符)，超过200KB限制",
-                            "suggestion": "请分块处理或减少参数内容"
+                            "error": tr("tools_exec.params_too_large", chars=len(arguments_str)),
+                            "suggestion": tr("tools_exec.params_too_large_suggestion")
                         }, ensure_ascii=False)
 
                     # 针对特定工具的内容检查
@@ -1105,8 +1108,8 @@ class MainTerminalToolsExecutionMixin:
                         if not DISABLE_LENGTH_CHECK and len(content) > length_limit:
                             return json.dumps({
                                 "success": False,
-                                "error": f"文件内容过长({len(content)}字符)，超过{length_limit}字符限制",
-                                "suggestion": "请分块写入，或设置 append=true 多次写入"
+                                "error": tr("tools_exec.content_too_long", chars=len(content), limit=length_limit),
+                                "suggestion": tr("tools_exec.content_too_long_suggestion")
                             }, ensure_ascii=False)
                         if '\\' in content and content.count('\\') > len(content) / 10:
                             print(f"{OUTPUT_FORMATS['warning']} 检测到大量转义字符，可能存在格式问题")
@@ -1114,7 +1117,7 @@ class MainTerminalToolsExecutionMixin:
                 except Exception as e:
                     return json.dumps({
                         "success": False,
-                        "error": f"参数预检查失败: {str(e)}"
+                        "error": tr("tools_exec.precheck_failed", error=str(e))
                     }, ensure_ascii=False)
 
                 # 自定义工具预解析（仅管理员）
@@ -1151,7 +1154,7 @@ class MainTerminalToolsExecutionMixin:
                         manager = getattr(self, "mcp_client_manager", None)
                         registry = getattr(self, "mcp_server_registry", None)
                         if manager is None or registry is None:
-                            result = {"success": False, "error": "MCP 模块不可用"}
+                            result = {"success": False, "error": tr("tools_exec.mcp_module_unavailable")}
                         else:
                             refresh = bool(arguments.get("refresh", False))
                             include_disabled = bool(arguments.get("include_disabled", False))
@@ -1210,11 +1213,11 @@ class MainTerminalToolsExecutionMixin:
                             }
                     elif is_mcp_tool_alias:
                         if not getattr(self, "mcp_tools_enabled", False):
-                            result = {"success": False, "error": "MCP 功能未启用"}
+                            result = {"success": False, "error": tr("tools_exec.mcp_not_enabled")}
                             return json.dumps(result, ensure_ascii=False)
                         manager = getattr(self, "mcp_client_manager", None)
                         if manager is None:
-                            result = {"success": False, "error": "MCP 管理器不可用"}
+                            result = {"success": False, "error": tr("tools_exec.mcp_manager_unavailable")}
                         else:
                             # intent 仅用于原生工具的人类可读展示，不应透传给 MCP 远端工具
                             mcp_arguments = arguments
@@ -1251,18 +1254,18 @@ class MainTerminalToolsExecutionMixin:
                         path = arguments.get("path")
                         prompt = arguments.get("prompt")
                         if not path:
-                            return json.dumps({"success": False, "error": "缺少 path 参数", "warnings": []}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.missing_path_param"), "warnings": []}, ensure_ascii=False)
                         result = self.ocr_client.vlm_analyze(path=path, prompt=prompt or "")
                     elif tool_name == "view_image":
                         path = (arguments.get("path") or "").strip()
                         if not path:
-                            return json.dumps({"success": False, "error": "path 不能为空"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.path_empty")}, ensure_ascii=False)
                         host_unrestricted = self._is_host_mode()
                         if path.startswith("/workspace"):
                             if host_unrestricted:
                                 path = path.split("/workspace", 1)[1].lstrip("/")
                             else:
-                                return json.dumps({"success": False, "error": "非法路径，超出项目根目录，请使用不带/workspace的相对路径"}, ensure_ascii=False)
+                                return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_no_workspace")}, ensure_ascii=False)
                         if host_unrestricted and (Path(path).is_absolute() or (len(path) > 1 and path[1] == ":")):
                             abs_path = Path(path).expanduser().resolve()
                         else:
@@ -1271,14 +1274,14 @@ class MainTerminalToolsExecutionMixin:
                                 try:
                                     abs_path.relative_to(Path(self.context_manager.project_path).resolve())
                                 except Exception:
-                                    return json.dumps({"success": False, "error": "非法路径，超出项目根目录，请使用不带/workspace的相对路径"}, ensure_ascii=False)
+                                    return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_no_workspace")}, ensure_ascii=False)
                         if not abs_path.exists() or not abs_path.is_file():
-                            return json.dumps({"success": False, "error": f"图片不存在: {path}"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.image_not_found", path=path)}, ensure_ascii=False)
                         if abs_path.stat().st_size > 10 * 1024 * 1024:
-                            return json.dumps({"success": False, "error": "图片过大，需 <= 10MB"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.image_too_large")}, ensure_ascii=False)
                         allowed_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
                         if abs_path.suffix.lower() not in allowed_ext:
-                            return json.dumps({"success": False, "error": f"不支持的图片格式: {abs_path.suffix}"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.image_unsupported_format", suffix=abs_path.suffix)}, ensure_ascii=False)
                         # 记录待附加图片，供上层将图片附加到工具结果
                         self.pending_image_view = {
                             "path": str(path)
@@ -1287,20 +1290,20 @@ class MainTerminalToolsExecutionMixin:
                         # 原图由前端按 path 走 /api/file/content 加载，不在结果里内联
                         result = {
                             "success": True,
-                            "message": "图片已附加到工具结果中，将随 tool 返回。",
+                            "message": tr("tools_exec.image_attached"),
                             "path": path,
                             "size": abs_path.stat().st_size,
                         }
                     elif tool_name == "view_video":
                         path = (arguments.get("path") or "").strip()
                         if not path:
-                            return json.dumps({"success": False, "error": "path 不能为空"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.path_empty")}, ensure_ascii=False)
                         host_unrestricted = self._is_host_mode()
                         if path.startswith("/workspace"):
                             if host_unrestricted:
                                 path = path.split("/workspace", 1)[1].lstrip("/")
                             else:
-                                return json.dumps({"success": False, "error": "非法路径，超出项目根目录，请使用相对路径"}, ensure_ascii=False)
+                                return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_relative")}, ensure_ascii=False)
                         if host_unrestricted and (Path(path).is_absolute() or (len(path) > 1 and path[1] == ":")):
                             abs_path = Path(path).expanduser().resolve()
                         else:
@@ -1309,18 +1312,18 @@ class MainTerminalToolsExecutionMixin:
                                 try:
                                     abs_path.relative_to(Path(self.context_manager.project_path).resolve())
                                 except Exception:
-                                    return json.dumps({"success": False, "error": "非法路径，超出项目根目录，请使用相对路径"}, ensure_ascii=False)
+                                    return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_relative")}, ensure_ascii=False)
                         if not abs_path.exists() or not abs_path.is_file():
-                            return json.dumps({"success": False, "error": f"视频不存在: {path}"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.video_not_found", path=path)}, ensure_ascii=False)
                         allowed_ext = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
                         if abs_path.suffix.lower() not in allowed_ext:
-                            return json.dumps({"success": False, "error": f"不支持的视频格式: {abs_path.suffix}"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.video_unsupported_format", suffix=abs_path.suffix)}, ensure_ascii=False)
                         if abs_path.stat().st_size > 50 * 1024 * 1024:
-                            return json.dumps({"success": False, "error": "视频过大，需 <= 50MB"}, ensure_ascii=False)
+                            return json.dumps({"success": False, "error": tr("tools_exec.video_too_large")}, ensure_ascii=False)
                         self.pending_video_view = {"path": str(path)}
                         result = {
                             "success": True,
-                            "message": "视频已附加到工具结果中，将随 tool 返回。",
+                            "message": tr("tools_exec.video_attached"),
                             "path": path
                         }
 
@@ -1355,7 +1358,7 @@ class MainTerminalToolsExecutionMixin:
                                 print(f"{OUTPUT_FORMATS['session']} 终端会话已重置: {result['session']}")
 
                         else:
-                            result = {"success": False, "error": f"未知操作: {action}"}
+                            result = {"success": False, "error": tr("tools_exec.unknown_action", action=action)}
                         result["action"] = action
 
                     # 终端输入工具
@@ -1384,7 +1387,7 @@ class MainTerminalToolsExecutionMixin:
                         wait_sub_agent_ids = arguments.get("wait_sub_agent_ids")
                         wait_sub_agent_output = arguments.get("wait_sub_agent_output")
                         wait_runcommand_id = arguments.get("wait_runcommand_id")
-                        reason = arguments.get("reason", "等待操作完成")
+                        reason = arguments.get("reason", tr("tools_exec.sleep_reason_default"))
 
                         provided = 0
                         if seconds is not None:
@@ -1398,31 +1401,31 @@ class MainTerminalToolsExecutionMixin:
                         if provided == 0:
                             result = {
                                 "success": False,
-                                "error": "sleep 至少需要提供一个参数：seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id"
+                                "error": tr("tools_exec.sleep_no_params")
                             }
                         elif provided > 1:
                             result = {
                                 "success": False,
-                                "error": "sleep 的等待参数互斥：seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id 只能提供一个"
+                                "error": tr("tools_exec.sleep_params_exclusive")
                             }
                         elif wait_sub_agent_output:
                             if not getattr(self, "multi_agent_mode", False):
-                                result = {"success": False, "error": "wait_sub_agent_output 仅在多智能体模式下可用"}
+                                result = {"success": False, "error": tr("tools_exec.agent_output_multi_agent_only")}
                             else:
                                 display_name = str(wait_sub_agent_output or "").strip()
                                 manager = getattr(self, "sub_agent_manager", None)
                                 if not manager:
-                                    result = {"success": False, "error": "子智能体管理器不可用"}
+                                    result = {"success": False, "error": tr("tools_exec.sub_agent_manager_unavailable")}
                                 else:
                                     state = manager.get_multi_agent_state(getattr(self.context_manager, "current_conversation_id", None))
                                     if not state:
-                                        result = {"success": False, "error": "当前对话没有多智能体状态"}
+                                        result = {"success": False, "error": tr("tools_exec.no_multi_agent_state")}
                                     else:
                                         # 显示名寻址：模型只传显示名，内部解析为全局 agent_id
                                         inst = state.get_instance_by_display_name(display_name)
                                         if not inst:
-                                            available = "、".join(state.list_display_names()) or "（无）"
-                                            result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available}"}
+                                            available = tr("tools_exec.list_sep").join(state.list_display_names()) or tr("tools_exec.none_placeholder")
+                                            result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available)}
                                         else:
                                             try:
                                                 loop = asyncio.get_running_loop()
@@ -1435,24 +1438,24 @@ class MainTerminalToolsExecutionMixin:
                                                     "message": msg,
                                                 }
                                             except asyncio.TimeoutError:
-                                                result = {"success": False, "error": f"等待 {inst.display_name} 输出超时（5分钟）。可用 send_message_to_sub_agent 重新激活。"}
+                                                result = {"success": False, "error": tr("tools_exec.agent_output_wait_timeout", display_name=inst.display_name)}
                                             except asyncio.CancelledError:
-                                                result = {"success": False, "error": f"等待 {inst.display_name} 被取消。该子智能体现在不可用，可用 send_message_to_sub_agent 重新激活。"}
+                                                result = {"success": False, "error": tr("tools_exec.agent_output_wait_cancelled", display_name=inst.display_name)}
                                             except RuntimeError as exc:
                                                 error_msg = str(exc)
                                                 if "send_message_to_sub_agent" not in error_msg:
-                                                    error_msg += " 可用 send_message_to_sub_agent 重新激活。"
+                                                    error_msg += tr("tools_exec.agent_reactivate_hint")
                                                 result = {"success": False, "error": error_msg}
                                             except Exception as exc:
-                                                result = {"success": False, "error": f"等待 {inst.display_name} 输出失败: {exc}。可用 send_message_to_sub_agent 重新激活。"}
+                                                result = {"success": False, "error": tr("tools_exec.agent_output_wait_failed", display_name=inst.display_name, error=str(exc))}
                         elif wait_sub_agent_ids:
                             if getattr(self, "multi_agent_mode", False):
                                 result = {
                                     "success": False,
-                                    "error": "多智能体模式下 sleep 工具不支持 wait_sub_agent_ids，请使用 wait_sub_agent_output。"
+                                    "error": tr("tools_exec.sleep_wait_ids_not_supported")
                                 }
                             elif not isinstance(wait_sub_agent_ids, list) or not wait_sub_agent_ids:
-                                result = {"success": False, "error": "wait_sub_agent_ids 必须是非空数组"}
+                                result = {"success": False, "error": tr("tools_exec.wait_ids_nonempty")}
                             else:
                                 normalized_ids = []
                                 invalid = []
@@ -1465,11 +1468,11 @@ class MainTerminalToolsExecutionMixin:
                                     except Exception:
                                         invalid.append(item)
                                 if invalid:
-                                    result = {"success": False, "error": f"wait_sub_agent_ids 含非法值: {invalid}"}
+                                    result = {"success": False, "error": tr("tools_exec.wait_ids_invalid", invalid=invalid)}
                                 else:
                                     manager = getattr(self, "sub_agent_manager", None)
                                     if not manager:
-                                        result = {"success": False, "error": "子智能体管理器不可用"}
+                                        result = {"success": False, "error": tr("tools_exec.sub_agent_manager_unavailable")}
                                     else:
                                         task_ids = []
                                         missing = []
@@ -1480,7 +1483,7 @@ class MainTerminalToolsExecutionMixin:
                                             else:
                                                 task_ids.append(task.get("task_id"))
                                         if missing:
-                                            result = {"success": False, "error": f"未找到对应子智能体: {missing}"}
+                                            result = {"success": False, "error": tr("tools_exec.agent_not_found_by_id", missing=missing)}
                                         else:
                                             wait_results = []
                                             waited_task_ids = []
@@ -1509,7 +1512,7 @@ class MainTerminalToolsExecutionMixin:
                                                 "agent_ids": normalized_ids,
                                                 "waited_task_ids": waited_task_ids,
                                                 "results": wait_results,
-                                                "message": f"已等待 {len(normalized_ids)} 个子智能体结束"
+                                                "message": tr("tools_exec.waited_agents_done", count=len(normalized_ids))
                                             }
                                             try:
                                                 if not hasattr(self, "_announced_sub_agent_tasks"):
@@ -1522,14 +1525,14 @@ class MainTerminalToolsExecutionMixin:
                         elif wait_runcommand_id:
                             bg_manager = getattr(self, "background_command_manager", None)
                             if not bg_manager:
-                                result = {"success": False, "error": "后台命令管理器不可用"}
+                                result = {"success": False, "error": tr("tools_exec.background_manager_unavailable")}
                             else:
                                 rec = bg_manager.get_record(str(wait_runcommand_id))
                                 current_conv = getattr(self.context_manager, "current_conversation_id", None)
                                 if not rec:
-                                    result = {"success": False, "error": f"未找到后台命令: {wait_runcommand_id}"}
+                                    result = {"success": False, "error": tr("tools_exec.bg_command_not_found", command_id=wait_runcommand_id)}
                                 elif rec.get("conversation_id") and current_conv and rec.get("conversation_id") != current_conv:
-                                    result = {"success": False, "error": "该后台命令不属于当前对话"}
+                                    result = {"success": False, "error": tr("tools_exec.bg_command_wrong_conversation")}
                                 else:
                                     wait_result = await asyncio.to_thread(
                                         bg_manager.wait_for_completion,
@@ -1543,7 +1546,7 @@ class MainTerminalToolsExecutionMixin:
                                         "mode": "wait_runcommand_id",
                                         "command_id": str(wait_runcommand_id),
                                         "result": wait_result,
-                                        "message": "后台 run_command 等待完成"
+                                        "message": tr("tools_exec.bg_runcommand_done")
                                     }
                         else:
                             max_sleep = 3600  # 最多等待3600秒（1小时）
@@ -1551,28 +1554,28 @@ class MainTerminalToolsExecutionMixin:
                             try:
                                 seconds = float(seconds)
                             except Exception:
-                                result = {"success": False, "error": "seconds 必须是数字"}
+                                result = {"success": False, "error": tr("tools_exec.seconds_not_number")}
                                 seconds_parse_ok = False
                                 seconds = 0.0
                             if seconds_parse_ok and seconds > max_sleep:
                                 result = {
                                     "success": False,
-                                    "error": f"等待时间过长，最多允许 {max_sleep} 秒",
-                                    "suggestion": f"建议分多次等待或减少等待时间"
+                                    "error": tr("tools_exec.sleep_too_long", max_sleep=max_sleep),
+                                    "suggestion": tr("tools_exec.sleep_too_long_suggestion")
                                 }
                             elif seconds_parse_ok:
                                 # 确保秒数为正数
                                 if seconds <= 0:
                                     result = {
                                         "success": False,
-                                        "error": "等待时间必须大于0"
+                                        "error": tr("tools_exec.sleep_must_be_positive")
                                     }
                                 else:
                                     print(f"{OUTPUT_FORMATS['info']} 等待 {seconds} 秒: {reason}")
                                     await asyncio.sleep(seconds)
                                     result = {
                                         "success": True,
-                                        "message": f"已等待 {seconds} 秒",
+                                        "message": tr("tools_exec.waited_seconds", seconds=seconds),
                                         "reason": reason,
                                         "timestamp": datetime.now().isoformat()
                                     }
@@ -1594,8 +1597,8 @@ class MainTerminalToolsExecutionMixin:
                                 arguments["annotation"]
                             )
                         if result.get("success"):
-                            result["message"] = (
-                                f"已创建空文件: {result['path']}。请使用 write_file 写入内容，或使用 edit_file 进行替换。"
+                            result["message"] = tr(
+                                "tools_exec.file_created_empty", path=result['path']
                             )
 
                     elif tool_name == "delete_file":
@@ -1643,7 +1646,7 @@ class MainTerminalToolsExecutionMixin:
                         content = arguments.get("content", "")
                         append_flag = bool(arguments.get("append", False))
                         if not path:
-                            result = {"success": False, "error": "缺少必要参数: file_path"}
+                            result = {"success": False, "error": tr("tools_exec.missing_file_path")}
                         else:
                             # 在写入前先备份当前内容（浅备份）。
                             self._track_shallow_versioning(path)
@@ -1669,9 +1672,9 @@ class MainTerminalToolsExecutionMixin:
                         path = arguments.get("file_path")
                         replacements = arguments.get("replacements")
                         if not path:
-                            result = {"success": False, "error": "缺少必要参数: file_path"}
+                            result = {"success": False, "error": tr("tools_exec.missing_file_path")}
                         elif not isinstance(replacements, list) or not replacements:
-                            result = {"success": False, "error": "缺少必要参数: replacements（必须是非空数组）"}
+                            result = {"success": False, "error": tr("tools_exec.missing_replacements")}
                         else:
                             # 在替换前先备份当前内容（浅备份）。
                             self._track_shallow_versioning(path)
@@ -1694,7 +1697,7 @@ class MainTerminalToolsExecutionMixin:
                         if not allowed:
                             return json.dumps({
                                 "success": False,
-                                "error": f"搜索配额已用尽，将在 {quota_info.get('reset_at')} 重置。请向用户说明情况并提供替代方案。",
+                                "error": tr("tools_exec.search_quota_exhausted", reset_at=quota_info.get('reset_at')),
                                 "quota": quota_info
                             }, ensure_ascii=False)
                         search_response = await self.search_engine.search_with_summary(
@@ -1721,7 +1724,7 @@ class MainTerminalToolsExecutionMixin:
                         else:
                             result = {
                                 "success": False,
-                                "error": search_response.get("error", "搜索失败"),
+                                "error": search_response.get("error", tr("tools_exec.search_failed")),
                                 "filters": search_response.get("filters", {}),
                                 "query": search_response.get("query"),
                                 "results": search_response.get("results", []),
@@ -1745,7 +1748,7 @@ class MainTerminalToolsExecutionMixin:
                             if char_count > MAX_EXTRACT_WEBPAGE_CHARS:
                                 result = {
                                     "success": False,
-                                    "error": f"网页提取返回了过长的{char_count}字符，请不要提取这个网页，可以使用网页保存功能，然后使用read工具查找或查看网页",
+                                    "error": tr("tools_exec.webpage_extract_too_long", char_count=char_count),
                                     "char_count": char_count,
                                     "limit": MAX_EXTRACT_WEBPAGE_CHARS,
                                     "url": url
@@ -1759,7 +1762,7 @@ class MainTerminalToolsExecutionMixin:
                         except Exception as e:
                             result = {
                                 "success": False,
-                                "error": f"网页提取失败: {str(e)}",
+                                "error": tr("tools_exec.webpage_extract_failed", error=str(e)),
                                 "url": url
                             }
 
@@ -1774,7 +1777,7 @@ class MainTerminalToolsExecutionMixin:
                         if not TAVILY_API_KEY or TAVILY_API_KEY == "your-tavily-api-key":
                             result = {
                                 "success": False,
-                                "error": "Tavily API密钥未配置，无法保存网页",
+                                "error": tr("tools_exec.tavily_key_missing"),
                                 "url": url,
                                 "path": target_path
                             }
@@ -1788,7 +1791,7 @@ class MainTerminalToolsExecutionMixin:
                                 )
 
                                 if not extract_result or "error" in extract_result:
-                                    error_message = extract_result.get("error", "提取失败，未返回任何内容") if isinstance(extract_result, dict) else "提取失败"
+                                    error_message = extract_result.get("error", tr("tools_exec.extract_failed_no_content")) if isinstance(extract_result, dict) else tr("tools_exec.extract_failed")
                                     result = {
                                         "success": False,
                                         "error": error_message,
@@ -1810,7 +1813,7 @@ class MainTerminalToolsExecutionMixin:
                                         failed_list = extract_result.get("failed_results", []) if isinstance(extract_result, dict) else []
                                         result = {
                                             "success": False,
-                                            "error": "提取成功结果为空，无法保存",
+                                            "error": tr("tools_exec.extract_result_empty"),
                                             "url": url,
                                             "path": target_path,
                                             "failed": failed_list
@@ -1821,7 +1824,7 @@ class MainTerminalToolsExecutionMixin:
                                         if not content_to_save:
                                             result = {
                                                 "success": False,
-                                                "error": "网页内容为空，未写入文件",
+                                                "error": tr("tools_exec.webpage_content_empty"),
                                                 "url": url,
                                                 "path": target_path
                                             }
@@ -1831,7 +1834,7 @@ class MainTerminalToolsExecutionMixin:
                                             if not write_result.get("success"):
                                                 result = {
                                                     "success": False,
-                                                    "error": write_result.get("error", "写入文件失败"),
+                                                    "error": write_result.get("error", tr("tools_exec.write_file_failed")),
                                                     "url": url,
                                                     "path": target_path
                                                 }
@@ -1844,7 +1847,7 @@ class MainTerminalToolsExecutionMixin:
                                                     "path": write_result.get("path", target_path),
                                                     "char_count": char_count,
                                                     "byte_size": byte_size,
-                                                    "message": f"网页内容已以纯文本保存到 {write_result.get('path', target_path)}，可用 read_file 的 search/extract 查看，必要时再用终端命令。"
+                                                    "message": tr("tools_exec.webpage_saved", path=write_result.get('path', target_path))
                                                 }
 
                                                 if isinstance(extract_result, dict) and extract_result.get("failed_results"):
@@ -1853,7 +1856,7 @@ class MainTerminalToolsExecutionMixin:
                             except Exception as e:
                                 result = {
                                     "success": False,
-                                    "error": f"网页保存失败: {str(e)}",
+                                    "error": tr("tools_exec.webpage_save_failed", error=str(e)),
                                     "url": url,
                                     "path": target_path
                                 }
@@ -1882,17 +1885,17 @@ class MainTerminalToolsExecutionMixin:
                             if timeout_value is None or float(timeout_value) <= 0:
                                 result = {
                                     "success": False,
-                                    "error": "后台模式下 timeout 参数必填且需大于0"
+                                    "error": tr("tools_exec.bg_timeout_required")
                                 }
                             elif float(timeout_value) > 3600:
                                 result = {
                                     "success": False,
-                                    "error": "后台模式下 timeout 最大为 3600 秒"
+                                    "error": tr("tools_exec.bg_timeout_max")
                                 }
                             else:
                                 bg_manager = getattr(self, "background_command_manager", None)
                                 if not bg_manager:
-                                    result = {"success": False, "error": "后台命令管理器不可用"}
+                                    result = {"success": False, "error": tr("tools_exec.background_manager_unavailable")}
                                 else:
                                     result = bg_manager.create_background_command(
                                         terminal_ops=self.terminal_ops,
@@ -1907,12 +1910,12 @@ class MainTerminalToolsExecutionMixin:
                             if timeout_value is None or float(timeout_value) <= 0:
                                 result = {
                                     "success": False,
-                                    "error": "timeout 参数必填且需大于0"
+                                    "error": tr("tools_exec.timeout_required")
                                 }
                             elif float(timeout_value) > 120:
                                 result = {
                                     "success": False,
-                                    "error": "前台模式下 timeout 最大为 120 秒"
+                                    "error": tr("tools_exec.fg_timeout_max")
                                 }
                             else:
                                 result = await self.terminal_ops.run_command(
@@ -1928,7 +1931,7 @@ class MainTerminalToolsExecutionMixin:
                                     if char_count > MAX_RUN_COMMAND_CHARS:
                                         result = {
                                             "success": False,
-                                            "error": f"结果内容过大，有{char_count}字符，请使用限制字符数的获取内容方式，根据程度选择10k以内的数",
+                                            "error": tr("tools_exec.result_too_large", char_count=char_count),
                                             "char_count": char_count,
                                             "limit": MAX_RUN_COMMAND_CHARS,
                                             "command": arguments["command"]
@@ -1952,11 +1955,11 @@ class MainTerminalToolsExecutionMixin:
 
                         # 参数校验
                         if operation == "append" and (not content or not str(content).strip()):
-                            result = {"success": False, "error": "append 操作需要 content"}
+                            result = {"success": False, "error": tr("tools_exec.append_needs_content")}
                         elif operation == "replace" and (index is None or index <= 0 or not content or not str(content).strip()):
-                            result = {"success": False, "error": "replace 操作需要有效的 index 和 content"}
+                            result = {"success": False, "error": tr("tools_exec.replace_needs_valid_index_content")}
                         elif operation == "delete" and (index is None or index <= 0):
-                            result = {"success": False, "error": "delete 操作需要有效的 index"}
+                            result = {"success": False, "error": tr("tools_exec.delete_needs_valid_index")}
                         else:
                             # 统一使用 main 记忆类型
                             result = self.memory_manager.update_entries(
@@ -1969,7 +1972,7 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "recall_project_memory":
                         name = str(arguments.get("name", "")).strip()
                         if not name:
-                            result = {"success": False, "error": "recall_project_memory 需要 name 参数"}
+                            result = {"success": False, "error": tr("tools_exec.recall_needs_name")}
                         else:
                             result = self._handle_recall_project_memory(name)
 
@@ -1984,7 +1987,7 @@ class MainTerminalToolsExecutionMixin:
                         else:
                             keywords = []
                         if not keywords:
-                            result = {"success": False, "error": "search_project_memory 需要 keywords 参数（至少 1 个关键词）"}
+                            result = {"success": False, "error": tr("tools_exec.search_memory_needs_keywords")}
                         else:
                             try:
                                 max_results = int(arguments.get("max_results") or 5)
@@ -1997,11 +2000,11 @@ class MainTerminalToolsExecutionMixin:
                         description = str(arguments.get("description", "")).strip()
                         content_text = str(arguments.get("content", "")).strip()
                         if not name:
-                            result = {"success": False, "error": "update_project_memory 需要 name 参数"}
+                            result = {"success": False, "error": tr("tools_exec.update_memory_needs_name")}
                         elif not description:
-                            result = {"success": False, "error": "update_project_memory 需要 description 参数"}
+                            result = {"success": False, "error": tr("tools_exec.update_memory_needs_description")}
                         elif not content_text:
-                            result = {"success": False, "error": "update_project_memory 需要 content 参数"}
+                            result = {"success": False, "error": tr("tools_exec.update_memory_needs_content")}
                         else:
                             result = self._handle_update_project_memory(name, description, content_text)
 
@@ -2046,23 +2049,23 @@ class MainTerminalToolsExecutionMixin:
                             "excluded_conversation_id": current_conversation_id,
                             "results": items,
                             "count": len(items),
-                            "summary": f"找到 {len(items)} 个当前工作区内的历史对话",
+                            "summary": tr("tools_exec.conversation_search_found", count=len(items)),
                         }
 
                     elif tool_name == "conversation_review":
                         conversation_id = str(arguments.get("conversation_id") or "").strip()
                         review_mode = str(arguments.get("mode") or "").strip().lower()
                         if not conversation_id:
-                            result = {"success": False, "error": "conversation_id 不能为空"}
+                            result = {"success": False, "error": tr("tools_exec.conversation_id_empty")}
                         elif review_mode not in {"read", "save"}:
-                            result = {"success": False, "error": "mode 必须为 read 或 save", "conversation_id": conversation_id}
+                            result = {"success": False, "error": tr("tools_exec.review_mode_invalid"), "conversation_id": conversation_id}
                         else:
                             manager = getattr(self.context_manager, "conversation_manager", None)
                             conversation_data = manager.load_conversation(conversation_id) if manager else None
                             if not conversation_data:
                                 result = {
                                     "success": False,
-                                    "error": "对话不存在或不属于当前工作区",
+                                    "error": tr("tools_exec.review_conversation_missing"),
                                     "conversation_id": conversation_id,
                                 }
                             else:
@@ -2091,7 +2094,7 @@ class MainTerminalToolsExecutionMixin:
                                         "title": title,
                                         "content": content,
                                         "char_count": char_count,
-                                        "summary": f"已直接返回对话回顾内容（{char_count} 字符）",
+                                        "summary": tr("tools_exec.review_returned", char_count=char_count),
                                     }
                                 else:
                                     rel_path = save_review_file()
@@ -2105,9 +2108,9 @@ class MainTerminalToolsExecutionMixin:
                                         "char_count": char_count,
                                         "too_long": too_long,
                                         "summary": (
-                                            f"对话回顾内容太长（{char_count} 字符），已保存到文件: {rel_path}，请分段或查找阅读。"
+                                            tr("tools_exec.review_too_long_saved", char_count=char_count, rel_path=rel_path)
                                             if too_long
-                                            else f"已生成对话回顾文件: {rel_path}"
+                                            else tr("tools_exec.review_saved", rel_path=rel_path)
                                         ),
                                     }
 
@@ -2131,9 +2134,9 @@ class MainTerminalToolsExecutionMixin:
                         if getattr(self, "multi_agent_mode", False):
                             role_id = arguments.get("role_id")
                             if not role_id:
-                                result = {"success": False, "error": "多智能体模式下 create_sub_agent 必须指定 role_id"}
+                                result = {"success": False, "error": tr("tools_exec.create_sub_agent_need_role_id")}
                             elif arguments.get("deliverables_dir"):
-                                result = {"success": False, "error": "多智能体模式下不支持交付目录参数"}
+                                result = {"success": False, "error": tr("tools_exec.create_sub_agent_no_deliverables")}
                             else:
                                 try:
                                     from modules.multi_agent.role_store import load_preset_role, infer_custom_roles_dir
@@ -2146,7 +2149,7 @@ class MainTerminalToolsExecutionMixin:
                                     _runtime_dir = WEB_PRESET_ROLES_DIR if _is_web else _custom_dir
                                     role = load_preset_role(role_id, runtime_dir=_runtime_dir, custom_dir=_custom_dir)
                                     if not role:
-                                        result = {"success": False, "error": f"角色不存在: {role_id}"}
+                                        result = {"success": False, "error": tr("tools_exec.role_not_found", role_id=role_id)}
                                     else:
                                         conv_id = self.context_manager.current_conversation_id
                                         multi_agent_state = self.sub_agent_manager.get_or_create_multi_agent_state(conv_id)
@@ -2286,8 +2289,8 @@ class MainTerminalToolsExecutionMixin:
                             display_name = str(arguments.get("display_name") or "").strip()
                             inst = state.get_instance_by_display_name(display_name) if state else None
                             if not inst:
-                                available = "、".join(state.list_display_names()) if state else ""
-                                result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available or '（无）'}"}
+                                available = tr("tools_exec.list_sep").join(state.list_display_names()) if state else ""
+                                result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available or tr("tools_exec.none_placeholder"))}
                             else:
                                 result = self.sub_agent_manager.terminate_sub_agent(agent_id=inst.agent_id)
                                 if isinstance(result, dict):
@@ -2309,7 +2312,7 @@ class MainTerminalToolsExecutionMixin:
                             # 多智能体模式：按显示名列表查询，内部解析为全局 agent_id
                             names = arguments.get("display_names")
                             if not isinstance(names, list) or not names:
-                                result = {"success": False, "error": "display_names 必须是非空数组（子智能体显示名，如 UI Operator_1）"}
+                                result = {"success": False, "error": tr("tools_exec.display_names_nonempty")}
                             else:
                                 conv_id = self.context_manager.current_conversation_id
                                 state = self.sub_agent_manager.get_multi_agent_state(conv_id)
@@ -2327,7 +2330,7 @@ class MainTerminalToolsExecutionMixin:
                                     r = self.sub_agent_manager.get_sub_agent_status(agent_ids=agent_ids)
                                     results.extend(r.get("results") or [])
                                 for name in not_found_names:
-                                    results.append({"found": False, "display_name": name, "error": "子智能体不存在"})
+                                    results.append({"found": False, "display_name": name, "error": tr("tools_exec.agent_not_exist")})
                                 result = {"success": True, "results": results}
                         else:
                             result = self.sub_agent_manager.get_sub_agent_status(
@@ -2337,7 +2340,7 @@ class MainTerminalToolsExecutionMixin:
                     # 多智能体模式专属工具：send_message_to_sub_agent / stop_sub_agent / answer_sub_agent_question / create_custom_agent / list_agents / list_active_sub_agents
                     elif tool_name == "send_message_to_sub_agent":
                         if not getattr(self, "multi_agent_mode", False):
-                            result = {"success": False, "error": "该工具仅在多智能体模式下可用"}
+                            result = {"success": False, "error": tr("tools_exec.multi_agent_only")}
                         else:
                             try:
                                 from modules.multi_agent.state import build_master_message_to_sub_agent
@@ -2346,14 +2349,14 @@ class MainTerminalToolsExecutionMixin:
                                 conv_id = self.context_manager.current_conversation_id
                                 state = self.sub_agent_manager.get_multi_agent_state(conv_id)
                                 if not state:
-                                    result = {"success": False, "error": "多智能体状态未就绪"}
+                                    result = {"success": False, "error": tr("tools_exec.multi_agent_state_not_ready")}
                                 else:
                                     # 显示名寻址：模型只知道角色内编号显示名（如 UI Operator_1），
                                     # 全局 agent_id 在内部解析，不暴露给模型
                                     inst = state.get_instance_by_display_name(display_name)
                                     if not inst:
-                                        available = "、".join(state.list_display_names()) or "（无）"
-                                        result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available}"}
+                                        available = tr("tools_exec.list_sep").join(state.list_display_names()) or tr("tools_exec.none_placeholder")
+                                        result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available)}
                                     else:
                                         agent_id = inst.agent_id
                                         # 构造消息文本并插入子对话
@@ -2370,9 +2373,9 @@ class MainTerminalToolsExecutionMixin:
                                         if not ok:
                                             latest = self.sub_agent_manager._latest_task_for_agent(agent_id)
                                             if latest and latest.get("status") == "terminated":
-                                                result = {"success": False, "error": f"{display_name} 已被手动终结，无法再接收消息。如需继续工作，请创建新的子智能体。"}
+                                                result = {"success": False, "error": tr("tools_exec.agent_terminated_no_message", display_name=display_name)}
                                             else:
-                                                result = {"success": False, "error": f"{display_name} 不存在或已结束"}
+                                                result = {"success": False, "error": tr("tools_exec.agent_not_exist_or_ended", display_name=display_name)}
                                         else:
                                             result = {"success": True, "display_name": display_name}
                                         ma_debug(
@@ -2388,7 +2391,7 @@ class MainTerminalToolsExecutionMixin:
 
                     elif tool_name == "stop_sub_agent":
                         if not getattr(self, "multi_agent_mode", False):
-                            result = {"success": False, "error": "该工具仅在多智能体模式下可用"}
+                            result = {"success": False, "error": tr("tools_exec.multi_agent_only")}
                         else:
                             try:
                                 display_name = str(arguments.get("display_name") or "").strip()
@@ -2396,8 +2399,8 @@ class MainTerminalToolsExecutionMixin:
                                 state = self.sub_agent_manager.get_multi_agent_state(conv_id)
                                 inst = state.get_instance_by_display_name(display_name) if state else None
                                 if not inst:
-                                    available = "、".join(state.list_display_names()) if state else ""
-                                    result = {"success": False, "error": f"未找到子智能体「{display_name}」。当前已有: {available or '（无）'}"}
+                                    available = tr("tools_exec.list_sep").join(state.list_display_names()) if state else ""
+                                    result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available or tr("tools_exec.none_placeholder"))}
                                 else:
                                     result = self.sub_agent_manager.stop_sub_agent(agent_id=inst.agent_id)
                                     if isinstance(result, dict):
@@ -2408,7 +2411,7 @@ class MainTerminalToolsExecutionMixin:
 
                     elif tool_name == "answer_sub_agent_question":
                         if not getattr(self, "multi_agent_mode", False):
-                            result = {"success": False, "error": "该工具仅在多智能体模式下可用"}
+                            result = {"success": False, "error": tr("tools_exec.multi_agent_only")}
                         else:
                             try:
                                 question_id = arguments.get("question_id", "")
@@ -2422,7 +2425,7 @@ class MainTerminalToolsExecutionMixin:
                                     conversation_id=conv_id,
                                 )
                                 if not state:
-                                    result = {"success": False, "error": "多智能体状态未就绪"}
+                                    result = {"success": False, "error": tr("tools_exec.multi_agent_state_not_ready")}
                                 else:
                                     ok = state.provide_answer(question_id, answer)
                                     result = {"success": bool(ok), "question_id": question_id}
@@ -2439,7 +2442,7 @@ class MainTerminalToolsExecutionMixin:
                             thinking_mode_arg = arguments.get("thinking_mode", "fast")
                             model_key_arg = arguments.get("model_key", "").strip() or None
                             if not role_id or not name or not body_prompt:
-                                result = {"success": False, "error": "role_id/name/body_prompt 必填"}
+                                result = {"success": False, "error": tr("tools_exec.custom_agent_fields_required")}
                             else:
                                 _data_dir = str(getattr(self, "data_dir", ""))
                                 from modules.multi_agent.role_store import infer_custom_roles_dir
@@ -2488,12 +2491,12 @@ class MainTerminalToolsExecutionMixin:
                         logger.info("[handle_tool_call] manage_personalization执行完成: result=%s", result)
 
                     else:
-                        result = {"success": False, "error": f"未知工具: {tool_name}"}
+                        result = {"success": False, "error": tr("tools_exec.unknown_tool", tool_name=tool_name)}
 
                 except Exception as e:
                     logger.error(f"工具执行失败: {tool_name} - {e}")
                     logger.exception("[handle_tool_call] 工具执行异常详情")
-                    result = {"success": False, "error": f"工具执行异常: {str(e)}"}
+                    result = {"success": False, "error": tr("tools_exec.tool_exec_exception", error=str(e))}
 
                 logger.debug("[handle_tool_call] 工具调用结束: tool_name=%s, result=%s", tool_name, result)
                 return json.dumps(result, ensure_ascii=False)
@@ -2514,26 +2517,26 @@ class MainTerminalToolsExecutionMixin:
                 result = {k: v for k, v in config.items() if k in readable_fields}
                 # 构建详细返回信息
                 field_descriptions = {
-                    "enabled": "个性化功能总开关",
-                    "self_identify": f"AI自称: {result.get('self_identify') or '(未设置)'}",
-                    "user_name": f"AI如何称呼用户: {result.get('user_name') or '(未设置)'}",
-                    "profession": f"用户职业: {result.get('profession') or '(未设置)'}",
-                    "tone": f"交流语气: {result.get('tone') or '(未设置)'}",
-                    "considerations": f"注意事项: {'已设置' if (result.get('considerations') or '').strip() else '未设置'}",
-                    "theme": f"主题配色: {result.get('theme', 'classic')}",
-                    "communication_style": f"交流风格: {result.get('communication_style', 'default')}",
-                    "conversation_continuity": f"对话连续性: {result.get('conversation_continuity', 'medium')}"
+                    "enabled": tr("tools_exec.pref_enabled_label"),
+                    "self_identify": tr("tools_exec.pref_self_identify", value=result.get('self_identify') or tr("tools_exec.pref_unset_paren")),
+                    "user_name": tr("tools_exec.pref_user_name", value=result.get('user_name') or tr("tools_exec.pref_unset_paren")),
+                    "profession": tr("tools_exec.pref_profession", value=result.get('profession') or tr("tools_exec.pref_unset_paren")),
+                    "tone": tr("tools_exec.pref_tone", value=result.get('tone') or tr("tools_exec.pref_unset_paren")),
+                    "considerations": tr("tools_exec.pref_considerations", value=tr("tools_exec.pref_set") if (result.get('considerations') or '').strip() else tr("tools_exec.pref_unset")),
+                    "theme": tr("tools_exec.pref_theme", value=result.get('theme', 'classic')),
+                    "communication_style": tr("tools_exec.pref_communication_style", value=result.get('communication_style', 'default')),
+                    "conversation_continuity": tr("tools_exec.pref_conversation_continuity", value=result.get('conversation_continuity', 'medium'))
                 }
                 details = "\n".join([f"- {field_descriptions.get(k, k)}: {v}" for k, v in result.items()])
                 logger.info("[_execute_manage_personalization] read成功")
                 return {
                     "success": True,
                     "data": result,
-                    "message": f"个性化配置读取成功:\n{details}"
+                    "message": tr("tools_exec.pref_read_success", details=details)
                 }
             except Exception as e:
                 logger.error("[_execute_manage_personalization] read失败: %s", e)
-                return {"success": False, "error": f"读取配置失败: {str(e)}"}
+                return {"success": False, "error": tr("tools_exec.pref_read_failed", error=str(e))}
         
         elif action == "update":
             logger.info("[_execute_manage_personalization] 进入update分支")
@@ -2543,14 +2546,14 @@ class MainTerminalToolsExecutionMixin:
             
             if not field:
                 logger.warning("[_execute_manage_personalization] field未指定")
-                return {"success": False, "error": "更新操作需要指定 field 参数"}
+                return {"success": False, "error": tr("tools_exec.pref_update_needs_field")}
             
             # 验证字段是否允许修改
             logger.info("[_execute_manage_personalization] 验证字段: field=%s", field)
             allowed_fields = ["self_identify", "user_name", "profession", "tone", "considerations", "theme", "communication_style", "conversation_continuity"]
             if field not in allowed_fields:
                 logger.warning("[_execute_manage_personalization] 字段不允许修改: %s not in %s", field, allowed_fields)
-                return {"success": False, "error": f"字段 '{field}' 不允许修改，可修改字段: {allowed_fields}"}
+                return {"success": False, "error": tr("tools_exec.pref_field_not_allowed", field=field, allowed_fields=allowed_fields)}
             
             # 验证value
             validation_errors = []
@@ -2558,42 +2561,42 @@ class MainTerminalToolsExecutionMixin:
             if field in ["self_identify", "user_name", "profession", "tone"]:
                 # 字符串字段验证
                 if not isinstance(value, str):
-                    validation_errors.append(f"{field} 必须是字符串")
+                    validation_errors.append(tr("tools_exec.pref_must_be_string", field=field))
                 elif len(value) > MAX_SHORT_FIELD_LENGTH:
-                    validation_errors.append(f"{field} 不能超过 {MAX_SHORT_FIELD_LENGTH} 个字符")
+                    validation_errors.append(tr("tools_exec.pref_field_too_long", field=field, max_length=MAX_SHORT_FIELD_LENGTH))
             
             elif field == "considerations":
                 # 注意事项文本验证
                 if not isinstance(value, str):
-                    validation_errors.append("considerations 必须是字符串")
+                    validation_errors.append(tr("tools_exec.pref_considerations_must_be_string"))
                 elif len(value) > MAX_CONSIDERATION_TEXT_LENGTH:
-                    validation_errors.append(f"considerations 不能超过 {MAX_CONSIDERATION_TEXT_LENGTH} 个字符")
+                    validation_errors.append(tr("tools_exec.pref_considerations_too_long", max_length=MAX_CONSIDERATION_TEXT_LENGTH))
             
             elif field == "theme":
                 # 主题验证
                 if not isinstance(value, str):
-                    validation_errors.append("theme 必须是字符串")
+                    validation_errors.append(tr("tools_exec.pref_theme_must_be_string"))
                 elif value not in ALLOWED_THEMES:
-                    validation_errors.append(f"theme 必须是以下之一: {list(ALLOWED_THEMES)}")
+                    validation_errors.append(tr("tools_exec.pref_theme_invalid", themes=list(ALLOWED_THEMES)))
             
             elif field == "communication_style":
                 # 交流风格验证
                 if not isinstance(value, str):
-                    validation_errors.append("communication_style 必须是字符串")
+                    validation_errors.append(tr("tools_exec.pref_comm_style_must_be_string"))
                 elif value not in ALLOWED_COMMUNICATION_STYLES:
-                    validation_errors.append("communication_style 必须是 'default'、'human_like' 或 'auto'")
+                    validation_errors.append(tr("tools_exec.pref_comm_style_invalid"))
 
             elif field == "conversation_continuity":
                 if not isinstance(value, str):
-                    validation_errors.append("conversation_continuity 必须是字符串")
+                    validation_errors.append(tr("tools_exec.pref_continuity_must_be_string"))
                 elif value not in ALLOWED_CONVERSATION_CONTINUITY:
-                    validation_errors.append("conversation_continuity 必须是 'high'、'medium' 或 'low'")
+                    validation_errors.append(tr("tools_exec.pref_continuity_invalid"))
             
             if validation_errors:
                 logger.warning("[_execute_manage_personalization] 验证失败: %s", validation_errors)
                 return {
                     "success": False,
-                    "error": "验证失败",
+                    "error": tr("tools_exec.pref_validation_failed"),
                     "validation_errors": validation_errors
                 }
             
@@ -2621,7 +2624,7 @@ class MainTerminalToolsExecutionMixin:
                 # 构建返回结果
                 result = {
                     "success": True,
-                    "message": f"字段 '{field}' 更新成功",
+                    "message": tr("tools_exec.pref_field_updated", field=field),
                     "updated_field": field,
                     "old_value": old_value,
                     "updated_value": value
@@ -2638,11 +2641,11 @@ class MainTerminalToolsExecutionMixin:
             except Exception as e:
                 logger.error("[_execute_manage_personalization] 保存失败: %s", e)
                 logger.exception("[_execute_manage_personalization] 保存异常详情")
-                return {"success": False, "error": f"保存配置失败: {str(e)}"}
+                return {"success": False, "error": tr("tools_exec.pref_save_failed", error=str(e))}
         
         else:
             logger.warning("[_execute_manage_personalization] 未知的action: %s", action)
-            return {"success": False, "error": f"未知的 action: {action}，可选: read, update"}
+            return {"success": False, "error": tr("tools_exec.pref_unknown_action", action=action)}
 
     async def confirm_action(self, action: str, arguments: Dict) -> bool:
                 """确认危险操作"""

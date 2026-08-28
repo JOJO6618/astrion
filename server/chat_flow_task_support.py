@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 from modules.sub_agent import TERMINAL_STATUSES
+from modules.i18n import tr
 from modules.multi_agent.debug_logger import ma_debug
 
 
@@ -364,7 +365,8 @@ async def process_background_command_updates(*, messages: List[Dict], inline: bo
     for update in updates:
         command_id = update.get("command_id")
         output = update.get("output") or ""
-        message = "[后台 run_command 完成]\n" + (output if output else "[no_output]")
+        # 格式与前端 history.ts / ui/shared.ts 识别正则联动，改动须同步前端
+        message = tr("background_command.done_header") + "\n" + (output if output else "[no_output]")
         status = update.get("status")
         debug_log(
             f"[BgCmdDebug] emit inline notice command_id={command_id} status={status} "
@@ -574,7 +576,7 @@ async def wait_retry_delay(*, delay_seconds: int, client_sid: str, username: str
             stop_requested = client_stop_info.get('stop', False) if isinstance(client_stop_info, dict) else client_stop_info
             if stop_requested:
                 sender('task_stopped', {
-                    'message': '命令执行被用户取消',
+                    'message': tr("tool_loop.cancelled_by_user"),
                     'reason': 'user_stop'
                 })
                 clear_stop_flag(client_sid, username)
@@ -597,7 +599,7 @@ def cancel_pending_tools(*, tool_calls_list, sender, messages):
             'result': {
                 "success": False,
                 "status": "cancelled",
-                "message": "命令执行被用户取消",
+                "message": tr("tool_loop.cancelled_by_user"),
                 "tool": func_name
             }
         })
@@ -606,5 +608,5 @@ def cancel_pending_tools(*, tool_calls_list, sender, messages):
                 "role": "tool",
                 "tool_call_id": tc_id,
                 "name": func_name,
-                "content": "命令执行被用户取消",
+                "content": tr("tool_loop.cancelled_by_user"),
             })

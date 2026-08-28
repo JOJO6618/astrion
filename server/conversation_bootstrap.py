@@ -19,6 +19,7 @@ from server.context import get_user_resources
 from server.tasks import task_manager
 from server.tasks.helpers import _task_public_payload
 from server.utils_common import debug_log
+from modules.i18n import tr
 
 conversation_bootstrap_bp = Blueprint("conversation_bootstrap", __name__)
 
@@ -149,7 +150,7 @@ def bootstrap_conversation(conversation_id: str):
     username = get_current_username()
     normalized_id = _normalize_conv_id(conversation_id)
     if not normalized_id:
-        return jsonify({"success": False, "error": "缺少 conversation_id"}), 400
+        return jsonify({"success": False, "error": tr("bootstrap.missing_conversation_id")}), 400
 
     workspace_id = (request.args.get("workspace_id") or "").strip() or None
 
@@ -161,12 +162,12 @@ def bootstrap_conversation(conversation_id: str):
 
     ctx_manager = getattr(ws_terminal, "context_manager", None)
     if ctx_manager is None:
-        return jsonify({"success": False, "error": "终端上下文不可用"}), 503
+        return jsonify({"success": False, "error": tr("bootstrap.terminal_unavailable")}), 503
 
     cm = ctx_manager._get_conversation_manager_for_id(normalized_id)
     conversation_data = cm.load_conversation(normalized_id) if cm else None
     if not conversation_data:
-        return jsonify({"success": False, "error": f"对话 {normalized_id} 不存在"}), 404
+        return jsonify({"success": False, "error": tr("bootstrap.conversation_not_found", id=normalized_id)}), 404
 
     raw_meta = conversation_data.get("metadata", {}) or {}
     messages = conversation_data.get("messages", []) or []
@@ -230,7 +231,7 @@ def bootstrap_conversation(conversation_id: str):
     data: Dict[str, Any] = {
         "conversation_id": normalized_id,
         "meta": {
-            "title": conversation_data.get("title", "未知对话"),
+            "title": conversation_data.get("title", tr("bootstrap.unknown_conversation")),
             "run_mode": run_mode,
             "thinking_mode": bool(raw_meta.get("thinking_mode", run_mode != "fast")),
             "reasoning_effort": raw_meta.get("reasoning_effort"),

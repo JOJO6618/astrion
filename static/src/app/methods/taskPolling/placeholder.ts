@@ -137,7 +137,7 @@ export const placeholderMethods = {
   },
   isPlaceholderConversationTitle(title: any) {
     const normalized = String(title || '').trim();
-    // '\u65b0\u5bf9\u8bdd' = '新对话'（后端默认标题判等，\u 转义仅过审计）
-    return !normalized || normalized === '\u65b0\u5bf9\u8bdd';
+    // 默认标题双语判等：zh '新对话' / en 'New Chat'（后端 modules/i18n.py conversation.default_title 按语言生成；\u 转义仅过审计）
+    return !normalized || normalized === '\u65b0\u5bf9\u8bdd' || normalized === 'New Chat';
   }
 };

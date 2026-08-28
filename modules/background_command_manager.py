@@ -19,6 +19,7 @@ from modules.host_sandbox_runner import (
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
+from modules.i18n import tr
 
 
 TERMINAL_STATUSES = {"completed", "failed", "timeout", "cancelled"}
@@ -49,9 +50,9 @@ class BackgroundCommandManager:
         if timeout is None or float(timeout) <= 0:
             return {
                 "success": False,
-                "error": "timeout 参数必填且需大于0",
+                "error": tr("terminal.timeout_required"),
                 "status": "error",
-                "output": "timeout 参数缺失",
+                "output": tr("terminal.timeout_missing"),
                 "return_code": -1,
             }
 
@@ -80,7 +81,7 @@ class BackgroundCommandManager:
         except ValueError:
             return {
                 "success": False,
-                "error": "工作目录必须在项目文件夹内",
+                "error": tr("terminal.work_dir_outside_project"),
                 "status": "error",
                 "output": "",
                 "return_code": -1,
@@ -149,7 +150,7 @@ class BackgroundCommandManager:
                 return {
                     "success": False,
                     "status": "error",
-                    "error": "后台任务记录丢失",
+                    "error": tr("terminal.record_lost"),
                     "output": "",
                     "return_code": -1,
                 }
@@ -162,7 +163,7 @@ class BackgroundCommandManager:
                 result["command_id"] = command_id
                 result["run_in_background"] = True
                 result["background_task_created"] = False
-                result["message"] = "命令在5秒内完成，未创建后台任务"
+                result["message"] = tr("terminal.finished_within_5s")
                 return result
 
             output = self._build_current_output(rec)
@@ -171,7 +172,7 @@ class BackgroundCommandManager:
                 "status": "running_background",
                 "command_id": command_id,
                 "command": final_command,
-                "message": "后台命令已创建；以下为当前已捕获输出。",
+                "message": tr("terminal.background_created_with_output"),
                 "output": output,
                 "return_code": None,
                 "timeout": timeout_value,
@@ -214,7 +215,7 @@ class BackgroundCommandManager:
                 mount_path = getattr(session, "mount_path", "/workspace") or "/workspace"
                 docker_bin = shutil.which("docker") or "docker"
                 if not container_name:
-                    raise RuntimeError("容器模式下缺少 container_name")
+                    raise RuntimeError(tr("bg_cmd.container_name_missing"))
                 try:
                     relative = work_path.relative_to(self.project_path).as_posix()
                 except ValueError:
@@ -339,10 +340,10 @@ class BackgroundCommandManager:
                     status = "completed"
                 else:
                     status = "failed"
-                    message = f"命令执行失败 (返回码: {return_code})"
+                    message = tr("terminal.exec_failed_code", code=return_code)
             except subprocess.TimeoutExpired:
                 status = "timeout"
-                message = f"命令执行超时 ({timeout}秒)"
+                message = tr("terminal.exec_timeout_seconds", timeout=timeout)
                 # 跨平台终止：POSIX killpg(SIGINT→SIGKILL)，Windows taskkill /F /T
                 self._terminate_pid(process.pid)
                 try:
@@ -363,7 +364,7 @@ class BackgroundCommandManager:
 
         except Exception as exc:
             status = "failed"
-            message = f"执行失败: {exc}"
+            message = tr("terminal.exec_failed_generic", error=exc)
         finally:
             combined_output = "".join(stdout_buf + stderr_buf)
             truncated = False
@@ -522,9 +523,9 @@ class BackgroundCommandManager:
                     self._terminate_pid(pid)
                 output = self._build_current_output(rec)
                 message = (
-                    "后台指令运行超时，已自动清理运行状态。"
+                    tr("terminal.bg_stale_timeout_cleaned")
                     if stale_timeout
-                    else "检测到后台指令进程已退出，已自动清理运行状态。"
+                    else tr("terminal.bg_stale_exited_cleaned")
                 )
                 rec["status"] = "failed"
                 rec["result"] = {
@@ -553,12 +554,12 @@ class BackgroundCommandManager:
 
     def cancel_command(self, command_id: str) -> Dict[str, Any]:
         if not command_id:
-            return {"success": False, "status": "error", "error": "command_id 不能为空"}
+            return {"success": False, "status": "error", "error": tr("terminal.command_id_required")}
 
         with self._lock:
             rec = self._records.get(command_id)
             if not rec:
-                return {"success": False, "status": "error", "error": f"未找到后台命令: {command_id}"}
+                return {"success": False, "status": "error", "error": tr("terminal.background_command_not_found", command_id=command_id)}
             status = str(rec.get("status") or "")
             if status in TERMINAL_STATUSES:
                 payload = dict(rec.get("result") or {})
@@ -568,7 +569,7 @@ class BackgroundCommandManager:
                     "success": status == "completed",
                     "status": status,
                     "command_id": command_id,
-                    "message": "后台命令已结束",
+                    "message": tr("terminal.background_command_finished"),
                 }
             process = self._processes.get(command_id)
             pid = rec.get("pid")
@@ -584,7 +585,7 @@ class BackgroundCommandManager:
         with self._cv:
             rec = self._records.get(command_id)
             if not rec:
-                return {"success": False, "status": "error", "error": f"未找到后台命令: {command_id}"}
+                return {"success": False, "status": "error", "error": tr("terminal.background_command_not_found", command_id=command_id)}
 
             output = self._build_current_output(rec)
             now = time.time()
@@ -603,7 +604,7 @@ class BackgroundCommandManager:
                 "elapsed_ms": int(max(0.0, (now - float(rec.get("created_at") or now)) * 1000)),
                 "command_id": command_id,
                 "run_in_background": True,
-                "message": "后台命令已手动停止" if stopped else "后台命令停止请求已发送",
+                "message": tr("terminal.background_cancelled_manual") if stopped else tr("terminal.background_cancel_requested"),
             }
             rec["result"] = result
             self._processes.pop(command_id, None)
@@ -622,7 +623,7 @@ class BackgroundCommandManager:
         with self._cv:
             rec = self._records.get(command_id)
             if not rec:
-                return {"success": False, "error": f"未找到后台命令: {command_id}", "status": "error"}
+                return {"success": False, "error": tr("terminal.background_command_not_found", command_id=command_id), "status": "error"}
 
             status = rec.get("status")
             if status in TERMINAL_STATUSES and isinstance(rec.get("result"), dict):
@@ -643,7 +644,7 @@ class BackgroundCommandManager:
             while time.time() < deadline:
                 rec = self._records.get(command_id)
                 if not rec:
-                    return {"success": False, "error": f"未找到后台命令: {command_id}", "status": "error"}
+                    return {"success": False, "error": tr("terminal.background_command_not_found", command_id=command_id), "status": "error"}
                 status = rec.get("status")
                 if status in TERMINAL_STATUSES and isinstance(rec.get("result"), dict):
                     if claim:
@@ -653,12 +654,12 @@ class BackgroundCommandManager:
 
             rec = self._records.get(command_id)
             if not rec:
-                return {"success": False, "error": f"未找到后台命令: {command_id}", "status": "error"}
+                return {"success": False, "error": tr("terminal.background_command_not_found", command_id=command_id), "status": "error"}
             return {
                 "success": False,
                 "status": "timeout",
                 "command_id": command_id,
-                "message": "等待后台命令完成超时",
+                "message": tr("terminal.wait_bg_timeout"),
                 "output": self._build_current_output(rec),
                 "return_code": rec.get("result", {}).get("return_code") if isinstance(rec.get("result"), dict) else None,
             }

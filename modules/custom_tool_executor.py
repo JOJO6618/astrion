@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional
 
 from modules.custom_tool_registry import CustomToolRegistry
 
+from modules.i18n import tr
+
 # 默认超时时间（秒）
 DEFAULT_CUSTOM_TOOL_TIMEOUT = 30
 
@@ -38,14 +40,14 @@ class CustomToolExecutor:
     async def run(self, tool_id: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         tool = self.registry.get_tool(tool_id)
         if not tool:
-            return {"success": False, "error": f"未找到自定义工具: {tool_id}"}
+            return {"success": False, "error": tr("custom_tool.not_found", tool_id=tool_id)}
         exec_conf = tool.get("execution") or {}
         if exec_conf.get("type") not in {None, "python"}:
-            return {"success": False, "error": "当前仅支持 python 执行类型"}
+            return {"success": False, "error": tr("custom_tool.unsupported_type")}
 
         code_template = exec_conf.get("code_template") or tool.get("execution_code") or tool.get("code_template")
         if not code_template:
-            return {"success": False, "error": "自定义工具缺少 code_template"}
+            return {"success": False, "error": tr("custom_tool.missing_code_template")}
 
         timeout = exec_conf.get("timeout") or tool.get("timeout") or DEFAULT_CUSTOM_TOOL_TIMEOUT
 
@@ -56,12 +58,12 @@ class CustomToolExecutor:
         except KeyError as exc:
             return {
                 "success": False,
-                "error": f"缺少必填参数: {exc}",
+                "error": tr("custom_tool.missing_params", error=str(exc)),
                 "missing": str(exc),
                 "tool_id": tool_id,
             }
         except Exception as exc:
-            return {"success": False, "error": f"模板渲染失败: {exc}", "tool_id": tool_id}
+            return {"success": False, "error": tr("custom_tool.render_failed", error=str(exc)), "tool_id": tool_id}
 
         # 通过统一的 run_command 链路执行 Python，复用同一套解释器探测、沙箱与审批语义。
         result = await self.terminal_ops.run_command(
@@ -71,7 +73,7 @@ class CustomToolExecutor:
         result["custom_tool"] = True
         result["tool_id"] = tool_id
         result["code_rendered"] = rendered
-        result.setdefault("message", result.get("output") or "已执行自定义工具")
+        result.setdefault("message", result.get("output") or tr("custom_tool.executed"))
 
         # 返回层（可选）
         return_conf = tool.get("return") or tool.get("return_config") or {}

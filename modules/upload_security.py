@@ -24,6 +24,7 @@ from config import (
     UPLOAD_CLAMAV_TIMEOUT_SECONDS,
     UPLOAD_SCAN_LOG_SUBDIR,
 )
+from modules.i18n import tr
 from utils.logger import setup_logger
 
 if TYPE_CHECKING:
@@ -117,7 +118,8 @@ class UploadQuarantineManager:
             metadata["scan"] = asdict(scan_report)
             if not scan_report.is_clean:
                 metadata["scan_failure_reason"] = scan_report.message or scan_report.signature
-                raise UploadSecurityError("安全审核未通过", code="scan_failed")
+                # 文本与前端 stores/upload.ts 识别正则联动，改动须同步前端
+                raise UploadSecurityError(tr("upload.security_rejected"), code="scan_failed")
             promoted_path = self._promote(stage.path, target_path)
             metadata["final_path"] = str(promoted_path)
             self._log_event(True, metadata)
@@ -157,7 +159,7 @@ class UploadQuarantineManager:
     def _enforce_size(self, size: int):
         if size > MAX_UPLOAD_SIZE:
             raise UploadSecurityError(
-                f"文件大小 {size} 超过上限 {MAX_UPLOAD_SIZE} 字节",
+                tr("upload.size_exceeded", size=size, max=MAX_UPLOAD_SIZE),
                 code="size_exceeded",
             )
 
@@ -168,13 +170,14 @@ class UploadQuarantineManager:
         for pattern in self.allowed_extensions:
             if lowered.endswith(pattern):
                 return
-        raise UploadSecurityError("文件类型不在允许列表中", code="extension_forbidden")
+        # 文本与前端 stores/upload.ts 识别正则联动，改动须同步前端
+        raise UploadSecurityError(tr("upload.type_not_allowed"), code="extension_forbidden")
 
     def _scan(self, staged_path: Path) -> ScanReport:
         if not self.clamav_enabled:
             return ScanReport(status="skipped", engine="clamdscan", message="已跳过病毒扫描")
         if not self.clamav_bin:
-            raise UploadSecurityError("未找到 ClamAV 扫描器，请检查配置", code="scanner_missing")
+            raise UploadSecurityError(tr("upload_sec.scanner_not_found"), code="scanner_missing")
 
         command = [self.clamav_bin] + self.clamav_args + [str(staged_path)]
         start = time.time()
@@ -196,7 +199,7 @@ class UploadQuarantineManager:
                 duration_ms=int((time.time() - start) * 1000),
             )
         except FileNotFoundError as exc:
-            raise UploadSecurityError("ClamAV 扫描器不可用", code="scanner_missing") from exc
+            raise UploadSecurityError(tr("upload_sec.scanner_unavailable"), code="scanner_missing") from exc
 
         duration_ms = int((time.time() - start) * 1000)
         stdout = (result.stdout or "").strip()

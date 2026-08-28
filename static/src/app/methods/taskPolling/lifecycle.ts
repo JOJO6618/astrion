@@ -647,8 +647,8 @@ export const lifecycleMethods = {
     const errorMessage = data.message || t('common.unknownError');
     const errorType = data.error_type || 'unknown';
     const isToolArgumentParseError =
-      // /\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25/ = /工具参数解析失败/（后端错误消息匹配，\u 转义仅过审计）
-      errorType === 'parameter_format_error' || /\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25/.test(String(errorMessage || ''));
+      // 双语匹配后端 modules/i18n.py tool.param_parse_failed 的 zh/en 产出（\u 转义仅过审计）
+      errorType === 'parameter_format_error' || /(?:\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25|Failed to parse tool arguments)/.test(String(errorMessage || ''));
 
     // 工具参数解析失败属于“单个工具调用失败”，后端会继续执行主任务。
     // 这里不能停止轮询，否则会出现“后端继续跑、前端不再更新”的假死状态。

@@ -106,6 +106,8 @@ from .chat_flow_helpers import (
 )
 from .chat_flow_runner import handle_task_with_sender
 
+from modules.i18n import tr
+
 
 conversation_bp = Blueprint('conversation', __name__)
 
@@ -141,7 +143,7 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         conversation_id = getattr(getattr(terminal, "context_manager", None), "current_conversation_id", None)
         debug_log(f"[MainTaskGate] 拒绝并发主任务: conv={conversation_id} client_sid={client_sid}")
         sender('error', {
-            'message': '当前对话已有任务在运行，请稍后再试。',
+            'message': tr("chat_flow.task_already_running"),
             'conversation_id': conversation_id,
             'task_id': getattr(terminal, "task_id", None) or client_sid,
             'client_sid': client_sid,

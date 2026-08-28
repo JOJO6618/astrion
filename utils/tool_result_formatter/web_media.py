@@ -5,6 +5,8 @@ from utils.tool_result_formatter.common import (
     _format_failure, _preview_text, _summarize_output_block, _summarize_todo_tasks
 )
 
+from modules.i18n import tr
+
 def _format_create_skill(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("create_skill", result_data)
@@ -98,7 +100,7 @@ def _format_manage_personalization(result_data: Dict[str, Any]) -> str:
 
     config = result_data.get("data") or {}
     if not isinstance(config, dict):
-        return result_data.get("message") or "个性化配置读取成功"
+        return result_data.get("message") or tr("fmt_web_media.personalization_read_ok")
 
     lines = ["当前个性化配置:"]
     for key, value in config.items():

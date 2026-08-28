@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from modules.approval_agent import ApprovalAgent
 from server.state import tool_approval_manager
+from modules.i18n import tr
 
 
 def build_auto_approval_payload(
@@ -74,7 +75,7 @@ async def run_auto_approval(
             return {"decision": status, "item": row, "source": "manual"}
         return None
 
-    _progress({"stage": "start", "message": "自动审批开始"})
+    _progress({"stage": "start", "message": tr("auto_approval.start")})
     payload = build_auto_approval_payload(
         web_terminal=web_terminal,
         recent_tool_actions=recent_tool_actions,
@@ -94,6 +95,6 @@ async def run_auto_approval(
         )
         out = {"decision": decided.get("status"), "item": decided, "source": "approval_agent"}
     else:
-        out = _manual_takeover() or {"decision": "rejected", "reason": "人工接管失败"}
-    _progress({"stage": "done", "message": "自动审批结束", "decision": (out or {}).get("decision")})
+        out = _manual_takeover() or {"decision": "rejected", "reason": tr("auto_approval.takeover_failed")}
+    _progress({"stage": "done", "message": tr("auto_approval.done"), "decision": (out or {}).get("decision")})
     return out

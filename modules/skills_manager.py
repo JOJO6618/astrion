@@ -15,6 +15,8 @@ from typing import Dict, List, Optional, Sequence
 from config import AGENT_SKILLS_DIR, CUSTOM_SKILLS_DIR, IS_HOST_MODE, PROJECT_AGENTS_SKILLS_DIRNAME, WORKSPACE_SKILLS_DIRNAME
 from utils.logger import setup_logger
 
+from modules.i18n import tr
+
 logger = setup_logger(__name__)
 
 SKILL_FILE_NAME = "SKILL.md"
@@ -151,25 +153,25 @@ def validate_skill_directory(source_dir: str | Path) -> Dict[str, object]:
     """Validate a skill folder with minimal required SKILL.md frontmatter."""
     source = Path(source_dir).expanduser().resolve()
     if not source.exists() or not source.is_dir():
-        return {"success": False, "error": "source_dir 不是目录", "source_dir": str(source)}
+        return {"success": False, "error": tr("skills.source_dir_not_dir"), "source_dir": str(source)}
 
     skill_id = source.name
     if not _is_valid_skill_id(skill_id):
-        return {"success": False, "error": "skill 文件夹名称不合法", "skill_name": skill_id}
+        return {"success": False, "error": tr("skills.skill_id_invalid"), "skill_name": skill_id}
 
     skill_file = source / SKILL_FILE_NAME
     if not skill_file.exists() or not skill_file.is_file():
-        return {"success": False, "error": "缺少 SKILL.md", "skill_name": skill_id}
+        return {"success": False, "error": tr("skills.missing_skill_md"), "skill_name": skill_id}
 
     try:
         content = skill_file.read_text(encoding="utf-8")
     except Exception as exc:
-        return {"success": False, "error": f"读取 SKILL.md 失败: {exc}", "skill_name": skill_id}
+        return {"success": False, "error": tr("skills.skill_md_read_failed", error=str(exc)), "skill_name": skill_id}
 
     if not re.search(r"(?m)^\s*name\s*:", content):
-        return {"success": False, "error": "缺少 name:", "skill_name": skill_id}
+        return {"success": False, "error": tr("skills.missing_name"), "skill_name": skill_id}
     if not re.search(r"(?m)^\s*description\s*:", content):
-        return {"success": False, "error": "缺少 description:", "skill_name": skill_id}
+        return {"success": False, "error": tr("skills.missing_description"), "skill_name": skill_id}
 
     return {
         "success": True,
@@ -193,12 +195,12 @@ def archive_skill_directory(source_dir: str | Path, target_root: str | Path) -> 
     try:
         target.relative_to(target_base)
     except ValueError:
-        return {"success": False, "error": "目标路径不合法", "skill_name": source.name}
+        return {"success": False, "error": tr("skills.target_path_invalid"), "skill_name": source.name}
 
     if target.exists():
         return {
             "success": False,
-            "error": "目标 skill 已存在",
+            "error": tr("skills.target_exists"),
             "skill_name": source.name,
             "target_dir": str(target),
         }
@@ -208,7 +210,7 @@ def archive_skill_directory(source_dir: str | Path, target_root: str | Path) -> 
     except Exception as exc:
         return {
             "success": False,
-            "error": f"移动 skill 失败: {exc}",
+            "error": tr("skills.move_failed", error=str(exc)),
             "skill_name": source.name,
             "source_dir": str(source),
             "target_dir": str(target),
@@ -474,7 +476,7 @@ def sync_workspace_skills(
     try:
         skills_dir.relative_to(root)
     except Exception:
-        return {"success": False, "error": "skills 目录不在项目路径内"}
+        return {"success": False, "error": tr("skills.skills_dir_not_in_project")}
 
     ensure_agent_skills_dir(base_dir)
     catalog = get_skills_catalog(base_dir, private_dir=private_dir)

@@ -23,6 +23,7 @@ from config import (
     TERMINAL_SANDBOX_REQUIRE,
     TOOLBOX_TERMINAL_IDLE_SECONDS,
 )
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -128,7 +129,7 @@ class ToolboxContainer:
             )
 
             if not terminal.start():
-                raise RuntimeError("工具容器启动失败，请检查 Docker 或本地 shell 环境。")
+                raise RuntimeError(tr("toolbox.container_start_failed"))
 
             self._terminal = terminal
             self._last_used = time.time()

@@ -1014,13 +1014,16 @@ interface MultiAgentMessageInfo {
   content: string;
 }
 
-// 后端多智能体消息格式匹配（中文须与后端下发文本一致；\u 转义仅为通过 i18n 审计，不改变匹配行为）
-const MULTI_AGENT_MESSAGE_RE =
+// 后端多智能体消息格式匹配（须与后端 modules/i18n.py 的 zh/en 两种产出一致；\u 转义仅为通过 i18n 审计）
+const MULTI_AGENT_MESSAGE_ZH_RE =
   /^\u6765\u81ea\s+(.+?)\s+\u7684(.+?)\nid:\s*(\S+)\n\n<(.+?)>\n<(\w+)([^>]*)>\n([\s\S]*?)\n<\/\5>\n<\/\4>$/;
+// en: From {name}[ to {target}]: {label}（与 zh 组索引平行，解析逻辑共用）
+const MULTI_AGENT_MESSAGE_EN_RE =
+  /^From\s+(.+?)(?:\s+to\s+.+?)?\s*:\s*(.+?)\nid:\s*(\S+)\n\n<(.+?)>\n<(\w+)([^>]*)>\n([\s\S]*?)\n<\/\5>\n<\/\4>$/;
 
 function parseMultiAgentMessage(content: string): MultiAgentMessageInfo | null {
   const text = String(content || '');
-  const m = text.match(MULTI_AGENT_MESSAGE_RE);
+  const m = text.match(MULTI_AGENT_MESSAGE_ZH_RE) || text.match(MULTI_AGENT_MESSAGE_EN_RE);
   if (!m) {
     return null;
   }
@@ -1082,10 +1085,11 @@ const escapeUserHtml = (value: string): string =>
 // 路径前缀可选：后端自 cedef87d 起返回相对工作区路径（.astrion/skills/...），历史消息仍可能是绝对路径
 const USER_SKILL_LINK_RE = /\[\$([^\]\n]+)\]\(((?:[^)\n]*[\\/])?\.astrion[\\/]skills[\\/][^)\n]+[\\/]SKILL\.md)\)/g;
 const USER_FILE_LINK_RE = /\[([^\]\n]+)\]\(file:\/\/([^)\n]+)\)/g;
-// 后端子智能体系统消息格式匹配（中文=后端下发文本，\u 转义仅过审计，不改变行为）
-const SUB_AGENT_DONE_LABEL_RE = /^\u5b50\u667a\u80fd\u4f53\d+\s*\u4efb\u52a1\u5b8c\u6210$/;
-const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?\u5b50\u667a\u80fd\u4f53\s*#?\s*(\d+)\s*\u4efb\u52a1\u6458\u8981[:：]/;
-const BG_RUN_COMMAND_DONE_LABEL_RE = /^(?:\[)?\u540e\u53f0\s*run_command\s*\u5b8c\u6210(?:\])?$/;
+// 前端自身生成的完成标签识别（chat.subAgentDoneLabel / appUi.backgroundRunCommandDone 的 zh/en 两种产出）
+const SUB_AGENT_DONE_LABEL_RE = /^(?:\u5b50\u667a\u80fd\u4f53\d+\s*\u4efb\u52a1\u5b8c\u6210|Sub-agent\s*\d+\s*complete)$/;
+// 后端子智能体摘要前缀（modules/i18n.py sub_agent.summary_*，双语）
+const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
+const BG_RUN_COMMAND_DONE_LABEL_RE = /^(?:\[)?(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)(?:\])?$/;
 const RENDERABLE_ACTION_TYPES = new Set([
   'thinking',
   'text',
@@ -2048,8 +2052,8 @@ function getSubAgentSystemNoticeLabel(action: any): string | null {
     return content;
   }
   const m = content.match(SUB_AGENT_DONE_PREFIX_RE);
-  // /\u5df2\u5b8c\u6210/ = /已完成/（后端子智能体完成标记，\u 转义仅过审计）
-  if (m && /\u5df2\u5b8c\u6210/.test(content)) {
+  // 完成判定双语：zh /已完成/，en /Completed./（后端 modules/i18n.py sub_agent.summary_completed）
+  if (m && /(?:\u5df2\u5b8c\u6210|Completed\.)/.test(content)) {
     if (!debugLoggedSystemActionKeys.has(`${key}-regex-pass`)) {
       debugLoggedSystemActionKeys.add(`${key}-regex-pass`);
     }

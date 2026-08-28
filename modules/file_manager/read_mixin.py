@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -60,12 +61,16 @@ class ReadMixin:
         try:
             file_size = full_path.stat().st_size
         except FileNotFoundError:
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if size_limit and file_size > size_limit:
             return {
                 "success": False,
-                "error": f"文件太大 ({file_size / 1024 / 1024:.2f}MB > {size_limit / 1024 / 1024}MB)"
+                "error": tr(
+                    "file_manager.file_too_large",
+                    size=f"{file_size / 1024 / 1024:.2f}",
+                    limit=f"{size_limit / 1024 / 1024}",
+                )
             }
         
         try:
@@ -74,10 +79,10 @@ class ReadMixin:
         except UnicodeDecodeError:
             return {
                 "success": False,
-                "error": "文件不是 UTF-8 文本，无法直接读取，请改用 run_command 调用合适的解析工具或 Python 解释器。"
+                "error": tr("file_manager.not_utf8_text")
             }
         except Exception as e:
-            return {"success": False, "error": f"读取文件失败: {e}"}
+            return {"success": False, "error": tr("file_manager.read_failed", error=e)}
         
         content = "".join(lines)
         return {
@@ -94,10 +99,10 @@ class ReadMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         ok, msg = self._ensure_host_access(full_path, "read")
         if not ok:
             return {"success": False, "error": msg}
@@ -136,10 +141,10 @@ class ReadMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         ok, msg = self._ensure_host_access(full_path, "read")
         if not ok:
             return {"success": False, "error": msg}
@@ -196,7 +201,7 @@ class ReadMixin:
         start = start_line if start_line and start_line > 0 else 1
         end = end_line if end_line and end_line >= start else total_lines
         if start > total_lines:
-            return {"success": False, "error": "起始行超出文件长度"}
+            return {"success": False, "error": tr("file_manager.start_line_out_of_file")}
         end = min(end, total_lines)
         
         selected_lines = lines[start - 1 : end]
@@ -226,17 +231,17 @@ class ReadMixin:
     ) -> Dict:
         """在文件中搜索关键词，返回合并后的窗口。"""
         if not query:
-            return {"success": False, "error": "缺少搜索关键词"}
+            return {"success": False, "error": tr("file_manager.missing_search_query")}
         
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         ok, msg = self._ensure_host_access(full_path, "read")
         if not ok:
             return {"success": False, "error": msg}
@@ -296,17 +301,17 @@ class ReadMixin:
     ) -> Dict:
         """根据多个行区间提取内容。"""
         if not segments:
-            return {"success": False, "error": "缺少要提取的行区间"}
+            return {"success": False, "error": tr("file_manager.missing_segments")}
         
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         ok, msg = self._ensure_host_access(full_path, "read")
         if not ok:
             return {"success": False, "error": msg}
@@ -324,16 +329,16 @@ class ReadMixin:
         
         for item in segments:
             if not isinstance(item, dict):
-                return {"success": False, "error": "segments 数组中的每一项都必须是对象"}
+                return {"success": False, "error": tr("file_manager.segments_items_must_be_objects")}
             start_line = item.get("start_line")
             end_line = item.get("end_line")
             label = item.get("label")
             if start_line is None or end_line is None:
-                return {"success": False, "error": "所有区间都必须包含 start_line 和 end_line"}
+                return {"success": False, "error": tr("file_manager.segments_need_line_bounds")}
             if start_line <= 0 or end_line < start_line:
-                return {"success": False, "error": "行区间不合法"}
+                return {"success": False, "error": tr("file_manager.segment_range_invalid")}
             if start_line > total_lines:
-                return {"success": False, "error": f"区间起点 {start_line} 超出文件行数"}
+                return {"success": False, "error": tr("file_manager.segment_start_exceeds", line=start_line)}
             end_line = min(end_line, total_lines)
             snippet = "".join(lines[start_line - 1 : end_line])
             extracted.append({

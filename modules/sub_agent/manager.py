@@ -35,6 +35,7 @@ from modules.multi_agent.state import (
     GLOBAL_MULTI_AGENT_STATES_LOCK,
 )
 from server.utils_common import debug_log
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from core.web_terminal import WebTerminal
@@ -252,12 +253,12 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             return {"success": False, "error": validation_error}
 
         if not thinking_mode:
-            return {"success": False, "error": "缺少 thinking_mode 参数，必须指定 fast 或 thinking"}
+            return {"success": False, "error": tr("sub_agent_mgr.missing_thinking_mode")}
         if thinking_mode not in {"fast", "thinking"}:
-            return {"success": False, "error": "thinking_mode 仅支持 fast 或 thinking"}
+            return {"success": False, "error": tr("sub_agent_mgr.thinking_mode_invalid")}
 
         if not conversation_id:
-            return {"success": False, "error": "缺少对话ID，无法创建子智能体"}
+            return {"success": False, "error": tr("sub_agent_mgr.missing_conversation_id")}
 
         if not self._ensure_agent_slot_available(conversation_id, agent_id):
             # 多智能体模式的 agent_id 由系统自动分配且不对外暴露，
@@ -265,17 +266,17 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             if multi_agent_mode:
                 return {
                     "success": False,
-                    "error": "内部错误：实例编号分配冲突，请重试创建。"
+                    "error": tr("sub_agent_mgr.instance_slot_conflict"),
                 }
             return {
                 "success": False,
-                "error": f"该对话已使用过编号 {agent_id}，请更换新的子智能体代号。"
+                "error": tr("sub_agent_mgr.agent_id_used", agent_id=agent_id),
             }
 
         if self._active_task_count(conversation_id) >= SUB_AGENT_MAX_ACTIVE:
             return {
                 "success": False,
-                "error": f"该对话已存在 {SUB_AGENT_MAX_ACTIVE} 个运行中的子智能体，请稍后再试。",
+                "error": tr("sub_agent_mgr.max_active_reached", count=SUB_AGENT_MAX_ACTIVE),
             }
 
         task_id = self._generate_task_id(agent_id)
@@ -362,7 +363,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             except ValueError:
                 shutil.rmtree(task_root, ignore_errors=True)
                 # 多智能体模式的 agent_id 是内部编号，不把具体值抛给模型
-                return {"success": False, "error": "内部错误：实例注册冲突，请重试创建。"}
+                return {"success": False, "error": tr("sub_agent_mgr.instance_register_conflict")}
 
         sub_agent = SubAgentTask(
             manager=self,
@@ -399,7 +400,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                     pass
             shutil.rmtree(task_root, ignore_errors=True)
             logger.exception(f"[SubAgent] 子智能体调度失败: agent_id={agent_id}, task_id={task_id}")
-            return {"success": False, "error": f"子智能体调度失败（事件循环繁忙），请稍后重试: {exc}"}
+            return {"success": False, "error": tr("sub_agent_mgr.schedule_failed", error=exc)}
 
         # 调度成功后再提交状态：self.tasks 记录与 _running_tasks 句柄同步出现，
         # reconcile_task_states 任何时刻看到该记录都能拿到运行句柄，不会误标 terminated
@@ -433,10 +434,10 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
 
         asyncio_task.add_done_callback(_on_done)
 
-        message = f"子智能体{agent_id} 已创建，任务ID: {task_id}"
+        message = tr("sub_agent_mgr.created", agent_id=agent_id, task_id=task_id)
         if multi_agent_mode and display_name:
             # 多智能体模式：对用户/模型只暴露显示名，task_id 为内部细节不进文案
-            message = f"{display_name} 已创建。"
+            message = tr("sub_agent_mgr.created_multi", display_name=display_name)
         print(f"{OUTPUT_FORMATS['info']} {message}")
         ma_debug(
             "manager_create_sub_agent",
@@ -469,12 +470,12 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         """阻塞等待子智能体完成或超时。"""
         task = self._select_task(task_id, agent_id)
         if not task:
-            return {"success": False, "error": "未找到对应的子智能体任务"}
+            return {"success": False, "error": tr("sub_agent_mgr.task_not_found")}
 
         if task.get("status") in TERMINAL_STATUSES or task.get("status") == "terminated":
             if task.get("final_result"):
                 return task["final_result"]
-            return {"success": False, "status": task.get("status"), "message": "子智能体已结束。"}
+            return {"success": False, "status": task.get("status"), "message": tr("sub_agent_mgr.already_finished")}
 
         real_task_id = task["task_id"]
         deadline = time.time() + (timeout_seconds or task.get("timeout_seconds") or SUB_AGENT_DEFAULT_TIMEOUT)
@@ -485,7 +486,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             # 并替换 self.tasks 字典，导致旧 task 引用失效。每次循环重新获取引用。
             task = self.tasks.get(real_task_id)
             if not task:
-                return {"success": False, "error": "未找到对应的子智能体任务"}
+                return {"success": False, "error": tr("sub_agent_mgr.task_not_found")}
             running_task = self._running_tasks.get(real_task_id)
             status = task.get("status")
 
@@ -499,7 +500,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 task = self.tasks.get(real_task_id) or task
                 if task.get("final_result"):
                     return task["final_result"]
-                return {"success": False, "status": status, "message": "子智能体已结束，但未获取到结果。"}
+                return {"success": False, "status": status, "message": tr("sub_agent_mgr.finished_no_result")}
 
             # asyncio Task 已结束但状态可能还没同步：等待 final_result 就绪
             if running_task and running_task.done():
@@ -575,14 +576,14 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         """暂停指定子智能体，使其进入 idle 状态而不终结。"""
         task = self._select_task(task_id, agent_id, include_idle=True)
         if not task:
-            return {"success": False, "error": "未找到对应的子智能体任务"}
+            return {"success": False, "error": tr("sub_agent_mgr.task_not_found")}
 
         real_task_id = task["task_id"]
         real_agent_id = task.get("agent_id")
         if not task.get("multi_agent_mode"):
-            return {"success": False, "error": "stop_sub_agent 仅在多智能体模式下可用"}
+            return {"success": False, "error": tr("sub_agent_mgr.pause_only_multi_agent")}
         if task.get("status") == "terminated":
-            return {"success": False, "error": "子智能体已被终结，无法暂停"}
+            return {"success": False, "error": tr("sub_agent_mgr.terminated_cannot_pause")}
 
         # 查找或复活实例，确保能接收软停止信号
         if real_agent_id is not None:
@@ -594,7 +595,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             try:
                 sub_agent.request_soft_stop()
             except Exception as exc:
-                return {"success": False, "error": f"暂停子智能体失败: {exc}"}
+                return {"success": False, "error": tr("sub_agent_mgr.pause_failed", error=exc)}
         else:
             # 本地没有活实例：实例可能跑在另一个 manager 内存里，
             # 写控制文件让对端自行软停止；同时先把记录置 idle 作为即时反馈
@@ -622,7 +623,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "task_id": real_task_id,
             "agent_id": real_agent_id,
             "display_name": task.get("display_name") or None,
-            "message": f"{display_name} 已暂停，可用 send_message_to_sub_agent 重新激活。",
+            "message": tr("sub_agent_mgr.paused_message", display_name=display_name),
         }
 
     def terminate_sub_agent(
@@ -643,7 +644,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         # 多智能体模式下子智能体可能处于 idle，仍需支持终结
         task = self._select_task(task_id, agent_id, include_idle=True)
         if not task:
-            return {"success": False, "error": "未找到对应的子智能体任务"}
+            return {"success": False, "error": tr("sub_agent_mgr.task_not_found")}
 
         task_id = task["task_id"]
         agent_id = task.get("agent_id")
@@ -695,8 +696,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         # ---- 2) 任务记录标记 terminated（含实例对应记录，若与选中记录不同） ----
         self._mark_task_terminated(
             task,
-            message="子智能体已被强制关闭。",
-            system_message=f"🛑 {display_name} 已被手动关闭。",
+            message=tr("sub_agent_mgr.force_closed"),
+            system_message=tr("sub_agent_mgr.force_closed_sysmsg", display_name=display_name),
             notified=True,
         )
         inst_task_id = getattr(inst, "task_id", None) if inst is not None else None
@@ -705,8 +706,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             if other_task and other_task.get("status") not in TERMINAL_STATUSES.union({"terminated"}):
                 self._mark_task_terminated(
                     other_task,
-                    message="子智能体已被强制关闭。",
-                    system_message=f"🛑 {display_name} 已被手动关闭。",
+                    message=tr("sub_agent_mgr.force_closed"),
+                    system_message=tr("sub_agent_mgr.force_closed_sysmsg", display_name=display_name),
                     notified=True,
                 )
 
@@ -735,8 +736,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "task_id": task_id,
             "agent_id": agent_id,
             "display_name": display_name,
-            "message": "子智能体已被强制关闭。",
-            "system_message": f"🛑 {display_name} 已被手动关闭。",
+            "message": tr("sub_agent_mgr.force_closed"),
+            "system_message": tr("sub_agent_mgr.force_closed_sysmsg", display_name=display_name),
         }
 
     def _write_terminated_output_snapshot(self, task: Dict, *, display_name: str = "") -> None:
@@ -760,7 +761,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             existing.update({
                 "success": False,
                 "status": "terminated",
-                "summary": f"{display_name or '子智能体'} 已被手动关闭。",
+                "summary": tr("sub_agent_mgr.terminated_snapshot_summary", name=display_name or tr("sub_agent_mgr.agent_generic")),
                 "terminated_at": time.time(),
             })
             output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -816,7 +817,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         最终状态，而不是返回「不存在」。
         """
         if not agent_ids:
-            return {"success": False, "error": "必须指定至少一个agent_id"}
+            return {"success": False, "error": tr("sub_agent_mgr.need_agent_id")}
 
         def _find_task_by_agent_id(aid: int):
             # 先查运行中/待运行的任务
@@ -840,7 +841,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 results.append({
                     "agent_id": agent_id,
                     "found": False,
-                    "error": "子智能体不存在",
+                    "error": tr("sub_agent_mgr.agent_not_found"),
                 })
                 continue
 
@@ -997,12 +998,12 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             )
         if tool_name == "todo_get":
             return {"success": True, "todo_list": todo_manager.get_snapshot()}
-        return {"success": False, "error": f"未知待办工具: {tool_name}"}
+        return {"success": False, "error": tr("sub_agent_mgr.unknown_todo_tool", tool_name=tool_name)}
 
     async def execute_tool_for_sub_agent(self, tool_name: str, arguments: Dict[str, Any], agent_id: Optional[int] = None) -> Dict[str, Any]:
         """代表子智能体在主进程中执行工具。"""
         if not self.terminal:
-            return {"success": False, "error": "子智能体管理器未绑定终端，无法执行工具"}
+            return {"success": False, "error": tr("sub_agent_mgr.no_terminal")}
 
         # 待办工具走子智能体隔离存储，避免覆盖主智能体待办并串到前端显示
         if tool_name in {"todo_create", "todo_update_task", "todo_get"}:
@@ -1022,7 +1023,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 return {"success": True, "output": result_text}
         except Exception as exc:
             logger.exception(f"[SubAgent] 工具执行异常: {tool_name}")
-            return {"success": False, "error": f"工具执行异常: {exc}"}
+            return {"success": False, "error": tr("sub_agent_mgr.tool_exec_exception", error=exc)}
 
     # ------------------------------------------------------------------
     # 重启后恢复运行中任务

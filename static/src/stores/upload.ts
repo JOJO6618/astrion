@@ -213,10 +213,10 @@ export const useUploadStore = defineStore('upload', {
         const originalMessage = error && error.message ? String(error.message) : '';
         const fileLabel = file && file.name ? file.name : t('stores.genericFile');
         let displayMessage = originalMessage || t('common.retryLater');
-        // 后端上传错误消息匹配（中文须与后端下发文本一致；\u 转义仅过 i18n 审计，不改变行为）
-        if (/\u5b89\u5168\u5ba1\u6838\u672a\u901a\u8fc7/.test(originalMessage) || /Eicar/i.test(originalMessage)) {
+        // 双语匹配后端 modules/i18n.py upload.* 的 zh/en 产出（\u 转义仅过 i18n 审计）
+        if (/(?:\u5b89\u5168\u5ba1\u6838\u672a\u901a\u8fc7|Security check failed)/.test(originalMessage) || /Eicar/i.test(originalMessage)) {
           displayMessage = t('stores.uploadSecurityRejected', { name: fileLabel });
-        } else if (/\u6587\u4ef6\u7c7b\u578b\u4e0d\u5728\u5141\u8bb8\u5217\u8868\u4e2d/.test(originalMessage)) {
+        } else if (/(?:\u6587\u4ef6\u7c7b\u578b\u4e0d\u5728\u5141\u8bb8\u5217\u8868\u4e2d|File type is not in the allowed list)/.test(originalMessage)) {
           displayMessage = t('stores.uploadTypeNotAllowed', { name: fileLabel });
         } else if (displayMessage) {
           displayMessage = t('stores.uploadFailedWithReason', { name: fileLabel, reason: displayMessage });

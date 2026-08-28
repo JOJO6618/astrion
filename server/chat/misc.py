@@ -42,6 +42,8 @@ from server.state import tool_approval_manager, user_question_manager
 from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
+from modules.i18n import tr
+
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 @chat_bp.route('/api/memory', methods=['GET'])
 @api_login_required
@@ -50,7 +52,7 @@ def api_memory_entries(terminal: WebTerminal, workspace: UserWorkspace, username
     """返回主/任务记忆条目列表，供虚拟显示器加载"""
     memory_type = request.args.get('type', 'main')
     if memory_type not in ('main', 'task'):
-        return jsonify({"success": False, "error": "type 必须是 main 或 task"}), 400
+        return jsonify({"success": False, "error": tr("chat_misc.invalid_memory_type")}), 400
     try:
         entries = terminal.memory_manager._read_entries(memory_type)  # type: ignore
         return jsonify({"success": True, "type": memory_type, "entries": entries})
@@ -64,7 +66,7 @@ def get_monitor_snapshot_api():
     if not execution_id:
         return jsonify({
             'success': False,
-            'error': '缺少 executionId 参数'
+            'error': tr('chat_misc.missing_execution_id')
         }), 400
     stage = (request.args.get('stage') or 'before').lower()
     if stage not in {'before', 'after'}:
@@ -73,7 +75,7 @@ def get_monitor_snapshot_api():
     if not snapshot:
         return jsonify({
             'success': False,
-            'error': '未找到对应快照'
+            'error': tr('chat_misc.snapshot_not_found')
         }), 404
     return jsonify({
         'success': True,
@@ -116,15 +118,15 @@ def tool_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str
     if category is None:
         return jsonify({
             "success": False,
-            "error": "缺少类别参数",
-            "message": "请求体需要提供 category 字段"
+            "error": tr("chat_misc.missing_category"),
+            "message": tr("chat_misc.missing_category_field")
         }), 400
 
     if 'enabled' not in data:
         return jsonify({
             "success": False,
-            "error": "缺少启用状态",
-            "message": "请求体需要提供 enabled 字段"
+            "error": tr("chat_misc.missing_enabled"),
+            "message": tr("chat_misc.missing_enabled_field")
         }), 400
 
     try:
@@ -132,16 +134,16 @@ def tool_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str
         if policy.get("ui_blocks", {}).get("block_tool_toggle"):
             return jsonify({
                 "success": False,
-                "error": "工具开关已被管理员禁用",
-                "message": "被管理员强制禁用"
+                "error": tr("chat_misc.tool_toggle_admin_disabled"),
+                "message": tr("chat_misc.admin_forced_disabled")
             }), 403
         enabled = bool(data['enabled'])
         forced = getattr(terminal, "admin_forced_category_states", {}) or {}
         if isinstance(forced.get(category), bool) and forced[category] != enabled:
             return jsonify({
                 "success": False,
-                "error": "该工具类别已被管理员强制为启用/禁用，无法修改",
-                "message": "被管理员强制启用/禁用"
+                "error": tr("chat_misc.category_forced"),
+                "message": tr("chat_misc.admin_forced_state")
             }), 403
         terminal.set_tool_category_enabled(category, enabled)
         snapshot = terminal.get_tool_settings_snapshot()

@@ -5,6 +5,8 @@ from utils.tool_result_formatter.common import (
     _format_failure, _preview_text, _summarize_output_block, _summarize_todo_tasks
 )
 
+from modules.i18n import tr
+
 def format_read_file_result(result_data: Dict[str, Any]) -> str:
     """格式化 read_file 工具的输出，兼容读取/搜索/抽取模式。"""
     if not isinstance(result_data, dict):
@@ -64,7 +66,7 @@ def format_read_file_result(result_data: Dict[str, Any]) -> str:
             seg_texts.append("未提供可抽取的片段。")
         return "\n".join([header] + seg_texts)
 
-    return _format_failure("read_file", {"error": "不支持的读取模式"})
+    return _format_failure("read_file", {"error": tr("fmt_file.unsupported_read_mode")})
 
 def _format_write_file_diff(result_data: Dict[str, Any], raw_text: str) -> str:
     path = result_data.get("path", "目标文件")
@@ -81,7 +83,7 @@ def _format_write_file_diff(result_data: Dict[str, Any], raw_text: str) -> str:
         fail_descriptions = []
         for item in failed_blocks[:3]:
             idx = item.get("index")
-            reason = item.get("reason") or item.get("error") or "未说明原因"
+            reason = item.get("reason") or item.get("error") or tr("fmt_file2.reason_not_specified")
             fail_descriptions.append(f"#{idx}: {reason}")
         lines.append("⚠️ 失败块: " + "；".join(fail_descriptions))
         if len(failed_blocks) > 3:
@@ -98,7 +100,7 @@ def _format_write_file_diff(result_data: Dict[str, Any], raw_text: str) -> str:
         detail_sections: List[str] = []
         for item in failed_blocks:
             idx = item.get("index")
-            reason = item.get("reason") or item.get("error") or "未说明原因"
+            reason = item.get("reason") or item.get("error") or tr("fmt_file2.reason_not_specified")
             hint = item.get("hint")
             block_patch = item.get("block_patch") or item.get("patch")
             # 自动判别常见错误形态，便于快速定位问题
@@ -146,14 +148,14 @@ def _format_write_file_diff(result_data: Dict[str, Any], raw_text: str) -> str:
         lines.extend(risk_sections)
 
     if result_data.get("success") is False and result_data.get("error"):
-        lines.append(f"⚠️ 错误: {result_data.get('error')}")
+        lines.append(tr("fmt_file2.error_template", error=result_data.get("error")))
     formatted = "\n".join(line for line in lines if line)
     return formatted or raw_text
 
 def _format_create_file(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("create_file", result_data)
-    return result_data.get("message") or f"已创建空文件: {result_data.get('path', '未知路径')}"
+    return result_data.get("message") or tr("fmt_file.empty_file_created", path=result_data.get("path") or tr("fmt_file.unknown_path"))
 
 def _format_write_file(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
@@ -181,7 +183,7 @@ def _format_edit_file(result_data: Dict[str, Any]) -> str:
                 if not isinstance(item, dict):
                     continue
                 index = item.get("index")
-                reason = item.get("reason") or item.get("error") or "未知原因"
+                reason = item.get("reason") or item.get("error") or tr("fmt_file2.reason_unknown")
                 status = item.get("status")
                 prefix = f"第 {index} 组" if index is not None else "某一组"
                 if status:
@@ -274,16 +276,16 @@ def _format_delete_file(result_data: Dict[str, Any]) -> str:
         return _format_failure("delete_file", result_data)
     path = result_data.get("path") or "未知路径"
     action = result_data.get("action") or "deleted"
-    return f"已{action}文件: {path}"
+    return tr("fmt_file.file_action_done", action=action, path=path)
 
 def _format_rename_file(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("rename_file", result_data)
     old_path = result_data.get("old_path") or "旧路径未知"
     new_path = result_data.get("new_path") or "新路径未知"
-    return f"已重命名: {old_path} -> {new_path}"
+    return tr("fmt_file.renamed", old_path=old_path, new_path=new_path)
 
 def _format_create_folder(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("create_folder", result_data)
-    return f"已创建文件夹: {result_data.get('path', '未知路径')}"
+    return tr("fmt_file.folder_created", path=result_data.get("path", "未知路径"))

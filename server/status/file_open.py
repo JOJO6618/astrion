@@ -35,6 +35,8 @@ from modules.host_workspace_manager import (
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
 import server.state as state
+from modules.i18n import tr
+
 def _open_path_in_file_manager(path: Path) -> bool:
     target = path.expanduser().resolve()
     if not target.exists():
@@ -62,9 +64,9 @@ def _resolve_project_git_file(workspace, rel_path: str) -> tuple[Path | None, st
         target = (repo_root / rel_path).expanduser().resolve()
         target.relative_to(repo_root)
     except Exception:
-        return None, "文件路径无效"
+        return None, tr("status_file_open.invalid_path")
     if not target.exists() or not target.is_file():
-        return None, "文件不存在"
+        return None, tr("status_file_open.file_not_found")
     return target, ""
 
 def _mac_open_app_candidates(file_path: Path | None = None) -> list[dict]:
@@ -337,11 +339,11 @@ def open_project_in_file_manager(terminal, workspace, username):
                 None,
             )
             if not target:
-                return jsonify({"success": False, "error": "工作区不存在"}), 404
+                return jsonify({"success": False, "error": tr("status_file_open.workspace_not_found")}), 404
             project_path = Path(target.get("path") or "").expanduser().resolve()
         else:
             if target_workspace_id not in user_manager.list_user_workspaces(username):
-                return jsonify({"success": False, "error": "项目不存在"}), 404
+                return jsonify({"success": False, "error": tr("status_file_open.project_not_found")}), 404
             ws_obj = user_manager.ensure_user_workspace(username, target_workspace_id)
             project_path = Path(getattr(ws_obj, "project_path", "") or "").expanduser().resolve()
     else:
@@ -351,18 +353,18 @@ def open_project_in_file_manager(terminal, workspace, username):
     target = Path(root_text).expanduser().resolve() if ok and root_text else project_path
     if _open_path_in_file_manager(target):
         return jsonify({"success": True})
-    return jsonify({"success": False, "error": "无法打开文件管理器"}), 500
+    return jsonify({"success": False, "error": tr("status_file_open.cannot_open_file_manager")}), 500
 
 @status_bp.route('/api/project/file-open-apps')
 @api_login_required
 @with_terminal
 def list_project_file_open_apps(terminal, workspace, username):
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
     rel_path = request.args.get("path", "").strip()
     target, error = _resolve_project_git_file(workspace, rel_path)
     if not target:
-        return jsonify({"success": False, "error": error or "文件路径无效"}), 400
+        return jsonify({"success": False, "error": error or tr("status_file_open.invalid_path")}), 400
     if sys.platform == "darwin":
         apps = _mac_open_app_candidates(target)
     elif os.name == "nt":
@@ -375,24 +377,24 @@ def list_project_file_open_apps(terminal, workspace, username):
 @api_login_required
 def get_project_open_app_icon():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
     app_id = request.args.get("app_id", "").strip()
     if sys.platform != "darwin" or not app_id:
-        return jsonify({"success": False, "error": "应用图标不可用"}), 404
+        return jsonify({"success": False, "error": tr("status_file_open.app_icon_unavailable")}), 404
     try:
         app_path = Path(app_id).expanduser().resolve()
         if not app_path.exists() or app_path.suffix != ".app":
-            return jsonify({"success": False, "error": "应用不存在"}), 404
+            return jsonify({"success": False, "error": tr("status_file_open.app_not_found")}), 404
         icon_path = _mac_app_icon_path(app_path)
         if not icon_path:
-            return jsonify({"success": False, "error": "应用图标不存在"}), 404
+            return jsonify({"success": False, "error": tr("status_file_open.app_icon_not_found")}), 404
         cache_dir = Path(tempfile.gettempdir()) / "agents_app_icons"
         cache_dir.mkdir(parents=True, exist_ok=True)
         out_path = cache_dir / f"{abs(hash(str(app_path)))}.png"
         if not out_path.exists() or out_path.stat().st_mtime < icon_path.stat().st_mtime:
             sips = shutil.which("sips")
             if not sips:
-                return jsonify({"success": False, "error": "图标转换工具不可用"}), 404
+                return jsonify({"success": False, "error": tr("status_file_open.icon_tool_unavailable")}), 404
             subprocess.run(
                 [sips, "-s", "format", "png", str(icon_path), "--out", str(out_path)],
                 stdout=subprocess.DEVNULL,
@@ -404,25 +406,25 @@ def get_project_open_app_icon():
             return send_file(str(out_path), mimetype="image/png")
     except Exception:
         pass
-    return jsonify({"success": False, "error": "应用图标不可用"}), 404
+    return jsonify({"success": False, "error": tr("status_file_open.app_icon_unavailable")}), 404
 
 @status_bp.route('/api/project/open-file-with-app', methods=['POST'])
 @api_login_required
 @with_terminal
 def open_project_file_with_app(terminal, workspace, username):
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
     payload = request.get_json(silent=True) or {}
     rel_path = str(payload.get("path") or "").strip()
     app_id = str(payload.get("app_id") or "").strip()
     if not app_id:
-        return jsonify({"success": False, "error": "未选择应用"}), 400
+        return jsonify({"success": False, "error": tr("status_file_open.app_not_selected")}), 400
     target, error = _resolve_project_git_file(workspace, rel_path)
     if not target:
-        return jsonify({"success": False, "error": error or "文件路径无效"}), 400
+        return jsonify({"success": False, "error": error or tr("status_file_open.invalid_path")}), 400
     available = _mac_open_app_candidates(target) if sys.platform == "darwin" else _windows_open_app_candidates(target) if os.name == "nt" else []
     if not any(item.get("id") == app_id for item in available):
-        return jsonify({"success": False, "error": "应用不可用"}), 400
+        return jsonify({"success": False, "error": tr("status_file_open.app_unavailable")}), 400
     if _open_file_with_app(target, app_id):
         return jsonify({"success": True})
-    return jsonify({"success": False, "error": "打开文件失败"}), 500
+    return jsonify({"success": False, "error": tr("status_file_open.open_file_failed")}), 500

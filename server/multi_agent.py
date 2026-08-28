@@ -27,6 +27,7 @@ from modules.multi_agent.role_store import (
 )
 from config.paths import CUSTOM_ROLES_DIR, WEB_PRESET_ROLES_DIR
 from config.limits import REASONING_EFFORT_LEVELS
+from modules.i18n import tr
 
 multi_agent_bp = Blueprint("multi_agent", __name__)
 
@@ -52,16 +53,16 @@ def rebuild_conversation_index_api():
     try:
         username = get_current_username()
         if not username:
-            return jsonify({"success": False, "error": "未登录"}), 401
+            return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
         terminal, _ = get_user_resources(username)
         if not terminal:
-            return jsonify({"success": False, "error": "工作区未就绪"}), 503
+            return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
         ctx_manager = getattr(terminal, "context_manager", None)
         if not ctx_manager:
-            return jsonify({"success": False, "error": "上下文管理器未初始化"}), 503
+            return jsonify({"success": False, "error": tr("multi_agent_api.context_manager_not_initialized")}), 503
         ma_manager = getattr(ctx_manager, "multi_agent_conversation_manager", None)
         if not ma_manager:
-            return jsonify({"success": False, "error": "多智能体对话管理器未初始化"}), 503
+            return jsonify({"success": False, "error": tr("multi_agent_api.ma_conversation_manager_not_initialized")}), 503
         rebuilt = ma_manager._rebuild_index_from_files()
         ma_manager._save_index(rebuilt)
         return jsonify({"success": True, "index_size": len(rebuilt)})
@@ -119,17 +120,17 @@ def create_role_api():
         thinking_mode = str(data.get("thinking_mode") or "fast").strip()
         model_key = str(data.get("model_key") or "").strip() or None
         if not role_id or not name or not body_prompt:
-            return jsonify({"success": False, "error": "role_id/name/body_prompt 必填"}), 400
+            return jsonify({"success": False, "error": tr("multi_agent_api.role_fields_required")}), 400
         if thinking_mode not in {"fast", "thinking"}:
             thinking_mode = "fast"
         # 不允许覆盖预设角色
         if is_preset_role(role_id):
-            return jsonify({"success": False, "error": f"不能覆盖预设角色 {role_id}"}), 409
+            return jsonify({"success": False, "error": tr("multi_agent_api.cannot_override_preset_role", role_id=role_id)}), 409
         # 不允许覆盖已存在的用户自定义角色
         runtime_dir, custom_dir = _get_role_dirs()
         existing = {r.role_id for r in list_roles(runtime_dir=runtime_dir, custom_dir=custom_dir)}
         if role_id in existing:
-            return jsonify({"success": False, "error": f"角色 {role_id} 已存在"}), 409
+            return jsonify({"success": False, "error": tr("multi_agent_api.role_already_exists", role_id=role_id)}), 409
         role = RoleConfig(
             role_id=role_id,
             name=name,
@@ -155,7 +156,7 @@ def update_role_api(role_id: str):
         # 加载现有角色（先查自定义覆盖，再查预设）
         role = load_preset_role(role_id, runtime_dir=runtime_dir, custom_dir=custom_dir)
         if not role:
-            return jsonify({"success": False, "error": f"角色 {role_id} 不存在"}), 404
+            return jsonify({"success": False, "error": tr("multi_agent_api.role_not_found", role_id=role_id)}), 404
         # 更新字段
         if "name" in data:
             role.name = str(data["name"]).strip() or role.name
@@ -184,11 +185,11 @@ def delete_role_api(role_id: str):
     """删除用户自定义角色。不能删除预设角色。"""
     try:
         if is_preset_role(role_id):
-            return jsonify({"success": False, "error": f"不能删除预设角色 {role_id}"}), 403
+            return jsonify({"success": False, "error": tr("multi_agent_api.cannot_delete_preset_role", role_id=role_id)}), 403
         _, custom_dir = _get_role_dirs()
         deleted = delete_custom_role(role_id, custom_dir=custom_dir)
         if not deleted:
-            return jsonify({"success": False, "error": f"角色 {role_id} 不存在或无法删除"}), 404
+            return jsonify({"success": False, "error": tr("multi_agent_api.role_not_found_or_delete_failed", role_id=role_id)}), 404
         return jsonify({"success": True, "role_id": role_id})
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500
@@ -201,10 +202,10 @@ def get_multi_agent_settings_api():
     try:
         username = get_current_username()
         if not username:
-            return jsonify({"success": False, "error": "未登录"}), 401
+            return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
         _, workspace = get_user_resources(username)
         if not workspace:
-            return jsonify({"success": False, "error": "工作区未就绪"}), 503
+            return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
         # 从个人化配置中读取子智能体设置
         from modules.personalization_manager import load_personalization_config
         prefs = load_personalization_config(workspace.data_dir) or {}
@@ -229,10 +230,10 @@ def update_multi_agent_settings_api():
     try:
         username = get_current_username()
         if not username:
-            return jsonify({"success": False, "error": "未登录"}), 401
+            return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
         _, workspace = get_user_resources(username)
         if not workspace:
-            return jsonify({"success": False, "error": "工作区未就绪"}), 503
+            return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
         data = request.get_json() or {}
         settings = data.get("settings") or {}
         from modules.personalization_manager import load_personalization_config, save_personalization_config
@@ -243,7 +244,7 @@ def update_multi_agent_settings_api():
         if threshold is not None:
             threshold = int(threshold)
             if threshold < 10000:
-                return jsonify({"success": False, "error": "压缩阈值不能小于 10000"}), 400
+                return jsonify({"success": False, "error": tr("multi_agent_api.compress_threshold_too_small")}), 400
             prefs["sub_agent_compress_threshold_tokens"] = threshold
             dirty = True
         # 更新子智能体最大轮次（键存在才处理：None → 删除键恢复默认 50；0 → 无上限；正整数 → 该值）
@@ -259,9 +260,9 @@ def update_multi_agent_settings_api():
                 try:
                     max_turns = int(max_turns_raw)
                 except (TypeError, ValueError):
-                    return jsonify({"success": False, "error": "最大轮次必须是整数"}), 400
+                    return jsonify({"success": False, "error": tr("multi_agent_api.max_turns_must_be_integer")}), 400
                 if max_turns < 0:
-                    return jsonify({"success": False, "error": "最大轮次不能为负数（0 表示无上限）"}), 400
+                    return jsonify({"success": False, "error": tr("multi_agent_api.max_turns_cannot_be_negative")}), 400
                 prefs["sub_agent_max_turns"] = max_turns
                 dirty = True
         if dirty:
@@ -288,14 +289,14 @@ def create_multi_agent_conversation():
 
     username = get_current_username()
     if not username:
-        return jsonify({"success": False, "error": "未登录"}), 401
+        return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
 
     data = request.get_json() or {}
     target_workspace_id = (data.get("workspace_id") or "").strip()
 
     terminal, workspace = get_user_resources(username)
     if not terminal or not workspace:
-        return jsonify({"success": False, "error": "工作区未就绪"}), 503
+        return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
 
     if target_workspace_id:
         try:
@@ -336,10 +337,10 @@ def create_multi_agent_conversation():
 
     ctx_manager = getattr(terminal, "context_manager", None)
     if not ctx_manager:
-        return jsonify({"success": False, "error": "上下文管理器未初始化"}), 500
+        return jsonify({"success": False, "error": tr("multi_agent_api.context_manager_not_initialized")}), 500
     cm = getattr(ctx_manager, "multi_agent_conversation_manager", None) or getattr(ctx_manager, "conversation_manager", None)
     if not cm:
-        return jsonify({"success": False, "error": "对话管理器未初始化"}), 500
+        return jsonify({"success": False, "error": tr("multi_agent_api.conversation_manager_not_initialized")}), 500
 
     safe_run_mode = str(run_mode or "").strip().lower()
     if safe_run_mode == "deep":  # 旧版标识符映射
@@ -456,16 +457,16 @@ def list_active_sub_agents_api():
     """查询当前会话所有子智能体实例（多智能体模式专用）。"""
     username = get_current_username()
     if not username:
-        return jsonify({"success": False, "error": "未登录"}), 401
+        return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
     conversation_id = (request.args.get("conversation_id") or "").strip()
     if not conversation_id:
-        return jsonify({"success": False, "error": "缺少 conversation_id 参数"}), 400
+        return jsonify({"success": False, "error": tr("multi_agent_api.missing_conversation_id_param")}), 400
     terminal, _ = get_user_resources(username, conversation_id=conversation_id)
     if not terminal:
-        return jsonify({"success": False, "error": "工作区未就绪"}), 503
+        return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
     sub_agent_manager = getattr(terminal, "sub_agent_manager", None)
     if not sub_agent_manager:
-        return jsonify({"success": False, "error": "子智能体管理器未就绪"}), 503
+        return jsonify({"success": False, "error": tr("multi_agent_api.sub_agent_manager_not_ready")}), 503
     state = sub_agent_manager.get_multi_agent_state(conversation_id)
     agents: List[Dict[str, Any]] = []
     if state:

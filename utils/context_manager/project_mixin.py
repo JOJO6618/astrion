@@ -59,6 +59,8 @@ from utils.host_workspace_debug import write_host_workspace_debug
 from utils.media_store import MediaStore
 from utils.token_usage import normalize_usage_payload
 
+from modules.i18n import tr
+
 AUTO_SHALLOW_PLACEHOLDER = "过早的工具结果已经被自动压缩"
 AUTO_SHALLOW_TOOL_WHITELIST = {
     "write_file",
@@ -238,7 +240,7 @@ class ProjectMixin:
 
         if self._is_host_mode_without_safety():
             structure["unavailable"] = True
-            structure["message"] = "宿主机模式下文件树不可用"
+            structure["message"] = tr("project_mixin.host_mode_tree_unavailable")
             return structure
         
         # 记录实际存在的文件

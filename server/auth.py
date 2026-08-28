@@ -26,6 +26,7 @@ from .security import (
 )
 from . import state
 from .utils_common import debug_log
+from modules.i18n import tr
 
 auth_bp = Blueprint("auth", __name__)
 AUTH_DEBUG_FILE = Path(LOGS_DIR).expanduser().resolve() / "auth_debug.log"
@@ -142,19 +143,19 @@ def login():
 
     limited, retry_after = check_rate_limit("login", 10, 60, client_ip)
     if limited:
-        return jsonify({"success": False, "error": "登录请求过于频繁，请稍后再试。", "retry_after": retry_after}), 429
+        return jsonify({"success": False, "error": tr("auth.login_rate_limited"), "retry_after": retry_after}), 429
 
     blocked, block_for = is_action_blocked("login", identifier=client_ip)
     if blocked:
-        return jsonify({"success": False, "error": f"尝试次数过多，请 {block_for} 秒后重试。", "retry_after": block_for}), 429
+        return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
 
     record = state.user_manager.authenticate(email, password)
     if not record:
         wait_seconds = register_failure("login", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=client_ip)
-        error_payload = {"success": False, "error": "账号或密码错误"}
+        error_payload = {"success": False, "error": tr("auth.invalid_credentials")}
         status_code = 401
         if wait_seconds:
-            error_payload.update({"error": f"尝试次数过多，请 {wait_seconds} 秒后重试。", "retry_after": wait_seconds})
+            error_payload.update({"error": tr("auth.too_many_attempts", seconds=wait_seconds), "retry_after": wait_seconds})
             status_code = 429
         return jsonify(error_payload), status_code
 
@@ -212,9 +213,9 @@ def login():
 def host_login():
     """宿主机模式一键进入（仅当 TERMINAL_SANDBOX_MODE=host 时可用）。"""
     if (TERMINAL_SANDBOX_MODE or "").lower() != "host":
-        return jsonify({"success": False, "error": "宿主机模式未启用"}), 403
+        return jsonify({"success": False, "error": tr("auth.host_mode_disabled")}), 403
     if not state.container_manager.has_capacity("host"):
-        return jsonify({"success": False, "error": "资源繁忙，请稍后再试"}), 503
+        return jsonify({"success": False, "error": tr("auth.resource_busy")}), 503
 
     _, host_workspace = resolve_host_workspace()
     # 初始化 session，跳过账号体系
@@ -294,7 +295,7 @@ def register():
     from .security import get_client_ip
     limited, retry_after = check_rate_limit("register", 5, 300, get_client_ip())
     if limited:
-        return jsonify({"success": False, "error": "注册请求过于频繁，请稍后再试。", "retry_after": retry_after}), 429
+        return jsonify({"success": False, "error": tr("auth.register_rate_limited"), "retry_after": retry_after}), 429
     try:
         state.user_manager.register_user(username, email, password, invite_code)
         auth_debug_log(f"[auth_debug] POST /register success username={username}")
@@ -352,7 +353,7 @@ def session_status():
 def get_tutorial_status():
     username = (get_current_username() or "").strip().lower()
     if not username:
-        return jsonify({"success": False, "error": "未登录"}), 401
+        return jsonify({"success": False, "error": tr("auth.not_logged_in")}), 401
 
     if bool(session.get("host_mode")) or username == "host":
         return jsonify({
@@ -394,15 +395,15 @@ def get_tutorial_status():
 def set_tutorial_status():
     username = (get_current_username() or "").strip().lower()
     if not username:
-        return jsonify({"success": False, "error": "未登录"}), 401
+        return jsonify({"success": False, "error": tr("auth.not_logged_in")}), 401
     if bool(session.get("host_mode")) or username == "host":
-        return jsonify({"success": False, "error": "宿主机模式无需设置新手教程状态"}), 400
+        return jsonify({"success": False, "error": tr("auth.host_mode_tutorial_not_applicable")}), 400
 
     payload = request.get_json(silent=True) or {}
     completed = payload.get("tutorial_completed", True)
     record = state.user_manager.set_tutorial_completed(username, bool(completed))
     if not record:
-        return jsonify({"success": False, "error": "用户不存在"}), 404
+        return jsonify({"success": False, "error": tr("auth.user_not_found")}), 404
     return jsonify({
         "success": True,
         "data": {
@@ -436,7 +437,7 @@ def terminal_page():
     from .auth_helpers import resolve_admin_policy
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
-        return "实时终端已被管理员禁用", 403
+        return tr("auth.terminal_blocked_by_admin"), 403
     return current_app.send_static_file('terminal.html')
 
 

@@ -18,6 +18,7 @@ from config.model_profiles import get_registered_model_profiles
 from core.tool_config import TOOL_CATEGORIES
 from . import state
 from modules.personalization_manager import sanitize_personalization_payload
+from modules.i18n import tr
 
 api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
@@ -73,7 +74,7 @@ def create_workspace_api():
     payload = request.get_json(silent=True) or {}
     ws_id = _sanitize_workspace_id(payload.get("workspace_id") or payload.get("name") or "")
     if not ws_id:
-        return jsonify({"success": False, "error": "workspace_id 只能包含字母/数字/._-，长度1-40"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.workspace_id_invalid_chars")}), 400
     try:
         ws = state.api_user_manager.ensure_workspace(username, ws_id)
     except Exception as exc:
@@ -87,11 +88,11 @@ def get_workspace_api(workspace_id: str):
     username = session.get("username")
     ws_id = _sanitize_workspace_id(workspace_id)
     if not ws_id:
-        return jsonify({"success": False, "error": "workspace_id 不合法"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.workspace_id_invalid")}), 400
     workspaces = state.api_user_manager.list_workspaces(username)
     ws_info = workspaces.get(ws_id)
     if not ws_info:
-        return jsonify({"success": False, "error": "workspace 不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.workspace_not_found")}), 404
     return jsonify({"success": True, "workspace": ws_info})
 
 
@@ -101,11 +102,11 @@ def delete_workspace_api(workspace_id: str):
     username = session.get("username")
     ws_id = _sanitize_workspace_id(workspace_id)
     if not ws_id:
-        return jsonify({"success": False, "error": "workspace_id 不合法"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.workspace_id_invalid")}), 400
     # 阻止删除有运行中任务的工作区
     running = [t for t in task_manager.list_tasks(username, ws_id) if t.status in {"pending", "running"}]
     if running:
-        return jsonify({"success": False, "error": "该工作区有运行中的任务，无法删除"}), 409
+        return jsonify({"success": False, "error": tr("api_v1.workspace_has_running_tasks")}), 409
     removed = state.api_user_manager.delete_workspace(username, ws_id)
     # 清理终端/容器缓存
     term_key = f"{username}::{ws_id}"
@@ -115,7 +116,7 @@ def delete_workspace_api(workspace_id: str):
     except Exception:
         pass
     if not removed:
-        return jsonify({"success": False, "error": "workspace 不存在或删除失败"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.workspace_not_found_or_delete_failed")}), 404
     return jsonify({"success": True, "workspace_id": ws_id})
 
 
@@ -128,7 +129,7 @@ def _within_uploads(workspace, rel_path: str) -> Path:
     rel = rel.lstrip("/").strip()
     target = (base / rel).resolve()
     if not str(target).startswith(str(base)):
-        raise ValueError("非法路径")
+        raise ValueError(tr("api_v1_raise.invalid_path"))
     return target
 
 
@@ -151,7 +152,7 @@ def _within_project(workspace, rel_path: str, default_to_project_root: bool = Tr
     rel = rel.lstrip("/")
     target = (base / rel).resolve()
     if not str(target).startswith(str(base)):
-        raise ValueError("非法路径")
+        raise ValueError(tr("api_v1_raise.invalid_path"))
     return target
 
 
@@ -200,7 +201,7 @@ def _personalization_dir(workspace):
 
 def _resolve_workspace(username: str, workspace_id: str):
     if not workspace_id:
-        raise RuntimeError("workspace_id 不能为空")
+        raise RuntimeError(tr("api_v1_raise.workspace_id_empty"))
     return state.api_user_manager.ensure_workspace(username, workspace_id)
 
 
@@ -211,13 +212,13 @@ def create_conversation_api(workspace_id: str):
     ws = _resolve_workspace(username, workspace_id)
     terminal, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not terminal:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     payload = request.get_json(silent=True) or {}
     prompt_name = payload.get("prompt_name")
     personalization_name = payload.get("personalization_name")
     result = terminal.create_new_conversation()
     if not result.get("success"):
-        return jsonify({"success": False, "error": result.get("error") or "创建对话失败"}), 500
+        return jsonify({"success": False, "error": result.get("error") or tr("api_v1.create_conversation_failed")}), 500
     conv_id = result.get("conversation_id")
     # 记录元数据，稍后消息时可自动应用
     _update_conversation_metadata(workspace, conv_id, {
@@ -246,31 +247,31 @@ def send_message_api(workspace_id: str):
     prompt_name = payload.get("prompt_name")
     personalization_name = payload.get("personalization_name")
     if not message and not images:
-        return jsonify({"success": False, "error": "消息不能为空"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.message_empty")}), 400
 
     terminal, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not terminal or not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     try:
         conversation_id, _ = ensure_conversation_loaded(terminal, conversation_id, workspace=workspace)
     except Exception as exc:
-        return jsonify({"success": False, "error": f"对话加载失败: {exc}"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.conversation_load_failed", error=exc)}), 400
 
     # 应用自定义 prompt/personalization（如果提供）
     try:
         if prompt_name:
             prompt_path = _prompt_dir(workspace) / f"{prompt_name}.txt"
             if not prompt_path.exists():
-                return jsonify({"success": False, "error": "prompt 不存在"}), 404
+                return jsonify({"success": False, "error": tr("api_v1.prompt_not_found")}), 404
             terminal.context_manager.custom_system_prompt = prompt_path.read_text(encoding="utf-8")
         if personalization_name:
             pers_path = _personalization_dir(workspace) / f"{personalization_name}.json"
             if not pers_path.exists():
-                return jsonify({"success": False, "error": "personalization 不存在"}), 404
+                return jsonify({"success": False, "error": tr("api_v1.personalization_not_found")}), 404
             try:
                 terminal.context_manager.custom_personalization_config = json.loads(pers_path.read_text(encoding="utf-8"))
             except Exception:
-                return jsonify({"success": False, "error": "personalization 解析失败"}), 400
+                return jsonify({"success": False, "error": tr("api_v1.personalization_parse_failed")}), 400
         # 持久化到对话元数据
         _update_conversation_metadata(workspace, conversation_id, {
             "custom_prompt_name": prompt_name,
@@ -287,7 +288,7 @@ def send_message_api(workspace_id: str):
         except Exception as exc:
             debug_log(f"[api_v1] 应用个性化失败: {exc}")
     except Exception as exc:
-        return jsonify({"success": False, "error": f"自定义参数错误: {exc}"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.custom_params_error", error=exc)}), 400
 
     try:
         rec = task_manager.create_chat_task(
@@ -323,7 +324,7 @@ def list_conversations_api(workspace_id: str):
     ws = _resolve_workspace(username, workspace_id)
     terminal, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not terminal or not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     limit = max(1, min(int(request.args.get("limit", 20)), 100))
     offset = max(0, int(request.args.get("offset", 0)))
     conv_dir = Path(workspace.data_dir) / "conversations"
@@ -357,10 +358,10 @@ def get_conversation_api(workspace_id: str, conv_id: str):
     ws = _resolve_workspace(username, workspace_id)
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     path = _conversation_path(workspace, conv_id)
     if not path.exists():
-        return jsonify({"success": False, "error": "对话不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.conversation_not_found")}), 404
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         include_messages = request.args.get("full", "0") == "1"
@@ -378,7 +379,7 @@ def delete_conversation_api(workspace_id: str, conv_id: str):
     ws = _resolve_workspace(username, workspace_id)
     terminal, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not terminal or not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     result = terminal.delete_conversation(conv_id)
     status = 200 if result.get("success") else 404
     result["workspace_id"] = ws.workspace_id
@@ -391,7 +392,7 @@ def get_task_events(task_id: str):
     username = session.get("username")
     rec = task_manager.get_task(username, task_id)
     if not rec:
-        return jsonify({"success": False, "error": "任务不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.task_not_found")}), 404
     try:
         offset = int(request.args.get("from", 0))
     except Exception:
@@ -420,7 +421,7 @@ def cancel_task_api_v1(task_id: str):
     username = session.get("username")
     ok = task_manager.cancel_task(username, task_id)
     if not ok:
-        return jsonify({"success": False, "error": "任务不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.task_not_found")}), 404
     return jsonify({"success": True})
 
 
@@ -431,14 +432,14 @@ def upload_file_api(workspace_id: str):
     ws = _resolve_workspace(username, workspace_id)
     terminal, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not terminal or not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     if 'file' not in request.files:
-        return jsonify({"success": False, "error": "未找到文件"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.no_file_uploaded")}), 400
     file_obj = request.files['file']
     raw_name = request.form.get('filename') or file_obj.filename
     filename = sanitize_filename_preserve_unicode(raw_name)
     if not filename:
-        return jsonify({"success": False, "error": "非法文件名"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.invalid_filename")}), 400
     subdir = request.form.get("dir") or ""
     try:
         target_dir = _within_uploads(workspace, subdir)
@@ -459,7 +460,7 @@ def upload_file_api(workspace_id: str):
             relative_path=rel_path,
         )
     except Exception as exc:
-        return jsonify({"success": False, "error": f"保存文件失败: {exc}"}), 500
+        return jsonify({"success": False, "error": tr("api_v1.save_file_failed", error=exc)}), 500
 
     metadata = result.get("metadata", {})
     return jsonify({
@@ -479,12 +480,12 @@ def list_files_api(workspace_id: str):
     ws = _resolve_workspace(username, workspace_id)
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     rel = request.args.get("path") or ""
     try:
         target = _within_project(workspace, rel)
         if not target.exists():
-            return jsonify({"success": False, "error": "路径不存在"}), 404
+            return jsonify({"success": False, "error": tr("api_v1.path_not_found")}), 404
         if not target.is_dir():
             stat = target.stat()
             rel_entry = target.relative_to(workspace.project_path)
@@ -525,16 +526,16 @@ def download_file_api(workspace_id: str):
     ws = _resolve_workspace(username, workspace_id)
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     rel = request.args.get("path")
     if not rel:
-        return jsonify({"success": False, "error": "缺少 path"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.path_missing")}), 400
     try:
         target = _within_project(workspace, rel)
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     if not target.exists():
-        return jsonify({"success": False, "error": "文件不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.file_does_not_exist")}), 404
 
     if target.is_dir():
         memory_file = BytesIO()
@@ -558,7 +559,7 @@ def list_prompts_api():
     ws = _resolve_workspace(username, "default")
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     base = _prompt_dir(workspace)
     items = []
     for p in sorted(base.glob("*.txt")):
@@ -578,10 +579,10 @@ def get_prompt_api(name: str):
     ws = _resolve_workspace(username, "default")
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     p = _prompt_dir(workspace) / f"{name}.txt"
     if not p.exists():
-        return jsonify({"success": False, "error": "prompt 不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.prompt_not_found")}), 404
     return jsonify({"success": True, "name": name, "content": p.read_text(encoding="utf-8")})
 
 
@@ -592,12 +593,12 @@ def create_prompt_api():
     ws = _resolve_workspace(username, "default")
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     payload = request.get_json() or {}
     name = (payload.get("name") or "").strip()
     content = payload.get("content") or ""
     if not name:
-        return jsonify({"success": False, "error": "name 不能为空"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.name_empty")}), 400
     p = _prompt_dir(workspace) / f"{name}.txt"
     p.write_text(content, encoding="utf-8")
     return jsonify({"success": True, "name": name})
@@ -610,7 +611,7 @@ def list_personalizations_api():
     ws = _resolve_workspace(username, "default")
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     base = _personalization_dir(workspace)
     items = []
     for p in sorted(base.glob("*.json")):
@@ -630,10 +631,10 @@ def get_personalization_api(name: str):
     ws = _resolve_workspace(username, "default")
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     p = _personalization_dir(workspace) / f"{name}.json"
     if not p.exists():
-        return jsonify({"success": False, "error": "personalization 不存在"}), 404
+        return jsonify({"success": False, "error": tr("api_v1.personalization_not_found")}), 404
     try:
         raw = json.loads(p.read_text(encoding="utf-8"))
         # 读取时也做一次规范化，避免历史脏数据一直向外暴露
@@ -641,7 +642,7 @@ def get_personalization_api(name: str):
         if content != raw:
             p.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as exc:
-        return jsonify({"success": False, "error": f"解析失败: {exc}"}), 500
+        return jsonify({"success": False, "error": tr("api_v1.parse_failed", error=exc)}), 500
     return jsonify({"success": True, "name": name, "content": content})
 
 
@@ -652,18 +653,18 @@ def create_personalization_api():
     ws = _resolve_workspace(username, "default")
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
-        return jsonify({"success": False, "error": "系统未初始化"}), 503
+        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     payload = request.get_json() or {}
     name = (payload.get("name") or "").strip()
     content = payload.get("content")
     if not name:
-        return jsonify({"success": False, "error": "name 不能为空"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.name_empty")}), 400
     if content is None:
-        return jsonify({"success": False, "error": "content 不能为空"}), 400
+        return jsonify({"success": False, "error": tr("api_v1.content_empty")}), 400
     p = _personalization_dir(workspace) / f"{name}.json"
     try:
         if not isinstance(content, dict):
-            return jsonify({"success": False, "error": "content 必须是 JSON object"}), 400
+            return jsonify({"success": False, "error": tr("api_v1.content_must_be_object")}), 400
         existing = None
         if p.exists():
             try:
@@ -674,7 +675,7 @@ def create_personalization_api():
         sanitized = sanitize_personalization_payload(content, fallback=existing)
         p.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as exc:
-        return jsonify({"success": False, "error": f"保存失败: {exc}"}), 500
+        return jsonify({"success": False, "error": tr("api_v1.save_failed", error=exc)}), 500
     return jsonify({"success": True, "name": name, "content": sanitized})
 
 

@@ -14,6 +14,7 @@ from .monitor import cache_monitor_snapshot
 from .security import compact_web_search_result
 from .chat_flow_helpers import detect_tool_failure
 from .chat_flow_runner_helpers import resolve_monitor_path, resolve_monitor_memory, capture_monitor_snapshot
+from modules.i18n import tr
 from utils.tool_result_formatter import (
     extract_mcp_content_for_context,
     format_tool_result_for_context,
@@ -50,21 +51,21 @@ def _build_tool_approval_preview(web_terminal, function_name: str, arguments: Di
         replacements = args.get("replacements")
         preview["file_path"] = file_path
         if not file_path:
-            preview["summary"] = "缺少 file_path"
+            preview["summary"] = tr("tool_loop.preview_missing_file_path")
             return preview
         if not isinstance(replacements, list) or not replacements:
-            preview["summary"] = "缺少 replacements（必须是非空数组）"
+            preview["summary"] = tr("tool_loop.preview_missing_replacements")
             return preview
         preview["replacement_groups"] = len(replacements)
         try:
             valid, err, full_path = web_terminal.file_manager._validate_path(str(file_path))
             if not valid or full_path is None:
-                preview["summary"] = err or "路径校验失败"
+                preview["summary"] = err or tr("tool_loop.preview_path_invalid")
                 return preview
             resolved_path = str(Path(full_path))
             preview["resolved_path"] = resolved_path
             if not full_path.exists() or not full_path.is_file():
-                preview["summary"] = "目标文件不存在，无法生成上下文预览"
+                preview["summary"] = tr("tool_loop.preview_file_not_found")
                 return preview
             content = full_path.read_text(encoding="utf-8", errors="ignore")
             first = replacements[0] if isinstance(replacements[0], dict) else {}
@@ -72,11 +73,11 @@ def _build_tool_approval_preview(web_terminal, function_name: str, arguments: Di
             new_text = str(first.get("new_string") or "")
             replace_all = first.get("replace_all", False)
             if not isinstance(replace_all, bool):
-                preview["summary"] = "第 1 组 replace_all 必须是 true 或 false"
+                preview["summary"] = tr("tool_loop.preview_replace_all_type")
                 return preview
             short_old_text_notice = bool(old_text and len(old_text.splitlines()) < 3)
             if short_old_text_notice:
-                preview["notice"] = "提示：第 1 组 old_string 少于3行，允许继续执行；需要批量替换的场景可以单行或不足一行"
+                preview["notice"] = tr("tool_loop.preview_short_old_notice")
             old_lines = old_text.splitlines()
             new_lines = new_text.splitlines()
             idx = content.find(old_text) if old_text else -1
@@ -97,8 +98,8 @@ def _build_tool_approval_preview(web_terminal, function_name: str, arguments: Di
                     "old_start_line": start_line_no,
                     "old_end_line": end_line_no,
                 }
-                mode_text = "全部匹配" if replace_all is True else "首个匹配"
-                preview["summary"] = f"编辑 {file_path}，共 {len(replacements)} 组；预览第 1 组第 {start_line_no}-{end_line_no} 行（{mode_text}）"
+                mode_text = tr("tool_loop.preview_mode_all") if replace_all is True else tr("tool_loop.preview_mode_first")
+                preview["summary"] = tr("tool_loop.preview_summary", file_path=file_path, count=len(replacements), start=start_line_no, end=end_line_no, mode=mode_text)
             else:
                 preview["edit_context"] = {
                     "before": [],
@@ -108,16 +109,16 @@ def _build_tool_approval_preview(web_terminal, function_name: str, arguments: Di
                     "old_start_line": None,
                     "old_end_line": None,
                 }
-                preview["summary"] = f"共 {len(replacements)} 组替换；未在文件中定位到第 1 组 old_string，显示原始替换内容"
+                preview["summary"] = tr("tool_loop.preview_old_not_found", count=len(replacements))
             if short_old_text_notice:
-                preview["summary"] = f"{preview['summary']}（第 1 组 old_string 少于3行，已告知并继续）"
+                preview["summary"] = f"{preview['summary']}{tr('tool_loop.preview_short_old_suffix')}"
         except Exception as exc:
-            preview["summary"] = f"生成编辑预览失败: {exc}"
+            preview["summary"] = tr("tool_loop.preview_failed", error=exc)
         return preview
 
     if function_name in {"run_command", "terminal_input"}:
         preview["command"] = args.get("command")
-        preview["summary"] = f"执行命令: {args.get('command') or ''}"
+        preview["summary"] = tr("tool_loop.preview_run_command", command=args.get('command') or '')
         return preview
 
     if function_name in {"create_file", "create_folder", "delete_file"}:
@@ -195,8 +196,8 @@ def _inject_runtime_mode_notice(
 
 
 def _format_rejected_tool_text(reason: str) -> str:
-    clean_reason = str(reason or "").strip() or "未提供"
-    return f"工具调用被拒绝\n原因：{clean_reason}"
+    clean_reason = str(reason or "").strip() or tr("tool_loop.reason_not_provided")
+    return tr("tool_loop.tool_call_rejected", reason=clean_reason)
 
 
 async def _wait_for_tool_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0) -> Dict[str, Any]:
@@ -204,14 +205,14 @@ async def _wait_for_tool_approval(*, approval_id: str, username: str, timeout_se
     while True:
         row = tool_approval_manager.get(approval_id)
         if not row:
-            return {"decision": "rejected", "reason": "审批请求不存在"}
+            return {"decision": "rejected", "code": "approval_missing", "reason": tr("tool_loop.approval_missing")}
         if row.get("username") != username:
-            return {"decision": "rejected", "reason": "审批请求用户不匹配"}
+            return {"decision": "rejected", "code": "approval_user_mismatch", "reason": tr("tool_loop.approval_user_mismatch")}
         status = row.get("status")
         if status in {"approved", "rejected"}:
             return {"decision": status, "item": row}
         if (time.time() - started) >= timeout_seconds:
-            return {"decision": "rejected", "reason": "审批超时"}
+            return {"decision": "rejected", "code": "approval_timeout", "reason": tr("tool_loop.approval_timeout")}
         await asyncio.sleep(0.2)
 
 
@@ -240,11 +241,11 @@ async def _wait_for_user_questions(*, question_ids: List[str], username: str, ti
         for qid in list(pending):
             row = user_question_manager.get(qid)
             if not row:
-                answered[qid] = {"status": "missing", "answer_text": "用户问题不存在。"}
+                answered[qid] = {"status": "missing", "answer_text": tr("tool_loop.question_missing")}
                 pending.remove(qid)
                 continue
             if row.get("username") != username:
-                answered[qid] = {"status": "forbidden", "answer_text": "用户问题所属用户不匹配。"}
+                answered[qid] = {"status": "forbidden", "answer_text": tr("tool_loop.question_user_mismatch")}
                 pending.remove(qid)
                 continue
             if row.get("status") == "answered":
@@ -254,7 +255,7 @@ async def _wait_for_user_questions(*, question_ids: List[str], username: str, ti
             break
         if (time.time() - started) >= timeout_seconds:
             for qid in list(pending):
-                answered[qid] = {"status": "timeout", "answer_text": "等待用户回答超时。"}
+                answered[qid] = {"status": "timeout", "answer_text": tr("tool_loop.question_timeout")}
                 pending.remove(qid)
             break
         await asyncio.sleep(0.2)
@@ -319,7 +320,7 @@ async def _handle_workflow_tool(*, function_name: str, web_terminal, arguments, 
             )
     except Exception as exc:
         # 柔性原则：任何工作流异常不得掐断智能体工作
-        result = {"success": False, "error": f"工作流工具执行异常：{exc}"}
+        result = {"success": False, "error": tr("tool_loop.workflow_tool_error", error=exc)}
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -338,41 +339,41 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
         current_work_mode = None
     if current_work_mode != "plan":
         return _payload(success=False, status="not_in_plan_mode",
-                        message="当前不在计划模式，submit_plan 不可用。若需要用户确认方案，请直接在回复中输出讨论内容。")
+                        message=tr("tool_loop.submit_plan_not_in_plan_mode"))
 
     # 2. 校验计划文件路径并读取内容
     plan_file = str(args.get("plan_file") or "").strip()
     summary = str(args.get("summary") or "").strip()
     if not plan_file:
         return _payload(success=False, status="invalid_plan_file",
-                        message="缺少 plan_file 参数。请先把计划写入 .astrion/plan/ 下的 .md 文件再提交。")
+                        message=tr("tool_loop.submit_plan_missing_file"))
     try:
         valid, err, full_path = web_terminal.file_manager._validate_path(plan_file)
     except Exception as exc:
         valid, err, full_path = False, str(exc), None
     if not valid or not full_path:
         return _payload(success=False, status="invalid_plan_file",
-                        message=f"计划文件路径无效：{err or plan_file}")
+                        message=tr("tool_loop.submit_plan_invalid_path", error=err or plan_file))
     try:
         project_root = Path(web_terminal.context_manager.project_path).resolve()
         plan_dir = (project_root / ".astrion" / "plan").resolve()
         resolved = Path(full_path).resolve()
         if resolved != plan_dir and plan_dir not in resolved.parents:
             return _payload(success=False, status="invalid_plan_file",
-                            message="计划文件必须位于工作区 .astrion/plan/ 目录下。")
+                            message=tr("tool_loop.submit_plan_wrong_dir"))
         if resolved.suffix.lower() != ".md":
             return _payload(success=False, status="invalid_plan_file",
-                            message="计划文件必须是 .md 文档。")
+                            message=tr("tool_loop.submit_plan_not_md"))
         if not resolved.is_file():
             return _payload(success=False, status="plan_file_missing",
-                            message=f"计划文件不存在：{plan_file}。请先写入计划文档再提交。")
+                            message=tr("tool_loop.submit_plan_file_missing", plan_file=plan_file))
         plan_content = resolved.read_text(encoding="utf-8", errors="replace")
     except Exception as exc:
         return _payload(success=False, status="plan_file_error",
-                        message=f"读取计划文件失败：{exc}")
+                        message=tr("tool_loop.submit_plan_read_failed", error=exc))
     if not plan_content.strip():
         return _payload(success=False, status="plan_file_empty",
-                        message="计划文档还是空的，请先写入计划内容再提交。")
+                        message=tr("tool_loop.submit_plan_empty"))
 
     # 3. 创建批准请求并通知前端弹窗
     approval = plan_approval_manager.create_request(
@@ -391,9 +392,9 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
             "success": False,
             "status": "awaiting_plan_approval",
             "approval_id": approval.get("approval_id"),
-            "message": "等待用户批准计划"
+            "message": tr("tool_loop.awaiting_plan_approval")
         },
-        'message': '等待用户批准计划',
+        'message': tr("tool_loop.awaiting_plan_approval"),
         'conversation_id': conversation_id
     })
     sender('plan_approval_required', {
@@ -429,26 +430,26 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
                 socketio.emit('status_update', web_terminal.get_status(), room=f"user_{username}")
             except Exception:
                 pass
-            switch_note = "系统已自动切换到执行模式，权限已解除只读锁定。"
+            switch_note = tr("tool_loop.plan_switch_note_ok")
         except Exception as exc:
-            switch_note = f"（切换到执行模式失败：{exc}，可请用户手动切换运行模式）"
-        message = f"用户已批准你的计划。{switch_note}请立即按照计划开始实施。"
+            switch_note = tr("tool_loop.plan_switch_note_failed", error=exc)
+        message = tr("tool_loop.plan_approved", switch_note=switch_note)
         if comment:
-            message += f"\n用户批准时附带的意见：{comment}"
+            message += tr("tool_loop.plan_approved_comment", comment=comment)
         return _payload(success=True, status="approved", message=message,
                         comment=comment, plan_file=plan_file)
 
     if status == "rejected":
-        message = "用户拒绝了这份计划，你仍处于计划模式。请根据用户的意见修订计划文档后重新调用 submit_plan 提交。"
+        message = tr("tool_loop.plan_rejected")
         if comment:
-            message += f"\n用户的意见：{comment}"
+            message += tr("tool_loop.plan_rejected_comment", comment=comment)
         else:
-            message += "\n用户没有填写具体意见，可在回复中询问用户需要调整的方向。"
+            message += tr("tool_loop.plan_rejected_no_comment")
         return _payload(success=False, status="rejected", message=message,
                         comment=comment, plan_file=plan_file)
 
     return _payload(success=False, status=status or "unknown",
-                    message="计划批准未得到用户决定（可能已超时或请求丢失），可重新调用 submit_plan 提交。",
+                    message=tr("tool_loop.plan_no_decision"),
                     plan_file=plan_file)
 
 
@@ -531,9 +532,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     "success": False,
                     "status": "awaiting_user_answer",
                     "question_id": question.get("question_id"),
-                    "message": "等待用户回答"
+                    "message": tr("tool_loop.awaiting_user_answer")
                 },
-                'message': '等待用户回答',
+                'message': tr("tool_loop.awaiting_user_answer"),
                 'conversation_id': conversation_id
             })
         sender('user_questions_required', {
@@ -548,7 +549,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         for question in created_questions:
             qid = str(question.get("question_id") or "")
             answer_row = wait_answers.get(qid) or {}
-            answer_text = str(answer_row.get("answer_text") or "用户未回答。").strip() or "用户未回答。"
+            answer_text = str(answer_row.get("answer_text") or tr("tool_loop.user_no_answer")).strip() or tr("tool_loop.user_no_answer")
             tool_call_id = str(question.get("tool_call_id") or "")
             if tool_call_id:
                 user_question_results_by_tool_call_id[tool_call_id] = answer_text
@@ -581,7 +582,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     'result': {
                         "success": False,
                         "status": "cancelled",
-                        "message": "命令执行被用户取消",
+                        "message": tr("tool_loop.cancelled_by_user"),
                         "tool": function_name
                     }
                 })
@@ -591,10 +592,10 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                         "role": "tool",
                         "tool_call_id": tool_call_id,
                         "name": function_name,
-                        "content": "命令执行被用户取消",
+                        "content": tr("tool_loop.cancelled_by_user"),
                     })
                 sender('task_stopped', {
-                    'message': '命令执行被用户取消',
+                    'message': tr("tool_loop.cancelled_by_user"),
                     'reason': 'user_stop'
                 })
                 clear_stop_flag(client_sid, username)
@@ -623,7 +624,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             success, arguments, error_msg = web_terminal.api_client._safe_tool_arguments_parse(arguments_str, function_name)
             if not success:
                 debug_log(f"安全解析失败: {error_msg}")
-                error_text = f'工具参数解析失败: {error_msg}'
+                # 格式与前端 taskPolling/lifecycle.ts 识别正则联动，改动须同步前端
+                error_text = tr("tool.param_parse_failed", error=error_msg)
                 error_payload = {
                     "success": False,
                     "error": error_text,
@@ -691,7 +693,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     debug_log(f"JSON修复也失败: {repair_error}")
                     debug_log(f"修复尝试: {repair_attempts}")
                     debug_log(f"修复后内容前100字符: {repaired_str[:100]}")
-                    error_text = f'工具参数解析失败: {e}'
+                    # 格式与前端 taskPolling/lifecycle.ts 识别正则联动，改动须同步前端
+                    error_text = tr("tool.param_parse_failed", error=e)
                     error_payload = {
                         "success": False,
                         "error": error_text,
@@ -733,9 +736,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 )
                 function_name = "vlm_analyze"
             else:
-                denied_message = (
-                    f"工具 {function_name} 不在当前模型可用工具列表中，已拒绝执行。"
-                )
+                denied_message = tr("tool_loop.tool_not_allowed", tool=function_name)
                 denied_payload = {
                     "success": False,
                     "status": "denied",
@@ -776,7 +777,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
 
         permission_eval = web_terminal.evaluate_tool_permission(function_name, arguments)
         if not permission_eval.get("allowed", True):
-            denied_message = permission_eval.get("message") or "当前权限模式不允许执行该工具。"
+            denied_message = permission_eval.get("message") or tr("tool_loop.permission_denied_default")
             denied_payload = {
                 "success": False,
                 "status": "denied",
@@ -829,9 +830,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     "success": False,
                     "status": "awaiting_approval",
                     "approval_id": approval_item.get("approval_id"),
-                    "message": "等待用户审批"
+                    "message": tr("tool_loop.awaiting_approval")
                 },
-                'message': '等待用户审批',
+                'message': tr("tool_loop.awaiting_approval"),
                 'conversation_id': conversation_id
             })
             wait_result = None
@@ -861,9 +862,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 'conversation_id': conversation_id,
             })
             if wait_result.get("decision") != "approved":
-                reject_message = "操作被用户拒绝"
-                if wait_result.get("reason") == "审批超时":
-                    reject_message = "审批超时，操作未执行"
+                reject_message = tr("tool_loop.rejected_by_user")
+                if wait_result.get("code") == "approval_timeout":
+                    reject_message = tr("tool_loop.rejected_timeout")
                 reason = ((wait_result.get("item") or {}).get("reason") or wait_result.get("reason") or "").strip()
                 if reason:
                     reject_message = f"{reject_message}：{reason}"
@@ -950,7 +951,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         check_count = 0
 
         if function_name == "ask_user" and str(tool_call_id) in user_question_results_by_tool_call_id:
-            answer_text = user_question_results_by_tool_call_id.get(str(tool_call_id)) or "用户未回答。"
+            answer_text = user_question_results_by_tool_call_id.get(str(tool_call_id)) or tr("tool_loop.user_no_answer")
             qid = user_question_id_by_tool_call_id.get(str(tool_call_id))
             tool_result = json.dumps({
                 "success": True,
@@ -1010,7 +1011,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             tool_result = json.dumps({
                 "success": False,
                 "status": "cancelled",
-                "message": "命令执行被用户取消"
+                "message": tr("tool_loop.cancelled_by_user")
             }, ensure_ascii=False)
 
             debug_log("[停止检测] 发送取消通知到前端")
@@ -1021,7 +1022,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 'result': {
                     "success": False,
                     "status": "cancelled",
-                    "message": "命令执行被用户取消",
+                    "message": tr("tool_loop.cancelled_by_user"),
                     "tool": function_name
                 }
             })
@@ -1031,13 +1032,13 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 "role": "tool",
                 "tool_call_id": tool_call_id,
                 "name": function_name,
-                "content": "命令执行被用户取消",
+                "content": tr("tool_loop.cancelled_by_user"),
             })
 
             # 保存取消结果
             web_terminal.context_manager.add_conversation(
                 "tool",
-                "命令执行被用户取消",
+                tr("tool_loop.cancelled_by_user"),
                 tool_call_id=tool_call_id,
                 name=function_name,
                 metadata={"status": "cancelled"}
@@ -1046,7 +1047,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
 
             # 发送停止事件并清除标志
             sender('task_stopped', {
-                'message': '命令执行被用户取消',
+                'message': tr("tool_loop.cancelled_by_user"),
                 'reason': 'user_stop'
             })
             clear_stop_flag(client_sid, username)
@@ -1057,7 +1058,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             if tool_result is None and tool_task is not None:
                 tool_result = await tool_task
             if tool_result is None:
-                tool_result = json.dumps({"success": False, "error": "工具未返回结果"}, ensure_ascii=False)
+                tool_result = json.dumps({"success": False, "error": tr("tool_loop.tool_no_result")}, ensure_ascii=False)
             debug_log(f"工具结果: {tool_result[:200]}...")
 
         execution_time = time.time() - start_time
@@ -1099,9 +1100,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     "success": False,
                     "status": "awaiting_approval",
                     "approval_id": approval_item.get("approval_id"),
-                    "message": "检测到写权限受限，等待用户审批后重试"
+                    "message": tr("tool_loop.awaiting_approval_retry")
                 },
-                'message': '检测到写权限受限，等待用户审批',
+                'message': tr("tool_loop.awaiting_approval_retry_short"),
                 'conversation_id': conversation_id
             })
             wait_result = None
@@ -1131,9 +1132,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 'conversation_id': conversation_id,
             })
             if wait_result.get("decision") != "approved":
-                reject_message = "操作被用户拒绝"
-                if wait_result.get("reason") == "审批超时":
-                    reject_message = "审批超时，操作未执行"
+                reject_message = tr("tool_loop.rejected_by_user")
+                if wait_result.get("code") == "approval_timeout":
+                    reject_message = tr("tool_loop.rejected_timeout")
                 reason = ((wait_result.get("item") or {}).get("reason") or wait_result.get("reason") or "").strip()
                 if reason:
                     reject_message = f"{reject_message}：{reason}"
@@ -1339,7 +1340,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                         metadata_payload = {}
                     metadata_payload["tool_image_path"] = img_path
                     sender('system_message', {
-                        'content': f'系统已记录图片路径（不再附带二进制数据）: {img_path}'
+                        'content': tr("tool_loop.image_path_recorded", path=img_path)
                     })
 
         # view_video: 将视频直接附加到 tool 结果中（不再插入 user 消息）
@@ -1358,7 +1359,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                         metadata_payload = {}
                     metadata_payload["tool_video_path"] = video_path
                     sender('system_message', {
-                        'content': f'系统已记录视频路径（不再附带二进制数据）: {video_path}'
+                        'content': tr("tool_loop.video_path_recorded", path=video_path)
                     })
 
         # 立即保存工具结果
@@ -1522,7 +1523,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         )
         if not deep_result.get("success"):
             sender('error', {
-                "message": deep_result.get("error") or "自动深层压缩失败",
+                "message": deep_result.get("error") or tr("tool_loop.deep_compression_failed"),
                 "conversation_id": conversation_id,
             })
         web_terminal._tool_loop_active = previous_tool_loop_active

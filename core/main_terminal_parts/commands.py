@@ -87,6 +87,8 @@ from config.model_profiles import (
     model_supports_video,
 )
 
+from modules.i18n import tr
+
 logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 
@@ -150,7 +152,7 @@ class MainTerminalCommandMixin:
             if cmd in self.commands:
                 await self.commands[cmd](args)
             else:
-                print(f"{OUTPUT_FORMATS['error']} 未知命令: {cmd}")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.unknown_command', cmd=cmd)}")
                 await self.show_help()
 
     async def handle_task(self, user_input: str):
@@ -164,9 +166,10 @@ class MainTerminalCommandMixin:
                 max_context_tokens = get_model_context_window(self.model_key)
                 if max_context_tokens:
                     if current_tokens >= max_context_tokens:
-                        msg = (
-                            f"当前对话上下文已达 {current_tokens} tokens，"
-                            f"超过模型上限 {max_context_tokens}，请先压缩或清理上下文后再试。"
+                        msg = tr(
+                            "commands.context_over_limit",
+                            current_tokens=current_tokens,
+                            max_context_tokens=max_context_tokens,
                         )
                         print(f"{OUTPUT_FORMATS['error']} {msg}")
                         # 记录一条系统消息，方便回溯
@@ -175,9 +178,11 @@ class MainTerminalCommandMixin:
                     usage_percent = (current_tokens / max_context_tokens) * 100
                     warned = self.context_manager.conversation_metadata.get("context_warning_sent", False)
                     if usage_percent >= 70 and not warned:
-                        warn_msg = (
-                            f"当前上下文约占 {usage_percent:.1f}%（{current_tokens}/{max_context_tokens}），"
-                            "建议使用压缩功能。"
+                        warn_msg = tr(
+                            "commands.context_warning",
+                            usage_percent=usage_percent,
+                            current_tokens=current_tokens,
+                            max_context_tokens=max_context_tokens,
                         )
                         print(f"{OUTPUT_FORMATS['warning']} {warn_msg}")
                         self.context_manager.conversation_metadata["context_warning_sent"] = True
@@ -307,7 +312,7 @@ class MainTerminalCommandMixin:
                 # ===== 统一保存到对话历史（关键修复） =====
 
                 # 1. 构建助手回复内容（思考内容通过 reasoning_content 存储）
-                assistant_content = final_response or "已完成操作。"
+                assistant_content = final_response or tr("commands.task_done_placeholder")
 
                 # 2. 保存assistant消息（包含tool_calls但不包含结果）
                 self.context_manager.add_conversation(
@@ -396,13 +401,13 @@ class MainTerminalCommandMixin:
                         limit = int(args)
                         limit = max(1, min(limit, 50))  # 限制在1-50之间
                     except ValueError:
-                        print(f"{OUTPUT_FORMATS['warning']} 无效数量，使用默认值10")
+                        print(f"{OUTPUT_FORMATS['warning']} {tr('commands.invalid_count_default')}")
                         limit = 10
 
                 conversations = self.context_manager.get_conversation_list(limit=limit)
 
                 if not conversations["conversations"]:
-                    print(f"{OUTPUT_FORMATS['info']} 暂无对话记录")
+                    print(f"{OUTPUT_FORMATS['info']} {tr('commands.no_conversations')}")
                     return
 
                 print(f"\n📚 最近 {len(conversations['conversations'])} 个对话:")
@@ -429,13 +434,13 @@ class MainTerminalCommandMixin:
                     print(f"使用 /conversations {limit + 10} 查看更多")
 
             except Exception as e:
-                print(f"{OUTPUT_FORMATS['error']} 获取对话列表失败: {e}")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversations_list_failed', error=e)}")
 
     async def load_conversation_command(self, args: str):
             """加载指定对话"""
             if not args:
-                print(f"{OUTPUT_FORMATS['error']} 请指定对话ID")
-                print("使用方法: /load <对话ID>")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.load_need_id')}")
+                print(tr("commands.load_usage_hint"))
                 await self.show_conversations("5")  # 显示最近5个对话作为提示
                 return
 
@@ -444,16 +449,16 @@ class MainTerminalCommandMixin:
             try:
                 success = self.context_manager.load_conversation_by_id(conversation_id)
                 if success:
-                    print(f"{OUTPUT_FORMATS['success']} 对话已加载: {conversation_id}")
-                    print(f"{OUTPUT_FORMATS['info']} 消息数量: {len(self.context_manager.conversation_history)}")
+                    print(f"{OUTPUT_FORMATS['success']} {tr('commands.conversation_loaded', conversation_id=conversation_id)}")
+                    print(f"{OUTPUT_FORMATS['info']} {tr('commands.messages_count', count=len(self.context_manager.conversation_history))}")
 
                     self.current_session_id += 1
 
                 else:
-                    print(f"{OUTPUT_FORMATS['error']} 对话加载失败")
+                    print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversation_load_failed')}")
 
             except Exception as e:
-                print(f"{OUTPUT_FORMATS['error']} 加载对话异常: {e}")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversation_load_exception', error=e)}")
 
     async def new_conversation_command(self, args: str = ""):
             """创建新对话"""
@@ -463,23 +468,23 @@ class MainTerminalCommandMixin:
                     thinking_mode=self.thinking_mode
                 )
 
-                print(f"{OUTPUT_FORMATS['success']} 已创建新对话: {conversation_id}")
+                print(f"{OUTPUT_FORMATS['success']} {tr('commands.conversation_created', conversation_id=conversation_id)}")
 
                 self.current_session_id += 1
 
             except Exception as e:
-                print(f"{OUTPUT_FORMATS['error']} 创建新对话失败: {e}")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversation_create_failed', error=e)}")
 
     async def save_conversation_command(self, args: str = ""):
             """手动保存当前对话"""
             try:
                 success = self.context_manager.save_current_conversation()
                 if success:
-                    print(f"{OUTPUT_FORMATS['success']} 对话已保存")
+                    print(f"{OUTPUT_FORMATS['success']} {tr('commands.conversation_saved')}")
                 else:
-                    print(f"{OUTPUT_FORMATS['error']} 对话保存失败")
+                    print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversation_save_failed')}")
             except Exception as e:
-                print(f"{OUTPUT_FORMATS['error']} 保存对话异常: {e}")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversation_save_exception', error=e)}")
 
     async def clear_conversation(self, args: str = ""):
             """清除对话记录（修改版：创建新对话而不是清空）"""
@@ -492,10 +497,10 @@ class MainTerminalCommandMixin:
                     # 创建新对话
                     await self.new_conversation_command()
 
-                    print(f"{OUTPUT_FORMATS['success']} 已开始新对话")
+                    print(f"{OUTPUT_FORMATS['success']} {tr('commands.new_conversation_started')}")
 
                 except Exception as e:
-                    print(f"{OUTPUT_FORMATS['error']} 创建新对话失败: {e}")
+                    print(f"{OUTPUT_FORMATS['error']} {tr('commands.conversation_create_failed', error=e)}")
 
     async def show_status(self, args: str = ""):
             """显示系统状态"""
@@ -591,9 +596,9 @@ class MainTerminalCommandMixin:
                 # 保存文件备注
                 self.context_manager.save_annotations()
 
-                print(f"{OUTPUT_FORMATS['success']} 状态已保存")
+                print(f"{OUTPUT_FORMATS['success']} {tr('commands.state_saved')}")
             except Exception as e:
-                print(f"{OUTPUT_FORMATS['error']} 状态保存失败: {e}")
+                print(f"{OUTPUT_FORMATS['error']} {tr('commands.state_save_failed', error=e)}")
 
     async def show_help(self, args: str = ""):
             """显示帮助信息"""
@@ -646,7 +651,7 @@ class MainTerminalCommandMixin:
             result = self.terminal_manager.list_terminals()
 
             if result["total"] == 0:
-                print(f"{OUTPUT_FORMATS['info']} 当前没有活动的终端会话")
+                print(f"{OUTPUT_FORMATS['info']} {tr('commands.no_active_terminals')}")
             else:
                 print(f"\n📺 终端会话列表 ({result['total']}/{result['max_allowed']}):")
                 print("="*50)
@@ -663,7 +668,7 @@ class MainTerminalCommandMixin:
 
     async def exit_system(self, args: str = ""):
             """退出系统"""
-            print(f"{OUTPUT_FORMATS['info']} 正在退出...")
+            print(f"{OUTPUT_FORMATS['info']} {tr('commands.exiting')}")
 
             # 关闭所有终端会话
             self.terminal_manager.close_all()
@@ -709,7 +714,7 @@ class MainTerminalCommandMixin:
             elif action == "backup":
                 path = self.memory_manager.backup_memory(target)
                 if path:
-                    print(f"备份保存到: {path}")
+                    print(tr("commands.memory_backup_saved", path=path))
 
     async def show_history(self, args: str = ""):
             """显示对话历史"""
@@ -741,7 +746,7 @@ class MainTerminalCommandMixin:
     async def show_files(self, args: str = ""):
             """显示项目文件"""
             if self.context_manager._is_host_mode_without_safety():
-                print("\n⚠️ 宿主机模式下文件树不可用")
+                print("\n" + tr("commands.file_tree_unavailable_host"))
                 return
             structure = self.context_manager.get_project_structure()
             print(f"\n📁 项目文件结构:")
@@ -755,13 +760,13 @@ class MainTerminalCommandMixin:
                 normalized = "thinking"
             allowed = ["fast", "thinking"]
             if normalized not in allowed:
-                raise ValueError(f"不支持的模式: {mode}")
+                raise ValueError(tr("commands_raise.unsupported_mode", mode=mode))
             # 仅思考模型限制
             if getattr(self, "model_profile", {}).get("thinking_only") and normalized != "thinking":
-                raise ValueError("当前模型仅支持思考模式")
+                raise ValueError(tr("commands_raise.thinking_only_model"))
             # fast-only 模型限制
             if getattr(self, "model_profile", {}).get("fast_only") and normalized != "fast":
-                raise ValueError("当前模型仅支持快速模式")
+                raise ValueError(tr("commands_raise.fast_only_model"))
             self.run_mode = normalized
             self.thinking_mode = normalized != "fast"
             self.api_client.thinking_mode = self.thinking_mode
@@ -774,7 +779,7 @@ class MainTerminalCommandMixin:
             else:
                 normalized = str(effort).strip().lower()
                 if normalized not in REASONING_EFFORT_LEVELS:
-                    raise ValueError(f"不支持的推理强度: {effort}")
+                    raise ValueError(tr("commands_raise.unsupported_reasoning_effort", effort=effort))
                 self.reasoning_effort = normalized
             self.api_client.reasoning_effort = self.reasoning_effort
             return self.reasoning_effort
@@ -789,9 +794,9 @@ class MainTerminalCommandMixin:
             model_key = resolve_model_key(model_key)
             profile = get_model_profile(model_key)
             if getattr(self.context_manager, "has_images", False) and not model_supports_image(model_key):
-                raise ValueError("当前对话包含图片，目标模型不支持图片输入")
+                raise ValueError(tr("commands_raise.model_no_image"))
             if getattr(self.context_manager, "has_videos", False) and not model_supports_video(model_key):
-                raise ValueError("当前对话包含视频，目标模型不支持视频输入")
+                raise ValueError(tr("commands_raise.model_no_video"))
             previous_mode = self.run_mode
             self.model_key = model_key
             self.model_profile = profile
@@ -850,17 +855,17 @@ class MainTerminalCommandMixin:
             if args:
                 candidate = args.strip().lower()
                 if candidate not in modes:
-                    print(f"{OUTPUT_FORMATS['error']} 无效模式: {args}。可选: fast / thinking / deep")
+                    print(f"{OUTPUT_FORMATS['error']} {tr('commands.invalid_mode', mode=args)}")
                     return
                 target_mode = candidate
             else:
                 current_index = modes.index(self.run_mode) if self.run_mode in modes else 0
                 target_mode = modes[(current_index + 1) % len(modes)]
             if target_mode == self.run_mode:
-                print(f"{OUTPUT_FORMATS['info']} 当前已是 {self.get_run_mode_label()}")
+                print(f"{OUTPUT_FORMATS['info']} {tr('commands.mode_already', label=self.get_run_mode_label())}")
                 return
             try:
                 self.set_run_mode(target_mode)
-                print(f"{OUTPUT_FORMATS['info']} 已切换到: {self.get_run_mode_label()}")
+                print(f"{OUTPUT_FORMATS['info']} {tr('commands.mode_switched', label=self.get_run_mode_label())}")
             except ValueError as exc:
                 print(f"{OUTPUT_FORMATS['error']} {exc}")

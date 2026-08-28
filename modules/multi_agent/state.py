@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from modules.multi_agent.debug_logger import ma_debug
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.sub_agent.task import SubAgentTask
@@ -72,10 +73,11 @@ def format_multi_agent_message(
 
     type_label = msg_type_text or msg_type_to_text(msg_type)
     # 第一行：自然语言前缀（含 target 标识）
+    # 格式与前端 ChatArea.vue 多智能体消息解析正则联动，改动须同步前端
     if target:
-        prefix = f"来自 {display_name} 向 {target} 的{type_label}"
+        prefix = tr("multi_agent.from_directed", display_name=display_name, target=target, type_label=type_label)
     else:
-        prefix = f"来自 {display_name} 的{type_label}"
+        prefix = tr("multi_agent.from_plain", display_name=display_name, type_label=type_label)
 
     # 第二行：id
     id_line = f"id: {msg_id}"
@@ -104,15 +106,11 @@ def format_multi_agent_message(
 
 
 def msg_type_to_text(msg_type: str) -> str:
-    """把 TYPE_* 转为中文短语，用于 prompt 前缀。"""
-    mapping = {
-        TYPE_TASK: "任务发布",
-        TYPE_OUTPUT: "任务进度输出",
-        TYPE_ASK: "提问",
-        TYPE_ANSWER: "回答",
-        TYPE_MESSAGE: "消息",
-    }
-    return mapping.get(msg_type, msg_type)
+    """把 TYPE_* 转为当前界面语言短语，用于 prompt 前缀。"""
+    key = f"multi_agent.type_{msg_type}"
+    translated = tr(key)
+    # 未知类型：tr 返回 key 本身，此时回退为原始 msg_type
+    return msg_type if translated == key else translated
 
 
 def build_master_dispatch_text(task: str, msg_id: Optional[str] = None) -> str:

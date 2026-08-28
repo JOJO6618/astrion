@@ -13,6 +13,7 @@ from modules.host_sandbox_policy import (
     get_macos_deny_read_paths,
     get_macos_deny_read_regexes,
 )
+from modules.i18n import tr
 
 
 @dataclass
@@ -158,7 +159,7 @@ def build_host_sandbox_plan(
         return _build_linux_plan(command, work_path, env, network_permission)
     if system == "Windows":
         return _build_windows_plan(command, work_path, env, network_permission)
-    raise HostSandboxError(f"不支持的宿主机系统: {system}")
+    raise HostSandboxError(tr("sandbox.unsupported_system", system=system))
 
 
 def build_host_sandbox_readonly_plan(
@@ -174,7 +175,7 @@ def build_host_sandbox_readonly_plan(
         return _build_linux_readonly_plan(command, work_path, env, network_permission)
     if system == "Windows":
         return _build_windows_readonly_plan(command, work_path, env, network_permission)
-    raise HostSandboxError(f"不支持的宿主机系统: {system}")
+    raise HostSandboxError(tr("sandbox.unsupported_system", system=system))
 
 
 def build_host_sandbox_shell_plan(
@@ -189,7 +190,7 @@ def build_host_sandbox_shell_plan(
         return _build_linux_shell_plan(work_path, env, network_permission)
     if system == "Windows":
         return _build_windows_shell_plan(work_path, env, network_permission)
-    raise HostSandboxError(f"不支持的宿主机系统: {system}")
+    raise HostSandboxError(tr("sandbox.unsupported_system", system=system))
 
 
 def _build_macos_plan(
@@ -200,7 +201,7 @@ def _build_macos_plan(
 ) -> SandboxPlan:
     sandbox_exec = shutil.which("sandbox-exec")
     if not sandbox_exec:
-        raise HostSandboxError("macOS 未找到 sandbox-exec，拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec"))
     profile = _macos_profile_for_workspace(work_path, network_permission)
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
     return SandboxPlan(command=cmd, env=env, cwd=str(work_path))
@@ -214,7 +215,7 @@ def _build_macos_readonly_plan(
 ) -> SandboxPlan:
     sandbox_exec = shutil.which("sandbox-exec")
     if not sandbox_exec:
-        raise HostSandboxError("macOS 未找到 sandbox-exec，拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec"))
     network_policy = _build_macos_network_policy(network_permission)
     workspace = str(work_path.resolve())
 
@@ -247,7 +248,7 @@ def _build_macos_shell_plan(
 ) -> SandboxPlan:
     sandbox_exec = shutil.which("sandbox-exec")
     if not sandbox_exec:
-        raise HostSandboxError("macOS 未找到 sandbox-exec，拒绝启动宿主机沙箱终端。")
+        raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec_shell"))
     profile = _macos_profile_for_workspace(work_path, network_permission)
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-i"]
     return SandboxPlan(command=cmd, env=env, cwd=str(work_path))
@@ -300,14 +301,14 @@ def _build_linux_plan(
 ) -> SandboxPlan:
     bwrap = shutil.which("bwrap")
     if not bwrap:
-        raise HostSandboxError("Linux 未找到 bubblewrap(bwrap)，拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.linux_no_bwrap_exec"))
 
     seccomp_bpf = os.environ.get("HOST_SANDBOX_LINUX_SECCOMP_BPF", "").strip()
     if not seccomp_bpf:
-        raise HostSandboxError("Linux 缺少 HOST_SANDBOX_LINUX_SECCOMP_BPF，拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.linux_no_seccomp_exec"))
     seccomp_path = Path(seccomp_bpf).expanduser().resolve()
     if not seccomp_path.exists():
-        raise HostSandboxError(f"seccomp BPF 文件不存在: {seccomp_path}")
+        raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
     shell_cmd = ["/bin/bash", "-lc", command]
     # network_permission 暂不参与 Linux 构建，保持现有 --share-net 行为
     return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path)
@@ -321,13 +322,13 @@ def _build_linux_readonly_plan(
 ) -> SandboxPlan:
     bwrap = shutil.which("bwrap")
     if not bwrap:
-        raise HostSandboxError("Linux 未找到 bubblewrap(bwrap)，拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.linux_no_bwrap_exec"))
     seccomp_bpf = os.environ.get("HOST_SANDBOX_LINUX_SECCOMP_BPF", "").strip()
     if not seccomp_bpf:
-        raise HostSandboxError("Linux 缺少 HOST_SANDBOX_LINUX_SECCOMP_BPF，拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.linux_no_seccomp_exec"))
     seccomp_path = Path(seccomp_bpf).expanduser().resolve()
     if not seccomp_path.exists():
-        raise HostSandboxError(f"seccomp BPF 文件不存在: {seccomp_path}")
+        raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
     shell_cmd = ["/bin/bash", "-lc", command]
     return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path, readonly=True)
 
@@ -339,13 +340,13 @@ def _build_linux_shell_plan(
 ) -> SandboxPlan:
     bwrap = shutil.which("bwrap")
     if not bwrap:
-        raise HostSandboxError("Linux 未找到 bubblewrap(bwrap)，拒绝启动宿主机沙箱终端。")
+        raise HostSandboxError(tr("sandbox.linux_no_bwrap_shell"))
     seccomp_bpf = os.environ.get("HOST_SANDBOX_LINUX_SECCOMP_BPF", "").strip()
     if not seccomp_bpf:
-        raise HostSandboxError("Linux 缺少 HOST_SANDBOX_LINUX_SECCOMP_BPF，拒绝启动宿主机沙箱终端。")
+        raise HostSandboxError(tr("sandbox.linux_no_seccomp_shell"))
     seccomp_path = Path(seccomp_bpf).expanduser().resolve()
     if not seccomp_path.exists():
-        raise HostSandboxError(f"seccomp BPF 文件不存在: {seccomp_path}")
+        raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
     shell_cmd = ["/bin/bash", "-i"]
     return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path)
 
@@ -359,7 +360,7 @@ def _build_linux_common_plan(
 ) -> SandboxPlan:
     bwrap = shutil.which("bwrap")
     if not bwrap:
-        raise HostSandboxError("Linux 未找到 bubblewrap(bwrap)。")
+        raise HostSandboxError(tr("sandbox.linux_no_bwrap_brief"))
     sandbox_root = str(work_path.resolve())
     cmd: List[str] = [
         bwrap,
@@ -428,7 +429,7 @@ def _win_path_to_wsl(path) -> str:
     raw = str(path)
     m = re.match(r"^([A-Za-z]):[\\/](.*)$", raw)
     if not m:
-        raise HostSandboxError(f"无法转换为 WSL 路径（仅支持盘符路径）: {raw}")
+        raise HostSandboxError(tr("sandbox.wsl_path_convert_failed", path=raw))
     drive = m.group(1).lower()
     rest = m.group(2).replace("\\", "/").rstrip("/")
     return f"/mnt/{drive}/{rest}" if rest else f"/mnt/{drive}"
@@ -441,22 +442,17 @@ def _ensure_wsl_sandbox_distro() -> str:
         return name
     wsl = shutil.which("wsl.exe")
     if not wsl:
-        raise HostSandboxError("Windows 未找到 wsl.exe（WSL2），拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.windows_no_wsl"))
     env = dict(os.environ)
     env["WSL_UTF8"] = "1"
-    setup_hint = (
-        f"未找到可用的 WSL 沙箱发行版 '{name}'。"
-        "请先运行 scripts/setup-wsl-sandbox.ps1 创建专用沙箱发行版"
-        "（必须关闭 interop，不可用 docker-desktop 或日常 Ubuntu 代替，"
-        "详见 wsl2-sandbox-poc-report.md）。"
-    )
+    setup_hint = tr("sandbox.wsl_setup_hint", distro=name)
     try:
         probe = subprocess.run(
             [wsl, "-d", name, "-e", "true"],
             capture_output=True, timeout=30, env=env,
         )
     except Exception as exc:
-        raise HostSandboxError(f"WSL 沙箱发行版探测失败: {exc}。{setup_hint}")
+        raise HostSandboxError(tr("sandbox.wsl_distro_probe_failed", error=exc, hint=setup_hint))
     if probe.returncode != 0:
         raise HostSandboxError(setup_hint)
     try:
@@ -465,12 +461,9 @@ def _ensure_wsl_sandbox_distro() -> str:
             capture_output=True, timeout=30, env=env,
         )
     except Exception as exc:
-        raise HostSandboxError(f"WSL 沙箱 bwrap 探测失败: {exc}。{setup_hint}")
+        raise HostSandboxError(tr("sandbox.wsl_bwrap_probe_failed", error=exc, hint=setup_hint))
     if probe_bwrap.returncode != 0:
-        raise HostSandboxError(
-            f"WSL 沙箱发行版 '{name}' 内未安装 bubblewrap，请重新运行 "
-            "scripts/setup-wsl-sandbox.ps1 或在发行版内执行 apk add bubblewrap。"
-        )
+        raise HostSandboxError(tr("sandbox.wsl_distro_no_bwrap", distro=name))
     _wsl_distro_verified[name] = True
     return name
 
@@ -525,7 +518,7 @@ def _build_windows_wsl_plan(
 ) -> SandboxPlan:
     wsl = shutil.which("wsl.exe")
     if not wsl:
-        raise HostSandboxError("Windows 未找到 wsl.exe（WSL2），拒绝执行宿主机命令。")
+        raise HostSandboxError(tr("sandbox.windows_no_wsl"))
     distro = _ensure_wsl_sandbox_distro()
     ws_wsl = _win_path_to_wsl(work_path.resolve())
     argv = _build_windows_bwrap_argv(ws_wsl, shell_cmd, readonly, network_permission)

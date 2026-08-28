@@ -26,6 +26,7 @@ from config import (
 )
 from modules.personalization_manager import ensure_personalization_config
 from modules.personalization_manager import PERSONALIZATION_FILENAME
+from modules.i18n import tr
 
 
 @dataclass
@@ -95,11 +96,11 @@ class UserManager:
         invite_code = (invite_code or "").strip()
 
         if not password or len(password) < 8:
-            raise ValueError("密码长度至少 8 位。")
+            raise ValueError(tr("user_mgr.password_min_length"))
         if username in self._users:
-            raise ValueError("该用户名已被注册。")
+            raise ValueError(tr("user_mgr.username_registered"))
         if email in self._email_map:
-            raise ValueError("该邮箱已被注册。")
+            raise ValueError(tr("user_mgr.email_registered"))
 
         invite_entry = self._validate_invite_code(invite_code)
         password_hash = generate_password_hash(password)
@@ -142,14 +143,14 @@ class UserManager:
         if not candidate:
             candidate = "default"
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,40}", candidate):
-            raise ValueError("项目 ID 只能包含字母、数字、点、下划线或连字符，长度 1-40。")
+            raise ValueError(tr("user_mgr.workspace_id_rule"))
         return candidate
 
     @classmethod
     def validate_new_workspace_id(cls, workspace_id: str) -> str:
         candidate = cls.normalize_workspace_id(workspace_id)
         if candidate in cls.RESERVED_WORKSPACE_IDS or candidate.startswith("."):
-            raise ValueError("该项目名称已被系统保留，请换一个名称。")
+            raise ValueError(tr("user_mgr.workspace_id_reserved"))
         return candidate
 
     def _project_container_root(self, username: str) -> Path:
@@ -513,10 +514,10 @@ class UserManager:
         ws_id = self.normalize_workspace_id(workspace_id)
         label_text = (label or "").strip()
         if not label_text:
-            raise ValueError("项目名称不能为空")
+            raise ValueError(tr("user_mgr.workspace_name_empty"))
         known = self.list_user_workspaces(username)
         if ws_id not in known:
-            raise ValueError("项目不存在")
+            raise ValueError(tr("user_mgr.workspace_not_found"))
         workspace = self.ensure_user_workspace(username, ws_id)
         meta_path = Path(workspace.root) / "project.json"
         meta_path.write_text(
@@ -539,9 +540,9 @@ class UserManager:
         try:
             target.relative_to(projects_root.resolve())
         except ValueError as exc:
-            raise ValueError("项目路径不合法") from exc
+            raise ValueError(tr("user_mgr.workspace_path_invalid")) from exc
         if not target.exists() or not target.is_dir():
-            raise ValueError("项目不存在")
+            raise ValueError(tr("user_mgr.workspace_not_found"))
         shutil.rmtree(target)
 
     def set_default_user_workspace(self, username: str, workspace_id: str) -> str:
@@ -550,10 +551,10 @@ class UserManager:
         ws_id = self.normalize_workspace_id(workspace_id)
         known = self.list_user_workspaces(username)
         if ws_id not in known:
-            raise ValueError("项目不存在")
+            raise ValueError(tr("user_mgr.workspace_not_found"))
         record = self._users.get(username)
         if not record:
-            raise ValueError("用户不存在")
+            raise ValueError(tr("user_mgr.user_not_found"))
         record.default_workspace_id = ws_id
         self._save_users()
         return ws_id
@@ -578,16 +579,16 @@ class UserManager:
         """新增或更新邀请码。remaining=None 表示不限次数。"""
         invite_code = (code or "").strip()
         if not invite_code:
-            raise ValueError("邀请码不能为空。")
+            raise ValueError(tr("user_mgr.invite_code_empty"))
         if len(invite_code) > 64:
-            raise ValueError("邀请码长度不能超过 64 个字符。")
+            raise ValueError(tr("user_mgr.invite_code_too_long"))
         if remaining is not None:
             try:
                 remaining = int(remaining)
             except (TypeError, ValueError):
-                raise ValueError("remaining 必须是整数或 null。")
+                raise ValueError(tr("user_mgr.remaining_must_be_integer_or_null"))
             if remaining < 0:
-                raise ValueError("remaining 不能小于 0。")
+                raise ValueError(tr("user_mgr.remaining_not_negative"))
         entry = {
             "code": invite_code,
             "remaining": remaining,
@@ -599,7 +600,7 @@ class UserManager:
     def delete_invite_code(self, code: str) -> bool:
         invite_code = (code or "").strip()
         if not invite_code:
-            raise ValueError("邀请码不能为空。")
+            raise ValueError(tr("user_mgr.invite_code_empty"))
         existed = invite_code in self._invites
         if existed:
             self._invites.pop(invite_code, None)
@@ -624,10 +625,10 @@ class UserManager:
         key = (username or "").strip().lower()
         password = (new_password or "").strip()
         if not password or len(password) < 8:
-            raise ValueError("密码长度至少 8 位。")
+            raise ValueError(tr("user_mgr.password_min_length"))
         record = self._users.get(key)
         if not record:
-            raise ValueError("用户不存在。")
+            raise ValueError(tr("user_mgr.user_not_found_dot"))
         record.password_hash = generate_password_hash(password)
         self._save_users()
         return record
@@ -638,13 +639,13 @@ class UserManager:
     def _normalize_username(self, username: str) -> str:
         candidate = (username or "").strip().lower()
         if not candidate or not self.USERNAME_REGEX.match(candidate):
-            raise ValueError("用户名需为 3-32 位小写字母、数字、下划线或连字符。")
+            raise ValueError(tr("user_mgr.username_rule"))
         return candidate
 
     def _normalize_email(self, email: str) -> str:
         email = (email or "").strip().lower()
         if "@" not in email or len(email) < 6:
-            raise ValueError("邮箱格式不正确。")
+            raise ValueError(tr("user_mgr.email_invalid"))
         return email
 
     def _index_user(self, record: UserRecord):
@@ -702,7 +703,7 @@ class UserManager:
             if migrated:
                 self._save_users()
         except json.JSONDecodeError:
-            raise RuntimeError(f"无法解析用户数据文件: {file_path}")
+            raise RuntimeError(tr("user_mgr.users_file_parse_failed", file_path=file_path))
 
     def _save_users(self):
         payload = {
@@ -739,7 +740,7 @@ class UserManager:
                     codes = []
                 self._invites = {item["code"]: item for item in codes if isinstance(item, dict) and "code" in item}
         except json.JSONDecodeError:
-            raise RuntimeError(f"无法解析邀请码文件: {self.invite_codes_file}")
+            raise RuntimeError(tr("user_mgr.invite_file_parse_failed", file_path=self.invite_codes_file))
 
     def _save_invite_codes(self, overrides: Optional[Dict[str, Dict]] = None):
         codes = overrides or self._invites
@@ -750,14 +751,14 @@ class UserManager:
 
     def _validate_invite_code(self, code: str) -> Dict:
         if not code:
-            raise ValueError("邀请码不能为空。")
+            raise ValueError(tr("user_mgr.invite_code_empty"))
         entry = self._invites.get(code)
         if not entry:
-            raise ValueError("邀请码不存在或已失效。")
+            raise ValueError(tr("user_mgr.invite_code_invalid"))
 
         remaining = entry.get("remaining")
         if remaining is not None and remaining <= 0:
-            raise ValueError("邀请码已被使用。")
+            raise ValueError(tr("user_mgr.invite_code_used"))
         return entry
 
     def _consume_invite(self, entry: Dict):

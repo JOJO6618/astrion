@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -54,7 +55,7 @@ class PatchMixin:
         if not patch_text or "*** Begin Patch" not in patch_text or "*** End Patch" not in patch_text:
             return {
                 "success": False,
-                "error": "补丁格式错误：缺少 *** Begin Patch / *** End Patch 标记。"
+                "error": tr("file_manager.patch_missing_markers")
             }
 
         start = patch_text.find("*** Begin Patch")
@@ -62,7 +63,7 @@ class PatchMixin:
         if end <= start:
             return {
                 "success": False,
-                "error": "补丁格式错误：结束标记位置异常。"
+                "error": tr("file_manager.patch_bad_end_marker")
             }
 
         body = patch_text[start + len("*** Begin Patch"):end]
@@ -84,7 +85,7 @@ class PatchMixin:
                     if not current_block["lines"]:
                         return {
                             "success": False,
-                            "error": f"补丁块缺少内容：{current_block.get('header', '').strip()}"
+                            "error": tr("file_manager.patch_block_empty", header=current_block.get("header", "").strip())
                         }
                     blocks.append(current_block)
 
@@ -97,7 +98,7 @@ class PatchMixin:
                     except ValueError:
                         return {
                             "success": False,
-                            "error": f"补丁块编号必须是整数：{header}"
+                            "error": tr("file_manager.patch_block_id_not_int", header=header)
                         }
 
                 current_block = {"id": block_id, "header": header, "lines": []}
@@ -107,7 +108,7 @@ class PatchMixin:
                 if stripped:
                     return {
                         "success": False,
-                        "error": "补丁格式错误：在检测到第一个 @@ 块之前出现内容。"
+                        "error": tr("file_manager.patch_content_before_first_block")
                     }
                 continue
 
@@ -120,14 +121,14 @@ class PatchMixin:
             if not current_block["lines"]:
                 return {
                     "success": False,
-                    "error": f"补丁块缺少内容：{current_block.get('header', '').strip()}"
+                    "error": tr("file_manager.patch_block_empty", header=current_block.get("header", "").strip())
                 }
             blocks.append(current_block)
 
         if not blocks:
             return {
                 "success": False,
-                "error": "补丁格式错误：未检测到任何 @@ [id:n] 块。"
+                "error": tr("file_manager.patch_no_blocks")
             }
 
         parsed_blocks: List[Dict] = []
@@ -178,7 +179,7 @@ class PatchMixin:
             if not has_content:
                 return {
                     "success": False,
-                    "error": f"补丁块 {idx} 未包含任何 + / - / 上下文行。"
+                    "error": tr("file_manager.patch_block_no_content", index=idx)
                 }
 
             append_only = False
@@ -216,7 +217,7 @@ class PatchMixin:
         if not blocks:
             return {
                 "success": False,
-                "error": "未检测到有效的补丁块。"
+                "error": tr("file_manager.patch_no_valid_blocks")
             }
 
         relative_path = str(self._relative_path(full_path))
@@ -311,7 +312,7 @@ class PatchMixin:
                         completed_indices.append(block["index"])
             except Exception as e:
                 append_success = False
-                write_error = f"追加写入失败: {e}"
+                write_error = tr("file_manager.append_write_failed", error=e)
                 append_results.append({
                     "index": append_only_blocks[-1]["index"],
                     "status": "failed",
@@ -328,12 +329,15 @@ class PatchMixin:
         completed_unique = sorted(set(completed_indices))
 
         summary_parts = [
-            f"向 {relative_path} 应用 {total_blocks} 个补丁块",
-            f"成功 {len(completed_unique)} 个",
-            f"失败 {len(failed_entries)} 个"
+            tr("file_manager.patch_summary_header", path=relative_path, total=total_blocks),
+            tr("file_manager.patch_summary_success", count=len(completed_unique)),
+            tr("file_manager.patch_summary_failed", count=len(failed_entries))
         ]
         if append_only_blocks:
-            summary_parts.append(f"追加 {len(append_only_blocks)} 块，写入 {append_lines_total} 行（{append_bytes} 字节）")
+            summary_parts.append(tr(
+                "file_manager.patch_summary_append",
+                **{"blocks": len(append_only_blocks), "lines": append_lines_total, "bytes": append_bytes},
+            ))
         if write_error:
             summary_parts.append(write_error)
         summary = "，".join(summary_parts)
@@ -372,10 +376,10 @@ class PatchMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         
         try:
             relative_path = self._relative_path(full_path)
@@ -388,7 +392,7 @@ class PatchMixin:
             with open(full_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
         except Exception as e:
-            return {"success": False, "error": f"读取文件失败: {e}"}
+            return {"success": False, "error": tr("file_manager.read_failed", error=e)}
         
         current_content = original_content
         results: List[Dict] = []
@@ -467,7 +471,7 @@ class PatchMixin:
                     f.write(current_content)
                 write_performed = True
             except Exception as e:
-                write_error = f"写入文件失败: {e}"
+                write_error = tr("file_manager.write_failed", error=e)
                 # 写入失败时恢复原始内容
                 try:
                     with open(full_path, 'w', encoding='utf-8') as f:

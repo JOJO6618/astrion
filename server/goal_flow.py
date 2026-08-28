@@ -20,6 +20,7 @@ from modules.goal_review_agent import GoalReviewAgent
 from modules.personalization_manager import load_personalization_config
 
 from .chat_flow_task_support import inject_runtime_user_message
+from modules.i18n import tr
 
 # ① 注入的目标模式提示词（开头一次 + 每次压缩后重注入）
 GOAL_MODE_PROMPT = (
@@ -210,7 +211,7 @@ async def handle_goal_after_turn(
     payload_text = gsm.build_review_payload_text(assistant_content)
     if callable(sender):
         try:
-            sender("goal_review_progress", {"conversation_id": conversation_id, "progress": {"stage": "start", "message": "开始审核"}})
+            sender("goal_review_progress", {"conversation_id": conversation_id, "progress": {"stage": "start", "message": tr("goal_flow.review_start_event")}})
         except Exception:
             pass
     try:
@@ -229,7 +230,7 @@ async def handle_goal_after_turn(
         )
     except Exception as exc:
         # 审核异常 → 保守续命，但仍受边界约束
-        result = {"status": "continue", "message": f"目标审核出现异常（{exc}），请继续核对目标并推进未完成的部分。"}
+        result = {"status": "continue", "message": tr("goal_flow.review_exec_exception", error=exc)}
 
     status = (result or {}).get("status")
     message = (result or {}).get("message") or ""

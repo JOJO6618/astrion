@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Set
 
 from config import SUB_AGENT_DEFAULT_TIMEOUT, SUB_AGENT_MAX_ACTIVE
 
+from modules.i18n import tr
+
 
 class SubAgentCreationMixin:
     """提供子智能体创建参数校验、任务ID生成、交付目录解析与槽位管理能力。"""
@@ -116,11 +118,11 @@ class SubAgentCreationMixin:
         if multi_agent_mode and not relative_dir:
             return self.project_path.resolve()
         if not relative_dir:
-            raise ValueError("交付目录不能为空，必须指定")
+            raise ValueError(tr("sub_agent_creation.deliverables_dir_required"))
         deliverables_path = (self.project_path / relative_dir).resolve()
         if not str(deliverables_path).startswith(str(self.project_path)):
-            raise ValueError("交付目录必须位于项目目录内")
+            raise ValueError(tr("sub_agent_creation.deliverables_dir_outside"))
         if deliverables_path.exists():
-            raise ValueError("交付目录必须为不存在的新目录")
+            raise ValueError(tr("sub_agent_creation.deliverables_dir_not_new"))
         deliverables_path.mkdir(parents=True, exist_ok=True)
         return deliverables_path

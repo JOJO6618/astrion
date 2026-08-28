@@ -9,6 +9,17 @@ logger = logging.getLogger(__name__)
 
 import asyncio, json, time, re, os, shutil
 from datetime import datetime, timedelta
+def _is_not_found_message(text) -> bool:
+    """结果消息是否为「不存在」类。
+
+    消息文本按当前 UI 语言生成（见 modules/i18n），判等必须双语兼容：
+    zh 含「不存在」；en 一律为 "not found"（见各 conversation.* 文案）。
+    """
+    s = str(text or "")
+    return "不存在" in s or "not found" in s.lower()
+
+
+from modules.i18n import tr
 from pathlib import Path
 from collections import defaultdict, Counter, deque
 from io import BytesIO
@@ -185,8 +196,8 @@ def _build_safe_load_result(terminal: WebTerminal, conversation_id: str) -> Dict
     if not data:
         return {
             "success": False,
-            "error": "对话不存在或加载失败",
-            "message": f"对话加载失败: {normalized_id}",
+            "error": tr("conversation.load_failed_not_found"),
+            "message": tr("conversation.load_failed_detail", conversation_id=normalized_id),
         }
     meta = data.get("metadata", {}) or {}
     run_mode = meta.get("run_mode") or getattr(terminal, "run_mode", "fast")
@@ -196,13 +207,13 @@ def _build_safe_load_result(terminal: WebTerminal, conversation_id: str) -> Dict
     return {
         "success": True,
         "conversation_id": normalized_id,
-        "title": data.get("title", "未知对话"),
+        "title": data.get("title", tr("conversation.unknown_title")),
         "messages_count": len(data.get("messages", []) or []),
         "run_mode": run_mode,
         "thinking_mode": thinking_mode,
         "reasoning_effort": meta.get("reasoning_effort"),
         "model_key": meta.get("model_key") or getattr(terminal, "model_key", None),
-        "message": f"对话已加载: {normalized_id}",
+        "message": tr("conversation.loaded_detail", conversation_id=normalized_id),
         "safe_navigation": True,
     }
 
@@ -439,7 +450,7 @@ def get_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username: s
             }
         })
     except Exception as exc:
-        return jsonify({"success": False, "error": f"读取输入草稿失败: {exc}"}), 500
+        return jsonify({"success": False, "error": tr("conversation.read_input_draft_failed", error=str(exc))}), 500
 
 
 @conversation_bp.route('/api/input-draft', methods=['POST', 'PUT'])
@@ -455,7 +466,7 @@ def upsert_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username
         if not isinstance(content, str):
             content = str(content)
         if len(content) > 40000:
-            return jsonify({"success": False, "error": "输入草稿过长（最大 40000 字符）"}), 400
+            return jsonify({"success": False, "error": tr("conversation.input_draft_too_long")}), 400
         raw_skill_refs = body.get("skill_refs") if isinstance(body, dict) else []
         skill_refs = []
         if isinstance(raw_skill_refs, list):
@@ -510,7 +521,7 @@ def upsert_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username
             }
         })
     except Exception as exc:
-        return jsonify({"success": False, "error": f"保存输入草稿失败: {exc}"}), 500
+        return jsonify({"success": False, "error": tr("conversation.save_input_draft_failed", error=str(exc))}), 500
 
 
 # === 背景生成对话标题（从 app_legacy 拆分） ===
@@ -531,10 +542,10 @@ def _resolve_target_terminal_for_workspace(
     if _is_host_mode_request(username):
         catalog, _ = resolve_host_workspace()
         if not any(item.get("workspace_id") == workspace_id for item in (catalog.get("workspaces") or [])):
-            raise ValueError("工作区不存在")
+            raise ValueError(tr("conversation.workspace_not_found"))
     else:
         if workspace_id not in user_manager.list_user_workspaces(username):
-            raise ValueError("项目不存在")
+            raise ValueError(tr("conversation.project_not_found"))
     try:
         target_terminal, target_workspace = get_user_resources(
             username, workspace_id=workspace_id, update_session=False
@@ -542,7 +553,7 @@ def _resolve_target_terminal_for_workspace(
     except RuntimeError as exc:
         raise RuntimeError(str(exc)) from exc
     if not target_terminal or not target_workspace:
-        raise RuntimeError("系统未初始化")
+        raise RuntimeError(tr("conversation.system_not_initialized"))
     target_cm = getattr(getattr(target_terminal, "context_manager", None), "conversation_manager", None)
     write_host_workspace_debug(
         "sidebar-debug-api",
@@ -613,7 +624,7 @@ def get_conversations(terminal: WebTerminal, workspace: UserWorkspace, username:
             return jsonify({
                 "success": False,
                 "error": result.get("error", "Unknown error"),
-                "message": result.get("message", "获取对话列表失败")
+                "message": result.get("message", tr("conversation.get_list_failed"))
             }), 500
             
     except Exception as e:
@@ -621,7 +632,7 @@ def get_conversations(terminal: WebTerminal, workspace: UserWorkspace, username:
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "获取对话列表时发生异常"
+            "message": tr("conversation.get_list_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations', methods=['POST'])
@@ -676,7 +687,7 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
             # 后者会切换 context_manager.current_conversation_id，导致运行任务后续内容串写到新对话。
             cm = getattr(getattr(terminal, "context_manager", None), "conversation_manager", None)
             if not cm:
-                return jsonify({"success": False, "error": "对话管理器未初始化"}), 500
+                return jsonify({"success": False, "error": tr("conversation.manager_not_initialized")}), 500
             try:
                 prefs = load_personalization_config(workspace.data_dir)
             except Exception:
@@ -749,7 +760,7 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
             result = {
                 "success": True,
                 "conversation_id": conversation_id,
-                "message": f"已创建新对话: {conversation_id}",
+                "message": tr("conversation.created_detail", conversation_id=conversation_id),
                 "safe_navigation": True,
             }
         else:
@@ -796,7 +807,7 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
                 # 安全导航创建不代表后端 terminal 当前对话已切换，因此不广播 conversation_changed。
                 socketio.emit('conversation_changed', {
                     'conversation_id': result["conversation_id"],
-                    'title': "新对话"
+                    'title': tr("conversation.default_title")
                 }, room=f"user_{username}")
 
             perf_log("create_conversation route done", elapsed_ms=(time.perf_counter() - t0) * 1000, extra={"conv_id": result.get("conversation_id")})
@@ -810,7 +821,7 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "创建对话时发生异常"
+            "message": tr("conversation.create_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/<conversation_id>', methods=['GET'])
@@ -841,7 +852,7 @@ def get_conversation_info(terminal: WebTerminal, workspace: UserWorkspace, usern
             return jsonify({
                 "success": False,
                 "error": "Conversation not found",
-                "message": f"对话 {conversation_id} 不存在"
+                "message": tr("conversation.not_found_detail", conversation_id=conversation_id)
             }), 404
             
     except Exception as e:
@@ -849,7 +860,7 @@ def get_conversation_info(terminal: WebTerminal, workspace: UserWorkspace, usern
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "获取对话信息时发生异常"
+            "message": tr("conversation.get_info_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/<conversation_id>/load', methods=['PUT'])
@@ -923,7 +934,7 @@ def load_conversation(conversation_id, terminal: WebTerminal, workspace: UserWor
                 # 安全导航只改变前端查看对象，不代表后端 terminal 当前上下文已切换。
                 socketio.emit('conversation_changed', {
                     'conversation_id': conversation_id,
-                    'title': result.get("title", "未知对话"),
+                    'title': result.get("title", tr("conversation.unknown_title")),
                     'messages_count': result.get("messages_count", 0)
                 }, room=f"user_{username}")
 
@@ -950,7 +961,7 @@ def load_conversation(conversation_id, terminal: WebTerminal, workspace: UserWor
                 result_message=result.get("message", ""),
                 not_found=True,
             )
-            status_code = 404 if "不存在" in result.get("message", "") else 500
+            status_code = 404 if _is_not_found_message(result.get("message", "")) else 500
             return jsonify(result), status_code
 
     except Exception as e:
@@ -960,7 +971,7 @@ def load_conversation(conversation_id, terminal: WebTerminal, workspace: UserWor
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "加载对话时发生异常"
+            "message": tr("conversation.load_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/<conversation_id>', methods=['DELETE'])
@@ -1006,14 +1017,14 @@ def delete_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
             
             return jsonify(result)
         else:
-            return jsonify(result), 404 if "不存在" in result.get("message", "") else 500
+            return jsonify(result), 404 if _is_not_found_message(result.get("message", "")) else 500
             
     except Exception as e:
         logger.error(f"[API] 删除对话错误: {e}")
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "删除对话时发生异常"
+            "message": tr("conversation.delete_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/search', methods=['GET'])
@@ -1042,7 +1053,7 @@ def search_conversations(terminal: WebTerminal, workspace: UserWorkspace, userna
             return jsonify({
                 "success": False,
                 "error": "Missing query parameter",
-                "message": "请提供搜索关键词"
+                "message": tr("conversation.search_query_required")
             }), 400
 
         # 限制参数范围
@@ -1117,7 +1128,7 @@ def search_conversations(terminal: WebTerminal, workspace: UserWorkspace, userna
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "搜索对话时发生异常"
+            "message": tr("conversation.search_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/<conversation_id>/messages', methods=['GET'])
@@ -1172,7 +1183,7 @@ def get_conversation_messages(conversation_id, terminal: WebTerminal, workspace:
             return jsonify({
                 "success": False,
                 "error": "Conversation not found",
-                "message": f"对话 {conversation_id} 不存在"
+                "message": tr("conversation.not_found_detail", conversation_id=conversation_id)
             }), 404
             
     except Exception as e:
@@ -1180,7 +1191,7 @@ def get_conversation_messages(conversation_id, terminal: WebTerminal, workspace:
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "获取对话消息时发生异常"
+            "message": tr("conversation.get_messages_exception")
         }), 500
 
 
@@ -1193,18 +1204,18 @@ def download_conversation_media(media_id, terminal: WebTerminal, workspace: User
         ctx = getattr(terminal, "context_manager", None)
         media_store = getattr(ctx, "media_store", None)
         if media_store is None:
-            return jsonify({"success": False, "error": "media_store 不可用"}), 503
+            return jsonify({"success": False, "error": tr("conversation.media_store_unavailable")}), 503
 
         target_id = str(media_id or "").strip()
         if not target_id:
-            return jsonify({"success": False, "error": "media_id 不能为空"}), 400
+            return jsonify({"success": False, "error": tr("conversation.media_id_required")}), 400
 
         entry = media_store.get_media_entry(target_id)
         if not isinstance(entry, dict):
-            return jsonify({"success": False, "error": "媒体不存在"}), 404
+            return jsonify({"success": False, "error": tr("conversation.media_not_found")}), 404
         payload = media_store.load_bytes_by_media_id(target_id)
         if payload is None:
-            return jsonify({"success": False, "error": "媒体文件不存在"}), 404
+            return jsonify({"success": False, "error": tr("conversation.media_file_not_found")}), 404
 
         mime_type = str(entry.get("mime_type") or "application/octet-stream").strip() or "application/octet-stream"
         blob_name = str(entry.get("blob_rel_path") or "")
@@ -1305,7 +1316,7 @@ def update_conversation_versioning(conversation_id, terminal: WebTerminal, works
             last_input_seq=int(meta.get("last_input_seq") or 0),
         )
         if not ok:
-            return jsonify({"success": False, "error": "更新对话版本配置失败"}), 404
+            return jsonify({"success": False, "error": tr("conversation.update_versioning_failed")}), 404
         return jsonify({
             "success": True,
             "data": {
@@ -1333,7 +1344,7 @@ def list_conversation_versioning_checkpoints(conversation_id, terminal: WebTermi
         versioning_meta = _get_conversation_versioning_meta(terminal, normalized_id)
         tracking_mode = _normalize_versioning_tracking_mode(versioning_meta.get("tracking_mode"))
         if tracking_mode == ConversationVersioningManager.TRACKING_MODE_WORKSPACE_AND_CONVERSATION and not host_mode:
-            return jsonify({"success": False, "error": "当前模式不支持工作区版本点，请切换到宿主机模式"}), 400
+            return jsonify({"success": False, "error": tr("conversation.versioning_workspace_point_unsupported")}), 400
         if not versioning_meta.get("enabled"):
             return jsonify({
                 "success": True,
@@ -1394,11 +1405,11 @@ def get_conversation_versioning_checkpoint_detail(conversation_id, seq: int, ter
         vmeta = _get_conversation_versioning_meta(terminal, normalized_id)
         tracking_mode = _normalize_versioning_tracking_mode(vmeta.get("tracking_mode"))
         if tracking_mode == ConversationVersioningManager.TRACKING_MODE_WORKSPACE_AND_CONVERSATION and not host_mode:
-            return jsonify({"success": False, "error": "当前模式不支持工作区版本详情，请切换到宿主机模式"}), 400
+            return jsonify({"success": False, "error": tr("conversation.versioning_workspace_detail_unsupported")}), 400
         manager = _get_conv_versioning_manager(workspace, normalized_id)
         row = manager.get_checkpoint_detail(seq, include_patch=True)
         if not row:
-            return jsonify({"success": False, "error": "未找到对应版本点"}), 404
+            return jsonify({"success": False, "error": tr("conversation.checkpoint_not_found")}), 404
 
         backup_mode = str(vmeta.get("backup_mode") or "shallow").strip().lower()
         debug_log(f"[Versioning][Detail] conv={normalized_id} seq={seq} backup_mode={backup_mode} row_shallow_msg_id={row.get('shallow_message_id')} files_count={len(row.get('files') or [])}")
@@ -1480,7 +1491,7 @@ def _restore_checkpoint_to_conversation(
     target_manager = _get_conv_versioning_manager(workspace, target_conversation_id)
     checkpoint = source_manager.get_checkpoint(seq)
     if not checkpoint:
-        raise VersioningError("未找到对应版本点")
+        raise VersioningError(tr("conversation.checkpoint_not_found"))
 
     normalized_backup_mode = "full" if backup_mode == "full" else "shallow"
     if normalized_backup_mode == "shallow":
@@ -1504,7 +1515,7 @@ def _restore_checkpoint_to_conversation(
             )
     elif tracking_mode == ConversationVersioningManager.TRACKING_MODE_WORKSPACE_AND_CONVERSATION:
         if not host_mode:
-            raise VersioningError("当前模式不支持工作区回溯，请切换到宿主机模式")
+            raise VersioningError(tr("conversation.versioning_workspace_restore_unsupported"))
         target_manager.restore_to_tree(checkpoint.get("tree_hash"))
         debug_log(
             f"[Versioning][Restore] git restored conv={target_conversation_id} seq={seq} "
@@ -1568,7 +1579,7 @@ def _restore_checkpoint_to_conversation(
         allow_shrink=True,
     )
     if not ok:
-        raise VersioningError("保存恢复后的对话失败")
+        raise VersioningError(tr("conversation.restore_save_failed"))
 
     prune_info = target_manager.prune_checkpoints_after(seq)
     resolved_last_commit = prune_info.get("last_tree_hash") or checkpoint.get("tree_hash")
@@ -1619,11 +1630,11 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
         payload = request.get_json(silent=True) or {}
         seq = int(payload.get("seq") or 0)
         if seq < 0:
-            return jsonify({"success": False, "error": "缺少有效 seq"}), 400
+            return jsonify({"success": False, "error": tr("conversation.seq_required")}), 400
 
         vmeta = _get_conversation_versioning_meta(terminal, normalized_id)
         if not vmeta.get("enabled"):
-            return jsonify({"success": False, "error": "当前对话未开启版本管理"}), 400
+            return jsonify({"success": False, "error": tr("conversation.versioning_not_enabled")}), 400
 
         restore_mode = str(payload.get("mode") or "overwrite").lower()
         if restore_mode not in {"overwrite", "copy"}:
@@ -1634,14 +1645,14 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
         manager = _get_conv_versioning_manager(workspace, normalized_id)
         checkpoint = manager.get_checkpoint(seq)
         if not checkpoint:
-            return jsonify({"success": False, "error": "未找到对应版本点"}), 404
+            return jsonify({"success": False, "error": tr("conversation.checkpoint_not_found")}), 404
 
         # 默认使用 checkpoint 创建时的 tracking_mode；若前端显式指定则优先采用。
         tracking_mode = _normalize_versioning_tracking_mode(
             requested_tracking_mode or checkpoint.get("tracking_mode") or vmeta.get("tracking_mode")
         )
         if tracking_mode == ConversationVersioningManager.TRACKING_MODE_WORKSPACE_AND_CONVERSATION and not host_mode:
-            return jsonify({"success": False, "error": "当前模式不支持工作区回溯，请切换到宿主机模式"}), 400
+            return jsonify({"success": False, "error": tr("conversation.versioning_workspace_restore_unsupported")}), 400
 
         cm = terminal.context_manager.conversation_manager
         target_conversation_id = normalized_id
@@ -1649,7 +1660,7 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
         if restore_mode == "copy":
             duplicate_result = terminal.context_manager.duplicate_conversation(normalized_id)
             if not duplicate_result.get("success"):
-                return jsonify({"success": False, "error": duplicate_result.get("error", "复制对话失败")}), 500
+                return jsonify({"success": False, "error": duplicate_result.get("error", tr("conversation.duplicate_failed"))}), 500
             target_conversation_id = _normalize_conv_id(duplicate_result["duplicate_conversation_id"])
             copied = _copy_versioning_records(normalized_id, target_conversation_id, workspace.data_dir)
             if not copied:
@@ -1688,7 +1699,7 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
         }, room=f"user_{username}")
         socketio.emit('conversation_changed', {
             'conversation_id': target_conversation_id,
-            'title': (cm.load_conversation(target_conversation_id) or {}).get("title", "版本回溯对话"),
+            'title': (cm.load_conversation(target_conversation_id) or {}).get("title", tr("conversation.version_restored_title")),
         }, room=f"user_{username}")
 
         return jsonify({
@@ -1716,7 +1727,7 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
     try:
         policy = resolve_admin_policy(get_current_user_record())
         if policy.get("ui_blocks", {}).get("block_compress_conversation"):
-            return jsonify({"success": False, "error": "压缩对话已被管理员禁用"}), 403
+            return jsonify({"success": False, "error": tr("conversation.compress_blocked_by_admin")}), 403
         normalized_id = conversation_id if conversation_id.startswith('conv_') else f"conv_{conversation_id}"
         # 对话级隔离：压缩必须在该对话的专属 terminal 上执行。
         # with_terminal 只从 query/body 取 conversation_id，本路由的 id 在路径里，
@@ -1739,7 +1750,7 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
         )
 
         if not result.get("success"):
-            status_code = 404 if "不存在" in result.get("error", "") else (409 if result.get("in_progress") else 400)
+            status_code = 404 if _is_not_found_message(result.get("error", "")) else (409 if result.get("in_progress") else 400)
             return jsonify(result), status_code
 
         # in-place 压缩：对话 id 不变。通知前端当前对话内容已变化（历史前缀被标记），刷新展示。
@@ -1816,7 +1827,7 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "压缩对话时发生异常"
+            "message": tr("conversation.compress_exception")
         }), 500
 
 
@@ -1862,11 +1873,11 @@ def cancel_conversation_compression(conversation_id, terminal: WebTerminal, work
                 "compression_mode": None,
                 "compression_stage": None,
                 "compression_resume_payload": None,
-                "compression_error": "用户切换对话导致压缩取消",
+                "compression_error": tr("conversation.compression_cancelled_error"),
             }
         )
         if not ok:
-            return jsonify({"success": False, "error": "对话不存在或取消失败"}), 404
+            return jsonify({"success": False, "error": tr("conversation.not_found_or_cancel_failed")}), 404
         return jsonify({"success": True, "conversation_id": normalized_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1988,7 +1999,7 @@ def get_sub_agent_activity(task_id: str, terminal: WebTerminal, workspace: UserW
     """返回指定子智能体的活动记录（进度）。"""
     manager = getattr(terminal, "sub_agent_manager", None)
     if not manager:
-        return jsonify({"success": False, "error": "子智能体管理器不可用"}), 404
+        return jsonify({"success": False, "error": tr("conversation.sub_agent_manager_unavailable")}), 404
     try:
         try:
             manager._load_state()
@@ -1997,7 +2008,7 @@ def get_sub_agent_activity(task_id: str, terminal: WebTerminal, workspace: UserW
 
         task = manager.tasks.get(task_id)
         if not task:
-            return jsonify({"success": False, "error": "未找到对应子智能体任务"}), 404
+            return jsonify({"success": False, "error": tr("conversation.sub_agent_task_not_found")}), 404
 
         progress_file = task.get("progress_file")
         if not progress_file:
@@ -2027,7 +2038,7 @@ def get_sub_agent_activity(task_id: str, terminal: WebTerminal, workspace: UserW
                     except Exception:
                         continue
             except Exception as exc:
-                return jsonify({"success": False, "error": f"读取进度失败: {exc}"}), 500
+                return jsonify({"success": False, "error": tr("conversation.read_progress_failed", error=str(exc))}), 500
 
         payload = {
             "task_id": task_id,
@@ -2052,10 +2063,10 @@ def stop_all_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, usernam
     data = request.get_json(silent=True) or {}
     mode = str(data.get('mode') or 'terminate').strip().lower()
     if mode not in {'terminate', 'soft_stop'}:
-        return jsonify({"success": False, "error": "mode 只支持 terminate/soft_stop"}), 400
+        return jsonify({"success": False, "error": tr("conversation.unsupported_stop_mode")}), 400
     manager = getattr(terminal, 'sub_agent_manager', None)
     if not manager:
-        return jsonify({"success": False, "error": "子智能体管理器不可用"}), 404
+        return jsonify({"success": False, "error": tr("conversation.sub_agent_manager_unavailable")}), 404
     conversation_id = terminal.context_manager.current_conversation_id
     try:
         try:
@@ -2095,7 +2106,7 @@ def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWork
     """手动停止指定子智能体。"""
     manager = getattr(terminal, "sub_agent_manager", None)
     if not manager:
-        return jsonify({"success": False, "error": "子智能体管理器不可用"}), 404
+        return jsonify({"success": False, "error": tr("conversation.sub_agent_manager_unavailable")}), 404
     try:
         try:
             manager._load_state()
@@ -2104,16 +2115,16 @@ def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWork
 
         task = manager.tasks.get(task_id)
         if not task:
-            return jsonify({"success": False, "error": "未找到对应子智能体任务"}), 404
+            return jsonify({"success": False, "error": tr("conversation.sub_agent_task_not_found")}), 404
 
         current_conv_id = terminal.context_manager.current_conversation_id
         task_conv_id = task.get("conversation_id")
         if current_conv_id and task_conv_id and task_conv_id != current_conv_id:
-            return jsonify({"success": False, "error": "无权限停止该子智能体任务"}), 403
+            return jsonify({"success": False, "error": tr("conversation.sub_agent_stop_forbidden")}), 403
 
         result = manager.terminate_sub_agent(task_id=task_id)
         if not result.get("success"):
-            return jsonify({"success": False, "error": result.get("error") or "停止子智能体失败"}), 400
+            return jsonify({"success": False, "error": result.get("error") or tr("conversation.sub_agent_stop_failed")}), 400
         return jsonify({"success": True, "data": result})
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500
@@ -2171,16 +2182,16 @@ def get_background_command_detail(command_id: str, terminal: WebTerminal, worksp
     """返回指定后台 run_command 的详情（含实时输出）。"""
     manager = getattr(terminal, "background_command_manager", None)
     if not manager:
-        return jsonify({"success": False, "error": "后台命令管理器不可用"}), 404
+        return jsonify({"success": False, "error": tr("conversation.background_command_manager_unavailable")}), 404
     try:
         rec = manager.get_record_with_output(command_id)
         if not rec:
-            return jsonify({"success": False, "error": "未找到对应后台命令"}), 404
+            return jsonify({"success": False, "error": tr("conversation.background_command_not_found")}), 404
 
         current_conv_id = terminal.context_manager.current_conversation_id
         rec_conv_id = rec.get("conversation_id")
         if current_conv_id and rec_conv_id and rec_conv_id != current_conv_id:
-            return jsonify({"success": False, "error": "无权限访问该后台命令"}), 403
+            return jsonify({"success": False, "error": tr("conversation.background_command_access_forbidden")}), 403
 
         result = rec.get("result") if isinstance(rec.get("result"), dict) else {}
         payload = {
@@ -2209,19 +2220,19 @@ def cancel_background_command(command_id: str, terminal: WebTerminal, workspace:
     """手动停止指定后台 run_command。"""
     manager = getattr(terminal, "background_command_manager", None)
     if not manager:
-        return jsonify({"success": False, "error": "后台命令管理器不可用"}), 404
+        return jsonify({"success": False, "error": tr("conversation.background_command_manager_unavailable")}), 404
     try:
         rec = manager.get_record(command_id)
         if not rec:
-            return jsonify({"success": False, "error": "未找到对应后台命令"}), 404
+            return jsonify({"success": False, "error": tr("conversation.background_command_not_found")}), 404
         current_conv_id = terminal.context_manager.current_conversation_id
         rec_conv_id = rec.get("conversation_id")
         if current_conv_id and rec_conv_id and rec_conv_id != current_conv_id:
-            return jsonify({"success": False, "error": "无权限停止该后台命令"}), 403
+            return jsonify({"success": False, "error": tr("conversation.background_command_stop_forbidden")}), 403
 
         result = manager.cancel_command(command_id)
         if not result.get("status"):
-            return jsonify({"success": False, "error": result.get("error") or "停止后台命令失败"}), 400
+            return jsonify({"success": False, "error": result.get("error") or tr("conversation.background_command_stop_failed")}), 400
         return jsonify({"success": True, "data": result})
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500
@@ -2237,7 +2248,7 @@ def duplicate_conversation(conversation_id, terminal: WebTerminal, workspace: Us
         result = terminal.context_manager.duplicate_conversation(conversation_id)
 
         if not result.get("success"):
-            status_code = 404 if "不存在" in result.get("error", "") else 400
+            status_code = 404 if _is_not_found_message(result.get("error", "")) else 400
             return jsonify(result), status_code
 
         new_conversation_id = result["duplicate_conversation_id"]
@@ -2250,7 +2261,7 @@ def duplicate_conversation(conversation_id, terminal: WebTerminal, workspace: Us
             }, room=f"user_{username}")
             socketio.emit('conversation_changed', {
                 'conversation_id': new_conversation_id,
-                'title': load_result.get('title', '复制的对话'),
+                'title': load_result.get('title', tr('conversation.duplicated_title')),
                 'messages_count': load_result.get('messages_count', 0)
             }, room=f"user_{username}")
             socketio.emit('conversation_loaded', {
@@ -2271,7 +2282,7 @@ def duplicate_conversation(conversation_id, terminal: WebTerminal, workspace: Us
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "复制对话时发生异常"
+            "message": tr("conversation.duplicate_exception")
         }), 500
 
 
@@ -2282,13 +2293,13 @@ def review_conversation_preview(conversation_id, terminal: WebTerminal, workspac
     """生成对话回顾预览（不落盘，只返回前若干行文本）"""
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_conversation_review"):
-        return jsonify({"success": False, "error": "对话引用已被管理员禁用"}), 403
+        return jsonify({"success": False, "error": tr("conversation.review_blocked_by_admin")}), 403
     try:
         current_id = terminal.context_manager.current_conversation_id
         if conversation_id == current_id:
             return jsonify({
                 "success": False,
-                "message": "无法引用当前对话"
+                "message": tr("conversation.cannot_review_current_conversation")
             }), 400
 
         conversation_data = terminal.context_manager._get_conversation_manager_for_id(conversation_id).load_conversation(conversation_id)
@@ -2296,7 +2307,7 @@ def review_conversation_preview(conversation_id, terminal: WebTerminal, workspac
             return jsonify({
                 "success": False,
                 "error": "Conversation not found",
-                "message": f"对话 {conversation_id} 不存在"
+                "message": tr("conversation.not_found_detail", conversation_id=conversation_id)
             }), 404
 
         limit = request.args.get('limit', default=20, type=int) or 20
@@ -2314,7 +2325,7 @@ def review_conversation_preview(conversation_id, terminal: WebTerminal, workspac
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "生成预览时发生异常"
+            "message": tr("conversation.review_preview_exception")
         }), 500
 
 
@@ -2325,13 +2336,13 @@ def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
     """生成完整对话回顾 Markdown 文件"""
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_conversation_review"):
-        return jsonify({"success": False, "error": "对话引用已被管理员禁用"}), 403
+        return jsonify({"success": False, "error": tr("conversation.review_blocked_by_admin")}), 403
     try:
         current_id = terminal.context_manager.current_conversation_id
         if conversation_id == current_id:
             return jsonify({
                 "success": False,
-                "message": "无法引用当前对话"
+                "message": tr("conversation.cannot_review_current_conversation")
             }), 400
 
         conversation_data = terminal.context_manager._get_conversation_manager_for_id(conversation_id).load_conversation(conversation_id)
@@ -2339,7 +2350,7 @@ def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
             return jsonify({
                 "success": False,
                 "error": "Conversation not found",
-                "message": f"对话 {conversation_id} 不存在"
+                "message": tr("conversation.not_found_detail", conversation_id=conversation_id)
             }), 404
 
         messages = conversation_data.get("messages", [])
@@ -2370,7 +2381,7 @@ def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "生成对话回顾时发生异常"
+            "message": tr("conversation.review_generate_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/statistics', methods=['GET'])
@@ -2391,7 +2402,7 @@ def get_conversations_statistics(terminal: WebTerminal, workspace: UserWorkspace
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "获取对话统计时发生异常"
+            "message": tr("conversation.get_statistics_exception")
         }), 500
 
 @conversation_bp.route('/api/conversations/current', methods=['GET'])
@@ -2407,7 +2418,7 @@ def get_current_conversation(terminal: WebTerminal, workspace: UserWorkspace, us
             "success": True,
             "data": {
                 "id": current_id,
-                "title": "新对话",
+                "title": tr("conversation.default_title"),
                 "messages_count": 0,
                 "is_temporary": True,
                 "title_locked": False
@@ -2423,7 +2434,7 @@ def get_current_conversation(terminal: WebTerminal, workspace: UserWorkspace, us
                 "success": True,
                 "data": {
                     "id": current_id,
-                    "title": conversation_data.get("title", "未知对话"),
+                    "title": conversation_data.get("title", tr("conversation.unknown_title")),
                     "messages_count": len(conversation_data.get("messages", [])),
                     "is_temporary": False,
                     "title_locked": bool(metadata.get("title_locked", False))
@@ -2432,7 +2443,7 @@ def get_current_conversation(terminal: WebTerminal, workspace: UserWorkspace, us
         else:
             return jsonify({
                 "success": False,
-                "error": "对话不存在"
+                "error": tr("conversation.not_found")
             }), 404
             
     except Exception as e:
@@ -2471,7 +2482,7 @@ def _execute_system_command(terminal: WebTerminal, command: str) -> Dict[str, An
         return {
             'command': cmd,
             'success': True,
-            'message': '对话已清除'
+            'message': tr('conversation.cleared')
         }
 
     if cmd == "status":
@@ -2494,13 +2505,13 @@ def _execute_system_command(terminal: WebTerminal, command: str) -> Dict[str, An
         return {
             'command': cmd,
             'success': False,
-            'message': '终端系统未初始化'
+            'message': tr('conversation.terminal_system_not_initialized')
         }
 
     return {
         'command': cmd or command,
         'success': False,
-        'message': f'未知命令: {cmd or command}'
+        'message': tr('conversation.unknown_command', command=cmd or command)
     }
 
 
@@ -2515,7 +2526,7 @@ def execute_command_api(terminal: WebTerminal, workspace: UserWorkspace, usernam
         if not command:
             return jsonify({
                 "success": False,
-                "message": "命令不能为空"
+                "message": tr("conversation.command_required")
             }), 400
 
         record_user_activity(username)
@@ -2525,7 +2536,7 @@ def execute_command_api(terminal: WebTerminal, workspace: UserWorkspace, usernam
     except Exception as exc:
         return jsonify({
             "success": False,
-            "message": f"命令执行异常: {exc}"
+            "message": tr("conversation.command_execution_exception", error=str(exc))
         }), 500
 
 @conversation_bp.route('/api/conversations/<conversation_id>/token-statistics', methods=['GET'])
@@ -2545,7 +2556,7 @@ def get_conversation_token_statistics(conversation_id, terminal: WebTerminal, wo
             return jsonify({
                 "success": False,
                 "error": "Conversation not found",
-                "message": f"对话 {conversation_id} 不存在"
+                "message": tr("conversation.not_found_detail", conversation_id=conversation_id)
             }), 404
             
     except Exception as e:
@@ -2553,7 +2564,7 @@ def get_conversation_token_statistics(conversation_id, terminal: WebTerminal, wo
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "获取token统计时发生异常"
+            "message": tr("conversation.get_token_statistics_exception")
         }), 500
 
 

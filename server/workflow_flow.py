@@ -30,6 +30,7 @@ from modules.workflow_state_manager import (
     STATUS_STOPPED,
     WorkflowStateManager,
 )
+from modules.i18n import tr
 
 _KIND_LABELS = {"stage": "阶段", "review": "审核", "branch": "分支", "start": "开始", "end": "结束"}
 
@@ -79,7 +80,7 @@ def activate_workflow(
     """
     name = str(name or "").strip()
     if not name:
-        return {"success": False, "error": "缺少工作流名称。"}
+        return {"success": False, "error": tr("workflow_flow.missing_workflow_name")}
     existing = get_active_manager(data_dir, conversation_id)
     if existing is not None:
         current_name = str(existing.state.get("workflow_name") or "")
@@ -88,20 +89,17 @@ def activate_workflow(
             return {"success": True, "already": True, "text": text, "manager": existing}
         return {
             "success": False,
-            "error": (
-                f"当前对话已激活工作流「{current_name}」，同一时间只能激活一个工作流。"
-                "请先调用 deactivate_workflow 退出，再激活新的。"
-            ),
+            "error": tr("workflow_flow.already_active_other", name=current_name),
         }
     try:
         wf = load_workflow(name, data_dir)
     except FileNotFoundError:
-        return {"success": False, "error": f"工作流不存在：{name}"}
+        return {"success": False, "error": tr("workflow_flow.workflow_not_found", name=name)}
     except ValueError as exc:
         return {"success": False, "error": str(exc)}
     errors = validate_structure(wf)
     if errors:
-        return {"success": False, "error": "工作流结构校验未通过：" + "；".join(errors)}
+        return {"success": False, "error": tr("workflow_flow.structure_invalid", errors="；".join(errors))}
     wsm = WorkflowStateManager(data_dir, conversation_id)
     entry = None
     for node in wf.get("nodes") or []:
@@ -114,7 +112,7 @@ def activate_workflow(
             entry_node = node
             break
     if not entry_node:
-        return {"success": False, "error": "工作流缺少有效的入口节点（开始节点未连接）。"}
+        return {"success": False, "error": tr("workflow_flow.missing_entry_node")}
     wsm.activate(
         workflow_name=str(wf.get("name") or name),
         definition_markdown=workflow_to_markdown(wf),
@@ -310,21 +308,21 @@ async def handle_stage_report(
     if wsm is None:
         return {
             "success": False,
-            "error": "当前对话没有激活的工作流（可能已被退出）。如需重新开始，请调用 activate_workflow。",
+            "error": tr("workflow_flow.no_active_workflow_hint"),
         }
     current = wsm.get_node(wsm.get_current_node_id())
     if not current:
-        return {"success": False, "error": "工作流状态异常：当前节点不存在于定义快照中。可调用 get_workflow_status 自查。"}
+        return {"success": False, "error": tr("workflow_flow.state_node_missing")}
     if current.get("kind") == "branch":
         return {
             "success": False,
-            "error": f"当前停在分支点「{current.get('name')}」，请先调用 choose_workflow_branch(target_node_id) 选择路径。",
+            "error": tr("workflow_flow.at_branch_need_choose", name=current.get('name')),
         }
     if current.get("kind") != "stage":
-        return {"success": False, "error": f"当前不在执行阶段（位于「{current.get('name')}」），无法汇报阶段完成。"}
+        return {"success": False, "error": tr("workflow_flow.not_in_stage", name=current.get('name'))}
     nxt = wsm.get_node(current.get("next"))
     if not nxt:
-        return {"success": False, "error": "流程定义异常：当前阶段没有有效的后续节点。"}
+        return {"success": False, "error": tr("workflow_flow.stage_no_next")}
     stage_info = {
         "node_id": current.get("id"),
         "name": str(current.get("name") or ""),
@@ -353,19 +351,19 @@ async def handle_branch_choice(
     """choose_workflow_branch 核心：仅当前停在 branch 时可调，校验候选集后推进。"""
     wsm = get_active_manager(data_dir, conversation_id)
     if wsm is None:
-        return {"success": False, "error": "当前对话没有激活的工作流。"}
+        return {"success": False, "error": tr("workflow_flow.no_active_workflow")}
     current = wsm.get_node(wsm.get_current_node_id())
     if not current or current.get("kind") != "branch":
-        return {"success": False, "error": "当前不在分支点，无需选择路径。"}
+        return {"success": False, "error": tr("workflow_flow.not_at_branch")}
     target_node_id = str(target_node_id or "").strip()
     routes = [r for r in (current.get("next") or []) if isinstance(r, dict)]
     valid = next((r for r in routes if r.get("target") == target_node_id), None)
     if valid is None:
         menu = "、".join(str(r.get("target")) for r in routes)
-        return {"success": False, "error": f"「{target_node_id}」不在候选路径中。可选：{menu}"}
+        return {"success": False, "error": tr("workflow_flow.target_not_in_routes", target=target_node_id, menu=menu)}
     target = wsm.get_node(target_node_id)
     if not target:
-        return {"success": False, "error": f"目标节点不存在：{target_node_id}"}
+        return {"success": False, "error": tr("workflow_flow.target_node_not_found", target=target_node_id)}
     text = await _arrive_at(
         node=target,
         wsm=wsm,
@@ -374,7 +372,7 @@ async def handle_branch_choice(
         conversation_id=conversation_id,
         stage_info=None,
     )
-    return {"success": True, "message": f"已选择路径：{valid.get('condition') or target.get('name')}\n\n{text}"}
+    return {"success": True, "message": tr("workflow_flow.branch_selected", route=valid.get('condition') or target.get('name'), text=text)}
 
 
 async def _arrive_at(
@@ -399,7 +397,7 @@ async def _arrive_at(
             wsm.record_stage_completion(summary=stage_info["summary"], rounds=stage_info["rounds"])
         wsm.move_to(str(node["id"]), msg_index=_history_len(web_terminal))
         emit_workflow_progress(wsm=wsm, sender=sender, conversation_id=conversation_id)
-        head = f"阶段「{stage_info['name']}」已记录完成。\n\n" if stage_info else ""
+        head = (tr("workflow_flow.stage_recorded", name=stage_info['name']) + "\n\n") if stage_info else ""
         return head + _current_node_brief(wsm=wsm, current=node)
 
     if kind == "end":
@@ -415,7 +413,7 @@ async def _arrive_at(
                 "current": None,
                 "next": None,
                 "reviewing": False,
-                "footnote": {"kind": "success", "text": "工作流已完成"},
+                "footnote": {"kind": "success", "text": tr("workflow_flow.completed_footnote")},
                 "event": "workflow_completed",
                 "conversation_id": conversation_id,
             })
@@ -424,8 +422,8 @@ async def _arrive_at(
             except Exception:
                 pass
         wsm.deactivate(status=STATUS_COMPLETED, reason=REASON_COMPLETED)
-        head = f"阶段「{stage_info['name']}」已记录完成。\n\n" if stage_info else ""
-        return head + f"工作流「{wsm.state.get('workflow_name')}」已到达终点「{name}」，全部完成。请向用户输出总结后结束。"
+        head = (tr("workflow_flow.stage_recorded", name=stage_info['name']) + "\n\n") if stage_info else ""
+        return head + tr("workflow_flow.reached_end", name=wsm.state.get('workflow_name'), end=name)
 
     if kind == "branch":
         routes = [r for r in (node.get("next") or []) if isinstance(r, dict) and r.get("target")]
@@ -433,7 +431,7 @@ async def _arrive_at(
             # 并线器（单出线）：自动穿过，不记完成、不停留
             target = wsm.get_node(routes[0].get("target")) if routes else None
             if not target:
-                return "流程定义异常：分支节点没有有效的出线。"
+                return tr("workflow_flow.branch_no_route")
             return await _arrive_at(
                 node=target, wsm=wsm, web_terminal=web_terminal, sender=sender,
                 conversation_id=conversation_id, stage_info=stage_info,
@@ -443,7 +441,7 @@ async def _arrive_at(
             wsm.record_stage_completion(summary=stage_info["summary"], rounds=stage_info["rounds"])
         wsm.move_to(str(node["id"]), msg_index=_history_len(web_terminal))
         emit_workflow_progress(wsm=wsm, sender=sender, conversation_id=conversation_id)
-        head = f"阶段「{stage_info['name']}」已记录完成。\n\n" if stage_info else ""
+        head = (tr("workflow_flow.stage_recorded", name=stage_info['name']) + "\n\n") if stage_info else ""
         return head + _current_node_brief(wsm=wsm, current=node)
 
     if kind == "review":
@@ -458,12 +456,12 @@ async def _arrive_at(
         if result.get("decision") == "pass":
             nxt = wsm.get_node(node.get("next"))
             if not nxt:
-                return f"审核「{name}」通过，但通过路由指向不存在的节点。流程定义异常，工作流无法继续。"
+                return tr("workflow_flow.review_pass_no_next", name=name)
             inner = await _arrive_at(
                 node=nxt, wsm=wsm, web_terminal=web_terminal, sender=sender,
                 conversation_id=conversation_id, stage_info=stage_info,
             )
-            return f"审核「{name}」通过：{result.get('message')}\n\n{inner}"
+            return tr("workflow_flow.review_pass", name=name, message=result.get('message'), inner=inner)
         # 驳回
         count = wsm.increment_reject(str(node.get("id")))
         max_rejects = int(node.get("maxRejects") or 3)
@@ -474,25 +472,25 @@ async def _arrive_at(
                 wsm=wsm, sender=sender, conversation_id=conversation_id,
                 extra={"event": "workflow_failed", "reason": REASON_MAX_REJECTS},
             )
-            return (
-                f"审核「{name}」未通过（第 {count} 次，已达连续驳回上限 {max_rejects}）：{review_message}\n\n"
-                "工作流已连续驳回超限而终止（failed）。请告知用户审核意见与终止原因；"
-                "如需重新开始，可在调整流程或准备充分后重新激活。"
+            return tr(
+                "workflow_flow.review_max_rejects",
+                name=name, count=count, max=max_rejects, message=review_message,
             )
         reject_target = wsm.get_node(node.get("rejectTo"))
         if not reject_target:
-            return f"审核「{name}」未通过：{review_message}\n\n但驳回路由指向不存在的节点，流程定义异常，工作流无法继续。"
+            return tr("workflow_flow.review_reject_to_missing", name=name, message=review_message)
         wsm.move_to(str(reject_target["id"]), msg_index=_history_len(web_terminal))
         emit_workflow_progress(
             wsm=wsm, sender=sender, conversation_id=conversation_id,
             extra={"event": "workflow_rejected", "review_node": name, "reject_count": count},
         )
-        return (
-            f"审核「{name}」未通过（第 {count}/{max_rejects} 次）：{review_message}\n\n"
-            f"你已回到「{reject_target.get('name')}」。请按整改意见修改后，重新调用 report_workflow_stage 汇报。"
+        return tr(
+            "workflow_flow.review_rejected",
+            name=name, count=count, max=max_rejects, message=review_message,
+            target=reject_target.get('name'),
         )
 
-    return f"流程定义异常：未知节点类型 {kind!r}（节点「{name}」）。"
+    return tr("workflow_flow.unknown_node_kind", kind=repr(kind), name=name)
 
 
 # ---------------------------------------------------------------- 审核
@@ -606,7 +604,7 @@ async def run_stage_review(
         try:
             sender(
                 "workflow_review_progress",
-                {"conversation_id": conversation_id, "progress": {"stage": "start", "message": f"审核「{review_name}」开始"}},
+                {"conversation_id": conversation_id, "progress": {"stage": "start", "message": tr("workflow_flow.review_start_event", name=review_name)}},
             )
         except Exception:
             pass
@@ -629,16 +627,13 @@ async def run_stage_review(
     except Exception as exc:
         result = {
             "decision": "reject",
-            "message": (
-                f"审核智能体执行异常（{exc}）。本次按驳回处理：请告知用户审核服务可能异常；"
-                "若属偶发，可稍后重新汇报本阶段。"
-            ),
+            "message": tr("workflow_flow.review_exec_exception", exc=exc),
             "source": "workflow_review_agent",
         }
     if not isinstance(result, dict) or result.get("decision") not in ("pass", "reject"):
         result = {
             "decision": "reject",
-            "message": "审核未产出有效结论。本次按驳回处理：请告知用户审核服务可能异常；若属偶发，可稍后重新汇报本阶段。",
+            "message": tr("workflow_flow.review_no_conclusion"),
             "source": "workflow_review_agent",
         }
     return result
@@ -650,10 +645,10 @@ async def run_stage_review(
 def deactivate_workflow(*, data_dir, conversation_id: str, reason: str, sender=None) -> Dict[str, Any]:
     """模型自主退出（deactivate_workflow 工具）：摘牌，工具返回闭环，不发 user 通知。"""
     if not conversation_id:
-        return {"success": False, "error": "当前没有打开的对话。"}
+        return {"success": False, "error": tr("workflow_flow.no_open_conversation")}
     wsm = get_active_manager(data_dir, conversation_id)
     if wsm is None:
-        return {"success": False, "error": "当前对话没有激活的工作流。"}
+        return {"success": False, "error": tr("workflow_flow.no_active_workflow")}
     name = str(wsm.state.get("workflow_name") or "")
     wsm.deactivate(status=STATUS_STOPPED, reason=REASON_MODEL)
     # 摘牌后广播 {active: False} 快照（此时 progress_snapshot 只剩 active=False）：
@@ -661,9 +656,10 @@ def deactivate_workflow(*, data_dir, conversation_id: str, reason: str, sender=N
     # 否则只能等下次刷新/切换对话静态校正才消失。
     emit_workflow_progress(wsm=wsm, sender=sender, conversation_id=conversation_id)
     note = str(reason or "").strip()
+    note_label = note or tr("workflow_flow.model_auto_exited")
     return {
         "success": True,
-        "message": f"工作流「{name}」已退出（{note or '模型自主退出'}）。工作流状态已摘牌，你可以继续自由工作。",
+        "message": tr("workflow_flow.deactivated_model", name=name, note=note_label),
     }
 
 
@@ -671,15 +667,12 @@ def deactivate_workflow_by_user(*, data_dir, conversation_id: str) -> Dict[str, 
     """用户 slash 退出（REST）：摘牌 + 柔性通知入池（忙时工具循环消费 / 闲时 REST 直发）。"""
     wsm = get_active_manager(data_dir, conversation_id)
     if wsm is None:
-        return {"success": False, "error": "当前对话没有激活的工作流。"}
+        return {"success": False, "error": tr("workflow_flow.no_active_workflow")}
     name = str(wsm.state.get("workflow_name") or "")
     wsm.deactivate(status=STATUS_STOPPED, reason=REASON_USER)
     wsm.push_notice(
         notice_type="deactivated_by_user",
-        message=(
-            f"用户已退出工作流「{name}」。工作流已摘牌，无需继续按流程推进；"
-            "你可以继续自由工作。若用户之后要求恢复，可重新激活。"
-        ),
+        message=tr("workflow_flow.deactivated_by_user_notice", name=name),
     )
     return {"success": True, "workflow_name": name}
 
@@ -696,10 +689,10 @@ def build_round_limit_notice(*, data_dir, conversation_id: str) -> Optional[str]
         return None
     wsm.mark_round_limit_notified()
     current = wsm.get_node(wsm.get_current_node_id()) or {}
-    return (
-        f"工作流「{definition.get('name')}」的当前步骤「{current.get('name')}」已进行 {rounds} 轮，"
-        f"达到单步轮数上限（{max_rounds}）。请立刻停下当前工作，告知用户已超过 {max_rounds} 轮，"
-        "并询问是否还要继续。（工作流仍在进行中，等待用户决定；用户回复后可继续推进或退出。）"
+    return tr(
+        "workflow_flow.round_limit_reached",
+        name=definition.get('name'), step=current.get('name'),
+        rounds=rounds, max_rounds=max_rounds,
     )
 
 
@@ -710,7 +703,7 @@ def build_status_text(*, data_dir, conversation_id: str) -> str:
     """get_workflow_status 工具返回文本。"""
     wsm = get_active_manager(data_dir, conversation_id)
     if wsm is None:
-        return "当前对话没有激活的工作流。"
+        return tr("workflow_flow.no_active_workflow")
     definition = wsm.load_definition() or {}
     current = wsm.get_node(wsm.get_current_node_id()) or {}
     lines: List[str] = [

@@ -59,6 +59,8 @@ from utils.host_workspace_debug import write_host_workspace_debug
 from utils.media_store import MediaStore
 from utils.token_usage import normalize_usage_payload
 
+from modules.i18n import tr
+
 AUTO_SHALLOW_PLACEHOLDER = "过早的工具结果已经被自动压缩"
 AUTO_SHALLOW_TOOL_WHITELIST = {
     "write_file",
@@ -495,7 +497,7 @@ class ConversationMixin:
         if not conversation_data:
             return {
                 "success": False,
-                "error": f"对话不存在: {conversation_id}"
+                "error": tr("ctx_mgr.conversation_not_found", conversation_id=conversation_id)
             }
 
         original_messages = deepcopy(conversation_data.get("messages", []) or [])
@@ -538,7 +540,7 @@ class ConversationMixin:
         # 设置复制后的对话标题
         if original_title:
             try:
-                new_title = f"{original_title} 的副本"
+                new_title = tr("ctx_mgr.duplicate_title_suffix", original_title=original_title)
                 self.conversation_manager.update_conversation_title(duplicate_conversation_id, new_title)
             except Exception:
                 pass

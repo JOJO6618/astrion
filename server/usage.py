@@ -13,6 +13,8 @@ from .state import (
     _last_active_cache,
 )
 
+from modules.i18n import tr
+
 usage_bp = Blueprint('usage', __name__)
 
 
@@ -23,7 +25,7 @@ def get_usage_stats():
     username = get_current_username()
     tracker = get_or_create_usage_tracker(username)
     if not tracker:
-        return jsonify({"success": False, "error": "未找到用户"}), 404
+        return jsonify({"success": False, "error": tr("auth.usage_user_not_found")}), 404
     return jsonify({
         "success": True,
         "data": tracker.get_stats()

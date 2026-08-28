@@ -40,6 +40,7 @@ from modules.host_sandbox_runner import (
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -54,7 +55,7 @@ class CommandMixin:
         # 检查禁止的命令
         for forbidden in FORBIDDEN_COMMANDS:
             if forbidden in command.lower():
-                return False, f"用户不允许执行包含“{forbidden}”的指令"
+                return False, tr("terminal.forbidden_command", pattern=forbidden)
         
         # 检查危险的命令模式
         dangerous_patterns = [
@@ -67,7 +68,7 @@ class CommandMixin:
         
         for pattern in dangerous_patterns:
             if pattern in command.lower():
-                return False, f"用户不允许执行包含“{pattern}”的指令"
+                return False, tr("terminal.forbidden_command", pattern=pattern)
         
         return True, ""
 
@@ -105,7 +106,7 @@ class CommandMixin:
             "return_code": 0 if success else -1
         }
         if not success:
-            result["error"] = payload.get("error") or payload.get("message", "命令执行失败")
+            result["error"] = payload.get("error") or payload.get("message") or tr("terminal.command_failed")
         if "message" in payload:
             result["message"] = payload["message"]
         if "status" in payload:

@@ -14,6 +14,8 @@ from .chat_flow_runner_helpers import extract_intent_from_partial
 from .chat_flow_task_support import wait_retry_delay, cancel_pending_tools
 from .state import get_stop_flag, clear_stop_flag
 
+from modules.i18n import tr
+
 
 async def run_streaming_attempts(*, web_terminal, messages, tools, sender, client_sid: str, username: str, conversation_id: Optional[str], current_iteration: int, max_api_retries: int, retry_delay_seconds: int, detected_tool_intent: Dict[str, str], full_response: str, tool_calls: list, current_thinking: str, detected_tools: Dict[str, str], last_usage_payload, in_thinking: bool, thinking_started: bool, thinking_ended: bool, text_started: bool, text_has_content: bool, text_streaming: bool, text_chunk_index: int, last_text_chunk_time, chunk_count: int, reasoning_chunks: int, content_chunks: int, tool_chunks: int, last_finish_reason: Optional[str], accumulated_response: str) -> Dict[str, Any]:
     api_error = None
@@ -61,7 +63,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                     debug_log(f"检测到停止请求，中断流处理")
                     cancel_pending_tools(tool_calls_list=tool_calls, sender=sender, messages=messages)
                     sender('task_stopped', {
-                        'message': '命令执行被用户取消',
+                        'message': tr("tool_loop.cancelled_by_user"),
                         'reason': 'user_stop'
                     })
                     clear_stop_flag(client_sid, username)
@@ -200,7 +202,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                             sender('tool_preparing', {
                                 'id': tool_id,
                                 'name': tool_name,
-                                'message': f'准备调用 {tool_name}...',
+                                'message': tr("stream_loop.preparing_tool", tool=tool_name),
                                 'intent': intent_value,
                                 'conversation_id': conversation_id
                             })
@@ -288,7 +290,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             if stop_requested:
                 debug_log("任务在流处理完成后检测到停止状态")
                 sender('task_stopped', {
-                    'message': '命令执行被用户取消',
+                    'message': tr("tool_loop.cancelled_by_user"),
                     'reason': 'user_stop'
                 })
                 cancel_pending_tools(tool_calls_list=tool_calls, sender=sender, messages=messages)

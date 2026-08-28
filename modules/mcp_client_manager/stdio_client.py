@@ -21,6 +21,8 @@ from config import MCP_PROTOCOL_VERSION, MCP_DEFAULT_TIMEOUT_SECONDS
 from modules.mcp_client_manager.exceptions import MCPClientError
 from modules.mcp_server_registry import MCPServerRegistry
 
+from modules.i18n import tr
+
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
 
@@ -185,7 +187,7 @@ class _StdioMCPClient:
         env_raw = dict(self.server.get("env") or {})
         cwd_raw = str(self.server.get("cwd") or "").strip() or None
         if not command_raw:
-            raise MCPClientError("stdio 服务缺少 command")
+            raise MCPClientError(tr("mcp_stdio.missing_command"))
 
         session = self.container_session
         use_container = bool(session and getattr(session, "mode", None) == "docker")
@@ -201,7 +203,7 @@ class _StdioMCPClient:
 
         container_name = str(getattr(session, "container_name", "") or "").strip()
         if not container_name:
-            raise MCPClientError("docker 模式下 stdio MCP 缺少 container_name")
+            raise MCPClientError(tr("mcp_stdio.docker_missing_container_name"))
         docker_bin = str(getattr(session, "sandbox_bin", "") or "docker").strip() or "docker"
         docker_path = shutil.which(docker_bin) or docker_bin
         mount_path = self._normalize_mount_path(getattr(session, "mount_path", "/workspace"))
@@ -269,7 +271,7 @@ class _StdioMCPClient:
                 env=env,
             )
         except Exception as exc:
-            raise MCPClientError(f"启动 stdio MCP 服务失败: {exc}") from exc
+            raise MCPClientError(tr("mcp_stdio.launch_failed", error=exc)) from exc
         # 启动后台排空线程：stdout 按行入队（供 _read_message 带超时消费），
         # stderr 持续排空（防止管道缓冲写满阻塞服务进程），仅保留末尾行用于诊断。
         self._stdout_queue = queue.Queue()
@@ -316,21 +318,21 @@ class _StdioMCPClient:
         returncode = self.process.returncode if self.process else None
         stderr_tail = "".join(self._stderr_lines)[-400:] if self._stderr_lines else ""
         detail = (stderr_tail or last_text_line or "")[:400]
-        return MCPClientError(f"stdio 进程已退出（code={returncode}）{detail}")
+        return MCPClientError(tr("mcp_stdio.process_exited", code=returncode, detail=detail))
 
     def _send(self, payload: Dict[str, Any]) -> None:
         if not self.process or not self.process.stdin:
-            raise MCPClientError("stdio 进程未启动")
+            raise MCPClientError(tr("mcp_stdio.process_not_started"))
         raw = json.dumps(payload, ensure_ascii=False)
         try:
             self.process.stdin.write(raw + "\n")
             self.process.stdin.flush()
         except Exception as exc:
-            raise MCPClientError(f"写入 stdio 消息失败: {exc}") from exc
+            raise MCPClientError(tr("mcp_stdio.write_failed", error=exc)) from exc
 
     def _read_message(self, timeout_seconds: Optional[float] = None) -> Dict[str, Any]:
         if not self.process or not self.process.stdout:
-            raise MCPClientError("stdio 进程未启动")
+            raise MCPClientError(tr("mcp_stdio.process_not_started"))
         timeout = self.timeout_seconds if timeout_seconds is None else max(0.1, float(timeout_seconds))
         deadline = time.monotonic() + timeout
         last_text_line = ""
@@ -339,7 +341,7 @@ class _StdioMCPClient:
         while True:
             remain = deadline - time.monotonic()
             if remain <= 0:
-                raise MCPClientError("读取 stdio MCP 响应超时")
+                raise MCPClientError(tr("mcp_stdio.read_timeout"))
             try:
                 item = self._stdout_queue.get(timeout=min(0.3, remain))
             except queue.Empty:
@@ -416,7 +418,7 @@ class _StdioMCPClient:
             if msg.get("id") == req_id and "method" not in msg:
                 if "error" in msg:
                     error = msg.get("error") or {}
-                    raise MCPClientError(f"{method} 调用失败: {error}")
+                    raise MCPClientError(tr("mcp_stdio.call_failed", method=method, error=error))
                 return msg.get("result") or {}
 
             # 服务端请求：回包后继续等待目标响应

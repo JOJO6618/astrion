@@ -23,6 +23,8 @@ from modules.mcp_client_manager.models import MCPClientPoolEntry, MCPToolBinding
 from modules.mcp_client_manager.stdio_client import _StdioMCPClient
 from modules.mcp_server_registry import MCPServerRegistry
 
+from modules.i18n import tr
+
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
 
@@ -112,7 +114,7 @@ class MCPClientManager:
     def _ensure_client_locked(self, server: Dict[str, Any], timeout_seconds: int, *, force_recreate: bool = False):
         sid = str(server.get("id") or "").strip()
         if not sid:
-            raise MCPClientError("MCP 服务缺少 id")
+            raise MCPClientError(tr("mcp_mgr.server_missing_id"))
         signature = self._server_signature(server)
         entry = self._client_pool.get(sid)
         needs_recreate = force_recreate or (entry is None)
@@ -183,7 +185,7 @@ class MCPClientManager:
                     continue
         if last_exc:
             raise last_exc
-        raise MCPClientError("MCP 客户端执行失败")
+        raise MCPClientError(tr("mcp_mgr.client_exec_failed"))
 
     def close_all_clients(self) -> None:
         with self._pool_lock:
@@ -297,7 +299,7 @@ class MCPClientManager:
             )
         if transport == "streamable_http":
             return _StreamableHTTPMCPClient(server, timeout_seconds, self.protocol_version)
-        raise MCPClientError(f"不支持的 MCP transport: {transport}")
+        raise MCPClientError(tr("mcp_mgr.unsupported_transport", transport=transport))
 
     def _paged_list_tools(self, client, max_pages: int = 20) -> List[Dict[str, Any]]:
         cursor: Optional[str] = None
@@ -320,7 +322,7 @@ class MCPClientManager:
     def discover_tools_for_server(self, server_id: str, *, timeout_seconds: Optional[int] = None) -> Dict[str, Any]:
         server = self.registry.get_server(server_id)
         if not server:
-            return {"success": False, "error": f"未找到 MCP 服务: {server_id}"}
+            return {"success": False, "error": tr("mcp.server_not_found", server_id=server_id)}
         timeout = int(timeout_seconds or server.get("timeout_seconds") or MCP_DEFAULT_TIMEOUT_SECONDS)
         started = time.time()
         try:
@@ -473,12 +475,12 @@ class MCPClientManager:
     ) -> Dict[str, Any]:
         binding = self._resolve_binding(tool_alias, alias_map)
         if not binding:
-            return {"success": False, "error": f"未找到 MCP 工具映射: {tool_alias}"}
+            return {"success": False, "error": tr("mcp.tool_mapping_not_found", tool_alias=tool_alias)}
         server = self.registry.get_server(binding.server_id)
         if not server:
-            return {"success": False, "error": f"未找到 MCP 服务: {binding.server_id}"}
+            return {"success": False, "error": tr("mcp.server_not_found", server_id=binding.server_id)}
         if not server.get("enabled", True):
-            return {"success": False, "error": f"MCP 服务已禁用: {binding.server_id}"}
+            return {"success": False, "error": tr("mcp.server_disabled", server_id=binding.server_id)}
 
         timeout = int(server.get("timeout_seconds") or binding.timeout_seconds or MCP_DEFAULT_TIMEOUT_SECONDS)
         started = time.time()

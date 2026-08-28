@@ -3422,6 +3422,8 @@ const localeLabel = computed(() => {
 
 const selectLocaleOption = (nextLocale: LocaleKey) => {
   setLocale(nextLocale);
+  // 同步到后端个人偏好（personalization.json ui_locale）：后端用户可见消息语言随动
+  personalization.updateField({ key: 'ui_locale', value: nextLocale });
   closeDropdown();
 };
 

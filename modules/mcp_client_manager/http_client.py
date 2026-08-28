@@ -19,6 +19,8 @@ import httpx
 from config import MCP_PROTOCOL_VERSION, MCP_DEFAULT_TIMEOUT_SECONDS
 from modules.mcp_server_registry import MCPServerRegistry
 
+from modules.i18n import tr
+
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
 
@@ -126,9 +128,9 @@ class _StreamableHTTPMCPClient:
                 json=payload,
             )
         except Exception as exc:
-            raise MCPClientError(f"HTTP MCP 回写失败: {exc}") from exc
+            raise MCPClientError(tr("mcp_http.writeback_failed", error=exc)) from exc
         if resp.status_code >= 400:
-            raise MCPClientError(f"HTTP MCP 回写状态异常: {resp.status_code} {resp.text[:400]}")
+            raise MCPClientError(tr("mcp_http.writeback_status_error", status=resp.status_code, detail=resp.text[:400]))
 
     def _handle_server_request_message(self, message: Dict[str, Any]) -> None:
         msg_id = message.get("id")
@@ -160,7 +162,7 @@ class _StreamableHTTPMCPClient:
         _allow_session_retry: bool = True,
     ) -> Dict[str, Any]:
         if not self.url:
-            raise MCPClientError("streamable_http 服务缺少 url")
+            raise MCPClientError(tr("mcp_http.missing_url"))
         req_id = None if notification else self._next_id()
         payload: Dict[str, Any] = {"jsonrpc": "2.0", "method": method, "params": params or {}}
         if req_id is not None:
@@ -172,7 +174,7 @@ class _StreamableHTTPMCPClient:
                 json=payload,
             )
         except Exception as exc:
-            raise MCPClientError(f"HTTP MCP 请求失败: {exc}") from exc
+            raise MCPClientError(tr("mcp_http.request_failed", error=exc)) from exc
 
         session_id = self._header_pick(resp.headers, "Mcp-Session-Id")
         if session_id:
@@ -198,7 +200,7 @@ class _StreamableHTTPMCPClient:
             )
 
         if resp.status_code >= 400:
-            raise MCPClientError(f"HTTP MCP 状态异常: {resp.status_code} {resp.text[:400]}")
+            raise MCPClientError(tr("mcp_http.status_error", status=resp.status_code, detail=resp.text[:400]))
 
         if notification:
             return {}
@@ -230,9 +232,9 @@ class _StreamableHTTPMCPClient:
                 pass
 
         if not message:
-            raise MCPClientError(f"HTTP MCP 未返回可解析响应（method={method}）")
+            raise MCPClientError(tr("mcp_http.unparsable_response", method=method))
         if "error" in message:
-            raise MCPClientError(f"{method} 调用失败: {message.get('error')}")
+            raise MCPClientError(tr("mcp.call_failed", method=method, error=message.get("error")))
         return message.get("result") or {}
 
     def initialize(self) -> Dict[str, Any]:

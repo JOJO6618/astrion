@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from utils.atomic_io import replace_with_retry
 
+from modules.i18n import tr
+
 
 DEFAULT_MIME_BY_KIND: Dict[str, str] = {
     "image": "image/png",
@@ -64,7 +66,7 @@ def _guess_extension(mime_type: str, kind: str) -> str:
 def _decode_base64_payload(payload: str) -> bytes:
     data = "".join(str(payload or "").strip().split())
     if not data:
-        raise ValueError("base64 数据为空")
+        raise ValueError(tr("media_store.base64_empty"))
     missing_padding = len(data) % 4
     if missing_padding:
         data += "=" * (4 - missing_padding)
@@ -74,7 +76,7 @@ def _decode_base64_payload(payload: str) -> bytes:
 def _parse_data_url(data_url: str) -> Tuple[str, str]:
     raw = str(data_url or "").strip()
     if not raw.startswith("data:") or "," not in raw:
-        raise ValueError("非法 data URL")
+        raise ValueError(tr("media_store.invalid_data_url"))
     header, payload = raw.split(",", 1)
     mime = "application/octet-stream"
     if ";" in header:
@@ -82,7 +84,7 @@ def _parse_data_url(data_url: str) -> Tuple[str, str]:
     elif len(header) > 5:
         mime = header[5:]
     if ";base64" not in header.lower():
-        raise ValueError("仅支持 base64 data URL")
+        raise ValueError(tr("media_store.base64_only"))
     return mime, payload
 
 
@@ -150,7 +152,7 @@ class MediaStore:
                 }
             data = json.loads(self.index_file.read_text(encoding="utf-8") or "{}")
             if not isinstance(data, dict):
-                raise ValueError("index.json 不是对象")
+                raise ValueError(tr("media_store.index_not_object"))
             data.setdefault("version", self.INDEX_VERSION)
             data.setdefault("media", {})
             data.setdefault("message_map", {})
@@ -215,7 +217,7 @@ class MediaStore:
         source_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not isinstance(payload, (bytes, bytearray)) or len(payload) == 0:
-            raise ValueError("媒体二进制为空")
+            raise ValueError(tr("media_store.binary_empty"))
         sha256_hex = hashlib.sha256(payload).hexdigest()
         media_id = self._build_media_id(sha256_hex)
         normalized_kind = _normalize_kind(kind, mime_type)

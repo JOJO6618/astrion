@@ -5,6 +5,8 @@ from utils.tool_result_formatter.common import (
     _format_failure, _preview_text, _summarize_output_block, _summarize_todo_tasks
 )
 
+from modules.i18n import tr
+
 def _format_conversation_search(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("conversation_search", result_data)
@@ -88,7 +90,7 @@ def _format_todo_create(result_data: Dict[str, Any]) -> str:
 def _format_todo_update_task(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("todo_update_task", result_data)
-    message = result_data.get("message") or "任务状态已更新"
+    message = result_data.get("message") or tr("fmt_agent.todo_update_default")
     todo = result_data.get("todo_list") or {}
     tasks = todo.get("tasks") or []
     total = len(tasks)
@@ -182,7 +184,7 @@ def _format_wait_sub_agent(result_data: Dict[str, Any]) -> str:
         elapsed_seconds = result_data.get("elapsed_seconds")
     if result_data.get("success"):
         copied_path = result_data.get("copied_path") or result_data.get("deliverables_path")
-        message = result_data.get("message") or "子智能体任务已完成。"
+        message = result_data.get("message") or tr("fmt_agent2.task_completed")
         deliver_note = f"交付已复制到 {copied_path}" if copied_path else "交付目录已生成"
         lines = [f"子智能体 #{agent_id}/{task_id} 完成"]
         if stats_text:
@@ -192,7 +194,7 @@ def _format_wait_sub_agent(result_data: Dict[str, Any]) -> str:
         lines.append(message)
         lines.append(deliver_note)
         return "\n".join(lines)
-    message = result_data.get("message") or result_data.get("error") or "子智能体任务失败"
+    message = result_data.get("message") or result_data.get("error") or tr("fmt_agent2.task_failed")
     lines = [f"⚠️ 子智能体 #{agent_id}/{task_id} 状态 {status}"]
     if stats_text:
         lines.append(stats_text)
@@ -246,7 +248,7 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
 def _format_close_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("close_sub_agent", result_data)
-    message = result_data.get("message") or "子智能体已关闭。"
+    message = result_data.get("message") or tr("fmt_agent2.closed")
     task_id = result_data.get("task_id")
     status = result_data.get("status")
     status_note = f"（状态 {status}）" if status else ""
@@ -261,7 +263,7 @@ def _format_terminate_sub_agent(result_data: Dict[str, Any]) -> str:
         return f"已强制关闭子智能体 {display_name}。"
     agent_id = result_data.get("agent_id")
     task_id = result_data.get("task_id")
-    message = result_data.get("message") or "子智能体已被强制关闭。"
+    message = result_data.get("message") or tr("fmt_agent2.force_closed")
     if agent_id is not None:
         return f"已强制关闭子智能体 #{agent_id}（task_id={task_id}）。"
     return f"{message}（task_id={task_id}）"
@@ -283,7 +285,7 @@ def _format_stop_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("stop_sub_agent", result_data)
     display_name = result_data.get("display_name")
-    message = result_data.get("message") or "子智能体已暂停。"
+    message = result_data.get("message") or tr("fmt_agent2.paused")
     if display_name:
         # manager 返回的 message 已是「{显示名} 已暂停…」格式，直接返回避免重复
         return message

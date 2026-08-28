@@ -13,6 +13,7 @@ from server.context import get_user_resources
 from server.utils_common import debug_log
 from config import WORKSPACE_SKILLS_DIRNAME
 from modules.skills_manager import wait_skill_file_ready
+from modules.i18n import tr
 
 
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
@@ -54,7 +55,7 @@ def _resolve_workspace_skill_path(workspace, raw_path: str) -> Path:
         skills_dir = _workspace_skills_dir(workspace)
     except Exception as exc:
         debug_log(f"[SkillsAPI] resolve skill cannot compute skills_dir: {exc}")
-        raise ValueError(f"无法定位工作区 skills 目录: {exc}") from exc
+        raise ValueError(tr("tasks.skill_dir_unavailable", error=exc)) from exc
     debug_log(f"[SkillsAPI] resolve skill skills_dir={skills_dir!r} raw_path={raw_path!r}")
     try:
         target = Path(str(raw_path or "")).expanduser()
@@ -63,21 +64,21 @@ def _resolve_workspace_skill_path(workspace, raw_path: str) -> Path:
         target = target.resolve()
     except Exception as exc:
         debug_log(f"[SkillsAPI] resolve skill cannot resolve path: {exc}")
-        raise ValueError(f"skill 路径解析失败: {exc}") from exc
+        raise ValueError(tr("tasks.skill_path_resolve_failed", error=exc)) from exc
     debug_log(f"[SkillsAPI] resolve skill resolved_target={target!r} name={target.name!r}")
     if target.name != "SKILL.md":
-        raise ValueError(f"skill 路径必须指向 SKILL.md: {target.name}")
+        raise ValueError(tr("tasks.skill_path_not_skillmd", name=target.name))
     try:
         target.relative_to(skills_dir)
     except ValueError as exc:
         debug_log(f"[SkillsAPI] resolve skill path outside skills_dir: target={target!r} skills_dir={skills_dir!r}")
-        raise ValueError("skill 路径必须位于当前工作区 .astrion/skills/ 内") from exc
+        raise ValueError(tr("tasks.skill_path_outside")) from exc
     # 工作区 skills 目录可能被并发的全量同步（rmtree+重建）短暂清空，
     # 直接 is_file() 一次失败会把瞬时窗口误判为「skill 文件不存在」拒绝任务，
     # 这里改为有界等待重试，等过同步窗口再下结论。
     if not wait_skill_file_ready(target, skills_dir):
         debug_log(f"[SkillsAPI] resolve skill file not found (after wait): {target!r}")
-        raise ValueError("skill 文件不存在")
+        raise ValueError(tr("tasks.skill_not_found"))
     return target
 
 def _list_workspace_skills(workspace) -> List[Dict[str, str]]:
@@ -121,9 +122,9 @@ def _build_skill_context_messages(workspace, raw_refs: Any) -> List[Dict[str, st
         try:
             content = skill_file.read_text(encoding="utf-8")
         except UnicodeDecodeError as exc:
-            raise ValueError(f"skill 文件编码错误，无法读取: {skill_file.name}") from exc
+            raise ValueError(tr("tasks.skill_encoding_error", name=skill_file.name)) from exc
         except OSError as exc:
-            raise ValueError(f"读取 skill 文件失败: {exc}") from exc
+            raise ValueError(tr("tasks.skill_read_failed", error=exc)) from exc
         metadata = _parse_skill_metadata(content, skill_file.parent.name)
         messages.append({
             "name": metadata.get("name") or skill_file.parent.name,
@@ -140,7 +141,7 @@ def list_skills_api():
     try:
         _terminal, workspace = get_user_resources(username, workspace_id)
         if not workspace:
-            return jsonify({"success": False, "error": "工作区不可用"}), 400
+            return jsonify({"success": False, "error": tr("tasks.workspace_unavailable")}), 400
         return jsonify({
             "success": True,
             "skills": _list_workspace_skills(workspace),

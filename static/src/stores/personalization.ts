@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { t, currentLocale } from '@/locales';
+import { t, currentLocale, setLocale } from '@/locales';
 import { useModelStore } from './model';
 
 // 语气预设：模块顶层禁止调 t()，这里只存 key，由 getter tonePresets 在读取时 t(key) 求值（随语言切换刷新）
@@ -152,6 +152,7 @@ interface PersonalForm {
   sidebar_pinned_workspaces: string[];
   sidebar_workspace_order: string[];
   theme: 'classic' | 'light' | 'dark';
+  ui_locale: 'zh-CN' | 'en-US';
   goal_review_mode: 'readonly' | 'active';
   goal_end_conditions: string[];
   goal_max_turns: number;
@@ -357,6 +358,7 @@ const defaultForm = (): PersonalForm => ({
   sidebar_pinned_workspaces: [],
   sidebar_workspace_order: [],
   theme: loadCachedTheme(),
+  ui_locale: 'zh-CN' as 'zh-CN' | 'en-US',
   goal_review_mode: 'readonly',
   goal_end_conditions: ['max_turns'],
   goal_max_turns: 5,
@@ -633,6 +635,9 @@ export const usePersonalizationStore = defineStore('personalization', {
           ? data.sidebar_workspace_order.filter((item: unknown) => typeof item === 'string')
           : [],
         theme: ['classic', 'light', 'dark'].includes(data.theme) ? data.theme : fallbackTheme,
+        ui_locale: ['zh-CN', 'en-US'].includes(data.ui_locale)
+          ? data.ui_locale
+          : (this.form?.ui_locale || 'zh-CN'),
         goal_review_mode: data.goal_review_mode === 'active' ? 'active' : 'readonly',
         goal_end_conditions: Array.isArray(data.goal_end_conditions)
           ? data.goal_end_conditions.filter((x: any) => x === 'max_turns' || x === 'max_tokens')
@@ -654,6 +659,10 @@ export const usePersonalizationStore = defineStore('personalization', {
           : null;
       if (this.form.theme !== currentTheme) {
         this.applyTheme(this.form.theme);
+      }
+      // 界面语言以后端个人偏好为准（多设备/多工作区共享），覆盖本地缓存
+      if (this.form.ui_locale && this.form.ui_locale !== currentLocale.value) {
+        setLocale(this.form.ui_locale);
       }
       persistStackedHideBorders(this.form.stacked_hide_borders);
       persistMinimalExpandHeightLimited(this.form.minimal_expand_height_limited);

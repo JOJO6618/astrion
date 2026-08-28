@@ -16,6 +16,9 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import MAIN_MEMORY_FILE, TASK_MEMORY_FILE, DATA_DIR, OUTPUT_FORMATS
 
+from modules.i18n import tr
+
+
 class MemoryManager:
     def __init__(self, data_dir: Optional[str] = None):
         self.data_dir = Path(data_dir).expanduser().resolve() if data_dir else Path(DATA_DIR).resolve()
@@ -351,29 +354,29 @@ class MemoryManager:
 
         if op == "append":
             if not content or not str(content).strip():
-                return {"success": False, "error": "append 需要 content"}
+                return {"success": False, "error": tr("memory.append_requires_content")}
             entries.append(str(content).strip())
             success = self._write_entries(memory_type, entries)
             return {"success": success, "operation": op, "memory_type": memory_type, "count": len(entries)}
 
         if op == "replace":
             if index is None or index <= 0:
-                return {"success": False, "error": "replace 需要有效的 index（从1开始）"}
+                return {"success": False, "error": tr("memory.replace_requires_valid_index")}
             if not content or not str(content).strip():
-                return {"success": False, "error": "replace 需要 content"}
+                return {"success": False, "error": tr("memory.replace_requires_content")}
             if index > len(entries):
-                return {"success": False, "error": f"序号 {index} 超出当前记忆条目数 {len(entries)}"}
+                return {"success": False, "error": tr("memory.index_out_of_range", index=index, total=len(entries))}
             entries[index - 1] = str(content).strip()
             success = self._write_entries(memory_type, entries)
             return {"success": success, "operation": op, "memory_type": memory_type, "index": index, "count": len(entries)}
 
         if op == "delete":
             if index is None or index <= 0:
-                return {"success": False, "error": "delete 需要有效的 index（从1开始）"}
+                return {"success": False, "error": tr("memory.delete_requires_valid_index")}
             if index > len(entries):
-                return {"success": False, "error": f"序号 {index} 超出当前记忆条目数 {len(entries)}"}
+                return {"success": False, "error": tr("memory.index_out_of_range", index=index, total=len(entries))}
             entries.pop(index - 1)
             success = self._write_entries(memory_type, entries)
             return {"success": success, "operation": op, "memory_type": memory_type, "index": index, "count": len(entries)}
 
-        return {"success": False, "error": f"未知操作: {operation}"}
+        return {"success": False, "error": tr("memory.unknown_operation", operation=operation)}

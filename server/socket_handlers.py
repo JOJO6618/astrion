@@ -5,6 +5,7 @@ from flask import request
 from flask_socketio import emit, join_room, leave_room, disconnect
 
 from .extensions import socketio
+from modules.i18n import tr
 from .auth_helpers import get_current_username, resolve_admin_policy
 from .context import (
     get_terminal_for_sid,
@@ -27,7 +28,7 @@ def handle_connect(auth):
     username = get_current_username()
     token_value = (auth or {}).get('socket_token') if isinstance(auth, dict) else None
     if not username or not consume_socket_token(token_value, username):
-        emit('error', {'message': '未登录或连接凭证无效'})
+        emit('error', {'message': tr("socket.not_logged_in")})
         disconnect()
         return
     
@@ -145,7 +146,7 @@ def handle_stop_task():
     set_stop_flag(request.sid, username, task_info)
 
     emit('stop_requested', {
-        'message': '停止请求已接收，正在停止任务...'
+        'message': tr("socket.stop_received")
     })
 
 @socketio.on('terminal_subscribe')
@@ -161,7 +162,7 @@ def handle_terminal_subscribe(data):
         return
     policy = resolve_admin_policy(user_manager.get_user(username))
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
-        emit('error', {'message': '实时终端已被管理员禁用'})
+        emit('error', {'message': tr("socket.terminal_disabled")})
         return
     
     if request.sid not in terminal_rooms:
@@ -220,7 +221,7 @@ def handle_get_terminal_output(data):
         return
     policy = resolve_admin_policy(user_manager.get_user(username))
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
-        emit('error', {'message': '实时终端已被管理员禁用'})
+        emit('error', {'message': tr("socket.terminal_disabled")})
         return
     
     result = terminal.terminal_manager.get_terminal_output(session_name, lines)
@@ -254,9 +255,9 @@ def handle_message(data):
 
     # 返回废弃提示
     emit('error', {
-        'message': 'WebSocket 聊天已废弃，请使用 REST API (/api/tasks)',
+        'message': tr("socket.ws_chat_deprecated"),
         'code': 'DEPRECATED',
-        'migration_guide': '前端已切换到轮询模式，请刷新页面'
+        'migration_guide': tr("socket.ws_migration_guide")
     })
     return
 
@@ -266,17 +267,17 @@ def handle_message(data):
     images = data.get('images') or []
     videos = data.get('videos') or []
     if not message and not images and not videos:
-        emit('error', {'message': '消息不能为空'})
+        emit('error', {'message': tr("socket.empty_message")})
         return
     current_model = getattr(terminal, "model_key", None) or ""
     if images and not model_supports_image(current_model):
-        emit('error', {'message': '当前模型不支持图片，请切换到支持图片的模型'})
+        emit('error', {'message': tr("socket.image_not_supported")})
         return
     if videos and not model_supports_video(current_model):
-        emit('error', {'message': '当前模型不支持视频，请切换到支持视频的模型'})
+        emit('error', {'message': tr("socket.video_not_supported")})
         return
     if images and videos:
-        emit('error', {'message': '图片和视频请分开发送'})
+        emit('error', {'message': tr("socket.image_video_separate")})
         return
 
     debug_log(f"[WebSocket] 收到消息: {message}")
@@ -293,7 +294,7 @@ def handle_message(data):
         conv_data = terminal.context_manager._get_conversation_manager_for_id(conversation_id).load_conversation(conversation_id) or {}
     except Exception:
         conv_data = {}
-    title = conv_data.get('title', '新对话')
+    title = conv_data.get('title', tr("conversation.default_title"))
 
     socketio.emit('conversation_resolved', {
         'conversation_id': conversation_id,

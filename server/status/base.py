@@ -33,6 +33,7 @@ from modules.host_workspace_manager import (
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
 import server.state as state
+from modules.i18n import tr
 
 STATUS_DIAG_VERBOSE = os.environ.get("STATUS_DIAG_VERBOSE", "0") not in {"0", "false", "False"}
 STATUS_DIAG_SLOW_MS = int(os.environ.get("STATUS_DIAG_SLOW_MS", "1200") or 1200)
@@ -220,7 +221,7 @@ def get_project_storage(terminal, workspace, username):
     try:
         file_manager = getattr(terminal, 'file_manager', None)
         if not file_manager:
-            return jsonify({"success": False, "error": "文件管理器未初始化"}), 500
+            return jsonify({"success": False, "error": tr("status_base.file_manager_not_initialized")}), 500
         used_bytes = file_manager._get_project_size()
         limit_bytes = PROJECT_MAX_STORAGE_MB * 1024 * 1024 if PROJECT_MAX_STORAGE_MB else None
         usage_percent = (used_bytes / limit_bytes * 100) if limit_bytes else None

@@ -25,6 +25,7 @@ import httpx
 from config import PROMPTS_DIR, LOGS_DIR
 from modules.goal_state_manager import REVIEW_MODE_ACTIVE, REVIEW_MODE_READONLY
 from modules.review_agent_config import resolve_review_agent_config
+from modules.i18n import tr
 
 PROMPT_NAME = "goal_review_agent.txt"
 DEFAULT_MAX_ROUNDS = 3
@@ -32,9 +33,6 @@ DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_COMMAND_TIMEOUT = 60
 DEBUG_SAVE_GOAL_REVIEW_TRANSCRIPT = True
 DEBUG_TRANSCRIPT_DIR = Path(LOGS_DIR) / "goal_review_agent"
-
-# 兜底续命消息（审核智能体未能产出明确结论时使用）
-FALLBACK_CONTINUE_MESSAGE = "审核未能给出明确结论。请重新对照目标核查当前进度，找出尚未完成的部分并继续推进。"
 
 
 def load_goal_review_agent_config() -> Dict[str, Any]:
@@ -180,13 +178,13 @@ class GoalReviewAgent:
                 pass
 
         def _continue(message: str) -> Dict[str, Any]:
-            return {"status": "continue", "message": message or FALLBACK_CONTINUE_MESSAGE, "source": "goal_review_agent"}
+            return {"status": "continue", "message": message or tr("goal_review.fallback_continue"), "source": "goal_review_agent"}
 
         url = str(self.cfg.get("url") or "").strip()
         key = str(self.cfg.get("key") or "").strip()
         model = str(self.cfg.get("model") or "").strip()
         if not url or not key or not model:
-            out = _continue("目标审核智能体配置缺失，无法判断完成情况，请继续推进目标。")
+            out = _continue(tr("goal_review.config_missing"))
             _flush_trace(out)
             return out
         endpoint = f"{url.rstrip('/')}/chat/completions"
@@ -207,7 +205,7 @@ class GoalReviewAgent:
             while True:
                 rounds += 1
                 if rounds > max_rounds:
-                    out = _continue(f"目标审核超过 {max_rounds} 轮未产出结论，请继续推进目标。")
+                    out = _continue(tr("goal_review.max_rounds_no_conclusion", max_rounds=max_rounds))
                     _flush_trace(out)
                     return out
                 if cancel_check:
@@ -215,7 +213,7 @@ class GoalReviewAgent:
                     if external:
                         return external
                 if progress_cb:
-                    progress_cb({"stage": "model_call", "round": rounds, "message": f"审核轮次 {rounds}"})
+                    progress_cb({"stage": "model_call", "round": rounds, "message": tr("goal_review.round_progress", round=rounds)})
                 req = {
                     "model": model,
                     "messages": messages,
@@ -250,18 +248,18 @@ class GoalReviewAgent:
                             retry_resp.raise_for_status()
                             resp = retry_resp
                         except httpx.HTTPStatusError:
-                            out = _continue(f"目标审核请求失败({retry_resp.status_code})，请继续推进目标。")
+                            out = _continue(tr("goal_review.request_failed", code=retry_resp.status_code))
                             _flush_trace(out)
                             return out
                     else:
                         out = _continue(
-                            f"目标审核请求失败({exc.response.status_code if exc.response else 'unknown'})，请继续推进目标。"
+                            tr("goal_review.request_failed", code=exc.response.status_code if exc.response else "unknown")
                         )
                         _flush_trace(out)
                         return out
                 except Exception as exc:
                     _trace("request_exception", {"round": rounds, "error": str(exc)})
-                    out = _continue("目标审核请求异常，请继续推进目标。")
+                    out = _continue(tr("goal_review.request_exception"))
                     _flush_trace(out)
                     return out
 
@@ -311,7 +309,7 @@ class GoalReviewAgent:
                         status = str(args.get("status") or "").strip().lower()
                         message = str(args.get("message") or "").strip()
                         if status == "done":
-                            out = {"status": "done", "message": message or "目标已达成。", "source": "goal_review_agent"}
+                            out = {"status": "done", "message": message or tr("goal_review.done_default_message"), "source": "goal_review_agent"}
                             _flush_trace(out)
                             return out
                         if status == "continue":
@@ -319,7 +317,7 @@ class GoalReviewAgent:
                             _flush_trace(out)
                             return out
                         # 非法 status：保守续命
-                        out = _continue(message or "审核返回了无法识别的状态，请继续推进目标。")
+                        out = _continue(message or tr("goal_review.unrecognized_status"))
                         _flush_trace(out)
                         return out
                     if fn == "run_command":

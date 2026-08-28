@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from modules.multi_agent.state import MultiAgentState
 
 from modules.multi_agent.debug_logger import ma_debug
+from modules.i18n import tr
 
 logger = setup_logger(__name__)
 
@@ -210,7 +211,7 @@ class SubAgentTask:
         except Exception as exc:
             logger.exception(f"[SubAgent] task={self.task_id} 执行异常")
             ma_debug("sub_agent_run_exception", task_id=self.task_id, agent_id=self.agent_id, display_name=self.display_name, error=str(exc))
-            await self._write_failure(f"执行异常: {exc}")
+            await self._write_failure(tr("sub_agent_task.execution_error", error=exc))
 
     async def _run_loop(self) -> None:
         client, model_key = self._build_client()
@@ -295,7 +296,7 @@ class SubAgentTask:
 
             turn += 1
             if max_turns is not None and turn > max_turns:
-                await self._write_failure("任务执行超过最大轮次限制", max_turns_exceeded=True)
+                await self._write_failure(tr("sub_agent_task.max_turns_exceeded"), max_turns_exceeded=True)
                 return
 
             self.stats["api_calls"] += 1
@@ -378,9 +379,10 @@ class SubAgentTask:
                 if self.multi_agent_mode and not call_error.received_any:
                     # 5 次尝试全部失败（均为零接收）：子智能体不终止，转为 idle
                     # 并向 Team Leader 汇报错误，等待检查网络后重新下达指令
-                    error_report = (
-                        f"⚠️ 模型请求连续 {_SUB_AGENT_MAX_API_RETRIES + 1} 次失败（网络或 API 异常）："
-                        f"{call_error}。本轮任务无法继续，我已进入空闲状态，请检查网络/模型服务后重新给我下达指令。"
+                    error_report = tr(
+                        "sub_agent_task.model_call_failed_idle",
+                        count=_SUB_AGENT_MAX_API_RETRIES + 1,
+                        error=call_error,
                     )
                     ma_debug(
                         "sub_agent_api_retries_exhausted_idle",
@@ -399,7 +401,7 @@ class SubAgentTask:
                 if self.multi_agent_mode:
                     # 同步把失败状态告知 Team Leader，避免主智能体无感知空等
                     self._forward_output_to_master(
-                        f"⚠️ 模型输出中断（收到部分内容后连接断开）：{call_error}。本轮任务失败。",
+                        tr("sub_agent_task.model_output_interrupted", error=call_error),
                         is_final=True,
                     )
                 raise call_error
@@ -730,7 +732,7 @@ class SubAgentTask:
         if chosen_key not in model_map and valid_models:
             chosen_key = valid_models[0]
         if chosen_key not in model_map:
-            raise RuntimeError(f"未找到可用子智能体模型配置: {config_path}")
+            raise RuntimeError(tr("sub_agent_task2.no_model_config", path=config_path))
 
         client = APIClient(thinking_mode=(self.thinking_mode == "thinking"), web_mode=True)
         client.model_key = chosen_key
@@ -776,7 +778,7 @@ class SubAgentTask:
                         )
                     else:
                         error_text = str(error_info)
-                    raise SubAgentModelCallError(f"API 调用失败: {error_text}", received_any=received_any)
+                    raise SubAgentModelCallError(tr("sub_agent_task2.api_call_failed", error=error_text), received_any=received_any)
                 choice = (chunk.get("choices") or [{}])[0]
                 delta = choice.get("delta") or {}
                 if delta.get("content"):
@@ -833,7 +835,7 @@ class SubAgentTask:
             raise
         except Exception as exc:
             # chat 流本身抛出的漏网异常（如底层连接错误未被转为 error chunk 时）
-            raise SubAgentModelCallError(f"API 调用异常: {exc}", received_any=received_any) from exc
+            raise SubAgentModelCallError(tr("sub_agent_task2.api_call_exception", error=exc), received_any=received_any) from exc
 
         return assistant_message, reasoning, tool_calls, usage
 
@@ -1150,11 +1152,11 @@ class SubAgentTask:
     async def _write_finish(self, args: Dict[str, Any], elapsed: float) -> None:
         success = bool(args.get("success", False))
         summary = str(args.get("summary") or "").strip()
-        error = None if success else (summary or "子智能体报告执行失败，未说明原因")
+        error = None if success else (summary or tr("sub_agent_task.report_failed_no_reason"))
         self._finalize_task(success, summary, elapsed, error=error)
 
     async def _write_timeout(self, elapsed: float) -> None:
-        self._finalize_task(False, "任务超时未完成", elapsed, timeout=True, error="任务超时未完成")
+        self._finalize_task(False, tr("sub_agent_task.timeout_incomplete"), elapsed, timeout=True, error=tr("sub_agent_task.timeout_incomplete"))
 
     async def _write_failure(self, message: str, *, max_turns_exceeded: bool = False, timeout: bool = False) -> None:
         elapsed = time.time() - (self.stats["runtime_start"] / 1000)
@@ -1366,7 +1368,7 @@ class SubAgentTask:
             output_data = {
                 "success": False,
                 "status": "terminated",
-                "summary": "子智能体已被手动终止",
+                "summary": tr("sub_agent_task.manual_terminated_summary"),
                 "stats": {**self.stats, "runtime_seconds": runtime_seconds},
             }
             self.output_file.parent.mkdir(parents=True, exist_ok=True)

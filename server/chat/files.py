@@ -44,6 +44,8 @@ from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 from server.utils_common import sanitize_filename_preserve_unicode
 
+from modules.i18n import tr
+
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 
 
@@ -89,14 +91,14 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     if policy.get("ui_blocks", {}).get("block_upload"):
         return jsonify({
             "success": False,
-            "error": "文件上传已被管理员禁用",
-            "message": "被管理员禁用上传"
+            "error": tr("chat_files.upload_admin_disabled"),
+            "message": tr("chat_files.upload_admin_disabled_message")
         }), 403
     if 'file' not in request.files:
         return jsonify({
             "success": False,
-            "error": "未找到文件",
-            "message": "请求中缺少文件字段"
+            "error": tr("chat_files.file_not_found_in_request"),
+            "message": tr("chat_files.missing_file_field")
         }), 400
 
     uploaded_file = request.files['file']
@@ -105,8 +107,8 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     if not uploaded_file:
         return jsonify({
             "success": False,
-            "error": "未找到文件",
-            "message": "请求中缺少文件内容"
+            "error": tr("chat_files.file_not_found_in_request"),
+            "message": tr("chat_files.missing_file_content")
         }), 400
 
     raw_name = original_name or uploaded_file.filename or ''
@@ -117,8 +119,8 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     if not raw_name.strip():
         return jsonify({
             "success": False,
-            "error": "文件名为空",
-            "message": "请选择要上传的文件"
+            "error": tr("chat_files.empty_filename"),
+            "message": tr("chat_files.choose_file")
         }), 400
 
     filename = sanitize_filename_preserve_unicode(raw_name)
@@ -127,15 +129,15 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     if not filename:
         return jsonify({
             "success": False,
-            "error": "非法文件名",
-            "message": "文件名包含不支持的字符"
+            "error": tr("chat_files.invalid_filename"),
+            "message": tr("chat_files.unsupported_filename_chars")
         }), 400
 
     file_manager = getattr(terminal, 'file_manager', None)
     if file_manager is None:
         return jsonify({
             "success": False,
-            "error": "文件管理器未初始化"
+            "error": tr("chat_files.file_manager_uninitialized")
         }), 500
 
     target_folder_relative = UPLOAD_FOLDER_NAME
@@ -151,7 +153,7 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     except Exception as exc:
         return jsonify({
             "success": False,
-            "error": f"创建上传目录失败: {exc}"
+            "error": tr("chat_files.create_upload_dir_failed", error=exc)
         }), 500
 
     target_relative = str(Path(target_folder_relative) / filename)
@@ -185,7 +187,7 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     except Exception as exc:
         return jsonify({
             "success": False,
-            "error": f"路径解析失败: {exc}"
+            "error": tr("chat_files.path_resolve_failed", error=exc)
         }), 400
 
     guard = get_upload_guard(workspace)
@@ -203,7 +205,7 @@ def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     except Exception as exc:
         return jsonify({
             "success": False,
-            "error": f"保存文件失败: {exc}"
+            "error": tr("chat_files.save_failed", error=exc)
         }), 500
 
     metadata = result.get("metadata", {})
@@ -225,8 +227,8 @@ def handle_file_too_large(error):
     size_mb = MAX_UPLOAD_SIZE / (1024 * 1024)
     return jsonify({
         "success": False,
-        "error": "文件过大",
-        "message": f"单个文件大小不可超过 {size_mb:.1f} MB"
+        "error": tr("chat_files.file_too_large"),
+        "message": tr("chat_files.file_too_large_message", size_mb=size_mb)
     }), 413
 
 @chat_bp.route('/api/download/file')
@@ -236,13 +238,13 @@ def download_file_api(terminal: WebTerminal, workspace: UserWorkspace, username:
     """下载单个文件"""
     path = (request.args.get('path') or '').strip()
     if not path:
-        return jsonify({"success": False, "error": "缺少路径参数"}), 400
+        return jsonify({"success": False, "error": tr("chat_files.missing_path_param")}), 400
 
     valid, error, full_path = terminal.file_manager._validate_path(path)
     if not valid or full_path is None:
-        return jsonify({"success": False, "error": error or "路径校验失败"}), 400
+        return jsonify({"success": False, "error": error or tr("chat_files.path_validation_failed")}), 400
     if not full_path.exists() or not full_path.is_file():
-        return jsonify({"success": False, "error": "文件不存在"}), 404
+        return jsonify({"success": False, "error": tr("chat_files.file_not_found")}), 404
 
     return send_file(
         full_path,
@@ -257,13 +259,13 @@ def download_folder_api(terminal: WebTerminal, workspace: UserWorkspace, usernam
     """打包并下载文件夹"""
     path = (request.args.get('path') or '').strip()
     if not path:
-        return jsonify({"success": False, "error": "缺少路径参数"}), 400
+        return jsonify({"success": False, "error": tr("chat_files.missing_path_param")}), 400
 
     valid, error, full_path = terminal.file_manager._validate_path(path)
     if not valid or full_path is None:
-        return jsonify({"success": False, "error": error or "路径校验失败"}), 400
+        return jsonify({"success": False, "error": error or tr("chat_files.path_validation_failed")}), 400
     if not full_path.exists() or not full_path.is_dir():
-        return jsonify({"success": False, "error": "文件夹不存在"}), 404
+        return jsonify({"success": False, "error": tr("chat_files.folder_not_found")}), 404
 
     buffer = BytesIO()
     folder_name = Path(path).name or full_path.name or "archive"
@@ -336,13 +338,13 @@ def file_content_api(terminal: WebTerminal, workspace: UserWorkspace, username: 
     非白名单 MIME 退化为 octet-stream，避免浏览器误执行 HTML/JS。"""
     path = (request.args.get('path') or '').strip()
     if not path:
-        return jsonify({"success": False, "error": "缺少路径参数"}), 400
+        return jsonify({"success": False, "error": tr("chat_files.missing_path_param")}), 400
 
     valid, error, full_path = terminal.file_manager._validate_path(path)
     if not valid or full_path is None:
-        return jsonify({"success": False, "error": error or "路径校验失败"}), 400
+        return jsonify({"success": False, "error": error or tr("chat_files.path_validation_failed")}), 400
     if not full_path.exists() or not full_path.is_file():
-        return jsonify({"success": False, "error": "文件不存在"}), 404
+        return jsonify({"success": False, "error": tr("chat_files.file_not_found")}), 404
 
     mime_type = _resolve_inline_mime(full_path)
 

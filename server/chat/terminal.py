@@ -42,6 +42,8 @@ from server.state import tool_approval_manager, user_question_manager
 from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
+from modules.i18n import tr
+
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 @chat_bp.route('/api/terminals')
 @api_login_required
@@ -50,7 +52,7 @@ def get_terminals(terminal: WebTerminal, workspace: UserWorkspace, username: str
     """获取终端会话列表"""
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
-        return jsonify({"success": False, "error": "实时终端已被管理员禁用"}), 403
+        return jsonify({"success": False, "error": tr("chat_terminal.realtime_terminal_admin_disabled")}), 403
     if terminal.terminal_manager:
         result = terminal.terminal_manager.list_terminals()
         return jsonify(result)

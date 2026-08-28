@@ -38,6 +38,7 @@ from modules.host_workspace_manager import (
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
 import server.state as state
+from modules.i18n import tr
 @status_bp.route('/api/app/version')
 @api_login_required
 def get_app_version_info():
@@ -76,7 +77,7 @@ def download_latest_apk():
     project_root = Path(__file__).resolve().parent.parent.parent
     apk_path = _resolve_android_apk_path(project_root)
     if not apk_path.exists():
-        return jsonify({"success": False, "error": "APK 不存在，请先构建 release 包"}), 404
+        return jsonify({"success": False, "error": tr("status_app.apk_not_found")}), 404
     return send_file(
         apk_path,
         as_attachment=True,

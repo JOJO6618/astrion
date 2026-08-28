@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from config import HOST_WORKSPACES_FILE
 from utils.atomic_io import replace_with_retry
+from modules.i18n import tr
 
 _WORKSPACE_ID_RE = re.compile(r"^[a-zA-Z0-9._-]{1,64}$")
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -62,10 +63,10 @@ def _ensure_config_file(path: Path, *, strict: bool = False) -> Dict[str, Any]:
             if isinstance(data, dict):
                 return data
             if strict:
-                raise RuntimeError("host_workspaces 配置格式错误（非 JSON 对象），已停止写入以避免覆盖原文件")
+                raise RuntimeError(tr("host_ws.config_format_error"))
         except Exception as exc:
             if strict:
-                raise RuntimeError(f"host_workspaces 配置解析失败，已停止写入以避免覆盖原文件: {exc}") from exc
+                raise RuntimeError(tr("host_ws.config_parse_failed", error=exc)) from exc
             # 只回退到内存默认值，不覆盖磁盘文件
             return _default_payload()
     data = _default_payload()
@@ -94,7 +95,7 @@ def _slugify_workspace_id(raw: Any) -> str:
 def _normalize_workspace_path(raw: Any) -> Path:
     value = str(raw or "").strip()
     if not value:
-        raise ValueError("工作区路径不能为空")
+        raise ValueError(tr("host_ws.path_empty"))
     path = Path(value).expanduser()
     if not path.is_absolute():
         path = (_REPO_ROOT / path).resolve()
@@ -257,9 +258,9 @@ def rename_host_workspace(
     ws_id = str(workspace_id or "").strip()
     clean_label = str(label or "").strip()
     if not ws_id:
-        raise ValueError("缺少 workspace_id")
+        raise ValueError(tr("host_ws.workspace_id_missing"))
     if not clean_label:
-        raise ValueError("工作区名称不能为空")
+        raise ValueError(tr("host_ws.name_empty"))
 
     cfg_path = _resolve_config_path(config_path)
     with _HOST_WORKSPACE_LOCK:
@@ -278,7 +279,7 @@ def rename_host_workspace(
             updated = dict(item)
             break
         if not updated:
-            raise ValueError("工作区不存在")
+            raise ValueError(tr("host_ws.workspace_not_found"))
         payload["workspaces"] = raw_workspaces
         _atomic_write_json(cfg_path, payload)
 
@@ -294,7 +295,7 @@ def delete_host_workspace(
 ) -> Dict[str, Any]:
     ws_id = str(workspace_id or "").strip()
     if not ws_id:
-        raise ValueError("缺少 workspace_id")
+        raise ValueError(tr("host_ws.workspace_id_missing"))
 
     cfg_path = _resolve_config_path(config_path)
     with _HOST_WORKSPACE_LOCK:
@@ -312,7 +313,7 @@ def delete_host_workspace(
                 continue
             kept.append(item)
         if not deleted:
-            raise ValueError("工作区不存在")
+            raise ValueError(tr("host_ws.workspace_not_found"))
         # 允许删除最后一个工作区：回到「无工作区」状态，等待用户重新手动创建
 
         payload["workspaces"] = kept
@@ -337,7 +338,7 @@ def set_default_host_workspace(
     """设置指定工作区为默认工作区。"""
     ws_id = str(workspace_id or "").strip()
     if not ws_id:
-        raise ValueError("缺少 workspace_id")
+        raise ValueError(tr("host_ws.workspace_id_missing"))
 
     cfg_path = _resolve_config_path(config_path)
     with _HOST_WORKSPACE_LOCK:
@@ -353,7 +354,7 @@ def set_default_host_workspace(
                 seen_ids.add(normalized.get("workspace_id"))
 
         if ws_id not in seen_ids:
-            raise ValueError("工作区不存在")
+            raise ValueError(tr("host_ws.workspace_not_found"))
 
         payload["default_workspace_id"] = ws_id
         _atomic_write_json(cfg_path, payload)

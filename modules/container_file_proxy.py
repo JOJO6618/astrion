@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Dict, Optional, Any, TYPE_CHECKING
 
+from modules.i18n import tr
+
 CONTAINER_FILE_SCRIPT = r"""
 import json
 import sys
@@ -455,12 +457,12 @@ class ContainerFileProxy:
 
     def run(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if not self.is_available():
-            return {"success": False, "error": "容器未就绪，无法执行文件操作"}
+            return {"success": False, "error": tr("container_proxy.container_not_ready")}
 
         session = self.container_session
         docker_bin = session.sandbox_bin or shutil.which("docker")
         if not docker_bin:
-            return {"success": False, "error": "未找到 Docker 运行时"}
+            return {"success": False, "error": tr("container_proxy.docker_runtime_not_found")}
 
         request = {
             "action": action,
@@ -484,22 +486,22 @@ class ContainerFileProxy:
                 timeout=60,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            return {"success": False, "error": f"容器执行失败: {exc}"}
+            return {"success": False, "error": tr("container_proxy.exec_failed", error=str(exc))}
 
         if completed.returncode != 0:
             stderr = (completed.stderr or "").strip()
             stdout = (completed.stdout or "").strip()
-            message = stderr or stdout or "未知错误"
-            return {"success": False, "error": f"容器返回错误: {message}"}
+            message = stderr or stdout or tr("container_proxy.unknown_error")
+            return {"success": False, "error": tr("container_proxy.container_returned_error", message=message)}
 
         output = completed.stdout or ""
         output = output.strip()
         if not output:
-            return {"success": False, "error": "容器未返回任何结果"}
+            return {"success": False, "error": tr("container_proxy.no_output")}
         try:
             return json.loads(output)
         except json.JSONDecodeError:
             return {
                 "success": False,
-                "error": f"容器响应无法解析: {output[:200]}",
+                "error": tr("container_proxy.response_unparseable", output=output[:200]),
             }

@@ -32,6 +32,7 @@ from config import (
     LINUX_SAFETY,
 )
 from modules.container_monitor import collect_stats, inspect_state
+from modules.i18n import tr
 
 
 @dataclass
@@ -155,7 +156,7 @@ class UserContainerManager:
                     return handle
 
             if not self._has_capacity(key):
-                raise RuntimeError("资源繁忙：容器配额已用尽，请稍候再试。")
+                raise RuntimeError(tr("container_mgr.quota_exhausted"))
 
             # Important: create container using the cache key so each workspace gets its own container name.
             handle = self._create_handle(key, workspace, mode)
@@ -288,10 +289,10 @@ class UserContainerManager:
 
         docker_path = shutil.which(self.sandbox_bin or "docker")
         if not docker_path:
-            raise RuntimeError(f"未找到容器运行时 {self.sandbox_bin}")
+            raise RuntimeError(tr("container_mgr.runtime_not_found", runtime=self.sandbox_bin))
 
         if not self.image:
-            raise RuntimeError("TERMINAL_SANDBOX_IMAGE 未配置，无法启动容器。")
+            raise RuntimeError(tr("container_mgr.image_not_configured"))
 
         # 创建前先做 daemon 就绪检查：daemon 未启动时给出友好中文报错，
         # 而不是 docker run 的英文原始 stderr（如 Cannot connect to the Docker daemon...）
@@ -348,7 +349,7 @@ class UserContainerManager:
             check=False,
         )
         if result.returncode != 0:
-            message = result.stderr.strip() or result.stdout.strip() or "容器启动失败"
+            message = result.stderr.strip() or result.stdout.strip() or tr("container_mgr.docker_start_failed")
             raise RuntimeError(message)
 
         container_id = result.stdout.strip() or None
@@ -374,7 +375,7 @@ class UserContainerManager:
     def _assert_docker_runtime_ready(self):
         docker_path = shutil.which(self.sandbox_bin or "docker")
         if not docker_path:
-            raise RuntimeError(f"Docker 模式启动失败：未找到容器运行时 {self.sandbox_bin}")
+            raise RuntimeError(tr("container_mgr.docker_mode_runtime_not_found", runtime=self.sandbox_bin))
         try:
             result = subprocess.run(
                 [docker_path, "info"],
@@ -385,10 +386,10 @@ class UserContainerManager:
                 check=False,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            raise RuntimeError(f"Docker 模式启动失败：无法访问 Docker daemon: {exc}") from exc
+            raise RuntimeError(tr("container_mgr.docker_daemon_unreachable", error=exc)) from exc
         if result.returncode != 0:
-            message = (result.stderr or result.stdout or "").strip() or "docker info 返回非零状态"
-            raise RuntimeError(f"Docker 模式启动失败：{message}")
+            message = (result.stderr or result.stdout or "").strip() or tr("container_mgr.docker_info_nonzero")
+            raise RuntimeError(tr("container_mgr.docker_mode_failed", message=message))
 
     def _kill_container(self, container_name: Optional[str], docker_bin: Optional[str]):
         if not container_name or not docker_bin:

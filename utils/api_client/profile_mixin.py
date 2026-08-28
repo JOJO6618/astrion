@@ -32,7 +32,7 @@ except ImportError:
 
 from utils.log_rotation import append_line, prune_dir
 
-
+from modules.i18n import tr
 
 from utils.api_client.utils import _api_dump_enabled
 
@@ -49,7 +49,7 @@ class APIClientProfileMixin:
         }
         """
         if not profile or "fast" not in profile:
-            raise ValueError("无效的模型配置")
+            raise ValueError(tr("api_profile.invalid_model_config"))
         fast = profile["fast"] or {}
         thinking = profile.get("thinking") or fast
         self.fast_api_config = {

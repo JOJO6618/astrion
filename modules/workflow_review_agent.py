@@ -27,6 +27,7 @@ import httpx
 from config import PROMPTS_DIR, LOGS_DIR
 from modules.goal_state_manager import REVIEW_MODE_ACTIVE, REVIEW_MODE_READONLY
 from modules.review_agent_config import resolve_review_agent_config
+from modules.i18n import tr
 
 PROMPT_NAME = "workflow_review_agent.txt"
 DEFAULT_TIMEOUT_SECONDS = 120
@@ -34,12 +35,6 @@ DEFAULT_MAX_ROUNDS = 6
 DEFAULT_MAX_COMMAND_TIMEOUT = 60
 DEBUG_SAVE_WORKFLOW_REVIEW_TRANSCRIPT = True
 DEBUG_TRANSCRIPT_DIR = Path(LOGS_DIR) / "workflow_review_agent"
-
-# 兜底驳回消息（审核智能体未能产出明确结论时使用）
-FALLBACK_REJECT_MESSAGE = (
-    "本次审核未能正常完成（审核服务异常或未产出结论），按驳回处理。"
-    "请告知用户审核服务可能异常；若属偶发，可稍后重新汇报本阶段。"
-)
 
 
 def load_workflow_review_agent_config() -> Dict[str, Any]:
@@ -186,13 +181,13 @@ class WorkflowReviewAgent:
                 pass
 
         def _reject(message: str) -> Dict[str, Any]:
-            return {"decision": "reject", "message": message or FALLBACK_REJECT_MESSAGE, "source": "workflow_review_agent"}
+            return {"decision": "reject", "message": message or tr("workflow_review.fallback_reject"), "source": "workflow_review_agent"}
 
         url = str(self.cfg.get("url") or "").strip()
         key = str(self.cfg.get("key") or "").strip()
         model = str(self.cfg.get("model") or "").strip()
         if not url or not key or not model:
-            out = _reject(f"工作流审核智能体配置缺失，无法完成审核。{FALLBACK_REJECT_MESSAGE}")
+            out = _reject(tr("workflow_review.config_missing"))
             _flush_trace(out)
             return out
         endpoint = f"{url.rstrip('/')}/chat/completions"
@@ -217,11 +212,11 @@ class WorkflowReviewAgent:
                     if external:
                         return external
                 if rounds > max_rounds:
-                    out = _reject(f"审核超过最大轮次仍未产出结论。{FALLBACK_REJECT_MESSAGE}")
+                    out = _reject(tr("workflow_review.max_rounds_no_conclusion"))
                     _flush_trace(out)
                     return out
                 if progress_cb:
-                    progress_cb({"stage": "model_call", "round": rounds, "message": f"审核轮次 {rounds}"})
+                    progress_cb({"stage": "model_call", "round": rounds, "message": tr("workflow_review.round_progress", round=rounds)})
                 req = {
                     "model": model,
                     "messages": messages,
@@ -256,18 +251,18 @@ class WorkflowReviewAgent:
                             retry_resp.raise_for_status()
                             resp = retry_resp
                         except httpx.HTTPStatusError:
-                            out = _reject(f"审核请求失败({retry_resp.status_code})。{FALLBACK_REJECT_MESSAGE}")
+                            out = _reject(tr("workflow_review.request_failed", code=retry_resp.status_code))
                             _flush_trace(out)
                             return out
                     else:
                         out = _reject(
-                            f"审核请求失败({exc.response.status_code if exc.response else 'unknown'})。{FALLBACK_REJECT_MESSAGE}"
+                            tr("workflow_review.request_failed", code=exc.response.status_code if exc.response else "unknown")
                         )
                         _flush_trace(out)
                         return out
                 except Exception as exc:
                     _trace("request_exception", {"round": rounds, "error": str(exc)})
-                    out = _reject(f"审核请求异常（{exc}）。{FALLBACK_REJECT_MESSAGE}")
+                    out = _reject(tr("workflow_review.request_exception", error=exc))
                     _flush_trace(out)
                     return out
 
@@ -317,15 +312,15 @@ class WorkflowReviewAgent:
                         decision = str(args.get("decision") or "").strip().lower()
                         message = str(args.get("message") or "").strip()
                         if decision == "pass":
-                            out = {"decision": "pass", "message": message or "审核通过。", "source": "workflow_review_agent"}
+                            out = {"decision": "pass", "message": message or tr("workflow_review.pass_default_message"), "source": "workflow_review_agent"}
                             _flush_trace(out)
                             return out
                         if decision == "reject":
-                            out = _reject(message or "审核未通过，请按整改意见补充后重新汇报。")
+                            out = _reject(message or tr("workflow_review.reject_default_message"))
                             _flush_trace(out)
                             return out
                         # 非法 decision：保守驳回
-                        out = _reject(message or f"审核返回了无法识别的结论。{FALLBACK_REJECT_MESSAGE}")
+                        out = _reject(message or tr("workflow_review.unrecognized_conclusion"))
                         _flush_trace(out)
                         return out
                     if fn == "run_command":

@@ -38,6 +38,8 @@ from modules.host_workspace_manager import (
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
 import server.state as state
+from modules.i18n import tr
+
 def _build_host_workspaces_payload(catalog: dict, current_id: str) -> list[dict]:
     running_by_workspace = _active_task_counts("host")
     workspaces = []
@@ -56,7 +58,7 @@ def _build_host_workspaces_payload(catalog: dict, current_id: str) -> list[dict]
 @api_login_required
 def list_host_workspaces():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
 
     catalog, current = resolve_host_workspace(session.get("host_workspace_id"))
     current_id = current.get("workspace_id") if current else None
@@ -84,7 +86,7 @@ def list_host_workspaces():
 @api_login_required
 def create_host_workspace_api():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
 
     payload = request.get_json(silent=True) if request.method != "GET" else None
     workspace_path = (
@@ -105,7 +107,7 @@ def create_host_workspace_api():
     set_default = str(set_default_raw).lower() in {"1", "true", "yes", "on"}
 
     if not workspace_path:
-        return jsonify({"success": False, "error": "缺少 path"}), 400
+        return jsonify({"success": False, "error": tr("status_host_workspace.missing_path")}), 400
 
     try:
         result = create_host_workspace(workspace_path, label=label, set_default=set_default)
@@ -139,14 +141,14 @@ def create_host_workspace_api():
 @api_login_required
 def delete_host_workspace_api():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
 
     payload = request.get_json(silent=True) or {}
     workspace_id = (payload.get("workspace_id") or "").strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少 workspace_id"}), 400
+        return jsonify({"success": False, "error": tr("status_host_workspace.missing_workspace_id")}), 400
     if _active_task_counts("host").get(workspace_id):
-        return jsonify({"success": False, "error": "该工作区有运行中的任务，暂不能删除"}), 409
+        return jsonify({"success": False, "error": tr("status_host_workspace.workspace_has_running_tasks")}), 409
     try:
         _close_terminal_for_key(f"host::{workspace_id}")
         container_manager.release_container(f"host::{workspace_id}", reason="delete_host_workspace")
@@ -190,15 +192,15 @@ def delete_host_workspace_api():
 @api_login_required
 def rename_host_workspace_api():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
 
     payload = request.get_json(silent=True) or {}
     workspace_id = (payload.get("workspace_id") or "").strip()
     label = (payload.get("label") or payload.get("name") or "").strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少 workspace_id"}), 400
+        return jsonify({"success": False, "error": tr("status_host_workspace.missing_workspace_id")}), 400
     if not label:
-        return jsonify({"success": False, "error": "工作区名称不能为空"}), 400
+        return jsonify({"success": False, "error": tr("status_host_workspace.workspace_name_required")}), 400
     try:
         result = rename_host_workspace(workspace_id, label)
     except ValueError as exc:
@@ -222,12 +224,12 @@ def rename_host_workspace_api():
 @api_login_required
 def set_default_host_workspace_api():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
 
     payload = request.get_json(silent=True) or {}
     workspace_id = (payload.get("workspace_id") or "").strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少 workspace_id"}), 400
+        return jsonify({"success": False, "error": tr("status_host_workspace.missing_workspace_id")}), 400
     try:
         result = set_default_host_workspace(workspace_id)
     except ValueError as exc:
@@ -250,7 +252,7 @@ def set_default_host_workspace_api():
 @api_login_required
 def select_host_workspace():
     if not _is_host_mode_request():
-        return jsonify({"success": False, "error": "仅宿主机模式可用"}), 403
+        return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
 
     payload = request.get_json(silent=True) if request.method != "GET" else None
     workspace_id = (
@@ -259,7 +261,7 @@ def select_host_workspace():
         or ""
     ).strip()
     if not workspace_id:
-        return jsonify({"success": False, "error": "缺少 workspace_id"}), 400
+        return jsonify({"success": False, "error": tr("status_host_workspace.missing_workspace_id")}), 400
     write_host_workspace_debug(
         "status.select_host_workspace.request",
         workspace_id=workspace_id,
@@ -273,7 +275,7 @@ def select_host_workspace():
         None,
     )
     if not target:
-        return jsonify({"success": False, "error": "workspace_id 不存在"}), 404
+        return jsonify({"success": False, "error": tr("status_host_workspace.workspace_id_not_found")}), 404
     target_path = str(Path(target.get("path") or "").expanduser().resolve())
     write_host_workspace_debug(
         "status.select_host_workspace.target",

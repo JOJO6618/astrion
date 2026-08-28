@@ -37,6 +37,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
 from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
+from modules.i18n import tr
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -65,17 +66,17 @@ class ListMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
-            return {"success": False, "error": "不是文件"}
+            return {"success": False, "error": tr("file_manager.not_a_file")}
         
         # 验证行号
         if start_line < 1:
-            return {"success": False, "error": "行号必须从1开始"}
+            return {"success": False, "error": tr("file_manager.line_start_must_be_one")}
         
         if end_line < start_line:
-            return {"success": False, "error": "结束行号不能小于起始行号"}
+            return {"success": False, "error": tr("file_manager.end_line_lt_start_line")}
         
         try:
             relative_path = self._relative_path(full_path)
@@ -101,9 +102,9 @@ class ListMixin:
                     lines.extend([''] * (start_line - total_lines - 1))
                     lines.append(content if content.endswith('\n') else content + '\n')
                 else:
-                    return {"success": False, "error": f"起始行号 {start_line} 超出文件范围 (共 {total_lines} 行)"}
+                    return {"success": False, "error": tr("file_manager.edit_start_line_out_of_range", start_line=start_line, total_lines=total_lines)}
             elif end_line > total_lines:
-                return {"success": False, "error": f"结束行号 {end_line} 超出文件范围 (共 {total_lines} 行)"}
+                return {"success": False, "error": tr("file_manager.edit_end_line_out_of_range", end_line=end_line, total_lines=total_lines)}
             else:
                 # 执行操作（转换为0基索引）
                 start_idx = start_line - 1
@@ -136,7 +137,7 @@ class ListMixin:
                     del lines[start_idx:end_idx]
                     
                 else:
-                    return {"success": False, "error": f"未知的操作类型: {operation}"}
+                    return {"success": False, "error": tr("file_manager.unknown_operation", operation=operation)}
             
             # 写回文件
             with open(full_path, 'w', encoding='utf-8') as f:
@@ -146,11 +147,11 @@ class ListMixin:
             
             # 生成操作描述
             if operation == "replace":
-                operation_desc = f"替换第 {start_line}-{end_line} 行"
+                operation_desc = tr("file_manager.desc_replace_lines", start=start_line, end=end_line)
             elif operation == "insert":
-                operation_desc = f"在第 {start_line} 行前插入"
+                operation_desc = tr("file_manager.desc_insert_before", line=start_line)
             elif operation == "delete":
-                operation_desc = f"删除第 {start_line}-{end_line} 行"
+                operation_desc = tr("file_manager.desc_delete_lines", start=start_line, end=end_line)
             
             print(f"{OUTPUT_FORMATS['file']} {operation_desc}: {relative_path}")
             
@@ -178,10 +179,10 @@ class ListMixin:
             full_path = self.project_path
         
         if not full_path.exists():
-            return {"success": False, "error": "目录不存在"}
+            return {"success": False, "error": tr("file_manager.dir_not_found")}
         
         if not full_path.is_dir():
-            return {"success": False, "error": "不是目录"}
+            return {"success": False, "error": tr("file_manager.not_a_directory")}
         
         try:
             files = []
@@ -222,7 +223,7 @@ class ListMixin:
             return {"success": False, "error": error}
         
         if not full_path.exists():
-            return {"success": False, "error": "文件不存在"}
+            return {"success": False, "error": tr("file_manager.file_not_found")}
         
         try:
             stat = full_path.stat()

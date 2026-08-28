@@ -24,6 +24,8 @@ except ImportError:  # pragma: no cover
         TODO_MAX_TASK_LENGTH,
     )
 
+from modules.i18n import tr
+
 
 class TodoManager:
     """负责创建、更新和结束 TODO 列表"""
@@ -64,27 +66,27 @@ class TodoManager:
 
         overview = (overview or "").strip()
         if not overview:
-            return {"success": False, "error": "任务概述不能为空。"}
+            return {"success": False, "error": tr("todo.overview_empty")}
         if len(overview) > self.MAX_OVERVIEW_LENGTH:
             return {
                 "success": False,
-                "error": f"任务概述过长（当前 {len(overview)} 字），请精简至 {self.MAX_OVERVIEW_LENGTH} 字以内。"
+                "error": tr("todo.overview_too_long", count=len(overview), max_length=self.MAX_OVERVIEW_LENGTH),
             }
 
         normalized_tasks = self._normalize_tasks(tasks or [])
         if not normalized_tasks:
-            return {"success": False, "error": "需要至少提供一个任务。"}
+            return {"success": False, "error": tr("todo.no_tasks")}
         if len(tasks or []) > self.MAX_TASKS:
             return {
                 "success": False,
-                "error": f"任务数量过多，最多允许 {self.MAX_TASKS} 个任务。"
+                "error": tr("todo.too_many_tasks", max_count=self.MAX_TASKS),
             }
 
         for title in normalized_tasks:
             if len(title) > self.MAX_TASK_LENGTH:
                 return {
                     "success": False,
-                    "error": f"任务「{title}」过长，请控制在 {self.MAX_TASK_LENGTH} 字以内。"
+                    "error": tr("todo.task_too_long", title=title, max_length=self.MAX_TASK_LENGTH),
                 }
 
         todo = {
@@ -105,16 +107,16 @@ class TodoManager:
         self._save(todo)
         return {
             "success": True,
-            "message": "待办列表已创建（覆盖之前的列表）。",
+            "message": tr("todo.created"),
             "todo_list": todo
         }
 
     def update_task_status(self, task_indices: Any, completed: bool) -> Dict[str, Any]:
         todo = self._get_current()
         if not todo:
-            return {"success": False, "error": "当前没有待办列表，请先创建。"}
+            return {"success": False, "error": tr("todo.no_todo_list")}
         if todo.get("status") in {"completed", "closed"}:
-            return {"success": False, "error": "待办列表已结束，无法继续修改。"}
+            return {"success": False, "error": tr("todo.list_closed")}
 
         # 兼容单个/多个序号
         if isinstance(task_indices, int):
@@ -125,15 +127,15 @@ class TodoManager:
                 if isinstance(idx, int):
                     indices.append(idx)
         else:
-            return {"success": False, "error": "task_index 或 task_indices 必须是数字或数字数组。"}
+            return {"success": False, "error": tr("todo.invalid_indices_type")}
 
         if not indices:
-            return {"success": False, "error": "请提供至少一个任务序号。"}
+            return {"success": False, "error": tr("todo.no_indices")}
 
         valid_max = len(todo["tasks"])
         invalid = [i for i in indices if i < 1 or i > valid_max]
         if invalid:
-            return {"success": False, "error": f"任务序号超出范围（1-{valid_max}）：{invalid}"}
+            return {"success": False, "error": tr("todo.index_out_of_range", valid_max=valid_max, invalid=invalid)}
 
         # 去重保持顺序
         seen = set()
@@ -153,14 +155,22 @@ class TodoManager:
         if all_done:
             return {
                 "success": True,
-                "message": "所有任务已完成。",
+                "message": tr("todo.all_done"),
                 "todo_list": todo
             }
         if len(normalized) == 1:
-            msg = f"任务 {normalized[0]}{'完成' if completed else '取消完成'}。"
+            msg = (
+                tr("todo.task_done", index=normalized[0])
+                if completed
+                else tr("todo.task_undone", index=normalized[0])
+            )
         else:
             joined = ", ".join(str(i) for i in normalized)
-            msg = f"任务 {joined}{'全部完成' if completed else '已取消完成'}。"
+            msg = (
+                tr("todo.tasks_all_done", indices=joined)
+                if completed
+                else tr("todo.tasks_all_undone", indices=joined)
+            )
         return {
             "success": True,
             "message": msg,

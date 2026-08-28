@@ -61,6 +61,7 @@ except ImportError:
         TERMINAL_SANDBOX_ENV,
         TERMINAL_SANDBOX_REQUIRE,
     )
+from modules.i18n import tr
 
 
 class CommandMixin:
@@ -87,7 +88,7 @@ class CommandMixin:
         if not self.is_running or not self.process:
             return {
                 "success": False,
-                "error": "终端未运行，请先打开终端会话。",
+                "error": tr("terminal.not_running"),
                 "session": self.session_name
             }
         
@@ -152,7 +153,7 @@ class CommandMixin:
             except Exception:
                 return {
                     "success": False,
-                    "error": "终端已不可用或输入失败，请重新打开终端会话。",
+                    "error": tr("terminal.input_failed"),
                     "session": self.session_name
                 }
             
@@ -193,19 +194,19 @@ class CommandMixin:
                 # 明确捕获到结束标记，视为完成
                 status = "completed"
             message_map = {
-                "completed": "命令执行完成",
-                "no_output": "未捕获输出，命令可能未产生结果",
-                "awaiting_input": "命令已发送，终端等待进一步输入或仍在运行",
-                "echo_loop": "检测到终端正在回显输入，命令可能未成功执行",
-                "output_with_echo": "命令产生输出，但终端疑似重复回显",
-                "timeout": f"输出等待达到上限（{int(timeout)}秒）"
+                "completed": tr("terminal.cmd_completed"),
+                "no_output": tr("terminal.cmd_no_output"),
+                "awaiting_input": tr("terminal.cmd_awaiting_input"),
+                "echo_loop": tr("terminal.cmd_echo_loop"),
+                "output_with_echo": tr("terminal.cmd_output_with_echo"),
+                "timeout": tr("terminal.cmd_wait_timeout", timeout=int(timeout))
             }
             if timeout >= 60:
-                message = f"[已收集约{int(timeout)}秒内的输出]"
+                message = tr("terminal.collected_output_note", timeout=int(timeout))
             else:
-                message = message_map.get(status, "命令执行完成")
+                message = message_map.get(status, tr("terminal.cmd_completed"))
             if output_truncated:
-                message += f"（输出已截断，保留末尾{TERMINAL_INPUT_MAX_CHARS}字符）"
+                message += tr("terminal.output_truncated_appendix", chars=TERMINAL_INPUT_MAX_CHARS)
             elapsed_ms = int((time.time() - start_time) * 1000)
             return {
                 "success": status in {"completed", "output_with_echo"},
@@ -220,7 +221,7 @@ class CommandMixin:
             }
                 
         except Exception as e:
-            error_msg = f"发送命令失败: {str(e)}"
+            error_msg = tr("terminal.send_failed", error=e)
             print(f"{OUTPUT_FORMATS['error']} {error_msg}")
             return {
                 "success": False,
@@ -378,5 +379,5 @@ class CommandMixin:
         if len(output) > self.display_size:
             # 保留最后的display_size字符
             output = output[-self.display_size:]
-            output = f"[输出已截断，显示最后{self.display_size}字符]\n{output}"
+            output = f"{tr('terminal.display_truncated_prefix', chars=self.display_size)}\n{output}"
         return output

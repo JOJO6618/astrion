@@ -15,6 +15,9 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import TAVILY_API_KEY, SEARCH_MAX_RESULTS, OUTPUT_FORMATS, DATA_DIR
 
+from modules.i18n import tr
+
+
 class SearchEngine:
     def __init__(self):
         self.api_key = TAVILY_API_KEY
@@ -65,7 +68,7 @@ class SearchEngine:
         if not self.api_key or self.api_key == "your-tavily-api-key":
             return {
                 "success": False,
-                "error": "Tavily API密钥未配置",
+                "error": tr("search_engine.api_key_not_configured"),
                 "results": []
             }
         
@@ -107,7 +110,7 @@ class SearchEngine:
                 if response.status_code != 200:
                     return {
                         "success": False,
-                        "error": f"API请求失败: {response.status_code}",
+                        "error": tr("search_engine.api_request_failed", status_code=response.status_code),
                         "results": []
                     }
                 
@@ -123,13 +126,13 @@ class SearchEngine:
         except httpx.TimeoutException:
             return {
                 "success": False,
-                "error": "搜索超时",
+                "error": tr("search_engine.search_timeout"),
                 "results": []
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"搜索失败: {str(e)}",
+                "error": tr("search_engine.search_failed", error=str(e)),
                 "results": []
             }
     
@@ -196,7 +199,7 @@ class SearchEngine:
         if not results["success"]:
             return {
                 "success": False,
-                "error": results.get("error", "未知错误"),
+                "error": results.get("error", tr("search_engine.unknown_error")),
                 "summary": ""
             }
         
@@ -249,14 +252,14 @@ class SearchEngine:
         results = await self.search(query, max_results=5)
         
         if not results["success"]:
-            return f"搜索失败: {results['error']}"
+            return tr("search_engine.search_failed", error=results["error"])
         
         # 返回第一个结果的摘要
         if results["results"]:
             first_result = results["results"][0]
             return f"{first_result['title']}\n{first_result['content'][:300]}..."
         
-        return "未找到相关信息"
+        return tr("search_engine.no_relevant_info")
     
     def save_results(self, results: Dict, filename: str = None) -> str:
         """
@@ -340,7 +343,7 @@ class SearchEngine:
         if normalized_topic not in self._valid_topics:
             return {
                 "success": False,
-                "error": f"无效的topic: {topic}. 可选值: {', '.join(self._valid_topics)}",
+                "error": tr("search_engine.invalid_topic", topic=topic, valid=", ".join(self._valid_topics)),
                 "results": []
             }
         payload["topic"] = normalized_topic
@@ -354,7 +357,7 @@ class SearchEngine:
         if selected_filters > 1:
             return {
                 "success": False,
-                "error": "时间参数只能三选一：time_range、days、start_date+end_date 不能同时使用",
+                "error": tr("search_engine.time_params_mutually_exclusive"),
                 "results": []
             }
         
@@ -365,19 +368,19 @@ class SearchEngine:
             except (TypeError, ValueError):
                 return {
                     "success": False,
-                    "error": f"days 必须是正整数，当前值: {days}",
+                    "error": tr("search_engine.days_must_be_positive_int", days=days),
                     "results": []
                 }
             if days_value <= 0:
                 return {
                     "success": False,
-                    "error": f"days 必须大于0，当前值: {days_value}",
+                    "error": tr("search_engine.days_must_be_greater_than_zero", days=days_value),
                     "results": []
                 }
             if normalized_topic != "news":
                 return {
                     "success": False,
-                    "error": "days 参数仅在 topic=\"news\" 时可用，请调整 topic 或改用其他时间参数",
+                    "error": tr("search_engine.days_only_for_news"),
                     "results": []
                 }
             payload["days"] = days_value
@@ -390,7 +393,7 @@ class SearchEngine:
             if not normalized_range:
                 return {
                     "success": False,
-                    "error": f"无效的time_range: {time_range}. 可选值: day/week/month/year 或缩写 d/w/m/y",
+                    "error": tr("search_engine.invalid_time_range", time_range=time_range),
                     "results": []
                 }
             payload["time_range"] = normalized_range
@@ -401,19 +404,19 @@ class SearchEngine:
             if not start_date or not end_date:
                 return {
                     "success": False,
-                    "error": "start_date 与 end_date 必须同时提供且格式为 YYYY-MM-DD",
+                    "error": tr("search_engine.date_range_requires_both"),
                     "results": []
                 }
             if not self._date_pattern.match(start_date):
                 return {
                     "success": False,
-                    "error": f"start_date 格式无效: {start_date}，请使用 YYYY-MM-DD",
+                    "error": tr("search_engine.start_date_invalid_format", start_date=start_date),
                     "results": []
                 }
             if not self._date_pattern.match(end_date):
                 return {
                     "success": False,
-                    "error": f"end_date 格式无效: {end_date}，请使用 YYYY-MM-DD",
+                    "error": tr("search_engine.end_date_invalid_format", end_date=end_date),
                     "results": []
                 }
             try:
@@ -422,13 +425,13 @@ class SearchEngine:
             except ValueError:
                 return {
                     "success": False,
-                    "error": "start_date 或 end_date 含无效日期，请检查是否为有效的公历日期",
+                    "error": tr("search_engine.invalid_calendar_date"),
                     "results": []
                 }
             if start_dt > end_dt:
                 return {
                     "success": False,
-                    "error": f"start_date ({start_date}) 不能晚于 end_date ({end_date})",
+                    "error": tr("search_engine.start_date_after_end_date", start_date=start_date, end_date=end_date),
                     "results": []
                 }
             payload["start_date"] = start_date
@@ -443,7 +446,7 @@ class SearchEngine:
                 if normalized_topic != "general":
                     return {
                         "success": False,
-                        "error": "country 参数仅在 topic=\"general\" 时可用，请调整 topic 或移除 country",
+                        "error": tr("search_engine.country_only_for_general"),
                         "results": []
                     }
                 payload["country"] = normalized_country
@@ -454,7 +457,7 @@ class SearchEngine:
             if not isinstance(include_domains, list):
                 return {
                     "success": False,
-                    "error": "include_domains 必须是字符串数组",
+                    "error": tr("search_engine.include_domains_must_be_array"),
                     "results": []
                 }
             cleaned_domains = []
@@ -462,7 +465,7 @@ class SearchEngine:
                 if not isinstance(item, str):
                     return {
                         "success": False,
-                        "error": "include_domains 中每一项都必须是字符串",
+                        "error": tr("search_engine.include_domains_item_must_be_string"),
                         "results": []
                     }
                 domain = item.strip().lower()
@@ -471,7 +474,7 @@ class SearchEngine:
             if len(cleaned_domains) > 300:
                 return {
                     "success": False,
-                    "error": f"include_domains 最多支持300个域名，当前: {len(cleaned_domains)}",
+                    "error": tr("search_engine.include_domains_too_many", count=len(cleaned_domains)),
                     "results": []
                 }
             if cleaned_domains:

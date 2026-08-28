@@ -49,6 +49,8 @@ import logging
 import hmac
 import mimetypes
 
+from modules.i18n import tr
+
 # ==========================================
 # 回顾文件生成辅助
 # ==========================================
@@ -651,7 +653,7 @@ def rate_limited(action: str, limit: int, window_seconds: int, scope: str = "ip"
             identifier = resolve_identifier(scope, kwargs=kwargs)
             limited, retry_after = check_rate_limit(action, limit, window_seconds, identifier)
             if limited:
-                message = error_message or "请求过于频繁，请稍后再试。"
+                message = error_message or tr("legacy.rate_limited")
                 return jsonify({
                     "success": False,
                     "error": message,
@@ -752,12 +754,12 @@ def consume_socket_token(token_value: Optional[str], username: Optional[str]) ->
 
 def format_tool_result_notice(tool_name: str, tool_call_id: Optional[str], content: str) -> str:
     """将工具执行结果转为系统消息文本，方便在对话中回传。"""
-    header = f"[工具结果] {tool_name}"
+    header = tr("legacy.tool_result_header", tool=tool_name)
     if tool_call_id:
         header += f" (tool_call_id={tool_call_id})"
     body = (content or "").strip()
     if not body:
-        body = "（无附加输出）"
+        body = tr("legacy.tool_result_empty")
     return f"{header}\n{body}"
 
 
@@ -879,7 +881,7 @@ def admin_api_required(view_func):
     def wrapped(*args, **kwargs):
         record = get_current_user_record()
         if not record or not is_admin_user(record):
-            return jsonify({"success": False, "error": "需要管理员权限"}), 403
+            return jsonify({"success": False, "error": tr("legacy.admin_required")}), 403
         return view_func(*args, **kwargs)
 
     return wrapped
@@ -908,7 +910,7 @@ def ensure_conversation_loaded(terminal: WebTerminal, conversation_id: Optional[
         # 不显式传入运行模式，优先回到个性化/默认配置
         result = terminal.create_new_conversation()
         if not result.get("success"):
-            raise RuntimeError(result.get("message", "创建对话失败"))
+            raise RuntimeError(result.get("message", tr("legacy.create_conversation_failed")))
         conversation_id = result["conversation_id"]
         session['run_mode'] = terminal.run_mode
         session['thinking_mode'] = terminal.thinking_mode
@@ -919,7 +921,7 @@ def ensure_conversation_loaded(terminal: WebTerminal, conversation_id: Optional[
         if current_id != conversation_id:
             load_result = terminal.load_conversation(conversation_id)
             if not load_result.get("success"):
-                raise RuntimeError(load_result.get("message", "对话加载失败"))
+                raise RuntimeError(load_result.get("message", tr("legacy.load_conversation_failed")))
             # 切换到对话记录的运行模式
             try:
                 conv_data = terminal.context_manager._get_conversation_manager_for_id(conversation_id).load_conversation(conversation_id) or {}

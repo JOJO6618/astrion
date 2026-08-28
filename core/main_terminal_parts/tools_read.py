@@ -84,6 +84,8 @@ from config.model_profiles import (
     get_model_context_window,
 )
 
+from modules.i18n import tr
+
 logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 
@@ -105,7 +107,7 @@ class MainTerminalToolsReadMixin:
     def _resolve_skill_id(self, skill_name: Any) -> Dict[str, Any]:
                 normalized_input = self._normalize_skill_name(skill_name)
                 if not normalized_input:
-                    return {"success": False, "error": "skill_name 不能为空"}
+                    return {"success": False, "error": tr("tools_read.skill_name_empty")}
 
                 try:
                     personalization = load_personalization_config(self.data_dir)
@@ -139,12 +141,11 @@ class MainTerminalToolsReadMixin:
                         # 同名冲突：报错并引导改用 read_file 按具体路径查看
                         return {
                             "success": False,
-                            "error": (
-                                f"技能 '{sid}' 存在同名重复：{primary_dir}/{sid}/SKILL.md 与 "
-                                f"{conflict_dir}/{sid}/SKILL.md 均存在，read_skill 无法确定读取哪一份。\n"
-                                f"请改用 read_file 工具按具体路径读取查看（可分别读取 "
-                                f"{primary_dir}/{sid}/SKILL.md 与 {conflict_dir}/{sid}/SKILL.md 对比），"
-                                f"或告知用户删除/重命名其中一份以消除重复。"
+                            "error": tr(
+                                "tools_read.skill_name_conflict",
+                                sid=sid,
+                                primary_dir=primary_dir,
+                                conflict_dir=conflict_dir,
                             ),
                         }
                     return {"success": True, "skill_id": sid, "display_dir": primary_dir}
@@ -165,10 +166,10 @@ class MainTerminalToolsReadMixin:
                 if len(label_matches) > 1:
                     return {
                         "success": False,
-                        "error": f"skill_name 匹配到多个技能: {', '.join(sorted(label_matches))}，请改用 skill id"
+                        "error": tr("tools_read.skill_name_ambiguous", matches=', '.join(sorted(label_matches)))
                     }
 
-                return {"success": False, "error": f"未找到技能: {normalized_input}"}
+                return {"success": False, "error": tr("tools_read.skill_not_found", name=normalized_input)}
 
     def _handle_read_skill_tool(self, arguments: Dict) -> Dict:
                 skill_name = arguments.get("skill_name")
@@ -194,7 +195,7 @@ class MainTerminalToolsReadMixin:
                 """处理 recall_project_memory：读取 .astrion/memory/{name}.md"""
                 safe_name = str(name).strip()
                 if not safe_name or "/" in safe_name or "\\" in safe_name:
-                    return {"success": False, "error": f"记忆名称不合法: {name}"}
+                    return {"success": False, "error": tr("tools_read.memory_name_invalid", name=name)}
                 file_path = f"{WORKSPACE_MEMORY_DIRNAME}/{safe_name}.md"
                 read_args = {
                     "path": file_path,
@@ -218,12 +219,12 @@ class MainTerminalToolsReadMixin:
                         clean_keywords.append(kw_text)
                 clean_keywords = clean_keywords[:5]
                 if not clean_keywords:
-                    return {"success": False, "error": "search_project_memory 需要至少 1 个关键词"}
+                    return {"success": False, "error": tr("tools_read.search_memory_needs_keywords")}
 
                 max_results = self._clamp_int(max_results, 5, 1, 10)
                 memory_dir = Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME
                 if not memory_dir.exists() or not memory_dir.is_dir():
-                    empty_text = "项目记忆目录不存在，暂无项目记忆可检索。"
+                    empty_text = tr("tools_read.memory_dir_not_exists")
                     return {
                         "success": True,
                         "count": 0,
@@ -303,9 +304,9 @@ class MainTerminalToolsReadMixin:
                 top = scored[:max_results]
 
                 if not top:
-                    empty_text = (
-                        f"未找到匹配的项目记忆（关键词：{'、'.join(clean_keywords)}）。"
-                        "不要更换关键词重复检索；继续当前任务即可。"
+                    empty_text = tr(
+                        "tools_read.search_no_match_content",
+                        keywords="、".join(clean_keywords),
                     )
                     return {
                         "success": True,
@@ -313,20 +314,27 @@ class MainTerminalToolsReadMixin:
                         "keywords": clean_keywords,
                         "results": [],
                         "content": empty_text,
-                        "summary": "未找到匹配的项目记忆",
+                        "summary": tr("tools_read.search_no_match_summary"),
                     }
 
-                content_lines = [f"找到 {len(top)} 个匹配的项目记忆（关键词：{'、'.join(clean_keywords)}）：", ""]
+                content_lines = [
+                    tr(
+                        "tools_read.search_found_header",
+                        count=len(top),
+                        keywords="、".join(clean_keywords),
+                    ),
+                    "",
+                ]
                 for rank, item in enumerate(top, start=1):
-                    content_lines.append(f"[{rank}] {item['name']}（.astrion/memory/{item['file']}）")
+                    content_lines.append(tr("tools_read.search_result_item", rank=rank, name=item['name'], file=item['file']))
                     if item["description"]:
-                        content_lines.append(f"    描述：{item['description']}")
+                        content_lines.append(tr("tools_read.search_result_desc", description=item['description']))
                     if item["snippets"]:
-                        content_lines.append("    匹配片段：")
+                        content_lines.append(tr("tools_read.search_result_snippets_label"))
                         for snippet in item["snippets"]:
                             content_lines.append(f"      L{snippet['line']}: {snippet['text']}")
                     content_lines.append("")
-                content_lines.append("如需完整内容，使用 recall_project_memory 读取对应记忆。")
+                content_lines.append(tr("tools_read.search_read_full_hint"))
                 content_text = "\n".join(content_lines).strip()
 
                 return {
@@ -335,7 +343,7 @@ class MainTerminalToolsReadMixin:
                     "keywords": clean_keywords,
                     "results": top,
                     "content": content_text,
-                    "summary": f"找到 {len(top)} 个匹配的项目记忆",
+                    "summary": tr("tools_read.search_found_summary", count=len(top)),
                 }
 
     @staticmethod
@@ -361,9 +369,9 @@ class MainTerminalToolsReadMixin:
                 try:
                     number = int(value)
                 except (TypeError, ValueError):
-                    return None, f"{field_name} 必须是整数"
+                    return None, tr("tools_read.param_must_be_int", field_name=field_name)
                 if number < 1:
-                    return None, f"{field_name} 必须大于等于1"
+                    return None, tr("tools_read.param_must_be_gte_1", field_name=field_name)
                 return number, None
 
     @staticmethod
@@ -412,11 +420,11 @@ class MainTerminalToolsReadMixin:
                 """集中处理 read_file 工具的三种模式。"""
                 file_path = arguments.get("path")
                 if not file_path:
-                    return {"success": False, "error": "缺少文件路径参数"}
+                    return {"success": False, "error": tr("tools_read.missing_file_path")}
 
                 read_type = (arguments.get("type") or "read").lower()
                 if read_type not in {"read", "search", "extract"}:
-                    return {"success": False, "error": f"未知的读取类型: {read_type}"}
+                    return {"success": False, "error": tr("tools_read.unknown_read_type", read_type=read_type)}
 
                 max_chars = self._clamp_int(
                     arguments.get("max_chars"),
@@ -445,7 +453,7 @@ class MainTerminalToolsReadMixin:
                         if error:
                             return {"success": False, "error": error}
                         if start_line and end_line < start_line:
-                            return {"success": False, "error": "end_line 必须大于等于 start_line"}
+                            return {"success": False, "error": tr("tools_read.end_line_ge_start_line")}
 
                     read_result = self.file_manager.read_text_segment(
                         file_path,
@@ -465,7 +473,12 @@ class MainTerminalToolsReadMixin:
                         "total_lines": read_result["total_lines"],
                         "file_size": read_result["size"],
                         "char_count": char_count,
-                        "message": f"已读取 {read_result['path']} 的内容（行 {read_result['line_start']}~{read_result['line_end']}）"
+                        "message": tr(
+                            "tools_read.read_success",
+                            path=read_result["path"],
+                            line_start=read_result["line_start"],
+                            line_end=read_result["line_end"],
+                        )
                     })
                     base_result["truncated"] = truncated
                     self.context_manager.load_file(read_result["path"])
@@ -474,7 +487,7 @@ class MainTerminalToolsReadMixin:
                 if read_type == "search":
                     query = arguments.get("query")
                     if not query:
-                        return {"success": False, "error": "搜索模式需要提供 query 参数"}
+                        return {"success": False, "error": tr("tools_read.search_requires_query")}
 
                     max_matches = self._clamp_int(
                         arguments.get("max_matches"),
@@ -523,7 +536,12 @@ class MainTerminalToolsReadMixin:
                         "case_sensitive": case_sensitive,
                         "matches": limited_matches,
                         "char_count": char_count,
-                        "message": f"在 {search_result['path']} 中搜索 \"{query}\"，返回 {len(limited_matches)} 条结果"
+                        "message": tr(
+                            "tools_read.search_success",
+                            path=search_result["path"],
+                            query=query,
+                            count=len(limited_matches),
+                        )
                     })
                     base_result["truncated"] = truncated
                     return base_result
@@ -531,7 +549,7 @@ class MainTerminalToolsReadMixin:
                 # extract
                 segments = arguments.get("segments")
                 if not isinstance(segments, list) or not segments:
-                    return {"success": False, "error": "extract 模式需要提供 segments 数组"}
+                    return {"success": False, "error": tr("tools_read.extract_requires_segments")}
 
                 extract_result = self.file_manager.extract_segments(
                     file_path,
@@ -554,7 +572,11 @@ class MainTerminalToolsReadMixin:
                     "total_lines": extract_result["total_lines"],
                     "segment_count": len(limited_segments),
                     "char_count": char_count,
-                    "message": f"已从 {extract_result['path']} 抽取 {len(limited_segments)} 个片段"
+                    "message": tr(
+                        "tools_read.extract_success",
+                        path=extract_result["path"],
+                        count=len(limited_segments),
+                    )
                 })
                 base_result["truncated"] = truncated
                 self.context_manager.load_file(extract_result["path"])

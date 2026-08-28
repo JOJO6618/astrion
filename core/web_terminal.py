@@ -22,6 +22,8 @@ except ImportError:
     from config import MAX_TERMINALS, TERMINAL_BUFFER_SIZE, TERMINAL_DISPLAY_SIZE, REASONING_EFFORT_LEVELS
 from modules.terminal_manager import TerminalManager
 
+from modules.i18n import tr
+
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
 
@@ -343,7 +345,7 @@ class WebTerminal(MainTerminal):
             return {
                 "success": True,
                 "conversation_id": conversation_id,
-                "message": f"已创建新对话: {conversation_id}",
+                "message": tr("web_terminal.conversation_created", conversation_id=conversation_id),
                 # 路由层据此跳过重复的版本控制初始化（此前每次新建对话初始化两遍）
                 "versioning_initialized": versioning_initialized,
             }
@@ -352,7 +354,7 @@ class WebTerminal(MainTerminal):
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"创建新对话失败: {e}"
+                "message": tr("web_terminal.conversation_create_failed", error=e)
             }
 
     def _ensure_conversation_versioning_enabled(self, conversation_id: str) -> None:
@@ -524,34 +526,34 @@ class WebTerminal(MainTerminal):
                 if not conversation_data:
                     return {
                         "success": False,
-                        "error": "对话数据缺失",
-                        "message": f"对话数据缺失: {conversation_id}"
+                        "error": tr("web_terminal.conversation_data_missing_error"),
+                        "message": tr("web_terminal.conversation_data_missing_message", conversation_id=conversation_id)
                     }
                 
                 return {
                     "success": True,
                     "conversation_id": conversation_id,
-                    "title": conversation_data.get("title", "未知对话"),
+                    "title": conversation_data.get("title", tr("web_terminal.unknown_conversation_title")),
                     # 消息数以磁盘数据为准：服务实例不挂载历史，len(conversation_history) 恒为 0
                     "messages_count": len(conversation_data.get("messages") or []),
                     "run_mode": self.run_mode,
                     "thinking_mode": self.thinking_mode,
                     "model_key": getattr(self, "model_key", None),
                     "multi_agent_mode": bool(getattr(self, "multi_agent_mode", False)),
-                    "message": f"对话已加载: {conversation_id}"
+                    "message": tr("web_terminal.conversation_loaded", conversation_id=conversation_id)
                 }
             else:
                 return {
                     "success": False,
-                    "error": "对话不存在或加载失败",
-                    "message": f"对话加载失败: {conversation_id}"
+                    "error": tr("web_terminal.conversation_not_found_error"),
+                    "message": tr("web_terminal.conversation_load_failed", conversation_id=conversation_id)
                 }
                 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"加载对话异常: {e}"
+                "message": tr("web_terminal.conversation_load_exception", error=e)
             }
     
     def get_conversations_list(self, limit: int = 20, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None) -> Dict:
@@ -566,7 +568,7 @@ class WebTerminal(MainTerminal):
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"获取对话列表失败: {e}"
+                "message": tr("web_terminal.conversation_list_failed", error=e)
             }
     
     def delete_conversation(self, conversation_id: str) -> Dict:
@@ -576,19 +578,19 @@ class WebTerminal(MainTerminal):
             if success:
                 return {
                     "success": True,
-                    "message": f"对话已删除: {conversation_id}"
+                    "message": tr("web_terminal.conversation_deleted", conversation_id=conversation_id)
                 }
             else:
                 return {
                     "success": False,
-                    "error": "删除失败",
-                    "message": f"对话删除失败: {conversation_id}"
+                    "error": tr("web_terminal.conversation_delete_failed_error"),
+                    "message": tr("web_terminal.conversation_delete_failed", conversation_id=conversation_id)
                 }
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"删除对话异常: {e}"
+                "message": tr("web_terminal.conversation_delete_exception", error=e)
             }
     
     def search_conversations(self, query: str, limit: int = 20, multi_agent_mode: Optional[bool] = None) -> Dict:
@@ -604,7 +606,7 @@ class WebTerminal(MainTerminal):
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"搜索对话失败: {e}"
+                "message": tr("web_terminal.conversation_search_failed", error=e)
             }
     
     # ===========================================
@@ -703,7 +705,7 @@ class WebTerminal(MainTerminal):
             'tool': tool_name,
             'arguments': arguments,
             'status': 'executing',
-            'message': f'正在执行 {tool_name}...'
+            'message': tr("web_terminal.tool_executing", tool_name=tool_name),
         })
         
         # 对于某些工具，发送更详细的状态
@@ -824,7 +826,7 @@ class WebTerminal(MainTerminal):
                         'tool': tool_name,
                         'success': False,
                         'result': result_data,
-                        'message': f'{tool_name} 执行失败: 参数过长',
+                        'message': tr("web_terminal.tool_failed_param_too_long", tool_name=tool_name),
                         'error_type': 'parameter_too_long',
                         'suggestion': result_data.get('suggestion', '建议分块处理')
                     })
@@ -833,7 +835,7 @@ class WebTerminal(MainTerminal):
                         'tool': tool_name,
                         'success': False,
                         'result': result_data,
-                        'message': f'{tool_name} 执行失败: 参数格式错误',
+                        'message': tr("web_terminal.tool_failed_param_format", tool_name=tool_name),
                         'error_type': 'parameter_format_error',
                         'suggestion': result_data.get('suggestion', '请检查参数格式')
                     })
@@ -843,12 +845,12 @@ class WebTerminal(MainTerminal):
                         'tool': tool_name,
                         'success': False,
                         'result': result_data,
-                        'message': f'{tool_name} 执行失败: {error_msg}',
+                        'message': tr("web_terminal.tool_failed_general", tool_name=tool_name, error_msg=error_msg),
                         'error_type': 'general_error'
                     })
             else:
                 # 成功的情况
-                success_msg = result_data.get('message', f'{tool_name} 执行成功')
+                success_msg = result_data.get('message', tr("web_terminal.tool_succeeded", tool_name=tool_name))
                 self.broadcast('tool_execution_end', {
                     'tool': tool_name,
                     'success': True,
@@ -864,7 +866,7 @@ class WebTerminal(MainTerminal):
                 'tool': tool_name,
                 'success': False,
                 'result': result_data,
-                'message': f'{tool_name} 返回了非JSON格式结果',
+                'message': tr("web_terminal.tool_result_not_json", tool_name=tool_name),
                 'error_type': 'invalid_result_format'
             })
         

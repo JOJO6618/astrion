@@ -38,6 +38,7 @@ from modules.personalization_manager import (
     resolve_context_compression_settings,
 )
 from modules.skill_hint_manager import SkillHintManager
+from modules.i18n import tr
 from modules.upload_security import UploadSecurityError
 from modules.user_manager import UserWorkspace
 from modules.usage_tracker import QUOTA_DEFAULTS
@@ -703,12 +704,12 @@ def _build_sub_agent_notice_text(update: Dict[str, Any], *, summary_override: Op
         agent_id = update.get("agent_id")
         summary = summary_override or update.get("summary") or update.get("message") or ""
         deliverables_dir = update.get("deliverables_dir", "") or ""
-        lines = [f"子智能体{agent_id} ({summary}) 已完成任务。"]
+        lines = [tr("task_main.sub_agent_done_line", agent_id=agent_id, summary=summary)]
         msg = update.get("message")
         if msg:
             lines.append(str(msg))
         if deliverables_dir:
-            lines.append(f"交付目录：{deliverables_dir}")
+            lines.append(tr("task_main.deliverables_line", dir=deliverables_dir))
         system_message = "\n\n".join(lines)
     return f"[系统通知|sub_agent]\n{system_message}"
 
@@ -805,13 +806,13 @@ def _collect_pending_completion_notices(*, web_terminal, conversation_id: str) -
             except Exception:
                 pass
             # 统一 [系统通知|background_command] 前缀；正文给出命令、退出码、输出
-            header = "后台指令已完成。"
+            header = tr("background_tasks.done_header")
             if command:
-                header += f"\n\n命令：{command}"
+                header += "\n\n" + tr("background_tasks.command_line", command=command)
             if return_code is not None:
-                header += f"\n退出码：{return_code}"
+                header += "\n" + tr("background_tasks.return_code_line", code=return_code)
             body = output if output else "[no_output]"
-            message_text = f"[系统通知|background_command]\n{header}\n\n输出：\n{body}"
+            message_text = f"[系统通知|background_command]\n{header}\n\n{tr('background_tasks.output_section')}\n{body}"
             notices.append({
                 "kind": "background_command",
                 "message": message_text,
@@ -1886,7 +1887,7 @@ async def handle_task_with_sender(
         )
         if not deep_result.get("success"):
             sender('error', {
-                "message": deep_result.get("error") or "自动深层压缩失败",
+                "message": deep_result.get("error") or tr("tool_loop.deep_compression_failed"),
                 "conversation_id": conversation_id,
             })
         else:
@@ -1989,9 +1990,10 @@ async def handle_task_with_sender(
     web_terminal.api_client.update_context_budget(current_tokens, max_context_tokens)
     if max_context_tokens:
         if current_tokens >= max_context_tokens:
-            err_msg = (
-                f"当前对话上下文已达 {current_tokens} tokens，超过模型上限 "
-                f"{max_context_tokens}，请先使用压缩功能或清理对话后再试。"
+            err_msg = tr(
+                "task_main.context_overflow",
+                current=current_tokens,
+                max=max_context_tokens,
             )
             debug_log(err_msg)
             web_terminal.context_manager.add_conversation("system", err_msg)
@@ -2006,14 +2008,16 @@ async def handle_task_with_sender(
         usage_percent = (current_tokens / max_context_tokens) * 100
         warned = web_terminal.context_manager.conversation_metadata.get("context_warning_sent", False)
         if usage_percent >= 70 and not warned:
-            warn_msg = (
-                f"当前对话上下文约占 {usage_percent:.1f}%（{current_tokens}/{max_context_tokens}），"
-                "建议使用压缩功能。"
+            warn_msg = tr(
+                "task_main.context_usage_hint",
+                percent=f"{usage_percent:.1f}",
+                current=current_tokens,
+                max=max_context_tokens,
             )
             web_terminal.context_manager.conversation_metadata["context_warning_sent"] = True
             web_terminal.context_manager.auto_save_conversation(force=True)
             sender('context_warning', {
-                'title': '上下文过长',
+                'title': tr("task_main.context_overflow_title"),
                 'message': warn_msg,
                 'type': 'warning',
                 'conversation_id': conversation_id
@@ -2093,7 +2097,7 @@ async def handle_task_with_sender(
                 if _bg_mgr.list_waiting_items(conversation_id):
                     _stopped_has_bg_cmd = True
             sender('task_stopped', {
-                'message': '任务已停止',
+                'message': tr("task_main.task_stopped"),
                 'reason': 'user_requested',
                 'has_running_sub_agents': _stopped_has_bg,
                 'has_running_background_commands': _stopped_has_bg_cmd,
@@ -2132,7 +2136,7 @@ async def handle_task_with_sender(
         if MAX_TOTAL_TOOL_CALLS is not None and total_tool_calls >= MAX_TOTAL_TOOL_CALLS:
             debug_log(f"已达到最大工具调用次数限制 ({MAX_TOTAL_TOOL_CALLS})")
             sender('system_message', {
-                'content': f'⚠️ 已达到最大工具调用次数限制 ({MAX_TOTAL_TOOL_CALLS})，任务结束。'
+                'content': tr("task_main.max_tool_calls_reached", limit=MAX_TOTAL_TOOL_CALLS)
             })
             break
         
@@ -2178,7 +2182,7 @@ async def handle_task_with_sender(
                 'reset_at': quota_info.get('reset_at')
             })
             sender('error', {
-                'message': "配额已达到上限，暂时无法继续调用模型。",
+                'message': tr("task_main.quota_exceeded"),
                 'quota': quota_info
             })
             finalize_user_work_timer()
@@ -2279,10 +2283,10 @@ async def handle_task_with_sender(
                 if auto_fix_attempts <= AUTO_FIX_MAX_ATTEMPTS:
                     debug_log(f"检测到格式错误的工具调用，尝试自动修复 (尝试 {auto_fix_attempts}/{AUTO_FIX_MAX_ATTEMPTS})")
                     
-                    fix_message = "你使用了错误的格式输出工具调用。请使用正确的工具调用格式而不是直接输出JSON。根据当前进度继续执行任务。"
-                    
+                    fix_message = tr("task_main.auto_fix_instruction")
+
                     sender('system_message', {
-                        'content': f'⚠️ 自动修复: {fix_message}'
+                        'content': tr("task_main.auto_fix_notice", message=fix_message)
                     })
                     
                     messages.append({
@@ -2295,7 +2299,7 @@ async def handle_task_with_sender(
                 else:
                     debug_log(f"自动修复尝试已达上限 ({AUTO_FIX_MAX_ATTEMPTS})")
                     sender('system_message', {
-                        'content': f'⌘ 工具调用格式错误，自动修复失败。请手动检查并重试。'
+                        'content': tr("task_main.auto_fix_failed")
                     })
                     break
         
@@ -2402,13 +2406,13 @@ async def handle_task_with_sender(
                 ):
                     debug_log(f"警告: 连续调用相同工具 {tool_name} 已达 {MAX_CONSECUTIVE_SAME_TOOL} 次")
                     sender('system_message', {
-                        'content': f'⚠️ 检测到重复调用 {tool_name} 工具 {MAX_CONSECUTIVE_SAME_TOOL} 次，可能存在循环。'
+                        'content': tr("task_main.repeat_tool_warning", tool=tool_name, limit=MAX_CONSECUTIVE_SAME_TOOL)
                     })
                     
                     if consecutive_same_tool[tool_name] >= MAX_CONSECUTIVE_SAME_TOOL + 2:
                         debug_log(f"终止: 工具 {tool_name} 调用次数过多")
                         sender('system_message', {
-                            'content': f'⌘ 工具 {tool_name} 重复调用过多，任务终止。'
+                            'content': tr("task_main.repeat_tool_terminated", tool=tool_name)
                         })
                         break
             else:
@@ -2456,7 +2460,7 @@ async def handle_task_with_sender(
             return
         if tool_loop_result.get("approval_rejected"):
             sender('task_stopped', {
-                'message': tool_loop_result.get("approval_message") or '操作被用户拒绝',
+                'message': tool_loop_result.get("approval_message") or tr("tool_loop.rejected_by_user"),
                 'reason': 'approval_rejected',
                 'conversation_id': conversation_id,
                 'has_running_sub_agents': False,

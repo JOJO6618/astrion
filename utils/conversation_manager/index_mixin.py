@@ -27,6 +27,8 @@ try:
 except Exception:
     perf_log = None
 
+from modules.i18n import tr
+
 @dataclass
 class ConversationMetadata:
     """对话元数据"""
@@ -166,7 +168,7 @@ class IndexMixin:
             metadata = data.get("metadata", {}) or {}
 
             rebuilt_index[conv_id] = {
-                "title": data.get("title") or "未命名对话",
+                "title": data.get("title") or tr("conv_mgr.untitled_conversation"),
                 "created_at": data.get("created_at"),
                 "updated_at": data.get("updated_at"),
                 "project_path": metadata.get("project_path"),

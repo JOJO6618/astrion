@@ -83,6 +83,8 @@ from config.model_profiles import (
     get_model_context_window,
 )
 
+from modules.i18n import tr
+
 logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 PERMISSION_MODES = {"readonly", "approval", "auto_approval", "unrestricted"}
@@ -242,7 +244,7 @@ class MainTerminalToolsPolicyMixin:
     def set_work_mode(self, mode: str, *, persist: bool = True, conversation_id: Optional[str] = None) -> str:
                 normalized = str(mode or "").strip().lower()
                 if normalized not in WORK_MODES:
-                    raise ValueError("无效运行模式，仅支持 plan / ask / execute")
+                    raise ValueError(tr("tools_policy.invalid_work_mode"))
                 self.current_work_mode = normalized
                 if not persist:
                     return normalized
@@ -269,7 +271,7 @@ class MainTerminalToolsPolicyMixin:
                 """
                 normalized = str(mode or "").strip().lower()
                 if normalized not in WORK_MODES:
-                    raise ValueError("无效运行模式，仅支持 plan / ask / execute")
+                    raise ValueError(tr("tools_policy.invalid_work_mode"))
                 previous = self.get_work_mode()
                 conv_id = conversation_id or getattr(getattr(self, "context_manager", None), "current_conversation_id", None)
 
@@ -349,13 +351,13 @@ class MainTerminalToolsPolicyMixin:
     def set_permission_mode(self, mode: str, *, persist: bool = True, conversation_id: Optional[str] = None) -> str:
                 normalized = str(mode or "").strip().lower()
                 if normalized not in PERMISSION_MODES:
-                    raise ValueError("无效权限模式，仅支持 readonly / approval / auto_approval / unrestricted")
+                    raise ValueError(tr("tools_policy.invalid_permission_mode"))
                 # 计划模式下权限锁死为只读（后端强制）：仅允许保持/切到 readonly。
                 # 解除锁定的唯一路径是 switch_work_mode 先切离 plan 再恢复权限。
                 if normalized != "readonly" and getattr(self, "get_work_mode", None):
                     try:
                         if self.get_work_mode() == "plan":
-                            raise ValueError("计划模式下权限模式锁定为只读，请先切换运行模式")
+                            raise ValueError(tr("tools_policy.plan_mode_locks_readonly"))
                     except AttributeError:
                         pass
                 previous = self.get_permission_mode()
@@ -433,10 +435,10 @@ class MainTerminalToolsPolicyMixin:
                 """设置工具类别的启用状态 / Toggle tool category enablement."""
                 categories = self.tool_categories_map
                 if category not in categories:
-                    raise ValueError(f"未知的工具类别: {category}")
+                    raise ValueError(tr("tools_policy.unknown_tool_category", category=category))
                 forced = self.admin_forced_category_states.get(category)
                 if isinstance(forced, bool) and forced != enabled:
-                    raise ValueError("该类别被管理员强制为启用/禁用，无法修改")
+                    raise ValueError(tr("tools_policy.category_admin_locked"))
                 final_enabled = bool(enabled)
                 self.tool_category_states[category] = final_enabled
                 self._ensure_runtime_tool_overrides()[category] = final_enabled

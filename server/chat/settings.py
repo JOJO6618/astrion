@@ -45,6 +45,8 @@ from server.state import tool_approval_manager, user_question_manager
 from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
+from modules.i18n import tr
+
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 
 
@@ -117,7 +119,7 @@ def update_thinking_mode(terminal: WebTerminal, workspace: UserWorkspace, userna
         return jsonify({
             "success": False,
             "error": str(exc),
-            "message": "切换思考模式时发生异常"
+            "message": tr("chat_settings.thinking_mode_exception")
         }), code
 
 @chat_bp.route('/api/reasoning-effort', methods=['POST'])
@@ -182,7 +184,7 @@ def update_reasoning_effort(terminal: WebTerminal, workspace: UserWorkspace, use
         return jsonify({
             "success": False,
             "error": str(exc),
-            "message": "设置推理强度时发生异常"
+            "message": tr("chat_settings.reasoning_effort_exception")
         }), code
 
 @chat_bp.route('/api/model', methods=['POST'])
@@ -195,7 +197,7 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
         data = request.get_json() or {}
         model_key = data.get("model_key")
         if not model_key:
-            return jsonify({"success": False, "error": "缺少 model_key"}), 400
+            return jsonify({"success": False, "error": tr("chat_settings.missing_model_key")}), 400
 
         # 管理员禁用模型校验
         policy = resolve_admin_policy(get_current_user_record())
@@ -203,8 +205,8 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
         if model_key in disabled_models:
             return jsonify({
                 "success": False,
-                "error": "该模型已被管理员禁用",
-                "message": "被管理员强制禁用"
+                "error": tr("chat_settings.model_admin_disabled"),
+                "message": tr("chat_settings.admin_forced_disabled")
             }), 403
 
         # /new 页面语义：请求未携带 conversation_id 且为工作区级 terminal 时，
@@ -282,7 +284,7 @@ def get_personalization_settings(terminal: WebTerminal, workspace: UserWorkspace
     try:
         policy = resolve_admin_policy(get_current_user_record())
         if policy.get("ui_blocks", {}).get("block_personal_space"):
-            return jsonify({"success": False, "error": "个人空间已被管理员禁用"}), 403
+            return jsonify({"success": False, "error": tr("chat_settings.personal_space_admin_disabled")}), 403
         data = load_personalization_config(workspace.data_dir)
         private_skills_dir = infer_private_skills_dir(workspace.data_dir)
         skills_catalog = get_skills_catalog(private_dir=private_skills_dir)
@@ -332,7 +334,7 @@ def update_personalization_settings(terminal: WebTerminal, workspace: UserWorksp
     try:
         policy = resolve_admin_policy(get_current_user_record())
         if policy.get("ui_blocks", {}).get("block_personal_space"):
-            return jsonify({"success": False, "error": "个人空间已被管理员禁用"}), 403
+            return jsonify({"success": False, "error": tr("chat_settings.personal_space_admin_disabled")}), 403
         config = save_personalization_config(workspace.data_dir, payload)
         private_skills_dir = infer_private_skills_dir(workspace.data_dir)
         skills_catalog = get_skills_catalog(private_dir=private_skills_dir)

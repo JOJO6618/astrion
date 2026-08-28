@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
+from modules.i18n import tr
+
 
 class EasterEggManager:
     """管理隐藏彩蛋效果的触发逻辑。"""
@@ -17,7 +19,7 @@ class EasterEggManager:
             "flood": {
                 "label": "灌水",
                 "aliases": ["flood", "water", "wave", "灌水", "注水"],
-                "message": "淡蓝色水面从底部缓缓上涨，并带有柔和波纹。",
+                "message": tr("easter_egg.flood_message"),
                 "duration_seconds": 45,
                 "intensity_range": (0.87, 0.93),
                 "notes": "特效为半透明覆盖层，不会阻挡交互。",
@@ -25,7 +27,7 @@ class EasterEggManager:
             "snake": {
                 "label": "贪吃蛇",
                 "aliases": ["snake", "贪吃蛇", "snakegame", "snake_game"],
-                "message": "发光的丝带贪吃蛇追逐苹果，吃满 20 个后会一路远行离开屏幕。",
+                "message": tr("easter_egg.snake_message"),
                 "duration_seconds": 200,
                 "notes": "动画为独立 Canvas，不影响页面点击。",
                 "apples_target": 20,
@@ -45,7 +47,7 @@ class EasterEggManager:
         """
         effect_key = (effect or "").strip().lower()
         if not effect_key:
-            return self._build_error("缺少 effect 参数")
+            return self._build_error(tr("easter_egg.missing_effect"))
 
         for effect_id, metadata in self.effects.items():
             aliases = metadata.get("aliases", [])
@@ -62,7 +64,7 @@ class EasterEggManager:
                     payload[key] = value
                 return payload
 
-        return self._build_error(f"未知彩蛋: {effect_key}")
+        return self._build_error(tr("easter_egg.unknown_effect", effect=effect_key))
 
     def _build_error(self, message: str) -> Dict[str, object]:
         """返回格式化的错误信息。"""

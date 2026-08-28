@@ -5,6 +5,8 @@ import json
 from typing import Dict, Any, List, Union, Tuple
 from utils.logger import setup_logger
 
+from modules.i18n import tr
+
 logger = setup_logger(__name__)
 
 async def tavily_extract(urls: Union[str, List[str]], api_key: str, extract_depth: str = "basic", max_urls: int = 1) -> Dict[str, Any]:
@@ -21,7 +23,7 @@ async def tavily_extract(urls: Union[str, List[str]], api_key: str, extract_dept
         提取结果字典
     """
     if not api_key:
-        return {"error": "Tavily API密钥未配置"}
+        return {"error": tr("webpage.api_key_missing")}
 
     # 确保urls是列表
     if isinstance(urls, str):
@@ -49,15 +51,15 @@ async def tavily_extract(urls: Union[str, List[str]], api_key: str, extract_dept
             if response.status_code == 200:
                 return response.json()
             else:
-                return {"error": f"API请求失败: HTTP {response.status_code}"}
+                return {"error": tr("webpage.api_request_failed", status_code=response.status_code)}
 
     except httpx.TimeoutException:
-        return {"error": "请求超时，网页响应过慢"}
+        return {"error": tr("webpage.timeout")}
     except httpx.RequestError as e:
-        return {"error": f"网络请求错误: {str(e)}"}
+        return {"error": tr("webpage.network_error", error=str(e))}
     except Exception as e:
         logger.error(f"网页提取异常: {e}")
-        return {"error": f"提取异常: {str(e)}"}
+        return {"error": tr("webpage.extract_error", error=str(e))}
 
 
 def format_extract_results(results: Dict[str, Any]) -> str:
@@ -71,10 +73,10 @@ def format_extract_results(results: Dict[str, Any]) -> str:
         格式化后的内容字符串
     """
     if "error" in results:
-        return f"❌ 提取失败: {results['error']}"
+        return tr("webpage.format_failed", error=results["error"])
 
     if not results.get("results"):
-        return "❌ 未能提取到任何内容"
+        return tr("webpage.no_content")
 
     formatted_parts = []
     
@@ -97,7 +99,7 @@ def format_extract_results(results: Dict[str, Any]) -> str:
     if results.get("failed_results"):
         formatted_parts.append("\n❌ 提取失败的URL:")
         for failed in results["failed_results"]:
-            formatted_parts.append(f"- {failed.get('url', 'N/A')}: {failed.get('error', '未知错误')}")
+            formatted_parts.append(f"- {failed.get('url', 'N/A')}: {failed.get('error', tr('webpage.unknown_error'))}")
 
     return "\n".join(formatted_parts)
 

@@ -12,6 +12,8 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request, send_file
 
+from modules.i18n import tr
+
 from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record
 from .context import with_terminal, get_gui_manager
 from .utils_common import debug_log
@@ -24,7 +26,7 @@ files_bp = Blueprint("files", __name__)
 def get_files(terminal, workspace, username):
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("collapse_workspace") or policy.get("ui_blocks", {}).get("block_file_manager"):
-        return jsonify({"success": False, "error": "文件浏览已被管理员禁用"}), 403
+        return jsonify({"success": False, "error": tr("files.browse_disabled_admin")}), 403
     structure = terminal.context_manager.get_project_structure()
     return jsonify(structure)
 
@@ -47,7 +49,7 @@ def _format_entry(entry) -> Dict[str, Any]:
 def gui_list_entries(terminal, workspace, username):
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_file_manager"):
-        return jsonify({"success": False, "error": "文件管理已被管理员禁用"}), 403
+        return jsonify({"success": False, "error": tr("files.manage_disabled_admin")}), 403
     relative_path = request.args.get('path') or ""
     manager = get_gui_manager(workspace)
     try:
@@ -71,7 +73,7 @@ def gui_list_entries(terminal, workspace, username):
 def gui_download_entry(terminal, workspace, username):
     path = request.args.get('path')
     if not path:
-        return jsonify({"success": False, "error": "缺少 path"}), 400
+        return jsonify({"success": False, "error": tr("files.missing_path")}), 400
     manager = get_gui_manager(workspace)
     try:
         target = manager.prepare_download(path)
@@ -99,7 +101,7 @@ def gui_text_entry(terminal, workspace, username):
     if request.method == 'GET':
         path = request.args.get('path')
         if not path:
-            return jsonify({"success": False, "error": "缺少 path"}), 400
+            return jsonify({"success": False, "error": tr("files.missing_path")}), 400
         try:
             content, modified = manager.read_text(path)
             return jsonify({"success": True, "path": path, "content": content, "modified_at": modified})
@@ -110,7 +112,7 @@ def gui_text_entry(terminal, workspace, username):
     path = payload.get('path')
     content = payload.get('content')
     if path is None or content is None:
-        return jsonify({"success": False, "error": "缺少 path 或 content"}), 400
+        return jsonify({"success": False, "error": tr("files.missing_path_or_content")}), 400
     try:
         result = manager.write_text(path, content)
         return jsonify({"success": True, "data": result})
@@ -215,21 +217,21 @@ def search_project_files(terminal, workspace, username):
     """为 @文件 功能提供项目内文件/文件夹搜索（包含隐藏目录）。"""
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("collapse_workspace") or policy.get("ui_blocks", {}).get("block_file_manager"):
-        return jsonify({"success": False, "error": "文件浏览已被管理员禁用"}), 403
+        return jsonify({"success": False, "error": tr("files.browse_disabled_admin")}), 403
 
     query = str(request.args.get('q') or '').strip()
 
     try:
         project_path = Path(getattr(workspace, 'project_path', '') or '').expanduser().resolve()
         if not project_path.exists():
-            return jsonify({"success": False, "error": "项目路径不存在"}), 400
+            return jsonify({"success": False, "error": tr("files.project_path_not_found")}), 400
     except Exception as exc:
-        return jsonify({"success": False, "error": f"项目路径无效: {exc}"}), 400
+        return jsonify({"success": False, "error": tr("files.invalid_project_path", error=exc)}), 400
 
     try:
         files, folders = _scan_project_entries(project_path, max_depth=6)
     except Exception as exc:
-        return jsonify({"success": False, "error": f"扫描项目失败: {exc}"}), 500
+        return jsonify({"success": False, "error": tr("files.scan_project_failed", error=exc)}), 500
 
     if not query:
         root_files, root_folders = _scan_root_entries(project_path)

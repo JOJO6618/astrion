@@ -11,6 +11,7 @@ import functools
 from flask import request, jsonify, session, g
 
 from . import state
+from modules.i18n import tr
 
 
 def _extract_bearer_token() -> str:
@@ -25,11 +26,11 @@ def api_token_required(view_func):
     def wrapped(*args, **kwargs):
         token = _extract_bearer_token()
         if not token:
-            return jsonify({"success": False, "error": "缺少 Bearer Token"}), 401
+            return jsonify({"success": False, "error": tr("auth.missing_bearer_token")}), 401
 
         record = state.api_user_manager.get_user_by_token(token)
         if not record:
-            return jsonify({"success": False, "error": "无效的 Token"}), 401
+            return jsonify({"success": False, "error": tr("auth.invalid_token")}), 401
 
         try:
             state.api_user_manager.bump_usage(record.username, request.path)
