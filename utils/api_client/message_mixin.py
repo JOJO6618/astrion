@@ -44,6 +44,20 @@ class APIClientMessageMixin:
         if not messages:
             return messages
 
+        # 防御：上游偶发会把裸字符串混进消息列表（如子智能体压缩重建的 system
+        # prompt 文本），直接 .get() 会崩。统一包装为标准 system 消息，保留内容。
+        # 下游 sanitizer 对非 dict 是静默丢弃，先行归一也能避免内容丢失。
+        normalized: List[Dict] = []
+        for item in messages:
+            if isinstance(item, dict):
+                normalized.append(item)
+            else:
+                normalized.append({
+                    "role": "system",
+                    "content": item if isinstance(item, str) else json.dumps(item, ensure_ascii=False),
+                })
+        messages = normalized
+
         merged_contents: List[str] = []
         idx = 0
         while idx < len(messages) and messages[idx].get("role") == "system":

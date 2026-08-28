@@ -1099,7 +1099,10 @@ class SubAgentTask:
         summary_text = "\n".join(summary_lines)
 
         # 重建消息列表：冻结的 system prompt + 压缩摘要 system + 保留的最近消息
-        frozen_system = self._rebuild_system_prompt()
+        # 注意：_rebuild_system_prompt 返回裸字符串，必须包装为标准消息 dict；
+        # 否则下游 API 客户端（_merge_system_messages 的 msg.get("role")）会在
+        # 压缩后的首次模型调用崩溃（'str' object has no attribute 'get'）。
+        frozen_system = {"role": "system", "content": self._rebuild_system_prompt()}
         compressed_system = {
             "role": "system",
             "content": summary_text,
