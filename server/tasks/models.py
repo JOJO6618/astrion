@@ -105,12 +105,19 @@ class TaskManager:
         self._lock = threading.Lock()
 
     def cleanup_old_tasks(self, max_age_seconds: int = 3600) -> int:
-        """清理超过指定时间的已完成任务"""
+        """清理超过指定时间的已完成/已停止任务。
+
+        终态集合说明：用户取消的实际终态是 "stopped"（历史代码误写为从未被赋值的
+        "canceled"，导致 stopped 任务永不清理，此处修正并保留 canceled 兼容）。
+        cancel_requested 正常是 cancel_task 到收尾之间的秒级瞬态；若因进程异常残留
+        超过 max_age，必为死记录，一并清理兜底（updated_at 在打标时已刷新，正常
+        收尾中的任务不可能存活到 max_age）。
+        """
         now = time.time()
         with self._lock:
             to_remove = []
             for task_id, rec in self._tasks.items():
-                if rec.status in {"succeeded", "failed", "canceled"}:
+                if rec.status in {"succeeded", "failed", "stopped", "canceled", "cancel_requested"}:
                     age = now - rec.updated_at
                     if age > max_age_seconds:
                         to_remove.append(task_id)
@@ -1009,17 +1016,17 @@ class TaskManager:
             # 结束状态
             canceled_flag = rec.stop_requested or stop_hint or bool(stop_flags.get(rec.task_id, {}).get("stop"))
             if canceled_flag:
-                # 用户取消时，根据是否还有后台任务决定状态：
-                # - 有后台任务：保持 cancel_requested，等待用户第二下清理
-                # - 无后台任务：直接 stopped
-                # 注意：如果 cancel_task 第二下已经先把 rec.status 设为 stopped，则保持 stopped。
+                # 用户取消：主任务一律以 stopped 终态收尾。
+                # cancel_requested 仅作为 cancel_task 到本收尾之间的瞬态（此期间仍视为
+                # 活跃，防止前端对账在收尾间隙误清运行态/重复重放）。
+                # 后台任务（子智能体/后台命令）有独立的停止入口与运行状态，主任务不再
+                # 为其保持 cancel_requested 等待「第二下点击」——该交互已废弃，保持
+                # cancel_requested 只会让任务永久卡在活跃集合，被 bootstrap / 对账当作
+                # 「最新活跃主任务」反复重放死任务事件流（显示回退事故的根因）。
                 bg_state = self._has_running_background(rec, terminal)
                 has_bg = bg_state["has_running_sub_agents"] or bg_state["has_running_background_commands"]
                 with self._lock:
-                    if rec.status == "stopped":
-                        new_status = "stopped"
-                    else:
-                        new_status = "cancel_requested" if has_bg else "stopped"
+                    new_status = "stopped"
                     rec.status = new_status
                     rec.updated_at = time.time()
                 debug_log(
