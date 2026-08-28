@@ -11,19 +11,19 @@
           :disabled="previewLoading"
           @click="openHtmlPreview"
         >
-          {{ previewLoading ? '加载中…' : '预览' }}
+          {{ previewLoading ? $t('common.loading') : $t('chat.preview') }}
         </button>
         <button v-if="canCopy" type="button" class="sfc-btn" @click="copyContent">
-          {{ copied ? '已复制' : '复制' }}
+          {{ copied ? $t('common.copied') : $t('common.copy') }}
         </button>
-        <button type="button" class="sfc-btn sfc-btn-download" @click="handleDownload">下载</button>
+        <button type="button" class="sfc-btn sfc-btn-download" @click="handleDownload">{{ $t('common.download') }}</button>
       </div>
     </div>
 
     <div class="sfc-preview" :class="{ 'sfc-preview--csv': fileType === 'csv' }" v-if="canPreview">
       <div class="sfc-loading" v-if="loading">
         <span class="sfc-spinner"></span>
-        <span>加载中...</span>
+        <span>{{ $t('common.loading') }}</span>
       </div>
 
       <div class="sfc-error" v-else-if="error">{{ error }}</div>
@@ -48,7 +48,7 @@
           </table>
         </div>
         <div class="sfc-csv-meta" v-if="csvTruncated">
-          仅显示前 {{ csvRows.length }} 行，完整内容请下载查看
+          {{ $t('chat.csvTruncated', { n: csvRows.length }) }}
         </div>
       </template>
 
@@ -81,6 +81,7 @@ import { renderMarkdown } from '../../composables/useMarkdownRenderer';
 import { buildShowHtmlIframeSrcdoc } from '@/utils/showHtmlSandbox';
 import { openShowHtmlFullscreen } from '@/utils/showHtmlFullscreen';
 import PdfPreview from './PdfPreview.vue';
+import { t } from '@/locales';
 
 // 文本类文件内容缓存，避免父组件反复重建卡片时重复 fetch 导致闪烁
 const SHOW_FILE_CONTENT_CACHE = new Map<string, { content: string; ts: number }>();
@@ -305,7 +306,7 @@ async function openHtmlPreview() {
         } catch {
           // 响应体非 JSON 时沿用 statusText
         }
-        error.value = msg || '加载失败';
+        error.value = msg || t('common.loadFailed');
         return;
       }
       content = await resp.text();
@@ -314,7 +315,7 @@ async function openHtmlPreview() {
       rawContent.value = content;
     }
     if (!content.trim()) {
-      error.value = '文件内容为空';
+      error.value = t('chat.fileEmpty');
       return;
     }
     openShowHtmlFullscreen({
@@ -322,11 +323,11 @@ async function openHtmlPreview() {
       allowScripts: true,
       title: displayName.value,
       notice: detectExternalResourceRefs(content)
-        ? '含外部资源引用，预览可能不完整'
+        ? t('chat.htmlPreviewNotice')
         : undefined
     });
   } catch (e) {
-    error.value = (e as Error).message || '网络错误';
+    error.value = (e as Error).message || t('chat.networkError');
   } finally {
     previewLoading.value = false;
   }
@@ -359,7 +360,7 @@ async function loadContent() {
         } catch {
           // 响应体非 JSON 时沿用 statusText
         }
-        error.value = msg || '加载失败';
+        error.value = msg || t('common.loadFailed');
         return;
       }
       const content = await resp.text();
@@ -367,7 +368,7 @@ async function loadContent() {
       setCachedShowFileContent(props.path, content);
     }
   } catch (e) {
-    error.value = (e as Error).message || '网络错误';
+    error.value = (e as Error).message || t('chat.networkError');
   } finally {
     loading.value = false;
   }
@@ -398,7 +399,7 @@ async function handleDownload() {
       } catch {
         // 响应体非 JSON 时沿用 statusText
       }
-      throw new Error(msg || '下载失败');
+      throw new Error(msg || t('common.downloadFailed'));
     }
     const blob = await resp.blob();
     const blobUrl = URL.createObjectURL(blob);
@@ -433,7 +434,7 @@ function openFullImage() {
 }
 
 function onImageError() {
-  error.value = '图片加载失败';
+  error.value = t('chat.imageLoadFailed');
 }
 
 onMounted(() => {

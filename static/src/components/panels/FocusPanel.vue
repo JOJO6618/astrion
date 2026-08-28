@@ -7,20 +7,20 @@
     <div class="sidebar-header">
       <h3 class="icon-label">
         <span class="icon icon-sm" :style="iconStyle('eye')" aria-hidden="true"></span>
-        <span>聚焦文件 ({{ focusedCount }}/3)</span>
+        <span>{{ $t('shell.focusFilesCount', { n: focusedCount }) }}</span>
       </h3>
       <button
         v-if="showCloseButton"
         type="button"
         class="focus-close-btn"
-        aria-label="关闭聚焦面板"
+        :aria-label="$t('shell.closeFocusPanel')"
         @click="$emit('close')"
       >
         ×
       </button>
     </div>
     <div class="focused-files" v-if="!collapsed">
-      <div v-if="!focusedCount" class="no-files">暂无聚焦文件</div>
+      <div v-if="!focusedCount" class="no-files">{{ $t('shell.noFocusFiles') }}</div>
       <div v-else class="file-tabs">
         <div v-for="(file, path) in focusedFileMap" :key="path" class="file-tab">
           <div class="tab-header">

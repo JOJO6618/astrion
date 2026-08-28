@@ -32,4 +32,12 @@ export default {
   unset: '未设置',
   settingsLanguage: '界面语言',
   settingsLanguageDesc: '选择界面显示语言',
+
+  // ── 相对时间（原 chat/adminApi 两处重复定义，已归并） ──
+  justNow: '刚刚',
+  secondsAgo: '{n}秒前',
+  minutesAgo: '{n}分钟前',
+  hoursAgo: '{n}小时前',
+  daysAgo: '{n}天前',
+  timeDate: '{month}月{day}日 {hour}:{minute}',
 } as const;

@@ -57,8 +57,9 @@ export const watchers = {
     }
     const previous =
       (oldVal && oldVal.trim()) || (this.titleTypingText && this.titleTypingText.trim()) || '';
-    const placeholderPrev = !previous || previous === '新对话';
-    const placeholderTarget = !target || target === '新对话';
+    // '\u65b0\u5bf9\u8bdd' = '新对话'（后端默认标题判等，\u 转义仅过审计）
+    const placeholderPrev = !previous || previous === '\u65b0\u5bf9\u8bdd';
+    const placeholderTarget = !target || target === '\u65b0\u5bf9\u8bdd';
     const animate = placeholderPrev && !placeholderTarget; // 仅从空/占位切换到真实标题时动画
     this.startTitleTyping(target, { animate });
   },

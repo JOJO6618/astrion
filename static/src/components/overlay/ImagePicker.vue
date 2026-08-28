@@ -4,9 +4,9 @@
       <div class="image-picker-panel">
         <div class="header">
           <div class="header-left">
-            <div class="title">选择图片（最多9张）</div>
+            <div class="title">{{ $t('overlay.imagePickerTitle') }}</div>
             <button type="button" class="local-btn" :disabled="uploading" @click="triggerLocal">
-              {{ uploading ? '上传中...' : '从本地发送' }}
+              {{ uploading ? $t('overlay.uploading') : $t('overlay.sendFromLocal') }}
             </button>
             <input
               ref="localInput"
@@ -20,8 +20,8 @@
           <button class="close-btn" @click="close">×</button>
         </div>
         <div class="body">
-          <div v-if="loading" class="loading">加载中...</div>
-          <div v-else-if="!images.length" class="empty">未找到图片文件</div>
+          <div v-if="loading" class="loading">{{ $t('common.loading') }}</div>
+          <div v-else-if="!images.length" class="empty">{{ $t('overlay.noImages') }}</div>
           <div v-else class="grid">
             <div
               v-for="item in images"
@@ -37,16 +37,16 @@
           </div>
         </div>
         <div class="footer">
-          <div class="count">已选 {{ selectedSet.size }} / 9</div>
+          <div class="count">{{ $t('overlay.imageSelectedCount', { n: selectedSet.size }) }}</div>
           <div class="actions">
-            <button type="button" class="btn secondary" @click="close">取消</button>
+            <button type="button" class="btn secondary" @click="close">{{ $t('common.cancel') }}</button>
             <button
               type="button"
               class="btn primary"
               :disabled="!selectedSet.size"
               @click="confirm"
             >
-              确认
+              {{ $t('common.confirm') }}
             </button>
           </div>
         </div>

@@ -11,8 +11,8 @@
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
           </div>
-          <div class="drag-upload-text">松开鼠标上传图片</div>
-          <div class="drag-upload-hint">支持拖拽图片、视频文件到此处</div>
+          <div class="drag-upload-text">{{ $t('appCore.dragUploadText') }}</div>
+          <div class="drag-upload-hint">{{ $t('appCore.dragUploadHint') }}</div>
         </div>
       </div>
     </transition>
@@ -48,10 +48,10 @@
         </div>
       </div>
       <div class="loading-copy">
-        <h2>加载中...</h2>
-        <p>正在连接服务器，请稍候</p>
+        <h2>{{ $t('common.loading') }}</h2>
+        <p>{{ $t('appCore.connectingServer') }}</p>
         <button type="button" class="loading-refresh-btn" @click="refreshCurrentPage">
-          刷新页面
+          {{ $t('appCore.refreshPage') }}
         </button>
       </div>
     </div>
@@ -160,7 +160,7 @@
             <transition name="header-menu">
               <div v-if="headerMenuOpen" class="model-mode-dropdown" ref="headerMenu">
                 <div class="dropdown-column" data-tutorial="header-model-options">
-                  <div class="dropdown-title">模型</div>
+                  <div class="dropdown-title">{{ $t('appCore.model') }}</div>
                   <div class="dropdown-list dropdown-list--models">
                     <button
                       v-for="option in modelOptions"
@@ -179,7 +179,7 @@
                 </div>
 
                 <div class="dropdown-column" data-tutorial="header-runmode-options">
-                  <div class="dropdown-title">运行模式</div>
+                  <div class="dropdown-title">{{ $t('appCore.runMode') }}</div>
                   <button
                     v-for="option in headerRunModeOptions"
                     :key="option.value"
@@ -385,7 +385,7 @@
           <button
             type="button"
             class="qd-toggle"
-            :aria-label="qdExpanded ? '收起快捷窗口' : '展开快捷窗口'"
+            :aria-label="qdExpanded ? $t('appCore.collapseQuickDock') : $t('appCore.expandQuickDock')"
             :aria-pressed="qdExpanded"
             @click="qdUserCollapsed = !qdUserCollapsed"
           >
@@ -592,7 +592,7 @@
             type="button"
             class="mobile-panel-fab"
             data-tutorial="mobile-menu-trigger"
-            aria-label="切换工作区"
+            :aria-label="$t('appCore.switchWorkspace')"
             @click="toggleMobileOverlayMenu"
           >
             <img :src="mobilePanelIcon" alt="" aria-hidden="true" />
@@ -611,8 +611,11 @@
               <span class="mobile-selector-mode">{{ headerRunModeLabel }}</span>
             </span>
           </button>
-          <div class="mobile-topbar-title" :title="currentConversationTitle || '未命名对话'">
-            {{ currentConversationTitle || '未命名对话' }}
+          <div
+            class="mobile-topbar-title"
+            :title="currentConversationTitle || $t('overlay.unnamedConversation')"
+          >
+            {{ currentConversationTitle || $t('overlay.unnamedConversation') }}
           </div>
         </div>
         <transition name="mobile-panel-menu">
@@ -621,7 +624,7 @@
               type="button"
               class="dropdown-item mobile-menu-item"
               data-tutorial="mobile-menu-conversation"
-              aria-label="对话记录"
+              :aria-label="$t('appCore.conversationHistory')"
               @click="openMobileOverlay('conversation')"
             >
               <svg class="mobile-menu-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -646,13 +649,13 @@
                   stroke-linecap="round"
                 />
               </svg>
-              <div class="item-label">对话记录</div>
+              <div class="item-label">{{ $t('appCore.conversationHistory') }}</div>
             </button>
             <button
               type="button"
               class="dropdown-item mobile-menu-item mobile-menu-item--personal"
               data-tutorial="mobile-menu-personal"
-              aria-label="个人空间"
+              :aria-label="$t('appCore.personalSpace')"
               @click="handleMobilePersonalClick"
             >
               <img
@@ -661,13 +664,13 @@
                 alt=""
                 aria-hidden="true"
               />
-              <div class="item-label">个人空间</div>
+              <div class="item-label">{{ $t('appCore.personalSpace') }}</div>
             </button>
             <button
               type="button"
               class="dropdown-item mobile-menu-item"
               data-tutorial="mobile-menu-new-chat"
-              aria-label="新建对话"
+              :aria-label="$t('common.newConversation')"
               @click="createNewConversation"
             >
               <img
@@ -676,13 +679,13 @@
                 alt=""
                 aria-hidden="true"
               />
-              <div class="item-label">新建对话</div>
+              <div class="item-label">{{ $t('common.newConversation') }}</div>
             </button>
             <button
               v-if="isAppShell"
               type="button"
               class="dropdown-item mobile-menu-item mobile-menu-item--refresh"
-              aria-label="刷新页面"
+              :aria-label="$t('appCore.refreshPage')"
               @click="handleMobileRefreshClick"
             >
               <img
@@ -691,7 +694,7 @@
                 alt=""
                 aria-hidden="true"
               />
-              <div class="item-label">刷新页面</div>
+              <div class="item-label">{{ $t('appCore.refreshPage') }}</div>
             </button>
           </div>
         </transition>
@@ -702,7 +705,7 @@
             ref="headerMenu"
           >
             <div class="dropdown-column" data-tutorial="header-model-options">
-              <div class="dropdown-title">模型</div>
+              <div class="dropdown-title">{{ $t('appCore.model') }}</div>
               <div class="dropdown-list dropdown-list--models">
                 <button
                   v-for="option in modelOptions"
@@ -720,7 +723,7 @@
             </div>
 
             <div class="dropdown-column" data-tutorial="header-runmode-options">
-              <div class="dropdown-title">运行模式</div>
+              <div class="dropdown-title">{{ $t('appCore.runMode') }}</div>
               <button
                 v-for="option in headerRunModeOptions"
                 :key="option.value"

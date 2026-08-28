@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { useConversationStore } from './conversation';
 
 interface SubAgent {
@@ -184,7 +185,7 @@ export const useSubAgentStore = defineStore('subAgent', {
     async terminateSubAgent(taskId: string) {
       const normalizedId = (taskId || '').toString().trim();
       if (!normalizedId) {
-        return { success: false, error: 'task_id 不能为空' };
+        return { success: false, error: t('stores.taskIdRequired') };
       }
       this.stoppingTaskIds = {
         ...this.stoppingTaskIds,

@@ -9,6 +9,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import rehypeStringify from 'rehype-stringify';
 import { visit } from 'unist-util-visit';
+import { t } from '@/locales';
 
 let latexRenderTimer: number | null = null;
 let streamingCodeHighlightTimer: number | null = null;
@@ -587,6 +588,7 @@ function wrapCodeBlocks(html: string, isStreaming = false) {
       const language = langMatch ? langMatch[1] : 'text';
       const blockId = `code-${stableHash(`${attributes}|${content}`)}`;
       const streamingAttr = isStreaming ? ' data-streaming="1"' : '';
+      const copyCodeLabel = t('utils.copyCode');
       const escapedContent = content
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -597,7 +599,7 @@ function wrapCodeBlocks(html: string, isStreaming = false) {
             <div class="code-block-wrapper"${streamingAttr} data-md-code-block="1">
                 <div class="code-block-header">
                     <span class="code-language">${language}</span>
-                    <button class="copy-code-btn" data-code="${blockId}" title="复制代码" aria-label="复制代码"></button>
+                    <button class="copy-code-btn" data-code="${blockId}" title="${copyCodeLabel}" aria-label="${copyCodeLabel}"></button>
                 </div>
                 <pre><code${attributes} data-code-id="${blockId}" data-original-code="${escapedContent}">${content}</code></pre>
             </div>`;

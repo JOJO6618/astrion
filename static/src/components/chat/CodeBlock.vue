@@ -9,8 +9,8 @@
       <button
         class="copy-code-btn"
         :class="{ copied }"
-        title="复制代码"
-        aria-label="复制代码"
+        :title="$t('chat.copyCode')"
+        :aria-label="$t('chat.copyCode')"
         @click="handleCopy"
       ></button>
     </div>

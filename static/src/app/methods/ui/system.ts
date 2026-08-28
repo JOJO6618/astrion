@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -91,7 +92,7 @@ export const systemMethods = {
   pickWelcomeText() {
     const pool = this.blankWelcomePool;
     if (!Array.isArray(pool) || !pool.length) {
-      this.blankWelcomeText = '有什么可以帮忙的？';
+      this.blankWelcomeText = t('appUi.blankWelcomeDefault');
       return;
     }
     const idx = Math.floor(Math.random() * pool.length);

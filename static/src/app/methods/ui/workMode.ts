@@ -4,12 +4,14 @@
 // 空闲才可切换（运行中后端返回 409）、切换结果由后端注入系统通知。
 // 联动规则：plan 档锁定权限为只读（UI 禁用 + 后端强制）；
 // submit_plan 批准后后端自动切到 execute，前端经 plan_approval_resolved 刷新。
+import { t, currentLocale } from '@/locales';
 
 export const workModeMethods = {
   getWorkModeLabel(mode) {
+    void currentLocale.value;
     const options = Array.isArray(this.workModeOptions) ? this.workModeOptions : [];
     const hit = options.find((item) => item.value === mode);
-    return hit ? hit.label : mode || '未知';
+    return hit ? hit.label : mode || t('appUi.unknown');
   },
   async fetchWorkMode() {
     try {
@@ -58,10 +60,10 @@ export const workModeMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (response.status === 409) {
-        throw new Error(payload?.message || '对话运行中，请等待当前任务结束后再切换运行模式');
+        throw new Error(payload?.message || t('appUi.workModeRunningMessage'));
       }
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || payload?.error || '切换运行模式失败');
+        throw new Error(payload?.message || payload?.error || t('appUi.switchRunModeFailed'));
       }
       if (typeof payload?.mode === 'string') {
         this.currentWorkMode = payload.mode;
@@ -77,17 +79,17 @@ export const workModeMethods = {
       } else {
         this.fetchExecutionMode();
       }
-      const labelMap: Record<string, string> = { plan: '计划', ask: '询问', execute: '执行' };
+      const labelMap: Record<string, string> = { plan: t('appUi.workModePlan'), ask: t('appUi.workModeAsk'), execute: t('appUi.workModeExecute') };
       this.uiPushToast({
-        title: '运行模式已更新',
-        message: payload?.message || `已切换为 ${labelMap[this.currentWorkMode] || this.currentWorkMode}`,
+        title: t('appUi.runModeUpdated'),
+        message: payload?.message || t('appUi.switchedToMode', { mode: labelMap[this.currentWorkMode] || this.currentWorkMode }),
         type: 'info',
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '切换运行模式失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchRunModeFailed'));
       this.uiPushToast({
-        title: '切换运行模式失败',
+        title: t('appUi.switchRunModeFailed'),
         message: msg,
         type: 'error'
       });

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -54,7 +55,7 @@ export const tutorialMethods = {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data?.success) {
-        throw new Error(data?.error || '更新新手教程状态失败');
+        throw new Error(data?.error || t('appUi.updateTutorialStatusFailed'));
       }
       const tutorialStore = useTutorialStore();
       tutorialStore.markCompleted();
@@ -63,8 +64,8 @@ export const tutorialMethods = {
     } catch (error) {
       console.warn('更新新手教程提示状态失败:', error);
       this.uiPushToast({
-        title: '提示',
-        message: '保存新手教程状态失败，请稍后重试',
+        title: t('appUi.notice'),
+        message: t('appUi.tutorialSaveFailedMessage'),
         type: 'warning'
       });
       return false;

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 
 export type ModelKey = string;
 
@@ -69,7 +70,7 @@ export const useModelStore = defineStore('model', {
       const resp = await fetch('/api/v1/models', { cache: 'no-store' });
       const data = await resp.json();
       if (!resp.ok || !data?.success || !Array.isArray(data.items)) {
-        throw new Error(data?.error || '加载模型列表失败');
+        throw new Error(data?.error || t('stores.loadModelListFailed'));
       }
       const mapped: ModelOption[] = data.items
         .filter((item: any) => item && item.model_key)

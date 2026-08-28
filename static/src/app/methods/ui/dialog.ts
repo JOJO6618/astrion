@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -25,7 +26,7 @@ import {
 
 export const dialogMethods = {
   openPersonalPage() {
-    if (this.isPolicyBlocked('block_personal_space', '个人空间已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_personal_space', t('appUi.policyBlockedPersonalSpace'))) {
       return;
     }
     this.personalizationOpenDrawer();
@@ -114,7 +115,7 @@ export const dialogMethods = {
       );
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
-        throw new Error(result?.message || result?.error || '提交计划决策失败');
+        throw new Error(result?.message || result?.error || t('appUi.submitPlanDecisionFailed'));
       }
       this.pendingPlanApprovals = (this.pendingPlanApprovals || []).filter(
         (item) => item && String(item.approval_id || '') !== approvalId
@@ -125,22 +126,22 @@ export const dialogMethods = {
         this.fetchPermissionMode();
         this.fetchExecutionMode();
         this.uiPushToast({
-          title: '计划已批准',
-          message: '已切换到执行模式，开始实施',
+          title: t('appUi.planApproved'),
+          message: t('appUi.planApprovedMessage'),
           type: 'success',
           duration: 2200
         });
       } else {
         this.uiPushToast({
-          title: '已拒绝计划',
-          message: 'AI 将根据你的意见修订后重新提交',
+          title: t('appUi.planRejected'),
+          message: t('appUi.planRejectedMessage'),
           type: 'info',
           duration: 2200
         });
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '提交计划决策失败');
-      this.uiPushToast({ title: '提交计划决策失败', message: msg, type: 'error' });
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.submitPlanDecisionFailed'));
+      this.uiPushToast({ title: t('appUi.submitPlanDecisionFailed'), message: msg, type: 'error' });
     } finally {
       this.answeringPlanApprovalIds = [];
     }
@@ -149,13 +150,13 @@ export const dialogMethods = {
     return this.decideToolApproval(approvalId, 'rejected');
   },
   openReviewDialog() {
-    if (this.isPolicyBlocked('block_conversation_review', '对话引用已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_conversation_review', t('appUi.policyBlockedReview'))) {
       return;
     }
     if (!this.isConnected) {
       this.uiPushToast({
-        title: '无法使用',
-        message: '当前未连接，无法生成回顾文件',
+        title: t('appUi.unavailable'),
+        message: t('appUi.unavailableNoConnectionMessage'),
         type: 'warning'
       });
       return;
@@ -183,8 +184,8 @@ export const dialogMethods = {
   handleReviewSelect(id) {
     if (id === this.currentConversationId) {
       this.uiPushToast({
-        title: '无法引用当前对话',
-        message: '请选择其他对话生成回顾',
+        title: t('appUi.cannotReferenceCurrentConversation'),
+        message: t('appUi.chooseOtherConversationForReview'),
         type: 'warning'
       });
       return;
@@ -219,7 +220,7 @@ export const dialogMethods = {
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload?.success) {
-          throw new Error(payload?.message || payload?.error || '提交回答失败');
+          throw new Error(payload?.message || payload?.error || t('appUi.submitAnswerFailed'));
         }
       }
       this.pendingUserQuestions = (this.pendingUserQuestions || []).filter(
@@ -236,8 +237,8 @@ export const dialogMethods = {
         this.userQuestionActiveIndex = Math.min(this.userQuestionActiveIndex, this.pendingUserQuestions.length - 1);
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '提交回答失败');
-      this.uiPushToast({ title: '提交回答失败', message: msg, type: 'error' });
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.submitAnswerFailed'));
+      this.uiPushToast({ title: t('appUi.submitAnswerFailed'), message: msg, type: 'error' });
     } finally {
       this.answeringUserQuestionIds = [];
     }
@@ -292,7 +293,7 @@ export const dialogMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || payload?.error || '提交审批失败');
+        throw new Error(payload?.message || payload?.error || t('appUi.submitApprovalFailed'));
       }
       this.pendingToolApprovals = (this.pendingToolApprovals || []).filter(
         (item) => item && item.approval_id !== id
@@ -304,9 +305,9 @@ export const dialogMethods = {
         }
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '审批失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.approvalFailed'));
       this.uiPushToast({
-        title: '审批失败',
+        title: t('appUi.approvalFailed'),
         message: msg,
         type: 'error'
       });

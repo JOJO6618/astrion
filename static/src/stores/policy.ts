@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 
 export interface EffectivePolicy {
   categories: Record<
@@ -58,12 +59,12 @@ export const usePolicyStore = defineStore('policy', {
         const resp = await fetch('/api/effective-policy');
         const result = await resp.json();
         if (!resp.ok || !result.success) {
-          throw new Error(result.error || '加载策略失败');
+          throw new Error(result.error || t('stores.loadPolicyFailed'));
         }
         this.policy = result.data || DEFAULT_POLICY;
         this.loaded = true;
       } catch (error: any) {
-        this.error = error?.message || '加载策略失败';
+        this.error = error?.message || t('stores.loadPolicyFailed');
       } finally {
         this.loading = false;
       }

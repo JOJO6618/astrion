@@ -3,21 +3,21 @@
     <header class="wf-library__topbar">
       <button type="button" class="wf-btn wf-btn--ghost" @click="$emit('exit')">
         <span class="icon" :style="iconSrc(ICONS.arrowLeft)" aria-hidden="true"></span>
-        <span>返回对话</span>
+        <span>{{ $t('workflow.backToConversation') }}</span>
       </button>
     </header>
 
     <div class="wf-library__container">
       <div class="wf-library__heading">
         <div class="wf-library__title-block">
-          <h1 class="wf-library__title">工作流</h1>
+          <h1 class="wf-library__title">{{ $t('workflow.libraryTitle') }}</h1>
           <p class="wf-library__subtitle">
-            把一套既定的工作方式、验证方式与结束方式存为流程，在对话中激活复用。
+            {{ $t('workflow.librarySubtitle') }}
           </p>
         </div>
         <button type="button" class="wf-btn wf-btn--primary" @click="$emit('create')">
           <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
-          <span>新建工作流</span>
+          <span>{{ $t('workflow.newWorkflow') }}</span>
         </button>
       </div>
 
@@ -33,12 +33,12 @@
           </div>
           <div class="wf-row__main">
             <div class="wf-row__name">{{ wf.name }}</div>
-            <div class="wf-row__desc">{{ wf.description || '（无描述）' }}</div>
+            <div class="wf-row__desc">{{ wf.description || $t('workflow.noDescription') }}</div>
           </div>
           <div class="wf-row__meta">
-            <span>{{ wf.nodeCount }} 个节点</span>
+            <span>{{ $t('workflow.nodeCountLabel', { n: wf.nodeCount }) }}</span>
             <span class="wf-row__meta-sep">·</span>
-            <span>{{ wf.source === 'builtin' ? '内置' : '用户' }}</span>
+            <span>{{ wf.source === 'builtin' ? $t('workflow.badgeBuiltin') : $t('workflow.badgeUser') }}</span>
             <span class="wf-row__meta-sep">·</span>
             <span>{{ wf.updatedAt }}</span>
           </div>
@@ -46,8 +46,8 @@
             <button
               type="button"
               class="wf-icon-btn"
-              aria-label="编辑"
-              title="编辑"
+              :aria-label="$t('workflow.edit')"
+              :title="$t('workflow.edit')"
               @click="$emit('open', wf.name)"
             >
               <span class="icon" :style="iconSrc(ICONS.pencil)" aria-hidden="true"></span>
@@ -55,8 +55,8 @@
             <button
               type="button"
               class="wf-icon-btn"
-              aria-label="复制"
-              title="复制"
+              :aria-label="$t('common.copy')"
+              :title="$t('common.copy')"
               @click="$emit('duplicate', wf.name)"
             >
               <span class="icon" :style="iconSrc(ICONS.copy)" aria-hidden="true"></span>
@@ -65,8 +65,8 @@
               v-if="confirmingDelete !== wf.name"
               type="button"
               class="wf-icon-btn wf-icon-btn--danger"
-              aria-label="删除"
-              title="删除"
+              :aria-label="$t('common.delete')"
+              :title="$t('common.delete')"
               @click="confirmingDelete = wf.name"
             >
               <span class="icon" :style="iconSrc(ICONS.trash)" aria-hidden="true"></span>
@@ -77,7 +77,7 @@
               class="wf-btn wf-btn--danger-confirm"
               @click="onConfirmDelete(wf.name)"
             >
-              确认删除
+              {{ $t('workflow.confirmDelete') }}
             </button>
           </div>
         </div>
@@ -85,11 +85,11 @@
 
       <div v-else class="wf-library__empty">
         <span class="icon icon-xl" :style="iconSrc(ICONS.workflow)" aria-hidden="true"></span>
-        <p class="wf-library__empty-title">还没有工作流</p>
-        <p class="wf-library__empty-hint">新建一个，或在对话中让 AI 帮你生成后归档。</p>
+        <p class="wf-library__empty-title">{{ $t('workflow.emptyTitle') }}</p>
+        <p class="wf-library__empty-hint">{{ $t('workflow.emptyHint') }}</p>
         <button type="button" class="wf-btn wf-btn--primary" @click="$emit('create')">
           <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
-          <span>新建工作流</span>
+          <span>{{ $t('workflow.newWorkflow') }}</span>
         </button>
       </div>
     </div>

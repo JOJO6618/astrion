@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { debugLog, goalModeDebugLog } from '../app/methods/common';
 
 const debugNotifyLog = (...args: any[]) => {
@@ -115,12 +116,12 @@ export const useTaskStore = defineStore('task', {
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || '创建任务失败');
+          throw new Error(error.error || t('stores.createTaskFailed'));
         }
 
         const result = await response.json();
         if (!result.success) {
-          throw new Error(result.error || '创建任务失败');
+          throw new Error(result.error || t('stores.createTaskFailed'));
         }
 
         this.currentTaskId = result.data.task_id;
@@ -186,7 +187,7 @@ export const useTaskStore = defineStore('task', {
 
         const result = await response.json();
         if (!result.success) {
-          throw new Error(result.error || '轮询任务失败');
+          throw new Error(result.error || t('stores.pollTaskFailed'));
         }
 
         const data = result.data;
@@ -412,8 +413,8 @@ export const useTaskStore = defineStore('task', {
           this.pollingWarned = true;
           if ((window as any).__vueApp?.uiPushToast) {
             (window as any).__vueApp.uiPushToast({
-              title: '轮询波动',
-              message: '消息更新暂时不稳定，正在自动重试',
+              title: t('stores.pollingFluctuation'),
+              message: t('stores.pollingUnstableRetry'),
               type: 'warning',
               duration: 5000
             });
@@ -579,12 +580,12 @@ export const useTaskStore = defineStore('task', {
         });
 
         if (!response.ok) {
-          throw new Error('取消任务失败');
+          throw new Error(t('stores.cancelTaskFailed'));
         }
 
         const result = await response.json();
         if (!result.success) {
-          throw new Error(result.error || '取消任务失败');
+          throw new Error(result.error || t('stores.cancelTaskFailed'));
         }
 
         debugLog('[Task] 已发送取消请求，等待后端停止确认');
@@ -601,12 +602,12 @@ export const useTaskStore = defineStore('task', {
 
         const response = await fetch('/api/tasks');
         if (!response.ok) {
-          throw new Error('获取任务列表失败');
+          throw new Error(t('stores.fetchTaskListFailed'));
         }
 
         const result = await response.json();
         if (!result.success) {
-          throw new Error(result.error || '获取任务列表失败');
+          throw new Error(result.error || t('stores.fetchTaskListFailed'));
         }
 
         // 查找当前对话的活动任务

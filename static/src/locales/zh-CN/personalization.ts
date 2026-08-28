@@ -356,4 +356,21 @@ export default {
   modelModeConflictTitle: '模型/思考模式不兼容',
   modelThinkingOnlyWarning: '{label} 仅支持思考模式，已保持原设置。',
   modelFastOnlyWarning: '{label} 仅支持快速模式，已保持原设置。',
+
+  // ── 新手体验引导（ExperienceOnboarding） ──
+  expTitle: '第一次使用？选择适合您的模式',
+  expSubtitle: '速度、联网与工具范围各不相同，随时可在个人空间切换',
+  expConfirmStart: '确认并开始',
+  expModeFastBadge: '极速',
+  expModeFastTitle: '快速回答',
+  expModeFastDesc: '快速回答您的问题，会上网搜索，不会写文件',
+  expModeThinkingBadge: '思考',
+  expModeThinkingTitle: '思考后再答',
+  expModeThinkingDesc: '经过思考后完成任务，会上网搜索，不会写文件，回复时间较长',
+  expModeResearchBadge: '研究',
+  expModeResearchTitle: '多步骤研究',
+  expModeResearchDesc: '多步骤思考与 20+ 工具完成复杂任务，回复时间可能很长',
+  expModeExpertBadge: '专家',
+  expModeExpertTitle: '全功能探索',
+  expModeExpertDesc: '自由探索所有配置选项，适合智能体专家与从业者',
 } as const;

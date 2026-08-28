@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -30,13 +31,13 @@ export const reviewMethods = {
     }
     if (this.compressionActiveForCurrentConversation) {
       this.uiPushToast({
-        title: '对话自动压缩中',
-        message: '当前对话正在压缩，请稍后再试',
+        title: t('appUi.conversationAutoCompressing'),
+        message: t('appUi.compressingNowPleaseWait'),
         type: 'warning'
       });
       return;
     }
-    if (this.isPolicyBlocked('block_compress_conversation', '压缩对话已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_compress_conversation', t('appUi.policyBlockedCompress'))) {
       return;
     }
     this.compressConversation();
@@ -90,24 +91,24 @@ export const reviewMethods = {
     if (this.reviewSubmitting) return;
     if (!this.reviewSelectedConversationId) {
       this.uiPushToast({
-        title: '请选择对话',
-        message: '请选择要生成回顾的对话记录',
+        title: t('appUi.selectConversation'),
+        message: t('appUi.selectConversationForReview'),
         type: 'info'
       });
       return;
     }
     if (this.reviewSelectedConversationId === this.currentConversationId) {
       this.uiPushToast({
-        title: '无法引用当前对话',
-        message: '请选择其他对话生成回顾',
+        title: t('appUi.cannotReferenceCurrentConversation'),
+        message: t('appUi.chooseOtherConversationForReview'),
         type: 'warning'
       });
       return;
     }
     if (!this.currentConversationId) {
       this.uiPushToast({
-        title: '无法发送',
-        message: '当前没有活跃对话，无法自动发送提示消息',
+        title: t('appUi.cannotSend'),
+        message: t('appUi.noActiveConversationMessage'),
         type: 'warning'
       });
       return;
@@ -119,29 +120,33 @@ export const reviewMethods = {
         this.reviewSelectedConversationId
       );
       if (!path) {
-        throw new Error('未获取到生成的文件路径');
+        throw new Error(t('appUi.reviewPathMissing'));
       }
       const count = typeof char_count === 'number' ? char_count : 0;
       this.reviewGeneratedPath = path;
       const suggestion =
-        count && count <= 10000 ? '建议直接完整阅读。' : '建议使用 read 工具进行搜索或分段阅读。';
+        count && count <= 10000 ? t('appUi.reviewSuggestReadFull') : t('appUi.reviewSuggestReadBySearch');
       if (this.reviewSendToModel) {
-        const message = `帮我继续这个任务，对话文件在 ${path}，文件长 ${count || '未知'} 字符，${suggestion} 请阅读文件了解后，不要直接继续工作，而是向我汇报你的理解，然后等我做出指示。`;
+        const message = t('appUi.reviewAutoMessage', {
+          path,
+          count: count || t('appUi.unknown'),
+          suggestion
+        });
         const sent = await this.sendAutoUserMessage(message);
         if (sent) {
           this.reviewDialogOpen = false;
         }
       } else {
         this.uiPushToast({
-          title: '回顾文件已生成',
+          title: t('appUi.reviewFileGenerated'),
           message: path,
           type: 'success'
         });
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '生成失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.generateFailed'));
       this.uiPushToast({
-        title: '生成回顾失败',
+        title: t('appUi.generateReviewFailed'),
         message: msg,
         type: 'error'
       });
@@ -159,12 +164,12 @@ export const reviewMethods = {
       );
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        const msg = payload?.message || payload?.error || '获取预览失败';
+        const msg = payload?.message || payload?.error || t('appUi.fetchPreviewFailed');
         throw new Error(msg);
       }
       this.reviewPreviewLines = payload?.data?.preview || [];
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '获取预览失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.fetchPreviewFailed'));
       this.reviewPreviewError = msg;
     } finally {
       this.reviewPreviewLoading = false;
@@ -176,7 +181,7 @@ export const reviewMethods = {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || !payload?.success) {
-      const msg = payload?.message || payload?.error || '生成失败';
+      const msg = payload?.message || payload?.error || t('appUi.generateFailed');
       throw new Error(msg);
     }
     const data = payload.data || payload;

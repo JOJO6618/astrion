@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 
 type ResizingPanel = 'left' | 'right' | null;
 type MobileOverlayTarget = 'conversation' | 'focus' | 'approval' | null;
@@ -255,10 +256,10 @@ export const useUiStore = defineStore('ui', {
         }
         this.confirmDialog = {
           visible: true,
-          title: options.title || '确认操作',
-          message: options.message || '请确认本次操作',
-          confirmText: options.confirmText || '确认',
-          cancelText: options.cancelText || '取消',
+          title: options.title || t('stores.confirmAction'),
+          message: options.message || t('stores.confirmOperation'),
+          confirmText: options.confirmText || t('common.confirm'),
+          cancelText: options.cancelText || t('common.cancel'),
           warningText: options.warningText || '',
           closeOnBackdrop: options.closeOnBackdrop !== false,
           confirmVariant: options.confirmVariant === 'danger' ? 'danger' : 'primary',

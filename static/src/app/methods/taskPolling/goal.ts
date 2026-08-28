@@ -17,6 +17,7 @@ import {
   getOptimisticUserEchoTarget,
   findRecentMatchingUserMessage,
 } from './shared';
+import { t } from '@/locales';
 
 export const goalMethods = {
   handleGoalProgress(data: any) {
@@ -47,12 +48,12 @@ export const goalMethods = {
     if (!Array.isArray(this.autoApprovalFeedLines)) {
       this.autoApprovalFeedLines = [];
     }
-    this.autoApprovalTitle = '目标审批';
+    this.autoApprovalTitle = t('appTasks.goalReviewTitle');
     if (progress.stage === 'start') {
-      this.autoApprovalFeedLines = ['开始审核'];
+      this.autoApprovalFeedLines = [t('appTasks.reviewStarted')];
       this.autoApprovalFinalMessage = '';
     } else if (progress.stage === 'model_call') {
-      this.autoApprovalFeedLines.push(String(progress.message || `审核轮次 ${progress.round || ''}`).trim());
+      this.autoApprovalFeedLines.push(String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim());
     } else if (progress.stage === 'run_command' && progress.command) {
       this.autoApprovalFeedLines.push(String(progress.command));
     } else if (progress.message) {
@@ -62,7 +63,7 @@ export const goalMethods = {
     this.$forceUpdate();
   },
   scheduleGoalApprovalPanelAutoClose() {
-    if (this.isMobileViewport || this.autoApprovalTitle !== '目标审批') {
+    if (this.isMobileViewport || this.autoApprovalTitle !== t('appTasks.goalReviewTitle')) {
       return;
     }
     if (this.approvalAutoCloseTimer) {

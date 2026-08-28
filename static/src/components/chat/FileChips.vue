@@ -60,13 +60,13 @@
       </span>
       <span class="file-chip-meta">
         <span class="file-chip-name">{{ file.name }}</span>
-        <span class="file-chip-type">{{ file.label }}</span>
+        <span class="file-chip-type">{{ $t(file.labelKey) }}</span>
       </span>
       <button
         v-if="removable"
         type="button"
         class="file-chip-remove"
-        :aria-label="`移除 ${file.name}`"
+        :aria-label="$t('chat.removeFile', { name: file.name })"
         @click.stop="$emit('remove', file.path)"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
@@ -91,33 +91,34 @@ interface FileChipEntry {
   path: string;
   name: string;
   kind: string;
-  label: string;
+  labelKey: string;
 }
 
 const FILE_BODY_PATH =
   'M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z';
 
-// 类型识别表：扩展名 → { 类型键（对应 --file-kind-* token / 图标笔画）, 中文类型标签 }
-const FILE_KIND_MAP: Record<string, { kind: string; label: string }> = {
-  doc: { kind: 'word', label: '文档' },
-  docx: { kind: 'word', label: '文档' },
-  xls: { kind: 'excel', label: '电子表格' },
-  xlsx: { kind: 'excel', label: '电子表格' },
-  csv: { kind: 'excel', label: '电子表格' },
-  ppt: { kind: 'ppt', label: '演示文稿' },
-  pptx: { kind: 'ppt', label: '演示文稿' },
-  pdf: { kind: 'pdf', label: 'PDF' },
-  txt: { kind: 'text', label: '文本' },
-  md: { kind: 'text', label: '文本' },
-  log: { kind: 'text', label: '文本' },
-  zip: { kind: 'archive', label: '压缩包' },
-  tar: { kind: 'archive', label: '压缩包' },
-  gz: { kind: 'archive', label: '压缩包' },
-  tgz: { kind: 'archive', label: '压缩包' },
-  bz2: { kind: 'archive', label: '压缩包' },
-  xz: { kind: 'archive', label: '压缩包' },
-  '7z': { kind: 'archive', label: '压缩包' },
-  rar: { kind: 'archive', label: '压缩包' }
+// 类型识别表：扩展名 → { 类型键（对应 --file-kind-* token / 图标笔画）, 类型标签 key（模板 $t 解析） }
+// 注意：labelKey 存文案 key（模块顶层禁止调 t()），模板里 $t(file.labelKey) 渲染时求值。
+const FILE_KIND_MAP: Record<string, { kind: string; labelKey: string }> = {
+  doc: { kind: 'word', labelKey: 'chat.fileTypeDoc' },
+  docx: { kind: 'word', labelKey: 'chat.fileTypeDoc' },
+  xls: { kind: 'excel', labelKey: 'chat.fileTypeSheet' },
+  xlsx: { kind: 'excel', labelKey: 'chat.fileTypeSheet' },
+  csv: { kind: 'excel', labelKey: 'chat.fileTypeSheet' },
+  ppt: { kind: 'ppt', labelKey: 'chat.fileTypeSlides' },
+  pptx: { kind: 'ppt', labelKey: 'chat.fileTypeSlides' },
+  pdf: { kind: 'pdf', labelKey: 'chat.fileTypePdf' },
+  txt: { kind: 'text', labelKey: 'chat.fileTypeText' },
+  md: { kind: 'text', labelKey: 'chat.fileTypeText' },
+  log: { kind: 'text', labelKey: 'chat.fileTypeText' },
+  zip: { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  tar: { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  gz: { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  tgz: { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  bz2: { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  xz: { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  '7z': { kind: 'archive', labelKey: 'chat.fileTypeArchive' },
+  rar: { kind: 'archive', labelKey: 'chat.fileTypeArchive' }
 };
 
 const CODE_EXTENSIONS = new Set([
@@ -141,15 +142,15 @@ const basename = (path: string): string => {
   return parts.length ? parts[parts.length - 1] : String(path || '');
 };
 
-const resolveKind = (name: string): { kind: string; label: string } => {
+const resolveKind = (name: string): { kind: string; labelKey: string } => {
   const ext = (name.includes('.') ? name.split('.').pop() || '' : '').trim().toLowerCase();
   if (ext && FILE_KIND_MAP[ext]) {
     return FILE_KIND_MAP[ext];
   }
   if (ext && CODE_EXTENSIONS.has(ext)) {
-    return { kind: 'code', label: '代码' };
+    return { kind: 'code', labelKey: 'chat.fileTypeCode' };
   }
-  return { kind: 'generic', label: '文件' };
+  return { kind: 'generic', labelKey: 'chat.fileTypeGeneric' };
 };
 
 const normalizedFiles = computed<FileChipEntry[]>(() => {
@@ -160,8 +161,8 @@ const normalizedFiles = computed<FileChipEntry[]>(() => {
       const name =
         (typeof item === 'object' && item && typeof item.name === 'string' && item.name) ||
         basename(path);
-      const { kind, label } = resolveKind(name);
-      return { path, name, kind, label };
+      const { kind, labelKey } = resolveKind(name);
+      return { path, name, kind, labelKey };
     })
     .filter((entry): entry is FileChipEntry => !!entry);
 });

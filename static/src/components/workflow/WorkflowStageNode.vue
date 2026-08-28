@@ -18,19 +18,19 @@
         v-if="data.isEntry"
         class="icon stage-node__flag stage-node__flag--entry"
         :style="iconSrc(ICONS.flag)"
-        aria-label="入口阶段"
+        :aria-label="$t('workflow.entryStageAriaLabel')"
       ></span>
       <span
         v-else-if="data.isTerminal"
         class="icon stage-node__flag stage-node__flag--terminal"
         :style="iconSrc(ICONS.octagon)"
-        aria-label="终点阶段"
+        :aria-label="$t('workflow.terminalStageAriaLabel')"
       ></span>
       <span v-else class="stage-node__dot" aria-hidden="true"></span>
       <span class="stage-node__name">{{ data.node.name || data.node.id }}</span>
     </div>
     <div class="stage-node__goal" :class="{ 'stage-node__goal--empty': !data.node.goal }">
-      {{ data.node.goal || '未设置阶段目标' }}
+      {{ data.node.goal || $t('workflow.stageGoalUnset') }}
     </div>
     <div class="stage-node__foot">
       <span class="stage-node__id">{{ data.node.id }}</span>

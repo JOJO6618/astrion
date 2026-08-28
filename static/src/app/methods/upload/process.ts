@@ -4,6 +4,7 @@ import { useModelStore } from '../../../stores/model';
 import {
 
 } from './shared';
+import { t } from '@/locales';
 
 export const processMethods = {
   normalizeLocalFiles(files) {
@@ -29,8 +30,8 @@ export const processMethods = {
     }
     if (this.mediaUploading) {
       this.uiPushToast({
-        title: '上传中',
-        message: '请等待当前图片上传完成',
+        title: t('appUi.uploadingTitle'),
+        message: t('appUi.waitImageUploadDone'),
         type: 'info'
       });
       return;
@@ -38,8 +39,8 @@ export const processMethods = {
     const list = this.normalizeLocalFiles(files);
     if (!list.length) {
       this.uiPushToast({
-        title: '未获取到文件',
-        message: '系统未返回有效的文件内容，请重试',
+        title: t('appUi.noFileReceived'),
+        message: t('appUi.noValidFileContent'),
         type: 'warning'
       });
       return;
@@ -48,8 +49,8 @@ export const processMethods = {
     const remaining = Math.max(0, 9 - existingCount);
     if (!remaining) {
       this.uiPushToast({
-        title: '已达上限',
-        message: '最多只能选择 9 张图片',
+        title: t('appUi.limitReachedTitle'),
+        message: t('appUi.maxImagesMessage', { max: 9 }),
         type: 'warning'
       });
       return;
@@ -60,16 +61,16 @@ export const processMethods = {
     const candidates = valid.length ? valid : list;
     if (valid.length < list.length && valid.length > 0) {
       this.uiPushToast({
-        title: '已忽略',
-        message: '已跳过非图片文件',
+        title: t('appUi.ignoredTitle'),
+        message: t('appUi.skippedNonImageFiles'),
         type: 'info'
       });
     }
     const limited = candidates.slice(0, remaining);
     if (candidates.length > remaining) {
       this.uiPushToast({
-        title: '已超出数量',
-        message: `最多还能添加 ${remaining} 张图片，已自动截断`,
+        title: t('appUi.exceededTitle'),
+        message: t('appUi.truncatedImagesMessage', { n: remaining }),
         type: 'warning'
       });
     }
@@ -95,8 +96,8 @@ export const processMethods = {
     }
     if (this.uploading) {
       this.uiPushToast({
-        title: '上传中',
-        message: '请等待当前文件上传完成',
+        title: t('appUi.uploadingTitle'),
+        message: t('appUi.waitFileUploadDone'),
         type: 'info'
       });
       return;
@@ -104,8 +105,8 @@ export const processMethods = {
     const list = this.normalizeLocalFiles(files);
     if (!list.length) {
       this.uiPushToast({
-        title: '未获取到文件',
-        message: '系统未返回有效的文件内容，请重试',
+        title: t('appUi.noFileReceived'),
+        message: t('appUi.noValidFileContent'),
         type: 'warning'
       });
       return;
@@ -114,8 +115,8 @@ export const processMethods = {
     const remaining = Math.max(0, 9 - existingCount);
     if (!remaining) {
       this.uiPushToast({
-        title: '已达上限',
-        message: '最多只能附加 9 个文件',
+        title: t('appUi.limitReachedTitle'),
+        message: t('appUi.maxFilesMessage', { max: 9 }),
         type: 'warning'
       });
       return;
@@ -123,8 +124,8 @@ export const processMethods = {
     const limited = list.slice(0, remaining);
     if (list.length > remaining) {
       this.uiPushToast({
-        title: '已超出数量',
-        message: `最多还能附加 ${remaining} 个文件，已自动截断`,
+        title: t('appUi.exceededTitle'),
+        message: t('appUi.truncatedFilesMessage', { n: remaining }),
         type: 'warning'
       });
     }
@@ -146,8 +147,8 @@ export const processMethods = {
     }
     if (this.mediaUploading) {
       this.uiPushToast({
-        title: '上传中',
-        message: '请等待当前视频上传完成',
+        title: t('appUi.uploadingTitle'),
+        message: t('appUi.waitVideoUploadDone'),
         type: 'info'
       });
       return;
@@ -155,8 +156,8 @@ export const processMethods = {
     const list = this.normalizeLocalFiles(files);
     if (!list.length) {
       this.uiPushToast({
-        title: '未获取到文件',
-        message: '系统未返回有效的文件内容，请重试',
+        title: t('appUi.noFileReceived'),
+        message: t('appUi.noValidFileContent'),
         type: 'warning'
       });
       return;
@@ -166,15 +167,15 @@ export const processMethods = {
     const candidates = valid.length ? valid : list;
     if (valid.length < list.length && valid.length > 0) {
       this.uiPushToast({
-        title: '已忽略',
-        message: '已跳过非视频文件',
+        title: t('appUi.ignoredTitle'),
+        message: t('appUi.skippedNonVideoFiles'),
         type: 'info'
       });
     }
     if (candidates.length > 1) {
       this.uiPushToast({
-        title: '视频数量过多',
-        message: '一次只能选择 1 个视频，已使用第一个',
+        title: t('appUi.tooManyVideosTitle'),
+        message: t('appUi.onlyOneVideoMessage'),
         type: 'warning'
       });
     }

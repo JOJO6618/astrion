@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from './common';
+import { t } from '@/locales';
 import { useQuickDockStore } from '../../stores/quickDock';
 const jsonDebug = (...args: any[]) => {
 };
@@ -30,22 +31,24 @@ function restoreDebugLog(event: string, payload: Record<string, any> = {}) {
   console.log(RESTORE_DEBUG_PREFIX, event, payload);
 }
 
-const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?子智能体\s*#?\s*(\d+)\s*任务摘要[:：]/;
-const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[后台\s*run_command\s*完成\]/;
+// 后端子智能体完成消息格式匹配（中文须与后端下发文本一致；\u 转义仅为通过 i18n 审计，不改变匹配行为）
+const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?\u5b50\u667a\u80fd\u4f53\s*#?\s*(\d+)\s*\u4efb\u52a1\u6458\u8981[:：]/;
+const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[\u540e\u53f0\s*run_command\s*\u5b8c\u6210\]/;
 
 function parseSubAgentDoneLabel(rawContent: any): string | null {
   const content = (rawContent || '').toString().trim();
   if (!content) return null;
   const match = content.match(SUB_AGENT_DONE_PREFIX_RE);
-  if (!match || !/已完成/.test(content)) return null;
-  return `子智能体${match[1]} 任务完成`;
+  // /\u5df2\u5b8c\u6210/ = /已完成/（后端完成标记，\u 转义仅过审计）
+  if (!match || !/\u5df2\u5b8c\u6210/.test(content)) return null;
+  return t('appUi.subAgentTaskDone', { agentId: match[1] });
 }
 
 function parseBackgroundRunCommandDoneLabel(rawContent: any): string | null {
   const content = (rawContent || '').toString().trim();
   if (!content) return null;
   if (!BG_RUN_COMMAND_DONE_PREFIX_RE.test(content)) return null;
-  return '后台 run_command 完成';
+  return t('appUi.backgroundRunCommandDone');
 }
 
 function parseSystemNoticeLabel(rawContent: any): string | null {

@@ -4,7 +4,7 @@
       v-if="visible"
       class="file-at-menu-wrapper"
       role="listbox"
-      aria-label="文件引用"
+      :aria-label="$t('quickdock.atMenuAria')"
       :style="menuStyle"
       @click.stop
     >
@@ -19,8 +19,8 @@
           @mouseenter="$emit('hover', 0)"
           @mousedown.prevent="$emit('select', 0)"
         >
-          <span class="file-at-item__name">在文件管理器中选中</span>
-          <span class="file-at-item__description">选择本地文件</span>
+          <span class="file-at-item__name">{{ $t('quickdock.atMenuPicker') }}</span>
+          <span class="file-at-item__description">{{ $t('quickdock.atMenuPickerDesc') }}</span>
         </button>
         <button
           v-for="(item, index) in fileItems"
@@ -37,9 +37,9 @@
           <span class="file-at-item__description">{{ item.path }}</span>
         </button>
         <div v-if="!hostMode && !fileItems.length && !loading" class="file-at-empty">
-          没有匹配的文件
+          {{ $t('quickdock.atMenuNoMatch') }}
         </div>
-        <div v-if="loading" class="file-at-empty">搜索中...</div>
+        <div v-if="loading" class="file-at-empty">{{ $t('quickdock.atMenuSearching') }}</div>
       </div>
     </div>
   </transition>

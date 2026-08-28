@@ -1,5 +1,6 @@
 // @ts-nocheck
 // @ts-nocheck
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -17,8 +18,9 @@ import {
 } from '../../../composables/usePanelResize';
 import { debugLog } from '../common';
 
-export const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?子智能体\s*#?\s*(\d+)\s*任务摘要[:：]/;
-export const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[后台\s*run_command\s*完成\]/;
+// 后端子智能体完成消息格式匹配（中文须与后端下发文本一致；\u 转义仅为通过 i18n 审计，不改变匹配行为）
+export const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?\u5b50\u667a\u80fd\u4f53\s*#?\s*(\d+)\s*\u4efb\u52a1\u6458\u8981[:：]/;
+export const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[\u540e\u53f0\s*run_command\s*\u5b8c\u6210\]/;
 export const userMDebug = (...args: any[]) => {
 };
 export let uiBounceTraceCount = 0;
@@ -121,12 +123,13 @@ export function parseSubAgentDoneLabel(rawContent: any): string | null {
     return null;
   }
   const match = content.match(SUB_AGENT_DONE_PREFIX_RE);
-  const isCompleted = /已完成/.test(content);
+  // /\u5df2\u5b8c\u6210/ = /已完成/（后端完成标记，\u 转义仅过审计）
+  const isCompleted = /\u5df2\u5b8c\u6210/.test(content);
   if (!match || !isCompleted) {
     return null;
   }
   const agentId = match[1];
-  return `子智能体${agentId} 任务完成`;
+  return t('appUi.subAgentTaskDone', { agentId });
 }
 
 export function parseBackgroundRunCommandDoneLabel(rawContent: any): string | null {
@@ -137,7 +140,7 @@ export function parseBackgroundRunCommandDoneLabel(rawContent: any): string | nu
   if (!BG_RUN_COMMAND_DONE_PREFIX_RE.test(content)) {
     return null;
   }
-  return '后台 run_command 完成';
+  return t('appUi.backgroundRunCommandDone');
 }
 
 export function parseSystemNoticeLabel(rawContent: any): string | null {

@@ -1,3 +1,5 @@
+import { t } from '@/locales';
+
 type NumericLike = number | string | null | undefined;
 
 export interface QuotaEntry {
@@ -10,10 +12,11 @@ export type UsageQuotaMap = Record<string, QuotaEntry | undefined> | null | unde
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 const RATE_UNITS = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-const QUOTA_TYPE_LABELS: Record<string, string> = {
-  thinking: '思考模型',
-  search: '搜索',
-  fast: '常规模型'
+// 模块顶层禁调 t()：这里只存 key，使用处（quotaTypeLabel）再解析，避免固化语言
+const QUOTA_TYPE_KEYS: Record<string, string> = {
+  thinking: 'utils.quotaTypeThinking',
+  search: 'utils.quotaTypeSearch',
+  fast: 'utils.quotaTypeFast'
 };
 
 function normalizeNumber(value: NumericLike): number {
@@ -78,7 +81,7 @@ export function formatRate(bytesPerSecond: NumericLike): string {
 }
 
 export function quotaTypeLabel(type: string): string {
-  return QUOTA_TYPE_LABELS[type] || QUOTA_TYPE_LABELS.fast;
+  return t(QUOTA_TYPE_KEYS[type] || QUOTA_TYPE_KEYS.fast);
 }
 
 export function formatResetTime(iso?: NumericLike): string {
@@ -140,5 +143,8 @@ export function buildQuotaToastMessage(
 ): string {
   const entry = quota?.[type];
   const referenceResetAt = typeof resetAt !== 'undefined' ? resetAt : entry?.reset_at;
-  return `${quotaTypeLabel(type)} 配额已用完，将在 ${formatResetTime(referenceResetAt)} 重置`;
+  return t('utils.quotaExhaustedResetIn', {
+    type: quotaTypeLabel(type),
+    time: formatResetTime(referenceResetAt)
+  });
 }

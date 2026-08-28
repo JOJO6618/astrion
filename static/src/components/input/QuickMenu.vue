@@ -9,7 +9,7 @@
         @click="$emit('quick-upload')"
         :disabled="!isConnected || uploading"
       >
-        {{ uploading ? '上传中...' : '上传文件' }}
+        {{ uploading ? $t('quickdock.uploading') : $t('quickdock.uploadFile') }}
       </button>
       <button
         type="button"
@@ -18,7 +18,7 @@
         @click.stop="$emit('open-review')"
         :disabled="!isConnected || streamingMessage"
       >
-        对话回顾
+        {{ $t('quickdock.conversationReview') }}
       </button>
       <button
         v-if="currentModelSupportsImage"
@@ -28,7 +28,7 @@
         @click.stop="$emit('pick-images')"
         :disabled="!isConnected || streamingMessage"
       >
-        发送图片
+        {{ $t('quickdock.sendImage') }}
       </button>
       <button
         v-if="currentModelSupportsVideo"
@@ -38,7 +38,7 @@
         @click.stop="$emit('pick-video')"
         :disabled="!isConnected || streamingMessage"
       >
-        发送视频
+        {{ $t('quickdock.sendVideo') }}
       </button>
       <button
         type="button"
@@ -47,7 +47,7 @@
         @click.stop="$emit('toggle-tool-menu')"
         :disabled="!isConnected"
       >
-        工具禁用
+        {{ $t('quickdock.disableTools') }}
         <span class="entry-arrow">›</span>
       </button>
       <button
@@ -57,11 +57,11 @@
         @click.stop="$emit('toggle-goal-mode')"
         :disabled="!isConnected"
       >
-        目标模式
+        {{ $t('quickdock.goalMode') }}
         <span class="entry-arrow">
-          <template v-if="goalRunning">运行中</template>
-          <template v-else-if="goalCompleted">完成</template>
-          <template v-else>{{ goalModeArmed ? '已就绪' : '' }}</template>
+          <template v-if="goalRunning">{{ $t('common.running') }}</template>
+          <template v-else-if="goalCompleted">{{ $t('quickdock.goalDone') }}</template>
+          <template v-else>{{ goalModeArmed ? $t('quickdock.goalArmed') : '' }}</template>
         </span>
       </button>
       <button
@@ -71,15 +71,15 @@
         @click.stop="$emit('toggle-settings')"
         :disabled="!isConnected"
       >
-        设置
+        {{ $t('quickdock.settingsMenu') }}
         <span class="entry-arrow">›</span>
       </button>
       </div>
 
       <transition name="submenu-slide">
         <div class="quick-submenu tool-submenu" v-if="toolMenuOpen">
-          <div class="submenu-status" v-if="toolSettingsLoading">正在同步工具状态...</div>
-          <div v-else-if="!toolSettings.length" class="submenu-empty">暂无可控工具</div>
+          <div class="submenu-status" v-if="toolSettingsLoading">{{ $t('quickdock.toolSettingsSyncing') }}</div>
+          <div v-else-if="!toolSettings.length" class="submenu-empty">{{ $t('quickdock.noControllableTools') }}</div>
           <div v-else class="submenu-list tool-submenu-list">
             <button
               v-for="category in toolSettings"
@@ -99,9 +99,9 @@
                 <span>{{ category.label }}</span>
               </span>
               <span class="entry-arrow">
-                <template v-if="category.locked"> 被管理员锁定 </template>
+                <template v-if="category.locked">{{ $t('quickdock.lockedByAdmin') }}</template>
                 <template v-else>
-                  {{ category.enabled ? '禁用' : '启用' }}
+                  {{ category.enabled ? $t('quickdock.toolDisable') : $t('quickdock.toolEnable') }}
                 </template>
               </span>
             </button>
@@ -118,7 +118,7 @@
               @click="$emit('realtime-terminal')"
               :disabled="!isConnected"
             >
-              实时终端
+              {{ $t('quickdock.realtimeTerminal') }}
             </button>
             <button
               type="button"
@@ -127,7 +127,7 @@
               @click="console.log('[UI_DEBUG] QuickMenu 用量统计按钮 clicked, emitting toggle-token-panel with true'); $emit('toggle-token-panel', true)"
               :disabled="!currentConversationId"
             >
-              用量统计
+              {{ $t('quickdock.usageStats') }}
             </button>
             <button
               type="button"
@@ -135,7 +135,7 @@
               @click="$emit('compress-conversation')"
               :disabled="compressing || streamingMessage || !isConnected"
             >
-              {{ compressing ? '压缩中...' : '压缩对话' }}
+              {{ compressing ? $t('quickdock.compressing') : $t('quickdock.compressConversation') }}
             </button>
             <button
               type="button"
@@ -143,7 +143,7 @@
               @click="$emit('toggle-approval-panel')"
               :disabled="!currentConversationId"
             >
-              审批面板
+              {{ $t('quickdock.approvalPanel') }}
             </button>
             <button
               v-if="executionModeEnabled"
@@ -151,7 +151,7 @@
               class="menu-entry submenu-entry"
               @click="$emit('open-path-authorization')"
             >
-              路径授权
+              {{ $t('quickdock.pathAuthorization') }}
             </button>
           </div>
         </div>

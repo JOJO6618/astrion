@@ -7,7 +7,7 @@
           <span class="icon icon-sm" :style="iconStyle('brain')" aria-hidden="true"></span>
         </span>
       </div>
-      <span class="status-text">{{ action.streaming ? '正在思考...' : '思考过程' }}</span>
+      <span class="status-text">{{ action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking') }}</span>
     </div>
     <div class="collapsible-content">
       <div

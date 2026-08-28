@@ -2,7 +2,7 @@
   <div ref="containerRef" class="pdf-preview">
     <div v-if="loading" class="pdf-preview-loading">
       <span class="pdf-preview-spinner"></span>
-      <span>PDF 加载中...</span>
+      <span>{{ $t('chat.pdfLoading') }}</span>
     </div>
 
     <div v-else-if="error" class="pdf-preview-error">{{ error }}</div>
@@ -11,6 +11,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { t } from '@/locales';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
@@ -63,11 +64,11 @@ async function renderPdf() {
   try {
     const resp = await fetch(props.source, { credentials: 'same-origin' });
     if (!resp.ok) {
-      throw new Error(resp.statusText || 'PDF 加载失败');
+      throw new Error(resp.statusText || t('chat.pdfLoadFailed'));
     }
     const data = await resp.arrayBuffer();
     if (!data.byteLength) {
-      throw new Error('PDF 内容为空');
+      throw new Error(t('chat.pdfEmpty'));
     }
 
     const loadingTask = getDocument({ data });
@@ -103,7 +104,7 @@ async function renderPdf() {
 
     loading.value = false;
   } catch (e) {
-    const message = (e as Error)?.message || 'PDF 渲染失败';
+    const message = (e as Error)?.message || t('chat.pdfRenderFailed');
     if (message.toLowerCase().includes('cancel')) {
       return;
     }

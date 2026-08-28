@@ -4,41 +4,41 @@
       <div class="subagent-activity-modal goal-progress-modal">
         <div class="subagent-activity-header">
           <div class="subagent-activity-title">
-            {{ isDone ? '目标已完成' : isStopped ? '目标模式停止' : '目标模式进行中' }}
+            {{ isDone ? $t('overlay.goalDoneTitle') : isStopped ? $t('overlay.goalStoppedTitle') : $t('overlay.goalRunningTitle') }}
           </div>
           <button type="button" class="subagent-activity-close" @click="$emit('close')">×</button>
         </div>
 
         <div class="goal-progress-meta">
           <span class="goal-progress-status" :class="statusClass">{{ statusLabel }}</span>
-          <span v-if="goal" class="goal-progress-goal" :title="goal">目标：{{ goal }}</span>
+          <span v-if="goal" class="goal-progress-goal" :title="goal">{{ $t('overlay.goalLabel', { goal }) }}</span>
         </div>
 
         <div class="goal-progress-metrics">
           <div class="goal-metric">
             <div class="goal-metric__value">{{ turnCount }}</div>
-            <div class="goal-metric__label">已运行轮数</div>
+            <div class="goal-metric__label">{{ $t('overlay.metricTurns') }}</div>
           </div>
           <div class="goal-metric">
             <div class="goal-metric__value">{{ formattedTokens }}</div>
-            <div class="goal-metric__label">消耗 token</div>
+            <div class="goal-metric__label">{{ $t('overlay.metricTokens') }}</div>
           </div>
           <div class="goal-metric">
             <div class="goal-metric__value">{{ toolCalls }}</div>
-            <div class="goal-metric__label">工具调用</div>
+            <div class="goal-metric__label">{{ $t('overlay.metricToolCalls') }}</div>
           </div>
           <div class="goal-metric">
             <div class="goal-metric__value">{{ formattedDuration }}</div>
-            <div class="goal-metric__label">用时</div>
+            <div class="goal-metric__label">{{ $t('overlay.metricDuration') }}</div>
           </div>
         </div>
 
         <div v-if="isStopped && stoppedReasonLabel" class="goal-progress-reason">
-          停止原因：{{ stoppedReasonLabel }}
+          {{ $t('overlay.stopReason', { reason: stoppedReasonLabel }) }}
         </div>
 
         <div v-if="summary" class="goal-progress-summary">
-          <div class="goal-progress-summary__title">{{ isDone ? '完成总结' : '最后进展' }}</div>
+          <div class="goal-progress-summary__title">{{ isDone ? $t('overlay.summaryDone') : $t('overlay.summaryLatest') }}</div>
           <div class="goal-progress-summary__body">{{ summary }}</div>
         </div>
       </div>
@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { t, currentLocale } from '@/locales';
 
 defineOptions({ name: 'GoalProgressDialog' });
 
@@ -63,9 +64,10 @@ const isDone = computed(() => status.value === 'done');
 const isStopped = computed(() => status.value === 'stopped');
 
 const statusLabel = computed(() => {
-  if (isDone.value) return '已完成';
-  if (isStopped.value) return '已停止';
-  return '运行中';
+  void currentLocale.value;
+  if (isDone.value) return t('overlay.statusDone');
+  if (isStopped.value) return t('overlay.statusStopped');
+  return t('common.running');
 });
 const statusClass = computed(() => ({
   'is-done': isDone.value,
@@ -140,14 +142,16 @@ const formattedDuration = computed(() => {
 });
 
 const stoppedReasonLabel = computed(() => {
+  void currentLocale.value;
   const map: Record<string, string> = {
-    idle_no_tool: '主模型停止时未调用任何工具（可能卡住）',
-    max_turns: '已达到最大轮数上限',
-    max_tokens: '已达到累计 token 上限',
-    user_cancel: '用户手动停止'
+    idle_no_tool: 'overlay.reasonIdleNoTool',
+    max_turns: 'overlay.reasonMaxTurns',
+    max_tokens: 'overlay.reasonMaxTokens',
+    user_cancel: 'overlay.reasonUserCancel'
   };
   const reason = (props.progress?.stopped_reason || '').toString();
-  return map[reason] || reason;
+  const key = map[reason];
+  return key ? t(key) : reason;
 });
 </script>
 

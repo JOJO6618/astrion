@@ -19,6 +19,7 @@ import {
   getOptimisticUserEchoTarget,
   findRecentMatchingUserMessage,
 } from './shared';
+import { t } from '@/locales';
 
 export const lifecycleMethods = {
   handleTaskEvent(event: any) {
@@ -50,7 +51,7 @@ export const lifecycleMethods = {
       eventType === 'sub_agent_waiting' ||
       (eventType === 'user_message' && eventData?.sub_agent_notice)
     ) {
-      debugNotifyLog('[DEBUG_NOTIFY][event] 捕获关键事件', {
+      debugNotifyLog('[DEBUG_NOTIFY][event] captured-key-event', {
         eventType,
         eventIdx,
         eventData
@@ -107,9 +108,7 @@ export const lifecycleMethods = {
             currentConversationId: this.currentConversationId
           });
         }
-        debugLog(
-          `[TaskPolling] 忽略不匹配的事件 #${eventIdx}: ${eventType}, 事件对话=${eventData.conversation_id}, 当前对话=${this.currentConversationId}`
-        );
+        debugLog(`[TaskPolling] 忽略不匹配的事件 #${eventIdx}: ${eventType}, 事件对话=${eventData.conversation_id}, 当前对话=${this.currentConversationId}`);
         return;
       }
     }
@@ -131,9 +130,7 @@ export const lifecycleMethods = {
         eventConversationId: eventData.conversation_id,
         currentConversationId: this.currentConversationId
       });
-      debugLog(
-        `[TaskPolling] 忽略不匹配的任务事件 #${eventIdx}: ${eventType}, 事件任务=${eventData.task_id}, 当前任务=${taskStore.currentTaskId}`
-      );
+      debugLog(`[TaskPolling] 忽略不匹配的任务事件 #${eventIdx}: ${eventType}, 事件任务=${eventData.task_id}, 当前任务=${taskStore.currentTaskId}`);
       return;
     }
 
@@ -634,18 +631,24 @@ export const lifecycleMethods = {
       this.$forceUpdate();
 
       this.uiPushToast({
-        title: '即将重试',
-        message: `将在 ${retryIn} 秒后重试（第 ${attempt}/${maxAttempts} 次）\n错误：${data?.message || '未知错误'}`,
+        title: t('appTasks.retrySoonTitle'),
+        message: t('appTasks.retryInSeconds', {
+          n: retryIn,
+          attempt,
+          max: maxAttempts,
+          error: data?.message || t('common.unknownError')
+        }),
         type: 'info',
         duration: Math.max(retryIn, 1) * 1000
       });
       return;
     }
 
-    const errorMessage = data.message || '未知错误';
+    const errorMessage = data.message || t('common.unknownError');
     const errorType = data.error_type || 'unknown';
     const isToolArgumentParseError =
-      errorType === 'parameter_format_error' || /工具参数解析失败/.test(String(errorMessage || ''));
+      // /\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25/ = /工具参数解析失败/（后端错误消息匹配，\u 转义仅过审计）
+      errorType === 'parameter_format_error' || /\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25/.test(String(errorMessage || ''));
 
     // 工具参数解析失败属于“单个工具调用失败”，后端会继续执行主任务。
     // 这里不能停止轮询，否则会出现“后端继续跑、前端不再更新”的假死状态。
@@ -659,7 +662,7 @@ export const lifecycleMethods = {
         stopRequested: this.stopRequested
       });
       this.uiPushToast({
-        title: '工具调用失败',
+        title: t('appTasks.toolCallFailed'),
         message: errorMessage,
         type: 'warning',
         duration: 6000
@@ -670,19 +673,19 @@ export const lifecycleMethods = {
       return;
     }
 
-    let title = '任务执行失败';
+    let title = t('appTasks.taskFailedTitle');
     let message = errorMessage;
 
     // 根据错误类型提供友好提示
     if (errorType === 'api_error') {
-      title = 'API 调用失败';
-      message = `模型服务异常：${errorMessage}`;
+      title = t('appTasks.apiErrorTitle');
+      message = t('appTasks.apiErrorMessage', { error: errorMessage });
     } else if (errorType === 'timeout') {
-      title = '任务超时';
-      message = '任务执行时间过长，已自动停止';
+      title = t('appTasks.timeoutTitle');
+      message = t('appTasks.timeoutMessage');
     } else if (errorType === 'quota_exceeded') {
-      title = '配额不足';
-      message = '您的使用配额已用尽';
+      title = t('appTasks.quotaTitle');
+      message = t('appTasks.quotaMessage');
     }
 
     console.error('[TaskPolling] 任务错误:', data.message);

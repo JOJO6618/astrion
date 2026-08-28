@@ -33,7 +33,7 @@
     <div class="branch-node__body">
       <span class="icon branch-node__icon" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
       <span class="branch-node__name">{{ data.node.name || data.node.id }}</span>
-      <span class="branch-node__meta">{{ data.outCount }} 出</span>
+      <span class="branch-node__meta">{{ $t('workflow.branchOutMeta', { n: data.outCount }) }}</span>
     </div>
   </div>
 </template>

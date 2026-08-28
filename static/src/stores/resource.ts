@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 
 interface ConversationTokens {
   cumulative_input_tokens: number;
@@ -162,7 +163,7 @@ export const useResourceStore = defineStore('resource', {
           project.limit_label ||
           (project.limit_bytes
             ? `${(project.limit_bytes / (1024 * 1024)).toFixed(0)} MB`
-            : '未限制');
+            : t('stores.unlimited'));
         if (project.limit_bytes) {
           const pct =
             typeof project.usage_percent === 'number'
@@ -317,7 +318,7 @@ export const useResourceStore = defineStore('resource', {
       try {
         const resp = await fetch('/api/project-storage');
         if (!resp.ok) {
-          throw new Error(resp.statusText || '请求失败');
+          throw new Error(resp.statusText || t('stores.requestFailed'));
         }
         const data = await resp.json();
         if (data && data.success && data.data) {
@@ -392,7 +393,7 @@ export const useResourceStore = defineStore('resource', {
       try {
         const response = await fetch('/api/usage');
         if (!response.ok) {
-          throw new Error(response.statusText || '请求失败');
+          throw new Error(response.statusText || t('stores.requestFailed'));
         }
         const data = await response.json();
         if (data && data.success && data.data) {

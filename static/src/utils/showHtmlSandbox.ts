@@ -102,9 +102,9 @@ export const SHOW_HTML_IFRAME_GUARD_SCRIPT = `(function () {
     if (!id) return;
     var target = document.getElementById(id);
     if (target) {
-      // 先摘掉 id 再更新 hash，避免浏览器默认锚点滚动穿透到宿主页面
+      // Remove the id first so the hash update does not trigger the browser's default anchor scroll
       target.removeAttribute('id');
-      try { window.location.hash = id; } catch (err) { /* opaque origin 下忽略 */ }
+      try { window.location.hash = id; } catch (err) { /* ignore under opaque origin */ }
       target.setAttribute('id', id);
       localScrollIntoView(target, { block: 'start' });
     } else {
@@ -116,7 +116,7 @@ export const SHOW_HTML_IFRAME_GUARD_SCRIPT = `(function () {
     try {
       win.Element.prototype.scrollIntoView = Element.prototype.scrollIntoView;
       win.HTMLElement.prototype.focus = HTMLElement.prototype.focus;
-    } catch (err) { /* 跨源子 frame 跳过 */ }
+    } catch (err) { /* skip cross-origin child frames */ }
   }
   new MutationObserver(function (mutations) {
     for (var i = 0; i < mutations.length; i++) {

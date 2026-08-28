@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { useTaskStore } from '../../../stores/task';
 import {
   extractSkillRefsFromMessage,
@@ -10,18 +11,18 @@ export const systemCommandMethods = {
   async executeSystemCommand(rawCommand, options = {}) {
     const command = (rawCommand || '').toString().trim();
     if (!command) {
-      return { success: false, message: '命令不能为空' };
+      return { success: false, message: t('appMessages.commandEmpty') };
     }
 
     if (!this.isConnected) {
       if (options.showToast !== false) {
         this.uiPushToast({
-          title: '连接不可用',
-          message: '当前无法执行命令，请稍后重试。',
+          title: t('appMessages.connectionUnavailable'),
+          message: t('appMessages.connectionUnavailableMessage'),
           type: 'error'
         });
       }
-      return { success: false, message: '连接不可用' };
+      return { success: false, message: t('appMessages.connectionUnavailable') };
     }
 
     try {
@@ -43,7 +44,7 @@ export const systemCommandMethods = {
       this.handleSystemCommandResult(result, options);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '命令执行失败';
+      const message = error instanceof Error ? error.message : t('appMessages.commandExecutionFailed');
       const result = {
         command: command.replace(/^\//, ''),
         success: false,
@@ -64,8 +65,8 @@ export const systemCommandMethods = {
       this.resetTokenStatistics();
       if (showToast) {
         this.uiPushToast({
-          title: '已清除',
-          message: data.message || '对话已清除',
+          title: t('appMessages.clearedTitle'),
+          message: data.message || t('appMessages.conversationCleared'),
           type: 'success'
         });
       }
@@ -73,11 +74,11 @@ export const systemCommandMethods = {
     }
 
     if (data.command === 'status' && data.success) {
-      this.addSystemMessage(`系统状态:\n${JSON.stringify(data.data || {}, null, 2)}`);
+      this.addSystemMessage(`${t('appMessages.systemStatus')}:\n${JSON.stringify(data.data || {}, null, 2)}`);
       if (showToast) {
         this.uiPushToast({
-          title: '状态已更新',
-          message: '已获取系统状态',
+          title: t('appMessages.statusUpdatedTitle'),
+          message: t('appMessages.statusFetched'),
           type: 'success'
         });
       }
@@ -85,11 +86,11 @@ export const systemCommandMethods = {
     }
 
     if (!data.success) {
-      this.addSystemMessage(`命令失败: ${data.message || '未知错误'}`);
+      this.addSystemMessage(`${t('appMessages.commandFailedLabel')}: ${data.message || t('common.unknownError')}`);
       if (showToast) {
         this.uiPushToast({
-          title: '命令执行失败',
-          message: data.message || '请稍后重试',
+          title: t('appMessages.commandExecutionFailed'),
+          message: data.message || t('common.retryLater'),
           type: 'error'
         });
       }
@@ -98,8 +99,8 @@ export const systemCommandMethods = {
 
     if (showToast) {
       this.uiPushToast({
-        title: '命令已执行',
-        message: data.command || '完成',
+        title: t('appMessages.commandExecutedTitle'),
+        message: data.command || t('appMessages.commandDone'),
         type: 'success'
       });
     }

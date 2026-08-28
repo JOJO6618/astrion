@@ -4,7 +4,7 @@
     <header class="terminal-panel__header">
       <div class="terminal-panel__tabs">
         <div v-if="!sessionKeys.length" class="terminal-panel__empty-tab">
-          <span>等待终端会话...</span>
+          <span>{{ $t('shell.waitingTerminalSession') }}</span>
         </div>
         <button
           v-for="name in sessionKeys"
@@ -21,7 +21,7 @@
       <button
         type="button"
         class="terminal-panel__close"
-        aria-label="关闭终端面板"
+        :aria-label="$t('shell.closeTerminalPanel')"
         @click="$emit('close')"
       >&times;</button>
     </header>
@@ -33,7 +33,7 @@
           <rect x="2" y="3" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/>
           <path d="M6 7h12M6 10h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <span>当前没有开启的终端</span>
+        <span>{{ $t('shell.noOpenTerminals') }}</span>
       </div>
     </div>
   </aside>

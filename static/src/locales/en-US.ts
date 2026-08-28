@@ -12,6 +12,19 @@ import adminDashboard from './en-US/adminDashboard';
 import adminPolicy from './en-US/adminPolicy';
 import adminApi from './en-US/adminApi';
 import adminCustomTools from './en-US/adminCustomTools';
+import appMessages from './en-US/appMessages';
+import appTasks from './en-US/appTasks';
+import appUi from './en-US/appUi';
+import appCore from './en-US/appCore';
+import chat from './en-US/chat';
+import chatActions from './en-US/chatActions';
+import quickdock from './en-US/quickdock';
+import stores from './en-US/stores';
+import overlay from './en-US/overlay';
+import shell from './en-US/shell';
+import sidebar from './en-US/sidebar';
+import auth from './en-US/auth';
+import utils from './en-US/utils';
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
@@ -27,6 +40,19 @@ const enUS: DeepString<typeof zhCN> = {
   adminPolicy,
   adminApi,
   adminCustomTools,
+  appMessages,
+  appTasks,
+  appUi,
+  appCore,
+  chat,
+  chatActions,
+  quickdock,
+  stores,
+  overlay,
+  shell,
+  sidebar,
+  auth,
+  utils,
 };
 
 export default enUS;

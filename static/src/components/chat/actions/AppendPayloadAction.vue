@@ -16,21 +16,24 @@
       <div class="append-meta" v-if="action.append">
         <span v-if="action.append.path">{{ action.append.path }}</span>
         <span v-if="action.append.lines !== null && action.append.lines !== undefined"
-          >· 行数 {{ action.append.lines }}</span
+          >{{ $t('chat.linesCount', { n: action.append.lines }) }}</span
         >
         <span v-if="action.append.bytes !== null && action.append.bytes !== undefined"
-          >· 字节 {{ action.append.bytes }}</span
+          >{{ $t('chat.bytesCount', { n: action.append.bytes }) }}</span
         >
       </div>
       <div class="append-warning icon-label" v-if="action.append?.forced">
         <span class="icon icon-sm" :style="iconStyle('triangleAlert')" aria-hidden="true"></span>
-        <span>未检测到结束标记，请根据提示继续补充。</span>
+        <span>{{ $t('chat.appendWarning') }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { t, currentLocale } from '@/locales';
+
 defineOptions({ name: 'AppendPayloadAction' });
 
 const props = defineProps<{
@@ -39,13 +42,22 @@ const props = defineProps<{
   variant: 'payload' | 'summary';
 }>();
 
-const successText =
-  props.variant === 'payload'
-    ? `已写入 ${props.action.append?.path || '目标文件'} 的追加内容（内容已保存至文件）`
-    : props.action.append?.summary || '文件追加完成';
+const successText = computed(() => {
+  void currentLocale.value;
+  if (props.variant === 'payload') {
+    return t('chat.appendSuccess', {
+      path: props.action.append?.path || t('chat.targetFile'),
+    });
+  }
+  return props.action.append?.summary || t('chat.appendDone');
+});
 
-const errorText =
-  props.variant === 'payload'
-    ? `向 ${props.action.append?.path || '目标文件'} 写入失败，内容已截获供后续修复。`
-    : `${props.action.append?.path || '目标文件'} 写入失败，请按提示重新尝试。`;
+const errorText = computed(() => {
+  void currentLocale.value;
+  const path = props.action.append?.path || t('chat.targetFile');
+  if (props.variant === 'payload') {
+    return t('chat.appendFailed', { path });
+  }
+  return t('chatActions.appendFailedRetry', { path });
+});
 </script>

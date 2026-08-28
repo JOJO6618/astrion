@@ -20,7 +20,9 @@
         />
         <path d="M8 12h5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
       </svg>
-      <span class="qd-window__title">{{ kind === 'agent' ? '子智能体' : '后台指令' }}</span>
+      <span class="qd-window__title">
+        {{ kind === 'agent' ? $t('quickdock.subAgent') : $t('quickdock.backgroundCommand') }}
+      </span>
       <span class="qd-window__counter">{{ rows.length }}</span>
     </header>
     <ul ref="listRef" class="qd-list">
@@ -41,7 +43,7 @@
       >
         <span class="qd-run-status"></span>
         <span class="qd-run-name" :title="row.name">{{ row.name }}</span>
-        <button class="qd-row-menu-btn" title="更多" @click.stop="openMenu($event, row)">
+        <button class="qd-row-menu-btn" :title="$t('quickdock.more')" @click.stop="openMenu($event, row)">
           <svg viewBox="0 0 16 16">
             <circle cx="3.5" cy="8" r="1.3" fill="currentColor" />
             <circle cx="8" cy="8" r="1.3" fill="currentColor" />
@@ -56,6 +58,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t, currentLocale } from '@/locales';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 import { useQuickDockStore } from '@/stores/quickDock';
@@ -115,6 +118,7 @@ interface SourceItem {
 }
 
 const sourceItems = computed<SourceItem[]>(() => {
+  void currentLocale.value;
   if (props.kind === 'agent') {
     return subAgentStore.subAgents
       .map((a) => {
@@ -125,7 +129,7 @@ const sourceItems = computed<SourceItem[]>(() => {
         const status = (a.status || '').toString().toLowerCase();
         return {
           id,
-          name: a.display_name || a.summary || `子智能体 ${a.agent_id ?? id}`,
+          name: a.display_name || a.summary || t('quickdock.agentNamed', { id: a.agent_id ?? id }),
           state: agentStateOf(status)
         };
       })

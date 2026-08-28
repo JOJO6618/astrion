@@ -3,7 +3,7 @@
     <div class="versioning-card" @click="closeScopeMenu">
       <header class="versioning-header">
         <div class="versioning-header-left">
-          <h3>版本管理</h3>
+          <h3>{{ $t('common.versioning') }}</h3>
           <label class="switch-line">
             <input
               type="checkbox"
@@ -12,15 +12,15 @@
               @change="$emit('toggle-enabled', ($event.target as HTMLInputElement).checked)"
             />
             <span class="switch"></span>
-            <span class="switch-text">{{ enabled ? '开启' : '关闭' }}</span>
+            <span class="switch-text">{{ enabled ? $t('overlay.switchOn') : $t('overlay.switchOff') }}</span>
           </label>
         </div>
         <div class="versioning-header-actions">
           <button type="button" class="refresh-btn" :disabled="loading" @click="$emit('refresh')">
             <span class="icon icon-sm" :style="iconStyle('refreshCw')" aria-hidden="true"></span>
-            <span>刷新</span>
+            <span>{{ $t('overlay.refresh') }}</span>
           </button>
-          <button type="button" class="icon-close-btn" aria-label="关闭" @click="$emit('close')">
+          <button type="button" class="icon-close-btn" :aria-label="$t('common.close')" @click="$emit('close')">
             <span class="icon icon-sm" :style="iconStyle('x')" aria-hidden="true"></span>
           </button>
         </div>
@@ -40,24 +40,24 @@
               <span class="seq">#{{ item.seq }}</span>
               <span class="time">{{ formatTime(item.timestamp) }}</span>
             </div>
-            <div class="preview">{{ item.message_preview || '(空消息)' }}</div>
+            <div class="preview">{{ item.message_preview || $t('overlay.emptyMessage') }}</div>
             <div class="row stats">
               <span class="plus">+{{ item.insertions || 0 }}</span>
               <span class="minus">-{{ item.deletions || 0 }}</span>
-              <span class="files">{{ item.files_changed || 0 }} 文件</span>
+              <span class="files">{{ $t('overlay.filesCount', { n: item.files_changed || 0 }) }}</span>
             </div>
           </button>
-          <div v-if="!items.length" class="empty">暂无版本点</div>
+          <div v-if="!items.length" class="empty">{{ $t('overlay.noCheckpoints') }}</div>
         </aside>
 
         <section class="checkpoint-detail scroll-area">
-          <div v-if="detailLoading" class="loading">加载详情中...</div>
+          <div v-if="detailLoading" class="loading">{{ $t('overlay.loadingDetail') }}</div>
           <template v-else-if="detail">
-            <h4>提交详情 #{{ detail.seq }}</h4>
+            <h4>{{ $t('overlay.detailTitle', { seq: detail.seq }) }}</h4>
             <div class="summary">
               <span class="plus">+{{ detail.insertions || 0 }}</span>
               <span class="minus">-{{ detail.deletions || 0 }}</span>
-              <span class="files">{{ detail.files_changed || 0 }} 文件</span>
+              <span class="files">{{ $t('overlay.filesCount', { n: detail.files_changed || 0 }) }}</span>
             </div>
             <div class="file-list">
               <template v-for="(file, idx) in detail.files || []" :key="`${file.status}:${file.path}:${idx}`">
@@ -70,7 +70,7 @@
                   </span>
                 </div>
                 <div v-if="isFileExpanded(file, idx)" class="tool-result-diff scroll-area versioning-diff">
-                  <div v-if="!(file.patch_lines || []).length" class="empty">暂无可展示的文本变更行</div>
+                  <div v-if="!(file.patch_lines || []).length" class="empty">{{ $t('overlay.noDiffLines') }}</div>
                   <template v-for="(line, lineIdx) in file.patch_lines || []" :key="`line:${idx}:${lineIdx}`">
                     <div
                       v-for="(subLine, subIdx) in splitDiffContent(line.content)"
@@ -82,19 +82,19 @@
                       <span class="diff-content">{{ subLine }}</span>
                     </div>
                   </template>
-                  <div v-if="file.patch_truncated" class="approval-note">内容过长，已截断展示</div>
+                  <div v-if="file.patch_truncated" class="approval-note">{{ $t('overlay.diffTruncated') }}</div>
                 </div>
               </template>
             </div>
           </template>
-          <div v-else class="empty">请选择一个版本点查看详情</div>
+          <div v-else class="empty">{{ $t('overlay.selectCheckpoint') }}</div>
         </section>
       </div>
 
       <footer class="versioning-footer">
         <div class="restore-options">
           <div class="restore-option-group">
-            <span class="restore-option-label">回溯范围</span>
+            <span class="restore-option-label">{{ $t('overlay.restoreScope') }}</span>
             <div class="restore-option-buttons">
               <button
                 type="button"
@@ -103,7 +103,7 @@
                 :disabled="restoring"
                 @click="$emit('update:tracking-mode', 'conversation_only')"
               >
-                仅回溯对话
+                {{ $t('overlay.scopeConversationOnly') }}
               </button>
               <button
                 type="button"
@@ -112,12 +112,12 @@
                 :disabled="restoring || !hostMode"
                 @click="$emit('update:tracking-mode', 'workspace_and_conversation')"
               >
-                回溯对话和工作区
+                {{ $t('overlay.scopeWorkspaceAndConversation') }}
               </button>
             </div>
           </div>
           <div class="restore-option-group">
-            <span class="restore-option-label">回溯模式</span>
+            <span class="restore-option-label">{{ $t('overlay.restoreModeLabel') }}</span>
             <div class="restore-option-buttons">
               <button
                 type="button"
@@ -126,7 +126,7 @@
                 :disabled="restoring"
                 @click="$emit('update:restore-mode', 'overwrite')"
               >
-                覆盖当前对话
+                {{ $t('overlay.modeOverwrite') }}
               </button>
               <button
                 type="button"
@@ -135,7 +135,7 @@
                 :disabled="restoring"
                 @click="$emit('update:restore-mode', 'copy')"
               >
-                复制对话
+                {{ $t('overlay.modeCopy') }}
               </button>
             </div>
           </div>
@@ -146,7 +146,7 @@
           :disabled="!enabled || selectedSeq === null || selectedSeq === undefined || restoring"
           @click="$emit('confirm')"
         >
-          {{ restoring ? '回溯中...' : '确认回溯' }}
+          {{ restoring ? $t('overlay.restoring') : $t('overlay.confirmRestore') }}
         </button>
       </footer>
     </div>

@@ -2,7 +2,7 @@
   <transition name="quota-toast-fade">
     <div class="quota-toast" v-if="quotaToast">
       <span class="quota-toast-label">{{ quotaToast.message }}</span>
-      <button type="button" class="toast-close" aria-label="关闭通知" @click="dismiss">×</button>
+      <button type="button" class="toast-close" :aria-label="$t('shell.closeNotification')" @click="dismiss">×</button>
     </div>
   </transition>
 </template>

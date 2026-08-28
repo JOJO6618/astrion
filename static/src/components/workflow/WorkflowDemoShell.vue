@@ -15,16 +15,17 @@
       @delete="deleteWorkflowByName"
       @exit="exitDemo"
     />
-    <div v-else class="wf-shell__loading">加载中…</div>
+    <div v-else class="wf-shell__loading">{{ $t('common.loading') }}</div>
     <div v-if="errorMessage" class="wf-shell__error" role="alert">
       <span>{{ errorMessage }}</span>
-      <button type="button" class="wf-shell__error-close" aria-label="关闭" @click="errorMessage = ''">×</button>
+      <button type="button" class="wf-shell__error-close" :aria-label="$t('common.close')" @click="errorMessage = ''">×</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { t } from '@/locales';
 import WorkflowLibraryView from './WorkflowLibraryView.vue';
 import WorkflowEditorView from './WorkflowEditorView.vue';
 import { createEmptyWorkflow, type WorkflowDef } from './workflowModel';
@@ -70,7 +71,7 @@ async function refreshList() {
   try {
     workflows.value = await listWorkflows();
   } catch (err) {
-    showError(err, '加载工作流列表失败');
+    showError(err, t('workflow.loadListFailed'));
   } finally {
     listLoaded.value = true;
   }
@@ -82,7 +83,7 @@ async function openEditor(name: string) {
     editingName.value = name;
     history.replaceState({}, '', `/workflow/${name}`);
   } catch (err) {
-    showError(err, '加载工作流失败');
+    showError(err, t('workflow.loadFailed'));
   }
 }
 
@@ -108,7 +109,7 @@ async function createWorkflow() {
     await refreshList();
     await openEditor(def.name);
   } catch (err) {
-    showError(err, '新建工作流失败');
+    showError(err, t('workflow.createFailed'));
   }
 }
 
@@ -121,7 +122,7 @@ async function duplicateWorkflow(name: string) {
     await saveWorkflow(copy);
     await refreshList();
   } catch (err) {
-    showError(err, '复制工作流失败');
+    showError(err, t('workflow.duplicateFailed'));
   }
 }
 
@@ -134,7 +135,7 @@ async function deleteWorkflowByName(name: string) {
     }
     await refreshList();
   } catch (err) {
-    showError(err, '删除工作流失败');
+    showError(err, t('workflow.deleteFailed'));
   }
 }
 
@@ -167,7 +168,7 @@ onMounted(async () => {
     try {
       currentWorkflow.value = await loadWorkflow(editingName.value);
     } catch (err) {
-      showError(err, '加载工作流失败');
+      showError(err, t('workflow.loadFailed'));
       backToLibrary();
     }
   }

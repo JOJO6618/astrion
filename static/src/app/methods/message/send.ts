@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog, goalModeDebugLog } from '../common';
+import { t } from '@/locales';
 import { useTaskStore } from '../../../stores/task';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -12,8 +13,8 @@ export const sendMethods = {
   async handleSendOrStop() {
     if (this.compressionActiveForCurrentConversation) {
       this.uiPushToast({
-        title: '对话自动压缩中',
-        message: '当前不可发送/停止，请等待压缩完成',
+        title: t('appMessages.autoCompressingTitle'),
+        message: t('appMessages.autoCompressingBlockSend'),
         type: 'warning'
       });
       return;
@@ -27,8 +28,8 @@ export const sendMethods = {
     // 注意：仅在主对话空闲时拦截；运行中该按钮是「停止」语义，不能影响停止功能。
     if (hasFiles && !hasText && !hasMedia && !this.composerBusy) {
       this.uiPushToast({
-        title: '需要文字消息',
-        message: '附加文件需随文字消息一起发送',
+        title: t('appMessages.textRequiredTitle'),
+        message: t('appMessages.textRequiredMessage'),
         type: 'warning'
       });
       return;
@@ -57,8 +58,8 @@ export const sendMethods = {
     }
     if (this.composerBusy && mainIdle && hasMedia) {
       this.uiPushToast({
-        title: '后台子智能体运行中',
-        message: '请等待后台任务结束后再发送图片/视频',
+        title: t('appMessages.subAgentRunningTitle'),
+        message: t('appMessages.subAgentRunningMessage'),
         type: 'warning'
       });
       return;
@@ -90,8 +91,8 @@ export const sendMethods = {
       }
       if (hasMedia) {
         this.uiPushToast({
-          title: '运行中仅支持文本',
-          message: '图片/视频请等待当前任务结束后发送',
+          title: t('appMessages.runningTextOnlyTitle'),
+          message: t('appMessages.runningTextOnlyMessage'),
           type: 'warning'
         });
         return;
@@ -102,8 +103,8 @@ export const sendMethods = {
       // 阻止直接发起新任务（后端同对话互斥会 409）。排队/停止走上方 composerBusy 分支，不受此守卫影响。
       if (this.currentWorkspaceHasRunningTask) {
         this.uiPushToast({
-          title: '当前对话正在运行',
-          message: '请等待当前对话任务完成后再发送新消息；同工作区的其他对话可正常并行。',
+          title: t('appMessages.conversationRunningTitle'),
+          message: t('appMessages.conversationRunningMessage'),
           type: 'warning'
         });
         return;
@@ -117,8 +118,8 @@ export const sendMethods = {
 
     if (this.compressionActiveForCurrentConversation) {
       this.uiPushToast({
-        title: '对话自动压缩中',
-        message: '压缩完成后才能继续发送消息',
+        title: t('appMessages.autoCompressingTitle'),
+        message: t('appMessages.compressionBlocksSend'),
         type: 'warning'
       });
       return false;
@@ -128,16 +129,16 @@ export const sendMethods = {
     }
     if (!this.isConnected) {
       this.uiPushToast({
-        title: '连接已断开',
-        message: '当前无法发送消息，请等待连接恢复后重试',
+        title: t('appMessages.connectionLostTitle'),
+        message: t('appMessages.connectionLostMessage'),
         type: 'warning'
       });
       return false;
     }
     if (this.mediaUploading && !usePresetText) {
       this.uiPushToast({
-        title: '上传中',
-        message: '请等待图片/视频上传完成后再发送',
+        title: t('appMessages.uploadingTitle'),
+        message: t('appMessages.uploadingMessage'),
         type: 'info'
       });
       return false;
@@ -193,8 +194,8 @@ export const sendMethods = {
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (hasImages && !currentModel?.supportsImage) {
       this.uiPushToast({
-        title: '当前模型不支持图片',
-        message: '请切换到支持图片输入的模型再发送图片',
+        title: t('appMessages.modelNoImageTitle'),
+        message: t('appMessages.modelNoImageMessage'),
         type: 'error'
       });
       return false;
@@ -202,8 +203,8 @@ export const sendMethods = {
 
     if (hasVideos && !currentModel?.supportsVideo) {
       this.uiPushToast({
-        title: '当前模型不支持视频',
-        message: '请切换到支持视频输入的模型后再发送视频',
+        title: t('appMessages.modelNoVideoTitle'),
+        message: t('appMessages.modelNoVideoMessage'),
         type: 'error'
       });
       return false;
@@ -211,8 +212,8 @@ export const sendMethods = {
 
     if (hasVideos && hasImages) {
       this.uiPushToast({
-        title: '请勿同时发送',
-        message: '视频与图片需分开发送，每条仅包含一种媒体',
+        title: t('appMessages.noMixedMediaTitle'),
+        message: t('appMessages.noMixedMediaMessage'),
         type: 'warning'
       });
       return false;
@@ -220,8 +221,8 @@ export const sendMethods = {
 
     if (hasVideos) {
       this.uiPushToast({
-        title: '视频处理中',
-        message: '读取视频需要较长时间，请耐心等待',
+        title: t('appMessages.videoProcessingTitle'),
+        message: t('appMessages.videoProcessingMessage'),
         type: 'info',
         duration: 5000
       });
@@ -255,8 +256,8 @@ export const sendMethods = {
           personalizationStore.form.versioning_backup_mode === 'full';
         if (shouldShowBackupToast) {
           backupToastId = this.uiPushToast({
-            title: '正在初始化备份',
-            message: '正在创建完整工作区快照，请稍候…',
+            title: t('appMessages.initializingBackupTitle'),
+            message: t('appMessages.initializingBackupMessage'),
             type: 'info',
             duration: null,
             closable: false
@@ -281,17 +282,17 @@ export const sendMethods = {
         });
         const createResult = await createResp.json().catch(() => ({}));
         if (!createResp.ok || !createResult?.success || !createResult?.conversation_id) {
-          throw new Error(createResult?.message || createResult?.error || '创建对话失败');
+          throw new Error(createResult?.message || createResult?.error || t('appMessages.createConversationFailed'));
         }
         targetConversationId = createResult.conversation_id;
         // 创建即定型：落地对话类型（与后端 metadata 保持一致）
         this.currentConversationType = isMultiAgent ? 'multi_agent' : 'normal';
         this.skipConversationHistoryReload = true;
         this.currentConversationId = targetConversationId;
-        this.currentConversationTitle = '新对话';
+        this.currentConversationTitle = t('common.newConversation');
         const newPlaceholder = {
           id: targetConversationId,
-          title: '新对话',
+          title: t('common.newConversation'),
           updated_at: new Date().toISOString(),
           total_messages: 0,
           total_tools: 0
@@ -359,8 +360,8 @@ export const sendMethods = {
         history.replaceState({ conversationId: targetConversationId }, '', `/${pathFragment}`);
       } catch (error) {
         this.uiPushToast({
-          title: '发送失败',
-          message: error?.message || '创建新对话失败，请重试',
+          title: t('appMessages.sendFailedTitle'),
+          message: error?.message || t('appMessages.createNewConversationFailedMessage'),
           type: 'error'
         });
         return false;
@@ -435,8 +436,8 @@ export const sendMethods = {
     } catch (error) {
       console.error('[Message] 创建任务失败:', error);
       this.uiPushToast({
-        title: '发送失败',
-        message: error.message || '创建任务失败，请重试',
+        title: t('appMessages.sendFailedTitle'),
+        message: error.message || t('appMessages.createTaskFailedMessage'),
         type: 'error'
       });
       this.streamingMessage = false;
@@ -495,8 +496,8 @@ export const sendMethods = {
     if (this.compressionActiveForCurrentConversation) {
       this._stopTaskRunning = false;
       this.uiPushToast({
-        title: '对话自动压缩中',
-        message: '压缩进行中，当前不可停止任务',
+        title: t('appMessages.autoCompressingTitle'),
+        message: t('appMessages.autoCompressingBlockStop'),
         type: 'warning'
       });
       return;
@@ -601,8 +602,8 @@ export const sendMethods = {
       }
 
       this.uiPushToast({
-        title: '停止请求已发送',
-        message: '若主对话未停止，请稍候；后台任务可通过状态栏单独停止',
+        title: t('appMessages.stopRequestedTitle'),
+        message: t('appMessages.stopRequestedMessage'),
         type: 'info'
       });
     } finally {

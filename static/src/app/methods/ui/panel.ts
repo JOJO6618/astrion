@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -59,7 +60,7 @@ export const panelMethods = {
     if (!this.isConnected) {
       return;
     }
-    if (this.isPolicyBlocked('block_focus_panel', '聚焦面板已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_focus_panel', t('appUi.policyBlockedFocusPanel'))) {
       return;
     }
     this.toggleFocusPanel();
@@ -80,7 +81,7 @@ export const panelMethods = {
     if (!this.currentConversationId) {
       return;
     }
-    if (this.isPolicyBlocked('block_token_panel', '用量统计已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_token_panel', t('appUi.policyBlockedTokenPanel'))) {
       return;
     }
     // 移动端禁用“点击展开顶部用量面板”，仅允许在已展开时点击收起

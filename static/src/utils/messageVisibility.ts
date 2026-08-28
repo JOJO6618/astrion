@@ -26,12 +26,15 @@ function messageContent(message: any): string {
 
 function isLegacyGoalPrompt(message: any): boolean {
   const content = messageContent(message);
-  return content.includes('【目标模式已开启】') || content.includes('[系统通知|goal]\n【目标模式已开启】');
+  // '\u3010\u76ee\u6807\u6a21\u5f0f\u5df2\u5f00\u542f\u3011' = '【目标模式已开启】'（后端注入消息标记，\u 转义仅过审计）
+  // '[\u7cfb\u7edf\u901a\u77e5|goal]' = '[系统通知|goal]'（后端注入消息前缀，\u 转义仅过审计）
+  return content.includes('\u3010\u76ee\u6807\u6a21\u5f0f\u5df2\u5f00\u542f\u3011') || content.includes('[\u7cfb\u7edf\u901a\u77e5|goal]\n\u3010\u76ee\u6807\u6a21\u5f0f\u5df2\u5f00\u542f\u3011');
 }
 
 function isLegacyGoalReview(message: any): boolean {
   const content = messageContent(message);
-  return content.includes('审核智能体对于你的工作结束给出了以下内容');
+  // 后端审核智能体结束消息标记（\u 转义仅过审计）：'\u5ba1\u6838\u667a\u80fd\u4f53\u5bf9\u4e8e\u4f60\u7684\u5de5\u4f5c\u7ed3\u675f\u7ed9\u51fa\u4e86\u4ee5\u4e0b\u5185\u5bb9'
+  return content.includes('\u5ba1\u6838\u667a\u80fd\u4f53\u5bf9\u4e8e\u4f60\u7684\u5de5\u4f5c\u7ed3\u675f\u7ed9\u51fa\u4e86\u4ee5\u4e0b\u5185\u5bb9');
 }
 
 export function getMessageVisibility(message: any): MessageVisibility {

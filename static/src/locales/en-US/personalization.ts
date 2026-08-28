@@ -355,4 +355,21 @@ export default {
   modelModeConflictTitle: 'Model / thinking mode conflict',
   modelThinkingOnlyWarning: '{label} only supports thinking mode. Your setting was kept.',
   modelFastOnlyWarning: '{label} only supports fast mode. Your setting was kept.',
+
+  // ── Experience onboarding ──
+  expTitle: 'First time? Choose a mode that fits you',
+  expSubtitle: 'Speed, web access and tool scope differ; switch anytime in personal space',
+  expConfirmStart: 'Confirm & Start',
+  expModeFastBadge: 'Lightning',
+  expModeFastTitle: 'Quick answers',
+  expModeFastDesc: "Answers your questions quickly, searches the web, and doesn't write files",
+  expModeThinkingBadge: 'Thinking',
+  expModeThinkingTitle: 'Think first',
+  expModeThinkingDesc: "Thinks before completing tasks, searches the web, and doesn't write files; replies take longer",
+  expModeResearchBadge: 'Research',
+  expModeResearchTitle: 'Multi-step research',
+  expModeResearchDesc: 'Multi-step reasoning and 20+ tools for complex tasks; replies may take a while',
+  expModeExpertBadge: 'Expert',
+  expModeExpertTitle: 'Full-featured exploration',
+  expModeExpertDesc: 'Explore every configuration option freely; built for agent experts and practitioners',
 } as const;

@@ -29,6 +29,7 @@
 import type { Edge, Node } from '@vue-flow/core';
 import { MarkerType } from '@vue-flow/core';
 import dagre from '@dagrejs/dagre';
+import { t } from '@/locales';
 
 // ---------------------------------------------------------------- 类型
 
@@ -136,12 +137,12 @@ export function createEmptyWorkflow(name: string): WorkflowDef {
     reviewMode: 'active',
     maxStageRounds: 20,
     endConditions: '',
-    body: '## 工作方式\n\n## 验证方式\n\n## 结束方式\n',
+    body: t('workflow.defaultBodyTemplate'),
     source: 'user',
     updatedAt: '',
     nodes: [
-      { kind: 'start', id: 'start-1', name: '开始', next: 'end-1', position: { x: 60, y: 220 } },
-      { kind: 'end', id: 'end-1', name: '结束', position: { x: 480, y: 220 } },
+      { kind: 'start', id: 'start-1', name: t('workflow.defaultStartNode'), next: 'end-1', position: { x: 60, y: 220 } },
+      { kind: 'end', id: 'end-1', name: t('workflow.defaultEndNode'), position: { x: 480, y: 220 } },
     ],
   };
 }
@@ -337,7 +338,7 @@ export function addStage(def: WorkflowDef, position: { x: number; y: number }): 
   const stage: WorkflowStageDef = {
     kind: 'stage',
     id: genNodeId(def, 'stage'),
-    name: `阶段 ${def.nodes.filter((x) => x.kind === 'stage').length + 1}`,
+    name: t('workflow.defaultStageName', { n: def.nodes.filter((x) => x.kind === 'stage').length + 1 }),
     goal: '',
     instructions: '',
     next: null,
@@ -351,7 +352,7 @@ export function addReview(def: WorkflowDef, position: { x: number; y: number }):
   const review: WorkflowReviewDef = {
     kind: 'review',
     id: genNodeId(def, 'review'),
-    name: `审核 ${def.nodes.filter((x) => x.kind === 'review').length + 1}`,
+    name: t('workflow.defaultReviewName', { n: def.nodes.filter((x) => x.kind === 'review').length + 1 }),
     prompt: '',
     next: null,
     rejectTo: null,
@@ -366,7 +367,7 @@ export function addBranch(def: WorkflowDef, position: { x: number; y: number }):
   const branch: WorkflowBranchDef = {
     kind: 'branch',
     id: genNodeId(def, 'branch'),
-    name: `分支 ${def.nodes.filter((x) => x.kind === 'branch').length + 1}`,
+    name: t('workflow.defaultBranchName', { n: def.nodes.filter((x) => x.kind === 'branch').length + 1 }),
     next: [],
     position,
   };
@@ -378,7 +379,7 @@ export function addStart(def: WorkflowDef, position: { x: number; y: number }): 
   const start: WorkflowStartDef = {
     kind: 'start',
     id: genNodeId(def, 'start'),
-    name: '开始',
+    name: t('workflow.defaultStartNode'),
     next: null,
     position,
   };
@@ -390,7 +391,7 @@ export function addEnd(def: WorkflowDef, position: { x: number; y: number }): Wo
   const end: WorkflowEndDef = {
     kind: 'end',
     id: genNodeId(def, 'end'),
-    name: '结束',
+    name: t('workflow.defaultEndNode'),
     position,
   };
   def.nodes.push(end);
@@ -416,19 +417,19 @@ export function removeNode(def: WorkflowDef, nodeId: string): void {
  * - branch 源：累加语义（重复返回错误）
  */
 export function connectNext(def: WorkflowDef, sourceId: string, targetId: string): string | null {
-  if (sourceId === targetId) return '不能连接到自身';
+  if (sourceId === targetId) return t('workflow.connectSelf');
   const source = findNode(def, sourceId);
-  if (!source) return '源节点不存在';
-  if (source.kind === 'end') return '结束节点没有出线';
-  if (!nodeExists(def, targetId)) return '目标节点不存在';
-  if (findNode(def, targetId)?.kind === 'start') return '不能连到开始节点';
+  if (!source) return t('workflow.sourceMissing');
+  if (source.kind === 'end') return t('workflow.endHasNoOut');
+  if (!nodeExists(def, targetId)) return t('workflow.targetMissing');
+  if (findNode(def, targetId)?.kind === 'start') return t('workflow.connectToStart');
   if (source.kind === 'branch') {
-    if (source.next.some((r) => r.target === targetId)) return '该路由已存在';
+    if (source.next.some((r) => r.target === targetId)) return t('workflow.routeExists');
     source.next.push({ target: targetId, condition: '' });
     return null;
   }
   if (source.kind === 'review' && source.rejectTo === targetId) {
-    return '该目标已是驳回路由（红线），先断开驳回路由';
+    return t('workflow.targetIsRejectRoute');
   }
   source.next = targetId;
   return null;
@@ -441,15 +442,15 @@ export function connectNext(def: WorkflowDef, sourceId: string, targetId: string
  */
 export function replaceBranchTarget(def: WorkflowDef, sourceId: string, slotIndex: number, newTarget: string): string | null {
   const source = findNode(def, sourceId);
-  if (!source) return '源节点不存在';
-  if (source.kind !== 'branch') return '只有分支节点有多出桩';
-  if (!nodeExists(def, newTarget)) return '目标节点不存在';
-  if (findNode(def, newTarget)?.kind === 'start') return '不能连到开始节点';
+  if (!source) return t('workflow.sourceMissing');
+  if (source.kind !== 'branch') return t('workflow.onlyBranchHasOuts');
+  if (!nodeExists(def, newTarget)) return t('workflow.targetMissing');
+  if (findNode(def, newTarget)?.kind === 'start') return t('workflow.connectToStart');
   const sorted = [...source.next].sort((a, b) => nodeY(def, a.target) - nodeY(def, b.target));
   const oldRoute = sorted[slotIndex];
-  if (oldRoute === undefined) return '该连接点是空桩，拖线即新增出线';
+  if (oldRoute === undefined) return t('workflow.emptySlot');
   if (oldRoute.target === newTarget) return null; // 幂等
-  if (source.next.some((r) => r.target === newTarget)) return '该目标已在出线中';
+  if (source.next.some((r) => r.target === newTarget)) return t('workflow.targetAlreadyOut');
   // 保序替换（条件描述保留）：数组序不变，桩位在下次渲染时按新目标方位重排
   const route = source.next.find((r) => r.target === oldRoute.target);
   if (route) route.target = newTarget;
@@ -458,13 +459,13 @@ export function replaceBranchTarget(def: WorkflowDef, sourceId: string, slotInde
 
 /** 驳回连线（菱形上/下连桩拉出，语义相同仅方向不同）。单值替换语义。 */
 export function connectRejectTo(def: WorkflowDef, sourceId: string, targetId: string): string | null {
-  if (sourceId === targetId) return '不能驳回至自身';
+  if (sourceId === targetId) return t('workflow.rejectToSelf');
   const source = findNode(def, sourceId);
-  if (!source) return '源节点不存在';
-  if (source.kind !== 'review') return '只有审核节点（菱形）有驳回路由';
-  if (!nodeExists(def, targetId)) return '目标节点不存在';
-  if (findNode(def, targetId)?.kind === 'start') return '不能驳回至开始节点';
-  if (source.next === targetId) return '该目标已是通过路由（蓝线）';
+  if (!source) return t('workflow.sourceMissing');
+  if (source.kind !== 'review') return t('workflow.onlyReviewHasReject');
+  if (!nodeExists(def, targetId)) return t('workflow.targetMissing');
+  if (findNode(def, targetId)?.kind === 'start') return t('workflow.rejectToStart');
+  if (source.next === targetId) return t('workflow.targetIsPassRoute');
   source.rejectTo = targetId;
   return null;
 }
@@ -495,13 +496,13 @@ function nodeNameOfLocal(def: WorkflowDef, id: string): string {
 export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
   const issues: WorkflowIssue[] = [];
   if (!def.name.trim()) {
-    issues.push({ level: 'error', message: '工作流缺少 name' });
+    issues.push({ level: 'error', message: t('workflow.missingName') });
   }
   if (!def.description.trim()) {
-    issues.push({ level: 'warning', message: '工作流缺少 description（激活选择时靠它辨认）' });
+    issues.push({ level: 'warning', message: t('workflow.missingDescription') });
   }
   if (def.nodes.length === 0) {
-    issues.push({ level: 'error', message: '至少需要一个开始节点和一个结束节点' });
+    issues.push({ level: 'error', message: t('workflow.needStartEnd') });
     return issues;
   }
 
@@ -511,74 +512,74 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
   const starts = def.nodes.filter((n) => n.kind === 'start');
   const ends = def.nodes.filter((n) => n.kind === 'end');
   if (starts.length === 0) {
-    issues.push({ level: 'error', message: '缺少开始节点（顶栏「添加节点 → 开始」）' });
+    issues.push({ level: 'error', message: t('workflow.missingStart') });
   } else if (starts.length > 1) {
-    issues.push({ level: 'error', message: `开始节点只能有一个（当前 ${starts.length} 个）`, nodeId: starts[1].id });
+    issues.push({ level: 'error', message: t('workflow.multipleStarts', { n: starts.length }), nodeId: starts[1].id });
   }
   if (ends.length === 0) {
-    issues.push({ level: 'error', message: '缺少结束节点（顶栏「添加节点 → 结束」）' });
+    issues.push({ level: 'error', message: t('workflow.missingEnd') });
   }
 
   const ids = new Set<string>();
   for (const n of def.nodes) {
     if (ids.has(n.id)) {
-      issues.push({ level: 'error', message: `节点 id 重复：${n.id}`, nodeId: n.id });
+      issues.push({ level: 'error', message: t('workflow.dupNodeId', { id: n.id }), nodeId: n.id });
     }
     ids.add(n.id);
     if (!n.name.trim()) {
-      issues.push({ level: 'error', message: `节点 ${n.id} 缺少名称`, nodeId: n.id });
+      issues.push({ level: 'error', message: t('workflow.nodeMissingName', { id: n.id }), nodeId: n.id });
     }
     switch (n.kind) {
       case 'start':
         if (n.next === null) {
-          issues.push({ level: 'error', message: '开始节点未连接（从右侧连桩拖线到首个节点）', nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.startNotConnected'), nodeId: n.id });
         } else if (!targetValid(n.next)) {
-          issues.push({ level: 'error', message: `开始节点指向不存在的节点：${n.next}`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.startBadTarget', { target: n.next }), nodeId: n.id });
         }
         break;
       case 'end':
         break;
       case 'stage':
         if (!n.goal.trim()) {
-          issues.push({ level: 'warning', message: `阶段「${n.name || n.id}」缺少目标描述`, nodeId: n.id });
+          issues.push({ level: 'warning', message: t('workflow.stageMissingGoal', { name: n.name || n.id }), nodeId: n.id });
         }
         if (n.next === null) {
-          issues.push({ level: 'error', message: `阶段「${n.name || n.id}」未连接后续（连到下一节点或结束节点）`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.stageNotConnected', { name: n.name || n.id }), nodeId: n.id });
         } else if (!targetValid(n.next)) {
-          issues.push({ level: 'error', message: `阶段「${n.name}」指向不存在的节点：${n.next}`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.stageBadTarget', { name: n.name, target: n.next }), nodeId: n.id });
         } else if (isStart(n.next)) {
-          issues.push({ level: 'error', message: `阶段「${n.name}」不能连到开始节点`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.stageToStart', { name: n.name }), nodeId: n.id });
         }
         break;
       case 'review':
         if (!n.prompt.trim()) {
-          issues.push({ level: 'warning', message: `审核「${n.name || n.id}」缺少审核关注点`, nodeId: n.id });
+          issues.push({ level: 'warning', message: t('workflow.reviewMissingFocus', { name: n.name || n.id }), nodeId: n.id });
         }
         if (n.next === null) {
-          issues.push({ level: 'error', message: `审核「${n.name || n.id}」未连接通过路由（蓝线）`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.reviewNoPassRoute', { name: n.name || n.id }), nodeId: n.id });
         } else if (!targetValid(n.next)) {
-          issues.push({ level: 'error', message: `审核「${n.name}」指向不存在的节点：${n.next}`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.reviewBadTarget', { name: n.name, target: n.next }), nodeId: n.id });
         }
         if (n.rejectTo === null) {
-          issues.push({ level: 'error', message: `审核「${n.name || n.id}」缺少驳回路由（红线必须连接）`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.reviewNoRejectRoute', { name: n.name || n.id }), nodeId: n.id });
         } else if (!targetValid(n.rejectTo)) {
-          issues.push({ level: 'error', message: `审核「${n.name}」驳回至不存在的节点：${n.rejectTo}`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.reviewBadRejectTarget', { name: n.name, target: n.rejectTo }), nodeId: n.id });
         } else if (isStart(n.rejectTo)) {
-          issues.push({ level: 'error', message: `审核「${n.name}」不能驳回至开始节点`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.reviewRejectToStart', { name: n.name }), nodeId: n.id });
         }
         if (!Number.isFinite(n.maxRejects) || n.maxRejects < 1) {
-          issues.push({ level: 'error', message: `审核「${n.name || n.id}」驳回上限必须 ≥ 1`, nodeId: n.id });
+          issues.push({ level: 'error', message: t('workflow.reviewBadMaxRejects', { name: n.name || n.id }), nodeId: n.id });
         }
         break;
       case 'branch':
         if (n.next.length === 0) {
-          issues.push({ level: 'warning', message: `分支「${n.name || n.id}」没有出线（死端）`, nodeId: n.id });
+          issues.push({ level: 'warning', message: t('workflow.branchNoOutsNamed', { name: n.name || n.id }), nodeId: n.id });
         }
         for (const route of n.next) {
           if (!targetValid(route.target)) {
-            issues.push({ level: 'error', message: `分支「${n.name}」指向不存在的节点：${route.target}`, nodeId: n.id });
+            issues.push({ level: 'error', message: t('workflow.branchBadTarget', { name: n.name, target: route.target }), nodeId: n.id });
           } else if (isStart(route.target)) {
-            issues.push({ level: 'error', message: `分支「${n.name}」不能连到开始节点`, nodeId: n.id });
+            issues.push({ level: 'error', message: t('workflow.branchToStart', { name: n.name }), nodeId: n.id });
           }
         }
         // 多条出线 = AI 决策点，每条都必须写条件，否则 AI 无法选择
@@ -587,7 +588,7 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
             if (!route.condition.trim()) {
               issues.push({
                 level: 'warning',
-                message: `分支「${n.name}」到「${nodeNameOfLocal(def, route.target)}」的出线缺少条件描述`,
+                message: t('workflow.branchRouteMissingCondition', { name: n.name, target: nodeNameOfLocal(def, route.target) }),
                 nodeId: n.id,
               });
             }
@@ -618,7 +619,7 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
     }
     for (const n of def.nodes) {
       if (!reachable.has(n.id)) {
-        issues.push({ level: 'warning', message: `节点「${n.name}」从开始节点不可达`, nodeId: n.id });
+        issues.push({ level: 'warning', message: t('workflow.nodeUnreachable', { name: n.name }), nodeId: n.id });
       }
     }
   }

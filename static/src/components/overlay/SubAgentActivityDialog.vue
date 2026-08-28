@@ -4,7 +4,7 @@
       <div class="subagent-activity-modal">
         <div class="subagent-activity-header">
           <div class="subagent-activity-title">
-            子智能体 #{{ activeAgent.agent_id || activeAgent.task_id }} 进度
+            {{ $t('overlay.subAgentProgressTitle', { id: activeAgent.agent_id || activeAgent.task_id }) }}
           </div>
           <button type="button" class="subagent-activity-close" @click="close">×</button>
         </div>
@@ -23,14 +23,14 @@
             :disabled="stopLoading"
             @click="handleStop"
           >
-            {{ stopLoading ? '停止中...' : '手动停止' }}
+            {{ stopLoading ? $t('overlay.stopInProgress') : $t('overlay.stopManually') }}
           </button>
           <span v-if="stopError" class="subagent-activity-error">{{ stopError }}</span>
         </div>
         <div class="subagent-activity-body">
           <div v-if="activityError" class="subagent-activity-error">{{ activityError }}</div>
           <div v-else-if="!timelineItems.length" class="subagent-activity-empty">
-            {{ activityLoading ? '正在读取子智能体活动...' : '暂无活动记录' }}
+            {{ activityLoading ? $t('overlay.readingActivity') : $t('overlay.noActivity') }}
           </div>
           <div v-else class="subagent-activity-list">
             <div
@@ -58,6 +58,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t, currentLocale } from '@/locales';
 import { useSubAgentStore } from '@/stores/subAgent';
 
 type ActivityEntry = {
@@ -95,37 +96,37 @@ const buildText = (entry: ActivityEntry) => {
   const args = entry.args || {};
   if (tool === 'read_file') {
     const path = args.path || args.file_path || '';
-    return `阅读 ${path}`;
+    return t('overlay.toolReadFile', { path });
   }
   if (tool === 'write_file') {
     const path = args.file_path || args.path || '';
-    return `写入文件 ${path}`;
+    return t('overlay.toolWriteFile', { path });
   }
   if (tool === 'read_skill') {
     const skillName = args.skill_name || '';
-    return `阅读技能 ${skillName}`;
+    return t('overlay.toolReadSkill', { name: skillName });
   }
   if (tool === 'web_search') {
     const query = args.query || args.q || '';
-    return `在互联网中搜索 ${query}`;
+    return t('overlay.toolWebSearch', { query });
   }
   if (tool === 'extract_webpage') {
     const url = args.url || '';
-    return `在互联网中提取 ${url}`;
+    return t('overlay.toolExtractWebpage', { url });
   }
   if (tool === 'run_command') {
     const command = args.command || '';
-    return `运行命令 ${command}`;
+    return t('overlay.toolRunCommand', { command });
   }
   if (tool === 'edit_file') {
     const path = args.path || args.file_path || '';
-    return `编辑 ${path}`;
+    return t('overlay.toolEditFile', { path });
   }
   if (tool === 'read_mediafile') {
     const path = args.path || args.file_path || '';
-    return `读取媒体文件 ${path}`;
+    return t('overlay.toolReadMedia', { path });
   }
-  return `${tool || '工具'}`;
+  return tool || t('overlay.toolGeneric');
 };
 
 const canStop = computed(() => {
@@ -145,7 +146,7 @@ const handleStop = async () => {
   stopError.value = '';
   const result = await subAgentStore.terminateSubAgent(taskId);
   if (!result?.success) {
-    stopError.value = result?.error || '停止失败';
+    stopError.value = result?.error || t('overlay.stopFailed');
   }
 };
 
@@ -171,6 +172,7 @@ const handleItemClick = (item: any) => {
 };
 
 const timelineItems = computed(() => {
+  void currentLocale.value;
   const entries = activityEntries.value || [];
   const rawItems: { kind: 'tool'; key: string; entry: ActivityEntry } | { kind: 'output'; key: string; content: string; isFinal: boolean }[] = [];
   let currentToolGroup: { kind: 'tool'; key: string; entry: ActivityEntry } | null = null;
@@ -253,7 +255,14 @@ const timelineItems = computed(() => {
       kind: 'tool' as const,
       key: item.key,
       state,
-      stateLabel: state === 'completed' ? '完成' : state === 'failed' ? '失败' : state === 'calling' ? '调用中' : '进行中',
+      stateLabel:
+        state === 'completed'
+          ? t('overlay.stateCompleted')
+          : state === 'failed'
+            ? t('common.failed')
+            : state === 'calling'
+              ? t('overlay.stateCalling')
+              : t('overlay.stateInProgress'),
       text: buildText(item.entry)
     };
   });

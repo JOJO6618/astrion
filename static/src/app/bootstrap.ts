@@ -2,6 +2,7 @@
 import katex from 'katex';
 import DOMPurify from 'dompurify';
 import { createApp } from 'vue';
+import { t } from '@/locales';
 import ShowFileCard from '../components/chat/ShowFileCard.vue';
 import { buildShowHtmlIframeSrcdoc } from '../utils/showHtmlSandbox';
 import {
@@ -449,7 +450,7 @@ function openShowHtmlCardMenu(anchor: HTMLElement, wrapper: HTMLElement) {
   menu.className = 'show-html-card-menu';
   menu.setAttribute('role', 'menu');
 
-  const refreshItem = buildShowHtmlCardMenuItem('刷新');
+  const refreshItem = buildShowHtmlCardMenuItem(t('appCore.refresh'));
   refreshItem.onclick = (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -457,7 +458,7 @@ function openShowHtmlCardMenu(anchor: HTMLElement, wrapper: HTMLElement) {
     triggerShowHtmlCardRefresh(wrapper, anchor);
   };
 
-  const fullscreenItem = buildShowHtmlCardMenuItem('全屏');
+  const fullscreenItem = buildShowHtmlCardMenuItem(t('appCore.fullscreen'));
   fullscreenItem.onclick = (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -503,8 +504,8 @@ function bindShowHtmlCardControls(wrapper: HTMLElement, controls: ShowHtmlCardCo
     menuBtn = document.createElement('button');
     menuBtn.type = 'button';
     menuBtn.className = 'chat-inline-card__menu-btn';
-    menuBtn.title = '卡片操作';
-    menuBtn.setAttribute('aria-label', '卡片操作');
+    menuBtn.title = t('appCore.cardActions');
+    menuBtn.setAttribute('aria-label', t('appCore.cardActions'));
     menuBtn.setAttribute('aria-haspopup', 'menu');
     menuBtn.textContent = '⋯';
     toolbar.appendChild(menuBtn);
@@ -603,8 +604,8 @@ function renderShowImages(root: ParentNode | null = document) {
       const tip = document.createElement('div');
       tip.className = 'chat-inline-card__error chat-inline-image__error';
       tip.textContent = rawSrc
-        ? `无法显示图片：不支持的图片路径 ${rawSrc}`
-        : '无法显示图片：缺少图片路径';
+        ? t('appCore.imageUnsupportedPath', { src: rawSrc })
+        : t('appCore.imageMissingPath');
       figure.appendChild(tip);
       node.replaceChildren(figure);
       node.setAttribute('data-rendered', '1');
@@ -625,7 +626,7 @@ function renderShowImages(root: ParentNode | null = document) {
       figure.classList.add('chat-inline-card--error', 'chat-inline-image--error');
       const tip = document.createElement('div');
       tip.className = 'chat-inline-card__error chat-inline-image__error';
-      tip.textContent = '图片加载失败';
+      tip.textContent = t('appCore.imageLoadFailed');
       figure.appendChild(tip);
     };
     figure.appendChild(img);
@@ -728,7 +729,7 @@ function renderShowImages(root: ParentNode | null = document) {
         host.className = 'chat-inline-card__body chat-inline-html__host chat-inline-html__host--pending';
         const tip = document.createElement('div');
         tip.className = 'chat-inline-card__pending-tip chat-inline-html__pending-tip';
-        tip.textContent = '正在渲染内容...';
+        tip.textContent = t('appCore.renderingContent');
         host.appendChild(tip);
         wrapper.appendChild(host);
         pending = { wrapper, host, tip };
@@ -1421,7 +1422,7 @@ function dispatchShowFileDownload(path: string) {
         return resp.json().then((j) => {
           throw new Error(j.error || j.message || resp.statusText);
         }).catch(() => {
-          throw new Error(resp.statusText || '下载失败');
+          throw new Error(resp.statusText || t('common.downloadFailed'));
         });
       }
       return resp.blob();
@@ -1454,7 +1455,7 @@ function renderShowFileCard(node: Element) {
   const path = (node.getAttribute('path') || '').trim().replace(/^\/+/, '');
 
   if (!path) {
-    node.replaceChildren(document.createTextNode('[show_file: 缺少 path 属性]'));
+    node.replaceChildren(document.createTextNode(t('appCore.showFileMissingPath')));
     return;
   }
 

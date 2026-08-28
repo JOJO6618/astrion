@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { t } from '@/locales';
 import { ICONS, TOOL_CATEGORY_ICON_MAP } from '../utils/icons';
 
 /* host/docker 模式缓存：模式是部署级属性几乎不变，首屏用缓存值渲染
@@ -166,19 +167,19 @@ export function dataState() {
     suppressTitleTyping: false,
     headerMenuOpen: false,
     blankWelcomePool: [
-      '有什么可以帮忙的？',
-      '想了解些热点吗？',
-      '要我帮你完成作业吗？',
-      '整点代码？',
-      '随便聊点什么？',
-      '想让我帮你整理一下思路吗？',
-      '要不要我帮你写个小工具？',
-      '发我一句话，我来接着做。',
-      '我来给你画幅画？',
-      '想看小猫吗？',
-      '有什么难题丢过来吧。',
-      '想不想看个有意思的？',
-      '来，说说你的需求~'
+      t('appCore.welcomeHelp'),
+      t('appCore.welcomeHot'),
+      t('appCore.welcomeHomework'),
+      t('appCore.welcomeCode'),
+      t('appCore.welcomeChat'),
+      t('appCore.welcomeOrganize'),
+      t('appCore.welcomeTool'),
+      t('appCore.welcomeContinue'),
+      t('appCore.welcomeDraw'),
+      t('appCore.welcomeCat'),
+      t('appCore.welcomePuzzle'),
+      t('appCore.welcomeFun'),
+      t('appCore.welcomeNeed')
     ],
     mobileViewportQuery: null,
     modeMenuOpen: false,
@@ -195,13 +196,13 @@ export function dataState() {
     networkPermissionOptions: [
       {
         value: 'restricted',
-        label: '受限',
-        description: '仅允许本地回环访问，外部网络不可用'
+        label: t('appUi.networkRestricted'),
+        description: t('appCore.networkRestrictedDesc')
       },
       {
         value: 'full',
-        label: '完全开放',
-        description: '允许所有出站和入站网络连接'
+        label: t('appUi.networkFull'),
+        description: t('appCore.networkFullDesc')
       }
     ],
     workModeMenuOpen: false,
@@ -209,18 +210,18 @@ export function dataState() {
     workModeOptions: [
       {
         value: 'plan',
-        label: '计划',
-        description: '只制定计划，批准后执行'
+        label: t('appUi.workModePlan'),
+        description: t('appCore.workModePlanDesc')
       },
       {
         value: 'ask',
-        label: '询问',
-        description: '先讨论确认，再开工'
+        label: t('appUi.workModeAsk'),
+        description: t('appCore.workModeAskDesc')
       },
       {
         value: 'execute',
-        label: '执行',
-        description: '自行补全细节，直接开工'
+        label: t('appUi.workModeExecute'),
+        description: t('appCore.workModeExecuteDesc')
       }
     ],
     pathAuthorizationDialogOpen: false,
@@ -255,35 +256,35 @@ export function dataState() {
     permissionModeOptions: [
       {
         value: 'readonly',
-        label: '只读',
-        description: '仅允许读取/搜索类工具，禁止修改工作区'
+        label: t('personalization.permissionReadonly'),
+        description: t('appCore.permissionReadonlyDesc')
       },
       {
         value: 'approval',
-        label: '批准',
-        description: '对工作区文件进行修改的工具需用户批准后才会执行'
+        label: t('appCore.permissionApproval'),
+        description: t('appCore.permissionApprovalDesc')
       },
       {
         value: 'auto_approval',
-        label: '自动审核',
-        description: '工作区内写入直通，高风险操作由后台审核智能体自动审批'
+        label: t('appCore.permissionAutoApproval'),
+        description: t('appCore.permissionAutoApprovalDesc')
       },
       {
         value: 'unrestricted',
-        label: '无限制',
-        description: '保持当前默认行为，不额外拦截'
+        label: t('appCore.permissionUnrestricted'),
+        description: t('appCore.permissionUnrestrictedDesc')
       }
     ],
     executionModeOptions: [
       {
         value: 'sandbox',
-        label: '沙箱',
-        description: '所有指令会在系统沙箱中执行'
+        label: t('input.executionSandbox'),
+        description: t('appCore.executionSandboxDesc')
       },
       {
         value: 'direct',
-        label: '完全访问权限',
-        description: '所有指令会在宿主机直接执行'
+        label: t('input.executionFullAccess'),
+        description: t('appCore.executionDirectDesc')
       }
     ],
     pendingToolApprovals: [],
@@ -300,7 +301,7 @@ export function dataState() {
     userQuestionTitleBlinkRed: true,
     autoApprovalFeedLines: [],
     autoApprovalFinalMessage: '',
-    autoApprovalTitle: '自动审批记录',
+    autoApprovalTitle: t('appTasks.autoApprovalRecordTitle'),
     approvalAutoCloseTimer: null,
     imageEntries: [],
     imageLoading: false,

@@ -20,7 +20,7 @@
     <div class="review-node__body">
       <span class="icon review-node__eye" :style="iconSrc(ICONS.eye)" aria-hidden="true"></span>
       <span class="review-node__name">{{ data.node.name || data.node.id }}</span>
-      <span class="review-node__meta">驳回 ≤{{ data.node.maxRejects }}</span>
+      <span class="review-node__meta">{{ $t('workflow.rejectLimitMeta', { n: data.node.maxRejects }) }}</span>
     </div>
   </div>
 </template>

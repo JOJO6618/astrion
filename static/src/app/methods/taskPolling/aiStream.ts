@@ -17,6 +17,7 @@ import {
   getOptimisticUserEchoTarget,
   findRecentMatchingUserMessage,
 } from './shared';
+import { t } from '@/locales';
 
 export const aiStreamMethods = {
   handleAiMessageStart(data: any, eventIdx: number) {
@@ -77,7 +78,7 @@ export const aiStreamMethods = {
         // actions 被清空不代表没有内容，事件重放会恢复。
       } else if (!hasContent) {
         lastMessage.awaitingFirstContent = true;
-        lastMessage.generatingLabel = lastMessage.generatingLabel || '思考中...';
+        lastMessage.generatingLabel = lastMessage.generatingLabel || t('appTasks.thinkingLabel');
       } else {
         // 如果已有内容，确保等待动画不显示
         lastMessage.awaitingFirstContent = false;

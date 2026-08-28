@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { useInputStore } from './input';
 
 interface ToastPayload {
@@ -21,7 +22,7 @@ const defaultDependencies: ChatActionDependencies = {
   autoResizeInput: () => {},
   focusComposer: () => {},
   isConnected: () => false,
-  executeCommand: async () => ({ success: false, message: '命令通道不可用' }),
+  executeCommand: async () => ({ success: false, message: t('stores.commandChannelUnavailable') }),
   downloadResource: async () => {}
 };
 
@@ -53,8 +54,8 @@ export const useChatActionStore = defineStore('chatActions', {
       const content = (action && (action.content || action.text || ''))?.toString();
       if (!content) {
         this.dependencies.pushToast({
-          title: '复制失败',
-          message: '未找到可复制的内容',
+          title: t('common.copyFailed'),
+          message: t('stores.copyContentNotFound'),
           type: 'warning'
         });
         return false;
@@ -62,16 +63,16 @@ export const useChatActionStore = defineStore('chatActions', {
       try {
         await this.copyText(content);
         this.dependencies.pushToast({
-          title: '已复制',
-          message: blockId ? `片段 ${blockId} 已复制到剪贴板` : '内容已复制到剪贴板',
+          title: t('common.copied'),
+          message: blockId ? t('stores.blockCopied', { id: blockId }) : t('stores.contentCopied'),
           type: 'success'
         });
         return true;
       } catch (error) {
         console.warn('复制失败:', error);
         this.dependencies.pushToast({
-          title: '复制失败',
-          message: '浏览器阻止了复制操作，请手动选择文本后复制。',
+          title: t('common.copyFailed'),
+          message: t('stores.copyBlockedByBrowser'),
           type: 'error'
         });
         return false;
@@ -85,8 +86,8 @@ export const useChatActionStore = defineStore('chatActions', {
       const codeEl = document.querySelector(selector) as HTMLElement | null;
       if (!codeEl) {
         this.dependencies.pushToast({
-          title: '复制失败',
-          message: '未找到对应的代码块',
+          title: t('common.copyFailed'),
+          message: t('stores.codeBlockNotFound'),
           type: 'warning'
         });
         return false;
@@ -95,8 +96,8 @@ export const useChatActionStore = defineStore('chatActions', {
       const content = encoded ? decodeHtmlEntities(encoded) : codeEl.textContent || '';
       if (!content.trim()) {
         this.dependencies.pushToast({
-          title: '复制失败',
-          message: '代码内容为空',
+          title: t('common.copyFailed'),
+          message: t('stores.codeContentEmpty'),
           type: 'warning'
         });
         return false;
@@ -104,16 +105,16 @@ export const useChatActionStore = defineStore('chatActions', {
       try {
         await this.copyText(content);
         this.dependencies.pushToast({
-          title: '已复制',
-          message: '代码已复制到剪贴板',
+          title: t('common.copied'),
+          message: t('stores.codeCopied'),
           type: 'success'
         });
         return true;
       } catch (error) {
         console.warn('复制代码失败:', error);
         this.dependencies.pushToast({
-          title: '复制失败',
-          message: '浏览器阻止了复制操作，请手动复制。',
+          title: t('common.copyFailed'),
+          message: t('stores.copyBlockedManual'),
           type: 'error'
         });
         return false;
@@ -122,8 +123,8 @@ export const useChatActionStore = defineStore('chatActions', {
     applyActionContent(action: any) {
       if (!action || !action.content) {
         this.dependencies.pushToast({
-          title: '无法应用',
-          message: '缺少可应用的内容',
+          title: t('stores.applyFailed'),
+          message: t('stores.applyContentMissing'),
           type: 'warning'
         });
         return false;
@@ -133,8 +134,8 @@ export const useChatActionStore = defineStore('chatActions', {
       this.dependencies.autoResizeInput();
       this.dependencies.focusComposer();
       this.dependencies.pushToast({
-        title: '已填充',
-        message: '请检查内容后发送以应用这些修改。',
+        title: t('stores.filled'),
+        message: t('stores.checkContentBeforeSend'),
         type: 'info'
       });
       return true;
@@ -143,16 +144,16 @@ export const useChatActionStore = defineStore('chatActions', {
       const command = (action && (action.command || action.content))?.toString();
       if (!command) {
         this.dependencies.pushToast({
-          title: '无法执行',
-          message: '没有可执行的命令内容',
+          title: t('stores.cannotExecute'),
+          message: t('stores.commandContentMissing'),
           type: 'warning'
         });
         return false;
       }
       if (!this.dependencies.isConnected()) {
         this.dependencies.pushToast({
-          title: '连接已断开',
-          message: '请重新连接后再试。',
+          title: t('stores.connectionLost'),
+          message: t('stores.reconnectAndRetry'),
           type: 'error'
         });
         return false;
@@ -161,22 +162,22 @@ export const useChatActionStore = defineStore('chatActions', {
         const result = await this.dependencies.executeCommand(command);
         if (result && result.success === false) {
           this.dependencies.pushToast({
-            title: '命令执行失败',
-            message: result.message || '请稍后重试',
+            title: t('stores.commandFailed'),
+            message: result.message || t('common.retryLater'),
             type: 'error'
           });
           return false;
         }
         this.dependencies.pushToast({
-          title: '命令已执行',
+          title: t('stores.commandExecuted'),
           message: command,
           type: 'success'
         });
         return true;
       } catch (error) {
         this.dependencies.pushToast({
-          title: '命令执行失败',
-          message: (error as Error)?.message || '请稍后重试',
+          title: t('stores.commandFailed'),
+          message: (error as Error)?.message || t('common.retryLater'),
           type: 'error'
         });
         return false;
@@ -185,8 +186,8 @@ export const useChatActionStore = defineStore('chatActions', {
     async downloadActionAttachment(action: any) {
       if (!action || !action.path) {
         this.dependencies.pushToast({
-          title: '下载失败',
-          message: '没有可下载的目标文件',
+          title: t('common.downloadFailed'),
+          message: t('stores.downloadTargetMissing'),
           type: 'warning'
         });
         return false;
@@ -196,8 +197,8 @@ export const useChatActionStore = defineStore('chatActions', {
     async downloadFile(path: string) {
       if (!path) {
         this.dependencies.pushToast({
-          title: '下载失败',
-          message: '没有提供有效的文件路径',
+          title: t('common.downloadFailed'),
+          message: t('stores.downloadPathInvalid'),
           type: 'warning'
         });
         return false;
@@ -211,7 +212,7 @@ export const useChatActionStore = defineStore('chatActions', {
         console.warn('下载失败:', error);
         if (error && (error as Error).message) {
           this.dependencies.pushToast({
-            title: '下载失败',
+            title: t('common.downloadFailed'),
             message: (error as Error).message,
             type: 'error'
           });

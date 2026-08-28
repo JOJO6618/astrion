@@ -18,6 +18,7 @@ import {
   getOptimisticUserEchoTarget,
   findRecentMatchingUserMessage,
 } from './shared';
+import { t } from '@/locales';
 
 export const toolMethods = {
   handleToolPreparing(data: any) {
@@ -68,7 +69,7 @@ export const toolMethods = {
         argumentLabel: '',
         status: 'preparing',
         result: null,
-        message: data.message || `准备调用 ${data.name}...`,
+        message: data.message || t('appTasks.preparingTool', { name: data.name }),
         intent_full: data.intent || '',
         intent_rendered: data.intent || ''
       },
@@ -466,7 +467,7 @@ export const toolMethods = {
         this.userQuestionTitleBlinkRed = true;
         const applyTitle = () => {
           const dot = this.userQuestionTitleBlinkRed ? '🔴' : '⚪';
-          document.title = `${dot} 需要回答 - Agents`;
+          document.title = t('appTasks.answerNeededTitle', { dot });
           this.userQuestionTitleBlinkRed = !this.userQuestionTitleBlinkRed;
         };
         applyTitle();
@@ -475,7 +476,7 @@ export const toolMethods = {
       if (typeof window === 'undefined' || !('Notification' in window)) {
         return;
       }
-      const title = '需要你确认一个问题';
+      const title = t('appTasks.questionConfirmTitle');
       const body = String(question?.question || '').slice(0, 120);
       if (Notification.permission === 'granted') {
         new Notification(title, { body });
@@ -516,8 +517,11 @@ export const toolMethods = {
     const decision = String(data?.decision || '').trim().toLowerCase();
     const reason = String(data?.reason || '').trim();
     if (decision === 'approved' || decision === 'rejected') {
-      const decisionText = decision === 'approved' ? '批准通过' : '拒绝';
-      this.autoApprovalFinalMessage = `${decisionText}\n原因：${reason || '未提供'}`;
+      const decisionText = decision === 'approved' ? t('appTasks.approvalApproved') : t('appTasks.approvalRejected');
+      this.autoApprovalFinalMessage = t('appTasks.approvalFinalMessage', {
+        decision: decisionText,
+        reason: reason || t('appTasks.reasonNotProvided')
+      });
     }
     // 电脑端：审批完成后延迟折叠面板（给用户留出查看结果时间）
     if (!this.pendingToolApprovals.length && !this.isMobileViewport) {
@@ -538,9 +542,9 @@ export const toolMethods = {
     if (!Array.isArray(this.autoApprovalFeedLines)) {
       this.autoApprovalFeedLines = [];
     }
-    this.autoApprovalTitle = '自动审批记录';
+    this.autoApprovalTitle = t('appTasks.autoApprovalRecordTitle');
     if (progress.stage === 'start') {
-      this.autoApprovalFeedLines = ['自动审批开始'];
+      this.autoApprovalFeedLines = [t('appTasks.autoApprovalStarted')];
       this.autoApprovalFinalMessage = '';
     } else if (progress.stage === 'run_command' && progress.command) {
       this.autoApprovalFeedLines.push(String(progress.command));

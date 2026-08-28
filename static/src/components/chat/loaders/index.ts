@@ -1,4 +1,5 @@
 import { Component } from 'vue';
+import { t } from '@/locales';
 import SquareGridLoader from './SquareGridLoader.vue';
 import RotatingSquaresLoader from './RotatingSquaresLoader.vue';
 import DualChaseLoader from './DualChaseLoader.vue';
@@ -51,7 +52,7 @@ const pickRandomIndex = (indices: number[]) => {
 export function getRandomLoader(): Component {
   const poolSize = loaderPool.length;
   if (poolSize === 0) {
-    throw new Error('loaderPool 不能为空');
+    throw new Error(t('chatActions.loaderPoolEmpty'));
   }
 
   // 不重复窗口不能超过 poolSize - 1，否则无解

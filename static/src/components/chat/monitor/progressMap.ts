@@ -1,39 +1,49 @@
+// 监视器场景进行状态文案（progressMap）
+// ⚠️ 顶层映射表只存文案 key（模块顶层禁止调 t()），getSceneProgressLabel 调用时 t(key) 解析，
+//    语言切换后新产生的标签自动取当前语言；历史快照标签保持事件发生时语言（与迁移前一致）。
+// ⚠️ 与 stores/monitor.ts 的拼接耦合：stores 侧 transformStatus 会对以「正在」开头的 zh 文案
+//    执行 slice(2) 后拼装 t('stores.playbackStatus')（回放{label}）。
+//    因此 zh-CN/chat.ts 的 progress* 译文必须保持「正在…」前缀结构；英文不命中前缀即原样透传。
+import { t } from '@/locales';
+
 export const SCENE_PROGRESS_LABELS: Record<string, string> = {
-  browserSearch: '正在搜索',
-  webExtract: '正在提取',
-  webSave: '正在保存',
-  appendFile: '正在编辑',
-  modifyFile: '正在编辑',
-  createFile: '正在创建',
-  deleteFile: '正在删除',
-  readFile: '正在读取',
-  reader: '正在读取',
-  focus: '正在聚焦',
-  unfocus: '正在处理',
+  browserSearch: 'chat.progressBrowserSearch',
+  webExtract: 'chat.progressWebExtract',
+  webSave: 'chat.progressWebSave',
+  appendFile: 'chat.progressAppendFile',
+  modifyFile: 'chat.progressModifyFile',
+  createFile: 'chat.progressCreateFile',
+  deleteFile: 'chat.progressDeleteFile',
+  readFile: 'chat.progressReadFile',
+  reader: 'chat.progressReader',
+  focus: 'chat.progressFocus',
+  unfocus: 'chat.progressUnfocus',
   // 运行类工具显示具体工具名，由运行时传入
-  runCommand: '运行命令',
-  terminalSession: '打开终端',
-  terminalInput: '终端输入',
-  terminalSnapshot: '获取终端输出',
-  memoryUpdate: '正在同步记忆',
-  todoCreate: '正在更新待办',
-  todoUpdate: '正在更新待办',
-  todoFinish: '正在完成任务',
-  todoFinishConfirm: '正在确认任务',
-  todoDelete: '正在移除任务',
-  wait: '正在等待',
-  sleep: '正在等待',
-  createFolder: '正在创建文件夹',
-  renameFile: '正在重命名',
-  terminalReset: '正在重置终端',
-  terminalSleep: '准备等待',
-  terminalRun: '终端运行中',
-  ocr: '正在提取',
-  memory: '正在同步记忆',
-  todo: '正在管理待办',
-  genericTool: '调用工具'
+  runCommand: 'chat.progressRunCommand',
+  terminalSession: 'chat.progressTerminalSession',
+  terminalInput: 'chat.progressTerminalInput',
+  terminalSnapshot: 'chat.progressTerminalSnapshot',
+  memoryUpdate: 'chat.progressMemoryUpdate',
+  todoCreate: 'chat.progressTodoCreate',
+  todoUpdate: 'chat.progressTodoUpdate',
+  todoFinish: 'chat.progressTodoFinish',
+  todoFinishConfirm: 'chat.progressTodoFinishConfirm',
+  todoDelete: 'chat.progressTodoDelete',
+  wait: 'chat.progressWait',
+  sleep: 'chat.progressSleep',
+  createFolder: 'chat.progressCreateFolder',
+  renameFile: 'chat.progressRenameFile',
+  terminalReset: 'chat.progressTerminalReset',
+  terminalSleep: 'chat.progressTerminalSleep',
+  terminalRun: 'chat.progressTerminalRun',
+  ocr: 'chat.progressOcr',
+  memory: 'chat.progressMemory',
+  todo: 'chat.progressTodo',
+  genericTool: 'chat.progressGenericTool'
 };
 
 export function getSceneProgressLabel(name: string): string | null {
-  return SCENE_PROGRESS_LABELS[name] || null;
+  const key = SCENE_PROGRESS_LABELS[name];
+  if (!key) return null;
+  return t(key);
 }

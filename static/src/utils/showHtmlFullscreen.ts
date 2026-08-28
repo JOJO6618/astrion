@@ -6,6 +6,7 @@
  * - HTML 文件预览：与 js="on" 卡片同策略（注入 CSP/守卫，allow-scripts）
  */
 import { EMPTY_SHOW_HTML_SRCDOC } from './showHtmlSandbox';
+import { t } from '@/locales';
 
 export interface ShowHtmlFullscreenPayload {
   srcdoc: string;
@@ -79,7 +80,7 @@ function ensureShowHtmlFullscreenDom(): ShowHtmlFullscreenState {
   root.className = 'show-html-fullscreen';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
-  root.setAttribute('aria-label', '全屏预览');
+  root.setAttribute('aria-label', t('utils.fullscreenPreview'));
 
   const bar = document.createElement('div');
   bar.className = 'show-html-fullscreen__bar';
@@ -87,7 +88,7 @@ function ensureShowHtmlFullscreenDom(): ShowHtmlFullscreenState {
   heading.className = 'show-html-fullscreen__heading';
   const title = document.createElement('span');
   title.className = 'show-html-fullscreen__title';
-  title.textContent = '全屏预览';
+  title.textContent = t('utils.fullscreenPreview');
   const notice = document.createElement('span');
   notice.className = 'show-html-fullscreen__notice';
   notice.style.display = 'none';
@@ -99,15 +100,15 @@ function ensureShowHtmlFullscreenDom(): ShowHtmlFullscreenState {
   const refreshBtn = document.createElement('button');
   refreshBtn.type = 'button';
   refreshBtn.className = 'show-html-fullscreen__btn';
-  refreshBtn.title = '刷新';
-  refreshBtn.setAttribute('aria-label', '刷新');
+  refreshBtn.title = t('utils.refresh');
+  refreshBtn.setAttribute('aria-label', t('utils.refresh'));
   refreshBtn.textContent = '↻';
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'show-html-fullscreen__btn show-html-fullscreen__btn--close';
-  closeBtn.title = '关闭（Esc）';
-  closeBtn.setAttribute('aria-label', '关闭全屏预览');
+  closeBtn.title = t('utils.closeEsc');
+  closeBtn.setAttribute('aria-label', t('utils.closeFullscreenPreview'));
   closeBtn.textContent = '✕';
 
   actions.appendChild(refreshBtn);
@@ -157,7 +158,7 @@ export function openShowHtmlFullscreen(payload: ShowHtmlFullscreenPayload) {
   if (typeof document === 'undefined') return;
   const state = ensureShowHtmlFullscreenDom();
   state.payload = payload;
-  state.titleEl.textContent = payload.title || '全屏预览';
+  state.titleEl.textContent = payload.title || t('utils.fullscreenPreview');
   const noticeText = (payload.notice || '').trim();
   state.noticeEl.textContent = noticeText;
   state.noticeEl.style.display = noticeText ? '' : 'none';

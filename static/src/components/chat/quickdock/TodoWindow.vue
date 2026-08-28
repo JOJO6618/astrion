@@ -19,7 +19,7 @@
         />
         <path d="M8.5 11.5H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
       </svg>
-      <span class="qd-window__title">待办事项</span>
+      <span class="qd-window__title">{{ $t('quickdock.todoWindowTitle') }}</span>
       <span class="qd-window__counter">{{ doneCount }}/{{ rows.length }}</span>
     </header>
     <ul ref="listRef" class="qd-list">

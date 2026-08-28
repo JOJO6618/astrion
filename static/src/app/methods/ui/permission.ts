@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t, currentLocale } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -38,8 +39,8 @@ export const permissionMethods = {
     const policyStore = usePolicyStore();
     if (policyStore.uiBlocks[key]) {
       this.uiPushToast({
-        title: '已被管理员禁用',
-        message: message || '被管理员强制禁用',
+        title: t('appUi.disabledByAdmin'),
+        message: message || t('appUi.forceDisabledByAdmin'),
         type: 'warning'
       });
       return true;
@@ -47,14 +48,16 @@ export const permissionMethods = {
     return false;
   },
   getPermissionModeLabel(mode) {
+    void currentLocale.value;
     const options = Array.isArray(this.permissionModeOptions) ? this.permissionModeOptions : [];
     const hit = options.find((item) => item.value === mode);
-    return hit ? hit.label : mode || '未知';
+    return hit ? hit.label : mode || t('appUi.unknown');
   },
   getExecutionModeLabel(mode) {
+    void currentLocale.value;
     const options = Array.isArray(this.executionModeOptions) ? this.executionModeOptions : [];
     const hit = options.find((item) => item.value === mode);
-    return hit ? hit.label : mode || '未知';
+    return hit ? hit.label : mode || t('appUi.unknown');
   },
   async changePermissionMode(mode) {
     const target = String(mode || '')
@@ -80,7 +83,7 @@ export const permissionMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || payload?.error || '切换权限失败');
+        throw new Error(payload?.message || payload?.error || t('appUi.switchPermissionFailed'));
       }
       if (typeof payload?.mode === 'string') {
         this.currentPermissionMode = payload.mode;
@@ -92,15 +95,15 @@ export const permissionMethods = {
       }
       this.pendingPermissionMode = '';
       this.uiPushToast({
-        title: '权限已更新',
-        message: payload?.message || '已立即生效',
+        title: t('appUi.permissionUpdated'),
+        message: payload?.message || t('appUi.appliedImmediately'),
         type: 'info',
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '切换权限失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchPermissionFailed'));
       this.uiPushToast({
-        title: '切换权限失败',
+        title: t('appUi.switchPermissionFailed'),
         message: msg,
         type: 'error'
       });
@@ -127,7 +130,7 @@ export const permissionMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || payload?.error || '切换执行环境失败');
+        throw new Error(payload?.message || payload?.error || t('appUi.switchExecutionModeFailed'));
       }
       const state = payload?.state || {};
       if (typeof state.mode === 'string') {
@@ -135,15 +138,15 @@ export const permissionMethods = {
       }
       this.pendingExecutionMode = '';
       this.uiPushToast({
-        title: '执行环境已更新',
-        message: payload?.message || '已立即生效',
+        title: t('appUi.executionModeUpdated'),
+        message: payload?.message || t('appUi.appliedImmediately'),
         type: this.currentExecutionMode === 'direct' ? 'warning' : 'info',
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '切换执行环境失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchExecutionModeFailed'));
       this.uiPushToast({
-        title: '切换执行环境失败',
+        title: t('appUi.switchExecutionModeFailed'),
         message: msg,
         type: 'error'
       });
@@ -174,23 +177,23 @@ export const permissionMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || payload?.error || '切换网络权限失败');
+        throw new Error(payload?.message || payload?.error || t('appUi.switchNetworkPermissionFailed'));
       }
       if (typeof payload.mode === 'string') {
         this.currentNetworkPermission = payload.mode;
       }
       this.pendingNetworkPermission = typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
-      const labelMap: Record<string, string> = { restricted: '受限', full: '完全开放' };
+      const labelMap: Record<string, string> = { restricted: t('appUi.networkRestricted'), full: t('appUi.networkFull') };
       this.uiPushToast({
-        title: '网络权限已更新',
-        message: payload?.message || `已切换为 ${labelMap[this.currentNetworkPermission] || this.currentNetworkPermission}`,
+        title: t('appUi.networkPermissionUpdated'),
+        message: payload?.message || t('appUi.switchedToMode', { mode: labelMap[this.currentNetworkPermission] || this.currentNetworkPermission }),
         type: this.currentNetworkPermission === 'full' ? 'warning' : 'info',
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '切换网络权限失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchNetworkPermissionFailed'));
       this.uiPushToast({
-        title: '切换网络权限失败',
+        title: t('appUi.switchNetworkPermissionFailed'),
         message: msg,
         type: 'error'
       });
@@ -317,7 +320,7 @@ export const permissionMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || '保存失败');
+        throw new Error(payload?.error || t('appUi.saveFailed'));
       }
       const savedWritable = Array.isArray(payload.writable_paths) ? payload.writable_paths : writableLines;
       const savedReadable = Array.isArray(payload.readable_extra_paths)
@@ -330,14 +333,14 @@ export const permissionMethods = {
           ? this.pathAuthorizationReadableDraft
           : this.pathAuthorizationWritableDraft;
       this.uiPushToast({
-        title: '路径授权已保存',
-        message: '命令工具立即生效；终端会话请重开后生效',
+        title: t('appUi.pathAuthorizationSaved'),
+        message: t('appUi.pathAuthApplyMessage'),
         type: 'success'
       });
       this.pathAuthorizationDialogOpen = false;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || '保存失败');
-      this.uiPushToast({ title: '保存路径授权失败', message: msg, type: 'error' });
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.saveFailed'));
+      this.uiPushToast({ title: t('appUi.savePathAuthorizationFailed'), message: msg, type: 'error' });
     } finally {
       this.pathAuthorizationSaving = false;
     }

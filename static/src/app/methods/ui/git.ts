@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -100,7 +101,7 @@ export const gitMethods = {
       );
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        this.gitChangesError = payload?.error || '加载 Git 变更失败';
+        this.gitChangesError = payload?.error || t('appUi.loadGitChangesFailed');
         if (!hasExistingDiff) {
           this.gitChangesDiff = null;
         }
@@ -111,7 +112,7 @@ export const gitMethods = {
         this.gitChangesPanelOpen = false;
       }
     } catch (error) {
-      this.gitChangesError = '加载 Git 变更失败';
+      this.gitChangesError = t('appUi.loadGitChangesFailed');
       if (!hasExistingDiff) {
         this.gitChangesDiff = null;
       }

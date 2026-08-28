@@ -4,6 +4,7 @@ import { useModelStore } from '../../../stores/model';
 import {
 
 } from './shared';
+import { t } from '@/locales';
 
 export const entriesMethods = {
   upsertImageEntry(path, filename) {
@@ -143,16 +144,16 @@ export const entriesMethods = {
       this.imageEntries = entries;
       if (!entries.length) {
         this.uiPushToast({
-          title: '未找到图片',
-          message: '工作区内没有可用的图片文件',
+          title: t('appUi.noImagesFound'),
+          message: t('appUi.noImagesInWorkspace'),
           type: 'info'
         });
       }
     } catch (error) {
       console.error('加载图片列表失败', error);
       this.uiPushToast({
-        title: '加载图片失败',
-        message: error?.message || '请稍后重试',
+        title: t('appUi.loadImagesFailed'),
+        message: error?.message || t('common.retryLater'),
         type: 'error'
       });
     } finally {
@@ -166,16 +167,16 @@ export const entriesMethods = {
       this.videoEntries = entries;
       if (!entries.length) {
         this.uiPushToast({
-          title: '未找到视频',
-          message: '工作区内没有可用的视频文件',
+          title: t('appUi.noVideosFound'),
+          message: t('appUi.noVideosInWorkspace'),
           type: 'info'
         });
       }
     } catch (error) {
       console.error('加载视频列表失败', error);
       this.uiPushToast({
-        title: '加载视频失败',
-        message: error?.message || '请稍后重试',
+        title: t('appUi.loadVideosFailed'),
+        message: error?.message || t('common.retryLater'),
         type: 'error'
       });
     } finally {

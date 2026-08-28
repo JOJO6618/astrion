@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -37,7 +38,7 @@ export const workspaceMethods = {
       const resp = await fetch('/api/tasks');
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || '获取运行任务失败');
+        throw new Error(payload?.error || t('appUi.fetchRunningTasksFailed'));
       }
       const tasks = Array.isArray(payload.data) ? payload.data : [];
       const activeStatuses = new Set(['pending', 'running', 'cancel_requested']);

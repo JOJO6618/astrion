@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -59,12 +60,12 @@ export const routeMethods = {
     }
     if (!path || this.isExplicitNewConversationRoute()) {
       this.currentConversationId = null;
-      this.currentConversationTitle = '新对话';
+      this.currentConversationTitle = t('common.newConversation');
       this.logMessageState('bootstrapRoute:clear-messages-for-new');
       this.messages = [];
       this.titleReady = true;
       this.suppressTitleTyping = false;
-      this.startTitleTyping('新对话', { animate: false });
+      this.startTitleTyping(t('common.newConversation'), { animate: false });
       this.initialRouteResolved = true;
       this.refreshBlankHeroState();
       // 触发后端重建索引以补全旧对话的 multi_agent_mode 字段（每次页面加载最多一次）
@@ -100,19 +101,19 @@ export const routeMethods = {
       } else {
         history.replaceState({}, '', '/new');
         this.currentConversationId = null;
-        this.currentConversationTitle = '新对话';
+        this.currentConversationTitle = t('common.newConversation');
         this.titleReady = true;
         this.suppressTitleTyping = false;
-        this.startTitleTyping('新对话', { animate: false });
+        this.startTitleTyping(t('common.newConversation'), { animate: false });
       }
     } catch (error) {
       console.warn('初始化路由失败:', error);
       history.replaceState({}, '', '/new');
       this.currentConversationId = null;
-      this.currentConversationTitle = '新对话';
+      this.currentConversationTitle = t('common.newConversation');
       this.titleReady = true;
       this.suppressTitleTyping = false;
-      this.startTitleTyping('新对话', { animate: false });
+      this.startTitleTyping(t('common.newConversation'), { animate: false });
     } finally {
       this.initialRouteResolved = true;
     }
@@ -126,7 +127,7 @@ export const routeMethods = {
     const convId = state.conversationId;
     if (!convId) {
       this.currentConversationId = null;
-      this.currentConversationTitle = '新对话';
+      this.currentConversationTitle = t('common.newConversation');
       this.logMessageState('handlePopState:clear-messages-no-conversation');
       this.messages = [];
       this.logMessageState('handlePopState:after-clear-no-conversation');

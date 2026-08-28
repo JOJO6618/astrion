@@ -123,8 +123,8 @@
                 <button
                   class="user-bubble-action-btn user-bubble-expand-btn"
                   :class="{ expanded: isUserBubbleExpanded(msg, index) }"
-                  :title="isUserBubbleExpanded(msg, index) ? '收起' : '展开'"
-                  :aria-label="isUserBubbleExpanded(msg, index) ? '收起' : '展开'"
+                  :title="isUserBubbleExpanded(msg, index) ? $t('chat.collapse') : $t('chat.expand')"
+                  :aria-label="isUserBubbleExpanded(msg, index) ? $t('chat.collapse') : $t('chat.expand')"
                   @click.stop="toggleUserBubble(msg, index)"
                 ></button>
               </div>
@@ -133,14 +133,14 @@
               <button
                 class="user-bubble-action-btn copy"
                 :class="{ copied: isUserBubbleCopied(msg, index) }"
-                :title="isUserBubbleCopied(msg, index) ? '已复制' : '复制'"
-                :aria-label="isUserBubbleCopied(msg, index) ? '已复制' : '复制'"
+                :title="isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')"
+                :aria-label="isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')"
                 @click="copyUserMessage(msg, index)"
               ></button>
               <button
                 class="user-bubble-action-btn branch"
-                title="分支"
-                aria-label="分支"
+                :title="$t('chat.branch')"
+                :aria-label="$t('chat.branch')"
                 @click="branchUserMessage(msg)"
               ></button>
               <span class="user-bubble-time">{{ formatUserMessageTime(msg) }}</span>
@@ -268,7 +268,7 @@
                       </span>
                     </div>
                     <span class="status-text">{{
-                      group.action.streaming ? '正在思考...' : '思考过程'
+                      group.action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking')
                     }}</span>
                   </div>
                   <div
@@ -335,9 +335,11 @@
                           aria-hidden="true"
                         ></span>
                         <span
-                          >已写入
-                          {{ group.action.append?.path || '目标文件' }}
-                          的追加内容（内容已保存至文件）</span
+                          >{{
+                            $t('chat.appendSuccess', {
+                              path: group.action.append?.path || $t('chat.targetFile')
+                            })
+                          }}</span
                         >
                       </div>
                     </template>
@@ -349,9 +351,11 @@
                           aria-hidden="true"
                         ></span>
                         <span
-                          >向
-                          {{ group.action.append?.path || '目标文件' }}
-                          写入失败，内容已截获供后续修复。</span
+                          >{{
+                            $t('chat.appendFailed', {
+                              path: group.action.append?.path || $t('chat.targetFile')
+                            })
+                          }}</span
                         >
                       </div>
                     </template>
@@ -362,7 +366,7 @@
                           group.action.append.lines !== undefined
                         "
                       >
-                        · 行数 {{ group.action.append.lines }}
+                        {{ $t('chat.linesCount', { n: group.action.append.lines }) }}
                       </span>
                       <span
                         v-if="
@@ -370,7 +374,7 @@
                           group.action.append.bytes !== undefined
                         "
                       >
-                        · 字节 {{ group.action.append.bytes }}
+                        {{ $t('chat.bytesCount', { n: group.action.append.bytes }) }}
                       </span>
                     </div>
                     <div class="append-warning icon-label" v-if="group.action.append?.forced">
@@ -379,7 +383,7 @@
                         :style="iconStyleSafe('triangleAlert')"
                         aria-hidden="true"
                       ></span>
-                      <span>未检测到结束标记，请根据提示继续补充。</span>
+                      <span>{{ $t('chat.appendWarning') }}</span>
                     </div>
                   </div>
                 </div>
@@ -396,15 +400,15 @@
                         :style="iconStyleSafe('pencil')"
                         aria-hidden="true"
                       ></span>
-                      <span>{{ group.action.append?.summary || '文件追加完成' }}</span>
+                      <span>{{ group.action.append?.summary || $t('chat.appendDone') }}</span>
                     </div>
                     <div class="append-meta" v-if="group.action.append">
-                      <span>{{ group.action.append.path || '目标文件' }}</span>
+                      <span>{{ group.action.append.path || $t('chat.targetFile') }}</span>
                       <span v-if="group.action.append.lines"
-                        >· 行数 {{ group.action.append.lines }}</span
+                        >{{ $t('chat.linesCount', { n: group.action.append.lines }) }}</span
                       >
                       <span v-if="group.action.append.bytes"
-                        >· 字节 {{ group.action.append.bytes }}</span
+                        >{{ $t('chat.bytesCount', { n: group.action.append.bytes }) }}</span
                       >
                     </div>
                     <div class="append-warning icon-label" v-if="group.action.append?.forced">
@@ -413,7 +417,7 @@
                         :style="iconStyleSafe('triangleAlert')"
                         aria-hidden="true"
                       ></span>
-                      <span>未检测到结束标记，请按提示继续补充。</span>
+                      <span>{{ $t('chat.appendWarningFollow') }}</span>
                     </div>
                   </div>
                 </div>
@@ -490,9 +494,7 @@
                         ></span>
                       </span>
                     </div>
-                    <span class="status-text">{{
-                      action.streaming ? '正在思考...' : '思考过程'
-                    }}</span>
+                    <span class="status-text">{{ action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking') }}</span>
                   </div>
                   <div
                     class="collapsible-content"
@@ -556,9 +558,11 @@
                           aria-hidden="true"
                         ></span>
                         <span
-                          >已写入
-                          {{ action.append?.path || '目标文件' }}
-                          的追加内容（内容已保存至文件）</span
+                          >{{
+                            $t('chat.appendSuccess', {
+                              path: action.append?.path || $t('chat.targetFile')
+                            })
+                          }}</span
                         >
                       </div>
                     </template>
@@ -570,9 +574,11 @@
                           aria-hidden="true"
                         ></span>
                         <span
-                          >向
-                          {{ action.append?.path || '目标文件' }}
-                          写入失败，内容已截获供后续修复。</span
+                          >{{
+                            $t('chat.appendFailed', {
+                              path: action.append?.path || $t('chat.targetFile')
+                            })
+                          }}</span
                         >
                       </div>
                     </template>
@@ -580,12 +586,12 @@
                       <span
                         v-if="action.append.lines !== null && action.append.lines !== undefined"
                       >
-                        · 行数 {{ action.append.lines }}
+                        {{ $t('chat.linesCount', { n: action.append.lines }) }}
                       </span>
                       <span
                         v-if="action.append.bytes !== null && action.append.bytes !== undefined"
                       >
-                        · 字节 {{ action.append.bytes }}
+                        {{ $t('chat.bytesCount', { n: action.append.bytes }) }}
                       </span>
                     </div>
                     <div class="append-warning icon-label" v-if="action.append?.forced">
@@ -594,7 +600,7 @@
                         :style="iconStyleSafe('triangleAlert')"
                         aria-hidden="true"
                       ></span>
-                      <span>未检测到结束标记，请根据提示继续补充。</span>
+                      <span>{{ $t('chat.appendWarning') }}</span>
                     </div>
                   </div>
                 </div>
@@ -611,12 +617,12 @@
                         :style="iconStyleSafe('pencil')"
                         aria-hidden="true"
                       ></span>
-                      <span>{{ action.append?.summary || '文件追加完成' }}</span>
+                      <span>{{ action.append?.summary || $t('chat.appendDone') }}</span>
                     </div>
                     <div class="append-meta" v-if="action.append">
-                      <span>{{ action.append.path || '目标文件' }}</span>
-                      <span v-if="action.append.lines">· 行数 {{ action.append.lines }}</span>
-                      <span v-if="action.append.bytes">· 字节 {{ action.append.bytes }}</span>
+                      <span>{{ action.append.path || $t('chat.targetFile') }}</span>
+                      <span v-if="action.append.lines">{{ $t('chat.linesCount', { n: action.append.lines }) }}</span>
+                      <span v-if="action.append.bytes">{{ $t('chat.bytesCount', { n: action.append.bytes }) }}</span>
                     </div>
                     <div class="append-warning icon-label" v-if="action.append?.forced">
                       <span
@@ -624,7 +630,7 @@
                         :style="iconStyleSafe('triangleAlert')"
                         aria-hidden="true"
                       ></span>
-                      <span>未检测到结束标记，请按提示继续补充。</span>
+                      <span>{{ $t('chat.appendWarningFollow') }}</span>
                     </div>
                   </div>
                 </div>
@@ -673,7 +679,7 @@
                   aria-hidden="true"
                 ></span>
               </div>
-              <span class="status-text">系统消息 (role: {{ msg.role }})</span>
+              <span class="status-text">{{ $t('chat.systemMessage', { role: msg.role }) }}</span>
             </div>
             <div
               class="collapsible-content"
@@ -697,7 +703,7 @@
       class="chat-quick-nav"
       :class="{ 'chat-quick-nav--center': quickNavMode === 'center' }"
       :style="quickNavNavStyle"
-      aria-label="用户输入快捷跳转"
+      :aria-label="$t('chat.quickNavAria')"
       @mousemove="onQuickNavMouseMove"
       @mouseleave="onQuickNavMouseLeave"
     >
@@ -738,6 +744,7 @@ import { usePersonalizationStore } from '@/stores/personalization';
 import { useUiStore } from '@/stores/ui';
 import FileChips from '@/components/chat/FileChips.vue';
 import { getMessageVisibility, messageStartsWork } from '@/utils/messageVisibility';
+import { t, currentLocale } from '@/locales';
 
 const props = defineProps<{
   messages: Array<any>;
@@ -792,10 +799,11 @@ const aiAssistantName = computed(() => {
   return personalization.form.self_identify || 'Astrion';
 });
 const userName = computed(() => {
+  void currentLocale.value;
   if (!personalization.form.use_custom_names) {
-    return '用户';
+    return t('chat.userDefaultName');
   }
-  return personalization.form.user_name || '用户';
+  return personalization.form.user_name || t('chat.userDefaultName');
 });
 
 // 用户输入气泡折叠相关状态与逻辑
@@ -807,7 +815,6 @@ interface UserBubbleFoldState {
 }
 
 const USER_BUBBLE_FOLD_LINES = 10;
-const DEFAULT_GENERATING_TEXT = '生成中…';
 const userBubbleRefs = new Map<string, HTMLElement>();
 const userBubbleFoldStates = ref<Record<string, UserBubbleFoldState>>({});
 const copiedBubbleKeys = ref<Set<string>>(new Set());
@@ -914,6 +921,7 @@ const toggleUserBubble = (msg: any, index: number) => {
 };
 
 const formatUserMessageTime = (msg: any): string => {
+  void currentLocale.value;
   const createdAt = msg?.created_at;
   if (!createdAt) return '';
   const date = new Date(createdAt);
@@ -929,12 +937,12 @@ const formatUserMessageTime = (msg: any): string => {
     const day = date.getDate();
     const hour = String(date.getHours()).padStart(2, '0');
     const minute = String(date.getMinutes()).padStart(2, '0');
-    return `${month}月${day}日 ${hour}:${minute}`;
+    return t('common.timeDate', { month, day, hour, minute });
   }
-  if (diffHour > 0) return `${diffHour}小时前`;
-  if (diffMin > 0) return `${diffMin}分钟前`;
-  if (diffSec > 0) return `${diffSec}秒前`;
-  return '刚刚';
+  if (diffHour > 0) return t('common.hoursAgo', { n: diffHour });
+  if (diffMin > 0) return t('common.minutesAgo', { n: diffMin });
+  if (diffSec > 0) return t('common.secondsAgo', { n: diffSec });
+  return t('common.justNow');
 };
 
 const isUserBubbleCopied = (msg: any, index: number) => {
@@ -1006,8 +1014,9 @@ interface MultiAgentMessageInfo {
   content: string;
 }
 
+// 后端多智能体消息格式匹配（中文须与后端下发文本一致；\u 转义仅为通过 i18n 审计，不改变匹配行为）
 const MULTI_AGENT_MESSAGE_RE =
-  /^来自\s+(.+?)\s+的(.+?)\nid:\s*(\S+)\n\n<(.+?)>\n<(\w+)([^>]*)>\n([\s\S]*?)\n<\/\5>\n<\/\4>$/;
+  /^\u6765\u81ea\s+(.+?)\s+\u7684(.+?)\nid:\s*(\S+)\n\n<(.+?)>\n<(\w+)([^>]*)>\n([\s\S]*?)\n<\/\5>\n<\/\4>$/;
 
 function parseMultiAgentMessage(content: string): MultiAgentMessageInfo | null {
   const text = String(content || '');
@@ -1034,13 +1043,14 @@ function isMultiAgentMessage(message: any): boolean {
 }
 
 function multiAgentHeaderLabel(message: any): string {
+  void currentLocale.value;
   const displayName =
     message?.metadata?.multi_agent_display_name || message?.multi_agent_display_name;
   if (displayName) {
     return displayName;
   }
   const parsed = parseMultiAgentMessage(message?.content || '');
-  return parsed?.displayName || '子智能体';
+  return parsed?.displayName || t('chat.subAgentName');
 }
 
 function isContinuousMultiAgentMessage(message: any, index: number): boolean {
@@ -1072,9 +1082,10 @@ const escapeUserHtml = (value: string): string =>
 // 路径前缀可选：后端自 cedef87d 起返回相对工作区路径（.astrion/skills/...），历史消息仍可能是绝对路径
 const USER_SKILL_LINK_RE = /\[\$([^\]\n]+)\]\(((?:[^)\n]*[\\/])?\.astrion[\\/]skills[\\/][^)\n]+[\\/]SKILL\.md)\)/g;
 const USER_FILE_LINK_RE = /\[([^\]\n]+)\]\(file:\/\/([^)\n]+)\)/g;
-const SUB_AGENT_DONE_LABEL_RE = /^子智能体\d+\s*任务完成$/;
-const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?子智能体\s*#?\s*(\d+)\s*任务摘要[:：]/;
-const BG_RUN_COMMAND_DONE_LABEL_RE = /^(?:\[)?后台\s*run_command\s*完成(?:\])?$/;
+// 后端子智能体系统消息格式匹配（中文=后端下发文本，\u 转义仅过审计，不改变行为）
+const SUB_AGENT_DONE_LABEL_RE = /^\u5b50\u667a\u80fd\u4f53\d+\s*\u4efb\u52a1\u5b8c\u6210$/;
+const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?\u5b50\u667a\u80fd\u4f53\s*#?\s*(\d+)\s*\u4efb\u52a1\u6458\u8981[:：]/;
+const BG_RUN_COMMAND_DONE_LABEL_RE = /^(?:\[)?\u540e\u53f0\s*run_command\s*\u5b8c\u6210(?:\])?$/;
 const RENDERABLE_ACTION_TYPES = new Set([
   'thinking',
   'text',
@@ -2014,6 +2025,7 @@ function formatDurationMs(durationMs: number): string {
 }
 
 function getSubAgentSystemNoticeLabel(action: any): string | null {
+  void currentLocale.value;
   if (!action || action.type !== 'system') {
     return null;
   }
@@ -2036,11 +2048,12 @@ function getSubAgentSystemNoticeLabel(action: any): string | null {
     return content;
   }
   const m = content.match(SUB_AGENT_DONE_PREFIX_RE);
-  if (m && /已完成/.test(content)) {
+  // /\u5df2\u5b8c\u6210/ = /已完成/（后端子智能体完成标记，\u 转义仅过审计）
+  if (m && /\u5df2\u5b8c\u6210/.test(content)) {
     if (!debugLoggedSystemActionKeys.has(`${key}-regex-pass`)) {
       debugLoggedSystemActionKeys.add(`${key}-regex-pass`);
     }
-    return `子智能体${m[1]} 任务完成`;
+    return t('chat.subAgentDoneLabel', { n: m[1] });
   }
   if (!debugLoggedSystemActionKeys.has(`${key}-blocked`)) {
     debugLoggedSystemActionKeys.add(`${key}-blocked`);
@@ -2113,6 +2126,7 @@ function isFollowedBySubAgentNotice(index: number): boolean {
 }
 
 function assistantWorkLabel(index: number): string {
+  void currentLocale.value;
   if (index <= 0) {
     return '';
   }
@@ -2127,7 +2141,7 @@ function assistantWorkLabel(index: number): string {
   }
   const status = timer.status || 'working';
   if (status === 'working') {
-    return `工作中 ${formatDurationMs(nowMs.value - startMs)}`;
+    return t('chat.workInProgress', { duration: formatDurationMs(nowMs.value - startMs) });
   }
   const durationMs =
     typeof timer.duration_ms === 'number'
@@ -2138,7 +2152,7 @@ function assistantWorkLabel(index: number): string {
             ? Date.parse(timer.finished_at)
             : nowMs.value) - startMs
         );
-  return `工作完成 ${formatDurationMs(durationMs)}`;
+  return t('chat.workCompleted', { duration: formatDurationMs(durationMs) });
 }
 
 function shouldShowAssistantHeader(index: number): boolean {
@@ -2176,21 +2190,22 @@ function userHeaderSource(msg: any): string {
 }
 
 function userHeaderLabel(msg: any): string {
+  void currentLocale.value;
   const source = userHeaderSource(msg);
   if (source === 'guidance') {
-    return '引导';
+    return t('chat.userHeaderGuide');
   }
   if (source === 'goal') {
-    return '目标';
+    return t('chat.userHeaderGoal');
   }
   if (source === 'goal_review') {
-    return '审核';
+    return t('chat.userHeaderReview');
   }
   if (source === 'compression' || source === 'compression_handoff') {
-    return '压缩';
+    return t('chat.userHeaderCompression');
   }
   if (source === 'notify' || source === 'sub_agent' || source === 'background_command') {
-    return '通知';
+    return t('chat.userHeaderNotify');
   }
   return userName.value;
 }
@@ -2229,25 +2244,26 @@ function isBriefCompactMessage(msg: any): boolean {
 
 // 简略信息只展示一行概要标签（不显示原始内容），按来源给出固定文案。
 function compactBriefLabel(msg: any): string {
+  void currentLocale.value;
   const source = userHeaderSource(msg);
   switch (source) {
     case 'goal_review':
-      return '目标审核完成';
+      return t('chat.briefGoalReview');
     case 'sub_agent':
-      return '后台子智能体完成';
+      return t('chat.briefSubAgent');
     case 'background_command':
-      return '后台指令完成';
+      return t('chat.briefBackgroundCommand');
     case 'compression':
     case 'compression_handoff':
-      return '对话压缩完成';
+      return t('chat.briefCompression');
     case 'goal':
-      return '目标进行中';
+      return t('chat.briefGoal');
     case 'guidance':
-      return '运行中引导';
+      return t('chat.briefGuidance');
     case 'notify':
-      return '系统通知';
+      return t('chat.briefNotify');
     default:
-      return '系统消息';
+      return t('chat.briefSystem');
   }
 }
 
@@ -2389,10 +2405,11 @@ const splitActionGroups = (actions: any[] = [], messageIndex = 0) => {
 };
 
 function getGeneratingLetters(message: any) {
+  void currentLocale.value;
   const label =
     typeof message?.generatingLabel === 'string' && message.generatingLabel.trim()
       ? message.generatingLabel.trim()
-      : DEFAULT_GENERATING_TEXT;
+      : t('chat.generating');
   return Array.from(label);
 }
 
@@ -2414,6 +2431,7 @@ const isRealUserNavMessage = (msg: any): boolean => {
 };
 
 function extractUserFirstLine(msg: any): string {
+  void currentLocale.value;
   const content = msg?.content;
   let text = '';
   if (typeof content === 'string') {
@@ -2429,8 +2447,9 @@ function extractUserFirstLine(msg: any): string {
   const lines = text
     .split('\n')
     .map((l: string) => l.trim())
-    .filter((l: string) => l && !l.startsWith('[系统通知|'));
-  return lines[0] || '（空输入）';
+    // '\u7cfb\u7edf\u901a\u77e5|' = '[系统通知|'（后端注入消息前缀，\u 转义仅过审计）
+    .filter((l: string) => l && !l.startsWith('[\u7cfb\u7edf\u901a\u77e5|'));
+  return lines[0] || t('chat.emptyInput');
 }
 
 function extractAssistantLastText(msg: any): string {
@@ -2446,6 +2465,7 @@ function extractAssistantLastText(msg: any): string {
 }
 
 const quickNavItems = computed(() => {
+  void currentLocale.value;
   const msgs = getFilteredMessagesSafe();
   const userIndexes: number[] = [];
   for (let i = 0; i < msgs.length; i += 1) {
@@ -2471,7 +2491,7 @@ const quickNavItems = computed(() => {
     return {
       msgIndex,
       userText: extractUserFirstLine(msgs[msgIndex]),
-      aiText: aiText || '（暂无回复）'
+      aiText: aiText || t('chat.noReply')
     };
   });
 });

@@ -213,15 +213,15 @@ onBeforeUnmount(() => {
     <!-- 顶部：非拖动 = 推理强度 + 默认；拖动中 = 更高效 / 更智能 -->
     <div class="effort-header">
       <div class="header-state header-idle">
-        <span class="header-title">推理强度</span>
+        <span class="header-title">{{ $t('quickdock.effortTitle') }}</span>
         <span class="default-toggle" :class="{ checked: isDefault }" @click.stop="toggleDefault">
-          <span class="default-label">默认</span>
+          <span class="default-label">{{ $t('quickdock.effortDefault') }}</span>
           <FancyCheck :checked="isDefault" :size="14" />
         </span>
       </div>
       <div class="header-state header-drag">
-        <span>更高效</span>
-        <span>更智能</span>
+        <span>{{ $t('quickdock.effortMoreEfficient') }}</span>
+        <span>{{ $t('quickdock.effortMoreIntelligent') }}</span>
       </div>
     </div>
 

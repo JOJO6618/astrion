@@ -19,7 +19,7 @@
       :style="{ height: `${moreVisible ? moreHeight : 0}px` }"
       @click="toggleMore"
     >
-      <img class="more-icon" src="/static/icons/align-left.svg" alt="展开" />
+      <img class="more-icon" src="/static/icons/align-left.svg" :alt="$t('chat.expand')" />
       <div class="more-copy">
         <span class="more-title">{{ moreTitle }}</span>
         <span class="more-desc">{{ moreDesc }}</span>
@@ -54,7 +54,7 @@
                   <span class="icon icon-sm" :style="iconStyle('brain')" aria-hidden="true"></span>
                 </span>
               </div>
-              <span class="status-text">{{ action.streaming ? '正在思考...' : '思考过程' }}</span>
+              <span class="status-text">{{ action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking') }}</span>
             </div>
             <div class="collapsible-content" :style="contentStyle(blockKey(action, idx))">
               <div
@@ -106,6 +106,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
 
@@ -187,10 +188,16 @@ const isSingle = computed(() => stackableActions.value.length === 1);
 // 避免一次性挂载多个块时整个对话区剧烈高度跳动。
 const animated = computed(() => !!props.conversationRunning && !!props.isLatestMessage);
 const totalSteps = computed(() => stackableActions.value.length);
-const moreTitle = computed(() => (showAll.value ? '已展开全部' : '更多'));
-const moreDesc = computed(() =>
-  showAll.value ? `共 ${totalSteps.value} 个步骤` : `${hiddenCount.value} 个步骤折叠`
-);
+const moreTitle = computed(() => {
+  void currentLocale.value;
+  return showAll.value ? t('chat.allExpanded') : t('chat.more');
+});
+const moreDesc = computed(() => {
+  void currentLocale.value;
+  return showAll.value
+    ? t('chat.stepsTotal', { n: totalSteps.value })
+    : t('chat.stepsHidden', { n: hiddenCount.value });
+});
 
 const blockKey = (action: any, idx: number) => action?.blockId || action?.id || `stacked-${idx}`;
 

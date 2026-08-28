@@ -5,17 +5,17 @@
         class="new-user-tutorial-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="新手教程提示"
+        :aria-label="$t('overlay.tutorialPromptAriaLabel')"
       >
-        <p class="eyebrow">欢迎</p>
-        <h3>新用户 {{ username || '用户' }}</h3>
-        <p class="desc">是否需要通过新手教程来快速认识这个系统？</p>
+        <p class="eyebrow">{{ $t('overlay.welcome') }}</p>
+        <h3>{{ $t('overlay.newUserTitle', { name: username || $t('overlay.user') }) }}</h3>
+        <p class="desc">{{ $t('overlay.tutorialPromptDesc') }}</p>
         <div class="actions">
           <button type="button" class="primary" :disabled="loading" @click="emitStart">
-            {{ loading ? '处理中...' : '开始吧！' }}
+            {{ loading ? $t('overlay.processing') : $t('overlay.startTutorial') }}
           </button>
           <button type="button" class="ghost" :disabled="loading" @click="emitSkip">
-            不再提示
+            {{ $t('overlay.noMorePrompt') }}
           </button>
         </div>
       </div>

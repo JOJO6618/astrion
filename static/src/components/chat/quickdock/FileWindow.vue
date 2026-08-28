@@ -10,7 +10,7 @@
         />
         <path d="M9.5 2.5V5H12" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
       </svg>
-      <span class="qd-window__title">文件</span>
+      <span class="qd-window__title">{{ $t('quickdock.fileWindowTitle') }}</span>
       <span class="qd-window__counter">{{ rows.length }}</span>
     </header>
     <ul ref="listRef" class="qd-list">
@@ -23,7 +23,7 @@
         :title="row.path"
         @click="openRow(row)"
       >
-        <button class="qd-row-menu-btn" title="更多" @click.stop="openMenu($event, row)">
+        <button class="qd-row-menu-btn" :title="$t('quickdock.more')" @click.stop="openMenu($event, row)">
           <svg viewBox="0 0 16 16">
             <circle cx="3.5" cy="8" r="1.3" fill="currentColor" />
             <circle cx="8" cy="8" r="1.3" fill="currentColor" />

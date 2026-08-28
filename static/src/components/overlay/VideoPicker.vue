@@ -4,9 +4,9 @@
       <div class="image-picker-panel">
         <div class="header">
           <div class="header-left">
-            <div class="title">选择视频（一次最多 1 个）</div>
+            <div class="title">{{ $t('overlay.videoPickerTitle') }}</div>
             <button type="button" class="local-btn" :disabled="uploading" @click="triggerLocal">
-              {{ uploading ? '上传中...' : '从本地发送' }}
+              {{ uploading ? $t('overlay.uploading') : $t('overlay.sendFromLocal') }}
             </button>
             <input
               ref="localInput"
@@ -19,8 +19,8 @@
           <button class="close-btn" @click="close">×</button>
         </div>
         <div class="body">
-          <div v-if="loading" class="loading">加载中...</div>
-          <div v-else-if="!videos.length" class="empty">未找到视频文件</div>
+          <div v-if="loading" class="loading">{{ $t('common.loading') }}</div>
+          <div v-else-if="!videos.length" class="empty">{{ $t('overlay.noVideos') }}</div>
           <div v-else class="grid">
             <div
               v-for="item in videos"
@@ -39,16 +39,16 @@
           </div>
         </div>
         <div class="footer">
-          <div class="count">已选 {{ selectedSet.size }} / 1</div>
+          <div class="count">{{ $t('overlay.videoSelectedCount', { n: selectedSet.size }) }}</div>
           <div class="actions">
-            <button type="button" class="btn secondary" @click="close">取消</button>
+            <button type="button" class="btn secondary" @click="close">{{ $t('common.cancel') }}</button>
             <button
               type="button"
               class="btn primary"
               :disabled="!selectedSet.size"
               @click="confirm"
             >
-              确认
+              {{ $t('common.confirm') }}
             </button>
           </div>
         </div>

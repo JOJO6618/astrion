@@ -1,0 +1,120 @@
+// Locale namespace: stores (en-US mirror, keys must match zh-CN/stores.ts exactly).
+// Spec: doc/frontend/i18n_spec.md. Used by static/src/stores/*.ts.
+// Note: no t() at module top level in stores; module-level constants hold keys and
+// resolve via t(key) at the point of use.
+export default {
+  // ── chat: playful placeholder labels while streaming (picked at random when a message is created) ──
+  generatingBrainstorming: 'Brainstorming…',
+  generatingPreparing: 'Just a moment, AI is preparing',
+  generatingPreparingTools: 'Preparing tools',
+  generatingThink: 'Let me think…',
+  generatingAnswerSoon: 'The answer is almost here',
+  generatingLoadingInspiration: 'Loading inspiration',
+  generatingAssemblingIdeas: 'Assembling ideas',
+  generatingBestApproach: 'Weighing the best approach',
+  generatingBrainMeeting: 'Ideas in session',
+  generatingOrganizing: 'Gathering materials',
+  generatingPolishing: 'Polishing the reply',
+  generatingContext: 'Fitting context',
+  generatingMemorySearch: 'Digging through memory',
+  generatingAlmostDone: 'Almost done, hang tight',
+  generatingDomainExpand: 'Expanding the field',
+  generatingToolchain: 'Assembling toolchain…',
+  generatingSentence: 'Shaping the sentence…',
+  generatingRethinking: 'Let me think it through…',
+  generatingKnowledgeSearch: 'Searching the knowledge base…',
+
+  // ── chatActions: copy / apply / run command / download (transient toasts) ──
+  commandChannelUnavailable: 'Command channel unavailable',
+  copyContentNotFound: 'No content to copy',
+  blockCopied: 'Block {id} copied to clipboard',
+  contentCopied: 'Content copied to clipboard',
+  copyBlockedByBrowser: 'Your browser blocked the copy. Select the text and copy manually.',
+  codeBlockNotFound: 'Code block not found',
+  codeContentEmpty: 'Code content is empty',
+  codeCopied: 'Code copied to clipboard',
+  copyBlockedManual: 'Your browser blocked the copy. Please copy manually.',
+  applyFailed: 'Cannot apply',
+  applyContentMissing: 'No content to apply',
+  filled: 'Filled in',
+  checkContentBeforeSend: 'Review the content and send it to apply the changes.',
+  cannotExecute: 'Cannot run',
+  commandContentMissing: 'No command content to run',
+  connectionLost: 'Connection lost',
+  reconnectAndRetry: 'Reconnect and try again.',
+  commandFailed: 'Command failed',
+  commandExecuted: 'Command executed',
+  downloadTargetMissing: 'No file to download',
+  downloadPathInvalid: 'No valid file path provided',
+
+  // ── backgroundCommand / subAgent: argument validation errors ──
+  commandIdRequired: 'command_id is required',
+  taskIdRequired: 'task_id is required',
+
+  // ── model / policy / task / focus / resource / file: load errors and fallbacks ──
+  loadModelListFailed: 'Failed to load model list',
+  loadPolicyFailed: 'Failed to load policy',
+  createTaskFailed: 'Failed to create task',
+  pollTaskFailed: 'Failed to poll task',
+  cancelTaskFailed: 'Failed to cancel task',
+  fetchTaskListFailed: 'Failed to fetch task list',
+  pollingFluctuation: 'Polling fluctuation',
+  pollingUnstableRetry: 'Message updates are temporarily unstable, retrying automatically',
+  requestFailed: 'Request failed',
+  fileTreeUnavailableHostMode: 'File tree unavailable in host mode',
+  unlimited: 'Unlimited',
+
+  // ── ui: confirm dialog defaults ──
+  confirmAction: 'Confirm action',
+  confirmOperation: 'Please confirm this operation',
+
+  // ── upload: upload flow toasts ──
+  uploadDisabled: 'Upload disabled',
+  uploadDisabledByAdmin: 'Upload has been disabled by the administrator',
+  videoProcessing: 'Processing video',
+  videoProcessingSlow: 'Reading video takes a while, please be patient',
+  uploadingFileTitle: 'Uploading file',
+  uploadingFile: 'Uploading {name}...',
+  uploadingScanning: 'File uploaded, running security scan...',
+  serverResponseUnparseable: 'Could not parse server response',
+  uploadFailed: 'Upload failed',
+  uploadSuccess: 'Uploaded: {name}',
+  uploadComplete: 'Upload complete',
+  genericFile: 'File',
+  uploadSecurityRejected: '{name} failed the security review',
+  uploadTypeNotAllowed: '{name} file type is not allowed',
+  uploadFailedWithReason: 'Failed to upload "{name}": {reason}',
+  uploadFailedRetryLater: 'Failed to upload "{name}", please try again later',
+
+  // ── personalization: save / toggle status and validation errors ──
+  updateFailed: 'Failed to update',
+  enabled: 'Enabled',
+  disabled: 'Disabled',
+  deepCompressMustExceedShallow: 'Deep compression trigger context must be greater than shallow compression trigger context',
+  saveFailed: 'Failed to save',
+  saved: 'Saved',
+  autoSaveFailed: 'Failed to auto-save',
+  logoutFailedRetry: 'Failed to sign out, please try again later',
+
+  // ── personalization: tone presets (keys resolved in a getter, refresh on language switch) ──
+  toneChatty: 'Chatty',
+  toneHumorous: 'Humorous',
+  toneBlunt: 'Blunt',
+  toneEncouraging: 'Encouraging',
+  tonePoetic: 'Poetic',
+  toneCorporate: 'Corporate',
+  toneUnconventional: 'Unconventional',
+  toneEmpathetic: 'Empathetic',
+
+  // ── monitor: transient status bar labels ──
+  idle: 'Idle',
+  planning: 'Planning',
+  thinking: 'Thinking',
+  abnormal: 'Error',
+  waitingReply: 'Waiting for reply',
+  waitingReplyEllipsis: 'Waiting for reply...',
+  inProgress: 'In progress',
+  playbackStatus: 'Replaying {label}',
+  toolPlayback: 'Tool playback',
+  toolExecFailed: 'Tool execution failed',
+} as const;

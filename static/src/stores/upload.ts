@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { useUiStore } from './ui';
 import { useFileStore } from './file';
 import { usePolicyStore } from './policy';
@@ -76,8 +77,8 @@ export const useUploadStore = defineStore('upload', {
       if (policyStore.uiBlocks?.block_upload) {
         const uiStore = useUiStore();
         uiStore.pushToast({
-          title: '上传被禁用',
-          message: '已被管理员禁用上传功能',
+          title: t('stores.uploadDisabled'),
+          message: t('stores.uploadDisabledByAdmin'),
           type: 'warning'
         });
         return [];
@@ -130,8 +131,8 @@ export const useUploadStore = defineStore('upload', {
       if (!skipPolicyCheck && policyStore.uiBlocks?.block_upload) {
         const uiStore = useUiStore();
         uiStore.pushToast({
-          title: '上传被禁用',
-          message: '已被管理员禁用上传功能',
+          title: t('stores.uploadDisabled'),
+          message: t('stores.uploadDisabledByAdmin'),
           type: 'warning'
         });
         return null;
@@ -143,8 +144,8 @@ export const useUploadStore = defineStore('upload', {
         /\.(mp4|mov|m4v|webm|avi|mkv|flv|mpg|mpeg)$/i.test(file.name || '');
       if (isVideoFile) {
         uiStore.pushToast({
-          title: '视频处理中',
-          message: '读取视频需要较长时间，请耐心等待',
+          title: t('stores.videoProcessing'),
+          message: t('stores.videoProcessingSlow'),
           type: 'info',
           duration: 5000
         });
@@ -153,8 +154,8 @@ export const useUploadStore = defineStore('upload', {
         this.setUploading(true);
       }
       const toastId = uiStore.pushToast({
-        title: '上传文件',
-        message: `正在上传 ${file.name}...`,
+        title: t('stores.uploadingFileTitle'),
+        message: t('stores.uploadingFile', { name: file.name }),
         type: 'info',
         duration: null
       });
@@ -169,7 +170,7 @@ export const useUploadStore = defineStore('upload', {
         });
         if (toastId) {
           uiStore.updateToast(toastId, {
-            message: '文件已上传，正在执行安全扫描...',
+            message: t('stores.uploadingScanning'),
             type: 'info'
           });
         }
@@ -177,26 +178,26 @@ export const useUploadStore = defineStore('upload', {
         try {
           result = await response.json();
         } catch (error) {
-          throw new Error('服务器响应无法解析');
+          throw new Error(t('stores.serverResponseUnparseable'));
         }
         if (!response.ok || !result.success) {
-          const message = result.error || result.message || '上传失败';
+          const message = result.error || result.message || t('stores.uploadFailed');
           throw new Error(message);
         }
         if (refreshFileTree) {
           await fileStore.fetchFileTree();
         }
-        const successMessage = `上传成功：${result.path || file.name}`;
+        const successMessage = t('stores.uploadSuccess', { name: result.path || file.name });
         if (toastId) {
           uiStore.updateToast(toastId, {
-            title: '上传完成',
+            title: t('stores.uploadComplete'),
             message: successMessage,
             type: 'success',
             duration: 4500
           });
         } else {
           uiStore.pushToast({
-            title: '上传完成',
+            title: t('stores.uploadComplete'),
             message: successMessage,
             type: 'success'
           });
@@ -210,28 +211,29 @@ export const useUploadStore = defineStore('upload', {
         return null;
       } catch (error: any) {
         const originalMessage = error && error.message ? String(error.message) : '';
-        const fileLabel = file && file.name ? file.name : '文件';
-        let displayMessage = originalMessage || '请稍后重试';
-        if (/安全审核未通过/.test(originalMessage) || /Eicar/i.test(originalMessage)) {
-          displayMessage = `${fileLabel} 安全审核未通过`;
-        } else if (/文件类型不在允许列表中/.test(originalMessage)) {
-          displayMessage = `${fileLabel} 文件类型不在允许列表中`;
+        const fileLabel = file && file.name ? file.name : t('stores.genericFile');
+        let displayMessage = originalMessage || t('common.retryLater');
+        // 后端上传错误消息匹配（中文须与后端下发文本一致；\u 转义仅过 i18n 审计，不改变行为）
+        if (/\u5b89\u5168\u5ba1\u6838\u672a\u901a\u8fc7/.test(originalMessage) || /Eicar/i.test(originalMessage)) {
+          displayMessage = t('stores.uploadSecurityRejected', { name: fileLabel });
+        } else if (/\u6587\u4ef6\u7c7b\u578b\u4e0d\u5728\u5141\u8bb8\u5217\u8868\u4e2d/.test(originalMessage)) {
+          displayMessage = t('stores.uploadTypeNotAllowed', { name: fileLabel });
         } else if (displayMessage) {
-          displayMessage = `${fileLabel} 上传失败：${displayMessage}`;
+          displayMessage = t('stores.uploadFailedWithReason', { name: fileLabel, reason: displayMessage });
         } else {
-          displayMessage = `${fileLabel} 上传失败，请稍后重试`;
+          displayMessage = t('stores.uploadFailedRetryLater', { name: fileLabel });
         }
         const uiStore = useUiStore();
         if (toastId) {
           uiStore.updateToast(toastId, {
-            title: '上传失败',
+            title: t('stores.uploadFailed'),
             message: displayMessage,
             type: 'error',
             duration: 5000
           });
         } else {
           uiStore.pushToast({
-            title: '上传失败',
+            title: t('stores.uploadFailed'),
             message: displayMessage,
             type: 'error'
           });

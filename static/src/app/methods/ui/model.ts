@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -46,8 +47,8 @@ export const modelMethods = {
     const policyStore = usePolicyStore();
     if (policyStore.isModelDisabled(key)) {
       this.uiPushToast({
-        title: '模型被禁用',
-        message: '被管理员强制禁用',
+        title: t('appUi.modelDisabled'),
+        message: t('appUi.forceDisabledByAdmin'),
         type: 'warning'
       });
       return;
@@ -56,16 +57,16 @@ export const modelMethods = {
     const targetModel = modelStore.models.find((m) => m.key === key);
     if (this.conversationHasImages && !targetModel?.supportsImage) {
       this.uiPushToast({
-        title: '切换失败',
-        message: '当前对话包含图片，目标模型不支持图片输入',
+        title: t('appUi.switchFailed'),
+        message: t('appUi.conversationHasImagesMessage'),
         type: 'error'
       });
       return;
     }
     if (this.conversationHasVideos && !targetModel?.supportsVideo) {
       this.uiPushToast({
-        title: '切换失败',
-        message: '当前对话包含视频，目标模型不支持视频输入',
+        title: t('appUi.switchFailed'),
+        message: t('appUi.conversationHasVideosMessage'),
         type: 'error'
       });
       return;
@@ -85,7 +86,7 @@ export const modelMethods = {
       });
       const payload = await resp.json();
       if (!resp.ok || !payload.success) {
-        throw new Error(payload.error || payload.message || '切换失败');
+        throw new Error(payload.error || payload.message || t('appUi.switchFailed'));
       }
       const data = payload.data || {};
       modelStore.setModel(data.model_key || key);
@@ -106,15 +107,15 @@ export const modelMethods = {
         }
       }
       this.uiPushToast({
-        title: '模型已切换',
+        title: t('appUi.modelSwitched'),
         message: modelStore.currentModel?.label || key,
         type: 'success'
       });
     } catch (error) {
       modelStore.setModel(prev);
-      const msg = error instanceof Error ? error.message : String(error || '切换失败');
+      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchFailed'));
       this.uiPushToast({
-        title: '切换模型失败',
+        title: t('appUi.switchModelFailed'),
         message: msg,
         type: 'error'
       });

@@ -9,14 +9,14 @@
       <div class="git-changes-panel__summary">
         <span class="git-changes-panel__add">+{{ additions }}</span>
         <span class="git-changes-panel__del">-{{ deletions }}</span>
-        <button type="button" class="git-changes-panel__close" aria-label="关闭 Git 变更面板" @click="$emit('close')">
+        <button type="button" class="git-changes-panel__close" :aria-label="$t('shell.closeGitPanel')" @click="$emit('close')">
           ×
         </button>
       </div>
     </header>
 
     <div class="git-changes-panel__body">
-      <div v-if="loading && !diff" class="git-changes-panel__empty">正在加载 Git 变更…</div>
+      <div v-if="loading && !diff" class="git-changes-panel__empty">{{ $t('shell.loadingGitChanges') }}</div>
       <div v-else-if="error && !files.length" class="git-changes-panel__empty git-changes-panel__empty--error">{{ error }}</div>
       <div v-else-if="!files.length" class="git-changes-panel__empty">
         <svg class="git-changes-panel__empty-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -25,7 +25,7 @@
           <path d="M18 19c-2.8 0-5-2.2-5-5v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <circle cx="20" cy="19" r="2" stroke="currentColor" stroke-width="2"/>
         </svg>
-        <span>当前没有未提交变更</span>
+        <span>{{ $t('shell.noUncommittedChanges') }}</span>
       </div>
       <section v-for="file in files" v-else :key="file.path" class="git-change-file">
         <div class="git-change-file__header">
@@ -36,7 +36,7 @@
                 class="git-change-file__open-btn"
                 :class="{ open: openMenuPath === file.path || appsLoadingPath === file.path }"
                 :disabled="!hostMode"
-                :title="hostMode ? '用应用打开文件' : 'Docker 模式不可用'"
+                :title="hostMode ? $t('shell.openFileWithApp') : $t('shell.dockerModeUnavailable')"
                 @click.stop.prevent="toggleOpenMenu(file.path)"
               >
                 <img class="git-change-file__open-icon" :src="filePenIcon" alt="" aria-hidden="true" />
@@ -65,7 +65,7 @@
                   <span>{{ app.label }}</span>
                 </button>
                 <div v-if="!appsLoadingPath && !openAppsError && !openApps.length" class="git-change-file__open-empty">
-                  未检测到可用应用
+                  {{ $t('shell.noAppsDetected') }}
                 </div>
               </div>
             </span>
@@ -76,7 +76,7 @@
               class="git-change-file__reset"
               @click.stop.prevent="handleResetContext(file.path)"
             >
-              恢复
+              {{ $t('shell.restore') }}
             </button>
           </span>
           <span class="git-change-file__stats">
@@ -96,7 +96,7 @@
               >
                 <span class="git-change-file__fold-content">
                   <span class="git-change-file__fold-icon git-change-file__fold-icon--up" aria-hidden="true"></span>
-                  <span>{{ hunk.before_hidden }} 行未编辑的内容</span>
+                  <span>{{ $t('shell.hiddenLines', { n: hunk.before_hidden }) }}</span>
                 </span>
               </button>
               <div
@@ -121,7 +121,7 @@
             >
               <span class="git-change-file__fold-content">
                 <span class="git-change-file__fold-icon git-change-file__fold-icon--down" aria-hidden="true"></span>
-                <span>{{ file.after_hidden }} 行未编辑的内容</span>
+                <span>{{ $t('shell.hiddenLines', { n: file.after_hidden }) }}</span>
               </span>
             </button>
           </div>
@@ -134,6 +134,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ref } from 'vue';
+import { t, currentLocale } from '@/locales';
 
 defineOptions({ name: 'GitChangesPanel' });
 
@@ -153,7 +154,10 @@ const emit = defineEmits<{
 }>();
 
 const branchLabel = computed(() => String(props.diff?.branch || 'HEAD'));
-const upstreamLabel = computed(() => String(props.diff?.upstream || '未设置云端分支'));
+const upstreamLabel = computed(() => {
+  void currentLocale.value;
+  return String(props.diff?.upstream || t('shell.unsetUpstream'));
+});
 const additions = computed(() => Math.max(0, Number(props.diff?.additions || 0)));
 const deletions = computed(() => Math.max(0, Number(props.diff?.deletions || 0)));
 const files = computed(() => (Array.isArray(props.diff?.files) ? props.diff.files : []));
@@ -201,12 +205,12 @@ const toggleOpenMenu = async (path: string) => {
     const resp = await fetch(`/api/project/file-open-apps?path=${encodeURIComponent(path)}`);
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok || !payload?.success) {
-      throw new Error(payload?.error || '检测应用失败');
+      throw new Error(payload?.error || t('shell.detectAppsFailed'));
     }
     openApps.value = Array.isArray(payload?.data?.apps) ? payload.data.apps : [];
     openMenuPath.value = path;
   } catch (error: any) {
-    openAppsError.value = error?.message || '检测应用失败';
+    openAppsError.value = error?.message || t('shell.detectAppsFailed');
     openMenuPath.value = path;
   } finally {
     appsLoadingPath.value = '';
@@ -222,11 +226,11 @@ const openFileWithApp = async (path: string, appId: string) => {
     });
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok || !payload?.success) {
-      throw new Error(payload?.error || '打开文件失败');
+      throw new Error(payload?.error || t('shell.openFileFailed'));
     }
     openMenuPath.value = '';
   } catch (error) {
-    openAppsError.value = error instanceof Error ? error.message : '打开文件失败';
+    openAppsError.value = error instanceof Error ? error.message : t('shell.openFileFailed');
   }
 };
 </script>

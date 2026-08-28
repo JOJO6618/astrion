@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { t } from '@/locales';
 
 export function useSecondaryPass() {
   const verified = ref(false);
@@ -12,13 +13,13 @@ export function useSecondaryPass() {
     error.value = null;
     try {
       const resp = await fetch('/api/admin/secondary/status', { credentials: 'same-origin' });
-      if (!resp.ok) throw new Error(`状态请求失败：${resp.status}`);
+      if (!resp.ok) throw new Error(t('adminApi.statusRequestFailed', { status: resp.status }));
       const data = await resp.json();
       verified.value = !!data.verified;
       // 兼容旧后端：字段缺失时视为已配置（保持原有输入框行为）
       configured.value = data.configured !== false;
     } catch (err: any) {
-      error.value = err.message || '无法验证二级密码状态';
+      error.value = err.message || t('adminApi.cannotVerifySecondaryPass');
     } finally {
       loading.value = false;
     }
@@ -36,11 +37,11 @@ export function useSecondaryPass() {
       });
       const data = await resp.json();
       if (!resp.ok || !data.success) {
-        throw new Error(data.error || '二级密码验证失败');
+        throw new Error(data.error || t('adminApi.secondaryPassVerifyFailed'));
       }
       verified.value = true;
     } catch (err: any) {
-      error.value = err.message || '验证失败';
+      error.value = err.message || t('adminApi.verifyFailed');
       verified.value = false;
     } finally {
       loading.value = false;

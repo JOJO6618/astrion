@@ -1,0 +1,120 @@
+// 文案命名空间：stores（zh-CN 源语言）
+// 规范见 doc/frontend/i18n_spec.md。由迁移任务填充，en-US 同名文件必须保持 key 完全一致（tsc 强制）。
+// 使用方：static/src/stores/*.ts（Pinia store 中的 toast/confirm/Error/状态词/预设词等瞬时文案）
+// 说明：store 模块顶层禁止调 t()；模块级常量一律存 key（如 GENERATING_LABEL_KEYS、TONE_PRESET_KEYS），在使用处 t(key) 求值。
+export default {
+  // ── chat：流式生成中的趣味占位标签（随机抽取，创建消息时求值） ──
+  generatingBrainstorming: '正在构思…',
+  generatingPreparing: '稍候，AI 正在准备',
+  generatingPreparingTools: '准备工具中',
+  generatingThink: '容我三思…',
+  generatingAnswerSoon: '答案马上就来',
+  generatingLoadingInspiration: '灵感加载中',
+  generatingAssemblingIdeas: '思路拼装中',
+  generatingBestApproach: '琢磨最佳方案',
+  generatingBrainMeeting: '脑内开会中',
+  generatingOrganizing: '整理资料中',
+  generatingPolishing: '润色回复中',
+  generatingContext: '调配上下文',
+  generatingMemorySearch: '搜刮记忆中',
+  generatingAlmostDone: '快敲完了，别急',
+  generatingDomainExpand: '领域展开',
+  generatingToolchain: '工具链装配中…',
+  generatingSentence: '句子正在成形…',
+  generatingRethinking: '让我再捋一捋…',
+  generatingKnowledgeSearch: '知识库检索中…',
+
+  // ── chatActions：复制 / 应用 / 执行命令 / 下载（toast 瞬时文案） ──
+  commandChannelUnavailable: '命令通道不可用',
+  copyContentNotFound: '未找到可复制的内容',
+  blockCopied: '片段 {id} 已复制到剪贴板',
+  contentCopied: '内容已复制到剪贴板',
+  copyBlockedByBrowser: '浏览器阻止了复制操作，请手动选择文本后复制。',
+  codeBlockNotFound: '未找到对应的代码块',
+  codeContentEmpty: '代码内容为空',
+  codeCopied: '代码已复制到剪贴板',
+  copyBlockedManual: '浏览器阻止了复制操作，请手动复制。',
+  applyFailed: '无法应用',
+  applyContentMissing: '缺少可应用的内容',
+  filled: '已填充',
+  checkContentBeforeSend: '请检查内容后发送以应用这些修改。',
+  cannotExecute: '无法执行',
+  commandContentMissing: '没有可执行的命令内容',
+  connectionLost: '连接已断开',
+  reconnectAndRetry: '请重新连接后再试。',
+  commandFailed: '命令执行失败',
+  commandExecuted: '命令已执行',
+  downloadTargetMissing: '没有可下载的目标文件',
+  downloadPathInvalid: '没有提供有效的文件路径',
+
+  // ── backgroundCommand / subAgent：参数校验错误 ──
+  commandIdRequired: 'command_id 不能为空',
+  taskIdRequired: 'task_id 不能为空',
+
+  // ── model / policy / task / focus / resource / file：加载类错误与兜底 ──
+  loadModelListFailed: '加载模型列表失败',
+  loadPolicyFailed: '加载策略失败',
+  createTaskFailed: '创建任务失败',
+  pollTaskFailed: '轮询任务失败',
+  cancelTaskFailed: '取消任务失败',
+  fetchTaskListFailed: '获取任务列表失败',
+  pollingFluctuation: '轮询波动',
+  pollingUnstableRetry: '消息更新暂时不稳定，正在自动重试',
+  requestFailed: '请求失败',
+  fileTreeUnavailableHostMode: '宿主机模式下文件树不可用',
+  unlimited: '未限制',
+
+  // ── ui：confirm 弹窗默认文案 ──
+  confirmAction: '确认操作',
+  confirmOperation: '请确认本次操作',
+
+  // ── upload：上传流程 toast ──
+  uploadDisabled: '上传被禁用',
+  uploadDisabledByAdmin: '已被管理员禁用上传功能',
+  videoProcessing: '视频处理中',
+  videoProcessingSlow: '读取视频需要较长时间，请耐心等待',
+  uploadingFileTitle: '上传文件',
+  uploadingFile: '正在上传 {name}...',
+  uploadingScanning: '文件已上传，正在执行安全扫描...',
+  serverResponseUnparseable: '服务器响应无法解析',
+  uploadFailed: '上传失败',
+  uploadSuccess: '上传成功：{name}',
+  uploadComplete: '上传完成',
+  genericFile: '文件',
+  uploadSecurityRejected: '{name} 安全审核未通过',
+  uploadTypeNotAllowed: '{name} 文件类型不在允许列表中',
+  uploadFailedWithReason: '{name} 上传失败：{reason}',
+  uploadFailedRetryLater: '{name} 上传失败，请稍后重试',
+
+  // ── personalization：保存 / 启用状态与校验错误 ──
+  updateFailed: '更新失败',
+  enabled: '已启用',
+  disabled: '已停用',
+  deepCompressMustExceedShallow: '深压缩触发上下文必须大于浅压缩触发上下文',
+  saveFailed: '保存失败',
+  saved: '已保存',
+  autoSaveFailed: '自动保存失败',
+  logoutFailedRetry: '退出登录失败，请稍后重试',
+
+  // ── personalization：语气预设（存 key，getter 求值，随语言切换刷新） ──
+  toneChatty: '健谈',
+  toneHumorous: '幽默',
+  toneBlunt: '直言不讳',
+  toneEncouraging: '鼓励性',
+  tonePoetic: '诗意',
+  toneCorporate: '企业商务',
+  toneUnconventional: '打破常规',
+  toneEmpathetic: '同理心',
+
+  // ── monitor：状态栏瞬时标签 ──
+  idle: '待机',
+  planning: '正在规划',
+  thinking: '思考中',
+  abnormal: '异常',
+  waitingReply: '等待回复',
+  waitingReplyEllipsis: '等待回复...',
+  inProgress: '进行中',
+  playbackStatus: '回放{label}',
+  toolPlayback: '工具操作回放',
+  toolExecFailed: '工具执行失败',
+} as const;

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog, traceLog } from '../common';
+import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import {
 
@@ -118,7 +119,7 @@ export const stateMethods = {
     this.toolSetSettings([]);
     this.pendingToolApprovals = [];
     this.decidingApprovalIds = [];
-    this.autoApprovalTitle = '自动审批记录';
+    this.autoApprovalTitle = t('appTasks.autoApprovalRecordTitle');
     // 切换对话/工作区/新建视图时，清理上一轮目标模式的本地完成提示。
     // 如果目标任务仍在运行，后续 restoreTaskState 会重新恢复运行态。
     this.goalModeArmed = false;

@@ -6,29 +6,29 @@
         type="button"
         data-tutorial="token-close"
         @click="emit('toggle')"
-        aria-label="收起用量统计"
+        :aria-label="$t('sidebar.collapseUsage')"
       >
-        <span class="sr-only">关闭</span>
+        <span class="sr-only">{{ $t('common.close') }}</span>
       </button>
       <div class="token-panel-content">
         <div class="usage-dashboard">
           <div class="usage-cell usage-cell--left usage-cell--token panel-card">
-            <div class="usage-title">Token 统计</div>
+            <div class="usage-title">{{ $t('sidebar.tokenStats') }}</div>
             <div class="stat-grid stat-grid--triple">
               <div class="stat-block">
-                <div class="stat-label">当前上下文</div>
+                <div class="stat-label">{{ $t('sidebar.currentContext') }}</div>
                 <div class="stat-value stat-value--accent">
                   {{ formatTokenCount(currentContextTokens || 0) }}
                 </div>
               </div>
               <div class="stat-block">
-                <div class="stat-label">累计输入</div>
+                <div class="stat-label">{{ $t('sidebar.cumulativeInput') }}</div>
                 <div class="stat-value stat-value--success">
                   {{ formatTokenCount(currentConversationTokens.cumulative_input_tokens || 0) }}
                 </div>
               </div>
               <div class="stat-block">
-                <div class="stat-label">累计输出</div>
+                <div class="stat-label">{{ $t('sidebar.cumulativeOutput') }}</div>
                 <div class="stat-value stat-value--warning">
                   {{ formatTokenCount(currentConversationTokens.cumulative_output_tokens || 0) }}
                 </div>
@@ -37,7 +37,7 @@
           </div>
           <div class="usage-cell usage-cell--right usage-cell--performance panel-card">
             <div class="usage-title">
-              <span>性能统计</span>
+              <span>{{ $t('sidebar.performanceStats') }}</span>
               <span class="status-pill" v-if="containerStatus" :class="containerStatusClass">
                 {{ containerStatusText }}
               </span>
@@ -52,7 +52,7 @@
                     </div>
                   </div>
                   <div class="stat-block">
-                    <div class="stat-label">内存</div>
+                    <div class="stat-label">{{ $t('sidebar.memory') }}</div>
                     <div class="stat-value stat-value--mono">
                       {{ formatBytes(containerStatus.stats.memory.used_bytes) }}
                       <template v-if="containerStatus.stats.memory.limit_bytes">
@@ -65,27 +65,27 @@
                   </div>
                 </div>
               </template>
-              <div class="usage-placeholder" v-else>容器已运行，等待采集指标...</div>
+              <div class="usage-placeholder" v-else>{{ $t('sidebar.containerMetricsPending') }}</div>
             </template>
-            <div class="usage-placeholder" v-else>当前运行在宿主机模式，暂无容器指标。</div>
+            <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoContainer') }}</div>
           </div>
           <div class="usage-cell usage-cell--left usage-cell--quota panel-card">
-            <div class="usage-title">额度统计</div>
+            <div class="usage-title">{{ $t('sidebar.quotaStats') }}</div>
             <div class="stat-grid stat-grid--triple">
               <div class="stat-block" v-for="tier in quotaTiers" :key="tier.key">
-                <div class="stat-label">{{ tier.label }}</div>
+                <div class="stat-label">{{ $t(tier.label) }}</div>
                 <div class="stat-value">{{ formatQuotaValue(tier.value) }}</div>
                 <div class="stat-foot" v-if="(tier.value.count || 0) > 0">
-                  重置 {{ formatResetTime(tier.value.reset_at) }}
+                  {{ $t('sidebar.resetAt', { time: formatResetTime(tier.value.reset_at) }) }}
                 </div>
               </div>
             </div>
           </div>
           <div class="usage-cell usage-cell--right usage-cell--resource panel-card">
-            <div class="usage-title">资源统计</div>
+            <div class="usage-title">{{ $t('sidebar.resourceStats') }}</div>
             <div class="stat-grid stat-grid--double">
               <div class="stat-block">
-                <div class="stat-label">网络</div>
+                <div class="stat-label">{{ $t('sidebar.network') }}</div>
                 <div class="stat-value stat-value--mono">
                   ↓{{ formatRate(containerNetRate.down_bps) }} ↑{{
                     formatRate(containerNetRate.up_bps)
@@ -93,7 +93,7 @@
                 </div>
               </div>
               <div class="stat-block">
-                <div class="stat-label">存储</div>
+                <div class="stat-label">{{ $t('sidebar.storage') }}</div>
                 <div class="stat-value stat-value--mono">
                   {{ formatBytes(projectStorage.used_bytes) }}
                   <template v-if="projectStorage.limit_bytes"
@@ -116,6 +116,7 @@
 defineOptions({ name: 'TokenDrawer' });
 
 import { computed } from 'vue';
+import { t, currentLocale } from '@/locales';
 
 const emit = defineEmits<{
   (e: 'toggle'): void;
@@ -146,9 +147,9 @@ const props = defineProps<{
 }>();
 
 const quotaTiers = computed(() => [
-  { key: 'fast', label: '常规模型', value: props.usageQuota.fast },
-  { key: 'thinking', label: '思考模型', value: props.usageQuota.thinking },
-  { key: 'search', label: '搜索', value: props.usageQuota.search }
+  { key: 'fast', label: 'sidebar.quotaTierFast', value: props.usageQuota.fast },
+  { key: 'thinking', label: 'sidebar.quotaTierThinking', value: props.usageQuota.thinking },
+  { key: 'search', label: 'sidebar.quotaTierSearch', value: props.usageQuota.search }
 ]);
 
 const hasContainerStats = computed(() => {
@@ -178,14 +179,15 @@ const containerStatusClass = computed(() => {
 });
 
 const containerStatusText = computed(() => {
+  void currentLocale.value;
   const status = props.containerStatus;
   if (!status) {
-    return '未知';
+    return t('sidebar.unknown');
   }
   if (status.mode !== 'docker') {
     return 'Host';
   }
   const stopped = status.state && status.state.running === false;
-  return stopped ? '停止' : '运行';
+  return stopped ? t('sidebar.stopped') : t('sidebar.containerRunning');
 });
 </script>

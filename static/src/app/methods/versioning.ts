@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from './common';
+import { t } from '@/locales';
 import { persistWorkspaceMode } from '../state';
 
 const normalizeTrackingMode = (value: any): 'workspace_and_conversation' | 'conversation_only' => {
@@ -18,7 +19,7 @@ export const versioningMethods = {
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data?.success) {
         if (!silent) {
-          throw new Error(data?.error || '获取版本状态失败');
+          throw new Error(data?.error || t('appMessages.versioningFetchStatusFailed'));
         }
         return null;
       }
@@ -32,8 +33,8 @@ export const versioningMethods = {
     } catch (error) {
       if (!silent) {
         this.uiPushToast({
-          title: '版本管理',
-          message: error?.message || '获取版本状态失败',
+          title: t('common.versioning'),
+          message: error?.message || t('appMessages.versioningFetchStatusFailed'),
           type: 'error'
         });
       }
@@ -49,7 +50,7 @@ export const versioningMethods = {
       const resp = await fetch(`/api/conversations/${targetId}/versioning/checkpoints`);
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data?.success) {
-        throw new Error(data?.error || '加载版本点失败');
+        throw new Error(data?.error || t('appMessages.versioningLoadCheckpointsFailed'));
       }
       const items = Array.isArray(data?.data?.items) ? data.data.items : [];
       this.versioningCheckpoints = items;
@@ -60,8 +61,8 @@ export const versioningMethods = {
       return items;
     } catch (error) {
       this.uiPushToast({
-        title: '版本管理',
-        message: error?.message || '加载版本点失败',
+        title: t('common.versioning'),
+        message: error?.message || t('appMessages.versioningLoadCheckpointsFailed'),
         type: 'error'
       });
       return [];
@@ -94,8 +95,8 @@ export const versioningMethods = {
     if (!this.currentConversationId) {
       this.versioningEnabled = !!enabled;
       this.uiPushToast({
-        title: '版本管理',
-        message: enabled ? '已为下一次新对话开启版本管理' : '已取消下一次新对话的版本管理',
+        title: t('common.versioning'),
+        message: enabled ? t('appMessages.versioningEnabledForNext') : t('appMessages.versioningDisabledForNext'),
         type: 'success'
       });
       return;
@@ -112,14 +113,14 @@ export const versioningMethods = {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data?.success) {
-        throw new Error(data?.error || '切换版本管理失败');
+        throw new Error(data?.error || t('appMessages.versioningToggleFailed'));
       }
       this.versioningEnabled = !!data?.data?.enabled;
       this.versioningMode = 'overwrite';
       this.versioningRestoreMode = 'overwrite';
       this.uiPushToast({
-        title: '版本管理',
-        message: this.versioningEnabled ? '已开启' : '已关闭',
+        title: t('common.versioning'),
+        message: this.versioningEnabled ? t('appMessages.versioningOn') : t('appMessages.versioningOff'),
         type: 'success'
       });
       if (this.versioningEnabled) {
@@ -131,8 +132,8 @@ export const versioningMethods = {
       }
     } catch (error) {
       this.uiPushToast({
-        title: '版本管理',
-        message: error?.message || '切换失败',
+        title: t('common.versioning'),
+        message: error?.message || t('appMessages.versioningSwitchFailed'),
         type: 'error'
       });
     } finally {
@@ -156,11 +157,11 @@ export const versioningMethods = {
       } catch (parseErr: any) {
         // eslint-disable-next-line no-console
         console.error('[VersioningDetail] parse failed:', parseErr?.message, 'status=', resp.status, 'text=', text);
-        throw new Error(`详情响应解析失败: ${parseErr?.message || '未知错误'}`);
+        throw new Error(`${t('appMessages.versioningDetailParseFailed')}: ${parseErr?.message || t('common.unknownError')}`);
       }
       // eslint-disable-next-line no-console
       if (!resp.ok || !data?.success) {
-        throw new Error(data?.error || '加载详情失败');
+        throw new Error(data?.error || t('appMessages.versioningLoadDetailFailed'));
       }
       this.versioningSelectedDetail = data.data || null;
       // eslint-disable-next-line no-console
@@ -170,8 +171,8 @@ export const versioningMethods = {
       // eslint-disable-next-line no-console
       console.error('[VersioningDetail] error:', error);
       this.uiPushToast({
-        title: '版本管理',
-        message: error?.message || '加载详情失败',
+        title: t('common.versioning'),
+        message: error?.message || t('appMessages.versioningLoadDetailFailed'),
         type: 'error'
       });
     } finally {
@@ -188,13 +189,21 @@ export const versioningMethods = {
 
     const restoreMode = this.versioningRestoreMode || 'overwrite';
     const trackingMode = normalizeTrackingMode(this.versioningTrackingMode);
-    const scopeLabel = trackingMode === 'conversation_only' ? '仅回溯对话' : '回溯对话和工作区';
-    const modeLabel = restoreMode === 'copy' ? '复制对话' : '覆盖当前对话';
+    const scopeLabel =
+      trackingMode === 'conversation_only'
+        ? t('appMessages.versioningScopeConversationOnly')
+        : t('appMessages.versioningScopeConversationAndWorkspace');
+    const modeLabel =
+      restoreMode === 'copy' ? t('appMessages.versioningModeCopy') : t('appMessages.versioningModeOverwrite');
     const confirmed = await this.confirmAction({
-      title: '确认回溯',
-      message: `将${scopeLabel}到输入 #${this.versioningSelectedSeq} 对应的状态，并${modeLabel}。是否继续？`,
-      confirmText: '回溯',
-      cancelText: '取消'
+      title: t('appMessages.versioningRestoreConfirmTitle'),
+      message: t('appMessages.versioningRestoreConfirmMessage', {
+        scope: scopeLabel,
+        mode: modeLabel,
+        seq: this.versioningSelectedSeq
+      }),
+      confirmText: t('appMessages.versioningRestoreConfirmText'),
+      cancelText: t('common.cancel')
     });
     if (!confirmed) return;
 
@@ -211,7 +220,7 @@ export const versioningMethods = {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data?.success) {
-        throw new Error(data?.error || '回溯失败');
+        throw new Error(data?.error || t('appMessages.versioningRestoreFailed'));
       }
       const targetConversationId = data?.data?.conversation_id || this.currentConversationId;
       this.versioningDialogOpen = false;
@@ -224,19 +233,19 @@ export const versioningMethods = {
         this.conversations.splice(
           0,
           this.conversations.length,
-          { id: targetConversationId, title: '版本回溯对话', updated_at: new Date().toISOString(), total_messages: 0, total_tools: 0 },
+          { id: targetConversationId, title: t('appMessages.versioningRestoreConversationTitle'), updated_at: new Date().toISOString(), total_messages: 0, total_tools: 0 },
           ...this.conversations.filter((c) => c && c.id !== targetConversationId)
         );
       }
       this.uiPushToast({
-        title: '版本管理',
-        message: restoreMode === 'copy' ? '已复制并回溯到新对话' : '回溯完成',
+        title: t('common.versioning'),
+        message: restoreMode === 'copy' ? t('appMessages.versioningRestoreCopyDone') : t('appMessages.versioningRestoreDone'),
         type: 'success'
       });
     } catch (error) {
       this.uiPushToast({
-        title: '版本管理',
-        message: error?.message || '回溯失败',
+        title: t('common.versioning'),
+        message: error?.message || t('appMessages.versioningRestoreFailed'),
         type: 'error'
       });
     } finally {

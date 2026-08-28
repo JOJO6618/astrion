@@ -260,7 +260,7 @@ function lineNumber(line: any): string {
         :style="props.iconStyle('filePen')"
         aria-hidden="true"
       ></span>
-      <span class="edit-summary-card__title">已编辑 {{ files.length }} 个文件</span>
+      <span class="edit-summary-card__title">{{ $t('chat.filesEdited', { n: files.length }) }}</span>
       <span class="edit-summary-card__totals">
         <span class="edit-summary-plus">+{{ totals.added }}</span>
         <span class="edit-summary-minus">-{{ totals.removed }}</span>
@@ -297,7 +297,7 @@ function lineNumber(line: any): string {
           class="es-modal__panel"
           :style="panelStyle"
           role="dialog"
-          :aria-label="`文件变更：${activeFile.path}`"
+          :aria-label="$t('chat.fileChanges', { path: activeFile.path })"
           @mouseenter="onPanelMouseEnter"
           @mouseleave="onPanelMouseLeave"
         >
@@ -316,7 +316,7 @@ function lineNumber(line: any): string {
               v-if="pinned || isMobile"
               type="button"
               class="es-modal__close"
-              aria-label="关闭"
+              :aria-label="$t('common.close')"
               @click.stop="close"
             >
               <span class="icon icon-sm" :style="props.iconStyle('x')" aria-hidden="true"></span>
@@ -332,9 +332,9 @@ function lineNumber(line: any): string {
                   <span class="es-diff-content">{{ line.content }}</span>
                 </div>
               </template>
-              <div v-if="activeFile.truncated" class="es-diff-note">内容过长，已截断展示</div>
+              <div v-if="activeFile.truncated" class="es-diff-note">{{ $t('chat.diffTruncated') }}</div>
             </template>
-            <div v-else class="es-diff-empty">暂无可展示的文本变更行</div>
+            <div v-else class="es-diff-empty">{{ $t('chat.diffEmpty') }}</div>
           </div>
         </div>
       </div>

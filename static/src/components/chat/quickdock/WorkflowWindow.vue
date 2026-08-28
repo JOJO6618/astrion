@@ -31,10 +31,10 @@
           <span class="wf-row__dot"></span>
           <span class="wf-row__name">{{ row.name }}</span>
           <span v-if="row.kind === 'current' && row.reviewing" class="wf-row__meta">
-            <span class="wf-spinner"></span>审核中
+            <span class="wf-spinner"></span>{{ $t('quickdock.reviewing') }}
           </span>
           <span v-else-if="row.rounds != null && row.kind !== 'next'" class="wf-row__meta">
-            {{ row.rounds }} 轮
+            {{ $t('quickdock.roundsLabel', { n: row.rounds }) }}
           </span>
         </li>
       </ul>
@@ -53,6 +53,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t } from '@/locales';
 import { useWorkflowStore } from '@/stores/workflow';
 import type { WorkflowFootnote, WorkflowSnapshot } from '@/stores/workflow';
 
@@ -149,7 +150,7 @@ function buildRows(snap: WorkflowSnapshot): Row[] {
       out.push(baseRow(snap.next, 'next', null));
     }
   } else if (snap.status === 'completed') {
-    out.push(baseRow('结束', 'done', null));
+    out.push(baseRow(t('quickdock.workflowEndRow'), 'done', null));
   }
   return out;
 }

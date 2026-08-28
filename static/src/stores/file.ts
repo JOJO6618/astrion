@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { useConversationStore } from './conversation';
 
 const FILE_STORE_DEBUG_LOGS = false;
@@ -108,7 +109,7 @@ export const useFileStore = defineStore('file', {
     },
     markFileTreeUnavailable(message: string) {
       this.fileTreeUnavailable = true;
-      this.fileTreeMessage = message || '宿主机模式下文件树不可用';
+      this.fileTreeMessage = message || t('stores.fileTreeUnavailableHostMode');
       this.fileTree = [];
       this.expandedFolders = {};
     },

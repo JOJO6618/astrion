@@ -1,23 +1,23 @@
 <template>
   <main class="auth-page">
     <section class="auth-card">
-      <h1 class="auth-title">创建账号</h1>
-      <p class="auth-subtitle">完成注册后即可登录使用</p>
+      <h1 class="auth-title">{{ t('auth.createAccount') }}</h1>
+      <p class="auth-subtitle">{{ t('auth.registerDoneHint') }}</p>
 
       <div class="auth-form-group">
-        <label class="auth-label" for="username">用户名</label>
+        <label class="auth-label" for="username">{{ t('auth.username') }}</label>
         <input
           id="username"
           v-model.trim="username"
           type="text"
           class="auth-input"
-          placeholder="仅限小写字母/数字/下划线"
+          :placeholder="t('auth.usernamePlaceholder')"
           autocomplete="username"
         />
       </div>
 
       <div class="auth-form-group">
-        <label class="auth-label" for="email">邮箱</label>
+        <label class="auth-label" for="email">{{ t('auth.email') }}</label>
         <input
           id="email"
           v-model.trim="email"
@@ -28,7 +28,7 @@
       </div>
 
       <div class="auth-form-group">
-        <label class="auth-label" for="password">密码</label>
+        <label class="auth-label" for="password">{{ t('auth.password') }}</label>
         <input
           id="password"
           v-model="password"
@@ -40,27 +40,28 @@
       </div>
 
       <div class="auth-form-group">
-        <label class="auth-label" for="invite">邀请码</label>
+        <label class="auth-label" for="invite">{{ t('auth.inviteCode') }}</label>
         <input
           id="invite"
           v-model.trim="inviteCode"
           type="text"
           class="auth-input"
-          placeholder="必填"
+          :placeholder="t('auth.requiredPlaceholder')"
           autocomplete="off"
           @keydown.enter="register"
         />
       </div>
 
-      <button class="auth-button" :disabled="submitting" @click="register">注册</button>
+      <button class="auth-button" :disabled="submitting" @click="register">{{ t('auth.register') }}</button>
       <div class="auth-error">{{ error }}</div>
-      <div class="auth-link">已有账号？<a href="/login">返回登录</a></div>
+      <div class="auth-link">{{ t('auth.haveAccount') }}<a href="/login">{{ t('auth.backToLogin') }}</a></div>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { t } from '@/locales';
 import { applyTheme, loadTheme } from './theme';
 
 declare global {
@@ -78,7 +79,7 @@ const submitting = ref(false);
 
 const register = async () => {
   if (!username.value || !email.value || !password.value || !inviteCode.value) {
-    error.value = '请完整填写所有字段';
+    error.value = t('auth.fillAllFields');
     return;
   }
 
@@ -103,9 +104,9 @@ const register = async () => {
       return;
     }
 
-    error.value = data.error || '注册失败';
+    error.value = data.error || t('auth.registerFailed');
   } catch (_err) {
-    error.value = '网络错误，请稍后再试';
+    error.value = t('auth.networkErrorRetry');
   } finally {
     submitting.value = false;
   }

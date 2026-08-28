@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import type {
   MonitorBubbleOptions,
   MonitorDriver,
@@ -127,7 +128,7 @@ const randomId = (prefix = 'evt') =>
 
 export const useMonitorStore = defineStore('monitor', {
   state: (): MonitorState => ({
-    statusLabel: '待机',
+    statusLabel: t('stores.idle'),
     queue: [],
     playing: false,
     awaitingTools: {},
@@ -207,7 +208,7 @@ export const useMonitorStore = defineStore('monitor', {
       const preserveQueue = !!options?.preserveQueue;
       const preservePendingResults = !!options?.preservePendingResults;
       const preserveAwaitingTools = !!options?.preserveAwaitingTools;
-      this.statusLabel = '待机';
+      this.statusLabel = t('stores.idle');
       if (!preserveQueue) {
         this.queue = [];
         this.playing = false;
@@ -316,20 +317,20 @@ export const useMonitorStore = defineStore('monitor', {
       this.speechBuffer = '';
     },
     showPendingReply() {
-      this.setStatus('待机');
+      this.setStatus(t('stores.idle'));
       if (this.driver && typeof this.driver.showWaitingBubble === 'function') {
-        this.driver.showWaitingBubble('等待回复');
+        this.driver.showWaitingBubble(t('stores.waitingReply'));
         this.bubbleActive = true;
         return;
       }
-      this.driver?.showSpeechBubble('等待回复...', { variant: 'info', duration: 0 });
+      this.driver?.showSpeechBubble(t('stores.waitingReplyEllipsis'), { variant: 'info', duration: 0 });
       this.bubbleActive = true;
     },
     enqueueModelSpeech(text: string) {
       if (!text) {
         return;
       }
-      this.setStatus('正在规划');
+      this.setStatus(t('stores.planning'));
       this.speechBuffer = `${this.speechBuffer}${text}`;
       this.lastSpeechAt = Date.now();
       monitorDebug('enqueueModelSpeech', {
@@ -357,14 +358,14 @@ export const useMonitorStore = defineStore('monitor', {
         monitorDebug('enqueueModelThinking already active');
         return;
       }
-      this.setStatus('思考中');
+      this.setStatus(t('stores.thinking'));
       monitorDebug('enqueueModelThinking show bubble');
       this.driver?.showThinkingBubble();
       this.bubbleActive = true;
       this.thinkingActive = true;
     },
     endModelOutput() {
-      this.setStatus('待机');
+      this.setStatus(t('stores.idle'));
       this.thinkingActive = false;
     },
     enqueueToolEvent(payload: Record<string, any>) {
@@ -459,9 +460,9 @@ export const useMonitorStore = defineStore('monitor', {
         this.clearProgressIndicator(key);
       }
       if (payload.status && ['failed', 'error'].includes(payload.status)) {
-        const message = payload.message || '工具执行失败';
+        const message = payload.message || t('stores.toolExecFailed');
         this.driver?.showSpeechBubble(message, { variant: 'error', icon: '✖', duration: 2800 });
-        this.setStatus('异常');
+        this.setStatus(t('stores.abnormal'));
         setTimeout(() => this.hideBubble(), 2600);
       }
       if (key) {
@@ -598,7 +599,7 @@ export const useMonitorStore = defineStore('monitor', {
         this.driver.showSpeechBubble(this.speechBuffer, { variant: 'info', duration: 0 });
         this.bubbleActive = true;
       }
-      this.setStatus('待机');
+      this.setStatus(t('stores.idle'));
       monitorLifecycleLog('queue-end');
     },
     async runScript(event: MonitorEvent) {
@@ -644,9 +645,10 @@ export const useMonitorStore = defineStore('monitor', {
       };
 
       const transformStatus = (raw?: string) => {
-        const label = typeof raw === 'string' && raw.trim().length ? raw.trim() : '进行中';
-        if (label.startsWith('正在')) {
-          return `回放${label.slice(2)}`;
+        const label = typeof raw === 'string' && raw.trim().length ? raw.trim() : t('stores.inProgress');
+        // '\u6b63\u5728' = '正在'（与 chat.ts progress* zh 译文前缀的拼接耦合；\u 转义仅过审计，slice(2) 行为不变）
+        if (label.startsWith('\u6b63\u5728')) {
+          return t('stores.playbackStatus', { label: label.slice(2) });
         }
         return label;
       };
@@ -657,7 +659,7 @@ export const useMonitorStore = defineStore('monitor', {
         statusPhase: 'playback'
       };
 
-      this.setStatus('工具操作回放');
+      this.setStatus(t('stores.toolPlayback'));
       monitorLifecycleLog('runScript:playback', {
         script: event.script,
         waitKey,

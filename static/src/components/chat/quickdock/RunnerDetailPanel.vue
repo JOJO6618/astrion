@@ -9,7 +9,7 @@
       <span class="qd-detail__title" :title="title">{{ title }}</span>
       <span class="qd-detail__badge" :class="`is-${stateClass}`">{{ statusText }}</span>
       <span v-if="tokensText" class="qd-detail__tokens" :title="tokensTitle">{{ tokensText }}</span>
-      <button class="qd-detail__close" title="关闭" @click="close">
+      <button class="qd-detail__close" :title="$t('common.close')" @click="close">
         <svg viewBox="0 0 16 16" fill="none">
           <path
             d="M4 4l8 8M12 4l-8 8"
@@ -24,7 +24,7 @@
       <!-- 子智能体：工具调用 + 文本输出时间线 -->
       <template v-if="effectiveDetail?.kind === 'agent'">
         <div v-if="!timelineItems.length" class="qd-detail__empty">
-          {{ activityLoading ? '加载中…' : '暂无进度' }}
+          {{ activityLoading ? $t('common.loading') : $t('quickdock.noProgress') }}
         </div>
         <div
           v-for="item in timelineItems"
@@ -48,7 +48,7 @@
       <!-- 后台指令：终端输出行 -->
       <template v-else>
         <div v-if="!outputLines.length" class="qd-detail__empty">
-          {{ detailLoading ? '加载中…' : '暂无输出' }}
+          {{ detailLoading ? $t('common.loading') : $t('quickdock.noOutput') }}
         </div>
         <div
           v-for="(line, i) in outputLines"
@@ -66,6 +66,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t, currentLocale } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
@@ -172,40 +173,42 @@ const stateClass = computed(() => {
 });
 
 const title = computed(() => {
+  void currentLocale.value;
   if (!effectiveDetail.value) {
     return '';
   }
   if (effectiveDetail.value.kind === 'agent') {
     const agent = subAgentStore.subAgents.find((a) => a.task_id === effectiveDetail.value?.id);
     return (
-      agent?.display_name || agent?.summary || subAgentStore.activeAgent?.display_name || '子智能体'
+      agent?.display_name || agent?.summary || subAgentStore.activeAgent?.display_name || t('quickdock.subAgent')
     );
   }
   const cmd = bgStore.commands.find((c) => c.command_id === effectiveDetail.value?.id);
-  return cmd?.command || bgStore.activeCommand?.command || '后台指令';
+  return cmd?.command || bgStore.activeCommand?.command || t('quickdock.backgroundCommand');
 });
 
 const statusText = computed(() => {
+  void currentLocale.value;
   const status = currentStatus.value.toLowerCase();
   if (status === 'idle') {
-    return '空闲';
+    return t('quickdock.statusIdle');
   }
   if (isRunning.value) {
-    return '运行中';
+    return t('common.running');
   }
   if (status === 'completed') {
-    return '已完成';
+    return t('quickdock.statusCompleted');
   }
   if (status === 'failed') {
-    return '已失败';
+    return t('quickdock.statusFailed');
   }
   if (status === 'timeout') {
-    return '已超时';
+    return t('quickdock.statusTimeout');
   }
   if (status === 'terminated' || status === 'cancelled') {
-    return '已终止';
+    return t('quickdock.statusTerminated');
   }
-  return '已结束';
+  return t('quickdock.statusEnded');
 });
 
 /* ---------------- 子智能体上下文 token（数据源：/api/sub_agents 列表轮询） ---------------- */
@@ -251,7 +254,10 @@ const tokensText = computed(() => {
   return formatCtxTokens(currentTokens.value);
 });
 
-const tokensTitle = computed(() => `上下文 ${currentTokens.value.toLocaleString()} tokens`);
+const tokensTitle = computed(() => {
+  void currentLocale.value;
+  return t('quickdock.contextTokensTitle', { tokens: currentTokens.value.toLocaleString() });
+});
 
 /* ---------------- 子智能体时间线（逻辑借鉴 SubAgentActivityDialog） ---------------- */
 
@@ -277,18 +283,26 @@ function isEntryTerminal(status?: string) {
   ].includes(normalized);
 }
 
+/** 工具条目状态标签：映射表存 key、使用处解析（规范 §3.3，模块顶层禁止调 t()） */
+const TOOL_STATE_LABEL_KEYS: Record<string, string> = {
+  completed: 'quickdock.toolStateDone',
+  failed: 'quickdock.toolStateFailed',
+  calling: 'quickdock.toolStateCalling',
+  running: 'quickdock.toolStateProgress'
+};
+
 function buildText(entry: any): string {
   const tool = entry.tool || '';
   const args = entry.args || {};
-  if (tool === 'read_file') return `阅读 ${args.path || args.file_path || ''}`;
-  if (tool === 'write_file') return `写入文件 ${args.file_path || args.path || ''}`;
-  if (tool === 'read_skill') return `阅读技能 ${args.skill_name || ''}`;
-  if (tool === 'web_search') return `搜索 ${args.query || args.q || ''}`;
-  if (tool === 'extract_webpage') return `提取 ${args.url || ''}`;
-  if (tool === 'run_command') return `运行命令 ${args.command || ''}`;
-  if (tool === 'edit_file') return `编辑 ${args.path || args.file_path || ''}`;
-  if (tool === 'read_mediafile') return `读取媒体文件 ${args.path || args.file_path || ''}`;
-  return tool || '工具';
+  if (tool === 'read_file') return t('quickdock.toolReadFile', { path: args.path || args.file_path || '' });
+  if (tool === 'write_file') return t('quickdock.toolWriteFile', { path: args.file_path || args.path || '' });
+  if (tool === 'read_skill') return t('quickdock.toolReadSkill', { name: args.skill_name || '' });
+  if (tool === 'web_search') return t('quickdock.toolSearch', { query: args.query || args.q || '' });
+  if (tool === 'extract_webpage') return t('quickdock.toolExtract', { url: args.url || '' });
+  if (tool === 'run_command') return t('quickdock.toolRunCommand', { command: args.command || '' });
+  if (tool === 'edit_file') return t('quickdock.toolEditFile', { path: args.path || args.file_path || '' });
+  if (tool === 'read_mediafile') return t('quickdock.toolReadMedia', { path: args.path || args.file_path || '' });
+  return tool || t('common.tool');
 }
 
 interface ToolTimelineItem {
@@ -307,6 +321,7 @@ interface OutputTimelineItem {
 }
 
 const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => {
+  void currentLocale.value;
   const entries = activityEntries.value || [];
   const rawItems: ({ kind: 'tool'; key: string; entry: any } | OutputTimelineItem)[] = [];
   let currentToolGroup: { kind: 'tool'; key: string; entry: any } | null = null;
@@ -394,8 +409,8 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
       kind: 'tool' as const,
       key: item.key,
       state,
-      stateLabel: state === 'completed' ? '完成' : state === 'failed' ? '失败' : state === 'calling' ? '调用中' : '进行中',
-      toolName: item.entry.tool || '工具',
+      stateLabel: t(TOOL_STATE_LABEL_KEYS[state] || 'quickdock.toolStateProgress'),
+      toolName: item.entry.tool || t('common.tool'),
       text: buildText(item.entry)
     };
   });

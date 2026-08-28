@@ -295,12 +295,12 @@ const timeAgo = (iso?: string) => {
   if (!Number.isFinite(ts)) return '—';
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return t('adminApi.justNow');
-  if (mins < 60) return t('adminApi.minutesAgo', { count: mins });
+  if (mins < 1) return t('common.justNow');
+  if (mins < 60) return t('common.minutesAgo', { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return t('adminApi.hoursAgo', { count: hours });
+  if (hours < 24) return t('common.hoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  return t('adminApi.daysAgo', { count: days });
+  return t('common.daysAgo', { n: days });
 };
 const formatPercentNumber = (v: any) => {
   if (v === null || v === undefined) return '—';

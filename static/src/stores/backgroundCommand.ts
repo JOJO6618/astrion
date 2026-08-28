@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { useConversationStore } from './conversation';
 
 interface BackgroundCommand {
@@ -171,7 +172,7 @@ export const useBackgroundCommandStore = defineStore('backgroundCommand', {
     async cancelCommand(commandId: string) {
       const normalizedId = (commandId || '').toString().trim();
       if (!normalizedId) {
-        return { success: false, error: 'command_id 不能为空' };
+        return { success: false, error: t('stores.commandIdRequired') };
       }
       this.stoppingCommandIds = {
         ...this.stoppingCommandIds,

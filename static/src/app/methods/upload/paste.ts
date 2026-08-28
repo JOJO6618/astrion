@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 
 export const pasteMethods = {
@@ -15,8 +16,8 @@ export const pasteMethods = {
 
     if (!this.isConnected) {
       this.uiPushToast({
-        title: '未连接',
-        message: '请等待服务器连接后再上传',
+        title: t('appUi.notConnected'),
+        message: t('appUi.waitForConnectionBeforeUpload'),
         type: 'warning'
       });
       return;
@@ -25,8 +26,8 @@ export const pasteMethods = {
     const policyStore = usePolicyStore();
     if (policyStore.uiBlocks?.block_upload) {
       this.uiPushToast({
-        title: '上传被禁用',
-        message: '已被管理员禁用上传功能',
+        title: t('appUi.uploadDisabled'),
+        message: t('appUi.uploadDisabledByAdmin'),
         type: 'warning'
       });
       return;

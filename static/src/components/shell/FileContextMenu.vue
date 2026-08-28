@@ -10,7 +10,7 @@
       type="button"
       @click.stop="handleDownloadFile"
     >
-      下载文件
+      {{ $t('shell.downloadFile') }}
     </button>
     <button
       v-if="contextMenu.node && contextMenu.node.type === 'folder'"
@@ -18,7 +18,7 @@
       :disabled="!contextMenu.node.path"
       @click.stop="handleDownloadFolder"
     >
-      下载压缩包
+      {{ $t('shell.downloadArchive') }}
     </button>
   </div>
 </template>

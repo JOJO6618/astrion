@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { persistWorkspaceMode } from '../../state';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
@@ -240,8 +241,8 @@ export const socketMethods = {
       console.warn('引导模式加载工作区列表失败:', err);
     }
     this.uiPushToast({
-      title: '尚未创建工作区',
-      message: '请点击侧边栏的「工作区」按钮创建第一个工作区',
+      title: t('appUi.workspaceBootstrapTitle'),
+      message: t('appUi.workspaceBootstrapMessage'),
       type: 'info'
     });
   },
@@ -267,7 +268,7 @@ export const socketMethods = {
           await this.enterWorkspaceBootstrapMode();
           return;
         }
-        throw new Error(`状态接口请求失败: ${statusResponse.status}`);
+        throw new Error(t('appUi.statusApiRequestFailed', { status: statusResponse.status }));
       }
       const statusData = await statusResponse.json();
       this.socket = null;
@@ -352,10 +353,10 @@ export const socketMethods = {
       this.dockerProjectMode = !isHostMode;
       persistWorkspaceMode(!!isHostMode);
       if (isHostMode) {
-        this.fileMarkTreeUnavailable('宿主机模式下文件树不可用');
+        this.fileMarkTreeUnavailable(t('appUi.hostModeFileTreeUnavailable'));
         await this.fetchHostWorkspaces();
       } else {
-        this.fileMarkTreeUnavailable('Docker 模式下文件区已改为项目列表');
+        this.fileMarkTreeUnavailable(t('appUi.dockerModeFilesChanged'));
         await this.fetchHostWorkspaces();
         this.hostWorkspaceCreatePath = '';
         this.hostWorkspaceCreateLabel = '';
@@ -407,7 +408,7 @@ export const socketMethods = {
           } else {
             this.titleReady = true;
             this.suppressTitleTyping = false;
-            const fallbackTitle = this.currentConversationTitle || '新对话';
+            const fallbackTitle = this.currentConversationTitle || t('common.newConversation');
             this.currentConversationTitle = fallbackTitle;
             this.startTitleTyping(fallbackTitle, { animate: false });
           }
@@ -428,7 +429,7 @@ export const socketMethods = {
           console.warn('获取当前对话标题失败:', e);
           this.titleReady = true;
           this.suppressTitleTyping = false;
-          this.startTitleTyping(this.currentConversationTitle || '新对话', '');
+          this.startTitleTyping(this.currentConversationTitle || t('common.newConversation'), '');
         }
       }
 

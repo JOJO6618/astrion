@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -35,13 +36,13 @@ export const hostWorkspaceMethods = {
       const resp = await fetch(this.versioningHostMode ? '/api/host/workspaces' : '/api/projects');
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || '获取项目列表失败');
+        throw new Error(payload?.error || t('appUi.fetchProjectsFailed'));
       }
       const data = payload.data || {};
       const items = Array.isArray(data.workspaces) ? data.workspaces : [];
       this.hostWorkspaces = items.map((item: any) => ({
         workspace_id: String(item.workspace_id || ''),
-        label: String(item.label || item.workspace_id || '未命名项目'),
+        label: String(item.label || item.workspace_id || t('appUi.unnamedProject')),
         path: String(item.path || ''),
         is_current: !!item.is_current,
         running_task_count: Number(item.running_task_count || 0)
@@ -98,7 +99,7 @@ export const hostWorkspaceMethods = {
       const resp = await fetch(`${selectEndpoint}?workspace_id=${query}`);
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || (this.versioningHostMode ? '切换宿主机工作区失败' : '切换项目失败'));
+        throw new Error(payload?.error || (this.versioningHostMode ? t('appUi.switchHostWorkspaceFailed') : t('appUi.switchProjectFailed')));
       }
       const data = payload.data || {};
       this.currentHostWorkspaceId = String(data.current_workspace_id || targetId);
@@ -112,7 +113,7 @@ export const hostWorkspaceMethods = {
         this.messages = [];
         this.currentConversationId = null;
         this.resetTokenStatistics?.();
-        this.currentConversationTitle = '新对话';
+        this.currentConversationTitle = t('common.newConversation');
         this.titleReady = true;
         this.suppressTitleTyping = false;
         try {
@@ -137,7 +138,7 @@ export const hostWorkspaceMethods = {
           this.conversationsOffset = 0;
           await this.loadConversationsList();
         } else {
-          this.startTitleTyping('新对话', { animate: false });
+          this.startTitleTyping(t('common.newConversation'), { animate: false });
           history.replaceState({}, '', '/new');
           await this.loadConversationsList();
         }
@@ -146,7 +147,7 @@ export const hostWorkspaceMethods = {
         .find((item: any) => String(item?.workspace_id || '') === this.currentHostWorkspaceId);
       const switchedLabel = String(switchedWorkspace?.label || '').trim();
       this.uiPushToast({
-        title: this.versioningHostMode ? '工作区已切换' : '项目已切换',
+        title: this.versioningHostMode ? t('appUi.workspaceSwitched') : t('appUi.projectSwitched'),
         message: this.versioningHostMode
           ? (data.project_path || switchedLabel || targetId)
           : (switchedLabel || targetId),
@@ -163,9 +164,9 @@ export const hostWorkspaceMethods = {
       this.conversations = restoredCache.list;
       this.searchActive = previousSearchActive;
       this.conversationsLoading = false;
-      const message = error instanceof Error ? error.message : String(error || '切换失败');
+      const message = error instanceof Error ? error.message : String(error || t('appUi.switchFailed'));
       this.uiPushToast({
-        title: this.versioningHostMode ? '切换工作区失败' : '切换项目失败',
+        title: this.versioningHostMode ? t('appUi.switchWorkspaceFailed') : t('appUi.switchProjectFailed'),
         message,
         type: 'error'
       });
@@ -183,11 +184,11 @@ export const hostWorkspaceMethods = {
     const workspacePath = String(this.hostWorkspaceCreatePath || '').trim();
     const label = String(this.hostWorkspaceCreateLabel || '').trim();
     if (this.versioningHostMode && !workspacePath) {
-      this.hostWorkspaceCreateError = '路径不能为空';
+      this.hostWorkspaceCreateError = t('appUi.pathCannotBeEmpty');
       return;
     }
     if (this.dockerProjectMode && !label) {
-      this.hostWorkspaceCreateError = '项目名称不能为空';
+      this.hostWorkspaceCreateError = t('appUi.projectNameCannotBeEmpty');
       return;
     }
 
@@ -205,7 +206,7 @@ export const hostWorkspaceMethods = {
       });
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || (this.versioningHostMode ? '新建宿主机工作区失败' : '新建项目失败'));
+        throw new Error(payload?.error || (this.versioningHostMode ? t('appUi.createWorkspaceFailed') : t('appUi.createProjectFailed')));
       }
       await this.fetchHostWorkspaces();
       const createdLabel = payload?.data?.workspace?.label || label || workspacePath;
@@ -213,15 +214,15 @@ export const hostWorkspaceMethods = {
       this.hostWorkspaceCreatePath = '';
       this.hostWorkspaceCreateLabel = '';
       this.uiPushToast({
-        title: this.versioningHostMode ? '工作区已创建' : '项目已创建',
+        title: this.versioningHostMode ? t('appUi.workspaceCreated') : t('appUi.projectCreated'),
         message: createdLabel,
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || '新建失败');
+      const message = error instanceof Error ? error.message : String(error || t('appUi.createFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode ? '新建工作区失败' : '新建项目失败',
+        title: this.versioningHostMode ? t('appUi.createWorkspaceFailed') : t('appUi.createProjectFailed'),
         message,
         type: 'error'
       });
@@ -241,7 +242,7 @@ export const hostWorkspaceMethods = {
     const workspaceId = String(payload?.workspace_id || '').trim();
     const label = String(payload?.label || '').trim();
     if (!workspaceId || !label) {
-      this.hostWorkspaceCreateError = this.dockerProjectMode ? '项目名称不能为空' : '工作区名称不能为空';
+      this.hostWorkspaceCreateError = this.dockerProjectMode ? t('appUi.projectNameCannotBeEmpty') : t('appUi.workspaceNameCannotBeEmpty');
       return;
     }
     this.hostWorkspaceManageSubmitting = true;
@@ -258,19 +259,19 @@ export const hostWorkspaceMethods = {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok || !result?.success) {
-        throw new Error(result?.error || '重命名失败');
+        throw new Error(result?.error || t('appUi.renameFailed'));
       }
       await this.fetchHostWorkspaces();
       this.uiPushToast({
-        title: this.versioningHostMode ? '工作区已重命名' : '项目已重命名',
+        title: this.versioningHostMode ? t('appUi.workspaceRenamed') : t('appUi.projectRenamed'),
         message: label,
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || '重命名失败');
+      const message = error instanceof Error ? error.message : String(error || t('appUi.renameFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode ? '重命名工作区失败' : '重命名项目失败',
+        title: this.versioningHostMode ? t('appUi.renameWorkspaceFailed') : t('appUi.renameProjectFailed'),
         message,
         type: 'error'
       });
@@ -288,15 +289,14 @@ export const hostWorkspaceMethods = {
     }
     const workspaceId = String(item?.workspace_id || '').trim();
     if (!workspaceId) return;
-    const kindLabel = this.versioningHostMode ? '工作区' : '项目';
     const wasCurrent = workspaceId === this.currentHostWorkspaceId;
     const ok = opts.skipConfirm ? true : await this.confirmAction({
-      title: `删除${kindLabel}`,
+      title: this.versioningHostMode ? t('appUi.deleteWorkspaceConfirmTitle') : t('appUi.deleteProjectConfirmTitle'),
       message: this.versioningHostMode
-        ? `确定要从列表中删除“${item?.label || workspaceId}”吗？不会删除磁盘上的工作区文件夹。`
-        : `确定要删除项目“${item?.label || workspaceId}”吗？该项目文件夹和对话记录会被一并删除。`,
-      confirmText: '删除',
-      cancelText: '取消',
+        ? t('appUi.deleteWorkspaceConfirmMessage', { name: item?.label || workspaceId })
+        : t('appUi.deleteProjectConfirmMessage', { name: item?.label || workspaceId }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       confirmVariant: 'danger'
     });
     if (!ok) return;
@@ -315,7 +315,7 @@ export const hostWorkspaceMethods = {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok || !result?.success) {
-        throw new Error(result?.error || '删除失败');
+        throw new Error(result?.error || t('appUi.deleteFailed'));
       }
       const data = result.data || {};
       this.currentHostWorkspaceId = String(data.current_workspace_id || this.currentHostWorkspaceId || '');
@@ -326,7 +326,7 @@ export const hostWorkspaceMethods = {
       if (wasCurrent) {
         this.messages = [];
         this.currentConversationId = null;
-        this.currentConversationTitle = '新对话';
+        this.currentConversationTitle = t('common.newConversation');
         this.searchActive = false;
         this.searchResults = [];
         /* 当前工作区已删除：双类型缓存整体失效后重新加载 */
@@ -339,15 +339,15 @@ export const hostWorkspaceMethods = {
         await this.loadConversationsList();
       }
       this.uiPushToast({
-        title: `${kindLabel}已删除`,
+        title: this.versioningHostMode ? t('appUi.workspaceDeleted') : t('appUi.projectDeleted'),
         message: item?.label || workspaceId,
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || '删除失败');
+      const message = error instanceof Error ? error.message : String(error || t('appUi.deleteFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: `删除${kindLabel}失败`,
+        title: this.versioningHostMode ? t('appUi.deleteWorkspaceFailed') : t('appUi.deleteProjectFailed'),
         message,
         type: 'error'
       });
@@ -386,12 +386,12 @@ export const hostWorkspaceMethods = {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok || !result?.success) {
-        throw new Error(result?.error || '打开失败');
+        throw new Error(result?.error || t('appUi.openFailed'));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || '打开失败');
+      const message = error instanceof Error ? error.message : String(error || t('appUi.openFailed'));
       this.uiPushToast({
-        title: this.versioningHostMode ? '打开工作区失败' : '打开项目失败',
+        title: this.versioningHostMode ? t('appUi.openWorkspaceFailed') : t('appUi.openProjectFailed'),
         message,
         type: 'error'
       });
@@ -407,7 +407,7 @@ export const hostWorkspaceMethods = {
 
     this.hostWorkspaceManageSubmitting = true;
     this.hostWorkspaceCreateError = '';
-    const kindLabel = this.versioningHostMode ? '工作区' : '项目';
+    const isHostMode = this.versioningHostMode;
     try {
       const endpoint = this.versioningHostMode
         ? '/api/host/workspaces/set-default'
@@ -420,21 +420,21 @@ export const hostWorkspaceMethods = {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok || !result?.success) {
-        throw new Error(result?.error || `设置默认${kindLabel}失败`);
+        throw new Error(result?.error || (isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed')));
       }
       const data = result.data || {};
       this.defaultHostWorkspaceId = String(data.default_workspace_id || workspaceId);
       await this.fetchHostWorkspaces();
       this.uiPushToast({
-        title: `已设为默认${kindLabel}`,
+        title: isHostMode ? t('appUi.setAsDefaultWorkspace') : t('appUi.setAsDefaultProject'),
         message: (this.hostWorkspaces || []).find((w: any) => w.workspace_id === workspaceId)?.label || workspaceId,
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || `设置默认${kindLabel}失败`);
+      const message = error instanceof Error ? error.message : String(error || (isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed')));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: `设置默认${kindLabel}失败`,
+        title: isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed'),
         message,
         type: 'error'
       });

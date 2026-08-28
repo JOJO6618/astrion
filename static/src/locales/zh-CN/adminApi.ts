@@ -52,8 +52,11 @@ export default {
   deleteFailed: '删除失败',
   fetchFailed: '获取失败',
   fetchTokenFailed: '获取 token 失败',
-  justNow: '刚刚', // TODO(common): 时间相对词候选公共词
-  minutesAgo: '{count} 分钟前',
-  hoursAgo: '{count} 小时前',
-  daysAgo: '{count} 天前',
+
+  // ── 二级密码（useSecondaryPass.ts） ──
+  statusRequestFailed: '状态请求失败：{status}',
+  cannotVerifySecondaryPass: '无法验证二级密码状态',
+  secondaryPassVerifyFailed: '二级密码验证失败',
+  // TODO(common): 候选公共词
+  verifyFailed: '验证失败',
 } as const;

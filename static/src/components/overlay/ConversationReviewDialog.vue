@@ -3,18 +3,18 @@
     <div class="review-window">
       <div class="review-header">
         <div class="header-titles">
-          <div class="title">对话回顾</div>
-          <div class="subtitle">选择要生成回顾文件的对话</div>
+          <div class="title">{{ $t('overlay.reviewTitle') }}</div>
+          <div class="subtitle">{{ $t('overlay.reviewSubtitle') }}</div>
         </div>
         <div class="header-actions">
           <div v-if="generatedPath" class="hint" :title="generatedPath">
-            已生成 {{ generatedPath }}
+            {{ $t('overlay.generatedHint', { path: generatedPath }) }}
           </div>
           <button
             type="button"
             class="icon-close-btn"
-            aria-label="关闭"
-            title="关闭"
+            :aria-label="$t('common.close')"
+            :title="$t('common.close')"
             @click="$emit('close')"
             :disabled="submitting"
           >
@@ -26,14 +26,14 @@
       <div class="review-body">
         <div class="review-left">
           <div class="pane-head">
-            <span class="pane-head-label">对话列表</span>
+            <span class="pane-head-label">{{ $t('overlay.conversationList') }}</span>
             <span class="pane-head-meta" v-if="conversations.length">
-              共 {{ conversations.length }} 条
+              {{ $t('overlay.conversationCount', { n: conversations.length }) }}
             </span>
           </div>
           <div class="scroll-area conversation-list" :class="{ loading }">
-            <div v-if="loading" class="empty">正在加载...</div>
-            <div v-else-if="!conversations.length" class="empty">暂无对话</div>
+            <div v-if="loading" class="empty">{{ $t('common.loading') }}</div>
+            <div v-else-if="!conversations.length" class="empty">{{ $t('overlay.noConversations') }}</div>
             <template v-else>
               <button
                 v-for="conv in conversations"
@@ -48,14 +48,14 @@
                 :disabled="submitting || conv.id === currentConversationId"
               >
                 <div class="row">
-                  <span class="item-title">{{ conv.title || '未命名对话' }}</span>
-                  <span v-if="conv.id === currentConversationId" class="tag current-tag">当前</span>
+                  <span class="item-title">{{ conv.title || $t('overlay.unnamedConversation') }}</span>
+                  <span v-if="conv.id === currentConversationId" class="tag current-tag">{{ $t('overlay.currentTag') }}</span>
                 </div>
                 <div class="meta">
                   <span>{{ formatUpdatedAt(conv.updated_at) }}</span>
                   <span>
-                    {{ conv.total_messages || 0 }}条
-                    <span v-if="(conv.total_tools || 0) > 0"> · {{ conv.total_tools }}工具</span>
+                    {{ $t('overlay.messageCount', { n: conv.total_messages || 0 }) }}
+                    <span v-if="(conv.total_tools || 0) > 0">{{ $t('overlay.toolCount', { n: conv.total_tools }) }}</span>
                   </span>
                 </div>
               </button>
@@ -67,7 +67,7 @@
                 @click="$emit('load-more')"
                 :disabled="loadingMore || !hasMore || submitting"
               >
-                {{ loadingMore ? '载入中...' : hasMore ? '加载更多' : '没有更多了' }}
+                {{ loadingMore ? $t('overlay.loadingMore') : hasMore ? $t('overlay.loadMore') : $t('overlay.noMore') }}
               </button>
             </div>
           </div>
@@ -75,15 +75,15 @@
 
         <div class="review-right">
           <div class="pane-head">
-            <span class="pane-head-label">预览（前 {{ previewLimit }} 条）</span>
+            <span class="pane-head-label">{{ $t('overlay.previewTitle', { n: previewLimit }) }}</span>
             <span v-if="preview && preview.length" class="pane-head-meta">
-              {{ preview.length }} 条
+              {{ $t('overlay.previewCount', { n: preview.length }) }}
             </span>
           </div>
           <div class="scroll-area preview-box" :class="{ loading: previewLoading }">
             <div v-if="previewLoading" class="placeholder">
               <span class="icon icon-xl placeholder-icon" :style="iconStyle('clock')" aria-hidden="true"></span>
-              <div class="text-main">预览生成中...</div>
+              <div class="text-main">{{ $t('overlay.previewGenerating') }}</div>
             </div>
             <div v-else-if="previewError" class="placeholder error">
               <span class="icon icon-xl placeholder-icon" :style="iconStyle('triangleAlert')" aria-hidden="true"></span>
@@ -91,8 +91,8 @@
             </div>
             <div v-else-if="!preview || !preview.length" class="placeholder">
               <span class="icon icon-xl placeholder-icon" :style="iconStyle('file')" aria-hidden="true"></span>
-              <div class="text-main">选择左侧对话以查看预览</div>
-              <div class="text-sub">最多展示前 {{ previewLimit }} 条</div>
+              <div class="text-main">{{ $t('overlay.previewEmptyHint') }}</div>
+              <div class="text-sub">{{ $t('overlay.previewLimitHint', { n: previewLimit }) }}</div>
             </div>
             <div v-else class="preview-list">
               <div v-for="(line, idx) in preview" :key="idx" class="preview-line">
@@ -111,7 +111,7 @@
             @change="$emit('toggle-send', ($event.target as HTMLInputElement).checked)"
           />
           <span class="switch"></span>
-          <span class="label">是否发送给模型</span>
+          <span class="label">{{ $t('overlay.sendToModel') }}</span>
         </label>
         <button
           type="button"
@@ -119,7 +119,7 @@
           @click="$emit('confirm')"
           :disabled="!selectedId || submitting"
         >
-          {{ submitting ? '生成中...' : '确认' }}
+          {{ submitting ? $t('overlay.generating') : $t('common.confirm') }}
         </button>
       </div>
     </div>

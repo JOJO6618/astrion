@@ -247,9 +247,9 @@ export function stripComments(code) {
   return out;
 }
 
-/** console / debugLog 日志行不作为违规（日志可保留中文，见规范 §3.3） */
+/** console / debugLog / socketLog 日志行不作为违规（日志可保留中文，见规范 §3.3） */
 const LOG_LINE_RE =
-  /\bconsole\s*\.\s*(log|warn|error|info|debug|trace|table|group|groupEnd|groupCollapsed)\s*\(|\bdebugLog\s*\(|\.\s*debugLog\s*\(/;
+  /\bconsole\s*\.\s*(log|warn|error|info|debug|trace|table|group|groupEnd|groupCollapsed)\s*\(|\bdebugLog\s*\(|\.\s*debugLog\s*\(|\bsocketLog\s*\(/;
 
 /** 返回文件中剥离注释后仍含中文的行号列表 */
 function findCjkLines(filePath) {

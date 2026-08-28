@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog, traceLog } from '../common';
+import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { persistNewConversationType } from '../../state';
 import {
@@ -119,8 +120,8 @@ export const actionMethods = {
         personalizationStore.form.versioning_backup_mode === 'full';
       if (shouldShowBackupToast) {
         backupToastId = this.uiPushToast({
-          title: '正在初始化备份',
-          message: '正在创建完整工作区快照，请稍候…',
+          title: t('appMessages.initializingBackupTitle'),
+          message: t('appMessages.initializingBackupMessage'),
           type: 'info',
           duration: null,
           closable: false
@@ -159,7 +160,7 @@ export const actionMethods = {
         // 在本地列表插入占位，避免等待刷新
         const placeholder = {
           id: newConversationId,
-          title: '新对话',
+          title: t('common.newConversation'),
           updated_at: new Date().toISOString(),
           total_messages: 0,
           total_tools: 0
@@ -246,15 +247,15 @@ export const actionMethods = {
       } else {
         console.error('创建对话失败:', result.message);
         this.uiPushToast({
-          title: '创建对话失败',
-          message: result.message || '服务器未返回成功状态',
+          title: t('appMessages.createConversationFailed'),
+          message: result.message || t('appMessages.serverNotSuccessMessage'),
           type: 'error'
         });
       }
     } catch (error) {
       console.error('创建对话异常:', error);
       this.uiPushToast({
-        title: '创建对话异常',
+        title: t('appMessages.createConversationErrorTitle'),
         message: error.message || String(error),
         type: 'error'
       });
@@ -288,7 +289,7 @@ export const actionMethods = {
         debugLog('工作区新对话创建成功:', newConversationId);
         const placeholder = {
           id: newConversationId,
-          title: '新对话',
+          title: t('common.newConversation'),
           updated_at: new Date().toISOString(),
           total_messages: 0,
           total_tools: 0
@@ -333,15 +334,15 @@ export const actionMethods = {
       } else {
         console.error('创建对话失败:', result.message);
         this.uiPushToast({
-          title: '创建对话失败',
-          message: result.message || '服务器未返回成功状态',
+          title: t('appMessages.createConversationFailed'),
+          message: result.message || t('appMessages.serverNotSuccessMessage'),
           type: 'error'
         });
       }
     } catch (error) {
       console.error('创建工作区对话异常:', error);
       this.uiPushToast({
-        title: '创建工作区对话异常',
+        title: t('appMessages.createWorkspaceConversationErrorTitle'),
         message: error.message || String(error),
         type: 'error'
       });
@@ -352,10 +353,10 @@ export const actionMethods = {
     const workspaceId = typeof payload === 'object' ? payload?.workspaceId : undefined;
     if (!conversationId) return;
     const confirmed = await this.confirmAction({
-      title: '删除对话',
-      message: '确定要删除这个对话吗？删除后无法恢复。',
-      confirmText: '删除',
-      cancelText: '取消'
+      title: t('appMessages.deleteConversationTitle'),
+      message: t('appMessages.deleteConversationConfirmMessage'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel')
     });
     if (!confirmed) {
       return;
@@ -457,8 +458,8 @@ export const actionMethods = {
       } else {
         console.error('删除对话失败:', result.message);
         this.uiPushToast({
-          title: '删除对话失败',
-          message: result.message || '服务器未返回成功状态',
+          title: t('appMessages.deleteConversationFailedTitle'),
+          message: result.message || t('appMessages.serverNotSuccessMessage'),
           type: 'error'
         });
       }
@@ -470,7 +471,7 @@ export const actionMethods = {
       this.conversationListAnimationMode = 'idle';
       console.error('删除对话异常:', error);
       this.uiPushToast({
-        title: '删除对话异常',
+        title: t('appMessages.deleteConversationErrorTitle'),
         message: error.message || String(error),
         type: 'error'
       });
@@ -497,7 +498,7 @@ export const actionMethods = {
           );
           const sourceConversation = sourceIndex >= 0 ? this.conversations[sourceIndex] : null;
           const duplicateTitle =
-            result.load_result?.title || sourceConversation?.title || '复制的对话';
+            result.load_result?.title || sourceConversation?.title || t('appMessages.duplicateConversationTitle');
           const duplicatePlaceholder = {
             id: newId,
             title: duplicateTitle,
@@ -569,9 +570,9 @@ export const actionMethods = {
           await this.loadConversation(newId, { force: true, preserveListPosition: true });
         }
       } else {
-        const message = result.message || result.error || '复制失败';
+        const message = result.message || result.error || t('common.copyFailed');
         this.uiPushToast({
-          title: '复制对话失败',
+          title: t('appMessages.duplicateConversationFailedTitle'),
           message,
           type: 'error'
         });
@@ -579,7 +580,7 @@ export const actionMethods = {
     } catch (error) {
       console.error('复制对话异常:', error);
       this.uiPushToast({
-        title: '复制对话异常',
+        title: t('appMessages.duplicateConversationErrorTitle'),
         message: error.message || String(error),
         type: 'error'
       });

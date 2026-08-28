@@ -446,7 +446,7 @@
                               :disabled="option.disabled"
                               @click="selectDefaultModel(option.value)"
                             >
-                              <strong>{{ $t(option.labelKey) }}</strong
+                              <strong>{{ option.label }}</strong
                               ><span>{{ option.disabled ? $t('personalization.modelDisabled') : option.desc }}</span
                               ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                             </button>

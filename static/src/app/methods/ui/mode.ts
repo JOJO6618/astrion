@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { persistNewConversationType } from '../../state';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
@@ -100,7 +101,7 @@ export const modeMethods = {
     try {
       const newPlaceholder = {
         id: normalized,
-        title: '新对话',
+        title: t('common.newConversation'),
         updated_at: new Date().toISOString(),
         total_messages: 0,
         total_tools: 0
@@ -206,8 +207,8 @@ export const modeMethods = {
     if (fastOnly && mode !== 'fast') {
       if (!options.suppressToast) {
         this.uiPushToast({
-          title: '模式不可用',
-          message: '当前模型仅支持快速模式',
+          title: t('appUi.modeUnavailable'),
+          message: t('appUi.fastOnlyModeMessage'),
           type: 'warning'
         });
       }
@@ -218,8 +219,8 @@ export const modeMethods = {
     if (thinkingOnly && mode !== 'thinking') {
       if (!options.suppressToast) {
         this.uiPushToast({
-          title: '模式不可用',
-          message: '当前模型仅支持思考模式',
+          title: t('appUi.modeUnavailable'),
+          message: t('appUi.thinkingOnlyModeMessage'),
           type: 'warning'
         });
       }
@@ -242,7 +243,7 @@ export const modeMethods = {
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) {
-        throw new Error(payload.message || payload.error || '切换失败');
+        throw new Error(payload.message || payload.error || t('appUi.switchFailed'));
       }
       const data = payload.data || {};
       this.thinkingMode =
@@ -250,10 +251,10 @@ export const modeMethods = {
       this.runMode = data.mode || mode;
     } catch (error) {
       console.error('切换运行模式失败:', error);
-      const message = error instanceof Error ? error.message : String(error || '未知错误');
+      const message = error instanceof Error ? error.message : String(error || t('common.unknownError'));
       this.uiPushToast({
-        title: '切换思考模式失败',
-        message: message || '请稍后重试',
+        title: t('appUi.switchThinkingModeFailed'),
+        message: message || t('common.retryLater'),
         type: 'error'
       });
     } finally {
@@ -302,7 +303,7 @@ export const modeMethods = {
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) {
-        throw new Error(payload.message || payload.error || '设置失败');
+        throw new Error(payload.message || payload.error || t('appUi.settingFailed'));
       }
       const data = payload.data || {};
       // 仅当 UI 仍停留在该序列的值时才用服务端回写确认
@@ -320,10 +321,10 @@ export const modeMethods = {
         this.reasoningEffort = rollback;
       }
       console.error('设置推理强度失败:', error);
-      const message = error instanceof Error ? error.message : String(error || '未知错误');
+      const message = error instanceof Error ? error.message : String(error || t('common.unknownError'));
       this.uiPushToast({
-        title: '设置推理强度失败',
-        message: message || '请稍后重试',
+        title: t('appUi.setReasoningEffortFailed'),
+        message: message || t('common.retryLater'),
         type: 'error'
       });
     }
@@ -331,11 +332,11 @@ export const modeMethods = {
   async handleStopAllSubAgents() {
     const isMultiAgent = this.currentConversationType === 'multi_agent';
     const mode = isMultiAgent ? 'soft_stop' : 'terminate';
-    const title = isMultiAgent ? '是否暂停所有子智能体？' : '是否终结所有子智能体？';
+    const title = isMultiAgent ? t('appUi.pauseAllSubAgentsTitle') : t('appUi.terminateAllSubAgentsTitle');
     const message = isMultiAgent
-      ? '所有正在运行的子智能体将停止工作并变为空闲状态。取消表示不执行操作。'
-      : '所有后台子智能体将被强制终止。取消表示不执行操作。';
-    const confirmText = isMultiAgent ? '暂停' : '终结';
+      ? t('appUi.pauseAllSubAgentsMessage')
+      : t('appUi.terminateAllSubAgentsMessage');
+    const confirmText = isMultiAgent ? t('appUi.pause') : t('appUi.terminate');
     let proceed = false;
     try {
       const uiStore = (await import('../../../stores/ui')).useUiStore();
@@ -343,7 +344,7 @@ export const modeMethods = {
         title,
         message,
         confirmText,
-        cancelText: '取消',
+        cancelText: t('common.cancel'),
         confirmVariant: 'danger',
         closeOnBackdrop: true
       });
@@ -358,21 +359,21 @@ export const modeMethods = {
       const result = await store.stopAllAgents(mode);
       if (!result.success) {
         this.uiPushToast({
-          title: '停止子智能体失败',
-          message: result.error || '请重试',
+          title: t('appUi.stopSubAgentsFailed'),
+          message: result.error || t('appUi.pleaseRetry'),
           type: 'error'
         });
         return;
       }
       this.uiPushToast({
-        title: isMultiAgent ? '子智能体已暂停' : '子智能体已终结',
-        message: `已处理 ${result.stoppedCount || 0} 个子智能体`,
+        title: isMultiAgent ? t('appUi.subAgentsPaused') : t('appUi.subAgentsTerminated'),
+        message: t('appUi.stoppedSubAgentCount', { n: result.stoppedCount || 0 }),
         type: 'info'
       });
     } catch (error: any) {
       console.error('[stopAllSubAgents] 调用失败:', error);
       this.uiPushToast({
-        title: '停止子智能体失败',
+        title: t('appUi.stopSubAgentsFailed'),
         message: error?.message || String(error),
         type: 'error'
         });

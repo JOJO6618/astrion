@@ -25,15 +25,15 @@
           :disabled="!menuTargetRunning"
           @click="killRunner"
         >
-          强制关闭
+          {{ $t('quickdock.menuForceStop') }}
         </button>
       </template>
       <template v-else>
-        <button class="qd-menu__item" @click="downloadFile">下载</button>
+        <button class="qd-menu__item" @click="downloadFile">{{ $t('common.download') }}</button>
         <button v-if="hostMode" class="qd-menu__item" @click="revealInManager">
-          在文件管理器中打开
+          {{ $t('quickdock.menuRevealInManager') }}
         </button>
-        <button class="qd-menu__item" @click="copyPath">复制路径</button>
+        <button class="qd-menu__item" @click="copyPath">{{ $t('quickdock.menuCopyPath') }}</button>
       </template>
     </div>
   </aside>
@@ -42,6 +42,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t } from '@/locales';
 import {
   useQuickDockStore,
   persistQuickDockHadContent,
@@ -284,7 +285,7 @@ async function killRunner() {
       ? await subAgentStore.terminateSubAgent(m.key)
       : await bgStore.cancelCommand(m.key);
   if (!result?.success) {
-    uiStore.pushToast({ message: result?.error || '强制关闭失败', type: 'error' });
+    uiStore.pushToast({ message: result?.error || t('quickdock.killForceStopFailed'), type: 'error' });
   }
 }
 
@@ -318,11 +319,11 @@ async function revealInManager() {
     const resp = await fetch(`/api/project/file-open-apps?path=${encodeURIComponent(path)}`);
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok || !payload?.success) {
-      throw new Error(payload?.error || '检测可用应用失败');
+      throw new Error(payload?.error || t('quickdock.revealDetectAppsFailed'));
     }
     const apps = Array.isArray(payload?.data?.apps) ? payload.data.apps : [];
     if (!apps.length) {
-      throw new Error('未找到可用应用');
+      throw new Error(t('quickdock.revealNoAppsFound'));
     }
     const openResp = await fetch('/api/project/open-file-with-app', {
       method: 'POST',
@@ -331,10 +332,10 @@ async function revealInManager() {
     });
     const openPayload = await openResp.json().catch(() => ({}));
     if (!openResp.ok || !openPayload?.success) {
-      throw new Error(openPayload?.error || '打开文件失败');
+      throw new Error(openPayload?.error || t('quickdock.revealOpenFileFailed'));
     }
   } catch (err: any) {
-    uiStore.pushToast({ message: err?.message || '打开文件失败', type: 'error' });
+    uiStore.pushToast({ message: err?.message || t('quickdock.revealOpenFileFailed'), type: 'error' });
   }
 }
 
@@ -350,7 +351,7 @@ async function copyPath() {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(path);
-      toast('已复制相对路径', 'success');
+      toast(t('quickdock.copiedRelativePath'), 'success');
       return;
     } catch {
       // 走 fallback
@@ -364,9 +365,9 @@ async function copyPath() {
   ta.select();
   try {
     document.execCommand('copy');
-    toast('已复制相对路径', 'success');
+    toast(t('quickdock.copiedRelativePath'), 'success');
   } catch {
-    toast('复制失败', 'error');
+    toast(t('common.copyFailed'), 'error');
   }
   ta.remove();
 }

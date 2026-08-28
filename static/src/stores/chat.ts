@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 import { getMessageVisibility, messageStartsWork } from '@/utils/messageVisibility';
 
 interface ScrollStatePayload {
@@ -16,26 +17,27 @@ interface ChatState {
   thinkingScrollLocks: Map<string, boolean>;
 }
 
-const GENERATING_LABELS = [
-  '正在构思…',
-  '稍候，AI 正在准备',
-  '准备工具中',
-  '容我三思…',
-  '答案马上就来',
-  '灵感加载中',
-  '思路拼装中',
-  '琢磨最佳方案',
-  '脑内开会中',
-  '整理资料中',
-  '润色回复中',
-  '调配上下文',
-  '搜刮记忆中',
-  '快敲完了，别急',
-  '领域展开',
-  '工具链装配中…',
-  '句子正在成形…',
-  '让我再捋一捋…',
-  '知识库检索中…'
+// 生成中的趣味占位标签：模块顶层禁止调 t()，这里只存 key，在创建消息时 t(key) 求值
+const GENERATING_LABEL_KEYS = [
+  'stores.generatingBrainstorming',
+  'stores.generatingPreparing',
+  'stores.generatingPreparingTools',
+  'stores.generatingThink',
+  'stores.generatingAnswerSoon',
+  'stores.generatingLoadingInspiration',
+  'stores.generatingAssemblingIdeas',
+  'stores.generatingBestApproach',
+  'stores.generatingBrainMeeting',
+  'stores.generatingOrganizing',
+  'stores.generatingPolishing',
+  'stores.generatingContext',
+  'stores.generatingMemorySearch',
+  'stores.generatingAlmostDone',
+  'stores.generatingDomainExpand',
+  'stores.generatingToolchain',
+  'stores.generatingSentence',
+  'stores.generatingRethinking',
+  'stores.generatingKnowledgeSearch'
 ];
 
 const SHOW_HTML_COMPLETE_BLOCK_RE = /<show_html\b[\s\S]*?<\/show_html>/i;
@@ -46,11 +48,11 @@ function hasCompletedShowHtmlBlock(content: string | null | undefined) {
 }
 
 function randomGeneratingLabel() {
-  if (!GENERATING_LABELS.length) {
+  if (!GENERATING_LABEL_KEYS.length) {
     return '';
   }
-  const index = Math.floor(Math.random() * GENERATING_LABELS.length);
-  return GENERATING_LABELS[index];
+  const index = Math.floor(Math.random() * GENERATING_LABEL_KEYS.length);
+  return t(GENERATING_LABEL_KEYS[index]);
 }
 
 function createAssistantMessage() {

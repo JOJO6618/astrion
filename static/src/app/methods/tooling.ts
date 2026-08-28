@@ -14,6 +14,7 @@ import {
   getLanguageClass
 } from '../../utils/chatDisplay';
 import { debugLog } from './common';
+import { t } from '@/locales';
 
 export const toolingMethods = {
   toolCategoryIcon(categoryId) {
@@ -49,7 +50,7 @@ export const toolingMethods = {
         }
         if (['running', 'preparing'].includes(action.tool.status)) {
           action.tool.status = 'stale';
-          action.tool.message = action.tool.message || '已被新的响应中断';
+          action.tool.message = action.tool.message || t('appTasks.interruptedByNewResponse');
           this.toolUnregisterAction(action);
         }
       });
@@ -71,7 +72,7 @@ export const toolingMethods = {
           typeof action.tool.status === 'string' ? action.tool.status.toLowerCase() : '';
         if (!status || ['preparing', 'running', 'pending', 'queued', 'stale', 'awaiting_user_answer'].includes(status)) {
           action.tool.status = 'cancelled';
-          action.tool.message = action.tool.message || '已停止';
+          action.tool.message = action.tool.message || t('appTasks.stopped');
         }
       });
     });
@@ -217,8 +218,8 @@ export const toolingMethods = {
     const policyStore = usePolicyStore();
     if (policyStore.isCategoryLocked(categoryId)) {
       this.uiPushToast({
-        title: '无法修改',
-        message: '该工具类别被管理员强制设置',
+        title: t('appTasks.cannotModify'),
+        message: t('appTasks.categoryEnforcedByAdmin'),
         type: 'warning'
       });
       return;
@@ -249,7 +250,7 @@ export const toolingMethods = {
         console.warn('更新工具设置失败:', data);
         if (data && (data.message || data.error)) {
           this.uiPushToast({
-            title: '无法切换工具',
+            title: t('appTasks.cannotSwitchTool'),
             message: data.message || data.error,
             type: 'warning'
           });
@@ -267,7 +268,7 @@ export const toolingMethods = {
     if (!this.isConnected) {
       return;
     }
-    if (this.isPolicyBlocked('block_tool_toggle', '工具启用/禁用已被管理员锁定')) {
+    if (this.isPolicyBlocked('block_tool_toggle', t('appTasks.toolToggleLockedByAdmin'))) {
       return;
     }
     this.modeMenuOpen = false;

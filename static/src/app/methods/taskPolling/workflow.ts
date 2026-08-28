@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useWorkflowStore } from '../../../stores/workflow';
+import { t } from '@/locales';
 
 /**
  * 工作流运行时事件处理（任务轮询链路）。
@@ -27,12 +28,12 @@ export const workflowMethods = {
     if (!Array.isArray(this.autoApprovalFeedLines)) {
       this.autoApprovalFeedLines = [];
     }
-    this.autoApprovalTitle = '工作流审核';
+    this.autoApprovalTitle = t('appTasks.workflowReviewTitle');
     if (progress.stage === 'start') {
-      this.autoApprovalFeedLines = ['开始审核'];
+      this.autoApprovalFeedLines = [t('appTasks.reviewStarted')];
       this.autoApprovalFinalMessage = '';
     } else if (progress.stage === 'model_call') {
-      this.autoApprovalFeedLines.push(String(progress.message || `审核轮次 ${progress.round || ''}`).trim());
+      this.autoApprovalFeedLines.push(String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim());
     } else if (progress.stage === 'run_command' && progress.command) {
       this.autoApprovalFeedLines.push(String(progress.command));
     } else if (progress.message) {

@@ -8,12 +8,12 @@
         :class="{ 'ws-switcher--project': isProject }"
         :style="popoverStyle"
         role="dialog"
-        :aria-label="noun"
+        :aria-label="$t(noun)"
         @click.stop
       >
         <div class="ws-switcher__header">
-          <span class="ws-switcher__title">{{ noun }}</span>
-          <span class="ws-switcher__count">{{ workspaces.length }} 个</span>
+          <span class="ws-switcher__title">{{ $t(noun) }}</span>
+          <span class="ws-switcher__count">{{ $t('sidebar.workspaceCount', { n: workspaces.length }) }}</span>
         </div>
 
         <div class="ws-switcher__list" ref="listEl" @scroll="closeMenu">
@@ -33,14 +33,14 @@
             <!-- 删除确认内联 -->
             <div v-if="deletingId === item.workspace_id" class="ws-confirm">
               <div class="ws-confirm-text">
-                删除「{{ item.label }}」？{{ isProject ? '项目文件夹和对话记录将一并删除。' : '不会删除磁盘上的文件夹。' }}
+                {{ $t(isProject ? 'sidebar.deleteProjectConfirm' : 'sidebar.deleteWorkspaceConfirm', { label: item.label }) }}
               </div>
               <div class="ws-confirm-actions">
                 <button type="button" class="ws-btn ghost" :disabled="busy" @click.stop="deletingId = null">
-                  取消
+                  {{ $t('common.cancel') }}
                 </button>
                 <button type="button" class="ws-btn danger" :disabled="busy" @click.stop="confirmDelete(item)">
-                  删除
+                  {{ $t('common.delete') }}
                 </button>
               </div>
             </div>
@@ -63,15 +63,15 @@
                   @keydown.esc.prevent="renamingId = null"
                 />
                 <span v-else class="ws-row-name">{{ item.label }}</span>
-                <span v-if="!isProject" class="ws-row-path">{{ item.path || '（未配置路径）' }}</span>
+                <span v-if="!isProject" class="ws-row-path">{{ item.path || $t('sidebar.unconfiguredPath') }}</span>
               </span>
               <span class="ws-row-meta">
-                <span v-if="item.workspace_id === defaultWorkspaceId" class="ws-tag">默认</span>
+                <span v-if="item.workspace_id === defaultWorkspaceId" class="ws-tag">{{ $t('sidebar.default') }}</span>
                 <button
                   type="button"
                   class="ws-more"
                   :aria-expanded="menuOpenId === item.workspace_id"
-                  aria-label="更多操作"
+                  :aria-label="$t('common.moreActions')"
                   @click.stop="toggleMenu(item)"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -82,7 +82,7 @@
             </template>
           </div>
           <div v-if="!workspaces.length" class="ws-empty">
-            {{ isProject ? '暂无项目' : '暂无工作区' }}
+            {{ isProject ? $t('sidebar.noProjects') : $t('sidebar.noWorkspaces') }}
           </div>
         </div>
 
@@ -95,7 +95,7 @@
                   <path d="M5 12h14" /><path d="M12 5v14" />
                 </svg>
               </span>
-              <span>新建{{ noun }}</span>
+              <span>{{ $t('sidebar.createNoun', { noun: $t(noun) }) }}</span>
             </button>
           </div>
           <form v-else class="ws-create-form" :class="{ fading: bottomFading }" @submit.prevent="submitCreate">
@@ -103,7 +103,7 @@
               ref="createNameEl"
               v-model="createLabel"
               type="text"
-              :placeholder="isProject ? '项目名称' : '工作区名称（可选）'"
+              :placeholder="isProject ? $t('sidebar.projectNamePlaceholder') : $t('sidebar.workspaceNamePlaceholder')"
               autocomplete="off"
               :disabled="createSubmitting"
             />
@@ -111,17 +111,17 @@
               v-if="!isProject"
               v-model="createPath"
               type="text"
-              placeholder="路径：绝对路径或相对仓库路径"
+              :placeholder="$t('sidebar.pathPlaceholder')"
               autocomplete="off"
               :disabled="createSubmitting"
             />
             <div v-if="errorMessage" class="ws-create-error">{{ errorMessage }}</div>
             <div class="ws-create-actions">
               <button type="button" class="ws-btn ghost" :disabled="createSubmitting" @click.stop="closeCreateForm">
-                取消
+                {{ $t('common.cancel') }}
               </button>
               <button type="submit" class="ws-btn primary" :disabled="createSubmitting">
-                {{ createSubmitting ? '创建中...' : '创建' }}
+                {{ createSubmitting ? $t('sidebar.creating') : $t('sidebar.create') }}
               </button>
             </div>
           </form>
@@ -143,14 +143,14 @@
           :disabled="menuOpenId === defaultWorkspaceId || busy"
           @click="handleMenuAction('set-default')"
         >
-          设为默认
+          {{ $t('sidebar.setDefault') }}
         </button>
-        <button type="button" :disabled="busy" @click="handleMenuAction('rename')">重命名</button>
+        <button type="button" :disabled="busy" @click="handleMenuAction('rename')">{{ $t('sidebar.rename') }}</button>
         <button type="button" :disabled="isProject || busy" @click="handleMenuAction('reveal')">
-          在文件夹中打开
+          {{ $t('sidebar.revealInFolder') }}
         </button>
         <div class="ws-menu-sep"></div>
-        <button type="button" class="danger" :disabled="busy" @click="handleMenuAction('delete')">删除</button>
+        <button type="button" class="danger" :disabled="busy" @click="handleMenuAction('delete')">{{ $t('common.delete') }}</button>
       </div>
     </transition>
   </Teleport>
@@ -205,7 +205,7 @@ const emit = defineEmits<{
 }>();
 
 const isProject = computed(() => props.workspaceKind === 'project');
-const noun = computed(() => (isProject.value ? '项目' : '工作区'));
+const noun = computed(() => (isProject.value ? 'sidebar.project' : 'sidebar.workspace'));
 
 const popoverEl = ref<HTMLElement | null>(null);
 const listEl = ref<HTMLElement | null>(null);

@@ -1,5 +1,18 @@
 import { defineStore } from 'pinia';
+import { t, currentLocale } from '@/locales';
 import { useModelStore } from './model';
+
+// 语气预设：模块顶层禁止调 t()，这里只存 key，由 getter tonePresets 在读取时 t(key) 求值（随语言切换刷新）
+const TONE_PRESET_KEYS = [
+  'stores.toneChatty',
+  'stores.toneHumorous',
+  'stores.toneBlunt',
+  'stores.toneEncouraging',
+  'stores.tonePoetic',
+  'stores.toneCorporate',
+  'stores.toneUnconventional',
+  'stores.toneEmpathetic'
+] as const;
 
 export type BlockDisplayMode = 'traditional' | 'stacked' | 'minimal';
 export type CompactMessageDisplay = 'full' | 'brief';
@@ -160,7 +173,6 @@ interface PersonalizationState {
   error: string;
   toggleUpdating: boolean;
   overlayPressActive: boolean;
-  tonePresets: string[];
   form: PersonalForm;
   toolCategories: Array<{ id: string; label: string }>;
   skillsCatalog: Array<{ id: string; label: string; description?: string }>;
@@ -412,7 +424,6 @@ export const usePersonalizationStore = defineStore('personalization', {
     error: '',
     toggleUpdating: false,
     overlayPressActive: false,
-    tonePresets: ['健谈', '幽默', '直言不讳', '鼓励性', '诗意', '企业商务', '打破常规', '同理心'],
     form: defaultForm(),
     toolCategories: [],
     skillsCatalog: [],
@@ -420,6 +431,13 @@ export const usePersonalizationStore = defineStore('personalization', {
     projectMemoryInjectLimitMin: PROJECT_MEMORY_INJECT_LIMIT_MIN,
     experiments: loadExperimentState()
   }),
+  getters: {
+    // 语气预设：响应式依赖 currentLocale，语言切换时自动刷新
+    tonePresets: () => {
+      void currentLocale.value;
+      return TONE_PRESET_KEYS.map((key) => t(key));
+    }
+  },
   actions: {
     async openDrawer() {
       this.visible = true;
@@ -468,13 +486,13 @@ export const usePersonalizationStore = defineStore('personalization', {
         const resp = await fetch('/api/personalization');
         const result = await resp.json();
         if (!resp.ok || !result.success) {
-          throw new Error(result.error || '加载失败');
+          throw new Error(result.error || t('common.loadFailed'));
         }
         this.applyPersonalizationData(result.data || {});
         this.applyPersonalizationMeta(result);
         this.loaded = true;
       } catch (error: any) {
-        this.error = error?.message || '加载失败';
+        this.error = error?.message || t('common.loadFailed');
       } finally {
         this.loading = false;
       }
@@ -782,13 +800,13 @@ export const usePersonalizationStore = defineStore('personalization', {
         });
         const result = await resp.json();
         if (!resp.ok || !result.success) {
-          throw new Error(result.error || '更新失败');
+          throw new Error(result.error || t('stores.updateFailed'));
         }
         if (result.data) {
           this.applyPersonalizationData(result.data);
         }
         this.applyPersonalizationMeta(result);
-        const statusLabel = newValue ? '已启用' : '已停用';
+        const statusLabel = newValue ? t('stores.enabled') : t('stores.disabled');
         this.status = statusLabel;
         setTimeout(() => {
           if (this.status === statusLabel) {
@@ -797,7 +815,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         }, 2000);
       } catch (error: any) {
         this.form.enabled = previousValue;
-        this.error = error?.message || '更新失败';
+        this.error = error?.message || t('stores.updateFailed');
       } finally {
         this.toggleUpdating = false;
       }
@@ -817,7 +835,7 @@ export const usePersonalizationStore = defineStore('personalization', {
           this.normalizeCompressionNumber(this.form.deep_compress_trigger_tokens) ??
           DEFAULT_DEEP_COMPRESS_TRIGGER_TOKENS;
         if (deepTrigger <= shallowTrigger) {
-          throw new Error('深压缩触发上下文必须大于浅压缩触发上下文');
+          throw new Error(t('stores.deepCompressMustExceedShallow'));
         }
         const resp = await fetch('/api/personalization', {
           method: 'POST',
@@ -826,18 +844,19 @@ export const usePersonalizationStore = defineStore('personalization', {
         });
         const result = await resp.json();
         if (!resp.ok || !result.success) {
-          throw new Error(result.error || '保存失败');
+          throw new Error(result.error || t('stores.saveFailed'));
         }
         this.applyPersonalizationData(result.data || {});
         this.applyPersonalizationMeta(result);
-        this.status = '已保存';
+        const savedStatus = t('stores.saved');
+        this.status = savedStatus;
         setTimeout(() => {
-          if (this.status === '已保存') {
+          if (this.status === savedStatus) {
             this.status = '';
           }
         }, 3000);
       } catch (error: any) {
-        this.error = error?.message || '保存失败';
+        this.error = error?.message || t('stores.saveFailed');
       } finally {
         this.saving = false;
       }
@@ -883,11 +902,11 @@ export const usePersonalizationStore = defineStore('personalization', {
         });
         const result = await resp.json();
         if (!resp.ok || !result.success) {
-          throw new Error(result.error || '自动保存失败');
+          throw new Error(result.error || t('stores.autoSaveFailed'));
         }
         // 静默成功，不刷新表单（避免打断用户编辑）
       } catch (error: any) {
-        this.error = error?.message || '自动保存失败';
+        this.error = error?.message || t('stores.autoSaveFailed');
       } finally {
         this.saving = false;
       }
@@ -1082,7 +1101,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         window.location.replace(`/logout?ts=${Date.now()}`);
       } catch (error: any) {
         console.error('退出登录失败:', error);
-        this.error = error?.message || '退出登录失败，请稍后重试';
+        this.error = error?.message || t('stores.logoutFailedRetry');
         // 兜底：直接访问 GET /logout
         window.location.replace(`/logout?ts=${Date.now()}`);
       }

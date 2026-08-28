@@ -1,23 +1,23 @@
 <template>
   <transition name="user-question-fade" appear>
     <div v-if="visible && questions.length" class="user-question-overlay" @click.self="emit('minimize')">
-      <section class="user-question-card" role="dialog" aria-modal="true" aria-label="需要你回答一个问题">
+      <section class="user-question-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.userQuestionAriaLabel')">
         <header class="user-question-windowbar">
-          <div class="user-question-traffic" aria-label="窗口控制">
-            <button type="button" class="traffic-dot traffic-dot--close" aria-label="暂时收起" @click="emit('minimize')"></button>
+          <div class="user-question-traffic" :aria-label="$t('overlay.windowControlAria')">
+            <button type="button" class="traffic-dot traffic-dot--close" :aria-label="$t('overlay.minimizeAria')" @click="emit('minimize')"></button>
           </div>
-          <div class="user-question-window-title">需要你确认</div>
+          <div class="user-question-window-title">{{ $t('overlay.userQuestionWindowTitle') }}</div>
         </header>
 
         <header class="user-question-header">
           <div class="user-question-title-block">
             <div v-if="questions.length > 1" class="user-question-kicker-row">
-              <span class="user-question-kicker">问题 {{ currentIndex + 1 }} / {{ questions.length }}</span>
-              <span class="user-question-nav" aria-label="问题切换">
-                <button type="button" :disabled="currentIndex <= 0" @click="go(-1)" aria-label="上一个问题">
+              <span class="user-question-kicker">{{ $t('overlay.questionIndex', { current: currentIndex + 1, total: questions.length }) }}</span>
+              <span class="user-question-nav" :aria-label="$t('overlay.questionNavAria')">
+                <button type="button" :disabled="currentIndex <= 0" @click="go(-1)" :aria-label="$t('overlay.prevQuestionAria')">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l-5 5 5 5" /></svg>
                 </button>
-                <button type="button" :disabled="currentIndex >= questions.length - 1" @click="go(1)" aria-label="下一个问题">
+                <button type="button" :disabled="currentIndex >= questions.length - 1" @click="go(1)" :aria-label="$t('overlay.nextQuestionAria')">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5" /></svg>
                 </button>
               </span>
@@ -48,7 +48,7 @@
               v-model="currentDraft.text"
               class="user-question-textarea"
               rows="3"
-              placeholder="输入文字回答…"
+              :placeholder="$t('overlay.answerPlaceholder')"
               spellcheck="false"
               @keydown.meta.enter.prevent="submit"
               @keydown.ctrl.enter.prevent="submit"
@@ -61,15 +61,15 @@
             type="button"
             class="user-question-btn ghost"
             :disabled="submitting"
-            title="不回答当前这个问题，AI 将改为在对话中直接提问"
+            :title="$t('overlay.dismissTitle')"
             @click="dismiss"
           >
-            ✕ 不回答
+            {{ $t('overlay.dismiss') }}
           </button>
           <div class="user-question-spacer"></div>
           <div class="user-question-actions">
             <button type="button" class="user-question-btn primary" :disabled="!canSubmit || submitting" @click="submit">
-              {{ submitting ? '提交中...' : '确定' }}
+              {{ submitting ? $t('overlay.submittingAnswer') : $t('common.ok') }}
             </button>
           </div>
         </footer>

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import {
@@ -36,8 +37,8 @@ export const dragMethods = {
 
     if (!this.isConnected) {
       this.uiPushToast({
-        title: '未连接',
-        message: '请等待服务器连接后再上传',
+        title: t('appUi.notConnected'),
+        message: t('appUi.waitForConnectionBeforeUpload'),
         type: 'warning'
       });
       return;
@@ -46,8 +47,8 @@ export const dragMethods = {
     const policyStore = usePolicyStore();
     if (policyStore.uiBlocks?.block_upload) {
       this.uiPushToast({
-        title: '上传被禁用',
-        message: '已被管理员禁用上传功能',
+        title: t('appUi.uploadDisabled'),
+        message: t('appUi.uploadDisabledByAdmin'),
         type: 'warning'
       });
       return;
@@ -86,8 +87,8 @@ export const dragMethods = {
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (!currentModel?.supportsImage) {
       this.uiPushToast({
-        title: '当前模型不支持图片',
-        message: '请选择支持图片输入的模型后再发送图片',
+        title: t('appUi.modelDoesNotSupportImage'),
+        message: t('appUi.chooseImageModelMessage'),
         type: 'error'
       });
       return;
@@ -101,8 +102,8 @@ export const dragMethods = {
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (!currentModel?.supportsVideo) {
       this.uiPushToast({
-        title: '当前模型不支持视频',
-        message: '请切换到支持视频输入的模型后再发送视频',
+        title: t('appUi.modelDoesNotSupportVideo'),
+        message: t('appUi.switchToVideoModelMessage'),
         type: 'error'
       });
       return;

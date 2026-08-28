@@ -3,20 +3,20 @@
     <div class="modify-placeholder-content">
       <div class="icon-label">
         <span class="icon icon-sm" :style="iconStyle('hammer')" aria-hidden="true"></span>
-        <span>{{ action.modify?.summary || `已处理 ${action.modify?.path || '目标文件'}` }}</span>
+        <span>{{ action.modify?.summary || $t('chatActions.modifyProcessed', { path: action.modify?.path || $t('chat.targetFile') }) }}</span>
       </div>
       <div class="modify-meta" v-if="action.modify">
-        <span v-if="action.modify.total">· 共 {{ action.modify.total }} 处</span>
+        <span v-if="action.modify.total">{{ $t('chatActions.modifyTotal', { n: action.modify.total }) }}</span>
         <span v-if="action.modify.completed"
-          >· 完成 {{ action.modify.completed.length || action.modify.completed }} 处</span
+          >{{ $t('chatActions.modifyDone', { n: action.modify.completed.length || action.modify.completed }) }}</span
         >
         <span v-if="action.modify.failed"
-          >· 未完成 {{ action.modify.failed.length || action.modify.failed }} 处</span
+          >{{ $t('chatActions.modifyRemaining', { n: action.modify.failed.length || action.modify.failed }) }}</span
         >
       </div>
       <div class="modify-warning icon-label" v-if="action.modify?.forced">
         <span class="icon icon-sm" :style="iconStyle('triangleAlert')" aria-hidden="true"></span>
-        <span>未检测到结束标记，系统已自动处理。</span>
+        <span>{{ $t('chatActions.modifyWarning') }}</span>
       </div>
     </div>
   </div>

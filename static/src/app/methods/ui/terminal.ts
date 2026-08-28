@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -28,7 +29,7 @@ export const terminalMethods = {
     if (!this.isConnected) {
       return;
     }
-    if (this.isPolicyBlocked('block_realtime_terminal', '实时终端已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_realtime_terminal', t('appUi.policyBlockedTerminal'))) {
       return;
     }
     this.toggleTerminalPanel();

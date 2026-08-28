@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -114,7 +115,7 @@ export const composerMethods = {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.success) {
-      throw new Error(data?.error || '保存输入草稿失败');
+      throw new Error(data?.error || t('appUi.saveInputDraftFailed'));
     }
     this.composerDraftLastSyncedContent = content;
     this.composerDraftDirty = false;
@@ -130,7 +131,7 @@ export const composerMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || '获取输入草稿失败');
+        throw new Error(payload?.error || t('appUi.fetchInputDraftFailed'));
       }
       if (Number(this.composerDraftFetchSeq || 0) !== fetchSeq) {
         return;

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { t, currentLocale } from '@/locales';
 import { mapState, mapWritableState } from 'pinia';
 import { useConnectionStore } from '../stores/connection';
 import { useFileStore } from '../stores/file';
@@ -154,14 +155,16 @@ export const computed = {
     return this.thinkingMode ? 'thinking' : 'fast';
   },
   headerRunModeOptions() {
+    void currentLocale.value;
     return [
-      { value: 'fast', label: '快速模式', desc: '低思考，响应更快' },
-      { value: 'thinking', label: '思考模式', desc: '持续推理，适合复杂任务' }
+      { value: 'fast', label: t('appCore.fastMode'), desc: t('appCore.fastModeDesc') },
+      { value: 'thinking', label: t('input.thinkingMode'), desc: t('appCore.thinkingModeDesc') }
     ];
   },
   headerRunModeLabel() {
+    void currentLocale.value;
     const current = this.headerRunModeOptions.find((o) => o.value === this.resolvedRunMode);
-    return current ? current.label : '快速模式';
+    return current ? current.label : t('appCore.fastMode');
   },
   // 推理强度滑块：仅思考模式 + 当前模型支持推理强度参数时显示
   showEffortSlider() {
@@ -170,7 +173,8 @@ export const computed = {
   },
   currentModelLabel() {
     const modelStore = useModelStore();
-    return modelStore.currentModel?.label || '未选择模型';
+    void currentLocale.value;
+    return modelStore.currentModel?.label || t('appCore.modelNotSelected');
   },
   policyUiBlocks() {
     const store = usePolicyStore();
@@ -339,6 +343,7 @@ export const computed = {
   },
   // 状态形象：驱动 StatusAvatar（欢迎页 + 对话末尾指示器）
   avatarStatus() {
+    void currentLocale.value;
     const messages = Array.isArray(this.messages) ? this.messages : [];
     const lastAssistant = (() => {
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -360,9 +365,9 @@ export const computed = {
     const cmdCount = countRunning(bgStore.commands);
     const bgText = (() => {
       const parts = [];
-      if (cmdCount > 0) parts.push(`${cmdCount}个后台指令`);
-      if (agentCount > 0) parts.push(`${agentCount}个后台智能体`);
-      return parts.length ? `${parts.join('，')}运行中...` : '';
+      if (cmdCount > 0) parts.push(t('appCore.backgroundCommandCount', { n: cmdCount, count: cmdCount }));
+      if (agentCount > 0) parts.push(t('appCore.backgroundAgentCount', { n: agentCount, count: agentCount }));
+      return parts.length ? `${parts.join('，')}${t('appCore.backgroundRunning')}` : '';
     })();
 
     const intentEnabled = !!usePersonalizationStore().form?.tool_intent_enabled;
@@ -415,7 +420,7 @@ export const computed = {
 
     // ---- 决策 ----
     if (isThinking) {
-      return { mode: 'think', toolKeys: [], toolTexts: [], text: '思考中...', tracking: false };
+      return { mode: 'think', toolKeys: [], toolTexts: [], text: t('appCore.thinking'), tracking: false };
     }
     if (runningTools.length > 0) {
       const keys = runningTools.map((a) => toolFaceKey(a?.tool?.name));
@@ -443,7 +448,7 @@ export const computed = {
       // 「等待 API 响应…」优先于随机等待文案：后端已发出请求、尚未开始回复
       // （api_request_start 事件驱动，覆盖首轮与工具轮次间的每一次等待）
       if (!text && this.apiRequestPending) {
-        return { mode: 'work', toolKeys: [], toolTexts: [], text: '等待 API 响应…', tracking: false, apiWaiting: true };
+        return { mode: 'work', toolKeys: [], toolTexts: [], text: t('appCore.waitingApiResponse'), tracking: false, apiWaiting: true };
       }
       if (!text) {
         const awaitingMsg = lastAssistant && lastAssistant.awaitingFirstContent ? lastAssistant : null;

@@ -4,7 +4,7 @@
       <!-- 左缘拖拽手柄：拖动调整面板宽度，localStorage 持久化 -->
       <div
         class="qd-preview__resize"
-        title="拖拽调整宽度"
+        :title="$t('quickdock.resizeWidthHint')"
         @mousedown="startPreviewResize"
       ></div>
       <section class="qd-preview__panel">
@@ -25,7 +25,7 @@
           </svg>
           <span class="qd-preview__name" :title="previewPath">{{ fileName }}</span>
           <span class="qd-preview__path" :title="previewPath">{{ dirName }}</span>
-          <button class="qd-preview__close" title="关闭" @click="close">
+          <button class="qd-preview__close" :title="$t('common.close')" @click="close">
             <svg viewBox="0 0 16 16" fill="none">
               <path
                 d="M4 4l8 8M12 4l-8 8"
@@ -37,7 +37,7 @@
           </button>
         </header>
         <div class="qd-preview__body">
-          <div v-if="loading" class="qd-preview__loading">加载中…</div>
+          <div v-if="loading" class="qd-preview__loading">{{ $t('common.loading') }}</div>
           <div v-else-if="error" class="qd-preview__error">{{ error }}</div>
           <template v-else>
             <!-- 自动换行模式（设置项开启）：逐行渲染，行号内嵌不会错位，行高亮走 CSS :hover -->
@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { highlightCode, prismLangForPath } from '@/utils/prismHighlight';
@@ -241,7 +242,7 @@ watch(
       return;
     }
     if (!PREVIEWABLE_EXTS.has(extOf(path))) {
-      error.value = '该文件类型不支持预览';
+      error.value = t('quickdock.previewTypeUnsupported');
       return;
     }
     loading.value = true;
@@ -249,7 +250,7 @@ watch(
       const resp = await fetch(`/api/file/content?path=${encodeURIComponent(path)}`);
       if (!resp.ok) {
         const payload = await resp.json().catch(() => ({}));
-        throw new Error(payload?.error || `加载失败（HTTP ${resp.status}）`);
+        throw new Error(payload?.error || t('quickdock.loadFailedHttp', { status: resp.status }));
       }
       const text = await resp.text();
       if (mySeq !== loadSeq) {
@@ -260,7 +261,7 @@ watch(
       if (mySeq !== loadSeq) {
         return;
       }
-      error.value = err?.message || '加载失败';
+      error.value = err?.message || t('common.loadFailed');
     } finally {
       if (mySeq === loadSeq) {
         loading.value = false;

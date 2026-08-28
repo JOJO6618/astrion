@@ -6,12 +6,12 @@
   >
     <div class="sidebar-header" :class="{ 'mobile-header': isMobileViewport }">
       <h3 class="icon-label">{{ panelTitle }}</h3>
-      <button type="button" class="approval-close-btn" aria-label="关闭审批面板" @click="handleCloseClick">
+      <button type="button" class="approval-close-btn" :aria-label="$t('shell.closeApprovalPanel')" @click="handleCloseClick">
         ×
       </button>
     </div>
     <div class="approval-panel-body" v-if="!collapsed">
-      <div v-if="!approvals.length && !isGoalApprovalMode" class="no-files">暂无待审批操作</div>
+      <div v-if="!approvals.length && !isGoalApprovalMode" class="no-files">{{ $t('shell.noPendingApprovals') }}</div>
         <div v-else class="approval-list">
           <div v-for="item in approvals" :key="item.approval_id" class="approval-card">
             <div class="approval-card__title">{{ item.tool_name }}</div>
@@ -52,14 +52,14 @@
 
             <div v-else-if="isPathOnlyPreview(item)" class="approval-kv">
               <div>
-                <strong>路径：</strong
+                <strong>{{ $t('shell.pathLabel') }}</strong
                 ><span class="approval-value approval-value--path">{{ resolvePath(item) }}</span>
               </div>
             </div>
 
             <div v-else-if="isRenamePreview(item)" class="approval-kv">
               <div>
-                <strong>重命名：</strong
+                <strong>{{ $t('shell.renameLabel') }}</strong
                 ><span class="approval-value approval-value--path"
                   >{{ item.preview?.old_path }} → {{ item.preview?.new_path }}</span
                 >
@@ -72,8 +72,8 @@
             >{{ item.preview?.code || item.preview?.command || '' }}</pre>
 
             <div v-else class="approval-kv">
-              <div><strong>工具：</strong>{{ item.tool_name }}</div>
-              <div v-if="item.preview?.summary"><strong>说明：</strong>{{ item.preview.summary }}</div>
+              <div><strong>{{ $t('shell.toolLabel') }}</strong>{{ item.tool_name }}</div>
+              <div v-if="item.preview?.summary"><strong>{{ $t('shell.summaryLabel') }}</strong>{{ item.preview.summary }}</div>
             </div>
           <div class="approval-actions">
             <button
@@ -82,7 +82,7 @@
               :disabled="isDeciding(item.approval_id)"
               @click="$emit('switch-unrestricted', item.approval_id)"
             >
-              切换到无限制
+              {{ $t('shell.switchToUnrestricted') }}
             </button>
             <button
               type="button"
@@ -90,7 +90,7 @@
               :disabled="isDeciding(item.approval_id)"
               @click="$emit('approve', item.approval_id)"
             >
-              运行
+              {{ $t('shell.run') }}
             </button>
             <button
               type="button"
@@ -98,7 +98,7 @@
               :disabled="isDeciding(item.approval_id)"
               @click="$emit('reject', item.approval_id)"
             >
-              拒绝
+              {{ $t('shell.reject') }}
             </button>
           </div>
         </div>
@@ -131,6 +131,7 @@
 
 <script setup lang="ts">
 import { onMounted, computed } from 'vue';
+import { t, currentLocale } from '@/locales';
 
 defineOptions({ name: 'ToolApprovalPanel' });
 
@@ -144,11 +145,20 @@ const props = defineProps<{
   autoApprovalTitle?: string;
 }>();
 
-const autoApprovalTitle = computed(() => props.autoApprovalTitle || '自动审批记录');
-const isGoalApprovalMode = computed(() => autoApprovalTitle.value === '目标审批');
-const panelTitle = computed(() =>
-  isGoalApprovalMode.value ? '目标审批' : `工具审批 (${props.approvals.length})`
-);
+const autoApprovalTitle = computed(() => {
+  void currentLocale.value;
+  return props.autoApprovalTitle || t('appTasks.autoApprovalRecordTitle');
+});
+const isGoalApprovalMode = computed(() => {
+  void currentLocale.value;
+  return autoApprovalTitle.value === t('appTasks.goalReviewTitle');
+});
+const panelTitle = computed(() => {
+  void currentLocale.value;
+  return isGoalApprovalMode.value
+    ? t('appTasks.goalReviewTitle')
+    : t('shell.toolApprovalTitle', { n: props.approvals.length });
+});
 
 const emit = defineEmits<{
   (event: 'approve', approvalId: string): void;
@@ -193,18 +203,21 @@ const resolvePath = (item: any) => {
 };
 
 const getToolLabel = (toolName: string) => {
+  void currentLocale.value;
   const name = String(toolName || '');
   const map: Record<string, string> = {
-    run_command: '执行命令',
-    terminal_input: '终端输入',
-    create_file: '创建文件',
-    create_folder: '创建文件夹',
-    delete_file: '删除文件',
-    rename_file: '重命名文件',
-    write_file: '写入文件',
-    edit_file: '编辑文件'
+    run_command: 'shell.toolRunCommand',
+    terminal_input: 'shell.toolTerminalInput',
+    create_file: 'shell.toolCreateFile',
+    create_folder: 'shell.toolCreateFolder',
+    delete_file: 'shell.toolDeleteFile',
+    rename_file: 'shell.toolRenameFile',
+    write_file: 'shell.toolWriteFile',
+    edit_file: 'shell.toolEditFile'
   };
-  return map[name] || name || '待审批操作';
+  const labelKey = map[name];
+  if (labelKey) return t(labelKey);
+  return name || t('shell.pendingApproval');
 };
 
 const getWriteLines = (item: any): string[] => {
@@ -230,7 +243,7 @@ const parseFinalMessage = (text: string) => {
   return {
     title,
     reason,
-    isApproved: title.includes('批准通过')
+    isApproved: title.includes(t('appTasks.approvalApproved'))
   };
 };
 

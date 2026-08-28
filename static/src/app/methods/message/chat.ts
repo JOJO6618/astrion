@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { useTaskStore } from '../../../stores/task';
 import {
   extractSkillRefsFromMessage,
@@ -9,10 +10,10 @@ import {
 export const chatMethods = {
   async clearChat() {
     const confirmed = await this.confirmAction({
-      title: '清除对话',
-      message: '确定要清除所有对话记录吗？该操作不可撤销。',
-      confirmText: '清除',
-      cancelText: '取消'
+      title: t('appMessages.clearChatTitle'),
+      message: t('appMessages.clearChatConfirmMessage'),
+      confirmText: t('appMessages.clearChatConfirmText'),
+      cancelText: t('common.cancel')
     });
     if (confirmed) {
       await this.executeSystemCommand('/clear', { showToast: false });
@@ -21,8 +22,8 @@ export const chatMethods = {
   async compressConversation() {
     if (!this.currentConversationId) {
       this.uiPushToast({
-        title: '无法压缩',
-        message: '当前没有可压缩的对话。',
+        title: t('appMessages.cannotCompressTitle'),
+        message: t('appMessages.cannotCompressMessage'),
         type: 'info'
       });
       return;
@@ -43,8 +44,8 @@ export const chatMethods = {
       this.compressionToastId = null;
     }
     this.compressionToastId = this.uiPushToast({
-      title: '压缩中',
-      message: '对话正在压缩，请稍候…',
+      title: t('appMessages.compressingTitle'),
+      message: t('appMessages.compressingMessage'),
       type: 'info',
       duration: null,
       closable: false
@@ -82,26 +83,26 @@ export const chatMethods = {
 
         debugLog('对话压缩完成:', result);
         this.uiPushToast({
-          title: '压缩完成',
-          message: '已压缩较早的对话内容',
+          title: t('appMessages.compressionCompletedTitle'),
+          message: t('appMessages.compressionCompletedMessage'),
           type: 'success',
           duration: 2200
         });
       } else {
-        const message = result.message || result.error || '压缩失败';
+        const message = result.message || result.error || t('appMessages.compressionFailed');
         this.compressionError = message;
         this.uiPushToast({
-          title: '压缩失败',
+          title: t('appMessages.compressionFailed'),
           message,
           type: 'error'
         });
       }
     } catch (error) {
       console.error('压缩对话异常:', error);
-      this.compressionError = error.message || '请稍后重试';
+      this.compressionError = error.message || t('common.retryLater');
       this.uiPushToast({
-        title: '压缩对话异常',
-        message: error.message || '请稍后重试',
+        title: t('appMessages.compressionErrorTitle'),
+        message: error.message || t('common.retryLater'),
         type: 'error'
       });
     } finally {
@@ -145,8 +146,8 @@ export const chatMethods = {
     } catch (error) {
       console.error('[Message] 自动消息创建任务失败:', error);
       this.uiPushToast({
-        title: '发送失败',
-        message: error?.message || '创建任务失败，请重试',
+        title: t('appMessages.sendFailedTitle'),
+        message: error?.message || t('appMessages.createTaskFailedMessage'),
         type: 'error'
       });
       this.streamingMessage = false;

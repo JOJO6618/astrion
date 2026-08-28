@@ -5,7 +5,7 @@
         <button
           type="button"
           class="sidebar-nav-row conversation-menu-btn"
-          :title="collapsed ? '展开对话记录' : '收起对话记录'"
+          :title="collapsed ? $t('sidebar.expandConversations') : $t('sidebar.collapseConversations')"
           @click="$emit('toggle')"
         >
           <span
@@ -29,10 +29,10 @@
               <path d="M9 13h6" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" />
             </svg>
           </span>
-          <span class="sidebar-nav-label">对话记录</span>
+          <span class="sidebar-nav-label">{{ $t('sidebar.conversationHistory') }}</span>
         </button>
 
-        <button type="button" class="sidebar-nav-row" title="新建对话" @click="$emit('create')">
+        <button type="button" class="sidebar-nav-row" :title="$t('sidebar.newConversation')" @click="$emit('create')">
           <span
             class="sidebar-nav-icon pencil-icon"
             data-tutorial="quick-new-conversation"
@@ -55,7 +55,7 @@
               <path d="m15 5 4 4" />
             </svg>
           </span>
-          <span class="sidebar-nav-label">新建对话</span>
+          <span class="sidebar-nav-label">{{ $t('sidebar.newConversation') }}</span>
         </button>
 
         <button
@@ -63,7 +63,7 @@
           type="button"
           class="sidebar-nav-row workspace-entry-btn"
           :class="{ active: workspaceSwitcherOpen }"
-          :title="workspaceKind === 'project' ? '项目' : '工作区'"
+          :title="workspaceKind === 'project' ? $t('sidebar.project') : $t('sidebar.workspace')"
           data-tutorial="workspace-toggle"
           ref="workspaceEntryBtn"
           @click="toggleWorkspaceSwitcher"
@@ -92,13 +92,13 @@
               />
             </svg>
           </span>
-          <span class="sidebar-nav-label">{{ workspaceKind === 'project' ? '项目' : '工作区' }}</span>
+          <span class="sidebar-nav-label">{{ workspaceKind === 'project' ? $t('sidebar.project') : $t('sidebar.workspace') }}</span>
         </button>
 
         <button
           type="button"
           class="sidebar-nav-row"
-          title="工作流"
+          :title="$t('sidebar.workflows')"
           @click="$emit('open-workflows')"
         >
           <span class="sidebar-nav-icon workflow-icon" aria-hidden="true">
@@ -124,7 +124,7 @@
               <rect x="17.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
             </svg>
           </span>
-          <span class="sidebar-nav-label">工作流</span>
+          <span class="sidebar-nav-label">{{ $t('sidebar.workflows') }}</span>
         </button>
       </div>
 
@@ -136,7 +136,7 @@
           <input
             class="search-input"
             :value="searchQuery"
-            placeholder="搜索对话"
+            :placeholder="$t('sidebar.searchConversationPlaceholder')"
             @input="$emit('search', ($event.target as HTMLInputElement).value)"
             @keydown.enter.prevent="
               $emit('search-submit', ($event.target as HTMLInputElement).value)
@@ -152,7 +152,7 @@
           :class="{ active: sidebarType === 'normal' }"
           @click="setSidebarType('normal')"
         >
-          普通对话
+          {{ $t('sidebar.normalConversations') }}
         </button>
         <button
           type="button"
@@ -160,7 +160,7 @@
           :class="{ active: sidebarType === 'multi_agent' }"
           @click="setSidebarType('multi_agent')"
         >
-          多智能体
+          {{ $t('sidebar.multiAgent') }}
         </button>
       </div>
 
@@ -168,7 +168,7 @@
         <Transition :name="slideTransitionName">
           <div :key="sidebarType" class="conversation-list-pane">
         <div v-if="runningTaskItems.length && !searchActive && !isGroupByWorkspaceActive" class="running-task-section">
-          <div class="running-task-section-title">运行中的任务</div>
+          <div class="running-task-section-title">{{ $t('sidebar.runningTasksTitle') }}</div>
           <button
             v-for="task in runningTaskItems"
             :key="task.task_id"
@@ -180,14 +180,14 @@
             <span class="running-task-workspace">{{ task.workspace_label || task.workspace_id }}</span>
             <span class="running-task-main">
               <span class="running-task-title">{{
-                task.conversation_title || task.message || '运行中的对话'
+                task.conversation_title || task.message || $t('sidebar.runningConversation')
               }}</span>
               <span
                 v-if="isTaskActive(task)"
                 class="conversation-running-loader running-task-state"
-                aria-label="运行中"
+                :aria-label="$t('common.running')"
               ></span>
-              <span v-else class="conversation-complete-check running-task-state" aria-label="已完成"></span>
+              <span v-else class="conversation-complete-check running-task-state" :aria-label="$t('sidebar.completed')"></span>
             </span>
           </button>
         </div>
@@ -218,7 +218,7 @@
                   <span
                     v-if="String(ws.workspace_id || '') === currentWorkspaceId"
                     class="workspace-current-dot"
-                    aria-label="当前工作区"
+                    :aria-label="$t('sidebar.currentWorkspace')"
                   ></span>
                   <span
                     v-if="
@@ -228,7 +228,7 @@
                       openWorkspaceMenuId !== String(ws.workspace_id || '')
                     "
                     class="workspace-running-loader"
-                    aria-label="运行中"
+                    :aria-label="$t('common.running')"
                   ></span>
                 </button>
                 <div
@@ -238,8 +238,8 @@
                   <button
                     type="button"
                     class="workspace-new-btn"
-                    title="新建对话"
-                    aria-label="新建对话"
+                    :title="$t('sidebar.newConversation')"
+                    :aria-label="$t('sidebar.newConversation')"
                     @click="handleCreateWorkspaceConversation(String(ws.workspace_id || ''))"
                   >
                     <span class="icon icon-sm" :style="iconStyle('pencil')" aria-hidden="true"></span>
@@ -247,8 +247,8 @@
                   <button
                     type="button"
                     class="workspace-more-btn"
-                    title="更多操作"
-                    aria-label="更多操作"
+                    :title="$t('common.moreActions')"
+                    :aria-label="$t('common.moreActions')"
                     :aria-expanded="openWorkspaceMenuId === String(ws.workspace_id || '')"
                     @click.stop="toggleWorkspaceMenu(String(ws.workspace_id || ''))"
                   >
@@ -259,17 +259,17 @@
                     :class="{ open: openWorkspaceMenuId === String(ws.workspace_id || '') }"
                   >
                     <button type="button" @click="handlePinWorkspace(String(ws.workspace_id || ''))">
-                      <span>{{ pinnedWorkspaceIds.has(String(ws.workspace_id || '')) ? '取消置顶' : '置顶' }}</span>
+                      <span>{{ pinnedWorkspaceIds.has(String(ws.workspace_id || '')) ? $t('sidebar.unpinWorkspace') : $t('sidebar.pinWorkspace') }}</span>
                     </button>
                     <button
                       v-if="props.versioningHostMode"
                       type="button"
                       @click="handleRevealWorkspace(String(ws.workspace_id || ''))"
                     >
-                      <span>在文件夹中打开</span>
+                      <span>{{ $t('sidebar.revealInFolder') }}</span>
                     </button>
                     <button type="button" @click="startRenameWorkspace(ws)">
-                      <span>重命名</span>
+                      <span>{{ $t('sidebar.rename') }}</span>
                     </button>
                   </div>
                 </div>
@@ -283,7 +283,7 @@
                     v-if="!getWorkspaceGroup(String(ws.workspace_id || ''))?.conversations?.length"
                     class="workspace-no-conversations"
                   >
-                    暂无对话
+                    {{ $t('sidebar.noConversations') }}
                   </div>
                   <template v-else>
                     <div
@@ -321,21 +321,21 @@
                             <span
                               v-if="isConversationActive(conv.id)"
                               class="conversation-running-loader"
-                              aria-label="运行中"
-                              title="运行中"
+                              :aria-label="$t('common.running')"
+                              :title="$t('common.running')"
                             ></span>
                             <span
                               v-else-if="isConversationCompleted(conv.id)"
                               class="conversation-complete-check"
-                              aria-label="已完成"
-                              title="已完成"
+                              :aria-label="$t('sidebar.completed')"
+                              :title="$t('sidebar.completed')"
                             ></span>
                             <button
                               v-else
                               type="button"
                               class="conversation-more-btn"
-                              title="更多操作"
-                              aria-label="更多操作"
+                              :title="$t('common.moreActions')"
+                              :aria-label="$t('common.moreActions')"
                               :data-action-trigger="conv.id"
                               :aria-expanded="openActionMenuId === conv.id"
                               @click="toggleActionMenu(conv.id)"
@@ -360,7 +360,7 @@
                                   "
                                 >
                                   <span class="icon icon-sm" :style="iconStyle('copy')" aria-hidden="true"></span>
-                                  <span>复制</span>
+                                  <span>{{ $t('common.copy') }}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -371,7 +371,7 @@
                                   "
                                 >
                                   <span class="icon icon-sm" :style="iconStyle('trash')" aria-hidden="true"></span>
-                                  <span>删除</span>
+                                  <span>{{ $t('common.delete') }}</span>
                                 </button>
                               </div>
                             </Teleport>
@@ -389,7 +389,7 @@
                         :disabled="getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore"
                         @click="loadMoreWorkspaceConversations(String(ws.workspace_id || ''))"
                       >
-                        {{ getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore ? '载入中...' : '加载更多' }}
+                        {{ getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore ? $t('sidebar.loadingMore') : $t('sidebar.loadMore') }}
                       </button>
                     </div>
                   </template>
@@ -402,7 +402,7 @@
         <template v-else-if="isGroupByWorkspaceActive && searchActive">
           <div class="workspace-groups search-result-groups">
             <div v-if="!searchInProgress && !sortedSearchGroups.length" class="no-conversations">
-              未找到匹配对话
+              {{ $t('sidebar.noMatchingConversations') }}
             </div>
             <div
               v-for="group in sortedSearchGroups"
@@ -441,21 +441,21 @@
                         <span
                           v-if="isConversationActive(conv.id)"
                           class="conversation-running-loader"
-                          aria-label="运行中"
-                          title="运行中"
+                          :aria-label="$t('common.running')"
+                          :title="$t('common.running')"
                         ></span>
                         <span
                           v-else-if="isConversationCompleted(conv.id)"
                           class="conversation-complete-check"
-                          aria-label="已完成"
-                          title="已完成"
+                          :aria-label="$t('sidebar.completed')"
+                          :title="$t('sidebar.completed')"
                         ></span>
                         <button
                           v-else
                           type="button"
                           class="conversation-more-btn"
-                          title="更多操作"
-                          aria-label="更多操作"
+                          :title="$t('common.moreActions')"
+                          :aria-label="$t('common.moreActions')"
                           :data-action-trigger="conv.id"
                           :aria-expanded="openActionMenuId === conv.id"
                           @click="toggleActionMenu(conv.id)"
@@ -480,7 +480,7 @@
                               "
                             >
                               <span class="icon icon-sm" :style="iconStyle('copy')" aria-hidden="true"></span>
-                              <span>复制</span>
+                              <span>{{ $t('common.copy') }}</span>
                             </button>
                             <button
                               type="button"
@@ -491,7 +491,7 @@
                               "
                             >
                               <span class="icon icon-sm" :style="iconStyle('trash')" aria-hidden="true"></span>
-                              <span>删除</span>
+                              <span>{{ $t('common.delete') }}</span>
                             </button>
                           </div>
                         </Teleport>
@@ -509,10 +509,10 @@
             v-if="loading && !displayConversations.length && !searchActive && !isDeletingConversation"
             class="loading-conversations"
           >
-            正在加载...
+            {{ $t('sidebar.loading') }}
           </div>
           <div v-else-if="!displayConversations.length && !loading && !isDeletingConversation" class="no-conversations">
-            {{ searchActive ? '未找到匹配对话' : '暂无对话记录' }}
+            {{ searchActive ? $t('sidebar.noMatchingConversations') : $t('sidebar.noConversationHistory') }}
           </div>
           <transition-group
             v-else
@@ -547,21 +547,21 @@
                 <span
                   v-if="isConversationActive(conv.id)"
                   class="conversation-running-loader"
-                  aria-label="运行中"
-                  title="运行中"
+                  :aria-label="$t('common.running')"
+                  :title="$t('common.running')"
                 ></span>
                 <span
                   v-else-if="isConversationCompleted(conv.id)"
                   class="conversation-complete-check"
-                  aria-label="已完成"
-                  title="已完成"
+                  :aria-label="$t('sidebar.completed')"
+                  :title="$t('sidebar.completed')"
                 ></span>
                 <button
                   v-else
                   type="button"
                   class="conversation-more-btn"
-                  title="更多操作"
-                  aria-label="更多操作"
+                  :title="$t('common.moreActions')"
+                  :aria-label="$t('common.moreActions')"
                   :data-action-trigger="conv.id"
                   :aria-expanded="openActionMenuId === conv.id"
                   @click="toggleActionMenu(conv.id)"
@@ -586,7 +586,7 @@
                                   "
                                 >
                                   <span class="icon icon-sm" :style="iconStyle('copy')" aria-hidden="true"></span>
-                                  <span>复制</span>
+                                  <span>{{ $t('common.copy') }}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -597,7 +597,7 @@
                                   "
                                 >
                                   <span class="icon icon-sm" :style="iconStyle('trash')" aria-hidden="true"></span>
-                                  <span>删除</span>
+                                  <span>{{ $t('common.delete') }}</span>
                                 </button>
                               </div>
                             </Teleport>
@@ -613,7 +613,7 @@
             :disabled="loadingMore"
             @click="$emit('load-more')"
           >
-            {{ loadingMore ? '载入中...' : '加载更多' }}
+            {{ loadingMore ? $t('sidebar.loadingMore') : $t('sidebar.loadMore') }}
           </button>
         </div>
         <div v-else-if="searchActive" class="load-more search-more">
@@ -623,7 +623,7 @@
                 <span class="icon icon-sm search-spinner-icon" :style="iconStyle('search')"></span>
               </span>
             </span>
-            <span class="search-progress-text">搜索中...</span>
+            <span class="search-progress-text">{{ $t('sidebar.searching') }}</span>
           </div>
           <button
             v-else-if="searchMoreAvailable"
@@ -631,9 +631,9 @@
             type="button"
             @click="$emit('search-more')"
           >
-            搜索更多
+            {{ $t('sidebar.searchMore') }}
           </button>
-          <div v-else-if="displayConversations.length" class="search-done">已全部搜索</div>
+          <div v-else-if="displayConversations.length" class="search-done">{{ $t('sidebar.searchExhausted') }}</div>
         </div>
           </div>
         </Transition>
@@ -646,23 +646,23 @@
       >
         <div class="workspace-rename-card">
           <div class="workspace-rename-title">
-            重命名{{ workspaceKind === 'workspace' ? '工作区' : '项目' }}
+            {{ $t('sidebar.renameTitle', { kind: $t(workspaceKind === 'workspace' ? 'sidebar.workspace' : 'sidebar.project') }) }}
           </div>
           <input
             ref="renameInput"
             v-model="renameWorkspaceLabel"
             type="text"
             class="workspace-rename-input"
-            placeholder="请输入名称"
+            :placeholder="$t('sidebar.renamePlaceholder')"
             @keydown.enter.prevent="submitRenameWorkspace"
             @keydown.esc.prevent="cancelRenameWorkspace"
           />
           <div class="workspace-rename-actions">
             <button type="button" class="workspace-rename-cancel" @click="cancelRenameWorkspace">
-              取消
+              {{ $t('common.cancel') }}
             </button>
             <button type="button" class="workspace-rename-confirm" @click="submitRenameWorkspace">
-              确认
+              {{ $t('common.confirm') }}
             </button>
           </div>
         </div>
@@ -692,7 +692,7 @@
           type="button"
           class="sidebar-nav-row personal-page-btn"
           data-tutorial="open-personal-space"
-          title="个人空间"
+          :title="$t('sidebar.personalSpace')"
           @click="$emit('personal')"
         >
           <span class="sidebar-nav-icon" aria-hidden="true">
@@ -704,7 +704,7 @@
               ></path>
             </svg>
           </span>
-          <span class="sidebar-nav-label personal-label">个人空间</span>
+          <span class="sidebar-nav-label personal-label">{{ $t('sidebar.personalSpace') }}</span>
         </button>
       </div>
     </div>

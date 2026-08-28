@@ -105,7 +105,7 @@
                     <div v-html="renderToolResult(step.action)"></div>
                   </div>
                   <div v-else class="tool-result">
-                    <div class="result-item">执行中...</div>
+                    <div class="result-item">{{ $t('chat.executing') }}</div>
                   </div>
                 </div>
               </div>
@@ -151,6 +151,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick, onBeforeUnmount, Component } from 'vue';
+import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
 
@@ -248,6 +249,7 @@ const getFirstLine = (raw: string) => {
 };
 
 const getToolSummaryText = (action: Action) => {
+  void currentLocale.value;
   const tool = action.tool;
   if (!tool) return '';
 
@@ -259,15 +261,15 @@ const getToolSummaryText = (action: Action) => {
   }
 
   if (tool.status === 'preparing') {
-    return `准备调用 ${tool.name || '工具'}...`;
+    return t('toolResults.sentences.preparing', { name: tool.name || t('common.tool') });
   }
   if (tool.status === 'running') {
-    return `正在调用 ${tool.name || '工具'}...`;
+    return t('chat.callingTool', { name: tool.name || t('common.tool') });
   }
   if (tool.status === 'completed') {
-    return tool.display_name || tool.name || '工具执行完成';
+    return tool.display_name || tool.name || t('chat.toolCompleted');
   }
-  return action.streaming ? '正在执行工具...' : tool.display_name || tool.name || '执行工具';
+  return action.streaming ? t('chat.executingTool') : tool.display_name || tool.name || t('chat.runTool');
 };
 
 const isActiveToolAction = (action: Action) => {
@@ -689,30 +691,32 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   trigger_easter_egg: 'easter_egg'
 };
 
-const CATEGORY_LABELS: Record<ToolCategory, (count: number) => string> = {
-  read: (n) => `读取了 ${n} 个文件`,
-  command: (n) => `运行了 ${n} 个指令`,
-  edit: (n) => `编辑了 ${n} 次文件`,
-  search: (n) => `搜索了 ${n} 次`,
-  webpage: (n) => `查看了 ${n} 次网页`,
-  mcp: (n) => `执行了 ${n} 次 MCP 工具`,
-  workflow_activate: (n) => `激活了 ${n} 个工作流`,
-  workflow_advance: (n) => `推进了 ${n} 次工作流进度`,
-  workflow: (n) => `执行了 ${n} 次工作流操作`,
-  todo_create: (n) => `创建了 ${n} 次待办`,
-  todo_update: (n) => `更新了 ${n} 次待办`,
-  memory_update: (n) => `更新了 ${n} 次记忆`,
-  memory_read: (n) => `查看了 ${n} 次记忆`,
-  conversation: (n) => `回顾了 ${n} 次对话`,
-  sub_agent: (n) => `创建了 ${n} 个子智能体`,
-  sub_agent_manage: (n) => `管理了 ${n} 次子智能体`,
-  wait: (n) => `等待了 ${n} 次`,
-  ask: (n) => `询问了 ${n} 次`,
-  plan: (n) => `提交了 ${n} 次计划`,
-  skill: (n) => `归档了 ${n} 次技能`,
-  settings: (n) => `更新了 ${n} 次个性化设置`,
-  easter_egg: (n) => `触发了 ${n} 次彩蛋`,
-  other: (n) => `执行了 ${n} 次其他操作`
+// 分类摘要文案 key（模块顶层禁止调 t()：存 key 字符串，渲染时 t() 求值）
+// TODO(common): 候选公共词（若跨域复用于摘要统计可归并 common）
+const CATEGORY_LABEL_KEYS: Record<ToolCategory, string> = {
+  read: 'chat.summaryRead',
+  command: 'chat.summaryCommand',
+  edit: 'chat.summaryEdit',
+  search: 'chat.summarySearch',
+  webpage: 'chat.summaryWebpage',
+  mcp: 'chat.summaryMcp',
+  workflow_activate: 'chat.summaryWorkflowActivate',
+  workflow_advance: 'chat.summaryWorkflowAdvance',
+  workflow: 'chat.summaryWorkflow',
+  todo_create: 'chat.summaryTodoCreate',
+  todo_update: 'chat.summaryTodoUpdate',
+  memory_update: 'chat.summaryMemoryUpdate',
+  memory_read: 'chat.summaryMemoryRead',
+  conversation: 'chat.summaryConversation',
+  sub_agent: 'chat.summarySubAgent',
+  sub_agent_manage: 'chat.summarySubAgentManage',
+  wait: 'chat.summaryWait',
+  ask: 'chat.summaryAsk',
+  plan: 'chat.summaryPlan',
+  skill: 'chat.summarySkill',
+  settings: 'chat.summarySettings',
+  easter_egg: 'chat.summaryEasterEgg',
+  other: 'chat.summaryOther'
 };
 
 const CATEGORY_ORDER: ToolCategory[] = [
@@ -751,6 +755,7 @@ const getToolCategory = (action: Action): ToolCategory => {
 
 // 运行中：显示当前最新步骤的意图或状态（单行，由 CSS 截断）
 const getRunningSummaryText = (actions: Action[]): string => {
+  void currentLocale.value;
   const streamingActions = actions.filter((a) => a.streaming);
 
   let currentStep;
@@ -784,15 +789,17 @@ const getRunningSummaryText = (actions: Action[]): string => {
     }
 
     if (tool.status === 'preparing') {
-      return `准备调用 ${tool.name || '工具'}...`;
+      return t('toolResults.sentences.preparing', { name: tool.name || t('common.tool') });
     }
     if (tool.status === 'running') {
-      return `正在调用 ${tool.name || '工具'}...`;
+      return t('chat.callingTool', { name: tool.name || t('common.tool') });
     }
     if (tool.status === 'completed') {
-      return tool.display_name || tool.name || '工具执行完成';
+      return tool.display_name || tool.name || t('chat.toolCompleted');
     }
-    return currentStep.streaming ? '正在执行工具...' : tool.display_name || tool.name || '执行工具';
+    return currentStep.streaming
+      ? t('chat.executingTool')
+      : tool.display_name || tool.name || t('chat.runTool');
   }
 
   return '';
@@ -800,6 +807,7 @@ const getRunningSummaryText = (actions: Action[]): string => {
 
 // 完成后：汇总本组所有工具的执行次数
 const getCompletedSummaryText = (actions: Action[]): string => {
+  void currentLocale.value;
   const toolActions = actions.filter((a) => a.type === 'tool');
 
   if (toolActions.length === 0) {
@@ -830,7 +838,7 @@ const getCompletedSummaryText = (actions: Action[]): string => {
   CATEGORY_ORDER.forEach((category) => {
     const count = counts[category];
     if (count > 0) {
-      parts.push(CATEGORY_LABELS[category](count));
+      parts.push(t(CATEGORY_LABEL_KEYS[category], { n: count }));
     }
   });
 
@@ -971,8 +979,9 @@ const getStepIconStyle = (step: Step) => {
 };
 
 const getToolName = (action: Action) => {
+  void currentLocale.value;
   const tool = action.tool;
-  if (!tool) return '执行工具';
+  if (!tool) return t('chat.runTool');
 
   const intentEnabled = personalizationStore.form.tool_intent_enabled;
   const intentText = tool.intent_rendered || tool.intent_full || '';
@@ -984,15 +993,15 @@ const getToolName = (action: Action) => {
 
   // 没有intent或未开启intent模式时显示状态
   if (tool.status === 'preparing') {
-    return `准备调用 ${tool.name || '工具'}...`;
+    return t('toolResults.sentences.preparing', { name: tool.name || t('common.tool') });
   }
   if (tool.status === 'running') {
-    return `正在调用 ${tool.name || '工具'}...`;
+    return t('chat.callingTool', { name: tool.name || t('common.tool') });
   }
   if (tool.status === 'completed') {
-    return '工具执行完成';
+    return t('chat.toolCompleted');
   }
-  return tool.name || '执行工具';
+  return tool.name || t('chat.runTool');
 };
 
 const getToolIntent = (action: Action) => {
@@ -1000,6 +1009,7 @@ const getToolIntent = (action: Action) => {
 };
 
 const renderToolResult = (action: Action) => {
+  void currentLocale.value;
   const rendered = renderEnhancedToolResult(
     action,
     props.formatSearchTopic || (() => ''),
@@ -1009,7 +1019,7 @@ const renderToolResult = (action: Action) => {
   if (rendered) return rendered;
 
   const result = action.tool?.result;
-  if (!result) return '<div class="result-item">执行中...</div>';
+  if (!result) return `<div class="result-item">${escapeHtml(t('chat.executing'))}</div>`;
 
   if (typeof result === 'string') {
     return `<div class="result-item"><pre>${escapeHtml(result)}</pre></div>`;

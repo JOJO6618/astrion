@@ -28,11 +28,11 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span>多模态知识浏览器</span>
+                <span>{{ $t('chat.vmBrowserTitle') }}</span>
               </div>
               <div class="browser-body">
                 <div class="search-bar"><span ref="browserSearchText"></span></div>
-                <div class="browser-status" ref="browserStatus">准备搜索...</div>
+                <div class="browser-status" ref="browserStatus">{{ $t('chat.vmBrowserReady') }}</div>
                 <div class="results-list results-scroll">
                   <ul ref="browserResults"></ul>
                 </div>
@@ -44,11 +44,11 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span class="window-title">网页提取</span>
+                <span class="window-title">{{ $t('chat.vmWebExtract') }}</span>
               </div>
               <div class="extraction-body">
                 <div class="extract-url" ref="extractionUrl"></div>
-                <div class="extract-status" ref="extractionState">等待提取</div>
+                <div class="extract-status" ref="extractionState">{{ $t('chat.vmExtractWait') }}</div>
                 <div class="extract-summary" ref="extractionSummary"></div>
               </div>
             </div>
@@ -68,7 +68,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span ref="editorHeaderText">文件</span>
+                <span ref="editorHeaderText">{{ $t('chat.vmFile') }}</span>
               </div>
               <div class="editor-body" ref="editorBody"></div>
             </div>
@@ -78,7 +78,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span ref="terminalHeaderText">终端</span>
+                <span ref="terminalHeaderText">{{ $t('chat.vmTerminal') }}</span>
               </div>
               <div class="terminal-body">
                 <div class="terminal-tabs" ref="terminalTabs">
@@ -94,7 +94,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span ref="commandTitle">命令行</span>
+                <span ref="commandTitle">{{ $t('chat.vmCommandLine') }}</span>
               </div>
               <div class="command-body">
                 <div class="command-input" ref="commandInput"></div>
@@ -120,7 +120,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span ref="readerTitle">阅读器</span>
+                <span ref="readerTitle">{{ $t('chat.vmReaderTitle') }}</span>
               </div>
               <div class="reader-body">
                 <div class="reading-lines" ref="readerLines"></div>
@@ -133,7 +133,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span class="window-title">记忆</span>
+                <span class="window-title">{{ $t('chat.vmMemory') }}</span>
               </div>
               <div class="memory-body">
                 <div class="memory-list" ref="memoryList"></div>
@@ -150,7 +150,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span class="window-title">待办事项</span>
+                <span class="window-title">{{ $t('chat.vmTodo') }}</span>
               </div>
               <div class="todo-body">
                 <div class="todo-summary" ref="todoSummary"></div>
@@ -163,7 +163,7 @@
                 <span class="traffic-dot red"></span>
                 <span class="traffic-dot yellow"></span>
                 <span class="traffic-dot green"></span>
-                <span class="window-title">等待</span>
+                <span class="window-title">{{ $t('chat.vmWait') }}</span>
               </div>
               <div class="wait-body">
                 <div class="flip-clock" ref="waitDisplay">
@@ -185,31 +185,31 @@
             </div>
 
             <div class="context-menu" ref="desktopMenu">
-              <button data-action="file">新建文件</button>
-              <button data-action="folder">新建文件夹</button>
-              <button data-action="wait">等待</button>
+              <button data-action="file">{{ $t('chat.vmNewFile') }}</button>
+              <button data-action="folder">{{ $t('chat.vmNewFolder') }}</button>
+              <button data-action="wait">{{ $t('chat.vmWait') }}</button>
             </div>
             <div class="context-menu" ref="folderMenu">
-              <button data-action="file">新建文件</button>
-              <button data-action="folder">新建文件夹</button>
+              <button data-action="file">{{ $t('chat.vmNewFile') }}</button>
+              <button data-action="folder">{{ $t('chat.vmNewFolder') }}</button>
             </div>
             <div class="context-menu" ref="fileMenu">
-              <button data-action="read">阅读文件</button>
-              <button data-action="edit">编辑文件</button>
-              <button data-action="rename">重命名</button>
-              <button data-action="delete">删除文件</button>
+              <button data-action="read">{{ $t('chat.vmReadFile') }}</button>
+              <button data-action="edit">{{ $t('chat.vmEditFile') }}</button>
+              <button data-action="rename">{{ $t('chat.vmRename') }}</button>
+              <button data-action="delete">{{ $t('chat.vmDeleteFile') }}</button>
             </div>
             <div class="context-menu" ref="focusMenu">
-              <button data-action="focus">聚焦文件</button>
-              <button data-action="unfocus">取消聚焦</button>
+              <button data-action="focus">{{ $t('chat.vmFocusFile') }}</button>
+              <button data-action="unfocus">{{ $t('chat.vmUnfocus') }}</button>
             </div>
             <div class="context-menu" ref="browserMenu">
-              <button data-action="save">保存网页</button>
+              <button data-action="save">{{ $t('chat.vmSaveWebpage') }}</button>
             </div>
             <div class="context-menu" ref="terminalMenu">
-              <button data-action="snapshot">保存快照</button>
-              <button data-action="reset">重置终端</button>
-              <button data-action="close">关闭终端</button>
+              <button data-action="snapshot">{{ $t('chat.vmSaveSnapshot') }}</button>
+              <button data-action="reset">{{ $t('chat.vmResetTerminal') }}</button>
+              <button data-action="close">{{ $t('chat.vmCloseTerminal') }}</button>
             </div>
 
             <div class="speech-bubble" ref="bubbleEl">

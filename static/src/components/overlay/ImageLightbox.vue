@@ -6,13 +6,13 @@
         class="image-lightbox"
         role="dialog"
         aria-modal="true"
-        :aria-label="preview.name || '图片预览'"
+        :aria-label="preview.name || $t('overlay.imagePreview')"
         @click.self="close"
       >
         <button
           type="button"
           class="image-lightbox__close"
-          aria-label="关闭预览"
+          :aria-label="$t('overlay.closePreview')"
           @click.stop="close"
         >
           ×
@@ -21,7 +21,7 @@
           <img
             class="image-lightbox__img"
             :src="preview.url"
-            :alt="preview.name || '图片预览'"
+            :alt="preview.name || $t('overlay.imagePreview')"
             draggable="false"
           />
           <div v-if="preview.name" class="image-lightbox__caption">{{ preview.name }}</div>

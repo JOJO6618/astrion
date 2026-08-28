@@ -3,7 +3,7 @@
     <div v-if="open" class="overlay-backdrop">
       <div class="overlay-card">
         <div class="overlay-header">
-          <h3>路径授权</h3>
+          <h3>{{ $t('overlay.pathAuthTitle') }}</h3>
           <button type="button" @click="$emit('close')">×</button>
         </div>
         <div class="mode-switch">
@@ -13,7 +13,7 @@
             :class="{ active: mode === 'writable' }"
             @click="$emit('update:mode', 'writable')"
           >
-            可读可写
+            {{ $t('overlay.writableMode') }}
           </button>
           <button
             type="button"
@@ -21,14 +21,14 @@
             :class="{ active: mode === 'readable' }"
             @click="$emit('update:mode', 'readable')"
           >
-            仅可读
+            {{ $t('overlay.readableMode') }}
           </button>
         </div>
         <p class="hint">
           {{
             mode === 'writable'
-              ? '可读可写路径在 workspace-write 沙箱中可写入，只读沙箱中仅可读。'
-              : '仅可读路径在只读沙箱中会被加入允许读取列表；工作区可写沙箱默认已可读。'
+              ? $t('overlay.writableHint')
+              : $t('overlay.readableHint')
           }}
         </p>
         <textarea
@@ -37,13 +37,13 @@
           @input="$emit('update:value', ($event.target as HTMLTextAreaElement).value)"
           :placeholder="
             mode === 'writable'
-              ? '每行一个路径，例如：~/Desktop/agents-export'
-              : '每行一个路径，例如：~/Documents/reference'
+              ? $t('overlay.writablePlaceholder')
+              : $t('overlay.readablePlaceholder')
           "
         />
         <div class="actions">
-          <button type="button" class="btn" @click="$emit('save')" :disabled="saving">保存</button>
-          <button type="button" class="btn btn-muted" @click="$emit('close')">取消</button>
+          <button type="button" class="btn" @click="$emit('save')" :disabled="saving">{{ $t('common.save') }}</button>
+          <button type="button" class="btn btn-muted" @click="$emit('close')">{{ $t('common.cancel') }}</button>
         </div>
       </div>
     </div>

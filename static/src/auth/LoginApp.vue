@@ -1,11 +1,11 @@
 <template>
   <main class="auth-page">
     <section class="auth-card">
-      <h1 class="auth-title">Astrion 登录</h1>
-      <p class="auth-subtitle">使用账号继续访问工作台</p>
+      <h1 class="auth-title">{{ t('auth.loginTitle') }}</h1>
+      <p class="auth-subtitle">{{ t('auth.loginSubtitle') }}</p>
 
       <div class="auth-form-group">
-        <label class="auth-label" for="email">邮箱</label>
+        <label class="auth-label" for="email">{{ t('auth.email') }}</label>
         <input
           id="email"
           v-model.trim="email"
@@ -16,7 +16,7 @@
       </div>
 
       <div class="auth-form-group">
-        <label class="auth-label" for="password">密码</label>
+        <label class="auth-label" for="password">{{ t('auth.password') }}</label>
         <input
           id="password"
           v-model="password"
@@ -27,7 +27,7 @@
         />
       </div>
 
-      <button class="auth-button" :disabled="submitting" @click="login">登录</button>
+      <button class="auth-button" :disabled="submitting" @click="login">{{ t('auth.login') }}</button>
 
       <button
         v-if="hostModeEnabled"
@@ -35,17 +35,18 @@
         :disabled="hostSubmitting"
         @click="hostLogin"
       >
-        宿主机模式（免登录）
+        {{ t('auth.hostModeNoLogin') }}
       </button>
 
       <div class="auth-error">{{ error }}</div>
-      <div class="auth-link">还没有账号？<a href="/register">点击注册</a></div>
+      <div class="auth-link">{{ t('auth.noAccount') }}<a href="/register">{{ t('auth.signUp') }}</a></div>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { t } from '@/locales';
 import { applyTheme, loadTheme } from './theme';
 
 declare global {
@@ -63,7 +64,7 @@ const hostModeEnabled = ref(false);
 
 const doLogin = async (redirectUrl = '/') => {
   if (!email.value || !password.value) {
-    error.value = '请输入邮箱和密码';
+    error.value = t('auth.emailAndPasswordRequired');
     return;
   }
 
@@ -80,7 +81,7 @@ const doLogin = async (redirectUrl = '/') => {
     // 503 = ensure_container 失败（Docker 未启动/镜像缺失等），error 带具体原因，原地显示
     if (resp.status === 503) {
       const data = await resp.json().catch(() => ({} as any));
-      error.value = data.error || '服务暂时不可用，请稍后重试';
+      error.value = data.error || t('auth.serviceUnavailable');
       return;
     }
 
@@ -90,9 +91,9 @@ const doLogin = async (redirectUrl = '/') => {
       return;
     }
 
-    error.value = data.error || '登录失败';
+    error.value = data.error || t('auth.loginFailed');
   } catch (_err) {
-    error.value = '网络错误，请重试';
+    error.value = t('auth.networkErrorRetry');
   } finally {
     submitting.value = false;
   }
@@ -109,7 +110,7 @@ const doHostLogin = async (redirectUrl = '/') => {
     // 503 = 容量满或终端创建失败，error 带具体原因，原地显示
     if (resp.status === 503) {
       const data = await resp.json().catch(() => ({} as any));
-      error.value = data.error || '资源繁忙，请稍后再试';
+      error.value = data.error || t('auth.resourceBusy');
       return;
     }
 
@@ -119,9 +120,9 @@ const doHostLogin = async (redirectUrl = '/') => {
       return;
     }
 
-    error.value = data.error || '宿主机模式不可用';
+    error.value = data.error || t('auth.hostModeUnavailable');
   } catch (_err) {
-    error.value = '网络错误，请重试';
+    error.value = t('auth.networkErrorRetry');
   } finally {
     hostSubmitting.value = false;
   }

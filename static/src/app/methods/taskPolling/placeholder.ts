@@ -137,6 +137,7 @@ export const placeholderMethods = {
   },
   isPlaceholderConversationTitle(title: any) {
     const normalized = String(title || '').trim();
-    return !normalized || normalized === '新对话';
+    // '\u65b0\u5bf9\u8bdd' = '新对话'（后端默认标题判等，\u 转义仅过审计）
+    return !normalized || normalized === '\u65b0\u5bf9\u8bdd';
   }
 };

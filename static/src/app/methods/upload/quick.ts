@@ -4,13 +4,14 @@ import { useModelStore } from '../../../stores/model';
 import {
 
 } from './shared';
+import { t } from '@/locales';
 
 export const quickMethods = {
   handleQuickUpload() {
     if (this.uploading || !this.isConnected) {
       return;
     }
-    if (this.isPolicyBlocked('block_upload', '上传功能已被管理员禁用')) {
+    if (this.isPolicyBlocked('block_upload', t('appUi.uploadDisabledByAdmin'))) {
       return;
     }
     this.triggerFileUpload();

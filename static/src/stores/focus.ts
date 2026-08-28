@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { t } from '@/locales';
 
 interface FocusedFile {
   size: number;
@@ -18,7 +19,7 @@ export const useFocusStore = defineStore('focus', {
       try {
         const response = await fetch('/api/focused');
         if (!response.ok) {
-          throw new Error(response.statusText || '请求失败');
+          throw new Error(response.statusText || t('stores.requestFailed'));
         }
         const data = await response.json();
         this.focusedFiles = data || {};

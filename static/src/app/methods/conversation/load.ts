@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog, traceLog } from '../common';
+import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import {
 
@@ -265,8 +266,8 @@ export const loadMethods = {
         this.suppressTitleTyping = false;
         this.titleReady = true;
         this.uiPushToast({
-          title: '加载对话失败',
-          message: result.message || '服务器未返回成功状态',
+          title: t('appMessages.loadConversationFailedTitle'),
+          message: result.message || t('appMessages.serverNotSuccessMessage'),
           type: 'error'
         });
       }
@@ -279,7 +280,7 @@ export const loadMethods = {
       this.suppressTitleTyping = false;
       this.titleReady = true;
       this.uiPushToast({
-        title: '加载对话异常',
+        title: t('appMessages.loadConversationErrorTitle'),
         message: error.message || String(error),
         type: 'error'
       });

@@ -11,6 +11,7 @@ import {
   isQuotaExceeded as isQuotaExceededUtil,
   buildQuotaToastMessage
 } from '../../utils/formatters';
+import { t, currentLocale } from '@/locales';
 
 export const resourceMethods = {
   hasContainerStats() {
@@ -46,11 +47,12 @@ export const resourceMethods = {
   },
 
   containerStatusText() {
+    void currentLocale.value;
     if (!this.containerStatus) {
-      return '未知';
+      return t('appTasks.unknown');
     }
     if (this.containerStatus.mode !== 'docker') {
-      return '宿主机模式';
+      return t('appTasks.hostMode');
     }
     const rawStatus =
       (this.containerStatus.state &&
@@ -58,20 +60,21 @@ export const resourceMethods = {
       '';
     const status = String(rawStatus).toLowerCase();
     if (status.includes('running')) {
-      return '运行中';
+      return t('common.running');
     }
     if (status.includes('paused')) {
-      return '已暂停';
+      return t('appTasks.paused');
     }
     if (status.includes('exited') || status.includes('dead')) {
-      return '已停止';
+      return t('appTasks.stopped');
     }
-    return rawStatus || '容器模式';
+    return rawStatus || t('appTasks.containerMode');
   },
 
   formatTime(value) {
+    void currentLocale.value;
     if (!value) {
-      return '未知时间';
+      return t('appTasks.unknownTime');
     }
     let date;
     if (typeof value === 'number') {
@@ -95,15 +98,15 @@ export const resourceMethods = {
     const now = Date.now();
     const diff = now - date.getTime();
     if (diff < 60000) {
-      return '刚刚';
+      return t('appTasks.justNow');
     }
     if (diff < 3600000) {
       const mins = Math.floor(diff / 60000);
-      return `${mins} 分钟前`;
+      return t('appTasks.minutesAgo', { n: mins });
     }
     if (diff < 86400000) {
       const hours = Math.floor(diff / 3600000);
-      return `${hours} 小时前`;
+      return t('appTasks.hoursAgo', { n: hours });
     }
     const formatter = new Intl.DateTimeFormat('zh-CN', {
       month: '2-digit',
@@ -315,8 +318,8 @@ export const resourceMethods = {
           message = await response.text();
         }
         this.uiPushToast({
-          title: '下载失败',
-          message: message || '无法完成下载',
+          title: t('common.downloadFailed'),
+          message: message || t('appTasks.cannotCompleteDownload'),
           type: 'error'
         });
         return;
@@ -335,7 +338,7 @@ export const resourceMethods = {
     } catch (error) {
       console.error('下载失败:', error);
       this.uiPushToast({
-        title: '下载失败',
+        title: t('common.downloadFailed'),
         message: error.message || String(error),
         type: 'error'
       });

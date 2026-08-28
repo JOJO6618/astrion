@@ -1,9 +1,9 @@
 <template>
   <transition name="plan-approval-fade" appear>
     <div v-if="visible && current" class="plan-approval-overlay">
-      <section class="plan-approval-card" role="dialog" aria-modal="true" aria-label="计划待批准">
+      <section class="plan-approval-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.planApprovalAriaLabel')">
         <header class="plan-approval-windowbar">
-          <div class="plan-approval-window-title">计划待批准</div>
+          <div class="plan-approval-window-title">{{ $t('overlay.planApprovalTitle') }}</div>
         </header>
 
         <header class="plan-approval-header">
@@ -15,7 +15,7 @@
                 <path d="M14 2v6h6" />
               </svg>
               <span>{{ current.plan_file }}</span>
-              <span v-if="current.plan_content_truncated" class="plan-approval-truncated">（内容过长，已截断预览，完整内容见文件）</span>
+              <span v-if="current.plan_content_truncated" class="plan-approval-truncated">{{ $t('overlay.planTruncatedNote') }}</span>
             </p>
           </div>
         </header>
@@ -29,7 +29,7 @@
             v-model="comment"
             class="plan-approval-textarea"
             rows="2"
-            placeholder="意见（可选）：批准时作为补充要求，拒绝时说明需要调整的方向…"
+            :placeholder="$t('overlay.planCommentPlaceholder')"
             spellcheck="false"
             :disabled="submitting"
             @keydown.meta.enter.prevent="approve"
@@ -42,20 +42,20 @@
             type="button"
             class="plan-approval-btn ghost"
             :disabled="submitting"
-            title="拒绝这份计划，AI 将根据你的意见修订后重新提交"
+            :title="$t('overlay.planRejectTitle')"
             @click="reject"
           >
-            拒绝
+            {{ $t('overlay.reject') }}
           </button>
           <div class="plan-approval-spacer"></div>
           <button
             type="button"
             class="plan-approval-btn primary"
             :disabled="submitting"
-            title="批准计划并切换到执行模式开始实施"
+            :title="$t('overlay.planApproveTitle')"
             @click="approve"
           >
-            {{ submitting ? '提交中…' : '批准并执行' }}
+            {{ submitting ? $t('overlay.submittingPlan') : $t('overlay.approveAndExecute') }}
           </button>
         </footer>
       </section>

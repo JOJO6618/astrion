@@ -51,8 +51,10 @@ export default {
   deleteFailed: 'Failed to delete user',
   fetchFailed: 'Failed to fetch',
   fetchTokenFailed: 'Failed to fetch token',
-  justNow: 'Just now',
-  minutesAgo: '{count}m ago',
-  hoursAgo: '{count}h ago',
-  daysAgo: '{count}d ago',
+
+  // Secondary password (useSecondaryPass.ts)
+  statusRequestFailed: 'Status request failed: {status}',
+  cannotVerifySecondaryPass: 'Unable to verify secondary password status',
+  secondaryPassVerifyFailed: 'Secondary password verification failed',
+  verifyFailed: 'Verification failed',
 } as const;

@@ -6,7 +6,7 @@
       @click.self="dialog?.closeOnBackdrop !== false && resolve(false)"
     >
       <div class="confirm-modal">
-        <div class="confirm-title">{{ dialog.title || '确认操作' }}</div>
+        <div class="confirm-title">{{ dialog.title || $t('shell.confirmOperation') }}</div>
         <div class="confirm-message">{{ dialog.message }}</div>
         <div v-if="dialog.warningText" class="confirm-warning">{{ dialog.warningText }}</div>
         <div
@@ -18,7 +18,7 @@
             class="confirm-button confirm-button--cancel"
             @click="resolve(false)"
           >
-            {{ dialog.cancelText || '取消' }}
+            {{ dialog.cancelText || $t('common.cancel') }}
           </button>
           <button
             type="button"
@@ -30,7 +30,7 @@
             "
             @click="resolve(true)"
           >
-            {{ dialog.confirmText || '确认' }}
+            {{ dialog.confirmText || $t('common.confirm') }}
           </button>
         </div>
       </div>

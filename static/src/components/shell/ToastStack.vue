@@ -14,7 +14,7 @@
           v-if="toast.closable !== false"
           type="button"
           class="toast-close"
-          aria-label="关闭通知"
+          :aria-label="$t('shell.closeNotification')"
           @click="dismiss(toast.id)"
         >
           ×

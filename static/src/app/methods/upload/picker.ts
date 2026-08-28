@@ -4,6 +4,7 @@ import { useModelStore } from '../../../stores/model';
 import {
 
 } from './shared';
+import { t } from '@/locales';
 
 export const pickerMethods = {
   triggerFileUpload() {
@@ -19,8 +20,8 @@ export const pickerMethods = {
     const policyStore = usePolicyStore();
     if (policyStore.uiBlocks?.block_upload) {
       this.uiPushToast({
-        title: '上传被禁用',
-        message: '已被管理员禁用上传功能',
+        title: t('appUi.uploadDisabled'),
+        message: t('appUi.uploadDisabledByAdmin'),
         type: 'warning'
       });
       return;
@@ -35,8 +36,8 @@ export const pickerMethods = {
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (!currentModel?.supportsImage) {
       this.uiPushToast({
-        title: '当前模型不支持图片',
-        message: '请选择支持图片输入的模型后再发送图片',
+        title: t('appUi.modelDoesNotSupportImage'),
+        message: t('appUi.chooseImageModelMessage'),
         type: 'error'
       });
       return;
@@ -53,8 +54,8 @@ export const pickerMethods = {
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (!currentModel?.supportsVideo) {
       this.uiPushToast({
-        title: '当前模型不支持视频',
-        message: '请切换到支持视频输入的模型后再发送视频',
+        title: t('appUi.modelDoesNotSupportVideo'),
+        message: t('appUi.switchToVideoModelMessage'),
         type: 'error'
       });
       return;

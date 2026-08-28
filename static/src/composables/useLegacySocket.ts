@@ -22,6 +22,7 @@ import { getMessageVisibility, messageStartsWork } from '../utils/messageVisibil
 import { goalModeDebugLog } from '../app/methods/common';
 import { useQuickDockStore } from '../stores/quickDock';
 import { useChatStore } from '../stores/chat';
+import { t } from '@/locales';
 
 export async function initializeLegacySocket(ctx: any) {
   try {
@@ -677,7 +678,7 @@ export async function initializeLegacySocket(ctx: any) {
         ctx.currentConversationTokens.cumulative_total_tokens = data.cumulative_total_tokens || 0;
 
         socketLog(
-          `累计Token统计更新: 输入=${data.cumulative_input_tokens}, 输出=${data.cumulative_output_tokens}, 总计=${data.cumulative_total_tokens}`
+          `Cumulative token stats updated: input=${data.cumulative_input_tokens}, output=${data.cumulative_output_tokens}, total=${data.cumulative_total_tokens}`
         );
 
         const hasContextTokens = typeof data.current_context_tokens === 'number';
@@ -694,8 +695,8 @@ export async function initializeLegacySocket(ctx: any) {
 
     // 上下文过长提示
     ctx.socket.on('context_warning', (data) => {
-      const title = data?.title || '上下文过长';
-      const message = data?.message || '当前对话上下文接近上限，建议使用压缩功能。';
+      const title = data?.title || t('utils.contextTooLong');
+      const message = data?.message || t('utils.contextNearLimit');
       if (typeof ctx.uiPushToast === 'function') {
         ctx.uiPushToast({
           title,
@@ -1390,7 +1391,7 @@ export async function initializeLegacySocket(ctx: any) {
           argumentLabel: '',
           status: 'preparing',
           result: null,
-          message: data.message || `准备调用 ${data.name}...`,
+          message: data.message || t('appTasks.preparingTool', { name: data.name }),
           intent_full: data.intent || '',
           intent_rendered: data.intent || ''
         },
@@ -1530,8 +1531,8 @@ export async function initializeLegacySocket(ctx: any) {
 
         if (data.name === 'view_video' && typeof ctx.uiPushToast === 'function') {
           ctx.uiPushToast({
-            title: '视频读取中',
-            message: '读取视频需要较长时间，请耐心等待',
+            title: t('utils.videoReading'),
+            message: t('utils.videoReadingSlow'),
             type: 'info',
             duration: 5000
           });
@@ -1664,7 +1665,7 @@ export async function initializeLegacySocket(ctx: any) {
         return;
       }
       ctx.chatAddAppendPayloadAction({
-        path: data.path || '未知文件',
+        path: data.path || t('utils.unknownFile'),
         forced: !!data.forced,
         success: data.success === undefined ? true : !!data.success,
         lines: data.lines ?? null,
@@ -1684,7 +1685,7 @@ export async function initializeLegacySocket(ctx: any) {
         return;
       }
       ctx.chatAddModifyPayloadAction({
-        path: data.path || '未知文件',
+        path: data.path || t('utils.unknownFile'),
         total: data.total ?? null,
         completed: data.completed || [],
         failed: data.failed || [],
@@ -1795,9 +1796,14 @@ export async function initializeLegacySocket(ctx: any) {
       // 显示等待提示
       if (typeof ctx.appendSystemAction === 'function') {
         const taskList = data.tasks
-          .map((t: any) => `子智能体${t.agent_id} (${t.summary || '无描述'})`)
-          .join('、');
-        ctx.appendSystemAction(`⏳ 等待 ${data.count} 个后台子智能体完成：${taskList}`);
+          .map((agent: any) =>
+            t('utils.subAgentItem', {
+              id: agent.agent_id,
+              summary: agent.summary || t('utils.noDescription')
+            })
+          )
+          .join(t('utils.listSeparator'));
+        ctx.appendSystemAction(t('utils.waitingForSubAgents', { n: data.count, list: taskList }));
       }
 
       ctx.$forceUpdate();
@@ -1840,7 +1846,7 @@ export async function initializeLegacySocket(ctx: any) {
 
     // 错误处理
     ctx.socket.on('error', (data) => {
-      const msg = data?.message || '发生未知错误';
+      const msg = data?.message || t('utils.unknownErrorOccurred');
       const code = data?.status_code;
       const errType = data?.error_type;
       const errCode = data?.error_code;
@@ -1854,24 +1860,29 @@ export async function initializeLegacySocket(ctx: any) {
       const retryAttempt = Number(data?.attempt) || 1;
       const retryMax = Number(data?.max_attempts) || retryAttempt;
       const detailParts = [
-        dumpPath ? `请求记录: ${dumpPath}` : '',
-        baseUrl ? `接口: ${baseUrl}` : '',
-        modelId ? `模型: ${modelId}` : '',
-        conversationId ? `对话ID: ${conversationId}` : '',
-        taskId ? `任务ID: ${taskId}` : ''
+        dumpPath ? t('utils.requestRecord', { path: dumpPath }) : '',
+        baseUrl ? t('utils.endpoint', { endpoint: baseUrl }) : '',
+        modelId ? t('utils.model', { model: modelId }) : '',
+        conversationId ? t('utils.conversationIdLabel', { id: conversationId }) : '',
+        taskId ? t('utils.taskIdLabel', { id: taskId }) : ''
       ].filter(Boolean);
       const detailText = detailParts.length ? `\n${detailParts.join('\n')}` : '';
       if (typeof ctx.uiPushToast === 'function') {
         ctx.uiPushToast({
-          title: code ? `API错误 ${code}` : 'API错误',
+          title: code ? t('utils.apiErrorWithCode', { code }) : t('utils.apiError'),
           message: `${errType ? `${errType}${errCode ? `(${errCode})` : ''}: ${msg}` : msg}${detailText}`,
           type: 'error',
           duration: 6000
         });
         if (shouldRetry) {
           ctx.uiPushToast({
-            title: '即将重试',
-            message: `将在 ${retryIn} 秒后重试（第 ${retryAttempt}/${retryMax} 次）\n错误：${msg}`,
+            title: t('appTasks.retrySoonTitle'),
+            message: t('appTasks.retryInSeconds', {
+              n: retryIn,
+              attempt: retryAttempt,
+              max: retryMax,
+              error: msg
+            }),
             type: 'info',
             duration: Math.max(retryIn, 1) * 1000
           });
@@ -1919,9 +1930,11 @@ export async function initializeLegacySocket(ctx: any) {
         // 清除对话时重置Token统计
         ctx.resetTokenStatistics();
       } else if (data.command === 'status' && data.success) {
-        ctx.addSystemMessage(`系统状态:\n${JSON.stringify(data.data, null, 2)}`);
+        ctx.addSystemMessage(
+          t('utils.systemStatus', { data: JSON.stringify(data.data, null, 2) })
+        );
       } else if (!data.success) {
-        ctx.addSystemMessage(`命令失败: ${data.message}`);
+        ctx.addSystemMessage(t('utils.commandFailed', { message: data.message }));
       }
     });
 

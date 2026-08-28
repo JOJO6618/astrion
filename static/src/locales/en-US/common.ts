@@ -30,4 +30,12 @@ export default {
   unset: 'Not set',
   settingsLanguage: 'Language',
   settingsLanguageDesc: 'Choose the display language',
+
+  // ── Relative time (merged from chat/adminApi duplicates) ──
+  justNow: 'Just now',
+  secondsAgo: '{n}s ago',
+  minutesAgo: '{n}min ago',
+  hoursAgo: '{n}h ago',
+  daysAgo: '{n}d ago',
+  timeDate: '{month}/{day} {hour}:{minute}',
 } as const;

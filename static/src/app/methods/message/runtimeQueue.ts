@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { t } from '@/locales';
 import { useTaskStore } from '../../../stores/task';
 import {
   extractSkillRefsFromMessage,
@@ -198,8 +199,8 @@ export const runtimeQueueMethods = {
       const taskId = taskStore.currentTaskId;
       if (!taskId) {
         this.uiPushToast({
-          title: '暂不可堆积',
-          message: '未检测到活跃任务，请稍后再试',
+          title: t('appMessages.cannotQueueTitle'),
+          message: t('appMessages.noActiveTaskMessage'),
           type: 'warning'
         });
         return false;
@@ -216,15 +217,15 @@ export const runtimeQueueMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || '堆积消息失败');
+        throw new Error(payload?.error || t('appMessages.queueMessageFailed'));
       }
       const nextQueue = this.applyRuntimeQueuedMessages(payload?.data?.messages || []) || [];
       this.setRuntimeQueueSyncLock(nextQueue, 2200);
       return true;
     } catch (error) {
       this.uiPushToast({
-        title: '堆积失败',
-        message: error?.message || '请稍后重试',
+        title: t('appMessages.queueFailedTitle'),
+        message: error?.message || t('common.retryLater'),
         type: 'error'
       });
       return false;
@@ -255,14 +256,14 @@ export const runtimeQueueMethods = {
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || '删除失败');
+        throw new Error(payload?.error || t('appMessages.deleteFailed'));
       }
       const nextQueue = this.applyRuntimeQueuedMessages(payload?.data?.messages || []) || [];
       this.setRuntimeQueueSyncLock(nextQueue, 2200);
     } catch (error) {
       this.uiPushToast({
-        title: '删除失败',
-        message: error?.message || '请稍后重试',
+        title: t('appMessages.deleteFailed'),
+        message: error?.message || t('common.retryLater'),
         type: 'error'
       });
     }
@@ -280,8 +281,8 @@ export const runtimeQueueMethods = {
       }));
       if (!sent) {
         this.uiPushToast({
-          title: '发送失败',
-          message: '引导消息未发出，请稍后重试',
+          title: t('appMessages.sendFailedTitle'),
+          message: t('appMessages.guideMessageNotSent'),
           type: 'warning'
         });
         return;
@@ -306,8 +307,8 @@ export const runtimeQueueMethods = {
       const taskId = taskStore.currentTaskId;
       if (!taskId) {
         this.uiPushToast({
-          title: '暂不可引导',
-          message: '未检测到活跃任务，请稍后再试',
+          title: t('appMessages.cannotGuideTitle'),
+          message: t('appMessages.noActiveTaskMessage'),
           type: 'warning'
         });
         return;
@@ -320,20 +321,20 @@ export const runtimeQueueMethods = {
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || '提交引导失败');
+        throw new Error(payload?.error || t('appMessages.submitGuideFailed'));
       }
       const nextQueue = this.applyRuntimeQueuedMessages(payload?.data?.messages || []) || [];
       this.setRuntimeQueueSyncLock(nextQueue, 2200);
       this.uiPushToast({
-        title: '已设为引导对话',
-        message: '将在下一次工具结果后插入到当前对话',
+        title: t('appMessages.guideSetTitle'),
+        message: t('appMessages.guideSetMessage'),
         type: 'success',
         duration: 1800
       });
     } catch (error) {
       this.uiPushToast({
-        title: '引导失败',
-        message: error?.message || '请稍后重试',
+        title: t('appMessages.guideFailedTitle'),
+        message: error?.message || t('common.retryLater'),
         type: 'error'
       });
     }

@@ -3,7 +3,9 @@
     <div v-if="activeCommand" class="subagent-activity-overlay" @click.self="close">
       <div class="subagent-activity-modal bg-command-modal">
         <div class="subagent-activity-header">
-          <div class="subagent-activity-title">后台指令 {{ activeCommand.command_id }}</div>
+          <div class="subagent-activity-title">
+            {{ $t('overlay.bgCommandTitle', { id: activeCommand.command_id }) }}
+          </div>
           <button type="button" class="subagent-activity-close" @click="close">×</button>
         </div>
         <div class="subagent-activity-meta">
@@ -27,14 +29,14 @@
             :disabled="stopLoading"
             @click="handleStop"
           >
-            {{ stopLoading ? '停止中...' : '手动停止' }}
+            {{ stopLoading ? $t('overlay.stopInProgress') : $t('overlay.stopManually') }}
           </button>
           <span v-if="stopError" class="subagent-activity-error">{{ stopError }}</span>
         </div>
         <div class="subagent-activity-body">
           <div v-if="detailError" class="subagent-activity-error">{{ detailError }}</div>
           <div v-else-if="detailLoading && !displayOutput" class="subagent-activity-empty">
-            正在读取后台指令输出...
+            {{ $t('overlay.bgCommandReadingOutput') }}
           </div>
           <pre v-else class="bg-command-output">{{ displayOutput || '[no_output]' }}</pre>
         </div>
@@ -46,6 +48,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t } from '@/locales';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 
 const commandStore = useBackgroundCommandStore();
@@ -80,7 +83,7 @@ const handleStop = async () => {
   stopError.value = '';
   const result = await commandStore.cancelCommand(commandId);
   if (!result?.success) {
-    stopError.value = result?.error || '停止失败';
+    stopError.value = result?.error || t('overlay.stopFailed');
   }
 };
 

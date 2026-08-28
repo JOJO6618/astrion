@@ -17,6 +17,7 @@ import {
   getOptimisticUserEchoTarget,
   findRecentMatchingUserMessage,
 } from './shared';
+import { t } from '@/locales';
 
 export const compressionMethods = {
   handleCompressionState(data: any) {
@@ -32,14 +33,14 @@ export const compressionMethods = {
     this.compressionMode = data.mode || '';
     this.compressionStage = data.stage || '';
     if (this.compressionInProgress && !wasInProgress) {
-      const modeLabel = this.compressionMode === 'manual' ? '手动' : '自动';
+      const modeLabel = this.compressionMode === 'manual' ? t('appTasks.compressionManual') : t('appTasks.compressionAuto');
       if (this.compressionToastId) {
         this.uiDismissToast(this.compressionToastId);
         this.compressionToastId = null;
       }
       this.compressionToastId = this.uiPushToast({
-        title: '压缩中',
-        message: `对话正在${modeLabel}压缩，请稍候…`,
+        title: t('appTasks.compressing'),
+        message: t('appTasks.compressingMessage', { mode: modeLabel }),
         type: 'info',
         duration: null,
         closable: false
@@ -60,8 +61,8 @@ export const compressionMethods = {
     }
     debugLog('[TaskPolling] 自动浅层压缩触发, idx:', eventIdx, data);
     this.uiPushToast({
-      title: '自动浅层压缩',
-      message: `已自动压缩 ${count} 条较早工具结果`,
+      title: t('appTasks.shallowCompressionTitle'),
+      message: t('appTasks.shallowCompressedMessage', { n: count }),
       type: 'info',
       duration: 2500
     });
@@ -92,8 +93,8 @@ export const compressionMethods = {
     // loadConversation 会 clearTask 停止轮询才需要 restore；in-place 跳过了
     // loadConversation，轮询仍在运行，restoreTaskState 的 rebuild 反而会
     this.uiPushToast({
-      title: '压缩完成',
-      message: '已压缩较早的对话内容',
+      title: t('appTasks.compressionComplete'),
+      message: t('appTasks.compressedEarlierContent'),
       type: 'success',
       duration: 2400
     });
@@ -517,7 +518,7 @@ export const compressionMethods = {
           // 重放事件会恢复内容，不显示等待提示。
           // 如果还没有内容事件，说明回复还没开始，应该显示等待提示。
           rebuildContainer.awaitingFirstContent = !hasAssistantContentEvent;
-          rebuildContainer.generatingLabel = rebuildContainer.generatingLabel || '思考中...';
+          rebuildContainer.generatingLabel = rebuildContainer.generatingLabel || t('appTasks.thinkingLabel');
           // 清理旧的流式标记，确保新事件能正确设置
           if (typeof rebuildContainer.streaming === 'boolean') {
             rebuildContainer.streaming = true;
@@ -693,8 +694,8 @@ export const compressionMethods = {
       });
 
       this.uiPushToast({
-        title: '任务恢复',
-        message: '检测到进行中的任务，已恢复连接',
+        title: t('appTasks.taskRestoredTitle'),
+        message: t('appTasks.taskRestoredMessage'),
         type: 'info',
         duration: 3000
       });

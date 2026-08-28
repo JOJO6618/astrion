@@ -57,16 +57,16 @@
     >
       <header class="tutorial-popover__header">
         <span class="tutorial-popover__step">{{ visibleStepIndex }} / {{ totalVisibleSteps }}</span>
-        <button type="button" class="tutorial-popover__close" @click="handleExit">退出</button>
+        <button type="button" class="tutorial-popover__close" @click="handleExit">{{ $t('overlay.tutorialExit') }}</button>
       </header>
-      <h3 class="tutorial-popover__title">{{ step?.title || '新手教程' }}</h3>
+      <h3 class="tutorial-popover__title">{{ step?.title || $t('overlay.tutorialFallbackTitle') }}</h3>
       <p class="tutorial-popover__desc">{{ step?.description || '' }}</p>
       <p v-if="isWaitingTarget" class="tutorial-popover__warn">
-        未找到目标元素，可稍后重试或跳过当前步骤。
+        {{ $t('overlay.tutorialWaitingTarget') }}
       </p>
-      <p v-else-if="isMustClick" class="tutorial-popover__hint">请点击高亮目标继续。</p>
+      <p v-else-if="isMustClick" class="tutorial-popover__hint">{{ $t('overlay.tutorialMustClickHint') }}</p>
       <p v-if="showPersonalScrollHint" class="tutorial-popover__hint">
-        提示：个人空间内容可上下滚动查看。
+        {{ $t('overlay.tutorialScrollHint') }}
       </p>
 
       <footer class="tutorial-popover__actions">
@@ -81,6 +81,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t, currentLocale } from '@/locales';
 import { useTutorialStore, type TutorialPlacement } from '@/stores/tutorial';
 
 interface RectLike {
@@ -133,9 +134,11 @@ const isPersonalTutorialPhase = computed(() => {
 });
 const showPersonalScrollHint = computed(() => isPersonalTutorialPhase.value);
 const nextLabel = computed(() => {
-  if (isLastStep.value) return '完成';
-  if (isMustClick.value) return targetRect.value ? '请先点击高亮目标' : '下一步（跳过）';
-  return '下一步';
+  void currentLocale.value;
+  if (isLastStep.value) return t('overlay.tutorialComplete');
+  if (isMustClick.value)
+    return targetRect.value ? t('overlay.tutorialClickFirst') : t('overlay.tutorialNextSkip');
+  return t('overlay.tutorialNext');
 });
 const maskInteractivityStyle = computed(() => ({ pointerEvents: 'auto' }));
 
