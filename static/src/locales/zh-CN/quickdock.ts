@@ -46,10 +46,9 @@ export default {
   toolRunCommand: '运行命令 {command}',
   toolEditFile: '编辑 {path}',
   toolReadMedia: '读取媒体文件 {path}',
-  toolStateDone: '完成',
-  toolStateFailed: '失败',
-  toolStateCalling: '调用中',
-  toolStateProgress: '进行中',
+
+  // —— 子智能体详情面板：上下文压缩提示 ——
+  contextCompressed: '上下文已压缩（第 {round} 轮）',
 
   // —— 文件预览面板（FilePreviewPanel） ——
   resizeWidthHint: '拖拽调整宽度',

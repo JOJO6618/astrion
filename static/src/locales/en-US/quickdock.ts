@@ -39,10 +39,9 @@ export default {
   toolRunCommand: 'Run command {command}',
   toolEditFile: 'Edit {path}',
   toolReadMedia: 'Read media file {path}',
-  toolStateDone: 'Done',
-  toolStateFailed: 'Failed',
-  toolStateCalling: 'Calling...',
-  toolStateProgress: 'In progress',
+
+  // —— Sub-agent detail panel: context compression notice ——
+  contextCompressed: 'Context compressed (round {round})',
 
   // —— File preview panel ——
   resizeWidthHint: 'Drag to resize width',

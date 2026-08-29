@@ -30,15 +30,23 @@
           v-for="item in timelineItems"
           :key="item.key"
           class="qd-feed-row"
-          :class="[item.kind === 'tool' ? 'feed-tool' : 'feed-text', { 'is-new': animatedKeys.has(item.key) }]"
+          :class="[item.kind === 'tool' ? 'feed-tool' : item.kind === 'compression' ? 'feed-compressed' : 'feed-text', { 'is-new': animatedKeys.has(item.key) }]"
         >
           <template v-if="item.kind === 'tool'">
-            <span v-if="item.state === 'running' || item.state === 'calling'" class="qd-tool-spinner"></span>
-            <span v-else class="qd-tool-done">{{ item.state === 'failed' ? '✕' : '✓' }}</span>
             <span class="tool-name">{{ item.toolName }}</span>
             <span class="tool-param" :title="item.text">{{ item.text }}</span>
-            <span class="tool-result" :class="{ 'is-error': item.state === 'failed' }">
-              {{ item.stateLabel }}
+            <span class="tool-status" :class="{ 'is-error': item.state === 'failed' }">
+              <span v-if="item.state === 'running' || item.state === 'calling'" class="qd-tool-spinner"></span>
+              <span v-else class="qd-tool-done">{{ item.state === 'failed' ? '✕' : '✓' }}</span>
+            </span>
+          </template>
+          <template v-else-if="item.kind === 'compression'">
+            <span class="feed-compressed__label">
+              <svg class="feed-compressed__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 1.5 13.5 4v4.5c0 3-2.2 5-5.5 6-3.3-1-5.5-3-5.5-6V4L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                <path d="M5.5 8.2 7.2 9.9 11 5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {{ t('quickdock.contextCompressed', { round: item.round }) }}
             </span>
           </template>
           <template v-else>{{ item.content }}</template>
@@ -283,14 +291,6 @@ function isEntryTerminal(status?: string) {
   ].includes(normalized);
 }
 
-/** 工具条目状态标签：映射表存 key、使用处解析（规范 §3.3，模块顶层禁止调 t()） */
-const TOOL_STATE_LABEL_KEYS: Record<string, string> = {
-  completed: 'quickdock.toolStateDone',
-  failed: 'quickdock.toolStateFailed',
-  calling: 'quickdock.toolStateCalling',
-  running: 'quickdock.toolStateProgress'
-};
-
 function buildText(entry: any): string {
   const tool = entry.tool || '';
   const args = entry.args || {};
@@ -309,7 +309,6 @@ interface ToolTimelineItem {
   kind: 'tool';
   key: string;
   state: string;
-  stateLabel: string;
   toolName: string;
   text: string;
 }
@@ -320,10 +319,16 @@ interface OutputTimelineItem {
   content: string;
 }
 
-const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => {
+interface CompressionTimelineItem {
+  kind: 'compression';
+  key: string;
+  round: number;
+}
+
+const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | CompressionTimelineItem)[]>(() => {
   void currentLocale.value;
   const entries = activityEntries.value || [];
-  const rawItems: ({ kind: 'tool'; key: string; entry: any } | OutputTimelineItem)[] = [];
+  const rawItems: ({ kind: 'tool'; key: string; entry: any } | OutputTimelineItem | CompressionTimelineItem)[] = [];
   let currentToolGroup: { kind: 'tool'; key: string; entry: any } | null = null;
 
   const flushToolGroup = () => {
@@ -358,6 +363,17 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
         }
       }
       rawItems.splice(cut, 0, outputItem);
+      return;
+    }
+
+    // 上下文压缩提示：在压缩发生的位置插入一条提示条目
+    if (entry?.type === 'progress' && entry?.subtype === 'compression') {
+      flushToolGroup();
+      rawItems.push({
+        kind: 'compression',
+        key: `compression-${entry.ts || index}`,
+        round: Number(entry.round) || 0,
+      });
       return;
     }
 
@@ -401,7 +417,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
   flushToolGroup();
 
   return rawItems.map((item) => {
-    if (item.kind === 'output') {
+    if (item.kind === 'output' || item.kind === 'compression') {
       return item;
     }
     const state = normalizeStatus(item.entry.status);
@@ -409,7 +425,6 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem)[]>(() => 
       kind: 'tool' as const,
       key: item.key,
       state,
-      stateLabel: t(TOOL_STATE_LABEL_KEYS[state] || 'quickdock.toolStateProgress'),
       toolName: item.entry.tool || t('common.tool'),
       text: buildText(item.entry)
     };
