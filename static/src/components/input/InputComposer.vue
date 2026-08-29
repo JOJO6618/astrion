@@ -375,8 +375,8 @@
                   :class="{ 'is-active': option.value === currentWorkMode }"
                   @click.stop="$emit('change-work-mode', option.value)"
                 >
-                  <span class="agent-type-switcher__menu-label">{{ option.label }}</span>
-                  <span class="agent-type-switcher__menu-desc">{{ option.description }}</span>
+                  <span class="agent-type-switcher__menu-label">{{ $t(option.labelKey) }}</span>
+                  <span class="agent-type-switcher__menu-desc">{{ $t(option.descriptionKey) }}</span>
                 </button>
               </div>
             </div>
@@ -546,8 +546,8 @@
                 :disabled="permissionLockedByPlan"
                 @click="$emit('change-permission-mode', option.value)"
               >
-                <span class="permission-switcher__item-label">{{ option.label }}</span>
-                <span class="permission-switcher__item-desc">{{ option.description }}</span>
+                <span class="permission-switcher__item-label">{{ $t(option.labelKey) }}</span>
+                <span class="permission-switcher__item-desc">{{ $t(option.descriptionKey) }}</span>
               </button>
             </div>
             <div
@@ -572,9 +572,9 @@
                 <span
                   class="permission-switcher__item-label"
                   :class="{ 'permission-switcher__item-label--warn': option.value === 'direct' }"
-                  >{{ option.label }}</span
+                  >{{ $t(option.labelKey) }}</span
                 >
-                <span class="permission-switcher__item-desc">{{ option.description }}</span>
+                <span class="permission-switcher__item-desc">{{ $t(option.descriptionKey) }}</span>
               </button>
             </div>
             <div
@@ -595,9 +595,9 @@
                 <span
                   class="permission-switcher__item-label"
                   :class="{ 'permission-switcher__item-label--warn': option.value === 'full' }"
-                  >{{ option.label }}</span
+                  >{{ $t(option.labelKey) }}</span
                 >
-                <span class="permission-switcher__item-desc">{{ option.description }}</span>
+                <span class="permission-switcher__item-desc">{{ $t(option.descriptionKey) }}</span>
               </button>
             </div>
           </div>
@@ -756,13 +756,13 @@ const props = defineProps<{
   blockConversationReview?: boolean;
   currentPermissionMode: 'readonly' | 'approval' | 'auto_approval' | 'unrestricted';
   permissionMenuOpen: boolean;
-  permissionOptions: Array<{ value: string; label: string; description: string }>;
+  permissionOptions: Array<{ value: string; labelKey: string; descriptionKey: string }>;
   executionModeEnabled?: boolean;
   currentExecutionMode?: 'sandbox' | 'direct';
-  executionModeOptions?: Array<{ value: string; label: string; description: string }>;
+  executionModeOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
   networkPermissionEnabled?: boolean;
   currentNetworkPermission?: 'restricted' | 'full';
-  networkPermissionOptions?: Array<{ value: string; label: string; description: string }>;
+  networkPermissionOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
   currentContextTokens: number;
   versioningEnabled?: boolean;
   runtimeQueuedMessages?: Array<{ id: string; text: string }>;
@@ -790,7 +790,7 @@ const props = defineProps<{
   /** 运行模式菜单是否展开 */
   workModeMenuOpen?: boolean;
   /** 运行模式选项 */
-  workModeOptions?: Array<{ value: string; label: string; description: string }>;
+  workModeOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
   /** host/docker 项目模式下的工作区列表（/菜单「切换工作区」数据源） */
   hostWorkspaces?: Array<{
     workspace_id: string;
@@ -3320,10 +3320,11 @@ const triggerQuickUpload = () => {
 };
 
 const currentPermissionLabel = computed(() => {
+  void currentLocale.value;
   const matched = (props.permissionOptions || []).find(
     (item) => item.value === props.currentPermissionMode
   );
-  return matched ? matched.label : props.currentPermissionMode;
+  return matched ? t(matched.labelKey) : props.currentPermissionMode;
 });
 
 /** 对话类型选择器：选项定义（响应式：随语言切换刷新） */
@@ -3364,7 +3365,7 @@ const workModeLabel = computed(() => {
   const matched = (props.workModeOptions || []).find(
     (item) => item.value === props.currentWorkMode
   );
-  return matched ? matched.label : props.currentWorkMode || t('input.workModePlanFallback');
+  return matched ? t(matched.labelKey) : props.currentWorkMode || t('input.workModePlanFallback');
 });
 
 /** 计划模式下权限被锁定为只读（UI 禁用 + 后端强制） */

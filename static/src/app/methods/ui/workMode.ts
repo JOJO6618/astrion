@@ -11,7 +11,7 @@ export const workModeMethods = {
     void currentLocale.value;
     const options = Array.isArray(this.workModeOptions) ? this.workModeOptions : [];
     const hit = options.find((item) => item.value === mode);
-    return hit ? hit.label : mode || t('appUi.unknown');
+    return hit ? t(hit.labelKey) : mode || t('appUi.unknown');
   },
   async fetchWorkMode() {
     try {

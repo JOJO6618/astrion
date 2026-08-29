@@ -51,13 +51,13 @@ export const permissionMethods = {
     void currentLocale.value;
     const options = Array.isArray(this.permissionModeOptions) ? this.permissionModeOptions : [];
     const hit = options.find((item) => item.value === mode);
-    return hit ? hit.label : mode || t('appUi.unknown');
+    return hit ? t(hit.labelKey) : mode || t('appUi.unknown');
   },
   getExecutionModeLabel(mode) {
     void currentLocale.value;
     const options = Array.isArray(this.executionModeOptions) ? this.executionModeOptions : [];
     const hit = options.find((item) => item.value === mode);
-    return hit ? hit.label : mode || t('appUi.unknown');
+    return hit ? t(hit.labelKey) : mode || t('appUi.unknown');
   },
   async changePermissionMode(mode) {
     const target = String(mode || '')

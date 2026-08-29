@@ -196,13 +196,13 @@ export function dataState() {
     networkPermissionOptions: [
       {
         value: 'restricted',
-        label: t('appUi.networkRestricted'),
-        description: t('appCore.networkRestrictedDesc')
+        labelKey: 'appUi.networkRestricted',
+        descriptionKey: 'appCore.networkRestrictedDesc'
       },
       {
         value: 'full',
-        label: t('appUi.networkFull'),
-        description: t('appCore.networkFullDesc')
+        labelKey: 'appUi.networkFull',
+        descriptionKey: 'appCore.networkFullDesc'
       }
     ],
     workModeMenuOpen: false,
@@ -210,18 +210,18 @@ export function dataState() {
     workModeOptions: [
       {
         value: 'plan',
-        label: t('appUi.workModePlan'),
-        description: t('appCore.workModePlanDesc')
+        labelKey: 'appUi.workModePlan',
+        descriptionKey: 'appCore.workModePlanDesc'
       },
       {
         value: 'ask',
-        label: t('appUi.workModeAsk'),
-        description: t('appCore.workModeAskDesc')
+        labelKey: 'appUi.workModeAsk',
+        descriptionKey: 'appCore.workModeAskDesc'
       },
       {
         value: 'execute',
-        label: t('appUi.workModeExecute'),
-        description: t('appCore.workModeExecuteDesc')
+        labelKey: 'appUi.workModeExecute',
+        descriptionKey: 'appCore.workModeExecuteDesc'
       }
     ],
     pathAuthorizationDialogOpen: false,
@@ -256,35 +256,35 @@ export function dataState() {
     permissionModeOptions: [
       {
         value: 'readonly',
-        label: t('personalization.permissionReadonly'),
-        description: t('appCore.permissionReadonlyDesc')
+        labelKey: 'personalization.permissionReadonly',
+        descriptionKey: 'appCore.permissionReadonlyDesc'
       },
       {
         value: 'approval',
-        label: t('appCore.permissionApproval'),
-        description: t('appCore.permissionApprovalDesc')
+        labelKey: 'appCore.permissionApproval',
+        descriptionKey: 'appCore.permissionApprovalDesc'
       },
       {
         value: 'auto_approval',
-        label: t('appCore.permissionAutoApproval'),
-        description: t('appCore.permissionAutoApprovalDesc')
+        labelKey: 'appCore.permissionAutoApproval',
+        descriptionKey: 'appCore.permissionAutoApprovalDesc'
       },
       {
         value: 'unrestricted',
-        label: t('appCore.permissionUnrestricted'),
-        description: t('appCore.permissionUnrestrictedDesc')
+        labelKey: 'appCore.permissionUnrestricted',
+        descriptionKey: 'appCore.permissionUnrestrictedDesc'
       }
     ],
     executionModeOptions: [
       {
         value: 'sandbox',
-        label: t('input.executionSandbox'),
-        description: t('appCore.executionSandboxDesc')
+        labelKey: 'input.executionSandbox',
+        descriptionKey: 'appCore.executionSandboxDesc'
       },
       {
         value: 'direct',
-        label: t('input.executionFullAccess'),
-        description: t('appCore.executionDirectDesc')
+        labelKey: 'input.executionFullAccess',
+        descriptionKey: 'appCore.executionDirectDesc'
       }
     ],
     pendingToolApprovals: [],
