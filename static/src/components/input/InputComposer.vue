@@ -1751,12 +1751,12 @@ const permissionSlashMenuItems = computed<SlashMenuItem[]>(() => {
   const lockedByPlan = props.currentWorkMode === 'plan';
   return options.map((opt) => ({
     id: `perm:${opt.value}`,
-    label: opt.label,
+    label: t(opt.labelKey),
     description: lockedByPlan
       ? t('input.permissionLockedReadonlyDesc')
       : opt.value === current
-        ? t('input.optionWithCurrent', { desc: opt.description || '' })
-        : opt.description || '',
+        ? t('input.optionWithCurrent', { desc: t(opt.descriptionKey) })
+        : t(opt.descriptionKey),
     disabled: lockedByPlan,
     action: () => emit('change-permission-mode', opt.value)
   }));
@@ -1769,12 +1769,12 @@ const executionSlashMenuItems = computed<SlashMenuItem[]>(() => {
   const lockedByPlan = props.currentWorkMode === 'plan';
   return options.map((opt) => ({
     id: `exec:${opt.value}`,
-    label: opt.label,
+    label: t(opt.labelKey),
     description: lockedByPlan
       ? t('input.executionLockedSandboxDesc')
       : opt.value === current
-        ? t('input.optionWithCurrent', { desc: opt.description || '' })
-        : opt.description || '',
+        ? t('input.optionWithCurrent', { desc: t(opt.descriptionKey) })
+        : t(opt.descriptionKey),
     disabled: lockedByPlan,
     action: () => emit('change-execution-mode', opt.value)
   }));
@@ -1817,11 +1817,11 @@ const networkSlashMenuItems = computed<SlashMenuItem[]>(() => {
   const current = String(props.currentNetworkPermission || '');
   return options.map((opt) => ({
     id: `network:${opt.value}`,
-    label: opt.label,
+    label: t(opt.labelKey),
     description:
       opt.value === current
-        ? t('input.optionWithCurrent', { desc: opt.description || '' })
-        : opt.description || '',
+        ? t('input.optionWithCurrent', { desc: t(opt.descriptionKey) })
+        : t(opt.descriptionKey),
     action: () => emit('change-network-permission', opt.value)
   }));
 });
@@ -1832,11 +1832,11 @@ const workModeSlashMenuItems = computed<SlashMenuItem[]>(() => {
   const current = String(props.currentWorkMode || '');
   return options.map((opt) => ({
     id: `workmode:${opt.value}`,
-    label: opt.label,
+    label: t(opt.labelKey),
     description:
       opt.value === current
-        ? t('input.optionWithCurrent', { desc: opt.description || '' })
-        : opt.description || '',
+        ? t('input.optionWithCurrent', { desc: t(opt.descriptionKey) })
+        : t(opt.descriptionKey),
     action: () => emit('change-work-mode', opt.value)
   }));
 });
