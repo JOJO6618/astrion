@@ -103,22 +103,22 @@ class SubAgentCreationMixin:
             return "任务摘要不能为空"
         if not task or not task.strip():
             return "任务详情不能为空"
-        # 多智能体模式不需要交付目录
-        if not multi_agent_mode and target_dir is None:
-            return "指定文件夹不能为空"
+        # 交付目录不再必填：传统模式未指定时自动创建（见 _resolve_deliverables_dir）
         return None
 
     def _generate_task_id(self, agent_id: int) -> str:
         suffix = uuid.uuid4().hex[:6]
         return f"sub_{agent_id}_{int(time.time())}_{suffix}"
 
-    def _resolve_deliverables_dir(self, relative_dir: Optional[str], *, multi_agent_mode: bool = False) -> Path:
+    def _resolve_deliverables_dir(self, relative_dir: Optional[str], *, agent_id: int = 0, multi_agent_mode: bool = False) -> Path:
         relative_dir = (relative_dir or "").strip()
         # 多智能体模式：没有交付目录概念，直接使用项目根目录
         if multi_agent_mode and not relative_dir:
             return self.project_path.resolve()
         if not relative_dir:
-            raise ValueError(tr("sub_agent_creation.deliverables_dir_required"))
+            # 未显式指定交付目录：在运行时目录 .astrion/sub_agent_results/ 下自动创建
+            #（撞名自动加后缀，保证总能建成），实际路径由 create_sub_agent 结果返回
+            return self._auto_deliverables_dir(agent_id)
         deliverables_path = (self.project_path / relative_dir).resolve()
         if not str(deliverables_path).startswith(str(self.project_path)):
             raise ValueError(tr("sub_agent_creation.deliverables_dir_outside"))
@@ -126,3 +126,15 @@ class SubAgentCreationMixin:
             raise ValueError(tr("sub_agent_creation.deliverables_dir_not_new"))
         deliverables_path.mkdir(parents=True, exist_ok=True)
         return deliverables_path
+
+    def _auto_deliverables_dir(self, agent_id: int) -> Path:
+        """未指定交付目录时自动创建：.astrion/sub_agent_results/agent_{id}（撞名追加后缀）。"""
+        base = (self.project_path / ".astrion" / "sub_agent_results").resolve()
+        base.mkdir(parents=True, exist_ok=True)
+        candidate = base / f"agent_{agent_id}"
+        suffix = 2
+        while candidate.exists():
+            candidate = base / f"agent_{agent_id}_{suffix}"
+            suffix += 1
+        candidate.mkdir(parents=True, exist_ok=True)
+        return candidate

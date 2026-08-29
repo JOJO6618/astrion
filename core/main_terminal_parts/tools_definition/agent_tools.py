@@ -133,7 +133,7 @@ class ToolsDefinitionAgentToolsMixin:
                                     },
                                     "deliverables_dir": {
                                         "type": "string",
-                                        "description": "交付文件夹的相对路径（相对于项目根目录）。子智能体会将所有结果文件放在此目录。\n\n要求：必须是不存在的新目录；若目录不存在会自动创建；若目录已存在（无论是否为空）将报错。\n\n留空则使用默认路径：sub_agent_results/agent_{agent_id}\n\n示例：'docs/api'、'reports/performance'、'tests/generated'"
+                                        "description": "交付文件夹的相对路径（相对于项目根目录）。子智能体会将所有结果文件放在此目录。\n\n显式传入时：必须是不存在的新目录，若已存在（无论是否为空）将报错。\n\n留空时：自动在 .astrion/sub_agent_results/ 下创建（如 agent_{agent_id}），最终路径会作为工具结果返回。\n\n示例：'docs/api'、'reports/performance'、'tests/generated'"
                                     },
                                     "run_in_background": {
                                         "type": "boolean",
@@ -149,7 +149,7 @@ class ToolsDefinitionAgentToolsMixin:
                                         "description": "子智能体思考模式，根据任务复杂度选择：\n\nfast（快速模式）- 适合简单明确的任务：\n- 网络信息搜集和整理\n- 批量文件读取和简单处理\n- 执行已知的命令序列\n- 生成简单的文档或报告\n- 数据格式转换\n\nthinking（思考模式）- 适合复杂任务：\n- 代码架构分析和重构设计\n- 复杂算法实现和优化\n- 多步骤问题诊断和调试\n- 技术方案选型和对比\n- 需要深度推理的代码审查\n\n不填则使用默认模式。"
                                     }
                                 }),
-                                "required": ["agent_id", "summary", "task", "deliverables_dir", "thinking_mode"]
+                                "required": ["agent_id", "summary", "task", "thinking_mode"]
                             }
                         }
                     },

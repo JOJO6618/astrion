@@ -284,7 +284,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         task_root.mkdir(parents=True, exist_ok=True)
 
         try:
-            deliverables_path = self._resolve_deliverables_dir(deliverables_dir, multi_agent_mode=multi_agent_mode)
+            deliverables_path = self._resolve_deliverables_dir(deliverables_dir, agent_id=agent_id, multi_agent_mode=multi_agent_mode)
         except ValueError as exc:
             # 回滚已创建的任务目录，避免残留状态（交付目录校验失败时 deliverables 不会创建）
             shutil.rmtree(task_root, ignore_errors=True)
