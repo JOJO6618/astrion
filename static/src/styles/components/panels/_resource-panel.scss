@@ -549,32 +549,6 @@ body[data-theme='dark'] {
     }
 }
 
-/* Markdown列表样式 - 修复偏左问题 */
-.text-content ul,
-.text-content ol {
-    margin-left: 24px;  /* 增加左边距 */
-    padding-left: 0;
-    margin-bottom: 12px;
-}
-
-.text-content ul {
-    list-style-type: disc;  /* 实心圆点 */
-}
-
-.text-content ul ul {
-    list-style-type: circle;  /* 空心圆点 */
-    margin-top: 6px;
-}
-
-.text-content ol {
-    list-style-type: decimal;  /* 数字列表 */
-}
-
-.text-content li {
-    margin-bottom: 6px;
-    line-height: 1.6;
-}
-
 /* 搜索结果展示 */
 .search-meta {
     font-size: 14px;

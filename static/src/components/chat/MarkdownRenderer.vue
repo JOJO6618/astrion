@@ -107,4 +107,32 @@ watch(() => props.content, renderMath, { immediate: true });
 .markdown-text-segment > *:last-child {
   margin-bottom: 0;
 }
+
+/* 列表基础样式（渲染器自有，不依赖外部容器类名）：
+   全局 reset 清掉了 ul/ol 默认 padding，此处置回标准缩进，
+   保证 MarkdownRenderer 在任何容器内（聊天/批准弹窗/预览等）表现一致：
+   标记在左、文字缩进靠右 */
+.markdown-text-segment :deep(ul),
+.markdown-text-segment :deep(ol) {
+  padding-left: 24px;
+  margin-bottom: 12px;
+}
+
+.markdown-text-segment :deep(ul) {
+  list-style-type: disc;
+}
+
+.markdown-text-segment :deep(ul ul) {
+  list-style-type: circle;
+  margin-top: 6px;
+}
+
+.markdown-text-segment :deep(ol) {
+  list-style-type: decimal;
+}
+
+.markdown-text-segment :deep(li) {
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
 </style>
