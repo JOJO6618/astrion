@@ -128,6 +128,7 @@
           />
 
           <div v-if="titleRibbonVisible" class="conversation-ribbon" ref="titleRibbon">
+            <div class="conversation-ribbon__blur" aria-hidden="true"></div>
             <button
               type="button"
               class="conversation-ribbon__selector"
@@ -592,6 +593,7 @@
         ref="mobilePanelTrigger"
       >
         <div class="mobile-panel-topbar">
+          <div class="mobile-panel-topbar__blur" aria-hidden="true"></div>
           <button
             type="button"
             class="mobile-panel-fab"

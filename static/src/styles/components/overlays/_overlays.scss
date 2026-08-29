@@ -1440,6 +1440,46 @@
   height: 44px;
 }
 
+/* 顶栏下方渐进模糊带：mask-image 与 backdrop-filter 写在同一元素上时，
+   新版浏览器内核中模糊会静默失效（2026-08 实测），单元素 mask 渐隐模糊不可用；
+   改用三级强度递减的条带（元素本体 + ::before + ::after）模拟渐进模糊，
+   上方再由 ::after 颜色渐隐层溶掉阶梯感 */
+.mobile-panel-topbar__blur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px; /* 带 1（最强）：顶栏底上 8px ~ 底上 2px */
+  height: 6px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+
+.mobile-panel-topbar__blur::before,
+.mobile-panel-topbar__blur::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+/* 带 2（中等）：与带 1 重叠 1px 避免接缝 */
+.mobile-panel-topbar__blur::before {
+  top: 5px;
+  height: 7px;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* 带 3（极轻）：溶掉模糊下边界 */
+.mobile-panel-topbar__blur::after {
+  top: 11px;
+  height: 6px;
+  backdrop-filter: blur(1.2px);
+  -webkit-backdrop-filter: blur(1.2px);
+}
+
 .mobile-panel-topbar::after {
   content: '';
   position: absolute;
