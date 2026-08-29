@@ -55,6 +55,8 @@ export default {
   currentContext: 'Current context',
   cumulativeInput: 'Total input',
   cumulativeOutput: 'Total output',
+  cumulativeCachedInput: 'Cached input',
+  cacheHitRate: 'Cache hit rate',
   performanceStats: 'Performance',
   memory: 'Memory',
   containerMetricsPending: 'Container is running, waiting for metrics...',

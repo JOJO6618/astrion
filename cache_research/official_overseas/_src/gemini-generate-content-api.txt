@@ -1,0 +1,6810 @@
+![Gemini API](https://ai.google.dev/_static/googledevai/images/gemini-api-logo.svg)
+![Gemini API](https://ai.google.dev/_static/googledevai/images/gemini-api-logo.svg)
+
+# Generating content
+
+The Gemini API supports content generation with images, audio, code, tools, and more. For details on each of these features, read on and check out the task-focused sample code, or read the comprehensive guides.
+
+## Method: models.generateContent
+
+Generates a model response given an input `GenerateContentRequest`. Refer to the [text generation guide](https://ai.google.dev/gemini-api/docs/text-generation) for detailed usage information. Input capabilities differ between models, including tuned models. Refer to the [model guide](https://ai.google.dev/gemini-api/docs/models/gemini) and [tuning guide](https://ai.google.dev/gemini-api/docs/model-tuning) for details.
+
+`GenerateContentRequest`
+
+### Endpoint
+
+`https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent`
+
+### Path parameters
+
+`model`
+`string`
+
+Required. The name of the `Model` to use for generating the completion.
+
+`Model`
+
+Format: `models/{model}`. It takes the form `models/{model}`.
+
+`models/{model}`
+`models/{model}`
+
+### Request body
+
+The request body contains data with the following structure:
+
+`contents[]`
+`object (Content)`
+`Content`
+
+Required. The content of the current conversation with the model.
+
+For single-turn queries, this is a single instance. For multi-turn queries like [chat](https://ai.google.dev/gemini-api/docs/text-generation#chat), this is a repeated field that contains the conversation history and the latest request.
+
+`tools[]`
+`object (Tool)`
+`Tool`
+
+Optional. A list of `Tools` the `Model` may use to generate the next response.
+
+`Tools`
+`Model`
+
+A `Tool` is a piece of code that enables the system to interact with external systems to perform an action, or set of actions, outside of knowledge and scope of the `Model`. Supported `Tool`s are `Function` and `codeExecution`. Refer to the [Function calling](https://ai.google.dev/gemini-api/docs/function-calling) and the [Code execution](https://ai.google.dev/gemini-api/docs/code-execution) guides to learn more.
+
+`Tool`
+`Model`
+`Tool`
+`Function`
+`codeExecution`
+`toolConfig`
+`object (ToolConfig)`
+`ToolConfig`
+
+Optional. Tool configuration for any `Tool` specified in the request. Refer to the [Function calling guide](https://ai.google.dev/gemini-api/docs/function-calling#function_calling_mode) for a usage example.
+
+`Tool`
+`safetySettings[]`
+`object (SafetySetting)`
+`SafetySetting`
+
+Optional. A list of unique `SafetySetting` instances for blocking unsafe content.
+
+`SafetySetting`
+
+This will be enforced on the `GenerateContentRequest.contents` and `GenerateContentResponse.candidates`. There should not be more than one setting for each `SafetyCategory` type. The API will block any contents and responses that fail to meet the thresholds set by these settings. This list overrides the default settings for each `SafetyCategory` specified in the safetySettings. If there is no `SafetySetting` for a given `SafetyCategory` provided in the list, the API will use the default safety setting for that category. Harm categories HARM\_CATEGORY\_HATE\_SPEECH, HARM\_CATEGORY\_SEXUALLY\_EXPLICIT, HARM\_CATEGORY\_DANGEROUS\_CONTENT, HARM\_CATEGORY\_HARASSMENT, HARM\_CATEGORY\_CIVIC\_INTEGRITY, HARM\_CATEGORY\_JAILBREAK are supported. Refer to the [guide](https://ai.google.dev/gemini-api/docs/safety-settings) for detailed information on available safety settings. Also refer to the [Safety guidance](https://ai.google.dev/gemini-api/docs/safety-guidance) to learn how to incorporate safety considerations in your AI applications.
+
+`GenerateContentRequest.contents`
+`GenerateContentResponse.candidates`
+`SafetyCategory`
+`SafetyCategory`
+`SafetySetting`
+`SafetyCategory`
+`systemInstruction`
+`object (Content)`
+`Content`
+
+Optional. Developer set [system instruction(s)](https://ai.google.dev/gemini-api/docs/system-instructions). Currently, text only.
+
+`generationConfig`
+`object (GenerationConfig)`
+`GenerationConfig`
+
+Optional. Configuration options for model generation and outputs.
+
+`cachedContent`
+`string`
+
+Optional. The name of the content [cached](https://ai.google.dev/gemini-api/docs/caching) to use as context to serve the prediction. Format: `cachedContents/{cachedContent}`
+
+`cachedContents/{cachedContent}`
+`serviceTier`
+`enum (ServiceTier)`
+`ServiceTier`
+
+Optional. The service tier of the request.
+
+`store`
+`boolean`
+
+Optional. Configures the logging behavior for a given request. If set, it takes precedence over the project-level logging config.
+
+### Example request
+
+### Text
+
+### Python
+
+`from google import genai
+client = genai.Client()
+response = client.models.generate_content(
+model="gemini-3.7-flash", contents="Write a story about a magic backpack."
+)
+print(response.text)
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: "Write a story about a magic backpack.",
+});
+console.log(response.text);
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+contents := []*genai.Content{
+ genai.NewContentFromText("Write a story about a magic backpack.", genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, nil)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+text_generation.go`
+
+### Shell
+
+`curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[{"text": "Write a story about a magic backpack."}]
+ }]
+ }' 2> /dev/null
+
+text_generation.sh`
+
+### Java
+
+`Client client = new Client();
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ "Write a story about a magic backpack.",
+ null);
+System.out.println(response.text());
+
+TextGeneration.java`
+
+### Image
+
+### Python
+
+`from google import genai
+import PIL.Image
+client = genai.Client()
+organ = PIL.Image.open(media / "organ.jpg")
+response = client.models.generate_content(
+model="gemini-3.7-flash", contents=["Tell me about this instrument", organ]
+)
+print(response.text)
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const organ = await ai.files.upload({
+ file: path.join(media, "organ.jpg"),
+});
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: [
+ createUserContent([
+ "Tell me about this instrument", 
+ createPartFromUri(organ.uri, organ.mimeType)
+ ]),
+ ],
+});
+console.log(response.text);
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "organ.jpg"), 
+ &genai.UploadFileConfig{
+ MIMEType : "image/jpeg",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Tell me about this instrument"),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, nil)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+text_generation.go`
+
+### Shell
+
+`# Use a temporary file to hold the base64 encoded image data
+TEMP_B64=$(mktemp)
+trap 'rm -f "$TEMP_B64"' EXIT
+base64 $B64FLAGS $IMG_PATH > "$TEMP_B64"
+# Use a temporary file to hold the JSON payload
+TEMP_JSON=$(mktemp)
+trap 'rm -f "$TEMP_JSON"' EXIT
+cat > "$TEMP_JSON" << EOF
+{
+ "contents": [{
+ "parts":[
+ {"text": "Tell me about this instrument"},
+ {
+ "inline_data": {
+ "mime_type":"image/jpeg",
+ "data": "$(cat "$TEMP_B64")"
+ }
+ }
+ ]
+ }]
+}
+EOF
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d "@$TEMP_JSON" 2> /dev/null
+
+text_generation.sh`
+
+### Java
+
+`Client client = new Client();
+String path = media_path + "organ.jpg";
+byte[] imageData = Files.readAllBytes(Paths.get(path));
+Content content =
+ Content.fromParts(
+ Part.fromText("Tell me about this instrument."),
+ Part.fromBytes(imageData, "image/jpeg"));
+GenerateContentResponse response = client.models.generateContent("gemini-3.7-flash", content, null);
+System.out.println(response.text());
+
+TextGeneration.java`
+
+### Audio
+
+### Python
+
+`from google import genai
+client = genai.Client()
+sample_audio = client.files.upload(file=media / "sample.mp3")
+response = client.models.generate_content(
+model="gemini-3.7-flash",
+contents=["Give me a summary of this audio file.", sample_audio],
+)
+print(response.text)
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const audio = await ai.files.upload({
+ file: path.join(media, "sample.mp3"),
+});
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: [
+ createUserContent([
+ "Give me a summary of this audio file.",
+ createPartFromUri(audio.uri, audio.mimeType),
+ ]),
+ ],
+});
+console.log(response.text);
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "sample.mp3"), 
+ &genai.UploadFileConfig{
+ MIMEType : "audio/mpeg",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Give me a summary of this audio file."),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, nil)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+text_generation.go`
+
+### Shell
+
+`# Use File API to upload audio data to API request.
+MIME_TYPE=$(file -b --mime-type "${AUDIO_PATH}")
+NUM_BYTES=$(wc -c < "${AUDIO_PATH}")
+DISPLAY_NAME=AUDIO
+tmp_header_file=upload-header.tmp
+# Initial resumable request defining metadata.
+# The upload url is in the response headers dump them to a file.
+curl "${BASE_URL}/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+ -D upload-header.tmp \
+ -H "X-Goog-Upload-Protocol: resumable" \
+ -H "X-Goog-Upload-Command: start" \
+ -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Header-Content-Type: ${MIME_TYPE}" \
+ -H "Content-Type: application/json" \
+ -d "{'file': {'display_name': '${DISPLAY_NAME}'}}" 2> /dev/null
+upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")
+rm "${tmp_header_file}"
+# Upload the actual bytes.
+curl "${upload_url}" \
+ -H "Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Offset: 0" \
+ -H "X-Goog-Upload-Command: upload, finalize" \
+ --data-binary "@${AUDIO_PATH}" 2> /dev/null > file_info.json
+file_uri=$(jq ".file.uri" file_info.json)
+echo file_uri=$file_uri
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Please describe this file."},
+ {"file_data":{"mime_type": "audio/mpeg", "file_uri": '$file_uri'}}]
+ }]
+ }' 2> /dev/null > response.json
+cat response.json
+echo
+jq ".candidates[].content.parts[].text" response.json
+
+text_generation.sh`
+
+### Video
+
+### Python
+
+`from google import genai
+import time
+client = genai.Client()
+# Video clip (CC BY 3.0) from https://peach.blender.org/download/
+myfile = client.files.upload(file=media / "Big_Buck_Bunny.mp4")
+print(f"{myfile=}")
+# Poll until the video file is completely processed (state becomes ACTIVE).
+while not myfile.state or myfile.state.name != "ACTIVE":
+print("Processing video...")
+print("File state:", myfile.state)
+time.sleep(5)
+myfile = client.files.get(name=myfile.name)
+response = client.models.generate_content(
+model="gemini-3.7-flash", contents=[myfile, "Describe this video clip"]
+)
+print(f"{response.text=}")
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let video = await ai.files.upload({
+ file: path.join(media, 'Big_Buck_Bunny.mp4'),
+});
+// Poll until the video file is completely processed (state becomes ACTIVE).
+while (!video.state || video.state.toString() !== 'ACTIVE') {
+ console.log('Processing video...');
+ console.log('File state: ', video.state);
+ await sleep(5000);
+ video = await ai.files.get({name: video.name});
+}
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: [
+ createUserContent([
+ "Describe this video clip",
+ createPartFromUri(video.uri, video.mimeType),
+ ]),
+ ],
+});
+console.log(response.text);
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "Big_Buck_Bunny.mp4"), 
+ &genai.UploadFileConfig{
+ MIMEType : "video/mp4",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+// Poll until the video file is completely processed (state becomes ACTIVE).
+for file.State == genai.FileStateUnspecified || file.State != genai.FileStateActive {
+ fmt.Println("Processing video...")
+ fmt.Println("File state:", file.State)
+ time.Sleep(5 * time.Second)
+ file, err = client.Files.Get(ctx, file.Name, nil)
+ if err != nil {
+ log.Fatal(err)
+ }
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Describe this video clip"),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, nil)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+text_generation.go`
+
+### Shell
+
+`# Use File API to upload audio data to API request.
+MIME_TYPE=$(file -b --mime-type "${VIDEO_PATH}")
+NUM_BYTES=$(wc -c < "${VIDEO_PATH}")
+DISPLAY_NAME=VIDEO
+# Initial resumable request defining metadata.
+# The upload url is in the response headers dump them to a file.
+curl "${BASE_URL}/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+ -D "${tmp_header_file}" \
+ -H "X-Goog-Upload-Protocol: resumable" \
+ -H "X-Goog-Upload-Command: start" \
+ -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Header-Content-Type: ${MIME_TYPE}" \
+ -H "Content-Type: application/json" \
+ -d "{'file': {'display_name': '${DISPLAY_NAME}'}}" 2> /dev/null
+upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")
+rm "${tmp_header_file}"
+# Upload the actual bytes.
+curl "${upload_url}" \
+ -H "Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Offset: 0" \
+ -H "X-Goog-Upload-Command: upload, finalize" \
+ --data-binary "@${VIDEO_PATH}" 2> /dev/null > file_info.json
+file_uri=$(jq ".file.uri" file_info.json)
+echo file_uri=$file_uri
+state=$(jq ".file.state" file_info.json)
+echo state=$state
+name=$(jq ".file.name" file_info.json)
+echo name=$name
+while [[ "($state)" = *"PROCESSING"* ]];
+do
+ echo "Processing video..."
+ sleep 5
+ # Get the file of interest to check state
+ curl https://generativelanguage.googleapis.com/v1beta/files/$name > file_info.json
+ state=$(jq ".file.state" file_info.json)
+done
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Transcribe the audio from this video, giving timestamps for salient events in the video. Also provide visual descriptions."},
+ {"file_data":{"mime_type": "video/mp4", "file_uri": '$file_uri'}}]
+ }]
+ }' 2> /dev/null > response.json
+cat response.json
+echo
+jq ".candidates[].content.parts[].text" response.json
+
+text_generation.sh`
+
+### PDF
+
+### Python
+
+`from google import genai
+client = genai.Client()
+sample_pdf = client.files.upload(file=media / "test.pdf")
+response = client.models.generate_content(
+model="gemini-3.7-flash",
+contents=["Give me a summary of this document:", sample_pdf],
+)
+print(f"{response.text=}")
+
+text_generation.py`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "test.pdf"), 
+ &genai.UploadFileConfig{
+ MIMEType : "application/pdf",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Give me a summary of this document:"),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, nil)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+text_generation.go`
+
+### Shell
+
+`MIME_TYPE=$(file -b --mime-type "${PDF_PATH}")
+NUM_BYTES=$(wc -c < "${PDF_PATH}")
+DISPLAY_NAME=TEXT
+echo $MIME_TYPE
+tmp_header_file=upload-header.tmp
+# Initial resumable request defining metadata.
+# The upload url is in the response headers dump them to a file.
+curl "${BASE_URL}/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+ -D upload-header.tmp \
+ -H "X-Goog-Upload-Protocol: resumable" \
+ -H "X-Goog-Upload-Command: start" \
+ -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Header-Content-Type: ${MIME_TYPE}" \
+ -H "Content-Type: application/json" \
+ -d "{'file': {'display_name': '${DISPLAY_NAME}'}}" 2> /dev/null
+upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")
+rm "${tmp_header_file}"
+# Upload the actual bytes.
+curl "${upload_url}" \
+ -H "Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Offset: 0" \
+ -H "X-Goog-Upload-Command: upload, finalize" \
+ --data-binary "@${PDF_PATH}" 2> /dev/null > file_info.json
+file_uri=$(jq ".file.uri" file_info.json)
+echo file_uri=$file_uri
+# Now generate content using that file
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Can you add a few more lines to this poem?"},
+ {"file_data":{"mime_type": "application/pdf", "file_uri": '$file_uri'}}]
+ }]
+ }' 2> /dev/null > response.json
+cat response.json
+echo
+jq ".candidates[].content.parts[].text" response.json
+
+text_generation.sh`
+
+### Chat
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+# Pass initial history using the "history" argument
+chat = client.chats.create(
+model="gemini-3.7-flash",
+history=[
+types.Content(role="user", parts=[types.Part(text="Hello")]),
+types.Content(
+role="model",
+parts=[
+types.Part(
+text="Great to meet you. What would you like to know?"
+)
+],
+),
+],
+)
+response = chat.send_message(message="I have 2 dogs in my house.")
+print(response.text)
+response = chat.send_message(message="How many paws are in my house?")
+print(response.text)
+
+chat.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const chat = ai.chats.create({
+ model: "gemini-3.7-flash",
+ history: [
+ {
+ role: "user",
+ parts: [{ text: "Hello" }],
+ },
+ {
+ role: "model",
+ parts: [{ text: "Great to meet you. What would you like to know?" }],
+ },
+ ],
+});
+const response1 = await chat.sendMessage({
+ message: "I have 2 dogs in my house.",
+});
+console.log("Chat response 1:", response1.text);
+const response2 = await chat.sendMessage({
+ message: "How many paws are in my house?",
+});
+console.log("Chat response 2:", response2.text);
+
+chat.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+// Pass initial history using the History field.
+history := []*genai.Content{
+ genai.NewContentFromText("Hello", genai.RoleUser),
+ genai.NewContentFromText("Great to meet you. What would you like to know?", genai.RoleModel),
+}
+chat, err := client.Chats.Create(ctx, "gemini-3.7-flash", nil, history)
+if err != nil {
+ log.Fatal(err)
+}
+firstResp, err := chat.SendMessage(ctx, genai.Part{Text: "I have 2 dogs in my house."})
+if err != nil {
+ log.Fatal(err)
+}
+fmt.Println(firstResp.Text())
+secondResp, err := chat.SendMessage(ctx, genai.Part{Text: "How many paws are in my house?"})
+if err != nil {
+ log.Fatal(err)
+}
+fmt.Println(secondResp.Text())
+
+chat.go`
+
+### Shell
+
+`curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [
+ {"role":"user",
+ "parts":[{
+ "text": "Hello"}]},
+ {"role": "model",
+ "parts":[{
+ "text": "Great to meet you. What would you like to know?"}]},
+ {"role":"user",
+ "parts":[{
+ "text": "I have two dogs in my house. How many paws are in my house?"}]},
+ ]
+ }' 2> /dev/null | grep "text"
+
+chat.sh`
+
+### Java
+
+`Client client = new Client();
+Content userContent = Content.fromParts(Part.fromText("Hello"));
+Content modelContent =
+ Content.builder()
+ .role("model")
+ .parts(
+ Collections.singletonList(
+ Part.fromText("Great to meet you. What would you like to know?")
+ )
+ ).build();
+Chat chat = client.chats.create(
+ "gemini-3.7-flash",
+ GenerateContentConfig.builder()
+ .systemInstruction(userContent)
+ .systemInstruction(modelContent)
+ .build()
+);
+GenerateContentResponse response1 = chat.sendMessage("I have 2 dogs in my house.");
+System.out.println(response1.text());
+GenerateContentResponse response2 = chat.sendMessage("How many paws are in my house?");
+System.out.println(response2.text());
+
+ChatSession.java`
+
+### Cache
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+document = client.files.upload(file=media / "a11.txt")
+model_name = "gemini-3.7-flash"
+cache = client.caches.create(
+model=model_name,
+config=types.CreateCachedContentConfig(
+contents=[document],
+system_instruction="You are an expert analyzing transcripts.",
+),
+)
+print(cache)
+response = client.models.generate_content(
+model=model_name,
+contents="Please summarize this transcript",
+config=types.GenerateContentConfig(cached_content=cache.name),
+)
+print(response.text)
+
+cache.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const filePath = path.join(media, "a11.txt");
+const document = await ai.files.upload({
+ file: filePath,
+ config: { mimeType: "text/plain" },
+});
+console.log("Uploaded file name:", document.name);
+const modelName = "gemini-3.7-flash";
+const contents = [
+ createUserContent(createPartFromUri(document.uri, document.mimeType)),
+];
+const cache = await ai.caches.create({
+ model: modelName,
+ config: {
+ contents: contents,
+ systemInstruction: "You are an expert analyzing transcripts.",
+ },
+});
+console.log("Cache created:", cache);
+const response = await ai.models.generateContent({
+ model: modelName,
+ contents: "Please summarize this transcript",
+ config: { cachedContent: cache.name },
+});
+console.log("Response text:", response.text);
+
+cache.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"), 
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+modelName := "gemini-3.7-flash"
+document, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "a11.txt"), 
+ &genai.UploadFileConfig{
+ MIMEType : "text/plain",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromURI(document.URI, document.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+cache, err := client.Caches.Create(ctx, modelName, &genai.CreateCachedContentConfig{
+ Contents: contents,
+ SystemInstruction: genai.NewContentFromText(
+ "You are an expert analyzing transcripts.", genai.RoleUser,
+ ),
+})
+if err != nil {
+ log.Fatal(err)
+}
+fmt.Println("Cache created:")
+fmt.Println(cache)
+// Use the cache for generating content.
+response, err := client.Models.GenerateContent(
+ ctx,
+ modelName,
+ genai.Text("Please summarize this transcript"),
+ &genai.GenerateContentConfig{
+ CachedContent: cache.Name,
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+cache.go`
+
+### Tuned Model
+
+### Python
+
+`# With Gemini 2 we're launching a new SDK. See the following doc for details.
+# https://ai.google.dev/gemini-api/docs/migrate
+
+README.md`
+
+### JSON Mode
+
+### Python
+
+`from google import genai
+from google.genai import types
+from typing_extensions import TypedDict
+class Recipe(TypedDict):
+recipe_name: str
+ingredients: list[str]
+client = genai.Client()
+result = client.models.generate_content(
+model="gemini-3.7-flash",
+contents="List a few popular cookie recipes.",
+config=types.GenerateContentConfig(
+response_mime_type="application/json", response_schema=list[Recipe]
+),
+)
+print(result)
+
+controlled_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: "List a few popular cookie recipes.",
+ config: {
+ responseMimeType: "application/json",
+ responseSchema: {
+ type: "array",
+ items: {
+ type: "object",
+ properties: {
+ recipeName: { type: "string" },
+ ingredients: { type: "array", items: { type: "string" } },
+ },
+ required: ["recipeName", "ingredients"],
+ },
+ },
+ },
+});
+console.log(response.text);
+
+controlled_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"), 
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+schema := &genai.Schema{
+ Type: genai.TypeArray,
+ Items: &genai.Schema{
+ Type: genai.TypeObject,
+ Properties: map[string]*genai.Schema{
+ "recipe_name": {Type: genai.TypeString},
+ "ingredients": {
+ Type: genai.TypeArray,
+ Items: &genai.Schema{Type: genai.TypeString},
+ },
+ },
+ Required: []string{"recipe_name"},
+ },
+}
+config := &genai.GenerateContentConfig{
+ ResponseMIMEType: "application/json",
+ ResponseSchema: schema,
+}
+response, err := client.Models.GenerateContent(
+ ctx,
+ "gemini-3.7-flash",
+ genai.Text("List a few popular cookie recipes."),
+ config,
+)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+controlled_generation.go`
+
+### Shell
+
+`curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+-H 'Content-Type: application/json' \
+-d '{
+ "contents": [{
+ "parts":[
+ {"text": "List 5 popular cookie recipes"}
+ ]
+ }],
+ "generationConfig": {
+ "response_mime_type": "application/json",
+ "response_schema": {
+ "type": "ARRAY",
+ "items": {
+ "type": "OBJECT",
+ "properties": {
+ "recipe_name": {"type":"STRING"},
+ }
+ }
+ }
+ }
+}' 2> /dev/null | head
+
+controlled_generation.sh`
+
+### Java
+
+`Client client = new Client();
+Schema recipeSchema = Schema.builder()
+ .type(Array.class.getSimpleName())
+ .items(Schema.builder()
+ .type(Object.class.getSimpleName())
+ .properties(
+ Map.of("recipe_name", Schema.builder()
+ .type(String.class.getSimpleName())
+ .build(),
+ "ingredients", Schema.builder()
+ .type(Array.class.getSimpleName())
+ .items(Schema.builder()
+ .type(String.class.getSimpleName())
+ .build())
+ .build())
+ )
+ .required(List.of("recipe_name", "ingredients"))
+ .build())
+ .build();
+GenerateContentConfig config =
+ GenerateContentConfig.builder()
+ .responseMimeType("application/json")
+ .responseSchema(recipeSchema)
+ .build();
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ "List a few popular cookie recipes.",
+ config);
+System.out.println(response.text());
+
+ControlledGeneration.java`
+
+### Code execution
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+response = client.models.generate_content(
+model="gemini-3.7-flash",
+contents=(
+"Write and execute code that calculates the sum of the first 50 prime numbers. "
+"Ensure that only the executable code and its resulting output are generated."
+),
+)
+# Each part may contain text, executable code, or an execution result.
+for part in response.candidates[0].content.parts:
+print(part, "\n")
+print("-" * 80)
+# The .text accessor concatenates the parts into a markdown-formatted text.
+print("\n", response.text)
+
+code_execution.py`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+response, err := client.Models.GenerateContent(
+ ctx,
+ "gemini-3.7-flash",
+ genai.Text(
+ `Write and execute code that calculates the sum of the first 50 prime numbers.
+ Ensure that only the executable code and its resulting output are generated.`,
+ ),
+ &genai.GenerateContentConfig{},
+)
+if err != nil {
+ log.Fatal(err)
+}
+// Print the response.
+printResponse(response)
+fmt.Println("--------------------------------------------------------------------------------")
+fmt.Println(response.Text())
+
+code_execution.go`
+
+### Java
+
+`Client client = new Client();
+String prompt = """
+ Write and execute code that calculates the sum of the first 50 prime numbers.
+ Ensure that only the executable code and its resulting output are generated.
+ """;
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ prompt,
+ null);
+for (Part part : response.candidates().get().getFirst().content().get().parts().get()) {
+ System.out.println(part + "\n");
+}
+System.out.println("-".repeat(80));
+System.out.println(response.text());
+
+CodeExecution.java`
+
+### Function Calling
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+def add(a: float, b: float) -> float:
+ """returns a + b."""
+return a + b
+def subtract(a: float, b: float) -> float:
+ """returns a - b."""
+return a - b
+def multiply(a: float, b: float) -> float:
+ """returns a * b."""
+return a * b
+def divide(a: float, b: float) -> float:
+ """returns a / b."""
+return a / b
+# Create a chat session; function calling (via tools) is enabled in the config.
+chat = client.chats.create(
+model="gemini-3.7-flash",
+config=types.GenerateContentConfig(tools=[add, subtract, multiply, divide]),
+)
+response = chat.send_message(
+message="I have 57 cats, each owns 44 mittens, how many mittens is that in total?"
+)
+print(response.text)
+
+function_calling.py`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+modelName := "gemini-3.7-flash"
+// Create the function declarations for arithmetic operations.
+addDeclaration := createArithmeticToolDeclaration("addNumbers", "Return the result of adding two numbers.")
+subtractDeclaration := createArithmeticToolDeclaration("subtractNumbers", "Return the result of subtracting the second number from the first.")
+multiplyDeclaration := createArithmeticToolDeclaration("multiplyNumbers", "Return the product of two numbers.")
+divideDeclaration := createArithmeticToolDeclaration("divideNumbers", "Return the quotient of dividing the first number by the second.")
+// Group the function declarations as a tool.
+tools := []*genai.Tool{
+ {
+ FunctionDeclarations: []*genai.FunctionDeclaration{
+ addDeclaration,
+ subtractDeclaration,
+ multiplyDeclaration,
+ divideDeclaration,
+ },
+ },
+}
+// Create the content prompt.
+contents := []*genai.Content{
+ genai.NewContentFromText(
+ "I have 57 cats, each owns 44 mittens, how many mittens is that in total?", genai.RoleUser,
+ ),
+}
+// Set up the generate content configuration with function calling enabled.
+config := &genai.GenerateContentConfig{
+ Tools: tools,
+ ToolConfig: &genai.ToolConfig{
+ FunctionCallingConfig: &genai.FunctionCallingConfig{
+ // The mode equivalent to FunctionCallingConfigMode.ANY in JS.
+ Mode: genai.FunctionCallingConfigModeAny,
+ },
+ },
+}
+genContentResp, err := client.Models.GenerateContent(ctx, modelName, contents, config)
+if err != nil {
+ log.Fatal(err)
+}
+// Assume the response includes a list of function calls.
+if len(genContentResp.FunctionCalls()) == 0 {
+ log.Println("No function call returned from the AI.")
+ return nil
+}
+functionCall := genContentResp.FunctionCalls()[0]
+log.Printf("Function call: %+v\n", functionCall)
+// Marshal the Args map into JSON bytes.
+argsMap, err := json.Marshal(functionCall.Args)
+if err != nil {
+ log.Fatal(err)
+}
+// Unmarshal the JSON bytes into the ArithmeticArgs struct.
+var args ArithmeticArgs
+if err := json.Unmarshal(argsMap, &args); err != nil {
+ log.Fatal(err)
+}
+// Map the function name to the actual arithmetic function.
+var result float64
+switch functionCall.Name {
+ case "addNumbers":
+ result = add(args.FirstParam, args.SecondParam)
+ case "subtractNumbers":
+ result = subtract(args.FirstParam, args.SecondParam)
+ case "multiplyNumbers":
+ result = multiply(args.FirstParam, args.SecondParam)
+ case "divideNumbers":
+ result = divide(args.FirstParam, args.SecondParam)
+ default:
+ return fmt.Errorf("unimplemented function: %s", functionCall.Name)
+}
+log.Printf("Function result: %v\n", result)
+// Prepare the final result message as content.
+resultContents := []*genai.Content{
+ genai.NewContentFromText("The final result is " + fmt.Sprintf("%v", result), genai.RoleUser),
+}
+// Use GenerateContent to send the final result.
+finalResponse, err := client.Models.GenerateContent(ctx, modelName, resultContents, &genai.GenerateContentConfig{})
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(finalResponse)
+
+function_calling.go`
+
+### Node.js
+
+ `// Make sure to include the following import:
+ // import {GoogleGenAI} from '@google/genai';
+ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+ /**
+ * The add function returns the sum of two numbers.
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
+ function add(a, b) {
+ return a + b;
+ }
+ /**
+ * The subtract function returns the difference (a - b).
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
+ function subtract(a, b) {
+ return a - b;
+ }
+ /**
+ * The multiply function returns the product of two numbers.
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
+ function multiply(a, b) {
+ return a * b;
+ }
+ /**
+ * The divide function returns the quotient of a divided by b.
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
+ function divide(a, b) {
+ return a / b;
+ }
+ const addDeclaration = {
+ name: "addNumbers",
+ parameters: {
+ type: "object",
+ description: "Return the result of adding two numbers.",
+ properties: {
+ firstParam: {
+ type: "number",
+ description:
+ "The first parameter which can be an integer or a floating point number.",
+ },
+ secondParam: {
+ type: "number",
+ description:
+ "The second parameter which can be an integer or a floating point number.",
+ },
+ },
+ required: ["firstParam", "secondParam"],
+ },
+ };
+ const subtractDeclaration = {
+ name: "subtractNumbers",
+ parameters: {
+ type: "object",
+ description:
+ "Return the result of subtracting the second number from the first.",
+ properties: {
+ firstParam: {
+ type: "number",
+ description: "The first parameter.",
+ },
+ secondParam: {
+ type: "number",
+ description: "The second parameter.",
+ },
+ },
+ required: ["firstParam", "secondParam"],
+ },
+ };
+ const multiplyDeclaration = {
+ name: "multiplyNumbers",
+ parameters: {
+ type: "object",
+ description: "Return the product of two numbers.",
+ properties: {
+ firstParam: {
+ type: "number",
+ description: "The first parameter.",
+ },
+ secondParam: {
+ type: "number",
+ description: "The second parameter.",
+ },
+ },
+ required: ["firstParam", "secondParam"],
+ },
+ };
+ const divideDeclaration = {
+ name: "divideNumbers",
+ parameters: {
+ type: "object",
+ description:
+ "Return the quotient of dividing the first number by the second.",
+ properties: {
+ firstParam: {
+ type: "number",
+ description: "The first parameter.",
+ },
+ secondParam: {
+ type: "number",
+ description: "The second parameter.",
+ },
+ },
+ required: ["firstParam", "secondParam"],
+ },
+ };
+ // Step 1: Call generateContent with function calling enabled.
+ const generateContentResponse = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents:
+ "I have 57 cats, each owns 44 mittens, how many mittens is that in total?",
+ config: {
+ toolConfig: {
+ functionCallingConfig: {
+ mode: FunctionCallingConfigMode.ANY,
+ },
+ },
+ tools: [
+ {
+ functionDeclarations: [
+ addDeclaration,
+ subtractDeclaration,
+ multiplyDeclaration,
+ divideDeclaration,
+ ],
+ },
+ ],
+ },
+ });
+ // Step 2: Extract the function call.(
+ // Assuming the response contains a 'functionCalls' array.
+ const functionCall =
+ generateContentResponse.functionCalls &&
+ generateContentResponse.functionCalls[0];
+ console.log(functionCall);
+ // Parse the arguments.
+ const args = functionCall.args;
+ // Expected args format: { firstParam: number, secondParam: number }
+ // Step 3: Invoke the actual function based on the function name.
+ const functionMapping = {
+ addNumbers: add,
+ subtractNumbers: subtract,
+ multiplyNumbers: multiply,
+ divideNumbers: divide,
+ };
+ const func = functionMapping[functionCall.name];
+ if (!func) {
+ console.error("Unimplemented error:", functionCall.name);
+ return generateContentResponse;
+ }
+ const resultValue = func(args.firstParam, args.secondParam);
+ console.log("Function result:", resultValue);
+ // Step 4: Use the chat API to send the result as the final answer.
+ const chat = ai.chats.create({ model: "gemini-3.7-flash" });
+ const chatResponse = await chat.sendMessage({
+ message: "The final result is " + resultValue,
+ });
+ console.log(chatResponse.text);
+ return chatResponse;
+}
+
+function_calling.js`
+
+### Shell
+
+`cat > tools.json << EOF
+{
+ "function_declarations": [
+ {
+ "name": "enable_lights",
+ "description": "Turn on the lighting system."
+ },
+ {
+ "name": "set_light_color",
+ "description": "Set the light color. Lights must be enabled for this to work.",
+ "parameters": {
+ "type": "object",
+ "properties": {
+ "rgb_hex": {
+ "type": "string",
+ "description": "The light color as a 6-digit hex string, e.g. ff0000 for red."
+ }
+ },
+ "required": [
+ "rgb_hex"
+ ]
+ }
+ },
+ {
+ "name": "stop_lights",
+ "description": "Turn off the lighting system."
+ }
+ ]
+} 
+EOF
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -d @<(echo '
+ {
+ "system_instruction": {
+ "parts": {
+ "text": "You are a helpful lighting system bot. You can turn lights on and off, and you can set the color. Do not perform any other tasks."
+ }
+ },
+ "tools": ['$(cat tools.json)'],
+ "tool_config": {
+ "function_calling_config": {"mode": "auto"}
+ },
+ "contents": {
+ "role": "user",
+ "parts": {
+ "text": "Turn on the lights please."
+ }
+ }
+ }
+') 2>/dev/null |sed -n '/"content"/,/"finishReason"/p'
+
+function_calling.sh`
+
+### Java
+
+`Client client = new Client();
+FunctionDeclaration addFunction =
+ FunctionDeclaration.builder()
+ .name("addNumbers")
+ .parameters(
+ Schema.builder()
+ .type("object")
+ .properties(Map.of(
+ "firstParam", Schema.builder().type("number").description("First number").build(),
+ "secondParam", Schema.builder().type("number").description("Second number").build()))
+ .required(Arrays.asList("firstParam", "secondParam"))
+ .build())
+ .build();
+FunctionDeclaration subtractFunction =
+ FunctionDeclaration.builder()
+ .name("subtractNumbers")
+ .parameters(
+ Schema.builder()
+ .type("object")
+ .properties(Map.of(
+ "firstParam", Schema.builder().type("number").description("First number").build(),
+ "secondParam", Schema.builder().type("number").description("Second number").build()))
+ .required(Arrays.asList("firstParam", "secondParam"))
+ .build())
+ .build();
+FunctionDeclaration multiplyFunction =
+ FunctionDeclaration.builder()
+ .name("multiplyNumbers")
+ .parameters(
+ Schema.builder()
+ .type("object")
+ .properties(Map.of(
+ "firstParam", Schema.builder().type("number").description("First number").build(),
+ "secondParam", Schema.builder().type("number").description("Second number").build()))
+ .required(Arrays.asList("firstParam", "secondParam"))
+ .build())
+ .build();
+FunctionDeclaration divideFunction =
+ FunctionDeclaration.builder()
+ .name("divideNumbers")
+ .parameters(
+ Schema.builder()
+ .type("object")
+ .properties(Map.of(
+ "firstParam", Schema.builder().type("number").description("First number").build(),
+ "secondParam", Schema.builder().type("number").description("Second number").build()))
+ .required(Arrays.asList("firstParam", "secondParam"))
+ .build())
+ .build();
+GenerateContentConfig config = GenerateContentConfig.builder()
+ .toolConfig(ToolConfig.builder().functionCallingConfig(
+ FunctionCallingConfig.builder().mode("ANY").build()
+ ).build())
+ .tools(
+ Collections.singletonList(
+ Tool.builder().functionDeclarations(
+ Arrays.asList(
+ addFunction,
+ subtractFunction,
+ divideFunction,
+ multiplyFunction
+ )
+ ).build()
+ )
+ )
+ .build();
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ "I have 57 cats, each owns 44 mittens, how many mittens is that in total?",
+ config);
+if (response.functionCalls() == null || response.functionCalls().isEmpty()) {
+ System.err.println("No function call received");
+ return null;
+}
+var functionCall = response.functionCalls().getFirst();
+String functionName = functionCall.name().get();
+var arguments = functionCall.args();
+Map<String, BiFunction<Double, Double, Double>> functionMapping = new HashMap<>();
+functionMapping.put("addNumbers", (a, b) -> a + b);
+functionMapping.put("subtractNumbers", (a, b) -> a - b);
+functionMapping.put("multiplyNumbers", (a, b) -> a * b);
+functionMapping.put("divideNumbers", (a, b) -> b != 0 ? a / b : Double.NaN);
+BiFunction<Double, Double, Double> function = functionMapping.get(functionName);
+Number firstParam = (Number) arguments.get().get("firstParam");
+Number secondParam = (Number) arguments.get().get("secondParam");
+Double result = function.apply(firstParam.doubleValue(), secondParam.doubleValue());
+System.out.println(result);
+
+FunctionCalling.java`
+
+### Generation config
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+response = client.models.generate_content(
+model="gemini-3.7-flash",
+contents="Tell me a story about a magic backpack.",
+config=types.GenerateContentConfig(
+candidate_count=1,
+stop_sequences=["x"],
+max_output_tokens=20,
+temperature=1.0,
+),
+)
+print(response.text)
+
+configure_model_parameters.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: "Tell me a story about a magic backpack.",
+ config: {
+ candidateCount: 1,
+ stopSequences: ["x"],
+ maxOutputTokens: 20,
+ temperature: 1.0,
+ },
+});
+console.log(response.text);
+
+configure_model_parameters.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+// Create local variables for parameters.
+candidateCount := int32(1)
+maxOutputTokens := int32(20)
+temperature := float32(1.0)
+response, err := client.Models.GenerateContent(
+ ctx,
+ "gemini-3.7-flash",
+ genai.Text("Tell me a story about a magic backpack."),
+ &genai.GenerateContentConfig{
+ CandidateCount: candidateCount,
+ StopSequences: []string{"x"},
+ MaxOutputTokens: maxOutputTokens,
+ Temperature: &temperature,
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+configure_model_parameters.go`
+
+### Shell
+
+`curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Explain how AI works"}
+ ]
+ }],
+ "generationConfig": {
+ "stopSequences": [
+ "Title"
+ ],
+ "temperature": 1.0,
+ "maxOutputTokens": 800,
+ "topP": 0.8,
+ "topK": 10
+ }
+ }' 2> /dev/null | grep "text"
+
+configure_model_parameters.sh`
+
+### Java
+
+`Client client = new Client();
+GenerateContentConfig config =
+ GenerateContentConfig.builder()
+ .candidateCount(1)
+ .stopSequences(List.of("x"))
+ .maxOutputTokens(20)
+ .temperature(1.0F)
+ .build();
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ "Tell me a story about a magic backpack.",
+ config);
+System.out.println(response.text());
+
+ConfigureModelParameters.java`
+
+### Safety Settings
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+unsafe_prompt = (
+"I support Martians Soccer Club and I think Jupiterians Football Club sucks! "
+"Write a ironic phrase about them including expletives."
+)
+response = client.models.generate_content(
+model="gemini-3.7-flash",
+contents=unsafe_prompt,
+config=types.GenerateContentConfig(
+safety_settings=[
+types.SafetySetting(
+category="HARM_CATEGORY_HATE_SPEECH",
+threshold="BLOCK_MEDIUM_AND_ABOVE",
+),
+types.SafetySetting(
+category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_ONLY_HIGH"
+),
+]
+),
+)
+try:
+print(response.text)
+except Exception:
+print("No information generated by the model.")
+print(response.candidates[0].safety_ratings)
+
+safety_settings.py`
+
+### Node.js
+
+ `// Make sure to include the following import:
+ // import {GoogleGenAI} from '@google/genai';
+ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+ const unsafePrompt =
+ "I support Martians Soccer Club and I think Jupiterians Football Club sucks! Write a ironic phrase about them including expletives.";
+ const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: unsafePrompt,
+ config: {
+ safetySettings: [
+ {
+ category: "HARM_CATEGORY_HATE_SPEECH",
+ threshold: "BLOCK_MEDIUM_AND_ABOVE",
+ },
+ {
+ category: "HARM_CATEGORY_HARASSMENT",
+ threshold: "BLOCK_ONLY_HIGH",
+ },
+ ],
+ },
+ });
+ try {
+ console.log("Generated text:", response.text);
+ } catch (error) {
+ console.log("No information generated by the model.");
+ }
+ console.log("Safety ratings:", response.candidates[0].safetyRatings);
+ return response;
+}
+
+safety_settings.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+unsafePrompt := "I support Martians Soccer Club and I think Jupiterians Football Club sucks! " +
+ "Write a ironic phrase about them including expletives."
+config := &genai.GenerateContentConfig{
+ SafetySettings: []*genai.SafetySetting{
+ {
+ Category: "HARM_CATEGORY_HATE_SPEECH",
+ Threshold: "BLOCK_MEDIUM_AND_ABOVE",
+ },
+ {
+ Category: "HARM_CATEGORY_HARASSMENT",
+ Threshold: "BLOCK_ONLY_HIGH",
+ },
+ },
+}
+contents := []*genai.Content{
+ genai.NewContentFromText(unsafePrompt, genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, config)
+if err != nil {
+ log.Fatal(err)
+}
+// Print the generated text.
+text := response.Text()
+fmt.Println("Generated text:", text)
+// Print the and safety ratings from the first candidate.
+if len(response.Candidates) > 0 {
+ fmt.Println("Finish reason:", response.Candidates[0].FinishReason)
+ safetyRatings, err := json.MarshalIndent(response.Candidates[0].SafetyRatings, "", " ")
+ if err != nil {
+ return err
+ }
+ fmt.Println("Safety ratings:", string(safetyRatings))
+} else {
+ fmt.Println("No candidate returned.")
+}
+
+safety_settings.go`
+
+### Shell
+
+`echo '{
+ "safetySettings": [
+ {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+ {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}
+ ],
+ "contents": [{
+ "parts":[{
+ "text": "'I support Martians Soccer Club and I think Jupiterians Football Club sucks! Write a ironic phrase about them.'"}]}]}' > request.json
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d @request.json 2> /dev/null
+
+safety_settings.sh`
+
+### Java
+
+`Client client = new Client();
+String unsafePrompt = """
+ I support Martians Soccer Club and I think Jupiterians Football Club sucks!
+ Write a ironic phrase about them including expletives.
+ """;
+GenerateContentConfig config =
+ GenerateContentConfig.builder()
+ .safetySettings(Arrays.asList(
+ SafetySetting.builder()
+ .category("HARM_CATEGORY_HATE_SPEECH")
+ .threshold("BLOCK_MEDIUM_AND_ABOVE")
+ .build(),
+ SafetySetting.builder()
+ .category("HARM_CATEGORY_HARASSMENT")
+ .threshold("BLOCK_ONLY_HIGH")
+ .build()
+ )).build();
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ unsafePrompt,
+ config);
+try {
+ System.out.println(response.text());
+} catch (Exception e) {
+ System.out.println("No information generated by the model");
+}
+System.out.println(response.candidates().get().getFirst().safetyRatings());
+
+SafetySettings.java`
+
+### System Instruction
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+response = client.models.generate_content(
+model="gemini-3.7-flash",
+contents="Good morning! How are you?",
+config=types.GenerateContentConfig(
+system_instruction="You are a cat. Your name is Neko."
+),
+)
+print(response.text)
+
+system_instruction.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const response = await ai.models.generateContent({
+ model: "gemini-3.7-flash",
+ contents: "Good morning! How are you?",
+ config: {
+ systemInstruction: "You are a cat. Your name is Neko.",
+ },
+});
+console.log(response.text);
+
+system_instruction.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+// Construct the user message contents.
+contents := []*genai.Content{
+ genai.NewContentFromText("Good morning! How are you?", genai.RoleUser),
+}
+// Set the system instruction as a *genai.Content.
+config := &genai.GenerateContentConfig{
+ SystemInstruction: genai.NewContentFromText("You are a cat. Your name is Neko.", genai.RoleUser),
+}
+response, err := client.Models.GenerateContent(ctx, "gemini-3.7-flash", contents, config)
+if err != nil {
+ log.Fatal(err)
+}
+printResponse(response)
+
+system_instruction.go`
+
+### Shell
+
+`curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+-H 'Content-Type: application/json' \
+-d '{ "system_instruction": {
+ "parts":
+ { "text": "You are a cat. Your name is Neko."}},
+ "contents": {
+ "parts": {
+ "text": "Hello there"}}}'
+
+system_instruction.sh`
+
+### Java
+
+`Client client = new Client();
+Part textPart = Part.builder().text("You are a cat. Your name is Neko.").build();
+Content content = Content.builder().role("system").parts(ImmutableList.of(textPart)).build();
+GenerateContentConfig config = GenerateContentConfig.builder()
+ .systemInstruction(content)
+ .build();
+GenerateContentResponse response =
+ client.models.generateContent(
+ "gemini-3.7-flash",
+ "Good morning! How are you?",
+ config);
+System.out.println(response.text());
+
+SystemInstruction.java`
+
+### Response body
+
+If successful, the response body contains an instance of `GenerateContentResponse`.
+
+`GenerateContentResponse`
+
+## Method: models.streamGenerateContent
+
+Generates a [streamed response](https://ai.google.dev/gemini-api/docs/text-generation?lang=python#generate-a-text-stream) from the model given an input `GenerateContentRequest`.
+
+`GenerateContentRequest`
+
+### Endpoint
+
+`https://generativelanguage.googleapis.com/v1beta/{model=models/*}:streamGenerateContent`
+
+### Path parameters
+
+`model`
+`string`
+
+Required. The name of the `Model` to use for generating the completion.
+
+`Model`
+
+Format: `models/{model}`. It takes the form `models/{model}`.
+
+`models/{model}`
+`models/{model}`
+
+### Request body
+
+The request body contains data with the following structure:
+
+`contents[]`
+`object (Content)`
+`Content`
+
+Required. The content of the current conversation with the model.
+
+For single-turn queries, this is a single instance. For multi-turn queries like [chat](https://ai.google.dev/gemini-api/docs/text-generation#chat), this is a repeated field that contains the conversation history and the latest request.
+
+`tools[]`
+`object (Tool)`
+`Tool`
+
+Optional. A list of `Tools` the `Model` may use to generate the next response.
+
+`Tools`
+`Model`
+
+A `Tool` is a piece of code that enables the system to interact with external systems to perform an action, or set of actions, outside of knowledge and scope of the `Model`. Supported `Tool`s are `Function` and `codeExecution`. Refer to the [Function calling](https://ai.google.dev/gemini-api/docs/function-calling) and the [Code execution](https://ai.google.dev/gemini-api/docs/code-execution) guides to learn more.
+
+`Tool`
+`Model`
+`Tool`
+`Function`
+`codeExecution`
+`toolConfig`
+`object (ToolConfig)`
+`ToolConfig`
+
+Optional. Tool configuration for any `Tool` specified in the request. Refer to the [Function calling guide](https://ai.google.dev/gemini-api/docs/function-calling#function_calling_mode) for a usage example.
+
+`Tool`
+`safetySettings[]`
+`object (SafetySetting)`
+`SafetySetting`
+
+Optional. A list of unique `SafetySetting` instances for blocking unsafe content.
+
+`SafetySetting`
+
+This will be enforced on the `GenerateContentRequest.contents` and `GenerateContentResponse.candidates`. There should not be more than one setting for each `SafetyCategory` type. The API will block any contents and responses that fail to meet the thresholds set by these settings. This list overrides the default settings for each `SafetyCategory` specified in the safetySettings. If there is no `SafetySetting` for a given `SafetyCategory` provided in the list, the API will use the default safety setting for that category. Harm categories HARM\_CATEGORY\_HATE\_SPEECH, HARM\_CATEGORY\_SEXUALLY\_EXPLICIT, HARM\_CATEGORY\_DANGEROUS\_CONTENT, HARM\_CATEGORY\_HARASSMENT, HARM\_CATEGORY\_CIVIC\_INTEGRITY, HARM\_CATEGORY\_JAILBREAK are supported. Refer to the [guide](https://ai.google.dev/gemini-api/docs/safety-settings) for detailed information on available safety settings. Also refer to the [Safety guidance](https://ai.google.dev/gemini-api/docs/safety-guidance) to learn how to incorporate safety considerations in your AI applications.
+
+`GenerateContentRequest.contents`
+`GenerateContentResponse.candidates`
+`SafetyCategory`
+`SafetyCategory`
+`SafetySetting`
+`SafetyCategory`
+`systemInstruction`
+`object (Content)`
+`Content`
+
+Optional. Developer set [system instruction(s)](https://ai.google.dev/gemini-api/docs/system-instructions). Currently, text only.
+
+`generationConfig`
+`object (GenerationConfig)`
+`GenerationConfig`
+
+Optional. Configuration options for model generation and outputs.
+
+`cachedContent`
+`string`
+
+Optional. The name of the content [cached](https://ai.google.dev/gemini-api/docs/caching) to use as context to serve the prediction. Format: `cachedContents/{cachedContent}`
+
+`cachedContents/{cachedContent}`
+`serviceTier`
+`enum (ServiceTier)`
+`ServiceTier`
+
+Optional. The service tier of the request.
+
+`store`
+`boolean`
+
+Optional. Configures the logging behavior for a given request. If set, it takes precedence over the project-level logging config.
+
+### Example request
+
+### Text
+
+### Python
+
+`from google import genai
+client = genai.Client()
+response = client.models.generate_content_stream(
+model="gemini-3.7-flash", contents="Write a story about a magic backpack."
+)
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const response = await ai.models.generateContentStream({
+ model: "gemini-3.7-flash",
+ contents: "Write a story about a magic backpack.",
+});
+let text = "";
+for await (const chunk of response) {
+ console.log(chunk.text);
+ text += chunk.text;
+}
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+contents := []*genai.Content{
+ genai.NewContentFromText("Write a story about a magic backpack.", genai.RoleUser),
+}
+for response, err := range client.Models.GenerateContentStream(
+ ctx,
+ "gemini-3.7-flash",
+ contents,
+ nil,
+) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Print(response.Candidates[0].Content.Parts[0].Text)
+}
+
+text_generation.go`
+
+### Shell
+
+`curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}" \
+ -H 'Content-Type: application/json' \
+ --no-buffer \
+ -d '{ "contents":[{"parts":[{"text": "Write a story about a magic backpack."}]}]}'
+
+text_generation.sh`
+
+### Java
+
+`Client client = new Client();
+ResponseStream<GenerateContentResponse> responseStream =
+ client.models.generateContentStream(
+ "gemini-3.7-flash",
+ "Write a story about a magic backpack.",
+ null);
+StringBuilder response = new StringBuilder();
+for (GenerateContentResponse res : responseStream) {
+ System.out.print(res.text());
+ response.append(res.text());
+}
+responseStream.close();
+
+TextGeneration.java`
+
+### Image
+
+### Python
+
+`from google import genai
+import PIL.Image
+client = genai.Client()
+organ = PIL.Image.open(media / "organ.jpg")
+response = client.models.generate_content_stream(
+model="gemini-3.7-flash", contents=["Tell me about this instrument", organ]
+)
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const organ = await ai.files.upload({
+ file: path.join(media, "organ.jpg"),
+});
+const response = await ai.models.generateContentStream({
+ model: "gemini-3.7-flash",
+ contents: [
+ createUserContent([
+ "Tell me about this instrument", 
+ createPartFromUri(organ.uri, organ.mimeType)
+ ]),
+ ],
+});
+let text = "";
+for await (const chunk of response) {
+ console.log(chunk.text);
+ text += chunk.text;
+}
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "organ.jpg"), 
+ &genai.UploadFileConfig{
+ MIMEType : "image/jpeg",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Tell me about this instrument"),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+for response, err := range client.Models.GenerateContentStream(
+ ctx,
+ "gemini-3.7-flash",
+ contents,
+ nil,
+) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Print(response.Candidates[0].Content.Parts[0].Text)
+}
+
+text_generation.go`
+
+### Shell
+
+`cat > "$TEMP_JSON" << EOF
+{
+ "contents": [{
+ "parts":[
+ {"text": "Tell me about this instrument"},
+ {
+ "inline_data": {
+ "mime_type":"image/jpeg",
+ "data": "$(cat "$TEMP_B64")"
+ }
+ }
+ ]
+ }]
+}
+EOF
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d "@$TEMP_JSON" 2> /dev/null
+
+text_generation.sh`
+
+### Java
+
+`Client client = new Client();
+String path = media_path + "organ.jpg";
+byte[] imageData = Files.readAllBytes(Paths.get(path));
+Content content =
+ Content.fromParts(
+ Part.fromText("Tell me about this instrument."),
+ Part.fromBytes(imageData, "image/jpeg"));
+ResponseStream<GenerateContentResponse> responseStream =
+ client.models.generateContentStream(
+ "gemini-3.7-flash",
+ content,
+ null);
+StringBuilder response = new StringBuilder();
+for (GenerateContentResponse res : responseStream) {
+ System.out.print(res.text());
+ response.append(res.text());
+}
+responseStream.close();
+
+TextGeneration.java`
+
+### Audio
+
+### Python
+
+`from google import genai
+client = genai.Client()
+sample_audio = client.files.upload(file=media / "sample.mp3")
+response = client.models.generate_content_stream(
+model="gemini-3.7-flash",
+contents=["Give me a summary of this audio file.", sample_audio],
+)
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+
+text_generation.py`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "sample.mp3"), 
+ &genai.UploadFileConfig{
+ MIMEType : "audio/mpeg",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Give me a summary of this audio file."),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+for result, err := range client.Models.GenerateContentStream(
+ ctx,
+ "gemini-3.7-flash",
+ contents,
+ nil,
+) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Print(result.Candidates[0].Content.Parts[0].Text)
+}
+
+text_generation.go`
+
+### Shell
+
+`# Use File API to upload audio data to API request.
+MIME_TYPE=$(file -b --mime-type "${AUDIO_PATH}")
+NUM_BYTES=$(wc -c < "${AUDIO_PATH}")
+DISPLAY_NAME=AUDIO
+tmp_header_file=upload-header.tmp
+# Initial resumable request defining metadata.
+# The upload url is in the response headers dump them to a file.
+curl "${BASE_URL}/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+ -D upload-header.tmp \
+ -H "X-Goog-Upload-Protocol: resumable" \
+ -H "X-Goog-Upload-Command: start" \
+ -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Header-Content-Type: ${MIME_TYPE}" \
+ -H "Content-Type: application/json" \
+ -d "{'file': {'display_name': '${DISPLAY_NAME}'}}" 2> /dev/null
+upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")
+rm "${tmp_header_file}"
+# Upload the actual bytes.
+curl "${upload_url}" \
+ -H "Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Offset: 0" \
+ -H "X-Goog-Upload-Command: upload, finalize" \
+ --data-binary "@${AUDIO_PATH}" 2> /dev/null > file_info.json
+file_uri=$(jq ".file.uri" file_info.json)
+echo file_uri=$file_uri
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Please describe this file."},
+ {"file_data":{"mime_type": "audio/mpeg", "file_uri": '$file_uri'}}]
+ }]
+ }' 2> /dev/null > response.json
+cat response.json
+echo
+
+text_generation.sh`
+
+### Video
+
+### Python
+
+`from google import genai
+import time
+client = genai.Client()
+# Video clip (CC BY 3.0) from https://peach.blender.org/download/
+myfile = client.files.upload(file=media / "Big_Buck_Bunny.mp4")
+print(f"{myfile=}")
+# Poll until the video file is completely processed (state becomes ACTIVE).
+while not myfile.state or myfile.state.name != "ACTIVE":
+print("Processing video...")
+print("File state:", myfile.state)
+time.sleep(5)
+myfile = client.files.get(name=myfile.name)
+response = client.models.generate_content_stream(
+model="gemini-3.7-flash", contents=[myfile, "Describe this video clip"]
+)
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+
+text_generation.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let video = await ai.files.upload({
+ file: path.join(media, 'Big_Buck_Bunny.mp4'),
+});
+// Poll until the video file is completely processed (state becomes ACTIVE).
+while (!video.state || video.state.toString() !== 'ACTIVE') {
+ console.log('Processing video...');
+ console.log('File state: ', video.state);
+ await sleep(5000);
+ video = await ai.files.get({name: video.name});
+}
+const response = await ai.models.generateContentStream({
+ model: "gemini-3.7-flash",
+ contents: [
+ createUserContent([
+ "Describe this video clip",
+ createPartFromUri(video.uri, video.mimeType),
+ ]),
+ ],
+});
+let text = "";
+for await (const chunk of response) {
+ console.log(chunk.text);
+ text += chunk.text;
+}
+
+text_generation.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "Big_Buck_Bunny.mp4"), 
+ &genai.UploadFileConfig{
+ MIMEType : "video/mp4",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+// Poll until the video file is completely processed (state becomes ACTIVE).
+for file.State == genai.FileStateUnspecified || file.State != genai.FileStateActive {
+ fmt.Println("Processing video...")
+ fmt.Println("File state:", file.State)
+ time.Sleep(5 * time.Second)
+ file, err = client.Files.Get(ctx, file.Name, nil)
+ if err != nil {
+ log.Fatal(err)
+ }
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Describe this video clip"),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+for result, err := range client.Models.GenerateContentStream(
+ ctx,
+ "gemini-3.7-flash",
+ contents,
+ nil,
+) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Print(result.Candidates[0].Content.Parts[0].Text)
+}
+
+text_generation.go`
+
+### Shell
+
+`# Use File API to upload audio data to API request.
+MIME_TYPE=$(file -b --mime-type "${VIDEO_PATH}")
+NUM_BYTES=$(wc -c < "${VIDEO_PATH}")
+DISPLAY_NAME=VIDEO_PATH
+# Initial resumable request defining metadata.
+# The upload url is in the response headers dump them to a file.
+curl "${BASE_URL}/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+ -D upload-header.tmp \
+ -H "X-Goog-Upload-Protocol: resumable" \
+ -H "X-Goog-Upload-Command: start" \
+ -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Header-Content-Type: ${MIME_TYPE}" \
+ -H "Content-Type: application/json" \
+ -d "{'file': {'display_name': '${DISPLAY_NAME}'}}" 2> /dev/null
+upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")
+rm "${tmp_header_file}"
+# Upload the actual bytes.
+curl "${upload_url}" \
+ -H "Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Offset: 0" \
+ -H "X-Goog-Upload-Command: upload, finalize" \
+ --data-binary "@${VIDEO_PATH}" 2> /dev/null > file_info.json
+file_uri=$(jq ".file.uri" file_info.json)
+echo file_uri=$file_uri
+state=$(jq ".file.state" file_info.json)
+echo state=$state
+while [[ "($state)" = *"PROCESSING"* ]];
+do
+ echo "Processing video..."
+ sleep 5
+ # Get the file of interest to check state
+ curl https://generativelanguage.googleapis.com/v1beta/files/$name > file_info.json
+ state=$(jq ".file.state" file_info.json)
+done
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Please describe this file."},
+ {"file_data":{"mime_type": "video/mp4", "file_uri": '$file_uri'}}]
+ }]
+ }' 2> /dev/null > response.json
+cat response.json
+echo
+
+text_generation.sh`
+
+### PDF
+
+### Python
+
+`from google import genai
+client = genai.Client()
+sample_pdf = client.files.upload(file=media / "test.pdf")
+response = client.models.generate_content_stream(
+model="gemini-3.7-flash",
+contents=["Give me a summary of this document:", sample_pdf],
+)
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+
+text_generation.py`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+file, err := client.Files.UploadFromPath(
+ ctx, 
+ filepath.Join(getMedia(), "test.pdf"), 
+ &genai.UploadFileConfig{
+ MIMEType : "application/pdf",
+ },
+)
+if err != nil {
+ log.Fatal(err)
+}
+parts := []*genai.Part{
+ genai.NewPartFromText("Give me a summary of this document:"),
+ genai.NewPartFromURI(file.URI, file.MIMEType),
+}
+contents := []*genai.Content{
+ genai.NewContentFromParts(parts, genai.RoleUser),
+}
+for result, err := range client.Models.GenerateContentStream(
+ ctx,
+ "gemini-3.7-flash",
+ contents,
+ nil,
+) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Print(result.Candidates[0].Content.Parts[0].Text)
+}
+
+text_generation.go`
+
+### Shell
+
+`MIME_TYPE=$(file -b --mime-type "${PDF_PATH}")
+NUM_BYTES=$(wc -c < "${PDF_PATH}")
+DISPLAY_NAME=TEXT
+echo $MIME_TYPE
+tmp_header_file=upload-header.tmp
+# Initial resumable request defining metadata.
+# The upload url is in the response headers dump them to a file.
+curl "${BASE_URL}/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+ -D upload-header.tmp \
+ -H "X-Goog-Upload-Protocol: resumable" \
+ -H "X-Goog-Upload-Command: start" \
+ -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Header-Content-Type: ${MIME_TYPE}" \
+ -H "Content-Type: application/json" \
+ -d "{'file': {'display_name': '${DISPLAY_NAME}'}}" 2> /dev/null
+upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")
+rm "${tmp_header_file}"
+# Upload the actual bytes.
+curl "${upload_url}" \
+ -H "Content-Length: ${NUM_BYTES}" \
+ -H "X-Goog-Upload-Offset: 0" \
+ -H "X-Goog-Upload-Command: upload, finalize" \
+ --data-binary "@${PDF_PATH}" 2> /dev/null > file_info.json
+file_uri=$(jq ".file.uri" file_info.json)
+echo file_uri=$file_uri
+# Now generate content using that file
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=$GEMINI_API_KEY" \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [{
+ "parts":[
+ {"text": "Can you add a few more lines to this poem?"},
+ {"file_data":{"mime_type": "application/pdf", "file_uri": '$file_uri'}}]
+ }]
+ }' 2> /dev/null > response.json
+cat response.json
+echo
+
+text_generation.sh`
+
+### Chat
+
+### Python
+
+`from google import genai
+from google.genai import types
+client = genai.Client()
+chat = client.chats.create(
+model="gemini-3.7-flash",
+history=[
+types.Content(role="user", parts=[types.Part(text="Hello")]),
+types.Content(
+role="model",
+parts=[
+types.Part(
+text="Great to meet you. What would you like to know?"
+)
+],
+),
+],
+)
+response = chat.send_message_stream(message="I have 2 dogs in my house.")
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+response = chat.send_message_stream(message="How many paws are in my house?")
+for chunk in response:
+print(chunk.text)
+print("_" * 80)
+print(chat.get_history())
+
+chat.py`
+
+### Node.js
+
+`// Make sure to include the following import:
+// import {GoogleGenAI} from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const chat = ai.chats.create({
+ model: "gemini-3.7-flash",
+ history: [
+ {
+ role: "user",
+ parts: [{ text: "Hello" }],
+ },
+ {
+ role: "model",
+ parts: [{ text: "Great to meet you. What would you like to know?" }],
+ },
+ ],
+});
+console.log("Streaming response for first message:");
+const stream1 = await chat.sendMessageStream({
+ message: "I have 2 dogs in my house.",
+});
+for await (const chunk of stream1) {
+ console.log(chunk.text);
+ console.log("_".repeat(80));
+}
+console.log("Streaming response for second message:");
+const stream2 = await chat.sendMessageStream({
+ message: "How many paws are in my house?",
+});
+for await (const chunk of stream2) {
+ console.log(chunk.text);
+ console.log("_".repeat(80));
+}
+console.log(chat.getHistory());
+
+chat.js`
+
+### Go
+
+`ctx := context.Background()
+client, err := genai.NewClient(ctx, &genai.ClientConfig{
+ APIKey: os.Getenv("GEMINI_API_KEY"),
+ Backend: genai.BackendGeminiAPI,
+})
+if err != nil {
+ log.Fatal(err)
+}
+history := []*genai.Content{
+ genai.NewContentFromText("Hello", genai.RoleUser),
+ genai.NewContentFromText("Great to meet you. What would you like to know?", genai.RoleModel),
+}
+chat, err := client.Chats.Create(ctx, "gemini-3.7-flash", nil, history)
+if err != nil {
+ log.Fatal(err)
+}
+for chunk, err := range chat.SendMessageStream(ctx, genai.Part{Text: "I have 2 dogs in my house."}) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Println(chunk.Text())
+ fmt.Println(strings.Repeat("_", 64))
+}
+for chunk, err := range chat.SendMessageStream(ctx, genai.Part{Text: "How many paws are in my house?"}) {
+ if err != nil {
+ log.Fatal(err)
+ }
+ fmt.Println(chunk.Text())
+ fmt.Println(strings.Repeat("_", 64))
+}
+fmt.Println(chat.History(false))
+
+chat.go`
+
+### Shell
+
+`curl https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=$GEMINI_API_KEY \
+ -H 'Content-Type: application/json' \
+ -X POST \
+ -d '{
+ "contents": [
+ {"role":"user",
+ "parts":[{
+ "text": "Hello"}]},
+ {"role": "model",
+ "parts":[{
+ "text": "Great to meet you. What would you like to know?"}]},
+ {"role":"user",
+ "parts":[{
+ "text": "I have two dogs in my house. How many paws are in my house?"}]},
+ ]
+ }' 2> /dev/null | grep "text"
+
+chat.sh`
+
+### Response body
+
+If successful, the response body contains a stream of `GenerateContentResponse` instances.
+
+`GenerateContentResponse`
+
+## GenerateContentResponse
+
+Response from the model supporting multiple candidate responses.
+
+Safety ratings and content filtering are reported for both prompt in `GenerateContentResponse.prompt_feedback` and for each candidate in `finishReason` and in `safetyRatings`. The API: - Returns either all requested candidates or none of them - Returns no candidates at all only if there was something wrong with the prompt (check `promptFeedback`) - Reports feedback on each candidate in `finishReason` and `safetyRatings`.
+
+`GenerateContentResponse.prompt_feedback`
+`finishReason`
+`safetyRatings`
+`promptFeedback`
+`finishReason`
+`safetyRatings`
+`candidates[]`
+`object (Candidate)`
+`Candidate`
+
+Candidate responses from the model.
+
+`promptFeedback`
+`object (PromptFeedback)`
+`PromptFeedback`
+
+Returns the prompt's feedback related to the content filters.
+
+`usageMetadata`
+`object (UsageMetadata)`
+`UsageMetadata`
+
+Output only. Metadata on the generation requests' token usage.
+
+`modelVersion`
+`string`
+
+Output only. The model version used to generate the response.
+
+`responseId`
+`string`
+
+Output only. responseId is used to identify each response.
+
+`modelStatus`
+`object (ModelStatus)`
+`ModelStatus`
+
+Output only. The current model status of this model.
+
+| JSON representation |
+| --- |
+| ``` {   "candidates": [     {       object (Candidate)     }   ],   "promptFeedback": {     object (PromptFeedback)   },   "usageMetadata": {     object (UsageMetadata)   },   "modelVersion": string,   "responseId": string,   "modelStatus": {     object (ModelStatus)   } } ``` |
+
+`Candidate`
+`PromptFeedback`
+`UsageMetadata`
+`ModelStatus`
+
+## PromptFeedback
+
+A set of the feedback metadata the prompt specified in `GenerateContentRequest.content`.
+
+`GenerateContentRequest.content`
+`blockReason`
+`enum (BlockReason)`
+`BlockReason`
+
+Optional. If set, the prompt was blocked and no candidates are returned. Rephrase the prompt.
+
+`safetyRatings[]`
+`object (SafetyRating)`
+`SafetyRating`
+
+Ratings for safety of the prompt. There is at most one rating per category.
+
+| JSON representation |
+| --- |
+| ``` {   "blockReason": enum (BlockReason),   "safetyRatings": [     {       object (SafetyRating)     }   ] } ``` |
+
+`BlockReason`
+`SafetyRating`
+
+## BlockReason
+
+Specifies the reason why the prompt was blocked.
+
+| Enums | |
+| --- | --- |
+| `BLOCK_REASON_UNSPECIFIED` | Default value. This value is unused. |
+| `SAFETY` | Prompt was blocked due to safety reasons. Inspect `safetyRatings` to understand which safety category blocked it. |
+| `OTHER` | Prompt was blocked due to unknown reasons. |
+| `BLOCKLIST` | Prompt was blocked due to the terms which are included from the terminology blocklist. |
+| `PROHIBITED_CONTENT` | Prompt was blocked due to prohibited content. |
+| `IMAGE_SAFETY` | Candidates blocked due to unsafe image generation content. |
+
+`BLOCK_REASON_UNSPECIFIED`
+`SAFETY`
+`safetyRatings`
+`OTHER`
+`BLOCKLIST`
+`PROHIBITED_CONTENT`
+`IMAGE_SAFETY`
+
+## UsageMetadata
+
+Metadata on the generation request's token usage.
+
+`promptTokenCount`
+`integer`
+
+Number of tokens in the prompt. When `cachedContent` is set, this is still the total effective prompt size meaning this includes the number of tokens in the cached content.
+
+`cachedContent`
+`cachedContentTokenCount`
+`integer`
+
+Number of tokens in the cached part of the prompt (the cached content)
+
+`candidatesTokenCount`
+`integer`
+
+Total number of tokens across all the generated response candidates.
+
+`toolUsePromptTokenCount`
+`integer`
+
+Output only. Number of tokens present in tool-use prompt(s).
+
+`thoughtsTokenCount`
+`integer`
+
+Output only. Number of tokens of thoughts for thinking models.
+
+`totalTokenCount`
+`integer`
+
+Total token count for the generation request (prompt + thoughts + response candidates).
+
+`promptTokensDetails[]`
+`object (ModalityTokenCount)`
+`ModalityTokenCount`
+
+Output only. List of modalities that were processed in the request input.
+
+`cacheTokensDetails[]`
+`object (ModalityTokenCount)`
+`ModalityTokenCount`
+
+Output only. List of modalities of the cached content in the request input.
+
+`candidatesTokensDetails[]`
+`object (ModalityTokenCount)`
+`ModalityTokenCount`
+
+Output only. List of modalities that were returned in the response.
+
+`toolUsePromptTokensDetails[]`
+`object (ModalityTokenCount)`
+`ModalityTokenCount`
+
+Output only. List of modalities that were processed for tool-use request inputs.
+
+`serviceTier`
+`enum (ServiceTier)`
+`ServiceTier`
+
+Output only. Service tier of the request.
+
+| JSON representation |
+| --- |
+| ``` {   "promptTokenCount": integer,   "cachedContentTokenCount": integer,   "candidatesTokenCount": integer,   "toolUsePromptTokenCount": integer,   "thoughtsTokenCount": integer,   "totalTokenCount": integer,   "promptTokensDetails": [     {       object (ModalityTokenCount)     }   ],   "cacheTokensDetails": [     {       object (ModalityTokenCount)     }   ],   "candidatesTokensDetails": [     {       object (ModalityTokenCount)     }   ],   "toolUsePromptTokensDetails": [     {       object (ModalityTokenCount)     }   ],   "serviceTier": enum (ServiceTier) } ``` |
+
+`ModalityTokenCount`
+`ModalityTokenCount`
+`ModalityTokenCount`
+`ModalityTokenCount`
+`ServiceTier`
+
+## ModelStatus
+
+The status of the underlying model. This is used to indicate the stage of the underlying model and the retirement time if applicable.
+
+`modelStage`
+`enum (ModelStage)`
+`ModelStage`
+
+The stage of the underlying model.
+
+`retirementTime`
+`string (Timestamp format)`
+`Timestamp`
+
+The time at which the model will be retired.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+`message`
+`string`
+
+A message explaining the model status.
+
+| JSON representation |
+| --- |
+| ``` {   "modelStage": enum (ModelStage),   "retirementTime": string,   "message": string } ``` |
+
+`ModelStage`
+
+## ModelStage
+
+Defines the stage of the underlying model.
+
+| Enums | |
+| --- | --- |
+| `MODEL_STAGE_UNSPECIFIED` | Unspecified model stage. |
+| `UNSTABLE_EXPERIMENTAL` | The underlying model is subject to lots of tunings.  This item is deprecated! |
+| `EXPERIMENTAL` | Models in this stage are for experimental purposes only. |
+| `PREVIEW` | Models in this stage are more mature than experimental models. |
+| `STABLE` | Models in this stage are considered stable and ready for production use. |
+| `LEGACY` | If the model is on this stage, it means that this model is on the path to deprecation in near future. Only existing customers can use this model. |
+| `DEPRECATED` | Models in this stage are deprecated. These models cannot be used.  This item is deprecated! |
+| `RETIRED` | Models in this stage are retired. These models cannot be used. |
+
+`MODEL_STAGE_UNSPECIFIED`
+`UNSTABLE_EXPERIMENTAL`
+
+The underlying model is subject to lots of tunings.
+
+This item is deprecated!
+
+`EXPERIMENTAL`
+`PREVIEW`
+`STABLE`
+`LEGACY`
+`DEPRECATED`
+
+Models in this stage are deprecated. These models cannot be used.
+
+This item is deprecated!
+
+`RETIRED`
+
+## Candidate
+
+A response candidate generated from the model.
+
+`content`
+`object (Content)`
+`Content`
+
+Output only. Generated content returned from the model.
+
+`finishReason`
+`enum (FinishReason)`
+`FinishReason`
+
+Optional. Output only. The reason why the model stopped generating tokens.
+
+If empty, the model has not stopped generating tokens.
+
+`safetyRatings[]`
+`object (SafetyRating)`
+`SafetyRating`
+
+List of ratings for the safety of a response candidate.
+
+There is at most one rating per category.
+
+`citationMetadata`
+`object (CitationMetadata)`
+`CitationMetadata`
+
+Output only. Citation information for model-generated candidate.
+
+This field may be populated with recitation information for any text included in the `content`. These are passages that are "recited" from copyrighted material in the foundational LLM's training data.
+
+`content`
+`tokenCount`
+`integer`
+
+Output only. Token count for this candidate.
+
+`groundingAttributions[]`
+`object (GroundingAttribution)`
+`GroundingAttribution`
+
+Output only. Attribution information for sources that contributed to a grounded answer.
+
+This field is populated for `GenerateAnswer` calls.
+
+`GenerateAnswer`
+`groundingMetadata`
+`object (GroundingMetadata)`
+`GroundingMetadata`
+
+Output only. Grounding metadata for the candidate.
+
+This field is populated for `GenerateContent` calls.
+
+`GenerateContent`
+`avgLogprobs`
+`number`
+
+Output only. Average log probability score of the candidate.
+
+`logprobsResult`
+`object (LogprobsResult)`
+`LogprobsResult`
+
+Output only. Log-likelihood scores for the response tokens and top tokens
+
+`urlContextMetadata`
+`object (UrlContextMetadata)`
+`UrlContextMetadata`
+
+Output only. Metadata related to url context retrieval tool.
+
+`index`
+`integer`
+
+Output only. Index of the candidate in the list of response candidates.
+
+`finishMessage`
+`string`
+
+Optional. Output only. Details the reason why the model stopped generating tokens. This is populated only when `finishReason` is set.
+
+`finishReason`
+
+| JSON representation |
+| --- |
+| ``` {   "content": {     object (Content)   },   "finishReason": enum (FinishReason),   "safetyRatings": [     {       object (SafetyRating)     }   ],   "citationMetadata": {     object (CitationMetadata)   },   "tokenCount": integer,   "groundingAttributions": [     {       object (GroundingAttribution)     }   ],   "groundingMetadata": {     object (GroundingMetadata)   },   "avgLogprobs": number,   "logprobsResult": {     object (LogprobsResult)   },   "urlContextMetadata": {     object (UrlContextMetadata)   },   "index": integer,   "finishMessage": string } ``` |
+
+`Content`
+`FinishReason`
+`SafetyRating`
+`CitationMetadata`
+`GroundingAttribution`
+`GroundingMetadata`
+`LogprobsResult`
+`UrlContextMetadata`
+
+## FinishReason
+
+Defines the reason why the model stopped generating tokens.
+
+| Enums | |
+| --- | --- |
+| `FINISH_REASON_UNSPECIFIED` | Default value. This value is unused. |
+| `STOP` | Natural stop point of the model or provided stop sequence. |
+| `MAX_TOKENS` | The maximum number of tokens as specified in the request was reached. |
+| `SAFETY` | The response candidate content was flagged for safety reasons. |
+| `RECITATION` | The response candidate content was flagged for recitation reasons. |
+| `LANGUAGE` | The response candidate content was flagged for using an unsupported language. |
+| `OTHER` | Unknown reason. |
+| `BLOCKLIST` | Token generation stopped because the content contains forbidden terms. |
+| `PROHIBITED_CONTENT` | Token generation stopped for potentially containing prohibited content. |
+| `SPII` | Token generation stopped because the content potentially contains Sensitive Personally Identifiable Information (SPII). |
+| `MALFORMED_FUNCTION_CALL` | The function call generated by the model is invalid. |
+| `IMAGE_SAFETY` | Token generation stopped because generated images contain safety violations. |
+| `IMAGE_PROHIBITED_CONTENT` | Image generation stopped because generated images has other prohibited content. |
+| `IMAGE_OTHER` | Image generation stopped because of other miscellaneous issue. |
+| `NO_IMAGE` | The model was expected to generate an image, but none was generated. |
+| `IMAGE_RECITATION` | Image generation stopped due to recitation. |
+| `UNEXPECTED_TOOL_CALL` | Model generated a tool call but no tools were enabled in the request. |
+| `TOO_MANY_TOOL_CALLS` | Model called too many tools consecutively, thus the system exited execution. |
+| `MISSING_THOUGHT_SIGNATURE` | Request has at least one thought signature missing. |
+| `MALFORMED_RESPONSE` | Finished due to malformed response. |
+| `ESCALATION` | Request was filtered by an escalation rule. |
+
+`FINISH_REASON_UNSPECIFIED`
+`STOP`
+`MAX_TOKENS`
+`SAFETY`
+`RECITATION`
+`LANGUAGE`
+`OTHER`
+`BLOCKLIST`
+`PROHIBITED_CONTENT`
+`SPII`
+`MALFORMED_FUNCTION_CALL`
+`IMAGE_SAFETY`
+`IMAGE_PROHIBITED_CONTENT`
+`IMAGE_OTHER`
+`NO_IMAGE`
+`IMAGE_RECITATION`
+`UNEXPECTED_TOOL_CALL`
+`TOO_MANY_TOOL_CALLS`
+`MISSING_THOUGHT_SIGNATURE`
+`MALFORMED_RESPONSE`
+`ESCALATION`
+
+## GroundingAttribution
+
+Attribution for a source that contributed to an answer.
+
+`sourceId`
+`object (AttributionSourceId)`
+`AttributionSourceId`
+
+Output only. Identifier for the source contributing to this attribution.
+
+`content`
+`object (Content)`
+`Content`
+
+Grounding source content that makes up this attribution.
+
+| JSON representation |
+| --- |
+| ``` {   "sourceId": {     object (AttributionSourceId)   },   "content": {     object (Content)   } } ``` |
+
+`AttributionSourceId`
+`Content`
+
+## AttributionSourceId
+
+Identifier for the source contributing to this attribution.
+
+`source`
+`Union type`
+`source`
+`groundingPassage`
+`object (GroundingPassageId)`
+`GroundingPassageId`
+
+Identifier for an inline passage.
+
+`semanticRetrieverChunk`
+`object (SemanticRetrieverChunk)`
+`SemanticRetrieverChunk`
+
+Identifier for a `Chunk` fetched via Semantic Retriever.
+
+`Chunk`
+
+| JSON representation |
+| --- |
+| ``` {    // source   "groundingPassage": {     object (GroundingPassageId)   },   "semanticRetrieverChunk": {     object (SemanticRetrieverChunk)   }   // Union type } ``` |
+
+`GroundingPassageId`
+`SemanticRetrieverChunk`
+
+## GroundingPassageId
+
+Identifier for a part within a `GroundingPassage`.
+
+`GroundingPassage`
+`passageId`
+`string`
+
+Output only. ID of the passage matching the `GenerateAnswerRequest`'s `GroundingPassage.id`.
+
+`GenerateAnswerRequest`
+`GroundingPassage.id`
+`partIndex`
+`integer`
+
+Output only. Index of the part within the `GenerateAnswerRequest`'s `GroundingPassage.content`.
+
+`GenerateAnswerRequest`
+`GroundingPassage.content`
+
+| JSON representation |
+| --- |
+| ``` {   "passageId": string,   "partIndex": integer } ``` |
+
+## SemanticRetrieverChunk
+
+Identifier for a `Chunk` retrieved via Semantic Retriever specified in the `GenerateAnswerRequest` using `SemanticRetrieverConfig`.
+
+`Chunk`
+`GenerateAnswerRequest`
+`SemanticRetrieverConfig`
+`source`
+`string`
+
+Output only. Name of the source matching the request's `SemanticRetrieverConfig.source`. Example: `corpora/123` or `corpora/123/documents/abc`
+
+`SemanticRetrieverConfig.source`
+`corpora/123`
+`corpora/123/documents/abc`
+`chunk`
+`string`
+
+Output only. Name of the `Chunk` containing the attributed text. Example: `corpora/123/documents/abc/chunks/xyz`
+
+`Chunk`
+`corpora/123/documents/abc/chunks/xyz`
+
+| JSON representation |
+| --- |
+| ``` {   "source": string,   "chunk": string } ``` |
+
+## GroundingMetadata
+
+Metadata returned to client when grounding is enabled.
+
+`groundingChunks[]`
+`object (GroundingChunk)`
+`GroundingChunk`
+
+List of supporting references retrieved from specified grounding source. When streaming, this only contains the grounding chunks that have not been included in the grounding metadata of previous responses.
+
+`groundingSupports[]`
+`object (GroundingSupport)`
+`GroundingSupport`
+
+List of grounding support.
+
+`webSearchQueries[]`
+`string`
+
+Web search queries for the following-up web search.
+
+`imageSearchQueries[]`
+`string`
+
+Image search queries used for grounding.
+
+`searchEntryPoint`
+`object (SearchEntryPoint)`
+`SearchEntryPoint`
+
+Optional. Google search entry for the following-up web searches.
+
+`retrievalMetadata`
+`object (RetrievalMetadata)`
+`RetrievalMetadata`
+
+Metadata related to retrieval in the grounding flow.
+
+`googleMapsWidgetContextToken`
+`string`
+
+Optional. Resource name of the Google Maps widget context token that can be used with the PlacesContextElement widget in order to render contextual data. Only populated in the case that grounding with Google Maps is enabled.
+
+| JSON representation |
+| --- |
+| ``` {   "groundingChunks": [     {       object (GroundingChunk)     }   ],   "groundingSupports": [     {       object (GroundingSupport)     }   ],   "webSearchQueries": [     string   ],   "imageSearchQueries": [     string   ],   "searchEntryPoint": {     object (SearchEntryPoint)   },   "retrievalMetadata": {     object (RetrievalMetadata)   },   "googleMapsWidgetContextToken": string } ``` |
+
+`GroundingChunk`
+`GroundingSupport`
+`SearchEntryPoint`
+`RetrievalMetadata`
+
+## SearchEntryPoint
+
+Google search entry point.
+
+`renderedContent`
+`string`
+
+Optional. Web content snippet that can be embedded in a web page or an app webview.
+
+`sdkBlob`
+`string (bytes format)`
+
+Optional. Base64 encoded JSON representing array of <search term, search url> tuple.
+
+A base64-encoded string.
+
+| JSON representation |
+| --- |
+| ``` {   "renderedContent": string,   "sdkBlob": string } ``` |
+
+## GroundingChunk
+
+A `GroundingChunk` represents a segment of supporting evidence that grounds the model's response. It can be a chunk from the web, a retrieved context from a file, or information from Google Maps.
+
+`GroundingChunk`
+`chunk_type`
+`Union type`
+`chunk_type`
+`web`
+`object (Web)`
+`Web`
+
+Grounding chunk from the web.
+
+`image`
+`object (Image)`
+`Image`
+
+Optional. Grounding chunk from image search.
+
+`retrievedContext`
+`object (RetrievedContext)`
+`RetrievedContext`
+
+Optional. Grounding chunk from context retrieved by the file search tool.
+
+`maps`
+`object (Maps)`
+`Maps`
+
+Optional. Grounding chunk from Google Maps.
+
+| JSON representation |
+| --- |
+| ``` {    // chunk_type   "web": {     object (Web)   },   "image": {     object (Image)   },   "retrievedContext": {     object (RetrievedContext)   },   "maps": {     object (Maps)   }   // Union type } ``` |
+
+`Web`
+`Image`
+`RetrievedContext`
+`Maps`
+
+## Web
+
+Chunk from the web.
+
+`uri`
+`string`
+
+Output only. URI reference of the chunk.
+
+`title`
+`string`
+
+Output only. Title of the chunk.
+
+| JSON representation |
+| --- |
+| ``` {   "uri": string,   "title": string } ``` |
+
+## Image
+
+Chunk from image search.
+
+`sourceUri`
+`string`
+
+The web page URI for attribution.
+
+`imageUri`
+`string`
+
+The image asset URL.
+
+`title`
+`string`
+
+The title of the web page that the image is from.
+
+`domain`
+`string`
+
+The root domain of the web page that the image is from, e.g. "example.com".
+
+| JSON representation |
+| --- |
+| ``` {   "sourceUri": string,   "imageUri": string,   "title": string,   "domain": string } ``` |
+
+## RetrievedContext
+
+Chunk from context retrieved by the file search tool.
+
+`customMetadata[]`
+`object (CustomMetadata)`
+`CustomMetadata`
+
+Optional. User-provided metadata about the retrieved context.
+
+`uri`
+`string`
+
+Optional. URI reference of the semantic retrieval document.
+
+`title`
+`string`
+
+Optional. Title of the document.
+
+`text`
+`string`
+
+Optional. Text of the chunk.
+
+`fileSearchStore`
+`string`
+
+Optional. Name of the `FileSearchStore` containing the document. Example: `fileSearchStores/123`
+
+`FileSearchStore`
+`fileSearchStores/123`
+`pageNumber`
+`integer`
+
+Optional. Page number of the retrieved context, if applicable.
+
+`mediaId`
+`string`
+
+Optional. The media blob resource name for multimodal file search results. Format: fileSearchStores/{file\_search\_store\_id}/media/{blobId}
+
+| JSON representation |
+| --- |
+| ``` {   "customMetadata": [     {       object (CustomMetadata)     }   ],   "uri": string,   "title": string,   "text": string,   "fileSearchStore": string,   "pageNumber": integer,   "mediaId": string } ``` |
+
+`CustomMetadata`
+
+## CustomMetadata
+
+User provided metadata about the GroundingFact.
+
+`key`
+`string`
+
+The key of the metadata.
+
+`value`
+`Union type`
+`value`
+`stringValue`
+`string`
+
+Optional. The string value of the metadata.
+
+`stringListValue`
+`object (StringList)`
+`StringList`
+
+Optional. A list of string values for the metadata.
+
+`numericValue`
+`number`
+
+Optional. The numeric value of the metadata. The expected range for this value depends on the specific `key` used.
+
+`key`
+
+| JSON representation |
+| --- |
+| ``` {   "key": string,    // value   "stringValue": string,   "stringListValue": {     object (StringList)   },   "numericValue": number   // Union type } ``` |
+
+`StringList`
+
+## StringList
+
+A list of string values.
+
+`values[]`
+`string`
+
+The string values of the list.
+
+| JSON representation |
+| --- |
+| ``` {   "values": [     string   ] } ``` |
+
+## Maps
+
+A grounding chunk from Google Maps. A Maps chunk corresponds to a single place.
+
+`uri`
+`string`
+
+URI reference of the place.
+
+`title`
+`string`
+
+Title of the place.
+
+`text`
+`string`
+
+Text description of the place answer.
+
+`placeId`
+`string`
+
+The ID of the place, in `places/{placeId}` format. A user can use this ID to look up that place.
+
+`places/{placeId}`
+`placeAnswerSources`
+`object (PlaceAnswerSources)`
+`PlaceAnswerSources`
+
+Sources that provide answers about the features of a given place in Google Maps.
+
+| JSON representation |
+| --- |
+| ``` {   "uri": string,   "title": string,   "text": string,   "placeId": string,   "placeAnswerSources": {     object (PlaceAnswerSources)   } } ``` |
+
+`PlaceAnswerSources`
+
+## PlaceAnswerSources
+
+Collection of sources that provide answers about the features of a given place in Google Maps. Each PlaceAnswerSources message corresponds to a specific place in Google Maps. The Google Maps tool used these sources in order to answer questions about features of the place (e.g: "does Bar Foo have Wifi" or "is Foo Bar wheelchair accessible?"). Currently we only support review snippets as sources.
+
+`reviewSnippets[]`
+`object (ReviewSnippet)`
+`ReviewSnippet`
+
+Snippets of reviews that are used to generate answers about the features of a given place in Google Maps.
+
+| JSON representation |
+| --- |
+| ``` {   "reviewSnippets": [     {       object (ReviewSnippet)     }   ] } ``` |
+
+`ReviewSnippet`
+
+## ReviewSnippet
+
+Encapsulates a snippet of a user review that answers a question about the features of a specific place in Google Maps.
+
+`reviewId`
+`string`
+
+The ID of the review snippet.
+
+`googleMapsUri`
+`string`
+
+A link that corresponds to the user review on Google Maps.
+
+`title`
+`string`
+
+Title of the review.
+
+| JSON representation |
+| --- |
+| ``` {   "reviewId": string,   "googleMapsUri": string,   "title": string } ``` |
+
+## GroundingSupport
+
+Grounding support.
+
+`groundingChunkIndices[]`
+`integer`
+
+Optional. A list of indices (into 'grounding\_chunk' in `response.candidate.grounding_metadata`) specifying the citations associated with the claim. For instance [1,3,4] means that grounding\_chunk[1], grounding\_chunk[3], grounding\_chunk[4] are the retrieved content attributed to the claim. If the response is streaming, the groundingChunkIndices refer to the indices across all responses. It is the client's responsibility to accumulate the grounding chunks from all responses (while maintaining the same order).
+
+`response.candidate.grounding_metadata`
+`confidenceScores[]`
+`number`
+
+Optional. Confidence score of the support references. Ranges from 0 to 1. 1 is the most confident. This list must have the same size as the groundingChunkIndices.
+
+`renderedParts[]`
+`integer`
+
+Output only. Indices into the `parts` field of the candidate's content. These indices specify which rendered parts are associated with this support source.
+
+`parts`
+`segment`
+`object (Segment)`
+`Segment`
+
+Segment of the content this support belongs to.
+
+| JSON representation |
+| --- |
+| ``` {   "groundingChunkIndices": [     integer   ],   "confidenceScores": [     number   ],   "renderedParts": [     integer   ],   "segment": {     object (Segment)   } } ``` |
+
+`Segment`
+
+## Segment
+
+Segment of the content.
+
+`partIndex`
+`integer`
+
+The index of a Part object within its parent Content object.
+
+`startIndex`
+`integer`
+
+Start index in the given Part, measured in bytes. Offset from the start of the Part, inclusive, starting at zero.
+
+`endIndex`
+`integer`
+
+End index in the given Part, measured in bytes. Offset from the start of the Part, exclusive, starting at zero.
+
+`text`
+`string`
+
+The text corresponding to the segment from the response.
+
+| JSON representation |
+| --- |
+| ``` {   "partIndex": integer,   "startIndex": integer,   "endIndex": integer,   "text": string } ``` |
+
+## RetrievalMetadata
+
+Metadata related to retrieval in the grounding flow.
+
+`googleSearchDynamicRetrievalScore`
+`number`
+
+Optional. Score indicating how likely information from google search could help answer the prompt. The score is in the range [0, 1], where 0 is the least likely and 1 is the most likely. This score is only populated when google search grounding and dynamic retrieval is enabled. It will be compared to the threshold to determine whether to trigger google search.
+
+| JSON representation |
+| --- |
+| ``` {   "googleSearchDynamicRetrievalScore": number } ``` |
+
+## LogprobsResult
+
+Logprobs Result
+
+`topCandidates[]`
+`object (TopCandidates)`
+`TopCandidates`
+
+Length = total number of decoding steps.
+
+`chosenCandidates[]`
+`object (Candidate)`
+`Candidate`
+
+Length = total number of decoding steps. The chosen candidates may or may not be in topCandidates.
+
+`logProbabilitySum`
+`number`
+
+Sum of log probabilities for all tokens.
+
+| JSON representation |
+| --- |
+| ``` {   "topCandidates": [     {       object (TopCandidates)     }   ],   "chosenCandidates": [     {       object (Candidate)     }   ],   "logProbabilitySum": number } ``` |
+
+`TopCandidates`
+`Candidate`
+
+## TopCandidates
+
+Candidates with top log probabilities at each decoding step.
+
+`candidates[]`
+`object (Candidate)`
+`Candidate`
+
+Sorted by log probability in descending order.
+
+| JSON representation |
+| --- |
+| ``` {   "candidates": [     {       object (Candidate)     }   ] } ``` |
+
+`Candidate`
+
+## Candidate
+
+Candidate for the logprobs token and score.
+
+`token`
+`string`
+
+The candidate’s token string value.
+
+`tokenId`
+`integer`
+
+The candidate’s token id value.
+
+`logProbability`
+`number`
+
+The candidate's log probability.
+
+| JSON representation |
+| --- |
+| ``` {   "token": string,   "tokenId": integer,   "logProbability": number } ``` |
+
+## UrlContextMetadata
+
+Metadata related to url context retrieval tool.
+
+`urlMetadata[]`
+`object (UrlMetadata)`
+`UrlMetadata`
+
+List of url context.
+
+| JSON representation |
+| --- |
+| ``` {   "urlMetadata": [     {       object (UrlMetadata)     }   ] } ``` |
+
+`UrlMetadata`
+
+## UrlMetadata
+
+Context of the a single url retrieval.
+
+`retrievedUrl`
+`string`
+
+Retrieved url by the tool.
+
+`urlRetrievalStatus`
+`enum (UrlRetrievalStatus)`
+`UrlRetrievalStatus`
+
+Status of the url retrieval.
+
+| JSON representation |
+| --- |
+| ``` {   "retrievedUrl": string,   "urlRetrievalStatus": enum (UrlRetrievalStatus) } ``` |
+
+`UrlRetrievalStatus`
+
+## UrlRetrievalStatus
+
+Status of the url retrieval.
+
+| Enums | |
+| --- | --- |
+| `URL_RETRIEVAL_STATUS_UNSPECIFIED` | Default value. This value is unused. |
+| `URL_RETRIEVAL_STATUS_SUCCESS` | Url retrieval is successful. |
+| `URL_RETRIEVAL_STATUS_ERROR` | Url retrieval is failed due to error. |
+| `URL_RETRIEVAL_STATUS_PAYWALL` | Url retrieval is failed because the content is behind paywall. |
+| `URL_RETRIEVAL_STATUS_UNSAFE` | Url retrieval is failed because the content is unsafe. |
+
+`URL_RETRIEVAL_STATUS_UNSPECIFIED`
+`URL_RETRIEVAL_STATUS_SUCCESS`
+`URL_RETRIEVAL_STATUS_ERROR`
+`URL_RETRIEVAL_STATUS_PAYWALL`
+`URL_RETRIEVAL_STATUS_UNSAFE`
+
+## CitationMetadata
+
+A collection of source attributions for a piece of content.
+
+`citationSources[]`
+`object (CitationSource)`
+`CitationSource`
+
+Citations to sources for a specific response.
+
+| JSON representation |
+| --- |
+| ``` {   "citationSources": [     {       object (CitationSource)     }   ] } ``` |
+
+`CitationSource`
+
+## CitationSource
+
+A citation to a source for a portion of a specific response.
+
+`startIndex`
+`integer`
+
+Optional. Start of segment of the response that is attributed to this source.
+
+Index indicates the start of the segment, measured in bytes.
+
+`endIndex`
+`integer`
+
+Optional. End of the attributed segment, exclusive.
+
+`uri`
+`string`
+
+Optional. URI that is attributed as a source for a portion of the text.
+
+`license`
+`string`
+
+Optional. License for the GitHub project that is attributed as a source for segment.
+
+License info is required for code citations.
+
+| JSON representation |
+| --- |
+| ``` {   "startIndex": integer,   "endIndex": integer,   "uri": string,   "license": string } ``` |
+
+## HarmCategory
+
+The category of a rating.
+
+These categories cover various kinds of harms that developers may wish to adjust.
+
+| Enums | |
+| --- | --- |
+| `HARM_CATEGORY_UNSPECIFIED` | Category is unspecified. |
+| `HARM_CATEGORY_DEROGATORY` | **PaLM** - Negative or harmful comments targeting identity and/or protected attribute. |
+| `HARM_CATEGORY_TOXICITY` | **PaLM** - Content that is rude, disrespectful, or profane. |
+| `HARM_CATEGORY_VIOLENCE` | **PaLM** - Describes scenarios depicting violence against an individual or group, or general descriptions of gore. |
+| `HARM_CATEGORY_SEXUAL` | **PaLM** - Contains references to sexual acts or other lewd content. |
+| `HARM_CATEGORY_MEDICAL` | **PaLM** - Promotes unchecked medical advice. |
+| `HARM_CATEGORY_DANGEROUS` | **PaLM** - Dangerous content that promotes, facilitates, or encourages harmful acts. |
+| `HARM_CATEGORY_HARASSMENT` | **Gemini** - Harassment content. |
+| `HARM_CATEGORY_HATE_SPEECH` | **Gemini** - Hate speech and content. |
+| `HARM_CATEGORY_SEXUALLY_EXPLICIT` | **Gemini** - Sexually explicit content. |
+| `HARM_CATEGORY_DANGEROUS_CONTENT` | **Gemini** - Dangerous content. |
+| `HARM_CATEGORY_CIVIC_INTEGRITY` | **Gemini** - Content that may be used to harm civic integrity. DEPRECATED: use enableEnhancedCivicAnswers instead.  This item is deprecated! |
+| `HARM_CATEGORY_JAILBREAK` | **Gemini** - Prompts attempting to bypass or subvert the model's safety guidelines (jailbreak attempts). |
+
+`HARM_CATEGORY_UNSPECIFIED`
+`HARM_CATEGORY_DEROGATORY`
+`HARM_CATEGORY_TOXICITY`
+`HARM_CATEGORY_VIOLENCE`
+`HARM_CATEGORY_SEXUAL`
+`HARM_CATEGORY_MEDICAL`
+`HARM_CATEGORY_DANGEROUS`
+`HARM_CATEGORY_HARASSMENT`
+`HARM_CATEGORY_HATE_SPEECH`
+`HARM_CATEGORY_SEXUALLY_EXPLICIT`
+`HARM_CATEGORY_DANGEROUS_CONTENT`
+`HARM_CATEGORY_CIVIC_INTEGRITY`
+
+**Gemini** - Content that may be used to harm civic integrity. DEPRECATED: use enableEnhancedCivicAnswers instead.
+
+This item is deprecated!
+
+`HARM_CATEGORY_JAILBREAK`
+
+## ModalityTokenCount
+
+Represents token counting info for a single modality.
+
+`modality`
+`enum (Modality)`
+`Modality`
+
+The modality associated with this token count.
+
+`tokenCount`
+`integer`
+
+Number of tokens.
+
+| JSON representation |
+| --- |
+| ``` {   "modality": enum (Modality),   "tokenCount": integer } ``` |
+
+`Modality`
+
+## Modality
+
+Content Part modality
+
+| Enums | |
+| --- | --- |
+| `MODALITY_UNSPECIFIED` | Unspecified modality. |
+| `TEXT` | Plain text. |
+| `IMAGE` | Image. |
+| `VIDEO` | Video. |
+| `AUDIO` | Audio. |
+| `DOCUMENT` | Document, e.g. PDF. |
+
+`MODALITY_UNSPECIFIED`
+`TEXT`
+`IMAGE`
+`VIDEO`
+`AUDIO`
+`DOCUMENT`
+
+## SafetyRating
+
+Safety rating for a piece of content.
+
+The safety rating contains the category of harm and the harm probability level in that category for a piece of content. Content is classified for safety across a number of harm categories and the probability of the harm classification is included here.
+
+`category`
+`enum (HarmCategory)`
+`HarmCategory`
+
+Required. The category for this rating.
+
+`probability`
+`enum (HarmProbability)`
+`HarmProbability`
+
+Required. The probability of harm for this content.
+
+`blocked`
+`boolean`
+
+Was this content blocked because of this rating?
+
+| JSON representation |
+| --- |
+| ``` {   "category": enum (HarmCategory),   "probability": enum (HarmProbability),   "blocked": boolean } ``` |
+
+`HarmCategory`
+`HarmProbability`
+
+## HarmProbability
+
+The probability that a piece of content is harmful.
+
+The classification system gives the probability of the content being unsafe. This does not indicate the severity of harm for a piece of content.
+
+| Enums | |
+| --- | --- |
+| `HARM_PROBABILITY_UNSPECIFIED` | Probability is unspecified. |
+| `NEGLIGIBLE` | Content has a negligible chance of being unsafe. |
+| `LOW` | Content has a low chance of being unsafe. |
+| `MEDIUM` | Content has a medium chance of being unsafe. |
+| `HIGH` | Content has a high chance of being unsafe. |
+
+`HARM_PROBABILITY_UNSPECIFIED`
+`NEGLIGIBLE`
+`LOW`
+`MEDIUM`
+`HIGH`
+
+## SafetySetting
+
+Safety setting, affecting the safety-blocking behavior.
+
+Passing a safety setting for a category changes the allowed probability that content is blocked.
+
+`category`
+`enum (HarmCategory)`
+`HarmCategory`
+
+Required. The category for this setting.
+
+`threshold`
+`enum (HarmBlockThreshold)`
+`HarmBlockThreshold`
+
+Required. Controls the probability threshold at which harm is blocked.
+
+| JSON representation |
+| --- |
+| ``` {   "category": enum (HarmCategory),   "threshold": enum (HarmBlockThreshold) } ``` |
+
+`HarmCategory`
+`HarmBlockThreshold`
+
+## HarmBlockThreshold
+
+Block at and beyond a specified harm probability.
+
+| Enums | |
+| --- | --- |
+| `HARM_BLOCK_THRESHOLD_UNSPECIFIED` | Threshold is unspecified. |
+| `BLOCK_LOW_AND_ABOVE` | Content with NEGLIGIBLE will be allowed. |
+| `BLOCK_MEDIUM_AND_ABOVE` | Content with NEGLIGIBLE and LOW will be allowed. |
+| `BLOCK_ONLY_HIGH` | Content with NEGLIGIBLE, LOW, and MEDIUM will be allowed. |
+| `BLOCK_NONE` | All content will be allowed. |
+| `OFF` | Turn off the safety filter. |
+
+`HARM_BLOCK_THRESHOLD_UNSPECIFIED`
+`BLOCK_LOW_AND_ABOVE`
+`BLOCK_MEDIUM_AND_ABOVE`
+`BLOCK_ONLY_HIGH`
+`BLOCK_NONE`
+`OFF`
+
+## ServiceTier
+
+Service tier of the request.
+
+| Enums | |
+| --- | --- |
+| `unspecified` | Default service tier, which is standard. |
+| `standard` | Standard service tier. |
+| `flex` | Flex service tier. |
+| `priority` | Priority service tier. |
+
+`unspecified`
+`standard`
+`flex`
+`priority`
+
+## Content
+
+The base structured datatype containing multi-part content of a message.
+
+A `Content` includes a `role` field designating the producer of the `Content` and a `parts` field containing multi-part data that contains the content of the message turn.
+
+`Content`
+`role`
+`Content`
+`parts`
+`parts[]`
+`object (Part)`
+`Part`
+
+Ordered `Parts` that constitute a single message. Parts may have different MIME types.
+
+`Parts`
+`role`
+`string`
+
+Optional. The producer of the content. Must be either 'user' or 'model'.
+
+Useful to set for multi-turn conversations, otherwise can be left blank or unset.
+
+| JSON representation |
+| --- |
+| ``` {   "parts": [     {       object (Part)     }   ],   "role": string } ``` |
+
+`Part`
+
+## Part
+
+A datatype containing media that is part of a multi-part `Content` message.
+
+`Content`
+
+A `Part` consists of data which has an associated datatype. A `Part` can only contain one of the accepted types in `Part.data`.
+
+`Part`
+`Part`
+`Part.data`
+
+A `Part` must have a fixed IANA MIME type identifying the type and subtype of the media if the `inlineData` field is filled with raw bytes.
+
+`Part`
+`inlineData`
+`thought`
+`boolean`
+
+Optional. Indicates if the part is thought from the model.
+
+`thoughtSignature`
+`string (bytes format)`
+
+Optional. An opaque signature for the thought so it can be reused in subsequent requests.
+
+A base64-encoded string.
+
+`partMetadata`
+`object (Struct format)`
+`Struct`
+
+Custom metadata associated with the Part. Agents using genai.Part as content representation may need to keep track of the additional information. For example it can be name of a file/source from which the Part originates or a way to multiplex multiple Part streams.
+
+`mediaResolution`
+`object (MediaResolution)`
+`MediaResolution`
+
+Optional. Media resolution for the input media.
+
+`mediaProcessing`
+`enum (MediaProcessing)`
+`MediaProcessing`
+
+Optional. How the model processes this part's media for understanding. Only meaningful for video parts (`inlineData` or `fileData` with video mime). Non-video parts ignore this field.
+
+`inlineData`
+`fileData`
+`data`
+`Union type`
+`data`
+`text`
+`string`
+
+Inline text.
+
+`inlineData`
+`object (Blob)`
+`Blob`
+
+Inline media bytes.
+
+`functionCall`
+`object (FunctionCall)`
+`FunctionCall`
+
+A predicted `FunctionCall` returned from the model that contains a string representing the `FunctionDeclaration.name` with the arguments and their values.
+
+`FunctionCall`
+`FunctionDeclaration.name`
+`functionResponse`
+`object (FunctionResponse)`
+`FunctionResponse`
+
+The result output of a `FunctionCall` that contains a string representing the `FunctionDeclaration.name` and a structured JSON object containing any output from the function is used as context to the model.
+
+`FunctionCall`
+`FunctionDeclaration.name`
+`fileData`
+`object (FileData)`
+`FileData`
+
+URI based data.
+
+`executableCode`
+`object (ExecutableCode)`
+`ExecutableCode`
+
+Code generated by the model that is meant to be executed.
+
+`codeExecutionResult`
+`object (CodeExecutionResult)`
+`CodeExecutionResult`
+
+Result of executing the `ExecutableCode`.
+
+`ExecutableCode`
+`toolCall`
+`object (ToolCall)`
+`ToolCall`
+
+Server-side tool call. This field is populated when the model predicts a tool invocation that should be executed on the server. The client is expected to echo this message back to the API.
+
+`toolResponse`
+`object (ToolResponse)`
+`ToolResponse`
+
+The output from a server-side `ToolCall` execution. This field is populated by the client with the results of executing the corresponding `ToolCall`.
+
+`ToolCall`
+`ToolCall`
+`metadata`
+`Union type`
+`metadata`
+`videoMetadata`
+`object (VideoMetadata)`
+`VideoMetadata`
+
+Optional. Video metadata. The metadata should only be specified while the video data is presented in inlineData or fileData.
+
+| JSON representation |
+| --- |
+| ``` {   "thought": boolean,   "thoughtSignature": string,   "partMetadata": {     object   },   "mediaResolution": {     object (MediaResolution)   },   "mediaProcessing": enum (MediaProcessing),    // data   "text": string,   "inlineData": {     object (Blob)   },   "functionCall": {     object (FunctionCall)   },   "functionResponse": {     object (FunctionResponse)   },   "fileData": {     object (FileData)   },   "executableCode": {     object (ExecutableCode)   },   "codeExecutionResult": {     object (CodeExecutionResult)   },   "toolCall": {     object (ToolCall)   },   "toolResponse": {     object (ToolResponse)   }   // Union type    // metadata   "videoMetadata": {     object (VideoMetadata)   }   // Union type } ``` |
+
+`MediaResolution`
+`MediaProcessing`
+`Blob`
+`FunctionCall`
+`FunctionResponse`
+`FileData`
+`ExecutableCode`
+`CodeExecutionResult`
+`ToolCall`
+`ToolResponse`
+`VideoMetadata`
+
+## Blob
+
+Raw media bytes.
+
+Text should not be sent as raw bytes, use the 'text' field.
+
+`mimeType`
+`string`
+
+The IANA standard MIME type of the source data. Examples of supported types: - Images: image/png, image/jpeg, image/jpg, image/webp, image/heic, image/heif, image/gif, image/avif - Audio: audio/\*, video/audio/s16le, video/audio/wav - Video: video/\* - Text: text/plain, text/html, text/css, text/javascript, text/x-typescript, text/csv, text/markdown, text/x-python, text/xml, text/rtf, video/text/timestamp - Applications: application/x-javascript, application/x-typescript, application/x-python-code, application/json, application/x-ipynb+json, application/rtf, application/pdf For additional context, see [Supported file formats](https://ai.google.dev/gemini-api/docs/file-input-methods#supported-content-types). //
+
+`data`
+`string (bytes format)`
+
+Raw bytes for media formats.
+
+A base64-encoded string.
+
+| JSON representation |
+| --- |
+| ``` {   "mimeType": string,   "data": string } ``` |
+
+## FunctionCall
+
+A predicted `FunctionCall` returned from the model that contains a string representing the `FunctionDeclaration.name` with the arguments and their values.
+
+`FunctionCall`
+`FunctionDeclaration.name`
+`id`
+`string`
+
+Optional. Unique identifier of the function call. If populated, the client to execute the `functionCall` and return the response with the matching `id`.
+
+`functionCall`
+`id`
+`name`
+`string`
+
+Required. The name of the function to call. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 128.
+
+`args`
+`object (Struct format)`
+`Struct`
+
+Optional. The function parameters and values in JSON object format.
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "name": string,   "args": {     object   } } ``` |
+
+## FunctionResponse
+
+The result output from a `FunctionCall` that contains a string representing the `FunctionDeclaration.name` and a structured JSON object containing any output from the function is used as context to the model. This should contain the result of a`FunctionCall` made based on model prediction.
+
+`FunctionCall`
+`FunctionDeclaration.name`
+`FunctionCall`
+`id`
+`string`
+
+Optional. The identifier of the function call this response is for. Populated by the client to match the corresponding function call `id`.
+
+`id`
+`name`
+`string`
+
+Required. The name of the function to call. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 128.
+
+`response`
+`object (Struct format)`
+`Struct`
+
+Required. The function response in JSON object format. Callers can use any keys of their choice that fit the function's syntax to return the function output, e.g. "output", "result", etc. In particular, if the function call failed to execute, the response can have an "error" key to return error details to the model.
+
+Multimedia can be included by using a subobject containing a single "$ref" key whose value is the `inlineData.display_name` of a `FunctionResponsePart` holding the multimedia. See <https://ai.google.dev/gemini-api/docs/function-calling#multimodal>.
+
+`inlineData.display_name`
+`FunctionResponsePart`
+`parts[]`
+`object (FunctionResponsePart)`
+`FunctionResponsePart`
+
+Optional. Ordered `Parts` that constitute a function response. Parts may have different IANA MIME types.
+
+`Parts`
+`willContinue`
+`boolean`
+
+Optional. Signals that function call continues, and more responses will be returned, turning the function call into a generator. Is only applicable to NON\_BLOCKING function calls, is ignored otherwise. If set to false, future responses will not be considered. It is allowed to return empty `response` with `willContinue=False` to signal that the function call is finished. This may still trigger the model generation. To avoid triggering the generation and finish the function call, additionally set `scheduling` to `SILENT`.
+
+`response`
+`willContinue=False`
+`scheduling`
+`SILENT`
+`scheduling`
+`enum (Scheduling)`
+`Scheduling`
+
+Optional. Specifies how the response should be scheduled in the conversation. Only applicable to NON\_BLOCKING function calls, is ignored otherwise. Defaults to WHEN\_IDLE.
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "name": string,   "response": {     object   },   "parts": [     {       object (FunctionResponsePart)     }   ],   "willContinue": boolean,   "scheduling": enum (Scheduling) } ``` |
+
+`FunctionResponsePart`
+`Scheduling`
+
+## FunctionResponsePart
+
+A datatype containing media that is part of a `FunctionResponse` message.
+
+`FunctionResponse`
+
+A `FunctionResponsePart` consists of data which has an associated datatype. A `FunctionResponsePart` can only contain one of the accepted types in `FunctionResponsePart.data`.
+
+`FunctionResponsePart`
+`FunctionResponsePart`
+`FunctionResponsePart.data`
+
+A `FunctionResponsePart` must have a fixed IANA MIME type identifying the type and subtype of the media if the `inlineData` field is filled with raw bytes.
+
+`FunctionResponsePart`
+`inlineData`
+`data`
+`Union type`
+`data`
+`inlineData`
+`object (FunctionResponseBlob)`
+`FunctionResponseBlob`
+
+Inline media bytes.
+
+| JSON representation |
+| --- |
+| ``` {    // data   "inlineData": {     object (FunctionResponseBlob)   }   // Union type } ``` |
+
+`FunctionResponseBlob`
+
+## FunctionResponseBlob
+
+Raw media bytes for function response.
+
+Text should not be sent as raw bytes, use the 'FunctionResponse.response' field.
+
+`mimeType`
+`string`
+
+The IANA standard MIME type of the source data. Examples: - image/png - image/jpeg If an unsupported MIME type is provided, an error will be returned. For a complete list of supported types, see [Supported file formats](https://ai.google.dev/gemini-api/docs/prompting_with_media#supported_file_formats).
+
+`data`
+`string (bytes format)`
+
+Raw bytes for media formats.
+
+A base64-encoded string.
+
+| JSON representation |
+| --- |
+| ``` {   "mimeType": string,   "data": string } ``` |
+
+## Scheduling
+
+Specifies how the response should be scheduled in the conversation.
+
+| Enums | |
+| --- | --- |
+| `SCHEDULING_UNSPECIFIED` | This value is unused. |
+| `SILENT` | Only add the result to the conversation context, do not interrupt or trigger generation. |
+| `WHEN_IDLE` | Add the result to the conversation context, and prompt to generate output without interrupting ongoing generation. |
+| `INTERRUPT` | Add the result to the conversation context, interrupt ongoing generation and prompt to generate output. |
+
+`SCHEDULING_UNSPECIFIED`
+`SILENT`
+`WHEN_IDLE`
+`INTERRUPT`
+
+## FileData
+
+URI based data.
+
+`mimeType`
+`string`
+
+Optional. The IANA standard MIME type of the source data.
+
+`fileUri`
+`string`
+
+Required. URI.
+
+| JSON representation |
+| --- |
+| ``` {   "mimeType": string,   "fileUri": string } ``` |
+
+## ExecutableCode
+
+Code generated by the model that is meant to be executed, and the result returned to the model.
+
+Only generated when using the `CodeExecution` tool, in which the code will be automatically executed, and a corresponding `CodeExecutionResult` will also be generated.
+
+`CodeExecution`
+`CodeExecutionResult`
+`id`
+`string`
+
+Optional. Unique identifier of the `ExecutableCode` part. The server returns the `CodeExecutionResult` with the matching `id`.
+
+`ExecutableCode`
+`CodeExecutionResult`
+`id`
+`language`
+`enum (Language)`
+`Language`
+
+Required. Programming language of the `code`.
+
+`code`
+`code`
+`string`
+
+Required. The code to be executed.
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "language": enum (Language),   "code": string } ``` |
+
+`Language`
+
+## Language
+
+Supported programming languages for the generated code.
+
+| Enums | |
+| --- | --- |
+| `LANGUAGE_UNSPECIFIED` | Unspecified language. This value should not be used. |
+| `PYTHON` | Python >= 3.10, with numpy and simpy available. Python is the default language. |
+
+`LANGUAGE_UNSPECIFIED`
+`PYTHON`
+
+## CodeExecutionResult
+
+Result of executing the `ExecutableCode`.
+
+`ExecutableCode`
+
+Generated only when the `CodeExecution` tool is used.
+
+`CodeExecution`
+`id`
+`string`
+
+Optional. The identifier of the `ExecutableCode` part this result is for. Only populated if the corresponding `ExecutableCode` has an id.
+
+`ExecutableCode`
+`ExecutableCode`
+`outcome`
+`enum (Outcome)`
+`Outcome`
+
+Required. Outcome of the code execution.
+
+`output`
+`string`
+
+Optional. Contains stdout when code execution is successful, stderr or other description otherwise.
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "outcome": enum (Outcome),   "output": string } ``` |
+
+`Outcome`
+
+## Outcome
+
+Enumeration of possible outcomes of the code execution.
+
+| Enums | |
+| --- | --- |
+| `OUTCOME_UNSPECIFIED` | Unspecified status. This value should not be used. |
+| `OUTCOME_OK` | Code execution completed successfully. `output` contains the stdout, if any. |
+| `OUTCOME_FAILED` | Code execution failed. `output` contains the stderr and stdout, if any. |
+| `OUTCOME_DEADLINE_EXCEEDED` | Code execution ran for too long, and was cancelled. There may or may not be a partial `output` present. |
+
+`OUTCOME_UNSPECIFIED`
+`OUTCOME_OK`
+`output`
+`OUTCOME_FAILED`
+`output`
+`OUTCOME_DEADLINE_EXCEEDED`
+`output`
+
+## ToolCall
+
+A predicted server-side `ToolCall` returned from the model. This message contains information about a tool that the model wants to invoke. The client is NOT expected to execute this `ToolCall`. Instead, the client should pass this `ToolCall` back to the API in a subsequent turn within a `Content` message, along with the corresponding `ToolResponse`.
+
+`ToolCall`
+`ToolCall`
+`ToolCall`
+`Content`
+`ToolResponse`
+`id`
+`string`
+
+Optional. Unique identifier of the tool call. The server returns the tool response with the matching `id`.
+
+`id`
+`toolName`
+`string`
+
+Optional. The name of the tool that was called.
+
+`toolType`
+`enum (ToolType)`
+`ToolType`
+
+Required. The type of tool that was called.
+
+`args`
+`object (Struct format)`
+`Struct`
+
+Optional. The tool call arguments. Example: {"arg1" : "value1", "arg2" : "value2" , ...}
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "toolName": string,   "toolType": enum (ToolType),   "args": {     object   } } ``` |
+
+`ToolType`
+
+## ToolType
+
+The type of tool in the function call.
+
+| Enums | |
+| --- | --- |
+| `TOOL_TYPE_UNSPECIFIED` | Unspecified tool type. |
+| `GOOGLE_SEARCH_WEB` | Google search tool, maps to Tool.google\_search.search\_types.web\_search. |
+| `GOOGLE_SEARCH_IMAGE` | Image search tool, maps to Tool.google\_search.search\_types.image\_search. |
+| `URL_CONTEXT` | URL context tool, maps to Tool.url\_context. |
+| `GOOGLE_MAPS` | Google maps tool, maps to Tool.google\_maps. |
+| `FILE_SEARCH` | File search tool, maps to Tool.file\_search. |
+
+`TOOL_TYPE_UNSPECIFIED`
+`GOOGLE_SEARCH_WEB`
+`GOOGLE_SEARCH_IMAGE`
+`URL_CONTEXT`
+`GOOGLE_MAPS`
+`FILE_SEARCH`
+
+## ToolResponse
+
+The output from a server-side `ToolCall` execution. This message contains the results of a tool invocation that was initiated by a `ToolCall` from the model. The client should pass this `ToolResponse` back to the API in a subsequent turn within a `Content` message, along with the corresponding `ToolCall`.
+
+`ToolCall`
+`ToolCall`
+`ToolResponse`
+`Content`
+`ToolCall`
+`id`
+`string`
+
+Optional. The identifier of the tool call this response is for.
+
+`toolType`
+`enum (ToolType)`
+`ToolType`
+
+Required. The type of tool that was called, matching the `toolType` in the corresponding `ToolCall`.
+
+`toolType`
+`ToolCall`
+`response`
+`object (Struct format)`
+`Struct`
+
+Optional. The tool response.
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "toolType": enum (ToolType),   "response": {     object   } } ``` |
+
+`ToolType`
+
+## VideoMetadata
+
+This item is deprecated!
+
+Deprecated: Use `GenerateContentRequest.processing_options` instead. Metadata describes the input video content.
+
+`GenerateContentRequest.processing_options`
+`startOffset`
+`string (Duration format)`
+`Duration`
+
+Optional. The start offset of the video.
+
+A duration in seconds with up to nine fractional digits, ending with '`s`'. Example: `"3.5s"`.
+
+`s`
+`"3.5s"`
+`endOffset`
+`string (Duration format)`
+`Duration`
+
+Optional. The end offset of the video.
+
+A duration in seconds with up to nine fractional digits, ending with '`s`'. Example: `"3.5s"`.
+
+`s`
+`"3.5s"`
+`fps`
+`number`
+
+Optional. The frame rate of the video sent to the model. If not specified, the default value will be 1.0. The fps range is (0.0, 24.0].
+
+| JSON representation |
+| --- |
+| ``` {   "startOffset": string,   "endOffset": string,   "fps": number } ``` |
+
+## MediaResolution
+
+Media resolution for tokenization.
+
+`value`
+`Union type`
+`value`
+`level`
+`enum (Level)`
+`Level`
+
+The tokenization quality used for given media.  for Gemini API support .
+
+| JSON representation |
+| --- |
+| ``` {    // value   "level": enum (Level)   // Union type } ``` |
+
+`Level`
+
+## Level
+
+The media resolution level.
+
+| Enums | |
+| --- | --- |
+| `MEDIA_RESOLUTION_UNSPECIFIED` | Media resolution has not been set. |
+| `MEDIA_RESOLUTION_LOW` | Media resolution set to low. |
+| `MEDIA_RESOLUTION_MEDIUM` | Media resolution set to medium. |
+| `MEDIA_RESOLUTION_HIGH` | Media resolution set to high. |
+| `MEDIA_RESOLUTION_ULTRA_HIGH` | Media resolution set to ultra high. |
+
+`MEDIA_RESOLUTION_UNSPECIFIED`
+`MEDIA_RESOLUTION_LOW`
+`MEDIA_RESOLUTION_MEDIUM`
+`MEDIA_RESOLUTION_HIGH`
+`MEDIA_RESOLUTION_ULTRA_HIGH`
+
+## MediaProcessing
+
+How the model processes input media for understanding.
+
+| Enums | |
+| --- | --- |
+| `MEDIA_PROCESSING_UNSPECIFIED` | Default. Uses model-specific processing (3.5 Pro+ -> `AGENTIC`, older models -> `STATIC`). |
+| `STATIC` | Fixed-rate frame extraction. All frames placed in context. |
+| `AGENTIC` | Model-driven dynamic navigation. Recommended for most use cases. |
+
+`MEDIA_PROCESSING_UNSPECIFIED`
+`AGENTIC`
+`STATIC`
+`STATIC`
+`AGENTIC`
+
+## Environment
+
+An execution environment for an agent.
+
+`id`
+`string`
+
+Required. Output only. The ID of the environment.
+
+`sources[]`
+`object (Source)`
+`Source`
+
+Sources to be mounted into the environment.
+
+`created`
+`string`
+
+Output only. The time at which the environment was created in ISO 8601 format (YYYY-MM-DDThh:mm:ssZ).
+
+`updated`
+`string`
+
+Output only. The time at which the environment was last updated in ISO 8601 format (YYYY-MM-DDThh:mm:ssZ).
+
+`lastAccessed`
+`string`
+
+Output only. The time at which the environment was last accessed in ISO 8601 format (YYYY-MM-DDThh:mm:ssZ).
+
+`status`
+`enum (Status)`
+`Status`
+
+Output only. The status of the environment container.
+
+`fileCount`
+`string (int64 format)`
+
+Output only. The number of files in the environment, output only.
+
+`sizeBytes`
+`string (int64 format)`
+
+Output only. The total size of the environment files in bytes, output only.
+
+`network`
+`Union type`
+`network`
+`networkAllowlist`
+`object (EnvironmentNetworkEgressAllowlist)`
+`EnvironmentNetworkEgressAllowlist`
+
+Allow only specific domains.
+
+`networkMode`
+`enum (NetworkMode)`
+`NetworkMode`
+
+Network egress mode.
+
+| JSON representation |
+| --- |
+| ``` {   "id": string,   "sources": [     {       object (Source)     }   ],   "created": string,   "updated": string,   "lastAccessed": string,   "status": enum (Status),   "fileCount": string,   "sizeBytes": string,    // network   "networkAllowlist": {     object (EnvironmentNetworkEgressAllowlist)   },   "networkMode": enum (NetworkMode)   // Union type } ``` |
+
+`Source`
+`Status`
+`EnvironmentNetworkEgressAllowlist`
+`NetworkMode`
+
+## Status
+
+Status of the environment.
+
+| Enums | |
+| --- | --- |
+| `STATUS_UNSPECIFIED` |  |
+| `ACTIVE` |  |
+| `EXPIRED` |  |
+
+`STATUS_UNSPECIFIED`
+`ACTIVE`
+`EXPIRED`
+
+## NetworkMode
+
+Network egress mode for non-allowlist configurations.
+
+| Enums | |
+| --- | --- |
+| `NETWORK_MODE_UNSPECIFIED` | Default value. Unused. |
+| `DISABLED` | All network egress is blocked. |
+
+`NETWORK_MODE_UNSPECIFIED`
+`DISABLED`
+
+## Schema
+
+The `Schema` object allows the definition of input and output data types. These types can be objects, but also primitives and arrays. Represents a select subset of an [OpenAPI 3.0 schema object](https://spec.openapis.org/oas/v3.0.3#schema).
+
+`Schema`
+`type`
+`enum (Type)`
+`Type`
+
+Required. Data type.
+
+`format`
+`string`
+
+Optional. The format of the data. Any value is allowed, but most do not trigger any special functionality.
+
+`title`
+`string`
+
+Optional. The title of the schema.
+
+`description`
+`string`
+
+Optional. A brief description of the parameter. This could contain examples of use. Parameter description may be formatted as Markdown.
+
+`nullable`
+`boolean`
+
+Optional. Indicates if the value may be null.
+
+`enum[]`
+`string`
+
+Optional. Possible values of the element of Type.STRING with enum format. For example we can define an Enum Direction as : {type:STRING, format:enum, enum:["EAST", NORTH", "SOUTH", "WEST"]}
+
+`maxItems`
+`string (int64 format)`
+
+Optional. Maximum number of the elements for Type.ARRAY.
+
+`minItems`
+`string (int64 format)`
+
+Optional. Minimum number of the elements for Type.ARRAY.
+
+`properties`
+`map (key: string, value: object (Schema))`
+`Schema`
+
+Optional. Properties of Type.OBJECT.
+
+An object containing a list of `"key": value` pairs. Example: `{ "name": "wrench", "mass": "1.3kg", "count": "3" }`.
+
+`"key": value`
+`{ "name": "wrench", "mass": "1.3kg", "count": "3" }`
+`required[]`
+`string`
+
+Optional. Required properties of Type.OBJECT.
+
+`minProperties`
+`string (int64 format)`
+
+Optional. Minimum number of the properties for Type.OBJECT.
+
+`maxProperties`
+`string (int64 format)`
+
+Optional. Maximum number of the properties for Type.OBJECT.
+
+`minLength`
+`string (int64 format)`
+
+Optional. SCHEMA FIELDS FOR TYPE STRING Minimum length of the Type.STRING
+
+`maxLength`
+`string (int64 format)`
+
+Optional. Maximum length of the Type.STRING
+
+`pattern`
+`string`
+
+Optional. Pattern of the Type.STRING to restrict a string to a regular expression.
+
+`example`
+`value (Value format)`
+`Value`
+
+Optional. Example of the object. Will only populated when the object is the root.
+
+`anyOf[]`
+`object (Schema)`
+`Schema`
+
+Optional. The value should be validated against any (one or more) of the subschemas in the list.
+
+`propertyOrdering[]`
+`string`
+
+Optional. The order of the properties. Not a standard field in open api spec. Used to determine the order of the properties in the response.
+
+`default`
+`value (Value format)`
+`Value`
+
+Optional. Default value of the field. Per JSON Schema, this field is intended for documentation generators and doesn't affect validation. Thus it's included here and ignored so that developers who send schemas with a `default` field don't get unknown-field errors.
+
+`default`
+`items`
+`object (Schema)`
+`Schema`
+
+Optional. Schema of the elements of Type.ARRAY.
+
+`minimum`
+`number`
+
+Optional. SCHEMA FIELDS FOR TYPE INTEGER and NUMBER Minimum value of the Type.INTEGER and Type.NUMBER
+
+`maximum`
+`number`
+
+Optional. Maximum value of the Type.INTEGER and Type.NUMBER
+
+| JSON representation |
+| --- |
+| ``` {   "type": enum (Type),   "format": string,   "title": string,   "description": string,   "nullable": boolean,   "enum": [     string   ],   "maxItems": string,   "minItems": string,   "properties": {     string: {       object (Schema)     },     ...   },   "required": [     string   ],   "minProperties": string,   "maxProperties": string,   "minLength": string,   "maxLength": string,   "pattern": string,   "example": value,   "anyOf": [     {       object (Schema)     }   ],   "propertyOrdering": [     string   ],   "default": value,   "items": {     object (Schema)   },   "minimum": number,   "maximum": number } ``` |
+
+`Type`
+`Schema`
+`Schema`
+`Schema`
+
+## Type
+
+Type contains the list of OpenAPI data types as defined by <https://spec.openapis.org/oas/v3.0.3#data-types>
+
+| Enums | |
+| --- | --- |
+| `TYPE_UNSPECIFIED` | Not specified, should not be used. |
+| `STRING` | String type. |
+| `NUMBER` | Number type. |
+| `INTEGER` | Integer type. |
+| `BOOLEAN` | Boolean type. |
+| `ARRAY` | Array type. |
+| `OBJECT` | Object type. |
+| `NULL` | Null type. |
+
+`TYPE_UNSPECIFIED`
+`STRING`
+`NUMBER`
+`INTEGER`
+`BOOLEAN`
+`ARRAY`
+`OBJECT`
+`NULL`
+
+## Tool
+
+Tool details that the model may use to generate response.
+
+A `Tool` is a piece of code that enables the system to interact with external systems to perform an action, or set of actions, outside of knowledge and scope of the model.
+
+`Tool`
+
+Next ID: 17
+
+`functionDeclarations[]`
+`object (FunctionDeclaration)`
+`FunctionDeclaration`
+
+Optional. A list of `FunctionDeclarations` available to the model that can be used for function calling.
+
+`FunctionDeclarations`
+
+The model or system does not execute the function. Instead the defined function may be returned as a `FunctionCall` with arguments to the client side for execution. The model may decide to call a subset of these functions by populating `FunctionCall` in the response. The next conversation turn may contain a `FunctionResponse` with the `Content.role` "function" generation context for the next model turn.
+
+`FunctionCall`
+`FunctionCall`
+`FunctionResponse`
+`Content.role`
+`googleSearchRetrieval`
+`object (GoogleSearchRetrieval)`
+`GoogleSearchRetrieval`
+
+Optional. Retrieval tool that is powered by Google search.
+
+`codeExecution`
+`object (CodeExecution)`
+`CodeExecution`
+
+Optional. Enables the model to execute code as part of generation.
+
+`googleSearch`
+`object (GoogleSearch)`
+`GoogleSearch`
+
+Optional. GoogleSearch tool type. Tool to support Google Search in Model. Powered by Google.
+
+`computerUse`
+`object (ComputerUse)`
+`ComputerUse`
+
+Optional. Tool to support the model interacting directly with the computer. If enabled, it automatically populates computer-use specific Function Declarations.
+
+`urlContext`
+`object (UrlContext)`
+`UrlContext`
+
+Optional. Tool to support URL context retrieval.
+
+`fileSearch`
+`object (FileSearch)`
+`FileSearch`
+
+Optional. FileSearch tool type. Tool to retrieve knowledge from Semantic Retrieval corpora.
+
+`mcpServers[]`
+`object (McpServer)`
+`McpServer`
+
+Optional. MCP Servers to connect to.
+
+`googleMaps`
+`object (GoogleMaps)`
+`GoogleMaps`
+
+Optional. Tool that allows grounding the model's response with geospatial context related to the user's query.
+
+| JSON representation |
+| --- |
+| ``` {   "functionDeclarations": [     {       object (FunctionDeclaration)     }   ],   "googleSearchRetrieval": {     object (GoogleSearchRetrieval)   },   "codeExecution": {     object (CodeExecution)   },   "googleSearch": {     object (GoogleSearch)   },   "computerUse": {     object (ComputerUse)   },   "urlContext": {     object (UrlContext)   },   "fileSearch": {     object (FileSearch)   },   "mcpServers": [     {       object (McpServer)     }   ],   "googleMaps": {     object (GoogleMaps)   } } ``` |
+
+`FunctionDeclaration`
+`GoogleSearchRetrieval`
+`CodeExecution`
+`GoogleSearch`
+`ComputerUse`
+`UrlContext`
+`FileSearch`
+`McpServer`
+`GoogleMaps`
+
+## FunctionDeclaration
+
+Structured representation of a function declaration as defined by the [OpenAPI 3.03 specification](https://spec.openapis.org/oas/v3.0.3). Included in this declaration are the function name and parameters. This FunctionDeclaration is a representation of a block of code that can be used as a `Tool` by the model and executed by the client.
+
+`Tool`
+`name`
+`string`
+
+Required. The name of the function. Must be a-z, A-Z, 0-9, or contain underscores, colons, dots, and dashes, with a maximum length of 128.
+
+`description`
+`string`
+
+Required. A brief description of the function.
+
+`behavior`
+`enum (Behavior)`
+`Behavior`
+
+Optional. Specifies the function Behavior. Currently only supported by the BidiGenerateContent method.
+
+`parameters`
+`object (Schema)`
+`Schema`
+
+Optional. Describes the parameters to this function. Reflects the Open API 3.03 Parameter Object string Key: the name of the parameter. Parameter names are case sensitive. Schema Value: the Schema defining the type used for the parameter.
+
+`parametersJsonSchema`
+`value (Value format)`
+`Value`
+
+Optional. Describes the parameters to the function in JSON Schema format. The schema must describe an object where the properties are the parameters to the function. For example:
+
+`{
+"type": "object",
+"properties": {
+"name": { "type": "string" },
+"age": { "type": "integer" }
+},
+"additionalProperties": false,
+"required": ["name", "age"],
+"propertyOrdering": ["name", "age"]
+}`
+
+This field is mutually exclusive with `parameters`.
+
+`parameters`
+`response`
+`object (Schema)`
+`Schema`
+
+Optional. Describes the output from this function in JSON Schema format. Reflects the Open API 3.03 Response Object. The Schema defines the type used for the response value of the function.
+
+`responseJsonSchema`
+`value (Value format)`
+`Value`
+
+Optional. Describes the output from this function in JSON Schema format. The value specified by the schema is the response value of the function.
+
+This field is mutually exclusive with `response`.
+
+`response`
+
+| JSON representation |
+| --- |
+| ``` {   "name": string,   "description": string,   "behavior": enum (Behavior),   "parameters": {     object (Schema)   },   "parametersJsonSchema": value,   "response": {     object (Schema)   },   "responseJsonSchema": value } ``` |
+
+`Behavior`
+`Schema`
+`Schema`
+
+## Behavior
+
+Defines the function behavior. Defaults to `BLOCKING`.
+
+`BLOCKING`
+
+| Enums | |
+| --- | --- |
+| `UNSPECIFIED` | This value is unused. |
+| `BLOCKING` | If set, the system will wait to receive the function response before continuing the conversation. |
+| `NON_BLOCKING` | If set, the system will not wait to receive the function response. Instead, it will attempt to handle function responses as they become available while maintaining the conversation between the user and the model. |
+
+`UNSPECIFIED`
+`BLOCKING`
+`NON_BLOCKING`
+
+## GoogleSearchRetrieval
+
+Tool to retrieve public web data for grounding, powered by Google.
+
+`dynamicRetrievalConfig`
+`object (DynamicRetrievalConfig)`
+`DynamicRetrievalConfig`
+
+Specifies the dynamic retrieval configuration for the given source.
+
+| JSON representation |
+| --- |
+| ``` {   "dynamicRetrievalConfig": {     object (DynamicRetrievalConfig)   } } ``` |
+
+`DynamicRetrievalConfig`
+
+## DynamicRetrievalConfig
+
+Describes the options to customize dynamic retrieval.
+
+`mode`
+`enum (Mode)`
+`Mode`
+
+The mode of the predictor to be used in dynamic retrieval.
+
+`dynamicThreshold`
+`number`
+
+The threshold to be used in dynamic retrieval. If not set, a system default value is used.
+
+| JSON representation |
+| --- |
+| ``` {   "mode": enum (Mode),   "dynamicThreshold": number } ``` |
+
+`Mode`
+
+## Mode
+
+The mode of the predictor to be used in dynamic retrieval.
+
+| Enums | |
+| --- | --- |
+| `MODE_UNSPECIFIED` | Always trigger retrieval. |
+| `MODE_DYNAMIC` | Run retrieval only when system decides it is necessary. |
+
+`MODE_UNSPECIFIED`
+`MODE_DYNAMIC`
+
+## CodeExecution
+
+This type has no fields.
+
+Tool that executes code generated by the model, and automatically returns the result to the model.
+
+See also `ExecutableCode` and `CodeExecutionResult` which are only generated when using this tool.
+
+`ExecutableCode`
+`CodeExecutionResult`
+
+## GoogleSearch
+
+GoogleSearch tool type. Tool to support Google Search in Model. Powered by Google.
+
+`timeRangeFilter`
+`object (Interval)`
+`Interval`
+
+Optional. Filter search results to a specific time range. If customers set a start time, they must set an end time (and vice versa).
+
+`searchTypes`
+`object (SearchTypes)`
+`SearchTypes`
+
+Optional. The set of search types to enable. If not set, web search is enabled by default.
+
+| JSON representation |
+| --- |
+| ``` {   "timeRangeFilter": {     object (Interval)   },   "searchTypes": {     object (SearchTypes)   } } ``` |
+
+`Interval`
+`SearchTypes`
+
+## Interval
+
+Represents a time interval, encoded as a Timestamp start (inclusive) and a Timestamp end (exclusive).
+
+The start must be less than or equal to the end. When the start equals the end, the interval is empty (matches no time). When both start and end are unspecified, the interval matches any time.
+
+`startTime`
+`string (Timestamp format)`
+`Timestamp`
+
+Optional. Inclusive start of the interval.
+
+If specified, a Timestamp matching this interval will have to be the same or after the start.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+`endTime`
+`string (Timestamp format)`
+`Timestamp`
+
+Optional. Exclusive end of the interval.
+
+If specified, a Timestamp matching this interval will have to be before the end.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+
+| JSON representation |
+| --- |
+| ``` {   "startTime": string,   "endTime": string } ``` |
+
+## SearchTypes
+
+Different types of search that can be enabled on the GoogleSearch tool.
+
+`webSearch`
+`object (WebSearch)`
+`WebSearch`
+
+Optional. Enables web search. Only text results are returned.
+
+`imageSearch`
+`object (ImageSearch)`
+`ImageSearch`
+
+Optional. Enables image search. Image bytes are returned.
+
+| JSON representation |
+| --- |
+| ``` {   "webSearch": {     object (WebSearch)   },   "imageSearch": {     object (ImageSearch)   } } ``` |
+
+`WebSearch`
+`ImageSearch`
+
+## WebSearch
+
+This type has no fields.
+
+Standard web search for grounding and related configurations.
+
+## ImageSearch
+
+This type has no fields.
+
+Image search for grounding and related configurations.
+
+## ComputerUse
+
+Computer Use tool type.
+
+`environment`
+`enum (Environment)`
+`Environment`
+
+Required. The environment being operated.
+
+`excludedPredefinedFunctions[]`
+`string`
+
+Optional. By default, predefined functions are included in the final model call. Some of them can be explicitly excluded from being automatically included. This can serve two purposes: 1. Using a more restricted / different action space. 2. Improving the definitions / instructions of predefined functions.
+
+`enablePromptInjectionDetection`
+`boolean`
+
+Optional. Whether enable the prompt injection detection check on computer-use request.
+
+`disabledSafetyPolicies[]`
+`enum (SafetyPolicy)`
+`SafetyPolicy`
+
+Optional. Disabled safety policies for computer use.
+
+| JSON representation |
+| --- |
+| ``` {   "environment": enum (Environment),   "excludedPredefinedFunctions": [     string   ],   "enablePromptInjectionDetection": boolean,   "disabledSafetyPolicies": [     enum (SafetyPolicy)   ] } ``` |
+
+`Environment`
+`SafetyPolicy`
+
+## Environment
+
+Represents the environment being operated, such as a web browser.
+
+| Enums | |
+| --- | --- |
+| `ENVIRONMENT_UNSPECIFIED` | Defaults to browser. |
+| `ENVIRONMENT_BROWSER` | Operates in a web browser. |
+| `ENVIRONMENT_MOBILE` | Operates in a mobile environment. |
+| `ENVIRONMENT_DESKTOP` | Operates in a desktop environment. |
+
+`ENVIRONMENT_UNSPECIFIED`
+`ENVIRONMENT_BROWSER`
+`ENVIRONMENT_MOBILE`
+`ENVIRONMENT_DESKTOP`
+
+## SafetyPolicy
+
+Predefined safety policies for computer use.
+
+| Enums | |
+| --- | --- |
+| `SAFETY_POLICY_UNSPECIFIED` | Unspecified safety policy. |
+| `FINANCIAL_TRANSACTIONS` | Safety policy for financial transactions. |
+| `SENSITIVE_DATA_MODIFICATION` | Safety policy for sensitive data modification. |
+| `COMMUNICATION_TOOL` | Safety policy for communication tools (e.g. Gmail, Chat, Meet). |
+| `ACCOUNT_CREATION` | Safety policy for account creation. |
+| `DATA_MODIFICATION` | Safety policy for data modification. |
+| `USER_CONSENT_MANAGEMENT` | Safety policy for user consent management. |
+| `LEGAL_TERMS_AND_AGREEMENTS` | Safety policy for legal terms and agreements. |
+
+`SAFETY_POLICY_UNSPECIFIED`
+`FINANCIAL_TRANSACTIONS`
+`SENSITIVE_DATA_MODIFICATION`
+`COMMUNICATION_TOOL`
+`ACCOUNT_CREATION`
+`DATA_MODIFICATION`
+`USER_CONSENT_MANAGEMENT`
+`LEGAL_TERMS_AND_AGREEMENTS`
+
+## UrlContext
+
+This type has no fields.
+
+Tool to support URL context retrieval.
+
+## FileSearch
+
+The FileSearch tool that retrieves knowledge from Semantic Retrieval corpora. Files are imported to Semantic Retrieval corpora using the ImportFile API.
+
+`fileSearchStoreNames[]`
+`string`
+
+Required. The names of the fileSearchStores to retrieve from. Example: `fileSearchStores/my-file-search-store-123`
+
+`fileSearchStores/my-file-search-store-123`
+`metadataFilter`
+`string`
+
+Optional. Metadata filter to apply to the semantic retrieval documents and chunks.
+
+`topK`
+`integer`
+
+Optional. The number of semantic retrieval chunks to retrieve.
+
+| JSON representation |
+| --- |
+| ``` {   "fileSearchStoreNames": [     string   ],   "metadataFilter": string,   "topK": integer } ``` |
+
+## McpServer
+
+A MCPServer is a server that can be called by the model to perform actions. It is a server that implements the MCP protocol. Next ID: 6
+
+`name`
+`string`
+
+The name of the MCPServer.
+
+`transport`
+`Union type`
+`transport`
+`streamableHttpTransport`
+`object (StreamableHttpTransport)`
+`StreamableHttpTransport`
+
+A transport that can stream HTTP requests and responses.
+
+| JSON representation |
+| --- |
+| ``` {   "name": string,    // transport   "streamableHttpTransport": {     object (StreamableHttpTransport)   }   // Union type } ``` |
+
+`StreamableHttpTransport`
+
+## StreamableHttpTransport
+
+A transport that can stream HTTP requests and responses. Next ID: 6
+
+`url`
+`string`
+
+The full URL for the MCPServer endpoint. Example: "https://api.example.com/mcp"
+
+`headers`
+`map (key: string, value: string)`
+
+Optional: Fields for authentication headers, timeouts, etc., if needed.
+
+An object containing a list of `"key": value` pairs. Example: `{ "name": "wrench", "mass": "1.3kg", "count": "3" }`.
+
+`"key": value`
+`{ "name": "wrench", "mass": "1.3kg", "count": "3" }`
+`timeout`
+`string (Duration format)`
+`Duration`
+
+HTTP timeout for regular operations.
+
+A duration in seconds with up to nine fractional digits, ending with '`s`'. Example: `"3.5s"`.
+
+`s`
+`"3.5s"`
+`sseReadTimeout`
+`string (Duration format)`
+`Duration`
+
+Timeout for SSE read operations.
+
+A duration in seconds with up to nine fractional digits, ending with '`s`'. Example: `"3.5s"`.
+
+`s`
+`"3.5s"`
+`terminateOnClose`
+`boolean`
+
+Whether to close the client session when the transport closes.
+
+| JSON representation |
+| --- |
+| ``` {   "url": string,   "headers": {     string: string,     ...   },   "timeout": string,   "sseReadTimeout": string,   "terminateOnClose": boolean } ``` |
+
+## GoogleMaps
+
+The GoogleMaps Tool that provides geospatial context for the user's query.
+
+`enableWidget`
+`boolean`
+
+Optional. Whether to return a widget context token in the GroundingMetadata of the response. Developers can use the widget context token to render a Google Maps widget with geospatial context related to the places that the model references in the response.
+
+| JSON representation |
+| --- |
+| ``` {   "enableWidget": boolean } ``` |
+
+## REST Resource: auth\_tokens
+
+## Resource: AuthToken
+
+A request to create an ephemeral authentication token.
+
+`name`
+`string`
+
+Output only. Identifier. The token itself.
+
+`expireTime`
+`string (Timestamp format)`
+`Timestamp`
+
+Optional. Input only. Immutable. An optional time after which, when using the resulting token, messages in BidiGenerateContent sessions will be rejected. (Gemini may preemptively close the session after this time.)
+
+If not set then this defaults to 30 minutes in the future. If set, this value must be less than 20 hours in the future.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+`newSessionExpireTime`
+`string (Timestamp format)`
+`Timestamp`
+
+Optional. Input only. Immutable. The time after which new Live API sessions using the token resulting from this request will be rejected.
+
+If not set this defaults to 60 seconds in the future. If set, this value must be less than 20 hours in the future.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+`fieldMask`
+`string (FieldMask format)`
+`FieldMask`
+
+Optional. Input only. Immutable. If fieldMask is empty, and `bidiGenerateContentSetup` is not present, then the effective `BidiGenerateContentSetup` message is taken from the Live API connection.
+
+`bidiGenerateContentSetup`
+`BidiGenerateContentSetup`
+
+If fieldMask is empty, and `bidiGenerateContentSetup` *is* present, then the effective `BidiGenerateContentSetup` message is taken entirely from `bidiGenerateContentSetup` in this request. The setup message from the Live API connection is ignored.
+
+`bidiGenerateContentSetup`
+`BidiGenerateContentSetup`
+`bidiGenerateContentSetup`
+
+If fieldMask is not empty, then the corresponding fields from `bidiGenerateContentSetup` will overwrite the fields from the setup message in the Live API connection.
+
+`bidiGenerateContentSetup`
+
+This is a comma-separated list of fully qualified names of fields. Example: `"user.displayName,photo"`.
+
+`"user.displayName,photo"`
+`config`
+`Union type`
+`config`
+`bidiGenerateContentSetup`
+`object (BidiGenerateContentSetup)`
+`BidiGenerateContentSetup`
+
+Optional. Input only. Immutable. Configuration specific to `BidiGenerateContent`.
+
+`BidiGenerateContent`
+`uses`
+`integer`
+
+Optional. Input only. Immutable. The number of times the token can be used. If this value is zero then no limit is applied. Resuming a Live API session does not count as a use. If unspecified, the default is 1.
+
+| JSON representation |
+| --- |
+| ``` {   "name": string,   "expireTime": string,   "newSessionExpireTime": string,   "fieldMask": string,    // config   "bidiGenerateContentSetup": {     object (BidiGenerateContentSetup)   }   // Union type   "uses": integer } ``` |
+
+`BidiGenerateContentSetup`
+
+## BidiGenerateContentSetup
+
+Message to be sent in the first (and only in the first) `BidiGenerateContentClientMessage`. Contains configuration that will apply for the duration of the streaming RPC.
+
+`BidiGenerateContentClientMessage`
+
+Clients should wait for a `BidiGenerateContentSetupComplete` message before sending any additional messages.
+
+`BidiGenerateContentSetupComplete`
+`model`
+`string`
+
+Required. The model's resource name. This serves as an ID for the Model to use.
+
+Format: `models/{model}`
+
+`models/{model}`
+`generationConfig`
+`object (GenerationConfig)`
+`GenerationConfig`
+
+Optional. Generation config.
+
+The following fields are not supported:
+
+`responseLogprobs`
+`responseMimeType`
+`logprobs`
+`responseSchema`
+`responseJsonSchema`
+`stop_sequence`
+`skipResponseCache`
+`routing_config`
+`audio_timestamp`
+`systemInstruction`
+`object (Content)`
+`Content`
+
+Optional. The user provided system instructions for the model.
+
+Note: Only text should be used in parts and content in each part will be in a separate paragraph.
+
+`tools[]`
+`object (Tool)`
+`Tool`
+
+Optional. A list of `Tools` the model may use to generate the next response.
+
+`Tools`
+
+A `Tool` is a piece of code that enables the system to interact with external systems to perform an action, or set of actions, outside of knowledge and scope of the model.
+
+`Tool`
+`realtimeInputConfig`
+`object (RealtimeInputConfig)`
+`RealtimeInputConfig`
+
+Optional. Configures the handling of realtime input.
+
+`sessionResumption`
+`object (SessionResumptionConfig)`
+`SessionResumptionConfig`
+
+Optional. Configures session resumption mechanism.
+
+If included, the server will send `SessionResumptionUpdate` messages.
+
+`SessionResumptionUpdate`
+`contextWindowCompression`
+`object (ContextWindowCompressionConfig)`
+`ContextWindowCompressionConfig`
+
+Optional. Configures a context window compression mechanism.
+
+If included, the server will automatically reduce the size of the context when it exceeds the configured length.
+
+`inputAudioTranscription`
+`object (AudioTranscriptionConfig)`
+`AudioTranscriptionConfig`
+
+Optional. If set, enables transcription of voice input. The transcription aligns with the input audio language, if configured.
+
+`outputAudioTranscription`
+`object (AudioTranscriptionConfig)`
+`AudioTranscriptionConfig`
+
+Optional. If set, enables transcription of the model's audio output. The transcription aligns with the language code specified for the output audio, if configured.
+
+`historyConfig`
+`object (HistoryConfig)`
+`HistoryConfig`
+
+Optional. Configures the exchange of history between the client and the server.
+
+| JSON representation |
+| --- |
+| ``` {   "model": string,   "generationConfig": {     object (GenerationConfig)   },   "systemInstruction": {     object (Content)   },   "tools": [     {       object (Tool)     }   ],   "realtimeInputConfig": {     object (RealtimeInputConfig)   },   "sessionResumption": {     object (SessionResumptionConfig)   },   "contextWindowCompression": {     object (ContextWindowCompressionConfig)   },   "inputAudioTranscription": {     object (AudioTranscriptionConfig)   },   "outputAudioTranscription": {     object (AudioTranscriptionConfig)   },   "historyConfig": {     object (HistoryConfig)   } } ``` |
+
+`GenerationConfig`
+`Content`
+`Tool`
+`RealtimeInputConfig`
+`SessionResumptionConfig`
+`ContextWindowCompressionConfig`
+`AudioTranscriptionConfig`
+`AudioTranscriptionConfig`
+`HistoryConfig`
+
+## GenerationConfig
+
+Configuration options for model generation and outputs. Not all parameters are configurable for every model.
+
+`stopSequences[]`
+`string`
+
+Optional. The set of character sequences (up to 5) that will stop output generation. If specified, the API will stop at the first appearance of a `stop_sequence`. The stop sequence will not be included as part of the response.
+
+`stop_sequence`
+`responseMimeType`
+`string`
+
+Optional. MIME type of the generated candidate text. Supported MIME types are: `text/plain`: (default) Text output. `application/json`: JSON response in the response candidates. `text/x.enum`: ENUM as a string response in the response candidates. Refer to the [docs](https://ai.google.dev/gemini-api/docs/prompting_with_media#plain_text_formats) for a list of all supported text MIME types.
+
+`text/plain`
+`application/json`
+`text/x.enum`
+`responseSchema  
+(deprecated)`
+`object (Schema)`
+`Schema`
+
+This item is deprecated!
+
+Optional. Output schema of the generated candidate text. Schemas must be a subset of the [OpenAPI schema](https://spec.openapis.org/oas/v3.0.3#schema) and can be objects, primitives or arrays.
+
+If set, a compatible `responseMimeType` must also be set. Compatible MIME types: `application/json`: Schema for JSON response. Refer to the [JSON text generation guide](https://ai.google.dev/gemini-api/docs/json-mode) for more details.
+
+`responseMimeType`
+`application/json`
+`_responseJsonSchema  
+(deprecated)`
+`value (Value format)`
+`Value`
+
+This item is deprecated!
+
+Optional. Output schema of the generated response. This is an alternative to `responseSchema` that accepts [JSON Schema](https://json-schema.org/).
+
+`responseSchema`
+
+If set, `responseSchema` must be omitted, but `responseMimeType` is required.
+
+`responseSchema`
+`responseMimeType`
+
+While the full JSON Schema may be sent, not all features are supported. Specifically, only the following properties are supported:
+
+`$id`
+`$defs`
+`$ref`
+`$anchor`
+`type`
+`format`
+`title`
+`description`
+`enum`
+`items`
+`prefixItems`
+`minItems`
+`maxItems`
+`minimum`
+`maximum`
+`anyOf`
+`oneOf`
+`anyOf`
+`properties`
+`additionalProperties`
+`required`
+
+The non-standard `propertyOrdering` property may also be set.
+
+`propertyOrdering`
+
+Cyclic references are unrolled to a limited degree and, as such, may only be used within non-required properties. (Nullable properties are not sufficient.) If `$ref` is set on a sub-schema, no other properties, except for than those starting as a `$`, may be set.
+
+`$ref`
+`$`
+`responseJsonSchema`
+`value (Value format)`
+`Value`
+
+Optional. An internal detail. Use `responseJsonSchema` rather than this field.
+
+`responseJsonSchema`
+`responseModalities[]`
+`enum (Modality)`
+`Modality`
+
+Optional. The requested modalities of the response. Represents the set of modalities that the model can return, and should be expected in the response. This is an exact match to the modalities of the response.
+
+A model may have multiple combinations of supported modalities. If the requested modalities do not match any of the supported combinations, an error will be returned.
+
+An empty list is equivalent to requesting only text.
+
+`candidateCount`
+`integer`
+
+Optional. Number of generated responses to return. If unset, this will default to 1. Please note that this doesn't work for previous generation models (Gemini 1.0 family)
+
+`maxOutputTokens`
+`integer`
+
+Optional. The maximum number of tokens to include in a response candidate.
+
+Note: The default value varies by model, see the `Model.output_token_limit` attribute of the `Model` returned from the `getModel` function.
+
+`Model.output_token_limit`
+`Model`
+`getModel`
+`temperature`
+`number`
+
+Optional. Controls the randomness of the output.
+
+Note: The default value varies by model, see the `Model.temperature` attribute of the `Model` returned from the `getModel` function.
+
+`Model.temperature`
+`Model`
+`getModel`
+
+Values can range from [0.0, 2.0].
+
+`topP`
+`number`
+
+Optional. The maximum cumulative probability of tokens to consider when sampling.
+
+The model uses combined Top-k and Top-p (nucleus) sampling.
+
+Tokens are sorted based on their assigned probabilities so that only the most likely tokens are considered. Top-k sampling directly limits the maximum number of tokens to consider, while Nucleus sampling limits the number of tokens based on the cumulative probability.
+
+Note: The default value varies by `Model` and is specified by the`Model.top_p` attribute returned from the `getModel` function. An empty `topK` attribute indicates that the model doesn't apply top-k sampling and doesn't allow setting `topK` on requests.
+
+`Model`
+`Model.top_p`
+`getModel`
+`topK`
+`topK`
+`topK`
+`integer`
+
+Optional. The maximum number of tokens to consider when sampling.
+
+Gemini models use Top-p (nucleus) sampling or a combination of Top-k and nucleus sampling. Top-k sampling considers the set of `topK` most probable tokens. Models running with nucleus sampling don't allow topK setting.
+
+`topK`
+
+Note: The default value varies by `Model` and is specified by the`Model.top_p` attribute returned from the `getModel` function. An empty `topK` attribute indicates that the model doesn't apply top-k sampling and doesn't allow setting `topK` on requests.
+
+`Model`
+`Model.top_p`
+`getModel`
+`topK`
+`topK`
+`seed`
+`integer`
+
+Optional. Seed used in decoding. If not set, the request uses a randomly generated seed.
+
+`presencePenalty`
+`number`
+
+Optional. Presence penalty applied to the next token's logprobs if the token has already been seen in the response.
+
+This penalty is binary on/off and not dependant on the number of times the token is used (after the first). Use `frequencyPenalty` for a penalty that increases with each use.
+
+`frequencyPenalty`
+
+A positive penalty will discourage the use of tokens that have already been used in the response, increasing the vocabulary.
+
+A negative penalty will encourage the use of tokens that have already been used in the response, decreasing the vocabulary.
+
+`frequencyPenalty`
+`number`
+
+Optional. Frequency penalty applied to the next token's logprobs, multiplied by the number of times each token has been seen in the respponse so far.
+
+A positive penalty will discourage the use of tokens that have already been used, proportional to the number of times the token has been used: The more a token is used, the more difficult it is for the model to use that token again increasing the vocabulary of responses.
+
+Caution: A *negative* penalty will encourage the model to reuse tokens proportional to the number of times the token has been used. Small negative values will reduce the vocabulary of a response. Larger negative values will cause the model to start repeating a common token until it hits the `maxOutputTokens` limit.
+
+`maxOutputTokens`
+`responseLogprobs`
+`boolean`
+
+Optional. If true, export the logprobs results in response.
+
+`logprobs`
+`integer`
+
+Optional. Only valid if `responseLogprobs=True`. This sets the number of top logprobs, including the chosen candidate, to return at each decoding step in the `Candidate.logprobs_result`. The number must be in the range of [0, 20].
+
+`responseLogprobs=True`
+`Candidate.logprobs_result`
+`enableEnhancedCivicAnswers`
+`boolean`
+
+Optional. Enables enhanced civic answers. It may not be available for all models.
+
+`speechConfig`
+`object (SpeechConfig)`
+`SpeechConfig`
+
+Optional. The speech generation config.
+
+`thinkingConfig`
+`object (ThinkingConfig)`
+`ThinkingConfig`
+
+Optional. Config for thinking features. An error will be returned if this field is set for models that don't support thinking.
+
+`imageConfig`
+`object (ImageConfig)`
+`ImageConfig`
+
+Optional. Config for image generation. An error will be returned if this field is set for models that don't support these config options.
+
+`mediaResolution`
+`enum (MediaResolution)`
+`MediaResolution`
+
+Optional. If specified, the media resolution specified will be used.
+
+`enableAffectiveDialog`
+`boolean`
+
+Optional. If enabled, the model will detect emotions and adapt its responses accordingly.
+
+`responseFormat`
+`object (ResponseFormatConfig)`
+`ResponseFormatConfig`
+
+Optional. Configuration for the response output format. Allows specifying output configuration per modality (text, audio, image) in a flat structure.
+
+`translationConfig`
+`object (TranslationConfig)`
+`TranslationConfig`
+
+Optional. Config for translation.
+
+`audioTranscriptionConfig`
+`object (AudioTranscriptionConfig)`
+`AudioTranscriptionConfig`
+
+Optional. Config for audio transcription (speech recognition).
+
+| JSON representation |
+| --- |
+| ``` {   "stopSequences": [     string   ],   "responseMimeType": string,   "responseSchema": {     object (Schema)   },   "_responseJsonSchema": value,   "responseJsonSchema": value,   "responseModalities": [     enum (Modality)   ],   "candidateCount": integer,   "maxOutputTokens": integer,   "temperature": number,   "topP": number,   "topK": integer,   "seed": integer,   "presencePenalty": number,   "frequencyPenalty": number,   "responseLogprobs": boolean,   "logprobs": integer,   "enableEnhancedCivicAnswers": boolean,   "speechConfig": {     object (SpeechConfig)   },   "thinkingConfig": {     object (ThinkingConfig)   },   "imageConfig": {     object (ImageConfig)   },   "mediaResolution": enum (MediaResolution),   "enableAffectiveDialog": boolean,   "responseFormat": {     object (ResponseFormatConfig)   },   "translationConfig": {     object (TranslationConfig)   },   "audioTranscriptionConfig": {     object (AudioTranscriptionConfig)   } } ``` |
+
+`Schema`
+`Modality`
+`SpeechConfig`
+`ThinkingConfig`
+`ImageConfig`
+`MediaResolution`
+`ResponseFormatConfig`
+`TranslationConfig`
+`AudioTranscriptionConfig`
+
+## Modality
+
+Supported modalities of the response.
+
+| Enums | |
+| --- | --- |
+| `MODALITY_UNSPECIFIED` | Default value. |
+| `TEXT` | Indicates the model should return text. |
+| `IMAGE` | Indicates the model should return images. |
+| `AUDIO` | Indicates the model should return audio. |
+
+`MODALITY_UNSPECIFIED`
+`TEXT`
+`IMAGE`
+`AUDIO`
+
+## SpeechConfig
+
+Config for speech generation and transcription.
+
+`voiceConfig`
+`object (VoiceConfig)`
+`VoiceConfig`
+
+The configuration in case of single-voice output.
+
+`multiSpeakerVoiceConfig`
+`object (MultiSpeakerVoiceConfig)`
+`MultiSpeakerVoiceConfig`
+
+Optional. The configuration for the multi-speaker setup. It is mutually exclusive with the voiceConfig field.
+
+`languageCode`
+`string`
+
+Optional. The IETF [BCP-47](https://www.rfc-editor.org/rfc/bcp/bcp47.txt) language code that the user configured the app to use. Used for speech recognition and synthesis.
+
+Valid values are: `de-DE`, `en-AU`, `en-GB`, `en-IN`, `en-US`, `es-US`, `fr-FR`, `hi-IN`, `pt-BR`, `ar-XA`, `es-ES`, `fr-CA`, `id-ID`, `it-IT`, `ja-JP`, `tr-TR`, `vi-VN`, `bn-IN`, `gu-IN`, `kn-IN`, `ml-IN`, `mr-IN`, `ta-IN`, `te-IN`, `nl-NL`, `ko-KR`, `cmn-CN`, `pl-PL`, `ru-RU`, and `th-TH`.
+
+`de-DE`
+`en-AU`
+`en-GB`
+`en-IN`
+`en-US`
+`es-US`
+`fr-FR`
+`hi-IN`
+`pt-BR`
+`ar-XA`
+`es-ES`
+`fr-CA`
+`id-ID`
+`it-IT`
+`ja-JP`
+`tr-TR`
+`vi-VN`
+`bn-IN`
+`gu-IN`
+`kn-IN`
+`ml-IN`
+`mr-IN`
+`ta-IN`
+`te-IN`
+`nl-NL`
+`ko-KR`
+`cmn-CN`
+`pl-PL`
+`ru-RU`
+`th-TH`
+
+| JSON representation |
+| --- |
+| ``` {   "voiceConfig": {     object (VoiceConfig)   },   "multiSpeakerVoiceConfig": {     object (MultiSpeakerVoiceConfig)   },   "languageCode": string } ``` |
+
+`VoiceConfig`
+`MultiSpeakerVoiceConfig`
+
+## VoiceConfig
+
+The configuration for the voice to use.
+
+`voice_config`
+`Union type`
+`voice_config`
+`prebuiltVoiceConfig`
+`object (PrebuiltVoiceConfig)`
+`PrebuiltVoiceConfig`
+
+The configuration for the prebuilt voice to use.
+
+| JSON representation |
+| --- |
+| ``` {    // voice_config   "prebuiltVoiceConfig": {     object (PrebuiltVoiceConfig)   }   // Union type } ``` |
+
+`PrebuiltVoiceConfig`
+
+## PrebuiltVoiceConfig
+
+The configuration for the prebuilt speaker to use.
+
+`voiceName`
+`string`
+
+The name of the preset voice to use.
+
+| JSON representation |
+| --- |
+| ``` {   "voiceName": string } ``` |
+
+## MultiSpeakerVoiceConfig
+
+The configuration for the multi-speaker setup.
+
+`speakerVoiceConfigs[]`
+`object (SpeakerVoiceConfig)`
+`SpeakerVoiceConfig`
+
+Required. All the enabled speaker voices.
+
+| JSON representation |
+| --- |
+| ``` {   "speakerVoiceConfigs": [     {       object (SpeakerVoiceConfig)     }   ] } ``` |
+
+`SpeakerVoiceConfig`
+
+## SpeakerVoiceConfig
+
+The configuration for a single speaker in a multi speaker setup.
+
+`speaker`
+`string`
+
+Required. The name of the speaker to use. Should be the same as in the prompt.
+
+`voiceConfig`
+`object (VoiceConfig)`
+`VoiceConfig`
+
+Required. The configuration for the voice to use.
+
+| JSON representation |
+| --- |
+| ``` {   "speaker": string,   "voiceConfig": {     object (VoiceConfig)   } } ``` |
+
+`VoiceConfig`
+
+## ThinkingConfig
+
+Config for thinking features.
+
+`includeThoughts`
+`boolean`
+
+Indicates whether to include thoughts in the response. If true, thoughts are returned only when available.
+
+`thinkingBudget`
+`integer`
+
+The number of thoughts tokens that the model should generate.
+
+`thinkingLevel`
+`enum (ThinkingLevel)`
+`ThinkingLevel`
+
+Optional. Controls the maximum depth of the model's internal reasoning process before it produces a response. The default value is model-dependent. Refer to the [Thinking levels guide](https://ai.google.dev/gemini-api/docs/thinking#thinking-levels) for more details. Recommended for Gemini 3 or later models. Use with earlier models results in an error.
+
+| JSON representation |
+| --- |
+| ``` {   "includeThoughts": boolean,   "thinkingBudget": integer,   "thinkingLevel": enum (ThinkingLevel) } ``` |
+
+`ThinkingLevel`
+
+## ThinkingLevel
+
+Allow user to specify how much to think using enum instead of integer budget.
+
+| Enums | |
+| --- | --- |
+| `THINKING_LEVEL_UNSPECIFIED` | Default value. |
+| `MINIMAL` | Little to no thinking. |
+| `LOW` | Low thinking level. |
+| `MEDIUM` | Medium thinking level. |
+| `HIGH` | High thinking level. |
+
+`THINKING_LEVEL_UNSPECIFIED`
+`MINIMAL`
+`LOW`
+`MEDIUM`
+`HIGH`
+
+## ImageConfig
+
+Config for image generation features.
+
+`aspectRatio`
+`string`
+
+Optional. The aspect ratio of the image to generate. Supported aspect ratios: `1:1`, `1:4`, `4:1`, `1:8`, `8:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, or `21:9`.
+
+`1:1`
+`1:4`
+`4:1`
+`1:8`
+`8:1`
+`2:3`
+`3:2`
+`3:4`
+`4:3`
+`4:5`
+`5:4`
+`9:16`
+`16:9`
+`21:9`
+
+If not specified, the model will choose a default aspect ratio based on any reference images provided.
+
+`imageSize`
+`string`
+
+Optional. Specifies the size of generated images. Supported values are `512`, `1K`, `2K`, `4K`. If not specified, the model will use default value `1K`.
+
+`512`
+`1K`
+`2K`
+`4K`
+`1K`
+
+| JSON representation |
+| --- |
+| ``` {   "aspectRatio": string,   "imageSize": string } ``` |
+
+## MediaResolution
+
+Media resolution for the input media.
+
+| Enums | |
+| --- | --- |
+| `MEDIA_RESOLUTION_UNSPECIFIED` | Media resolution has not been set. |
+| `MEDIA_RESOLUTION_LOW` | Media resolution set to low (64 tokens). |
+| `MEDIA_RESOLUTION_MEDIUM` | Media resolution set to medium (256 tokens). |
+| `MEDIA_RESOLUTION_HIGH` | Media resolution set to high (zoomed reframing with 256 tokens). |
+
+`MEDIA_RESOLUTION_UNSPECIFIED`
+`MEDIA_RESOLUTION_LOW`
+`MEDIA_RESOLUTION_MEDIUM`
+`MEDIA_RESOLUTION_HIGH`
+
+## ResponseFormatConfig
+
+Configuration for the response output format. This is a flat object where each optional sub-field configures a specific output modality.
+
+`text`
+`object (TextResponseFormat)`
+`TextResponseFormat`
+
+Optional. Text output format configuration.
+
+`audio`
+`object (AudioResponseFormat)`
+`AudioResponseFormat`
+
+Optional. Audio output format configuration.
+
+`image`
+`object (ImageResponseFormat)`
+`ImageResponseFormat`
+
+Optional. Image output format configuration.
+
+| JSON representation |
+| --- |
+| ``` {   "text": {     object (TextResponseFormat)   },   "audio": {     object (AudioResponseFormat)   },   "image": {     object (ImageResponseFormat)   } } ``` |
+
+`TextResponseFormat`
+`AudioResponseFormat`
+`ImageResponseFormat`
+
+## TextResponseFormat
+
+Configuration for text output format.
+
+`mimeType`
+`enum (MimeType)`
+`MimeType`
+
+Optional. The MIME type of the text output.
+
+`schema`
+`value (Value format)`
+`Value`
+
+Optional. The JSON schema that the output should conform to. Only applicable when mimeType is APPLICATION\_JSON.
+
+| JSON representation |
+| --- |
+| ``` {   "mimeType": enum (MimeType),   "schema": value } ``` |
+
+`MimeType`
+
+## MimeType
+
+Supported MIME types for text output.
+
+| Enums | |
+| --- | --- |
+| `MIME_TYPE_UNSPECIFIED` | Default value. This value is unused. |
+| `APPLICATION_JSON` | JSON output format. |
+| `TEXT_PLAIN` | Plain text output format. |
+
+`MIME_TYPE_UNSPECIFIED`
+`APPLICATION_JSON`
+`TEXT_PLAIN`
+
+## AudioResponseFormat
+
+Configuration for audio output format.
+
+`mimeType`
+`enum (MimeType)`
+`MimeType`
+
+Optional. The MIME type of the audio output.
+
+`delivery`
+`enum (Delivery)`
+`Delivery`
+
+Optional. The delivery mode for the audio output.
+
+`sampleRate`
+`integer`
+
+Optional. Sample rate in Hz.
+
+`bitRate`
+`integer`
+
+Optional. Bit rate in bits per second (bps). Only applicable for compressed formats (MP3, Opus).
+
+| JSON representation |
+| --- |
+| ``` {   "mimeType": enum (MimeType),   "delivery": enum (Delivery),   "sampleRate": integer,   "bitRate": integer } ``` |
+
+`MimeType`
+`Delivery`
+
+## MimeType
+
+Supported MIME types for audio output.
+
+| Enums | |
+| --- | --- |
+| `MIME_TYPE_UNSPECIFIED` | Default value. This value is unused. |
+| `AUDIO_MP3` | MP3 audio format. |
+| `AUDIO_OGG_OPUS` | OGG Opus audio format. |
+| `AUDIO_L16` | Raw PCM (L16) audio format. |
+| `AUDIO_WAV` | WAV audio format. |
+| `AUDIO_ALAW` | A-law audio format. |
+| `AUDIO_MULAW` | Mu-law audio format. |
+
+`MIME_TYPE_UNSPECIFIED`
+`AUDIO_MP3`
+`AUDIO_OGG_OPUS`
+`AUDIO_L16`
+`AUDIO_WAV`
+`AUDIO_ALAW`
+`AUDIO_MULAW`
+
+## Delivery
+
+Delivery mode for audio output.
+
+| Enums | |
+| --- | --- |
+| `DELIVERY_UNSPECIFIED` | Default value. This value is unused. |
+| `INLINE` | Audio data is returned inline in the response. |
+| `URI` | Audio data is returned as a URI. |
+
+`DELIVERY_UNSPECIFIED`
+`INLINE`
+`URI`
+
+## ImageResponseFormat
+
+Configuration for image output format.
+
+`mimeType`
+`enum (MimeType)`
+`MimeType`
+
+Optional. The MIME type of the image output.
+
+`delivery`
+`enum (Delivery)`
+`Delivery`
+
+Optional. The delivery mode for the image output.
+
+`aspectRatio`
+`enum (AspectRatio)`
+`AspectRatio`
+
+Optional. The aspect ratio for the image output.
+
+`imageSize`
+`enum (ImageSize)`
+`ImageSize`
+
+Optional. The size of the image output.
+
+| JSON representation |
+| --- |
+| ``` {   "mimeType": enum (MimeType),   "delivery": enum (Delivery),   "aspectRatio": enum (AspectRatio),   "imageSize": enum (ImageSize) } ``` |
+
+`MimeType`
+`Delivery`
+`AspectRatio`
+`ImageSize`
+
+## MimeType
+
+Supported MIME types for image output.
+
+| Enums | |
+| --- | --- |
+| `MIME_TYPE_UNSPECIFIED` | Default value. This value is unused. |
+| `IMAGE_JPEG` | JPEG image format. |
+
+`MIME_TYPE_UNSPECIFIED`
+`IMAGE_JPEG`
+
+## Delivery
+
+Delivery mode for image output.
+
+| Enums | |
+| --- | --- |
+| `DELIVERY_UNSPECIFIED` | Default value. This value is unused. |
+| `INLINE` | Image data is returned inline in the response. |
+| `URI` | Image data is returned as a URI. |
+
+`DELIVERY_UNSPECIFIED`
+`INLINE`
+`URI`
+
+## AspectRatio
+
+Supported aspect ratios for image output.
+
+| Enums | |
+| --- | --- |
+| `ASPECT_RATIO_UNSPECIFIED` | Default value. This value is unused. |
+| `ASPECT_RATIO_ONE_BY_ONE` | 1:1 aspect ratio. |
+| `ASPECT_RATIO_TWO_BY_THREE` | 2:3 aspect ratio. |
+| `ASPECT_RATIO_THREE_BY_TWO` | 3:2 aspect ratio. |
+| `ASPECT_RATIO_THREE_BY_FOUR` | 3:4 aspect ratio. |
+| `ASPECT_RATIO_FOUR_BY_THREE` | 4:3 aspect ratio. |
+| `ASPECT_RATIO_FOUR_BY_FIVE` | 4:5 aspect ratio. |
+| `ASPECT_RATIO_FIVE_BY_FOUR` | 5:4 aspect ratio. |
+| `ASPECT_RATIO_NINE_BY_SIXTEEN` | 9:16 aspect ratio. |
+| `ASPECT_RATIO_SIXTEEN_BY_NINE` | 16:9 aspect ratio. |
+| `ASPECT_RATIO_TWENTY_ONE_BY_NINE` | 21:9 aspect ratio. |
+| `ASPECT_RATIO_ONE_BY_EIGHT` | 1:8 aspect ratio. |
+| `ASPECT_RATIO_EIGHT_BY_ONE` | 8:1 aspect ratio. |
+| `ASPECT_RATIO_ONE_BY_FOUR` | 1:4 aspect ratio. |
+| `ASPECT_RATIO_FOUR_BY_ONE` | 4:1 aspect ratio. |
+
+`ASPECT_RATIO_UNSPECIFIED`
+`ASPECT_RATIO_ONE_BY_ONE`
+`ASPECT_RATIO_TWO_BY_THREE`
+`ASPECT_RATIO_THREE_BY_TWO`
+`ASPECT_RATIO_THREE_BY_FOUR`
+`ASPECT_RATIO_FOUR_BY_THREE`
+`ASPECT_RATIO_FOUR_BY_FIVE`
+`ASPECT_RATIO_FIVE_BY_FOUR`
+`ASPECT_RATIO_NINE_BY_SIXTEEN`
+`ASPECT_RATIO_SIXTEEN_BY_NINE`
+`ASPECT_RATIO_TWENTY_ONE_BY_NINE`
+`ASPECT_RATIO_ONE_BY_EIGHT`
+`ASPECT_RATIO_EIGHT_BY_ONE`
+`ASPECT_RATIO_ONE_BY_FOUR`
+`ASPECT_RATIO_FOUR_BY_ONE`
+
+## ImageSize
+
+Supported image sizes for image output.
+
+| Enums | |
+| --- | --- |
+| `IMAGE_SIZE_UNSPECIFIED` | Default value. This value is unused. |
+| `IMAGE_SIZE_FIVE_TWELVE` | 512px image size. |
+| `IMAGE_SIZE_ONE_K` | 1K image size. |
+| `IMAGE_SIZE_TWO_K` | 2K image size. |
+| `IMAGE_SIZE_FOUR_K` | 4K image size. |
+
+`IMAGE_SIZE_UNSPECIFIED`
+`IMAGE_SIZE_FIVE_TWELVE`
+`IMAGE_SIZE_ONE_K`
+`IMAGE_SIZE_TWO_K`
+`IMAGE_SIZE_FOUR_K`
+
+## TranslationConfig
+
+Config for translation features.
+
+`targetLanguageCode`
+`string`
+
+Required. The target language for translation. Supported values are BCP-47 language codes (e.g. "en", "es", "fr").
+
+`echoTargetLanguage`
+`boolean`
+
+Optional. If true, the model will generate audio when the target language is spoken, essentially it will parrot the input. If false, we will not produce audio for the target language.
+
+| JSON representation |
+| --- |
+| ``` {   "targetLanguageCode": string,   "echoTargetLanguage": boolean } ``` |
+
+## AudioTranscriptionConfig
+
+The audio transcription configuration.
+
+`languageCodes[]`
+`string`
+
+Optional. BCP-47 language codes providing hints about the languages present in the audio. If omitted or empty, defaults to automatic language detection.
+
+`adaptationPhrases[]  
+(deprecated)`
+`string`
+
+This item is deprecated!
+
+Optional. A list of phrases used for speech adaptation, which biases the ASR model to improve recognition of these specific terms.
+
+`customVocabulary[]`
+`string`
+
+Optional. A list of custom vocabulary phrases to bias the speech recognition model toward recognizing specific terms (product names, proper nouns, jargon).
+
+`wordTimestamp`
+`boolean`
+
+Optional. Configures word-level timestamp generation.
+
+`diarization`
+`boolean`
+
+Optional. Configures speaker diarization.
+
+`language_config`
+`Union type`
+`language_codes`
+`language_config`
+`languageAuto  
+(deprecated)`
+`object (LanguageAuto)`
+`LanguageAuto`
+
+This item is deprecated!
+
+Optional. The model will detect the language automatically.
+
+`languageHints  
+(deprecated)`
+`object (LanguageHints)`
+`LanguageHints`
+
+This item is deprecated!
+
+Optional. Specifies one or more languages in the audio.
+
+| JSON representation |
+| --- |
+| ``` {   "languageCodes": [     string   ],   "adaptationPhrases": [     string   ],   "customVocabulary": [     string   ],   "wordTimestamp": boolean,   "diarization": boolean,    // language_config   "languageAuto": {     object (LanguageAuto)   },   "languageHints": {     object (LanguageHints)   }   // Union type } ``` |
+
+`LanguageAuto`
+`LanguageHints`
+
+## LanguageAuto
+
+This type has no fields.
+
+This item is deprecated!
+
+Indicates the language of the audio should be automatically detected.
+
+## LanguageHints
+
+This item is deprecated!
+
+Provides hints to the model about possible languages present in the audio.
+
+`languageCodes[]  
+(deprecated)`
+`string`
+
+This item is deprecated!
+
+Required. BCP-47 language codes.
+
+| JSON representation |
+| --- |
+| ``` {   "languageCodes": [     string   ] } ``` |
+
+## RealtimeInputConfig
+
+Configures the realtime input behavior in `BidiGenerateContent`.
+
+`BidiGenerateContent`
+`automaticActivityDetection`
+`object (AutomaticActivityDetection)`
+`AutomaticActivityDetection`
+
+Optional. If not set, automatic activity detection is enabled by default. If automatic voice detection is disabled, the client must send activity signals.
+
+`activityHandling`
+`enum (ActivityHandling)`
+`ActivityHandling`
+
+Optional. Defines what effect activity has.
+
+`turnCoverage`
+`enum (TurnCoverage)`
+`TurnCoverage`
+
+Optional. Defines which input is included in the user's turn.
+
+| JSON representation |
+| --- |
+| ``` {   "automaticActivityDetection": {     object (AutomaticActivityDetection)   },   "activityHandling": enum (ActivityHandling),   "turnCoverage": enum (TurnCoverage) } ``` |
+
+`AutomaticActivityDetection`
+`ActivityHandling`
+`TurnCoverage`
+
+## AutomaticActivityDetection
+
+Configures automatic detection of activity.
+
+`disabled`
+`boolean`
+
+Optional. If enabled (the default), detected voice and text input count as activity. If disabled, the client must send activity signals.
+
+`startOfSpeechSensitivity`
+`enum (StartSensitivity)`
+`StartSensitivity`
+
+Optional. Determines how likely speech is to be detected.
+
+`prefixPaddingMs`
+`integer`
+
+Optional. The required duration of detected speech before start-of-speech is committed. The lower this value, the more sensitive the start-of-speech detection is and shorter speech can be recognized. However, this also increases the probability of false positives.
+
+`endOfSpeechSensitivity`
+`enum (EndSensitivity)`
+`EndSensitivity`
+
+Optional. Determines how likely detected speech is ended.
+
+`silenceDurationMs`
+`integer`
+
+Optional. The required duration of detected non-speech (e.g. silence) before end-of-speech is committed. The larger this value, the longer speech gaps can be without interrupting the user's activity but this will increase the model's latency.
+
+| JSON representation |
+| --- |
+| ``` {   "disabled": boolean,   "startOfSpeechSensitivity": enum (StartSensitivity),   "prefixPaddingMs": integer,   "endOfSpeechSensitivity": enum (EndSensitivity),   "silenceDurationMs": integer } ``` |
+
+`StartSensitivity`
+`EndSensitivity`
+
+## StartSensitivity
+
+Determines how start of speech is detected.
+
+| Enums | |
+| --- | --- |
+| `START_SENSITIVITY_UNSPECIFIED` | The default is START\_SENSITIVITY\_HIGH. |
+| `START_SENSITIVITY_HIGH` | Automatic detection will detect the start of speech more often. |
+| `START_SENSITIVITY_LOW` | Automatic detection will detect the start of speech less often. |
+
+`START_SENSITIVITY_UNSPECIFIED`
+`START_SENSITIVITY_HIGH`
+`START_SENSITIVITY_LOW`
+
+## EndSensitivity
+
+Determines how end of speech is detected.
+
+| Enums | |
+| --- | --- |
+| `END_SENSITIVITY_UNSPECIFIED` | The default is END\_SENSITIVITY\_HIGH. |
+| `END_SENSITIVITY_HIGH` | Automatic detection ends speech more often. |
+| `END_SENSITIVITY_LOW` | Automatic detection ends speech less often. |
+
+`END_SENSITIVITY_UNSPECIFIED`
+`END_SENSITIVITY_HIGH`
+`END_SENSITIVITY_LOW`
+
+## ActivityHandling
+
+The different ways of handling user activity.
+
+| Enums | |
+| --- | --- |
+| `ACTIVITY_HANDLING_UNSPECIFIED` | If unspecified, the default behavior is `START_OF_ACTIVITY_INTERRUPTS`. |
+| `START_OF_ACTIVITY_INTERRUPTS` | If true, start of activity will interrupt the model's response (also called "barge in"). The model's current response will be cut-off in the moment of the interruption. This is the default behavior. |
+| `NO_INTERRUPTION` | The model's response will not be interrupted. |
+
+`ACTIVITY_HANDLING_UNSPECIFIED`
+`START_OF_ACTIVITY_INTERRUPTS`
+`START_OF_ACTIVITY_INTERRUPTS`
+`NO_INTERRUPTION`
+
+## TurnCoverage
+
+Options about which input is included in the user's turn.
+
+| Enums | |
+| --- | --- |
+| `TURN_COVERAGE_UNSPECIFIED` | If unspecified, a default behavior is selected based on the model. E.g., for Gemini 2.5, the default is `TURN_INCLUDES_ONLY_ACTIVITY`, while for Gemini 3.1 and onwards, it's `TURN_INCLUDES_AUDIO_ACTIVITY_AND_ALL_VIDEO`. |
+| `TURN_INCLUDES_ONLY_ACTIVITY` | Includes activity since the last turn, excluding inactivity (e.g. silence on the audio stream). |
+| `TURN_INCLUDES_ALL_INPUT` | Includes all realtime input since the last turn, including inactivity (e.g. silence on the audio stream). |
+| `TURN_INCLUDES_AUDIO_ACTIVITY_AND_ALL_VIDEO` | Includes audio activity and all video since the last turn. With automatic activity detection, audio activity means speech and excludes silence. |
+
+`TURN_COVERAGE_UNSPECIFIED`
+`TURN_INCLUDES_ONLY_ACTIVITY`
+`TURN_INCLUDES_AUDIO_ACTIVITY_AND_ALL_VIDEO`
+`TURN_INCLUDES_ONLY_ACTIVITY`
+`TURN_INCLUDES_ALL_INPUT`
+`TURN_INCLUDES_AUDIO_ACTIVITY_AND_ALL_VIDEO`
+
+## SessionResumptionConfig
+
+Session resumption configuration.
+
+This message is included in the session configuration as `BidiGenerateContentSetup.session_resumption`. If configured, the server will send `SessionResumptionUpdate` messages.
+
+`BidiGenerateContentSetup.session_resumption`
+`SessionResumptionUpdate`
+`handle`
+`string`
+
+The handle of a previous session. If not present then a new session is created.
+
+Session handles come from `SessionResumptionUpdate.token` values in previous connections.
+
+`SessionResumptionUpdate.token`
+
+| JSON representation |
+| --- |
+| ``` {   "handle": string } ``` |
+
+## ContextWindowCompressionConfig
+
+Enables context window compression — a mechanism for managing the model's context window so that it does not exceed a given length.
+
+`compression_mechanism`
+`Union type`
+`compression_mechanism`
+`slidingWindow`
+`object (SlidingWindow)`
+`SlidingWindow`
+
+A sliding-window mechanism.
+
+`triggerTokens`
+`string (int64 format)`
+
+The number of tokens (before running a turn) required to trigger a context window compression.
+
+This can be used to balance quality against latency as shorter context windows may result in faster model responses. However, any compression operation will cause a temporary latency increase, so they should not be triggered frequently.
+
+If not set, the default is 80% of the model's context window limit. This leaves 20% for the next user request/model response.
+
+| JSON representation |
+| --- |
+| ``` {    // compression_mechanism   "slidingWindow": {     object (SlidingWindow)   }   // Union type   "triggerTokens": string } ``` |
+
+`SlidingWindow`
+
+## SlidingWindow
+
+The SlidingWindow method operates by discarding content at the beginning of the context window. The resulting context will always begin at the start of a USER role turn. System instructions and any `BidiGenerateContentSetup.prefix_turns` will always remain at the beginning of the result.
+
+`BidiGenerateContentSetup.prefix_turns`
+`targetTokens`
+`string (int64 format)`
+
+The target number of tokens to keep. The default value is triggerTokens/2.
+
+Discarding parts of the context window causes a temporary latency increase so this value should be calibrated to avoid frequent compression operations.
+
+| JSON representation |
+| --- |
+| ``` {   "targetTokens": string } ``` |
+
+## HistoryConfig
+
+History configuration.
+
+This message is included in the session configuration as `BidiGenerateContentSetup.history_config`. Configures the exchange of history messages.
+
+`BidiGenerateContentSetup.history_config`
+`initialHistoryInClientContent`
+`boolean`
+
+Optional. If true, after sending `setupComplete`, the server will wait and at first process `clientContent` messages until `turnComplete` is `true`. This initial history will not trigger a model call and may end with role `MODEL`. After `turnComplete` is `true`, the client can start the realtime conversation via `realtimeInput`.
+
+`setupComplete`
+`clientContent`
+`turnComplete`
+`true`
+`MODEL`
+`turnComplete`
+`true`
+`realtimeInput`
+
+| JSON representation |
+| --- |
+| ``` {   "initialHistoryInClientContent": boolean } ``` |
+
+## Method: auth\_tokens.create
+
+Creates a token that can be used to constrain the behavior of a BidiGenerateContent session.
+
+### Endpoint
+
+`https://generativelanguage.googleapis.com/v1beta/auth_tokens`
+
+### Request body
+
+The request body contains an instance of `AuthToken`.
+
+`AuthToken`
+`expireTime`
+`string (Timestamp format)`
+`Timestamp`
+
+Optional. Input only. Immutable. An optional time after which, when using the resulting token, messages in BidiGenerateContent sessions will be rejected. (Gemini may preemptively close the session after this time.)
+
+If not set then this defaults to 30 minutes in the future. If set, this value must be less than 20 hours in the future.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+`newSessionExpireTime`
+`string (Timestamp format)`
+`Timestamp`
+
+Optional. Input only. Immutable. The time after which new Live API sessions using the token resulting from this request will be rejected.
+
+If not set this defaults to 60 seconds in the future. If set, this value must be less than 20 hours in the future.
+
+Uses RFC 3339, where generated output will always be Z-normalized and use 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: `"2014-10-02T15:01:23Z"`, `"2014-10-02T15:01:23.045123456Z"` or `"2014-10-02T15:01:23+05:30"`.
+
+`"2014-10-02T15:01:23Z"`
+`"2014-10-02T15:01:23.045123456Z"`
+`"2014-10-02T15:01:23+05:30"`
+`fieldMask`
+`string (FieldMask format)`
+`FieldMask`
+
+Optional. Input only. Immutable. If fieldMask is empty, and `bidiGenerateContentSetup` is not present, then the effective `BidiGenerateContentSetup` message is taken from the Live API connection.
+
+`bidiGenerateContentSetup`
+`BidiGenerateContentSetup`
+
+If fieldMask is empty, and `bidiGenerateContentSetup` *is* present, then the effective `BidiGenerateContentSetup` message is taken entirely from `bidiGenerateContentSetup` in this request. The setup message from the Live API connection is ignored.
+
+`bidiGenerateContentSetup`
+`BidiGenerateContentSetup`
+`bidiGenerateContentSetup`
+
+If fieldMask is not empty, then the corresponding fields from `bidiGenerateContentSetup` will overwrite the fields from the setup message in the Live API connection.
+
+`bidiGenerateContentSetup`
+
+This is a comma-separated list of fully qualified names of fields. Example: `"user.displayName,photo"`.
+
+`"user.displayName,photo"`
+`config`
+`Union type`
+`config`
+`bidiGenerateContentSetup`
+`object (BidiGenerateContentSetup)`
+`BidiGenerateContentSetup`
+
+Optional. Input only. Immutable. Configuration specific to `BidiGenerateContent`.
+
+`BidiGenerateContent`
+`uses`
+`integer`
+
+Optional. Input only. Immutable. The number of times the token can be used. If this value is zero then no limit is applied. Resuming a Live API session does not count as a use. If unspecified, the default is 1.
+
+### Response body
+
+If successful, the response body contains a newly created instance of `AuthToken`.
+
+`AuthToken`
+
+Except as otherwise noted, the content of this page is licensed under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/), and code samples are licensed under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0). For details, see the [Google Developers Site Policies](https://developers.google.com/site-policies). Java is a registered trademark of Oracle and/or its affiliates.
+
+Last updated 2026-08-17 UTC.

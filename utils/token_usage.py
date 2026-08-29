@@ -16,6 +16,7 @@ INPUT_TOKEN_KEYS = (
     "inputTokens",
     "promptTokens",
     "prefill_tokens",
+    "promptTokenCount",
 )
 OUTPUT_TOKEN_KEYS = (
     "completion_tokens",
@@ -24,6 +25,7 @@ OUTPUT_TOKEN_KEYS = (
     "completionTokens",
     "generated_tokens",
     "generatedTokens",
+    "candidatesTokenCount",
 )
 TOTAL_TOKEN_KEYS = (
     "total_tokens",
@@ -31,6 +33,45 @@ TOTAL_TOKEN_KEYS = (
     "total_token_count",
     "totalTokenCount",
 )
+# 缓存命中 token 数的所有已知字段位置（2026-08 调研，见 cache_research/SUMMARY.md）：
+# - OpenAI 系/Qwen/GLM/MiniMax/xAI/Mistral/千帆/OpenRouter: usage.prompt_tokens_details.cached_tokens
+#   （Responses API 为 usage.input_tokens_details.cached_tokens）
+# - DeepSeek: usage.prompt_cache_hit_tokens（顶层）
+# - Kimi / 阶跃Step / 部分 DashScope 地域: usage.cached_tokens（顶层）
+# - Anthropic / Bedrock / MiniMax-Anthropic 模式/中转站: usage.cache_read_input_tokens（顶层）
+# - Gemini: usageMetadata.cachedContentTokenCount
+CACHED_INPUT_TOKEN_KEYS = (
+    "cached_input_tokens",  # normalize 输出自身的字段名（保证二次归一化幂等）
+    "cached_tokens",
+    "cachedTokens",
+    "prompt_cache_hit_tokens",
+    "promptCacheHitTokens",
+    "cache_read_input_tokens",
+    "cacheReadInputTokens",
+    "cached_content_token_count",
+    "cachedContentTokenCount",
+)
+CACHE_WRITE_TOKEN_KEYS = (
+    "cache_creation_input_tokens",
+    "cacheCreationInputTokens",
+    "cache_write_tokens",
+    "cacheWriteTokens",
+)
+# 缓存详情可能出现的嵌套容器（OpenAI 风格 details 对象）
+PROMPT_DETAILS_KEYS = (
+    "prompt_tokens_details",
+    "input_tokens_details",
+    "promptTokensDetails",
+    "inputTokensDetails",
+)
+# Anthropic 语义的输入键与顶层缓存字段组合：仅当【输入命中 input_tokens 类键】
+# 且【顶层存在 cache_read_input_tokens / cache_creation_input_tokens】时才判定为
+# Anthropic 语义（input_tokens 不含缓存部分），需要把缓存部分加回总输入。
+# 注意：OpenAI Responses API 也用 input_tokens 键但其缓存字段在 input_tokens_details 里
+# （input_tokens 本身含缓存），因此不能用键名单独判断，必须同时要求顶层 Anthropic 字段存在。
+ANTHROPIC_STYLE_INPUT_KEYS = {"input_tokens", "inputTokens"}
+ANTHROPIC_CACHE_READ_KEYS = ("cache_read_input_tokens", "cacheReadInputTokens")
+ANTHROPIC_CACHE_WRITE_KEYS = ("cache_creation_input_tokens", "cacheCreationInputTokens")
 CURRENT_CONTEXT_KEYS = (
     "current_context_tokens",
     "currentContextTokens",
@@ -60,28 +101,49 @@ def _to_int(value: Any) -> Optional[int]:
 
 
 def _first_int(payload: Dict[str, Any], keys: Iterable[str]) -> Optional[int]:
+    _, value = _first_int_with_key(payload, keys)
+    return value
+
+
+def _first_int_with_key(payload: Dict[str, Any], keys: Iterable[str]) -> tuple:
+    """返回 (命中键名, 值)；未命中返回 (None, None)。"""
     for key in keys:
         if key in payload:
             value = _to_int(payload.get(key))
             if value is not None:
-                return value
-    return None
+                return key, value
+    return None, None
 
 
 def normalize_usage_payload(raw: Any) -> Optional[Dict[str, int]]:
     if not isinstance(raw, dict):
         return None
 
-    prompt_tokens = _first_int(raw, INPUT_TOKEN_KEYS)
+    prompt_key, prompt_tokens = _first_int_with_key(raw, INPUT_TOKEN_KEYS)
     completion_tokens = _first_int(raw, OUTPUT_TOKEN_KEYS)
     total_tokens = _first_int(raw, TOTAL_TOKEN_KEYS)
     current_context_tokens = _first_int(raw, CURRENT_CONTEXT_KEYS)
 
-    prompt_details = raw.get("prompt_tokens_details") or raw.get("input_tokens_details")
-    if isinstance(prompt_details, dict):
-        cached = _first_int(prompt_details, ("cached_tokens", "cachedTokens"))
-        # cached tokens are still part of prompt tokens in most APIs. Keep the
-        # detail accessible for callers that need it, but do not add it again.
+    # 缓存命中：先查顶层字段（DeepSeek/Kimi/Step/Anthropic/Gemini），再查 details 容器（OpenAI 系）
+    cached_input_tokens = _first_int(raw, CACHED_INPUT_TOKEN_KEYS)
+    cache_write_tokens = _first_int(raw, CACHE_WRITE_TOKEN_KEYS)
+    for details_key in PROMPT_DETAILS_KEYS:
+        prompt_details = raw.get(details_key)
+        if not isinstance(prompt_details, dict):
+            continue
+        if cached_input_tokens is None:
+            cached_input_tokens = _first_int(prompt_details, CACHED_INPUT_TOKEN_KEYS)
+        if cache_write_tokens is None:
+            cache_write_tokens = _first_int(prompt_details, CACHE_WRITE_TOKEN_KEYS)
+
+    # Anthropic 语义校准：顶层出现 cache_read/cache_creation 字段且输入键为 input_tokens 时，
+    # input_tokens 不含缓存读取/写入部分，加回以统一“总输入”口径；
+    # OpenAI 系（prompt_tokens 或 details 内 cached_tokens）本身含缓存部分，不校准。
+    anthropic_read = _first_int(raw, ANTHROPIC_CACHE_READ_KEYS)
+    anthropic_write = _first_int(raw, ANTHROPIC_CACHE_WRITE_KEYS)
+    if prompt_key in ANTHROPIC_STYLE_INPUT_KEYS and (anthropic_read or anthropic_write):
+        prompt_tokens = (prompt_tokens or 0) + (anthropic_read or 0) + (anthropic_write or 0)
+
     completion_details = raw.get("completion_tokens_details") or raw.get("output_tokens_details")
     if isinstance(completion_details, dict):
         reasoning = _first_int(completion_details, ("reasoning_tokens", "reasoningTokens"))
@@ -105,6 +167,7 @@ def normalize_usage_payload(raw: Any) -> Optional[Dict[str, int]]:
         "completion_tokens": int(completion_tokens),
         "total_tokens": int(total_tokens),
         "current_context_tokens": int(current_context_tokens),
+        "cached_input_tokens": int(cached_input_tokens or 0),
     }
 
 

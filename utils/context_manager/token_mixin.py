@@ -100,6 +100,7 @@ class TokenMixin:
                 "input_tokens": int(payload.get("input_tokens") or payload.get("total_input_tokens") or 0),
                 "output_tokens": int(payload.get("output_tokens") or payload.get("total_output_tokens") or 0),
                 "total_tokens": int(payload.get("total_tokens") or 0),
+                "cached_input_tokens": int(payload.get("cached_input_tokens") or payload.get("total_cached_input_tokens") or 0),
                 "updated_at": payload.get("updated_at"),
             }
         except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -117,13 +118,14 @@ class TokenMixin:
         with open(path, 'w', encoding='utf-8') as fh:
             json.dump(data, fh, ensure_ascii=False, indent=2)
 
-    def _increment_workspace_token_totals(self, input_tokens: int, output_tokens: int, total_tokens: int):
+    def _increment_workspace_token_totals(self, input_tokens: int, output_tokens: int, total_tokens: int, cached_input_tokens: int = 0):
         if input_tokens <= 0 and output_tokens <= 0 and total_tokens <= 0:
             return
         snapshot = self._load_token_totals()
         snapshot["input_tokens"] = snapshot.get("input_tokens", 0) + max(0, int(input_tokens))
         snapshot["output_tokens"] = snapshot.get("output_tokens", 0) + max(0, int(output_tokens))
         snapshot["total_tokens"] = snapshot.get("total_tokens", 0) + max(0, int(total_tokens))
+        snapshot["cached_input_tokens"] = snapshot.get("cached_input_tokens", 0) + max(0, int(cached_input_tokens))
         snapshot["updated_at"] = datetime.now().isoformat()
         self._save_token_totals(snapshot)
 
@@ -137,9 +139,11 @@ class TokenMixin:
         total_tokens = int(normalized_usage.get("total_tokens") or (prompt_tokens + completion_tokens))
         # 当前上下文长度优先取专用字段；缺失时回退到 prompt_tokens
         current_context_tokens = int(normalized_usage.get("current_context_tokens") or prompt_tokens)
+        # 本次请求命中缓存的输入 token（全厂商字段已在 normalize 中归一化）
+        cached_input_tokens = int(normalized_usage.get("cached_input_tokens") or 0)
 
         try:
-            self._increment_workspace_token_totals(prompt_tokens, completion_tokens, total_tokens)
+            self._increment_workspace_token_totals(prompt_tokens, completion_tokens, total_tokens, cached_input_tokens)
         except Exception as exc:
             print(f"[TokenStats] 无法写入累计Token: {exc}")
 
@@ -160,6 +164,7 @@ class TokenMixin:
                 completion_tokens,
                 total_tokens,
                 current_context_tokens=current_context_tokens,
+                cached_input_tokens=cached_input_tokens,
             )
 
             if success:
@@ -221,6 +226,8 @@ class TokenMixin:
                 'cumulative_input_tokens': cumulative_stats.get("total_input_tokens", 0) if cumulative_stats else 0,
                 'cumulative_output_tokens': cumulative_stats.get("total_output_tokens", 0) if cumulative_stats else 0,
                 'cumulative_total_tokens': cumulative_stats.get("total_tokens", 0) if cumulative_stats else 0,
+                'cumulative_cached_input_tokens': cumulative_stats.get("total_cached_input_tokens", 0) if cumulative_stats else 0,
+                'cache_exempt_input_tokens': cumulative_stats.get("cache_exempt_input_tokens", 0) if cumulative_stats else 0,
                 'current_context_tokens': cumulative_stats.get("current_context_tokens", 0) if cumulative_stats else 0,
                 'updated_at': datetime.now().isoformat()
             }

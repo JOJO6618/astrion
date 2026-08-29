@@ -132,6 +132,14 @@
     font-size: 20px;
 }
 
+// 深色主题下 --accent 为灰色（#606060），作为大字号统计数字辨识度不足，
+// 「当前上下文」数字改用 --text-primary（dark 下为白色）保证可读性。
+body[data-theme='dark'] {
+    .stat-value--accent {
+        color: var(--text-primary);
+    }
+}
+
 .stat-value--success {
     color: var(--state-success);
 }

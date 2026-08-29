@@ -676,6 +676,8 @@ export async function initializeLegacySocket(ctx: any) {
         ctx.currentConversationTokens.cumulative_input_tokens = data.cumulative_input_tokens || 0;
         ctx.currentConversationTokens.cumulative_output_tokens = data.cumulative_output_tokens || 0;
         ctx.currentConversationTokens.cumulative_total_tokens = data.cumulative_total_tokens || 0;
+        ctx.currentConversationTokens.cumulative_cached_input_tokens = data.cumulative_cached_input_tokens || 0;
+        ctx.currentConversationTokens.cache_exempt_input_tokens = data.cache_exempt_input_tokens || 0;
 
         socketLog(
           `Cumulative token stats updated: input=${data.cumulative_input_tokens}, output=${data.cumulative_output_tokens}, total=${data.cumulative_total_tokens}`

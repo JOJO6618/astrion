@@ -59,6 +59,8 @@ export default {
   currentContext: '当前上下文',
   cumulativeInput: '累计输入',
   cumulativeOutput: '累计输出',
+  cumulativeCachedInput: '累积缓存输入',
+  cacheHitRate: '缓存命中率',
   performanceStats: '性能统计',
   memory: '内存',
   containerMetricsPending: '容器已运行，等待采集指标...',

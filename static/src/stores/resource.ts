@@ -5,6 +5,8 @@ interface ConversationTokens {
   cumulative_input_tokens: number;
   cumulative_output_tokens: number;
   cumulative_total_tokens: number;
+  cumulative_cached_input_tokens: number;
+  cache_exempt_input_tokens: number;
 }
 
 interface ProjectStorage {
@@ -65,7 +67,9 @@ export const useResourceStore = defineStore('resource', {
     currentConversationTokens: {
       cumulative_input_tokens: 0,
       cumulative_output_tokens: 0,
-      cumulative_total_tokens: 0
+      cumulative_total_tokens: 0,
+      cumulative_cached_input_tokens: 0,
+      cache_exempt_input_tokens: 0
     } as ConversationTokens,
     projectStorage: {
       used_bytes: 0,
@@ -97,7 +101,9 @@ export const useResourceStore = defineStore('resource', {
       this.currentConversationTokens = {
         cumulative_input_tokens: 0,
         cumulative_output_tokens: 0,
-        cumulative_total_tokens: 0
+        cumulative_total_tokens: 0,
+        cumulative_cached_input_tokens: 0,
+        cache_exempt_input_tokens: 0
       };
     },
     setCurrentContextTokens(value: number) {
@@ -143,6 +149,10 @@ export const useResourceStore = defineStore('resource', {
           this.currentConversationTokens.cumulative_output_tokens =
             data.data.total_output_tokens || 0;
           this.currentConversationTokens.cumulative_total_tokens = data.data.total_tokens || 0;
+          this.currentConversationTokens.cumulative_cached_input_tokens =
+            data.data.total_cached_input_tokens || 0;
+          this.currentConversationTokens.cache_exempt_input_tokens =
+            data.data.cache_exempt_input_tokens || 0;
           if (typeof data.data.current_context_tokens === 'number') {
             this.currentContextTokens = data.data.current_context_tokens;
           }

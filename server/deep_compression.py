@@ -584,6 +584,8 @@ async def run_deep_compression(
 
     # 关键：重置 current_context_tokens，避免自动压缩续接后阈值判断仍读到压缩前的大值而陷入死循环。
     # 真实上下文长度会在下一次 API 响应后被重新写入。
+    # 同时置位 cache_cold_start_pending：压缩重写了上下文前缀，缓存可能已失效；
+    # 下一次真实调用若未命中缓存，其输入会被计入冷启动豁免值（cache_exempt_input_tokens）。
     try:
         target_manager.update_token_statistics(
             conversation_id,
@@ -591,6 +593,7 @@ async def run_deep_compression(
             output_tokens=0,
             total_tokens=0,
             current_context_tokens=0,
+            cache_cold_start_pending=True,
         )
     except Exception as exc:
         _emit(sender, "system_message", {"content": tr("deep_compression.stats_reset_failed", error=exc)})

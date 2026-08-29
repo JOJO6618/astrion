@@ -147,6 +147,11 @@ class MetadataMixin:
             "total_input_tokens": 0,
             "total_output_tokens": 0,
             "total_tokens": 0,
+            "total_cached_input_tokens": 0,
+            # 豁免出命中率分母的冷启动输入累计（首轮未命中 + 压缩后首轮未命中的输入）
+            "cache_exempt_input_tokens": 0,
+            # 深度压缩后待判定标记：下一次真实调用若无缓存命中，其输入累加进豁免值
+            "cache_cold_start_pending": False,
             "current_context_tokens": 0,
             "updated_at": now
         }
@@ -161,12 +166,15 @@ class MetadataMixin:
             if key not in token_stats:
                 token_stats[key] = default_value
         
-        # 确保数值类型正确
+        # 确保数值类型正确（cache_cold_start_pending 为布尔，不在此转换）
         try:
             token_stats["total_input_tokens"] = int(token_stats.get("total_input_tokens", 0))
             token_stats["total_output_tokens"] = int(token_stats.get("total_output_tokens", 0))
             token_stats["total_tokens"] = int(token_stats.get("total_tokens", 0))
+            token_stats["total_cached_input_tokens"] = int(token_stats.get("total_cached_input_tokens", 0))
+            token_stats["cache_exempt_input_tokens"] = int(token_stats.get("cache_exempt_input_tokens", 0))
             token_stats["current_context_tokens"] = int(token_stats.get("current_context_tokens", 0))
+            token_stats["cache_cold_start_pending"] = bool(token_stats.get("cache_cold_start_pending", False))
         except (ValueError, TypeError):
             print("⚠️ Token统计数据损坏，重置为0")
             token_stats = defaults

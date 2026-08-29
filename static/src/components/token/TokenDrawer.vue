@@ -33,6 +33,16 @@
                   {{ formatTokenCount(currentConversationTokens.cumulative_output_tokens || 0) }}
                 </div>
               </div>
+              <div class="stat-block">
+                <div class="stat-label">{{ $t('sidebar.cumulativeCachedInput') }}</div>
+                <div class="stat-value">
+                  {{ formatTokenCount(currentConversationTokens.cumulative_cached_input_tokens || 0) }}
+                </div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">{{ $t('sidebar.cacheHitRate') }}</div>
+                <div class="stat-value">{{ cacheHitRateText }}</div>
+              </div>
             </div>
           </div>
           <div class="usage-cell usage-cell--right usage-cell--performance panel-card">
@@ -128,6 +138,8 @@ const props = defineProps<{
   currentConversationTokens: {
     cumulative_input_tokens?: number;
     cumulative_output_tokens?: number;
+    cumulative_cached_input_tokens?: number;
+    cache_exempt_input_tokens?: number;
   };
   currentContextTokens: number;
   containerStatus: any;
@@ -151,6 +163,19 @@ const quotaTiers = computed(() => [
   { key: 'thinking', label: 'sidebar.quotaTierThinking', value: props.usageQuota.thinking },
   { key: 'search', label: 'sidebar.quotaTierSearch', value: props.usageQuota.search }
 ]);
+
+// 缓存命中率 = 累积缓存命中输入 / (累计总输入 - 冷启动豁免输入)；
+// 豁免值由后端累计：首轮及压缩后首轮若未命中缓存，其输入属于建立缓存的成本，不计入分母
+const cacheHitRateText = computed(() => {
+  const totalInput = props.currentConversationTokens.cumulative_input_tokens || 0;
+  const exemptInput = props.currentConversationTokens.cache_exempt_input_tokens || 0;
+  const effectiveInput = totalInput - exemptInput;
+  if (effectiveInput <= 0) {
+    return '--';
+  }
+  const cached = props.currentConversationTokens.cumulative_cached_input_tokens || 0;
+  return `${((cached / effectiveInput) * 100).toFixed(1)}%`;
+});
 
 const hasContainerStats = computed(() => {
   const status = props.containerStatus;
