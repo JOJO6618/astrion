@@ -413,6 +413,12 @@ class SubAgentTask:
             if self.current_context_tokens > 0 and self.current_context_tokens >= self.compress_threshold_tokens:
                 compressed = self._deep_compress_messages()
                 if compressed:
+                    # 写入进度文件：前端活动窗口在压缩发生的位置显示压缩提示
+                    self.emit("progress", {
+                        "subtype": "compression",
+                        "round": self._compress_round,
+                        "ts": int(time.time() * 1000),
+                    })
                     ma_debug(
                         "sub_agent_deep_compressed",
                         task_id=self.task_id,
@@ -477,6 +483,9 @@ class SubAgentTask:
                 progress_id = tool_call.get("id") or f"tool_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
 
                 if name == "finish_task":
+                    # finish_task 在模型流式阶段已 emit「calling」进度事件（_call_model），
+                    # 此处必须补终态，否则前端活动窗口该条目永远停留在「调用中」转圈
+                    self.emit("progress", {"id": progress_id, "tool": name, "status": "completed", "args": args, "ts": int(time.time() * 1000)})
                     await self._write_finish(args, elapsed)
                     return
 
