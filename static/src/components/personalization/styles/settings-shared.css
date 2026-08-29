@@ -1,0 +1,937 @@
+/*
+ * 个人空间抽屉共享样式（骨架 / 设置行 / 控件 / 浮层 / 响应式）
+ * 从 PersonalizationDrawer.vue 抽出：scoped 样式无法穿透 tab 子组件，故改为全局 CSS。
+ * 所有类名均为 settings-* / personal-* 前缀，全局冲突风险低。
+ */
+
+/* 卡片尺寸/圆角/内边距的唯一事实源在全局 .personal-page-card（_overlays.scss）；
+   这里只保留 redesign 特有的变量、容器查询上下文与内部布局 */
+.settings-redesign-card {
+  --settings-floating-menu-bg: color-mix(in srgb, var(--surface-soft) 90%, var(--surface-raised));
+  --settings-floating-menu-hover: var(--hover-bg);
+  --settings-floating-menu-shadow: none;
+  --settings-tab-hover-bg: var(--theme-tab-active);
+  --settings-tab-active-bg: var(--theme-tab-active);
+  position: relative;
+  /* 容器查询上下文：内部布局按卡片自身宽度响应挤压，与视口脱耦 */
+  container-type: inline-size;
+  container-name: settings-card;
+}
+
+html[data-theme='dark'] .settings-redesign-card,
+body[data-theme='dark'] .settings-redesign-card {
+  --settings-floating-menu-bg: var(--surface-panel);
+  --settings-floating-menu-hover: var(--hover-bg);
+  --settings-floating-menu-shadow: none;
+  --settings-tab-hover-bg: var(--hover-bg);
+  --settings-tab-active-bg: var(--hover-bg);
+}
+
+/* 桌面端关闭按钮位于侧栏顶部流内（不再是绝对定位大圆钮） */
+.settings-nav-head {
+  flex: 0 0 auto;
+  padding: 12px 12px 4px;
+}
+
+.settings-close-button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .settings-close-button:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+  }
+}
+
+.settings-close-button svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2;
+}
+
+/* 移动端顶栏：桌面端隐藏 */
+.settings-mobile-bar {
+  display: none;
+}
+
+.settings-tab-chevron {
+  display: none;
+}
+
+.settings-redesign-body,
+.settings-redesign-form {
+  height: 100%;
+  min-height: 0;
+}
+
+.settings-redesign-layout {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+}
+
+.settings-redesign-nav {
+  flex: 0 0 184px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--theme-control-border);
+}
+
+.settings-redesign-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 4px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-redesign-tab {
+  width: 100%;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  letter-spacing: -0.006em;
+}
+
+.settings-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .settings-redesign-tab:hover {
+    background: var(--settings-tab-hover-bg);
+  }
+}
+
+.settings-redesign-tab.active {
+  background: var(--settings-tab-active-bg);
+  font-weight: 640;
+}
+
+.settings-tab-icon {
+  --icon-size: 18px;
+  flex: 0 0 auto;
+}
+
+/* 与其他图标外框统一 18px，不再特殊放大（图标外框对齐规范） */
+.settings-tab-icon--chat {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-tab-icon--chat svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-redesign-content {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.settings-redesign-content-header {
+  height: 58px;
+  flex: 0 0 58px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--theme-control-border);
+}
+
+.settings-redesign-content-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  font-weight: 650;
+}
+
+.settings-redesign-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 20px 96px;
+  scroll-padding-bottom: 96px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-redesign-tabs::-webkit-scrollbar,
+.settings-redesign-scroll::-webkit-scrollbar,
+.settings-floating-menu::-webkit-scrollbar,
+.role-editor-body::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-floating-menu {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-page {
+  min-height: 0;
+}
+
+.settings-select-row,
+.settings-input-row,
+.settings-list-row,
+.settings-action-row,
+.settings-toggle-row {
+  min-height: 0;
+  border-bottom: 1px solid var(--theme-control-border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 0;
+  color: var(--text-primary);
+}
+
+.settings-list-row.tall,
+.settings-input-row.stackable {
+  align-items: flex-start;
+}
+
+.settings-list-row.tall {
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 360px);
+}
+
+.settings-row-copy {
+  min-width: 0;
+  display: block;
+}
+
+.settings-row-title {
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  line-height: 1.32;
+}
+
+.settings-row-desc {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settings-select-wrap {
+  position: relative;
+  display: inline-flex;
+  justify-self: end;
+}
+
+.settings-select-button {
+  width: max-content;
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .settings-select-button:hover {
+    background: var(--hover-bg);
+  }
+}
+
+.settings-select-button .select-chevron {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.settings-select-button .select-chevron::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-1.5px) rotate(45deg);
+}
+
+.settings-select-wrap.open .settings-select-button .select-chevron {
+  transform: rotate(180deg);
+}
+
+.settings-floating-menu {
+  position: fixed;
+  right: auto;
+  top: auto;
+  width: 300px;
+  max-height: calc(34px * 4 + 12px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--settings-floating-menu-bg);
+  border: 1px solid var(--theme-control-border);
+  box-shadow: var(--settings-floating-menu-shadow);
+  opacity: 1;
+  backdrop-filter: none;
+  z-index: 2147483647;
+  display: none;
+}
+
+.settings-select-wrap.open .settings-floating-menu {
+  display: block;
+}
+
+.settings-floating-menu.dark {
+  background: var(--surface-panel) !important;
+  box-shadow: none !important;
+}
+
+@media (hover: hover) {
+  .settings-floating-menu.dark .settings-menu-option:hover {
+    background: var(--hover-bg) !important;
+  }
+}
+
+html[data-theme='dark'] .settings-floating-menu,
+body[data-theme='dark'] .settings-floating-menu {
+  background: var(--surface-panel) !important;
+  box-shadow: none !important;
+}
+
+@media (hover: hover) {
+  html[data-theme='dark'] .settings-menu-option:hover,
+  body[data-theme='dark'] .settings-menu-option:hover {
+    background: var(--hover-bg) !important;
+  }
+}
+
+.settings-menu-option {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  row-gap: 0;
+  column-gap: 8px;
+  align-items: center;
+  padding: 5px 9px;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .settings-menu-option:hover {
+    background: var(--settings-floating-menu-hover);
+  }
+}
+
+.settings-menu-option:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.settings-menu-option strong {
+  grid-column: 1;
+  grid-row: 1;
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  min-width: 0;
+}
+
+.settings-menu-option span {
+  grid-column: 1;
+  grid-row: 2;
+  display: block;
+  margin-top: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.15;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-menu-option svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: var(--text-primary);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.settings-menu-option.selected svg {
+  opacity: 1;
+}
+
+.settings-input-row input,
+.settings-add-row input,
+.settings-number-row input,
+.settings-number-input,
+.settings-compression-grid input {
+  height: 32px;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 0 11px;
+  outline: none;
+  font-size: 13px;
+}
+
+.settings-number-input {
+  width: 120px;
+  text-align: right;
+}
+
+.settings-section-divider {
+  display: flex;
+  align-items: center;
+  margin: 18px 0 6px;
+}
+.settings-section-divider__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+.settings-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  margin-left: 10px;
+  background: var(--theme-control-border);
+}
+
+.settings-input-row > input {
+  width: min(220px, 100%);
+  text-align: left;
+}
+
+.settings-input-row input:focus,
+.settings-add-row input:focus,
+.settings-number-row input:focus,
+.settings-number-input:focus,
+.settings-compression-grid input:focus {
+  border-color: var(--text-secondary);
+  box-shadow: none;
+}
+
+/* width 用绝对值：min(280px, 100%) 的百分比在 grid auto 列固有尺寸计算中会失效，
+   导致列宽被内容（chips 排）撑到 404px、label 列被挤成 0px 竖排 */
+.settings-input-stack {
+  width: 280px;
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  justify-self: end;
+}
+
+.settings-input-stack.wide {
+  width: 240px;
+  max-width: 100%;
+}
+
+.settings-input-stack input {
+  width: 100%;
+}
+
+.settings-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-chip-row.right {
+  justify-content: flex-end;
+}
+
+.settings-chip-row button {
+  border: 1px solid var(--theme-control-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  min-height: 28px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.settings-number-row button,
+.settings-add-row button,
+.settings-secondary-button,
+.settings-primary-button {
+  border: 1px solid var(--theme-control-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .settings-chip-row button:hover,
+  .settings-number-row button:hover,
+  .settings-add-row button:hover,
+  .settings-secondary-button:hover {
+    background: var(--hover-bg);
+  }
+}
+
+.settings-chip-row button.active,
+.settings-primary-button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.settings-secondary-button.danger {
+  color: var(--state-warning);
+}
+
+.settings-inline-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-inline-actions.right {
+  margin-top: 10px;
+}
+
+.settings-mini-status {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-mini-status.warning {
+  color: var(--state-warning);
+}
+
+.settings-add-row,
+.settings-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.settings-add-row input,
+.settings-number-row input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.settings-textarea-row {
+  min-height: 0;
+  border-bottom: 1px solid var(--theme-control-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+  color: var(--text-primary);
+}
+
+.settings-textarea-row textarea {
+  width: 100%;
+  min-height: 96px;
+  max-height: 320px;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 12px;
+  outline: none;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+  overflow-y: auto;
+  font-family: inherit;
+}
+
+.settings-textarea-row textarea:focus {
+  border-color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.settings-textarea-row textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.settings-toggle-row {
+  cursor: pointer;
+  position: relative;
+}
+
+.settings-toggle-row input[type='checkbox'] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-group-block {
+  border-bottom: 1px solid var(--theme-control-border);
+  padding: 14px 0 16px;
+}
+
+.settings-group-title {
+  margin-bottom: 6px;
+}
+
+.settings-toggle-row.inner {
+  min-height: 48px;
+  padding: 7px 0 7px 18px;
+  border-bottom: 0;
+}
+
+.settings-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 26px;
+}
+
+.settings-compression-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 10px;
+}
+
+.settings-compression-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-save-bar {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 0;
+  min-height: 54px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.settings-save-bar > * {
+  pointer-events: auto;
+}
+
+.personal-status-group {
+  min-height: 20px;
+  font-size: 12px;
+}
+
+.status.success {
+  color: var(--state-success);
+}
+
+.status.error,
+.usage-summary-error {
+  color: var(--state-warning);
+}
+
+
+/* 注：卡片常态最大宽度 648px，以下断点均在此基础上进一步响应。
+   窗口拖窄（≤520px 卡片）：侧栏再收窄、内容留白再压缩、输入框收窄 */
+@container settings-card (max-width: 520px) {
+  .settings-redesign-nav {
+    flex-basis: 164px;
+  }
+
+  .settings-redesign-content-header {
+    padding: 0 16px;
+  }
+
+  .settings-redesign-scroll {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .settings-select-row,
+  .settings-input-row,
+  .settings-list-row,
+  .settings-action-row,
+  .settings-toggle-row {
+    gap: 12px;
+  }
+
+  .settings-input-row > input {
+    width: min(180px, 100%);
+  }
+
+  .settings-input-stack,
+  .settings-input-stack.wide {
+    width: 220px;
+    max-width: 100%;
+  }
+}
+
+/* 极限挤压（手机全屏 / 窗口极窄）：输入类行上下堆叠，控件全宽；开关行保持同行（iOS 设置式） */
+@container settings-card (max-width: 440px) {
+  .settings-select-row,
+  .settings-input-row,
+  .settings-list-row,
+  .settings-action-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .settings-select-wrap,
+  .settings-input-stack,
+  .settings-input-stack.wide,
+  .settings-input-row > input {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .settings-select-wrap .settings-select-button {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .settings-check-grid,
+  .settings-compression-grid,
+  .usage-summary-grid--tokens,
+  .usage-summary-grid--counts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══ 手机端 / 窄屏（≤760px）：全屏 + iOS 设置式「列表 → 子页」导航 ═══ */
+@media (max-width: 760px) {
+  /* 卡片全屏化由全局 _overlays.scss 同断点媒体查询负责（统一断点 760px） */
+
+  /* 导航列表与内容子页并排，直接切换（触屏不做平移动画，避免看到上一屏滑走） */
+  .settings-redesign-layout {
+    width: 200%;
+  }
+
+  .settings-redesign-card.mobile-in-sub .settings-redesign-layout {
+    transform: translateX(-50%);
+  }
+
+  .settings-redesign-nav,
+  .settings-redesign-content {
+    flex: 0 0 50%;
+    width: 50%;
+  }
+
+  /* iOS 点击默认灰色高亮闪（tap-highlight），观感类似 hover 粘滞，禁用 */
+  .settings-redesign-tab {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 窄屏布局下禁用选项 hover 态：桌面窄窗口 hover:hover 仍匹配，
+     触屏已由 @media (hover: hover) 包裹兑底，这里按布局模式再禁一层 */
+  .settings-redesign-tab:hover,
+  .settings-menu-option:hover {
+    background: transparent;
+  }
+
+  /* 移动端列表态不需要「当前选中项」常驻高亮（iOS 设置式列表无此概念） */
+  .settings-redesign-tab.active {
+    background: transparent;
+    font-weight: inherit;
+  }
+
+  .settings-floating-menu.dark .settings-menu-option:hover,
+  html[data-theme='dark'] .settings-menu-option:hover,
+  body[data-theme='dark'] .settings-menu-option:hover {
+    background: transparent !important;
+  }
+
+  .settings-redesign-nav {
+    border-right: 0;
+  }
+
+  /* 桌面端头部隐藏，移动端顶栏接管 */
+  .settings-nav-head,
+  .settings-redesign-content-header {
+    display: none;
+  }
+
+  .settings-mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
+    border-bottom: 1px solid var(--theme-control-border);
+    min-height: 52px;
+  }
+
+  .settings-mobile-bar-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-mobile-bar-cell {
+    width: 44px;
+    flex: 0 0 auto;
+  }
+
+  .settings-mobile-bar-btn {
+    height: 36px;
+    min-width: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .settings-mobile-bar-btn:active {
+    background: var(--hover-bg);
+  }
+
+  .settings-mobile-bar-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .settings-mobile-back {
+    color: var(--accent);
+  }
+
+  /* 导航变为分组列表样式：48px 触控目标 + 右箭头 */
+  .settings-redesign-tabs {
+    padding: 8px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+    gap: 3px;
+  }
+
+  .settings-redesign-tab {
+    height: 48px;
+    padding: 0 12px;
+    font-size: 15px;
+    border-radius: 10px;
+    gap: 12px;
+  }
+
+  .settings-tab-icon {
+    --icon-size: 20px;
+  }
+
+  .settings-tab-icon--chat {
+    width: 20px;
+    height: 20px;
+  }
+
+  .settings-tab-icon--chat svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .settings-tab-chevron {
+    display: block;
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+  }
+
+  .settings-redesign-scroll {
+    padding: 4px 16px calc(48px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .settings-save-bar {
+    right: 16px;
+  }
+
+  .settings-floating-menu {
+    width: min(340px, calc(100vw - 48px));
+  }
+}
+
+/* ── 语音模型下载进度条 ── */

@@ -28,6 +28,8 @@ export default {
   tool: 'Tool',
   versioning: 'Versioning',
   unset: 'Not set',
+  settings: 'Settings',
+  back: 'Back',
   settingsLanguage: 'Language',
   settingsLanguageDesc: 'Choose the display language',
 

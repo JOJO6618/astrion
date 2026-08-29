@@ -15,14 +15,14 @@
 }
 
 .personal-page-card {
-  width: min(96vw, 1020px);
-  height: calc(100vh - 40px);
-  max-height: 760px;
-  background: var(--theme-surface-card);
-  border-radius: 24px;
+  width: min(648px, calc(100vw - 40px));
+  height: min(646px, calc(100vh - 40px));
+  height: min(646px, calc(100dvh - 40px));
+  background: var(--theme-surface-soft);
+  border-radius: 14px;
   border: 1px solid var(--theme-control-border);
-  box-shadow: var(--theme-shadow-strong);
-  padding: 40px;
+  box-shadow: none;
+  padding: 0;
   text-align: left;
   color: var(--text-primary);
   display: flex;
@@ -329,11 +329,13 @@
   }
 }
 
-/* 手机端完整适配 */
-@media (max-width: 768px) {
+/* 手机端完整适配（与个人空间组件移动端断点 760px 统一） */
+@media (max-width: 760px) {
   .personal-page-overlay {
     padding: 0;
     align-items: stretch;
+    /* 盖过移动端顶栏 mobile-panel-trigger (1500) 及其下拉菜单 (1600) */
+    z-index: 1700;
   }
 
   .personal-page-card {
@@ -341,8 +343,6 @@
     height: 100%;
     max-height: none;
     border-radius: 0;
-    padding: 16px;
-    padding-top: 60px;
     display: flex;
     flex-direction: column;
   }
@@ -2553,6 +2553,21 @@
 .personal-page-vertical-leave-to {
   opacity: 0;
   transform: translateY(-26px);
+}
+
+/* 触屏（≤760px）不做内容切换过渡：mode=out-in 的离场动画在手机上观感拖沓。
+   必须放在原规则之后（同特异性后者胜）。
+   离场元素直接 display:none：窄屏下 transition 组件为默认同时模式，
+   旧内容瞬间消失、新内容瞬间出现，不会先闪旧内容。 */
+@media (max-width: 760px) {
+  .personal-page-vertical-enter-active,
+  .personal-page-vertical-leave-active {
+    transition: none;
+  }
+
+  .personal-page-vertical-leave-active {
+    display: none;
+  }
 }
 
 .personal-page-fade-enter-active,

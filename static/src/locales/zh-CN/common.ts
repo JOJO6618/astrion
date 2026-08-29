@@ -30,6 +30,8 @@ export default {
   tool: '工具',
   versioning: '版本管理',
   unset: '未设置',
+  settings: '设置',
+  back: '返回',
   settingsLanguage: '界面语言',
   settingsLanguageDesc: '选择界面显示语言',
 
