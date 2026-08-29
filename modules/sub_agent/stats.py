@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Optional
 
+from modules.i18n import tr
+
 
 class SubAgentStatsMixin:
     """提供子智能体任务耗时、统计摘要与结果消息组装能力。"""
@@ -38,13 +40,13 @@ class SubAgentStatsMixin:
         web_pages = self._coerce_stat_int(stats.get("web_pages"))
         commands = self._coerce_stat_int(stats.get("commands"))
         lines = [
-            f"调用了{api_calls}次",
-            f"阅读了{files_read}次文件",
-            f"写入了{write_files}次文件",
-            f"编辑了{edit_files}次文件",
-            f"搜索了{searches}次内容",
-            f"查看了{web_pages}个网页",
-            f"运行了{commands}个指令",
+            tr("sub_agent_stats.api_calls", n=api_calls),
+            tr("sub_agent_stats.files_read", n=files_read),
+            tr("sub_agent_stats.write_files", n=write_files),
+            tr("sub_agent_stats.edit_files", n=edit_files),
+            tr("sub_agent_stats.searches", n=searches),
+            tr("sub_agent_stats.web_pages", n=web_pages),
+            tr("sub_agent_stats.commands", n=commands),
         ]
         return "\n".join(lines)
 
@@ -61,9 +63,9 @@ class SubAgentStatsMixin:
         if stats_summary:
             parts.append(stats_summary)
         if duration_seconds is not None:
-            parts.append(f"运行了{duration_seconds}秒")
+            parts.append(tr("sub_agent_stats.duration", n=duration_seconds))
         if summary:
             parts.append(summary)
         if deliverables_dir:
-            parts.append(f"交付目录：{deliverables_dir}")
+            parts.append(tr("sub_agent_stats.deliverables", dir=deliverables_dir))
         return "\n\n".join(parts)

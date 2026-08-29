@@ -207,4 +207,42 @@ MESSAGES = {
         "zh-CN": "⚠️ 子智能体任务异常退出，系统已自动清理运行状态。",
         "en-US": "⚠️ The sub-agent task exited abnormally; the system auto-cleaned its running state.",
     },
+
+    # ── modules/sub_agent/stats.py（统计摘要与消息组装） ──
+    "sub_agent_stats.api_calls": {
+        "zh-CN": "调用了{n}次",
+        "en-US": "API calls: {n}",
+    },
+    "sub_agent_stats.files_read": {
+        "zh-CN": "阅读了{n}次文件",
+        "en-US": "Files read: {n}",
+    },
+    "sub_agent_stats.write_files": {
+        "zh-CN": "写入了{n}次文件",
+        "en-US": "Files written: {n}",
+    },
+    "sub_agent_stats.edit_files": {
+        "zh-CN": "编辑了{n}次文件",
+        "en-US": "Files edited: {n}",
+    },
+    "sub_agent_stats.searches": {
+        "zh-CN": "搜索了{n}次内容",
+        "en-US": "Searches: {n}",
+    },
+    "sub_agent_stats.web_pages": {
+        "zh-CN": "查看了{n}个网页",
+        "en-US": "Pages viewed: {n}",
+    },
+    "sub_agent_stats.commands": {
+        "zh-CN": "运行了{n}个指令",
+        "en-US": "Commands run: {n}",
+    },
+    "sub_agent_stats.duration": {
+        "zh-CN": "运行了{n}秒",
+        "en-US": "Ran for {n} seconds",
+    },
+    "sub_agent_stats.deliverables": {
+        "zh-CN": "交付目录：{dir}",
+        "en-US": "Deliverables directory: {dir}",
+    },
 }

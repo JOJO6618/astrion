@@ -177,6 +177,128 @@ MESSAGES = {
         "en-US": "Sub-agent paused.",
     },
 
+    # ── tool_result_formatter/agent_context.py（子智能体统计/创建/完成/交付等） ──
+    "fmt_agent2.api_calls": {
+        "zh-CN": "调用了{n}次",
+        "en-US": "API calls: {n}",
+    },
+    "fmt_agent2.files_read": {
+        "zh-CN": "阅读了{n}次文件",
+        "en-US": "Files read: {n}",
+    },
+    "fmt_agent2.edit_files": {
+        "zh-CN": "编辑了{n}次文件",
+        "en-US": "Files edited: {n}",
+    },
+    "fmt_agent2.searches": {
+        "zh-CN": "搜索了{n}次内容",
+        "en-US": "Searches: {n}",
+    },
+    "fmt_agent2.web_pages": {
+        "zh-CN": "查看了{n}个网页",
+        "en-US": "Pages viewed: {n}",
+    },
+    "fmt_agent2.commands": {
+        "zh-CN": "运行了{n}个指令",
+        "en-US": "Commands run: {n}",
+    },
+    "fmt_agent2.running_seconds": {
+        "zh-CN": "运行了{n}秒",
+        "en-US": "Ran for {n} seconds",
+    },
+    "fmt_agent2.created_with_status": {
+        "zh-CN": "{name} 已创建（状态 {status}）。",
+        "en-US": "{name} created (status {status}).",
+    },
+    "fmt_agent2.created_header": {
+        "zh-CN": "子智能体 #{agent_id} 已创建（task_id={task_id}，状态 {status}{ref_note}{deliver_note}）。",
+        "en-US": "Sub-agent #{agent_id} created (task_id={task_id}, status {status}{ref_note}{deliver_note}).",
+    },
+    "fmt_agent2.ref_count_note": {
+        "zh-CN": "，附带 {n} 份参考文件",
+        "en-US": ", with {n} reference files",
+    },
+    "fmt_agent2.deliver_dir_note": {
+        "zh-CN": "，交付目录: {dir}",
+        "en-US": ", deliverables directory: {dir}",
+    },
+    "fmt_agent2.completed_header": {
+        "zh-CN": "子智能体 #{agent_id}/{task_id} 完成",
+        "en-US": "Sub-agent #{agent_id}/{task_id} completed",
+    },
+    "fmt_agent2.copied_to": {
+        "zh-CN": "交付已复制到 {path}",
+        "en-US": "Deliverables copied to {path}",
+    },
+    "fmt_agent2.deliver_generated": {
+        "zh-CN": "交付目录已生成",
+        "en-US": "Deliverables directory generated",
+    },
+    "fmt_agent2.abnormal_header": {
+        "zh-CN": "⚠️ 子智能体 #{agent_id}/{task_id} 状态 {status}",
+        "en-US": "⚠️ Sub-agent #{agent_id}/{task_id} status {status}",
+    },
+    "fmt_agent2.no_status_results": {
+        "zh-CN": "未找到子智能体状态。",
+        "en-US": "No sub-agent status found.",
+    },
+    "fmt_agent2.label_not_found": {
+        "zh-CN": "子智能体 {label} 不存在。",
+        "en-US": "Sub-agent {label} does not exist.",
+    },
+    "fmt_agent2.label_completed": {
+        "zh-CN": "子智能体 {label} 已完成",
+        "en-US": "Sub-agent {label} completed",
+    },
+    "fmt_agent2.label_terminated": {
+        "zh-CN": "子智能体 {label} 已终止",
+        "en-US": "Sub-agent {label} terminated",
+    },
+    "fmt_agent2.label_abnormal": {
+        "zh-CN": "⚠️ 子智能体 {label} 状态 {status}",
+        "en-US": "⚠️ Sub-agent {label} status {status}",
+    },
+    "fmt_agent2.label_status": {
+        "zh-CN": "子智能体 {label} 状态: {status}",
+        "en-US": "Sub-agent {label} status: {status}",
+    },
+    "fmt_agent2.status_note": {
+        "zh-CN": "（状态 {status}）",
+        "en-US": " (status {status})",
+    },
+    "fmt_agent2.force_closed_display": {
+        "zh-CN": "已强制关闭子智能体 {name}。",
+        "en-US": "Sub-agent {name} was forcibly closed.",
+    },
+    "fmt_agent2.force_closed_id": {
+        "zh-CN": "已强制关闭子智能体 #{agent_id}（task_id={task_id}）。",
+        "en-US": "Sub-agent #{agent_id} was forcibly closed (task_id={task_id}).",
+    },
+    "fmt_agent2.sent_to_display": {
+        "zh-CN": "已向 {name} 发送消息。",
+        "en-US": "Message sent to {name}.",
+    },
+    "fmt_agent2.sent_to_id": {
+        "zh-CN": "已向子智能体 #{agent_id} 发送消息。",
+        "en-US": "Message sent to sub-agent #{agent_id}.",
+    },
+    "fmt_agent2.sent_plain": {
+        "zh-CN": "消息已发送。",
+        "en-US": "Message sent.",
+    },
+    "fmt_agent2.paused_id": {
+        "zh-CN": "已暂停子智能体 #{agent_id}。{message}",
+        "en-US": "Sub-agent #{agent_id} paused. {message}",
+    },
+    "fmt_agent2.answered_question": {
+        "zh-CN": "已向子智能体回复问题 {question_id}。",
+        "en-US": "Answered sub-agent question {question_id}.",
+    },
+    "fmt_agent2.answered_plain": {
+        "zh-CN": "回复已发送。",
+        "en-US": "Reply sent.",
+    },
+
     # ── utils/context_manager/project_mixin.py ──
     "project_mixin.host_mode_tree_unavailable": {
         "zh-CN": "宿主机模式下文件树不可用",

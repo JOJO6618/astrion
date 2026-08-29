@@ -131,12 +131,12 @@ def _format_sub_agent_stats(stats: Optional[Dict[str, Any]]) -> str:
     web_pages = _to_int(stats.get("web_pages"))
     commands = _to_int(stats.get("commands"))
     lines = [
-        f"调用了{api_calls}次",
-        f"阅读了{files_read}次文件",
-        f"编辑了{edit_files}次文件",
-        f"搜索了{searches}次内容",
-        f"查看了{web_pages}个网页",
-        f"运行了{commands}个指令",
+        tr("fmt_agent2.api_calls", n=api_calls),
+        tr("fmt_agent2.files_read", n=files_read),
+        tr("fmt_agent2.edit_files", n=edit_files),
+        tr("fmt_agent2.searches", n=searches),
+        tr("fmt_agent2.web_pages", n=web_pages),
+        tr("fmt_agent2.commands", n=commands),
     ]
     return "\n".join(lines)
 
@@ -147,14 +147,21 @@ def _format_create_sub_agent(result_data: Dict[str, Any]) -> str:
     display_name = result_data.get("display_name")
     status = result_data.get("status")
     if display_name:
-        return f"{display_name} 已创建（状态 {status or 'running'}）。"
+        return tr("fmt_agent2.created_with_status", name=display_name, status=status or "running")
     agent_id = result_data.get("agent_id")
     task_id = result_data.get("task_id")
     refs = result_data.get("copied_references") or []
-    ref_note = f"，附带 {len(refs)} 份参考文件" if refs else ""
+    ref_note = tr("fmt_agent2.ref_count_note", n=len(refs)) if refs else ""
     deliver_dir = result_data.get("deliverables_dir")
-    deliver_note = f"，交付目录: {deliver_dir}" if deliver_dir else ""
-    header = f"子智能体 #{agent_id} 已创建（task_id={task_id}，状态 {status}{ref_note}{deliver_note}）。"
+    deliver_note = tr("fmt_agent2.deliver_dir_note", dir=deliver_dir) if deliver_dir else ""
+    header = tr(
+        "fmt_agent2.created_header",
+        agent_id=agent_id,
+        task_id=task_id,
+        status=status,
+        ref_note=ref_note,
+        deliver_note=deliver_note,
+    )
     stats_text = _format_sub_agent_stats(
         result_data.get("stats") or (result_data.get("final_result") or {}).get("stats")
     )
@@ -166,7 +173,7 @@ def _format_create_sub_agent(result_data: Dict[str, Any]) -> str:
     if stats_text:
         lines.append(stats_text)
     if status == "completed" and isinstance(elapsed_seconds, (int, float)):
-        lines.append(f"运行了{int(round(elapsed_seconds))}秒")
+        lines.append(tr("fmt_agent2.running_seconds", n=int(round(elapsed_seconds))))
     if summary and status in {"completed", "failed", "timeout", "terminated"}:
         lines.append(str(summary))
     return "\n".join(lines)
@@ -185,17 +192,21 @@ def _format_wait_sub_agent(result_data: Dict[str, Any]) -> str:
     if result_data.get("success"):
         copied_path = result_data.get("copied_path") or result_data.get("deliverables_path")
         message = result_data.get("message") or tr("fmt_agent2.task_completed")
-        deliver_note = f"交付已复制到 {copied_path}" if copied_path else "交付目录已生成"
-        lines = [f"子智能体 #{agent_id}/{task_id} 完成"]
+        deliver_note = (
+            tr("fmt_agent2.copied_to", path=copied_path)
+            if copied_path
+            else tr("fmt_agent2.deliver_generated")
+        )
+        lines = [tr("fmt_agent2.completed_header", agent_id=agent_id, task_id=task_id)]
         if stats_text:
             lines.append(stats_text)
         if isinstance(elapsed_seconds, (int, float)):
-            lines.append(f"运行了{int(round(elapsed_seconds))}秒")
+            lines.append(tr("fmt_agent2.running_seconds", n=int(round(elapsed_seconds))))
         lines.append(message)
         lines.append(deliver_note)
         return "\n".join(lines)
     message = result_data.get("message") or result_data.get("error") or tr("fmt_agent2.task_failed")
-    lines = [f"⚠️ 子智能体 #{agent_id}/{task_id} 状态 {status}"]
+    lines = [tr("fmt_agent2.abnormal_header", agent_id=agent_id, task_id=task_id, status=status)]
     if stats_text:
         lines.append(stats_text)
     lines.append(message)
@@ -206,14 +217,14 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
         return _format_failure("get_sub_agent_status", result_data)
     results = result_data.get("results") or []
     if not results:
-        return "未找到子智能体状态。"
+        return tr("fmt_agent2.no_status_results")
     blocks = []
     for item in results:
         # 多智能体模式：优先使用角色内编号显示名，不暴露全局 agent_id
         agent_id = item.get("agent_id")
         label = item.get("display_name") or f"#{agent_id}"
         if not item.get("found"):
-            blocks.append(f"子智能体 {label} 不存在。")
+            blocks.append(tr("fmt_agent2.label_not_found", label=label))
             continue
         status = item.get("status")
         summary = None
@@ -229,17 +240,17 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
         stats_text = _format_sub_agent_stats(item.get("stats"))
 
         if status == "completed":
-            lines = [f"子智能体 {label} 已完成"]
+            lines = [tr("fmt_agent2.label_completed", label=label)]
         elif status == "terminated":
-            lines = [f"子智能体 {label} 已终止"]
+            lines = [tr("fmt_agent2.label_terminated", label=label)]
         elif status in {"failed", "timeout"}:
-            lines = [f"⚠️ 子智能体 {label} 状态 {status}"]
+            lines = [tr("fmt_agent2.label_abnormal", label=label, status=status)]
         else:
-            lines = [f"子智能体 {label} 状态: {status}"]
+            lines = [tr("fmt_agent2.label_status", label=label, status=status)]
         if stats_text:
             lines.append(stats_text)
         if status == "completed" and isinstance(elapsed_seconds, (int, float)):
-            lines.append(f"运行了{int(round(elapsed_seconds))}秒")
+            lines.append(tr("fmt_agent2.running_seconds", n=int(round(elapsed_seconds))))
         if summary:
             lines.append(str(summary))
         blocks.append("\n".join(lines))
@@ -251,7 +262,7 @@ def _format_close_sub_agent(result_data: Dict[str, Any]) -> str:
     message = result_data.get("message") or tr("fmt_agent2.closed")
     task_id = result_data.get("task_id")
     status = result_data.get("status")
-    status_note = f"（状态 {status}）" if status else ""
+    status_note = tr("fmt_agent2.status_note", status=status) if status else ""
     return f"{message}{status_note}（task_id={task_id}）"
 
 
@@ -260,12 +271,12 @@ def _format_terminate_sub_agent(result_data: Dict[str, Any]) -> str:
         return _format_failure("terminate_sub_agent", result_data)
     display_name = result_data.get("display_name")
     if display_name:
-        return f"已强制关闭子智能体 {display_name}。"
+        return tr("fmt_agent2.force_closed_display", name=display_name)
     agent_id = result_data.get("agent_id")
     task_id = result_data.get("task_id")
     message = result_data.get("message") or tr("fmt_agent2.force_closed")
     if agent_id is not None:
-        return f"已强制关闭子智能体 #{agent_id}（task_id={task_id}）。"
+        return tr("fmt_agent2.force_closed_id", agent_id=agent_id, task_id=task_id)
     return f"{message}（task_id={task_id}）"
 
 
@@ -274,11 +285,11 @@ def _format_send_message_to_sub_agent(result_data: Dict[str, Any]) -> str:
         return _format_failure("send_message_to_sub_agent", result_data)
     display_name = result_data.get("display_name")
     if display_name:
-        return f"已向 {display_name} 发送消息。"
+        return tr("fmt_agent2.sent_to_display", name=display_name)
     agent_id = result_data.get("agent_id")
     if agent_id is not None:
-        return f"已向子智能体 #{agent_id} 发送消息。"
-    return "消息已发送。"
+        return tr("fmt_agent2.sent_to_id", agent_id=agent_id)
+    return tr("fmt_agent2.sent_plain")
 
 
 def _format_stop_sub_agent(result_data: Dict[str, Any]) -> str:
@@ -291,7 +302,7 @@ def _format_stop_sub_agent(result_data: Dict[str, Any]) -> str:
         return message
     agent_id = result_data.get("agent_id")
     if agent_id is not None:
-        return f"已暂停子智能体 #{agent_id}。{message}"
+        return tr("fmt_agent2.paused_id", agent_id=agent_id, message=message)
     return message
 
 
@@ -300,8 +311,8 @@ def _format_answer_sub_agent_question(result_data: Dict[str, Any]) -> str:
         return _format_failure("answer_sub_agent_question", result_data)
     question_id = result_data.get("question_id")
     if question_id:
-        return f"已向子智能体回复问题 {question_id}。"
-    return "回复已发送。"
+        return tr("fmt_agent2.answered_question", question_id=question_id)
+    return tr("fmt_agent2.answered_plain")
 
 
 def _format_create_custom_agent(result_data: Dict[str, Any]) -> str:
