@@ -95,6 +95,18 @@ export const dialogMethods = {
       // ignore
     }
   },
+  minimizePlanApprovalDialog() {
+    if (!Array.isArray(this.pendingPlanApprovals) || !this.pendingPlanApprovals.length) {
+      return;
+    }
+    this.planApprovalMinimized = true;
+  },
+  restorePlanApprovalDialog() {
+    if (!Array.isArray(this.pendingPlanApprovals) || !this.pendingPlanApprovals.length) {
+      return;
+    }
+    this.planApprovalMinimized = false;
+  },
   async submitPlanApproval(payload) {
     const approvalId = String(payload?.approval_id || '').trim();
     if (!approvalId) {

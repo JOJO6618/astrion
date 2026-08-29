@@ -9,6 +9,7 @@ export default {
   goalModeRunning: '目标模式运行中',
   goalModeReady: '目标模式就绪',
   waitingForQuestion: '等待回答问题',
+  planApprovalPending: '有待批准的计划',
   subAgentsRunning: '{n} 个子智能体运行中',
   terminalsRunning: '{n} 个终端',
   quickMenuAriaLabel: '快捷菜单',

@@ -180,6 +180,14 @@
                 {{ $t('input.waitingForQuestion') }}
               </button>
               <button
+                v-if="planApprovalMinimized && (pendingPlanApprovalCount || 0) > 0"
+                type="button"
+                class="floating-project-status__notice floating-project-status__notice--button"
+                @click.stop="$emit('restore-plan-approval')"
+              >
+                {{ $t('input.planApprovalPending') }}
+              </button>
+              <button
                 v-if="(activeSubAgentCount || 0) > 0"
                 type="button"
                 class="floating-project-status__notice floating-project-status__notice--button"
@@ -698,6 +706,7 @@ const emit = defineEmits([
   'delete-runtime-message',
   'composer-height-change',
   'restore-user-question',
+  'restore-plan-approval',
   'toggle-goal-mode',
   'open-goal-dialog',
   'workflow-activated',
@@ -776,6 +785,8 @@ const props = defineProps<{
   } | null;
   userQuestionMinimized?: boolean;
   pendingUserQuestionCount?: number;
+  planApprovalMinimized?: boolean;
+  pendingPlanApprovalCount?: number;
   goalModeArmed?: boolean;
   goalRunning?: boolean;
   goalProgress?: Record<string, any> | null;
@@ -1066,6 +1077,7 @@ const floatingStatusVisible = computed(() => {
     !!props.goalRunning ||
     !!props.goalModeArmed ||
     (Number(props.pendingUserQuestionCount || 0) > 0) ||
+    (!!props.planApprovalMinimized && Number(props.pendingPlanApprovalCount || 0) > 0) ||
     (Number(props.activeSubAgentCount || 0) > 0);
   return visible;
 });

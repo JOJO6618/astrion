@@ -4,6 +4,17 @@
       <section class="plan-approval-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.planApprovalAriaLabel')">
         <header class="plan-approval-windowbar">
           <div class="plan-approval-window-title">{{ $t('overlay.planApprovalTitle') }}</div>
+          <button
+            type="button"
+            class="plan-approval-close"
+            :title="$t('overlay.planApprovalMinimize')"
+            :aria-label="$t('overlay.planApprovalMinimize')"
+            @click="emit('minimize')"
+          >
+            <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 5l10 10M15 5L5 15" />
+            </svg>
+          </button>
         </header>
 
         <header class="plan-approval-header">
@@ -75,6 +86,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'submit', payload: { approval_id: string; approved: boolean; comment: string }): void;
+  (event: 'minimize'): void;
 }>();
 
 // 计划批准一次只处理一份（plan 模式下模型阻塞等待，天然串行）；
@@ -139,12 +151,36 @@ function reject() {
 }
 
 .plan-approval-windowbar {
+  position: relative;
   height: 40px;
   flex: 0 0 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-bottom: 1px solid var(--border-default);
+}
+
+.plan-approval-close {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.plan-approval-close:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 .plan-approval-window-title {

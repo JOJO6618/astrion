@@ -9,6 +9,7 @@ export default {
   goalModeRunning: 'Goal mode running',
   goalModeReady: 'Goal mode ready',
   waitingForQuestion: 'Waiting for your answer',
+  planApprovalPending: 'Plan awaiting approval',
   subAgentsRunning: '{n} sub-agents running',
   terminalsRunning: '{n} terminals',
   quickMenuAriaLabel: 'Quick menu',

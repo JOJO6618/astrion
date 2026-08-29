@@ -87,6 +87,7 @@ export default {
   // ── PlanApprovalDialog：计划待批准 ──
   planApprovalAriaLabel: '计划待批准',
   planApprovalTitle: '计划待批准',
+  planApprovalMinimize: '关闭弹窗，稍后从状态栏恢复',
   planTruncatedNote: '（内容过长，已截断预览，完整内容见文件）',
   planCommentPlaceholder: '意见（可选）：批准时作为补充要求，拒绝时说明需要调整的方向…',
   planRejectTitle: '拒绝这份计划，AI 将根据你的意见修订后重新提交',

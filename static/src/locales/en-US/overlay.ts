@@ -88,6 +88,7 @@ export default {
   // ── PlanApprovalDialog ──
   planApprovalAriaLabel: 'Plan awaiting approval',
   planApprovalTitle: 'Plan awaiting approval',
+  planApprovalMinimize: 'Close the dialog; restore it later from the status bar',
   planTruncatedNote: '(Content too long; preview truncated. See the file for the full content)',
   planCommentPlaceholder:
     'Feedback (optional): added as extra requirements when approving, or describe what to adjust when rejecting...',

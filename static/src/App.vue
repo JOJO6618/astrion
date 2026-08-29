@@ -302,6 +302,8 @@
               :project-git-summary="projectGitSummary"
               :user-question-minimized="userQuestionMinimized"
               :pending-user-question-count="pendingUserQuestions.length"
+              :plan-approval-minimized="planApprovalMinimized"
+              :pending-plan-approval-count="pendingPlanApprovals.length"
               :goal-mode-armed="goalModeArmed"
               :goal-running="goalRunning"
               :goal-progress="goalProgress"
@@ -319,6 +321,7 @@
               :active-sub-agent-count="activeSubAgentCount"
               :avatar-status="showStatusAvatar && messages.length > 0 ? avatarStatus : null"
               @restore-user-question="restoreUserQuestionDialog"
+              @restore-plan-approval="restorePlanApprovalDialog"
               @stop-all-sub-agents="handleStopAllSubAgents"
               @update:input-message="inputSetMessage"
               @input-change="handleInputChange"
@@ -544,10 +547,11 @@
         @dismiss="dismissUserQuestions"
       />
       <PlanApprovalDialog
-        :visible="pendingPlanApprovals.length > 0"
+        :visible="pendingPlanApprovals.length > 0 && !planApprovalMinimized"
         :approvals="pendingPlanApprovals"
         :submitting-ids="answeringPlanApprovalIds"
         @submit="submitPlanApproval"
+        @minimize="minimizePlanApprovalDialog"
       />
       <transition name="overlay-fade">
         <VersioningDialog

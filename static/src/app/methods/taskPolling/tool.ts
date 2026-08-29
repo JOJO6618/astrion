@@ -446,6 +446,10 @@ export const toolMethods = {
     this.pendingPlanApprovals = this.pendingPlanApprovals.filter(
       (item: any) => item && String(item.approval_id || '') !== id
     );
+    // 弹窗被关闭（最小化）期间批准已解决：无待批事项时复位，避免状态栏按钮残留
+    if (!this.pendingPlanApprovals.length) {
+      this.planApprovalMinimized = false;
+    }
     // 批准后后端已切换运行模式/恢复权限与执行环境，刷新显示（多标签页同步场景）
     if (String(data?.decision || '') === 'approved') {
       this.fetchWorkMode();

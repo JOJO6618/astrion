@@ -292,6 +292,7 @@ export function dataState() {
     pendingUserQuestions: [],
     pendingPlanApprovals: [],
     answeringPlanApprovalIds: [],
+    planApprovalMinimized: false,
     userQuestionDialogVisible: false,
     userQuestionMinimized: false,
     userQuestionActiveIndex: 0,
