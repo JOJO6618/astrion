@@ -869,6 +869,22 @@
   z-index: 1;
 }
 
+/* 透明桥接热区：按钮被绝对定位在容器外，与气泡之间有 4px 间隙，
+   鼠标从气泡滑向按钮会经过间隙导致 :hover 中断、按钮收回；
+   用伪元素覆盖间隙，让 hover 从气泡平滑转移到按钮（仅命中区域，无视觉变化） */
+.message-block--last
+  .user-message:not(.user-message--compact):not(.user-message--brief):not(
+    .user-message--multi-agent
+  )
+  .user-bubble-actions::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  right: -12px;
+  top: -4px;
+  height: 4px;
+}
+
 .message-block--last .assistant-message .text-output {
   margin-top: 0;
   margin-bottom: 0;
