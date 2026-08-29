@@ -37,6 +37,10 @@ MESSAGES = {
         "zh-CN": "未登录",
         "en-US": "Not logged in",
     },
+    "auth.session_expired": {
+        "zh-CN": "登录状态已过期，请重新登录",
+        "en-US": "Your login session has expired. Please log in again.",
+    },
     "auth.host_mode_tutorial_not_applicable": {
         "zh-CN": "宿主机模式无需设置新手教程状态",
         "en-US": "Tutorial status does not apply in host mode",

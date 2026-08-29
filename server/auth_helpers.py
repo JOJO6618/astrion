@@ -34,7 +34,7 @@ def api_login_required(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
         if not is_logged_in():
-            return jsonify({"error": "Unauthorized"}), 401
+            return jsonify({"error": tr("auth.session_expired")}), 401
         return view_func(*args, **kwargs)
     return wrapped
 
