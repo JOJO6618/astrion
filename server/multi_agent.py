@@ -354,6 +354,18 @@ def create_multi_agent_conversation():
     default_permission_mode = (prefs or {}).get("default_permission_mode")
     if default_permission_mode not in ("readonly", "approval", "auto_approval", "unrestricted"):
         default_permission_mode = None
+    # 运行模式（work_mode）：沿用 terminal 当前值（与正常创建路径一致，
+    # /new 页面切换后新对话继承）；plan 档不变量 ⇒ 权限必须只读，
+    # 同时记录进入前权限供离开 plan 恢复
+    safe_work_mode = getattr(terminal, "get_work_mode", lambda: "plan")()
+    if safe_work_mode not in ("plan", "ask", "execute"):
+        safe_work_mode = "plan"
+    safe_permission_mode = default_permission_mode or getattr(terminal, "get_permission_mode", lambda: "unrestricted")()
+    safe_pre_plan_permission = None
+    if safe_work_mode == "plan":
+        if safe_permission_mode != "readonly":
+            safe_pre_plan_permission = safe_permission_mode
+        safe_permission_mode = "readonly"
 
     previous_cm_current = getattr(ctx_manager, "current_conversation_id", None)
 
@@ -380,8 +392,10 @@ def create_multi_agent_conversation():
         initial_messages=[],
         model_key=(prefs or {}).get("default_model") or getattr(terminal, "model_key", None),
         metadata_overrides={
-            "permission_mode": default_permission_mode or getattr(terminal, "get_permission_mode", lambda: "unrestricted")(),
+            "permission_mode": safe_permission_mode,
             "execution_mode": getattr(terminal, "get_execution_mode", lambda: "sandbox")(),
+            "work_mode": safe_work_mode,
+            "pre_plan_permission_mode": safe_pre_plan_permission,
             "multi_agent_mode": True,
             "reasoning_effort": ma_effort,
         },
