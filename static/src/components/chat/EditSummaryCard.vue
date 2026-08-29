@@ -7,8 +7,12 @@
  * assistant 消息末尾。同一文件多次编辑只展示合并后的最终结果（净变化）。
  *
  * 交互：
- * - 桌面端 hover 行（150ms 意图延迟）打开居中浮窗；离开行与浮窗后自动关闭
+ * - 桌面端 hover 行（600ms 意图延迟）打开居中浮窗；离开行与浮窗后自动关闭；
+ *   弹窗已打开时鼠标移到其他行，瞬间切换内容（不再等延迟）
  * - 点击行「钉住」弹窗（带遮罩 + 关闭按钮）；移动端无 hover，点击为唯一入口
+ * - 弹窗位置/高度在展开瞬间一次性计算并钉死，之后不再重算
+ * - 外部滚动 / 窗口缩放：直接关闭弹窗；钉住弹窗内部滚动放行（可滚动查看长 diff），
+ *   hover 弹窗内部滚动同样关闭
  * - Esc 关闭
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -132,9 +136,25 @@ function computePanelStyle() {
   }
 }
 
-function onWindowReposition() {
+// 弹窗打开后位置/高度钉死（只在 open 时计算一次），滚动不再重算位置：
+// - 外部滚动（对话区/页面）：一律关闭弹窗
+// - 内部滚动（diff 内容）：钉住弹窗放行，hover 弹窗也关闭
+// - 滚动/缩放关闭后短暂抑制重开，避免弹窗消失瞬间鼠标落在文件行上导致「关了又开」
+let suppressOpenUntil = 0;
+
+function onScrollCapture(e: Event) {
   if (!activePath.value) return;
-  computePanelStyle();
+  const target = e.target as Element | null;
+  const isInsidePanel = target instanceof Element && !!target.closest('.es-modal');
+  if (isInsidePanel && pinned.value) return;
+  suppressOpenUntil = Date.now() + 250;
+  close();
+}
+
+function onResizeClose() {
+  if (!activePath.value) return;
+  suppressOpenUntil = Date.now() + 250;
+  close();
 }
 
 function clearOpenTimer() {
@@ -160,9 +180,18 @@ function open(path: string, pin: boolean, rowEl: HTMLElement | null = null) {
   computePanelStyle();
 }
 
+// hover 打开意图延迟；弹窗已打开时切换到另一行则瞬间切换，不等待此延迟
+const HOVER_OPEN_DELAY = 600;
+
 function scheduleOpen(path: string, rowEl: HTMLElement | null) {
   clearOpenTimer();
-  openTimer = setTimeout(() => open(path, false, rowEl), 150);
+  if (Date.now() < suppressOpenUntil) return;
+  if (activePath.value) {
+    // 弹窗已打开：鼠标移到另一行，瞬间切换（重新定位 + 换内容）
+    open(path, false, rowEl);
+    return;
+  }
+  openTimer = setTimeout(() => open(path, false, rowEl), HOVER_OPEN_DELAY);
 }
 
 function scheduleClose() {
@@ -215,13 +244,14 @@ function onKeydown(e: KeyboardEvent) {
 watch(activePath, (v) => {
   if (v) {
     window.addEventListener('keydown', onKeydown);
-    window.addEventListener('resize', onWindowReposition);
-    // 捕获阶段监听滚动，让弹窗在对话区滚动时始终贴着锚定条目
-    window.addEventListener('scroll', onWindowReposition, true);
+    // 窗口缩放：直接关闭（钉死位置可能跑出视口），不做重算
+    window.addEventListener('resize', onResizeClose);
+    // 捕获阶段监听滚动：外部滚动一律关闭，钉住弹窗内部滚动放行
+    window.addEventListener('scroll', onScrollCapture, true);
   } else {
     window.removeEventListener('keydown', onKeydown);
-    window.removeEventListener('resize', onWindowReposition);
-    window.removeEventListener('scroll', onWindowReposition, true);
+    window.removeEventListener('resize', onResizeClose);
+    window.removeEventListener('scroll', onScrollCapture, true);
   }
 });
 
@@ -229,8 +259,8 @@ onBeforeUnmount(() => {
   clearOpenTimer();
   clearCloseTimer();
   window.removeEventListener('keydown', onKeydown);
-  window.removeEventListener('resize', onWindowReposition);
-  window.removeEventListener('scroll', onWindowReposition, true);
+  window.removeEventListener('resize', onResizeClose);
+  window.removeEventListener('scroll', onScrollCapture, true);
 });
 
 // ---------------- diff 行渲染辅助 ----------------
