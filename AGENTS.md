@@ -333,12 +333,14 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   - `run_command` 可调用，但在只读沙箱执行；写入由系统拒绝
   - 读取同样受限（各平台只读强制的可读边界见 §10.8）；读不到属预期边界，不是故障
   - `write_file` / `edit_file` 等写入类工具直接拒绝
+  - 持久终端可自由创建与输入，但以只读身份运行（docker 非特权 uid / 宿主机只读 profile），写入 EPERM 由系统强制；权限跨界切换（受限档⇄unrestricted）时现有终端直接销毁，重开生效
 - `approval`
   - `run_command` 先走只读沙箱（可读边界见 §10.8，读越界也会触发权限拒绝）
   - 若出现权限拒绝（例如 `Operation not permitted` / `Permission denied`），触发前端审批
   - 审批通过后，仅该次命令以可写沙箱重试；工具结果返回“重试后的最终结果”
   - **审批只授予该次命令的工作区内写权限，不放大读取**（2026-08-30 方案一）：可写沙箱读边界与只读同一白名单，读越界唯一途径是「路径授权」；重试后仍为文件权限拒绝时，工具结果附带 `read_scope_hint` 引导模型说明
   - **执行环境锁定为沙箱**（2026-08-30 起）：direct 下无沙箱兜底，启发式漏判的写命令会直接执行成功、审批承诺被架空，故批准/自动审核与 direct 硬互斥（锁定机制同 plan/只读，见 §10.6）
+  - 持久终端以只读身份运行（同 readonly 条目）：终端内写入永远 EPERM，需审批的写入走 `run_command` 两段式通道
 - `auto_approval`
   - `write_file` / `edit_file`：工作区内路径直接执行，工作区外路径进入审批流程
   - `run_command` 先走只读沙箱（可读边界见 §10.8）；触发权限拒绝后由后台审批智能体自动审核
@@ -414,12 +416,13 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   - 容器主进程保持 root（可写执行不变）；`sandbox_write_access=False` 的执行通道（`terminal_ops/run.py`、`background_command_manager.py`、只读语境创建的持久终端）以 `-u 10001:10001` 运行，`DOCKER_READONLY_EXEC_UID/GID` 可覆盖
   - 强制力 = 内核 DAC：工作区属主为宿主机 root，非属主无写权；600 权限文件（如 .env）不可读；逃逸需提权（setuid/内核漏洞），无 umount 类捷径
   - 前提：工作区属主与该 uid 不碰撞、无 o+w 文件、容器未挂 docker.sock（云端已验证）；macOS Docker Desktop（virtiofs fakeowner）不执行 uid 权限，仅 Linux 宿主生效
-  - 持久终端在 readonly/approval/auto_approval 下同以只读身份创建（`docker_terminal_readonly_enabled` 判定，`docker_readonly_getter` 注入）；终端里的写入会被拒，写命令走 run_command 审批通道
+  - 持久终端在 readonly/approval/auto_approval 下同以只读身份创建（`terminal_readonly_enabled` 判定，`terminal_readonly_getter` 注入）；终端里的写入会被拒，写命令走 run_command 审批通道；权限跨界切换（受限档⇄unrestricted）时销毁现有终端会话重建（`_apply_restricted_execution_mode_link` → `close_all()`）
   - Dockerfile 创建 `agent` 用户 + `/etc/gitconfig` safe.directory + 去 setuid 加固；数字 uid 不依赖镜像内用户存在，旧镜像直接受益
 - **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：
   - 只读/可写两个 profile **共用同一白名单读模型**（`_build_macos_whitelist_read_rules`），唯一区别是写权限：deny default + 系统路径白名单（`MACOS_MINIMAL_READABLE_PATHS`）+ 路径授权（writable + readable_extra）+ 工作区 + 祖先目录 literal allow（缺一个祖先进程 exec 直接 Abort trap，必须为 file-read*）+ env 注入 `GIT_CONFIG_GLOBAL=/dev/null`（可写/只读/持久终端三条 plan 均注入）
   - **deny 规则（.env 正则、~/.ssh 等）必须位于所有 allow 之后**（Seatbelt 后规则覆盖先规则）；两个 profile 均已修复旧顺序漏洞（工作区 .env 曾实际可读）
   - 可写 profile 已于 2026-08-30 白名单化（此前为全局可读，导致 unrestricted/审批批准后能读授权范围外文件）；白名单固有代价：祖先目录顶层文件名可列出（读文件内容仍被拒）
+  - 持久终端 shell plan 支持 readonly 参数（`_build_macos_shell_plan` 复用 `_macos_readonly_profile_for_workspace`）：受限档终端以只读 profile 创建，unrestricted 保持可写 profile
   - 原生文件工具对齐（`file_manager/path_mixin.py`）：读 roots 与沙箱白名单同源（系统路径 + 工作区 + 授权）+ 叠加同一禁读清单——至此 host+sandbox 下全部读通道（只读/可写沙箱命令、原生 read_file）共享同一边界
 - **Linux 宿主机 = bwrap**：只读为 `--ro-bind / /`（全局只读）；可写为 `--ro-bind / /` + 工作区可写 bind——**读侧仍是全局可读，尚未对齐白名单**（本机无 Linux 测试环境，刻意未动，待后续）；**Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合
 

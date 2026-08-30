@@ -239,12 +239,17 @@ class MainTerminalToolsPolicyMixin:
                     return "unrestricted"
                 return mode
 
-    def docker_terminal_readonly_enabled(self) -> bool:
-                """docker 持久终端是否以只读身份（非特权 uid）创建。
+    def terminal_readonly_enabled(self) -> bool:
+                """持久终端是否以只读身份创建（docker 与宿主机沙箱通用）。
 
-                readonly / approval / auto_approval 模式下为 True：新建的 docker
-                终端会话与 run_command 只读执行同一身份（内核 DAC 强制只读，见
-                modules/docker_readonly_exec.py）；unrestricted 保持 root。
+                readonly / approval / auto_approval 模式下为 True：新建的终端
+                会话与只读 run_command 同一身份——docker 容器内为非特权 uid
+                （内核 DAC 强制只读，见 modules/docker_readonly_exec.py），
+                宿主机沙箱为只读 profile（macOS Seatbelt 白名单只读 / Linux ro-bind
+                / Windows WSL 只读挂载，见 host_sandbox_runner 的 shell plan
+                readonly 参数）；unrestricted 保持可写身份（docker root /
+                宿主机可写 profile）。权限跨界切换（受限档⇄unrestricted）时
+                现有终端会被销毁，下次以新身份重建。
                 """
                 return self.get_permission_mode() != "unrestricted"
 
@@ -408,7 +413,18 @@ class MainTerminalToolsPolicyMixin:
                 切离受限档（到 unrestricted）时仅当有明确进入前记录才恢复（无记录保持 sandbox，安全默认）。
                 注意：metadata 键名保留 pre_readonly_execution_mode 不改（语义已泛化为受限档共用），
                 存量对话的恢复记录不受影响。
+
+                终端身份联动：终端读写身份在创建时钉死（受限档=只读身份，unrestricted=可写/root），
+                跨界切换时销毁现有终端会话，强制下次以新身份重建；readonly⇄approval
+                互切身份不变，不销毁。与执行环境切换销毁（terminal_manager.set_host_execution_mode）同策略。
                 """
+                if entering or leaving:
+                    try:
+                        tm = getattr(self, "terminal_manager", None)
+                        if tm is not None and hasattr(tm, "close_all"):
+                            tm.close_all()
+                    except Exception:
+                        pass
                 if entering:
                     try:
                         if hasattr(self, "get_execution_mode") and self.get_execution_mode() == "direct":

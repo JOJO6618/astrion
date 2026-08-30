@@ -172,22 +172,19 @@ class ModeMixin:
                 "- run_command：统一在系统只读沙箱中执行，写入会被系统直接拒绝\n"
                 "- 可读范围同样受限（宿主机 macOS：仅系统目录/工作区/路径授权可读；docker：受文件属主权限限制，600 等属主保护文件不可读）；读不到属预期边界，不要尝试绕过\n"
                 "- 文件操作：仅允许 read_file、view_image、view_video 等读取类工具\n"
-                "- 禁止：write_file、edit_file 及会修改工作区的命令操作"
+                "- 禁止：write_file、edit_file 及会修改工作区的命令操作\n"
+                "- 终端会话（terminal_*）：可自由创建与输入，但终端以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile），写入会被系统拒绝，属预期边界"
             )
         elif mode == "approval":
             detailed_rules = (
                 "- run_command：先在系统只读沙箱执行（可读范围同样受限）；仅当出现权限拒绝时才触发审批\n"
                 "- 审批通过后：仅当前这一次命令会以可写沙箱重试；审批只授予工作区内写权限，不放大读取范围\n"
                 "- 读取授权范围外的路径：审批无法放行，需用户在「路径授权」中添加\n"
-                "- 需要用户批准：terminal_input、write_file、edit_file、save_webpage 及其他会修改工作区的操作\n"
+                "- 需要用户批准：write_file、edit_file、save_webpage 及其他会修改工作区的操作\n"
                 "- 被拒绝或超时：本次操作不会执行写入\n"
-                "- 执行环境已锁定为沙箱（完全访问仅在无限制模式下可选）"
+                "- 执行环境已锁定为沙箱（完全访问仅在无限制模式下可选）\n"
+                "- 终端会话（terminal_*）可直接创建与输入（无需批准），但以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
             )
-            if docker_runtime:
-                detailed_rules += (
-                    "\n- docker 终端会话以只读身份运行：需要写入的命令请用 run_command（审批通过后以可写身份重跑）；"
-                    "终端里的写入会被系统拒绝，属预期边界"
-                )
         elif mode == "auto_approval":
             detailed_rules = (
                 "- write_file / edit_file：若路径在当前工作区内，直接执行；工作区外路径会进入审批流程\n"
@@ -196,13 +193,9 @@ class ModeMixin:
                 "- 自动审批由后台审批智能体执行，默认只判断危险性与越权风险，不判断任务必要性\n"
                 "- 自动审批拒绝：本次工具调用会返回“拒绝+理由”，主循环继续；人工拒绝可随时接管\n"
                 "- 可随时人工接管：用户在审批面板点击同意/拒绝/切换无限制后，自动审批会立即停止并以人工决策为准\n"
-                "- 执行环境已锁定为沙箱（完全访问仅在无限制模式下可选）"
+                "- 执行环境已锁定为沙箱（完全访问仅在无限制模式下可选）\n"
+                "- 终端会话（terminal_*）以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
             )
-            if docker_runtime:
-                detailed_rules += (
-                    "\n- docker 终端会话以只读身份运行：需要写入的命令请用 run_command（审批通过后以可写身份重跑）；"
-                    "终端里的写入会被系统拒绝，属预期边界"
-                )
         else:
             detailed_rules = ""
 

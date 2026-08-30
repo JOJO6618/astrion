@@ -136,8 +136,8 @@ class WebTerminal(MainTerminal):
             # 复用父类实例时也要确保 getter 已注入（父类创建时已传入，防御旧实例）
             if getattr(self.terminal_manager, "network_permission_getter", None) is None:
                 self.terminal_manager.network_permission_getter = self.get_network_permission
-            if getattr(self.terminal_manager, "docker_readonly_getter", None) is None:
-                self.terminal_manager.docker_readonly_getter = self.docker_terminal_readonly_enabled
+            if getattr(self.terminal_manager, "terminal_readonly_getter", None) is None:
+                self.terminal_manager.terminal_readonly_getter = self.terminal_readonly_enabled
         else:
             self.terminal_manager = TerminalManager(
                 project_path=project_path,
@@ -147,7 +147,7 @@ class WebTerminal(MainTerminal):
                 broadcast_callback=message_callback,
                 container_session=self.container_session,
                 network_permission_getter=self.get_network_permission,
-                docker_readonly_getter=self.docker_terminal_readonly_enabled,
+                terminal_readonly_getter=self.terminal_readonly_enabled,
             )
         # 让 run_command 与实时终端共享同一容器环境
         self.terminal_ops.attach_terminal_manager(self.terminal_manager)

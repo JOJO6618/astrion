@@ -132,7 +132,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 broadcast_callback=None,  # CLI模式不需要广播
                 container_session=container_session,
                 network_permission_getter=self.get_network_permission,
-                docker_readonly_getter=self.docker_terminal_readonly_enabled,
+                terminal_readonly_getter=self.terminal_readonly_enabled,
             )
             # 让 run_command 复用终端容器，保持环境一致
             self.terminal_ops.attach_terminal_manager(self.terminal_manager)

@@ -157,8 +157,13 @@ class StartMixin:
         try:
             # 实时读取所属终端实例的权限设置，而非进程级 env（多 terminal 并存时 env 会被覆盖）
             network_permission = self._resolve_network_permission()
+            # 终端读写身份创建时钉死：受限权限档（只读/批准/自动审核）→ 只读 profile
+            # （写入 EPERM 由系统强制）；unrestricted → 可写 profile。
+            # 权限跨界切换时所属 terminal 会销毁现有会话，保证身份与当前档位一致。
+            readonly = bool(self.sandbox_options.get("host_terminal_readonly"))
             plan = build_host_sandbox_shell_plan(
-                self.working_dir, env, network_permission=network_permission
+                self.working_dir, env, network_permission=network_permission,
+                readonly=readonly,
             )
             cmd_args = plan.command
             pass_fds = ()

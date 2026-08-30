@@ -209,8 +209,11 @@ class MainTerminalToolsExecutionMixin:
         "sleep",
         "ask_user",
         # 以下为只读/调研性质或会话状态管理类工具，只读模式（含计划模式）放行：
-        # 终端会话管理与快照（terminal_input 仍禁止，防止经持久终端执行写命令）
+        # 终端会话全生命周期（terminal_input 自 2026-08-30 起放行：终端读写身份在
+        # 创建时已钉死，受限档终端为只读身份——docker 非特权 uid / 宿主机只读
+        # profile，写入由系统直接 EPERM，无需工具层再拦）
         "terminal_session",
+        "terminal_input",
         "terminal_snapshot",
         # 子智能体全生命周期（只读权限会传播给子智能体，计划模式调研主力）
         "create_sub_agent",
@@ -225,7 +228,6 @@ class MainTerminalToolsExecutionMixin:
     }
     _APPROVAL_REQUIRED_TOOLS = {
         "run_command",
-        "terminal_input",
         "write_file",
         "edit_file",
         "create_file",
@@ -428,20 +430,9 @@ class MainTerminalToolsExecutionMixin:
                             "requires_approval": requires,
                             "risk_markers": risk_markers,
                         }
-                    if tool_name == "terminal_input":
-                        command_text = args.get("command") or args.get("input")
-                        if self._is_docker_runtime():
-                            readonly_ok = self._is_readonly_run_command_allowed(command_text)
-                            risk_markers = self._extract_command_risk_markers(command_text)
-                            requires = (not readonly_ok) or bool(risk_markers)
-                            return {
-                                "allowed": True,
-                                "mode": mode,
-                                "requires_approval": requires,
-                                "risk_markers": risk_markers,
-                            }
-                        if self._is_readonly_run_command_allowed(command_text):
-                            return {"allowed": True, "mode": mode, "requires_approval": False}
+                    # terminal_input 不设审批/分流（2026-08-30 起）：受限档终端创建时
+                    # 已钉死为只读身份，写入由系统 EPERM 兜底；需要审批的写入请走
+                    # run_command 两段式通道。
                     if tool_name in self._APPROVAL_REQUIRED_TOOLS:
                         return {"allowed": True, "mode": mode, "requires_approval": True}
                     return {"allowed": True, "mode": mode}
@@ -473,19 +464,8 @@ class MainTerminalToolsExecutionMixin:
                             "risk_markers": risk_markers,
                         }
                     if tool_name == "terminal_input":
-                        command_text = args.get("command") or args.get("input")
-                        if self._is_docker_runtime():
-                            readonly_ok = self._is_readonly_run_command_allowed(command_text)
-                            risk_markers = self._extract_command_risk_markers(command_text)
-                            requires = (not readonly_ok) or bool(risk_markers)
-                            return {
-                                "allowed": True,
-                                "mode": mode,
-                                "requires_approval": requires,
-                                "risk_markers": risk_markers,
-                            }
-                        if self._is_readonly_run_command_allowed(command_text):
-                            return {"allowed": True, "mode": mode, "requires_approval": False}
+                        # 与 approval 同理：受限档终端只读身份兜底，不审批不分流
+                        return {"allowed": True, "mode": mode, "requires_approval": False}
                     if tool_name in self._APPROVAL_REQUIRED_TOOLS:
                         return {"allowed": True, "mode": mode, "requires_approval": True}
                     return {"allowed": True, "mode": mode}

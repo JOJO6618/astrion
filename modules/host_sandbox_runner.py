@@ -219,14 +219,21 @@ def build_host_sandbox_shell_plan(
     work_path: Path,
     env: Dict[str, str],
     network_permission: Optional[str] = None,
+    readonly: bool = False,
 ) -> SandboxPlan:
+    """持久终端（交互式 shell）沙箱计划。
+
+    readonly=True 时使用只读身份（macOS 只读 profile / Linux bwrap ro-bind /
+    Windows WSL 只读挂载）：受限权限档（只读/批准/自动审核）的终端以此创建，
+    写入由系统直接拒绝（EPERM）；unrestricted 档传 False 保持可写。
+    """
     system = platform.system()
     if system == "Darwin":
-        return _build_macos_shell_plan(work_path, env, network_permission)
+        return _build_macos_shell_plan(work_path, env, network_permission, readonly=readonly)
     if system == "Linux":
-        return _build_linux_shell_plan(work_path, env, network_permission)
+        return _build_linux_shell_plan(work_path, env, network_permission, readonly=readonly)
     if system == "Windows":
-        return _build_windows_shell_plan(work_path, env, network_permission)
+        return _build_windows_shell_plan(work_path, env, network_permission, readonly=readonly)
     raise HostSandboxError(tr("sandbox.unsupported_system", system=system))
 
 
@@ -256,14 +263,29 @@ def _build_macos_readonly_plan(
     sandbox_exec = shutil.which("sandbox-exec")
     if not sandbox_exec:
         raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec"))
+    profile = _macos_readonly_profile_for_workspace(work_path, network_permission)
+    # git 在 ~/.gitconfig 不可读时会 fatal（PoC 实测），指向 /dev/null 跳过全局配置
+    plan_env = dict(env)
+    plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
+    cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
+    return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
+
+
+def _macos_readonly_profile_for_workspace(
+    work_path: Path,
+    network_permission: Optional[str] = None,
+) -> str:
+    """macOS 只读沙箱 profile（deny-default 白名单读模型，2026-08-30 起）。
+
+    默认全部不可读，仅系统路径白名单 + 路径授权（可写+仅可读）+ 工作区可读，
+    写权限仅 /dev/null；deny 规则在白名单内做最后排除（如工作区内的 .env）。
+    历史模型为「全局可读 + 敏感路径黑名单」，且 deny 顺序在 workspace allow
+    之前导致工作区内 .env 实际可读（Seatbelt 后规则覆盖先规则），本次一并修复。
+    只读 run_command 与受限档持久终端（shell plan readonly=True）共用本函数。
+    """
     network_policy = _build_macos_network_policy(network_permission)
     workspace = str(work_path.resolve())
 
-    # 只读沙箱（2026-08-30 起）：deny-default 白名单读模型。
-    # 默认全部不可读，仅系统路径白名单 + 路径授权（可写+仅可读）+ 工作区可读，
-    # 写权限仅 /dev/null；deny 规则在白名单内做最后排除（如工作区内的 .env）。
-    # 历史模型为「全局可读 + 敏感路径黑名单」，且 deny 顺序在 workspace allow
-    # 之前导致工作区内 .env 实际可读（Seatbelt 后规则覆盖先规则），本次一并修复。
     readable_paths = list(MACOS_MINIMAL_READABLE_PATHS)
     readable_paths.extend(get_macos_readable_paths())
     readable_paths.append(str(work_path))  # 原始形式（可能含符号链接）
@@ -274,7 +296,7 @@ def _build_macos_readonly_plan(
     if regex_rules:
         deny_rules += "\n" + regex_rules
 
-    profile = (
+    return (
         '(version 1)\n'
         '(deny default)\n'
         '(allow sysctl-read)\n'
@@ -285,22 +307,23 @@ def _build_macos_readonly_plan(
         f'{deny_rules}\n'
         '(allow file-write* (literal "/dev/null"))'
     )
-    # git 在 ~/.gitconfig 不可读时会 fatal（PoC 实测），指向 /dev/null 跳过全局配置
-    plan_env = dict(env)
-    plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
-    cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
-    return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
 
 
 def _build_macos_shell_plan(
     work_path: Path,
     env: Dict[str, str],
     network_permission: Optional[str] = None,
+    readonly: bool = False,
 ) -> SandboxPlan:
     sandbox_exec = shutil.which("sandbox-exec")
     if not sandbox_exec:
         raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec_shell"))
-    profile = _macos_profile_for_workspace(work_path, network_permission)
+    # 受限档终端以只读身份创建（与只读 run_command 同一 profile），写入 EPERM；
+    # unrestricted 保持可写 profile（白名单读 + 工作区/授权路径可写）。
+    if readonly:
+        profile = _macos_readonly_profile_for_workspace(work_path, network_permission)
+    else:
+        profile = _macos_profile_for_workspace(work_path, network_permission)
     # 同 _build_macos_plan：白名单读下 git 需要 GIT_CONFIG_GLOBAL 兜底
     plan_env = dict(env)
     plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -401,6 +424,7 @@ def _build_linux_shell_plan(
     work_path: Path,
     env: Dict[str, str],
     network_permission: Optional[str] = None,
+    readonly: bool = False,
 ) -> SandboxPlan:
     bwrap = shutil.which("bwrap")
     if not bwrap:
@@ -412,7 +436,7 @@ def _build_linux_shell_plan(
     if not seccomp_path.exists():
         raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
     shell_cmd = ["/bin/bash", "-i"]
-    return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path)
+    return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path, readonly=readonly)
 
 
 def _build_linux_common_plan(
@@ -627,8 +651,9 @@ def _build_windows_shell_plan(
     work_path: Path,
     env: Dict[str, str],
     network_permission: Optional[str] = None,
+    readonly: bool = False,
 ) -> SandboxPlan:
     return _build_windows_wsl_plan(
-        work_path, env, ["bash", "-i"], readonly=False,
+        work_path, env, ["bash", "-i"], readonly=readonly,
         network_permission=network_permission,
     )
