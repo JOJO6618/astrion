@@ -414,7 +414,22 @@
 
 .chat-container--mobile {
   --chat-rail-fluid: 100%;
+  /* 顶部留白必须放在滚动容器 .messages-area 上（见下），不能放父容器：
+     父容器 overflow:hidden + padding-top 会把滚动区整体下推，fixed 顶栏
+     （.mobile-panel-trigger）的 backdrop-filter 条带背后只剩纯色背景、
+     无消息内容可模糊，移动端模糊因此失效只剩颜色渐隐层（2026-08-30 实测） */
+}
+
+/* 顶栏占位 44px + 原消息区间距 8px；滚动容器自身的 padding-top 允许消息
+   滚动时进入 fixed 顶栏背后区域（与桌面端 .has-title-ribbon 同理），
+   三级渐进模糊条带才有内容可模糊 */
+.chat-container--mobile .messages-area {
   padding-top: 52px;
+}
+
+/* monitor 面板是 flex 文档流子项、无滚动区，保留容器级留白避开 fixed 顶栏 */
+.chat-container--mobile.chat-container--monitor {
+  padding-top: 44px;
 }
 
 .chat-container--mobile.chat-container--app-shell {
@@ -429,9 +444,8 @@
     --composer-reserved-height: var(--composer-base-height);
   }
 
-  .chat-container--mobile {
-    padding-top: 44px;
-  }
+  /* .chat-container--mobile 不再设 padding-top：留白已统一挪到滚动容器
+     .messages-area（见上方注释），保证顶栏模糊条带背后有可模糊的消息内容 */
 
   .messages-area {
     padding-top: 8px;
