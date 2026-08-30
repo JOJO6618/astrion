@@ -62,6 +62,7 @@ except ImportError:
         TERMINAL_SANDBOX_REQUIRE,
     )
 
+from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_uid_gid
 from modules.i18n import tr
 
 
@@ -262,6 +263,9 @@ class StartMixin:
             "exec",
             "-i",
         ]
+        if self.sandbox_options.get("docker_readonly_exec"):
+            # 只读身份会话：与 run_command 只读执行同一非特权 uid（内核 DAC 强制）
+            cmd += docker_readonly_exec_args()
         if container_workdir:
             cmd += ["-w", container_workdir]
 
@@ -323,6 +327,14 @@ class StartMixin:
             "-v",
             f"{working_dir}:{mount_path}",
         ]
+
+        if self.sandbox_options.get("docker_readonly_exec"):
+            # 只读身份会话（新建容器）：docker run 用 --user 指定非特权 uid
+            ro_uid, ro_gid = docker_readonly_uid_gid()
+            cmd += ["--user", f"{ro_uid}:{ro_gid}"]
+            for ro_env in ("HOME=/tmp", "GIT_CONFIG_COUNT=1",
+                           "GIT_CONFIG_KEY_0=safe.directory", "GIT_CONFIG_VALUE_0=*"):
+                cmd += ["-e", ro_env]
 
         network = self.sandbox_options.get("network")
         if network:

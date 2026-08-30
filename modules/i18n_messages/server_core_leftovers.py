@@ -107,9 +107,9 @@ MESSAGES = {
         "zh-CN": "计划模式下执行环境锁定为沙箱，请先切换运行模式",
         "en-US": "Execution environment is locked to sandbox in plan mode; switch work mode first",
     },
-    "main_terminal.readonly_mode_locks_sandbox": {
-        "zh-CN": "只读模式下执行环境锁定为沙箱，请先切换权限模式",
-        "en-US": "Execution environment is locked to sandbox in readonly mode; switch permission mode first",
+    "main_terminal.restricted_mode_locks_sandbox": {
+        "zh-CN": "只读/批准/自动审核模式下执行环境锁定为沙箱，切换到无限制模式后可选完全访问",
+        "en-US": "Execution environment is locked to sandbox in readonly/approval/auto-approval mode; switch to unrestricted for direct access",
     },
 
     # ── core/main_terminal_parts/tools_policy.py ──

@@ -301,6 +301,10 @@ class UserContainerManager:
         container_name = self._build_container_name(username)
         self._kill_container(container_name, docker_path)
 
+        # 容器主进程刻意保持 root：可写执行（docker exec 不带 -u）依赖它；
+        # 只读权限模式的执行通道在 exec 时以非特权 uid 运行（内核 DAC 强制只读），
+        # 见 modules/docker_readonly_exec.py。工作区 bind 挂载是唯一可写资产，
+        # 切勿给容器挂载 docker.sock 或追加特权/capability（会直接击穿该模型）。
         cmd = [
             docker_path,
             "run",

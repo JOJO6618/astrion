@@ -136,6 +136,8 @@ class WebTerminal(MainTerminal):
             # 复用父类实例时也要确保 getter 已注入（父类创建时已传入，防御旧实例）
             if getattr(self.terminal_manager, "network_permission_getter", None) is None:
                 self.terminal_manager.network_permission_getter = self.get_network_permission
+            if getattr(self.terminal_manager, "docker_readonly_getter", None) is None:
+                self.terminal_manager.docker_readonly_getter = self.docker_terminal_readonly_enabled
         else:
             self.terminal_manager = TerminalManager(
                 project_path=project_path,
@@ -145,6 +147,7 @@ class WebTerminal(MainTerminal):
                 broadcast_callback=message_callback,
                 container_session=self.container_session,
                 network_permission_getter=self.get_network_permission,
+                docker_readonly_getter=self.docker_terminal_readonly_enabled,
             )
         # 让 run_command 与实时终端共享同一容器环境
         self.terminal_ops.attach_terminal_manager(self.terminal_manager)
@@ -197,7 +200,9 @@ class WebTerminal(MainTerminal):
                 logger.warning("加载个性化偏好失败，将使用内置默认: %s", exc)
             preferred_model = prefs.get("default_model")
             preferred_mode = prefs.get("default_run_mode")
-            preferred_permission_mode = prefs.get("default_permission_mode") or None
+            # 权限模式不读取个性化默认值：沿用 terminal 当前值（与下方 work_mode 同一原则），
+            # /new 页面权限切换已同步到 terminal（_sync_workspace_terminal_mode），
+            # 个性化 default_permission_mode 仅在 terminal 首次构造时生效（tools_policy 加载）。
             preferred_effort = prefs.get("default_reasoning_effort")
             if isinstance(preferred_effort, str):
                 preferred_effort = preferred_effort.strip().lower() or None
@@ -205,13 +210,6 @@ class WebTerminal(MainTerminal):
                     preferred_effort = None
             else:
                 preferred_effort = None
-            if preferred_permission_mode not in ("readonly", "approval", "auto_approval", "unrestricted"):
-                try:
-                    preferred_permission_mode = self.get_permission_mode()
-                except Exception:
-                    preferred_permission_mode = None
-            if not isinstance(preferred_permission_mode, str) or not preferred_permission_mode.strip():
-                preferred_permission_mode = "unrestricted"
             candidate_mode = preferred_mode.lower() if isinstance(preferred_mode, str) else None
             if candidate_mode == "deep":  # 旧版标识符映射
                 candidate_mode = "thinking"
@@ -237,6 +235,8 @@ class WebTerminal(MainTerminal):
                 current_work_mode = self.get_work_mode()
             except Exception:
                 pass
+            # 权限模式（permission_mode）：与 work_mode 同一原则，沿用 terminal 当前值，
+            # 不用个性化默认值覆盖（曾因此导致 /new 切只读后新建对话回落无限制）。
             if current_work_mode == "plan":
                 # 不变量：plan ⇒ 权限必须只读。记录进入前权限（供离开 plan 恢复）并锁定。
                 # 注意不能在 plan 状态下调用非只读的 set_permission_mode（plan 锁会 raise）。
@@ -248,14 +248,6 @@ class WebTerminal(MainTerminal):
                     new_conv_pre_plan_permission = pre_plan_perm
                     try:
                         self.set_permission_mode("readonly", persist=False)
-                    except Exception:
-                        pass
-            else:
-                try:
-                    self.set_permission_mode(preferred_permission_mode, persist=False)
-                except Exception:
-                    try:
-                        self.set_permission_mode("unrestricted", persist=False)
                     except Exception:
                         pass
 
@@ -486,6 +478,16 @@ class WebTerminal(MainTerminal):
                     # 自愈：plan 模式但执行环境是 direct 的异常数据，强制回沙箱
                     # （只读权限依赖沙箱硬限制，direct 下只读无牙齿）
                     if self.get_work_mode() == "plan" and hasattr(self, "get_execution_mode"):
+                        try:
+                            if self.get_execution_mode() != "sandbox":
+                                self.set_execution_mode("sandbox")
+                        except Exception:
+                            pass
+                    # 自愈：受限权限档（只读/批准/自动审核）但执行环境是 direct 的
+                    # 存量/异常数据，强制回沙箱（批准后重试依赖沙箱可写+白名单读兜底，
+                    # direct 下审批承诺被架空；与 set_execution_mode 的受限档锁互补，
+                    # 上面 restore direct 被锁拦下后这里再保一层）
+                    if self.get_permission_mode() in {"readonly", "approval", "auto_approval"} and hasattr(self, "get_execution_mode"):
                         try:
                             if self.get_execution_mode() != "sandbox":
                                 self.set_execution_mode("sandbox")

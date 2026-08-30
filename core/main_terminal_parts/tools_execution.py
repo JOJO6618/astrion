@@ -238,6 +238,10 @@ class MainTerminalToolsExecutionMixin:
         "save_workflow",
     }
 
+    # 只读命令文本判定（启发式）：用于 approval/auto_approval 的「是否需要审批」决策。
+    # 2026-08-30 起不再是安全边界——docker 只读由非特权 uid 内核 DAC 强制
+    # （modules/docker_readonly_exec.py），宿主机由 OS 沙箱强制。已知可绕过
+    # （如 find . -delete），绕过启发式只会让命令多走一次审批，不会造成写入。
     # 扩展的只读命令白名单（包含常用管道命令）
     _READONLY_ALLOWED_EXECUTABLES = {
         "grep", "find", "ls", "pwd", "tree", "cat", "head", "tail",

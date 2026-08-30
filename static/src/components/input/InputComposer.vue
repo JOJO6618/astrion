@@ -504,11 +504,11 @@
             type="button"
             class="permission-switcher__btn"
             :disabled="!isConnected"
-            :title="permissionLockedByPlan ? $t('input.permissionLockedByPlanTitle') : (executionLockedByReadonly ? $t('input.executionLockedReadonlyTitle') : '')"
+            :title="permissionLockedByPlan ? $t('input.permissionLockedByPlanTitle') : (executionLockedByRestricted ? $t('input.executionLockedRestrictedTitle') : '')"
             @click="$emit('toggle-permission-menu')"
           >
             <svg
-              v-if="permissionLockedByPlan || executionLockedByReadonly"
+              v-if="permissionLockedByPlan || executionLockedByRestricted"
               class="permission-switcher__lock"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -566,7 +566,7 @@
               <div class="permission-switcher__group-title">
                 {{ $t('input.executionEnv') }}
                 <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{ $t('input.planModeLocked') }}</span>
-                <span v-else-if="executionLockedByReadonly" class="permission-switcher__group-lock">{{ $t('input.readonlyModeLocked') }}</span>
+                <span v-else-if="executionLockedByRestricted" class="permission-switcher__group-lock">{{ $t('input.restrictedModeLocked') }}</span>
               </div>
               <button
                 v-for="option in executionModeOptions"
@@ -3383,12 +3383,12 @@ const workModeLabel = computed(() => {
 /** 计划模式下权限被锁定为只读（UI 禁用 + 后端强制） */
 const permissionLockedByPlan = computed(() => props.currentWorkMode === 'plan');
 
-/** 只读模式下执行环境锁定为沙箱（UI 禁用 + 后端强制） */
-const executionLockedByReadonly = computed(() => props.currentPermissionMode === 'readonly');
+/** 受限权限档（只读/批准/自动审核）执行环境锁定为沙箱（UI 禁用 + 后端强制）；仅无限制可选完全访问 */
+const executionLockedByRestricted = computed(() => props.currentPermissionMode !== 'unrestricted');
 
-/** 执行环境组禁用条件：plan 全锁 或 readonly 锁执行环境（权限组仅受 plan 锁） */
+/** 执行环境组禁用条件：plan 全锁 或 受限权限档锁执行环境（权限组仅受 plan 锁） */
 const executionModeLocked = computed(
-  () => permissionLockedByPlan.value || executionLockedByReadonly.value
+  () => permissionLockedByPlan.value || executionLockedByRestricted.value
 );
 
 const currentExecutionShortLabel = computed(() => {

@@ -123,6 +123,13 @@ def save_policy(policy: Dict) -> Dict:
 
 
 def get_macos_writable_paths() -> List[str]:
+    """沙箱可写路径全集 = 部署环境变量 + policy 文件（合并去重）。
+
+    仅两个来源（2026-08-30 收敛）：真·环境变量
+    HOST_SANDBOX_MACOS_WRITABLE_PATHS（部署通道）+ host_sandbox_policy.json
+    的 macos_writable_paths（前端「路径授权」UI）。settings.json 的
+    terminal.macos_writable_paths 已不再是来源（config/__init__.py 映射已移除）。
+    """
     file_items = load_policy().get("macos_writable_paths", [])
     merged: List[str] = []
     for raw in list(HOST_SANDBOX_MACOS_WRITABLE_PATHS or []) + list(file_items or []):

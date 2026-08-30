@@ -59,10 +59,12 @@ def _load_dotenv():
                         os.environ[k] = str(v)
 
             # 映射 settings.json 字段 → 旧版环境变量名（兼容现有 config/*.py 模块）
+            # 注意：terminal.macos_writable_paths 已于 2026-08-30 移除——
+            # 沙箱路径授权只读两个来源：config/host_sandbox_policy.json（前端
+            # 「路径授权」UI）与真·环境变量；settings.json 中的历史值一次性失效。
             _LEGACY_MAP = {
                 "terminal.sandbox_mode":             "TERMINAL_SANDBOX_MODE",
                 "terminal.execution_mode_default":   "HOST_EXECUTION_MODE_DEFAULT",
-                "terminal.macos_writable_paths":      "HOST_SANDBOX_MACOS_WRITABLE_PATHS",
                 "terminal.max_active_containers":     "MAX_ACTIVE_USER_CONTAINERS",
                 "terminal.project_max_storage_mb":    "PROJECT_MAX_STORAGE_MB",
                 "server.port":                        "WEB_SERVER_PORT",

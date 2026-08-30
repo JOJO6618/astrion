@@ -175,6 +175,35 @@ def _is_permission_denied_result(result_data: Dict[str, Any]) -> bool:
     return any(marker in joined for marker in markers)
 
 
+def _is_file_permission_denied_result(result_data: Dict[str, Any]) -> bool:
+    """是否为文件读写权限拒绝（区别于网络受限报错）。
+
+    用于审批批准后重试仍失败的场景：方案一（2026-08-30）起可写沙箱读边界
+    与只读同为白名单，批准不再放大读取；此时给模型追加「路径授权」引导。
+    """
+    if not isinstance(result_data, dict):
+        return False
+    if result_data.get("success") is True:
+        return False
+    fragments: List[str] = []
+    for key in ("error", "message", "output"):
+        value = result_data.get(key)
+        if isinstance(value, str) and value.strip():
+            fragments.append(value.lower())
+    joined = "\n".join(fragments)
+    if not joined:
+        return False
+    markers = (
+        "operation not permitted",
+        "permission denied",
+        "access denied",
+        "权限不足",
+        "无权限",
+        "不允许",
+    )
+    return any(marker in joined for marker in markers)
+
+
 def _inject_runtime_mode_notice(
     *,
     web_terminal,
@@ -1186,6 +1215,13 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             except Exception:
                 result_data = {"output": retry_tool_result}
                 tool_result = retry_tool_result
+            # 方案一（2026-08-30）：批准只授予「本次工作区内写权限」，可写沙箱读边界
+            # 与只读同为白名单（不再全局可读）。重试后仍为文件权限拒绝 ⇒ 大概率是
+            # 读取了授权范围外的路径——提示模型引导用户走「路径授权」，审批不放大读取。
+            if _is_file_permission_denied_result(result_data):
+                if isinstance(result_data, dict):
+                    result_data["read_scope_hint"] = tr("tool_loop.retry_still_denied_read_scope")
+                    tool_result = json.dumps(result_data, ensure_ascii=False)
 
         tool_failed = detect_tool_failure(result_data)
 

@@ -132,6 +132,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 broadcast_callback=None,  # CLI模式不需要广播
                 container_session=container_session,
                 network_permission_getter=self.get_network_permission,
+                docker_readonly_getter=self.docker_terminal_readonly_enabled,
             )
             # 让 run_command 复用终端容器，保持环境一致
             self.terminal_ops.attach_terminal_manager(self.terminal_manager)
@@ -208,7 +209,10 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.skill_strict_run_command_foreground_enabled: bool = False
             self.skill_strict_run_command_background_enabled: bool = False
             self.default_permission_mode: str = "unrestricted"
-            self.current_permission_mode: str = "unrestricted"
+            # None = 未初始化：由随后的 apply_personalization_preferences 应用个性化默认
+            # 权限模式（与 current_work_mode 同一机制，构造时生效一次）；所有读取路径
+            # 均按 None→unrestricted 兜底（get_permission_mode / tools_execution）
+            self.current_permission_mode: Optional[str] = None
             self.host_execution_mode: str = "sandbox"
             self.host_network_permission: str = "restricted"
             self.pending_permission_mode: Optional[str] = None
@@ -352,7 +356,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                         self.set_execution_mode(pending_execution)
                         applied = True
                     except Exception:
-                        # 锁定拒绝（plan / readonly 下禁止 direct）：丢弃该 pending，保持沙箱
+                        # 锁定拒绝（plan / 受限权限档下禁止 direct）：丢弃该 pending，保持沙箱
                         applied = False
                     if applied:
                         if hasattr(self, "build_runtime_mode_switch_notice"):
@@ -433,13 +437,14 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                         raise ValueError(tr("main_terminal.plan_mode_locks_sandbox"))
                 except AttributeError:
                     pass
-            # 只读模式下执行环境同样锁死为沙箱（与 plan 锁并列）：
-            # 切到 readonly 权限时由 set_permission_mode 联动强制沙箱，
-            # 这里拦直接调用（API/队列）防止只读期间切回 direct 绕过 OS 沙箱硬限制。
+            # 受限权限档（只读/批准/自动审核）执行环境同样锁死为沙箱（与 plan 锁并列）：
+            # 切到受限档时由 set_permission_mode 联动强制沙箱，这里拦直接调用（API/队列）
+            # 防止受限档期间切回 direct——direct 下无沙箱，只读形同虚设、审批承诺被架空
+            # （启发式漏判的写命令无 EPERM 兜底）。仅 unrestricted 可选 direct。
             if normalized == "direct" and getattr(self, "get_permission_mode", None):
                 try:
-                    if self.get_permission_mode() == "readonly":
-                        raise ValueError(tr("main_terminal.readonly_mode_locks_sandbox"))
+                    if self.get_permission_mode() != "unrestricted":
+                        raise ValueError(tr("main_terminal.restricted_mode_locks_sandbox"))
                 except AttributeError:
                     pass
             self.host_execution_mode = normalized
@@ -679,7 +684,9 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 thinking_mode=self.thinking_mode,
                 run_mode=self.run_mode,
                 metadata_overrides={
-                    "permission_mode": self.default_permission_mode or "unrestricted",
+                    # 构造时 current_permission_mode 已由 apply_personalization_preferences
+                    # 初始化为个性化默认值，这里直接取当前生效值即可
+                    "permission_mode": self.get_permission_mode(),
                     "execution_mode": self.get_execution_mode(),
                     "pending_permission_mode": None,
                     "pending_execution_mode": None,

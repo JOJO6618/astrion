@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from modules.host_sandbox_policy import (
     get_macos_writable_paths,
+    get_macos_readable_paths,
     get_macos_deny_read_paths,
     get_macos_deny_read_regexes,
 )
@@ -30,38 +31,30 @@ class HostSandboxError(RuntimeError):
     pass
 
 
-# macOS 最小可读系统路径集合（Codex 风格 deny-default + allow-list）。
-# 当前仅作为常量保留，供后续需要严格 allow-list 的只读沙箱模式使用。
-# 当前只读沙箱采用“全局可读 + 敏感路径拒绝”模型，以保证工具兼容性。
+# macOS 只读沙箱的系统路径白名单（deny-default + allow-list，Codex 风格）。
+# 2026-08-30 起正式启用：只读沙箱 = 默认拒绝全部读取，仅本列表 + 路径授权
+# （macos_writable_paths / macos_readable_extra_paths）+ 工作区可读。
+# 列表经真机 PoC 校准：/System 含 dyld 共享缓存（进程启动必需）、
+# /Library/Developer/CommandLineTools 是 Apple git 等开发工具的真身、
+# /opt/homebrew 为 arm64 工具链（Intel 的 /usr/local 已由 /usr 覆盖）、
+# /private/var 覆盖 $TMPDIR（/var/folders/...）。
 MACOS_MINIMAL_READABLE_PATHS = [
     "/bin",
     "/sbin",
-    "/usr/bin",
-    "/usr/sbin",
-    "/usr/libexec",
-    "/usr/lib",
-    "/usr/share",
-    "/usr/local/lib",
-    "/opt/homebrew/lib",
+    "/usr",
     "/lib",
+    "/System",
+    "/Library/Apple",
+    "/Library/Developer/CommandLineTools",
+    "/Applications",
     "/etc",
     "/private/etc",
+    "/dev",
     "/tmp",
     "/private/tmp",
-    "/var/tmp",
-    "/private/var/tmp",
     "/var",
     "/private/var",
-    "/dev",
-    "/System/Library/Frameworks",
-    "/System/Library/PrivateFrameworks",
-    "/System/Library/SubFrameworks",
-    "/System/Library/CoreServices",
-    "/System/Library/Extensions",
-    "/Library/Apple",
-    "/Library/Preferences",
-    "/Library/Filesystems/NetFSPlugins",
-    "/Applications",
+    "/opt/homebrew",
 ]
 
 
@@ -105,6 +98,50 @@ def _build_macos_deny_regex_rules(patterns: List[str]) -> str:
     rules: List[str] = []
     for pattern in patterns:
         rules.append(f'(deny file-read* (regex #"{pattern}"))')
+    return "\n".join(rules)
+
+
+def _build_macos_whitelist_read_rules(paths: List[str]) -> str:
+    """白名单读规则：每个允许路径的 subpath allow + 其全部祖先目录的 literal allow。
+
+    两个实测要点（2026-08-30 真机 PoC）：
+    1. Seatbelt 路径解析需要对每个祖先目录的读权限（file-read*），缺一个祖先
+       进程 exec 会直接 Abort trap: 6（file-read-metadata 不够，必须 file-read*）。
+       代价：祖先目录的顶层文件名可列出（读文件内容、列子目录仍被拒）。
+    2. 符号链接路径必须「原始形式 + 解析形式」双写：/etc→/private/etc 这类
+       链接，只写任一种都会 Operation not permitted（链接遍历与目标各查一次）。
+    """
+    literals: set[str] = set()
+    subpaths: List[str] = []
+    seen: set[str] = set()
+
+    def _add(path_str: str) -> None:
+        if not path_str or path_str in seen:
+            return
+        seen.add(path_str)
+        subpaths.append(path_str)
+        for ancestor in Path(path_str).parents:
+            ancestor_str = str(ancestor)
+            if ancestor_str and ancestor_str != ".":
+                literals.add(ancestor_str)
+
+    for raw in paths:
+        if not raw:
+            continue
+        try:
+            expanded = str(Path(raw).expanduser())
+        except Exception:
+            continue
+        _add(expanded)
+        resolved = _expand_path(raw)
+        if resolved:
+            _add(resolved)
+
+    rules: List[str] = []
+    for literal in sorted(literals):
+        rules.append(f'(allow file-read* (literal "{literal}"))')
+    for subpath in subpaths:
+        rules.append(f'(allow file-read* (subpath "{subpath}"))')
     return "\n".join(rules)
 
 
@@ -203,8 +240,11 @@ def _build_macos_plan(
     if not sandbox_exec:
         raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec"))
     profile = _macos_profile_for_workspace(work_path, network_permission)
+    # 白名单读模型下 ~/.gitconfig 不可读会使 git fatal（PoC 实测），指向 /dev/null 跳过
+    plan_env = dict(env)
+    plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
-    return SandboxPlan(command=cmd, env=env, cwd=str(work_path))
+    return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
 
 
 def _build_macos_readonly_plan(
@@ -219,8 +259,16 @@ def _build_macos_readonly_plan(
     network_policy = _build_macos_network_policy(network_permission)
     workspace = str(work_path.resolve())
 
-    # 只读沙箱：全局可读 + 敏感路径/文件拒绝，写权限仅 /dev/null。
-    # 工作区在 deny 规则之后再显式 allow，保证“工作区内不受沙箱影响”。
+    # 只读沙箱（2026-08-30 起）：deny-default 白名单读模型。
+    # 默认全部不可读，仅系统路径白名单 + 路径授权（可写+仅可读）+ 工作区可读，
+    # 写权限仅 /dev/null；deny 规则在白名单内做最后排除（如工作区内的 .env）。
+    # 历史模型为「全局可读 + 敏感路径黑名单」，且 deny 顺序在 workspace allow
+    # 之前导致工作区内 .env 实际可读（Seatbelt 后规则覆盖先规则），本次一并修复。
+    readable_paths = list(MACOS_MINIMAL_READABLE_PATHS)
+    readable_paths.extend(get_macos_readable_paths())
+    readable_paths.append(str(work_path))  # 原始形式（可能含符号链接）
+    readable_paths.append(workspace)       # 解析形式
+    allow_rules = _build_macos_whitelist_read_rules(readable_paths)
     deny_rules = _build_macos_deny_rules(get_macos_deny_read_paths())
     regex_rules = _build_macos_deny_regex_rules(get_macos_deny_read_regexes())
     if regex_rules:
@@ -232,13 +280,16 @@ def _build_macos_readonly_plan(
         '(allow sysctl-read)\n'
         '(allow process*)\n'
         f'{network_policy}'
-        '(allow file-read*)\n'
+        f'{allow_rules}\n'
+        # deny 必须位于所有 allow 之后（后规则覆盖先规则）
         f'{deny_rules}\n'
-        f'(allow file-read* (subpath "{workspace}"))\n'
         '(allow file-write* (literal "/dev/null"))'
     )
+    # git 在 ~/.gitconfig 不可读时会 fatal（PoC 实测），指向 /dev/null 跳过全局配置
+    plan_env = dict(env)
+    plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
-    return SandboxPlan(command=cmd, env=env, cwd=str(work_path))
+    return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
 
 
 def _build_macos_shell_plan(
@@ -250,8 +301,11 @@ def _build_macos_shell_plan(
     if not sandbox_exec:
         raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec_shell"))
     profile = _macos_profile_for_workspace(work_path, network_permission)
+    # 同 _build_macos_plan：白名单读下 git 需要 GIT_CONFIG_GLOBAL 兜底
+    plan_env = dict(env)
+    plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-i"]
-    return SandboxPlan(command=cmd, env=env, cwd=str(work_path))
+    return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
 
 
 def _macos_profile_for_workspace(
@@ -275,7 +329,16 @@ def _macos_profile_for_workspace(
             write_rules.append(f'(subpath "{entry}")')
     write_expr = " ".join(write_rules)
     network_policy = _build_macos_network_policy(network_permission)
-    workspace = str(work_path.resolve())
+    # 可写沙箱（2026-08-30 起）与只读沙箱共用同一白名单读模型：
+    # 默认拒绝全部读取，仅系统路径白名单 + 路径授权（可写+仅可读）+ 工作区可读。
+    # 权限模式只管工作区内读写——unrestricted 也不例外；工作区外读取的唯一途径
+    # 是「路径授权」。历史模型为「全局可读 + 黑名单」，导致无限制模式/审批批准后
+    # 能读授权范围外文件（读放大），本次按方案一修复：审批不放大读取。
+    readable_paths = list(MACOS_MINIMAL_READABLE_PATHS)
+    readable_paths.extend(get_macos_readable_paths())
+    readable_paths.append(str(work_path))  # 原始形式（可能含符号链接）
+    readable_paths.append(workspace)       # 解析形式
+    allow_rules = _build_macos_whitelist_read_rules(readable_paths)
     deny_rules = _build_macos_deny_rules(get_macos_deny_read_paths())
     regex_rules = _build_macos_deny_regex_rules(get_macos_deny_read_regexes())
     if regex_rules:
@@ -286,9 +349,10 @@ def _macos_profile_for_workspace(
         '(allow sysctl-read)\n'
         '(allow process*)\n'
         f'{network_policy}'
-        '(allow file-read*)\n'
+        f'{allow_rules}\n'
+        # deny 必须位于所有 allow 之后（Seatbelt 后规则覆盖先规则），
+        # 否则工作区内的 .env 会被 workspace allow 覆盖成可读（旧顺序漏洞）
         f'{deny_rules}\n'
-        f'(allow file-read* (subpath "{workspace}"))\n'
         f'(allow file-write* {write_expr})'
     )
 

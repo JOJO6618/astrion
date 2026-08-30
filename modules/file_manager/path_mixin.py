@@ -1,6 +1,7 @@
 # modules/file_manager.py - 文件管理模块（添加行编辑功能）
 
 import os
+import platform
 import shutil
 from pathlib import Path
 import re
@@ -35,7 +36,13 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
         LINUX_SAFETY,
     )
 from modules.container_file_proxy import ContainerFileProxy
-from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
+from modules.host_sandbox_policy import (
+    get_macos_writable_paths,
+    get_macos_readable_paths,
+    get_macos_deny_read_paths,
+    get_macos_deny_read_regexes,
+)
+from modules.host_sandbox_runner import MACOS_MINIMAL_READABLE_PATHS
 from utils.logger import setup_logger
 from modules.i18n import tr
 
@@ -163,7 +170,14 @@ class PathMixin:
         else:
             temp_roots = [Path("/tmp").resolve(), Path("/private/tmp").resolve()]
         roots: List[Path] = [self.project_path.resolve(), *temp_roots]
-        raw_items = get_macos_writable_paths() if access == "write" else get_macos_readable_paths()
+        if access == "write":
+            raw_items = get_macos_writable_paths()
+        else:
+            raw_items = get_macos_readable_paths()
+            if platform.system() == "Darwin":
+                # 读 roots 与只读沙箱白名单同源：系统路径（/usr、/System 等）
+                # 在只读沙箱里可读，原生读工具应对齐（2026-08-30 白名单化）
+                raw_items = list(MACOS_MINIMAL_READABLE_PATHS) + list(raw_items)
         for raw in raw_items:
             try:
                 p = Path(raw).expanduser().resolve()
@@ -172,6 +186,31 @@ class PathMixin:
             if p not in roots:
                 roots.append(p)
         return roots
+
+    def _host_read_denied(self, resolved: Path) -> bool:
+        """macOS 禁读清单检查（与沙箱 deny 规则同源）：命中敏感路径或正则（如 .env）则拒绝。
+
+        原生读工具不走 sandbox-exec，需在进程内复刻同一份禁读语义，
+        避免出现「run_command 读不到、read_file 读得到」的逃逸口。
+        """
+        target = str(resolved)
+        for raw in get_macos_deny_read_paths():
+            try:
+                base = Path(raw).expanduser().resolve()
+            except Exception:
+                continue
+            try:
+                resolved.relative_to(base)
+                return True
+            except ValueError:
+                continue
+        for pattern in get_macos_deny_read_regexes():
+            try:
+                if re.search(pattern, target):
+                    return True
+            except re.error:
+                continue
+        return False
 
     def _ensure_host_access(self, full_path: Path, access: str) -> Tuple[bool, str]:
         if not self._is_host_mode():
@@ -185,7 +224,11 @@ class PathMixin:
         if access == "write" and not full_path.exists():
             check_target = full_path.parent.resolve()
         allowed_roots = self._host_allowed_roots(access)
-        if self._path_in_allowed_roots(check_target.resolve(), allowed_roots):
+        resolved_target = check_target.resolve()
+        if self._path_in_allowed_roots(resolved_target, allowed_roots):
+            # 读访问还需过 macOS 禁读清单（工作区内 .env 等，与沙箱 deny 同源）
+            if access == "read" and platform.system() == "Darwin" and self._host_read_denied(resolved_target):
+                return False, tr("file_manager.host_access_read_denied")
             return True, ""
         if access == "write":
             return False, tr("file_manager.host_access_write_denied")

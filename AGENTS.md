@@ -331,22 +331,28 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 - `readonly`
   - `run_command` 可调用，但在只读沙箱执行；写入由系统拒绝
+  - 读取同样受限（各平台只读强制的可读边界见 §10.8）；读不到属预期边界，不是故障
   - `write_file` / `edit_file` 等写入类工具直接拒绝
 - `approval`
-  - `run_command` 先走只读沙箱
+  - `run_command` 先走只读沙箱（可读边界见 §10.8，读越界也会触发权限拒绝）
   - 若出现权限拒绝（例如 `Operation not permitted` / `Permission denied`），触发前端审批
   - 审批通过后，仅该次命令以可写沙箱重试；工具结果返回“重试后的最终结果”
+  - **审批只授予该次命令的工作区内写权限，不放大读取**（2026-08-30 方案一）：可写沙箱读边界与只读同一白名单，读越界唯一途径是「路径授权」；重试后仍为文件权限拒绝时，工具结果附带 `read_scope_hint` 引导模型说明
+  - **执行环境锁定为沙箱**（2026-08-30 起）：direct 下无沙箱兜底，启发式漏判的写命令会直接执行成功、审批承诺被架空，故批准/自动审核与 direct 硬互斥（锁定机制同 plan/只读，见 §10.6）
 - `auto_approval`
   - `write_file` / `edit_file`：工作区内路径直接执行，工作区外路径进入审批流程
-  - `run_command` 先走只读沙箱；触发权限拒绝后由后台审批智能体自动审核
+  - `run_command` 先走只读沙箱（可读边界见 §10.8）；触发权限拒绝后由后台审批智能体自动审核
   - 自动审核拒绝时，工具返回“被拒绝+理由”并继续主循环（不强制结束任务）
+  - 批准后的读取边界与 approval 相同（不放大）
+  - 执行环境同样锁定为沙箱（同 approval 条目）
 - `unrestricted`
-  - 不做权限模式拦截；是否沙箱由执行环境决定
+  - 权限层不做拦截：工作区内读写自由、命令免批准；是否沙箱由执行环境决定
+  - 注意「无限制」只管工作区内：宿主机沙箱执行时读边界仍是白名单（见 §10.8），授权范围外读取需路径授权；direct 模式才真正无边界
 
 ### 10.2 执行环境
 
 - `sandbox`（默认）：使用 OS 沙箱执行（macOS: `sandbox-exec`，Linux: `bwrap + seccomp`，Windows: `WSL2`）
-- `direct`：宿主机直接执行（高风险）
+- `direct`：宿主机直接执行（高风险），**仅 `unrestricted` 权限可选**：受限权限档（只读/批准/自动审核）与 plan 模式下后端 `set_execution_mode` 硬锁拒绝 direct（i18n 键 `main_terminal.restricted_mode_locks_sandbox` / `plan_mode_locks_sandbox`）；进入受限档时若已是 direct 会被联动压回沙箱（记录 `pre_readonly_execution_mode`，切回 unrestricted 时恢复）；存量「受限档+direct」对话在加载时自愈矫正回沙箱
 - 切换后一直生效，无自动回退机制（2026-07 已移除原 TTL 自动回退）
 
 ### 10.3 路径授权语义
@@ -357,6 +363,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 - 语义：
   - 可读集合 = 可读可写 + 仅可读
   - 可写集合 = 可读可写
+- 配置来源（2026-08-30 收敛为两个）：`config/host_sandbox_policy.json`（UI 唯一读写目标）+ 真·环境变量 `HOST_SANDBOX_MACOS_WRITABLE_PATHS`（部署通道，与文件合并去重）。settings.json 的 `terminal.macos_writable_paths` 映射已移除（历史值一次性失效，需用路径授权重新添加）；.env 注入技术上仍生效，但不是受支持的通道，不推荐使用
 
 ### 10.4 维护约束
 
@@ -386,8 +393,9 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ### 实现要点（改代码必须知道）
 
-- **后端核心**：`core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁）；`switch_work_mode` 处理 plan⇄只读+沙箱联动，`pre_plan_permission_mode`/`pre_plan_execution_mode` 存对话 metadata；执行环境 plan 锁在 `core/main_terminal.py::set_execution_mode`（只拦 direct）
-- **创建对话的 work_mode 继承**：三条创建路径（prefer_defaults / 显式模式 / safe_navigation）一律沿用 terminal 当前值，**不用个性化默认值覆盖**——/new 页面切换器显示什么新对话就是什么；个性化 `default_work_mode` 仅在 terminal 首次构造时生效。plan 锁存在于 `set_permission_mode`，任何创建路径不得在其之前调用非只读 set（曾因此 500）
+- **后端核心**：`core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁；`RESTRICTED_PERMISSION_MODES` 受限档集合 + `set_permission_mode` 内 `_apply_restricted_execution_mode_link` 处理受限档⇄沙箱联动，`pre_readonly_execution_mode` 存对话 metadata——键名保留，语义已泛化为受限档共用）；`switch_work_mode` 处理 plan⇄只读+沙箱联动，`pre_plan_permission_mode`/`pre_plan_execution_mode` 存对话 metadata；执行环境 plan 锁与受限档锁同在 `core/main_terminal.py::set_execution_mode`（只拦 direct）
+- **创建对话的模式继承（work_mode + permission_mode 同一原则）**：三条创建路径（prefer_defaults / 显式模式 / safe_navigation）一律沿用 terminal 当前值，**不用个性化默认值覆盖**——/new 页面切换器显示什么新对话就是什么（切换经 `_sync_workspace_terminal_mode` 同步到工作区级 terminal）；个性化 `default_work_mode` / `default_permission_mode` 仅在 terminal 首次构造时生效（tools_policy 加载）。多智能体创建路径（`server/multi_agent.py`）与工作流创建路径（`workflow_runtime_api.py`）同样遵守。plan 锁存在于 `set_permission_mode`，任何创建路径不得在其之前调用非只读 set（曾因此 500）
+  - 历史教训：permission_mode 曾长期例外（`a2a04b95` 引入「个性化默认优先」，彼时还没有 /new 切换器同步机制），导致 /new 切只读后新建对话回落无限制（2026-08-30 修复，与 work_mode 对齐）
 - **提示词**：`prompts/work_mode.txt` 模板 + `mode.py::_build_work_mode_rules`（三档规则唯一来源，冻结注入与切换通知共用）；冻结注入在 `messages.py`（执行环境之后）；切换走现有 drift 机制（`_RUNTIME_MODE_KINDS` 第四种），通知携带完整新规则文本
 - **API**：`GET/POST /api/work-mode`（`server/chat/permission.py`）；**仅空闲可切换，运行中 409**（无 pending 队列）；`plan-approvals` pending/answer 端点在 `server/chat/approval.py`
 - **submit_plan 链路**：工具全模式注入（沟通类工具不过滤，非 plan 调用由 handler 运行时兜延返回引导）；`PlanApprovalManager`（`modules/plan_approval_manager.py`）+ `chat_flow_tool_loop.py::_handle_submit_plan` 阻塞等待 → 前端 `PlanApprovalDialog.vue` 弹窗 → 批准则工具循环内切 execute 并静默更新 baseline（避免误发 drift 通知）
@@ -396,7 +404,24 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ### 10.7) 后台命令只读沙箱修复（2026-08-13）
 
-后台 `run_command`（`run_in_background=true`）此前在**所有环境**绕过只读权限（`background_command_manager` 固定用可写沙箱计划）。已修复：`create_background_command` 透传 `sandbox_write_access`，宿主机路径按它选只读/可写计划。docker/web 模式的只读仍仅靠提示词约束（无真沙箱），维持现状。
+后台 `run_command`（`run_in_background=true`）此前在**所有环境**绕过只读权限（`background_command_manager` 固定用可写沙箱计划）。已修复：`create_background_command` 透传 `sandbox_write_access`，宿主机路径按它选只读/可写计划；docker 路径按它决定是否以非特权 uid 执行（见 §10.8）。
+
+### 10.8) 平台级只读强制（2026-08-30）
+
+只读权限的强制由各平台原生机制兜底；`config/limits.py` 的命令文本白名单（`_is_readonly_run_command_allowed`）只是**审批决策的启发式**，不再是安全边界（已知可绕过，如 `find . -delete`；绕过后果只是多走一次审批）。
+
+- **docker/web 模式 = 非特权 uid 执行角色**（`modules/docker_readonly_exec.py`）：
+  - 容器主进程保持 root（可写执行不变）；`sandbox_write_access=False` 的执行通道（`terminal_ops/run.py`、`background_command_manager.py`、只读语境创建的持久终端）以 `-u 10001:10001` 运行，`DOCKER_READONLY_EXEC_UID/GID` 可覆盖
+  - 强制力 = 内核 DAC：工作区属主为宿主机 root，非属主无写权；600 权限文件（如 .env）不可读；逃逸需提权（setuid/内核漏洞），无 umount 类捷径
+  - 前提：工作区属主与该 uid 不碰撞、无 o+w 文件、容器未挂 docker.sock（云端已验证）；macOS Docker Desktop（virtiofs fakeowner）不执行 uid 权限，仅 Linux 宿主生效
+  - 持久终端在 readonly/approval/auto_approval 下同以只读身份创建（`docker_terminal_readonly_enabled` 判定，`docker_readonly_getter` 注入）；终端里的写入会被拒，写命令走 run_command 审批通道
+  - Dockerfile 创建 `agent` 用户 + `/etc/gitconfig` safe.directory + 去 setuid 加固；数字 uid 不依赖镜像内用户存在，旧镜像直接受益
+- **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：
+  - 只读/可写两个 profile **共用同一白名单读模型**（`_build_macos_whitelist_read_rules`），唯一区别是写权限：deny default + 系统路径白名单（`MACOS_MINIMAL_READABLE_PATHS`）+ 路径授权（writable + readable_extra）+ 工作区 + 祖先目录 literal allow（缺一个祖先进程 exec 直接 Abort trap，必须为 file-read*）+ env 注入 `GIT_CONFIG_GLOBAL=/dev/null`（可写/只读/持久终端三条 plan 均注入）
+  - **deny 规则（.env 正则、~/.ssh 等）必须位于所有 allow 之后**（Seatbelt 后规则覆盖先规则）；两个 profile 均已修复旧顺序漏洞（工作区 .env 曾实际可读）
+  - 可写 profile 已于 2026-08-30 白名单化（此前为全局可读，导致 unrestricted/审批批准后能读授权范围外文件）；白名单固有代价：祖先目录顶层文件名可列出（读文件内容仍被拒）
+  - 原生文件工具对齐（`file_manager/path_mixin.py`）：读 roots 与沙箱白名单同源（系统路径 + 工作区 + 授权）+ 叠加同一禁读清单——至此 host+sandbox 下全部读通道（只读/可写沙箱命令、原生 read_file）共享同一边界
+- **Linux 宿主机 = bwrap**：只读为 `--ro-bind / /`（全局只读）；可写为 `--ro-bind / /` + 工作区可写 bind——**读侧仍是全局可读，尚未对齐白名单**（本机无 Linux 测试环境，刻意未动，待后续）；**Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合
 
 ## 11) 多智能体对话类型（multi-agent conversation type）
 

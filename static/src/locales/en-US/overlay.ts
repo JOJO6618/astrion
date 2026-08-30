@@ -79,9 +79,9 @@ export default {
   writableMode: 'Read & write',
   readableMode: 'Read-only',
   writableHint:
-    'Read-write paths are writable in the workspace-write sandbox and read-only in the read-only sandbox.',
+    'Read-write paths are writable in the writable sandbox and read-only in the read-only sandbox.',
   readableHint:
-    'Read-only paths are added to the allowed read list in the read-only sandbox; the writable workspace sandbox is readable by default.',
+    'Read-only paths join the read whitelist of the read-only sandbox (which denies all reads by default except system dirs, the workspace, and authorized paths).',
   writablePlaceholder: 'One path per line, e.g. ~/Desktop/agents-export',
   readablePlaceholder: 'One path per line, e.g. ~/Documents/reference',
 

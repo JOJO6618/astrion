@@ -19,6 +19,7 @@ from modules.host_sandbox_runner import (
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
+from modules.docker_readonly_exec import docker_readonly_exec_args
 from modules.i18n import tr
 
 
@@ -223,9 +224,11 @@ class BackgroundCommandManager:
                 container_workdir = mount_path.rstrip("/")
                 if relative:
                     container_workdir = f"{container_workdir}/{relative}"
-                exec_cmd = [
-                    docker_bin,
-                    "exec",
+                exec_cmd = [docker_bin, "exec"]
+                if not sandbox_write_access:
+                    # 只读执行：非特权 uid（内核 DAC 强制只读，见 modules/docker_readonly_exec.py）
+                    exec_cmd += docker_readonly_exec_args()
+                exec_cmd += [
                     "-e",
                     "PATH=/opt/agent-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
                     "-e",

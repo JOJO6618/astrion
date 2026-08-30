@@ -79,8 +79,8 @@ export default {
   pathAuthTitle: '路径授权',
   writableMode: '可读可写',
   readableMode: '仅可读',
-  writableHint: '可读可写路径在 workspace-write 沙箱中可写入，只读沙箱中仅可读。',
-  readableHint: '仅可读路径在只读沙箱中会被加入允许读取列表；工作区可写沙箱默认已可读。',
+  writableHint: '可读可写路径在可写沙箱中可写入，在只读沙箱中仅可读。',
+  readableHint: '仅可读路径会加入只读沙箱的读取白名单（只读沙箱默认拒绝所有读取，仅系统目录、工作区与授权路径可读）。',
   writablePlaceholder: '每行一个路径，例如：~/Desktop/agents-export',
   readablePlaceholder: '每行一个路径，例如：~/Documents/reference',
 

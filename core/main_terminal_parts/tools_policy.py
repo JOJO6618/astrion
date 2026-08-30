@@ -88,6 +88,10 @@ from modules.i18n import tr
 logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 PERMISSION_MODES = {"readonly", "approval", "auto_approval", "unrestricted"}
+# 受限权限档：只读 / 批准 / 自动审核。三档都依赖宿主机 OS 沙箱硬限制兜底
+# （批准后仍是沙箱可写+白名单读，direct 下启发式漏判的写命令无任何兜底），
+# 执行环境统一锁定为沙箱；direct（完全访问）是无限制档的专属搭配。
+RESTRICTED_PERMISSION_MODES = {"readonly", "approval", "auto_approval"}
 # 运行模式（交互方式档）：计划 / 询问 / 执行。
 # 与权限模式（能力档）正交；plan 档会联动锁死权限为只读。
 WORK_MODES = {"plan", "ask", "execute"}
@@ -235,6 +239,15 @@ class MainTerminalToolsPolicyMixin:
                     return "unrestricted"
                 return mode
 
+    def docker_terminal_readonly_enabled(self) -> bool:
+                """docker 持久终端是否以只读身份（非特权 uid）创建。
+
+                readonly / approval / auto_approval 模式下为 True：新建的 docker
+                终端会话与 run_command 只读执行同一身份（内核 DAC 强制只读，见
+                modules/docker_readonly_exec.py）；unrestricted 保持 root。
+                """
+                return self.get_permission_mode() != "unrestricted"
+
     def get_work_mode(self) -> str:
                 mode = str(getattr(self, "current_work_mode", None) or WORK_MODE_DEFAULT).strip().lower()
                 if mode not in WORK_MODES:
@@ -361,13 +374,15 @@ class MainTerminalToolsPolicyMixin:
                     except AttributeError:
                         pass
                 previous = self.get_permission_mode()
-                entering_readonly = normalized == "readonly" and previous != "readonly"
-                leaving_readonly = previous == "readonly" and normalized != "readonly"
+                # 受限档集合边界判定：readonly⇄approval 互切不动执行环境；
+                # 仅 unrestricted⇄受限档 跨界时才强制沙箱 / 恢复进入前环境。
+                entering_restricted = normalized in RESTRICTED_PERMISSION_MODES and previous not in RESTRICTED_PERMISSION_MODES
+                leaving_restricted = previous in RESTRICTED_PERMISSION_MODES and normalized not in RESTRICTED_PERMISSION_MODES
                 self.current_permission_mode = normalized
                 if not persist:
-                    # 只读联动不依赖持久化：运行中 pending 切换路径（apply_pending_runtime_mode_changes）
+                    # 受限档联动不依赖持久化：运行中 pending 切换路径（apply_pending_runtime_mode_changes）
                     # 也要内存级强制沙箱，只是不落 metadata（无记录则切离时保持沙箱，安全默认）。
-                    self._apply_readonly_execution_mode_link(entering_readonly, leaving_readonly, persist=False)
+                    self._apply_restricted_execution_mode_link(entering_restricted, leaving_restricted, persist=False)
                     return normalized
 
                 conv_id = conversation_id or getattr(getattr(self, "context_manager", None), "current_conversation_id", None)
@@ -380,16 +395,19 @@ class MainTerminalToolsPolicyMixin:
                             self.context_manager.conversation_metadata["permission_mode"] = normalized
                     except Exception:
                         pass
-                self._apply_readonly_execution_mode_link(entering_readonly, leaving_readonly, persist=True)
+                self._apply_restricted_execution_mode_link(entering_restricted, leaving_restricted, persist=True)
                 return normalized
 
-    def _apply_readonly_execution_mode_link(self, entering: bool, leaving: bool, *, persist: bool) -> None:
-                """只读权限 ⇄ 执行环境联动：进入 readonly 强制切沙箱，切离恢复进入前执行环境。
+    def _apply_restricted_execution_mode_link(self, entering: bool, leaving: bool, *, persist: bool) -> None:
+                """受限权限档（只读/批准/自动审核）⇄ 执行环境联动：进入受限档强制切沙箱，切离恢复进入前执行环境。
 
-                与 plan ⇄ readonly+sandbox 双锁逻辑对称：只读权限在宿主机依赖 OS 沙箱硬限制，
-                direct（完全访问）下无沙箱，只读形同虚设，必须一并锁回沙箱。
-                进入 readonly 时若执行环境为 direct，先存 pre_readonly_execution_mode 供切离时恢复；
-                切离 readonly 时仅当有明确进入前记录才恢复（无记录保持 sandbox，安全默认）。
+                与 plan ⇄ readonly+sandbox 双锁逻辑对称：受限档都依赖宿主机 OS 沙箱硬限制兜底
+                （批准后重试仍是可写沙箱+白名单读），direct（完全访问）下无沙箱，审批承诺会被架空
+                （启发式漏判的写命令直接执行成功、无 EPERM 触发审批），必须一并锁回沙箱。
+                进入受限档时若执行环境为 direct，先存 pre_readonly_execution_mode 供切离时恢复；
+                切离受限档（到 unrestricted）时仅当有明确进入前记录才恢复（无记录保持 sandbox，安全默认）。
+                注意：metadata 键名保留 pre_readonly_execution_mode 不改（语义已泛化为受限档共用），
+                存量对话的恢复记录不受影响。
                 """
                 if entering:
                     try:

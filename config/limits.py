@@ -43,7 +43,11 @@ READ_TOOL_MAX_MATCHES = 50
 PROJECT_MAX_STORAGE_MB = int(os.environ.get("PROJECT_MAX_STORAGE_MB", "2048"))
 PROJECT_MAX_STORAGE_BYTES = PROJECT_MAX_STORAGE_MB * 1024 * 1024
 
-# 只读权限模式：run_command 白名单配置
+# 只读权限模式：run_command 命令白名单（启发式文本识别）。
+# 注意（2026-08-30 起）：这只是「审批决策」与「兜底」的启发式，不再是安全边界——
+# docker 只读由非特权 uid 内核 DAC 强制（modules/docker_readonly_exec.py），
+# 宿主机只读由 OS 沙箱强制（modules/host_sandbox_runner.py）。已知可绕过
+# （如 find . -delete），请勿再为它增加拦截规则试图把它做成边界。
 READONLY_RUN_COMMAND_ALLOWED = (
     "grep",
     "find",

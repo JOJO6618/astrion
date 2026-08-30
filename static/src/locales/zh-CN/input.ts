@@ -17,11 +17,11 @@ export default {
   workModeTitle: '运行模式',
   versionControl: '版本控制',
   permissionLockedByPlanTitle: '计划模式下权限与执行环境已锁定，网络权限仍可调整',
-  executionLockedReadonlyTitle: '只读模式下执行环境已锁定为沙箱',
+  executionLockedRestrictedTitle: '只读/批准/自动审核模式下执行环境已锁定为沙箱',
   permissionGroup: '权限',
   planModeLocked: '计划模式锁定',
   executionEnv: '执行环境',
-  readonlyModeLocked: '只读模式锁定',
+  restrictedModeLocked: '受限模式锁定',
   networkPermission: '网络权限',
   usedPercent: '{n} 已用',
 

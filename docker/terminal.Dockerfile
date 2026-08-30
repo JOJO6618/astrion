@@ -76,3 +76,18 @@ ENV AGENT_TOOLBOX_VENV=/opt/agent-venv
 ENV PATH="/opt/agent-venv/bin:${PATH}"
 ENV NODE_PATH="/usr/lib/node_modules"
 
+# 5. 只读执行角色与安全加固（2026-08-30）
+#    - agent 用户（uid 10001，可用 --build-arg 调整）供只读权限模式的
+#      docker exec/run --user 使用；容器主进程与可写执行仍为 root。
+#      内核 DAC 强制：工作区文件属主为宿主机 root，agent 非属主 → 物理只读；
+#      uid 需与 DOCKER_READONLY_EXEC_UID 环境变量（默认 10001）保持一致。
+#    - /etc/gitconfig 烤入 safe.directory=*：修复非属主身份跑 git 时的
+#      "detected dubious ownership" 报错（后端 exec 也会用 env 注入，双保险）。
+#    - 移除全部 setuid 位：缩小只读身份在容器内的提权面
+#      （su/passwd/newgrp 等在本镜像的使用场景下不需要；ping 用的是
+#      file capabilities 而非 setuid，不受影响）。
+ARG AGENT_UID=10001
+RUN useradd --create-home --uid ${AGENT_UID} --shell /bin/bash agent && \
+    printf '[safe]\n\tdirectory = *\n' > /etc/gitconfig && \
+    find / -xdev -perm -4000 -type f -exec chmod u-s {} + 2>/dev/null || true
+

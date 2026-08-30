@@ -85,12 +85,12 @@ MESSAGES = {
         "en-US": "Waiting for user approval",
     },
     "tool_loop.awaiting_approval_retry": {
-        "zh-CN": "检测到写权限受限，等待用户审批后重试",
-        "en-US": "Write permission is restricted; waiting for user approval before retrying",
+        "zh-CN": "检测到权限受限，等待用户审批后重试（审批只授予工作区内写权限）",
+        "en-US": "Permission is restricted; waiting for user approval before retrying (approval grants workspace-scoped write only)",
     },
     "tool_loop.awaiting_approval_retry_short": {
-        "zh-CN": "检测到写权限受限，等待用户审批",
-        "en-US": "Write permission restricted; waiting for user approval",
+        "zh-CN": "检测到权限受限，等待用户审批",
+        "en-US": "Permission restricted; waiting for user approval",
     },
     "tool_loop.rejected_by_user": {
         "zh-CN": "操作被用户拒绝",
@@ -99,6 +99,10 @@ MESSAGES = {
     "tool_loop.rejected_timeout": {
         "zh-CN": "审批超时，操作未执行",
         "en-US": "Approval timed out; the operation was not executed",
+    },
+    "tool_loop.retry_still_denied_read_scope": {
+        "zh-CN": "审批已授予本次工作区内写权限，但命令仍被沙箱拒绝：很可能是读取了授权范围（工作区 / 路径授权 / 系统基础路径）之外的路径。读越界不随审批放行，请引导用户在「路径授权」中添加所需路径后重试。",
+        "en-US": "Approval granted workspace-scoped write for this command only, but the sandbox still rejected it: it most likely tried to read paths outside the authorized scope (workspace / path authorization / base system paths). Read escalation is not granted by approval; ask the user to add the needed path via Path Authorization and retry.",
     },
 
     # ── ask_user ──

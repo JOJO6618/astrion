@@ -77,6 +77,7 @@ class TerminalManager:
         sandbox_options: Optional[Dict] = None,
         container_session: Optional["ContainerHandle"] = None,
         network_permission_getter: Optional[Callable] = None,
+        docker_readonly_getter: Optional[Callable] = None,
     ):
         """
         初始化终端管理器
@@ -128,6 +129,10 @@ class TerminalManager:
         # 网络权限 getter（由所属 WebTerminal 注入）：新建持久终端时透传，
         # 使 shell 沙箱实时跟随该终端实例的权限设置而非进程级 env。
         self.network_permission_getter = network_permission_getter
+        # docker 只读身份 getter（由所属 WebTerminal 注入）：返回 True 时新建的
+        # docker 终端会话以非特权 uid 运行（与 run_command 只读执行同一身份，
+        # 见 modules/docker_readonly_exec.py）；已存在的会话不受影响。
+        self.docker_readonly_getter = docker_readonly_getter
         # 终端命令超时工具（兼容 macOS 无 coreutils 的情况）
         self._timeout_bin = shutil.which("timeout") or shutil.which("gtimeout")
         
@@ -158,6 +163,8 @@ class TerminalManager:
         """构造当前终端应使用的沙箱参数。"""
         options = dict(self.sandbox_options)
         options["allow_direct_host_execution"] = self.sandbox_mode == "host" and self.host_execution_mode == "direct"
+        readonly_getter = getattr(self, "docker_readonly_getter", None)
+        options["docker_readonly_exec"] = bool(readonly_getter and readonly_getter())
         if self.container_session and self.container_session.mode == "docker":
             options["container_name"] = self.container_session.container_name
             options["mount_path"] = self.container_session.mount_path

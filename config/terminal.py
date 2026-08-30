@@ -54,6 +54,11 @@ LINUX_SAFETY = os.environ.get("LINUX_SAFETY", "0") not in {"0", "false", "False"
 TOOLBOX_TERMINAL_IDLE_SECONDS = int(os.environ.get("TOOLBOX_TERMINAL_IDLE_SECONDS", "900"))
 MAX_ACTIVE_USER_CONTAINERS = int(os.environ.get("MAX_ACTIVE_USER_CONTAINERS", "8"))
 HOST_EXECUTION_MODE_DEFAULT = os.environ.get("HOST_EXECUTION_MODE_DEFAULT", "sandbox").strip().lower()
+# 沙箱可写路径的「部署通道」（逗号分隔）。路径授权只有两个来源：
+# config/host_sandbox_policy.json（前端「路径授权」UI）+ 本变量（真·环境变量），
+# 两者合并去重（见 modules/host_sandbox_policy.py::get_macos_writable_paths）。
+# settings.json 的 terminal.macos_writable_paths 映射已于 2026-08-30 移除；
+# .env 注入技术上仍会生效，但不是受支持的配置通道（不推荐使用）。
 HOST_SANDBOX_MACOS_WRITABLE_PATHS = _parse_paths(
     os.environ.get("HOST_SANDBOX_MACOS_WRITABLE_PATHS", "")
 )
