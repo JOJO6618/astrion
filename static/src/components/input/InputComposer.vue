@@ -499,7 +499,7 @@
         >
           <span>{{ $t('input.versionControl') }}</span>
         </button>
-        <div class="permission-switcher__block">
+        <div ref="permissionBlockEl" class="permission-switcher__block">
           <button
             type="button"
             class="permission-switcher__btn"
@@ -535,8 +535,13 @@
           </button>
           <div
             v-if="permissionMenuOpen"
+            ref="permissionMenuEl"
             class="permission-switcher__menu"
-            :class="{ 'permission-switcher__menu--split': executionModeEnabled }"
+            :class="{
+              'permission-switcher__menu--split': executionModeEnabled,
+              'permission-switcher__menu--centered': permissionMenuCentered,
+            }"
+            :style="permissionMenuCentered ? { left: permissionMenuCenteredLeft, right: 'auto' } : undefined"
           >
             <div
               class="permission-switcher__group"
@@ -3391,6 +3396,45 @@ const executionModeLocked = computed(
   () => permissionLockedByPlan.value || executionLockedByRestricted.value
 );
 
+/**
+ * 手机端权限菜单防溢出定位：优先右对齐锚点（right: 0），若菜单左缘会溢出屏幕
+ * （锚点在输入栏左下而菜单较宽时典型发生）则改为相对屏幕水平居中，垂直方向
+ * 保持锚点上方不变（inline left 为相对锚点容器的偏移换算）。仅 ≤768px 断点启用。
+ */
+const permissionBlockEl = ref<HTMLElement | null>(null);
+const permissionMenuEl = ref<HTMLElement | null>(null);
+const permissionMenuCentered = ref(false);
+const permissionMenuCenteredLeft = ref('0px');
+
+async function updatePermissionMenuPosition() {
+  permissionMenuCentered.value = false;
+  if (!props.permissionMenuOpen) return;
+  if (!window.matchMedia('(max-width: 768px)').matches) return;
+  await nextTick();
+  const block = permissionBlockEl.value;
+  const menu = permissionMenuEl.value;
+  if (!block || !menu) return;
+  const anchorRect = block.getBoundingClientRect();
+  const menuWidth = menu.offsetWidth;
+  const safeMargin = 8;
+  if (anchorRect.right - menuWidth < safeMargin) {
+    const centeredLeft = (window.innerWidth - menuWidth) / 2 - anchorRect.left;
+    permissionMenuCenteredLeft.value = `${Math.round(centeredLeft)}px`;
+    permissionMenuCentered.value = true;
+  }
+}
+
+function onWindowResizeRepositionMenu() {
+  if (props.permissionMenuOpen) void updatePermissionMenuPosition();
+}
+
+watch(
+  () => props.permissionMenuOpen,
+  (open) => {
+    if (open) void updatePermissionMenuPosition();
+  }
+);
+
 const currentExecutionShortLabel = computed(() => {
   void currentLocale.value;
   const mode = String(props.currentExecutionMode || '');
@@ -3588,6 +3632,7 @@ watch(
 
 onMounted(() => {
   document.addEventListener('click', closeProjectGitMenu);
+  window.addEventListener('resize', onWindowResizeRepositionMenu);
   adjustTextareaSize();
   nextTick(() => {
     emitComposerHeight();
@@ -3611,6 +3656,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopVoiceRecording();
   document.removeEventListener('click', closeProjectGitMenu);
+  window.removeEventListener('resize', onWindowResizeRepositionMenu);
   editor.value?.destroy();
   runtimeQueueItemRefs.forEach((el) => {
     if (el) {
