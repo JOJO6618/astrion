@@ -224,6 +224,9 @@ const bottomFading = ref(false);
 
 /* ---------- 浮层定位：锚定入口按钮，夹紧在视口内 ---------- */
 const POPOVER_WIDTH = 300;
+/* 视口宽度低于该值（直板机竖屏）时，面板右侧与入口下方都没有合适空间，
+   直接屏幕居中悬浮（类似原生 action sheet 的居中弹窗模式） */
+const CENTER_LAYOUT_MAX_VW = 480;
 const popoverStyle = ref<Record<string, string>>({});
 
 const updatePosition = () => {
@@ -235,8 +238,12 @@ const updatePosition = () => {
 
   let left = anchor.right + 8;
   let top = anchor.top - 6;
-  /* 右侧空间不足（如移动端全屏侧边栏）→ 改为在入口下方展开 */
-  if (left + POPOVER_WIDTH > vw - 8) {
+  if (vw < CENTER_LAYOUT_MAX_VW) {
+    /* 直板机窄屏：屏幕居中悬浮 */
+    left = Math.max(8, (vw - POPOVER_WIDTH) / 2);
+    top = Math.max(8, (vh - popH) / 2);
+  } else if (left + POPOVER_WIDTH > vw - 8) {
+    /* 右侧空间不足（如移动端全屏侧边栏）→ 改为在入口下方展开 */
     left = Math.max(8, Math.min(anchor.left, vw - POPOVER_WIDTH - 8));
     top = anchor.bottom + 6;
   }
@@ -475,8 +482,13 @@ onBeforeUnmount(() => {
 .ws-switcher {
   --ws-row-h: 50px;
   position: fixed;
-  z-index: 1500;
+  /* Teleport 到 body，需高于移动端侧边栏遮罩 .mobile-panel-overlay（z-index: 2000，
+     带 backdrop-filter 模糊），否则手机端在侧边栏里打开切换器会被压在模糊层下面；
+     与对话项菜单 conversation-actions-menu--fixed 同级 */
+  z-index: 2300;
   width: 300px;
+  /* 极端窄屏（宽度不足 316px 的老设备/窗口模式）兜底，防水平溢出 */
+  max-width: calc(100vw - 16px);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-default);
@@ -855,10 +867,11 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-/* 「…」浮动菜单（Teleport 到 body，fixed 定位逃逸裁切） */
+/* 「…」浮动菜单（Teleport 到 body，fixed 定位逃逸裁切）；
+   从 .ws-switcher（z-index: 2300）内打开，必须高于父面板 */
 .ws-menu-floating {
   position: fixed;
-  z-index: 1600;
+  z-index: 2400;
   min-width: 136px;
   padding: 4px;
   border: 1px solid var(--border-default);
