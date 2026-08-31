@@ -64,6 +64,8 @@ export default {
   // ── Task errors & retry (lifecycle.ts) ──
   retrySoonTitle: 'Retrying soon',
   retryInSeconds: 'Retrying in {n}s (attempt {attempt}/{max})\nError: {error}',
+  streamRetrying: 'Connection interrupted, retrying (attempt {attempt}/{max})…',
+  streamRetryingGeneric: 'Connection interrupted, retrying…',
   toolCallFailed: 'Tool call failed',
   taskFailedTitle: 'Task failed',
   apiErrorTitle: 'API call failed',

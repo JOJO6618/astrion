@@ -37,14 +37,19 @@ class SubAgentModelCallError(RuntimeError):
     """子智能体模型请求失败。
 
     received_any=False：请求阶段失败（未收到任何文本/思考/工具调用），可重试；
-    received_any=True：已开始收到流内容后断开（输出期间断开），直接失败不重试。
-    语义与主智能体 run_streaming_attempts 的 can_retry 判定一致
-    （not full_response and not tool_calls and not current_thinking）。
+    received_any=True：已开始收到流内容后断开（输出期间断开）——
+    网络类断流（is_network_error=True）同样可重试（清除重来，与主智能体
+    run_streaming_attempts 的放宽判定一致）；非网络错误（4xx 等业务错误）
+    有接收时不重试。
+    calling_tools：断流时流中已推送「正在调用」进度事件的工具列表，
+    重试前由 _run_loop 标记取消，避免前端进度弹窗永久卡在「调用中」。
     """
 
-    def __init__(self, message: str, *, received_any: bool = False):
+    def __init__(self, message: str, *, received_any: bool = False, is_network_error: bool = True, calling_tools: Optional[List[Dict[str, Any]]] = None):
         super().__init__(message)
         self.received_any = received_any
+        self.is_network_error = is_network_error
+        self.calling_tools = calling_tools or []
 
 
 # 模型请求失败重试策略（与主智能体 max_api_retries=4 / retry_delay_seconds=10 对齐：
@@ -331,9 +336,10 @@ class SubAgentTask:
             # 安全点：写入延迟的上下文通知（不触发新一轮工作，仅让下一轮模型调用看到）
             self._flush_pending_notifications()
 
-            # 模型请求（带失败重试，与主智能体同构：最多 5 次尝试、重试间隔 10s、
-            # 仅当零接收——未收到任何文本/思考/工具调用——时重试；
-            # 已开始收到内容后断开属于输出期间故障，直接失败不重试）
+            # 模型请求（带失败重试，与主智能体同构：最多 5 次尝试、重试间隔 10s）。
+            # 重试范围：零接收一律可重试；有接收（输出中途断开）仅网络类断流可重试，
+            # 采取「清除重来」——半截内容只在 _call_model 局部变量与已推送的 calling
+            # 进度事件里，转发给主智能体的输出只发生在流完整结束后，无副作用。
             assistant_message = ""
             reasoning = ""
             tool_calls = []
@@ -348,7 +354,7 @@ class SubAgentTask:
                     break
                 except SubAgentModelCallError as exc:
                     call_error = exc
-                    can_retry = api_attempt < _SUB_AGENT_MAX_API_RETRIES and not exc.received_any
+                    can_retry = api_attempt < _SUB_AGENT_MAX_API_RETRIES and (exc.is_network_error or not exc.received_any)
                     ma_debug(
                         "sub_agent_api_attempt_failed",
                         task_id=self.task_id,
@@ -363,6 +369,17 @@ class SubAgentTask:
                     )
                     if not can_retry:
                         break
+                    # 有接收断流重试（清除重来）：本轮已推送的「正在调用」工具进度
+                    # 条目标记取消，避免前端进度弹窗永久卡在「调用中」；
+                    # 重试成功后模型若再次调用会推送新的条目（新一轮工具 id 不同）。
+                    for calling_tool in exc.calling_tools:
+                        self.emit("progress", {
+                            "id": calling_tool.get("id"),
+                            "tool": calling_tool.get("name", ""),
+                            "status": "cancelled",
+                            "args": {},
+                            "ts": int(time.time() * 1000),
+                        })
                     # 重试本身也是一次额外 API 请求
                     self.stats["api_calls"] += 1
                     # 重试等待期间必须响应软停止/硬取消
@@ -376,8 +393,8 @@ class SubAgentTask:
                     continue
 
             if call_error is not None:
-                if self.multi_agent_mode and not call_error.received_any:
-                    # 5 次尝试全部失败（均为零接收）：子智能体不终止，转为 idle
+                if self.multi_agent_mode and (call_error.is_network_error or not call_error.received_any):
+                    # 5 次尝试全部失败（零接收或网络断流）：子智能体不终止，转为 idle
                     # 并向 Team Leader 汇报错误，等待检查网络后重新下达指令
                     error_report = tr(
                         "sub_agent_task.model_call_failed_idle",
@@ -396,8 +413,8 @@ class SubAgentTask:
                     self._idle = True
                     self._persist_conversation(partial_summary=error_report[:200])
                     continue
-                # 输出期间断开（已开始收到内容）或传统后台模式：直接失败，
-                # 异常上抛由 run() 捕获后 _write_failure 落盘 failed 状态
+                # 非网络业务错误（有接收，理论罕见）或传统后台模式（重试已耗尽）：
+                # 直接失败，异常上抛由 run() 捕获后 _write_failure 落盘 failed 状态
                 if self.multi_agent_mode:
                     # 同步把失败状态告知 Team Leader，避免主智能体无感知空等
                     self._forward_output_to_master(
@@ -779,15 +796,30 @@ class SubAgentTask:
                     raise asyncio.CancelledError()
                 if chunk.get("error"):
                     error_info = chunk.get("error")
+                    is_network = True
                     if isinstance(error_info, dict):
                         error_text = (
                             error_info.get("error_message")
                             or error_info.get("error_text")
                             or str(error_info)
                         )
+                        # status_code 为空 = 网络类断流（连接错误/超时/远端断开）；
+                        # 有值（4xx 等 HTTP 业务错误）不参与有接收重试放宽
+                        is_network = error_info.get("status_code") is None
                     else:
                         error_text = str(error_info)
-                    raise SubAgentModelCallError(tr("sub_agent_task2.api_call_failed", error=error_text), received_any=received_any)
+                    # 收集本轮已推送「正在调用」进度的工具，重试前需标记取消
+                    calling_tools = [
+                        {"id": tc.get("id"), "name": tc.get("function", {}).get("name", "")}
+                        for tc in tool_calls
+                        if tc.get("id") and tc.get("function", {}).get("name")
+                    ]
+                    raise SubAgentModelCallError(
+                        tr("sub_agent_task2.api_call_failed", error=error_text),
+                        received_any=received_any,
+                        is_network_error=is_network,
+                        calling_tools=calling_tools,
+                    )
                 choice = (chunk.get("choices") or [{}])[0]
                 delta = choice.get("delta") or {}
                 if delta.get("content"):
@@ -844,7 +876,17 @@ class SubAgentTask:
             raise
         except Exception as exc:
             # chat 流本身抛出的漏网异常（如底层连接错误未被转为 error chunk 时）
-            raise SubAgentModelCallError(tr("sub_agent_task2.api_call_exception", error=exc), received_any=received_any) from exc
+            calling_tools = [
+                {"id": tc.get("id"), "name": tc.get("function", {}).get("name", "")}
+                for tc in tool_calls
+                if tc.get("id") and tc.get("function", {}).get("name")
+            ]
+            raise SubAgentModelCallError(
+                tr("sub_agent_task2.api_call_exception", error=exc),
+                received_any=received_any,
+                is_network_error=True,
+                calling_tools=calling_tools,
+            ) from exc
 
         return assistant_message, reasoning, tool_calls, usage
 

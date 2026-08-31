@@ -319,7 +319,9 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                 }
 
         # === API响应完成后只计算输出token ===
-        if last_usage_payload:
+        # 断流作废轮不计 usage：本论响应不完整，重试成功后会按新一轮 usage 计数，
+        # 若在 error 分支判断之前 apply 会导致同一回答重复计数。
+        if last_usage_payload and not api_error:
             try:
                 web_terminal.context_manager.apply_usage_statistics(last_usage_payload)
                 debug_log(
@@ -367,12 +369,13 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                     error_message = f"API 请求失败（HTTP {error_status}）"
                 else:
                     error_message = "API 请求失败"
-            can_retry = (
-                api_attempt < max_api_retries
-                and not full_response
-                and not tool_calls
-                and not current_thinking
-            )
+            # 重试判定：网络类断流（status_code 为空：连接错误/超时/远端断开，
+            # 区别于 HTTP 业务错误）允许「有接收」重试——半截内容只存在于局部变量
+            # 与前端，后端历史与磁盘均未写入，清除重来无副作用；HTTP 业务错误
+            # （4xx 等，实际上不可能有接收）保持原逻辑仅零接收重试。
+            has_partial_output = bool(full_response or tool_calls or current_thinking)
+            is_network_error = error_status is None
+            can_retry = api_attempt < max_api_retries and (is_network_error or not has_partial_output)
             sender('error', {
                 'message': error_message,
                 'status_code': error_status,
@@ -388,6 +391,17 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                 'max_attempts': max_api_retries + 1
             })
             if can_retry:
+                if has_partial_output:
+                    # 「清除重来」：通知前端清掉本轮 attempt 已渲染的半截内容
+                    # （思考块含已闭合的 / 文本 / preparing 工具条目），重试的新内容
+                    # 将由新一轮 thinking_start/text_start/tool_preparing 重新推送。
+                    # 后端内存历史与磁盘均无半截状态，无需清理。
+                    sender('stream_reset', {
+                        'reason': 'stream_disconnected',
+                        'attempt': api_attempt + 2,
+                        'max_attempts': max_api_retries + 1,
+                        'retry_in': retry_delay_seconds,
+                    })
                 try:
                     profile = get_model_profile(getattr(web_terminal, "model_key", None))
                     web_terminal.apply_model_profile(profile)

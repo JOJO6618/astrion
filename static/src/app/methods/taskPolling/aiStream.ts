@@ -260,5 +260,27 @@ export const aiStreamMethods = {
     this.chatCompleteTextAction(full);
     this.$forceUpdate();
     this.monitorEndModelOutput();
+  },
+  handleStreamReset(data: any) {
+    // 断流重试「清除重来」：移除本轮 attempt 已渲染的半截内容
+    // （思考块含已闭合的 / 文本 / preparing 工具条目），重试内容将重新推送。
+    debugLog('[TaskPolling] 断流重试，清理本轮半截内容');
+    const retryAttempt = Number(data?.attempt) || 0;
+    const retryMax = Number(data?.max_attempts) || 0;
+    const retryLabel = retryAttempt && retryMax
+      ? t('appTasks.streamRetrying', { attempt: retryAttempt, max: retryMax })
+      : t('appTasks.streamRetryingGeneric');
+    const removedActions = this.chatResetStreamingAttemptActions?.(retryLabel) || [];
+    for (const action of removedActions) {
+      if (action?.id) {
+        this.preparingTools?.delete(action.id);
+      }
+      if (action?.type === 'tool') {
+        this.toolUnregisterAction?.(action);
+      }
+    }
+    this.chatClearThinkingLocks?.();
+    this.monitorEndModelOutput();
+    this.$forceUpdate();
   }
 };

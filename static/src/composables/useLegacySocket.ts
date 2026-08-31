@@ -1142,6 +1142,41 @@ export async function initializeLegacySocket(ctx: any) {
       ctx.apiRequestPending = true;
     });
 
+    // 断流重试「清除重来」：后端与 API 的流式连接在输出中途断开、即将自动重试，
+    // 清除本轮 attempt 已渲染的半截内容（思考块含已闭合的 / 文本 / preparing 工具条目），
+    // 重试的新内容会由新一轮 thinking_start/text_start/tool_preparing 重新推送。
+    ctx.socket.on('stream_reset', (data) => {
+      if (data?.conversation_id && data.conversation_id !== ctx.currentConversationId) {
+        return;
+      }
+      // 轮询模式下由任务事件流重放处理（lifecycle.ts case 'stream_reset'）
+      if (ctx.usePollingMode && !ctx.waitingForSubAgent) {
+        return;
+      }
+      socketLog('断流重试，清理本轮半截内容', data);
+      // 清逐字流缓冲，防止半截缓冲在重置后继续渲染
+      resetStreamingBuffer();
+      const retryAttempt = Number(data?.attempt) || 0;
+      const retryMax = Number(data?.max_attempts) || 0;
+      const retryLabel = retryAttempt && retryMax
+        ? t('appTasks.streamRetrying', { attempt: retryAttempt, max: retryMax })
+        : t('appTasks.streamRetryingGeneric');
+      const removedActions = ctx.chatResetStreamingAttemptActions?.(retryLabel) || [];
+      for (const action of removedActions) {
+        if (action?.id) {
+          ctx.preparingTools?.delete(action.id);
+        }
+        if (action?.type === 'tool') {
+          ctx.toolUnregisterAction?.(action);
+        }
+      }
+      if (typeof ctx.chatClearThinkingLocks === 'function') {
+        ctx.chatClearThinkingLocks();
+      }
+      ctx.monitorEndModelOutput?.();
+      ctx.$forceUpdate();
+    });
+
     // 思考流开始
     ctx.socket.on('thinking_start', (data) => {
       // 对话定向事件：只响应当前对话，避免运行中对话的流式输出渲染到 /new 等空白页。

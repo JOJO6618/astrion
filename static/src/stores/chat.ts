@@ -419,6 +419,51 @@ export const useChatStore = defineStore('chat', {
         }
       }
     },
+    // 断流重试「清除重来」：移除当前 assistant 消息中本轮 API 尝试已渲染的
+    // 半截内容——从 actions 末尾往前删除思考（含已闭合）/文本/preparing 工具条目，
+    // 遇到上一轮迭代的已完成工具结果等非本轮内容即停。复位流式标志；若消息
+    // 因此被清空则恢复「生成中」占位（label 通常为重试提示文案）。
+    // 返回被移除的 action 对象列表，供调用方清理 preparingTools / 工具注册表。
+    resetStreamingAttemptActions(label: string = ''): any[] {
+      const removed: any[] = [];
+      let msg: any = null;
+      if (
+        this.currentMessageIndex >= 0 &&
+        this.messages[this.currentMessageIndex]?.role === 'assistant'
+      ) {
+        msg = this.messages[this.currentMessageIndex];
+      } else {
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+          if (this.messages[i]?.role === 'assistant') {
+            msg = this.messages[i];
+            break;
+          }
+        }
+      }
+      if (!msg || !Array.isArray(msg.actions)) return removed;
+      while (msg.actions.length) {
+        const last = msg.actions[msg.actions.length - 1];
+        const isThinking = last?.type === 'thinking';
+        const isText = last?.type === 'text';
+        const isPreparingTool =
+          last?.type === 'tool' && String(last?.tool?.status || '').toLowerCase() === 'preparing';
+        if (!isThinking && !isText && !isPreparingTool) break;
+        removed.push(last);
+        msg.actions.pop();
+      }
+      msg.currentStreamingType = null;
+      msg.activeThinkingId = null;
+      msg.streamingThinking = '';
+      msg.streamingText = '';
+      if (msg.actions.length === 0) {
+        msg.awaitingFirstContent = true;
+        msg.generatingLabel = label;
+      } else {
+        msg.awaitingFirstContent = false;
+        msg.generatingLabel = '';
+      }
+      return removed;
+    },
     addSystemMessage(content: string, meta: any = null) {
       // 与历史重建保持一致：子智能体/后台完成通知作为独立 assistant 消息渲染，
       // 避免运行时与刷新后在垂直间距上不一致。

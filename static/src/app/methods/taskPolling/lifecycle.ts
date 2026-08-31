@@ -230,6 +230,12 @@ export const lifecycleMethods = {
         this.handleTextEnd(eventData, eventIdx);
         break;
 
+      case 'stream_reset':
+        // 断流重试「清除重来」：清理本轮 attempt 半截内容；
+        // 历史重放时同样安全（后续事件会把新一轮内容重新渲染出来）
+        this.handleStreamReset(eventData, eventIdx);
+        break;
+
       case 'tool_preparing':
         this.handleToolPreparing(eventData, eventIdx);
         break;

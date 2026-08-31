@@ -65,6 +65,8 @@ export default {
   // ── 任务错误与重试（lifecycle.ts） ──
   retrySoonTitle: '即将重试',
   retryInSeconds: '将在 {n} 秒后重试（第 {attempt}/{max} 次）\n错误：{error}',
+  streamRetrying: '连接中断，正在重试（第 {attempt}/{max} 次）…',
+  streamRetryingGeneric: '连接中断，正在重试…',
   toolCallFailed: '工具调用失败',
   taskFailedTitle: '任务执行失败',
   apiErrorTitle: 'API 调用失败',
