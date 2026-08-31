@@ -24,6 +24,7 @@ import shell from './zh-CN/shell';
 import sidebar from './zh-CN/sidebar';
 import auth from './zh-CN/auth';
 import utils from './zh-CN/utils';
+import sandbox from './zh-CN/sandbox';
 
 export default {
   common,
@@ -50,4 +51,5 @@ export default {
   sidebar,
   auth,
   utils,
+  sandbox,
 } as const;

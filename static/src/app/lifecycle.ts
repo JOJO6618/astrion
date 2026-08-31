@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useChatActionStore } from '../stores/chatActions';
+import { useSandboxSetupStore } from '../stores/sandboxSetup';
 import { normalizeScrollLock } from '../composables/useScrollControl';
 import { setupShowImageObserver, teardownShowImageObserver } from './bootstrap';
 import { debugLog } from './methods/common';
@@ -48,6 +49,8 @@ export async function mounted() {
   this.fetchTerminalCount();
   this.startTerminalCountIdleRefresh();
   this.checkTutorialPrompt();
+  // Windows 宿主机模式下检测沙箱环境，缺失时弹出居中的安装向导（不分 sandbox/direct 执行环境）
+  void useSandboxSetupStore().autoCheck();
   if (initialDataPromise && typeof initialDataPromise.then === 'function') {
     initialDataPromise
       .then(() => {

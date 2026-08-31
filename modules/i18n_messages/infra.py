@@ -152,6 +152,68 @@ MESSAGES = {
         "en-US": "bubblewrap is not installed inside the WSL sandbox distro '{distro}'. Re-run scripts/setup-wsl-sandbox.ps1 or run 'apk add bubblewrap' inside the distro",
     },
 
+    # ── modules/sandbox_setup_manager.py（沙箱环境一键安装） ──
+    "sandbox.setup_wsl_missing": {
+        "zh-CN": "未检测到可用的 WSL2（Windows Subsystem for Linux）",
+        "en-US": "No usable WSL2 (Windows Subsystem for Linux) detected",
+    },
+    "sandbox.setup_distro_missing": {
+        "zh-CN": "未找到沙箱发行版 '{distro}'",
+        "en-US": "Sandbox distro '{distro}' not found",
+    },
+    "sandbox.setup_bwrap_missing": {
+        "zh-CN": "沙箱发行版 '{distro}' 缺少 bubblewrap 组件",
+        "en-US": "Sandbox distro '{distro}' is missing bubblewrap",
+    },
+    "sandbox.setup_not_windows": {
+        "zh-CN": "仅 Windows 宿主机模式支持一键安装沙箱",
+        "en-US": "One-click sandbox setup is only supported on Windows host mode",
+    },
+    "sandbox.setup_not_host_mode": {
+        "zh-CN": "当前不是宿主机模式，无法安装沙箱",
+        "en-US": "Not in host mode; sandbox setup unavailable",
+    },
+    "sandbox.setup_script_missing": {
+        "zh-CN": "安装脚本 scripts/setup-wsl-sandbox.ps1 不存在",
+        "en-US": "Setup script scripts/setup-wsl-sandbox.ps1 not found",
+    },
+    "sandbox.setup_already_running": {
+        "zh-CN": "安装任务正在运行中",
+        "en-US": "A setup task is already running",
+    },
+    "sandbox.setup_enabling_wsl_log": {
+        "zh-CN": "正在请求管理员授权…",
+        "en-US": "Requesting administrator approval...",
+    },
+    "sandbox.setup_wsl_installing_log": {
+        "zh-CN": "授权通过，正在下载并安装 WSL2 组件…",
+        "en-US": "Approval granted; downloading and installing WSL2 components...",
+    },
+    "sandbox.setup_wsl_enabled_log": {
+        "zh-CN": "WSL2 已启用，继续安装沙箱发行版…",
+        "en-US": "WSL2 enabled, continuing with sandbox distro setup...",
+    },
+    "sandbox.setup_wsl_enable_failed": {
+        "zh-CN": "启用 WSL2 失败（可能未通过管理员授权）",
+        "en-US": "Failed to enable WSL2 (administrator approval may have been denied)",
+    },
+    "sandbox.setup_uac_timeout": {
+        "zh-CN": "等待管理员授权超时",
+        "en-US": "Timed out waiting for administrator approval",
+    },
+    "sandbox.setup_script_failed": {
+        "zh-CN": "安装脚本执行失败，详情见日志",
+        "en-US": "Setup script failed; see log for details",
+    },
+    "sandbox.setup_verify_failed": {
+        "zh-CN": "安装完成但验收检测未通过: {detail}",
+        "en-US": "Setup finished but verification failed: {detail}",
+    },
+    "sandbox.setup_bad_distro_name": {
+        "zh-CN": "发行版名称 '{distro}' 含非法字符（仅允许字母、数字、点、下划线、连字符）",
+        "en-US": "Distro name '{distro}' contains illegal characters (only letters, digits, dot, underscore, hyphen allowed)",
+    },
+
     # ── modules/user_container_manager.py（用户容器管理器） ──
     "container_mgr.quota_exhausted": {
         "zh-CN": "资源繁忙：容器配额已用尽，请稍候再试。",

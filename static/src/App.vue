@@ -554,6 +554,7 @@
         @submit="submitPlanApproval"
         @minimize="minimizePlanApprovalDialog"
       />
+      <SandboxSetupDialog />
       <transition name="overlay-fade">
         <VersioningDialog
           v-if="versioningDialogOpen"

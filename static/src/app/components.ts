@@ -33,6 +33,9 @@ const UserQuestionDialog = defineAsyncComponent(
 const PlanApprovalDialog = defineAsyncComponent(
   () => import('../components/overlay/PlanApprovalDialog.vue')
 );
+const SandboxSetupDialog = defineAsyncComponent(
+  () => import('../components/overlay/SandboxSetupDialog.vue')
+);
 const TutorialOverlay = defineAsyncComponent(
   () => import('../components/overlay/TutorialOverlay.vue')
 );
@@ -66,6 +69,7 @@ export const appComponents = {
   VersioningDialog,
   UserQuestionDialog,
   PlanApprovalDialog,
+  SandboxSetupDialog,
   TutorialOverlay,
   NewUserTutorialPrompt,
   GoalProgressDialog,
