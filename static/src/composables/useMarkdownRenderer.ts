@@ -344,9 +344,11 @@ function transformMathBlocks(raw: string): string {
     return `<span class="math-block" data-latex="${escapeHtmlAttribute(trimmed)}" data-display="block"></span>`;
   });
 
-  // 行内 $...$（排除 $ 本身和反斜杠转义）
+  // 行内 $...$（Pandoc 规则：开 $ 后非空白、闭 $ 前非空白、闭 $ 后不跟数字，
+  // 避免把 "$10 ≈ ¥72 | $5" 这类相邻货币 $ 误配对成公式——配对区间若跨过
+  // 表格 | 分隔符，生成的占位 span 会被表格解析拦腰切断，显示为原始文本）
   protectedText = protectedText.replace(
-    /(?<![\\$])\$([^$\n]+?)\$(?![\\$])/g,
+    /(?<![\\$])\$(?!\s)([^$\n]+?)(?<!\s)\$(?![\\$\d])/g,
     (match, latex: string) => {
       const trimmed = latex.replace(/\s+/g, ' ').trim();
       if (!trimmed) return match;
