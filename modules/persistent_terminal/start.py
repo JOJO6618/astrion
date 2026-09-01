@@ -62,7 +62,7 @@ except ImportError:
         TERMINAL_SANDBOX_REQUIRE,
     )
 
-from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_uid_gid
+from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_uid_gid, docker_readonly_wrap_inner
 from modules.i18n import tr
 
 
@@ -268,7 +268,8 @@ class StartMixin:
             "exec",
             "-i",
         ]
-        if self.sandbox_options.get("docker_readonly_exec"):
+        readonly_exec = bool(self.sandbox_options.get("docker_readonly_exec"))
+        if readonly_exec:
             # 只读身份会话：与 run_command 只读执行同一非特权 uid（内核 DAC 强制）
             cmd += docker_readonly_exec_args()
         if container_workdir:
@@ -284,10 +285,15 @@ class StartMixin:
         for key, value in envs.items():
             cmd += ["-e", f"{key}={value}"]
 
-        cmd.append(container_name)
-        cmd.append(shell_path)
+        inner_cmd = [shell_path]
         if shell_path.endswith("sh"):
-            cmd.append("-i")
+            inner_cmd.append("-i")
+        if readonly_exec:
+            # Landlock 加固：可用时 shell 及其子进程全程处于工作区只读域；失败自动降级纯 DAC。
+            inner_cmd = docker_readonly_wrap_inner(container_name, mount_path, inner_cmd, docker_path)
+
+        cmd.append(container_name)
+        cmd.extend(inner_cmd)
 
         env = os.environ.copy()
         process = subprocess.Popen(

@@ -40,7 +40,7 @@ from modules.host_sandbox_runner import (
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
-from modules.docker_readonly_exec import docker_readonly_exec_args
+from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
 
 if TYPE_CHECKING:
@@ -187,9 +187,15 @@ class RunMixin:
                 if relative:
                     container_workdir = f"{container_workdir}/{relative}"
                 exec_cmd = [docker_bin, "exec"]
+                inner_cmd = ["/bin/bash", "-lc", command]
                 if not sandbox_write_access:
                     # 只读执行：非特权 uid（内核 DAC 强制只读，见 modules/docker_readonly_exec.py）
                     exec_cmd += docker_readonly_exec_args()
+                    # Landlock 加固：可用时再以进程级只读域封住工作区写（777/o+w 绕 DAC 的洞）；
+                    # 部署/自检有阻塞 docker 调用，放线程池；失败自动降级纯 DAC。
+                    inner_cmd = await asyncio.to_thread(
+                        docker_readonly_wrap_inner, container_name, mount_path, inner_cmd, docker_bin
+                    )
                 exec_cmd += [
                     "-e",
                     "PATH=/opt/agent-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -198,9 +204,7 @@ class RunMixin:
                     "-w",
                     container_workdir,
                     container_name,
-                    "/bin/bash",
-                    "-lc",
-                    command,
+                    *inner_cmd,
                 ]
                 use_shell = False
 

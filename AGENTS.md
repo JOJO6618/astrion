@@ -412,10 +412,14 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 只读权限的强制由各平台原生机制兜底；`config/limits.py` 的命令文本白名单（`_is_readonly_run_command_allowed`）只是**审批决策的启发式**，不再是安全边界（已知可绕过，如 `find . -delete`；绕过后果只是多走一次审批）。
 
-- **docker/web 模式 = 非特权 uid 执行角色**（`modules/docker_readonly_exec.py`）：
+- **docker/web 模式 = 非特权 uid 执行角色 + Landlock 进程级只读域**（`modules/docker_readonly_exec.py`）：
   - 容器主进程保持 root（可写执行不变）；`sandbox_write_access=False` 的执行通道（`terminal_ops/run.py`、`background_command_manager.py`、只读语境创建的持久终端）以 `-u 10001:10001` 运行，`DOCKER_READONLY_EXEC_UID/GID` 可覆盖
-  - 强制力 = 内核 DAC：工作区属主为宿主机 root，非属主无写权；600 权限文件（如 .env）不可读；逃逸需提权（setuid/内核漏洞），无 umount 类捷径
-  - 前提：工作区属主与该 uid 不碰撞、无 o+w 文件、容器未挂 docker.sock（云端已验证）；macOS Docker Desktop（virtiofs fakeowner）不执行 uid 权限，仅 Linux 宿主生效
+  - 第一层强制力 = 内核 DAC：工作区属主为宿主机 root，非属主无写权；600 权限文件（如 .env）不可读；逃逸需提权（setuid/内核漏洞），无 umount 类捷径
+  - **第二层 = Landlock 只读域**（2026-09 新增，云端实测 kernel 6.8 / ABI V4 / Docker 28 默认 seccomp 放行）：纯 DAC 的残留漏洞是工作区内历史遗留的 world-writable（777/o+w）路径对只读 uid 仍可写；只读执行时命令再经 `modules/landlock_launcher.py`（首次执行时 docker cp 进容器并自检）进入「工作区写类操作全拒」的内核域，最终权限 = DAC ∩ Landlock，该洞封死。要点：
+    - launcher 规则：handled 只含写类操作；ro 路径（工作区挂载点）不加规则（无覆盖即拒绝）；/tmp、/var/tmp、/dev/shm 显式授写权以对齐纯 DAC 现状行为（只读身份 HOME=/tmp）；读/执行不进 handled，仍由 DAC 管。注意不能写「/ 授全量 + ro 授空」的交集规则——空授权规则被内核拒绝（ENOMSG/errno 42）
+    - 自检失败（内核 <5.13 / seccomp 拦截 / 容器无 python3）自动降级纯 DAC，warning 日志标注 enforcement level；`DOCKER_READONLY_LANDLOCK=0` 可整体停用
+    - 语义边界：Landlock 不管 chmod/chown 等元数据修改，也不管未配置的网络——因此非特权 uid 层必须保留（root+Landlock 的进程可 chmod 放宽权限位让域外进程受益）
+  - 前提：工作区属主与该 uid 不碰撞、容器未挂 docker.sock（云端已验证）；macOS Docker Desktop 双重不适用（virtiofs fakeowner 不按 uid 检查；linuxkit 内核未编译 Landlock），仅 Linux 宿主生效
   - 持久终端在 readonly/approval/auto_approval 下同以只读身份创建（`terminal_readonly_enabled` 判定，`terminal_readonly_getter` 注入）；终端里的写入会被拒，写命令走 run_command 审批通道；权限跨界切换（受限档⇄unrestricted）时销毁现有终端会话重建（`_apply_restricted_execution_mode_link` → `close_all()`）
   - Dockerfile 创建 `agent` 用户 + `/etc/gitconfig` safe.directory + 去 setuid 加固；数字 uid 不依赖镜像内用户存在，旧镜像直接受益
 - **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：
