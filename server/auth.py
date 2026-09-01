@@ -441,17 +441,48 @@ def terminal_page():
     return current_app.send_static_file('terminal.html')
 
 
+def _resolve_serving_workspace_roots(user):
+    """返回 (uploads_dir, project_root)，供 /user_upload/ 与 /workspace/ 文件服务路由使用。
+
+    宿主机免登录模式（host_mode session）必须与 get_user_resources 走同一套
+    host_workspaces.json 解析：上传文件实际存放在宿主机工作区目录的
+    .astrion/user_upload 下。若误用 user_manager 的 users/<user>/projects/<id>
+    结构，会解析到一个空工作区，导致已上传文件 404（show_image 引用上传目录
+    图片时加载失败）。
+    """
+    host_mode_session = bool(session.get("host_mode"))
+    sandbox_is_host = (TERMINAL_SANDBOX_MODE or "").lower() == "host"
+    if host_mode_session and sandbox_is_host:
+        selected_workspace_id = session.get("host_workspace_id") or session.get("workspace_id")
+        active_workspace_path = None
+        if not selected_workspace_id:
+            with state.HOST_ACTIVE_WORKSPACE_LOCK:
+                selected_workspace_id = state.HOST_ACTIVE_WORKSPACE_ID
+                active_workspace_path = state.HOST_ACTIVE_WORKSPACE_PATH
+        _, host_workspace = resolve_host_workspace(selected_workspace_id)
+        if not host_workspace:
+            return None, None
+        if active_workspace_path:
+            host_workspace = dict(host_workspace)
+            host_workspace["path"] = active_workspace_path
+        project_root = Path(host_workspace.get("path") or "").expanduser().resolve()
+        return (project_root / ".astrion" / "user_upload").resolve(), project_root
+    workspace = state.user_manager.ensure_user_workspace(
+        user.username,
+        session.get("workspace_id") or "default",
+    )
+    return workspace.uploads_dir.resolve(), workspace.project_path.resolve()
+
+
 @auth_bp.route('/user_upload/<path:filename>')
 @login_required
 def serve_user_upload(filename: str):
     user = get_current_user_record()
     if not user:
         return redirect('/login')
-    workspace = state.user_manager.ensure_user_workspace(
-        user.username,
-        session.get("workspace_id") or "default",
-    )
-    uploads_dir = workspace.uploads_dir.resolve()
+    uploads_dir, _project_root = _resolve_serving_workspace_roots(user)
+    if not uploads_dir:
+        abort(404)
     target = (uploads_dir / filename).resolve()
     try:
         target.relative_to(uploads_dir)
@@ -468,11 +499,9 @@ def serve_workspace_file(filename: str):
     user = get_current_user_record()
     if not user:
         return redirect('/login')
-    workspace = state.user_manager.ensure_user_workspace(
-        user.username,
-        session.get("workspace_id") or "default",
-    )
-    project_root = workspace.project_path.resolve()
+    _uploads_dir, project_root = _resolve_serving_workspace_roots(user)
+    if not project_root:
+        abort(404)
     target = (project_root / filename).resolve()
     try:
         target.relative_to(project_root)
