@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Local Android/IDE state
+local.properties
+.idea/
+.gradle/
+
+# Build outputs
+build/
+**/build/
+
+# Signing keys and secrets
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# Release artifacts
+*.apk
+*.aab
+*.apks
+*.dm
+app/release/

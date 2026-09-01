@@ -305,8 +305,10 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
    - `android-webview-app/APP_CHANGELOG.md`：在顶部新增当前版本说明
 3. 完成修改后提醒用户运行上传脚本  
    - 在发布流程中运行：`bash ./upload_android_apk.sh`（本地私有脚本，未随仓库发布）
+   - 脚本除上传 APK 外，还会同步 `app/build.gradle.kts` 与 `APP_CHANGELOG.md` 到服务器（2026-09-02 修复）
 
 > 禁止只改前端代码而不更新版本号/更新说明，否则会导致客户端更新提示与分发信息不一致。
+> 服务端 `/api/app/version` 的版本号是从服务器文件系统上的 `build.gradle.kts` 解析的（实现见 `server/status/docker.py`），**不是从 APK 包解析**——只传 APK 不同步元数据文件会导致 App 检测不到新版本。
 
 ## 9) 给 Agent 的硬性要求
 

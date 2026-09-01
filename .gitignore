@@ -80,7 +80,6 @@ research/
 # 含私人信息 / 个人工作流约定（脱敏前不进仓库）
 CLAUDE.md
 api_doc/
-android-webview-app/
 config/host_workspaces.json.example
 upload_android_apk.sh
 scripts/zip_agents.sh
