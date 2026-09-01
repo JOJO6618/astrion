@@ -1855,7 +1855,8 @@ async def handle_task_with_sender(
                 web_terminal,
                 conv_id,
                 message,
-                username
+                username,
+                personal_config.get("title_model", "")
             )
 
     # 自动深层压缩（用户输入后触发）

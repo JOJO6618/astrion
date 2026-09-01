@@ -874,14 +874,16 @@ watch(
     if (isVisible && tab === 'review-agents') {
       loadSubAgentModels();
     }
-    if (
-      isVisible &&
-      tab === 'general' &&
-      isAppShell.value &&
-      !appUpdateInfo.value &&
-      !appUpdateChecking.value
-    ) {
-      checkAppUpdate();
+    if (isVisible && tab === 'general') {
+      // 「标题生成模型」菜单复用子智能体模型库，需在常规页签也加载模型列表
+      loadSubAgentModels();
+      if (
+        isAppShell.value &&
+        !appUpdateInfo.value &&
+        !appUpdateChecking.value
+      ) {
+        checkAppUpdate();
+      }
     }
   }
 );

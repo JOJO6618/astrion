@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +10,6 @@ from typing import Any, Dict, List, Optional
 from core.web_terminal import WebTerminal
 from config import LOGS_DIR
 from utils.api_client import APIClient
-from config.model_profiles import get_default_model_key, get_model_profile
 
 TITLE_DEBUG_DIR = Path(LOGS_DIR).expanduser().resolve() / "title_debug"
 TITLE_DEBUG_FILE = TITLE_DEBUG_DIR / "title_generation.log"
@@ -32,44 +30,33 @@ def _title_debug_log(message: str, **extra: Any) -> None:
         pass
 
 
-def _env_optional(name: str) -> Optional[str]:
-    """从环境变量获取可选配置（已由 config/__init__.py 统一注入）。"""
-    value = os.environ.get(name)
-    if value is None:
-        return None
-    value = value.strip()
-    return value or None
-
-
 async def _generate_title_async(
     user_message: str,
     title_prompt_path,
     debug_logger,
+    model_profile: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
-    """使用快速模型生成对话标题。"""
+    """使用子智能体模型生成对话标题。
+
+    model_profile 来自个人空间「标题生成模型」配置解析出的子智能体模型库条目
+    （未配置时为模型库 default_model）。个人空间是唯一配置来源：不使用主智能体
+    默认模型，也不支持 AGENT_TITLE_* 环境变量覆盖；profile 缺失或应用失败时
+    直接放弃生成（带日志），不做其他回退。
+    """
     if not user_message:
         _title_debug_log("skip_empty_user_message")
         return None
 
     client = APIClient(thinking_mode=False, web_mode=True)
+    if not model_profile:
+        _title_debug_log("title_model_profile_missing")
+        return None
     try:
-        default_model = get_default_model_key()
-        client.model_key = default_model
-        client.apply_profile(get_model_profile(default_model))
+        client.apply_profile(model_profile)
+        _title_debug_log("title_model_profile_applied", model_name=model_profile.get("name"))
     except Exception as exc:
-        _title_debug_log("default_title_model_profile_failed", error=str(exc))
-    title_base = _env_optional("AGENT_TITLE_API_BASE_URL")
-    title_key = _env_optional("AGENT_TITLE_API_KEY")
-    title_model = _env_optional("AGENT_TITLE_MODEL_ID")
-    if title_base:
-        client.fast_api_config["base_url"] = title_base
-        client.api_base_url = title_base
-    if title_key:
-        client.fast_api_config["api_key"] = title_key
-        client.api_key = title_key
-    if title_model:
-        client.fast_api_config["model_id"] = title_model
-        client.model_id = title_model
+        _title_debug_log("title_model_profile_failed", error=str(exc), model_name=model_profile.get("name"))
+        return None
     _title_debug_log("start_generate_title", user_message_preview=str(user_message)[:200], user_message_len=len(str(user_message)))
     _title_debug_log(
         "title_api_config",
@@ -118,13 +105,27 @@ def generate_conversation_title_background(
     socketio_instance,
     title_prompt_path,
     debug_logger,
+    title_model: str = "",
 ):
-    """在后台生成对话标题并更新索引、推送给前端。"""
+    """在后台生成对话标题并更新索引、推送给前端。
+
+    title_model 为个人空间配置的子智能体模型条目名（空 = 子智能体模型库
+    default_model）。个人空间是唯一配置来源。
+    """
     if not conversation_id or not user_message:
         return
 
     async def _runner():
-        title = await _generate_title_async(user_message, title_prompt_path, debug_logger)
+        try:
+            from modules.review_agent_config import resolve_sub_agent_model_profile
+            # 未配置（空）时回落子智能体模型库 default_model，个人空间为唯一配置来源
+            model_profile = resolve_sub_agent_model_profile(title_model)
+        except Exception:
+            model_profile = None
+        if model_profile is None:
+            _title_debug_log("title_model_profile_unavailable", title_model=title_model, conversation_id=conversation_id)
+            return
+        title = await _generate_title_async(user_message, title_prompt_path, debug_logger, model_profile=model_profile)
         if not title:
             _title_debug_log("title_not_generated", conversation_id=conversation_id, username=username)
             return

@@ -18,7 +18,7 @@ from config import DATA_DIR
 from config.sub_agent import SUB_AGENT_MODELS_CONFIG_FILE
 from modules.personalization_manager import REVIEW_AGENT_KEYS
 
-__all__ = ["resolve_review_agent_config", "REVIEW_AGENT_KEYS"]
+__all__ = ["resolve_review_agent_config", "resolve_sub_agent_model_profile", "REVIEW_AGENT_KEYS"]
 
 
 def _load_model_entry(model_name: str) -> Dict[str, Any]:
@@ -50,6 +50,15 @@ def _load_model_entry(model_name: str) -> Dict[str, Any]:
     if chosen not in model_map and model_map:
         chosen = next(iter(model_map))
     return model_map.get(chosen)
+
+
+def resolve_sub_agent_model_profile(model_name: str) -> Dict[str, Any]:
+    """按名称从子智能体模型库解析模型 profile（APIClient.apply_profile 格式）。
+
+    名称留空或不存在时回落模型库 default_model（模型库也不可用时返回 None，
+    由调用方决定兜底行为）。
+    """
+    return _load_model_entry(str(model_name).strip() if model_name and str(model_name).strip() else "")
 
 
 def resolve_review_agent_config(agent_key: str) -> Dict[str, Any]:

@@ -94,6 +94,8 @@ interface PersonalForm {
   communication_style: CommunicationStyle;
   conversation_continuity: ConversationContinuity;
   auto_generate_title: boolean;
+  /** 标题生成模型（子智能体模型库条目名）；留空 = 模型库 default_model */
+  title_model: string;
   recent_conversations_prompt_enabled: boolean;
   recent_conversations_prompt_limit: number | string;
   project_memory_inject_limit: number | string | null;
@@ -300,6 +302,7 @@ const defaultForm = (): PersonalForm => ({
   communication_style: 'default',
   conversation_continuity: 'medium',
   auto_generate_title: true,
+  title_model: '',
   recent_conversations_prompt_enabled: false,
   recent_conversations_prompt_limit: DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT,
   project_memory_inject_limit: DEFAULT_PROJECT_MEMORY_INJECT_LIMIT,
@@ -515,6 +518,7 @@ export const usePersonalizationStore = defineStore('personalization', {
             ? data.conversation_continuity
             : 'medium',
         auto_generate_title: data.auto_generate_title !== false,
+        title_model: typeof data.title_model === 'string' ? data.title_model : '',
         recent_conversations_prompt_enabled: !!data.recent_conversations_prompt_enabled,
         recent_conversations_prompt_limit: this.normalizeRecentConversationsPromptLimit(
           data.recent_conversations_prompt_limit

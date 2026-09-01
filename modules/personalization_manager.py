@@ -82,6 +82,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "default_permission_mode": "unrestricted",
     "default_work_mode": "plan",  # 默认运行模式：plan / ask / execute
     "auto_generate_title": True,
+    "title_model": "",  # 对话标题生成使用的子智能体模型条目名（空=跟随主对话默认模型）
     "recent_conversations_prompt_enabled": False,
     "recent_conversations_prompt_limit": RECENT_CONVERSATIONS_PROMPT_LIMIT_DEFAULT,
     "project_memory_inject_limit": PROJECT_MEMORY_INJECT_LIMIT_DEFAULT,  # 项目记忆索引最大注入条数：None-无上限 / >=5-该值
@@ -278,6 +279,7 @@ def sanitize_personalization_payload(
         else "medium"
     )
     base["auto_generate_title"] = bool(data.get("auto_generate_title", base["auto_generate_title"]))
+    base["title_model"] = str(data.get("title_model", base.get("title_model", "")) or "").strip()
     base["recent_conversations_prompt_enabled"] = bool(
         data.get("recent_conversations_prompt_enabled", base.get("recent_conversations_prompt_enabled", False))
     )

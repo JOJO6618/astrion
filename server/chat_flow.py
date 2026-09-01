@@ -112,7 +112,7 @@ from modules.i18n import tr
 conversation_bp = Blueprint('conversation', __name__)
 
 
-def generate_conversation_title_background(web_terminal: WebTerminal, conversation_id: str, user_message: str, username: str):
+def generate_conversation_title_background(web_terminal: WebTerminal, conversation_id: str, user_message: str, username: str, title_model: str = ""):
     """在后台生成对话标题并更新索引、推送给前端。"""
     return _generate_conversation_title_background(
         web_terminal=web_terminal,
@@ -122,6 +122,7 @@ def generate_conversation_title_background(web_terminal: WebTerminal, conversati
         socketio_instance=socketio,
         title_prompt_path=TITLE_PROMPT_PATH,
         debug_logger=debug_log,
+        title_model=title_model,
     )
 
 

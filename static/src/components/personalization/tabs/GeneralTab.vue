@@ -32,6 +32,10 @@ const sandboxShowWizard = computed(() => {
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
+  activeDropdown,
+  activeTheme,
+  closeDropdown,
+  floatingMenuStyle,
   personalization,
   form,
   startTutorial,
@@ -42,7 +46,9 @@ const {
   appUpdateStateText,
   appUpdateChecking,
   checkAppUpdate,
-  downloadLatestApp
+  downloadLatestApp,
+  subAgentModels,
+  toggleDropdown
 } = ctx;
 </script>
 
@@ -65,6 +71,52 @@ const {
       />
       <FancyCheck :checked="form.auto_generate_title" />
     </label>
+
+    <!-- 标题生成模型：复用子智能体模型库配置（个人空间为唯一配置来源） -->
+    <div class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.titleModelTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.titleModelDesc') }}</span>
+      </span>
+      <div
+        class="settings-select-wrap"
+        :class="{ open: activeDropdown === 'title-model' }"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="settings-select-button"
+          @click="toggleDropdown('title-model')"
+        >
+          {{ form.title_model || $t('personalization.defaultModelOption') }}
+          <span class="select-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+          :style="activeDropdown === 'title-model' ? floatingMenuStyle : undefined"
+        >
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: !form.title_model }"
+            @click="personalization.updateField({ key: 'title_model', value: '' }); closeDropdown()"
+          >
+            <strong>{{ $t('personalization.defaultModelOption') }}</strong><span>{{ $t('personalization.titleDefaultModelDesc') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+          <button
+            v-for="m in subAgentModels"
+            :key="m.name"
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.title_model === m.name }"
+            @click="personalization.updateField({ key: 'title_model', value: m.name }); closeDropdown()"
+          >
+            <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || $t('personalization.textOnly') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="settings-action-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('personalization.tutorialTitle') }}</span>
