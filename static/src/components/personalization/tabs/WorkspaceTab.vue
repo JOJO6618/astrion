@@ -1,8 +1,30 @@
 <script setup lang="ts">
-import { inject } from 'vue';
+import { computed, inject, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import FancyCheck from '@/components/common/FancyCheck.vue';
+import { useSandboxSetupStore } from '@/stores/sandboxSetup';
 
 defineOptions({ name: 'WorkspaceTab' });
+
+const { t } = useI18n();
+const sandboxSetup = useSandboxSetupStore();
+
+// 沙箱环境区块：进入工作区与权限页时补一次检测（复用 store 内部防抖）
+onMounted(() => {
+  if (!sandboxSetup.status) void sandboxSetup.fetchStatus();
+});
+
+const sandboxStatusText = computed(() => {
+  const s = sandboxSetup.status;
+  if (!s || sandboxSetup.checking) return t('sandbox.sectionChecking');
+  if (!s.applicable) return t('sandbox.sectionUnavailable');
+  return s.state === 'ready' ? t('sandbox.sectionReady') : t('sandbox.sectionMissing');
+});
+
+const sandboxShowWizard = computed(() => {
+  const s = sandboxSetup.status;
+  return !!s && s.applicable && s.state !== 'ready';
+});
 
 /**
  * 共享上下文由 PersonalizationDrawer.vue 通过 provide 注入。
@@ -13,23 +35,17 @@ const {
   activeDropdown,
   floatingMenuStyle,
   form,
-  goalTokenLimitEnabled,
   permissionModeLabel,
   personalization,
   selectDefaultPermissionMode,
   selectDefaultWorkMode,
   selectVersioningBackupMode,
   toggleDropdown,
-  toggleGoalTokenLimit,
   versioningBackupModeLabel,
   workModeLabel,
   permissionModeOptions,
   workModeOptions,
-  // 清单外顶层绑定（模板引用）：activeTheme 已在 drawerContext 中提供；
-  // clampGoalMaxTurns / clampGoalMaxTokens 为顶层 const 但当前不在 drawerContext 内（详见 report.md）
-  activeTheme,
-  clampGoalMaxTurns,
-  clampGoalMaxTokens
+  activeTheme
 } = ctx;
 </script>
 
@@ -74,7 +90,7 @@ const {
                       </div>
                       <div class="settings-select-row">
                         <span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.defaultRunModeTitle') }}</span
+                          ><span class="settings-row-title">{{ $t('personalization.defaultWorkModeTitle') }}</span
                           ><span class="settings-row-desc"
                             >{{ $t('personalization.workRunModeDesc') }}</span
                           ></span
@@ -111,6 +127,45 @@ const {
                           </div>
                         </div>
                       </div>
+                      <div class="settings-action-row sandbox-env-row">
+                        <span class="settings-row-copy">
+                          <span class="settings-row-title">{{ $t('sandbox.sectionTitle') }}</span>
+                          <span class="settings-row-desc">{{ $t('sandbox.sectionDesc') }}</span>
+                        </span>
+                        <div class="settings-inline-actions">
+                          <span class="settings-mini-status" :class="{ warning: sandboxShowWizard }">{{
+                            sandboxStatusText
+                          }}</span>
+                          <span v-if="sandboxSetup.neverAsk" class="settings-mini-status">{{
+                            $t('sandbox.neverAgainSet')
+                          }}</span>
+                          <button
+                            v-if="sandboxSetup.neverAsk"
+                            type="button"
+                            class="settings-secondary-button"
+                            @click="sandboxSetup.resetNeverAsk()"
+                          >
+                            {{ $t('sandbox.resetNeverAgain') }}
+                          </button>
+                          <button
+                            type="button"
+                            class="settings-secondary-button"
+                            :disabled="sandboxSetup.checking"
+                            @click="sandboxSetup.recheck()"
+                          >
+                            {{ sandboxSetup.checking ? $t('common.refreshing') : $t('sandbox.recheck') }}
+                          </button>
+                          <button
+                            v-if="sandboxShowWizard"
+                            type="button"
+                            class="settings-primary-button"
+                            @click="sandboxSetup.openWizard()"
+                          >
+                            {{ $t('sandbox.openWizard') }}
+                          </button>
+                        </div>
+                      </div>
+
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
                           ><span class="settings-row-title">{{ $t('personalization.agentsMdInjectTitle') }}</span
@@ -241,77 +296,18 @@ const {
                         </div>
                       </div>
 
-                      <div class="settings-section-divider">
-                        <span class="settings-section-divider__label">{{ $t('personalization.goalModeDivider') }}</span>
-                      </div>
-
-                      <label class="settings-toggle-row"
-                        ><span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.goalReviewActiveTitle') }}</span
-                          ><span class="settings-row-desc"
-                            >{{ $t('personalization.goalReviewActiveDesc') }}</span
-                          ></span
-                        ><input
-                          type="checkbox"
-                          :checked="form.goal_review_mode === 'active'"
-                          @change="
-                            personalization.updateField({
-                              key: 'goal_review_mode',
-                              value: $event.target.checked ? 'active' : 'readonly'
-                            })
-                          " /><FancyCheck :checked="form.goal_review_mode === 'active'" /></label>
-
-                      <div class="settings-select-row">
-                        <span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.goalMaxTurnsTitle') }}</span
-                          ><span class="settings-row-desc"
-                            >{{ $t('personalization.goalMaxTurnsDesc') }}</span
-                          ></span
-                        >
-                        <input
-                          type="number"
-                          class="settings-number-input"
-                          min="1"
-                          max="100"
-                          :value="form.goal_max_turns"
-                          @change="
-                            personalization.updateField({
-                              key: 'goal_max_turns',
-                              value: clampGoalMaxTurns($event.target.value)
-                            })
-                          "
-                        />
-                      </div>
-
-                      <label class="settings-toggle-row"
-                        ><span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.goalTokenLimitTitle') }}</span
-                          ><span class="settings-row-desc"
-                            >{{ $t('personalization.goalTokenLimitDesc') }}</span
-                          ></span
-                        ><input
-                          type="checkbox"
-                          :checked="goalTokenLimitEnabled"
-                          @change="toggleGoalTokenLimit($event.target.checked)" /><FancyCheck :checked="goalTokenLimitEnabled" /></label>
-
-                      <div v-if="goalTokenLimitEnabled" class="settings-select-row">
-                        <span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.goalTokenLimitValueTitle') }}</span
-                          ><span class="settings-row-desc">{{ $t('personalization.goalTokenLimitValueDesc') }}</span></span
-                        >
-                        <input
-                          type="number"
-                          class="settings-number-input"
-                          min="1000"
-                          step="1000"
-                          :value="form.goal_max_tokens || 100000"
-                          @change="
-                            personalization.updateField({
-                              key: 'goal_max_tokens',
-                              value: clampGoalMaxTokens($event.target.value)
-                            })
-                          "
-                        />
-                      </div>
   </section>
 </template>
+
+<style scoped>
+/* 沙箱环境区块：上下结构（标题描述在上，状态徽标与按钮组整行在下），
+   避免默认左右结构中右侧按钮组挤压左侧文案空间 */
+.sandbox-env-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.sandbox-env-row .settings-inline-actions {
+  justify-content: flex-start;
+}
+</style>

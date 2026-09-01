@@ -477,10 +477,11 @@ const TUTORIAL_STEP_DEFS: TutorialStepDef[] = [
     placement: 'right'
   },
   {
+    // 用量统计已并入「常规」页签，锚点指向 general
     id: 'tab-usage',
     titleKey: 'tutorial.tabUsageTitle',
     descriptionKey: 'tutorial.tabUsageDesc',
-    target: '[data-tutorial="personal-tab-usage"]',
+    target: '[data-tutorial="personal-tab-general"]',
     mode: 'info',
     autoClick: true,
     placement: 'right'

@@ -131,8 +131,6 @@
 
                     <FilesTab v-else-if="activeTab === 'files'" key="files" />
 
-                    <DataTab v-else-if="activeTab === 'data'" key="data" />
-
                     <VoiceTab v-else-if="activeTab === 'voice'" key="voice" />
 
                     <SubAgentsTab v-else-if="activeTab === 'sub-agents'" key="sub-agents" />
@@ -174,7 +172,6 @@ import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ContextTab from './tabs/ContextTab.vue';
 import ToolsTab from './tabs/ToolsTab.vue';
 import FilesTab from './tabs/FilesTab.vue';
-import DataTab from './tabs/DataTab.vue';
 import VoiceTab from './tabs/VoiceTab.vue';
 import SubAgentsTab from './tabs/SubAgentsTab.vue';
 import ReviewAgentsTab from './tabs/ReviewAgentsTab.vue';
@@ -251,7 +248,6 @@ type PersonalTab =
   | 'context'
   | 'tools'
   | 'files'
-  | 'data'
   | 'voice'
   | 'sub-agents'
   | 'review-agents'
@@ -266,7 +262,6 @@ const baseTabs = [
   { id: 'context', labelKey: 'personalization.tabContext', icon: 'chatBubble' },
   { id: 'tools', labelKey: 'personalization.tabTools', icon: 'wrench' },
   { id: 'files', labelKey: 'personalization.tabFiles', icon: 'file' },
-  { id: 'data', labelKey: 'personalization.tabData', icon: 'layers' },
   { id: 'voice', labelKey: 'personalization.tabVoice', icon: 'mic' },
   { id: 'sub-agents', labelKey: 'personalization.tabSubAgents', icon: 'bot' },
   { id: 'review-agents', labelKey: 'personalization.tabReviewAgents', icon: 'checkbox' }
@@ -863,9 +858,6 @@ onMounted(async () => {
 watch(
   () => [activeTab.value, visible.value],
   ([tab, isVisible]) => {
-    if (isVisible && tab === 'data') {
-      fetchUsageSummary();
-    }
     if (isVisible && tab === 'sub-agents') {
       loadSubAgentRoles();
       loadSubAgentSettings();
@@ -874,9 +866,13 @@ watch(
     if (isVisible && tab === 'review-agents') {
       loadSubAgentModels();
     }
-    if (isVisible && tab === 'general') {
-      // 「标题生成模型」菜单复用子智能体模型库，需在常规页签也加载模型列表
+    if (isVisible && tab === 'model') {
+      // 「标题生成模型」菜单复用子智能体模型库，需在模型页签加载模型列表
       loadSubAgentModels();
+    }
+    if (isVisible && tab === 'general') {
+      // 用量统计已并入常规页签，切到时拉取一次
+      fetchUsageSummary();
       if (
         isAppShell.value &&
         !appUpdateInfo.value &&

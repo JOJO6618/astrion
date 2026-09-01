@@ -20,11 +20,6 @@ const {
   activeTheme,
   communicationStyleLabel,
   conversationContinuityLabel,
-  currentBlockDisplayMode,
-  stackedHideBorders,
-  handleStackedHideBordersChange,
-  minimalExpandHeightLimited,
-  handleMinimalExpandHeightLimitedChange,
   selectCommunicationStyle,
   selectConversationContinuity
 } = ctx;
@@ -96,6 +91,21 @@ const {
                           @focus="personalization.clearFeedback()"
                         />
                       </label>
+                      <label class="settings-toggle-row"
+                        ><span class="settings-row-copy"
+                          ><span class="settings-row-title">{{ $t('personalization.useCustomNamesTitle') }}</span
+                          ><span class="settings-row-desc"
+                            >{{ $t('personalization.useCustomNamesDesc') }}</span
+                          ></span
+                        ><input
+                          type="checkbox"
+                          :checked="form.use_custom_names"
+                          @change="
+                            personalization.updateField({
+                              key: 'use_custom_names',
+                              value: $event.target.checked
+                            })
+                          " /><FancyCheck :checked="form.use_custom_names" /></label>
                       <div class="settings-input-row stackable">
                         <span class="settings-row-title">{{ $t('personalization.toneTitle') }}</span>
                         <div class="settings-input-stack">
@@ -138,36 +148,6 @@ const {
                           @focus="personalization.clearFeedback()"
                         ></textarea>
                       </div>
-                      <label
-                        v-if="currentBlockDisplayMode === 'stacked'"
-                        class="settings-toggle-row"
-                      >
-                        <span class="settings-row-copy">
-                          <span class="settings-row-title">{{ $t('personalization.hideBlockBordersTitle') }}</span>
-                          <span class="settings-row-desc">{{ $t('personalization.hideBlockBordersDesc') }}</span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          :checked="stackedHideBorders"
-                          @change="handleStackedHideBordersChange($event)"
-                        />
-                        <FancyCheck :checked="stackedHideBorders" />
-                      </label>
-                      <label
-                        v-if="currentBlockDisplayMode === 'minimal'"
-                        class="settings-toggle-row"
-                      >
-                        <span class="settings-row-copy">
-                          <span class="settings-row-title">{{ $t('personalization.minimalExpandHeightTitle') }}</span>
-                          <span class="settings-row-desc">{{ $t('personalization.minimalExpandHeightDesc') }}</span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          :checked="minimalExpandHeightLimited"
-                          @change="handleMinimalExpandHeightLimitedChange($event)"
-                        />
-                        <FancyCheck :checked="minimalExpandHeightLimited" />
-                      </label>
                       <div class="settings-select-row">
                         <span class="settings-row-copy">
                           <span class="settings-row-title">{{ $t('personalization.communicationStyleTitle') }}</span>

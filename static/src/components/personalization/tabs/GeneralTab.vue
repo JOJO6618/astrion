@@ -1,30 +1,8 @@
 <script setup lang="ts">
-import { computed, inject, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { inject } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
-import { useSandboxSetupStore } from '@/stores/sandboxSetup';
 
 defineOptions({ name: 'GeneralTab' });
-
-const { t } = useI18n();
-const sandboxSetup = useSandboxSetupStore();
-
-// 沙箱环境区块：进入通用页时补一次检测（复用 store 内部防抖）
-onMounted(() => {
-  if (!sandboxSetup.status) void sandboxSetup.fetchStatus();
-});
-
-const sandboxStatusText = computed(() => {
-  const s = sandboxSetup.status;
-  if (!s || sandboxSetup.checking) return t('sandbox.sectionChecking');
-  if (!s.applicable) return t('sandbox.sectionUnavailable');
-  return s.state === 'ready' ? t('sandbox.sectionReady') : t('sandbox.sectionMissing');
-});
-
-const sandboxShowWizard = computed(() => {
-  const s = sandboxSetup.status;
-  return !!s && s.applicable && s.state !== 'ready';
-});
 
 /**
  * 共享上下文由 PersonalizationDrawer.vue 通过 provide 注入。
@@ -32,10 +10,6 @@ const sandboxShowWizard = computed(() => {
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  activeDropdown,
-  activeTheme,
-  closeDropdown,
-  floatingMenuStyle,
   personalization,
   form,
   startTutorial,
@@ -47,8 +21,12 @@ const {
   appUpdateChecking,
   checkAppUpdate,
   downloadLatestApp,
-  subAgentModels,
-  toggleDropdown
+  fetchUsageSummary,
+  formatTokenCount,
+  usageError,
+  usageLoading,
+  usageSummary,
+  usageUpdatedText
 } = ctx;
 </script>
 
@@ -71,51 +49,6 @@ const {
       />
       <FancyCheck :checked="form.auto_generate_title" />
     </label>
-
-    <!-- 标题生成模型：复用子智能体模型库配置（个人空间为唯一配置来源） -->
-    <div class="settings-select-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.titleModelTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.titleModelDesc') }}</span>
-      </span>
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'title-model' }"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="settings-select-button"
-          @click="toggleDropdown('title-model')"
-        >
-          {{ form.title_model || $t('personalization.defaultModelOption') }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown === 'title-model' ? floatingMenuStyle : undefined"
-        >
-          <button
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: !form.title_model }"
-            @click="personalization.updateField({ key: 'title_model', value: '' }); closeDropdown()"
-          >
-            <strong>{{ $t('personalization.defaultModelOption') }}</strong><span>{{ $t('personalization.titleDefaultModelDesc') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-          <button
-            v-for="m in subAgentModels"
-            :key="m.name"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.title_model === m.name }"
-            @click="personalization.updateField({ key: 'title_model', value: m.name }); closeDropdown()"
-          >
-            <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || $t('personalization.textOnly') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
-      </div>
-    </div>
 
     <div class="settings-action-row">
       <span class="settings-row-copy">
@@ -158,44 +91,68 @@ const {
         </button>
       </div>
     </div>
-    <div class="settings-action-row sandbox-env-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('sandbox.sectionTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('sandbox.sectionDesc') }}</span>
-      </span>
-      <div class="settings-inline-actions">
-        <span class="settings-mini-status" :class="{ warning: sandboxShowWizard }">{{
-          sandboxStatusText
-        }}</span>
-        <span v-if="sandboxSetup.neverAsk" class="settings-mini-status">{{
-          $t('sandbox.neverAgainSet')
-        }}</span>
-        <button
-          v-if="sandboxSetup.neverAsk"
-          type="button"
-          class="settings-secondary-button"
-          @click="sandboxSetup.resetNeverAsk()"
-        >
-          {{ $t('sandbox.resetNeverAgain') }}
-        </button>
-        <button
-          type="button"
-          class="settings-secondary-button"
-          :disabled="sandboxSetup.checking"
-          @click="sandboxSetup.recheck()"
-        >
-          {{ sandboxSetup.checking ? $t('common.refreshing') : $t('sandbox.recheck') }}
-        </button>
-        <button
-          v-if="sandboxShowWizard"
-          type="button"
-          class="settings-primary-button"
-          @click="sandboxSetup.openWizard()"
-        >
-          {{ $t('sandbox.openWizard') }}
-        </button>
+
+    <!-- 用量统计（原「数据管理」页签并入常规） -->
+    <div class="usage-summary-block" data-tutorial="personal-page-usage">
+      <div class="usage-summary-card settings-stats-card">
+        <div class="usage-summary-header">
+          <div>
+            <p class="usage-summary-eyebrow">{{ $t('personalization.usageEyebrow') }}</p>
+            <h3>{{ $t('personalization.usageTitle') }}</h3>
+            <p class="usage-summary-desc">{{ $t('personalization.usageDesc') }}
+            </p>
+          </div>
+        </div>
+        <div class="usage-summary-grid usage-summary-grid--tokens">
+          <div class="usage-summary-item">
+            <div class="label">{{ $t('personalization.usageInputLabel') }}</div>
+            <div class="value value--success">
+              {{ formatTokenCount(usageSummary.total_input_tokens) }}
+            </div>
+          </div>
+          <div class="usage-summary-item">
+            <div class="label">{{ $t('personalization.usageOutputLabel') }}</div>
+            <div class="value value--warning">
+              {{ formatTokenCount(usageSummary.total_output_tokens) }}
+            </div>
+          </div>
+        </div>
+        <div class="usage-summary-grid usage-summary-grid--counts">
+          <div class="usage-summary-item">
+            <div class="label">{{ $t('personalization.usageConversationsLabel') }}</div>
+            <div class="value">
+              {{ formatTokenCount(usageSummary.total_conversations) }}
+            </div>
+          </div>
+          <div class="usage-summary-item">
+            <div class="label">{{ $t('personalization.usageMessagesLabel') }}</div>
+            <div class="value">
+              {{ formatTokenCount(usageSummary.total_user_messages) }}
+            </div>
+          </div>
+          <div class="usage-summary-item">
+            <div class="label">{{ $t('personalization.usageToolsLabel') }}</div>
+            <div class="value">
+              {{ formatTokenCount(usageSummary.total_tools) }}
+            </div>
+          </div>
+        </div>
+        <div class="usage-summary-meta">
+          <span v-if="usageError" class="usage-summary-error">{{ usageError }}</span
+          ><span v-else-if="usageLoading">{{ $t('personalization.usageSyncing') }}</span
+          ><span v-else>{{ $t('personalization.usageUpdated', { time: usageUpdatedText }) }}</span
+          ><button
+            type="button"
+            class="usage-summary-refresh"
+            @click="fetchUsageSummary"
+            :disabled="usageLoading"
+          >
+            {{ usageLoading ? $t('personalization.usageRefreshing') : $t('personalization.usageRefresh') }}
+          </button>
+        </div>
       </div>
     </div>
+
     <div class="settings-action-row danger-zone">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('personalization.logoutTitle') }}</span>
@@ -213,14 +170,97 @@ const {
 </template>
 
 <style scoped>
-/* 沙箱环境区块：上下结构（标题描述在上，状态徽标与按钮组整行在下），
-   避免默认左右结构中右侧按钮组挤压左侧文案空间 */
-.sandbox-env-row {
-  grid-template-columns: minmax(0, 1fr);
+.usage-summary-block {
+  display: block;
+}
+
+.settings-stats-card,
+.usage-summary-card {
+  width: 100%;
+  max-width: 720px;
+  padding: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.usage-summary-header h3 {
+  margin: 4px 0 6px;
+  font-size: 20px;
+}
+
+.usage-summary-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  color: var(--accent-strong);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.usage-summary-desc,
+.usage-summary-note,
+.usage-summary-meta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.usage-summary-grid {
+  display: grid;
   gap: 10px;
 }
 
-.sandbox-env-row .settings-inline-actions {
-  justify-content: flex-start;
+.usage-summary-grid--tokens {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.usage-summary-grid--counts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.usage-summary-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--theme-control-border);
+  background: transparent;
+}
+
+.usage-summary-item .label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.usage-summary-item .value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.usage-summary-item .value--success {
+  color: var(--state-success);
+}
+
+.usage-summary-item .value--warning {
+  color: var(--state-warning);
+}
+
+.usage-summary-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.usage-summary-refresh {
+  border: 1px solid var(--theme-control-border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
 }
 </style>

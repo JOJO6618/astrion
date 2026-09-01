@@ -147,21 +147,6 @@ const {
                           " /><FancyCheck :checked="form.new_chat_button_behavior === 'route'" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.useCustomNamesTitle') }}</span
-                          ><span class="settings-row-desc"
-                            >{{ $t('personalization.useCustomNamesDesc') }}</span
-                          ></span
-                        ><input
-                          type="checkbox"
-                          :checked="form.use_custom_names"
-                          @change="
-                            personalization.updateField({
-                              key: 'use_custom_names',
-                              value: $event.target.checked
-                            })
-                          " /><FancyCheck :checked="form.use_custom_names" /></label>
-                      <label class="settings-toggle-row"
-                        ><span class="settings-row-copy"
                           ><span class="settings-row-title">{{ $t('personalization.enhancedToolDisplayTitle') }}</span
                           ><span class="settings-row-desc"
                             >{{ $t('personalization.enhancedToolDisplayDesc') }}</span
