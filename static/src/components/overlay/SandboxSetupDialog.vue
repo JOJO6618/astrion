@@ -9,17 +9,9 @@
       >
         <header class="sandbox-setup-windowbar">
           <div class="sandbox-setup-window-title">{{ $t('sandbox.setupTitle') }}</div>
-          <button
-            type="button"
-            class="sandbox-setup-close"
-            :title="$t('common.close')"
-            :aria-label="$t('common.close')"
-            @click="onClose"
-          >
-            <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 5l10 10M15 5L5 15" />
-            </svg>
-          </button>
+          <span class="sandbox-setup-close">
+            <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="onClose" />
+          </span>
         </header>
 
         <div class="sandbox-setup-body">
@@ -144,6 +136,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FancyCheck from '@/components/common/FancyCheck.vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 import { useSandboxSetupStore } from '@/stores/sandboxSetup';
 
 defineOptions({ name: 'SandboxSetupDialog' });
@@ -312,22 +305,9 @@ function onClose() {
   right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.sandbox-setup-close:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
 }
 
 .sandbox-setup-body {

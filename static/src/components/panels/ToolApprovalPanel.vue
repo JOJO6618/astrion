@@ -6,9 +6,7 @@
   >
     <div class="sidebar-header" :class="{ 'mobile-header': isMobileViewport }">
       <h3 class="icon-label">{{ panelTitle }}</h3>
-      <button type="button" class="approval-close-btn" :aria-label="$t('shell.closeApprovalPanel')" @click="handleCloseClick">
-        ×
-      </button>
+      <CloseButton :label="$t('shell.closeApprovalPanel')" @click="handleCloseClick" />
     </div>
     <div class="approval-panel-body" v-if="!collapsed">
       <div v-if="!approvals.length && !isGoalApprovalMode" class="no-files">{{ $t('shell.noPendingApprovals') }}</div>
@@ -132,6 +130,7 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue';
 import { t, currentLocale } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 defineOptions({ name: 'ToolApprovalPanel' });
 

@@ -768,7 +768,9 @@ function renderViewImage(result: any, args: any): string {
 
   if (imageUrl) {
     const safeUrl = escapeHtml(imageUrl);
-    html += `<div class="tool-result-image"><a href="${safeUrl}" target="_blank" rel="noopener" title="${escapeHtml(t('toolResults.media.viewImgTitle'))}"><img src="${safeUrl}" alt="${escapeHtml(t('toolResults.media.viewImgAlt'))}" loading="lazy" /></a></div>`;
+    // 不再用 <a target="_blank"> 打开新标签页，直接渲染 <img>，
+    // 由聊天消息区的事件委托统一承接点击灯箱预览。
+    html += `<div class="tool-result-image"><img src="${safeUrl}" alt="${escapeHtml(t('toolResults.media.viewImgAlt'))}" loading="lazy" /></div>`;
   }
 
   return html;

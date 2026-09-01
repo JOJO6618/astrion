@@ -10,16 +10,12 @@
           <div v-if="generatedPath" class="hint" :title="generatedPath">
             {{ $t('overlay.generatedHint', { path: generatedPath }) }}
           </div>
-          <button
-            type="button"
-            class="icon-close-btn"
-            :aria-label="$t('common.close')"
+          <CloseButton
+            :label="$t('common.close')"
             :title="$t('common.close')"
-            @click="$emit('close')"
             :disabled="submitting"
-          >
-            <span class="icon icon-sm" :style="iconStyle('x')" aria-hidden="true"></span>
-          </button>
+            @click="$emit('close')"
+          />
         </div>
       </div>
 
@@ -127,6 +123,8 @@
 </template>
 
 <script setup lang="ts">
+import CloseButton from '@/components/common/CloseButton.vue';
+
 defineOptions({ name: 'ConversationReviewDialog' });
 
 const props = defineProps<{
@@ -256,32 +254,6 @@ const formatUpdatedAt = (value: string | number) => {
 }
 
 /* 自定义关闭按钮，固定尺寸、视觉居中 */
-.icon-close-btn {
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
-}
-
-.icon-close-btn:hover:not(:disabled) {
-  background: var(--theme-tab-active);
-  color: var(--text-primary);
-}
-
-.icon-close-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* ===== 主体：左右两栏，靠竖线分隔 ===== */
 .review-body {
   flex: 1 1 auto;

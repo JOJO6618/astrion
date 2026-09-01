@@ -172,29 +172,11 @@ body[data-theme='dark'] {
     color: var(--text-secondary);
 }
 
+/* 按钮本体样式在 common/CloseButton.vue（boxed 变体），此处仅保留抽屉左上角定位 */
 .token-close-btn {
     position: absolute;
     top: 12px;
     left: 12px;
-    width: 14px;
-    height: 14px;
-    border: 1px solid var(--mac-close-border);
-    border-radius: 50%;
-    background: var(--mac-close);
-    display: block;
-    padding: 0;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease;
-    box-shadow: 0 2px 4px var(--shadow-color);
-}
-
-.token-close-btn:hover {
-    background: var(--mac-close-hover);
-    transform: translateY(-1px);
-}
-
-.token-close-btn:active {
-    transform: translateY(0);
 }
 
 .sr-only {
@@ -437,19 +419,7 @@ body[data-theme='dark'] {
     line-height: 1.4;
 }
 
-.toast-close {
-    border: none;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 16px;
-    cursor: pointer;
-    padding: 2px;
-}
-
-.toast-close:hover {
-    color: var(--text-primary);
-}
-
+/* .toast-close 已移除：Toast 关闭按钮统一改用 common/CloseButton.vue（boxed sm） */
 
 .status-pill--running {
     background: color-mix(in srgb, var(--state-success) 22%, transparent);

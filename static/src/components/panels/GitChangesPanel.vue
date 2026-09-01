@@ -9,9 +9,7 @@
       <div class="git-changes-panel__summary">
         <span class="git-changes-panel__add">+{{ additions }}</span>
         <span class="git-changes-panel__del">-{{ deletions }}</span>
-        <button type="button" class="git-changes-panel__close" :aria-label="$t('shell.closeGitPanel')" @click="$emit('close')">
-          ×
-        </button>
+        <CloseButton :label="$t('shell.closeGitPanel')" @click="$emit('close')" />
       </div>
     </header>
 
@@ -135,6 +133,7 @@
 import { computed } from 'vue';
 import { ref } from 'vue';
 import { t, currentLocale } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 defineOptions({ name: 'GitChangesPanel' });
 

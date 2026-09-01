@@ -4,17 +4,13 @@
       <section class="plan-approval-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.planApprovalAriaLabel')">
         <header class="plan-approval-windowbar">
           <div class="plan-approval-window-title">{{ $t('overlay.planApprovalTitle') }}</div>
-          <button
-            type="button"
-            class="plan-approval-close"
-            :title="$t('overlay.planApprovalMinimize')"
-            :aria-label="$t('overlay.planApprovalMinimize')"
-            @click="emit('minimize')"
-          >
-            <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 5l10 10M15 5L5 15" />
-            </svg>
-          </button>
+          <span class="plan-approval-close">
+            <CloseButton
+              :label="$t('overlay.planApprovalMinimize')"
+              :title="$t('overlay.planApprovalMinimize')"
+              @click="emit('minimize')"
+            />
+          </span>
         </header>
 
         <header class="plan-approval-header">
@@ -77,6 +73,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import MarkdownRenderer from '../chat/MarkdownRenderer.vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const props = defineProps<{
   visible: boolean;
@@ -165,22 +162,9 @@ function reject() {
   right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.plan-approval-close:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
 }
 
 .plan-approval-window-title {

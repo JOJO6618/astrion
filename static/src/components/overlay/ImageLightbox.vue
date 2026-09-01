@@ -9,14 +9,12 @@
         :aria-label="preview.name || $t('overlay.imagePreview')"
         @click.self="close"
       >
-        <button
-          type="button"
+        <CloseButton
+          variant="bare"
           class="image-lightbox__close"
-          :aria-label="$t('overlay.closePreview')"
-          @click.stop="close"
-        >
-          ×
-        </button>
+          :label="$t('overlay.closePreview')"
+          @click="close"
+        />
         <div class="image-lightbox__stage" @click.self="close">
           <img
             class="image-lightbox__img"
@@ -34,6 +32,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue';
 import { useUiStore } from '@/stores/ui';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const uiStore = useUiStore();
 const preview = computed(() => uiStore.imagePreview);
@@ -125,28 +124,15 @@ onBeforeUnmount(() => syncLock(false));
   text-overflow: ellipsis;
 }
 
+/* bare 变体：按钮本体样式在 CloseButton 组件内，此处只负责灯箱场景的定位与配色覆盖。
+   灯箱遮罩永远为深色，颜色不随主题变量；默认约 72% 透明度的白，hover 全亮。 */
 .image-lightbox__close {
   position: absolute;
   top: calc(10px + env(safe-area-inset-top, 0px));
   right: calc(10px + env(safe-area-inset-right, 0px));
   z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: var(--lightbox-btn-bg);
-  color: var(--lightbox-text);
-  font-size: 20px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.image-lightbox__close:hover {
-  background: var(--lightbox-btn-bg-hover);
+  --close-btn-color: color-mix(in srgb, var(--lightbox-text) 72%, transparent);
+  --close-btn-color-hover: var(--lightbox-text);
 }
 
 .lightbox-fade-enter-active,

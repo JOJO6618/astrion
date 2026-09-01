@@ -40,28 +40,6 @@
     overflow-y: auto;
 }
 
-.focus-close-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 16px;
-    background: var(--hover-bg);
-    color: var(--text-primary);
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.approval-close-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 16px;
-    background: var(--hover-bg);
-    color: var(--text-primary);
-    font-size: 20px;
-    cursor: pointer;
-}
-
 .git-changes-panel {
     flex: 0 0 auto;
     min-width: 340px;
@@ -124,24 +102,6 @@
 
 .git-changes-panel__del {
     color: var(--git-diff-del-text);
-}
-
-.git-changes-panel__close {
-    width: 28px;
-    height: 28px;
-    border: none;
-    border-radius: 14px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.git-changes-panel__close:hover {
-    background: var(--theme-tab-active);
-    color: var(--text-primary);
-    box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 .git-changes-panel__body {
@@ -843,19 +803,4 @@ body[data-theme='dark'] {
     background: var(--surface-base);
   }
 
-  .focus-close-btn {
-    background: var(--badge-bg);
-  }
-
-  .focus-close-btn:hover {
-    background: var(--surface-muted);
-  }
-
-  .approval-close-btn {
-    background: var(--badge-bg);
-  }
-
-  .approval-close-btn:hover {
-    background: var(--surface-muted);
-  }
 }

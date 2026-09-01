@@ -17,6 +17,7 @@
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useUiStore } from '@/stores/ui';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const props = defineProps<{
   summary: any;
@@ -342,15 +343,12 @@ function lineNumber(line: any): string {
               <span class="edit-summary-plus">+{{ activeFile.added || 0 }}</span>
               <span class="edit-summary-minus">-{{ activeFile.removed || 0 }}</span>
             </span>
-            <button
+            <CloseButton
               v-if="pinned || isMobile"
-              type="button"
-              class="es-modal__close"
-              :aria-label="$t('common.close')"
+              :label="$t('common.close')"
+              size="sm"
               @click.stop="close"
-            >
-              <span class="icon icon-sm" :style="props.iconStyle('x')" aria-hidden="true"></span>
-            </button>
+            />
           </div>
           <div class="es-modal__body">
             <template v-if="(activeFile.lines || []).length">
@@ -537,26 +535,6 @@ function lineNumber(line: any): string {
   flex: none;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-
-.es-modal__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-}
-
-.es-modal__close:hover {
-  background: var(--surface-muted);
-  color: var(--text-primary);
 }
 
 .es-modal__body {

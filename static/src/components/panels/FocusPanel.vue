@@ -9,15 +9,11 @@
         <span class="icon icon-sm" :style="iconStyle('eye')" aria-hidden="true"></span>
         <span>{{ $t('shell.focusFilesCount', { n: focusedCount }) }}</span>
       </h3>
-      <button
+      <CloseButton
         v-if="showCloseButton"
-        type="button"
-        class="focus-close-btn"
-        :aria-label="$t('shell.closeFocusPanel')"
+        :label="$t('shell.closeFocusPanel')"
         @click="$emit('close')"
-      >
-        ×
-      </button>
+      />
     </div>
     <div class="focused-files" v-if="!collapsed">
       <div v-if="!focusedCount" class="no-files">{{ $t('shell.noFocusFiles') }}</div>
@@ -40,6 +36,7 @@
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useFocusStore } from '@/stores/focus';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 defineOptions({ name: 'FocusPanel' });
 

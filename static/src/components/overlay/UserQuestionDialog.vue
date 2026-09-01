@@ -3,8 +3,8 @@
     <div v-if="visible && questions.length" class="user-question-overlay" @click.self="emit('minimize')">
       <section class="user-question-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.userQuestionAriaLabel')">
         <header class="user-question-windowbar">
-          <div class="user-question-traffic" :aria-label="$t('overlay.windowControlAria')">
-            <button type="button" class="traffic-dot traffic-dot--close" :aria-label="$t('overlay.minimizeAria')" @click="emit('minimize')"></button>
+          <div class="user-question-traffic">
+            <CloseButton :label="$t('overlay.minimizeAria')" @click="emit('minimize')" />
           </div>
           <div class="user-question-window-title">{{ $t('overlay.userQuestionWindowTitle') }}</div>
         </header>
@@ -80,6 +80,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const props = defineProps<{
   visible: boolean;
@@ -208,16 +209,7 @@ function dismiss() {
   align-items: center;
 }
 
-.traffic-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  padding: 0;
-  cursor: pointer;
-}
-
-.traffic-dot--close { background: var(--mac-close); }
+/* 关闭按钮本体样式在 common/CloseButton.vue（boxed 变体），traffic-dot 红点样式已随统一下线 */
 
 .user-question-window-title {
   text-align: center;

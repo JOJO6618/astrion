@@ -2,7 +2,7 @@
   <transition name="quota-toast-fade">
     <div class="quota-toast" v-if="quotaToast">
       <span class="quota-toast-label">{{ quotaToast.message }}</span>
-      <button type="button" class="toast-close" :aria-label="$t('shell.closeNotification')" @click="dismiss">×</button>
+      <CloseButton size="sm" :label="$t('shell.closeNotification')" @click="dismiss" />
     </div>
   </transition>
 </template>
@@ -10,6 +10,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { useUiStore } from '@/stores/ui';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const uiStore = useUiStore();
 const { quotaToast } = storeToRefs(uiStore);

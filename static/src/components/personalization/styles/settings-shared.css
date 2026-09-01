@@ -33,31 +33,6 @@ body[data-theme='dark'] .settings-redesign-card {
   padding: 12px 12px 4px;
 }
 
-.settings-close-button {
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-secondary);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .settings-close-button:hover {
-    background: var(--hover-bg);
-    color: var(--text-primary);
-  }
-}
-
-.settings-close-button svg {
-  width: 17px;
-  height: 17px;
-  stroke-width: 2;
-}
-
 /* 移动端顶栏：桌面端隐藏 */
 .settings-mobile-bar {
   display: none;

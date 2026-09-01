@@ -6,7 +6,7 @@
           <div class="subagent-activity-title">
             {{ $t('overlay.bgCommandTitle', { id: activeCommand.command_id }) }}
           </div>
-          <button type="button" class="subagent-activity-close" @click="close">×</button>
+          <CloseButton :label="$t('common.close')" @click="close" />
         </div>
         <div class="subagent-activity-meta">
           <span
@@ -49,6 +49,7 @@
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 
 const commandStore = useBackgroundCommandStore();

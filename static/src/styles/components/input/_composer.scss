@@ -1479,15 +1479,6 @@ body[data-theme='light'] {
     padding: 0 16px !important;
   }
 
-  /* 移动端审批面板关闭按钮 - 移除圆形外框 */
-  .mobile-panel-sheet--approval .approval-close-btn {
-    background: transparent !important;
-    border-radius: 0 !important;
-    width: auto !important;
-    height: auto !important;
-    padding: 4px !important;
-    font-size: 24px !important;
-  }
 }
 
 .user-question-mini-dot {

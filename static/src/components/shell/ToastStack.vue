@@ -10,15 +10,12 @@
           <div v-if="toast.title" class="app-toast-title">{{ toast.title }}</div>
           <div class="app-toast-message">{{ toast.message }}</div>
         </div>
-        <button
+        <CloseButton
           v-if="toast.closable !== false"
-          type="button"
-          class="toast-close"
-          :aria-label="$t('shell.closeNotification')"
+          size="sm"
+          :label="$t('shell.closeNotification')"
           @click="dismiss(toast.id)"
-        >
-          ×
-        </button>
+        />
       </div>
     </transition-group>
   </div>
@@ -27,6 +24,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { useUiStore } from '@/stores/ui';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const uiStore = useUiStore();
 const { toastQueue: toasts } = storeToRefs(uiStore);

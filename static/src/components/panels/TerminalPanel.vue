@@ -18,12 +18,7 @@
           <span class="terminal-panel__tab-name">{{ name }}</span>
         </button>
       </div>
-      <button
-        type="button"
-        class="terminal-panel__close"
-        :aria-label="$t('shell.closeTerminalPanel')"
-        @click="$emit('close')"
-      >&times;</button>
+      <CloseButton :label="$t('shell.closeTerminalPanel')" @click="$emit('close')" />
     </header>
 
     <!-- 终端容器 -->
@@ -44,6 +39,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Terminal } from 'xterm';
 import { io as createSocketClient } from 'socket.io-client';
 import 'xterm/css/xterm.css';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 defineOptions({ name: 'TerminalPanel' });
 
@@ -539,29 +535,6 @@ onBeforeUnmount(() => {
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.terminal-panel__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 14px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-left: 4px;
-}
-
-.terminal-panel__close:hover {
-  background: var(--theme-tab-active);
-  color: var(--text-primary);
-  box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 .terminal-panel__body {

@@ -6,7 +6,7 @@
           <div class="subagent-activity-title">
             {{ $t('overlay.subAgentProgressTitle', { id: activeAgent.agent_id || activeAgent.task_id }) }}
           </div>
-          <button type="button" class="subagent-activity-close" @click="close">×</button>
+          <CloseButton :label="$t('common.close')" @click="close" />
         </div>
         <div class="subagent-activity-meta">
           <span class="subagent-activity-status" :class="activeAgent.status || ''">{{
@@ -59,6 +59,7 @@
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t, currentLocale } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 import { useSubAgentStore } from '@/stores/subAgent';
 
 type ActivityEntry = {

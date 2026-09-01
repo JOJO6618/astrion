@@ -62,7 +62,7 @@
           :class="{ 'sfc-image--android': isAndroidApp }"
           :src="contentUrl"
           :alt="displayName"
-          @click="!isAndroidApp && openFullImage()"
+          @click="openFullImage()"
           @error="onImageError"
         />
       </template>
@@ -82,6 +82,7 @@ import { buildShowHtmlIframeSrcdoc } from '@/utils/showHtmlSandbox';
 import { openShowHtmlFullscreen } from '@/utils/showHtmlFullscreen';
 import PdfPreview from './PdfPreview.vue';
 import { t } from '@/locales';
+import { useUiStore } from '@/stores/ui';
 
 // 文本类文件内容缓存，避免父组件反复重建卡片时重复 fetch 导致闪烁
 const SHOW_FILE_CONTENT_CACHE = new Map<string, { content: string; ts: number }>();
@@ -430,7 +431,9 @@ async function copyContent() {
 }
 
 function openFullImage() {
-  if (contentUrl.value) window.open(contentUrl.value, '_blank');
+  if (!contentUrl.value) return;
+  // 全站统一走全局灯箱预览（Android WebView 同样适用，不再新开标签页）
+  useUiStore().openImagePreview({ url: contentUrl.value, name: displayName.value || '' });
 }
 
 function onImageError() {

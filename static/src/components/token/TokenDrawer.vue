@@ -1,15 +1,12 @@
 <template>
   <div class="token-drawer" v-if="visible" :class="{ collapsed }" data-tutorial="token-drawer">
     <div class="token-display-panel">
-      <button
+      <CloseButton
         class="token-close-btn"
-        type="button"
         data-tutorial="token-close"
+        :label="$t('sidebar.collapseUsage')"
         @click="emit('toggle')"
-        :aria-label="$t('sidebar.collapseUsage')"
-      >
-        <span class="sr-only">{{ $t('common.close') }}</span>
-      </button>
+      />
       <div class="token-panel-content">
         <div class="usage-dashboard">
           <div class="usage-cell usage-cell--left usage-cell--token panel-card">
@@ -127,6 +124,7 @@ defineOptions({ name: 'TokenDrawer' });
 
 import { computed } from 'vue';
 import { t, currentLocale } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const emit = defineEmits<{
   (e: 'toggle'): void;

@@ -9,16 +9,9 @@
       <span class="qd-detail__title" :title="title">{{ title }}</span>
       <span class="qd-detail__badge" :class="`is-${stateClass}`">{{ statusText }}</span>
       <span v-if="tokensText" class="qd-detail__tokens" :title="tokensTitle">{{ tokensText }}</span>
-      <button class="qd-detail__close" :title="$t('common.close')" @click="close">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path
-            d="M4 4l8 8M12 4l-8 8"
-            stroke="currentColor"
-            stroke-width="1.4"
-            stroke-linecap="round"
-          />
-        </svg>
-      </button>
+      <span class="qd-detail__close">
+        <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="close" />
+      </span>
     </header>
     <div ref="bodyRef" class="qd-detail__body" :class="{ 'body-fade': bodyFading }">
       <!-- 子智能体：工具调用 + 文本输出时间线 -->

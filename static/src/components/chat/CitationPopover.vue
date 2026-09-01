@@ -27,7 +27,12 @@
             </div>
             <div v-if="single.url" class="pop-url">{{ single.url }}</div>
             <div v-if="isImageFile(single)" class="pop-image">
-              <img :src="fileContentUrl(single)" :alt="single.file_name || ''" loading="lazy" />
+              <img
+                :src="fileContentUrl(single)"
+                :alt="single.file_name || ''"
+                loading="lazy"
+                @click.stop="openCitationPreview(single)"
+              />
             </div>
             <div v-else-if="displaySnippet(single)" class="pop-snippet">“{{ displaySnippet(single) }}”</div>
           </div>
@@ -130,6 +135,14 @@ function isImageFile(ann: CitationAnnotation): boolean {
 /** /api/file/content 的 inline 白名单含 image/，可直接作为 <img> 源 */
 function fileContentUrl(ann: CitationAnnotation): string {
   return `/api/file/content?path=${encodeURIComponent(ann.file_path || '')}`;
+}
+
+/** 点击引用图片缩略图：打开全局灯箱预览 */
+function openCitationPreview(ann: CitationAnnotation) {
+  uiStore.openImagePreview({
+    url: fileContentUrl(ann),
+    name: ann.file_name || ''
+  });
 }
 
 function shortDomain(domain?: string) {

@@ -2,8 +2,9 @@
 import katex from 'katex';
 import DOMPurify from 'dompurify';
 import { createApp } from 'vue';
-import { t } from '@/locales';
+import { t, i18n } from '@/locales';
 import ShowFileCard from '../components/chat/ShowFileCard.vue';
+import { useUiStore } from '@/stores/ui';
 import { buildShowHtmlIframeSrcdoc } from '../utils/showHtmlSandbox';
 import {
   openShowHtmlFullscreen,
@@ -174,10 +175,15 @@ function normalizeShowImageSrc(src: string) {
     trimmed = trimmed.replace(/^\/(?=[A-Za-z]:\/)/, '');
   }
   if (trimmed.startsWith('/user_upload/')) return trimmed;
-  // 兼容容器内部路径：/workspace/.../user_upload/xxx.png 或 /workspace/user_upload/xxx
-  const idx = trimmed.toLowerCase().indexOf('/user_upload/');
-  if (idx >= 0) {
-    return '/user_upload/' + trimmed.slice(idx + '/user_upload/'.length);
+  // 兼容容器内部绝对路径：/workspace/.../user_upload/xxx.png 或 /workspace/user_upload/xxx
+  // 注意：.astrion/user_upload/xxx 是工作区相对路径，不在此特判，
+  // 让它落到下方通用分支走 /api/file/content（与 _validate_path 同源解析，
+  // 避免依赖 /user_upload/ 后端路由在宿主机免登录模式下的工作区解析）
+  if (trimmed.startsWith('/')) {
+    const idx = trimmed.toLowerCase().indexOf('/user_upload/');
+    if (idx >= 0) {
+      return '/user_upload/' + trimmed.slice(idx + '/user_upload/'.length);
+    }
   }
   // /workspace 前缀是容器内绝对路径写法，剥掉后按工作区相对路径处理
   if (trimmed === '/workspace') return '';
@@ -1256,6 +1262,36 @@ function buildNodePathKey(node: Element) {
   return parts.reverse().join('/');
 }
 
+// ===== 内容图片点击预览（document 级事件委托） =====
+// 覆盖三类无 Vue 事件绑定的注入图片：
+//   1. <show_image> 卡片（figure.chat-inline-image，renderShowImages 动态创建）
+//   2. Markdown ![]() 正文图片（.text-content 内的 img）
+//   3. 工具结果图片（.tool-result-image，如 view_image / ocr_image）
+// 不会误伤：消息气泡图片与 CitationPopover 缩略图已用 @click.stop 阻断冒泡；
+// ShowFileCard 卡片自带 @click，在此显式排除；头像/图标为 SVG 或不在命中容器内。
+let imagePreviewDelegationBound = false;
+
+export function setupImagePreviewDelegation() {
+  if (imagePreviewDelegationBound) return;
+  imagePreviewDelegationBound = true;
+  document.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target || typeof target.closest !== 'function') return;
+    const img = target.closest('img') as HTMLImageElement | null;
+    if (!img) return;
+    // ShowFileCard 内部已自行打开灯箱预览，避免双重触发
+    if (img.closest('.show-file-card')) return;
+    const hit =
+      img.closest('figure.chat-inline-image') ||
+      img.closest('.tool-result-image') ||
+      img.closest('.text-content');
+    if (!hit) return;
+    const url = img.currentSrc || img.src;
+    if (!url) return;
+    useUiStore().openImagePreview({ url, name: img.alt || '' });
+  });
+}
+
 export function setupShowImageObserver() {
   if (showImageObserver || showContainerObserver) return;
   setupLayoutDebugObservers();
@@ -1471,6 +1507,9 @@ function renderShowFileCard(node: Element) {
   node.replaceChildren(mountEl);
 
   const app = createApp(ShowFileCard, { path });
+  // 独立 createApp 实例不继承主应用的插件，必须显式安装 i18n，
+  // 否则组件模板里的 $t 不可用（报 "j.$t is not a function"）
+  app.use(i18n);
   app.mount(mountEl);
   showFileAppMap.set(node, app);
 }

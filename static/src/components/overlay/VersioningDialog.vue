@@ -20,9 +20,7 @@
             <span class="icon icon-sm" :style="iconStyle('refreshCw')" aria-hidden="true"></span>
             <span>{{ $t('overlay.refresh') }}</span>
           </button>
-          <button type="button" class="icon-close-btn" :aria-label="$t('common.close')" @click="$emit('close')">
-            <span class="icon icon-sm" :style="iconStyle('x')" aria-hidden="true"></span>
-          </button>
+          <CloseButton :label="$t('common.close')" @click="$emit('close')" />
         </div>
       </header>
 
@@ -155,6 +153,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 const props = defineProps<{
   hostMode: boolean;
@@ -496,26 +495,6 @@ const splitDiffContent = (content: any): string[] => {
 .refresh-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.icon-close-btn {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
-}
-
-.icon-close-btn:hover {
-  background: var(--theme-tab-active);
-  color: var(--text-primary);
 }
 
 /* ===== 主体：左右分栏靠竖线 ===== */

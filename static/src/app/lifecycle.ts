@@ -2,7 +2,7 @@
 import { useChatActionStore } from '../stores/chatActions';
 import { useSandboxSetupStore } from '../stores/sandboxSetup';
 import { normalizeScrollLock } from '../composables/useScrollControl';
-import { setupShowImageObserver, teardownShowImageObserver } from './bootstrap';
+import { setupShowImageObserver, teardownShowImageObserver, setupImagePreviewDelegation } from './bootstrap';
 import { debugLog } from './methods/common';
 
 export function created() {
@@ -41,6 +41,7 @@ export async function mounted() {
     normalizeScrollLock(this);
   });
   setupShowImageObserver();
+  setupImagePreviewDelegation();
 
   // 立即加载初始数据（并行获取状态，优先同步运行模式）
   const initialDataPromise = this.loadInitialData();

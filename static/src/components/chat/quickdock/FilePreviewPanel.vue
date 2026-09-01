@@ -25,16 +25,7 @@
           </svg>
           <span class="qd-preview__name" :title="previewPath">{{ fileName }}</span>
           <span class="qd-preview__path" :title="previewPath">{{ dirName }}</span>
-          <button class="qd-preview__close" :title="$t('common.close')" @click="close">
-            <svg viewBox="0 0 16 16" fill="none">
-              <path
-                d="M4 4l8 8M12 4l-8 8"
-                stroke="currentColor"
-                stroke-width="1.4"
-                stroke-linecap="round"
-              />
-            </svg>
-          </button>
+          <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="close" />
         </header>
         <div class="qd-preview__body">
           <div v-if="loading" class="qd-preview__loading">{{ $t('common.loading') }}</div>
@@ -70,6 +61,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import CloseButton from '@/components/common/CloseButton.vue';
 import { t } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
 import { usePersonalizationStore } from '@/stores/personalization';

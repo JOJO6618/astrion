@@ -23,29 +23,19 @@
                 <div class="settings-mobile-bar">
                   <span class="settings-mobile-bar-cell" aria-hidden="true"></span>
                   <span class="settings-mobile-bar-title">{{ $t('common.settings') }}</span>
-                  <button
-                    type="button"
-                    class="settings-mobile-bar-btn"
-                    :aria-label="$t('personalization.closePersonalSpaceAriaLabel')"
-                    @click="personalization.closeDrawer()"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                      <path d="M6 6l12 12M18 6 6 18" />
-                    </svg>
-                  </button>
+                  <span class="settings-mobile-bar-btn">
+                    <CloseButton
+                      :label="$t('personalization.closePersonalSpaceAriaLabel')"
+                      @click="personalization.closeDrawer()"
+                    />
+                  </span>
                 </div>
                 <div class="settings-nav-head">
-                  <button
-                    type="button"
-                    class="settings-close-button"
+                  <CloseButton
                     data-tutorial="personal-close"
-                    :aria-label="$t('personalization.closePersonalSpaceAriaLabel')"
+                    :label="$t('personalization.closePersonalSpaceAriaLabel')"
                     @click="personalization.closeDrawer()"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round">
-                      <path d="M6 6l12 12M18 6 6 18" />
-                    </svg>
-                  </button>
+                  />
                 </div>
                 <div class="settings-redesign-tabs">
                 <button
@@ -164,6 +154,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, provide } from 'vue';
 import { storeToRefs } from 'pinia';
 import FancyCheck from '@/components/common/FancyCheck.vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
 import PreferencesTab from './tabs/PreferencesTab.vue';
 import ModelTab from './tabs/ModelTab.vue';

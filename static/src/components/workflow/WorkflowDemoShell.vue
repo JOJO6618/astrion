@@ -18,7 +18,7 @@
     <div v-else class="wf-shell__loading">{{ $t('common.loading') }}</div>
     <div v-if="errorMessage" class="wf-shell__error" role="alert">
       <span>{{ errorMessage }}</span>
-      <button type="button" class="wf-shell__error-close" :aria-label="$t('common.close')" @click="errorMessage = ''">×</button>
+      <CloseButton :label="$t('common.close')" @click="errorMessage = ''" />
     </div>
   </div>
 </template>
@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { t } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 import WorkflowLibraryView from './WorkflowLibraryView.vue';
 import WorkflowEditorView from './WorkflowEditorView.vue';
 import { createEmptyWorkflow, type WorkflowDef } from './workflowModel';

@@ -17,7 +17,7 @@
               @change="onLocalChange"
             />
           </div>
-          <button class="close-btn" @click="close">×</button>
+          <CloseButton :label="$t('common.close')" @click="close" />
         </div>
         <div class="body">
           <div v-if="loading" class="loading">{{ $t('common.loading') }}</div>
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, withDefaults } from 'vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 interface ImageEntry {
   name: string;
@@ -194,13 +195,6 @@ onMounted(() => {
 .local-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.close-btn {
-  background: transparent;
-  color: var(--text-tertiary);
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
 }
 .body {
   padding: 12px 16px;

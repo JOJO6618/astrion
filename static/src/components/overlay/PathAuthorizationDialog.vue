@@ -4,7 +4,7 @@
       <div class="overlay-card">
         <div class="overlay-header">
           <h3>{{ $t('overlay.pathAuthTitle') }}</h3>
-          <button type="button" @click="$emit('close')">×</button>
+          <CloseButton :label="$t('common.close')" @click="$emit('close')" />
         </div>
         <div class="mode-switch">
           <button
@@ -51,6 +51,8 @@
 </template>
 
 <script setup lang="ts">
+import CloseButton from '@/components/common/CloseButton.vue';
+
 defineProps<{ open: boolean; value: string; mode: 'writable' | 'readable'; saving?: boolean }>();
 defineEmits<{
   (e: 'close'): void;
@@ -65,7 +67,6 @@ defineEmits<{
 .overlay-card { width: min(680px, 92vw); background: var(--theme-surface-soft); border: 1px solid var(--theme-control-border); border-radius: 12px; padding: 12px; }
 .overlay-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .overlay-header h3 { margin: 0; font-size: 16px; }
-.overlay-header button { border: none; background: transparent; font-size: 20px; cursor: pointer; }
 .hint { font-size: 12px; color: var(--text-secondary); margin: 0 0 8px 0; }
 .mode-switch { display: inline-flex; border: 1px solid var(--theme-control-border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
 .mode-btn { border: none; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 12px; }

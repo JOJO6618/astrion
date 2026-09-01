@@ -2007,11 +2007,13 @@ html.show-html-fullscreen-open body {
   flex: 0 0 auto;
 }
 
-/* 与卡片 ⋯ 按钮一致的纯文字风格：无边框无背景，hover 仅变色 */
+/* 全屏预览顶栏按钮：与全站统一关闭按钮（common/CloseButton.vue boxed 变体）同一形态——
+   圆角方透明底，hover/active 出现 --hover-bg 底色块（动态 DOM 无法复用组件，样式在此对齐） */
 .show-html-fullscreen__btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 0;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
   display: inline-flex;
@@ -2020,10 +2022,18 @@ html.show-html-fullscreen-open body {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  transition: color 0.18s ease;
+  transition: background 140ms ease, color 140ms ease;
 }
 
-.show-html-fullscreen__btn:hover {
+@media (hover: hover) {
+  .show-html-fullscreen__btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+  }
+}
+
+.show-html-fullscreen__btn:active {
+  background: var(--hover-bg);
   color: var(--text-primary);
 }
 
@@ -2056,6 +2066,14 @@ html.show-html-fullscreen-open body {
 }
 .chat-inline-image figcaption {
   @extend .chat-inline-card__caption;
+}
+
+/* 可点击预览的内容图片统一给放大镜光标提示
+   （show_image 卡片 / Markdown 正文图 / 工具结果图，点击由 bootstrap.ts 事件委托承接） */
+.chat-inline-image img,
+.text-content img,
+.tool-result-image img {
+  cursor: zoom-in;
 }
 
 /* show_html 在 streaming 重建期间会短暂回到原始标签，需提供稳定占位避免 scrollHeight 抖动 */

@@ -6,7 +6,7 @@
           <div class="subagent-activity-title">
             {{ isDone ? $t('overlay.goalDoneTitle') : isStopped ? $t('overlay.goalStoppedTitle') : $t('overlay.goalRunningTitle') }}
           </div>
-          <button type="button" class="subagent-activity-close" @click="$emit('close')">×</button>
+          <CloseButton :label="$t('common.close')" @click="$emit('close')" />
         </div>
 
         <div class="goal-progress-meta">
@@ -49,6 +49,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { t, currentLocale } from '@/locales';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 defineOptions({ name: 'GoalProgressDialog' });
 

@@ -49,7 +49,7 @@
     <transition name="fade">
       <div v-if="banner.message" class="banner" :class="banner.type">
         <span>{{ banner.message }}</span>
-        <button type="button" class="banner-close" @click="banner.message = ''">×</button>
+        <CloseButton :label="$t('common.close')" @click="banner.message = ''" />
       </div>
     </transition>
 
@@ -300,6 +300,7 @@ import { computed, reactive, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useSecondaryPass } from './useSecondaryPass';
 import SecondaryGate from './SecondaryGate.vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
+import CloseButton from '@/components/common/CloseButton.vue';
 import { t, currentLocale } from '@/locales';
 
 type TargetType = 'global' | 'role' | 'user' | 'invite';
@@ -1059,14 +1060,6 @@ onBeforeUnmount(() => {
 .banner.error {
   background: rgba(189, 93, 58, 0.12);
   border-color: rgba(189, 93, 58, 0.35);
-}
-
-.banner-close {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
 }
 
 .panel {
