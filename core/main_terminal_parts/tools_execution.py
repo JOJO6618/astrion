@@ -1697,13 +1697,35 @@ class MainTerminalToolsExecutionMixin:
                         )
 
                         if search_response["success"]:
+                            # 注册网页来源 citation，并让模型可见的 summary 带上 [src_xxx] 前缀
+                            from modules.citations import get_registry
+                            registry = get_registry(self)
+                            citations = []
+                            results_list = search_response.get("results", [])
+                            for item in results_list:
+                                ann = registry.register_url(
+                                    title=item.get("title") or item.get("url") or "",
+                                    url=item.get("url") or "",
+                                    snippet=item.get("content", ""),
+                                    published_date=item.get("published_date") or None,
+                                    source_tool="web_search",
+                                )
+                                if ann:
+                                    item["citation_id"] = ann["id"]
+                                    citations.append(ann)
                             result = {
                                 "success": True,
-                                "summary": search_response["summary"],
+                                "summary": self.search_engine.build_summary_text(
+                                    search_response.get("query") or arguments["query"],
+                                    results_list,
+                                    search_response.get("filters", {}),
+                                    search_response.get("timestamp", ""),
+                                ),
                                 "filters": search_response.get("filters", {}),
                                 "query": search_response.get("query"),
-                                "results": search_response.get("results", []),
-                                "total_results": search_response.get("total_results", 0)
+                                "results": results_list,
+                                "total_results": search_response.get("total_results", 0),
+                                "citations": citations,
                             }
                         else:
                             result = {
@@ -1738,10 +1760,19 @@ class MainTerminalToolsExecutionMixin:
                                     "url": url
                                 }
                             else:
+                                from modules.citations import get_registry
+                                ann = get_registry(self).register_url(
+                                    title=url,
+                                    url=url,
+                                    snippet=full_content[:500],
+                                    source_tool="extract_webpage",
+                                )
                                 result = {
                                     "success": True,
                                     "url": url,
-                                    "content": full_content
+                                    "content": full_content,
+                                    "citation_id": ann.get("id") if ann else None,
+                                    "citations": [ann] if ann else [],
                                 }
                         except Exception as e:
                             result = {

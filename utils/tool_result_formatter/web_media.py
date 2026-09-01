@@ -33,7 +33,9 @@ def _format_extract_webpage(result_data: Dict[str, Any]) -> str:
     content = result_data.get("content") or ""
     length = len(content)
     truncated_flag = result_data.get("truncated") or False
-    header = f"提取完成：{url}，长度 {length} 字符。"
+    citation_id = result_data.get("citation_id")
+    citation_note = f"（来源 ID: {citation_id}）" if citation_id else ""
+    header = f"提取完成：{url}{citation_note}，长度 {length} 字符。"
     if not content:
         return f"{header} 内容为空。"
     # 为模型保留完整正文，避免 800 字预览导致上下文缺失

@@ -446,6 +446,18 @@ export const lifecycleMethods = {
       debugLog('[TaskPolling] 任务完成');
     }
 
+    // 行内引用：任务完成事件带回权威来源（轮询通道；socket 通道在 useLegacySocket 同款处理），
+    // 挂到最后一条 assistant 消息 metadata，MarkdownRenderer watcher 据此做 chip 裁决与富化
+    if (Array.isArray(data?.citations) && Array.isArray(this.messages) && this.messages.length) {
+      const lastMsg = this.messages[this.messages.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant') {
+        lastMsg.metadata = {
+          ...(lastMsg.metadata || {}),
+          citations: data.citations
+        };
+      }
+    }
+
     // 同步处理状态更新
     this.streamingMessage = false;
     this.stopRequested = false;

@@ -318,6 +318,26 @@ export const historyMethods = {
           };
         }
 
+        // 行内引用：工具循环的多条 assistant 持久化消息会合并成同一条前端消息，
+        // citations 需随合并按 id 去重汇聚，否则 chip 无数据可渲染
+        const msgCitations = message.metadata?.citations;
+        if (Array.isArray(msgCitations) && msgCitations.length) {
+          const merged = Array.isArray(currentAssistantMessage.metadata?.citations)
+            ? [...currentAssistantMessage.metadata.citations]
+            : [];
+          const seen = new Set(merged.map((c) => c?.id));
+          msgCitations.forEach((c) => {
+            if (c && c.id && !seen.has(c.id)) {
+              seen.add(c.id);
+              merged.push(c);
+            }
+          });
+          currentAssistantMessage.metadata = {
+            ...(currentAssistantMessage.metadata || {}),
+            citations: merged
+          };
+        }
+
         const content = message.content || '';
         const reasoningText = (message.reasoning_content || '').trim();
 

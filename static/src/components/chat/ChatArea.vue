@@ -187,6 +187,9 @@
             <MinimalBlocks
               v-if="hasRenderableAssistantActions(msg.actions || [])"
               :actions="msg.actions || []"
+              :citations="citationsForMessage(msg)"
+              :citations-final="citationsFinalForMessage(msg)"
+              enable-citations
               :conversation-running="streamingMessage"
               :is-latest-message="index === latestMessageIndex"
               :icon-style="iconStyleSafe"
@@ -308,6 +311,9 @@
                     <MarkdownRenderer
                       :content="group.action.content || ''"
                       :is-streaming="group.action.streaming"
+                      :citations="citationsForMessage(msg)"
+                      :citations-final="citationsFinalForMessage(msg)"
+                      enable-citations
                     />
                   </div>
                 </div>
@@ -533,6 +539,9 @@
                     <MarkdownRenderer
                       :content="action.content || ''"
                       :is-streaming="action.streaming"
+                      :citations="citationsForMessage(msg)"
+                      :citations-final="citationsFinalForMessage(msg)"
+                      enable-citations
                     />
                   </div>
                 </div>
@@ -739,6 +748,7 @@ import ToolAction from '@/components/chat/actions/ToolAction.vue';
 import StackedBlocks from './StackedBlocks.vue';
 import MinimalBlocks from './MinimalBlocks.vue';
 import MarkdownRenderer from './MarkdownRenderer.vue';
+import { collectConversationCitations, type CitationAnnotation } from './citationChips';
 import EditSummaryCard from './EditSummaryCard.vue';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useUiStore } from '@/stores/ui';
@@ -778,6 +788,22 @@ const personalizationReady = computed(() => {
 const renderPending = computed(() => {
   return !!props.historyLoading || !personalizationReady.value;
 });
+
+// 行内引用：对话级来源收集（扫描所有消息的工具结果 result.citations）。
+// 工具完成先于模型输出 marker，chip 在输出瞬间即可解析渲染，不等任务完成。
+const collectedCitations = computed<CitationAnnotation[]>(() =>
+  collectConversationCitations(props.messages || [])
+);
+/** 该消息可用的引用来源：权威（metadata.citations，后端裁决富化）优先，否则用收集表 */
+function citationsForMessage(msg: any): CitationAnnotation[] | undefined {
+  const meta = msg?.metadata?.citations;
+  if (Array.isArray(meta)) return meta;
+  return collectedCitations.value.length ? collectedCitations.value : undefined;
+}
+/** metadata.citations 到达即为权威裁决（含空数组=全部无效），触发无效 chip 移除与富化 */
+function citationsFinalForMessage(msg: any): boolean {
+  return Array.isArray(msg?.metadata?.citations);
+}
 const blockDisplayMode = computed(() => {
   return personalization.experiments.blockDisplayMode || 'stacked';
 });

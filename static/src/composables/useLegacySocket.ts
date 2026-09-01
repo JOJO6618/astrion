@@ -1802,6 +1802,18 @@ export async function initializeLegacySocket(ctx: any) {
 
       resetPendingToolEvents();
 
+      // 行内引用：任务完成时后端带回已用来源，挂到最后一条 assistant 消息的 metadata，
+      // MarkdownRenderer 的 citations watcher 会触发 chip 增强（流式期间的占位胶囊在此转正）
+      if (Array.isArray(data?.citations) && Array.isArray(ctx.messages) && ctx.messages.length) {
+        const lastMsg = ctx.messages[ctx.messages.length - 1];
+        if (lastMsg && lastMsg.role === 'assistant') {
+          lastMsg.metadata = {
+            ...(lastMsg.metadata || {}),
+            citations: data.citations
+          };
+        }
+      }
+
       // 任务完成后立即更新Token统计（关键修复）
       if (ctx.currentConversationId) {
         ctx.updateCurrentContextTokens();

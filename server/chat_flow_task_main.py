@@ -2034,6 +2034,8 @@ async def handle_task_with_sender(
     # 统计和限制变量
     total_iterations = 0
     total_tool_calls = 0
+    # 行内引用：任务级已用来源累积（task_complete 时带给前端实时渲染），按 id 去重
+    task_citations: Dict[str, dict] = {}
     consecutive_same_tool = defaultdict(int)
     last_tool_name = ""
     auto_fix_attempts = 0
@@ -2312,6 +2314,23 @@ async def handle_task_with_sender(
         
         assistant_content = "\n".join(assistant_content_parts) if assistant_content_parts else ""
         
+        # 行内引用：校验 marker、剥离无效引用，已用来源挂到消息 metadata 一并落库
+        round_citations = []
+        if assistant_content and ("【cite:" in assistant_content or "【file:" in assistant_content):
+            try:
+                from modules.citations import finalize_message_citations, get_registry
+                assistant_content, round_citations = finalize_message_citations(
+                    assistant_content,
+                    get_registry(web_terminal),
+                    str(getattr(web_terminal, "project_path", "") or ""),
+                )
+                for ann in round_citations:
+                    if ann.get("id"):
+                        task_citations[ann["id"]] = ann
+            except Exception as _cite_exc:
+                debug_log(f"[Citations] 行内引用处理失败，保留原文: {_cite_exc}")
+                round_citations = []
+        
         # 添加到消息历史（用于API继续对话，不保存到文件）
         assistant_message = {
             "role": "assistant",
@@ -2328,7 +2347,8 @@ async def handle_task_with_sender(
                 "assistant",
                 assistant_content,
                 tool_calls=tool_calls if tool_calls else None,
-                reasoning_content=current_thinking or ""
+                reasoning_content=current_thinking or "",
+                metadata={"citations": round_citations} if round_citations else None
             )
         
         # 为下一轮迭代重置流状态标志，但保留 full_response 供上面保存使用
@@ -2757,4 +2777,6 @@ async def handle_task_with_sender(
         # 前端就应保持运行态并继续轮询。
         'has_running_multi_agent': has_running_multi_agent or has_pending_ma_messages,
         'pending_runtime_guidance_messages': pending_runtime_guidance_messages,
+        # 行内引用：本任务全部已用来源，前端挂到当前 assistant 消息渲染 chip
+        'citations': list(task_citations.values()),
     })

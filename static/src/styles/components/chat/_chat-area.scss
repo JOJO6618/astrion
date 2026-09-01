@@ -2463,6 +2463,106 @@ a.md-download-link {
   }
 }
 
+// ===== 行内引用胶囊（citation chip） =====
+// 交互约定：hover / 展开态只变色，不动边框；弹层交互见 CitationPopover.vue
+.md-citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  margin: 0 2px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle; // 几何中心对齐「基线 + x字高/2」——与文字完全上下居中，且 20px 盒仍在 25.5px 行框内不撑行
+  background: var(--surface-muted);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover,
+  &.is-open {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+  }
+
+  &.is-pending {
+    cursor: default;
+  }
+
+  .chip-icons {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+  }
+
+  .chip-favicon {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex: none;
+  }
+
+  .chip-favicon + .chip-favicon {
+    margin-left: -5px;
+    border: 1px solid var(--surface-muted);
+  }
+
+  .chip-file-icon {
+    width: 12px;
+    height: 12px;
+    flex: none;
+    color: var(--text-tertiary);
+  }
+
+  .chip-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex: none;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--on-accent);
+    background: var(--accent);
+  }
+
+  .chip-label {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+    // 行高 1 会把 j/g/y 等字母的下沉笔画裁掉；放大行高让 descender 落入盒内
+    // （chip 总高 20px 由自身 height 锁定，行高放大不撑高）
+    line-height: 1.4;
+  }
+
+  .chip-count {
+    color: var(--text-tertiary);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  &:hover .chip-count,
+  &.is-open .chip-count {
+    color: var(--text-secondary);
+  }
+
+  .chip-pending-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+    margin: 0 4px;
+  }
+}
+
 // ===== 数学公式样式 =====
 .math-block {
   display: block;

@@ -37,6 +37,10 @@ export default {
   thinking: 'Thinking',
   thinkingRunning: 'Thinking...',
 
+  // —— Inline citations (citation chip / popover) ——
+  citationSources: '{n} sources',
+  citationOpenSource: 'Open source',
+
   // —— File append (append / append_payload) ——
   targetFile: 'target file',
   appendDone: 'File append complete',

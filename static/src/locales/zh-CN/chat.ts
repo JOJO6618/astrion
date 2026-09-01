@@ -47,6 +47,10 @@ export default {
   thinking: '思考过程',
   thinkingRunning: '正在思考...',
 
+  // —— 行内引用（citation chip / popover） ——
+  citationSources: '{n} 个来源',
+  citationOpenSource: '打开来源',
+
   // —— 文件追加（append / append_payload） ——
   targetFile: '目标文件',
   appendDone: '文件追加完成',

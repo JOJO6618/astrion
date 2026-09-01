@@ -314,6 +314,45 @@ function transformShowFileBlocks(raw: string) {
 }
 
 /**
+ * 预处理行内引用 marker（【cite:src_xxx】网页 / 【file:相对路径】文件），转换为 citation chip 占位 span。
+ * - 仅转换完整闭合的 marker；流式期间尾部未闭合的【…暂时隐藏，避免原始字符闪烁
+ * - 行内代码内的 marker 保持原样（fenced code block 已在 segment 拆分阶段剥离）
+ * - marker 内容进 data 属性前做属性转义，防注入
+ */
+function transformCitationMarkers(raw: string, isStreaming: boolean): string {
+  if (!raw || raw.indexOf('【') === -1) return raw;
+
+  // 保护行内代码：`...` 内的 marker 原样展示
+  const INLINE_CODE_PLACEHOLDER = '__CITE_PROTECT_INLINE_CODE_';
+  const inlineCodes: string[] = [];
+  let text = raw.replace(/`[^`\n]+`/g, (match) => {
+    inlineCodes.push(match);
+    return `${INLINE_CODE_PLACEHOLDER}${inlineCodes.length - 1}__`;
+  });
+
+  text = text.replace(/【(?:cite|file):([^】]+)】/g, (_m, ids: string) => {
+    const clean = ids
+      .split(/[,，]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+      .join(',');
+    if (!clean) return '';
+    return `<span class="md-citation-chip" data-citation-ids="${clean}"></span>`;
+  });
+
+  if (isStreaming) {
+    // 尾部未闭合 marker（【cite:... 甚至只输入了一半的【）暂时隐藏
+    text = text.replace(/【[^】]*$/, '');
+  }
+
+  // 还原行内代码
+  text = text.replace(new RegExp(`${INLINE_CODE_PLACEHOLDER}(\\d+)__`, 'g'), (_m, i: string) => inlineCodes[Number(i)]);
+
+  return text;
+}
+
+/**
  * 预处理 LaTeX 数学公式，避免被 markdown parser 拆段。
  * $$...$$ 转换为块级占位符，$...$ 转换为行内占位符，
  * 后续由 renderMathBlocks / renderMathInElement 统一渲染。
@@ -532,7 +571,7 @@ const sanitizedSchema: Record<string, any> = {
   attributes: {
     ...(defaultSchema.attributes || {}),
     div: [...((defaultSchema.attributes || {}).div || []), 'className', 'data-md-table-scroll'],
-    span: [...((defaultSchema.attributes || {}).span || []), 'className', 'dataLatex', 'dataDisplay', 'dataMathRendered', 'data-latex', 'data-display', 'data-math-rendered'],
+    span: [...((defaultSchema.attributes || {}).span || []), 'className', 'dataLatex', 'dataDisplay', 'dataMathRendered', 'data-latex', 'data-display', 'data-math-rendered', 'data-citation-ids', 'dataCitationIds'],
     a: [
       'ariaDescribedBy', 'ariaLabel', 'ariaLabelledBy',
       'dataFootnoteBackref', 'dataFootnoteRef',
@@ -719,15 +758,17 @@ export function parseMarkdownSegments(text: string, isStreaming = false): Markdo
   return segments;
 }
 
-export function renderMarkdownText(text: string, isStreaming = false): string {
+export function renderMarkdownText(text: string, isStreaming = false, enableCitations = false): string {
   if (!text) return '';
 
   // isStreaming 必须透传：流式期间未闭合的 show_html 需要编码成 data-partial 占位
   // （js=off 实时渲染 / js=on 显示"渲染中"），否则原始标签文本会直接散落到消息里
+  // enableCitations：仅 assistant 正文开启；用户消息/预览等静态文本里的【cite:】原样显示
+  const withCustomBlocks = transformShowFileBlocks(
+    transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming))
+  );
   const safeText = transformMathBlocks(
-    transformShowFileBlocks(
-      transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming))
-    )
+    enableCitations ? transformCitationMarkers(withCustomBlocks, isStreaming) : withCustomBlocks
   );
 
   let html = '';

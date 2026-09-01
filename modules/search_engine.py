@@ -6,6 +6,7 @@ from typing import Dict, Optional, Any, List
 from datetime import datetime
 from pathlib import Path
 import re
+from urllib.parse import urlparse
 try:
     from config import TAVILY_API_KEY, SEARCH_MAX_RESULTS, OUTPUT_FORMATS, DATA_DIR
 except ImportError:
@@ -150,10 +151,12 @@ class SearchEngine:
         
         # 处理每个搜索结果
         for idx, result in enumerate(raw_data.get("results", []), 1):
+            url = result.get("url", "")
             formatted_result = {
                 "index": idx,
                 "title": result.get("title", "无标题"),
-                "url": result.get("url", ""),
+                "url": url,
+                "domain": urlparse(url).netloc.lower() if url else "",
                 "content": result.get("content", ""),
                 "score": result.get("score", 0),
                 "published_date": result.get("published_date", "")
@@ -161,6 +164,48 @@ class SearchEngine:
             formatted["results"].append(formatted_result)
         
         return formatted
+
+    def build_summary_text(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+        filters: Dict[str, Any],
+        timestamp: str
+    ) -> str:
+        """构建给模型看的搜索摘要文本。
+
+        若结果项带 citation_id（tools_execution 注册 citation 后回填），
+        标题行会带 [src_xxx] 前缀，供模型在行内引用中使用。
+        """
+        summary_lines = [
+            f"🔍 搜索查询: {query}",
+            f"📅 搜索时间: {timestamp}"
+        ]
+        
+        filter_notes = self._summarize_filters(filters or {})
+        if filter_notes:
+            summary_lines.append(filter_notes)
+        summary_lines.append("")
+        
+        # 添加搜索结果
+        if results:
+            summary_lines.append("📊 搜索结果:")
+            
+            for result in results:
+                cid = result.get("citation_id")
+                title_line = f"\n{result['index']}. [{cid}] {result['title']}" if cid else f"\n{result['index']}. {result['title']}"
+                summary_lines.extend([
+                    title_line,
+                    f"   🔗 {result['url']}",
+                    f"   📄 {result['content'][:200]}..." if len(result['content']) > 200 else f"   📄 {result['content']}",
+                ])
+                
+                if result.get("published_date"):
+                    summary_lines.append(f"   📅 发布时间: {result['published_date']}")
+        else:
+            summary_lines.append("未找到相关结果")
+        
+        return "\n".join(summary_lines)
     
     async def search_with_summary(
         self,
@@ -203,36 +248,15 @@ class SearchEngine:
                 "summary": ""
             }
         
-        # 构建摘要
-        summary_lines = [
-            f"🔍 搜索查询: {query}",
-            f"📅 搜索时间: {results['timestamp']}"
-        ]
-        
-        filter_notes = self._summarize_filters(results.get("filters", {}))
-        if filter_notes:
-            summary_lines.append(filter_notes)
-        summary_lines.append("")
-        
-        # 添加搜索结果
-        if results["results"]:
-            summary_lines.append("📊 搜索结果:")
-            
-            for result in results["results"]:
-                summary_lines.extend([
-                    f"\n{result['index']}. {result['title']}",
-                    f"   🔗 {result['url']}",
-                    f"   📄 {result['content'][:200]}..." if len(result['content']) > 200 else f"   📄 {result['content']}",
-                ])
-                
-                if result.get("published_date"):
-                    summary_lines.append(f"   📅 发布时间: {result['published_date']}")
-        else:
-            summary_lines.append("未找到相关结果")
-        
         return {
             "success": True,
-            "summary": "\n".join(summary_lines),
+            "summary": self.build_summary_text(
+                query,
+                results["results"],
+                results.get("filters", {}),
+                results["timestamp"]
+            ),
+            "timestamp": results["timestamp"],
             "filters": results.get("filters", {}),
             "query": results.get("query", query),
             "results": results.get("results", []),

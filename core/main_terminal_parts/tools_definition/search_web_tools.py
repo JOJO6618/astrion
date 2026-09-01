@@ -92,7 +92,7 @@ class ToolsDefinitionSearchWebToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "web_search",
-                            "description": "当现有资料不足时搜索外部信息。调用前说明目的，精准撰写 query，并合理设置时间/主题参数；避免重复或无意义的搜索。",
+                            "description": "当现有资料不足时搜索外部信息。调用前说明目的，精准撰写 query，并合理设置时间/主题参数；避免重复或无意义的搜索。结果中每条来源带 [src_xxx] 引用 ID，回答中标注事实来源时使用。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -145,7 +145,7 @@ class ToolsDefinitionSearchWebToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "extract_webpage",
-                            "description": "在 web_search 结果不够详细时提取网页正文。调用前说明用途，注意提取内容会消耗大量 token，超过80000字符将被拒绝。",
+                            "description": "在 web_search 结果不够详细时提取网页正文。调用前说明用途，注意提取内容会消耗大量 token，超过80000字符将被拒绝。结果会带来源引用 ID。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({

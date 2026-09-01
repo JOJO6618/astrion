@@ -32,12 +32,17 @@ import {
   type MarkdownSegment
 } from '@/composables/useMarkdownRenderer';
 import { chunkRenderedHtml, type HtmlChunk } from '@/utils/htmlChunks';
+import { enhanceCitationChips, type CitationAnnotation } from './citationChips';
 
 defineOptions({ name: 'MarkdownRenderer' });
 
 const props = defineProps<{
   content: string;
   isStreaming?: boolean;
+  citations?: CitationAnnotation[];
+  /** citations 是否为后端裁决后的权威版本（message.metadata.citations 已到达） */
+  citationsFinal?: boolean;
+  enableCitations?: boolean;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -47,7 +52,8 @@ const segments = computed(() => parseMarkdownSegments(props.content || '', props
 
 function renderText(text: string) {
   // 透传流式标志：show_html 卡片在流式期间需要 partial 渲染（实时渲染/渲染中占位）
-  return renderMarkdownText(text, props.isStreaming);
+  // enableCitations：仅 assistant 正文开启引用渲染，其他场景【cite:】按原文显示
+  return renderMarkdownText(text, props.isStreaming, props.enableCitations);
 }
 
 // 分段级分块缓存：segments 每个 token 都是新对象，按 key 缓存避免对
@@ -83,6 +89,22 @@ function renderMath() {
 onMounted(renderMath);
 onUpdated(renderMath);
 watch(() => props.content, renderMath, { immediate: true });
+
+// 行内引用：渲染后扫描 chip 占位 span，填充内容并接管交互。
+// chip 在输出瞬间即解析（工具结果查表 / file token 自解析）；
+// citationsFinal 到达时做权威裁决（移除无效 chip）与富化。
+function enhanceCitations() {
+  if (!props.enableCitations) return;
+  nextTick(() => {
+    if (containerRef.value) {
+      enhanceCitationChips(containerRef.value, props.citations, { final: props.citationsFinal });
+    }
+  });
+}
+
+onMounted(enhanceCitations);
+onUpdated(enhanceCitations);
+watch(() => [props.citations, props.citationsFinal], enhanceCitations);
 </script>
 
 <style scoped>

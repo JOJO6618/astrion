@@ -121,7 +121,7 @@
         :class="{ 'streaming-text': group.streaming }"
       >
         <div class="text-content" :class="{ 'streaming-text': group.streaming }">
-          <MarkdownRenderer :content="group.content || ''" :is-streaming="group.streaming" />
+          <MarkdownRenderer :content="group.content || ''" :is-streaming="group.streaming" :citations="citations" :citations-final="citationsFinal" :enable-citations="enableCitations" />
         </div>
       </div>
       <div v-else-if="group.type === 'system'" class="summary-group sub-agent-system-group">
@@ -159,6 +159,7 @@ const personalizationStore = usePersonalizationStore();
 const heightLimited = computed(() => personalizationStore.form.minimal_expand_height_limited);
 import { getRandomLoader } from './loaders/index';
 import MarkdownRenderer from './MarkdownRenderer.vue';
+import type { CitationAnnotation } from './citationChips';
 
 interface Action {
   id?: string;
@@ -196,6 +197,9 @@ interface BlockGroup {
 
 const props = defineProps<{
   actions: Action[];
+  citations?: CitationAnnotation[];
+  citationsFinal?: boolean;
+  enableCitations?: boolean;
   conversationRunning?: boolean;
   isLatestMessage?: boolean;
   iconStyle?: (name: string) => any;

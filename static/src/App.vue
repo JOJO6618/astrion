@@ -404,6 +404,7 @@
         <FilePreviewPanel
           v-if="!isMobileViewport"
         />
+        <CitationPopover :host-mode="versioningHostMode" />
         <div
           v-if="!isMobileViewport && (terminalPanelOpen || gitChangesPanelOpen)"
           class="resize-handle resize-handle--right-panels"
@@ -843,6 +844,7 @@ import VideoPicker from './components/overlay/VideoPicker.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
 import QuickDock from './components/chat/quickdock/QuickDock.vue';
 import FilePreviewPanel from './components/chat/quickdock/FilePreviewPanel.vue';
+import CitationPopover from './components/chat/CitationPopover.vue';
 import { useTutorialStore } from './stores/tutorial';
 import { usePersonalizationStore } from './stores/personalization';
 
