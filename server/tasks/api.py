@@ -17,6 +17,7 @@ from flask import current_app, session
 from server.auth_helpers import api_login_required, get_current_username
 from server.context import get_user_resources, ensure_conversation_loaded
 from server.chat_flow import run_chat_task_sync
+from server.security import rate_limited
 from server.state import stop_flags
 from server.utils_common import debug_log, log_conn_diag
 from utils.host_workspace_debug import write_host_workspace_debug
@@ -109,6 +110,7 @@ def get_conversation_running_status_api(conversation_id: str):
 
 @tasks_bp.route("/api/tasks", methods=["POST"])
 @api_login_required
+@rate_limited("chat_task_create", 30, 60, scope="user")
 def create_task_api():
     username = get_current_username()
     workspace_id = session.get("workspace_id") or "default"

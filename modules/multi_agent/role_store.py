@@ -33,7 +33,21 @@ except ImportError:
     CUSTOM_ROLES_DIR = ""
     WEB_PRESET_ROLES_DIR = ""
 
+from modules.i18n import tr
+
 FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n(?P<rest>.*)$", re.S)
+
+# 角色 ID 白名单：小写字母数字开头，允许连字符/下划线（与现有 ui-operator 等预设兼容）。
+# role_id 直接参与文件路径拼接（{role_id}.md），必须拒绝 /、.. 等路径字符。
+_ROLE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
+def validate_role_id(role_id: str) -> str:
+    """校验并返回合法 role_id；非法时 raise ValueError（防路径穿越写入）。"""
+    cleaned = (role_id or "").strip()
+    if not _ROLE_ID_RE.match(cleaned):
+        raise ValueError(tr("multi_agent_api.role_id_invalid", role_id=repr(cleaned)))
+    return cleaned
 
 
 # ----- 目录推断 -----
@@ -363,6 +377,7 @@ def save_custom_role(
     custom_dir: Optional[str | Path] = None,
 ) -> Path:
     """保存角色到自定义目录。不传 custom_dir 时回退到 host 运行态目录。"""
+    validate_role_id(role.role_id)
     if custom_dir:
         c_dir = Path(custom_dir).expanduser().resolve()
     else:
@@ -378,6 +393,7 @@ def delete_custom_role(
     custom_dir: Optional[str | Path] = None,
 ) -> bool:
     """删除用户自定义角色。不传 custom_dir 时回退到 host 运行态目录。"""
+    role_id = validate_role_id(role_id)
     if custom_dir:
         c_dir = Path(custom_dir).expanduser().resolve()
     else:

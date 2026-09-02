@@ -345,9 +345,36 @@ def handle_message(data):
     start_chat_task(terminal, message, images, send_with_activity, client_sid, workspace, username, videos)
 
 
+# WS 客户端日志事件的轻量限流（防已认证用户洪泛写盘；username -> 时间戳滑窗）
+_WS_CLIENT_LOG_LIMIT = 30  # 每 60 秒最多 30 条
+_WS_CLIENT_LOG_WINDOW = 60.0
+_ws_client_log_buckets: Dict[str, list] = {}
+_WS_CLIENT_LOG_MAX_KEYS = 10000
+
+
+def _ws_client_log_allowed(username: str) -> bool:
+    now = time.time()
+    if len(_ws_client_log_buckets) > _WS_CLIENT_LOG_MAX_KEYS:
+        # 全局回收：清空过老桶（简单策略，防止桶表无限膨胀）
+        for key in [k for k, v in _ws_client_log_buckets.items() if not v or now - v[-1] > _WS_CLIENT_LOG_WINDOW]:
+            _ws_client_log_buckets.pop(key, None)
+        if len(_ws_client_log_buckets) > _WS_CLIENT_LOG_MAX_KEYS:
+            _ws_client_log_buckets.clear()
+    bucket = _ws_client_log_buckets.setdefault(username, [])
+    while bucket and now - bucket[0] > _WS_CLIENT_LOG_WINDOW:
+        bucket.pop(0)
+    if len(bucket) >= _WS_CLIENT_LOG_LIMIT:
+        return False
+    bucket.append(now)
+    return True
+
+
 @socketio.on('client_chunk_log')
 def handle_client_chunk_log(data):
     """前端chunk日志上报"""
+    username = connection_users.get(request.sid)
+    if not username or not _ws_client_log_allowed(username):
+        return
     conversation_id = data.get('conversation_id')
     chunk_index = int(data.get('index') or data.get('chunk_index') or 0)
     elapsed = float(data.get('elapsed') or 0.0)
@@ -359,6 +386,9 @@ def handle_client_chunk_log(data):
 @socketio.on('client_stream_debug_log')
 def handle_client_stream_debug_log(data):
     """前端流式调试日志"""
+    username = connection_users.get(request.sid)
+    if not username or not _ws_client_log_allowed(username):
+        return
     if not isinstance(data, dict):
         return
     entry = dict(data)

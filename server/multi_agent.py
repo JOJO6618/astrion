@@ -24,6 +24,7 @@ from modules.multi_agent.role_store import (
     delete_custom_role,
     is_preset_role,
     sync_preset_roles,
+    validate_role_id,
 )
 from config.paths import CUSTOM_ROLES_DIR, WEB_PRESET_ROLES_DIR
 from config.limits import REASONING_EFFORT_LEVELS
@@ -121,6 +122,10 @@ def create_role_api():
         model_key = str(data.get("model_key") or "").strip() or None
         if not role_id or not name or not body_prompt:
             return jsonify({"success": False, "error": tr("multi_agent_api.role_fields_required")}), 400
+        try:
+            role_id = validate_role_id(role_id)
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
         if thinking_mode not in {"fast", "thinking"}:
             thinking_mode = "fast"
         # 不允许覆盖预设角色
@@ -150,6 +155,10 @@ def create_role_api():
 @api_login_required
 def update_role_api(role_id: str):
     """更新用户自定义角色。不能更新预设角色。"""
+    try:
+        role_id = validate_role_id(role_id)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     try:
         data = request.get_json() or {}
         runtime_dir, custom_dir = _get_role_dirs()
@@ -183,6 +192,10 @@ def update_role_api(role_id: str):
 @api_login_required
 def delete_role_api(role_id: str):
     """删除用户自定义角色。不能删除预设角色。"""
+    try:
+        role_id = validate_role_id(role_id)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     try:
         if is_preset_role(role_id):
             return jsonify({"success": False, "error": tr("multi_agent_api.cannot_delete_preset_role", role_id=role_id)}), 403

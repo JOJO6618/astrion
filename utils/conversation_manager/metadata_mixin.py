@@ -50,7 +50,10 @@ class MetadataMixin:
         return f"conv_{timestamp}_{ms:03d}"
 
     def _get_conversation_file_path(self, conversation_id: str) -> Path:
-        """获取对话文件路径"""
+        """获取对话文件路径（白名单校验 ID，防止路径穿越读写数据目录外的文件）。"""
+        import re
+        if not re.fullmatch(r"conv_[A-Za-z0-9_-]+", conversation_id or ""):
+            raise ValueError(tr("conversation.invalid_conversation_id"))
         return self.conversations_dir / f"{conversation_id}.json"
 
     def _extract_title_from_messages(self, messages: List[Dict]) -> str:

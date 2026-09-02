@@ -327,6 +327,10 @@ def _open_file_with_app(file_path: Path, app_id: str) -> bool:
 @api_login_required
 @with_terminal
 def open_project_in_file_manager(terminal, workspace, username):
+    # 在宿主 GUI 上弹文件管理器窗口——仅 host（单机）模式合理；
+    # docker/web 多用户模式下这会让任何登录用户在服务器桌面弹窗（骚扰 + 路径存在性探测）
+    if not _is_host_mode_request():
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
     data = request.get_json(silent=True) or {}
     target_workspace_id = (data.get("workspace_id") or "").strip()
 

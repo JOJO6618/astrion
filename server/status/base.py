@@ -21,7 +21,7 @@ from server.state import (
     container_manager,
     user_manager,
 )
-from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE
+from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE, TERMINAL_SANDBOX_MOUNT_PATH
 from modules.host_workspace_manager import (
     create_host_workspace,
     delete_host_workspace,
@@ -149,7 +149,12 @@ def get_status(terminal, workspace, username):
     except Exception as exc:
         log_conn_diag(f"status conversation-meta-failed user={username} error={exc}")
     timings["conversation_meta_ms"] = (time.perf_counter() - phase_started_at) * 1000
-    status['project_path'] = str(workspace.project_path)
+    # docker/web 多用户模式下，宿主绝对路径会泄露服务器目录布局与系统用户名，
+    # 对用户无实际意义（操作均在容器 /workspace 内），脱敏为容器视角路径。
+    if _is_host_mode_request():
+        status['project_path'] = str(workspace.project_path)
+    else:
+        status['project_path'] = TERMINAL_SANDBOX_MOUNT_PATH
     phase_started_at = time.perf_counter()
     try:
         # 首屏状态只需要容器是否存在/运行等轻量信息；Docker stats 很慢，

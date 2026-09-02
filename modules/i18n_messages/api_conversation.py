@@ -7,6 +7,11 @@ Keys are prefixed with ``conversation.`` (the core table already owns
 """
 
 MESSAGES = {
+    # ── _get_conversation_file_path（对话 ID 白名单校验） ──
+    "conversation.invalid_conversation_id": {
+        "zh-CN": "对话 ID 不合法",
+        "en-US": "Invalid conversation ID",
+    },
     # ── _build_safe_load_result（安全导航加载结果，返还前端） ──
     "conversation.load_failed_not_found": {
         "zh-CN": "对话不存在或加载失败",

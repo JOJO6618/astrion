@@ -57,6 +57,7 @@ from modules.personalization_manager import (
     save_personalization_config,
 )
 from modules.upload_security import UploadSecurityError
+from server.security import rate_limited
 from modules.user_manager import UserWorkspace
 from modules.usage_tracker import QUOTA_DEFAULTS
 from modules.sub_agent import TERMINAL_STATUSES
@@ -1220,12 +1221,14 @@ def download_conversation_media(media_id, terminal: WebTerminal, workspace: User
             return jsonify({"success": False, "error": tr("conversation.media_file_not_found")}), 404
 
         mime_type = str(entry.get("mime_type") or "application/octet-stream").strip() or "application/octet-stream"
+        # 可执行/脚本类 mime 一律强制下载，防止存储型 XSS（与 file/content 的 SVG 策略一致）
+        _dangerous_inline = mime_type in {"text/html", "image/svg+xml", "application/xhtml+xml"} or mime_type.startswith("text/html")
         blob_name = str(entry.get("blob_rel_path") or "")
         filename = Path(blob_name).name if blob_name else target_id.replace(":", "_")
         return send_file(
             BytesIO(payload),
-            mimetype=mime_type,
-            as_attachment=False,
+            mimetype="application/octet-stream" if _dangerous_inline else mime_type,
+            as_attachment=_dangerous_inline,
             download_name=filename,
             conditional=True,
             etag=True,
@@ -1724,6 +1727,7 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
 @conversation_bp.route('/api/conversations/<conversation_id>/compress', methods=['POST'])
 @api_login_required
 @with_terminal
+@rate_limited("conversation_compress", 5, 300, scope="user")
 def compress_conversation(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """深层压缩指定对话（in-place）：生成 compact 文件、标记历史前缀为已压缩，按设置决定是否续接。"""
     try:

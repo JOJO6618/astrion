@@ -30,6 +30,10 @@ MESSAGES = {
         "zh-CN": "role_id/name/body_prompt 必填",
         "en-US": "role_id/name/body_prompt are required",
     },
+    "multi_agent_api.role_id_invalid": {
+        "zh-CN": "角色 ID 不合法：{role_id}（仅允许小写字母/数字开头，后接小写字母/数字/连字符/下划线）",
+        "en-US": "Invalid role ID: {role_id} (must start with lowercase letter/digit, followed by lowercase letters/digits/hyphens/underscores)",
+    },
     "multi_agent_api.cannot_override_preset_role": {
         "zh-CN": "不能覆盖预设角色 {role_id}",
         "en-US": "Cannot override preset role {role_id}",
