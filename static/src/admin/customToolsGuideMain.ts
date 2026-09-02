@@ -1,4 +1,7 @@
 import { createApp } from 'vue';
+import { installI18n } from '@/locales';
 import CustomToolsGuideApp from './CustomToolsGuideApp.vue';
 
-createApp(CustomToolsGuideApp).mount('#custom-tools-guide');
+const app = createApp(CustomToolsGuideApp);
+installI18n(app);
+app.mount('#custom-tools-guide');

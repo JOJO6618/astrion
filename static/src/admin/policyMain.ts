@@ -1,4 +1,7 @@
 import { createApp } from 'vue';
+import { installI18n } from '@/locales';
 import PolicyApp from './PolicyApp.vue';
 
-createApp(PolicyApp).mount('#admin-policy-app');
+const app = createApp(PolicyApp);
+installI18n(app);
+app.mount('#admin-policy-app');
