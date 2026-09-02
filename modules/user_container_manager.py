@@ -158,18 +158,22 @@ class UserContainerManager:
                     handle.touch()
                     return handle
 
-            if not self._has_capacity(key):
-                raise RuntimeError(tr("container_mgr.quota_exhausted"))
+            # 配额检查仅针对 docker 句柄：host 句柄只是会话标识，不占用容器池资源，
+            # 创建 host 句柄时直接跳过全局/每用户两道配额闸门
+            if mode == "docker":
+                if not self._has_capacity(key):
+                    raise RuntimeError(tr("container_mgr.quota_exhausted"))
 
-            # 每用户容器配额：防单用户多工作区占满全局容器池，挤占其他用户
-            per_user_limit = MAX_ACTIVE_CONTAINERS_PER_USER
-            if per_user_limit > 0:
-                owned = sum(
-                    1 for k in self._containers
-                    if k == username_norm or k.startswith(f"{username_norm}::")
-                )
-                if owned >= per_user_limit:
-                    raise RuntimeError(tr("container_mgr.per_user_quota_exhausted", limit=per_user_limit))
+                # 每用户容器配额：防单用户多工作区占满全局容器池，挤占其他用户
+                per_user_limit = MAX_ACTIVE_CONTAINERS_PER_USER
+                if per_user_limit > 0:
+                    owned = sum(
+                        1 for k, h in self._containers.items()
+                        if (k == username_norm or k.startswith(f"{username_norm}::"))
+                        and h.mode == "docker"
+                    )
+                    if owned >= per_user_limit:
+                        raise RuntimeError(tr("container_mgr.per_user_quota_exhausted", limit=per_user_limit))
 
             # Important: create container using the cache key so each workspace gets its own container name.
             handle = self._create_handle(key, workspace, mode)
@@ -193,7 +197,8 @@ class UserContainerManager:
                 return True
             if self.max_containers <= 0:
                 return True
-            return len(self._containers) < self.max_containers
+            docker_total = sum(1 for h in self._containers.values() if h.mode == "docker")
+            return docker_total < self.max_containers
 
     def get_handle(self, container_key: str) -> Optional[ContainerHandle]:
         key = self._normalize_username(container_key)
@@ -293,8 +298,11 @@ class UserContainerManager:
     def _has_capacity(self, username: str) -> bool:
         if self.max_containers <= 0:
             return True
-        existing = 1 if username in self._containers else 0
-        return (len(self._containers) - existing) < self.max_containers
+        # 全局上限同样只统计 docker 句柄（host 句柄不占用容器池）
+        docker_total = sum(1 for h in self._containers.values() if h.mode == "docker")
+        existing_handle = self._containers.get(username)
+        existing = 1 if (existing_handle and existing_handle.mode == "docker") else 0
+        return (docker_total - existing) < self.max_containers
 
     def _create_handle(self, username: str, workspace: str, mode: str) -> ContainerHandle:
         if mode != "docker":

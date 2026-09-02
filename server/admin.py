@@ -419,7 +419,9 @@ def build_api_admin_dashboard_snapshot():
     max_containers = getattr(container_manager, "max_containers", None) or len(handle_map)
     available_slots = None
     if max_containers:
-        available_slots = max(0, max_containers - len(handle_map))
+        # 可用余量只对 docker 句柄计数（host 句柄不占用容器池配额）
+        docker_total = sum(1 for val in handle_map.values() if val.get("mode") == "docker")
+        available_slots = max(0, max_containers - docker_total)
 
     upload_events = collect_upload_events()
     uploads_summary = summarize_upload_events(upload_events, quarantine_total_bytes)

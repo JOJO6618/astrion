@@ -57,7 +57,8 @@ LINUX_SAFETY = os.environ.get("LINUX_SAFETY", "0") not in {"0", "false", "False"
 TOOLBOX_TERMINAL_IDLE_SECONDS = int(os.environ.get("TOOLBOX_TERMINAL_IDLE_SECONDS", "900"))
 MAX_ACTIVE_USER_CONTAINERS = int(os.environ.get("MAX_ACTIVE_USER_CONTAINERS", "8"))
 # 每用户同时活跃的容器上限（防单用户多工作区占满全局容器池，2026-09-02 审计新增）
-MAX_ACTIVE_CONTAINERS_PER_USER = int(os.environ.get("MAX_ACTIVE_CONTAINERS_PER_USER", "3"))
+# 仅统计 docker 句柄（host 句柄不计入）；默认值 8 与全局上限对齐（2026-09-02 调整）
+MAX_ACTIVE_CONTAINERS_PER_USER = int(os.environ.get("MAX_ACTIVE_CONTAINERS_PER_USER", "8"))
 HOST_EXECUTION_MODE_DEFAULT = os.environ.get("HOST_EXECUTION_MODE_DEFAULT", "sandbox").strip().lower()
 # 沙箱可写路径的「部署通道」（逗号分隔）。路径授权只有两个来源：
 # config/host_sandbox_policy.json（前端「路径授权」UI）+ 本变量（真·环境变量），

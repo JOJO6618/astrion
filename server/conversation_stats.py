@@ -312,7 +312,8 @@ def collect_container_snapshots(handle_map: Dict[str, Dict[str, Any]]) -> Dict[s
         "host": active_total - docker_count,
         "issues": failure_count,
         "max_containers": container_manager.max_containers,
-        "available_slots": max(0, container_manager.max_containers - active_total) if container_manager.max_containers > 0 else None,
+        # 可用余量只对 docker 句柄计数（host 句柄不占用容器池配额）
+        "available_slots": max(0, container_manager.max_containers - docker_count) if container_manager.max_containers > 0 else None,
         "avg_cpu_percent": round(sum(cpu_values) / len(cpu_values), 2) if cpu_values else None,
         "avg_mem_percent": round(sum(mem_percent_values) / len(mem_percent_values), 2) if mem_percent_values else None,
         "total_mem_used_bytes": total_mem_used,
