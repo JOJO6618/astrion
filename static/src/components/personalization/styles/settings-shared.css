@@ -759,7 +759,8 @@ body[data-theme='dark'] .settings-floating-menu {
   }
 
   .settings-redesign-card.mobile-in-sub .settings-redesign-layout {
-    transform: translateX(-50%);
+    position: relative;
+    left: -100%;
   }
 
   .settings-redesign-nav,
