@@ -53,27 +53,68 @@
         </div>
       </template>
 
-      <!-- 多来源：列表 -->
+      <!-- 多来源：分页卡片（内容区与单来源一致，头部右侧左右箭头切换） -->
       <template v-else>
-        <div class="pop-header">
-          <span class="pop-domain">{{ t('chat.citationSources', { n: citationPopover.annotations.length }) }}</span>
+        <div
+          class="pop-header"
+          :class="{ clickable: current && isFile(current) && canPreviewFile }"
+          @click="onHeaderClick(current)"
+        >
+          <span class="pop-icon" v-html="iconHtml(current)"></span>
+          <span class="pop-domain">{{ headerText(current) }}</span>
+          <span class="pop-pager">
+            <button
+              type="button"
+              class="pop-pager-btn"
+              :disabled="currentIndex <= 0"
+              :aria-label="t('chat.citationPrev')"
+              @click.stop="stepPager(-1)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            </button>
+            <span class="pop-pager-count">{{ currentIndex + 1 }}/{{ citationPopover.annotations.length }}</span>
+            <button
+              type="button"
+              class="pop-pager-btn"
+              :disabled="currentIndex >= citationPopover.annotations.length - 1"
+              :aria-label="t('chat.citationNext')"
+              @click.stop="stepPager(1)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+          </span>
         </div>
         <div class="pop-scroll">
-          <div
-            v-for="ann in citationPopover.annotations"
-            :key="ann.id"
-            class="pop-list-row"
-            @click="onRowClick(ann)"
-          >
-            <span class="pop-list-icon" v-html="iconHtml(ann)"></span>
-            <span class="pop-list-text">
-              <span class="pop-list-title">
-                <span class="pop-list-title-text">{{ ann.title || ann.file_name || '' }}</span>
-                <span v-if="isFile(ann) && locatorText(ann)" class="pop-locator pop-locator--sm">{{ locatorText(ann) }}</span>
-              </span>
-              <span class="pop-list-domain">{{ rowSubText(ann) }}</span>
-            </span>
+          <div class="pop-body">
+            <div class="pop-title-row">
+              <div class="pop-title">{{ current.title || current.file_name || '' }}</div>
+              <span v-if="locatorText(current)" class="pop-locator">{{ locatorText(current) }}</span>
+            </div>
+            <div v-if="current.url" class="pop-url">{{ current.url }}</div>
+            <div v-if="isImageFile(current)" class="pop-image">
+              <img
+                :src="fileContentUrl(current)"
+                :alt="current.file_name || ''"
+                loading="lazy"
+                @click.stop="openCitationPreview(current)"
+              />
+            </div>
+            <div v-else-if="displaySnippet(current)" class="pop-snippet">“{{ displaySnippet(current) }}”</div>
           </div>
+        </div>
+        <div v-if="hasFooterAction" class="pop-footer">
+          <a
+            v-if="!isFile(current) && current.url"
+            class="pop-open"
+            :href="current.url"
+            target="_blank"
+            rel="noopener"
+          >{{ t('chat.citationOpenSource') }} ↗</a>
+          <span
+            v-else-if="isFile(current) && hostMode"
+            class="pop-open"
+            @click="openOnComputer(current)"
+          >{{ t('quickdock.menuRevealInManager') }}</span>
         </div>
       </template>
     </div>
@@ -106,9 +147,32 @@ const single = computed<CitationAnnotation | null>(() =>
   citationPopover.annotations.length === 1 ? citationPopover.annotations[0] : null,
 );
 
+/** 多来源分页：当前展示的条目索引（弹层打开时重置为 0，箭头步进） */
+const currentIndex = ref(0);
+
+/** 始终指向当前展示的条目：单来源 = 唯一一条；多来源 = 分页当前页 */
+const current = computed<CitationAnnotation | null>(() => {
+  const list = citationPopover.annotations;
+  if (!list.length) return null;
+  return list[Math.min(currentIndex.value, list.length - 1)] ?? null;
+});
+
+function stepPager(delta: number) {
+  const list = citationPopover.annotations;
+  if (list.length < 2) return;
+  const next = Math.min(Math.max(currentIndex.value + delta, 0), list.length - 1);
+  if (next === currentIndex.value) return;
+  currentIndex.value = next;
+  // 内容高度变化后重新定位，并给新条目做 favicon 竞速升级
+  void nextTick(() => {
+    positionPopover();
+    if (popoverEl.value) upgradeCitationFavicons(popoverEl.value);
+  });
+}
+
 // 底部有动作才渲染 footer：网页=打开来源；文件=在电脑上直接打开（仅宿主机）
 const hasFooterAction = computed(() => {
-  const s = single.value;
+  const s = current.value;
   if (!s) return false;
   if (isFile(s)) return !!props.hostMode;
   return !!s.url;
@@ -178,12 +242,6 @@ function locatorText(ann: CitationAnnotation): string {
   return bits.join(' · ');
 }
 
-function rowSubText(ann: CitationAnnotation): string {
-  // 行号徽章已提到标题行，副行固定显示路径（网页显示域名）
-  if (isFile(ann)) return ann.file_path || '';
-  return shortDomain(ann.domain);
-}
-
 function openFile(ann: CitationAnnotation) {
   if (!ann.file_path || !canPreviewFile.value) return;
   quickDock.openPreview(ann.file_path);
@@ -192,8 +250,12 @@ function openFile(ann: CitationAnnotation) {
 
 /* ---------- 文件内容片段懒加载 ----------
  * 后端落库时已富化 snippet；但旧消息（富化前持久化）与流式期的临时 annotation
- * 没有 snippet，这里在弹层打开时按 file_path 拉一次内容补齐。 */
+ * 没有 snippet，这里在弹层打开时按 file_path 拉一次内容补齐。
+ * 多来源时打开瞬间即并发预取全部条目，避免切换箭头时内容闪烁。 */
 const snippetCache = ref<Record<string, string>>({});
+
+/** in-flight 去重：同一 id 并发（当前条目 watch + 全量预取）只发一次请求 */
+const pendingSnippets = new Set<string>();
 
 function displaySnippet(ann: CitationAnnotation): string {
   return ann.snippet || snippetCache.value[ann.id] || '';
@@ -201,6 +263,8 @@ function displaySnippet(ann: CitationAnnotation): string {
 
 async function maybeFetchSnippet(ann: CitationAnnotation) {
   if (!isFile(ann) || isImageFile(ann) || ann.snippet || !ann.file_path || snippetCache.value[ann.id]) return;
+  if (pendingSnippets.has(ann.id)) return;
+  pendingSnippets.add(ann.id);
   const path = ann.file_path;
   try {
     const resp = await fetch(`/api/file/content?path=${encodeURIComponent(path)}`);
@@ -228,13 +292,22 @@ async function maybeFetchSnippet(ann: CitationAnnotation) {
     }
   } catch {
     /* 读取失败静默：弹层退化为仅路径/定位信息 */
+  } finally {
+    pendingSnippets.delete(ann.id);
+  }
+}
+
+/** 打开弹层时并发预取全部条目的文件摘要（图片条目跳过，直接显示预览） */
+function prefetchAllSnippets() {
+  for (const ann of citationPopover.annotations) {
+    void maybeFetchSnippet(ann);
   }
 }
 
 watch(
-  () => [citationPopover.visible, single.value?.id] as const,
+  () => [citationPopover.visible, current.value?.id] as const,
   ([visible]) => {
-    if (visible && single.value) maybeFetchSnippet(single.value);
+    if (visible && current.value) maybeFetchSnippet(current.value);
   },
 );
 
@@ -273,15 +346,6 @@ async function openOnComputer(ann: CitationAnnotation) {
   closeCitationPopover();
 }
 
-function onRowClick(ann: CitationAnnotation) {
-  if (isFile(ann)) {
-    openFile(ann);
-  } else if (ann.url) {
-    window.open(ann.url, '_blank', 'noopener');
-    closeCitationPopover();
-  }
-}
-
 /** 定位：优先放胶囊下方，空间不足翻到上方；水平方向视口内夹取 */
 function positionPopover() {
   const anchor = citationPopover.anchor;
@@ -303,6 +367,8 @@ watch(
   () => citationPopover.visible,
   async (visible) => {
     if (visible) {
+      currentIndex.value = 0; // 多来源分页每次打开回到第 1 条
+      prefetchAllSnippets(); // 并发预取全部条目摘要，切换时不再闪烁
       await nextTick();
       positionPopover();
       // v-html 渲染出的字母占位统一走多源竞速升级
@@ -387,10 +453,55 @@ onBeforeUnmount(() => {
   flex: none;
 }
 .pop-domain {
+  min-width: 0; /* 标题过长时由 ellipsis 截断，给右侧分页器让位 */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+/* 多来源分页：左侧 图标+域名，右侧 左右箭头+页码 */
+.pop-pager {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.pop-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.pop-pager-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+.pop-pager-btn:disabled {
+  color: var(--text-tertiary);
+  opacity: 0.45;
+  cursor: default;
+}
+.pop-pager-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.pop-pager-count {
+  min-width: 26px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 
 .pop-body {
@@ -474,73 +585,6 @@ onBeforeUnmount(() => {
   text-decoration: underline;
 }
 
-.pop-list-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 12px;
-  cursor: pointer;
-}
-.pop-list-row:hover {
-  background: var(--hover-bg);
-}
-.pop-list-row + .pop-list-row {
-  border-top: 1px solid var(--border-default);
-}
-.pop-list-icon {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.pop-list-icon :deep(.chip-favicon) {
-  width: 14px;
-  height: 14px;
-}
-.pop-list-icon :deep(.chip-file-icon) {
-  width: 14px;
-  height: 14px;
-  color: var(--text-tertiary); /* 显式颜色绑定，stroke=currentColor 才能生效 */
-}
-.pop-list-text {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.pop-list-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: 12.5px;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
-.pop-list-title-text {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* 列表行内的小型行号徽章（44px 行高内容纳得下） */
-.pop-locator--sm {
-  height: 16px;
-  padding: 0 6px;
-  font-size: 10px;
-}
-.pop-list-domain {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-}
-
 .pop-header :deep(.chip-favicon) {
   width: 12px;
   height: 12px;
@@ -551,8 +595,7 @@ onBeforeUnmount(() => {
   height: 12px;
   color: var(--text-tertiary);
 }
-.pop-header :deep(.chip-letter),
-.pop-list-icon :deep(.chip-letter) {
+.pop-header :deep(.chip-letter) {
   display: inline-flex;
   align-items: center;
   justify-content: center;

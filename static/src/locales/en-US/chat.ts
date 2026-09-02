@@ -38,8 +38,9 @@ export default {
   thinkingRunning: 'Thinking...',
 
   // —— Inline citations (citation chip / popover) ——
-  citationSources: '{n} sources',
   citationOpenSource: 'Open source',
+  citationPrev: 'Previous source',
+  citationNext: 'Next source',
 
   // —— File append (append / append_payload) ——
   targetFile: 'target file',
