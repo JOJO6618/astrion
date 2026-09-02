@@ -7,6 +7,7 @@
  * chip 内容并接管交互（悬停延迟开 / 移出延迟关 / 点击固定 / 滚动收起）。
  */
 import { reactive } from 'vue';
+import { faviconFallbackHtml, upgradeCitationFavicons } from './citationFavicon';
 
 export interface CitationAnnotation {
   id: string;
@@ -166,24 +167,14 @@ function chipLabel(ann: CitationAnnotation): string {
   return ann.type === 'file_citation' ? (ann.file_name || ann.file_path || '') : shortDomain(ann.domain);
 }
 
-function faviconHtml(domain: string): string {
-  const d = shortDomain(domain);
-  // 站点图标加载失败时退化为域名首字符
-  const letter = (d[0] || '?').toUpperCase();
-  return (
-    `<img class="chip-favicon" loading="lazy" alt="" ` +
-    `src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64" ` +
-    `onerror="this.outerHTML='<span class=&quot;chip-letter&quot;>${letter}</span>'">`
-  );
-}
-
 const FILE_ICON_SVG =
   '<svg class="chip-file-icon" viewBox="0 0 16 16" fill="none">' +
   '<path d="M4 1.5h5.5L13 5v9.5H4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
   '<path d="M9.5 1.5V5H13" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 
 function chipIconHtml(ann: CitationAnnotation): string {
-  return ann.type === 'file_citation' ? FILE_ICON_SVG : faviconHtml(ann.domain || '');
+  // 先渲染首字母兜底，真实 favicon 由 upgradeCitationFavicons 竞速成功后原地替换
+  return ann.type === 'file_citation' ? FILE_ICON_SVG : faviconFallbackHtml(ann.domain || '');
 }
 
 /**
@@ -264,6 +255,9 @@ export function enhanceCitationChips(
     chip._citationAnnotations = annotations;
     attachChipTriggers(chip);
   });
+
+  // 字母占位统一走多源竞速升级（域名级缓存，重复调用无副作用）
+  upgradeCitationFavicons(container);
 }
 
 function escapeText(s: string): string {

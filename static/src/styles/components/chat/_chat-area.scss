@@ -2525,7 +2525,11 @@ a.md-download-link {
     flex: none;
   }
 
-  .chip-favicon + .chip-favicon {
+  // 双图标叠放：favicon 与字母兜底的任意相邻组合保持一致视觉
+  .chip-favicon + .chip-favicon,
+  .chip-letter + .chip-letter,
+  .chip-favicon + .chip-letter,
+  .chip-letter + .chip-favicon {
     margin-left: -5px;
     border: 1px solid var(--surface-muted);
   }

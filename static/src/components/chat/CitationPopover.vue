@@ -92,6 +92,7 @@ import {
   closeCitationPopover,
   type CitationAnnotation,
 } from './citationChips';
+import { faviconFallbackHtml, upgradeCitationFavicons } from './citationFavicon';
 
 defineOptions({ name: 'CitationPopover' });
 
@@ -149,14 +150,6 @@ function shortDomain(domain?: string) {
   return (domain || '').replace(/^www\./, '');
 }
 
-function escapeText(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 const FILE_ICON_SVG =
   '<svg class="chip-file-icon" viewBox="0 0 16 16" fill="none">' +
   '<path d="M4 1.5h5.5L13 5v9.5H4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>' +
@@ -164,13 +157,8 @@ const FILE_ICON_SVG =
 
 function iconHtml(ann: CitationAnnotation): string {
   if (isFile(ann)) return FILE_ICON_SVG;
-  const d = shortDomain(ann.domain);
-  const letter = (d[0] || '?').toUpperCase();
-  return (
-    `<img class="chip-favicon" loading="lazy" alt="" ` +
-    `src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64" ` +
-    `onerror="this.outerHTML='<span class=&quot;chip-letter&quot;>${letter}</span>'">`
-  );
+  // 先渲染首字母兜底，真实 favicon 由 upgradeCitationFavicons 竞速成功后原地替换
+  return faviconFallbackHtml(ann.domain || '');
 }
 
 function headerText(ann: CitationAnnotation): string {
@@ -317,6 +305,8 @@ watch(
     if (visible) {
       await nextTick();
       positionPopover();
+      // v-html 渲染出的字母占位统一走多源竞速升级
+      if (popoverEl.value) upgradeCitationFavicons(popoverEl.value);
     }
   },
 );
