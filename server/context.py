@@ -640,6 +640,13 @@ def apply_conversation_overrides(terminal: WebTerminal, workspace, conversation_
         meta = data.get("metadata") or {}
         prompt_name = meta.get("custom_prompt_name")
         personalization_name = meta.get("personalization_name")
+        # 安全：元数据中的名称必须过资源名校验，防存储型路径穿越
+        import re as _re
+        def _safe_name(v):
+            v = (v or "").strip()
+            return v if _re.fullmatch(r"[A-Za-z0-9_-]{1,64}", v) else None
+        prompt_name = _safe_name(prompt_name)
+        personalization_name = _safe_name(personalization_name)
         # prompt override
         if prompt_name:
             prompt_path = Path(workspace.data_dir) / "prompts" / f"{prompt_name}.txt"

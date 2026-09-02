@@ -209,7 +209,15 @@ class CrudMixin:
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
-        
+
+        # 安全：禁止删除工作区根目录本身（空路径/点路径会解析为根；
+        # docker 模式下该目录是宿主 bind mount，rmtree 会真实删除宿主文件）
+        try:
+            if full_path.resolve() == Path(self.project_path).resolve():
+                return {"success": False, "error": tr("file_manager.cannot_delete_workspace_root")}
+        except Exception:
+            pass
+
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.folder_not_found")}
         

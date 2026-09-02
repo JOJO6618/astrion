@@ -5,8 +5,6 @@
 """
 from __future__ import annotations
 import os
-import zipfile
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -78,16 +76,9 @@ def gui_download_entry(terminal, workspace, username):
     try:
         target = manager.prepare_download(path)
         if target.is_dir():
-            memory_file = BytesIO()
-            with zipfile.ZipFile(memory_file, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
-                for root, dirs, files in os.walk(target):
-                    for file in files:
-                        full_path = Path(root) / file
-                        arcname = manager._to_relative(full_path)
-                        zf.write(full_path, arcname=arcname)
-            memory_file.seek(0)
-            download_name = f"{target.name}.zip"
-            return send_file(memory_file, as_attachment=True, download_name=download_name, mimetype='application/zip')
+            # 文件夹打包下载已下线（2026-09-02 安全审计：os.walk/zipfile 对文件型符号链接
+            # 会读取链接目标内容，容器内可借此泄露宿主任意文件）
+            return jsonify({"success": False, "error": tr("files.folder_download_removed")}), 410
         return send_file(target, as_attachment=True, download_name=target.name)
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 400

@@ -944,7 +944,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             snapshot_path = resolve_monitor_path(arguments)
             monitor_snapshot = capture_monitor_snapshot(web_terminal.file_manager, snapshot_path, MONITOR_SNAPSHOT_CHAR_LIMIT, debug_log)
             if monitor_snapshot:
-                cache_monitor_snapshot(tool_display_id, 'before', monitor_snapshot)
+                cache_monitor_snapshot(tool_display_id, 'before', monitor_snapshot, username=username)
         elif function_name in MONITOR_MEMORY_TOOLS:
             memory_snapshot_type = (arguments.get('memory_type') or 'main').lower()
             before_entries = None
@@ -957,7 +957,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     'memory_type': memory_snapshot_type,
                     'entries': before_entries
                 }
-                cache_monitor_snapshot(tool_display_id, 'before', monitor_snapshot)
+                cache_monitor_snapshot(tool_display_id, 'before', monitor_snapshot, username=username)
 
         sender('tool_start', {
             'id': tool_display_id,
@@ -1300,7 +1300,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             update_payload['awaiting_content'] = True
         if monitor_snapshot_after:
             update_payload['monitor_snapshot_after'] = monitor_snapshot_after
-            cache_monitor_snapshot(tool_display_id, 'after', monitor_snapshot_after)
+            cache_monitor_snapshot(tool_display_id, 'after', monitor_snapshot_after, username=username)
 
         sender('update_action', update_payload)
 

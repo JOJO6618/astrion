@@ -4,8 +4,6 @@ import json, time
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
-from io import BytesIO
-import zipfile
 import os
 
 from flask import Blueprint, jsonify, request, session, send_file
@@ -252,42 +250,10 @@ def download_file_api(terminal: WebTerminal, workspace: UserWorkspace, username:
         download_name=full_path.name
     )
 
-@chat_bp.route('/api/download/folder')
-@api_login_required
-@with_terminal
-def download_folder_api(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """打包并下载文件夹"""
-    path = (request.args.get('path') or '').strip()
-    if not path:
-        return jsonify({"success": False, "error": tr("chat_files.missing_path_param")}), 400
-
-    valid, error, full_path = terminal.file_manager._validate_path(path)
-    if not valid or full_path is None:
-        return jsonify({"success": False, "error": error or tr("chat_files.path_validation_failed")}), 400
-    if not full_path.exists() or not full_path.is_dir():
-        return jsonify({"success": False, "error": tr("chat_files.folder_not_found")}), 404
-
-    buffer = BytesIO()
-    folder_name = Path(path).name or full_path.name or "archive"
-
-    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_buffer:
-        # 确保目录本身被包含
-        zip_buffer.write(full_path, arcname=folder_name + '/')
-
-        for item in full_path.rglob('*'):
-            relative_name = Path(folder_name) / item.relative_to(full_path)
-            if item.is_dir():
-                zip_buffer.write(item, arcname=str(relative_name) + '/')
-            else:
-                zip_buffer.write(item, arcname=str(relative_name))
-
-    buffer.seek(0)
-    return send_file(
-        buffer,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name=f"{folder_name}.zip"
-    )
+# 文件夹打包下载功能已彻底移除（2026-09-02 安全审计）：
+# 原 /api/download/folder 端点在打包时不对 rglob 子项做符号链接/越界校验，
+# 攻击者在容器工作区内创建指向宿主绝对路径的文件型符号链接即可经 zip 泄露宿主任意文件
+# （含 settings.json / .env / 其他用户数据）。前端已无调用，功能直接下线。
 
 
 # 文件预览允许 inline 展示的 MIME 前缀白名单
@@ -314,13 +280,16 @@ _FILE_CONTENT_INLINE_TEXT_EXTS = {
 
 def _resolve_inline_mime(full_path: Path) -> str:
     """猜测 inline 预览用的 MIME 类型，不在白名单内的退化为 octet-stream。"""
+    suffix = full_path.suffix.lower()
+    # SVG 虽为 image/*，但可携带脚本，inline 渲染即存储型 XSS——与 HTML 同策略强制下载
+    if suffix == '.svg':
+        return 'application/octet-stream'
     guessed, _ = mimetypes.guess_type(str(full_path))
     if guessed:
         if guessed.startswith(_FILE_CONTENT_INLINE_MIME_PREFIXES):
             return guessed
         return 'application/octet-stream'
     # mimetypes 未识别，按扩展名兑底
-    suffix = full_path.suffix.lower()
     if suffix in _FILE_CONTENT_INLINE_TEXT_EXTS:
         return 'text/plain; charset=utf-8'
     if suffix == '.pdf':

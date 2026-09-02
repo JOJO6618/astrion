@@ -114,6 +114,9 @@ def create_task_api():
     workspace_id = session.get("workspace_id") or "default"
     payload = request.get_json() or {}
     message = (payload.get("message") or "").strip()
+    from config import MAX_MESSAGE_CHARS
+    if len(message) > MAX_MESSAGE_CHARS:
+        return jsonify({"success": False, "error": tr("tasks.message_too_long")}), 400
     images, videos = _normalize_media_payload(payload.get("images") or [], payload.get("videos") or [])
     files = _normalize_files_payload(payload.get("files"))
     conversation_id = payload.get("conversation_id")

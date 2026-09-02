@@ -19,7 +19,8 @@ import shutil
 def _resolve(root: pathlib.Path, rel: str) -> pathlib.Path:
     base = root.resolve()
     target = (base / rel).resolve()
-    if not str(target).startswith(str(base)):
+    # 带分隔符边界的包含判断，防 startswith 前缀碰撞（如 /workspace-evil）
+    if target != base and not str(target).startswith(str(base) + __import__('os').sep):
         raise ValueError("路径越界: %s" % rel)
     return target
 
@@ -82,7 +83,12 @@ def _create_folder(root, payload):
 
 def _delete_folder(root, payload):
     rel = payload.get("path")
+    # 安全：禁止删除工作区根本身（防 rmtree 抹掉整个 bind-mount 工作区）
+    if not rel or str(rel).strip() in {"", ".", "./", ".."}:
+        return {"success": False, "error": "不允许删除工作区根目录"}
     target = _resolve(root, rel)
+    if target == root.resolve():
+        return {"success": False, "error": "不允许删除工作区根目录"}
     if not target.exists():
         return {"success": False, "error": "文件夹不存在"}
     if not target.is_dir():

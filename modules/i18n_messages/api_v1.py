@@ -111,4 +111,16 @@ MESSAGES = {
         "zh-CN": "保存失败: {error}",
         "en-US": "Failed to save: {error}",
     },
+    "api_v1.invalid_resource_name": {
+        "zh-CN": "名称只能包含字母、数字、下划线和连字符（最长64字符）",
+        "en-US": "Name may only contain letters, digits, underscores and hyphens (max 64 chars)",
+    },
+    "api_v1.folder_download_removed": {
+        "zh-CN": "文件夹打包下载功能已下线",
+        "en-US": "Folder archive download has been removed",
+    },
+    "api_v1.message_too_long": {
+        "zh-CN": "消息内容过长",
+        "en-US": "Message is too long",
+    },
 }

@@ -140,6 +140,10 @@ MESSAGES = {
         "zh-CN": "用户名不能为空",
         "en-US": "Username cannot be empty",
     },
+    "api_user_mgr.invalid_workspace_id": {
+        "zh-CN": "workspace_id 只能包含字母、数字、点、下划线或连字符（1-40 位，以字母或数字开头）",
+        "en-US": "workspace_id may only contain letters, digits, dots, underscores or hyphens (1-40 chars, starting with a letter or digit)",
+    },
     "api_user_mgr.users_file_parse_failed": {
         "zh-CN": "无法解析 API 用户文件: {file_path} ({error})",
         "en-US": "Failed to parse API user file: {file_path} ({error})",

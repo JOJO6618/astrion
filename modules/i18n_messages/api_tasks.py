@@ -16,6 +16,10 @@ MESSAGES = {
         "zh-CN": "消息不能为空",
         "en-US": "Message cannot be empty",
     },
+    "tasks.message_too_long": {
+        "zh-CN": "消息内容过长",
+        "en-US": "Message is too long",
+    },
     "tasks.workspace_unavailable": {
         "zh-CN": "工作区不可用",
         "en-US": "Workspace is unavailable",

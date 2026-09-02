@@ -115,6 +115,10 @@ class ApiUserManager:
         ws_id = (workspace_id or "default").strip()
         if not ws_id:
             ws_id = "default"
+        # 安全：workspace_id 参与路径拼接，必须严格白名单（防 `..`/斜杠穿越）
+        import re as _re
+        if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,39}", ws_id) or ".." in ws_id:
+            raise ValueError(tr("api_user_mgr.invalid_workspace_id"))
 
         user_root = (self.workspace_root / username).resolve()
         shared_dir = user_root / "shared"
@@ -284,7 +288,15 @@ class ApiUserManager:
         ws_id = (workspace_id or "").strip()
         if not ws_id:
             return False
+        # 安全：同 ensure_workspace 的严格白名单校验，防路径穿越删除任意目录
+        import re as _re
+        if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,39}", ws_id) or ".." in ws_id:
+            return False
         work_root = (self.workspace_root / username / "workspaces" / ws_id).resolve()
+        # 二次防护：解析后的落点必须严格位于该用户的 workspaces 目录内
+        expected_parent = (self.workspace_root / username / "workspaces").resolve()
+        if work_root.parent != expected_parent:
+            return False
         if not work_root.exists():
             return False
         import shutil

@@ -74,6 +74,15 @@ def get_app_version_info():
 
 @status_bp.route('/api/app/apk/latest')
 def download_latest_apk():
+    # 安全：未认证全量下载 130MB+ 文件是带宽放大攻击面（2026-09-02 审计）；
+    # 与 /api/app/version 一致要求登录，并加来源限流。
+    from server.auth_helpers import is_logged_in
+    if not is_logged_in():
+        return jsonify({"success": False, "error": tr("auth.not_logged_in")}), 401
+    from server.security import check_rate_limit, get_client_ip
+    limited, retry_after = check_rate_limit("apk_download", 10, 60, get_client_ip())
+    if limited:
+        return jsonify({"success": False, "error": "rate_limited", "retry_after": retry_after}), 429
     project_root = Path(__file__).resolve().parent.parent.parent
     apk_path = _resolve_android_apk_path(project_root)
     if not apk_path.exists():

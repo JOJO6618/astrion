@@ -34,6 +34,10 @@ MESSAGES = {
         "zh-CN": "缺少 path",
         "en-US": "Missing path",
     },
+    "files.folder_download_removed": {
+        "zh-CN": "文件夹打包下载功能已下线",
+        "en-US": "Folder archive download has been removed",
+    },
     "files.missing_path_or_content": {
         "zh-CN": "缺少 path 或 content",
         "en-US": "Missing path or content",

@@ -154,6 +154,10 @@ MESSAGES = {
         "zh-CN": "文件夹不存在",
         "en-US": "Folder not found",
     },
+    "file_manager.cannot_delete_workspace_root": {
+        "zh-CN": "不允许删除工作区根目录",
+        "en-US": "Deleting the workspace root is not allowed",
+    },
     "file_manager.not_a_folder": {
         "zh-CN": "不是文件夹",
         "en-US": "Not a folder",

@@ -2,14 +2,13 @@
 from __future__ import annotations
 import os
 import json
-import zipfile
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Optional
 
 from flask import Blueprint, request, jsonify, send_file, session
 
 from .api_auth import api_token_required
+from .security import rate_limited
 from .tasks import task_manager
 from .context import get_user_resources, ensure_conversation_loaded, get_upload_guard, apply_conversation_overrides
 from .utils_common import sanitize_filename_preserve_unicode
@@ -69,6 +68,7 @@ def list_workspaces_api():
 
 @api_v1_bp.route("/workspaces", methods=["POST"])
 @api_token_required
+@rate_limited("api_v1_create_ws", 10, 300, scope="user")
 def create_workspace_api():
     username = session.get("username")
     payload = request.get_json(silent=True) or {}
@@ -120,6 +120,25 @@ def delete_workspace_api(workspace_id: str):
     return jsonify({"success": True, "workspace_id": ws_id})
 
 
+def _path_within(base: Path, target: Path) -> bool:
+    """严格的路径包含判断（带分隔符边界），避免 startswith 前缀碰撞。"""
+    if target == base:
+        return True
+    return str(target).startswith(str(base) + os.sep)
+
+
+def _validate_resource_name(name: str) -> str:
+    """校验 prompts/personalizations 等资源名，防路径穿越写入。
+
+    仅允许字母数字/下划线/连字符，最长 64；不含点号（防 `..` 与后缀伪装）。
+    """
+    import re
+    candidate = (name or "").strip()
+    if not candidate or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", candidate):
+        raise ValueError(tr("api_v1.invalid_resource_name"))
+    return candidate
+
+
 def _within_uploads(workspace, rel_path: str) -> Path:
     base = Path(workspace.uploads_dir).resolve()
     rel = rel_path or ""
@@ -128,7 +147,7 @@ def _within_uploads(workspace, rel_path: str) -> Path:
         rel = rel.split("user_upload/", 1)[1]
     rel = rel.lstrip("/").strip()
     target = (base / rel).resolve()
-    if not str(target).startswith(str(base)):
+    if not _path_within(base, target):
         raise ValueError(tr("api_v1_raise.invalid_path"))
     return target
 
@@ -151,7 +170,7 @@ def _within_project(workspace, rel_path: str, default_to_project_root: bool = Tr
         rel = rel.split("/workspace/", 1)[1]
     rel = rel.lstrip("/")
     target = (base / rel).resolve()
-    if not str(target).startswith(str(base)):
+    if not _path_within(base, target):
         raise ValueError(tr("api_v1_raise.invalid_path"))
     return target
 
@@ -207,6 +226,7 @@ def _resolve_workspace(username: str, workspace_id: str):
 
 @api_v1_bp.route("/workspaces/<workspace_id>/conversations", methods=["POST"])
 @api_token_required
+@rate_limited("api_v1_create_conv", 30, 60, scope="user")
 def create_conversation_api(workspace_id: str):
     username = session.get("username")
     ws = _resolve_workspace(username, workspace_id)
@@ -233,11 +253,15 @@ def create_conversation_api(workspace_id: str):
 
 @api_v1_bp.route("/workspaces/<workspace_id>/messages", methods=["POST"])
 @api_token_required
+@rate_limited("api_v1_send_msg", 20, 60, scope="user")
 def send_message_api(workspace_id: str):
     username = session.get("username")
     ws = _resolve_workspace(username, workspace_id)
     payload = request.get_json() or {}
     message = (payload.get("message") or "").strip()
+    from config import MAX_MESSAGE_CHARS
+    if len(message) > MAX_MESSAGE_CHARS:
+        return jsonify({"success": False, "error": tr("api_v1.message_too_long")}), 400
     images = payload.get("images") or []
     conversation_id = payload.get("conversation_id")
     model_key = payload.get("model_key")
@@ -260,11 +284,13 @@ def send_message_api(workspace_id: str):
     # 应用自定义 prompt/personalization（如果提供）
     try:
         if prompt_name:
+            prompt_name = _validate_resource_name(prompt_name)
             prompt_path = _prompt_dir(workspace) / f"{prompt_name}.txt"
             if not prompt_path.exists():
                 return jsonify({"success": False, "error": tr("api_v1.prompt_not_found")}), 404
             terminal.context_manager.custom_system_prompt = prompt_path.read_text(encoding="utf-8")
         if personalization_name:
+            personalization_name = _validate_resource_name(personalization_name)
             pers_path = _personalization_dir(workspace) / f"{personalization_name}.json"
             if not pers_path.exists():
                 return jsonify({"success": False, "error": tr("api_v1.personalization_not_found")}), 404
@@ -427,6 +453,7 @@ def cancel_task_api_v1(task_id: str):
 
 @api_v1_bp.route("/workspaces/<workspace_id>/files/upload", methods=["POST"])
 @api_token_required
+@rate_limited("api_v1_upload", 20, 300, scope="user")
 def upload_file_api(workspace_id: str):
     username = session.get("username")
     ws = _resolve_workspace(username, workspace_id)
@@ -538,16 +565,9 @@ def download_file_api(workspace_id: str):
         return jsonify({"success": False, "error": tr("api_v1.file_does_not_exist")}), 404
 
     if target.is_dir():
-        memory_file = BytesIO()
-        with zipfile.ZipFile(memory_file, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
-            for root, _, files in os.walk(target):
-                for file in files:
-                    full_path = Path(root) / file
-                    arcname = full_path.relative_to(workspace.project_path)
-                    zf.write(full_path, arcname=str(arcname))
-        memory_file.seek(0)
-        download_name = f"{target.name}.zip"
-        return send_file(memory_file, as_attachment=True, download_name=download_name, mimetype='application/zip')
+        # 文件夹打包下载已下线（2026-09-02 安全审计：os.walk/zipfile 跟随文件型
+        # 符号链接，可泄露宿主任意文件）
+        return jsonify({"success": False, "error": tr("api_v1.folder_download_removed")}), 410
     return send_file(target, as_attachment=True, download_name=target.name)
 
 
@@ -580,6 +600,10 @@ def get_prompt_api(name: str):
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
         return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
+    try:
+        name = _validate_resource_name(name)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     p = _prompt_dir(workspace) / f"{name}.txt"
     if not p.exists():
         return jsonify({"success": False, "error": tr("api_v1.prompt_not_found")}), 404
@@ -599,6 +623,10 @@ def create_prompt_api():
     content = payload.get("content") or ""
     if not name:
         return jsonify({"success": False, "error": tr("api_v1.name_empty")}), 400
+    try:
+        name = _validate_resource_name(name)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     p = _prompt_dir(workspace) / f"{name}.txt"
     p.write_text(content, encoding="utf-8")
     return jsonify({"success": True, "name": name})
@@ -632,6 +660,10 @@ def get_personalization_api(name: str):
     _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
     if not workspace:
         return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
+    try:
+        name = _validate_resource_name(name)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     p = _personalization_dir(workspace) / f"{name}.json"
     if not p.exists():
         return jsonify({"success": False, "error": tr("api_v1.personalization_not_found")}), 404
@@ -661,6 +693,10 @@ def create_personalization_api():
         return jsonify({"success": False, "error": tr("api_v1.name_empty")}), 400
     if content is None:
         return jsonify({"success": False, "error": tr("api_v1.content_empty")}), 400
+    try:
+        name = _validate_resource_name(name)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     p = _personalization_dir(workspace) / f"{name}.json"
     try:
         if not isinstance(content, dict):

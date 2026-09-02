@@ -23,6 +23,7 @@ from .security import (
     register_failure,
     is_action_blocked,
     clear_failures,
+    get_client_ip,
 )
 from . import state
 from .utils_common import debug_log
@@ -37,8 +38,9 @@ def auth_debug_log(message: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {message}"
     try:
-        with AUTH_DEBUG_FILE.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
+        # 走统一轮转，防止未认证请求刷爆磁盘（此前为无上限 append）
+        from utils.log_rotation import append_line
+        append_line(AUTH_DEBUG_FILE, line)
     except Exception:
         pass
     try:
@@ -139,7 +141,9 @@ def login():
     data = request.get_json() or {}
     email = (data.get('email') or '').strip()
     password = data.get('password') or ''
-    client_ip = request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or request.remote_addr or 'unknown'
+    # XFF 仅在可信代理后采信（见 security.get_client_ip），直连时以真实对端为准
+    client_ip = get_client_ip()
+    account_key = (email or '').strip().lower() or 'unknown'
 
     limited, retry_after = check_rate_limit("login", 10, 60, client_ip)
     if limited:
@@ -149,8 +153,14 @@ def login():
     if blocked:
         return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
 
+    # 账号维度锁定：防止伪造/轮换来源 IP 对同一账号持续爆破
+    blocked, block_for = is_action_blocked("login_account", identifier=account_key)
+    if blocked:
+        return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
+
     record = state.user_manager.authenticate(email, password)
     if not record:
+        register_failure("login_account", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=account_key)
         wait_seconds = register_failure("login", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=client_ip)
         error_payload = {"success": False, "error": tr("auth.invalid_credentials")}
         status_code = 401
@@ -193,6 +203,7 @@ def login():
     session.permanent = True
     _issue_login_nonce(record.username)
     clear_failures("login", identifier=client_ip)
+    clear_failures("login_account", identifier=account_key)
     try:
         state.container_manager.ensure_container(
             record.username,
@@ -211,8 +222,15 @@ def login():
 
 @auth_bp.route('/host-login', methods=['POST'])
 def host_login():
-    """宿主机模式一键进入（仅当 TERMINAL_SANDBOX_MODE=host 时可用）。"""
-    if (TERMINAL_SANDBOX_MODE or "").lower() != "host":
+    """宿主机模式一键进入（仅当 TERMINAL_SANDBOX_MODE=host 时可用）。
+
+    该入口无任何凭证，因此只允许本机回环地址直连调用（host 模式定位为本机单人使用）；
+    经反向代理/远程访问时一律拒绝，防止公网部署下任何人一键获得 admin 会话。
+    """
+    if (TERMINAL_SANDBOX_MODE or "").lower() != "host" or LINUX_SAFETY:
+        return jsonify({"success": False, "error": tr("auth.host_mode_disabled")}), 403
+    remote_addr = (request.remote_addr or "").strip()
+    if remote_addr not in {"127.0.0.1", "::1", "localhost"}:
         return jsonify({"success": False, "error": tr("auth.host_mode_disabled")}), 403
     if not state.container_manager.has_capacity("host"):
         return jsonify({"success": False, "error": tr("auth.resource_busy")}), 503
@@ -293,14 +311,22 @@ def register():
     invite_code = (data.get('invite_code') or '').strip()
 
     from .security import get_client_ip
-    limited, retry_after = check_rate_limit("register", 5, 300, get_client_ip())
+    client_ip = get_client_ip()
+    limited, retry_after = check_rate_limit("register", 5, 300, client_ip)
     if limited:
         return jsonify({"success": False, "error": tr("auth.register_rate_limited"), "retry_after": retry_after}), 429
+
+    # 邀请码爆破锁定：连续失败达到阈值后按来源锁定一段时间
+    blocked, block_for = is_action_blocked("register_invite", identifier=client_ip)
+    if blocked:
+        return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
+
     try:
         state.user_manager.register_user(username, email, password, invite_code)
         auth_debug_log(f"[auth_debug] POST /register success username={username}")
         return jsonify({"success": True})
     except ValueError as exc:
+        register_failure("register_invite", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=client_ip)
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500

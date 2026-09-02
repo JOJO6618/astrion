@@ -71,7 +71,7 @@ def get_monitor_snapshot_api():
     stage = (request.args.get('stage') or 'before').lower()
     if stage not in {'before', 'after'}:
         stage = 'before'
-    snapshot = get_cached_monitor_snapshot(execution_id, stage)
+    snapshot = get_cached_monitor_snapshot(execution_id, stage, username=get_current_username())
     if not snapshot:
         return jsonify({
             'success': False,

@@ -167,6 +167,15 @@ class GuiFileManager:
     # 基本操作
     # -------------------------
 
+    def _sanitize_entry_name(self, name: str) -> str:
+        """条目名称段级校验：禁止路径分隔符与穿越片段（防 `../../` 越出工作区）。"""
+        sanitized = (name or "").strip()
+        if not sanitized:
+            raise ValueError(tr("gui_file.name_empty"))
+        if sanitized in {".", ".."} or "/" in sanitized or "\\" in sanitized or "\x00" in sanitized:
+            raise ValueError(tr("gui_file.name_empty"))
+        return sanitized
+
     def create_entry(self, parent_relative: Optional[str], name: str, entry_type: str) -> str:
         parent = self._resolve(parent_relative)
         if not parent.exists():
@@ -174,9 +183,7 @@ class GuiFileManager:
         if not parent.is_dir():
             raise NotADirectoryError(tr("gui_file.parent_not_directory"))
 
-        sanitized = name.strip()
-        if not sanitized:
-            raise ValueError(tr("gui_file.name_empty"))
+        sanitized = self._sanitize_entry_name(name)
 
         target = parent / sanitized
         if target.exists():
@@ -215,8 +222,9 @@ class GuiFileManager:
             raise FileNotFoundError(tr("gui_file.target_not_found"))
 
         parent = target.parent
-        sanitized = new_name.strip()
-        if not sanitized:
+        try:
+            sanitized = self._sanitize_entry_name(new_name)
+        except ValueError:
             raise ValueError(tr("gui_file.new_name_empty"))
         new_path = parent / sanitized
         if new_path.exists():

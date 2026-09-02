@@ -13,6 +13,9 @@ CODE_EXECUTION_TIMEOUT = 60
 TERMINAL_COMMAND_TIMEOUT = 120
 SEARCH_MAX_RESULTS = 10
 
+# 单条用户消息最大字符数（防成本攻击与内存放大；2026-09-02 安全审计新增）
+MAX_MESSAGE_CHARS = int(os.environ.get("MAX_MESSAGE_CHARS", "200000") or 200000)
+
 # 自动修复与工具调用限制（None 表示不限制）
 AUTO_FIX_TOOL_CALL = False
 AUTO_FIX_MAX_ATTEMPTS = 3

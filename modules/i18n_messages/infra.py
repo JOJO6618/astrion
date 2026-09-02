@@ -219,6 +219,10 @@ MESSAGES = {
         "zh-CN": "资源繁忙：容器配额已用尽，请稍候再试。",
         "en-US": "Busy: container quota exhausted, please try again later",
     },
+    "container_mgr.per_user_quota_exhausted": {
+        "zh-CN": "资源繁忙：您的容器数量已达上限（{limit} 个），请先释放其他工作区的容器。",
+        "en-US": "Busy: you have reached your container limit ({limit}); please release containers of other workspaces first",
+    },
     "container_mgr.runtime_not_found": {
         "zh-CN": "未找到容器运行时 {runtime}",
         "en-US": "Container runtime not found: {runtime}",

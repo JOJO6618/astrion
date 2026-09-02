@@ -1142,9 +1142,16 @@ def resource_busy_page():
 
 @app.route('/api/client_debug_log', methods=['POST'])
 def client_debug_log():
-    """接收前端目标模式等调试日志"""
+    """接收前端目标模式等调试日志（限流 + 长度截断，防止未认证磁盘攻击）。"""
+    from server.security import check_rate_limit, get_client_ip
+    limited, retry_after = check_rate_limit("client_debug_log", 10, 60, get_client_ip())
+    if limited:
+        return jsonify({'ok': False, 'error': 'rate_limited', 'retry_after': retry_after}), 429
     try:
         data = request.get_json(silent=True) or {}
+        serialized = json.dumps(data, ensure_ascii=False)
+        if len(serialized) > 4000:  # 单条硬截断，避免大 payload 灌入日志
+            data = {"truncated": True, "raw_preview": serialized[:4000]}
         entry = dict(data)
         entry.setdefault('server_ts', time.time())
         log_goal_mode_debug_entry(entry)

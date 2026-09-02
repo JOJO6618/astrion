@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from config import (
+    MAX_ACTIVE_CONTAINERS_PER_USER,
     MAX_ACTIVE_USER_CONTAINERS,
     OUTPUT_FORMATS,
     TERMINAL_SANDBOX_BIN,
@@ -27,6 +28,7 @@ from config import (
     TERMINAL_SANDBOX_MOUNT_PATH,
     TERMINAL_SANDBOX_NAME_PREFIX,
     TERMINAL_SANDBOX_NETWORK,
+    TERMINAL_SANDBOX_PIDS_LIMIT,
     TERMINAL_SANDBOX_REQUIRE,
     LOGS_DIR,
     LINUX_SAFETY,
@@ -80,6 +82,7 @@ class UserContainerManager:
         self.network = TERMINAL_SANDBOX_NETWORK
         self.cpus = TERMINAL_SANDBOX_CPUS
         self.memory = TERMINAL_SANDBOX_MEMORY
+        self.pids_limit = TERMINAL_SANDBOX_PIDS_LIMIT
         self.binds = list(TERMINAL_SANDBOX_BINDS)
         self.sandbox_bin = TERMINAL_SANDBOX_BIN or "docker"
         self.name_prefix = TERMINAL_SANDBOX_NAME_PREFIX or "agent-user"
@@ -157,6 +160,16 @@ class UserContainerManager:
 
             if not self._has_capacity(key):
                 raise RuntimeError(tr("container_mgr.quota_exhausted"))
+
+            # 每用户容器配额：防单用户多工作区占满全局容器池，挤占其他用户
+            per_user_limit = MAX_ACTIVE_CONTAINERS_PER_USER
+            if per_user_limit > 0:
+                owned = sum(
+                    1 for k in self._containers
+                    if k == username_norm or k.startswith(f"{username_norm}::")
+                )
+                if owned >= per_user_limit:
+                    raise RuntimeError(tr("container_mgr.per_user_quota_exhausted", limit=per_user_limit))
 
             # Important: create container using the cache key so each workspace gets its own container name.
             handle = self._create_handle(key, workspace, mode)
@@ -327,6 +340,12 @@ class UserContainerManager:
             cmd += ["--cpus", str(self.cpus)]
         if self.memory:
             cmd += ["--memory", str(self.memory)]
+            # 锁定 swap 用量等于内存上限，防止 swap 绕过内存限制
+            cmd += ["--memory-swap", str(self.memory)]
+        # 安全默认（2026-09-02 审计）：PID 上限防 fork bomb；禁提权防 setuid 类攻击。
+        if self.pids_limit:
+            cmd += ["--pids-limit", str(self.pids_limit)]
+        cmd += ["--security-opt", "no-new-privileges:true"]
         for bind in self.binds:
             chunk = bind.strip()
             if chunk:
