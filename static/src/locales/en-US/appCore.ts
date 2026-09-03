@@ -27,7 +27,7 @@ export default {
 
   // Header run mode / model (computed.ts)
   fastMode: 'Fast mode',
-  fastModeDesc: 'Low reasoning, faster responses',
+  fastModeDesc: 'No reasoning, faster responses',
   thinkingModeDesc: 'Continuous reasoning for complex tasks',
   modelNotSelected: 'No model selected',
   // Plural forms in English; callers should pass both {n} and {count}.

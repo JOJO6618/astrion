@@ -79,7 +79,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "skills_catalog_snapshot": None,
     "default_run_mode": "thinking",
     "default_reasoning_effort": None,  # 默认推理强度：None=默认（不传参）
-    "default_permission_mode": "unrestricted",
+    "default_permission_mode": "approval",
     "default_work_mode": "plan",  # 默认运行模式：plan / ask / execute
     "auto_generate_title": True,
     "title_model": "",  # 对话标题生成使用的子智能体模型条目名（空=跟随主对话默认模型）
@@ -107,7 +107,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "hide_tool_approval_panel": True,  # 自动审核模式下不自动打开工具审核面板（默认开启）
     "enhanced_tool_display": True,  # 增强工具显示
     "compact_message_display": "full",  # 简略消息显示：full-完整原始内容 / brief-一行概要
-    "block_display_mode": "stacked",  # 堆叠块显示模式：traditional-传统列表 / stacked-堆叠动画 / minimal-极简模式
+    "block_display_mode": "minimal",  # 堆叠块显示模式：traditional-传统列表 / stacked-堆叠动画 / minimal-极简模式
     "show_status_avatar": True,  # 是否显示助手状态形象
     "stacked_hide_borders": False,  # 堆叠块隐藏边线
     "minimal_expand_height_limited": True,  # 极简模式展开摘要行时限制最大高度
@@ -366,7 +366,7 @@ def sanitize_personalization_payload(
     if isinstance(permission_mode, str) and permission_mode in ALLOWED_PERMISSION_MODES:
         base["default_permission_mode"] = permission_mode
     elif base.get("default_permission_mode") not in ALLOWED_PERMISSION_MODES:
-        base["default_permission_mode"] = "unrestricted"
+        base["default_permission_mode"] = "approval"
 
     work_mode = data.get("default_work_mode", base.get("default_work_mode"))
     if isinstance(work_mode, str) and work_mode.strip().lower() in ALLOWED_WORK_MODES:
@@ -518,7 +518,7 @@ def sanitize_personalization_payload(
     if isinstance(block_display_mode, str) and block_display_mode.strip().lower() in ALLOWED_BLOCK_DISPLAY_MODES:
         base["block_display_mode"] = block_display_mode.strip().lower()
     else:
-        base["block_display_mode"] = "stacked"
+        base["block_display_mode"] = "minimal"
 
     # 堆叠块隐藏边线
     if "stacked_hide_borders" in data:

@@ -31,7 +31,7 @@ export default {
 
   // ── 头部运行模式 / 模型（computed.ts） ──
   fastMode: '快速模式',
-  fastModeDesc: '低思考，响应更快',
+  fastModeDesc: '无思考，响应更快',
   thinkingModeDesc: '持续推理，适合复杂任务',
   modelNotSelected: '未选择模型',
   // 复数：英文用管道（调用方需同时传 {n} 与 {count}）；中文不区分

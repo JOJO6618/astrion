@@ -215,12 +215,12 @@ const loadCachedStackedHideBorders = (): boolean => {
 
 const loadCachedBlockDisplayMode = (): BlockDisplayMode => {
   if (typeof window === 'undefined' || !window.localStorage) {
-    return 'stacked';
+    return 'minimal';
   }
   try {
     const raw = window.localStorage.getItem(EXPERIMENT_STORAGE_KEY);
     if (!raw) {
-      return 'stacked';
+      return 'minimal';
     }
     const parsed = JSON.parse(raw);
     if (
@@ -232,7 +232,7 @@ const loadCachedBlockDisplayMode = (): BlockDisplayMode => {
   } catch (error) {
     console.warn('读取堆叠块显示模式缓存失败：', error);
   }
-  return 'stacked';
+  return 'minimal';
 };
 
 const persistStackedHideBorders = (value: boolean) => {
@@ -337,7 +337,7 @@ const defaultForm = (): PersonalForm => ({
   disabled_tool_categories: [],
   default_run_mode: null,
   default_reasoning_effort: null,
-  default_permission_mode: 'unrestricted',
+  default_permission_mode: 'approval',
   default_work_mode: 'plan',
   versioning_enabled_by_default: true,
   versioning_backup_mode: 'shallow',
@@ -370,7 +370,7 @@ const defaultForm = (): PersonalForm => ({
 });
 
 const defaultExperimentState = (): ExperimentState => ({
-  blockDisplayMode: 'stacked',
+  blockDisplayMode: 'minimal',
   compactMessageDisplay: 'full'
 });
 
@@ -543,7 +543,7 @@ export const usePersonalizationStore = defineStore('personalization', {
           data.block_display_mode === 'stacked' ||
           data.block_display_mode === 'minimal'
             ? data.block_display_mode
-            : 'stacked',
+            : 'minimal',
         show_status_avatar: data.show_status_avatar !== false,
         show_git_status_bar: data.show_git_status_bar !== false,
         auto_open_terminal_panel: data.auto_open_terminal_panel !== false,
@@ -593,7 +593,7 @@ export const usePersonalizationStore = defineStore('personalization', {
           data.default_permission_mode === 'auto_approval' ||
           data.default_permission_mode === 'unrestricted'
             ? data.default_permission_mode
-            : 'unrestricted',
+            : 'approval',
         default_work_mode:
           data.default_work_mode === 'plan' ||
           data.default_work_mode === 'ask' ||
@@ -678,9 +678,9 @@ export const usePersonalizationStore = defineStore('personalization', {
         this.form = { ...this.form, compact_message_display: 'brief' };
         void this.persistCompactMessageDisplay('brief');
       }
-      // 一次性迁移：堆叠块显示模式旧版仅在 localStorage 保存，后端默认 stacked 时回写本地缓存值。
+      // 一次性迁移：堆叠块显示模式旧版仅在 localStorage 保存，后端默认 minimal 时回写本地缓存值。
       const cachedBlockMode = this.experiments.blockDisplayMode;
-      if (this.form.block_display_mode === 'stacked' && cachedBlockMode !== 'stacked') {
+      if (this.form.block_display_mode === 'minimal' && cachedBlockMode !== 'minimal') {
         this.form = { ...this.form, block_display_mode: cachedBlockMode };
       }
       this.experiments = {
