@@ -103,3 +103,7 @@ test/deepseek_ocr_tutorial.md
 # 运行态缓存
 cache/
 website-design/exp/static/dist/
+
+# 官网已独立为单独仓库（astrion-website），本仓库不再追踪
+website-design/
+website-content/
