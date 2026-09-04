@@ -430,7 +430,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   - 可写 profile 已于 2026-08-30 白名单化（此前为全局可读，导致 unrestricted/审批批准后能读授权范围外文件）；白名单固有代价：祖先目录顶层文件名可列出（读文件内容仍被拒）
   - 持久终端 shell plan 支持 readonly 参数（`_build_macos_shell_plan` 复用 `_macos_readonly_profile_for_workspace`）：受限档终端以只读 profile 创建，unrestricted 保持可写 profile
   - 原生文件工具对齐（`file_manager/path_mixin.py`）：读 roots 与沙箱白名单同源（系统路径 + 工作区 + 授权）+ 叠加同一禁读清单——至此 host+sandbox 下全部读通道（只读/可写沙箱命令、原生 read_file）共享同一边界
-- **Linux 宿主机 = bwrap**：只读为 `--ro-bind / /`（全局只读）；可写为 `--ro-bind / /` + 工作区可写 bind——**读侧仍是全局可读，尚未对齐白名单**（本机无 Linux 测试环境，刻意未动，待后续）；**Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合
+- **Linux 宿主机 = bwrap**：只读为 `--ro-bind / /`（全局只读）；可写为 `--ro-bind / /` + 工作区可写 bind——**读侧仍是全局可读，尚未对齐白名单**；**2026-09-04 起官方口径：Linux 宿主机沙箱未测试、未适配、不可用**（README 与官网文档已同步声明；待有 Linux 测试环境再适配）；**Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合
 
 ## 11) 多智能体对话类型（multi-agent conversation type）
 
