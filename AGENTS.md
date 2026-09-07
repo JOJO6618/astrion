@@ -427,6 +427,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   - Dockerfile 创建 `agent` 用户 + `/etc/gitconfig` safe.directory + 去 setuid 加固；数字 uid 不依赖镜像内用户存在，旧镜像直接受益
 - **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：
   - 只读/可写两个 profile **共用同一白名单读模型**（`_build_macos_whitelist_read_rules`），唯一区别是写权限：deny default + 系统路径白名单（`MACOS_MINIMAL_READABLE_PATHS`）+ 路径授权（writable + readable_extra）+ 工作区 + 祖先目录 literal allow（缺一个祖先进程 exec 直接 Abort trap，必须为 file-read*）+ env 注入 `GIT_CONFIG_GLOBAL=/dev/null`（可写/只读/持久终端三条 plan 均注入）
+  - **xcselect 垫片兼容（2026-09-07 修复）**：/usr/bin 下的 python3/git/clang 等是 xcselect 垫片，启动即拉起 xcodebuild 读 `/Library/Preferences/com.apple.dt.Xcode.plist` 校验 license、并经 mach 服务 `com.apple.bsd.dirhelper` 解析 DARWIN_USER_TEMP_DIR——8-30 白名单化曾致其在沙箱内全灭。现两个 profile 均内置 `MACOS_BASE_MACH_RULES`（放行 dirhelper），白名单含 `/Library/Preferences`；可写 profile 额外放行 `$TMPDIR` 父目录（xcrun_db 缓存写入），只读 profile 不放行（缓存写失败仅噪音、非致命）
   - **deny 规则（.env 正则、~/.ssh 等）必须位于所有 allow 之后**（Seatbelt 后规则覆盖先规则）；两个 profile 均已修复旧顺序漏洞（工作区 .env 曾实际可读）
   - 可写 profile 已于 2026-08-30 白名单化（此前为全局可读，导致 unrestricted/审批批准后能读授权范围外文件）；白名单固有代价：祖先目录顶层文件名可列出（读文件内容仍被拒）
   - 持久终端 shell plan 支持 readonly 参数（`_build_macos_shell_plan` 复用 `_macos_readonly_profile_for_workspace`）：受限档终端以只读 profile 创建，unrestricted 保持可写 profile

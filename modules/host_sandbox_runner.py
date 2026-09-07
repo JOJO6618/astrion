@@ -38,6 +38,10 @@ class HostSandboxError(RuntimeError):
 # /Library/Developer/CommandLineTools 是 Apple git 等开发工具的真身、
 # /opt/homebrew 为 arm64 工具链（Intel 的 /usr/local 已由 /usr 覆盖）、
 # /private/var 覆盖 $TMPDIR（/var/folders/...）。
+# 2026-09-07 增 /Library/Preferences：/usr/bin 的 xcselect 垫片（python3/git/clang
+# 等）每次启动都会拉起 xcodebuild 读取系统许可记录 com.apple.dt.Xcode.plist 验证
+# Xcode/CLT license，读不到就直接报 "You have not agreed to the Xcode license
+# agreements" 退出（该目录在 macOS 默认权限下本就全局可读，不含密钥类敏感物）。
 MACOS_MINIMAL_READABLE_PATHS = [
     "/bin",
     "/sbin",
@@ -46,6 +50,7 @@ MACOS_MINIMAL_READABLE_PATHS = [
     "/System",
     "/Library/Apple",
     "/Library/Developer/CommandLineTools",
+    "/Library/Preferences",
     "/Applications",
     "/etc",
     "/private/etc",
@@ -56,6 +61,12 @@ MACOS_MINIMAL_READABLE_PATHS = [
     "/private/var",
     "/opt/homebrew",
 ]
+
+# 两个 macOS profile 共用的基础 mach 规则。dirhelper 是 libSystem 解析
+# DARWIN_USER_TEMP_DIR（confstr）所必需的服务，缺省被拒后垫片会打印
+# "confstr() failed with code 5" 警告并把 TMPDIR 回退到 /tmp；
+# 它只解析/创建当前用户自己的临时目录，不放行任何文件写权限。
+MACOS_BASE_MACH_RULES = '(allow mach-lookup (global-name "com.apple.bsd.dirhelper"))\n'
 
 
 def _expand_path(raw: str) -> Optional[str]:
@@ -301,6 +312,7 @@ def _macos_readonly_profile_for_workspace(
         '(deny default)\n'
         '(allow sysctl-read)\n'
         '(allow process*)\n'
+        f'{MACOS_BASE_MACH_RULES}'
         f'{network_policy}'
         f'{allow_rules}\n'
         # deny 必须位于所有 allow 之后（后规则覆盖先规则）
@@ -337,6 +349,19 @@ def _macos_profile_for_workspace(
 ) -> str:
     workspace = str(work_path.resolve())
     writable_paths = [workspace, "/tmp", "/private/tmp", "/dev/null"]
+    # dirhelper 放行后 TMPDIR 解析为真实 per-user 临时目录（/var/folders/.../T/）：
+    # xcselect 垫片会向其中写 xcrun_db 缓存，只读/可写 profile 语义不同——
+    # 可写 profile 放行其父目录（含同级 C/ 缓存目录，与放行 /tmp 的语义对齐，
+    # DAC 保证仅当前用户自己的目录可写），否则每次垫片调用都刷缓存写失败噪音；
+    # 只读 profile 不放行，缓存写失败仅噪音、非致命。
+    tmpdir = os.environ.get("TMPDIR", "")
+    if tmpdir:
+        try:
+            user_tmp_parent = str(Path(tmpdir).resolve().parent)
+            if user_tmp_parent not in writable_paths:
+                writable_paths.append(user_tmp_parent)
+        except Exception:
+            pass
     for raw in get_macos_writable_paths():
         try:
             expanded = str(Path(raw).expanduser().resolve())
@@ -371,6 +396,7 @@ def _macos_profile_for_workspace(
         '(deny default)\n'
         '(allow sysctl-read)\n'
         '(allow process*)\n'
+        f'{MACOS_BASE_MACH_RULES}'
         f'{network_policy}'
         f'{allow_rules}\n'
         # deny 必须位于所有 allow 之后（Seatbelt 后规则覆盖先规则），
