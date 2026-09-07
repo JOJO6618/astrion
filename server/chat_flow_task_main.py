@@ -1016,7 +1016,7 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
 
         # 主任务门闸：仅当对话没有正在运行的主任务时才预占门闸。
         # 防止通知任务与主任务并发交叉写入对话历史（2026-08-12 平行时空事故）。
-        # 预占成功后排发：门闸 token 随 session_data 移交给新任务线程认领释放；
+        # 预占成功后排发：门闸 token 经 RuntimeContext.directives 移交给新任务线程认领释放；
         # 排发失败则释放门闸并回滚通知标记，下轮重新收集。
         gate_token = try_acquire_main_task_gate(web_terminal)
         if gate_token is None:

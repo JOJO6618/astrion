@@ -738,7 +738,7 @@ def emit_workflow_progress(
     conversation_id: Optional[str],
     extra: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """广播工作流进度快照（sender → session_data → REST 轮询透传，对齐 goal 链路）。"""
+    """广播工作流进度快照（sender → 任务事件流 → REST 轮询透传，对齐 goal 链路）。"""
     if not callable(sender) or not conversation_id:
         return
     snap = wsm.progress_snapshot()

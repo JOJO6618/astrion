@@ -4,7 +4,7 @@
 - T01：显式上下文受理（无 HTTP 请求、无 test_request_context）
 - T02：同对话并发 chat 互斥 / notice 豁免
 - T04：取消（受理层语义；执行线程以 no-op 替身阻断，不触达模型调用）
-- 快照完整性：to_session_data 携带资源装配所需的全部身份与偏好字段
+- 上下文固化：受理后三层结构（principal/task_params/directives）原样落到任务记录
 
 本测试全程不创建 Flask 应用/请求上下文——这本身就是
 「公共入口不依赖隐式 Web 环境」的直接证明。
@@ -56,26 +56,26 @@ class RuntimeContextModelTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctx.validate()
 
-    def test_to_session_data_carries_identity_and_preferences(self):
+    def test_context_layers_carry_identity_and_preferences(self):
         ctx = _make_ctx()
-        snap = ctx.to_session_data()
-        # 身份与资源范围
-        self.assertEqual(snap["username"], "tester")
-        self.assertEqual(snap["workspace_id"], "default")
-        self.assertEqual(snap["role"], "user")
-        self.assertFalse(snap["is_api_user"])
-        self.assertTrue(snap["host_mode"])
-        self.assertEqual(snap["host_workspace_id"], "default")
+        # 身份与资源范围（principal 层）
+        p = ctx.principal
+        self.assertEqual(p.username, "tester")
+        self.assertEqual(p.workspace_id, "default")
+        self.assertEqual(p.role, "user")
+        self.assertFalse(p.is_api_user)
+        self.assertTrue(p.host_mode)
+        self.assertEqual(p.host_workspace_id, "default")
         # 偏好快照层（非本次覆盖）
-        self.assertEqual(snap["model_key"], "kimi-test")
-        self.assertEqual(snap["run_mode"], "fast")
-        self.assertFalse(snap["thinking_mode"])
-        # 内部指令
-        self.assertEqual(snap["main_task_gate_token"], "tok123")
-        # 默认不出现事件回放键
-        self.assertNotIn("auto_user_message_event", snap)
+        self.assertEqual(p.preferred_model_key, "kimi-test")
+        self.assertEqual(p.preferred_run_mode, "fast")
+        self.assertFalse(p.preferred_thinking_mode)
+        # 内部指令（directives 层）
+        self.assertEqual(ctx.directives.main_task_gate_token, "tok123")
+        # 默认不回放事件
+        self.assertFalse(ctx.directives.auto_user_message_event)
 
-    def test_to_session_data_directives(self):
+    def test_context_directives_fields(self):
         ctx = RuntimeContext(
             principal=_make_ctx().principal,
             params=TaskParams(message="m", conversation_id="c1", approval_timeout_seconds=120),
@@ -85,12 +85,12 @@ class RuntimeContextModelTest(unittest.TestCase):
                 preceding_user_notices=[{"message": "n1", "payload": {}}],
             ),
         )
-        snap = ctx.to_session_data()
-        self.assertTrue(snap["auto_user_message_event"])
-        self.assertEqual(snap["auto_user_message_payload"], {"visibility": "chat"})
-        self.assertEqual(len(snap["preceding_user_notices"]), 1)
-        # 超时透传机制（默认 None 时不出现，语义不变）
-        self.assertEqual(snap["approval_timeout_seconds"], 120)
+        d = ctx.directives
+        self.assertTrue(d.auto_user_message_event)
+        self.assertEqual(d.auto_user_message_payload, {"visibility": "chat"})
+        self.assertEqual(len(d.preceding_user_notices), 1)
+        # 超时透传机制（默认 None，显式设置后按层携带）
+        self.assertEqual(ctx.params.approval_timeout_seconds, 120)
 
     def test_principal_from_session_snapshot(self):
         snap = {
@@ -134,9 +134,9 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
         self.assertTrue(rec.task_id)
         self.assertEqual(rec.username, "tester")
         self.assertEqual(rec.conversation_id, "conv_test_rt")
-        # 快照经显式上下文进入，未触碰 Flask session
-        self.assertEqual(rec.session_data["username"], "tester")
-        self.assertEqual(rec.session_data["main_task_gate_token"], "tok123")
+        # 三层上下文经显式入口固化到任务记录，未触碰 Flask session
+        self.assertEqual(rec.principal.username, "tester")
+        self.assertEqual(rec.directives.main_task_gate_token, "tok123")
 
     def test_t02_same_conversation_chat_mutex_and_notice_exempt(self):
         # 第一个任务保持 running（线程 no-op 但 status 已被置 running）
@@ -158,12 +158,10 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             runtime_service.create_task(bad)
 
-    def test_create_chat_task_requires_explicit_session_data(self):
-        # 直调底层入口且不带快照 → 明确拒绝（不再静默读 Flask session）
+    def test_create_chat_task_requires_explicit_context(self):
+        # 直调底层入口且不带显式上下文 → 明确拒绝（不再静默读 Flask session）
         with self.assertRaises(ValueError):
-            task_manager.create_chat_task(
-                "tester", "default", "msg", [], "conv_x",
-            )
+            task_manager.create_chat_task(None)
 
     def test_t04_cancel_task(self):
         rec = self._create()

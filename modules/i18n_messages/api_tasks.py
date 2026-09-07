@@ -103,8 +103,8 @@ MESSAGES = {
         "en-US": "This conversation already has a running task. Please try again later.",
     },
     "tasks.missing_session_data": {
-        "zh-CN": "缺少任务运行上下文（session_data），请通过公共任务入口提交",
-        "en-US": "Missing runtime context (session_data); please submit via the runtime service entry",
+        "zh-CN": "缺少任务运行上下文，请通过公共任务入口提交",
+        "en-US": "Missing runtime context; please submit via the runtime service entry",
     },
     "tasks.system_not_initialized": {
         "zh-CN": "系统未初始化",

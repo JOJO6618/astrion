@@ -13,8 +13,8 @@ task_manager 注册，`create_chat_task` 的单对话互斥对它们不可见；
 用法：
 - 所有主任务入口统一收敛在 `process_message_task`（chat_flow.py），在此获取
   门闸并在 finally 释放。
-- 通知派发链（完成通知轮询器）先 `try_acquire_main_task_gate` 预占，再通过
-  session_data["main_task_gate_token"] 把 token 移交给新任务线程认领；
+- 通知派发链（完成通知轮询器）先 `try_acquire_main_task_gate` 预占，token 经
+  RuntimeContext.directives.main_task_gate_token 移交给新任务线程认领；
   派发失败时释放并回滚通知标记。
 """
 from __future__ import annotations

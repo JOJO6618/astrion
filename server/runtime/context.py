@@ -107,7 +107,6 @@ class RuntimeContext:
     ) -> "RuntimeContext":
         """从对话级 terminal/工作区构造（通知链、多智能体派发等内部调用方）。
 
-        与既有 session_data 手工构造逐字段对齐：
         host_mode 取 workspace.username == "host"；偏好快照取 terminal 当前值。
         """
         workspace_id = getattr(workspace, "workspace_id", None) or "default"
@@ -129,46 +128,6 @@ class RuntimeContext:
             directives=directives or InternalDirectives(),
         )
 
-    def to_session_data(self) -> Dict[str, Any]:
-        """兼容转换：合并为现有 ``create_chat_task`` 的 session_data 快照 dict。
-
-        快照在受理时固化、随任务线程传递：身份/偏好由 ``_run_chat_task`` 还原为
-        ``RuntimeIdentity`` 驱动资源装配（无 Flask 隐式上下文）；门闸移交
-        （main_task_gate_token）、事件注入（auto_user_message_*）、terminal 属性
-        设置（message_source/goal_mode/skill_context_messages）语义不变。
-
-        其中 run_mode/thinking_mode/model_key 取「用户偏好快照」层
-        （principal.preferred_*），供资源装配新建 terminal 时恢复默认值；
-        本次覆盖值（params.*）由 RuntimeService.create_task 走显式参数传递，
-        不进入本快照。
-        """
-        p = self.principal
-        session_data: Dict[str, Any] = {
-            "username": p.username,
-            "role": p.role,
-            "is_api_user": p.is_api_user,
-            "host_mode": p.host_mode,
-            "host_workspace_id": p.host_workspace_id or (p.workspace_id if p.host_mode else None),
-            "workspace_id": p.workspace_id,
-            "run_mode": p.preferred_run_mode,
-            "thinking_mode": p.preferred_thinking_mode,
-            "model_key": p.preferred_model_key,
-            "message_source": self.params.message_source,
-            "goal_mode": bool(self.params.goal_mode),
-            "skill_context_messages": list(self.params.skill_context_messages or []),
-        }
-        if self.params.approval_timeout_seconds is not None:
-            session_data["approval_timeout_seconds"] = int(self.params.approval_timeout_seconds)
-        d = self.directives
-        if d.main_task_gate_token:
-            session_data["main_task_gate_token"] = d.main_task_gate_token
-        if d.auto_user_message_event:
-            session_data["auto_user_message_event"] = True
-        if d.auto_user_message_payload:
-            session_data["auto_user_message_payload"] = dict(d.auto_user_message_payload)
-        if d.preceding_user_notices:
-            session_data["preceding_user_notices"] = list(d.preceding_user_notices)
-        return session_data
 
 
 def principal_from_session_snapshot(

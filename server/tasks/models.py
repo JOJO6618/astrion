@@ -15,6 +15,7 @@ from typing import Dict, Any, Optional, List
 # run_chat_task_sync 在使用点函数内延迟导入（见 _run_chat_task）。
 from server.context import RuntimeIdentity, get_user_resources, ensure_conversation_loaded
 from server.main_task_gate import release_main_task_gate
+from server.runtime.context import InternalDirectives, RuntimeContext, TaskParams, TrustedPrincipal
 from server.work_timer import finalize_conversation_work_timer
 from server.state import stop_flags
 from server.utils_common import debug_log, log_conn_diag
@@ -48,7 +49,14 @@ class TaskRecord:
         "thinking_mode",
         "run_mode",
         "max_iterations",
-        "session_data",
+        # 三层结构化运行上下文（契约 docs/runtime_contract.md §4.1）：受理时由
+        # RuntimeService.create_task 传入 RuntimeContext 并固化，任务线程直接
+        # 按层读取——不再有 session_data 兼容快照 dict。
+        "principal",
+        "task_params",
+        "directives",
+        # 运行期可变回写：goal_progress 事件最新快照（启动时为空，随事件流更新）
+        "goal_progress",
         "stop_requested",
         "next_event_idx",
         "runtime_pending_queue",
@@ -60,40 +68,39 @@ class TaskRecord:
     def __init__(
         self,
         task_id: str,
-        username: str,
-        workspace_id: str,
-        message: str,
+        ctx: RuntimeContext,
         conversation_id: Optional[str],
-        model_key: Optional[str],
-        thinking_mode: Optional[bool],
-        run_mode: Optional[str],
-        max_iterations: Optional[int],
-        task_type: str = "chat",
     ):
+        principal = ctx.principal
+        params = ctx.params
         self.task_id = task_id
-        self.username = username
-        self.workspace_id = workspace_id
+        self.username = principal.username
+        self.workspace_id = principal.workspace_id
         self.status = "pending"
         self.created_at = time.time()
         self.updated_at = self.created_at
-        self.message = message
+        self.message = params.message
+        # conversation_id 经受理层补建兜底后显式传入（可能与 params.conversation_id 不同）
         self.conversation_id = conversation_id
         # 刷新恢复时前端会从事件流重建进行中的输出，1000 在长流式回复下会过早截断，
         # 导致“只恢复最后几个字符”。这里提高缓冲上限，优先保证重建完整性。
         self.events: deque[Dict[str, Any]] = deque(maxlen=20000)
         self.thread: Optional[threading.Thread] = None
         self.error: Optional[str] = None
-        self.model_key = model_key
-        self.thinking_mode = thinking_mode
-        self.run_mode = run_mode
-        self.max_iterations = max_iterations
-        self.session_data: Dict[str, Any] = {}
+        self.model_key = params.model_key
+        self.thinking_mode = params.thinking_mode
+        self.run_mode = params.run_mode
+        self.max_iterations = params.max_iterations
+        self.principal: TrustedPrincipal = principal
+        self.task_params: TaskParams = params
+        self.directives: InternalDirectives = ctx.directives or InternalDirectives()
+        self.goal_progress: Optional[Dict[str, Any]] = None
         self.stop_requested: bool = False
         self.next_event_idx: int = 0
         self.runtime_pending_queue: List[Dict[str, Any]] = []
         self.runtime_guidance_queue: List[str] = []
         self.last_cancel_at: Optional[float] = None
-        self.task_type = task_type
+        self.task_type = str(params.task_type or "chat")
 
 class TaskManager:
     """线程内存版任务管理器，后续可替换为 Redis/DB。"""
@@ -128,29 +135,31 @@ class TaskManager:
     # ---- public APIs ----
     def create_chat_task(
         self,
-        username: str,
-        workspace_id: str,
-        message: str,
-        images: List[Any],
-        conversation_id: Optional[str],
-        videos: Optional[List[Any]] = None,
-        model_key: Optional[str] = None,
-        thinking_mode: Optional[bool] = None,
-        run_mode: Optional[str] = None,
-        max_iterations: Optional[int] = None,
-        session_data: Optional[Dict[str, Any]] = None,
-        message_source: Optional[str] = None,
-        goal_mode: bool = False,
-        skill_context_messages: Optional[List[Dict[str, str]]] = None,
-        files: Optional[List[str]] = None,
-        task_type: str = "chat",
+        ctx: RuntimeContext,
+        conversation_id: Optional[str] = None,
     ) -> TaskRecord:
+        """受理一轮 Run：显式三层上下文 → 互斥裁决 → 登记 → 起执行线程。
+
+        契约 docs/runtime_contract.md §4.1：``ctx`` 是唯一上下文来源（身份/参数/
+        内部指令三层），禁止隐式读取 Flask session。``conversation_id`` 允许覆盖
+        params 中的值（受理层补建对话后传入），未传时取 params.conversation_id。
+        """
+        if ctx is None:
+            raise ValueError(tr("tasks.missing_session_data"))
+        ctx.validate()
+        principal = ctx.principal
+        params = ctx.params
+        username = principal.username
+        workspace_id = principal.workspace_id
+        run_mode = params.run_mode
         if run_mode:
             normalized = str(run_mode).lower()
             if normalized not in {"fast", "thinking", "deep"}:
                 raise ValueError(tr("tasks.invalid_run_mode"))
             run_mode = normalized
-        normalized_task_type = str(task_type or "chat").strip().lower() or "chat"
+        if conversation_id is None:
+            conversation_id = params.conversation_id
+        normalized_task_type = str(params.task_type or "chat").strip().lower() or "chat"
         # 单对话互斥：普通 chat 任务禁止同一对话并发（防串写对话历史）；
         # 同工作区不同对话允许并行（对话级 terminal 隔离）。
         # notice（通知触发）任务允许与已完成的 chat 任务共存，用于后台通知重入。
@@ -168,23 +177,15 @@ class TaskManager:
             if existing:
                 raise RuntimeError(tr("tasks.task_already_running"))
         task_id = str(uuid.uuid4())
-        record = TaskRecord(task_id, username, workspace_id, message, conversation_id, model_key, thinking_mode, run_mode, max_iterations, task_type=normalized_task_type)
-        # 运行上下文快照（RuntimeContext.to_session_data 产物，契约 docs/runtime_contract.md §4.1）。
-        # 必须显式传入：禁止在受理层回退读 Flask session（隐式上下文在后台线程中
-        # 不可靠且会静默丢身份）。调用方统一走 RuntimeService.create_task 构造快照。
-        if session_data is None:
-            raise ValueError(tr("tasks.missing_session_data"))
-        snapshot = dict(session_data)
-        snapshot.setdefault("workspace_id", workspace_id)
-        if message_source is not None:
-            snapshot.setdefault("message_source", str(message_source))
-        snapshot["goal_mode"] = bool(goal_mode)
-        if skill_context_messages:
-            snapshot["skill_context_messages"] = list(skill_context_messages)
-        record.session_data = snapshot
+        record = TaskRecord(task_id, ctx, conversation_id)
+        record.task_type = normalized_task_type
         with self._lock:
             self._tasks[task_id] = record
-        thread = threading.Thread(target=self._run_chat_task, args=(record, images, videos or [], files or []), daemon=True)
+        thread = threading.Thread(
+            target=self._run_chat_task,
+            args=(record, list(params.images or []), list(params.videos or []), list(params.files or [])),
+            daemon=True,
+        )
         record.thread = thread
         record.status = "running"
         record.updated_at = time.time()
@@ -754,7 +755,7 @@ class TaskManager:
                 data.setdefault("workspace_id", rec.workspace_id)
         with self._lock:
             if event_type in {"goal_progress", "goal_completed", "goal_stopped"} and isinstance(data, dict):
-                rec.session_data["goal_progress"] = dict(data)
+                rec.goal_progress = dict(data)
             idx = getattr(rec, "next_event_idx", None)
             if idx is None:
                 idx = rec.events[-1]["idx"] + 1 if rec.events else 0
@@ -774,19 +775,18 @@ class TaskManager:
         workspace = None
         stop_hint = False
         try:
-            # 显式运行上下文（契约 docs/runtime_contract.md §4.1）：身份与偏好快照在
-            # 受理时由 RuntimeContext.to_session_data 固化，这里还原为 RuntimeIdentity
-            # 直接驱动资源装配——不再伪造 Flask 请求上下文（原 test_request_context
-            # 桥已拆除，任务线程全程无隐式上下文）。
-            sd = rec.session_data or {}
+            # 显式运行上下文（契约 docs/runtime_contract.md §4.1）：身份与偏好快照
+            # 受理时已固化为 rec.principal（TrustedPrincipal），这里直接映射为
+            # RuntimeIdentity 驱动资源装配——任务线程全程无隐式上下文。
+            p = rec.principal
             identity = RuntimeIdentity(
-                host_mode=bool(sd.get("host_mode")),
-                host_workspace_id=sd.get("host_workspace_id"),
-                is_api_user=bool(sd.get("is_api_user")),
-                role=sd.get("role"),
-                preferred_model_key=sd.get("model_key"),
-                preferred_run_mode=sd.get("run_mode"),
-                preferred_thinking_mode=sd.get("thinking_mode"),
+                host_mode=bool(p.host_mode),
+                host_workspace_id=p.host_workspace_id,
+                is_api_user=bool(p.is_api_user),
+                role=p.role,
+                preferred_model_key=p.preferred_model_key,
+                preferred_run_mode=p.preferred_run_mode,
+                preferred_thinking_mode=p.preferred_thinking_mode,
             )
             if identity.host_mode:
                 write_host_workspace_debug(
@@ -865,10 +865,10 @@ class TaskManager:
             # 仅对“后台通知触发的新任务”补发 user_message 事件到任务事件流。
             # 这样前端轮询能即时看到这条 user 消息，而不是刷新后才从历史中看到。
             try:
-                if bool((rec.session_data or {}).get("auto_user_message_event")):
+                if rec.directives.auto_user_message_event:
                     # 先回放本批「通知池」里的前置完成通知（除触发消息外的 N-1 条），
                     # 保证轮询客户端按时间顺序看到所有完成通知，且不各自触发新一轮工作。
-                    preceding_notices = (rec.session_data or {}).get("preceding_user_notices") or []
+                    preceding_notices = rec.directives.preceding_user_notices or []
                     if isinstance(preceding_notices, list):
                         for item in preceding_notices:
                             if not isinstance(item, dict):
@@ -885,7 +885,7 @@ class TaskManager:
                             }
                             notice_event.update(notice_payload)
                             self._append_event(rec, "user_message", notice_event)
-                    extra_payload = (rec.session_data or {}).get("auto_user_message_payload") or {}
+                    extra_payload = rec.directives.auto_user_message_payload or {}
                     if not isinstance(extra_payload, dict):
                         extra_payload = {}
                     payload = {
@@ -947,34 +947,34 @@ class TaskManager:
                 setattr(
                     terminal,
                     "_auto_user_message_event",
-                    bool((rec.session_data or {}).get("auto_user_message_event")),
+                    bool(rec.directives.auto_user_message_event),
                 )
                 setattr(
                     terminal,
                     "_auto_user_message_payload",
-                    dict((rec.session_data or {}).get("auto_user_message_payload") or {}),
+                    dict(rec.directives.auto_user_message_payload or {}),
                 )
                 setattr(
                     terminal,
                     "_current_user_message_source",
-                    str((rec.session_data or {}).get("message_source") or "user"),
+                    str(rec.task_params.message_source or "user"),
                 )
                 setattr(
                     terminal,
                     "_goal_mode_requested",
-                    bool((rec.session_data or {}).get("goal_mode")),
+                    bool(rec.task_params.goal_mode),
                 )
                 setattr(
                     terminal,
                     "_skill_context_messages",
-                    list((rec.session_data or {}).get("skill_context_messages") or []),
+                    list(rec.task_params.skill_context_messages or []),
                 )
                 # 审批/提问等待超时透传（契约 §6）：None = 保持既有默认语义（3600s），
                 # 超时后的语义属阶段三产品决策，本阶段仅建立透传机制。
                 setattr(
                     terminal,
                     "_approval_timeout_seconds",
-                    (rec.session_data or {}).get("approval_timeout_seconds"),
+                    rec.task_params.approval_timeout_seconds,
                 )
             except Exception:
                 previous_auto_user_event = None
@@ -999,7 +999,7 @@ class TaskManager:
                     videos=videos,
                     files=files or [],
                     # 通知链任务认领轮询器预占的门闸（其余任务为 None，走竞争获取）
-                    main_task_gate_token=(rec.session_data or {}).get("main_task_gate_token"),
+                    main_task_gate_token=rec.directives.main_task_gate_token,
                 )
             finally:
                 try:
@@ -1095,10 +1095,10 @@ class TaskManager:
             # 清理 stop_flags
             stop_flags.pop(rec.task_id, None)
             # 主任务门闸兜底释放：若任务线程在 process_message_task 认领前异常退出，
-            # 按 session_data 中的 token 释放，避免门闸泄漏导致对话永久被占用。
+            # 按受理时移交的 token 释放，避免门闸泄漏导致对话永久被占用。
             # 正常路径下 process_message_task 已在 finally 释放，此处为无操作。
             try:
-                gate_token = (rec.session_data or {}).get("main_task_gate_token")
+                gate_token = rec.directives.main_task_gate_token
                 if gate_token and terminal:
                     release_main_task_gate(terminal, gate_token)
             except Exception:
@@ -1186,9 +1186,9 @@ def task_public_payload(rec: TaskRecord, *, include_title: bool = True) -> Dict[
         "message": rec.message,
         "conversation_id": rec.conversation_id,
         "error": rec.error,
-        "message_source": (rec.session_data or {}).get("message_source"),
-        "goal_mode": bool((rec.session_data or {}).get("goal_mode")),
-        "goal_progress": (rec.session_data or {}).get("goal_progress"),
+        "message_source": rec.task_params.message_source,
+        "goal_mode": bool(rec.task_params.goal_mode),
+        "goal_progress": rec.goal_progress,
         "task_type": getattr(rec, "task_type", "chat"),
     }
     if include_title:

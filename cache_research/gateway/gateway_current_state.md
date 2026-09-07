@@ -122,7 +122,7 @@ Roadmap §12 的四个原语与当前实现的映射：
 - **入口收敛（当日验证，声明属实）**：
   - 全部 6 处任务创建调用点已迁移到 `runtime_service.create_task(ctx)`：`server/tasks/api.py:220`、`server/api_v1.py:335`、`server/workflow_runtime_api.py:192/:269`、`server/chat_flow_task_main.py:618/:1417`。
   - **无漏网调用点**：`create_chat_task` 实体调用全仓仅 2 处 = 定义 `models.py:128` + 委托 `service.py:38`。
-  - `create_chat_task` 强制显式 session_data，缺失抛 ValueError（`models.py:174-175`）。
+  - `create_chat_task` 强制显式 RuntimeContext，缺失抛 ValueError；**2026-09-08 已拆除 session_data 兼容桥**：TaskRecord 三层结构化直存（`principal`/`task_params`/`directives` + 可变 `goal_progress`），`to_session_data()` 已删除，全库生产代码无 session_data dict 残留。
 - **执行链运行期解耦（当日验证属实）**：`_run_chat_task` 不再建立 `test_request_context`，任务线程全程 `RuntimeIdentity` 驱动（`server/context/identity.py`）；server/core/modules/utils 下 `test_request_context` 实体调用 = 0；`models.py` 无 `session[` 读取。
 - **依赖方向（结论收窄，见 §3.3）**：`server/context.py`（989 行）已拆分为 `server/context/` 子包；`get_user_resources` 已参数化（RuntimeIdentity 显式身份快照）。**「符合单向依赖」的结论仅适用于「任务所需运行期上下文已显式化」这一层。**
 - **审批超时透传管道**：terminal `_approval_timeout_seconds` → 工具循环 `_approval_timeout_for()` → 4 个 `_wait_*` 调用点（默认 3600s 语义不变）。
@@ -261,6 +261,8 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 > **审核收口记录（gateway_implementation_review_2026-09-07.md）**：F1 已补 run.list 公共发现入口；F2 已完成 15+ 处路由转调（tasks/api.py 7、api_v1.py 3、chat/approval.py 6 + 载荷序列化收敛至 models.py 单一实现，死导入清零）；F3 已补 principal 工作区一致性校验；F4 已修（config .env 逃生门 + 测试自包含 + 假通过修复 + 审批等待链）。审核 §4 契约注释误导已修正（execution_plane/base.py：命令校验/路径授权仍在旧链路，真实后端接入时必须保留）。
 >
 > **本轮收口决策（2026-09-07 用户拍板）**：①②③ 链路（Client ↔ Gateway ↔ Runtime）贯通即为本轮终点；③↔④ 全量贯通（Host/Docker 迁入 ExecutionBackend 契约、E5-E10 纳入）后置为独立工作，期间默认路径 `execution_backend=None`（现有真实链路不变）。
+>
+> **②↔③ 内部形态结构化（2026-09-08）**：`to_session_data()` 兼容桥已拆除——`create_chat_task` 签名改为收 `RuntimeContext` 必填，`TaskRecord` 三层结构化直存（`principal`/`task_params`/`directives` + 可变 `goal_progress` 字段）；`_run_chat_task` 身份还原/门闸认领/事件注入/terminal 属性设置全部改为按层属性访问；`to_session_data()` 方法删除，生产代码 session_data dict 零残留。验证：75 测试全量回归失败恰为 4 项存量。
 
 ### 7.1 第 0 步：闭环疑点与小修复（不依赖架构决策）
 

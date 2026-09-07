@@ -5,10 +5,10 @@
 任务记录、事件流、门闸、保存保护仍由既有 TaskManager / main_task_gate /
 conversation_manager 承载（契约 §2 状态责任表不变）。
 
-兼容期说明：create_task 内部把 RuntimeContext 转换为既有
-session_data 快照传入 create_chat_task；任务线程已改为显式 RuntimeIdentity
-驱动资源装配（test_request_context 桥已拆除），session_data 快照仍承载
-门闸 token、事件回放等内部指令的跨线程传递。
+上下文传递：create_task 把 RuntimeContext 三层结构（principal/params/
+directives）原样传入 create_chat_task 并固化到任务记录；任务线程按层读取
+（身份映射为 RuntimeIdentity 驱动资源装配，门闸 token、事件回放等内部指令
+随 directives 跨线程传递）——不再有 session_data 兼容快照。
 """
 from __future__ import annotations
 
@@ -41,24 +41,7 @@ class RuntimeService:
             # 对话级 terminal 上运行。补建对话文件是装配职责，收在服务层单点，
             # Web/CLI/定时触发器等调用方无需各自实现「先建会话再发任务」。
             conversation_id = self._ensure_conversation_for_chat(ctx)
-        return task_manager.create_chat_task(
-            ctx.principal.username,
-            ctx.principal.workspace_id,
-            params.message,
-            list(params.images or []),
-            conversation_id,
-            videos=list(params.videos or []),
-            model_key=params.model_key,
-            thinking_mode=params.thinking_mode,
-            run_mode=params.run_mode,
-            max_iterations=params.max_iterations,
-            session_data=ctx.to_session_data(),
-            message_source=params.message_source,
-            goal_mode=params.goal_mode,
-            skill_context_messages=list(params.skill_context_messages or []),
-            files=list(params.files or []),
-            task_type=params.task_type,
-        )
+        return task_manager.create_chat_task(ctx, conversation_id=conversation_id)
 
     @staticmethod
     def _ensure_conversation_for_chat(ctx: RuntimeContext) -> Optional[str]:
