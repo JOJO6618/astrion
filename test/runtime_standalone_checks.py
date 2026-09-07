@@ -214,7 +214,8 @@ def check_chain():
     else:
         raise AssertionError("principal 与查询目标不一致必须抛 PermissionError")
 
-    # 6. 审批语义：create → list_pending → decide → 重复 decide 返回现状（单次裁决）
+    # 6. 审批语义：公共入口 list_pending_approvals / resolve_approval
+    # （manager 层语义已有覆盖，这里验收公共入口路由与错误语义透传）
     from server.state import tool_approval_manager
 
     item = tool_approval_manager.create_request(
@@ -222,11 +223,16 @@ def check_chain():
         tool_call_id="tc_smoke", tool_name="run_command",
         arguments={"command": "echo hi"}, preview={},
     )
-    pending = tool_approval_manager.list_pending("gw_smoke_user", conv_id)
-    assert any(p.get("approval_id") == item["approval_id"] for p in pending), "审批应入 pending 列表"
-    first = tool_approval_manager.decide(item["approval_id"], "gw_smoke_user", "approved")
+    pending = runtime_service.list_pending_approvals("gw_smoke_user", conv_id)
+    assert any(p.get("approval_id") == item["approval_id"] for p in pending.get("tool", [])), \
+        "公共入口审批列表应含该项"
+    first = runtime_service.resolve_approval(
+        "tool", username="gw_smoke_user", item_id=item["approval_id"], decision="approved"
+    )
     assert first.get("status") == "approved"
-    second = tool_approval_manager.decide(item["approval_id"], "gw_smoke_user", "rejected")
+    second = runtime_service.resolve_approval(
+        "tool", username="gw_smoke_user", item_id=item["approval_id"], decision="rejected"
+    )
     assert second.get("status") == "approved", "重复裁决必须返回现状（单次裁决）"
     # 越权防护：他人裁决应拒绝
     item2 = tool_approval_manager.create_request(
@@ -234,11 +240,22 @@ def check_chain():
         tool_call_id="tc_smoke2", tool_name="write_file", arguments={}, preview={},
     )
     try:
-        tool_approval_manager.decide(item2["approval_id"], "other_user", "approved")
+        runtime_service.resolve_approval(
+            "tool", username="other_user", item_id=item2["approval_id"], decision="approved"
+        )
     except PermissionError:
         pass
     else:
         raise AssertionError("越权裁决必须抛 PermissionError")
+    # 未知审批类型应拒绝
+    try:
+        runtime_service.resolve_approval(
+            "bogus", username="gw_smoke_user", item_id="x", decision="approved"
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("未知审批类型必须抛 ValueError")
 
 
 def check_fake_exec():

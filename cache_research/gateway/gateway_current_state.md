@@ -246,16 +246,18 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 
 > 总原则：协议草案与接口适配可迭代推进；**每一步保留现有门闸、保存和恢复保障**；四层不要求四进程（G13）；Remote Worker 不是本轮完成条件。
 
-> **实施状态速览（2026-09-07，commit d9bd599c / 27aeed70）**：
+> **实施状态速览（2026-09-07，commit d9bd599c / 27aeed70 / 4378eb6a 起）**：
 > | 步骤 | 状态 | 证据 |
 > |---|---|---|
 > | 第 0 步 | ✅ 代码侧完成（N3 人工验证待用户） | §6.1 状态注记 |
 > | 第 1 步 | ✅ | `StandaloneRuntimeLifecycleTest`；`server/tasks` 拆解；emit_event/run_background 安全包装 |
-> | 第 2 步 | ✅ | `docs/runtime_protocol.md`；`ProtocolSmokeChainTest` 全链路（含服务层补建对话） |
+> | 第 2 步 | ✅ | `docs/runtime_protocol.md`；`ProtocolSmokeChainTest` 全链路（含服务层补建对话、审批公共入口路由） |
 > | 第 3 步 | ✅ | 协议 §5.2-5.4（序号作用域/window_start 缺口检测/重启三场景/多端共享）；`get_task_events` meta 水位 |
-> | 第 4 步 | ✅ 首版（E1-E4 面） | `modules/execution_plane` + `docs/execution_contract.md` + `ExecutionPlaneFakeBackendTest`；E5-E10 与 Host/Docker 同契约接入为后续项 |
-> | 第 5 步 | ✅ 收窄完成（代码就绪度） | 公共入口覆盖清单：run.*/approval.*/session.* 全绿（协议 §3/§4）；正式客户端开发不在本轮 |
-> | 遗留 | ⬜ | N3 真实环境人工验证、N4/N5 疑点、E5-E10 纳入、定时任务（§7.6 后置） |
+> | 第 4 步 | ✅ 首版（E1-E4 面） | `modules/execution_plane` + `docs/execution_contract.md` + `ExecutionPlaneFakeBackendTest`；E5-E10 与 Host/Docker 同契约接入为后续项（§7.5-补） |
+> | 第 5 步 | ✅ 收窄完成（代码就绪度） | 公共入口覆盖：run.*/approval.*/session.* 全部进入 RuntimeService（协议 §3/§4）；正式客户端开发不在本轮 |
+> | 遗留 | ⬜ | N3 真实环境人工验证、N4/N5 疑点、③↔④ 全量贯通（§7.5-补）、定时任务（§7.6 后置） |
+>
+> **本轮收口决策（2026-09-07 用户拍板）**：①②③ 链路（Client ↔ Gateway ↔ Runtime）贯通即为本轮终点；③↔④ 全量贯通（Host/Docker 迁入 ExecutionBackend 契约、E5-E10 纳入）后置为独立工作，期间默认路径 `execution_backend=None`（现有真实链路不变）。
 
 ### 7.1 第 0 步：闭环疑点与小修复（不依赖架构决策）
 
@@ -288,6 +290,18 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 
 - 定义 Execution Contract：相同 Runtime 可接测试执行器（替身）及现有 Host/Docker 实现；执行链无需了解 Web 会话与客户端连接。
 - 验收：Runtime + 替身执行器可独立测试；Host/Docker 后端经同一契约接入。
+
+#### 7.5-补 ③↔④ 全量贯通工作分解（2026-09-07 定，后置独立工作）
+
+> 首版已完成：契约文档 + ExecutionBackend 协议（E1-E4）+ 替身执行器 + 接入点
+> （`MainTerminal.execution_backend`，默认 None）。以下为「Host/Docker 迁入契约」的四件事：
+
+1. **接口面补全 E5-E10**：文件读三模式 / 文件 CRUD 族 / 持久终端 6 操作 / path_validate / 执行环境快照 / 命令校验。照搬现状语义（返回结构、截断、错误形态），不发明新能力。主改 `modules/execution_plane/base.py`。
+2. **真实适配器 HostDockerBackend**：新实现类内部委托现有 terminal_ops / file_manager / terminal_manager / background_command_manager。**决策点**：薄适配（纯转发，快、风险小，4 处后端选择复制的结构债留着）vs 厚适配（顺手收敛 terminal_ops/run.py、background_command_manager.py、persistent_terminal/start.py、container_file_proxy.py 的后端选择逻辑，根治但动四个核心执行文件）。**既定方向：先薄适配**。
+3. **编排层全面切换**：tools_execution.py 给 E5-E10 分支插 backend 注入（约 6-10 处）；默认装配由 None 改为 HostDockerBackend 实例。**风险点是行为等价**：权限裁决/先读后写/浅备份/编辑摘要/字符截断留在编排层，执行细节归后端，边界必须切干净。
+4. **验收**：替身测试保持绿 + 全量回归 + N3 真实环境人工验证一并做。
+
+完成后收益：Runtime 对执行环境零直接依赖；换后端（Remote Worker、子智能体独立沙箱）只需换实现，不碰智能体循环。
 
 ### 7.6 第 5 步：正式客户端接入 + 定时任务后置接入
 

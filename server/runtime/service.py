@@ -147,6 +147,66 @@ class RuntimeService:
 
         return task_manager.promote_runtime_pending_to_guidance(username, task_id, message_id)
 
+    # ---- 审批/提问（公共入口；三类 manager 的薄路由，裁决语义由 manager 保证）----
+
+    _APPROVAL_KINDS = ("tool", "plan", "question")
+
+    def list_pending_approvals(
+        self, username: str, conversation_id: Optional[str] = None, *, kind: Optional[str] = None
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """待决审批/提问合并查询（approval.list）。kind=None 返回三类全量（按键分桶）。"""
+        from server.state import plan_approval_manager, tool_approval_manager, user_question_manager
+
+        kinds = (kind,) if kind else self._APPROVAL_KINDS
+        if any(k not in self._APPROVAL_KINDS for k in kinds):
+            raise ValueError(f"runtime_context: 未知审批类型 {kind}")
+        result: Dict[str, List[Dict[str, Any]]] = {}
+        if "tool" in kinds:
+            result["tool"] = tool_approval_manager.list_pending(username, conversation_id)
+        if "plan" in kinds:
+            result["plan"] = plan_approval_manager.list_pending(username, conversation_id)
+        if "question" in kinds:
+            result["question"] = user_question_manager.list_pending(username, conversation_id)
+        return result
+
+    def resolve_approval(
+        self,
+        kind: str,
+        *,
+        username: str,
+        item_id: str,
+        decision: Optional[str] = None,
+        approved: Optional[bool] = None,
+        comment: Optional[str] = None,
+        selected_option_id: Optional[str] = None,
+        text: Optional[str] = None,
+        dismissed: bool = False,
+    ) -> Dict[str, Any]:
+        """统一裁决入口（approval.resolve）。kind 路由：
+        - tool: decision ∈ {"approved","rejected"}（锁内单次裁决，重复回答返回现状）
+        - plan: approved bool + 可选 comment
+        - question: selected_option_id / text / dismissed 三选一语义
+        错误语义与 manager 一致：越权 PermissionError、不存在 KeyError、参数非法 ValueError。
+        """
+        from server.state import plan_approval_manager, tool_approval_manager, user_question_manager
+
+        if kind == "tool":
+            if decision is None:
+                raise ValueError("runtime_context: tool 审批需 decision")
+            return tool_approval_manager.decide(item_id, username, str(decision), reason=comment)
+        if kind == "plan":
+            if approved is None:
+                raise ValueError("runtime_context: plan 审批需 approved")
+            return plan_approval_manager.answer(
+                approval_id=item_id, username=username, approved=bool(approved), comment=comment
+            )
+        if kind == "question":
+            return user_question_manager.answer(
+                question_id=item_id, username=username,
+                selected_option_id=selected_option_id, text=text, dismissed=dismissed,
+            )
+        raise ValueError(f"runtime_context: 未知审批类型 {kind}")
+
     # ---- 会话查询（公共入口；CLI/定时器等非 Web 调用方不依赖 Web 路由）----
 
     def list_sessions(
