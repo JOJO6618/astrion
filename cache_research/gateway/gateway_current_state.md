@@ -246,16 +246,19 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 
 > 总原则：协议草案与接口适配可迭代推进；**每一步保留现有门闸、保存和恢复保障**；四层不要求四进程（G13）；Remote Worker 不是本轮完成条件。
 
-> **实施状态速览（2026-09-07，commit d9bd599c / 27aeed70 / 4378eb6a 起）**：
-> | 步骤 | 状态 | 证据 |
-> |---|---|---|
-> | 第 0 步 | ✅ 代码侧完成（N3 人工验证待用户） | §6.1 状态注记 |
-> | 第 1 步 | ✅ | `StandaloneRuntimeLifecycleTest`；`server/tasks` 拆解；emit_event/run_background 安全包装 |
-> | 第 2 步 | ✅ | `docs/runtime_protocol.md`；`ProtocolSmokeChainTest` 全链路（含服务层补建对话、审批公共入口路由） |
-> | 第 3 步 | ✅ | 协议 §5.2-5.4（序号作用域/window_start 缺口检测/重启三场景/多端共享）；`get_task_events` meta 水位 |
-> | 第 4 步 | ✅ 首版（E1-E4 面） | `modules/execution_plane` + `docs/execution_contract.md` + `ExecutionPlaneFakeBackendTest`；E5-E10 与 Host/Docker 同契约接入为后续项（§7.5-补） |
-> | 第 5 步 | ✅ 收窄完成（代码就绪度） | 公共入口覆盖：run.*/approval.*/session.* 全部进入 RuntimeService（协议 §3/§4）；正式客户端开发不在本轮 |
-> | 遗留 | ⬜ | N3 真实环境人工验证、N4/N5 疑点、③↔④ 全量贯通（§7.5-补）、定时任务（§7.6 后置） |
+> **实施状态速览（2026-09-07，三档口径：接口存在 / 适配完成 / 行为验收）**：
+> | 能力 | 接口存在 | 适配完成（既有入口转调） | 行为验收 |
+> |---|---|---|---|
+> | run.start / cancel / guide / queue | ✅ | ✅（tasks/api.py、api_v1.py 全部转调） | ✅ chain 双客户端 + lifecycle |
+> | run.get / run.events（含 window_start） | ✅ | ✅（HTTP 轮询透传水位） | ✅ offset/水位断言 |
+> | run.list（发现，审核 F1） | ✅ | ✅（/api/tasks 列表、running-status、api_v1 删除保护转调） | ✅ B 发现 A 的活动 Run 并取消 |
+> | approval.list / resolve | ✅ | ✅（chat/approval.py 三类六个路由转调） | ✅ 等待→批准→继续（approval_wait） |
+> | session.list / history（principal 用户+工作区双校验，F3） | ✅ | ⬜（Web 会话路由未动——属 conversation 域存量链路） | ✅ 含越权/跨工作区拒绝断言 |
+> | Gateway 独立初始化 | — | — | ✅ 子进程隔离（ASTRION_IGNORE_DOTENV 逃生门 + 假模型自包含 + 装配证据断言，F4） |
+> | ExecutionBackend 替身（E1-E4） | ✅ | —（默认 None，生产路径不变） | ✅ fake_exec |
+> | ③↔④ 全量贯通（Host/Docker 迁入、E5-E10） | ⬜ | ⬜ | ⬜ 后置（§7.5-补） |
+>
+> **审核收口记录（gateway_implementation_review_2026-09-07.md）**：F1 已补 run.list 公共发现入口；F2 已完成 15+ 处路由转调（tasks/api.py 7、api_v1.py 3、chat/approval.py 6 + 载荷序列化收敛至 models.py 单一实现，死导入清零）；F3 已补 principal 工作区一致性校验；F4 已修（config .env 逃生门 + 测试自包含 + 假通过修复 + 审批等待链）。审核 §4 契约注释误导已修正（execution_plane/base.py：命令校验/路径授权仍在旧链路，真实后端接入时必须保留）。
 >
 > **本轮收口决策（2026-09-07 用户拍板）**：①②③ 链路（Client ↔ Gateway ↔ Runtime）贯通即为本轮终点；③↔④ 全量贯通（Host/Docker 迁入 ExecutionBackend 契约、E5-E10 纳入）后置为独立工作，期间默认路径 `execution_backend=None`（现有真实链路不变）。
 

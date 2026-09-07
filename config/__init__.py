@@ -16,6 +16,10 @@ def _load_dotenv():
     import sys
     pre_existing_keys = set(os.environ.keys())
 
+    # 隔离/测试环境逃生门：显式禁用仓库根 .env 加载（含 ASTRION_DATA_ROOT 的
+    # .env 优先覆盖）。默认行为不变；仅测试子进程等需要完全自控环境的场景使用。
+    _ignore_dotenv = os.environ.get("ASTRION_IGNORE_DOTENV", "").strip().lower() in {"1", "true", "yes", "on"}
+
     # 1) 仓库根 .env（开发便利，不覆盖已有的环境变量，但 ASTRION_DATA_ROOT
     #    作为项目数据根目录必须优先以 .env 为准，避免外部 shell 误指到 clone）
     if getattr(sys, 'frozen', False):
@@ -28,6 +32,8 @@ def _load_dotenv():
         # 与「文件不存在」同等降级处理，而不是崩溃。
         env_exists = env_path.exists()
     except Exception:
+        env_exists = False
+    if _ignore_dotenv:
         env_exists = False
     if env_exists:
         try:

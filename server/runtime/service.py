@@ -256,6 +256,10 @@ class RuntimeService:
         if principal.username != username:
             # 纵深防御：principal 是适配层认证后的可信身份，不得与查询目标身份不符
             raise PermissionError("runtime_context: principal 与查询目标用户不一致")
+        if str(principal.workspace_id or "") != str(workspace_id or ""):
+            # 资源范围一致性：principal 声明的 workspace 即授权范围，
+            # 跨工作区查询必须重新认证构造新 principal，不得仅传第二份参数
+            raise PermissionError("runtime_context: principal 与查询目标工作区不一致")
         identity = RuntimeIdentity(
             host_mode=principal.host_mode,
             host_workspace_id=principal.host_workspace_id,
@@ -273,6 +277,46 @@ class RuntimeService:
         return terminal, workspace
 
     # ---- 观察（内部接口；后台调用方不必为观察任务发 HTTP 请求）----
+
+    def list_runs(
+        self,
+        username: str,
+        workspace_id: Optional[str] = None,
+        *,
+        conversation_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Run 发现查询（run.list）：按工作区/会话/状态筛选，created_at 倒序。
+
+        客户端 B 不知 task_id 时经本接口发现活动 Run（审核 F1）。载荷与 Web
+        /api/tasks 同构（复用 _task_public_payload），保证多端字段一致。
+        status 过滤语义同 Web 路由："active" = pending/running/cancel_requested，
+        或逗号分隔状态集；None 不过滤。归属约束：仅返回 username 自己的 Run。
+        """
+        from server.tasks import task_manager
+        from server.tasks.models import task_public_payload
+
+        recs = task_manager.list_tasks(username, workspace_id)
+        if conversation_id:
+            target = str(conversation_id)
+            recs = [r for r in recs if str(getattr(r, "conversation_id", None) or "") in {target, target[5:] if target.startswith("conv_") else f"conv_{target}"}]
+        if status:
+            normalized = str(status).strip().lower()
+            if normalized == "active":
+                active = {"pending", "running", "cancel_requested"}
+                recs = [r for r in recs if r.status in active]
+            else:
+                wanted = {part.strip() for part in normalized.split(",") if part.strip()}
+                recs = [r for r in recs if r.status in wanted]
+        recs = sorted(recs, key=lambda x: x.created_at, reverse=True)
+        # 载荷与 Web /api/tasks 完全同构（核心层唯一序列化实现，无新旧双轨）
+        return [task_public_payload(r) for r in recs]
+
+    def get_runtime_pending_messages(self, username: str, task_id: str):
+        """追问队列查询（run.queue 的查询面）。"""
+        from server.tasks import task_manager
+
+        return task_manager.get_runtime_pending_messages(username, task_id)
 
     def get_task(self, username: str, task_id: str):
         from server.tasks import task_manager

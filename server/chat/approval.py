@@ -38,7 +38,7 @@ from server.context import with_terminal, get_gui_manager, get_upload_guard, bui
 from server.security import rate_limited, prune_socket_tokens
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB, pending_socket_tokens, SOCKET_TOKEN_TTL_SECONDS
-from server.state import tool_approval_manager, user_question_manager, plan_approval_manager
+from server.runtime import runtime_service
 from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
@@ -53,7 +53,7 @@ def list_pending_user_questions(terminal: WebTerminal, workspace: UserWorkspace,
     requested_conv_id = (request.args.get("conversation_id") or "").strip() or None
     if requested_conv_id is None:
         requested_conv_id = getattr(terminal.context_manager, "current_conversation_id", None)
-    items = user_question_manager.list_pending(username=username, conversation_id=requested_conv_id)
+    items = runtime_service.list_pending_approvals(username, requested_conv_id, kind="question")["question"]
     return jsonify({
         "success": True,
         "items": items,
@@ -68,9 +68,10 @@ def answer_user_question(terminal: WebTerminal, workspace: UserWorkspace, userna
     """提交 ask_user 工具问题的回答。"""
     data = request.get_json() or {}
     try:
-        item = user_question_manager.answer(
-            question_id=question_id,
+        item = runtime_service.resolve_approval(
+            "question",
             username=username,
+            item_id=question_id,
             selected_option_id=data.get("selected_option_id"),
             text=data.get("text"),
             dismissed=bool(data.get("dismissed")),
@@ -97,7 +98,7 @@ def list_pending_plan_approvals(terminal: WebTerminal, workspace: UserWorkspace,
     requested_conv_id = (request.args.get("conversation_id") or "").strip() or None
     if requested_conv_id is None:
         requested_conv_id = getattr(terminal.context_manager, "current_conversation_id", None)
-    items = plan_approval_manager.list_pending(username=username, conversation_id=requested_conv_id)
+    items = runtime_service.list_pending_approvals(username, requested_conv_id, kind="plan")["plan"]
     return jsonify({
         "success": True,
         "items": items,
@@ -112,9 +113,10 @@ def answer_plan_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
     """提交计划批准/拒绝决策。approved=true 时工具循环侧会自动切换到 execute 模式。"""
     data = request.get_json() or {}
     try:
-        item = plan_approval_manager.answer(
-            approval_id=approval_id,
+        item = runtime_service.resolve_approval(
+            "plan",
             username=username,
+            item_id=approval_id,
             approved=bool(data.get("approved")),
             comment=data.get("comment"),
         )
@@ -140,7 +142,7 @@ def list_pending_tool_approvals(terminal: WebTerminal, workspace: UserWorkspace,
     requested_conv_id = (request.args.get("conversation_id") or "").strip() or None
     if requested_conv_id is None:
         requested_conv_id = getattr(terminal.context_manager, "current_conversation_id", None)
-    items = tool_approval_manager.list_pending(username=username, conversation_id=requested_conv_id)
+    items = runtime_service.list_pending_approvals(username, requested_conv_id, kind="tool")["tool"]
     return jsonify({
         "success": True,
         "items": items,
@@ -156,7 +158,9 @@ def decide_tool_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
     data = request.get_json() or {}
     decision = str(data.get("decision") or "").strip().lower()
     try:
-        item = tool_approval_manager.decide(approval_id=approval_id, username=username, decision=decision)
+        item = runtime_service.resolve_approval(
+            "tool", username=username, item_id=approval_id, decision=decision
+        )
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except KeyError:

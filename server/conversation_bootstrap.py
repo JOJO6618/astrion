@@ -17,7 +17,7 @@ from flask import Blueprint, jsonify, request, session
 from server.auth_helpers import api_login_required, get_current_username
 from server.context import get_user_resources
 from server.tasks import task_manager
-from server.tasks.helpers import _task_public_payload
+from server.tasks.models import task_public_payload
 from server.utils_common import debug_log
 from modules.i18n import tr
 
@@ -252,7 +252,7 @@ def bootstrap_conversation(conversation_id: str):
         replay = _decide_task_replay(messages, events)
         replay["task_id"] = main_rec.task_id
         # 任务摘要与全量事件：前端恢复时免去 GET /api/tasks 与 GET /api/tasks/{id} 两次请求
-        replay["task"] = _task_public_payload(main_rec)
+        replay["task"] = task_public_payload(main_rec)
         replay["events"] = events
         data["task_replay"] = replay
         debug_log(

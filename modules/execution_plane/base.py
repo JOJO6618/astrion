@@ -25,9 +25,12 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 class ExecutionBackend(Protocol):
     """执行环境后端协议。实现方：FakeExecutionBackend（替身）、未来 Host/Docker 适配器。
 
-    注意：本协议只承诺「执行语义」，不承诺安全边界——权限裁决（permission mode）、
-    路径授权（_validate_path）、命令校验（_validate_command）在 Runtime 编排层完成，
-    与本接口正交（契约 §4）。
+    注意：本协议只承诺「执行语义」，不承诺安全边界。当前权限裁决（permission mode）
+    与审批介入在 Runtime 编排层完成；但**命令校验（_validate_command/FORBIDDEN_COMMANDS）
+    与路径授权（_validate_path/禁读清单）仍由旧 terminal_ops/file_manager 链路承担**——
+    经本接口注入的后端分支并不会自动获得这些校验。未来接入真实 ExecutionBackend
+    （Host/Docker 迁入）时，必须准确分配并保留这些校验，不能按「上层已完成全部检查」
+    误读（审核 §4）。OS 层强制力（Seatbelt/bwrap/DAC+Landlock）是最终边界。
     """
 
     async def run_command(

@@ -25,6 +25,9 @@ _SMOKE_WORKSPACE.mkdir(parents=True, exist_ok=True)
 os.environ["ASTRION_DATA_ROOT"] = str(_SMOKE_ROOT)
 os.environ["DEPLOY_CONFIG_DIR"] = str(_SMOKE_ROOT / "config")
 os.environ["TERMINAL_SANDBOX_MODE"] = "host"
+# 隔离逃生门（审核 F4）：仓库根 .env 对 ASTRION_DATA_ROOT 有「.env 优先」的刻意覆盖，
+# 测试进程必须显式禁用它，否则隔离目录会被 .env 值穿透（静默落到真实/clone 数据根）。
+os.environ["ASTRION_IGNORE_DOTENV"] = "1"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -40,6 +43,41 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
         indent=2,
     ),
     encoding="utf-8",
+)
+
+# 自包含模型配置（审核 F4）：装配需要至少一个已注册模型；指向 127.0.0.1:9（discard
+# 端口，几乎必无监听）使模型调用以「连接拒绝」快速失败——不依赖 DNS/外部网络，
+# 也不需要真实凭证。验收对象是装配与生命周期，不是模型响应。
+(_SMOKE_ROOT / "config" / "custom_models.json").write_text(
+    json.dumps(
+        {
+            "models": [
+                {
+                    "model_name": "fake-smoke-model",
+                    "visible": True,
+                    "url": "http://127.0.0.1:9",
+                    "apikey": "fake-smoke-key",
+                    "reasoning_capability": "fast,thinking",
+                    "thinkmode_status": {"type": "param_toggle", "model_id": "fake-smoke-model"},
+                }
+            ]
+        },
+        ensure_ascii=False,
+        indent=2,
+    ),
+    encoding="utf-8",
+)
+
+# 隔离生效断言（审核 F4）：config import 后路径常量必须落在隔离根内，
+# 否则说明隔离被穿透（如 .env 覆盖）——宁可明确失败，绝不静默使用真实目录。
+import config as _smoke_config  # noqa: E402
+
+_assert_root = str(_SMOKE_ROOT.resolve())
+assert str(Path(_smoke_config.DATA_DIR).resolve()).startswith(_assert_root), (
+    f"隔离失败：DATA_DIR={_smoke_config.DATA_DIR} 不在 {_assert_root} 下"
+)
+assert str(Path(_smoke_config.DEPLOY_CONFIG_DIR).resolve()).startswith(_assert_root), (
+    f"隔离失败：DEPLOY_CONFIG_DIR={_smoke_config.DEPLOY_CONFIG_DIR} 不在 {_assert_root} 下"
 )
 
 
@@ -97,24 +135,34 @@ def check_lifecycle():
     from server.runtime import runtime_service as rs  # 单例别名，语义强调
 
     deadline = time.time() + 30
-    saw_events = False
+    saw_assembly = False  # 装配证据：api_request_start 事件（历史/请求构造完成，模型调用前）
     final_status = None
+    assembly_error = None
     while time.time() < deadline:
         events, _next_offset, err, _meta = rs.get_task_events("gw_smoke_user", task_id, 0)
         assert err is None, f"get_task_events 应可读: {err}"
-        if events:
-            saw_events = True
+        event_types = {e.get("type") for e in (events or [])}
+        # 装配失败（资源/会话/请求构造）会以 error 事件终结任务，必须与模型失败区分：
+        # api_request_start 之前出现 error = 装配失败，验收必须明确失败（审核 F4 假通过修复）
+        if "api_request_start" not in event_types and "error" in event_types:
+            assembly_error = [e for e in events if e.get("type") == "error"][-1]
+            break
+        if "api_request_start" in event_types:
+            saw_assembly = True
         rec_now = rs.get_task("gw_smoke_user", task_id)
         status = getattr(rec_now, "status", None)
         if status in {"succeeded", "failed", "stopped", "canceled", "cancel_requested"}:
             final_status = status
             break
         # 装配完成后主动取消（避免真实模型调用慢等；装配此时已真实发生）
-        if saw_events:
+        if saw_assembly:
             rs.cancel_task("gw_smoke_user", task_id)
         time.sleep(0.5)
 
-    assert saw_events, "任务线程应真实启动并产生事件（装配真实发生）"
+    assert assembly_error is None, (
+        f"装配阶段失败（非模型调用）：{assembly_error}"
+    )
+    assert saw_assembly, "任务线程应真实完成装配（出现 api_request_start 事件）"
 
     deadline = time.time() + 20
     while time.time() < deadline:
@@ -127,15 +175,16 @@ def check_lifecycle():
         f"任务应到达终态（模型失败属预期），实际: {final_status}"
     )
 
-    # 门闸最终释放（对话应可受理下一任务）
+    # 门闸最终释放（对话应可受理下一任务）；terminal 必须存在——
+    # 跳过检查会掩盖装配失败（审核 F4 假通过修复）
     import server.context.resources as resources
 
     term_key = "host::gwsmoke::" + str(getattr(rec_now, "conversation_id", "") or "")
     terminal = resources.state.user_terminals.get(term_key)
-    if terminal is not None:
-        from server.main_task_gate import is_main_task_gate_busy
+    assert terminal is not None, "装配成功后对话级 terminal 必须存在（否则装配未真实发生）"
+    from server.main_task_gate import is_main_task_gate_busy
 
-        assert not is_main_task_gate_busy(terminal), "任务终态后门闸必须释放（否则下一任务无法受理）"
+    assert not is_main_task_gate_busy(terminal), "任务终态后门闸必须释放（否则下一任务无法受理）"
 
     # 全程无 Flask app 初始化（socketio 未绑定 app）
     assert not has_app_context(), "验收结束仍应无 Flask app 上下文"
@@ -148,9 +197,42 @@ def check_chain():
     """第 2 步验收：极简协议客户端视角全链路（工作区→会话→运行→停止→历史→审批）。"""
     from server.runtime import runtime_service
 
-    # 1. 第一个 Run：受理 → 终态（模型失败属预期；等 api_request_start 确保历史已写）
+    # 1. 双客户端场景（审核 F1 验收）：A 受理 Run；B 不持有 task_id，仅凭身份+
+    # 工作区经公共入口发现 A 的活动 Run → 观察事件流 → 取消；A 的 Run 到终态。
     rec1 = runtime_service.create_task(_make_ctx())
-    rec1 = _wait_terminal_state(rec1.task_id, cancel_on_event="api_request_start")
+
+    # B 视角：轮询 list_runs 直到发现该 Run（按 message 识别，不读 A 侧变量）
+    discovered = None
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        active = runtime_service.list_runs("gw_smoke_user", "gwsmoke", status="active")
+        found = [r for r in active if "协议链路验收 ping" in (r.get("message") or "")]
+        if found:
+            discovered = found[0]
+            break
+        if getattr(rec1, "status", None) in {"succeeded", "failed", "stopped", "canceled"}:
+            break
+        time.sleep(0.4)
+    assert discovered, "B 应能经 list_runs 发现 A 发起的活动 Run（F1）"
+    assert discovered["task_id"] == rec1.task_id, "发现结果应指向同一 Run"
+
+    # B 观察事件流（用发现的 task_id），等 user_message 落盘证据后取消
+    deadline = time.time() + 20
+    saw_user_msg = False
+    while time.time() < deadline:
+        ev_b, _, err_b, _meta_b = runtime_service.get_task_events("gw_smoke_user", discovered["task_id"], 0)
+        assert err_b is None, "B 应可读 A 的事件流"
+        if any(e.get("type") == "user_message" for e in (ev_b or [])):
+            saw_user_msg = True
+            break
+        if any(e.get("type") == "error" for e in (ev_b or [])):
+            raise AssertionError(f"装配阶段失败（非模型调用）: {ev_b[-1] if ev_b else None}")
+        time.sleep(0.4)
+    assert saw_user_msg, "B 应观察到 A 的 user_message 事件（历史已落盘）"
+
+    # B 取消 A 的 Run（跨端操作），任务到终态
+    assert runtime_service.cancel_task("gw_smoke_user", discovered["task_id"]), "B 应可取消 A 的 Run"
+    rec1 = _wait_terminal_state(discovered["task_id"])
     assert rec1.status in {"succeeded", "failed", "stopped", "canceled"}, f"Run1 应达终态: {rec1.status}"
     conv_id = rec1.conversation_id
     assert conv_id, "Run 应建立会话 id（服务层补建对话，conversation_id 同步受理返回）"
@@ -213,6 +295,28 @@ def check_chain():
         pass
     else:
         raise AssertionError("principal 与查询目标不一致必须抛 PermissionError")
+    # F3：principal 声明的工作区与查询目标不一致也必须拒绝（同名用户跨工作区）
+    try:
+        runtime_service.get_session_history(
+            "gw_smoke_user", "gwsmoke", conv_id,
+            principal=_TP(username="gw_smoke_user", workspace_id="other_ws"),
+        )
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError("principal 工作区与查询目标不一致必须抛 PermissionError")
+
+    # 5.6 Run 发现公共入口（F1）：仅凭身份+工作区可列出活动/全部 Run
+    runs_all = runtime_service.list_runs("gw_smoke_user", "gwsmoke")
+    run_ids = {r["task_id"] for r in runs_all}
+    assert {rec1.task_id, rec2.task_id} <= run_ids, "list_runs 应含两个 Run"
+    assert all(r["username"] == "gw_smoke_user" for r in runs_all), "归属过滤"
+    runs_conv = runtime_service.list_runs("gw_smoke_user", "gwsmoke", conversation_id=conv_id)
+    assert {r["task_id"] for r in runs_conv} == {rec1.task_id, rec2.task_id}, "会话筛选"
+    runs_done = runtime_service.list_runs("gw_smoke_user", "gwsmoke", status="active")
+    assert not any(r["task_id"] in run_ids for r in runs_done), "终态后 active 筛选应为空"
+    payload_keys = set(runs_all[0].keys())
+    assert {"task_id", "status", "conversation_id", "task_type", "created_at"} <= payload_keys
 
     # 6. 审批语义：公共入口 list_pending_approvals / resolve_approval
     # （manager 层语义已有覆盖，这里验收公共入口路由与错误语义透传）
@@ -325,6 +429,110 @@ def check_fake_exec():
     assert getattr(terminal2, "execution_backend", "MISSING") is None, "默认应为 None（真实链路）"
 
 
+def check_approval_wait():
+    """审核 F4 交互覆盖：执行中审批等待 → 另一调用方经公共入口回答 → 执行继续。
+
+    驱动真实工具编排层（_execute_tool_calls_impl + approval 权限模式），不经模型
+    （模型只是 tool_calls 的生产者，与等待/裁决/继续语义无关）；执行环境为替身
+    （零真实副作用）。覆盖：审批创建事件发出 → 公共入口可发现 → 批准 → 工具继续执行。
+    """
+    import asyncio
+    import threading
+
+    from modules.execution_plane import FakeExecutionBackend
+    from server.chat_flow_tool_loop import _execute_tool_calls_impl
+    from server.context import RuntimeIdentity, get_user_resources
+    from server.runtime import runtime_service
+
+    identity = RuntimeIdentity(host_mode=True, host_workspace_id="gwsmoke", is_api_user=False, role="admin")
+    ws_term, workspace = get_user_resources(
+        "gw_smoke_user", workspace_id="gwsmoke", update_session=False, identity=identity
+    )
+    conv_id = ws_term.context_manager.conversation_manager.create_conversation(
+        project_path=str(workspace.project_path), run_mode="fast",
+        thinking_mode=False, model_key="fake-smoke-model",
+    )
+    terminal, _ = get_user_resources(
+        "gw_smoke_user", workspace_id="gwsmoke", update_session=False,
+        conversation_id=conv_id, identity=identity,
+    )
+    backend = FakeExecutionBackend()
+    terminal.execution_backend = backend
+    # 默认 work_mode=plan 会把权限锁为只读（AGENTS.md §10.6）；审批链路验收需 approval 档
+    terminal.set_work_mode("execute", persist=False, conversation_id=conv_id)
+    terminal.set_permission_mode("approval", persist=False, conversation_id=conv_id)
+
+    sent_events = []
+
+    def sender(event_type, data):
+        sent_events.append((event_type, data))
+
+    tool_calls = [{
+        "id": "tc_wait_1",
+        "type": "function",
+        "function": {"name": "run_command", "arguments": json.dumps({"command": "echo approved-cmd", "timeout": 5})},
+    }]
+    loop_result = {}
+
+    async def _noop_process(**_kwargs):
+        return None
+
+    def _get_stop_flag(*_args, **_kwargs):
+        return None
+
+    def _clear_stop_flag(*_args, **_kwargs):
+        return None
+
+    def run_loop():
+        async def _main():
+            return await _execute_tool_calls_impl(
+                web_terminal=terminal,
+                tool_calls=tool_calls,
+                sender=sender,
+                messages=[],
+                client_sid="approval_wait_sid",
+                username="gw_smoke_user",
+                iteration=1,
+                conversation_id=conv_id,
+                last_tool_call_time=time.time(),
+                process_sub_agent_updates=_noop_process,
+                process_background_command_updates=_noop_process,
+                get_stop_flag=_get_stop_flag,
+                clear_stop_flag=_clear_stop_flag,
+                workspace=workspace,
+            )
+        try:
+            loop_result["value"] = asyncio.run(_main())
+        except Exception as exc:
+            loop_result["error"] = exc
+
+    th = threading.Thread(target=run_loop, daemon=True)
+    th.start()
+
+    # 主线程扮演「另一调用方」：经公共入口发现待决审批并批准
+    deadline = time.time() + 20
+    approved = False
+    while time.time() < deadline:
+        pending = runtime_service.list_pending_approvals("gw_smoke_user", conv_id).get("tool", [])
+        if pending:
+            runtime_service.resolve_approval(
+                "tool", username="gw_smoke_user",
+                item_id=pending[0]["approval_id"], decision="approved",
+            )
+            approved = True
+            break
+        if "error" in loop_result:
+            break
+        time.sleep(0.3)
+    th.join(timeout=20)
+
+    assert "error" not in loop_result, f"工具循环异常: {loop_result.get('error')}"
+    assert approved, "执行中的任务应产生待决审批（另一调用方可经公共入口发现）"
+    assert any(t == "tool_approval_required" for t, _ in sent_events), "应发出 tool_approval_required 事件"
+    assert any(c["op"] == "run_command" for c in backend.calls), "批准后工具应继续执行（替身收到命令）"
+    assert not th.is_alive(), "批准后工具循环应退出"
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     if mode == "lifecycle":
@@ -333,8 +541,10 @@ def main():
         check_chain()
     elif mode == "fake_exec":
         check_fake_exec()
+    elif mode == "approval_wait":
+        check_approval_wait()
     else:
-        print("usage: runtime_standalone_checks.py <lifecycle|chain|fake_exec>", file=sys.stderr)
+        print("usage: runtime_standalone_checks.py <lifecycle|chain|fake_exec|approval_wait>", file=sys.stderr)
         return 2
     print(f"CHECK_OK {mode}")
     return 0

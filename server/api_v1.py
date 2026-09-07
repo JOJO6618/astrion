@@ -104,8 +104,8 @@ def delete_workspace_api(workspace_id: str):
     ws_id = _sanitize_workspace_id(workspace_id)
     if not ws_id:
         return jsonify({"success": False, "error": tr("api_v1.workspace_id_invalid")}), 400
-    # 阻止删除有运行中任务的工作区
-    running = [t for t in task_manager.list_tasks(username, ws_id) if t.status in {"pending", "running"}]
+    # 阻止删除有运行中任务的工作区（经公共服务发现，协议 run.list）
+    running = runtime_service.list_runs(username, ws_id, status="pending,running")
     if running:
         return jsonify({"success": False, "error": tr("api_v1.workspace_has_running_tasks")}), 409
     removed = state.api_user_manager.delete_workspace(username, ws_id)
@@ -421,16 +421,17 @@ def delete_conversation_api(workspace_id: str, conv_id: str):
 @api_token_required
 def get_task_events(task_id: str):
     username = session.get("username")
-    rec = task_manager.get_task(username, task_id)
+    rec = runtime_service.get_task(username, task_id)
     if not rec:
         return jsonify({"success": False, "error": tr("api_v1.task_not_found")}), 404
     try:
         offset = int(request.args.get("from", 0))
     except Exception:
         offset = 0
-    # 工作线程会持续追加事件，必须持锁快照，不能直接迭代 rec.events
-    events = task_manager.get_events_since(rec, offset)
-    next_offset = events[-1]["idx"] + 1 if events else offset
+    # 经公共服务读取事件流（含 window_start 缺口检测水位，协议 §5.2）
+    events, next_offset, _ev_err, ev_meta = runtime_service.get_task_events(username, task_id, offset)
+    events = events or []
+    next_offset = next_offset if next_offset is not None else offset
     return jsonify({
         "success": True,
         "data": {
@@ -442,6 +443,7 @@ def get_task_events(task_id: str):
             "error": rec.error,
             "events": events,
             "next_offset": next_offset,
+            "window_start": (ev_meta or {}).get("window_start", 0),
         }
     })
 
@@ -450,7 +452,7 @@ def get_task_events(task_id: str):
 @api_token_required
 def cancel_task_api_v1(task_id: str):
     username = session.get("username")
-    ok = task_manager.cancel_task(username, task_id)
+    ok = runtime_service.cancel_task(username, task_id)
     if not ok:
         return jsonify({"success": False, "error": tr("api_v1.task_not_found")}), 404
     return jsonify({"success": True})

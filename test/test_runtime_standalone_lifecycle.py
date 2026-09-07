@@ -59,5 +59,12 @@ class ExecutionPlaneFakeBackendTest(unittest.TestCase):
         _run_check("fake_exec")
 
 
+class ApprovalWaitChainTest(unittest.TestCase):
+    """审核 F4 交互覆盖：执行中审批等待→公共入口回答→执行继续（真实工具编排层）。"""
+
+    def test_approval_wait_resolve_continue(self):
+        _run_check("approval_wait")
+
+
 if __name__ == "__main__":
     unittest.main()

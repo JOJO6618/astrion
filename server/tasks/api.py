@@ -25,7 +25,6 @@ from modules.goal_state_manager import GoalStateManager, REASON_USER_CANCEL
 from server.tasks import task_manager
 from server.runtime import RuntimeContext, TaskParams, principal_from_session_snapshot, runtime_service
 from server.tasks.skills import _build_skill_context_messages
-from server.tasks.helpers import _task_public_payload
 from server.tasks.media import _normalize_media_payload, _normalize_files_payload
 from modules.i18n import tr
 
@@ -36,21 +35,11 @@ from modules.i18n import tr
 def list_tasks_api():
     username = get_current_username()
     workspace_id = (request.args.get("workspace_id") or "").strip() or None
-    status_filter = (request.args.get("status") or "").strip().lower()
-    recs = task_manager.list_tasks(username, workspace_id)
-    if status_filter:
-        if status_filter == "active":
-            active = {"pending", "running", "cancel_requested"}
-            recs = [rec for rec in recs if rec.status in active]
-        else:
-            wanted = {part.strip() for part in status_filter.split(",") if part.strip()}
-            recs = [rec for rec in recs if rec.status in wanted]
+    status_filter = (request.args.get("status") or "").strip().lower() or None
+    # 筛选/排序/序列化统一由公共服务承担（run.list，协议 §4）
     return jsonify({
         "success": True,
-        "data": [
-            _task_public_payload(r)
-            for r in sorted(recs, key=lambda x: x.created_at, reverse=True)
-        ]
+        "data": runtime_service.list_runs(username, workspace_id, status=status_filter)
     })
 
 @tasks_bp.route("/api/conversations/<conversation_id>/running-status", methods=["GET"])
@@ -67,19 +56,14 @@ def get_conversation_running_status_api(conversation_id: str):
     if not conversation_id:
         return jsonify({"success": False, "error": tr("tasks.missing_conversation_id")}), 400
 
-    # ① 主 task：内存中该对话是否有活动任务（取最新一条）
-    active_statuses = {"pending", "running", "cancel_requested"}
-    main_rec = None
-    for rec in task_manager.list_tasks(username):
-        if rec.conversation_id != conversation_id or rec.status not in active_statuses:
-            continue
-        if main_rec is None or rec.created_at > main_rec.created_at:
-            main_rec = rec
+    # ① 主 task：内存中该对话是否有活动任务（list_runs 已按会话筛选 + created_at 倒序）
+    active_runs = runtime_service.list_runs(username, conversation_id=conversation_id, status="active")
+    main_rec = active_runs[0] if active_runs else None
 
     # ②③④ 需要 terminal（sub_agent_manager / background_command_manager 挂在 terminal 上）
     workspace_id = (
         (request.args.get("workspace_id") or "").strip()
-        or (main_rec.workspace_id if main_rec else "")
+        or (main_rec["workspace_id"] if main_rec else "")
         or (session.get("workspace_id") or "")
     ) or None
     bg_status = {
@@ -101,8 +85,8 @@ def get_conversation_running_status_api(conversation_id: str):
         "data": {
             "conversation_id": conversation_id,
             "is_main_running": is_main_running,
-            "main_task_id": main_rec.task_id if main_rec else None,
-            "main_task_type": getattr(main_rec, "task_type", "chat") if main_rec else None,
+            "main_task_id": main_rec["task_id"] if main_rec else None,
+            "main_task_type": (main_rec.get("task_type") or "chat") if main_rec else None,
             **bg_status,
             "is_truly_active": is_main_running or any(bg_status.values()),
         }
@@ -222,7 +206,7 @@ def get_task_api(task_id: str):
     started_at = time.time()
     username = get_current_username()
     poll_req_id = request.headers.get("X-Task-Poll", "-")
-    rec = task_manager.get_task(username, task_id)
+    rec = runtime_service.get_task(username, task_id)
     if not rec:
         log_conn_diag(
             f"task-poll-missing req={poll_req_id} user={username} task_id={task_id}"
@@ -232,9 +216,11 @@ def get_task_api(task_id: str):
         offset = int(request.args.get("from", 0))
     except Exception:
         offset = 0
-    # 工作线程会持续追加事件，必须持锁快照，不能直接迭代 rec.events
-    events = task_manager.get_events_since(rec, offset)
-    next_offset = events[-1]["idx"] + 1 if events else offset
+    # 经公共服务读取事件流（含 window_start 缺口检测水位，协议 §5.2）
+    events, next_offset, _ev_err, ev_meta = runtime_service.get_task_events(username, task_id, offset)
+    events = events or []
+    next_offset = next_offset if next_offset is not None else offset
+    window_start = (ev_meta or {}).get("window_start", 0)
     elapsed_ms = (time.time() - started_at) * 1000.0
     should_log = (
         offset == 0
@@ -265,7 +251,8 @@ def get_task_api(task_id: str):
             "goal_progress": (rec.session_data or {}).get("goal_progress"),
             "events": events,
             "next_offset": next_offset,
-            "runtime_queued_messages": task_manager.get_runtime_pending_messages(
+            "window_start": window_start,
+            "runtime_queued_messages": runtime_service.get_runtime_pending_messages(
                 username, task_id
             ),
         }
@@ -275,10 +262,10 @@ def get_task_api(task_id: str):
 @api_login_required
 def cancel_task_api(task_id: str):
     username = get_current_username()
-    rec = task_manager.get_task(username, task_id)
+    rec = runtime_service.get_task(username, task_id)
     if not rec:
         return jsonify({"success": False, "error": tr("tasks.task_not_found")}), 404
-    ok = task_manager.cancel_task(username, task_id)
+    ok = runtime_service.cancel_task(username, task_id)
     # 用户取消任务时，一并停止该工作区的目标模式，避免后续新对话继承旧目标。
     try:
         if ok and rec.workspace_id:
@@ -301,7 +288,7 @@ def enqueue_runtime_guidance_api(task_id: str):
     if not message:
         return jsonify({"success": False, "error": tr("tasks.guidance_content_empty")}), 400
 
-    result = task_manager.enqueue_runtime_guidance(username, task_id, message)
+    result = runtime_service.enqueue_runtime_guidance(username, task_id, message)
     if not result.get("success"):
         code = result.get("code") or "runtime_guidance_failed"
         if code == "task_not_found":
@@ -329,7 +316,7 @@ def enqueue_runtime_queue_message_api(task_id: str):
     if not message:
         return jsonify({"success": False, "error": tr("tasks.message_empty")}), 400
     files = _normalize_files_payload(payload.get("files"))
-    result = task_manager.enqueue_runtime_pending_message(username, task_id, message, files=files)
+    result = runtime_service.enqueue_runtime_pending_message(username, task_id, message, files=files)
     if not result.get("success"):
         code = result.get("code") or "runtime_queue_enqueue_failed"
         if code == "task_not_found":
@@ -352,7 +339,7 @@ def enqueue_runtime_queue_message_api(task_id: str):
 @api_login_required
 def delete_runtime_queue_message_api(task_id: str, message_id: str):
     username = get_current_username()
-    result = task_manager.remove_runtime_pending_message(username, task_id, message_id)
+    result = runtime_service.remove_runtime_pending_message(username, task_id, message_id)
     if not result.get("success"):
         code = result.get("code") or "runtime_queue_delete_failed"
         if code == "task_not_found":
@@ -374,7 +361,7 @@ def delete_runtime_queue_message_api(task_id: str, message_id: str):
 @api_login_required
 def guide_runtime_queue_message_api(task_id: str, message_id: str):
     username = get_current_username()
-    result = task_manager.promote_runtime_pending_to_guidance(username, task_id, message_id)
+    result = runtime_service.promote_runtime_pending_to_guidance(username, task_id, message_id)
     if not result.get("success"):
         code = result.get("code") or "runtime_queue_guide_failed"
         if code == "task_not_found":
