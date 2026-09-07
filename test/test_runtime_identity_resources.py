@@ -126,5 +126,73 @@ class GetUserResourcesIdentityTest(unittest.TestCase):
         self.assertIsNotNone(terminal)
 
 
+class GetUserResourcesHostPolicyTest(unittest.TestCase):
+    """回归：host 模式 + 非显式身份 + host 用户记录存在时，管理员策略必须应用。
+
+    历史 bug（拆包遗漏导入）：resources.py 调用未导入的 get_current_user_role，
+    record 存在时触发 NameError，被 except 吞掉后工具分类/禁用模型策略静默不应用。
+    """
+
+    def test_host_record_applies_admin_policy(self):
+        import server.context.resources as resources
+
+        host_ws = {"workspace_id": "default", "path": "/tmp/host_ws_policy", "label": "默认"}
+        record = MagicMock()
+        record.username = "host"
+        record.invite_code = None
+        policy = {
+            "categories": {},
+            "forced_category_states": {},
+            "disabled_models": [],
+            "ui_blocks": {},
+            "updated_at": "v1",
+        }
+        base = _base_patches()
+        for p in base:
+            p.start()
+        try:
+            with patch("server.context.resources.TERMINAL_SANDBOX_MODE", "host"), \
+                 patch("server.context.resources.resolve_host_workspace", return_value=(None, host_ws)), \
+                 patch("server.context.resources.get_current_user_record", return_value=record), \
+                 patch("server.context.resources.get_current_user_role", return_value="admin") as get_role, \
+                 patch("modules.admin_policy_manager.get_effective_policy", return_value=policy) as get_policy:
+                from flask import Flask
+                app = Flask("host_policy_test")
+                app.secret_key = "test"
+                fake_terminal = MagicMock()
+                fake_terminal._reaper_closing = False
+                fake_terminal.model_key = "kimi-k2"
+                # 缓存命中路径会校验 project_path 是否匹配目标工作区路径，
+                # 不匹配会原地重建 terminal；设为 resolve 后的真实路径避免重建
+                resolved_path = str(Path("/tmp/host_ws_policy").resolve())
+                fake_terminal.project_path = resolved_path
+                fake_terminal.context_manager.project_path = resolved_path
+                ctx = app.test_request_context("/")
+                ctx.push()
+                try:
+                    # host 分支入口要求 session["host_mode"] 为真（非显式路径）
+                    from flask import session as flask_session
+                    flask_session["host_mode"] = True
+                    # 预置对话级 terminal 缓存命中，避免 WebTerminal 构造细节
+                    with patch.dict(resources.state.user_terminals, {"host::default::conv_policy": fake_terminal}, clear=False):
+                        terminal, _workspace = get_user_resources(
+                            "host",
+                            workspace_id="default",
+                            update_session=False,
+                            conversation_id="conv_policy",
+                            identity=None,  # 非显式：HTTP 适配层路径（bug 触发路径）
+                        )
+                finally:
+                    ctx.pop()
+            # 修复后直接证据：role 解析与策略应用都被真正执行
+            get_role.assert_called_once_with(record)
+            get_policy.assert_called_once()
+            fake_terminal.set_admin_policy.assert_called_once()
+            self.assertIsNotNone(terminal)
+        finally:
+            for p in base:
+                p.stop()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,10 @@
 """配额追踪器（UsageTracker）的获取与广播。"""
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import modules.user_manager
 
 from modules.usage_tracker import UsageTracker
 from server import state

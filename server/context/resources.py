@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import modules.user_manager
 
 from flask import session, has_request_context
 
@@ -25,7 +28,7 @@ from config.model_profiles import get_registered_model_keys
 from modules.i18n import tr
 from server import state
 from server.utils_common import debug_log
-from server.auth_helpers import get_current_username, get_current_user_record
+from server.auth_helpers import get_current_username, get_current_user_record, get_current_user_role
 from utils.host_workspace_debug import write_host_workspace_debug
 
 from server.context.identity import NoWorkspaceError, RuntimeIdentity, _resolve_user_role
