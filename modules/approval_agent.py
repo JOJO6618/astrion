@@ -16,7 +16,9 @@ from modules.i18n import tr
 DEFAULT_MAX_ROUNDS = 3
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_COMMAND_TIMEOUT = 20
-DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT = True
+# 审批 transcript 含完整 messages / 命令 / 结果，最容易接触敏感动作与路径，
+# 默认关闭（防 Secret Sink）；仅在调试审批链路时临时改回 True，用完恢复。
+DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT = False
 DEBUG_TRANSCRIPT_DIR = Path(LOGS_DIR) / "approval_agent"
 
 
