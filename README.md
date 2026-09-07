@@ -224,7 +224,7 @@ python3 -c "from werkzeug.security import generate_password_hash; print(generate
 
 > ⚠️ **安全提示**
 > - 注册邮箱仅用于登录与查重，**系统不发送验证邮件**——邀请码是注册的唯一实质门槛，请妥善保管。
-> - 新用户的默认权限模式为「无限制」（`unrestricted`，可执行任意终端命令）。多用户或包含不可信用户的场景下，建议用户在个人空间将默认权限模式调整为 `approval` / `readonly`。
+> - 新用户的默认权限模式为「批准」（`approval`：命令在沙箱内只读预检，写入/联网等动作需逐项批准后执行）。个人独占部署可在个人空间主动升级为 `auto_approval` / `unrestricted`；多用户或包含不可信用户的场景，建议引导用户在个人空间收紧为 `readonly`。
 
 ## 项目结构
 
