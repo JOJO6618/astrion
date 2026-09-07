@@ -9,6 +9,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server.context import _apply_workspace_personalization_preferences
 
+# server/context.py 拆分为子包后，目标函数实际位于 personalization 子模块；
+# patch 必须指向使用处的模块命名空间才能生效。
+_PERSONALIZATION_NS = "server.context.personalization"
+
 
 class FakeSession:
     def __init__(self):
@@ -26,8 +30,12 @@ class TestApplyWorkspacePersonalizationPreferences(unittest.TestCase):
         terminal = MagicMock()
         terminal.model_key = model_key
         terminal._workspace_default_model_applied = False
+        # MagicMock 的下划线属性默认是 truthy 子 mock；本组用例测「未绑定对话」
+        # 的工作区级恢复路径，必须显式置 None（is_conversation_bound 防护）。
+        terminal._bound_conversation_id = None
 
-        def _apply_personalization_preferences(config, apply_default_model=True):
+        def _apply_personalization_preferences(config, apply_default_model=True, **kwargs):
+            # 生产代码调用时还传 apply_default_modes 等关键字，side_effect 必须兼容
             if apply_default_model:
                 default_model = (config or {}).get("default_model")
                 if default_model:
@@ -40,8 +48,8 @@ class TestApplyWorkspacePersonalizationPreferences(unittest.TestCase):
         workspace.data_dir = tempfile.mkdtemp()
         return workspace
 
-    @patch("server.context.load_personalization_config")
-    @patch("server.context.has_request_context", return_value=True)
+    @patch(f"{_PERSONALIZATION_NS}.load_personalization_config")
+    @patch(f"{_PERSONALIZATION_NS}.has_request_context", return_value=True)
     def test_session_model_restored(self, _hrc, mock_load_config):
         """session 中保存了模型时，应恢复到该模型。"""
         mock_load_config.return_value = {"default_model": "default-model"}
@@ -51,14 +59,14 @@ class TestApplyWorkspacePersonalizationPreferences(unittest.TestCase):
         session = FakeSession()
         session["model_key"] = "session-model"
 
-        with patch("server.context.session", session):
+        with patch(f"{_PERSONALIZATION_NS}.session", session):
             _apply_workspace_personalization_preferences(terminal, workspace)
 
         terminal.set_model.assert_called_once_with("session-model")
         self.assertEqual(session.get("model_key"), "session-model")
 
-    @patch("server.context.load_personalization_config")
-    @patch("server.context.has_request_context", return_value=True)
+    @patch(f"{_PERSONALIZATION_NS}.load_personalization_config")
+    @patch(f"{_PERSONALIZATION_NS}.has_request_context", return_value=True)
     def test_default_model_applied_for_fresh_session(self, _hrc, mock_load_config):
         """没有 session 模型时，应应用默认模型（且仅一次）。"""
         mock_load_config.return_value = {"default_model": "default-model"}
@@ -66,7 +74,7 @@ class TestApplyWorkspacePersonalizationPreferences(unittest.TestCase):
         workspace = self._make_workspace()
         session = FakeSession()
 
-        with patch("server.context.session", session):
+        with patch(f"{_PERSONALIZATION_NS}.session", session):
             _apply_workspace_personalization_preferences(terminal, workspace)
 
         terminal.set_model.assert_not_called()

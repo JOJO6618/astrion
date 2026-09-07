@@ -83,7 +83,10 @@ class ServerRefactorSmokeTest(unittest.TestCase):
         self.assertIn("demo_tool", terminal.disabled_tools)
 
     def test_context_applies_workspace_personalization_preferences(self):
+        # server/context.py 已拆分为子包；目标函数实际位于 personalization 子模块，
+        # patch 必须指向使用处的模块命名空间才能生效。
         import server.context as context
+        import server.context.personalization as context_personalization
 
         calls = []
 
@@ -96,14 +99,14 @@ class ServerRefactorSmokeTest(unittest.TestCase):
                 calls.append(config)
 
         workspace = SimpleNamespace(data_dir="/tmp/workspace-data")
-        original_loader = context.load_personalization_config
+        original_loader = context_personalization.load_personalization_config
         try:
-            context.load_personalization_config = lambda data_dir: {
+            context_personalization.load_personalization_config = lambda data_dir: {
                 "disabled_tool_categories": ["custom"]
             }
             context._apply_workspace_personalization_preferences(Terminal(), workspace)
         finally:
-            context.load_personalization_config = original_loader
+            context_personalization.load_personalization_config = original_loader
 
         self.assertEqual(calls, [{"disabled_tool_categories": ["custom"]}])
 
