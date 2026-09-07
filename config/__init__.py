@@ -23,7 +23,13 @@ def _load_dotenv():
     else:
         env_path = Path(__file__).resolve().parents[1] / '.env'
     env_from_file: dict = {}
-    if env_path.exists():
+    try:
+        # 权限受限环境（只读沙箱白名单禁读 .env）下 exists() 会抛 PermissionError，
+        # 与「文件不存在」同等降级处理，而不是崩溃。
+        env_exists = env_path.exists()
+    except Exception:
+        env_exists = False
+    if env_exists:
         try:
             for raw_line in env_path.read_text(encoding="utf-8").splitlines():
                 line = raw_line.strip()

@@ -11,11 +11,7 @@ from collections import deque
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from flask import Blueprint, request, jsonify
-from flask import current_app, session
-
-from server.auth_helpers import api_login_required, get_current_username
-from server.context import get_user_resources, ensure_conversation_loaded
+from server.context import RuntimeIdentity, get_user_resources, ensure_conversation_loaded
 from server.chat_flow import run_chat_task_sync
 from server.main_task_gate import release_main_task_gate
 from server.work_timer import finalize_conversation_work_timer
@@ -172,41 +168,19 @@ class TaskManager:
                 raise RuntimeError(tr("tasks.task_already_running"))
         task_id = str(uuid.uuid4())
         record = TaskRecord(task_id, username, workspace_id, message, conversation_id, model_key, thinking_mode, run_mode, max_iterations, task_type=normalized_task_type)
-        # 记录当前 session 快照，便于后台线程内使用
-        if session_data is not None:
-            snapshot = dict(session_data)
-            snapshot.setdefault("workspace_id", workspace_id)
-            if message_source is not None:
-                snapshot.setdefault("message_source", str(message_source))
-            snapshot["goal_mode"] = bool(goal_mode)
-            if skill_context_messages:
-                snapshot["skill_context_messages"] = list(skill_context_messages)
-            try:
-                snapshot.setdefault("host_mode", session.get("host_mode"))
-                if snapshot.get("host_mode"):
-                    snapshot.setdefault("host_workspace_id", session.get("host_workspace_id") or workspace_id)
-            except Exception:
-                if snapshot.get("host_mode"):
-                    snapshot.setdefault("host_workspace_id", workspace_id)
-            record.session_data = snapshot
-        else:
-            try:
-                record.session_data = {
-                    "username": session.get("username"),
-                    "role": session.get("role"),
-                    "is_api_user": session.get("is_api_user"),
-                    "host_mode": session.get("host_mode"),
-                    "host_workspace_id": session.get("host_workspace_id") or workspace_id,
-                    "workspace_id": workspace_id,
-                    "run_mode": session.get("run_mode"),
-                    "thinking_mode": session.get("thinking_mode"),
-                    "model_key": session.get("model_key"),
-                    "message_source": str(message_source) if message_source is not None else None,
-                    "goal_mode": bool(goal_mode),
-                    "skill_context_messages": list(skill_context_messages or []),
-                }
-            except Exception:
-                record.session_data = {}
+        # 运行上下文快照（RuntimeContext.to_session_data 产物，契约 docs/runtime_contract.md §4.1）。
+        # 必须显式传入：禁止在受理层回退读 Flask session（隐式上下文在后台线程中
+        # 不可靠且会静默丢身份）。调用方统一走 RuntimeService.create_task 构造快照。
+        if session_data is None:
+            raise ValueError(tr("tasks.missing_session_data"))
+        snapshot = dict(session_data)
+        snapshot.setdefault("workspace_id", workspace_id)
+        if message_source is not None:
+            snapshot.setdefault("message_source", str(message_source))
+        snapshot["goal_mode"] = bool(goal_mode)
+        if skill_context_messages:
+            snapshot["skill_context_messages"] = list(skill_context_messages)
+        record.session_data = snapshot
         with self._lock:
             self._tasks[task_id] = record
         thread = threading.Thread(target=self._run_chat_task, args=(record, images, videos or [], files or []), daemon=True)
@@ -789,25 +763,34 @@ class TaskManager:
         workspace = None
         stop_hint = False
         try:
-            # 为后台线程构造最小请求上下文，填充 session
-            from server.app import app as flask_app
-            with flask_app.test_request_context():
-                try:
-                    for k, v in (rec.session_data or {}).items():
-                        if v is not None:
-                            session[k] = v
-                    if session.get("host_mode"):
-                        session["workspace_id"] = workspace_id
-                        session["host_workspace_id"] = session.get("host_workspace_id") or workspace_id
-                        write_host_workspace_debug(
-                            "tasks.run_chat_task.apply_host_session",
-                            task_id=rec.task_id,
-                            workspace_id=workspace_id,
-                            host_workspace_id=session.get("host_workspace_id"),
-                        )
-                except Exception:
-                    pass
-                terminal, workspace = get_user_resources(username, workspace_id=workspace_id, conversation_id=rec.conversation_id)
+            # 显式运行上下文（契约 docs/runtime_contract.md §4.1）：身份与偏好快照在
+            # 受理时由 RuntimeContext.to_session_data 固化，这里还原为 RuntimeIdentity
+            # 直接驱动资源装配——不再伪造 Flask 请求上下文（原 test_request_context
+            # 桥已拆除，任务线程全程无隐式上下文）。
+            sd = rec.session_data or {}
+            identity = RuntimeIdentity(
+                host_mode=bool(sd.get("host_mode")),
+                host_workspace_id=sd.get("host_workspace_id"),
+                is_api_user=bool(sd.get("is_api_user")),
+                role=sd.get("role"),
+                preferred_model_key=sd.get("model_key"),
+                preferred_run_mode=sd.get("run_mode"),
+                preferred_thinking_mode=sd.get("thinking_mode"),
+            )
+            if identity.host_mode:
+                write_host_workspace_debug(
+                    "tasks.run_chat_task.apply_host_session",
+                    task_id=rec.task_id,
+                    workspace_id=workspace_id,
+                    host_workspace_id=identity.host_workspace_id or workspace_id,
+                )
+            terminal, workspace = get_user_resources(
+                username,
+                workspace_id=workspace_id,
+                update_session=False,
+                conversation_id=rec.conversation_id,
+                identity=identity,
+            )
             if not terminal or not workspace:
                 raise RuntimeError(tr("tasks.system_not_initialized"))
             stop_hint = bool(stop_flags.get(rec.task_id, {}).get("stop"))
@@ -850,7 +833,7 @@ class TaskManager:
             # 确保会话加载
             conversation_id = rec.conversation_id
             try:
-                conversation_id, _ = ensure_conversation_loaded(terminal, conversation_id, workspace=workspace)
+                conversation_id, _ = ensure_conversation_loaded(terminal, conversation_id, workspace=workspace, update_session=False)
                 rec.conversation_id = conversation_id
             except Exception as exc:
                 raise RuntimeError(tr("tasks.conversation_load_failed", error=exc)) from exc
@@ -974,6 +957,13 @@ class TaskManager:
                     "_skill_context_messages",
                     list((rec.session_data or {}).get("skill_context_messages") or []),
                 )
+                # 审批/提问等待超时透传（契约 §6）：None = 保持既有默认语义（3600s），
+                # 超时后的语义属阶段三产品决策，本阶段仅建立透传机制。
+                setattr(
+                    terminal,
+                    "_approval_timeout_seconds",
+                    (rec.session_data or {}).get("approval_timeout_seconds"),
+                )
             except Exception:
                 previous_auto_user_event = None
                 previous_message_source = None
@@ -1009,6 +999,7 @@ class TaskManager:
                         setattr(terminal, "_skill_context_messages", previous_skill_context_messages)
                     else:
                         setattr(terminal, "_skill_context_messages", [])
+                    setattr(terminal, "_approval_timeout_seconds", None)
                     if terminal and getattr(terminal, "context_manager", None):
                         terminal.context_manager.set_web_terminal_callback(previous_ctx_callback)
                 except Exception as exc:

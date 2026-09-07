@@ -23,7 +23,8 @@
   - `server/app.py`: 推荐的 Web 服务入口（封装并转发到 `server/app_legacy.py`）
   - `web_server.py`: 兼容入口，已标记 deprecated，但仍可启动
 - **后端核心目录**
-  - `server/`: Flask 业务主线（chat/task/status 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`；REST 任务轮询为主，Socket.IO 主要用于兼容与实时辅助通道）
+  - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/广播/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；REST 任务轮询为主，Socket.IO 主要用于兼容与实时辅助通道）
+  - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/queue/get_task_events）；契约见 `docs/runtime_contract.md`
   - `core/`: 终端与工具编排（`main_terminal.py`、`web_terminal.py`、`main_terminal_parts/*`；其中 `main_terminal_parts/context/` 和 `main_terminal_parts/tools_definition` 已拆分为 base + mixin 子包）
   - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）
   - `config/`: 配置拆分（`api.py`, `limits.py`, `terminal.py`, `paths.py` ...），由 `config/__init__.py` 聚合并加载 `.env`

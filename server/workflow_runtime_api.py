@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 
 from server.auth_helpers import api_login_required
 from server.context import make_terminal_callback, with_terminal
+from server.runtime import InternalDirectives, RuntimeContext, TaskParams, runtime_service
 from modules.i18n import tr
 
 workflow_runtime_bp = Blueprint("workflow_runtime", __name__)
@@ -162,34 +163,33 @@ def api_activate_workflow(terminal, workspace, username):
             f"{activation_text}"
         )
 
-        from .tasks import task_manager
-
-        workspace_id = getattr(workspace, "workspace_id", None) or "default"
-        session_data = {
-            "username": username,
-            "message_source": "workflow",
-            # 门闸 token 随任务移交，由任务线程认领（见 process_message_task）
-            "main_task_gate_token": gate_token,
-            # 让任务事件流携带该 user 消息，保证轮询客户端/刷新后可见
-            "auto_user_message_event": True,
-            "auto_user_message_payload": {
-                "message_source": "workflow",
-                "workflow_activate": True,
-                "visibility": "chat",
-                "starts_work": True,
-                "timestamp": datetime.now().isoformat(),
-            },
-        }
-        try:
-            rec = task_manager.create_chat_task(
-                username,
-                workspace_id,
-                prompt,
-                [],
-                conversation_id,
+        # 公共任务入口：内部调用方，从 terminal 构造可信上下文；
+        # 门闸 token 与 user 消息事件回放走 InternalDirectives（客户端不可提交）。
+        ctx = RuntimeContext.from_terminal(
+            terminal,
+            workspace,
+            username,
+            params=TaskParams(
+                message=prompt,
+                conversation_id=conversation_id,
                 message_source="workflow",
-                session_data=session_data,
-            )
+            ),
+            directives=InternalDirectives(
+                # 门闸 token 随任务移交，由任务线程认领（见 process_message_task）
+                main_task_gate_token=gate_token,
+                # 让任务事件流携带该 user 消息，保证轮询客户端/刷新后可见
+                auto_user_message_event=True,
+                auto_user_message_payload={
+                    "message_source": "workflow",
+                    "workflow_activate": True,
+                    "visibility": "chat",
+                    "starts_work": True,
+                    "timestamp": datetime.now().isoformat(),
+                },
+            ),
+        )
+        try:
+            rec = runtime_service.create_task(ctx)
         except RuntimeError as exc:
             release_main_task_gate(terminal, gate_token)
             return jsonify({"error": str(exc)}), 409
@@ -245,31 +245,28 @@ def api_deactivate_workflow(terminal, workspace, username):
                 str(n.get("message") or "").strip() for n in notices if str(n.get("message") or "").strip()
             )
             if notice_text:
-                from .tasks import task_manager
-
-                workspace_id = getattr(workspace, "workspace_id", None) or "default"
-                session_data = {
-                    "username": username,
-                    "message_source": "workflow",
-                    "main_task_gate_token": gate_token,
-                    "auto_user_message_event": True,
-                    "auto_user_message_payload": {
-                        "message_source": "workflow",
-                        "workflow_notice": True,
-                        "visibility": "chat",
-                        "starts_work": True,
-                        "timestamp": datetime.now().isoformat(),
-                    },
-                }
-                task_manager.create_chat_task(
+                ctx = RuntimeContext.from_terminal(
+                    terminal,
+                    workspace,
                     username,
-                    workspace_id,
-                    notice_text,
-                    [],
-                    conversation_id,
-                    message_source="workflow",
-                    session_data=session_data,
+                    params=TaskParams(
+                        message=notice_text,
+                        conversation_id=conversation_id,
+                        message_source="workflow",
+                    ),
+                    directives=InternalDirectives(
+                        main_task_gate_token=gate_token,
+                        auto_user_message_event=True,
+                        auto_user_message_payload={
+                            "message_source": "workflow",
+                            "workflow_notice": True,
+                            "visibility": "chat",
+                            "starts_work": True,
+                            "timestamp": datetime.now().isoformat(),
+                        },
+                    ),
                 )
+                runtime_service.create_task(ctx)
                 dispatched = True
         except Exception:  # noqa: BLE001
             # 任何失败：通知放回池（等轮询器/工具循环消费），不静默丢失

@@ -229,6 +229,22 @@ def _format_rejected_tool_text(reason: str) -> str:
     return tr("tool_loop.tool_call_rejected", reason=clean_reason)
 
 
+def _approval_timeout_for(web_terminal) -> Optional[float]:
+    """任务级审批/提问等待超时（秒），来自受理时的 RuntimeContext 透传。
+
+    未设置/非法值 = None → 调用点回退默认 3600s（既有语义不变）。
+    超时后的语义（拒绝当前动作继续 vs 结束任务）属阶段三产品决策。
+    """
+    try:
+        value = getattr(web_terminal, "_approval_timeout_seconds", None)
+        if value is None:
+            return None
+        value = float(value)
+        return value if value > 0 else None
+    except Exception:
+        return None
+
+
 async def _wait_for_tool_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0) -> Dict[str, Any]:
     started = time.time()
     while True:
@@ -432,7 +448,11 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
     })
 
     # 4. 阻塞等待用户决定
-    resolved = await _wait_for_plan_approval(approval_id=str(approval.get("approval_id") or ""), username=username)
+    resolved = await _wait_for_plan_approval(
+        approval_id=str(approval.get("approval_id") or ""),
+        username=username,
+        timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+    )
     status = str(resolved.get("status") or "")
     comment = str(resolved.get("comment") or "").strip()
     sender('plan_approval_resolved', {
@@ -574,6 +594,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         wait_answers = await _wait_for_user_questions(
             question_ids=[str(q.get("question_id") or "") for q in created_questions],
             username=username,
+            timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
         )
         for question in created_questions:
             qid = str(question.get("question_id") or "")
@@ -883,6 +904,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 wait_result = await _wait_for_tool_approval(
                     approval_id=approval_item.get("approval_id"),
                     username=username,
+                    timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
                 )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),
@@ -1153,6 +1175,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 wait_result = await _wait_for_tool_approval(
                     approval_id=approval_item.get("approval_id"),
                     username=username,
+                    timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
                 )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),

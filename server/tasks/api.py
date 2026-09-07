@@ -24,6 +24,7 @@ from utils.host_workspace_debug import write_host_workspace_debug
 from config import DATA_DIR, WORKSPACE_SKILLS_DIRNAME
 from modules.goal_state_manager import GoalStateManager, REASON_USER_CANCEL
 from server.tasks import task_manager
+from server.runtime import RuntimeContext, TaskParams, principal_from_session_snapshot, runtime_service
 from server.tasks.skills import _build_skill_context_messages
 from server.tasks.helpers import _task_public_payload
 from server.tasks.media import _normalize_media_payload, _normalize_files_payload
@@ -196,23 +197,29 @@ def create_task_api():
         except Exception as exc:
             debug_log(f"[TaskAPI] 补建对话失败（继续按无 cid 处理）: {exc}")
 
+    # 公共任务入口（契约 docs/runtime_contract.md §4）：适配层在完成认证后
+    # 从 Flask session 显式构造可信 principal，服务层不再回退读隐式上下文。
     try:
-        rec = task_manager.create_chat_task(
-            username,
-            workspace_id,
-            message,
-            images,
-            conversation_id,
-            videos=videos,
-            model_key=model_key,
-            thinking_mode=thinking_mode,
-            run_mode=run_mode,
-            max_iterations=max_iterations,
-            message_source=message_source,
-            goal_mode=goal_mode,
-            skill_context_messages=skill_context_messages,
-            files=files,
+        ctx = RuntimeContext(
+            principal=principal_from_session_snapshot(session, workspace_id, username=username),
+            params=TaskParams(
+                message=message,
+                images=images,
+                videos=videos,
+                files=files or [],
+                conversation_id=conversation_id,
+                model_key=model_key,
+                thinking_mode=thinking_mode,
+                run_mode=run_mode,
+                max_iterations=max_iterations,
+                message_source=message_source,
+                goal_mode=goal_mode,
+                skill_context_messages=skill_context_messages,
+            ),
         )
+        rec = runtime_service.create_task(ctx)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"success": False, "error": str(exc)}), 409
     return jsonify({

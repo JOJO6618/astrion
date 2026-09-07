@@ -43,6 +43,7 @@ from modules.upload_security import UploadSecurityError
 from modules.user_manager import UserWorkspace
 from modules.usage_tracker import QUOTA_DEFAULTS
 from modules.sub_agent import TERMINAL_STATUSES
+from server.runtime import InternalDirectives, RuntimeContext, TaskParams, runtime_service
 from modules.multi_agent.debug_logger import ma_debug
 from modules.versioning_manager import ConversationVersioningManager, VersioningError
 from modules.shallow_versioning import ShallowVersioningManager
@@ -564,39 +565,21 @@ async def _dispatch_completion_user_notice(
         )
 
     try:
-        from .tasks import task_manager
-        workspace_id = getattr(workspace, "workspace_id", None) or "default"
-        host_mode = bool(getattr(workspace, "username", None) == "host")
-        session_data = {
-            "username": username,
-            "role": getattr(web_terminal, "user_role", "user"),
-            "is_api_user": getattr(web_terminal, "user_role", "") == "api",
-            "host_mode": host_mode,
-            "host_workspace_id": workspace_id if host_mode else None,
-            "workspace_id": workspace_id,
-            "run_mode": getattr(web_terminal, "run_mode", None),
-            "thinking_mode": getattr(web_terminal, "thinking_mode", None),
-            "model_key": getattr(web_terminal, "model_key", None),
-            "message_source": message_source,
-        }
-        # 派发方预占的主任务门闸 token 随任务移交，由任务线程认领（见 process_message_task）
-        if main_task_gate_token:
-            session_data["main_task_gate_token"] = main_task_gate_token
         ui_defaults = _user_message_ui_defaults(
             message_source,
             auto_user_message_event=True,
         )
         # 关键：通知类后台任务需要把 user_message 写入任务事件流，
         # 否则前端轮询只会看到 AI/tool 事件，看不到 user_message。
-        session_data["auto_user_message_event"] = True
-        session_data["auto_user_message_payload"] = {
+        auto_payload = {
             **dict(extra_payload or {}),
             **ui_defaults,
             "timestamp": datetime.now().isoformat(),
         }
         # 轮询客户端通过后续任务事件流回放前置通知（在线客户端已由上面的 socketio 回显覆盖）。
+        preceding_list = None
         if preceding_notices:
-            session_data["preceding_user_notices"] = [
+            preceding_list = [
                 {
                     "message": str(item.get("message") or ""),
                     "payload": dict(item.get("payload") or {}),
@@ -604,23 +587,35 @@ async def _dispatch_completion_user_notice(
                 for item in preceding_notices
                 if str(item.get("message") or "").strip()
             ]
+        # 公共任务入口：内部调用方，从 terminal 构造可信上下文；
+        # 模型/模式覆盖取 terminal 当前值（与偏好快照同值，对齐既有通知链语义）。
+        ctx = RuntimeContext.from_terminal(
+            web_terminal,
+            workspace,
+            username,
+            params=TaskParams(
+                message=user_message,
+                conversation_id=conversation_id,
+                message_source=message_source,
+                model_key=getattr(web_terminal, "model_key", None),
+                run_mode=getattr(web_terminal, "run_mode", None),
+                thinking_mode=getattr(web_terminal, "thinking_mode", None),
+            ),
+            directives=InternalDirectives(
+                # 派发方预占的主任务门闸 token 随任务移交，由任务线程认领
+                main_task_gate_token=main_task_gate_token,
+                auto_user_message_event=True,
+                auto_user_message_payload=auto_payload,
+                preceding_user_notices=preceding_list,
+            ),
+        )
         ma_debug(
             "dispatch_completion_create_chat_task",
             conversation_id=conversation_id,
             user_message_preview=user_message[:300],
             preceding_count=len(preceding_notices),
         )
-        rec = task_manager.create_chat_task(
-            username,
-            workspace_id,
-            user_message,
-            [],
-            conversation_id,
-            model_key=session_data.get("model_key"),
-            thinking_mode=session_data.get("thinking_mode"),
-            run_mode=session_data.get("run_mode"),
-            session_data=session_data,
-        )
+        rec = runtime_service.create_task(ctx)
         ma_debug(
             "dispatch_completion_task_created",
             conversation_id=conversation_id,
@@ -1347,25 +1342,11 @@ async def _dispatch_multi_agent_idle_messages(
     ui_defaults["starts_work"] = False
 
     workspace_id = getattr(workspace, "workspace_id", None) or "default"
-    host_mode = bool(getattr(workspace, "username", None) == "host")
-    session_data = {
-        "username": username,
-        "role": getattr(web_terminal, "user_role", "user"),
-        "is_api_user": getattr(web_terminal, "user_role", "") == "api",
-        "host_mode": host_mode,
-        "host_workspace_id": workspace_id if host_mode else None,
-        "workspace_id": workspace_id,
-        "run_mode": getattr(web_terminal, "run_mode", None),
-        "thinking_mode": getattr(web_terminal, "thinking_mode", None),
-        "model_key": getattr(web_terminal, "model_key", None),
-        "message_source": message_source,
-    }
     ma_auto_type = _auto_message_type_for_multi_agent_subtype(last["subtype"])
     # 重要：ui_defaults 默认会给出 visibility="compact"/starts_work=False，
     # 多智能体主消息是正常聊天消息，必须在 **ui_defaults 之后覆写为 chat，
     # 否则后端历史 metadata.visibility=compact 会让加载的消息走通知渲染。
-    session_data["auto_user_message_event"] = True
-    session_data["auto_user_message_payload"] = {
+    auto_payload = {
         **ui_defaults,
         "message_source": message_source,
         "sub_agent_notice": True,
@@ -1384,7 +1365,7 @@ async def _dispatch_multi_agent_idle_messages(
         workspace_id=workspace_id,
         username=username,
     )
-    session_data["auto_user_message_payload"].setdefault("metadata", {
+    auto_payload.setdefault("metadata", {
         **ui_defaults,
         "message_source": message_source,
         "auto_message_type": ma_auto_type,
@@ -1394,8 +1375,9 @@ async def _dispatch_multi_agent_idle_messages(
         "starts_work": False,
         "visibility": "chat",
     })
+    preceding_list = None
     if len(parsed_messages) > 1:
-        session_data["preceding_user_notices"] = [
+        preceding_list = [
             {
                 "message": item["text"],
                 "payload": {
@@ -1413,18 +1395,26 @@ async def _dispatch_multi_agent_idle_messages(
         ]
 
     try:
-        rec = task_manager.create_chat_task(
+        ctx = RuntimeContext.from_terminal(
+            web_terminal,
+            workspace,
             username,
-            workspace_id,
-            last["text"],
-            [],
-            conversation_id,
-            model_key=session_data.get("model_key"),
-            thinking_mode=session_data.get("thinking_mode"),
-            run_mode=session_data.get("run_mode"),
-            session_data=session_data,
-            task_type="notice",
+            params=TaskParams(
+                message=last["text"],
+                conversation_id=conversation_id,
+                message_source=message_source,
+                model_key=getattr(web_terminal, "model_key", None),
+                run_mode=getattr(web_terminal, "run_mode", None),
+                thinking_mode=getattr(web_terminal, "thinking_mode", None),
+                task_type="notice",
+            ),
+            directives=InternalDirectives(
+                auto_user_message_event=True,
+                auto_user_message_payload=auto_payload,
+                preceding_user_notices=preceding_list,
+            ),
         )
+        rec = runtime_service.create_task(ctx)
     except Exception as exc:
         ma_debug(
             "dispatch_ma_idle_create_task_exception",

@@ -10,6 +10,7 @@ from flask import Blueprint, request, jsonify, send_file, session
 from .api_auth import api_token_required
 from .security import rate_limited
 from .tasks import task_manager
+from server.runtime import RuntimeContext, TaskParams, principal_from_session_snapshot, runtime_service
 from .context import get_user_resources, ensure_conversation_loaded, get_upload_guard, apply_conversation_overrides
 from .utils_common import sanitize_filename_preserve_unicode
 from .utils_common import debug_log
@@ -316,18 +317,22 @@ def send_message_api(workspace_id: str):
     except Exception as exc:
         return jsonify({"success": False, "error": tr("api_v1.custom_params_error", error=exc)}), 400
 
+    # 公共任务入口：principal 携带 api_token_required 注入的身份
+    # （is_api_user=True / role="api"），丢失会静默串资源管理器（契约 §5）。
     try:
-        rec = task_manager.create_chat_task(
-            username=username,
-            workspace_id=ws.workspace_id,
-            message=message,
-            images=images,
-            conversation_id=conversation_id,
-            model_key=model_key,
-            thinking_mode=thinking_mode,
-            run_mode=run_mode,
-            max_iterations=max_iterations,
+        ctx = RuntimeContext(
+            principal=principal_from_session_snapshot(session, ws.workspace_id, username=username),
+            params=TaskParams(
+                message=message,
+                images=images,
+                conversation_id=conversation_id,
+                model_key=model_key,
+                thinking_mode=thinking_mode,
+                run_mode=run_mode,
+                max_iterations=max_iterations,
+            ),
         )
+        rec = runtime_service.create_task(ctx)
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except RuntimeError as exc:
