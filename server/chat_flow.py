@@ -70,7 +70,7 @@ from .utils_common import (
 from .security import rate_limited, format_tool_result_notice, compact_web_search_result, consume_socket_token, prune_socket_tokens, validate_csrf_request, requires_csrf_protection, get_csrf_token
 from .main_task_gate import acquire_adopted_main_task_gate, release_main_task_gate
 from .monitor import cache_monitor_snapshot, get_cached_monitor_snapshot
-from .extensions import socketio
+from .extensions import socketio, run_background
 from .state import (
     MONITOR_FILE_TOOLS,
     MONITOR_MEMORY_TOOLS,
@@ -264,7 +264,7 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
 # === 统一对外入口 ===
 def start_chat_task(terminal, message: str, images: Any, sender, client_sid: str, workspace, username: str, videos: Any = None):
     """在线程模式下启动对话任务，供 Socket 事件调用。"""
-    return socketio.start_background_task(
+    return run_background(
         process_message_task,
         terminal,
         message,

@@ -27,7 +27,7 @@ def get_or_create_usage_tracker(username: Optional[str], workspace: Optional['mo
 
 
 def emit_user_quota_update(username: Optional[str]):
-    from server.extensions import socketio
+    from server.extensions import emit_event
     if not username:
         return
     tracker = get_or_create_usage_tracker(username)
@@ -35,6 +35,6 @@ def emit_user_quota_update(username: Optional[str]):
         return
     try:
         snapshot = tracker.get_quota_snapshot()
-        socketio.emit('quota_update', {'quotas': snapshot}, room=f"user_{username}")
+        emit_event('quota_update', {'quotas': snapshot}, room=f"user_{username}")
     except Exception:
         pass

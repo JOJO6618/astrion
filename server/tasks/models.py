@@ -1,6 +1,5 @@
 """简单任务 API：将聊天任务与 WebSocket 解耦，支持后台运行与轮询。"""
 from __future__ import annotations
-from server.tasks import tasks_bp
 import mimetypes
 import json
 import time
@@ -11,8 +10,10 @@ from collections import deque
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
+# 注意：本模块属于任务核心层，禁止顶层 import Web 路由层模块
+# （server.tasks.blueprint / server.chat_flow 等），保证无 Web 应用初始化时可独立加载。
+# run_chat_task_sync 在使用点函数内延迟导入（见 _run_chat_task）。
 from server.context import RuntimeIdentity, get_user_resources, ensure_conversation_loaded
-from server.chat_flow import run_chat_task_sync
 from server.main_task_gate import release_main_task_gate
 from server.work_timer import finalize_conversation_work_timer
 from server.state import stop_flags
@@ -207,6 +208,16 @@ class TaskManager:
         with self._lock:
             snapshot = list(rec.events)
         return [e for e in snapshot if e["idx"] >= offset]
+
+    def get_event_window_start(self, rec: TaskRecord) -> int:
+        """事件窗口当前最小 idx（缺口检测水位，协议 docs/runtime_protocol.md §5.2）。
+
+        deque(maxlen) 挤出旧事件后窗口前移；客户端 offset 小于该值即说明
+        中间事件已被裁剪，必须走重新同步（会话快照对账）而非续传。
+        idx 单调不回绕，窗口未裁剪时为 0。
+        """
+        with self._lock:
+            return rec.events[0]["idx"] if rec.events else 0
 
     def list_tasks(self, username: str, workspace_id: Optional[str] = None) -> List[TaskRecord]:
         with self._lock:
@@ -903,10 +914,11 @@ class TaskManager:
                         data.setdefault("workspace_id", rec.workspace_id)
                 # 记录事件
                 self._append_event(rec, event_type, data)
-                # 在线用户仍然收到实时推送（房间 user_{username}）
+                # 在线用户仍然收到实时推送（房间 user_{username}）；
+                # 安全包装：socketio 未绑定（独立 Gateway 进程）时静默跳过
                 try:
-                    from server.extensions import socketio
-                    socketio.emit(event_type, data, room=f"user_{username}")
+                    from server.extensions import emit_event
+                    emit_event(event_type, data, room=f"user_{username}")
                 except Exception:
                     pass
 
@@ -972,6 +984,10 @@ class TaskManager:
                 previous_skill_context_messages = None
 
             try:
+                # 延迟导入：消除任务核心层对 Web 路由层（server/chat_flow.py）的静态依赖，
+                # 使本模块可在无 Web 应用初始化的进程中加载（Gateway 独立启动前提）。
+                from server.chat_flow import run_chat_task_sync
+
                 run_chat_task_sync(
                     terminal=terminal,
                     message=rec.message,
@@ -1027,7 +1043,7 @@ class TaskManager:
                 )
                 # 统一发送 task_stopped，携带后台任务状态
                 try:
-                    from server.extensions import socketio
+                    from server.extensions import emit_event
                     stopped_payload = {
                         'message': tr("task_main.task_stopped"),
                         'reason': 'user_requested',
@@ -1036,9 +1052,10 @@ class TaskManager:
                         'has_running_sub_agents': bg_state["has_running_sub_agents"],
                         'has_running_background_commands': bg_state["has_running_background_commands"],
                     }
-                    socketio.emit('task_stopped', stopped_payload, room=f"user_{rec.username}")
-                    # 同时写入轮询事件队列，确保 websocket 丢失时前端仍能收到
+                    # 先写权威事件流（轮询客户端可见），再做实时推送——
+                    # 推送失败（含 socketio 未绑定）不得影响事件流记录
                     self._append_event(rec, "task_stopped", stopped_payload)
+                    emit_event('task_stopped', stopped_payload, room=f"user_{rec.username}")
                     debug_log(
                         f"[TaskRun] 已发送 task_stopped: task_id={rec.task_id}, "
                         f"has_bg={has_bg}, room=user_{rec.username}"

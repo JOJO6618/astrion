@@ -8,13 +8,10 @@ from server.utils_common import debug_log
 
 
 def make_terminal_callback(username: str):
-    """生成面向指定用户的广播函数"""
-    from server.extensions import socketio
+    """生成面向指定用户的广播函数（独立 Gateway 进程下 socket 未初始化时静默跳过）"""
+    from server.extensions import emit_event
     def _callback(event_type, data):
-        try:
-            socketio.emit(event_type, data, room=f"user_{username}")
-        except Exception as exc:
-            debug_log(f"广播事件失败 ({username}): {event_type} - {exc}")
+        emit_event(event_type, data, room=f"user_{username}")
     return _callback
 
 

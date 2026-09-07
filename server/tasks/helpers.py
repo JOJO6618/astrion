@@ -1,6 +1,5 @@
 """简单任务 API：将聊天任务与 WebSocket 解耦，支持后台运行与轮询。"""
 from __future__ import annotations
-from server.tasks import tasks_bp
 import mimetypes
 import json
 import time

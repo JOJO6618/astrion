@@ -14,6 +14,7 @@ except ImportError:
 
 from core.tool_config import TOOL_CATEGORIES
 from config.model_profiles import get_default_model_key, get_registered_model_keys
+from utils.atomic_io import atomic_write_json
 
 from modules.i18n import tr
 
@@ -845,8 +846,8 @@ def save_personalization_config(base_dir: PathLike, payload: Dict[str, Any]) -> 
     validate_context_compression_settings(config)
     path = _to_path(base_dir)
     _ensure_parent(path)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    # 原子写：防止写中断留下半截 JSON（与对话保存链路的原子替换对齐，S10 修复）
+    atomic_write_json(path, config)
     _sync_ui_locale(config)
     return config
 

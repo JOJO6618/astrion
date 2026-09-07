@@ -34,7 +34,7 @@ from server.conversation import conversation_bp
 from server.chat import chat_bp
 from server.usage import usage_bp
 from server.status import status_bp
-from server.tasks import tasks_bp
+from server.tasks.web import get_tasks_blueprint
 from server.api_v1 import api_v1_bp
 from server.multi_agent import multi_agent_bp
 from server.workflow_page import workflow_page_bp
@@ -302,7 +302,7 @@ app.register_blueprint(conversation_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(usage_bp)
 app.register_blueprint(status_bp)
-app.register_blueprint(tasks_bp)
+app.register_blueprint(get_tasks_blueprint())
 app.register_blueprint(api_v1_bp)
 app.register_blueprint(multi_agent_bp)
 app.register_blueprint(workflow_page_bp)

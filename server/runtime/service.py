@@ -35,12 +35,18 @@ class RuntimeService:
         from server.tasks import task_manager
 
         params = ctx.params
+        conversation_id = params.conversation_id
+        if not conversation_id and str(params.task_type or "chat").strip().lower() == "chat":
+            # 对话级隔离兜底（自 server/tasks/api.py 下沉）：chat 任务必须落在
+            # 对话级 terminal 上运行。补建对话文件是装配职责，收在服务层单点，
+            # Web/CLI/定时触发器等调用方无需各自实现「先建会话再发任务」。
+            conversation_id = self._ensure_conversation_for_chat(ctx)
         return task_manager.create_chat_task(
             ctx.principal.username,
             ctx.principal.workspace_id,
             params.message,
             list(params.images or []),
-            params.conversation_id,
+            conversation_id,
             videos=list(params.videos or []),
             model_key=params.model_key,
             thinking_mode=params.thinking_mode,
@@ -53,6 +59,61 @@ class RuntimeService:
             files=list(params.files or []),
             task_type=params.task_type,
         )
+
+    @staticmethod
+    def _ensure_conversation_for_chat(ctx: RuntimeContext) -> Optional[str]:
+        """chat 任务未携带 conversation_id 时补建对话文件。
+
+        失败时返回 None（容错语义与原适配层兜底一致：任务线程内
+        ensure_conversation_loaded 仍有最终兜底，但会失去对话级隔离，
+        仅作为极端降级路径存在）。
+        """
+        try:
+            from server.context import RuntimeIdentity, get_user_resources
+            from server.utils_common import debug_log
+
+            p = ctx.principal
+            params = ctx.params
+            identity = RuntimeIdentity(
+                host_mode=p.host_mode,
+                host_workspace_id=p.host_workspace_id,
+                is_api_user=p.is_api_user,
+                role=p.role,
+                preferred_model_key=params.model_key or p.preferred_model_key,
+                preferred_run_mode=params.run_mode or p.preferred_run_mode,
+                preferred_thinking_mode=(
+                    params.thinking_mode if params.thinking_mode is not None else p.preferred_thinking_mode
+                ),
+            )
+            terminal, workspace = get_user_resources(
+                p.username, workspace_id=p.workspace_id, update_session=False, identity=identity
+            )
+            cm = getattr(getattr(terminal, "context_manager", None), "conversation_manager", None)
+            if cm is None or workspace is None:
+                return None
+            run_mode = params.run_mode or p.preferred_run_mode or "fast"
+            if run_mode not in {"fast", "thinking", "deep"}:
+                run_mode = "fast"
+            thinking_mode = params.thinking_mode
+            if thinking_mode is None:
+                thinking_mode = p.preferred_thinking_mode
+            thinking_mode = bool(thinking_mode) if thinking_mode is not None else (run_mode != "fast")
+            conversation_id = cm.create_conversation(
+                project_path=str(getattr(workspace, "project_path", "") or "."),
+                run_mode=run_mode,
+                thinking_mode=thinking_mode,
+                model_key=params.model_key or p.preferred_model_key,
+            )
+            debug_log(f"[RuntimeService] 未携带 conversation_id，已补建对话: {conversation_id}")
+            return conversation_id
+        except Exception as exc:
+            try:
+                from server.utils_common import debug_log
+
+                debug_log(f"[RuntimeService] 补建对话失败（继续按无 cid 处理）: {exc}")
+            except Exception:
+                pass
+            return None
 
     # ---- 控制 ----
 
@@ -95,19 +156,24 @@ class RuntimeService:
 
     def get_task_events(
         self, username: str, task_id: str, offset: int
-    ) -> Tuple[Optional[List[Dict[str, Any]]], Optional[int], Optional[str]]:
+    ) -> Tuple[Optional[List[Dict[str, Any]]], Optional[int], Optional[str], Optional[Dict[str, Any]]]:
         """按 offset 增量读取任务事件流（idx/offset 协议，与 REST 轮询同一语义）。
 
-        返回 (events, next_offset, error)。error 非空表示任务不存在或无权访问。
+        返回 (events, next_offset, error, meta)。error 非空表示任务不存在或无权访问。
+        meta 携带缺口检测水位：``window_start`` = 事件窗口当前最小 idx
+        （协议 docs/runtime_protocol.md §5.2）；客户端 offset < window_start
+        即事件已被裁剪，须走重新同步（会话快照对账）而非续传。
         """
         from server.tasks import task_manager
 
         rec = task_manager.get_task(username, task_id)
         if not rec:
-            return None, None, tr("tasks.task_not_found")
-        events = task_manager.get_events_since(rec, max(0, int(offset or 0)))
-        next_offset = events[-1]["idx"] + 1 if events else max(0, int(offset or 0))
-        return events, next_offset, None
+            return None, None, tr("tasks.task_not_found"), None
+        offset = max(0, int(offset or 0))
+        events = task_manager.get_events_since(rec, offset)
+        next_offset = events[-1]["idx"] + 1 if events else offset
+        meta = {"window_start": task_manager.get_event_window_start(rec)}
+        return events, next_offset, None, meta
 
 
 # 进程级单例（无状态，可安全共享）

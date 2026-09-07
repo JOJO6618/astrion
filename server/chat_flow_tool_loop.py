@@ -369,7 +369,7 @@ async def _handle_workflow_tool(*, function_name: str, web_terminal, arguments, 
     return json.dumps(result, ensure_ascii=False)
 
 
-async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender, username: str, conversation_id: Optional[str], tool_call_id: Optional[str]) -> str:
+async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender, username: str, conversation_id: Optional[str], tool_call_id: Optional[str], task_id: Optional[str] = None) -> str:
     """submit_plan 工具的计划批准流：弹窗展示计划文档 → 用户批准/拒绝 →
     批准则自动切换运行模式到 execute（联动恢复权限）并更新运行期模式基线。"""
     args = arguments or {}
@@ -424,7 +424,7 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
     approval = plan_approval_manager.create_request(
         username=username,
         conversation_id=conversation_id,
-        task_id=getattr(web_terminal, "task_id", None),
+        task_id=task_id,
         tool_call_id=tool_call_id,
         plan_file=plan_file,
         plan_content=plan_content,
@@ -475,8 +475,8 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
             except Exception:
                 pass
             try:
-                from .extensions import socketio
-                socketio.emit('status_update', web_terminal.get_status(), room=f"user_{username}")
+                from .extensions import emit_event
+                emit_event('status_update', web_terminal.get_status(), room=f"user_{username}")
             except Exception:
                 pass
             switch_note = tr("tool_loop.plan_switch_note_ok")
@@ -562,7 +562,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             question = user_question_manager.create_question(
                 username=username,
                 conversation_id=conversation_id,
-                task_id=getattr(web_terminal, "task_id", None),
+                task_id=client_sid,
                 tool_call_id=tool_call.get("id"),
                 question=arguments.get("question"),
                 context=arguments.get("context"),
@@ -863,7 +863,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             approval_item = tool_approval_manager.create_request(
                 username=username,
                 conversation_id=conversation_id,
-                task_id=getattr(web_terminal, "task_id", None),
+                task_id=client_sid,
                 tool_call_id=tool_call_id,
                 tool_name=function_name,
                 arguments=arguments,
@@ -873,6 +873,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 'approval': approval_item,
                 'conversation_id': conversation_id,
             })
+
+        if permission_eval.get("requires_approval"):
             sender('update_action', {
                 'preparing_id': tool_call_id,
                 'status': 'awaiting_approval',
@@ -1019,6 +1021,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 username=username,
                 conversation_id=conversation_id,
                 tool_call_id=str(tool_call_id) if tool_call_id else None,
+                task_id=client_sid,
             )
         elif function_name in ("report_workflow_stage", "choose_workflow_branch", "deactivate_workflow"):
             tool_result = await _handle_workflow_tool(
@@ -1134,7 +1137,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             approval_item = tool_approval_manager.create_request(
                 username=username,
                 conversation_id=conversation_id,
-                task_id=getattr(web_terminal, "task_id", None),
+                task_id=client_sid,
                 tool_call_id=tool_call_id,
                 tool_name=function_name,
                 arguments=arguments,

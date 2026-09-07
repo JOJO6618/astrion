@@ -14,10 +14,12 @@ POSIX 下 rename 不受打开句柄影响，无此问题。
 """
 from __future__ import annotations
 
+import json
 import os
+import tempfile
 import time
 from pathlib import Path
-from typing import Union
+from typing import Any, Dict, Union
 
 # ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION
 _RETRY_WINERRORS = {5, 32}
@@ -49,3 +51,31 @@ def replace_with_retry(
                 raise
             time.sleep(delay)
             delay = min(delay * 2, max_delay)
+
+
+
+def atomic_write_json(path: PathLike, data: Dict[str, Any]) -> None:
+    """原子写入 JSON 文件：唯一临时文件 + fsync + replace_with_retry。
+
+    防止写中断留下半截文件（直接 open(path,"w") 覆写的风险）。
+    临时文件与目标同目录，保证 os.replace 同卷原子性；异常时清理临时文件。
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent)
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fp:
+            json.dump(data, fp, ensure_ascii=False, indent=2)
+            fp.flush()
+            os.fsync(fp.fileno())
+        # Windows 瞬时持锁（并发读取/杀软扫描）重试，POSIX 行为不变
+        replace_with_retry(tmp_path, target)
+    finally:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass

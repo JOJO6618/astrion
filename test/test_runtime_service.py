@@ -177,17 +177,21 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
         rec = self._create()
         task_manager._append_event(rec, "system_message", {"text": "a"})
         task_manager._append_event(rec, "text_chunk", {"text": "b"})
-        events, next_offset, err = runtime_service.get_task_events("tester", rec.task_id, 0)
+        events, next_offset, err, meta = runtime_service.get_task_events("tester", rec.task_id, 0)
         self.assertIsNone(err)
         self.assertEqual([e["idx"] for e in events], [0, 1])
         self.assertEqual(next_offset, 2)
+        # 缺口检测水位：未裁剪时为 0
+        self.assertEqual(meta, {"window_start": 0})
         # offset 续读
-        events2, next2, _ = runtime_service.get_task_events("tester", rec.task_id, 1)
+        events2, next2, _, meta2 = runtime_service.get_task_events("tester", rec.task_id, 1)
         self.assertEqual([e["idx"] for e in events2], [1])
         self.assertEqual(next2, 2)
+        self.assertEqual(meta2["window_start"], 0)
         # 无权/不存在
-        events3, _, err3 = runtime_service.get_task_events("someone_else", rec.task_id, 0)
+        events3, _, err3, meta3 = runtime_service.get_task_events("someone_else", rec.task_id, 0)
         self.assertIsNone(events3)
+        self.assertIsNone(meta3)
         self.assertTrue(err3)
 
 

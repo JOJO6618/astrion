@@ -1,6 +1,6 @@
 """Workspace skill 读取与 /api/skills 接口。"""
 from __future__ import annotations
-from server.tasks import tasks_bp
+from server.tasks.blueprint import tasks_bp
 import re
 from pathlib import Path
 from typing import Dict, Any, List

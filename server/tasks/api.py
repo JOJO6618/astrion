@@ -1,6 +1,6 @@
 """简单任务 API：将聊天任务与 WebSocket 解耦，支持后台运行与轮询。"""
 from __future__ import annotations
-from server.tasks import tasks_bp
+from server.tasks.blueprint import tasks_bp
 import mimetypes
 import json
 import time
@@ -16,7 +16,6 @@ from flask import current_app, session
 
 from server.auth_helpers import api_login_required, get_current_username
 from server.context import get_user_resources, ensure_conversation_loaded
-from server.chat_flow import run_chat_task_sync
 from server.security import rate_limited
 from server.state import stop_flags
 from server.utils_common import debug_log, log_conn_diag
@@ -178,24 +177,8 @@ def create_task_api():
     except Exception:
         pass
 
-    # 对话级隔离兜底：chat 任务必须落在对话级 terminal 上。
-    # 前端正常先 POST /api/conversations 拿 cid 再建任务；直接调 API 未带
-    # conversation_id 时这里补建对话文件，任务随后在对话级 terminal 加载运行，
-    # 避免占用工作区级服务 terminal 并与其形成双持同一对话。
-    if not conversation_id:
-        try:
-            _term_nc, _ws_nc = get_user_resources(username, workspace_id)
-            _cm_nc = getattr(getattr(_term_nc, "context_manager", None), "conversation_manager", None)
-            if _cm_nc is not None:
-                conversation_id = _cm_nc.create_conversation(
-                    project_path=str(getattr(_ws_nc, "project_path", "") or "."),
-                    run_mode=(run_mode if run_mode in {"fast", "thinking", "deep"} else "fast"),
-                    thinking_mode=bool(thinking_mode) if thinking_mode is not None else (run_mode != "fast"),
-                    model_key=model_key,
-                )
-                debug_log(f"[TaskAPI] 未携带 conversation_id，已补建对话: {conversation_id}")
-        except Exception as exc:
-            debug_log(f"[TaskAPI] 补建对话失败（继续按无 cid 处理）: {exc}")
+    # 对话级隔离兜底已下沉至 RuntimeService.create_task（_ensure_conversation_for_chat）：
+    # chat 任务未携带 conversation_id 时由服务层补建对话文件，适配层不再重复实现。
 
     # 公共任务入口（契约 docs/runtime_contract.md §4）：适配层在完成认证后
     # 从 Flask session 显式构造可信 principal，服务层不再回退读隐式上下文。

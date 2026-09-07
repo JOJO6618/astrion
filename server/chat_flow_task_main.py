@@ -70,7 +70,7 @@ from .utils_common import (
 from .security import rate_limited, compact_web_search_result, consume_socket_token, prune_socket_tokens, validate_csrf_request, requires_csrf_protection, get_csrf_token
 from .main_task_gate import try_acquire_main_task_gate, release_main_task_gate
 from .monitor import cache_monitor_snapshot, get_cached_monitor_snapshot
-from .extensions import socketio
+from .extensions import emit_event, run_background
 from .state import (
     MONITOR_FILE_TOOLS,
     MONITOR_MEMORY_TOOLS,
@@ -640,36 +640,43 @@ async def _dispatch_completion_user_notice(
     except Exception as e:
         debug_log(f"[CompletionNotice] 创建后台消息任务失败，回退直接执行: {e}")
 
-    payload = {
-        'message': user_message,
-        'conversation_id': conversation_id,
-        'message_source': message_source,
-        'timestamp': datetime.now().isoformat(),
-    }
-    payload.update(_user_message_ui_defaults(message_source, auto_user_message_event=True))
-    payload.update(extra_payload)
-    payload["metadata"] = {
-        "message_source": message_source,
-        "visibility": payload.get("visibility"),
-        "starts_work": payload.get("starts_work"),
-        **(payload.get("metadata") or {}),
-    }
-    sender('user_message', payload)
+    # 回退路径没有任务线程（未登记 TaskRecord），轮询器预占的门闸 token 无法随任务
+    # 移交释放；必须在本函数内随回退执行结束释放，否则对话门闸会被长期占用，
+    # 后续通知派发将恒被 try_acquire_main_task_gate 拒绝（2026-09-07 N1 修复）。
+    # release_main_task_gate 对 None 或不匹配的 token 为无操作，可安全调用。
     try:
-        task_handle = asyncio.create_task(handle_task_with_sender(
-            terminal=web_terminal,
-            workspace=workspace,
-            message=user_message,
-            images=[],
-            sender=sender,
-            client_sid=client_sid,
-            username=username,
-            videos=[],
-            auto_user_message_event=True,
-        ))
-        await task_handle
-    except Exception as inner_exc:
-        debug_log(f"[CompletionNotice] 回退处理 user_message 失败: {inner_exc}")
+        payload = {
+            'message': user_message,
+            'conversation_id': conversation_id,
+            'message_source': message_source,
+            'timestamp': datetime.now().isoformat(),
+        }
+        payload.update(_user_message_ui_defaults(message_source, auto_user_message_event=True))
+        payload.update(extra_payload)
+        payload["metadata"] = {
+            "message_source": message_source,
+            "visibility": payload.get("visibility"),
+            "starts_work": payload.get("starts_work"),
+            **(payload.get("metadata") or {}),
+        }
+        sender('user_message', payload)
+        try:
+            task_handle = asyncio.create_task(handle_task_with_sender(
+                terminal=web_terminal,
+                workspace=workspace,
+                message=user_message,
+                images=[],
+                sender=sender,
+                client_sid=client_sid,
+                username=username,
+                videos=[],
+                auto_user_message_event=True,
+            ))
+            await task_handle
+        except Exception as inner_exc:
+            debug_log(f"[CompletionNotice] 回退处理 user_message 失败: {inner_exc}")
+    finally:
+        release_main_task_gate(web_terminal, main_task_gate_token)
 
 
 def _build_shared_waiting_payload(items: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -965,7 +972,7 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
 
     这样多个后台任务同时完成时，会被合并成一次（而非每条都触发一轮停止-再工作）。
     """
-    from .extensions import socketio
+    from .extensions import emit_event
 
     sub_manager = getattr(web_terminal, "sub_agent_manager", None)
     bg_manager = getattr(web_terminal, "background_command_manager", None)
@@ -979,7 +986,7 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
 
     def sender(event_type, data):
         try:
-            socketio.emit(event_type, data, room=f"user_{username}")
+            emit_event(event_type, data, room=f"user_{username}")
         except Exception:
             pass
 
@@ -1108,14 +1115,14 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
     与 poll_completion_notifications 完全分离，避免多智能体消息和传统后台
     通知竞争 task_manager 的单工作区互斥。
     """
-    from .extensions import socketio
+    from .extensions import emit_event
 
     max_wait_time = 3600
     start_wait = time.time()
 
     def sender(event_type, data):
         try:
-            socketio.emit(event_type, data, room=f"user_{username}")
+            emit_event(event_type, data, room=f"user_{username}")
         except Exception:
             pass
 
@@ -1478,7 +1485,6 @@ async def handle_task_with_sender(
     files=None,
 ):
     """处理任务并发送消息 - 集成token统计版本"""
-    from .extensions import socketio
 
     web_terminal = terminal
     conversation_id = getattr(web_terminal.context_manager, "current_conversation_id", None)
@@ -1840,7 +1846,7 @@ async def handle_task_with_sender(
         )
         if auto_title_enabled and not skip_auto_title_generation:
             conv_id = getattr(web_terminal.context_manager, "current_conversation_id", None)
-            socketio.start_background_task(
+            run_background(
                 generate_conversation_title_background,
                 web_terminal,
                 conv_id,
@@ -2164,7 +2170,7 @@ async def handle_task_with_sender(
             quota_allowed, quota_info = web_terminal.record_model_call(bool(thinking_expected))
         if not quota_allowed:
             quota_type = 'thinking' if thinking_expected else 'fast'
-            socketio.emit('quota_notice', {
+            emit_event('quota_notice', {
                 'type': quota_type,
                 'reset_at': quota_info.get('reset_at'),
                 'limit': quota_info.get('limit'),
@@ -2630,7 +2636,7 @@ async def handle_task_with_sender(
             finally:
                 loop.close()
 
-        socketio.start_background_task(run_completion_poll)
+        run_background(run_completion_poll)
 
     # 多智能体模式独立通知池：处理 running 实例 / idle 实例待消费的 pending 消息。
     # 与传统后台任务完全分离，避免两者竞争 create_chat_task 的单工作区互斥。
@@ -2682,7 +2688,7 @@ async def handle_task_with_sender(
                 loop.close()
                 ma_debug("ma_poll_thread_finally", conversation_id=conversation_id)
 
-        socketio.start_background_task(run_ma_poll)
+        run_background(run_ma_poll)
 
     if not needs_completion_poll and not needs_ma_poll:
         ma_debug(
