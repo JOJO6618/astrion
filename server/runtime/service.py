@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 from modules.i18n import tr
-from server.runtime.context import RuntimeContext
+from server.runtime.context import RuntimeContext, TrustedPrincipal
 
 
 class RuntimeService:
@@ -146,6 +146,71 @@ class RuntimeService:
         from server.tasks import task_manager
 
         return task_manager.promote_runtime_pending_to_guidance(username, task_id, message_id)
+
+    # ---- 会话查询（公共入口；CLI/定时器等非 Web 调用方不依赖 Web 路由）----
+
+    def list_sessions(
+        self,
+        username: str,
+        workspace_id: str,
+        principal: Optional[TrustedPrincipal] = None,
+        limit: int = 50,
+        offset: int = 0,
+        multi_agent_mode: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """会话列表查询。principal 省略时按 username/workspace_id 构造最小身份快照。
+
+        注意：返回结构由 conversation 管理链路定义（items/total 等），本服务只做
+        资源装配与转发，不重排字段。
+        """
+        terminal, _workspace = self._resources_for_query(username, workspace_id, principal)
+        cm = getattr(terminal, "context_manager", None)
+        if cm is None:
+            raise RuntimeError(tr("tasks.system_not_initialized"))
+        return cm.get_conversation_list(limit=limit, offset=offset, multi_agent_mode=multi_agent_mode)
+
+    def get_session_history(
+        self,
+        username: str,
+        workspace_id: str,
+        conversation_id: str,
+        principal: Optional[TrustedPrincipal] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """会话历史读取（磁盘权威快照）。返回 None 表示不存在。"""
+        if not str(conversation_id or "").strip():
+            raise ValueError("runtime_context: conversation_id 不能为空")
+        terminal, _workspace = self._resources_for_query(username, workspace_id, principal)
+        cm = getattr(terminal, "context_manager", None)
+        if cm is None:
+            raise RuntimeError(tr("tasks.system_not_initialized"))
+        manager = cm._get_conversation_manager_for_id(conversation_id)
+        return manager.load_conversation(conversation_id)
+
+    @staticmethod
+    def _resources_for_query(username: str, workspace_id: str, principal: Optional[TrustedPrincipal]):
+        """查询类调用的资源装配（工作区级 terminal 即可，不加载会话到内存）。"""
+        from server.context import RuntimeIdentity, get_user_resources
+
+        if principal is None:
+            principal = TrustedPrincipal(username=username, workspace_id=workspace_id)
+        if principal.username != username:
+            # 纵深防御：principal 是适配层认证后的可信身份，不得与查询目标身份不符
+            raise PermissionError("runtime_context: principal 与查询目标用户不一致")
+        identity = RuntimeIdentity(
+            host_mode=principal.host_mode,
+            host_workspace_id=principal.host_workspace_id,
+            is_api_user=principal.is_api_user,
+            role=principal.role,
+            preferred_model_key=principal.preferred_model_key,
+            preferred_run_mode=principal.preferred_run_mode,
+            preferred_thinking_mode=principal.preferred_thinking_mode,
+        )
+        terminal, workspace = get_user_resources(
+            username, workspace_id=workspace_id, update_session=False, identity=identity
+        )
+        if terminal is None:
+            raise RuntimeError(tr("tasks.system_not_initialized"))
+        return terminal, workspace
 
     # ---- 观察（内部接口；后台调用方不必为观察任务发 HTTP 请求）----
 

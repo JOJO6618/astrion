@@ -185,7 +185,36 @@ def check_chain():
     rec2 = _wait_terminal_state(rec2.task_id)
     assert rec2.status in {"succeeded", "failed", "stopped", "canceled"}, f"Run2 应达终态: {rec2.status}"
 
-    # 5. 审批语义：create → list_pending → decide → 重复 decide 返回现状（单次裁决）
+    # 5.5 会话查询公共入口（CLI/非 Web 调用方不依赖 Web 路由）
+    from server.runtime import TrustedPrincipal as _TP
+
+    listing = runtime_service.list_sessions(
+        "gw_smoke_user", "gwsmoke",
+        principal=_TP(username="gw_smoke_user", workspace_id="gwsmoke", role="admin",
+                      host_mode=True, host_workspace_id="gwsmoke"),
+    )
+    items = listing.get("items") or listing.get("conversations") or []
+    assert any((it.get("conversation_id") or it.get("id")) == conv_id for it in items), (
+        f"会话列表应含本次会话 {conv_id}（keys={list(listing.keys())}）"
+    )
+    history = runtime_service.get_session_history(
+        "gw_smoke_user", "gwsmoke", conv_id,
+        principal=_TP(username="gw_smoke_user", workspace_id="gwsmoke", role="admin",
+                      host_mode=True, host_workspace_id="gwsmoke"),
+    )
+    assert history and "协议链路验收 ping" in json.dumps(history, ensure_ascii=False), \
+        "会话历史公共入口应可读且含 user 消息"
+    try:
+        runtime_service.get_session_history(
+            "gw_smoke_user", "gwsmoke", conv_id,
+            principal=_TP(username="mallory", workspace_id="gwsmoke"),
+        )
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError("principal 与查询目标不一致必须抛 PermissionError")
+
+    # 6. 审批语义：create → list_pending → decide → 重复 decide 返回现状（单次裁决）
     from server.state import tool_approval_manager
 
     item = tool_approval_manager.create_request(

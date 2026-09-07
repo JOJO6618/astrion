@@ -226,6 +226,8 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 | N4 | 并发重复任务记录 | `models.py:157`「检查运行中→创建记录」与门闸分属两处，并发下是否产生重复任务记录未验证 | G7①/G10 |
 | N5 | `issue_socket_token` 发放竞争 | 未复现；若存在作为独立小缺陷处理 | G7② |
 
+> **实施状态（2026-09-07 第 0-4 步完成后）**：N1 ✅已修复（回退路径 finally 释放，`chat_flow_task_main.py`）；N2 ✅已修复（审批创建处显式 `task_id=client_sid`，`chat_flow_tool_loop.py` 4 处 + `_handle_submit_plan`）；N3 ⬜仍待用户重启服务后人工验证（清单见 §7.1）；N4/N5 保持原口径未动；S10 ✅已修复（`save_personalization_config` 改用公共 `atomic_write_json`）。另修复两处盘点后新发现：执行链 4 处裸 `socketio.emit`（未绑定抛 AttributeError；`task_stopped` 曾因异常顺序跳过事件流记录，已改为先写事件流再推送）；chat 任务无 cid 时服务层补建对话（`RuntimeService._ensure_conversation_for_chat`，自 `tasks/api.py` 下沉）。
+
 ### 6.2 结构性缺口
 
 - **跨重启恢复能力**：S2/S3/S6 纯内存态，重启即失；S6 条目永不清理（无 TTL）。TTL 应在终态与迟到回答规则明确后设计，不能直接删除仍合法等待的请求（G11）。
@@ -243,6 +245,17 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 ## 7. 后续路线（按 G9 重排为五步 + 前置第 0 步）
 
 > 总原则：协议草案与接口适配可迭代推进；**每一步保留现有门闸、保存和恢复保障**；四层不要求四进程（G13）；Remote Worker 不是本轮完成条件。
+
+> **实施状态速览（2026-09-07，commit d9bd599c / 27aeed70）**：
+> | 步骤 | 状态 | 证据 |
+> |---|---|---|
+> | 第 0 步 | ✅ 代码侧完成（N3 人工验证待用户） | §6.1 状态注记 |
+> | 第 1 步 | ✅ | `StandaloneRuntimeLifecycleTest`；`server/tasks` 拆解；emit_event/run_background 安全包装 |
+> | 第 2 步 | ✅ | `docs/runtime_protocol.md`；`ProtocolSmokeChainTest` 全链路（含服务层补建对话） |
+> | 第 3 步 | ✅ | 协议 §5.2-5.4（序号作用域/window_start 缺口检测/重启三场景/多端共享）；`get_task_events` meta 水位 |
+> | 第 4 步 | ✅ 首版（E1-E4 面） | `modules/execution_plane` + `docs/execution_contract.md` + `ExecutionPlaneFakeBackendTest`；E5-E10 与 Host/Docker 同契约接入为后续项 |
+> | 第 5 步 | ✅ 收窄完成（代码就绪度） | 公共入口覆盖清单：run.*/approval.*/session.* 全绿（协议 §3/§4）；正式客户端开发不在本轮 |
+> | 遗留 | ⬜ | N3 真实环境人工验证、N4/N5 疑点、E5-E10 纳入、定时任务（§7.6 后置） |
 
 ### 7.1 第 0 步：闭环疑点与小修复（不依赖架构决策）
 
