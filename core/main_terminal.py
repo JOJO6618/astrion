@@ -142,6 +142,12 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.terminal_ops.attach_terminal_manager(self.terminal_manager)
             self._apply_container_session(container_session)
 
+            # Execution Plane 后端（docs/execution_contract.md）：None = 现有
+            # Host/Docker 真实链路；注入 ExecutionBackend 实现（如替身执行器）后，
+            # handle_tool_call 的 E1-E4 分支（run_command/后台/write_file/edit_file）
+            # 改走该后端。测试或未来远端执行装配点注入。
+            self.execution_backend = None
+
             self.todo_manager = TodoManager(self.context_manager)
             self.sub_agent_manager = SubAgentManager(
                 project_path=self.project_path,

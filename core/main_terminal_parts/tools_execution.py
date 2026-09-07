@@ -1632,10 +1632,16 @@ class MainTerminalToolsExecutionMixin:
                         if not path:
                             result = {"success": False, "error": tr("tools_exec.missing_file_path")}
                         else:
-                            # 在写入前先备份当前内容（浅备份）。
-                            self._track_shallow_versioning(path)
-                            mode = "a" if append_flag else "w"
-                            result = self.file_manager.write_file(path, content, mode=mode)
+                            backend = getattr(self, "execution_backend", None)
+                            if backend is not None:
+                                # Execution Plane 后端（替身/远端）：不触真实磁盘，跳过浅备份
+                                mode = "a" if append_flag else "w"
+                                result = backend.write_file(path, content, mode=mode)
+                            else:
+                                # 在写入前先备份当前内容（浅备份）。
+                                self._track_shallow_versioning(path)
+                                mode = "a" if append_flag else "w"
+                                result = self.file_manager.write_file(path, content, mode=mode)
                             if isinstance(result, dict) and result.get("success"):
                                 # write_file 成功后，该文件视作当前会话已“接触”，
                                 # 允许后续继续 write/edit 而不再触发先读拦截。
@@ -1660,9 +1666,14 @@ class MainTerminalToolsExecutionMixin:
                         elif not isinstance(replacements, list) or not replacements:
                             result = {"success": False, "error": tr("tools_exec.missing_replacements")}
                         else:
-                            # 在替换前先备份当前内容（浅备份）。
-                            self._track_shallow_versioning(path)
-                            result = self.file_manager.replace_many_in_file(path, replacements)
+                            backend = getattr(self, "execution_backend", None)
+                            if backend is not None:
+                                # Execution Plane 后端（替身/远端）：不触真实磁盘，跳过浅备份
+                                result = backend.edit_file(path, replacements)
+                            else:
+                                # 在替换前先备份当前内容（浅备份）。
+                                self._track_shallow_versioning(path)
+                                result = self.file_manager.replace_many_in_file(path, replacements)
                             if isinstance(result, dict) and result.get("success"):
                                 self._mark_file_as_read_visited(result.get("path") or path)
                                 # 快捷窗口：记录本次对话编辑过的文件
@@ -1909,7 +1920,18 @@ class MainTerminalToolsExecutionMixin:
                                 }
                             else:
                                 bg_manager = getattr(self, "background_command_manager", None)
-                                if not bg_manager:
+                                backend = getattr(self, "execution_backend", None)
+                                if backend is not None:
+                                    # Execution Plane 后端（替身/远端）：不走真实后台命令线程
+                                    result = backend.run_command_background(
+                                        arguments["command"],
+                                        timeout=float(timeout_value),
+                                        conversation_id=getattr(self.context_manager, "current_conversation_id", None),
+                                        wait_seconds=5.0,
+                                        network_permission=network_permission,
+                                        sandbox_write_access=sandbox_write_access,
+                                    )
+                                elif not bg_manager:
                                     result = {"success": False, "error": tr("tools_exec.background_manager_unavailable")}
                                 else:
                                     result = bg_manager.create_background_command(
@@ -1933,12 +1955,22 @@ class MainTerminalToolsExecutionMixin:
                                     "error": tr("tools_exec.fg_timeout_max")
                                 }
                             else:
-                                result = await self.terminal_ops.run_command(
-                                    arguments["command"],
-                                    timeout=timeout_value,
-                                    sandbox_write_access=sandbox_write_access,
-                                    network_permission=network_permission,
-                                )
+                                backend = getattr(self, "execution_backend", None)
+                                if backend is not None:
+                                    # Execution Plane 后端（替身/远端）：不起真实子进程
+                                    result = await backend.run_command(
+                                        arguments["command"],
+                                        timeout=float(timeout_value),
+                                        sandbox_write_access=sandbox_write_access,
+                                        network_permission=network_permission,
+                                    )
+                                else:
+                                    result = await self.terminal_ops.run_command(
+                                        arguments["command"],
+                                        timeout=timeout_value,
+                                        sandbox_write_access=sandbox_write_access,
+                                        network_permission=network_permission,
+                                    )
 
                                 # 字符数检查
                                 if result.get("success") and "output" in result:
