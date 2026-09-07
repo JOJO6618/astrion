@@ -119,6 +119,9 @@ class SubAgentTask:
                 self.max_turns = _max_turns_int if _max_turns_int > 0 else None
         self.current_context_tokens: int = 0
         self._compress_round: int = 0
+        # 外部会话标识（x-opencode-session）：从已有对话文件恢复（重启/恢复场景），
+        # 无则首次请求时惰性生成；深度压缩后重置为新 ID。
+        self._external_session_id: Optional[str] = self._load_external_session_id()
 
         self.messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
@@ -764,6 +767,8 @@ class SubAgentTask:
         client.model_key = chosen_key
         client.project_path = str(self.manager.project_path)
         client.apply_profile(model_map[chosen_key])
+        # 外部会话标识（x-opencode-session）：随子对话生命周期稳定，压缩后重置
+        client.extra_headers_resolver = self._resolve_external_session_headers
         return client, chosen_key
 
     async def _call_model(
@@ -1044,6 +1049,43 @@ class SubAgentTask:
         # 兜底用内存中的
         return self.system_prompt
 
+    def _load_external_session_id(self) -> Optional[str]:
+        """从子对话文件恢复外部会话标识（重启/恢复场景）；不存在返回 None。"""
+        try:
+            if self.conversation_file.exists():
+                data = json.loads(self.conversation_file.read_text(encoding="utf-8"))
+                value = data.get("external_session_id")
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        except Exception:
+            pass
+        return None
+
+    def _resolve_external_session_headers(self, base_url: Optional[str]) -> Dict[str, str]:
+        """APIClient extra_headers_resolver：为本子智能体对话解析 x-opencode-session 头。
+
+        个人空间开关开启且端点为 opencode.ai 时返回稳定 session ID；首次请求
+        惰性生成，随 _persist_conversation 落盘，深度压缩后重置。
+        任何异常返回空 dict，不影响主请求。
+        """
+        try:
+            from modules.external_session import (
+                external_session_header_enabled,
+                is_opencode_endpoint,
+                new_external_session_id,
+            )
+
+            base_dir = getattr(self.manager, "data_dir", None)
+            if not external_session_header_enabled(base_dir):
+                return {}
+            if not is_opencode_endpoint(base_url):
+                return {}
+            if not self._external_session_id:
+                self._external_session_id = new_external_session_id()
+            return {"x-opencode-session": self._external_session_id}
+        except Exception:
+            return {}
+
     def _deep_compress_messages(self) -> bool:
         """深度压缩：把旧消息总结成一条 system 消息，重建 system prompt。
 
@@ -1174,6 +1216,15 @@ class SubAgentTask:
         self.current_context_tokens = 0
         self.stats["current_context_tokens"] = 0
 
+        # 压缩重写上下文后旧 session 的缓存亲和已失效，重置外部会话标识
+        # （与主对话深压缩后重置 external_session_id 的语义一致）
+        try:
+            from modules.external_session import new_external_session_id
+
+            self._external_session_id = new_external_session_id()
+        except Exception:
+            self._external_session_id = None
+
         logger.info(
             f"[SubAgentTask] task={self.task_id} 深度压缩完成: "
             f"压缩 {len(old_messages)} 条消息，保留 {len(recent_messages)} 条，"
@@ -1253,6 +1304,7 @@ class SubAgentTask:
                 "summary": partial_summary,
                 "messages": self.messages,
                 "stats": {**self.stats, "runtime_seconds": runtime_seconds, "turn_count": self.stats.get("turn_count", 0)},
+                "external_session_id": self._external_session_id,
             }
             self.conversation_file.parent.mkdir(parents=True, exist_ok=True)
             conversation_json = json.dumps(conversation_data, ensure_ascii=False)
@@ -1280,6 +1332,9 @@ class SubAgentTask:
             if self.conversation_file.exists():
                 data = json.loads(self.conversation_file.read_text(encoding="utf-8"))
                 self.messages = data.get("messages", [])
+                restored_session = data.get("external_session_id")
+                if isinstance(restored_session, str) and restored_session.strip():
+                    self._external_session_id = restored_session.strip()
                 ma_debug(
                     "sub_agent_soft_stop_recovered",
                     task_id=self.task_id,
@@ -1372,6 +1427,7 @@ class SubAgentTask:
             "summary": summary,
             "messages": self.messages,
             "stats": output_data["stats"],
+            "external_session_id": self._external_session_id,
         }
         stats_data = {**self.stats, "runtime_seconds": runtime_seconds, "turn_count": self.stats.get("turn_count", 0)}
 

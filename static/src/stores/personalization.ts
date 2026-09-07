@@ -136,6 +136,7 @@ interface PersonalForm {
   versioning_backup_mode: VersioningBackupMode;
   versioning_restore_mode: 'overwrite';
   default_model: string | null;
+  external_session_header: boolean;
   image_compression: string;
   auto_shallow_compress_enabled: boolean;
   auto_deep_compress_enabled: boolean;
@@ -343,6 +344,7 @@ const defaultForm = (): PersonalForm => ({
   versioning_backup_mode: 'shallow',
   versioning_restore_mode: 'overwrite',
   default_model: null,
+  external_session_header: false,
   image_compression: 'original',
   auto_shallow_compress_enabled: false,
   auto_deep_compress_enabled: true,
@@ -604,6 +606,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         versioning_backup_mode: data.versioning_backup_mode === 'full' ? 'full' : 'shallow',
         versioning_restore_mode: 'overwrite',
         default_model: typeof data.default_model === 'string' ? data.default_model : fallbackModel,
+        external_session_header: !!data.external_session_header,
         image_compression:
           typeof data.image_compression === 'string' ? data.image_compression : 'original',
         auto_shallow_compress_enabled: !!data.auto_shallow_compress_enabled,

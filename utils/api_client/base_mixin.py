@@ -7,7 +7,7 @@ import asyncio
 import base64
 import mimetypes
 import os
-from typing import List, Dict, Optional, AsyncGenerator, Any
+from typing import List, Dict, Optional, AsyncGenerator, Any, Callable
 from pathlib import Path
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +72,10 @@ class APIClientBaseMixin:
         self.supports_reasoning_effort = False  # 当前模型是否支持推理强度，由 apply_profile 注入
         # 最近一次API错误详情
         self.last_error_info: Optional[Dict[str, Any]] = None
+        # 附加请求头解析器：每次发请求时以 base_url 为参数回调，返回需合并的
+        # 额外请求头（如 x-opencode-session）。由宿主终端/子智能体按业务注入，
+        # 默认 None 不附加任何额外头。
+        self.extra_headers_resolver: Optional[Callable[[Optional[str]], Dict[str, str]]] = None
         # 请求体落盘目录（跟随 LOGS_DIR，默认 ~/.astrion/<mode>/logs/api_requests）
         self.request_dump_dir = Path(LOGS_DIR) / "api_requests"
         self.debug_log_path = Path(LOGS_DIR) / "api_debug.log"

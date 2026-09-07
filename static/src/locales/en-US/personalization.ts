@@ -332,6 +332,8 @@ export default {
   reviewDefaultModelDesc: 'Uses the model library default_model',
   titleModelTitle: 'Title generation model',
   titleModelDesc: 'Choose the AI model used to generate conversation titles, shared with sub-agents',
+  externalSessionHeaderTitle: 'External session header',
+  externalSessionHeaderDesc: 'Send a stable per-conversation x-opencode-session header to OpenCode endpoints for session routing and cache optimization; disabled means no header is sent',
   titleDefaultModelDesc: 'Uses the sub-agent model library default',
   reviewThinkingDesc: 'Falls back to fast mode automatically when the model does not support thinking',
   timeoutTitle: 'Review request timeout',

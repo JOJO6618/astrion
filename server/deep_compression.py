@@ -8,6 +8,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from modules.external_session import new_external_session_id
 from modules.i18n import tr
 
 def _load_summary_prompt(web_terminal) -> str:
@@ -650,6 +651,9 @@ async def run_deep_compression(
         "compression_error": summary_fail_reason,
         "compression_resume_payload": None,
         "is_ultra_long_conversation": False,
+        # 压缩重写上下文后旧 session 的缓存亲和已失效，重置外部会话标识
+        # （与 frozen prompt 一样随压缩周期重建；开关关闭时该值不会被发送）
+        "external_session_id": new_external_session_id(),
     }
     for frozen_key in REBUILD_FROZEN_KEYS:
         meta_updates[frozen_key] = None

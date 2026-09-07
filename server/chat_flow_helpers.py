@@ -35,6 +35,8 @@ async def _generate_title_async(
     title_prompt_path,
     debug_logger,
     model_profile: Optional[Dict[str, Any]] = None,
+    conversation_id: Optional[str] = None,
+    web_terminal=None,
 ) -> Optional[str]:
     """使用子智能体模型生成对话标题。
 
@@ -48,6 +50,21 @@ async def _generate_title_async(
         return None
 
     client = APIClient(thinking_mode=False, web_mode=True)
+    # 标题生成是主对话链路的附属调用：复用主对话的外部会话标识（x-opencode-session）
+    if conversation_id and web_terminal is not None:
+        def _title_extra_headers_resolver(base_url, _cid=conversation_id, _term=web_terminal):
+            try:
+                from modules.external_session import resolve_conversation_headers
+
+                cm = getattr(_term, "context_manager", None)
+                manager = cm._get_conversation_manager_for_id(_cid) if cm else None
+                return resolve_conversation_headers(
+                    base_url, _cid, manager=manager, base_dir=getattr(_term, "data_dir", None)
+                )
+            except Exception:
+                return {}
+
+        client.extra_headers_resolver = _title_extra_headers_resolver
     if not model_profile:
         _title_debug_log("title_model_profile_missing")
         return None
@@ -125,7 +142,14 @@ def generate_conversation_title_background(
         if model_profile is None:
             _title_debug_log("title_model_profile_unavailable", title_model=title_model, conversation_id=conversation_id)
             return
-        title = await _generate_title_async(user_message, title_prompt_path, debug_logger, model_profile=model_profile)
+        title = await _generate_title_async(
+            user_message,
+            title_prompt_path,
+            debug_logger,
+            model_profile=model_profile,
+            conversation_id=conversation_id,
+            web_terminal=web_terminal,
+        )
         if not title:
             _title_debug_log("title_not_generated", conversation_id=conversation_id, username=username)
             return

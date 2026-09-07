@@ -102,6 +102,10 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             # 初始化组件
             self.api_client = APIClient(thinking_mode=self.thinking_mode)
             self.api_client.project_path = project_path
+            # 外部会话标识（x-opencode-session）：请求时按当前对话惰性解析，
+            # 仅个人空间开关开启且端点为 opencode.ai 时附加；对话 ID 在请求时
+            # 从 context_manager 读取（构造时对话尚未创建/加载）。
+            self.api_client.extra_headers_resolver = self._resolve_external_session_headers
             self.model_key = get_default_model_key()
             self.model_profile = get_model_profile(self.model_key)
             self.apply_model_profile(self.model_profile)
@@ -244,6 +248,30 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 "new": self.new_conversation_command,
                 "save": self.save_conversation_command
             }
+
+    def _resolve_external_session_headers(self, base_url: Optional[str]) -> Dict[str, str]:
+            """APIClient extra_headers_resolver：为当前对话解析 x-opencode-session 头。
+
+            请求时惰性执行：个人空间开关开启且端点为 opencode.ai 时，返回该对话
+            的稳定 session ID（首次请求生成并存入对话 metadata，深压缩后重置）。
+            任何异常返回空 dict，不影响主请求。
+            """
+            try:
+                from modules.external_session import resolve_conversation_headers
+
+                cm = getattr(self, "context_manager", None)
+                conversation_id = getattr(cm, "current_conversation_id", None) if cm else None
+                if not conversation_id:
+                    return {}
+                manager = cm._get_conversation_manager_for_id(conversation_id)
+                return resolve_conversation_headers(
+                    base_url,
+                    conversation_id,
+                    manager=manager,
+                    base_dir=getattr(self, "data_dir", None),
+                )
+            except Exception:
+                return {}
 
     def _apply_container_session(self, session: Optional["ContainerHandle"]):
             self.container_session = session

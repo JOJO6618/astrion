@@ -481,12 +481,27 @@ def _title_debug_log(message: str, **extra: Any) -> None:
         pass
 
 
-async def _generate_title_async(user_message: str) -> Optional[str]:
+async def _generate_title_async(user_message: str, conversation_id: Optional[str] = None, web_terminal=None) -> Optional[str]:
     """使用快速模型生成对话标题。"""
     if not user_message:
         _title_debug_log("skip_empty_user_message")
         return None
     client = APIClient(thinking_mode=False, web_mode=True)
+    # 标题生成是主对话链路的附属调用：复用主对话的外部会话标识（x-opencode-session）
+    if conversation_id and web_terminal is not None:
+        def _title_extra_headers_resolver(base_url, _cid=conversation_id, _term=web_terminal):
+            try:
+                from modules.external_session import resolve_conversation_headers
+
+                cm = getattr(_term, "context_manager", None)
+                manager = cm._get_conversation_manager_for_id(_cid) if cm else None
+                return resolve_conversation_headers(
+                    base_url, _cid, manager=manager, base_dir=getattr(_term, "data_dir", None)
+                )
+            except Exception:
+                return {}
+
+        client.extra_headers_resolver = _title_extra_headers_resolver
     try:
         default_model = get_default_model_key()
         client.model_key = default_model
@@ -531,7 +546,7 @@ def generate_conversation_title_background(web_terminal: WebTerminal, conversati
         return
 
     async def _runner():
-        title = await _generate_title_async(user_message)
+        title = await _generate_title_async(user_message, conversation_id=conversation_id, web_terminal=web_terminal)
         if not title:
             _title_debug_log("title_not_generated", conversation_id=conversation_id, username=username)
             return

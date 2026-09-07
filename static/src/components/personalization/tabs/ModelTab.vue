@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { inject } from 'vue';
+import FancyCheck from '@/components/common/FancyCheck.vue';
 
 defineOptions({ name: 'ModelTab' });
 
@@ -201,5 +202,21 @@ const {
                           </div>
                         </div>
                       </div>
+                      <!-- 外部会话标识：opt-in，开启后向 opencode.ai 端点发送每对话稳定的 session 头 -->
+                      <label class="settings-toggle-row"
+                        ><span class="settings-row-copy"
+                          ><span class="settings-row-title">{{ $t('personalization.externalSessionHeaderTitle') }}</span
+                          ><span class="settings-row-desc"
+                            >{{ $t('personalization.externalSessionHeaderDesc') }}</span
+                          ></span
+                        ><input
+                          type="checkbox"
+                          :checked="form.external_session_header"
+                          @change="
+                            personalization.updateField({
+                              key: 'external_session_header',
+                              value: $event.target.checked
+                            })
+                          " /><FancyCheck :checked="form.external_session_header" /></label>
                     </section>
 </template>

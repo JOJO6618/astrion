@@ -32,6 +32,8 @@ except ImportError:
 
 from utils.log_rotation import append_line, prune_dir
 
+from modules.external_session import build_user_agent
+
 from modules.i18n import tr
 
 from utils.api_client.utils import _api_dump_enabled
@@ -105,11 +107,24 @@ class APIClientProfileMixin:
         """获取当前应该使用的思考模式：思考模式下每次请求都用思考配置。"""
         return bool(self.thinking_mode)
 
-    def _build_headers(self, api_key: str) -> Dict[str, str]:
-        return {
+    def _build_headers(self, api_key: str, base_url: Optional[str] = None) -> Dict[str, str]:
+        headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            # 以「产品名/版本号」自标识（OpenCode 等供应商要求，禁止宽泛 UA）
+            "User-Agent": build_user_agent(),
         }
+        # 合并附加请求头（如 x-opencode-session），由调用方注入的 resolver 按
+        # base_url 动态解析；解析器异常不影响主请求。
+        resolver = getattr(self, "extra_headers_resolver", None)
+        if resolver is not None:
+            try:
+                extra = resolver(base_url) or {}
+                if isinstance(extra, dict):
+                    headers.update({str(k): str(v) for k, v in extra.items()})
+            except Exception:
+                pass
+        return headers
 
     def _select_api_config(self, use_thinking: bool) -> Dict[str, str]:
         """

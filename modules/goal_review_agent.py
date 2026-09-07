@@ -23,6 +23,7 @@ from typing import Any, Callable, Dict, List, Optional
 import httpx
 
 from config import PROMPTS_DIR, LOGS_DIR
+from modules.external_session import build_user_agent, resolve_ephemeral_headers
 from modules.goal_state_manager import REVIEW_MODE_ACTIVE, REVIEW_MODE_READONLY
 from modules.review_agent_config import resolve_review_agent_config
 from modules.i18n import tr
@@ -188,7 +189,9 @@ class GoalReviewAgent:
             _flush_trace(out)
             return out
         endpoint = f"{url.rstrip('/')}/chat/completions"
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        # 以「产品名/版本号」自标识；审核调用无对话连续性，每次审核生成一次性 session ID
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": build_user_agent()}
+        headers.update(resolve_ephemeral_headers(url))
         timeout_seconds = int(self.cfg.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
         max_rounds = max(1, int(self.cfg.get("max_rounds") or DEFAULT_MAX_ROUNDS))
         extra_params = dict(self.cfg.get("extra_params") or {})

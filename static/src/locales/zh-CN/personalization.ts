@@ -333,6 +333,8 @@ export default {
   reviewDefaultModelDesc: '使用模型库的 default_model',
   titleModelTitle: '标题生成模型',
   titleModelDesc: '选择用于生成对话标题的 AI 模型，与子智能体共用模型库',
+  externalSessionHeaderTitle: '外部会话标识',
+  externalSessionHeaderDesc: '向 OpenCode 端点发送每个对话稳定的 x-opencode-session 请求头，用于会话路由与缓存优化；关闭则不发送',
   titleDefaultModelDesc: '使用子智能体模型库的默认模型',
   reviewThinkingDesc: '模型不支持思考时自动回落快速模式',
   timeoutTitle: '审核请求超时',

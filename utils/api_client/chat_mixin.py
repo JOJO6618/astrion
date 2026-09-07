@@ -64,7 +64,7 @@ class APIClientChatMixin:
         # 决定是否使用思考模式（思考模式下每次请求都用思考配置）
         current_thinking_mode = self.get_current_thinking_mode()
         api_config = self._select_api_config(current_thinking_mode)
-        headers = self._build_headers(api_config["api_key"])
+        headers = self._build_headers(api_config["api_key"], base_url=api_config.get("base_url"))
         
         try:
             override_max = self.thinking_max_tokens if current_thinking_mode else self.fast_max_tokens
