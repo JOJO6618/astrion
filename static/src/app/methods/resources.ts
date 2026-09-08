@@ -161,41 +161,52 @@ export const resourceMethods = {
         this.modelSet(status.model_key);
       }
     }
-    if (status && typeof status.permission_mode === 'string') {
-      this.currentPermissionMode = status.permission_mode;
-    }
-    // 运行模式（work_mode）：terminal 快照权威。对话加载后 load.ts 会再调
-    // fetchWorkMode 以对话 metadata 为准修正一次，两者一致，不会跳变。
-    if (status && typeof status.work_mode === 'string') {
-      this.currentWorkMode = status.work_mode;
-    }
-    const pendingModes = status?.pending_runtime_modes || {};
-    if (typeof pendingModes.permission_mode === 'string') {
-      this.pendingPermissionMode = pendingModes.permission_mode;
-    } else {
-      this.pendingPermissionMode = '';
-    }
-    if (status?.execution_mode && typeof status.execution_mode === 'object') {
-      if (typeof status.execution_mode.mode === 'string') {
-        this.currentExecutionMode = status.execution_mode.mode;
+    // 运行模式四件套（work_mode/permission_mode/execution_mode/network_permission）
+    // 来源隔离：status_update 是用户级房间广播，工作区级 / 其他对话 / 其他标签页
+    // 的 terminal 触发时都会携带它自己的模式值；不做隔离时别的 terminal 的快照会
+    // 覆盖当前对话的显示（plan 锁对话的 UI 会被误解锁，点击切换又被后端 500 拒绝）。
+    // 仅当快照对应当前查看的对话（含双空：/new 页面 ↔ 工作区级 terminal）才应用；
+    // 对话权威值由 load.ts 进入对话时的对话级 fetch（fetchWorkMode 等）保证。
+    const statusConvIdRaw = status?.conversation?.current_id;
+    const statusConvId = typeof statusConvIdRaw === 'string' ? statusConvIdRaw : '';
+    const modeSourceMatches = hasConversation ? statusConvId === convId : !statusConvId;
+    if (modeSourceMatches) {
+      if (status && typeof status.permission_mode === 'string') {
+        this.currentPermissionMode = status.permission_mode;
       }
-      this.executionModeEnabled =
-        typeof status.execution_mode_enabled === 'boolean' ? status.execution_mode_enabled : true;
-    }
-    if (typeof status.network_permission === 'string') {
-      this.currentNetworkPermission = status.network_permission;
-    }
-    this.networkPermissionEnabled =
-      typeof status.network_permission_enabled === 'boolean' ? status.network_permission_enabled : false;
-    if (typeof pendingModes.network_permission === 'string') {
-      this.pendingNetworkPermission = pendingModes.network_permission;
-    } else {
-      this.pendingNetworkPermission = '';
-    }
-    if (typeof pendingModes.execution_mode === 'string') {
-      this.pendingExecutionMode = pendingModes.execution_mode;
-    } else {
-      this.pendingExecutionMode = '';
+      if (status && typeof status.work_mode === 'string') {
+        this.currentWorkMode = status.work_mode;
+      }
+      const pendingModes = status?.pending_runtime_modes || {};
+      if (typeof pendingModes.permission_mode === 'string') {
+        this.pendingPermissionMode = pendingModes.permission_mode;
+      } else {
+        this.pendingPermissionMode = '';
+      }
+      if (status?.execution_mode && typeof status.execution_mode === 'object') {
+        if (typeof status.execution_mode.mode === 'string') {
+          this.currentExecutionMode = status.execution_mode.mode;
+        }
+        this.executionModeEnabled =
+          typeof status.execution_mode_enabled === 'boolean' ? status.execution_mode_enabled : true;
+      }
+      if (typeof status.network_permission === 'string') {
+        this.currentNetworkPermission = status.network_permission;
+      }
+      this.networkPermissionEnabled =
+        typeof status.network_permission_enabled === 'boolean'
+          ? status.network_permission_enabled
+          : false;
+      if (typeof pendingModes.network_permission === 'string') {
+        this.pendingNetworkPermission = pendingModes.network_permission;
+      } else {
+        this.pendingNetworkPermission = '';
+      }
+      if (typeof pendingModes.execution_mode === 'string') {
+        this.pendingExecutionMode = pendingModes.execution_mode;
+      } else {
+        this.pendingExecutionMode = '';
+      }
     }
     // has_images/has_videos 遵循与上面模型/运行模式相同的权威规则：
     // 有打开对话时才从 status 同步；空对话/显式新建路由（/new）上 status 里的值
