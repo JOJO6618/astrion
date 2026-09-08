@@ -258,6 +258,34 @@ export const useTaskStore = defineStore('task', {
         let sawTaskCompleteEvent = false;
         let sawTaskStoppedEvent = false;
 
+        // 事件窗口缺口检测（协议 §5.2）：请求 offset 落后于窗口起点，说明中间事件
+        // 已被裁剪，禁止当作“无新事件”静默吞掉——通知上层走会话快照对账（§5.4），
+        // 本批返回的事件（idx >= window_start）是连续段，游标照常推进。
+        const windowStart = Number(data?.window_start ?? 0);
+        if (fromOffset > 0 && fromOffset < windowStart) {
+          debugLog('[Task] 事件窗口缺口:', { from: fromOffset, windowStart });
+          taskPollDiag('task-poll-window-gap', {
+            requestId,
+            taskId,
+            from: fromOffset,
+            windowStart,
+            nextOffset: data?.next_offset
+          });
+          try {
+            eventHandler({
+              type: 'event_window_gap',
+              data: {
+                task_id: data?.task_id || this.currentTaskId,
+                conversation_id: data?.conversation_id || null,
+                from_offset: fromOffset,
+                window_start: windowStart
+              }
+            });
+          } catch (err) {
+            console.warn('[Task] 处理 event_window_gap 失败:', err);
+          }
+        }
+
         // 处理新事件
         if (data.events && data.events.length > 0) {
           debugLog(`[Task] 收到 ${data.events.length} 个新事件`);

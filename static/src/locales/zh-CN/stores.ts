@@ -60,6 +60,8 @@ export default {
   fetchTaskListFailed: '获取任务列表失败',
   pollingFluctuation: '轮询波动',
   pollingUnstableRetry: '消息更新暂时不稳定，正在自动重试',
+  eventWindowGap: '消息同步缺口',
+  eventWindowGapReload: '部分实时更新已被裁剪，正在重新同步对话内容',
   requestFailed: '请求失败',
   fileTreeUnavailableHostMode: '宿主机模式下文件树不可用',
   unlimited: '未限制',

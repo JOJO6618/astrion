@@ -17,6 +17,8 @@ export type TaskPollResult = {
   conversation_id?: string;
   events: Array<{ idx: number; type: string; data: any; ts?: number }>;
   next_offset: number;
+  // 事件窗口当前最小 idx（协议 §5.2）：offset 落后于此值说明中间事件已被裁剪
+  window_start?: number;
 };
 
 export class ApiClient {

@@ -493,7 +493,14 @@ export default function App() {
     const renderState = createEventRenderState();
     for (;;) {
       const result = await api.pollTask(taskId, offset);
-      offset = result.next_offset;
+      // 事件窗口缺口检测（协议 §5.2）：中间事件已被裁剪，提示用户并对齐窗口继续
+      const windowStart = Number(result.window_start ?? 0);
+      if (offset > 0 && offset < windowStart) {
+        addItem({ kind: 'system', body: `部分实时输出已被裁剪（窗口起点 ${windowStart}），以最终结果为准` });
+        offset = windowStart;
+      } else {
+        offset = result.next_offset;
+      }
       for (const event of result.events || []) {
         if (event.type === 'tool_approval_required') {
           const approval = event.data?.approval || event.data;

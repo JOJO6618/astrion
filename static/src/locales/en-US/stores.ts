@@ -60,6 +60,8 @@ export default {
   fetchTaskListFailed: 'Failed to fetch task list',
   pollingFluctuation: 'Polling fluctuation',
   pollingUnstableRetry: 'Message updates are temporarily unstable, retrying automatically',
+  eventWindowGap: 'Sync gap detected',
+  eventWindowGapReload: 'Some live updates were trimmed; resyncing conversation content',
   requestFailed: 'Request failed',
   fileTreeUnavailableHostMode: 'File tree unavailable in host mode',
   unlimited: 'Unlimited',

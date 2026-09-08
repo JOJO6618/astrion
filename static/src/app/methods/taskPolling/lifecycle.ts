@@ -392,6 +392,21 @@ export const lifecycleMethods = {
         if (this._rebuildingFromScratch) break;
         this.handleRuntimeQueueSync(eventData);
         break;
+      case 'event_window_gap':
+        // 事件窗口缺口（协议 §5.2/§5.4）：中间事件已被服务端裁剪，
+        // 以会话 JSON 为权威强制重读历史对账。重建期间历史本就是新加载的，跳过。
+        if (this._rebuildingFromScratch) break;
+        debugLog('[TaskPolling] 事件窗口缺口，触发会话快照对账:', eventData);
+        if ((window as any).__vueApp?.uiPushToast) {
+          (window as any).__vueApp.uiPushToast({
+            title: t('stores.eventWindowGap'),
+            message: t('stores.eventWindowGapReload'),
+            type: 'warning',
+            duration: 5000
+          });
+        }
+        this.fetchAndDisplayHistory({ force: true });
+        break;
 
       default:
         debugLog(`[TaskPolling] 未知事件类型: ${eventType}`);
