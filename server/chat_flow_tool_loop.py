@@ -246,6 +246,25 @@ def _approval_timeout_for(web_terminal) -> Optional[float]:
         return None
 
 
+def _make_interaction_stop_check(get_stop_flag_fn, task_id, username):
+    """构造审批/提问等待的停止检查（两级判定：entry 存在且 stop 字段为真）。
+
+    stop_flags[task_id] 在任务运行期常驻 {'stop': False, task, terminal, loop}
+    entry（chat_flow 启动时写入），entry 存在 ≠ 停止请求；与工具循环内既有
+    判断（client_stop_info.get('stop', False)）同语义。无 task_id 时不检查。
+    """
+    if not task_id or get_stop_flag_fn is None:
+        return None
+
+    def _check() -> bool:
+        info = get_stop_flag_fn(task_id, username, include_user=False)
+        if not info:
+            return False
+        return bool(info.get("stop", False)) if isinstance(info, dict) else bool(info)
+
+    return _check
+
+
 async def _wait_for_tool_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0, stop_check=None) -> Dict[str, Any]:
     """阻塞等待工具审批裁决。
 
@@ -491,7 +510,7 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
         approval_id=str(approval.get("approval_id") or ""),
         username=username,
         timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
-        stop_check=(lambda: _state_get_stop_flag(task_id, username, include_user=False)) if task_id else None,
+        stop_check=_make_interaction_stop_check(_state_get_stop_flag, task_id, username),
     )
     status = str(resolved.get("status") or "")
     comment = str(resolved.get("comment") or "").strip()
@@ -635,7 +654,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             question_ids=[str(q.get("question_id") or "") for q in created_questions],
             username=username,
             timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
-            stop_check=lambda: get_stop_flag(client_sid, username, include_user=False),
+            stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
         )
         for question in created_questions:
             qid = str(question.get("question_id") or "")
@@ -948,7 +967,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     approval_id=approval_item.get("approval_id"),
                     username=username,
                     timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
-                    stop_check=lambda: get_stop_flag(client_sid, username, include_user=False),
+                    stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
                 )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),
@@ -1221,7 +1240,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     approval_id=approval_item.get("approval_id"),
                     username=username,
                     timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
-                    stop_check=lambda: get_stop_flag(client_sid, username, include_user=False),
+                    stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
                 )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),
