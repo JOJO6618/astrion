@@ -433,15 +433,27 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
             "error": tr("chat_permission.invalid_work_mode")
         }), 400
 
+    # 请求显式携带的 conversation_id（query > body，与 with_terminal 路由同优先级）。
+    # 判定必须基于请求而非 terminal.context_manager.current_conversation_id：
+    # /new 页面不带 cid 时路由到工作区级 terminal，其焦点残留为「最近对话」
+    # （_ensure_conversation 自动加载最近对话恢复焦点），按残留焦点判定会把
+    # 最近对话误判为「本对话」，其运行中会误拦 /new 页面切换（新对话默认模式
+    # 与任何运行中对话无关）。
+    req_conv_id = (request.args.get("conversation_id") or "").strip() or None
+    if not req_conv_id and isinstance(data, dict):
+        req_conv_id = (data.get("conversation_id") or "").strip() or None
+
     # 运行中拒绝切换（无 pending 队列——运行模式不存在「工具结果后插入」的路径）。
-    # 运行模式是对话级状态，只检测本对话是否有运行中任务；其他对话运行不影响。
-    try:
-        from server.tasks import task_manager
-        current_conv = getattr(getattr(terminal, "context_manager", None), "current_conversation_id", None)
-        if current_conv:
+    # 运行模式是对话级状态，只检测本对话是否有运行中任务；其他对话运行不影响；
+    # /new 页面（无 cid）不检查，直接放行。
+    if req_conv_id:
+        try:
+            from server.tasks import task_manager
+            req_conv_norm = req_conv_id.removeprefix("conv_")
             conv_running = [
                 r for r in task_manager.list_tasks(username)
-                if r.status in {"pending", "running", "cancel_requested"} and r.conversation_id == current_conv
+                if r.status in {"pending", "running", "cancel_requested"}
+                and (r.conversation_id or "").removeprefix("conv_") == req_conv_norm
             ]
             if conv_running:
                 return jsonify({
@@ -449,12 +461,19 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
                     "error": tr("chat_permission.work_mode_running_refused"),
                     "message": tr("chat_permission.work_mode_running_refused"),
                 }), 409
-    except Exception:
-        pass
+        except Exception:
+            pass
 
     previous_permission = terminal.get_permission_mode() if hasattr(terminal, "get_permission_mode") else None
     try:
-        result = terminal.switch_work_mode(target_mode)
+        if req_conv_id:
+            # 对话内切换：持久化到该对话 metadata（对话级唯一真相）
+            result = terminal.switch_work_mode(target_mode, conversation_id=req_conv_id)
+        else:
+            # /new 页面：仅设工作区级内存态（新对话继承冻结读 terminal 当前值），
+            # persist=False 避免误写工作区 terminal 残留焦点对话的 metadata
+            # （与 _sync_workspace_terminal_mode 同策略）。
+            result = terminal.switch_work_mode(target_mode, persist=False)
     except Exception as exc:
         return jsonify({
             "success": False,
