@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List
 from .utils_common import debug_log
 from .state import MONITOR_FILE_TOOLS, MONITOR_MEMORY_TOOLS, MONITOR_SNAPSHOT_CHAR_LIMIT, MONITOR_MEMORY_ENTRY_LIMIT
 from .state import tool_approval_manager, user_question_manager, plan_approval_manager
+from .state import get_stop_flag as _state_get_stop_flag
 from .monitor import cache_monitor_snapshot
 from .security import compact_web_search_result
 from .chat_flow_helpers import detect_tool_failure
@@ -245,20 +246,35 @@ def _approval_timeout_for(web_terminal) -> Optional[float]:
         return None
 
 
-async def _wait_for_tool_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0) -> Dict[str, Any]:
+async def _wait_for_tool_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0, stop_check=None) -> Dict[str, Any]:
+    """阻塞等待工具审批裁决。
+
+    等待方退出路径（超时/软停止/协程取消）一律回写 expired 终态，
+    保证 manager 条目不再孤悬 pending（迟到回答不再生效）。
+    """
     started = time.time()
-    while True:
-        row = tool_approval_manager.get(approval_id)
-        if not row:
-            return {"decision": "rejected", "code": "approval_missing", "reason": tr("tool_loop.approval_missing")}
-        if row.get("username") != username:
-            return {"decision": "rejected", "code": "approval_user_mismatch", "reason": tr("tool_loop.approval_user_mismatch")}
-        status = row.get("status")
-        if status in {"approved", "rejected"}:
-            return {"decision": status, "item": row}
-        if (time.time() - started) >= timeout_seconds:
-            return {"decision": "rejected", "code": "approval_timeout", "reason": tr("tool_loop.approval_timeout")}
-        await asyncio.sleep(0.2)
+    try:
+        while True:
+            row = tool_approval_manager.get(approval_id)
+            if not row:
+                return {"decision": "rejected", "code": "approval_missing", "reason": tr("tool_loop.approval_missing")}
+            if row.get("username") != username:
+                return {"decision": "rejected", "code": "approval_user_mismatch", "reason": tr("tool_loop.approval_user_mismatch")}
+            status = row.get("status")
+            if status in {"approved", "rejected"}:
+                return {"decision": status, "item": row}
+            if status == "expired":
+                return {"decision": "rejected", "code": "approval_expired", "reason": tr("tool_loop.approval_expired")}
+            if (time.time() - started) >= timeout_seconds:
+                tool_approval_manager.mark_expired(approval_id)
+                return {"decision": "rejected", "code": "approval_timeout", "reason": tr("tool_loop.approval_timeout")}
+            if stop_check is not None and stop_check():
+                tool_approval_manager.mark_expired(approval_id)
+                return {"decision": "rejected", "code": "approval_stopped", "reason": tr("tool_loop.approval_stopped")}
+            await asyncio.sleep(0.2)
+    except asyncio.CancelledError:
+        tool_approval_manager.mark_expired(approval_id)
+        raise
 
 
 def _safe_parse_tool_arguments_for_question(web_terminal, tool_call: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -278,49 +294,72 @@ def _safe_parse_tool_arguments_for_question(web_terminal, tool_call: Dict[str, A
         return None
 
 
-async def _wait_for_user_questions(*, question_ids: List[str], username: str, timeout_seconds: float = 3600.0) -> Dict[str, Dict[str, Any]]:
+async def _wait_for_user_questions(*, question_ids: List[str], username: str, timeout_seconds: float = 3600.0, stop_check=None) -> Dict[str, Dict[str, Any]]:
     started = time.time()
     pending = {str(qid) for qid in question_ids if qid}
     answered: Dict[str, Dict[str, Any]] = {}
-    while pending:
-        for qid in list(pending):
-            row = user_question_manager.get(qid)
-            if not row:
-                answered[qid] = {"status": "missing", "answer_text": tr("tool_loop.question_missing")}
-                pending.remove(qid)
-                continue
-            if row.get("username") != username:
-                answered[qid] = {"status": "forbidden", "answer_text": tr("tool_loop.question_user_mismatch")}
-                pending.remove(qid)
-                continue
-            if row.get("status") == "answered":
-                answered[qid] = {**row, "answer_text": format_user_question_answer(row)}
-                pending.remove(qid)
-        if not pending:
-            break
-        if (time.time() - started) >= timeout_seconds:
+    try:
+        while pending:
             for qid in list(pending):
-                answered[qid] = {"status": "timeout", "answer_text": tr("tool_loop.question_timeout")}
-                pending.remove(qid)
-            break
-        await asyncio.sleep(0.2)
+                row = user_question_manager.get(qid)
+                if not row:
+                    answered[qid] = {"status": "missing", "answer_text": tr("tool_loop.question_missing")}
+                    pending.remove(qid)
+                    continue
+                if row.get("username") != username:
+                    answered[qid] = {"status": "forbidden", "answer_text": tr("tool_loop.question_user_mismatch")}
+                    pending.remove(qid)
+                    continue
+                if row.get("status") == "answered":
+                    answered[qid] = {**row, "answer_text": format_user_question_answer(row)}
+                    pending.remove(qid)
+                elif row.get("status") == "expired":
+                    answered[qid] = {"status": "expired", "answer_text": tr("tool_loop.question_expired")}
+                    pending.remove(qid)
+            if not pending:
+                break
+            if (time.time() - started) >= timeout_seconds:
+                for qid in list(pending):
+                    user_question_manager.mark_expired(qid)
+                    answered[qid] = {"status": "timeout", "answer_text": tr("tool_loop.question_timeout")}
+                    pending.remove(qid)
+                break
+            if stop_check is not None and stop_check():
+                for qid in list(pending):
+                    user_question_manager.mark_expired(qid)
+                    answered[qid] = {"status": "stopped", "answer_text": tr("tool_loop.question_stopped")}
+                    pending.remove(qid)
+                break
+            await asyncio.sleep(0.2)
+    except asyncio.CancelledError:
+        for qid in list(pending):
+            user_question_manager.mark_expired(qid)
+        raise
     return answered
 
 
-async def _wait_for_plan_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0) -> Dict[str, Any]:
+async def _wait_for_plan_approval(*, approval_id: str, username: str, timeout_seconds: float = 3600.0, stop_check=None) -> Dict[str, Any]:
     """阻塞等待计划批准结果（轮询管理器，与 _wait_for_user_questions 同构）。"""
     started = time.time()
-    while True:
-        row = plan_approval_manager.get(approval_id)
-        if not row:
-            return {"status": "missing"}
-        if row.get("username") != username:
-            return {"status": "forbidden"}
-        if row.get("status") in {"approved", "rejected"}:
-            return row
-        if (time.time() - started) >= timeout_seconds:
-            return {"status": "timeout"}
-        await asyncio.sleep(0.3)
+    try:
+        while True:
+            row = plan_approval_manager.get(approval_id)
+            if not row:
+                return {"status": "missing"}
+            if row.get("username") != username:
+                return {"status": "forbidden"}
+            if row.get("status") in {"approved", "rejected", "expired"}:
+                return row
+            if (time.time() - started) >= timeout_seconds:
+                plan_approval_manager.mark_expired(approval_id)
+                return {"status": "timeout"}
+            if stop_check is not None and stop_check():
+                plan_approval_manager.mark_expired(approval_id)
+                return {"status": "stopped"}
+            await asyncio.sleep(0.3)
+    except asyncio.CancelledError:
+        plan_approval_manager.mark_expired(approval_id)
+        raise
 
 
 async def _handle_workflow_tool(*, function_name: str, web_terminal, arguments, sender, workspace, messages, conversation_id: Optional[str]) -> str:
@@ -447,11 +486,12 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
         'conversation_id': conversation_id,
     })
 
-    # 4. 阻塞等待用户决定
+    # 4. 阻塞等待用户决定（软停止/取消时经 stop_check 退出并回写终态）
     resolved = await _wait_for_plan_approval(
         approval_id=str(approval.get("approval_id") or ""),
         username=username,
         timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+        stop_check=(lambda: _state_get_stop_flag(task_id, username, include_user=False)) if task_id else None,
     )
     status = str(resolved.get("status") or "")
     comment = str(resolved.get("comment") or "").strip()
@@ -595,6 +635,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             question_ids=[str(q.get("question_id") or "") for q in created_questions],
             username=username,
             timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+            stop_check=lambda: get_stop_flag(client_sid, username, include_user=False),
         )
         for question in created_questions:
             qid = str(question.get("question_id") or "")
@@ -907,6 +948,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     approval_id=approval_item.get("approval_id"),
                     username=username,
                     timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+                    stop_check=lambda: get_stop_flag(client_sid, username, include_user=False),
                 )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),
@@ -1179,6 +1221,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     approval_id=approval_item.get("approval_id"),
                     username=username,
                     timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+                    stop_check=lambda: get_stop_flag(client_sid, username, include_user=False),
                 )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),

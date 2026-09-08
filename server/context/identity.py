@@ -4,7 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from server.auth_helpers import get_current_user_role
+# 注意：本模块属于任务核心层依赖链（server.tasks → server.context），
+# 禁止顶层 import Web 适配层（server.auth_helpers 依赖 flask）。
+# 兼容模式下的角色解析在使用点函数内延迟导入（见 _resolve_user_role）。
 
 
 class NoWorkspaceError(RuntimeError):
@@ -38,4 +40,7 @@ def _resolve_user_role(identity: Optional[RuntimeIdentity], record, default: str
         if identity.role:
             return identity.role
         return (record.role if record and getattr(record, "role", None) else default)
+    # 兼容模式（HTTP 请求上下文）：延迟导入 Web 认证辅助
+    from server.auth_helpers import get_current_user_role
+
     return get_current_user_role(record)

@@ -14,7 +14,8 @@ from typing import Dict, Any, Optional, List
 from flask import Blueprint, request, jsonify
 from flask import current_app, session
 
-from server.auth_helpers import api_login_required, get_current_username
+from server.auth_helpers import get_current_username
+from server.gateway_auth import api_login_or_host_token_required
 from server.context import get_user_resources, ensure_conversation_loaded
 from server.security import rate_limited
 from server.state import stop_flags
@@ -31,7 +32,7 @@ from modules.i18n import tr
 
 
 @tasks_bp.route("/api/tasks", methods=["GET"])
-@api_login_required
+@api_login_or_host_token_required
 def list_tasks_api():
     username = get_current_username()
     workspace_id = (request.args.get("workspace_id") or "").strip() or None
@@ -43,7 +44,7 @@ def list_tasks_api():
     })
 
 @tasks_bp.route("/api/conversations/<conversation_id>/running-status", methods=["GET"])
-@api_login_required
+@api_login_or_host_token_required
 def get_conversation_running_status_api(conversation_id: str):
     """REST 对账接口：聚合某对话的完整运行状态。
 
@@ -93,7 +94,7 @@ def get_conversation_running_status_api(conversation_id: str):
     })
 
 @tasks_bp.route("/api/tasks", methods=["POST"])
-@api_login_required
+@api_login_or_host_token_required
 @rate_limited("chat_task_create", 30, 60, scope="user")
 def create_task_api():
     username = get_current_username()
@@ -201,7 +202,7 @@ def create_task_api():
     }), 202
 
 @tasks_bp.route("/api/tasks/<task_id>", methods=["GET"])
-@api_login_required
+@api_login_or_host_token_required
 def get_task_api(task_id: str):
     started_at = time.time()
     username = get_current_username()
@@ -259,7 +260,7 @@ def get_task_api(task_id: str):
     })
 
 @tasks_bp.route("/api/tasks/<task_id>/cancel", methods=["POST"])
-@api_login_required
+@api_login_or_host_token_required
 def cancel_task_api(task_id: str):
     username = get_current_username()
     rec = runtime_service.get_task(username, task_id)
@@ -280,7 +281,7 @@ def cancel_task_api(task_id: str):
     return jsonify({"success": True})
 
 @tasks_bp.route("/api/tasks/<task_id>/runtime_guidance", methods=["POST"])
-@api_login_required
+@api_login_or_host_token_required
 def enqueue_runtime_guidance_api(task_id: str):
     username = get_current_username()
     payload = request.get_json() or {}
@@ -308,7 +309,7 @@ def enqueue_runtime_guidance_api(task_id: str):
     )
 
 @tasks_bp.route("/api/tasks/<task_id>/runtime_queue", methods=["POST"])
-@api_login_required
+@api_login_or_host_token_required
 def enqueue_runtime_queue_message_api(task_id: str):
     username = get_current_username()
     payload = request.get_json() or {}
@@ -336,7 +337,7 @@ def enqueue_runtime_queue_message_api(task_id: str):
     )
 
 @tasks_bp.route("/api/tasks/<task_id>/runtime_queue/<message_id>", methods=["DELETE"])
-@api_login_required
+@api_login_or_host_token_required
 def delete_runtime_queue_message_api(task_id: str, message_id: str):
     username = get_current_username()
     result = runtime_service.remove_runtime_pending_message(username, task_id, message_id)
@@ -358,7 +359,7 @@ def delete_runtime_queue_message_api(task_id: str, message_id: str):
     )
 
 @tasks_bp.route("/api/tasks/<task_id>/runtime_queue/<message_id>/guide", methods=["POST"])
-@api_login_required
+@api_login_or_host_token_required
 def guide_runtime_queue_message_api(task_id: str, message_id: str):
     username = get_current_username()
     result = runtime_service.promote_runtime_pending_to_guidance(username, task_id, message_id)

@@ -10,7 +10,7 @@ from flask import Blueprint, request, jsonify, send_file, session
 from .api_auth import api_token_required
 from .security import rate_limited
 from .tasks import task_manager
-from server.runtime import RuntimeContext, TaskParams, principal_from_session_snapshot, runtime_service
+from server.runtime import RuntimeContext, TaskParams, TrustedPrincipal, principal_from_session_snapshot, runtime_service
 from .context import get_user_resources, ensure_conversation_loaded, get_upload_guard, apply_conversation_overrides
 from .utils_common import sanitize_filename_preserve_unicode
 from .utils_common import debug_log
@@ -353,33 +353,34 @@ def send_message_api(workspace_id: str):
 def list_conversations_api(workspace_id: str):
     username = session.get("username")
     ws = _resolve_workspace(username, workspace_id)
-    terminal, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
-    if not terminal or not workspace:
-        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
     limit = max(1, min(int(request.args.get("limit", 20)), 100))
     offset = max(0, int(request.args.get("offset", 0)))
-    conv_dir = Path(workspace.data_dir) / "conversations"
-    items = []
-    for p in sorted(conv_dir.glob("conv_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-            meta = data.get("metadata") or {}
-            items.append({
-                "id": data.get("id"),
-                "title": data.get("title"),
-                "created_at": data.get("created_at"),
-                "updated_at": data.get("updated_at"),
-                "run_mode": meta.get("run_mode"),
-                "model_key": meta.get("model_key"),
-                "custom_prompt_name": meta.get("custom_prompt_name"),
-                "personalization_name": meta.get("personalization_name"),
-                "workspace_id": ws.workspace_id,
-                "messages_count": len(data.get("messages", [])),
-            })
-        except Exception:
-            continue
-    sliced = items[offset:offset + limit]
-    return jsonify({"success": True, "data": sliced, "total": len(items)})
+    # 数据通道统一走公共入口（消除直读磁盘双轨）；载荷字段保持 api_v1 既有形态
+    principal = TrustedPrincipal(
+        username=str(username or ""), workspace_id=ws.workspace_id, role="api", is_api_user=True
+    )
+    try:
+        result = runtime_service.list_sessions(
+            str(username or ""), ws.workspace_id, principal, limit=limit, offset=offset
+        )
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+    items = [
+        {
+            "id": it.get("id"),
+            "title": it.get("title"),
+            "created_at": it.get("created_at"),
+            "updated_at": it.get("updated_at"),
+            "run_mode": it.get("run_mode"),
+            "model_key": it.get("model_key"),
+            "custom_prompt_name": it.get("custom_prompt_name"),
+            "personalization_name": it.get("personalization_name"),
+            "workspace_id": ws.workspace_id,
+            "messages_count": it.get("total_messages", 0),
+        }
+        for it in (result.get("conversations") or [])
+    ]
+    return jsonify({"success": True, "data": items, "total": result.get("total", len(items))})
 
 
 @api_v1_bp.route("/workspaces/<workspace_id>/conversations/<conv_id>", methods=["GET"])
@@ -387,20 +388,25 @@ def list_conversations_api(workspace_id: str):
 def get_conversation_api(workspace_id: str, conv_id: str):
     username = session.get("username")
     ws = _resolve_workspace(username, workspace_id)
-    _, workspace = get_user_resources(username, workspace_id=ws.workspace_id)
-    if not workspace:
-        return jsonify({"success": False, "error": tr("api_v1.system_not_initialized")}), 503
-    path = _conversation_path(workspace, conv_id)
-    if not path.exists():
-        return jsonify({"success": False, "error": tr("api_v1.conversation_not_found")}), 404
+    # 数据通道统一走公共入口（磁盘权威快照）；载荷形态保持 api_v1 既有语义
+    normalized = conv_id if conv_id.startswith("conv_") else f"conv_{conv_id}"
+    principal = TrustedPrincipal(
+        username=str(username or ""), workspace_id=ws.workspace_id, role="api", is_api_user=True
+    )
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        include_messages = request.args.get("full", "0") == "1"
-        if not include_messages:
-            data["messages"] = None
-        return jsonify({"success": True, "data": data, "workspace_id": ws.workspace_id})
+        data = runtime_service.get_session_history(
+            str(username or ""), ws.workspace_id, normalized, principal
+        )
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500
+    if data is None:
+        return jsonify({"success": False, "error": tr("api_v1.conversation_not_found")}), 404
+    include_messages = request.args.get("full", "0") == "1"
+    if not include_messages:
+        data["messages"] = None
+    return jsonify({"success": True, "data": data, "workspace_id": ws.workspace_id})
 
 
 @api_v1_bp.route("/workspaces/<workspace_id>/conversations/<conv_id>", methods=["DELETE"])

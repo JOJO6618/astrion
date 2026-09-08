@@ -7,11 +7,28 @@ from typing import Any, Dict, List, Optional
 
 from modules.i18n import tr
 
+# 终态条目保留时长（秒）：与任务记录终态清理（3600s）对齐。
+# pending 条目永不自动清理——仍属合法等待；等待方退出（超时/停止/取消）
+# 时会经 mark_expired 转为 expired 终态，再由本 TTL 惰性回收。
+RESOLVED_TTL_SECONDS = 3600.0
+
 
 class ToolApprovalManager:
     def __init__(self):
         self._items: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
+
+    def _prune_resolved(self, now: Optional[float] = None) -> None:
+        """惰性清理过期终态条目（锁内调用）。"""
+        now = now if now is not None else time.time()
+        expired_keys = [
+            key
+            for key, item in self._items.items()
+            if item.get("status") != "pending"
+            and float(item.get("decided_at") or item.get("created_at") or 0.0) + RESOLVED_TTL_SECONDS <= now
+        ]
+        for key in expired_keys:
+            self._items.pop(key, None)
 
     def create_request(
         self,
@@ -45,11 +62,28 @@ class ToolApprovalManager:
 
     def get(self, approval_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
+            self._prune_resolved()
             item = self._items.get(approval_id)
             return dict(item) if item else None
 
+    def mark_expired(self, approval_id: str) -> Optional[Dict[str, Any]]:
+        """将 pending 条目标记为 expired 终态（等待方超时/停止/取消时调用）。
+
+        幂等：非 pending 返回现状；不存在返回 None。过期后迟到的 decide
+        因状态非 pending 返回现状（不再生效）。
+        """
+        with self._lock:
+            self._prune_resolved()
+            item = self._items.get(approval_id)
+            if not item or item.get("status") != "pending":
+                return dict(item) if item else None
+            item["status"] = "expired"
+            item["decided_at"] = time.time()
+            return dict(item)
+
     def list_pending(self, username: str, conversation_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._lock:
+            self._prune_resolved()
             rows = []
             for item in self._items.values():
                 if item.get("username") != username:

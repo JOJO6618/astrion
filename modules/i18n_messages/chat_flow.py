@@ -80,6 +80,22 @@ MESSAGES = {
         "zh-CN": "审批超时",
         "en-US": "Approval timed out",
     },
+    "tool_loop.approval_stopped": {
+        "zh-CN": "任务已停止，审批不再等待",
+        "en-US": "Task stopped; approval no longer awaited",
+    },
+    "tool_loop.approval_expired": {
+        "zh-CN": "审批请求已过期",
+        "en-US": "Approval request expired",
+    },
+    "tool_loop.question_stopped": {
+        "zh-CN": "任务已停止，问题不再等待回答。",
+        "en-US": "Task stopped; the question is no longer awaiting an answer.",
+    },
+    "tool_loop.question_expired": {
+        "zh-CN": "用户问题已过期。",
+        "en-US": "The user question has expired.",
+    },
     "tool_loop.awaiting_approval": {
         "zh-CN": "等待用户审批",
         "en-US": "Waiting for user approval",

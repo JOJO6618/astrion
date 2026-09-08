@@ -250,15 +250,22 @@ v1 原文把「内存态」直接判为「状态唯一 Owner 的障碍」，混�
 > | 能力 | 接口存在 | 适配完成（既有入口转调） | 行为验收 |
 > |---|---|---|---|
 > | run.start / cancel / guide / queue | ✅ | ✅（tasks/api.py、api_v1.py 全部转调） | ✅ chain 双客户端 + lifecycle |
-> | run.get / run.events（含 window_start） | ✅ | ✅（HTTP 轮询透传水位） | ✅ offset/水位断言 |
+> | run.get / run.events（含 window_start） | ✅ | ✅（HTTP 轮询透传水位） | ✅ offset/水位断言 + 客户端缺口处理（2026-09-08：Web 检测后发 `event_window_gap` → 会话快照对账；CLI 提示并对齐窗口续读） |
 > | run.list（发现，审核 F1） | ✅ | ✅（/api/tasks 列表、running-status、api_v1 删除保护转调） | ✅ B 发现 A 的活动 Run 并取消 |
 > | approval.list / resolve | ✅ | ✅（chat/approval.py 三类六个路由转调） | ✅ 等待→批准→继续（approval_wait） |
-> | session.list / history（principal 用户+工作区双校验，F3） | ✅ | ⬜（Web 会话路由未动——属 conversation 域存量链路） | ✅ 含越权/跨工作区拒绝断言 |
+> | session.list / history（principal 用户+工作区双校验，F3） | ✅ | ✅（2026-09-08：新增 server/gateway_api.py `GET/POST /api/runtime/sessions` + `GET .../history` 传输暴露；api_v1 两会话路由转调公共入口消双轨，载荷字段经索引补字段保持兼容） | ✅ 含越权/跨工作区拒绝断言 |
+> | 通道认证（host Bearer token） | ✅（2026-09-08：server/gateway_auth.py；host 模式+回环限定，token 存 `<DATA_DIR>/host_api_token` 0600） | ✅（gateway_api 3 路由 + tasks/api.py 9 路由 + chat/approval.py 6 路由均支持双通道） | ⬜ 待真实环境验证 |
 > | Gateway 独立初始化 | — | — | ✅ 子进程隔离（ASTRION_IGNORE_DOTENV 逃生门 + 假模型自包含 + 装配证据断言，F4） |
 > | ExecutionBackend 替身（E1-E4） | ✅ | —（默认 None，生产路径不变） | ✅ fake_exec |
 > | ③↔④ 全量贯通（Host/Docker 迁入、E5-E10） | ⬜ | ⬜ | ⬜ 后置（§7.5-补） |
 >
 > **审核收口记录（gateway_implementation_review_2026-09-07.md）**：F1 已补 run.list 公共发现入口；F2 已完成 15+ 处路由转调（tasks/api.py 7、api_v1.py 3、chat/approval.py 6 + 载荷序列化收敛至 models.py 单一实现，死导入清零）；F3 已补 principal 工作区一致性校验；F4 已修（config .env 逃生门 + 测试自包含 + 假通过修复 + 审批等待链）。审核 §4 契约注释误导已修正（execution_plane/base.py：命令校验/路径授权仍在旧链路，真实后端接入时必须保留）。
+>
+> **第一档+第二档收尾（2026-09-08 实施）**：
+> - **flask 包依赖拆解（G4 收口）**：新增 `server/context/_flask_bridge.py`（延迟桥接 has_request_context/session_get/session_set，flask 缺失按无上下文处理）；identity/resources/conversation/personalization 四子模块顶层 flask+auth_helpers 依赖全拆；`server/context/__init__.py` 改 PEP 562 懒加载；chat_flow.py 清理死导入。实测：`import server.tasks` / `import server.runtime` 不再拉起 flask/flask_socketio/auth_helpers/chat_flow（venv 验证）。**剩余形态**：任务执行阶段（_run_chat_task 线程内延迟导入 chat_flow → security/extensions）仍拉起 flask+flask_socketio（SocketIO 空壳实例不 init_app），执行层彻底脱 flask 属更大工程，本轮未动。
+> - **审批链路三缺口收口**：三个 manager 新增 `mark_expired`（幂等）+ 终态 TTL 惰性清理（RESOLVED_TTL_SECONDS=3600，pending 永不自动清理）；三个 _wait_* 等待函数超时/软停止（stop_check 注入）/协程取消（CancelledError）三路径均回写 expired 终态；软停止打断对齐 REST 硬取消。i18n 新增 approval_stopped/approval_expired/question_stopped/question_expired 四键。
+> - **测试 patch 点随迁**：test_conversation_model_persistence（session→session_get/session_set）、test_runtime_identity_resources（get_current_user_*→_get_current_user_* wrapper）。全量 75 测试失败恰为 4 项存量（与改造无关）。
+> - **存量索引兼容注记**：会话列表 items 新增 run_mode/model_key/custom_prompt_name/personalization_name 字段（索引两个写入点同步补齐）；存量索引条目在对话下次更新前这两个新字段为 None。
 >
 > **本轮收口决策（2026-09-07 用户拍板）**：①②③ 链路（Client ↔ Gateway ↔ Runtime）贯通即为本轮终点；③↔④ 全量贯通（Host/Docker 迁入 ExecutionBackend 契约、E5-E10 纳入）后置为独立工作，期间默认路径 `execution_backend=None`（现有真实链路不变）。
 >

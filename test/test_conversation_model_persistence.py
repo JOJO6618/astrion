@@ -59,7 +59,10 @@ class TestApplyWorkspacePersonalizationPreferences(unittest.TestCase):
         session = FakeSession()
         session["model_key"] = "session-model"
 
-        with patch(f"{_PERSONALIZATION_NS}.session", session):
+        # flask bridge 化后（2026-09-08）：session 读写经 session_get/session_set，
+        # patch 点随之指向 bridge 函数而非模块级 session 符号。
+        with patch(f"{_PERSONALIZATION_NS}.session_get", side_effect=lambda key, default=None: session.get(key, default)), \
+             patch(f"{_PERSONALIZATION_NS}.session_set", side_effect=lambda key, value: session.__setitem__(key, value)):
             _apply_workspace_personalization_preferences(terminal, workspace)
 
         terminal.set_model.assert_called_once_with("session-model")
@@ -74,7 +77,8 @@ class TestApplyWorkspacePersonalizationPreferences(unittest.TestCase):
         workspace = self._make_workspace()
         session = FakeSession()
 
-        with patch(f"{_PERSONALIZATION_NS}.session", session):
+        with patch(f"{_PERSONALIZATION_NS}.session_get", side_effect=lambda key, default=None: session.get(key, default)), \
+             patch(f"{_PERSONALIZATION_NS}.session_set", side_effect=lambda key, value: session.__setitem__(key, value)):
             _apply_workspace_personalization_preferences(terminal, workspace)
 
         terminal.set_model.assert_not_called()

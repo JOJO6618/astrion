@@ -33,7 +33,8 @@ from modules.user_manager import UserWorkspace
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
+from server.auth_helpers import resolve_admin_policy, get_current_user_record, get_current_username
+from server.gateway_auth import api_login_or_host_token_required
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
 from server.security import rate_limited, prune_socket_tokens
 from server.utils_common import debug_log
@@ -46,7 +47,7 @@ from modules.i18n import tr
 
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 @chat_bp.route('/api/user-questions/pending', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def list_pending_user_questions(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """获取当前用户待回答的问题列表。"""
@@ -61,7 +62,7 @@ def list_pending_user_questions(terminal: WebTerminal, workspace: UserWorkspace,
     })
 
 @chat_bp.route('/api/user-questions/<question_id>/answer', methods=['POST'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 @rate_limited("user_question_answer", 120, 60, scope="user")
 def answer_user_question(terminal: WebTerminal, workspace: UserWorkspace, username: str, question_id: str):
@@ -91,7 +92,7 @@ def answer_user_question(terminal: WebTerminal, workspace: UserWorkspace, userna
     })
 
 @chat_bp.route('/api/plan-approvals/pending', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def list_pending_plan_approvals(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """获取当前用户待批准的计划列表（work_mode=plan 的 submit_plan 工具）。"""
@@ -106,7 +107,7 @@ def list_pending_plan_approvals(terminal: WebTerminal, workspace: UserWorkspace,
     })
 
 @chat_bp.route('/api/plan-approvals/<approval_id>/answer', methods=['POST'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 @rate_limited("plan_approval_answer", 120, 60, scope="user")
 def answer_plan_approval(terminal: WebTerminal, workspace: UserWorkspace, username: str, approval_id: str):
@@ -135,7 +136,7 @@ def answer_plan_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
     })
 
 @chat_bp.route('/api/tool-approvals/pending', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def list_pending_tool_approvals(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """获取当前用户待审批工具列表。"""
@@ -150,7 +151,7 @@ def list_pending_tool_approvals(terminal: WebTerminal, workspace: UserWorkspace,
     })
 
 @chat_bp.route('/api/tool-approvals/<approval_id>/decision', methods=['POST'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 @rate_limited("tool_approval_decision", 60, 60, scope="user")
 def decide_tool_approval(terminal: WebTerminal, workspace: UserWorkspace, username: str, approval_id: str):

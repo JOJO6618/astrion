@@ -7,6 +7,10 @@ from typing import Any, Dict, List, Optional
 
 from modules.i18n import tr
 
+# 终态条目保留时长（秒）：与任务记录终态清理（3600s）对齐。
+# pending 条目永不自动清理；等待方退出时经 mark_expired 转为终态后惰性回收。
+RESOLVED_TTL_SECONDS = 3600.0
+
 
 class UserQuestionManager:
     """In-memory manager for blocking model-to-user questions."""
@@ -14,6 +18,29 @@ class UserQuestionManager:
     def __init__(self):
         self._items: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
+
+    def _prune_resolved(self, now: Optional[float] = None) -> None:
+        """惰性清理过期终态条目（锁内调用）。"""
+        now = now if now is not None else time.time()
+        expired_keys = [
+            key
+            for key, item in self._items.items()
+            if item.get("status") != "pending"
+            and float(item.get("answered_at") or item.get("created_at") or 0.0) + RESOLVED_TTL_SECONDS <= now
+        ]
+        for key in expired_keys:
+            self._items.pop(key, None)
+
+    def mark_expired(self, question_id: str) -> Optional[Dict[str, Any]]:
+        """将 pending 条目标记为 expired 终态（等待方超时/停止/取消时调用，幂等）。"""
+        with self._lock:
+            self._prune_resolved()
+            item = self._items.get(question_id)
+            if not item or item.get("status") != "pending":
+                return dict(item) if item else None
+            item["status"] = "expired"
+            item["answered_at"] = time.time()
+            return dict(item)
 
     @staticmethod
     def _normalize_options(options: Any) -> List[Dict[str, str]]:
@@ -83,11 +110,13 @@ class UserQuestionManager:
 
     def get(self, question_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
+            self._prune_resolved()
             item = self._items.get(question_id)
             return dict(item) if item else None
 
     def list_pending(self, username: str, conversation_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._lock:
+            self._prune_resolved()
             rows = []
             for item in self._items.values():
                 if item.get("username") != username:

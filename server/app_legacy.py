@@ -40,6 +40,7 @@ from server.multi_agent import multi_agent_bp
 from server.workflow_page import workflow_page_bp
 from server.workflow_runtime_api import workflow_runtime_bp
 from server.conversation_bootstrap import conversation_bootstrap_bp
+from server.gateway_api import gateway_bp
 from server.socket_handlers import socketio
 from server.security import attach_security_hooks
 from werkzeug.utils import secure_filename
@@ -308,6 +309,7 @@ app.register_blueprint(multi_agent_bp)
 app.register_blueprint(workflow_page_bp)
 app.register_blueprint(workflow_runtime_bp)
 app.register_blueprint(conversation_bootstrap_bp)
+app.register_blueprint(gateway_bp)
 
 # 安全钩子（CSRF 校验 + 响应头）
 attach_security_hooks(app)

@@ -182,6 +182,8 @@ class IndexMixin:
                 "total_tools": metadata.get("total_tools", 0),
                 "status": metadata.get("status", "active"),
                 "multi_agent_mode": bool(metadata.get("multi_agent_mode", False)),
+                "custom_prompt_name": metadata.get("custom_prompt_name"),
+                "personalization_name": metadata.get("personalization_name"),
             }
         elapsed_ms = (time.perf_counter() - t0) * 1000
         if perf_log:

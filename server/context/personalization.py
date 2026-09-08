@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from flask import session, has_request_context
+from server.context._flask_bridge import has_request_context, session_get, session_set
 
 from core.web_terminal import WebTerminal
 from modules.personalization_manager import load_personalization_config
@@ -30,7 +30,7 @@ def _apply_workspace_personalization_preferences(
             if isinstance(session_model, str) and session_model.strip():
                 resolved_session_model = session_model.strip()
         elif allow_session_io and has_request_context():
-            raw_session_model = session.get("model_key")
+            raw_session_model = session_get("model_key")
             if isinstance(raw_session_model, str) and raw_session_model.strip():
                 resolved_session_model = raw_session_model.strip()
 
@@ -84,8 +84,8 @@ def _apply_workspace_personalization_preferences(
             except Exception:
                 pass
         if allow_session_io and has_request_context() and update_session:
-            session["run_mode"] = getattr(terminal, "run_mode", session.get("run_mode"))
-            session["thinking_mode"] = getattr(terminal, "thinking_mode", session.get("thinking_mode"))
-            session["model_key"] = getattr(terminal, "model_key", session.get("model_key"))
+            session_set("run_mode", getattr(terminal, "run_mode", session_get("run_mode")))
+            session_set("thinking_mode", getattr(terminal, "thinking_mode", session_get("thinking_mode")))
+            session_set("model_key", getattr(terminal, "model_key", session_get("model_key")))
     except Exception as exc:
         debug_log(f"[Personalization] 应用工作区偏好失败: {exc}")

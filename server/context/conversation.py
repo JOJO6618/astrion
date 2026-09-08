@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from flask import session, has_request_context
+from server.context._flask_bridge import has_request_context, session_set
 
 from core.web_terminal import WebTerminal
 from modules.i18n import tr
@@ -31,8 +31,8 @@ def ensure_conversation_loaded(
             raise RuntimeError(result.get("message", tr("context.create_conversation_failed")))
         conversation_id = result["conversation_id"]
         if update_session and has_request_context():
-            session['run_mode'] = terminal.run_mode
-            session['thinking_mode'] = terminal.thinking_mode
+            session_set('run_mode', terminal.run_mode)
+            session_set('thinking_mode', terminal.thinking_mode)
         created_new = True
     else:
         conversation_id = conversation_id if conversation_id.startswith('conv_') else f"conv_{conversation_id}"
@@ -66,9 +66,9 @@ def ensure_conversation_loaded(
                 except (ValueError, AttributeError):
                     pass
                 if update_session and has_request_context():
-                    session['run_mode'] = terminal.run_mode
-                    session['thinking_mode'] = terminal.thinking_mode
-                    session['model_key'] = getattr(terminal, "model_key", None)
+                    session_set('run_mode', terminal.run_mode)
+                    session_set('thinking_mode', terminal.thinking_mode)
+                    session_set('model_key', getattr(terminal, "model_key", None))
             except Exception:
                 pass
     if workspace is not None:

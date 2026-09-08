@@ -153,8 +153,8 @@ class GetUserResourcesHostPolicyTest(unittest.TestCase):
         try:
             with patch("server.context.resources.TERMINAL_SANDBOX_MODE", "host"), \
                  patch("server.context.resources.resolve_host_workspace", return_value=(None, host_ws)), \
-                 patch("server.context.resources.get_current_user_record", return_value=record), \
-                 patch("server.context.resources.get_current_user_role", return_value="admin") as get_role, \
+                 patch("server.context.resources._get_current_user_record", return_value=record), \
+                 patch("server.context.resources._get_current_user_role", return_value="admin") as get_role, \
                  patch("modules.admin_policy_manager.get_effective_policy", return_value=policy) as get_policy:
                 from flask import Flask
                 app = Flask("host_policy_test")

@@ -12,7 +12,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     import modules.user_manager
 
-from flask import session, has_request_context
+from server.context._flask_bridge import has_request_context, session_get, session_set
 
 from core.web_terminal import WebTerminal
 from modules.personalization_manager import load_personalization_config
@@ -28,8 +28,31 @@ from config.model_profiles import get_registered_model_keys
 from modules.i18n import tr
 from server import state
 from server.utils_common import debug_log
-from server.auth_helpers import get_current_username, get_current_user_record, get_current_user_role
 from utils.host_workspace_debug import write_host_workspace_debug
+
+# 兼容模式（未传 RuntimeIdentity）需要的 Web 认证辅助改为使用点延迟导入，
+# 保持任务核心层依赖链（server.tasks → server.context.resources）无 flask 包依赖。
+
+
+def _get_current_username() -> Optional[str]:
+    """兼容模式专用：延迟导入 Web 认证辅助。"""
+    from server.auth_helpers import get_current_username
+
+    return get_current_username()
+
+
+def _get_current_user_record():
+    """兼容模式专用：延迟导入 Web 认证辅助。"""
+    from server.auth_helpers import get_current_user_record
+
+    return get_current_user_record()
+
+
+def _get_current_user_role(record=None) -> str:
+    """兼容模式专用：延迟导入 Web 认证辅助。"""
+    from server.auth_helpers import get_current_user_role
+
+    return get_current_user_role(record)
 
 from server.context.identity import NoWorkspaceError, RuntimeIdentity, _resolve_user_role
 from server.context.broadcast import make_terminal_callback, attach_user_broadcast
@@ -133,7 +156,7 @@ def get_user_resources(
     读取 session 并回写）。
     """
     from modules.user_manager import UserWorkspace
-    username = (username or get_current_username())
+    username = (username or _get_current_username())
     if not username:
         return None, None
 
@@ -146,7 +169,7 @@ def get_user_resources(
     if explicit:
         host_mode_session = identity.host_mode
     else:
-        host_mode_session = bool(session.get("host_mode")) if has_request_context() else False
+        host_mode_session = bool(session_get("host_mode"))
     sandbox_is_host = (TERMINAL_SANDBOX_MODE or "host").lower() == "host"
     if host_mode_session and sandbox_is_host:
         # 宿主机多工作区并行：资源选择必须优先由显式 workspace_id / 当前请求 session 决定，
@@ -157,8 +180,8 @@ def get_user_resources(
                 selected_workspace_id = identity.host_workspace_id
             else:
                 selected_workspace_id = (
-                    (session.get("host_workspace_id") if has_request_context() else None)
-                    or (session.get("workspace_id") if has_request_context() else None)
+                    session_get("host_workspace_id")
+                    or session_get("workspace_id")
                 )
         with state.HOST_ACTIVE_WORKSPACE_LOCK:
             active_workspace_id = state.HOST_ACTIVE_WORKSPACE_ID
@@ -283,8 +306,8 @@ def get_user_resources(
                 run_mode = identity.preferred_run_mode
                 thinking_mode_flag = identity.preferred_thinking_mode
             else:
-                run_mode = session.get('run_mode') if has_request_context() else None
-                thinking_mode_flag = session.get('thinking_mode') if has_request_context() else None
+                run_mode = session_get('run_mode')
+                thinking_mode_flag = session_get('thinking_mode')
             if run_mode not in {"fast", "thinking", "deep"}:
                 run_mode = "fast"
                 thinking_mode_flag = False
@@ -306,18 +329,18 @@ def get_user_resources(
             terminal.user_role = "admin"
             terminal.quota_update_callback = None
             if can_write_session:
-                session['run_mode'] = terminal.run_mode
-                session['thinking_mode'] = terminal.thinking_mode
-                session['workspace_id'] = getattr(workspace, "workspace_id", None)
-                session['host_workspace_id'] = getattr(workspace, "workspace_id", None)
+                session_set('run_mode', terminal.run_mode)
+                session_set('thinking_mode', terminal.thinking_mode)
+                session_set('workspace_id', getattr(workspace, "workspace_id", None))
+                session_set('host_workspace_id', getattr(workspace, "workspace_id", None))
         else:
             terminal.update_container_session(container_handle)
             attach_user_broadcast(terminal, "host")
             terminal.username = "host"
             terminal.user_role = "admin"
             if can_write_session:
-                session['workspace_id'] = getattr(workspace, "workspace_id", None)
-                session['host_workspace_id'] = getattr(workspace, "workspace_id", None)
+                session_set('workspace_id', getattr(workspace, "workspace_id", None))
+                session_set('host_workspace_id', getattr(workspace, "workspace_id", None))
         _set_terminal_workspace_label(
             terminal,
             host_workspace.get("label") or host_workspace.get("workspace_id") or getattr(workspace, "workspace_id", None),
@@ -328,8 +351,8 @@ def get_user_resources(
             from core.tool_config import ToolCategory
             from modules import admin_policy_manager
 
-            record = None if explicit else get_current_user_record()
-            role = _resolve_user_role(identity, record, default="admin") if explicit else (get_current_user_role(record) if record else "admin")
+            record = None if explicit else _get_current_user_record()
+            role = _resolve_user_role(identity, record, default="admin") if explicit else (_get_current_user_role(record) if record else "admin")
             invite_code = getattr(record, "invite_code", None) if record else None
             policy = admin_policy_manager.get_effective_policy(
                 record.username if record else username,
@@ -356,7 +379,7 @@ def get_user_resources(
                         try:
                             terminal.set_model(candidate)
                             if can_write_session:
-                                session["model_key"] = terminal.model_key
+                                session_set("model_key", terminal.model_key)
                             break
                         except Exception:
                             continue
@@ -383,7 +406,7 @@ def get_user_resources(
         )
         return terminal, workspace
 
-    is_api_user = identity.is_api_user if explicit else (bool(session.get("is_api_user")) if has_request_context() else False)
+    is_api_user = identity.is_api_user if explicit else bool(session_get("is_api_user"))
     # API 用户与网页用户使用不同的 manager
     if is_api_user:
         record = None
@@ -391,13 +414,13 @@ def get_user_resources(
             raise RuntimeError(tr("context.missing_workspace_id"))
         workspace = state.api_user_manager.ensure_workspace(username, workspace_id)
     else:
-        record = (state.user_manager.get_user(username) if explicit else get_current_user_record())
+        record = (state.user_manager.get_user(username) if explicit else _get_current_user_record())
         if explicit:
             selected_workspace_id = workspace_id or "default"
         else:
             selected_workspace_id = (
                 workspace_id
-                or (session.get("workspace_id") if has_request_context() else None)
+                or session_get("workspace_id")
                 or "default"
             )
         workspace = state.user_manager.ensure_user_workspace(username, selected_workspace_id)
@@ -423,8 +446,8 @@ def get_user_resources(
             run_mode = identity.preferred_run_mode
             thinking_mode_flag = identity.preferred_thinking_mode
         else:
-            run_mode = session.get('run_mode') if has_request_context() else None
-            thinking_mode_flag = session.get('thinking_mode') if has_request_context() else None
+            run_mode = session_get('run_mode')
+            thinking_mode_flag = session_get('thinking_mode')
         if run_mode not in {"fast", "thinking", "deep"}:
             preferred_run_mode = None
             try:
@@ -460,10 +483,10 @@ def get_user_resources(
         terminal.user_role = "api" if is_api_user else _resolve_user_role(identity, record)
         terminal.quota_update_callback = (lambda metric=None: emit_user_quota_update(username)) if not is_api_user else None
         if can_write_session:
-            session['run_mode'] = terminal.run_mode
-            session['thinking_mode'] = terminal.thinking_mode
-            session['model_key'] = getattr(terminal, "model_key", None)
-            session['workspace_id'] = getattr(workspace, "workspace_id", None)
+            session_set('run_mode', terminal.run_mode)
+            session_set('thinking_mode', terminal.thinking_mode)
+            session_set('model_key', getattr(terminal, "model_key", None))
+            session_set('workspace_id', getattr(workspace, "workspace_id", None))
     else:
         terminal.update_container_session(container_handle)
         attach_user_broadcast(terminal, username)
@@ -471,7 +494,7 @@ def get_user_resources(
         terminal.user_role = "api" if is_api_user else _resolve_user_role(identity, record)
         terminal.quota_update_callback = (lambda metric=None: emit_user_quota_update(username)) if not is_api_user else None
         if can_write_session:
-            session['workspace_id'] = getattr(workspace, "workspace_id", None)
+            session_set('workspace_id', getattr(workspace, "workspace_id", None))
 
     if is_api_user:
         workspace_label = workspace_id_value
@@ -516,7 +539,7 @@ def get_user_resources(
                         try:
                             terminal.set_model(candidate)
                             if can_write_session:
-                                session["model_key"] = terminal.model_key
+                                session_set("model_key", terminal.model_key)
                             break
                         except Exception:
                             continue

@@ -229,6 +229,46 @@ class RuntimeService:
         manager = cm._get_conversation_manager_for_id(conversation_id)
         return manager.load_conversation(conversation_id)
 
+    def create_session(
+        self,
+        username: str,
+        workspace_id: str,
+        principal: Optional[TrustedPrincipal] = None,
+        *,
+        run_mode: Optional[str] = None,
+        thinking_mode: Optional[bool] = None,
+        model_key: Optional[str] = None,
+        multi_agent_mode: bool = False,
+    ) -> Dict[str, Any]:
+        """显式创建会话（session.create）。
+
+        纯创建对话文件（不切换任何 terminal 的当前对话）；返回
+        {"conversation_id": ...}。客户端随后 run.start 携带该 id 即可在
+        新会话中执行——「先建会话再发任务」的装配职责收在服务层单点。
+        默认模式解析优先级：显式传参 > principal 偏好快照 > 系统默认。
+        """
+        terminal, workspace = self._resources_for_query(username, workspace_id, principal)
+        cm = getattr(getattr(terminal, "context_manager", None), "conversation_manager", None)
+        if cm is None or workspace is None:
+            raise RuntimeError(tr("tasks.system_not_initialized"))
+        resolved_run_mode = run_mode or (principal.preferred_run_mode if principal else None) or "fast"
+        if resolved_run_mode not in {"fast", "thinking", "deep"}:
+            resolved_run_mode = "fast"
+        resolved_thinking = thinking_mode
+        if resolved_thinking is None and principal is not None:
+            resolved_thinking = principal.preferred_thinking_mode
+        resolved_thinking = (
+            bool(resolved_thinking) if resolved_thinking is not None else (resolved_run_mode != "fast")
+        )
+        conversation_id = cm.create_conversation(
+            project_path=str(getattr(workspace, "project_path", "") or "."),
+            run_mode=resolved_run_mode,
+            thinking_mode=resolved_thinking,
+            model_key=model_key or (principal.preferred_model_key if principal else None),
+            metadata_overrides={"multi_agent_mode": True} if multi_agent_mode else None,
+        )
+        return {"conversation_id": conversation_id}
+
     @staticmethod
     def _resources_for_query(username: str, workspace_id: str, principal: Optional[TrustedPrincipal]):
         """查询类调用的资源装配（工作区级 terminal 即可，不加载会话到内存）。"""
