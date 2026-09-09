@@ -1475,8 +1475,11 @@ function dispatchShowFileDownload(path: string) {
     })
     .catch((err) => {
       console.warn('[show_file] 下载失败:', err);
-      // 兜底：直接跳转
-      window.open(url, '_blank');
+      // 失败不再兜底跳转（window.open 会把后端 JSON 错误整页展示），改为错误弹窗提示
+      useUiStore().pushToast({
+        message: err?.message || t('common.downloadFailed'),
+        type: 'error'
+      });
     });
 }
 

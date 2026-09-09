@@ -1,8 +1,10 @@
 <template>
   <section
     v-if="renderVisible"
+    ref="rootRef"
     class="qd-detail"
     :class="{ 'panel-enter': entering, 'panel-leave': leaving }"
+    :style="{ right: `${panelRight}px` }"
   >
     <header class="qd-detail__header">
       <span class="qd-detail__dot" :class="`is-${stateClass}`"></span>
@@ -65,12 +67,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t, currentLocale } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
+import CloseButton from '@/components/common/CloseButton.vue';
 
 /**
  * 详情面板（fixed 浮在快捷窗口列左侧）
@@ -139,6 +142,35 @@ const entering = ref(false);
 const leaving = ref(false);
 const bodyFading = ref(false);
 const bodyRef = ref<HTMLElement | null>(null);
+const rootRef = ref<HTMLElement | null>(null);
+
+/* ---------------- 面板水平定位：跟随快捷栏实际位置 ----------------
+   CSS 里的 right 兜底值假设快捷栏贴视口最右缘；右侧再开预览/终端面板时
+   快捷栏左移，写死的 right 会让面板盖住快捷栏。显示期间逐帧测量
+   快捷栏左缘（顺带跟随面板开合过渡与拖拽调宽），保持 12px 间距。 */
+const panelRight = ref(294 + 12);
+let positionRafId = 0;
+
+function trackDockPosition() {
+  const aside = rootRef.value?.parentElement;
+  if (aside) {
+    const next = Math.round(window.innerWidth - aside.getBoundingClientRect().left + 12);
+    if (next !== panelRight.value) {
+      panelRight.value = next;
+    }
+  }
+  positionRafId = requestAnimationFrame(trackDockPosition);
+}
+
+watch(renderVisible, (visible) => {
+  if (visible) {
+    trackDockPosition();
+  } else {
+    cancelAnimationFrame(positionRafId);
+  }
+});
+
+onBeforeUnmount(() => cancelAnimationFrame(positionRafId));
 
 /** 当前条目状态与标题（关闭离开动画期间沿用最后快照） */
 const currentStatus = computed(() => {

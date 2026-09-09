@@ -105,9 +105,11 @@ export interface QuickDockMenuState {
   kind?: 'agent' | 'cmd';
   /** runner: task_id / command_id；file: 相对路径 */
   key: string;
-  /** fixed 定位坐标 */
+  /** fixed 定位坐标（top = 按钮下缘 + 间距） */
   left: number;
   top: number;
+  /** 按钮上缘坐标：下方空间不足时菜单翻转到按钮上方展开 */
+  btnTop: number;
   /** 菜单与触发按钮右对齐（runner 的 ⋯ 在行右侧） */
   alignRight: boolean;
 }

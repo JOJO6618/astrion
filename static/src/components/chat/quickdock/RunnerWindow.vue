@@ -169,6 +169,7 @@ function openMenu(e: MouseEvent, row: Row) {
     key: row.id,
     left: rect.right, // alignRight：菜单右缘对齐按钮右缘
     top: rect.bottom + 6,
+    btnTop: rect.top,
     alignRight: true
   });
 }

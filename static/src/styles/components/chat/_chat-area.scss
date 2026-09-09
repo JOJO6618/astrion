@@ -2469,15 +2469,43 @@ show-html[data-rendered='1'] {
   max-width: 100%;
 }
 
-// ===== download:// 链接样式 =====
+// ===== 文件下载链接样式（download:// 与工作区相对路径链接统一） =====
+// 版式对齐 ChatGPT：文件图标 + 链接文字 + 虚线下划线；颜色全部走三主题语义 token
 a.md-download-link {
-  color: var(--accent-primary);
-  text-decoration: underline;
+  color: var(--text-primary);
+  text-decoration: underline dotted;
+  text-decoration-color: var(--text-tertiary);
+  text-underline-offset: 3px;
+  /* 行高 2.5（正文 1.6）：撑高所在行盒，与上下两行拉开明显间距 */
+  line-height: 2.5;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition:
+    color 0.15s,
+    text-decoration-color 0.15s;
+
+  // 文件图标：mask 上色，跟随正文色（深色模式近白、浅色近黑）
+  &::before {
+    content: '';
+    display: inline-block;
+    /* 图标大于字高：顶部略过帽高线，底部下移到虚线下划线处（基线下 3px） */
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    vertical-align: -3px;
+    background-color: var(--text-primary);
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 1.5h-5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V4.5L9.5 1.5z'/%3E%3Cpath d='M9.5 1.5v3h3'/%3E%3Cpath d='M6 8h4M6 10.5h4'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 1.5h-5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V4.5L9.5 1.5z'/%3E%3Cpath d='M9.5 1.5v3h3'/%3E%3Cpath d='M6 8h4M6 10.5h4'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
 
   &:hover {
-    opacity: 0.8;
+    color: var(--accent);
+    text-decoration-color: var(--accent);
   }
 }
 

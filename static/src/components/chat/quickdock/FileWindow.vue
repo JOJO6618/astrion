@@ -78,6 +78,7 @@ function openMenu(e: MouseEvent, row: Row) {
     key: row.path,
     left: rect.left, // 与按钮左对齐、向下展开
     top: rect.bottom + 6,
+    btnTop: rect.top,
     alignRight: false
   });
 }

@@ -453,7 +453,9 @@
 .qd-detail {
   position: fixed;
   top: 20px;
-  right: calc(294px + 12px); /* 快捷窗口列宽 + gap */
+  /* right 由组件内联样式动态计算：跟随快捷栏实际位置（右侧可能还有预览/终端面板），
+     兜底值与旧写法一致（快捷窗口列宽 294 + gap 12） */
+  right: calc(294px + 12px);
   width: 480px;
   max-width: calc(100vw - 360px);
   height: 460px;
@@ -988,19 +990,43 @@
   box-shadow: var(--shadow-card);
 }
 
-.qd-menu.menu-enter {
-  animation: qd-menu-in 0.16s ease-out;
+/* 进入/离开：淡入淡出 + 从按钮一侧滑入——菜单在按钮下方展开时从上到下（默认），
+   翻转到按钮上方时从下到上（--above），动画始终以按钮为起点 */
+.qd-menu-enter-active,
+.qd-menu-leave-active {
+  transition:
+    opacity 0.16s ease-out,
+    transform 0.16s ease-out;
+  transform-origin: top center;
 }
 
-@keyframes qd-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-3px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.qd-menu--above.qd-menu-enter-active,
+.qd-menu--above.qd-menu-leave-active {
+  transform-origin: bottom center;
+}
+
+.qd-menu-leave-active {
+  transition-duration: 0.13s;
+  transition-timing-function: ease-in;
+  pointer-events: none;
+}
+
+.qd-menu-enter-from {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+.qd-menu--above.qd-menu-enter-from {
+  transform: translateY(4px) scale(0.98);
+}
+
+.qd-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-3px) scale(0.98);
+}
+
+.qd-menu--above.qd-menu-leave-to {
+  transform: translateY(3px) scale(0.98);
 }
 
 .qd-menu__item {

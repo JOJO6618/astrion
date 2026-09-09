@@ -17,25 +17,34 @@
     <!-- 详情面板（fixed 浮在列左侧） -->
     <RunnerDetailPanel />
 
-    <!-- 全局 ⋯ 菜单（fixed 单例） -->
-    <div v-if="menu" class="qd-menu menu-enter" :style="menuStyle" @click.stop>
-      <template v-if="menu.type === 'runner'">
-        <button
-          class="qd-menu__item qd-menu__item--danger"
-          :disabled="!menuTargetRunning"
-          @click="killRunner"
-        >
-          {{ $t('quickdock.menuForceStop') }}
-        </button>
-      </template>
-      <template v-else>
-        <button class="qd-menu__item" @click="downloadFile">{{ $t('common.download') }}</button>
-        <button v-if="hostMode" class="qd-menu__item" @click="revealInManager">
-          {{ $t('quickdock.menuRevealInManager') }}
-        </button>
-        <button class="qd-menu__item" @click="copyPath">{{ $t('quickdock.menuCopyPath') }}</button>
-      </template>
-    </div>
+    <!-- 全局 ⋯ 菜单（fixed 单例）；Transition 提供进入/离开动画，
+         离开期间用 effectiveMenu 快照保持内容与定位不变 -->
+    <Transition name="qd-menu">
+      <div
+        v-if="menu"
+        class="qd-menu"
+        :class="{ 'qd-menu--above': menuFlipped }"
+        :style="menuStyle"
+        @click.stop
+      >
+        <template v-if="effectiveMenu?.type === 'runner'">
+          <button
+            class="qd-menu__item qd-menu__item--danger"
+            :disabled="!menuTargetRunning"
+            @click="killRunner"
+          >
+            {{ $t('quickdock.menuForceStop') }}
+          </button>
+        </template>
+        <template v-else>
+          <button class="qd-menu__item" @click="downloadFile">{{ $t('common.download') }}</button>
+          <button v-if="hostMode" class="qd-menu__item" @click="revealInManager">
+            {{ $t('quickdock.menuRevealInManager') }}
+          </button>
+          <button class="qd-menu__item" @click="copyPath">{{ $t('quickdock.menuCopyPath') }}</button>
+        </template>
+      </div>
+    </Transition>
   </aside>
 </template>
 
@@ -46,7 +55,8 @@ import { t } from '@/locales';
 import {
   useQuickDockStore,
   persistQuickDockHadContent,
-  persistQuickDockConvContent
+  persistQuickDockConvContent,
+  type QuickDockMenuState
 } from '@/stores/quickDock';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
@@ -67,7 +77,7 @@ import FileWindow from './FileWindow.vue';
  * 同时负责：全局 ⋯ 菜单、Esc 分层关闭、列表轮询、对话切换重置。
  */
 
-defineProps<{ hostMode: boolean }>();
+const props = defineProps<{ hostMode: boolean }>();
 
 const quickDock = useQuickDockStore();
 const subAgentStore = useSubAgentStore();
@@ -243,14 +253,57 @@ const CMD_TERMINAL = new Set(['completed', 'failed', 'timeout', 'cancelled']);
 
 /* ---------------- 菜单定位与目标状态 ---------------- */
 
-const MENU_ESTIMATED_HEIGHT = 128;
+const MENU_ITEM_HEIGHT = 30;
+const MENU_CHROME = 10; // 上下 padding 4×2 + border 1×2
+const MENU_GAP = 6;
+const VIEWPORT_MARGIN = 8;
+
+/** 离开动画期间沿用的最后一份菜单快照（menu 关闭即 null，直接读会让位置/内容在动画中跳变） */
+const lastMenu = ref<QuickDockMenuState | null>(null);
+watch(
+  menu,
+  (val) => {
+    if (val) {
+      lastMenu.value = val;
+    }
+  },
+  { immediate: true }
+);
+const effectiveMenu = computed(() => menu.value || lastMenu.value);
+
+/** 菜单高度估算：行高固定 30px，按类型精确到项数，翻转时才能贴住按钮 */
+const menuEstimatedHeight = computed(() => {
+  const m = effectiveMenu.value;
+  if (!m) {
+    return 0;
+  }
+  if (m.type === 'runner') {
+    return MENU_ITEM_HEIGHT + MENU_CHROME;
+  }
+  return (props.hostMode ? 3 : 2) * MENU_ITEM_HEIGHT + MENU_CHROME;
+});
+
+/** 菜单是否翻转到按钮上方展开（下方放不下且上方更宽裕）；
+ *  驱动定位与动画方向（qd-menu--above：从下到上淡入） */
+const menuFlipped = computed(() => {
+  const m = effectiveMenu.value;
+  if (!m) {
+    return false;
+  }
+  const spaceBelow = window.innerHeight - VIEWPORT_MARGIN - m.top;
+  const spaceAbove = m.btnTop - MENU_GAP - VIEWPORT_MARGIN;
+  return spaceBelow < menuEstimatedHeight.value && spaceAbove > spaceBelow;
+});
 
 const menuStyle = computed(() => {
-  const m = menu.value;
+  const m = effectiveMenu.value;
   if (!m) {
     return {};
   }
-  const top = Math.min(m.top, window.innerHeight - MENU_ESTIMATED_HEIGHT - 8);
+  const estHeight = menuEstimatedHeight.value;
+  const top = menuFlipped.value
+    ? Math.max(VIEWPORT_MARGIN, m.btnTop - MENU_GAP - estHeight)
+    : Math.min(m.top, window.innerHeight - estHeight - VIEWPORT_MARGIN);
   if (m.alignRight) {
     return { right: `${window.innerWidth - m.left}px`, top: `${top}px` };
   }

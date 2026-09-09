@@ -509,26 +509,68 @@ function normalizeShowTagsPlugin() {
 }
 
 /**
- * 拦截 markdown 链接里的 download:// 协议，标记为下载链接。
- * 输入：[文件名.pdf](download:///output/file.pdf) 或 (download://output/file.pdf)
- * 输出：<a class="md-download-link" data-path="output/file.pdf" href="download://output/file.pdf">文件名.pdf</a>
- * 点击事件由 bootstrap.ts 统一拦截。
+ * 拦截 markdown 链接里的下载协议与工作区相对路径，标记为下载链接。
+ * 输入：[文件名.pdf](download:///output/file.pdf)、[报告](research/result.md)
+ * 输出：<a class="md-download-link" data-path="..." href="download://..." title="...">文件名.pdf</a>
+ * 点击事件由 bootstrap.ts 统一拦截（web 端 fetch 下载，Android 走原生桥接）。
  */
+/** 带 scheme 的绝对 URI（http/https/mailto/tel/ftp 等）都不是工作区文件 */
+const ABSOLUTE_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+/** 判断 href 是否为工作区内文件的相对路径（排除协议链接、协议相对链接、页内锚点） */
+function isWorkspaceFileHref(href: string): boolean {
+  const trimmed = href.trim();
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) return false;
+  if (ABSOLUTE_SCHEME_RE.test(trimmed)) return false;
+  return true;
+}
+
+/** 从相对路径 href 提取工作区相对路径：去 query/hash、URL 解码、去前导斜杠 */
+function extractWorkspacePath(href: string): string {
+  let path = href.trim().split('#')[0].split('?')[0];
+  // 模型输出的链接可能本身已 percent 编码，还可能叠加多层（如 micromark 规范化或
+  // 模型对已编码串二次编码）；逐层解码直到没有合法 %XX 序列，上限 3 层防死循环
+  for (let i = 0; i < 3; i++) {
+    if (!/%[0-9a-fA-F]{2}/.test(path)) {
+      break;
+    }
+    try {
+      const decoded = decodeURIComponent(path);
+      if (decoded === path) {
+        break;
+      }
+      path = decoded;
+    } catch {
+      break; // 含非法编码序列时保留现状
+    }
+  }
+  return path.replace(/^\/+/, '');
+}
+
 function transformDownloadLinksPlugin() {
   return (tree: any) => {
     visit(tree, 'element', (node: any) => {
       if (!node || node.tagName !== 'a' || !node.properties) return;
       const href = node.properties.href;
       if (typeof href !== 'string') return;
+      let path: string;
       // 兼容 download:///path（三个斜杠，旧写法）和 download://path（两个斜杠，推荐写法）
-      const match = href.match(/^download:\/\/\/?(.*)$/i);
-      if (!match) return;
-      const rawPath = match[1];
-      const path = rawPath.replace(/^\/+/, '');
+      const dlMatch = href.match(/^download:\/{2,}(.*)$/i);
+      if (dlMatch) {
+        // 必须走多层解码：micromark 会把中文等非 ASCII 字符规范化为 percent 编码，
+        // 不解码直接当路径会再被 encodeURIComponent 编一层，服务器拿到字面 %XX 文件名
+        path = extractWorkspacePath(dlMatch[1]);
+      } else if (isWorkspaceFileHref(href)) {
+        path = extractWorkspacePath(href);
+      } else {
+        return;
+      }
       if (!path) return;
       node.properties.href = `download://${path}`;
       node.properties['data-path'] = path;
       node.properties['data-download'] = '1';
+      // hover 提示完整路径
+      node.properties.title = path;
       const existingClass = node.properties.className;
       if (Array.isArray(existingClass)) {
         if (!existingClass.includes('md-download-link')) {
@@ -576,7 +618,7 @@ const sanitizedSchema: Record<string, any> = {
       'ariaDescribedBy', 'ariaLabel', 'ariaLabelledBy',
       'dataFootnoteBackref', 'dataFootnoteRef',
       'data-path', 'data-download',
-      'href',
+      'href', 'title',
       // className: 合并默认的 data-footnote-backref 和我们的 md-download-link
       ['className', 'data-footnote-backref', 'md-download-link']
     ],
