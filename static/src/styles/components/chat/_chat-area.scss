@@ -872,17 +872,22 @@
   background: transparent;
 }
 
+/* 与正文表格同一横线风格：无外框/无竖线/无底色块；
+   布局模式（换行/横向滚动）由 utils/tableLayout.ts 判定 */
 .user-message.user-message--multi-agent .bubble-text .md-table-scroll,
 .user-message.user-message--multi-agent .bubble-text [data-md-table-scroll='1'] {
   display: block;
   width: auto;
   max-width: none;
   margin: 10px 0;
+  overflow: hidden;
+}
+
+.user-message.user-message--multi-agent .bubble-text .md-table-scroll[data-md-table-mode='scroll'],
+.user-message.user-message--multi-agent .bubble-text [data-md-table-scroll='1'][data-md-table-mode='scroll'] {
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--text-primary) 4%, var(--chip-bg));
+  -webkit-overflow-scrolling: touch;
 }
 
 .user-message.user-message--multi-agent .bubble-text .md-table-scroll > table,
@@ -890,18 +895,38 @@
   margin: 0;
 }
 
+.user-message.user-message--multi-agent .bubble-text [data-md-table-mode='scroll'] > table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.user-message.user-message--multi-agent .bubble-text [data-md-table-mode='scroll'] > table td {
+  white-space: nowrap;
+}
+
 .user-message.user-message--multi-agent .bubble-text th,
 .user-message.user-message--multi-agent .bubble-text td {
-  border: 1px solid var(--border-default);
-  padding: 6px 10px;
+  border: none;
+  padding: 8px 14px 8px 0;
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
   font-size: 14px;
 }
 
-.user-message.user-message--multi-agent .bubble-text th {
+.user-message.user-message--multi-agent .bubble-text th:last-child,
+.user-message.user-message--multi-agent .bubble-text td:last-child {
+  padding-right: 0;
+}
+
+.user-message.user-message--multi-agent .bubble-text thead th {
   font-weight: 600;
-  background: color-mix(in srgb, var(--text-primary) 7%, var(--chip-bg));
+  white-space: nowrap;
+  border-bottom: 1.5px solid var(--border-strong);
+}
+
+.user-message.user-message--multi-agent .bubble-text tbody td {
+  border-bottom: 1px solid var(--border-default);
+  overflow-wrap: break-word;
 }
 
 .message-block--last
@@ -2187,12 +2212,14 @@ show-html[data-rendered='1'] {
   animation: none !important; /* 防止外部动画样式影响代码块，导致视觉抖动 */
 }
 
+/* 表格：清爽横线风格（无外框/无竖线/无底色块）。
+   布局模式由 utils/tableLayout.ts 按内容自然宽度判定：
+   默认换行模式（表格占满内容区、单元格折行）；
+   自然宽度超过阈值时容器打 data-md-table-mode='scroll'，退化为整表横向滚动。 */
 .text-output .text-content table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
   border-collapse: collapse;
   margin: 0;
-  background: var(--theme-surface-soft);
 }
 
 .text-output .text-content .md-table-scroll,
@@ -2200,14 +2227,16 @@ show-html[data-rendered='1'] {
   display: block;
   width: auto;
   max-width: none;
-  margin: 16px calc(var(--chat-content-x) * -1);
+  margin: 12px calc(var(--chat-content-x) * -1);
+  padding: 0 var(--chat-content-x);
+  overflow: hidden;
+}
+
+.text-output .text-content .md-table-scroll[data-md-table-mode='scroll'],
+.text-output .text-content [data-md-table-scroll='1'][data-md-table-mode='scroll'] {
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  border: 1px solid var(--border-default);
-  border-radius: 12px;
-  background: var(--theme-surface-soft);
-  box-shadow: none;
 }
 
 .text-output .text-content .md-table-scroll > table,
@@ -2215,47 +2244,62 @@ show-html[data-rendered='1'] {
   margin: 0;
 }
 
-.text-output .text-content .md-table-scroll::-webkit-scrollbar,
-.text-output .text-content [data-md-table-scroll='1']::-webkit-scrollbar {
-  height: 10px;
+.text-output .text-content [data-md-table-mode='scroll'] > table {
+  width: max-content;
+  min-width: 100%;
 }
 
-.text-output .text-content .md-table-scroll::-webkit-scrollbar-track,
-.text-output .text-content [data-md-table-scroll='1']::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--theme-surface-muted) 70%, transparent);
+.text-output .text-content [data-md-table-mode='scroll'] > table td {
+  white-space: nowrap;
+}
+
+/* 细滚动条仅在滚动模式出现 */
+.text-output .text-content .md-table-scroll[data-md-table-mode='scroll']::-webkit-scrollbar,
+.text-output .text-content [data-md-table-scroll='1'][data-md-table-mode='scroll']::-webkit-scrollbar {
+  height: 8px;
+}
+
+.text-output .text-content .md-table-scroll[data-md-table-mode='scroll']::-webkit-scrollbar-track,
+.text-output .text-content [data-md-table-scroll='1'][data-md-table-mode='scroll']::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.text-output .text-content .md-table-scroll[data-md-table-mode='scroll']::-webkit-scrollbar-thumb,
+.text-output .text-content [data-md-table-scroll='1'][data-md-table-mode='scroll']::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-secondary) 45%, transparent);
   border-radius: 999px;
-  margin: 0 8px 6px;
 }
 
-.text-output .text-content .md-table-scroll::-webkit-scrollbar-thumb,
-.text-output .text-content [data-md-table-scroll='1']::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-secondary) 55%, transparent);
-  border-radius: 999px;
-}
-
-.text-output .text-content .md-table-scroll,
-.text-output .text-content [data-md-table-scroll='1'] {
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 55%, transparent)
-    color-mix(in srgb, var(--theme-surface-muted) 70%, transparent);
+.text-output .text-content .md-table-scroll[data-md-table-mode='scroll'],
+.text-output .text-content [data-md-table-scroll='1'][data-md-table-mode='scroll'] {
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 45%, transparent) transparent;
   scrollbar-width: thin;
-}
-
-.text-output .text-content thead {
-  background: var(--theme-chip-bg);
 }
 
 .text-output .text-content th,
 .text-output .text-content td {
-  border: 1px solid var(--border-default);
-  padding: 10px 14px;
+  border: none;
+  padding: 11px 18px 11px 0;
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
   font-size: 14px;
 }
 
-.text-output .text-content th {
+.text-output .text-content th:last-child,
+.text-output .text-content td:last-child {
+  padding-right: 0;
+}
+
+.text-output .text-content thead th {
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  border-bottom: 1.5px solid var(--border-strong);
+}
+
+.text-output .text-content tbody td {
+  border-bottom: 1px solid var(--border-default);
+  overflow-wrap: break-word;
 }
 
 .text-output .text-content hr {
@@ -2690,14 +2734,7 @@ body[data-theme='dark'] {
     color: var(--text-primary);
   }
 
-  /* 表格 */
-  .text-output .text-content table {
-    background: var(--badge-bg);
-  }
-
-  .text-output .text-content thead {
-    background: var(--surface-panel);
-  }
+  /* 表格为无底色横线风格，三主题通用，无需覆盖 */
 
   /* 滚动锁定按钮 */
   .scroll-lock-btn {
@@ -2748,9 +2785,10 @@ body[data-theme='dark'] {
 
 /* ========== 明亮主题变体（对话区组件） ========== */
 /* 背景：浅色主题表面 token 阶梯近乎纯平（base/card/raised 全为 #ffffff），
-   基础样式中代码块白底落白底、表格 #f9f9f9 落白底均不可见；
+   基础样式中代码块白底落白底不可见；
    参照上方深色覆盖块的做法，按用户确认的方向做组件级补偿：
-   代码块仅头部着色、代码区与对话底保持同色；表格白体+浅灰表头+可见边框。 */
+   代码块仅头部着色、代码区与对话底保持同色。
+   表格为无底色横线风格，三主题通用，无需补偿。 */
 body[data-theme='light'] {
   /* 代码块 - 头部浅灰、代码区与对话底同为白色，外框加强到可见 */
   .code-block-wrapper {
@@ -2760,25 +2798,5 @@ body[data-theme='light'] {
   .code-block-header {
     background: var(--surface-muted);
     border-bottom-color: var(--border-strong);
-  }
-
-  /* 表格 - 白体 + 浅灰表头 + 可见边框 */
-  .text-output .text-content table {
-    background: var(--surface-raised);
-  }
-
-  .text-output .text-content thead {
-    background: var(--surface-muted);
-  }
-
-  .text-output .text-content th,
-  .text-output .text-content td {
-    border-color: var(--border-strong);
-  }
-
-  .text-output .text-content .md-table-scroll,
-  .text-output .text-content [data-md-table-scroll='1'] {
-    border-color: var(--border-strong);
-    background: var(--surface-raised);
   }
 }

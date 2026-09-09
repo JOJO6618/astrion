@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, onUpdated, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue';
 import CodeBlock from './CodeBlock.vue';
 import {
   parseMarkdownSegments,
@@ -32,6 +32,7 @@ import {
   type MarkdownSegment
 } from '@/composables/useMarkdownRenderer';
 import { chunkRenderedHtml, type HtmlChunk } from '@/utils/htmlChunks';
+import { classifyMarkdownTables, observeMarkdownTables } from '@/utils/tableLayout';
 import { enhanceCitationChips, type CitationAnnotation } from './citationChips';
 
 defineOptions({ name: 'MarkdownRenderer' });
@@ -105,6 +106,27 @@ function enhanceCitations() {
 onMounted(enhanceCitations);
 onUpdated(enhanceCitations);
 watch(() => [props.citations, props.citationsFinal], enhanceCitations);
+
+// 表格布局模式（换行/横向滚动）：渲染后按内容自然宽度判定，并监听容器宽度变化重判
+let stopTableObserver: (() => void) | null = null;
+
+function classifyTables() {
+  nextTick(() => {
+    const el = containerRef.value;
+    if (!el) return;
+    classifyMarkdownTables(el);
+    stopTableObserver?.();
+    stopTableObserver = observeMarkdownTables(el);
+  });
+}
+
+onMounted(classifyTables);
+onUpdated(classifyTables);
+watch(() => props.content, classifyTables);
+onBeforeUnmount(() => {
+  stopTableObserver?.();
+  stopTableObserver = null;
+});
 </script>
 
 <style scoped>
