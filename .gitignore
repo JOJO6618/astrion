@@ -10,6 +10,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
 
 # Runtime data (main agent)
 # 注意：运行态数据默认已迁出源码树到 ~/.astrion/astrion/<mode>/。
@@ -23,10 +24,9 @@ project/
 users/
 api/
 webapp.pid
-
-# Runtime data (sub agent)
-# 旧版 sub_agent/ 子项目已移除，子智能体逻辑现统一在 easyagent/。
-sub_agent_results/
+.runtime/
+.upload_quarantine/
+opencode_key_fix_output/
 
 # Misc
 *.pid
@@ -39,6 +39,9 @@ skills/
 
 # 本地实验残留与历史文档归档（不进仓库）
 _experiments/
+
+# 本地打包产物（dmg/App 构建输出）
+_packaging/
 
 # Ignore docs（doc/ 与 docs/ 均为本地文档，不纳入版本控制）
 doc/
@@ -67,6 +70,7 @@ sub_agent_results/
 easyagent/
 demo/
 cli-react-demo/
+cli-redesign-demo/
 static/demo/
 static/liquid-glass-demo/
 static/liquid-glass-demo.html
@@ -76,6 +80,7 @@ static/debug-theme.html
 
 # 个人开发笔记与研究资料
 research/
+cache_research/
 
 # 含私人信息 / 个人工作流约定（脱敏前不进仓库）
 CLAUDE.md

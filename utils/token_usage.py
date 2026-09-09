@@ -33,7 +33,7 @@ TOTAL_TOKEN_KEYS = (
     "total_token_count",
     "totalTokenCount",
 )
-# 缓存命中 token 数的所有已知字段位置（2026-08 调研，见 cache_research/SUMMARY.md）：
+# 缓存命中 token 数的所有已知字段位置（2026-08 调研，见 _experiments/cache_research/SUMMARY.md，本地归档未随仓库发布）：
 # - OpenAI 系/Qwen/GLM/MiniMax/xAI/Mistral/千帆/OpenRouter: usage.prompt_tokens_details.cached_tokens
 #   （Responses API 为 usage.input_tokens_details.cached_tokens）
 # - DeepSeek: usage.prompt_cache_hit_tokens（顶层）

@@ -1,6 +1,6 @@
 """Gateway 第 1/2 步验收：独立任务生命周期 + 极简协议全链路（G4/G13）。
 
-验收标准（来自 cache_research/gateway/gateway_current_state.md §7.2）：
+验收标准（来自 _experiments/cache_research/gateway/gateway_current_state.md §7.2，本地归档未随仓库发布）：
 - 进程全程不创建 Flask app、不注册蓝图、不初始化 SocketIO 服务；
 - RuntimeService 真实受理（create_task → task_id）、任务线程真实启动；
 - 资源装配真实执行（get_user_resources 由 RuntimeIdentity 驱动，不重 mock）；
