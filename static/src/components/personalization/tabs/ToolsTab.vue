@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue';
+import { inject, unref } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 
 defineOptions({ name: 'ToolsTab' });
@@ -18,17 +18,25 @@ const {
   toolLoadingRegistry
 } = ctx;
 
+/**
+ * 当前勾选为延迟加载的工具名列表。
+ * 注意：form 是 Drawer 经 storeToRefs + provide 传入的 Ref，脚本侧必须 unref 后再取属性
+ * （模板里会自动解包，脚本里直接 form.xxx 会得到 undefined）。
+ */
+const deferredToolNames = (): string[] => {
+  const f: any = unref(form);
+  return Array.isArray(f?.tool_loading_deferred) ? f.tool_loading_deferred : [];
+};
+
 /** 类目内工具是否全部被勾选为延迟加载 */
 const isCategoryFullyDeferred = (cat: { tools: string[] }) =>
   Array.isArray(cat.tools) &&
   cat.tools.length > 0 &&
-  cat.tools.every((name: string) => form.tool_loading_deferred.includes(name));
+  cat.tools.every((name: string) => deferredToolNames().includes(name));
 
 /** 勾选/取消单个延迟工具 */
 const toggleDeferredTool = (name: string, checked: boolean) => {
-  const current = Array.isArray(form.tool_loading_deferred)
-    ? [...form.tool_loading_deferred]
-    : [];
+  const current = [...deferredToolNames()];
   const idx = current.indexOf(name);
   if (checked && idx === -1) {
     current.push(name);
@@ -40,9 +48,7 @@ const toggleDeferredTool = (name: string, checked: boolean) => {
 
 /** 勾选/取消整个类目（幂等，不动其他类目） */
 const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
-  const current = new Set<string>(
-    Array.isArray(form.tool_loading_deferred) ? form.tool_loading_deferred : []
-  );
+  const current = new Set<string>(deferredToolNames());
   for (const name of cat.tools || []) {
     if (checked) {
       current.add(name);
