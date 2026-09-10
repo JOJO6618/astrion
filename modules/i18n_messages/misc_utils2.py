@@ -168,6 +168,18 @@ MESSAGES = {
         "zh-CN": "子智能体已被强制关闭。",
         "en-US": "Sub-agent was forcibly closed.",
     },
+    "fmt_tool_loading.loaded": {
+        "zh-CN": "已加载 {n} 个工具：{names}",
+        "en-US": "Loaded {n} tool(s): {names}",
+    },
+    "fmt_tool_loading.already": {
+        "zh-CN": "其中此前已加载：{names}",
+        "en-US": "Already loaded before: {names}",
+    },
+    "fmt_tool_loading.defs_header": {
+        "zh-CN": "工具完整定义（之后可直接调用，无需重复加载）：",
+        "en-US": "Full tool definitions (call them directly afterwards; no need to reload):",
+    },
     "fmt_agent2.paused": {
         "zh-CN": "子智能体已暂停。",
         "en-US": "Sub-agent paused.",

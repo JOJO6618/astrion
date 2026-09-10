@@ -274,6 +274,29 @@ class CompressionMixin:
             msg["metadata"] = metadata
             history[idx] = msg
         self.conversation_history = history
+        # 工具动态加载：被标记的消息在构建时会被替换内容，load_tools 返回的
+        # 工具定义随之从上下文消失，loaded 状态必须回滚（pending 回满）。
+        try:
+            from core.tool_loading import (
+                METADATA_KEY as _TL_META_KEY,
+                get_tool_loading_state as _tl_get_state,
+                reset_state_after_compression as _tl_reset,
+            )
+            _tl_state = _tl_get_state(getattr(self, "conversation_metadata", None))
+            if _tl_state:
+                _tl_new = _tl_reset(_tl_state)
+                _tl_conv_id = getattr(self, "current_conversation_id", None)
+                if _tl_conv_id:
+                    _tl_mgr = (
+                        self._get_conversation_manager_for_id(_tl_conv_id)
+                        if hasattr(self, "_get_conversation_manager_for_id")
+                        else self.conversation_manager
+                    )
+                    _tl_mgr.update_conversation_metadata(_tl_conv_id, {_TL_META_KEY: _tl_new})
+                if isinstance(getattr(self, "conversation_metadata", None), dict):
+                    self.conversation_metadata[_TL_META_KEY] = _tl_new
+        except Exception:
+            pass
         return len(candidates)
 
     def compress_conversation(self, conversation_id: str) -> Dict:
@@ -398,6 +421,21 @@ class CompressionMixin:
         has_images = metadata.get("has_images", False)
         original_title = conversation_data.get("title")
 
+        # 工具动态加载：仅源对话已启用时延续配置，且 loaded 回滚
+        # （load_tools 定义不随压缩摘要进入新历史）；老对话保持未启用。
+        _tl_overrides: Dict[str, Any] = {}
+        try:
+            from core.tool_loading import (
+                METADATA_KEY as _TL_META_KEY,
+                get_tool_loading_state as _tl_get_state,
+                reset_state_after_compression as _tl_reset,
+            )
+            _tl_src = _tl_get_state(metadata)
+            if _tl_src:
+                _tl_overrides[_TL_META_KEY] = _tl_reset(_tl_src)
+        except Exception:
+            _tl_overrides = {}
+
         compressed_conversation_id = self.conversation_manager.create_conversation(
             project_path=project_path,
             thinking_mode=thinking_mode,
@@ -407,6 +445,7 @@ class CompressionMixin:
             has_images=has_images,
             metadata_overrides={
                 "permission_mode": metadata.get("permission_mode", "unrestricted"),
+                **_tl_overrides,
             },
         )
 

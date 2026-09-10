@@ -241,6 +241,19 @@ export default {
   availableSkillsDesc: '勾选后会注入 system prompt，并同步到工作区的 .astrion/skills/ 目录',
   disabledToolCategoriesTitle: '默认禁用工具类别',
   disabledToolCategoriesDesc: '选择后，这些类别在新任务中保持关闭',
+  toolLoadingTitle: '按需加载的工具（动态加载）',
+  toolLoadingDesc: '勾选的工具默认不注入上下文，模型需要时经 load_tools 按需获取完整定义，可省 token 并提高工具选择准确率；仅对新对话生效，已有对话以创建时的快照为准',
+  toolLoadingEnabledTitle: '启用工具动态加载',
+  toolLoadingCat: {
+    workflow: '工作流',
+    sub_agent: '子智能体',
+    conversation: '对话回顾',
+    memory_write: '记忆写入',
+    personalization: '个性化',
+    skill_create: '技能',
+    mcp: 'MCP',
+    misc: '彩蛋'
+  },
 
   // ── 文件与图片 ──
   imageCompressionTitle: '图片压缩',

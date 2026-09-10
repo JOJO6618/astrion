@@ -359,6 +359,43 @@ class MessagesMixin:
             if skills_prompt:
                 messages.append({"role": "system", "content": skills_prompt})
 
+            # 工具动态加载目录（冻结段）：仅对话启用且延迟集非空时注入。
+            # 老对话/关闭对话无字段，不调用冻结函数，避免把空串冻住
+            # （与 AGENTS.md 段同一模式）。目录创建即钉死、终身不变——
+            # system prompt 是前缀缓存首段，loaded/pending 变化不进 prompt。
+            _tl_state_guard = None
+            try:
+                from core.tool_loading import get_tool_loading_state as _get_tl_state
+                _tl_cm = getattr(self, "context_manager", None)
+                _tl_meta = getattr(_tl_cm, "conversation_metadata", None) if _tl_cm else None
+                _tl_state_guard = _get_tl_state(_tl_meta)
+            except Exception:
+                _tl_state_guard = None
+
+            def _build_tool_loading_prompt() -> str:
+                try:
+                    from core.tool_loading import render_catalog
+                    template = self.load_prompt("tool_loading").strip()
+                    if not template or not _tl_state_guard:
+                        return ""
+                    unavailable = set(getattr(self, "disabled_tools", None) or set())
+                    catalog = render_catalog(_tl_state_guard["deferred_set"], unavailable=unavailable)
+                    if not catalog:
+                        return ""
+                    if "{tool_catalog}" in template:
+                        return template.replace("{tool_catalog}", catalog)
+                    return f"{template}\n{catalog}"
+                except Exception:
+                    return ""
+
+            if _tl_state_guard and _tl_state_guard["deferred_set"]:
+                tool_loading_prompt = self._get_or_init_frozen_prompt(
+                    "frozen_tool_loading_prompt",
+                    _build_tool_loading_prompt,
+                )
+                if tool_loading_prompt:
+                    messages.append({"role": "system", "content": tool_loading_prompt})
+
             # 工作流（Workflow）上下文：不冻结，每次按当前状态现生成。
             # 阶段推进时由 workflow_flow.refresh_workflow_system_segment 同步刷新，
             # 压缩不影响（system 段不在压缩范围），天然免疫压缩丢失。

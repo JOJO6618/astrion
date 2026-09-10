@@ -68,6 +68,10 @@ from modules.mcp_server_registry import MCPServerRegistry, build_default_mcp_cat
 
 from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
+from core.tool_loading import (
+    build_load_tools_definition,
+    get_tool_loading_state,
+)
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
 from utils.tool_result_formatter import format_tool_result_for_context
@@ -86,8 +90,12 @@ DISABLE_LENGTH_CHECK = True
 
 
 class ToolsDefinitionMainMixin:
-    def define_tools(self) -> List[Dict]:
-                """定义可用工具（添加确认工具）"""
+    def define_tools(self, include_deferred: bool = False) -> List[Dict]:
+                """定义可用工具（添加确认工具）
+
+                include_deferred=True 时跳过延迟工具过滤（供 load_tools 取
+                完整定义用），正常请求走默认 False。
+                """
                 tools: List[Dict] = []
                 tools.extend(self._build_core_tools())
                 tools.extend(self._build_file_tools())
@@ -157,7 +165,49 @@ class ToolsDefinitionMainMixin:
                         tool for tool in tools
                         if tool.get("function", {}).get("name") not in self.disabled_tools
                     ]
-                
+
+                # 工具动态加载：按对话快照过滤延迟工具。快照创建即钉死，
+                # tools 数组对话级稳定（不破坏前缀缓存）；老对话无字段=全量。
+                # load_tools 取完整定义走 include_deferred=True，跳过本段。
+                tl_state = None
+                if not include_deferred:
+                    try:
+                        _tl_cm = getattr(self, "context_manager", None)
+                        _tl_meta = getattr(_tl_cm, "conversation_metadata", None) if _tl_cm else None
+                        tl_state = get_tool_loading_state(_tl_meta)
+                    except Exception:
+                        tl_state = None
+                if tl_state:
+                    _deferred = set(tl_state["deferred_set"])
+                    tools = [
+                        tool for tool in tools
+                        if (tool.get("function") or {}).get("name") not in _deferred
+                    ]
+                    if _deferred:
+                        tools.append(build_load_tools_definition())
+                    # 懒记录 initial_exposed：首个请求写入一次。该字段仅作审计
+                    # 快照，过滤语义恒为「构建集 − deferred_set」，不依赖它。
+                    if not tl_state["initial_exposed"]:
+                        try:
+                            _tl_conv_id = getattr(_tl_cm, "current_conversation_id", None) if _tl_cm else None
+                            if _tl_conv_id:
+                                _exposed = [
+                                    name for name in (
+                                        (t.get("function") or {}).get("name") for t in tools
+                                    ) if name
+                                ]
+                                _new_state = {**tl_state, "initial_exposed": _exposed}
+                                _mgr = (
+                                    _tl_cm._get_conversation_manager_for_id(_tl_conv_id)
+                                    if hasattr(_tl_cm, "_get_conversation_manager_for_id")
+                                    else _tl_cm.conversation_manager
+                                )
+                                _mgr.update_conversation_metadata(_tl_conv_id, {"tool_loading": _new_state})
+                                if isinstance(_tl_cm.conversation_metadata, dict):
+                                    _tl_cm.conversation_metadata["tool_loading"] = _new_state
+                        except Exception:
+                            pass
+
                 # 调试日志：记录工具列表（DEBUG 级，不上终端）
                 tool_names = [t.get("function", {}).get("name") for t in tools]
                 logger.debug("[define_tools] 可用工具列表: %s", tool_names)

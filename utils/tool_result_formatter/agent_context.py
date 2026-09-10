@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional, Tuple
 from utils.tool_result_formatter.common import (
     _format_failure, _preview_text, _summarize_output_block, _summarize_todo_tasks
@@ -255,6 +256,29 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
             lines.append(str(summary))
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
+
+def _format_load_tools(result_data: Dict[str, Any]) -> str:
+    if not result_data.get("success"):
+        return _format_failure("load_tools", result_data)
+    tools = result_data.get("tools") or []
+    names = [
+        name for name in ((t.get("function") or {}).get("name") for t in tools)
+        if name
+    ]
+    header = result_data.get("message") or tr(
+        "fmt_tool_loading.loaded", n=len(tools), names=", ".join(names)
+    )
+    parts = [header]
+    already = result_data.get("already_loaded") or []
+    if already:
+        parts.append(tr("fmt_tool_loading.already", names=", ".join(already)))
+    # 关键：完整 JSON 定义必须保留在上下文输出里——模型后续调用的依据就是
+    # 这份 schema；若只写摘要，历史重建后模型将失去参数结构（与压缩重置
+    # 同源设计：定义只存在于 tool result 中）。
+    parts.append(tr("fmt_tool_loading.defs_header"))
+    parts.append("```json\n" + json.dumps(tools, ensure_ascii=False, indent=2) + "\n```")
+    return "\n\n".join(parts)
+
 
 def _format_terminate_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):

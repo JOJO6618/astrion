@@ -96,6 +96,12 @@ def api_activate_workflow(terminal, workspace, username):
             "pre_plan_permission_mode": _pre_plan_permission,
             "reasoning_effort": _reasoning_effort,
         }
+        # 工具动态加载快照（老对话无字段=不启用）
+        try:
+            from core.tool_loading import snapshot_overrides_from_prefs
+            _meta_overrides.update(snapshot_overrides_from_prefs(_prefs))
+        except Exception:
+            pass
         try:
             conversation_id = cm.create_conversation(
                 project_path=str(getattr(workspace, "project_path", "") or "."),

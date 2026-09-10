@@ -81,11 +81,22 @@ class RuntimeService:
             if thinking_mode is None:
                 thinking_mode = p.preferred_thinking_mode
             thinking_mode = bool(thinking_mode) if thinking_mode is not None else (run_mode != "fast")
+            # 工具动态加载快照（老对话无字段=不启用）
+            _tl_overrides: Dict[str, Any] = {}
+            try:
+                from core.tool_loading import snapshot_overrides_from_prefs
+                from modules.personalization_manager import load_personalization_config as _load_tl_prefs
+                _tl_overrides = snapshot_overrides_from_prefs(
+                    _load_tl_prefs(getattr(workspace, "data_dir", None))
+                )
+            except Exception:
+                _tl_overrides = {}
             conversation_id = cm.create_conversation(
                 project_path=str(getattr(workspace, "project_path", "") or "."),
                 run_mode=run_mode,
                 thinking_mode=thinking_mode,
                 model_key=params.model_key or p.preferred_model_key,
+                metadata_overrides=_tl_overrides or None,
             )
             debug_log(f"[RuntimeService] 未携带 conversation_id，已补建对话: {conversation_id}")
             return conversation_id
@@ -260,12 +271,23 @@ class RuntimeService:
         resolved_thinking = (
             bool(resolved_thinking) if resolved_thinking is not None else (resolved_run_mode != "fast")
         )
+        # 工具动态加载快照（多智能体对话 v1 不启用；老对话无字段=不启用）
+        _meta_overrides: Dict[str, Any] = {"multi_agent_mode": True} if multi_agent_mode else {}
+        try:
+            from core.tool_loading import snapshot_overrides_from_prefs
+            from modules.personalization_manager import load_personalization_config as _load_tl_prefs
+            _meta_overrides.update(snapshot_overrides_from_prefs(
+                _load_tl_prefs(getattr(workspace, "data_dir", None)),
+                multi_agent_mode=multi_agent_mode,
+            ))
+        except Exception:
+            pass
         conversation_id = cm.create_conversation(
             project_path=str(getattr(workspace, "project_path", "") or "."),
             run_mode=resolved_run_mode,
             thinking_mode=resolved_thinking,
             model_key=model_key or (principal.preferred_model_key if principal else None),
-            metadata_overrides={"multi_agent_mode": True} if multi_agent_mode else None,
+            metadata_overrides=_meta_overrides or None,
         )
         return {"conversation_id": conversation_id}
 

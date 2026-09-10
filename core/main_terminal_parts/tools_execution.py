@@ -223,6 +223,8 @@ class MainTerminalToolsExecutionMixin:
         # 工作流只读查询（激活/推进/停用/保存等状态写操作仍禁止）
         "list_workflows",
         "get_workflow_status",
+        # 工具动态加载入口（只读发现性质，各权限模式放行）
+        "load_tools",
     }
     _APPROVAL_REQUIRED_TOOLS = {
         "run_command",
@@ -1071,6 +1073,21 @@ class MainTerminalToolsExecutionMixin:
                 if tool_name in NEED_CONFIRMATION:
                     if not await self.confirm_action(tool_name, arguments):
                         return json.dumps({"success": False, "error": tr("tools_exec.action_cancelled")})
+
+                # 工具动态加载守门：延迟工具未加载时拦截并引导先 load_tools，
+                # 防止模型凭目录里的工具名猜参数盲调（读侧异常按未启用放行）。
+                try:
+                    from core.tool_loading import get_tool_loading_state, is_deferred_not_loaded
+                    _tl_cm_guard = getattr(self, "context_manager", None)
+                    _tl_meta_guard = getattr(_tl_cm_guard, "conversation_metadata", None) if _tl_cm_guard else None
+                    if is_deferred_not_loaded(get_tool_loading_state(_tl_meta_guard), tool_name):
+                        return json.dumps({
+                            "success": False,
+                            "tool_not_loaded": True,
+                            "error": tr("tools_exec.tool_not_loaded", tool_name=tool_name),
+                        }, ensure_ascii=False)
+                except Exception:
+                    pass
 
                 # === 新增：预检查参数大小和格式 ===
                 try:
@@ -2529,6 +2546,81 @@ class MainTerminalToolsExecutionMixin:
 
                     elif tool_name == "trigger_easter_egg":
                         result = self.easter_egg_manager.trigger_effect(arguments.get("effect"))
+
+                    elif tool_name == "load_tools":
+                        # 工具动态加载：按名返回完整定义，并把 loaded/pending 落盘
+                        from core.tool_loading import (
+                            get_tool_loading_state as _tl_get_state,
+                            mark_tools_loaded as _tl_mark_loaded,
+                        )
+                        _tl_cm = getattr(self, "context_manager", None)
+                        _tl_meta = getattr(_tl_cm, "conversation_metadata", None) if _tl_cm else None
+                        _tl_state = _tl_get_state(_tl_meta)
+                        if not _tl_state:
+                            result = {"success": False, "error": tr("tools_exec.load_tools_not_enabled")}
+                        else:
+                            _names = arguments.get("tool_names")
+                            if (
+                                not isinstance(_names, list) or not _names
+                                or not all(isinstance(n, str) and n.strip() for n in _names)
+                            ):
+                                result = {"success": False, "error": tr("tools_exec.load_tools_invalid_names")}
+                            else:
+                                _names = list(dict.fromkeys(n.strip() for n in _names))
+                                _available = set(_tl_state["loaded"]) | set(_tl_state["pending"])
+                                _unknown = [n for n in _names if n not in _available]
+                                if _unknown:
+                                    result = {
+                                        "success": False,
+                                        "error": tr(
+                                            "tools_exec.load_tools_unknown",
+                                            names=", ".join(_unknown),
+                                            available=", ".join(_tl_state["pending"]) or tr("tools_exec.none_placeholder"),
+                                        ),
+                                    }
+                                else:
+                                    # include_deferred=True 取完整定义（disabled_tools 过滤仍生效）
+                                    _all_defs = self.define_tools(include_deferred=True) or []
+                                    _def_map = {
+                                        (d.get("function") or {}).get("name"): d for d in _all_defs
+                                    }
+                                    _defs = [_def_map[n] for n in _names if n in _def_map]
+                                    _missing = [n for n in _names if n not in _def_map]
+                                    if _missing and not _defs:
+                                        result = {
+                                            "success": False,
+                                            "error": tr("tools_exec.load_tools_unavailable", names=", ".join(_missing)),
+                                        }
+                                    else:
+                                        _already = [n for n in _names if n in _tl_state["loaded"]]
+                                        _new = [n for n in _names if n not in _tl_state["loaded"] and n in _def_map]
+                                        _new_state = _tl_mark_loaded(_tl_state, [n for n in _names if n in _def_map])
+                                        # 持久化 loaded/pending（与冻结 prompt 同一 metadata 写入通道）
+                                        try:
+                                            _conv_id = getattr(_tl_cm, "current_conversation_id", None) if _tl_cm else None
+                                            if _conv_id:
+                                                _mgr = (
+                                                    _tl_cm._get_conversation_manager_for_id(_conv_id)
+                                                    if hasattr(_tl_cm, "_get_conversation_manager_for_id")
+                                                    else _tl_cm.conversation_manager
+                                                )
+                                                _mgr.update_conversation_metadata(_conv_id, {"tool_loading": _new_state})
+                                                if isinstance(_tl_cm.conversation_metadata, dict):
+                                                    _tl_cm.conversation_metadata["tool_loading"] = _new_state
+                                        except Exception:
+                                            pass
+                                        result = {
+                                            "success": True,
+                                            "tools": _defs,
+                                            "loaded_now": _new,
+                                            "already_loaded": _already,
+                                            **({"unavailable": _missing} if _missing else {}),
+                                            "message": tr(
+                                                "tools_exec.load_tools_loaded",
+                                                n=len(_defs),
+                                                names=", ".join(n for n in _names if n in _def_map),
+                                            ),
+                                        }
 
                     elif tool_name == "manage_personalization":
                         logger.info("[handle_tool_call] 进入manage_personalization分支")

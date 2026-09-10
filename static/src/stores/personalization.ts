@@ -100,6 +100,9 @@ interface PersonalForm {
   recent_conversations_prompt_limit: number | string;
   project_memory_inject_limit: number | string | null;
   tool_intent_enabled: boolean;
+  tool_loading_enabled: boolean;
+  /** 默认延迟加载的工具名列表（仅影响新建对话） */
+  tool_loading_deferred: string[];
   skill_hints_enabled: boolean;
   skill_strict_terminal_enabled: boolean;
   skill_strict_sub_agent_enabled: boolean;
@@ -179,6 +182,7 @@ interface PersonalizationState {
   overlayPressActive: boolean;
   form: PersonalForm;
   toolCategories: Array<{ id: string; label: string }>;
+  toolLoadingRegistry: Array<{ key: string; tools: string[] }>;
   skillsCatalog: Array<{ id: string; label: string; description?: string }>;
   recentConversationsPromptLimitRange: { min: number; max: number };
   projectMemoryInjectLimitMin: number;
@@ -308,6 +312,8 @@ const defaultForm = (): PersonalForm => ({
   recent_conversations_prompt_limit: DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT,
   project_memory_inject_limit: DEFAULT_PROJECT_MEMORY_INJECT_LIMIT,
   tool_intent_enabled: true,
+  tool_loading_enabled: true,
+  tool_loading_deferred: [],
   skill_hints_enabled: false,
   skill_strict_terminal_enabled: false,
   skill_strict_sub_agent_enabled: false,
@@ -433,6 +439,7 @@ export const usePersonalizationStore = defineStore('personalization', {
     overlayPressActive: false,
     form: defaultForm(),
     toolCategories: [],
+    toolLoadingRegistry: [],
     skillsCatalog: [],
     recentConversationsPromptLimitRange: { ...DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT_RANGE },
     projectMemoryInjectLimitMin: PROJECT_MEMORY_INJECT_LIMIT_MIN,
@@ -529,6 +536,10 @@ export const usePersonalizationStore = defineStore('personalization', {
           data.project_memory_inject_limit
         ),
         tool_intent_enabled: !!data.tool_intent_enabled,
+        tool_loading_enabled: data.tool_loading_enabled !== false,
+        tool_loading_deferred: Array.isArray(data.tool_loading_deferred)
+          ? data.tool_loading_deferred.filter((item: any) => typeof item === 'string')
+          : [],
         skill_hints_enabled: !!data.skill_hints_enabled,
         skill_strict_terminal_enabled: !!data.skill_strict_terminal_enabled,
         skill_strict_sub_agent_enabled: !!data.skill_strict_sub_agent_enabled,
@@ -779,6 +790,18 @@ export const usePersonalizationStore = defineStore('personalization', {
           .filter((item: { id: string }) => !!item.id);
       } else {
         this.toolCategories = [];
+      }
+      if (payload && Array.isArray(payload.tool_loading_registry)) {
+        this.toolLoadingRegistry = payload.tool_loading_registry
+          .map((item: { key?: string; tools?: any } = {}) => ({
+            key: typeof item.key === 'string' ? item.key : String(item.key ?? ''),
+            tools: Array.isArray(item.tools)
+              ? item.tools.filter((n: any) => typeof n === 'string')
+              : []
+          }))
+          .filter((item: { key: string }) => !!item.key);
+      } else {
+        this.toolLoadingRegistry = [];
       }
       if (payload && Array.isArray(payload.skills_catalog)) {
         this.skillsCatalog = payload.skills_catalog

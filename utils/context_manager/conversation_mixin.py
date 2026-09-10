@@ -157,6 +157,16 @@ class ConversationMixin:
         
         # 创建新对话：多智能体对话使用独立的 conversation_manager
         is_multi_agent = bool((metadata_overrides or {}).get("multi_agent_mode"))
+        # 工具动态加载：创建即钉死快照（多智能体对话 v1 不启用；老对话无字段=不启用）
+        try:
+            from core.tool_loading import snapshot_overrides_from_prefs
+            from modules.personalization_manager import load_personalization_config as _load_tl_prefs
+            _tl_prefs = getattr(self, "custom_personalization_config", None) or _load_tl_prefs(self.data_dir)
+            _tl_overrides = snapshot_overrides_from_prefs(_tl_prefs, multi_agent_mode=is_multi_agent)
+            if _tl_overrides:
+                metadata_overrides = {**_tl_overrides, **(metadata_overrides or {})}
+        except Exception:
+            pass
         target_manager = self._get_conversation_manager_for_multi_agent_mode(is_multi_agent)
         conversation_id = target_manager.create_conversation(
             project_path=project_path,
@@ -520,6 +530,9 @@ class ConversationMixin:
             has_images=has_images,
             metadata_overrides={
                 "permission_mode": metadata.get("permission_mode", "unrestricted"),
+                # 复制对话是同一对话的分叉，延续源对话的工具动态加载状态
+                **({"tool_loading": deepcopy(metadata["tool_loading"])}
+                   if isinstance(metadata.get("tool_loading"), dict) else {}),
             },
         )
 

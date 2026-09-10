@@ -94,6 +94,10 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "skill_strict_sub_agent_enabled": False,  # 强约束：子智能体系列工具需先阅读 sub-agent-guide
     "skill_strict_run_command_foreground_enabled": False,  # 强约束：run_command 前台模式需先阅读 run-command-guide
     "skill_strict_run_command_background_enabled": False,  # 强约束：run_command 后台模式需先阅读 run-command-guide
+    # 工具动态加载：总开关（默认开启）+ 默认延迟工具集（None=注册表全集）。
+    # 仅在创建对话时快照一次；已有对话以其对话文件中的快照为准，改这里不影响。
+    "tool_loading_enabled": True,
+    "tool_loading_deferred": None,
     "default_model": None,
     "image_compression": "original",  # original / 1080p / 720p / 540p
     "auto_shallow_compress_enabled": False,
@@ -310,6 +314,16 @@ def sanitize_personalization_payload(
         base["tool_intent_enabled"] = bool(data.get("tool_intent_enabled"))
     else:
         base["tool_intent_enabled"] = bool(base.get("tool_intent_enabled"))
+
+    # 工具动态加载（总开关 + 默认延迟集）
+    if "tool_loading_enabled" in data:
+        base["tool_loading_enabled"] = bool(data.get("tool_loading_enabled"))
+    else:
+        base["tool_loading_enabled"] = bool(base.get("tool_loading_enabled", True))
+    if "tool_loading_deferred" in data:
+        base["tool_loading_deferred"] = _sanitize_tool_loading_deferred(data.get("tool_loading_deferred"))
+    else:
+        base["tool_loading_deferred"] = _sanitize_tool_loading_deferred(base.get("tool_loading_deferred"))
 
     # Skill 提示系统开关
     if "skill_hints_enabled" in data:
@@ -1059,6 +1073,22 @@ def _sanitize_considerations(value: Any) -> str:
                 break
         return "\n".join(cleaned)[:MAX_CONSIDERATION_TEXT_LENGTH]
     return ""
+
+
+def _sanitize_tool_loading_deferred(value: Any) -> list:
+    """规范化默认延迟工具集：仅保留注册表内工具名，按注册表顺序去重。
+
+    None/非列表 => 注册表全集（默认全延迟）；显式空列表 => 不延迟任何工具。
+    """
+    try:
+        from core.tool_loading import deferrable_tool_names
+        allowed = deferrable_tool_names()
+    except Exception:
+        allowed = []
+    if not isinstance(value, list):
+        return list(allowed)
+    requested = {item for item in value if isinstance(item, str)}
+    return [name for name in allowed if name in requested]
 
 
 def _sanitize_tool_categories(value: Any, allowed: set) -> list:

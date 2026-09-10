@@ -522,6 +522,32 @@ MESSAGES = {
         "en-US": "Tool execution error: {error}",
     },
 
+    # ── 工具动态加载（load_tools） ──
+    "tools_exec.tool_not_loaded": {
+        "zh-CN": "工具 {tool_name} 未加载。请先调用 load_tools(tool_names=[\"{tool_name}\"]) 获取完整定义后再调用。",
+        "en-US": "Tool {tool_name} is not loaded. Call load_tools(tool_names=[\"{tool_name}\"]) first to get its full definition, then invoke it.",
+    },
+    "tools_exec.load_tools_not_enabled": {
+        "zh-CN": "本对话未启用工具动态加载，所有工具均已直接可用，无需加载。",
+        "en-US": "Dynamic tool loading is not enabled for this conversation; all tools are already available.",
+    },
+    "tools_exec.load_tools_invalid_names": {
+        "zh-CN": "参数 tool_names 必须是非空的工具名数组。",
+        "en-US": "Argument tool_names must be a non-empty array of tool names.",
+    },
+    "tools_exec.load_tools_unknown": {
+        "zh-CN": "以下工具不在可加载列表中：{names}。当前可加载的工具：{available}",
+        "en-US": "These tools cannot be loaded: {names}. Currently loadable tools: {available}",
+    },
+    "tools_exec.load_tools_unavailable": {
+        "zh-CN": "以下工具当前不可用（可能已被禁用）：{names}",
+        "en-US": "These tools are currently unavailable (possibly disabled): {names}",
+    },
+    "tools_exec.load_tools_loaded": {
+        "zh-CN": "已加载 {n} 个工具：{names}。完整定义见下方，之后可直接调用，无需重复加载。",
+        "en-US": "Loaded {n} tool(s): {names}. Full definitions below; you can now call them directly.",
+    },
+
     # ── 个性化管理 ──
     "tools_exec.pref_enabled_label": {
         "zh-CN": "个性化功能总开关",

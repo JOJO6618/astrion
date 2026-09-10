@@ -34,6 +34,7 @@ from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import load_policy, save_policy
 from modules.user_manager import UserWorkspace
 from core.web_terminal import WebTerminal
+from core.tool_loading import build_registry_payload
 from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
@@ -305,6 +306,7 @@ def get_personalization_settings(terminal: WebTerminal, workspace: UserWorkspace
             "data": data_out,
             "tool_categories": terminal.get_tool_settings_snapshot(),
             "skills_catalog": skills_catalog,
+            "tool_loading_registry": build_registry_payload(),
             "context_compression_settings": {
                 **compression_settings,
                 "context_window_tokens": min(

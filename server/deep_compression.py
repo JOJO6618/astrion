@@ -636,6 +636,7 @@ async def run_deep_compression(
         "frozen_workspace_prompt",
         "frozen_agents_md_prompt",
         "frozen_skills_prompt",
+        "frozen_tool_loading_prompt",
         "frozen_memory_prompt",
         "frozen_custom_system_prompt",
         "frozen_disabled_tools_prompt",
@@ -657,6 +658,19 @@ async def run_deep_compression(
     }
     for frozen_key in REBUILD_FROZEN_KEYS:
         meta_updates[frozen_key] = None
+    # 工具动态加载：压缩丢弃了历史中的 load_tools 定义（tool result 被标记重写），
+    # loaded 状态必须随之前滚回滚，否则守门会放行「上下文里已无定义」的工具调用。
+    try:
+        from core.tool_loading import (
+            METADATA_KEY as _TL_META_KEY,
+            get_tool_loading_state as _tl_get_state,
+            reset_state_after_compression as _tl_reset,
+        )
+        _tl_state = _tl_get_state(metadata)
+        if _tl_state:
+            meta_updates[_TL_META_KEY] = _tl_reset(_tl_state)
+    except Exception:
+        pass
     target_manager.update_conversation_metadata(conversation_id, meta_updates)
     # 同步内存中的 metadata，清除 frozen 缓存
     try:

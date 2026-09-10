@@ -189,6 +189,11 @@ export function renderEnhancedToolResult(
     return renderGetSubAgentStatus(result);
   }
 
+  // 工具动态加载
+  else if (name === 'load_tools') {
+    return renderLoadTools(result, args);
+  }
+
   // 默认回退：显示重要参数 + 结果摘要，不再直接返回空字符串
   return renderDefaultResult(result, args, name);
 }
@@ -1487,6 +1492,48 @@ function renderEasterEgg(result: any, args: any): string {
 }
 
 // 子智能体类渲染函数
+function renderLoadTools(result: any, args: any): string {
+  const status = formatToolStatusLabel(result, t('toolResults.status.completed'), t('toolResults.status.failedMark'));
+  const requested: string[] = Array.isArray(args?.tool_names) ? args.tool_names : [];
+  const loadedNow: string[] = Array.isArray(result?.loaded_now) ? result.loaded_now : [];
+  const already: string[] = Array.isArray(result?.already_loaded) ? result.already_loaded : [];
+  const unavailable: string[] = Array.isArray(result?.unavailable) ? result.unavailable : [];
+  const toolDefs: any[] = Array.isArray(result?.tools) ? result.tools : [];
+
+  // meta 只放调用参数与状态（§5.6：meta=参数，content=结果）
+  let html = '<div class="tool-result-meta">';
+  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
+  if (requested.length) {
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.requestedTools'))}</strong>${escapeHtml(requested.join(', '))}</div>`;
+  }
+  html += '</div>';
+
+  if (result?.success && toolDefs.length) {
+    html += '<div class="tool-result-content scrollable">';
+    if (loadedNow.length) {
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.loadedNow'))}</strong>${escapeHtml(loadedNow.join(', '))}</div>`;
+    }
+    if (already.length) {
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.alreadyLoaded'))}</strong>${escapeHtml(already.join(', '))}</div>`;
+    }
+    if (unavailable.length) {
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.unavailableTools'))}</strong>${escapeHtml(unavailable.join(', '))}</div>`;
+    }
+    for (const def of toolDefs) {
+      const fn = def?.function || {};
+      const toolName = String(fn.name || '');
+      // 只展示首行描述，完整 JSON 定义留给模型上下文，不上界面
+      const desc = String(fn.description || '').split('\n')[0];
+      html += `<div><strong>${escapeHtml(toolName)}</strong>${desc ? ` — ${escapeHtml(desc)}` : ''}</div>`;
+    }
+    html += '</div>';
+  } else if (!result?.success && result?.error) {
+    html += `<div class="tool-result-content scrollable"><div>${escapeHtml(String(result.error))}</div></div>`;
+  }
+
+  return html;
+}
+
 function renderCreateSubAgent(result: any, args: any): string {
   const status = formatToolStatusLabel(result, t('toolResults.status.created'), t('toolResults.status.createFailed'));
   const agentId = result.agent_id ?? args.agent_id ?? '';

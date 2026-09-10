@@ -734,6 +734,12 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
                             default_effort = None
                     else:
                         default_effort = None
+            # 工具动态加载快照（多智能体对话不启用；老对话无字段=不启用）
+            try:
+                from core.tool_loading import snapshot_overrides_from_prefs
+                _tl_overrides = snapshot_overrides_from_prefs(prefs, multi_agent_mode=bool(multi_agent_mode))
+            except Exception:
+                _tl_overrides = {}
             conversation_id = cm.create_conversation(
                 project_path=str(workspace.project_path),
                 thinking_mode=safe_thinking,
@@ -747,6 +753,7 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
                     "pre_plan_permission_mode": safe_pre_plan_permission,
                     "multi_agent_mode": bool(multi_agent_mode),
                     "reasoning_effort": default_effort,
+                    **_tl_overrides,
                 },
             )
             try:

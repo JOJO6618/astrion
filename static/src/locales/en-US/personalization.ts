@@ -240,6 +240,19 @@ export default {
   availableSkillsDesc: 'Checked skills are injected into the system prompt and synced to .astrion/skills/ in the workspace',
   disabledToolCategoriesTitle: 'Default disabled tool categories',
   disabledToolCategoriesDesc: 'These categories stay off in new tasks once selected',
+  toolLoadingTitle: 'On-demand tools (dynamic loading)',
+  toolLoadingDesc: 'Checked tools are not injected into context by default; the model fetches their full definitions on demand via load_tools, saving tokens and improving tool selection accuracy. Only affects new conversations; existing conversations keep the snapshot taken at creation',
+  toolLoadingEnabledTitle: 'Enable dynamic tool loading',
+  toolLoadingCat: {
+    workflow: 'Workflows',
+    sub_agent: 'Sub-agents',
+    conversation: 'Conversation review',
+    memory_write: 'Memory write',
+    personalization: 'Personalization',
+    skill_create: 'Skills',
+    mcp: 'MCP',
+    misc: 'Easter egg'
+  },
 
   // ── Files & Images ──
   imageCompressionTitle: 'Image compression',

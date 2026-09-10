@@ -14,8 +14,44 @@ const {
   personalization,
   skillsCatalog,
   toggleCategory,
-  toolCategories
+  toolCategories,
+  toolLoadingRegistry
 } = ctx;
+
+/** 类目内工具是否全部被勾选为延迟加载 */
+const isCategoryFullyDeferred = (cat: { tools: string[] }) =>
+  Array.isArray(cat.tools) &&
+  cat.tools.length > 0 &&
+  cat.tools.every((name: string) => form.tool_loading_deferred.includes(name));
+
+/** 勾选/取消单个延迟工具 */
+const toggleDeferredTool = (name: string, checked: boolean) => {
+  const current = Array.isArray(form.tool_loading_deferred)
+    ? [...form.tool_loading_deferred]
+    : [];
+  const idx = current.indexOf(name);
+  if (checked && idx === -1) {
+    current.push(name);
+  } else if (!checked && idx !== -1) {
+    current.splice(idx, 1);
+  }
+  personalization.updateField({ key: 'tool_loading_deferred', value: current });
+};
+
+/** 勾选/取消整个类目（幂等，不动其他类目） */
+const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
+  const current = new Set<string>(
+    Array.isArray(form.tool_loading_deferred) ? form.tool_loading_deferred : []
+  );
+  for (const name of cat.tools || []) {
+    if (checked) {
+      current.add(name);
+    } else {
+      current.delete(name);
+    }
+  }
+  personalization.updateField({ key: 'tool_loading_deferred', value: Array.from(current) });
+};
 </script>
 
 <template>
@@ -165,6 +201,44 @@ const {
                               :checked="form.disabled_tool_categories.includes(category.id)"
                               @change="toggleCategory(category.id)" /><FancyCheck :checked="form.disabled_tool_categories.includes(category.id)" /></label>
                         </div>
+                      </div>
+                      <div class="settings-group-block" v-if="toolLoadingRegistry.length">
+                        <div class="settings-group-title">
+                          <span class="settings-row-title">{{ $t('personalization.toolLoadingTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.toolLoadingDesc') }}</span>
+                        </div>
+                        <label class="settings-toggle-row inner"
+                          ><span class="settings-row-title">{{ $t('personalization.toolLoadingEnabledTitle') }}</span
+                          ><input
+                            type="checkbox"
+                            :checked="form.tool_loading_enabled"
+                            @change="
+                              personalization.updateField({
+                                key: 'tool_loading_enabled',
+                                value: $event.target.checked
+                              })
+                            " /><FancyCheck :checked="form.tool_loading_enabled" /></label>
+                        <template v-if="form.tool_loading_enabled">
+                          <div v-for="cat in toolLoadingRegistry" :key="cat.key">
+                            <label class="settings-toggle-row inner"
+                              ><span class="settings-row-title">{{ $t(`personalization.toolLoadingCat.${cat.key}`) }}</span
+                              ><input
+                                type="checkbox"
+                                :checked="isCategoryFullyDeferred(cat)"
+                                @change="toggleDeferredCategory(cat, $event.target.checked)" /><FancyCheck :checked="isCategoryFullyDeferred(cat)" /></label>
+                            <div class="settings-check-grid">
+                              <label
+                                v-for="name in cat.tools"
+                                :key="name"
+                                class="settings-toggle-row inner"
+                                ><span class="settings-row-title">{{ name }}</span
+                                ><input
+                                  type="checkbox"
+                                  :checked="form.tool_loading_deferred.includes(name)"
+                                  @change="toggleDeferredTool(name, $event.target.checked)" /><FancyCheck :checked="form.tool_loading_deferred.includes(name)" /></label>
+                            </div>
+                          </div>
+                        </template>
                       </div>
                     </section>
 </template>

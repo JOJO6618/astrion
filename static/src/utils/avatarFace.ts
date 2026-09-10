@@ -28,6 +28,7 @@ const TOOL_FACE_MAP: Record<string, string> = {
   todo_create: 'note',
   todo_update_task: 'check',
   create_sub_agent: 'subagent',
+  load_tools: 'search',
   terminate_sub_agent: 'subagent',
   get_sub_agent_status: 'subagent',
   manage_personalization: 'persona',
