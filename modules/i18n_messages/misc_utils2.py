@@ -164,10 +164,6 @@ MESSAGES = {
         "zh-CN": "子智能体任务失败",
         "en-US": "Sub-agent task failed",
     },
-    "fmt_agent2.closed": {
-        "zh-CN": "子智能体已关闭。",
-        "en-US": "Sub-agent closed.",
-    },
     "fmt_agent2.force_closed": {
         "zh-CN": "子智能体已被强制关闭。",
         "en-US": "Sub-agent was forcibly closed.",

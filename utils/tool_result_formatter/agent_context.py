@@ -256,16 +256,6 @@ def _format_get_sub_agent_status(result_data: Dict[str, Any]) -> str:
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
-def _format_close_sub_agent(result_data: Dict[str, Any]) -> str:
-    if not result_data.get("success"):
-        return _format_failure("close_sub_agent", result_data)
-    message = result_data.get("message") or tr("fmt_agent2.closed")
-    task_id = result_data.get("task_id")
-    status = result_data.get("status")
-    status_note = tr("fmt_agent2.status_note", status=status) if status else ""
-    return f"{message}{status_note}（task_id={task_id}）"
-
-
 def _format_terminate_sub_agent(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("terminate_sub_agent", result_data)

@@ -96,21 +96,12 @@ class ToolsDefinitionAgentToolsMixin:
             except Exception as exc:
                 logger.warning(f"[tools] 加载多智能体工具失败，回退旧版: {exc}")
         return [
-                                    {
-                        "type": "function",
-                        "function": {
-                            "name": "close_sub_agent",
-                            "description": "强制关闭指定子智能体，适用于长时间无响应、超时或卡死的任务。使用前请确认必要的日志/文件已保留，操作会立即终止该任务。",
-                            "parameters": {
-                                "type": "object",
-                                "properties": self._inject_intent({
-                                    "task_id": {"type": "string", "description": "子智能体任务ID"},
-                                    "agent_id": {"type": "integer", "description": "子智能体编号（1~5），若缺少 task_id 可用"}
-                                })
-                            }
-                        }
-                    },
-
+                                    # 【已删除】close_sub_agent（2026-09 彻底移除，勿恢复）：
+                                    # 该工具自 2025-11-15 引入起就是 terminate_sub_agent 的别名
+                                    # （两个提交相隔 19 分钟，handler 直接调 terminate_sub_agent）。
+                                    # main_terminal 拆分为 main_terminal_parts 时其执行分支丢失，
+                                    # 仅剩定义残留——模型调用必落 unknown_tool 报错，纯僵尸工具。
+                                    # 终止子智能体统一使用 terminate_sub_agent。
                                     {
                         "type": "function",
                         "function": {

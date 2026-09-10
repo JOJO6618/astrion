@@ -63,7 +63,6 @@ export const ICONS = Object.freeze({
 });
 
 export const TOOL_ICON_MAP = Object.freeze({
-  close_sub_agent: 'bot',
   create_file: 'file',
   create_skill: 'sparkles',
   manage_personalization: 'userPen',

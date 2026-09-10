@@ -184,7 +184,6 @@ class MainTerminalToolsExecutionMixin:
     }
     _SUB_AGENT_SERIES_TOOLS = {
         "create_sub_agent",
-        "close_sub_agent",
         "terminate_sub_agent",
         "get_sub_agent_status",
     }
@@ -217,7 +216,6 @@ class MainTerminalToolsExecutionMixin:
         "terminal_snapshot",
         # 子智能体全生命周期（只读权限会传播给子智能体，计划模式调研主力）
         "create_sub_agent",
-        "close_sub_agent",
         "terminate_sub_agent",
         "get_sub_agent_status",
         # MCP 服务列举（mcp__* 工具在 evaluate_tool_permission 中按前缀放行）

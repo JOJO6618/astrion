@@ -682,7 +682,6 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
 
   // 子智能体：创建 / 管理
   create_sub_agent: 'sub_agent',
-  close_sub_agent: 'sub_agent_manage',
   terminate_sub_agent: 'sub_agent_manage',
   get_sub_agent_status: 'sub_agent_manage',
 
