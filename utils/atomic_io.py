@@ -59,8 +59,18 @@ def atomic_write_json(path: PathLike, data: Dict[str, Any]) -> None:
 
     防止写中断留下半截文件（直接 open(path,"w") 覆写的风险）。
     临时文件与目标同目录，保证 os.replace 同卷原子性；异常时清理临时文件。
+
+    符号链接写穿（2026-09-10 修复）：目标是符号链接时必须先解析到真实文件再
+    原子替换。否则 os.replace 会把链接本身替换成普通文件（分叉），真实文件
+    根本没被写入——个人空间 personalization.json 共享链接曾因此被
+    user_manager 的链接校准判为分叉并丢弃，表现为「设置保存后立刻回退」。
     """
     target = Path(path)
+    try:
+        if target.is_symlink():
+            target = target.resolve()
+    except Exception:
+        pass
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
         prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent)
