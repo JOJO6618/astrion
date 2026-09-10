@@ -247,7 +247,7 @@ class ToolsDefinitionFileToolsMixin:
                                             "properties": {
                                                 "old_string": {
                                                     "type": "string",
-                                                    "description": "要替换的文本（需与文件内容精确匹配，保留缩进；建议提供至少3行提升定位稳定性。需要批量替换的场景可以单行或不足一行）"
+                                                    "description": "要替换的文本（需与文件内容精确匹配，保留缩进；必须提供至少3行内容，包含目标行及其前后上下文，不足3行将被拒绝执行）"
                                                 },
                                                 "new_string": {
                                                     "type": "string",

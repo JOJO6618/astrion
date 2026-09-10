@@ -258,16 +258,12 @@ MESSAGES = {
         "zh-CN": "发现{found}处，于{lines}行共替换{count}处",
         "en-US": "Found {found} matches; replaced {count} at lines {lines}",
     },
-    "file_manager.replace_short_old_notice": {
-        "zh-CN": "提示：old_string 少于3行，已继续执行；需要批量替换的场景可以单行或不足一行",
-        "en-US": "Note: old_string is shorter than 3 lines; execution continued. For batch replacement, use single-line or shorter strings",
+    "file_manager.replace_old_text_too_short": {
+        "zh-CN": "old_string 少于3行：为确保精确匹配，请提供至少3行内容（包含目标行及其前后上下文）",
+        "en-US": "old_string has fewer than 3 lines: to ensure precise matching, provide at least 3 lines including the target line and its surrounding context",
     },
     "file_manager.replace_many_summary": {
         "zh-CN": "共 {groups} 组替换，替换 {replacements} 处",
         "en-US": "{groups} groups processed; {replacements} replacements made",
-    },
-    "file_manager.replace_many_short_notice": {
-        "zh-CN": "提示：第 {indices} 组 old_string 少于3行，已继续执行",
-        "en-US": "Note: old_string in groups {indices} is shorter than 3 lines; execution continued",
     },
 }
