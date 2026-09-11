@@ -110,6 +110,10 @@
 - 可选参数：`python -m server.app --path ./project --port 8091 --debug --thinking-mode`
 - 兼容启动方式：`python web_server.py`
 - 统一入口：`python main.py`（当前实现会默认进入 Web 启动流程）
+- **Headless 启动（CLI 自启动专用）**：`python -m server.headless_app --path <cwd> --port 8091 --thinking-mode`
+  - 只挂运行时蓝图（gateway / tasks / status / approval / usage 五件套），不含 web 站点路由面（无 /login、无静态页、无会话管理）；根路径 `/` 返回简单 HTML 告知页
+  - 与 full 形态同进程模型（RuntimeService 单例/同一数据目录/同一端口 8091），只是启动时挂的路由面不同；**绝不能与 full 形态双进程并存**（MultiAgentState/门闸/审批 Map 是进程内单例）
+  - CLI（`cli/src/gateway.ts`）探测无服务时 spawn 的就是这个入口；python 解释器经依赖探测（import yaml/flask）从 .venv → homebrew 3.12/3.11 → python3 中选第一个可用的
 
 ### Frontend（根目录）
 - 安装依赖：`npm install`
@@ -613,7 +617,9 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 **硬性约束**：
 1. 新增任何「实时通知」一律写任务事件流（`_append_event`）或扩 `/api/status` 载荷，**禁止**重新引入 socket 推送。
 2. `server/extensions.py` 只剩 `run_background`（daemon 线程）；不要再往里加推送类函数。
-3. `WebTerminal.broadcast()` / `terminal_manager.broadcast` 调用点保留但回调恒为 None（判空安全），新代码不要依赖它们产生用户可见效果。
+3. `WebTerminal.broadcast()` / `terminal_manager.broadcast` 调用点保留但回调恒为 None（判空安全），新代码不要依赖它们产生用户可见效果。`make_terminal_callback(username)`（`server/context/resources.py`）同理：Socket.IO 移除后是恒返 None 的兼容空操作，保留仅为维持历史 import 路径（`workflow_runtime_api.py`、`resources.py` 自身构造 WebTerminal）不炸。
+
+**Headless 形态（2026-09-11 新增）**：`server/headless_app.py` 提供无 web 站点的启动入口（CLI 自启动专用，详见 §2）；审批三类端点（tool/plan/question）已从 chat_bp 拆为独立蓝图 `server/chat/approval.py::approval_bp`（6 条 URL 一字不变），full 与 headless 双形态共用。
 
 ## 13) 工具动态加载（tool_loading，2026-09 新增）
 

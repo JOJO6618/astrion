@@ -59,6 +59,14 @@ from server.context.personalization import _apply_workspace_personalization_pref
 from server.context.usage import get_or_create_usage_tracker
 
 
+def make_terminal_callback(username: str):
+    """Socket.IO 移除后的兼容空操作：实时推送已全量走任务事件流/REST 轮询，
+    回调恒为 None（WebTerminal 与 emit_workflow_progress 均判空安全）。
+    保留本符号仅为维持历史 import 路径不炸，新代码不应依赖它产生用户可见效果。
+    """
+    return None
+
+
 
 def _make_terminal_key(
     username: str,

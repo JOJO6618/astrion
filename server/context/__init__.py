@@ -25,6 +25,7 @@ _SYMBOL_MODULE = {
     "apply_conversation_overrides": "server.context.conversation",
     # resources
     "get_user_resources": "server.context.resources",
+    "make_terminal_callback": "server.context.resources",
     "_make_terminal_key": "server.context.resources",
     "_touch_terminal_activity": "server.context.resources",
     "_set_terminal_workspace_label": "server.context.resources",
@@ -42,6 +43,7 @@ __all__ = [
     "NoWorkspaceError",
     "RuntimeIdentity",
     "get_user_resources",
+    "make_terminal_callback",
     "with_terminal",
     "get_terminal_for_sid",
     "get_gui_manager",

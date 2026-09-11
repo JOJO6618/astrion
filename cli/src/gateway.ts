@@ -8,10 +8,35 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { existsSync, openSync, mkdirSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 
 const DEFAULT_PORT = 8091;
 const TOKEN_PATH = `${homedir()}/.astrion/astrion/host/data/host_api_token`;
+
+/** 探测能跑后端的 python 解释器：依次试候选，能 import 服务端关键依赖（yaml/flask）才用；
+ *  全部失败时退回第一个存在的候选（让启动日志留下真实报错，而不是 CLI 侧静默）。 */
+function pickPython(repoRoot: string): string {
+  const candidates = [
+    resolve(repoRoot, '.venv/bin/python'),
+    '/opt/homebrew/bin/python3.12',
+    '/opt/homebrew/bin/python3.11',
+    '/usr/local/bin/python3.12',
+    '/usr/local/bin/python3.11',
+    'python3',
+  ];
+  let firstExisting = '';
+  for (const bin of candidates) {
+    if (bin.startsWith('/') && !existsSync(bin)) continue;
+    if (!firstExisting) firstExisting = bin;
+    try {
+      execFileSync(bin, ['-c', 'import yaml, flask'], { stdio: 'ignore' });
+      return bin;
+    } catch {
+      // 缺依赖，试下一个
+    }
+  }
+  return firstExisting || 'python3';
+}
 
 export interface WorkspaceItem {
   workspace_id: string;
@@ -104,22 +129,23 @@ export class GatewayClient {
     }
   }
 
-  /** CLI 自启动后端（detached + unref，对齐旧 Ink 版参数；显式 --port 避免默认端口歧义）
-   *  python 优先用项目 .venv（系统 python3 缺依赖会启动即崩）；输出落日志文件便于诊断启动失败。 */
+  /** CLI 自启动后端（detached + unref；走 headless 入口，只挂 Gateway/任务/审批等运行时蓝图，
+   *  不拉起 web 站点路由面；显式 --port 避免默认端口歧义）
+   *  python 解释器做依赖探测（import yaml/flask 通过才用）——本机 .venv 缺 yaml 会启动即崩；
+   *  输出落日志文件便于诊断启动失败。 */
   private spawnServer(cwd: string): void {
     // cli/src → 项目根；fileURLToPath 正确解码中文路径（new URL().pathname 会留下
     // 百分号编码，导致 existsSync 永远 false、spawn cwd 无效——中文路径必用此函数）
     const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
     const port = Number(process.env.ASTRION_API_PORT || process.env.WEB_SERVER_PORT || DEFAULT_PORT);
-    const venvPython = resolve(repoRoot, '.venv/bin/python');
-    const pythonBin = existsSync(venvPython) ? venvPython : 'python3';
+    const pythonBin = pickPython(repoRoot);
     const logDir = `${homedir()}/.astrion/astrion/host/logs`;
     try {
       mkdirSync(logDir, { recursive: true });
       const logFd = openSync(resolve(logDir, 'cli_spawned_server.log'), 'a');
       const child = spawn(
         pythonBin,
-        ['-m', 'server.app', '--path', cwd, '--port', String(port), '--thinking-mode'],
+        ['-m', 'server.headless_app', '--path', cwd, '--port', String(port), '--thinking-mode'],
         {
           cwd: repoRoot,
           env: {

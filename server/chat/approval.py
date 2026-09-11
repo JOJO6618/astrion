@@ -1,5 +1,4 @@
 from __future__ import annotations
-from server.chat import chat_bp
 import json, time
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -9,6 +8,11 @@ import zipfile
 import os
 
 from flask import Blueprint, jsonify, request, session, send_file
+
+# 审批路由独立蓝图：审批（工具/计划/提问）属 Runtime 人机交互契约，
+# 不属 web chat 域；headless 形态只挂本蓝图而不挂 chat_bp。
+# 注意：URL 路径与原 chat_bp 时期完全一致，前端与客户端零改动。
+approval_bp = Blueprint("approval", __name__)
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import secrets
@@ -45,7 +49,7 @@ from server.monitor import get_cached_monitor_snapshot
 from modules.i18n import tr
 
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
-@chat_bp.route('/api/user-questions/pending', methods=['GET'])
+@approval_bp.route('/api/user-questions/pending', methods=['GET'])
 @api_login_or_host_token_required
 @with_terminal
 def list_pending_user_questions(terminal: WebTerminal, workspace: UserWorkspace, username: str):
@@ -60,7 +64,7 @@ def list_pending_user_questions(terminal: WebTerminal, workspace: UserWorkspace,
         "conversation_id": requested_conv_id,
     })
 
-@chat_bp.route('/api/user-questions/<question_id>/answer', methods=['POST'])
+@approval_bp.route('/api/user-questions/<question_id>/answer', methods=['POST'])
 @api_login_or_host_token_required
 @with_terminal
 @rate_limited("user_question_answer", 120, 60, scope="user")
@@ -90,7 +94,7 @@ def answer_user_question(terminal: WebTerminal, workspace: UserWorkspace, userna
         "item": item,
     })
 
-@chat_bp.route('/api/plan-approvals/pending', methods=['GET'])
+@approval_bp.route('/api/plan-approvals/pending', methods=['GET'])
 @api_login_or_host_token_required
 @with_terminal
 def list_pending_plan_approvals(terminal: WebTerminal, workspace: UserWorkspace, username: str):
@@ -105,7 +109,7 @@ def list_pending_plan_approvals(terminal: WebTerminal, workspace: UserWorkspace,
         "conversation_id": requested_conv_id,
     })
 
-@chat_bp.route('/api/plan-approvals/<approval_id>/answer', methods=['POST'])
+@approval_bp.route('/api/plan-approvals/<approval_id>/answer', methods=['POST'])
 @api_login_or_host_token_required
 @with_terminal
 @rate_limited("plan_approval_answer", 120, 60, scope="user")
@@ -134,7 +138,7 @@ def answer_plan_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
         "item": item,
     })
 
-@chat_bp.route('/api/tool-approvals/pending', methods=['GET'])
+@approval_bp.route('/api/tool-approvals/pending', methods=['GET'])
 @api_login_or_host_token_required
 @with_terminal
 def list_pending_tool_approvals(terminal: WebTerminal, workspace: UserWorkspace, username: str):
@@ -149,7 +153,7 @@ def list_pending_tool_approvals(terminal: WebTerminal, workspace: UserWorkspace,
         "conversation_id": requested_conv_id,
     })
 
-@chat_bp.route('/api/tool-approvals/<approval_id>/decision', methods=['POST'])
+@approval_bp.route('/api/tool-approvals/<approval_id>/decision', methods=['POST'])
 @api_login_or_host_token_required
 @with_terminal
 @rate_limited("tool_approval_decision", 60, 60, scope="user")
