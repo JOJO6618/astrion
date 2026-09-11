@@ -93,10 +93,16 @@ def _inject_host_identity() -> None:
 
     session 字段与 server/auth.py 的 host_login 保持一致（含 login_nonce），
     保证路由内及下游 is_logged_in()/principal 构造等既有逻辑无差异。
+
+    工作区绑定：CLI 等本机客户端以启动目录为工作区，经
+    `X-Astrion-Workspace-Id` 头声明；未声明或 id 不存在时 resolve 回退默认
+    工作区（与 web host-login 语义一致）。host 本机单人模型下客户端声明
+    不构成越权（工作区均属同一 host 用户）。
     """
     from server.auth import _issue_login_nonce
 
-    _, host_workspace = resolve_host_workspace()
+    requested_workspace_id = (request.headers.get("X-Astrion-Workspace-Id") or "").strip() or None
+    _, host_workspace = resolve_host_workspace(requested_workspace_id)
     session["logged_in"] = True
     session["username"] = "host"
     session["role"] = "admin"

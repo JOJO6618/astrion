@@ -18,7 +18,8 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file, session
 
 from server.auth_helpers import api_login_required, resolve_admin_policy
-from server.context import with_terminal, attach_user_broadcast
+from server.gateway_auth import api_login_or_host_token_required
+from server.context import with_terminal
 from server.state import (
     PROJECT_STORAGE_CACHE,
     PROJECT_STORAGE_CACHE_TTL_SECONDS,
@@ -55,7 +56,7 @@ def _build_host_workspaces_payload(catalog: dict, current_id: str) -> list[dict]
     return workspaces
 
 @status_bp.route('/api/host/workspaces')
-@api_login_required
+@api_login_or_host_token_required
 def list_host_workspaces():
     if not _is_host_mode_request():
         return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
@@ -83,7 +84,7 @@ def list_host_workspaces():
     })
 
 @status_bp.route('/api/host/workspaces/create', methods=['GET', 'POST'])
-@api_login_required
+@api_login_or_host_token_required
 def create_host_workspace_api():
     if not _is_host_mode_request():
         return jsonify({"success": False, "error": tr("status_host_workspace.host_mode_only")}), 403
@@ -318,7 +319,6 @@ def select_host_workspace():
     if host_terminal:
         try:
             host_terminal.update_container_session(container_handle)
-            attach_user_broadcast(host_terminal, "host")
             host_terminal.username = "host"
             host_terminal.user_role = "admin"
             write_host_workspace_debug(

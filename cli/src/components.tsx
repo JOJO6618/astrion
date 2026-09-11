@@ -1,325 +1,313 @@
-import React from 'react';
-import { Box, Text, useStdout, type DOMElement } from 'ink';
-import ImeTextInput from './ImeTextInput.js';
-import type { CliStatus, SlashCommand, SkillDefinition, TimelineItem, Workspace } from './types.js';
-import { formatContext, shortPath } from './format.js';
+// 渲染组件层：把 Block 列表渲染成 opentui 组件树
+// 列规范：L0 块标记「• 」｜L2 参数/结果标记「└ 」｜L4 结果详情/流式输出/思考后续行
+// 颜色规范：全部使用终端默认前景色；只有「└ 结果行 + 详情/输出内容」用 DIM 属性（微微淡，亮暗背景自适应）；
+//           唯一例外是错误状态用红色。
+import { useEffect, useMemo, type RefObject } from 'react';
+import { RGBA, StyledText, TextAttributes, type CliRenderer, type TextareaRenderable } from '@opentui/core';
+import { useRenderer } from '@opentui/react';
+import { revealedText, type Block } from './timeline';
 
-const SHOW_THINKING_DETAILS = false;
+const DIM = TextAttributes.DIM;
+const RED = '#e06c75';
+// 终端默认前景色（ANSI 39）：白底自动黑字、黑底自动白字。opentui 不传 fg 时是写死的白色，必须显式传。
+const FG = RGBA.defaultForeground();
+// 输入栏内部第一个字符所在列 = 外层 paddingX(1) + 边框(1) + 边框内 paddingX(1) = 3。
+// 输入栏下方的状态栏第一个字符与此列对齐（不顶格）。
+const COMPOSER_TEXT_INDENT = 3;
 
-export function StatusLine({ status }: { status: CliStatus }) {
-  const skill = status.activeSkill ? `  skill:${status.activeSkill.label}` : '';
-  const background = [
-    status.backgroundAgents > 0 ? `${status.backgroundAgents}后台智能体` : '',
-    status.backgroundCommands > 0 ? `${status.backgroundCommands}后台指令` : '',
-  ].filter(Boolean).join(' · ');
-  const left = `${status.model} · ${status.workspace.label} · ${status.permissionMode} · ${status.executionMode}${background ? ` · ${background}` : ''} · 版本控制:${status.versioningEnabled ? '开' : '关'}${skill}`;
-  const right = formatContext(status.contextUsed, status.contextLimit);
+// 亮暗自适应光标色，App 启动时经 resolveAdaptiveColors 检测后写入；渲染期读取。
+// 拖选/复制走终端原生（useMouse=false），不再需要应用内 selection 配色。
+export const adaptiveColors = {
+  cursor: '#ffffff',
+};
+
+// 统一文本组件。
+export function T({
+  fg,
+  attributes,
+  children,
+}: {
+  fg?: RGBA | string;
+  attributes?: number;
+  children?: React.ReactNode;
+}) {
   return (
-    <Box justifyContent="space-between" width="100%">
-      <Text color="gray">{left}</Text>
-      <Text color="gray">{right}</Text>
-    </Box>
+    <text fg={fg ?? FG} attributes={attributes}>
+      {children}
+    </text>
+  );
+}
+export function blinkDot(elapsed: number): string {
+  return Math.floor(elapsed / 450) % 2 === 0 ? '•' : '◦';
+}
+
+function UserBlock({ block }: { block: Extract<Block, { kind: 'user' }> }) {
+  return (
+    <box flexDirection="row" marginTop={1}>
+      <T fg={FG}>{'› '}</T>
+      <T fg={FG}>{block.text}</T>
+    </box>
   );
 }
 
-export function Composer(
-  {
-    value,
-    disabled,
-    marginTop = 1,
-    cursorYOffset = 0,
-    refreshTick = 0,
-    onChange,
-    onSubmit,
-  }: {
-    value: string;
-    disabled?: boolean;
-    marginTop?: number;
-    cursorYOffset?: number;
-    refreshTick?: number;
-    onChange: (value: string) => void;
-    onSubmit: (value: string) => void | Promise<void>;
-  },
-) {
-  const contentRef = React.useRef<DOMElement>(null);
-
+// 引导消息：运行中注入当前轮的用户消息（带 [引导] 标记，对应 Web 端 userHeaderGuide 徽标）
+function GuideBlock({ block }: { block: Extract<Block, { kind: 'guide' }> }) {
   return (
-    <Box flexDirection="column" marginTop={marginTop}>
-      <Box borderStyle="single" borderColor={disabled ? 'gray' : 'cyan'} paddingX={1} flexDirection="column">
-        <Box ref={contentRef}>
-          <Text color="cyan">› </Text>
-          <ImeTextInput
-            value={value}
-            disabled={disabled}
-            contentRef={contentRef}
-            cursorYOffset={cursorYOffset}
-            refreshTick={refreshTick}
-            onChange={onChange}
-            onSubmit={onSubmit}
-          />
-        </Box>
-      </Box>
-    </Box>
+    <box flexDirection="row" marginTop={1}>
+      <T fg={FG}>{'› '}</T>
+      <T fg={FG} attributes={DIM}>{'[引导] '}</T>
+      <T fg={FG}>{block.text}</T>
+    </box>
   );
 }
 
-function displayWidth(text: string): number {
-  let width = 0;
-  for (const char of Array.from(text)) {
-    const code = char.codePointAt(0) || 0;
-    if (code === 0) continue;
-    if (code < 32 || (code >= 0x7f && code < 0xa0)) continue;
-    width += isWideCodePoint(code) ? 2 : 1;
-  }
-  return width;
-}
-
-function isWideCodePoint(code: number): boolean {
+// 系统行：命令执行结果（/model 切换、/compact 等），整行 DIM
+function SystemBlock({ block }: { block: Extract<Block, { kind: 'system' }> }) {
   return (
-    code >= 0x1100 && (
-      code <= 0x115f ||
-      code === 0x2329 ||
-      code === 0x232a ||
-      (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
-      (code >= 0xac00 && code <= 0xd7a3) ||
-      (code >= 0xf900 && code <= 0xfaff) ||
-      (code >= 0xfe10 && code <= 0xfe19) ||
-      (code >= 0xfe30 && code <= 0xfe6f) ||
-      (code >= 0xff00 && code <= 0xff60) ||
-      (code >= 0xffe0 && code <= 0xffe6) ||
-      (code >= 0x1f300 && code <= 0x1f64f) ||
-      (code >= 0x1f900 && code <= 0x1f9ff) ||
-      (code >= 0x20000 && code <= 0x3fffd)
-    )
+    <box marginTop={1}>
+      <T fg={FG} attributes={DIM}>{`• ${block.text}`}</T>
+    </box>
   );
 }
 
-export function WelcomePanel({ status }: { status: CliStatus }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text color="gray">Astrion</Text>
-      <Box borderStyle="round" borderColor="gray" paddingX={2} paddingY={1} flexDirection="column">
-        <Text bold>Welcome back!</Text>
-        <Text color="gray">{status.model} · {status.runMode}</Text>
-        <Text color="gray">{shortPath(status.directory)}</Text>
-      </Box>
-    </Box>
-  );
-}
+function ThinkingBlock({
+  block,
+  elapsed,
+  expanded,
+}: {
+  block: Extract<Block, { kind: 'thinking' }>;
+  elapsed: number;
+  expanded: boolean;
+}) {
+  const revealed = revealedText(block.full, block.revealStart, block.cps, elapsed);
+  const collapsed = elapsed >= block.collapseAt;
 
-export function Timeline({ items, pulseTick = 0, width = 78 }: { items: TimelineItem[]; pulseTick?: number; width?: number }) {
-  return (
-    <Box flexDirection="column">
-      {items.map((item) => (
-        <TimelineRow key={item.id} item={item} pulseTick={pulseTick} />
-      ))}
-    </Box>
-  );
-}
-
-function TimelineRow({ item, pulseTick }: { item: TimelineItem; pulseTick: number }) {
-  const separator = useFullWidthSeparator();
-  if (item.kind === 'user') {
-    const lines = String(item.body || '').split(/\r?\n/);
+  if (!collapsed) {
+    const streaming = revealed.length < block.full.length;
+    const dot = streaming ? blinkDot(elapsed) : '•';
+    const lines = revealed.split('\n').filter((l) => l.length > 0);
     return (
-      <Box flexDirection="column" marginTop={1}>
-        <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="column">
-          {lines.map((line, index) => (
-            <Text key={`${item.id}-user-${index}`}>
-              {index === 0 ? <Text color="cyan">› </Text> : <Text>  </Text>}
-              <Text>{line}</Text>
-            </Text>
+      <box flexDirection="column" marginTop={1}>
+        <T fg={FG}>{`${dot} 思考中`}</T>
+        {lines.map((l, i) => (
+          <T key={i} fg={FG} attributes={DIM}>{`${i === 0 ? '  └ ' : '    '}${l}`}</T>
+        ))}
+      </box>
+    );
+  }
+
+  const all = block.full.split('\n').filter((l) => l.length > 0);
+  return (
+    <box flexDirection="column" marginTop={1}>
+      <T fg={FG}>{`• ${all[0] ?? ''}`}</T>
+      {expanded
+        ? all.slice(1).map((l, i) => (
+            <T key={i} fg={FG} attributes={DIM}>{`${i === 0 ? '  └ ' : '    '}${l}`}</T>
+          ))
+        : null}
+    </box>
+  );
+}
+
+function ToolBlock({ block, elapsed }: { block: Extract<Block, { kind: 'tool' }>; elapsed: number }) {
+  const running = block.status === 'running';
+  const failed = block.status === 'error';
+  const dot = running ? blinkDot(elapsed) : '•';
+  const streamOutput = running && block.stream
+    ? block.stream.lines.slice(0, Math.max(0, Math.floor((elapsed - block.stream.startAt) / block.stream.interval)))
+    : [];
+
+  return (
+    <box flexDirection="column" marginTop={1}>
+      {failed ? <T fg={RED}>{`${dot} ${block.title}`}</T> : <T fg={FG}>{`${dot} ${block.title}`}</T>}
+      {block.params.map((p) => (
+        <T key={p} fg={FG}>{`  ${p}`}</T>
+      ))}
+      {streamOutput.map((l, i) => (
+        <T key={i} fg={FG} attributes={DIM}>{`    ${l}`}</T>
+      ))}
+      {!running && block.result != null ? (
+        <>
+          <T fg={FG} attributes={DIM}>{`  └ ${block.result}`}</T>
+          {block.resultLines.map((l, i) => (
+            <T key={i} fg={FG} attributes={DIM}>{`    ${l}`}</T>
           ))}
-        </Box>
-      </Box>
-    );
-  }
-  if (item.kind === 'assistant') {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text color="gray">{separator}</Text>
-        <Text> </Text>
-        {wrapIndentedText(String(item.body || ''), 2, separator.length).map((line, index) => (
-          <Text key={`${item.id}-assistant-${index}`}>{line}</Text>
-        ))}
-        {item.status === 'success' ? <><Text> </Text><Text color="gray">{separator}</Text></> : null}
-      </Box>
-    );
-  }
-  if (item.kind === 'system') {
-    return <Text color="gray">• {item.body}</Text>;
-  }
-  const running = item.status === 'running';
-  const failed = item.status === 'failed';
-  const color = running ? (pulseTick % 2 === 0 ? 'gray' : undefined) : failed ? 'red' : item.kind === 'thinking' ? undefined : 'green';
-  const dot = running ? (pulseTick % 2 === 0 ? '◦' : '•') : '•';
-  const detailColor = item.kind === 'thinking' || item.kind === 'tool' || item.kind === 'sub_agent' ? 'gray' : undefined;
-  const detailWidth = separator.length;
-  const showDetails = item.kind === 'thinking' ? SHOW_THINKING_DETAILS : true;
+        </>
+      ) : null}
+    </box>
+  );
+}
+
+function AssistantBlock({ block, elapsed }: { block: Extract<Block, { kind: 'assistant' }>; elapsed: number }) {
+  const revealed = revealedText(block.full, block.revealStart, block.cps, elapsed);
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text><Text color={color}>{dot}</Text> {item.title || item.kind}</Text>
-      {showDetails && !running && item.body ? wrapIndentedText(`└ ${item.body}`, 2, detailWidth).map((line, index) => (
-        <Text key={`${item.id}-body-${index}`} color={detailColor}>{line}</Text>
-      )) : null}
-      {showDetails && (item.kind === 'thinking' || !running) && (item.lines || []).map((line, index) => (
-        wrapIndentedText(line, index === 0 && !item.body ? 2 : 4, detailWidth).map((wrapped, wrappedIndex) => (
-          <Text key={`${item.id}-${index}-${wrappedIndex}`} color={detailColor}>
-            {index === 0 && !item.body && wrappedIndex === 0 ? wrapped.replace(/^  /, '  └ ') : wrapped}
-          </Text>
-        ))
+    <box flexDirection="column" marginTop={1}>
+      {revealed.split('\n').map((l, i) => (
+        <T key={i} fg={FG}>{l}</T>
       ))}
-    </Box>
+    </box>
   );
 }
 
-function useFullWidthSeparator(): string {
-  const { stdout } = useStdout();
-  const width = Math.max(2, (stdout.columns || 80) - 2);
-  return '─'.repeat(width);
-}
-
-function wrapIndentedText(text: string, indent: number, width: number): string[] {
-  const prefix = ' '.repeat(indent);
-  const contentWidth = Math.max(10, width - indent);
-  const result: string[] = [];
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine || '';
-    if (displayWidth(line) <= contentWidth) {
-      result.push(`${prefix}${line}`);
-      continue;
-    }
-    let current = '';
-    let currentWidth = 0;
-    for (const char of Array.from(line)) {
-      const charWidth = displayWidth(char);
-      if (current && currentWidth + charWidth > contentWidth) {
-        result.push(`${prefix}${current}`);
-        current = char;
-        currentWidth = charWidth;
-      } else {
-        current += char;
-        currentWidth += charWidth;
-      }
-    }
-    result.push(`${prefix}${current}`);
+export function BlockView({
+  block,
+  elapsed,
+  thinkingExpanded,
+}: {
+  block: Block;
+  elapsed: number;
+  thinkingExpanded: boolean;
+}) {
+  switch (block.kind) {
+    case 'user':
+      return <UserBlock block={block} />;
+    case 'guide':
+      return <GuideBlock block={block} />;
+    case 'system':
+      return <SystemBlock block={block} />;
+    case 'thinking':
+      return <ThinkingBlock block={block} elapsed={elapsed} expanded={thinkingExpanded} />;
+    case 'tool':
+      return <ToolBlock block={block} elapsed={elapsed} />;
+    case 'assistant':
+      return <AssistantBlock block={block} elapsed={elapsed} />;
   }
-  return result.length ? result : [prefix];
 }
 
-export function SlashMenu({ query, commands, selectedIndex }: { query: string; commands: SlashCommand[]; selectedIndex: number }) {
-  const visibleCount = 5;
-  const leftIndent = '  ';
-  const start = Math.max(0, selectedIndex - 2);
-  const end = Math.min(commands.length, start + visibleCount);
-  const adjustedStart = Math.max(0, end - visibleCount);
-  const visibleCommands = commands.slice(adjustedStart, end);
+// 提前输入队列：运行中 Enter 发送的消息在此平铺，当前轮结束后自动按序发送；Ctrl+G 可将队首提升为引导
+export function QueueList({ queue }: { queue: string[] }) {
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Box flexDirection="column">
-        {visibleCommands.map((command, visibleIndex) => {
-          const index = adjustedStart + visibleIndex;
-          return (
-          <Text key={command.name} color={index === selectedIndex ? 'cyan' : undefined}>
-            {leftIndent}{index === selectedIndex ? '› ' : '  '}{command.name.padEnd(13)} {command.description}
-          </Text>
-          );
-        })}
-        {!commands.length ? <Text color="gray">{leftIndent}  无匹配命令</Text> : null}
-      </Box>
-    </Box>
+    <box flexShrink={0} flexDirection="column" paddingLeft={COMPOSER_TEXT_INDENT} paddingRight={1}>
+      <T fg={FG} attributes={DIM}>{`队列 ${queue.length} 条   结束后自动发送   Ctrl+G 引导队首`}</T>
+      {queue.map((q, i) => (
+        <T key={`${i}-${q}`} fg={FG} attributes={i === 0 ? 0 : DIM}>
+          {`› ${q}${i === 0 ? '（下一个）' : ''}`}
+        </T>
+      ))}
+    </box>
   );
 }
 
-export function Picker({ title, items, selectedIndex }: { title: string; items: Array<{ label: string; description?: string; disabled?: boolean }>; selectedIndex: number }) {
-  const visibleCount = 5;
-  const start = Math.max(0, selectedIndex - 2);
-  const end = Math.min(items.length, start + visibleCount);
-  const adjustedStart = Math.max(0, end - visibleCount);
-  const visibleItems = items.slice(adjustedStart, end);
+export function HintBar() {
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold>{title}</Text>
-      <Box flexDirection="column" marginTop={1}>
-        {visibleItems.map((item, visibleIndex) => {
-          const index = adjustedStart + visibleIndex;
-          return (
-            <Text key={`${item.label}-${index}`} color={item.disabled ? 'gray' : index === selectedIndex ? 'cyan' : undefined}>
-              {index === selectedIndex ? '› ' : '  '}{item.label.padEnd(20)} {item.description || ''}
-            </Text>
-          );
-        })}
-        {!items.length ? <Text color="gray">  暂无选项</Text> : null}
-      </Box>
-    </Box>
+    <box flexShrink={0} paddingX={1}>
+      <T fg={FG}>Astrion   [/] 命令菜单   [Ctrl+G] 引导   [Ctrl+E] 展开思考   [Esc] 退出</T>
+    </box>
   );
 }
 
-export function WorkspacePrompt({ cwd, selectedIndex }: { cwd: string; selectedIndex: number }) {
-  const options = ['确认，添加并继续', '拒绝，退出'];
+interface AdaptiveColors {
+  cursor: string;
+}
+
+// 终端亮暗检测 → 光标色（OSC 12 只认具体色）。
+// 白底：深色光标；黑底：白光标。
+// 检测链：1. renderer.themeMode（DEC 997）；2. 兜底 getPalette() 查 OSC 11 背景亮度；3. 都失败按黑底惯例。
+export async function resolveAdaptiveColors(renderer: CliRenderer): Promise<AdaptiveColors> {
+  const light: AdaptiveColors = { cursor: '#111111' };
+  const dark: AdaptiveColors = { cursor: '#ffffff' };
+  if (renderer.themeMode === 'light') return light;
+  if (renderer.themeMode === 'dark') return dark;
+  try {
+    const palette = await renderer.getPalette({ timeout: 500 });
+    const hex = palette.defaultBackground;
+    if (!hex) return dark;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? light : dark;
+  } catch {
+    return dark;
+  }
+}
+
+export function Composer({
+  finished,
+  textareaRef,
+  onSubmitMessage,
+  onContentChange,
+  placeholderOverride,
+}: {
+  finished: boolean;
+  textareaRef: RefObject<TextareaRenderable | null>;
+  onSubmitMessage: () => void;
+  onContentChange: () => void;
+  /** 面板占用输入栏时的提示覆盖（如 /path 输入授权路径） */
+  placeholderOverride?: string;
+}) {
+  const renderer = useRenderer();
+  useEffect(() => {
+    // 显式聚焦：opentui 不做自动焦点，必须手动 focus() 才能输入
+    textareaRef.current?.focus();
+  }, [renderer, textareaRef]);
+  // 提示文字变淡：StyledText 形式的 placeholder 直接采用 chunk 自带样式（placeholderColor 仅对字符串形式生效），
+  // 用默认前景色 + DIM，与「└ 内容微微淡」同一变淡语义。
+  const placeholder = useMemo(
+    () =>
+      new StyledText([
+        {
+          __isChunk: true as const,
+          text:
+            placeholderOverride ??
+            (finished ? '输入消息…   / 打开命令菜单' : '运行中   Enter 排队   Ctrl+G 引导   / 打开菜单'),
+          fg: FG,
+          attributes: DIM,
+        },
+      ]),
+    [finished, placeholderOverride],
+  );
   return (
-    <Box flexDirection="column">
-      <Text color="yellow">当前目录尚未添加为工作区：</Text>
-      <Text>  {shortPath(cwd)}</Text>
-      <Box marginTop={1} flexDirection="column">
-        <Text>Agent 将在此目录中读取文件、执行命令和修改内容。</Text>
-        <Text>是否将此目录添加为工作区？</Text>
-      </Box>
-      <Box marginTop={1} flexDirection="column">
-        {options.map((label, index) => (
-          <Text key={label} color={index === selectedIndex ? 'cyan' : undefined}>
-            {index === selectedIndex ? '› ' : '  '}{index + 1}. {label}
-          </Text>
-        ))}
-      </Box>
-    </Box>
+    <box flexShrink={0} flexDirection="column" paddingX={1} marginTop={1}>
+      <box borderStyle="single" borderColor={FG} paddingX={1}>
+        <textarea
+          ref={textareaRef}
+          width="100%"
+          minHeight={1}
+          maxHeight={6}
+          placeholder={placeholder}
+          textColor={FG}
+          focusedTextColor={FG}
+          cursorColor={adaptiveColors.cursor}
+          cursorStyle={{ style: 'line', blinking: true }}
+          onSubmit={onSubmitMessage}
+          onContentChange={onContentChange}
+          keyBindings={[
+            // Enter=发送，Shift+Enter=换行（对齐 web 端；opentui textarea 默认相反：return=换行、meta+return=提交）
+            { name: 'return', action: 'submit' },
+            { name: 'return', shift: true, action: 'newline' },
+          ]}
+        />
+      </box>
+    </box>
   );
 }
 
-export function StatusPanel({ status }: { status: CliStatus }) {
+export function StatusBar({
+  model,
+  thinking,
+  effortLabel,
+  workMode,
+  permMode,
+  execEnv,
+  contextUsage,
+}: {
+  model: string;
+  thinking: boolean;
+  /** 推理强度档位标签（思考模式时拼在模型后） */
+  effortLabel: string;
+  workMode: string;
+  permMode: string;
+  execEnv: string;
+  contextUsage: string;
+}) {
+  // 第一个字符与输入栏内部第一个字符对齐（见 COMPOSER_TEXT_INDENT）
+  // 布局：左组 = 模型+模式/强度、工作模式、权限模式、执行环境（空格分栏，不用 ·）；上下文用量固定最右
+  const modelPart = thinking ? `${model} 思考 ${effortLabel}` : `${model} 快速`;
   return (
-    <Box borderStyle="round" borderColor="gray" paddingX={1} flexDirection="column" marginTop={1}>
-      <Text>{'>_ Astrion CLI'}</Text>
-      <Text> </Text>
-      <StatusField label="Model" value={status.model} />
-      <StatusField label="Directory" value={shortPath(status.directory)} />
-      <StatusField label="Workspace" value={status.workspace.label} />
-      <StatusField label="Permissions" value={status.permissionMode} />
-      <StatusField label="Execution" value={status.executionMode} />
-      <StatusField label="Session" value={status.sessionId} />
-      <StatusField label="Context window" value={formatContext(status.contextUsed, status.contextLimit)} />
-    </Box>
-  );
-}
-
-function StatusField({ label, value }: { label: string; value: string }) {
-  return <Text>  {label.padEnd(15)} {value}</Text>;
-}
-
-export function HelpPanel({ commands }: { commands: SlashCommand[] }) {
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold>Commands</Text>
-      <Box flexDirection="column" marginTop={1}>
-        {commands.map((command) => (
-          <Text key={command.name}>  {command.name.padEnd(13)} {command.description}</Text>
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
-export function SkillHint({ skill }: { skill?: SkillDefinition }) {
-  if (!skill) return null;
-  return <Text color="gray">  + 先阅读 {skill.label} skill</Text>;
-}
-
-export function WorkspaceList({ workspaces, selectedIndex }: { workspaces: Workspace[]; selectedIndex: number }) {
-  return (
-    <Picker
-      title="Workspace"
-      selectedIndex={selectedIndex}
-      items={workspaces.map((workspace) => ({ label: workspace.label, description: shortPath(workspace.path) }))}
-    />
+    <box flexShrink={0} width="100%" flexDirection="row" justifyContent="space-between" paddingLeft={COMPOSER_TEXT_INDENT} paddingRight={1}>
+      <T fg={FG}>{`${modelPart}   ${workMode}   ${permMode}   ${execEnv}`}</T>
+      <T fg={FG}>{contextUsage}</T>
+    </box>
   );
 }

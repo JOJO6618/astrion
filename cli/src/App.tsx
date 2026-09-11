@@ -1,711 +1,288 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { slashCommands, filterCommands } from './commands.js';
-import { createWorkspaceForPath, findWorkspaceByPath, loadWorkspaceCatalog, repoRoot } from './workspaces.js';
-import type { CliStatus, ExecutionMode, ModelDefinition, PermissionMode, RunMode, SkillDefinition, SlashCommand, TimelineItem, Workspace, WorkspaceCatalog } from './types.js';
-import { nowSessionId, shortPath } from './format.js';
-import { Composer, HelpPanel, Picker, SkillHint, SlashMenu, StatusLine, StatusPanel, Timeline, WelcomePanel, WorkspacePrompt } from './components.js';
-import { ApiClient, createDefaultApiClient } from './api.js';
-import { createEventRenderState, reduceTaskEvent } from './eventMapper.js';
+// 主界面：时间线（真实事件流）+ 交互区（/ 菜单与面板）+ 输入栏 + 状态栏
+// 与 demo 的差异：无演示播放（消息来自 Gateway 任务事件流）；审批事件自动弹出；
+// 运行中 Enter=排队（本地队列，运行结束后自动发送，对齐 Web tryAutoSendRuntimeQueuedMessages）。
+import { useKeyboard, useRenderer } from '@opentui/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { TextareaRenderable } from '@opentui/core';
+import {
+  BlockView,
+  Composer,
+  HintBar,
+  QueueList,
+  StatusBar,
+  adaptiveColors,
+  resolveAdaptiveColors,
+} from './components';
+import { SlashMenu } from './menu';
+import { useSlashMenu } from './menuState';
+import { EFFORT_META } from './data';
+import { t } from './i18n';
+import { ChatRuntime } from './runtime';
+import { CPS_INSTANT, THINK_COLLAPSE_DELAY, type Block, type TimelineApi } from './timeline';
+import type { BootResult } from './boot';
 
-type InputMode = 'workspace_prompt' | 'composer' | 'slash_menu' | 'picker' | 'status_panel' | 'help_panel' | 'approval';
+const TICK_MS = 100;
+/** 与 menuState 中一致的 / token 检测（提交拦截用） */
+const SLASH_TOKEN_RE = /(^|[ \n])\/([^\s/]*)$/;
 
-type PickerOption = {
-  label: string;
-  description?: string;
-  disabled?: boolean;
-  onSelect: () => void | Promise<void>;
-};
+let idCounter = 0;
 
-type ApprovalOption = {
-  label: string;
-  description?: string;
-  decision: 'approved' | 'rejected';
-};
+function makeApi(setBlocks: React.Dispatch<React.SetStateAction<Block[]>>, getElapsed: () => number): TimelineApi {
+  let thinkingId: number | null = null;
+  let assistantId: number | null = null;
 
-const cwd = process.cwd();
-const initialCatalog = loadWorkspaceCatalog();
-const matchedWorkspace = findWorkspaceByPath(initialCatalog, cwd);
-
-function id(): string {
-  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function initialStatus(workspace: Workspace): CliStatus {
-  return {
-    model: '连接中',
-    runMode: 'thinking',
-    directory: workspace.path,
-    workspace,
-    permissionMode: 'auto_approval',
-    executionMode: 'sandbox',
-    sessionId: nowSessionId(),
-    contextUsed: 0,
-    contextLimit: 0,
-    versioningEnabled: false,
-    backgroundAgents: 0,
-    backgroundCommands: 0,
+  const patchById = (id: number, fn: (b: Block) => Block) => {
+    setBlocks((prev) => prev.map((b) => (b.id === id ? fn(b) : b)));
   };
-}
 
-function workspaceFromApi(item: any): Workspace {
-  return {
-    workspace_id: String(item.workspace_id || item.id || item.label || 'workspace'),
-    label: String(item.label || item.workspace_id || 'workspace'),
-    path: String(item.path || ''),
+  const api: TimelineApi = {
+    addUser(text) {
+      setBlocks((prev) => [...prev, { kind: 'user', id: idCounter++, text }]);
+    },
+    addGuide(text) {
+      setBlocks((prev) => [...prev, { kind: 'guide', id: idCounter++, text }]);
+    },
+    addSystem(text) {
+      setBlocks((prev) => [...prev, { kind: 'system', id: idCounter++, text }]);
+    },
+    startThinking() {
+      const id = idCounter++;
+      thinkingId = id;
+      setBlocks((prev) => [
+        ...prev,
+        { kind: 'thinking', id, full: '', revealStart: 0, cps: CPS_INSTANT, collapseAt: Number.POSITIVE_INFINITY },
+      ]);
+      return id;
+    },
+    appendThinking(chunk) {
+      if (thinkingId == null) api.startThinking(); // 容错：无 start 直接来 chunk 时隐式建块
+      const id = thinkingId!;
+      patchById(id, (b) => (b.kind === 'thinking' ? { ...b, full: b.full + chunk } : b));
+    },
+    endThinking() {
+      if (thinkingId == null) return;
+      const id = thinkingId;
+      thinkingId = null;
+      const collapseAt = getElapsed() + THINK_COLLAPSE_DELAY;
+      patchById(id, (b) => (b.kind === 'thinking' ? { ...b, collapseAt } : b));
+    },
+    startAssistant() {
+      const id = idCounter++;
+      assistantId = id;
+      setBlocks((prev) => [...prev, { kind: 'assistant', id, full: '', revealStart: 0, cps: CPS_INSTANT }]);
+      return id;
+    },
+    appendAssistant(chunk) {
+      if (assistantId == null) api.startAssistant();
+      const id = assistantId!;
+      patchById(id, (b) => (b.kind === 'assistant' ? { ...b, full: b.full + chunk } : b));
+    },
+    startTool(init) {
+      const id = idCounter++;
+      setBlocks((prev) => [
+        ...prev,
+        { kind: 'tool', id, title: init.title, params: init.params ?? [], status: 'running', resultLines: [] },
+      ]);
+      return id;
+    },
+    finishTool(result, resultLines = []) {
+      setBlocks((prev) => patchLastTool(prev, { status: 'done', result, resultLines }));
+    },
+    failTool(result, resultLines = []) {
+      setBlocks((prev) => patchLastTool(prev, { status: 'error', result, resultLines }));
+    },
   };
+  return api;
 }
 
-export default function App() {
-  const { exit } = useApp();
-  const { stdout } = useStdout();
-  const apiRef = useRef<ApiClient | null>(null);
-  const runningTaskRef = useRef<string | null>(null);
-  const currentConversationRef = useRef<string | undefined>(undefined);
-  const bootstrappedRef = useRef(false);
-  const [catalog, setCatalog] = useState<WorkspaceCatalog>(initialCatalog);
-  const [mode, setMode] = useState<InputMode>(matchedWorkspace ? 'composer' : 'workspace_prompt');
-  const [workspacePromptIndex, setWorkspacePromptIndex] = useState(0);
-  const [input, setInput] = useState('');
-  const [slashIndex, setSlashIndex] = useState(0);
-  const [pickerTitle, setPickerTitle] = useState('');
-  const [pickerOptions, setPickerOptions] = useState<PickerOption[]>([]);
-  const [pickerIndex, setPickerIndex] = useState(0);
-  const [approvalTitle, setApprovalTitle] = useState('');
-  const [approvalId, setApprovalId] = useState('');
-  const [approvalOptions] = useState<ApprovalOption[]>([
-    { label: '允许一次', decision: 'approved' },
-    { label: '拒绝', decision: 'rejected' },
-  ]);
-  const [approvalIndex, setApprovalIndex] = useState(0);
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-  const [status, setStatus] = useState<CliStatus>(() => initialStatus(matchedWorkspace || initialCatalog.workspaces[0]!));
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+/** 落定最近一个运行中的工具块（单线程模型顺序执行；按 tool_call_id 精确对应留待后续） */
+function patchLastTool(blocks: Block[], patch: Partial<Extract<Block, { kind: 'tool' }>>): Block[] {
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i]!;
+    if (b.kind === 'tool' && b.status === 'running') {
+      const next = blocks.slice();
+      next[i] = { ...b, ...patch } as Block;
+      return next;
+    }
+  }
+  return blocks;
+}
+
+export function App({ boot }: { boot: BootResult }) {
+  const renderer = useRenderer();
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [elapsed, setElapsed] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const [queue, setQueue] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
-  const [runningStartedAt, setRunningStartedAt] = useState<number | null>(null);
-  const [nowMs, setNowMs] = useState(Date.now());
-  const [workingTextTick, setWorkingTextTick] = useState(0);
-  const [workingDotTick, setWorkingDotTick] = useState(0);
-  const [timelineDotTick, setTimelineDotTick] = useState(0);
-  const [layoutRefreshTick, setLayoutRefreshTick] = useState(0);
-  const [models, setModels] = useState<ModelDefinition[]>([]);
-  const [skills, setSkills] = useState<SkillDefinition[]>([]);
-  const [permissionOptions, setPermissionOptions] = useState<PermissionMode[]>([]);
-  const [executionOptions, setExecutionOptions] = useState<ExecutionMode[]>([]);
 
-  const commandMatches = useMemo(() => filterCommands(input), [input]);
-  const runningSeconds = runningStartedAt ? Math.max(0, Math.floor((nowMs - runningStartedAt) / 1000)) : 0;
-  const hasRunningTimeline = useMemo(() => timeline.some((item) => item.status === 'running'), [timeline]);
-  const slashMenuVisibleCount = mode === 'slash_menu' ? Math.max(1, Math.min(5, commandMatches.length)) : 0;
-  const composerCursorYOffset = mode === 'slash_menu' ? 1 + slashMenuVisibleCount : 0;
+  const elapsedRef = useRef(0);
+  elapsedRef.current = elapsed;
+  const apiRef = useRef<TimelineApi | null>(null);
+  apiRef.current = useMemo(() => makeApi(setBlocks, () => elapsedRef.current), []);
+  const textareaRef = useRef<TextareaRenderable>(null);
+  const width = (renderer as unknown as { width?: number }).width ?? 78;
 
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [running]);
-
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => {
-      setWorkingTextTick((value) => value + 1);
-    }, 100);
-    return () => clearInterval(timer);
-  }, [running]);
-
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => {
-      setWorkingDotTick((value) => value + 1);
-    }, 800);
-    return () => clearInterval(timer);
-  }, [running]);
-
-  useEffect(() => {
-    if (!hasRunningTimeline) return;
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const delay = setTimeout(() => {
-      setTimelineDotTick((value) => value + 1);
-      timer = setInterval(() => {
-        setTimelineDotTick((value) => value + 1);
-      }, 800);
-    }, 400);
-    return () => {
-      clearTimeout(delay);
-      if (timer) clearInterval(timer);
-    };
-  }, [hasRunningTimeline]);
-
-  useEffect(() => {
-    if (mode !== 'composer' || bootstrappedRef.current) return;
-    bootstrappedRef.current = true;
-    getApi()
-      .then((api) => bootstrapConversation(api))
-      .catch((err) => addItem({ kind: 'tool', title: '初始化失败', status: 'failed', body: String(err.message || err) }));
-  }, [mode]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLayoutRefreshTick((v) => v + 1);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [mode, commandMatches.length, running, input.length, timeline.length]);
-
-  function addItem(item: Omit<TimelineItem, 'id'>) {
-    setTimeline((prev) => [...prev, { id: id(), ...item }]);
-  }
-
-  function patchStatusFromServer(raw: any, workspaceOverride?: Workspace) {
-    const execMode = typeof raw?.execution_mode === 'object' ? raw.execution_mode.mode : raw?.execution_mode;
-    const contextUsed = Number(raw?.context?.total_size || raw?.context_tokens || raw?.token_statistics?.current_context_tokens || 0);
-    setStatus((prev) => ({
-      ...prev,
-      model: raw?.model_key || prev.model,
-      runMode: raw?.run_mode || prev.runMode,
-      directory: raw?.project_path || workspaceOverride?.path || prev.directory,
-      workspace: workspaceOverride || prev.workspace,
-      permissionMode: raw?.permission_mode || prev.permissionMode,
-      executionMode: execMode || prev.executionMode,
-      sessionId: raw?.conversation?.current_id || prev.sessionId,
-      contextUsed: Number.isFinite(contextUsed) && contextUsed > 0 ? contextUsed : prev.contextUsed,
-    }));
-    if (raw?.conversation?.current_id) currentConversationRef.current = raw.conversation.current_id;
-  }
-
-  async function getApi(): Promise<ApiClient> {
-    if (!apiRef.current) apiRef.current = createDefaultApiClient(cwd, repoRoot);
-    if (!connected && !connecting) {
-      setConnecting(true);
-      try {
-        await apiRef.current.ensureConnected();
-        setConnected(true);
-      } finally {
-        setConnecting(false);
-      }
-    } else if (!connected) {
-      while (!connected && connecting) await sleep(100);
-    }
-    return apiRef.current;
-  }
-
-  async function syncBackendState(api = apiRef.current) {
-    if (!api) return;
-    try {
-      const wsData = await api.listWorkspaces();
-      const workspaces = (wsData.workspaces || []).map(workspaceFromApi);
-      const current = workspaces.find((ws) => ws.workspace_id === wsData.current_workspace_id) || workspaces.find((ws) => ws.path === status.workspace.path) || status.workspace;
-      setCatalog({ default_workspace_id: wsData.default_workspace_id, workspaces });
-      const rawStatus = await api.getStatus();
-      patchStatusFromServer(rawStatus, current);
-      const conv = await api.getCurrentConversation().catch(() => null);
-      const convId = conv?.id || rawStatus?.conversation?.current_id;
-      if (convId) currentConversationRef.current = convId;
-      await syncRuntimeCatalogs(api, convId).catch(() => undefined);
-    } catch (err) {
-      addItem({ kind: 'tool', title: '同步后端状态失败', status: 'failed', body: String((err as Error).message || err) });
-    }
-  }
-
-  async function syncRuntimeCatalogs(api: ApiClient, conversationId?: string) {
-    const [modelItems, personalization, permission, execution, subAgents, backgroundCommands, tokens, versioning] = await Promise.all([
-      api.listModels().catch(() => []),
-      api.getPersonalization().catch(() => null),
-      api.getPermissionMode().catch(() => null),
-      api.getExecutionMode().catch(() => null),
-      api.listSubAgents().catch(() => []),
-      api.listBackgroundCommands().catch(() => []),
-      conversationId ? api.getConversationTokens(conversationId).catch(() => null) : Promise.resolve(null),
-      conversationId ? api.getConversationVersioning(conversationId).catch(() => null) : Promise.resolve(null),
-    ]);
-    if (modelItems.length) setModels(modelItems);
-    const enabled = new Set((personalization?.data?.enabled_skills || []).map(String));
-    const skillItems = (personalization?.skills_catalog || [])
-      .filter((skill: any) => !enabled.size || enabled.has(String(skill.id)))
-      .map((skill: any) => ({ id: String(skill.id), label: String(skill.label || skill.id), description: String(skill.description || '') }));
-    if (skillItems.length) setSkills(skillItems);
-    const rawCompressionLimit = Number(
-      personalization?.context_compression_settings?.context_window_tokens
-      || personalization?.context_compression_settings?.deep_trigger_tokens
-      || personalization?.data?.deep_compress_trigger_tokens
-      || 0,
-    );
-    const currentModel = modelItems.find((item) => item.model_key === status.model);
-    const modelWindow = Number(currentModel?.context_window || 0);
-    const compressionLimit = rawCompressionLimit > 0 && modelWindow > 0
-      ? Math.min(rawCompressionLimit, modelWindow)
-      : rawCompressionLimit || modelWindow;
-    if (Array.isArray(permission?.options)) setPermissionOptions(permission.options);
-    if (Array.isArray(execution?.options)) setExecutionOptions(execution.options);
-    const runningAgents = subAgents.filter((item: any) => !['completed', 'failed', 'cancelled', 'terminated', 'timeout'].includes(String(item.status || '').toLowerCase())).length;
-    const runningCommands = backgroundCommands.filter((item: any) => !['completed', 'failed', 'cancelled', 'timeout'].includes(String(item.status || '').toLowerCase())).length;
-    const tokenUsed = Number(tokens?.total_tokens || 0);
-    setStatus((prev) => ({
-      ...prev,
-      contextUsed: Number.isFinite(tokenUsed) && tokenUsed > 0 ? tokenUsed : prev.contextUsed,
-      contextLimit: Number.isFinite(compressionLimit) && compressionLimit > 0 ? compressionLimit : prev.contextLimit,
-      versioningEnabled: versioning ? Boolean(versioning.enabled) : prev.versioningEnabled,
-      backgroundAgents: runningAgents,
-      backgroundCommands: runningCommands,
-    }));
-  }
-
-  async function bootstrapConversation(api: ApiClient) {
-    const result = await api.createConversation();
-    const convId = result.conversation_id || result.data?.conversation_id || result.data?.id || result.id;
-    if (convId) {
-      currentConversationRef.current = String(convId);
-      setStatus((prev) => ({ ...prev, sessionId: String(convId), contextUsed: 0 }));
-      await syncBackendState(api);
-      await syncRuntimeCatalogs(api, String(convId)).catch(() => undefined);
-    }
-  }
-
-  function openPicker(title: string, options: PickerOption[]) {
-    setPickerTitle(title);
-    setPickerOptions(options);
-    setPickerIndex(0);
-    setMode('picker');
-  }
-
-  function closeOverlay() {
-    setMode('composer');
-    setInput('');
-    setSlashIndex(0);
-    setPickerIndex(0);
-  }
-
-  async function executeCommand(command: SlashCommand) {
-    const name = command.name;
-    try {
-      if (name === '/new') {
-        const api = await getApi();
-        const result = await api.createConversation();
-        const convId = result.conversation_id || result.data?.conversation_id;
-        currentConversationRef.current = convId;
-        setTimeline([]);
-        setStatus((prev) => ({ ...prev, sessionId: convId || nowSessionId(), contextUsed: 0 }));
-        if (convId) await syncRuntimeCatalogs(api, String(convId)).catch(() => undefined);
-        closeOverlay();
-        return;
-      }
-      if (name === '/resume') {
-        const api = await getApi();
-        const conversations = await api.listConversations(30);
-        openPicker('Resume conversation', conversations.map((conv: any) => ({
-          label: String(conv.title || conv.id || '未命名对话'),
-          description: String(conv.updated_at || conv.created_at || conv.id || ''),
-          onSelect: async () => {
-            await api.loadConversation(String(conv.id));
-            currentConversationRef.current = String(conv.id);
-            setStatus((prev) => ({ ...prev, sessionId: String(conv.id) }));
-            await syncRuntimeCatalogs(api, String(conv.id)).catch(() => undefined);
-            addItem({ kind: 'system', body: `已切换对话：${conv.title || conv.id}` });
-            closeOverlay();
-          },
-        })));
-        return;
-      }
-      if (name === '/model') {
-        const api = await getApi();
-        const modelItems = (await api.listModels().catch(() => models)).filter((item) => item.model_key);
-        if (modelItems.length) setModels(modelItems);
-        const currentRunMode = status.runMode;
-        openPicker('Model', modelItems.map((model) => ({
-          label: model.name || model.model_key,
-          description: `${model.model_key === status.model ? 'current · ' : ''}${model.description || model.model_key}`,
-          onSelect: async () => {
-            await api.setModel(model.model_key);
-            setStatus((prev) => ({ ...prev, model: model.model_key, contextLimit: Number(model.context_window) || prev.contextLimit }));
-            addItem({ kind: 'system', body: `已切换模型：${model.name || model.model_key}` });
-            const modes = getRunModesForModel(model);
-            openPicker('Run Mode', modes.map((runMode) => ({
-              label: runMode,
-              description: runMode === currentRunMode ? 'current' : '',
-              onSelect: async () => {
-                await api.setRunMode(runMode);
-                setStatus((prev) => ({ ...prev, runMode }));
-                await syncBackendState(api);
-                addItem({ kind: 'system', body: `已切换运行模式：${runMode}` });
-                closeOverlay();
-              },
-            })));
-          },
-        })));
-        return;
-      }
-      if (name === '/versioning') {
-        const api = await getApi();
-        const convId = currentConversationRef.current || status.sessionId;
-        const current = await api.getConversationVersioning(convId).catch(() => null);
-        const enabled = current ? Boolean(current.enabled) : status.versioningEnabled;
-        const trackingMode = current?.tracking_mode;
-        openPicker('Versioning', [
-          { label: enabled ? '关闭版本控制' : '开启版本控制', onSelect: async () => {
-            const result = await api.setConversationVersioning(convId, !enabled, trackingMode);
-            setStatus((prev) => ({ ...prev, versioningEnabled: Boolean(result.enabled) }));
-            addItem({ kind: 'system', body: `版本控制：${result.enabled ? '开' : '关'}` });
-            closeOverlay();
-          } },
-        ]);
-        return;
-      }
-      if (name === '/permission') {
-        const api = await getApi();
-        const current = await api.getPermissionMode().catch(() => null);
-        const modes: PermissionMode[] = Array.isArray(current?.options) && current.options.length ? current.options : (permissionOptions.length ? permissionOptions : [status.permissionMode]);
-        openPicker('Permission Mode', modes.map((permissionMode) => ({ label: permissionMode, description: permissionMode === status.permissionMode ? 'current' : '', onSelect: async () => {
-          await api.setPermissionMode(permissionMode);
-          setStatus((prev) => ({ ...prev, permissionMode }));
-          addItem({ kind: 'system', body: `权限模式：${permissionMode}` });
-          closeOverlay();
-        } })));
-        return;
-      }
-      if (name === '/execution') {
-        const api = await getApi();
-        const current = await api.getExecutionMode().catch(() => null);
-        const modes: ExecutionMode[] = Array.isArray(current?.options) && current.options.length ? current.options : (executionOptions.length ? executionOptions : [status.executionMode]);
-        openPicker('Execution Environment', modes.map((executionMode) => ({ label: executionMode, description: executionMode === status.executionMode ? 'current' : executionMode === 'direct' ? '高风险' : '', onSelect: async () => {
-          await api.setExecutionMode(executionMode);
-          setStatus((prev) => ({ ...prev, executionMode }));
-          addItem({ kind: 'system', body: `执行环境：${executionMode}` });
-          closeOverlay();
-        } })));
-        return;
-      }
-      if (name === '/workspace') {
-        const api = await getApi();
-        const wsData = await api.listWorkspaces();
-        const workspaces = (wsData.workspaces || []).map(workspaceFromApi);
-        setCatalog({ default_workspace_id: wsData.default_workspace_id, workspaces });
-        openPicker('Workspace', workspaces.map((workspace) => ({ label: workspace.label, description: `${shortPath(workspace.path)}${workspace.workspace_id === wsData.current_workspace_id ? ' current' : ''}`, onSelect: async () => {
-          await api.selectWorkspace(workspace.workspace_id);
-          setStatus((prev) => ({ ...prev, workspace, directory: workspace.path }));
-          addItem({ kind: 'system', body: `已切换工作区：${workspace.label}` });
-          await syncBackendState(api);
-          closeOverlay();
-        } })));
-        return;
-      }
-      if (name === '/compact') {
-        const api = await getApi();
-        const convId = currentConversationRef.current || status.sessionId;
-        const result = await api.compressConversation(convId);
-        addItem({ kind: 'tool', title: '对话已压缩', body: result.compact_file || '', status: 'success' });
-        if (result.compressed_conversation_id) {
-          currentConversationRef.current = result.compressed_conversation_id;
-          setStatus((prev) => ({ ...prev, sessionId: result.compressed_conversation_id }));
-        }
-        closeOverlay();
-        return;
-      }
-      if (name === '/tools') {
-        const api = await getApi();
-        const snapshot = await api.getToolSettings();
-        const categories = snapshot.categories || {};
-        openPicker('Tools', Object.entries(categories).map(([key, value]: [string, any]) => ({ label: `${value.enabled ? '[x]' : '[ ]'} ${key}`, description: value.label || '', onSelect: async () => {
-          await api.setToolCategory(key, !value.enabled);
-          addItem({ kind: 'system', body: `工具 ${key}：${!value.enabled ? '启用' : '禁用'}` });
-          closeOverlay();
-        } })));
-        return;
-      }
-      if (name === '/path') {
-        const api = await getApi();
-        const auth = await api.getPathAuthorization();
-        openPicker('Authorized Paths', [
-          { label: '当前可读写路径', description: (auth.writable_paths || []).join(', ') || '无', onSelect: () => closeOverlay() },
-          { label: '当前只读路径', description: (auth.readable_extra_paths || []).join(', ') || '无', onSelect: () => closeOverlay() },
-        ]);
-        return;
-      }
-      if (name === '/skill') {
-        const api = await getApi();
-        const personalization = await api.getPersonalization().catch(() => null);
-        const enabled = new Set((personalization?.data?.enabled_skills || []).map(String));
-        const skillItems = (personalization?.skills_catalog || skills)
-          .filter((skill: any) => !enabled.size || enabled.has(String(skill.id)))
-          .map((skill: any) => ({ id: String(skill.id), label: String(skill.label || skill.id), description: String(skill.description || '') }));
-        if (skillItems.length) setSkills(skillItems);
-        openPicker('Skill', skillItems.map((skill: SkillDefinition) => ({ label: skill.label, description: skill.description, onSelect: () => {
-          setStatus((prev) => ({ ...prev, activeSkill: skill }));
-          addItem({ kind: 'system', body: `下一条消息将使用 skill：${skill.label}` });
-          closeOverlay();
-        } })).concat(skillItems.length ? [] : [{ label: '暂无可用 skill', disabled: true, onSelect: () => closeOverlay() }]));
-        return;
-      }
-      if (name === '/status') {
-        await getApi().then((api) => syncBackendState(api)).catch(() => undefined);
-        setMode('status_panel');
-        setInput('');
-        return;
-      }
-      if (name === '/help') {
-        setMode('help_panel');
-        setInput('');
-        return;
-      }
-      if (name === '/clear') {
-        setTimeline([]);
-        closeOverlay();
-        return;
-      }
-      if (name === '/exit') {
-        if (runningTaskRef.current) await apiRef.current?.cancelTask(runningTaskRef.current).catch(() => undefined);
-        exit();
-      }
-    } catch (err) {
-      addItem({ kind: 'tool', title: `命令失败：${name}`, status: 'failed', body: String((err as Error).message || err) });
-      closeOverlay();
-    }
-  }
-
-  async function submitUserMessage(text: string) {
-    addItem({ kind: 'user', body: text });
-    const skill = status.activeSkill;
-    const message = skill ? `${text}\n\n先阅读 ${skill.label} skill` : text;
-    if (skill) addItem({ kind: 'user', body: `先阅读 ${skill.label} skill` });
-    setStatus((prev) => ({ ...prev, activeSkill: undefined }));
-    setRunning(true);
-    setRunningStartedAt(Date.now());
-    try {
-      const api = await getApi();
-      const task = await api.createTask({ message, conversation_id: currentConversationRef.current, model_key: status.model, run_mode: status.runMode });
-      runningTaskRef.current = task.task_id;
-      if (task.conversation_id) currentConversationRef.current = task.conversation_id;
-      await pollTask(api, task.task_id);
-      await syncBackendState(api);
-    } catch (err) {
-      addItem({ kind: 'tool', title: '发送失败', status: 'failed', body: String((err as Error).message || err) });
-    } finally {
-      runningTaskRef.current = null;
-      setRunning(false);
-      setRunningStartedAt(null);
-    }
-  }
-
-  async function pollTask(api: ApiClient, taskId: string) {
-    let offset = 0;
-    const renderState = createEventRenderState();
-    for (;;) {
-      const result = await api.pollTask(taskId, offset);
-      // 事件窗口缺口检测（协议 §5.2）：中间事件已被裁剪，提示用户并对齐窗口继续
-      const windowStart = Number(result.window_start ?? 0);
-      if (offset > 0 && offset < windowStart) {
-        addItem({ kind: 'system', body: `部分实时输出已被裁剪（窗口起点 ${windowStart}），以最终结果为准` });
-        offset = windowStart;
+  // 审批裁决 → Gateway（runtime 在下方创建，经 ref 互指解开循环依赖）
+  const runtimeRef = useRef<ChatRuntime | null>(null);
+  const menu = useSlashMenu({
+    textareaRef,
+    apiRef,
+    destroy: () => {
+      runtimeRef.current?.destroy();
+      renderer.destroy();
+      process.exit(0);
+    },
+    width,
+    elapsed,
+    onApprovalAction: (action, approval) => {
+      if (action === 'reject') {
+        void runtimeRef.current?.decideApproval(approval.id, 'rejected');
+        apiRef.current?.addSystem(`${t('approval.rejected')}${approval.toolLabel}`);
       } else {
-        offset = result.next_offset;
+        void runtimeRef.current?.decideApproval(approval.id, 'approved');
+        apiRef.current?.addSystem(
+          action === 'unrestricted'
+            ? `${t('approval.switched')}${approval.toolLabel}`
+            : `${t('approval.approved')}${approval.toolLabel}`,
+        );
       }
-      for (const event of result.events || []) {
-        if (event.type === 'tool_approval_required') {
-          const approval = event.data?.approval || event.data;
-          if (approval?.approval_id) {
-            setApprovalId(String(approval.approval_id));
-            setApprovalTitle(`需要审批：${approval.tool_name || '工具调用'}`);
-            setApprovalIndex(0);
-            setMode('approval');
-          }
-        }
-        setTimeline((prev) => reduceTaskEvent(prev, renderState, event));
-      }
-      if (!['pending', 'running', 'cancel_requested'].includes(String(result.status))) break;
-      await sleep(700);
-    }
+    },
+  });
+  const menuRef = useRef(menu);
+  menuRef.current = menu;
+
+  // 会话运行时：发消息/事件轮询/审批自动弹出（只创建一次）
+  if (!runtimeRef.current) {
+    const rt = new ChatRuntime(boot.gateway, {
+      api: apiRef.current,
+      onRunningChange: setRunning,
+      onApprovalRequired: (a) => menuRef.current.openApproval(a),
+      onSystemMessage: (text) => apiRef.current?.addSystem(text),
+      tr: t,
+    });
+    rt.conversationId = boot.conversationId;
+    runtimeRef.current = rt;
   }
 
-  useInput((chunk, key) => {
-    void handleInput(chunk, key);
+  const runningRef = useRef(running);
+  runningRef.current = running;
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
+
+  // 启动时亮暗检测：结果写入 adaptiveColors（module 级），setState 触发一次重渲染
+  const [, setColorsTick] = useState(0);
+  useEffect(() => {
+    void resolveAdaptiveColors(renderer).then((c) => {
+      adaptiveColors.cursor = c.cursor;
+      setColorsTick((v) => v + 1);
+    });
+  }, [renderer]);
+
+  // 光标常驻输入栏（点击/拖选其他区域会切走焦点，主循环强制恢复）
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const ta = textareaRef.current;
+      if (ta && !ta.focused) ta.focus();
+    }, TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  // app 时钟：驱动思考折叠/闪烁点/revealedText（无演示播放）
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => setElapsed(Date.now() - startedAt), TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 运行结束后，提前输入队列逐条自动发送
+  useEffect(() => {
+    if (running || queue.length === 0) return;
+    const timer = setTimeout(() => {
+      const [head, ...rest] = queue;
+      if (head) void runtimeRef.current?.send(head);
+      setQueue(rest);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [running, queue]);
+
+  // 引导：输入框有字=直接引导注入当前轮；无字=提升队首为引导
+  // TODO(gateway)：接 POST /api/tasks/<id>/runtime_guidance（当前仅本地上屏，服务端注入后续接）
+  const handleGuide = () => {
+    if (!runningRef.current) return;
+    const text = (textareaRef.current?.plainText ?? '').trim();
+    if (text) {
+      textareaRef.current?.setText('');
+      apiRef.current?.addGuide(text);
+      return;
+    }
+    const [head, ...rest] = queueRef.current;
+    if (head) {
+      setQueue(rest);
+      apiRef.current?.addGuide(head);
+    }
+  };
+
+  useKeyboard((key) => {
+    // 菜单打开时 ↑↓/←→/Enter/Esc/删除键 优先给交互区面板
+    if (menu.handleKey(key)) return;
+    if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+      runtimeRef.current?.destroy();
+      renderer.destroy();
+      process.exit(0);
+    }
+    if (key.ctrl && key.name === 'e') {
+      key.preventDefault();
+      setExpanded((v) => !v);
+    }
+    if (key.ctrl && key.name === 'g') {
+      key.preventDefault();
+      handleGuide();
+    }
   });
 
-  function handleComposerChange(next: string) {
-    setInput(next);
-    if (next.startsWith('/')) {
-      if (mode !== 'slash_menu') setMode('slash_menu');
-      setSlashIndex(0);
-    } else if (mode === 'slash_menu') {
-      setMode('composer');
-      setSlashIndex(0);
+  // Enter（菜单关闭时）：运行中=提前输入排队；空闲=直接发送
+  const handleSubmit = () => {
+    const text = (textareaRef.current?.plainText ?? '').trim();
+    if (!text || SLASH_TOKEN_RE.test(text)) return;
+    textareaRef.current?.setText('');
+    if (runningRef.current) {
+      setQueue((q) => [...q, text]);
+    } else {
+      void runtimeRef.current?.send(text);
     }
-  }
+  };
 
-  async function handleComposerSubmit(raw: string) {
-    const text = String(raw || '').trim();
-    if (!text) return;
-    if (text.startsWith('/')) {
-      const command = filterCommands(text)[0];
-      if (command) await executeCommand(command);
-      return;
-    }
-    setInput('');
-    await submitUserMessage(text);
-  }
-
-  async function handleInput(chunk: string, key: any) {
-    if (mode === 'workspace_prompt') {
-      if (key.upArrow || chunk === 'k') setWorkspacePromptIndex(0);
-      else if (key.downArrow || chunk === 'j') setWorkspacePromptIndex(1);
-      else if (key.return) {
-        if (workspacePromptIndex === 0) {
-          const result = createWorkspaceForPath(catalog, cwd);
-          setCatalog(result.catalog);
-          setStatus((prev) => ({ ...prev, workspace: result.workspace, directory: result.workspace.path }));
-          bootstrappedRef.current = true;
-          setMode('composer');
-          getApi().then(async (api) => {
-            await api.createWorkspace(result.workspace.path, result.workspace.label).catch(() => undefined);
-            const wsData = await api.listWorkspaces().catch(() => null);
-            const backendWs = wsData?.workspaces?.find((ws: any) => String(ws.path) === result.workspace.path);
-            if (backendWs) await api.selectWorkspace(String(backendWs.workspace_id));
-            await bootstrapConversation(api);
-          }).catch((err) => addItem({ kind: 'tool', title: '连接后端失败', status: 'failed', body: String(err.message || err) }));
-        } else {
-          exit();
-        }
-      }
-      return;
-    }
-
-    if (mode === 'approval') {
-      if (key.upArrow) setApprovalIndex((prev) => Math.max(0, prev - 1));
-      else if (key.downArrow) setApprovalIndex((prev) => Math.min(approvalOptions.length - 1, prev + 1));
-      else if (key.return && approvalId) {
-        const selected = approvalOptions[approvalIndex]!;
-        await apiRef.current?.decideApproval(approvalId, selected.decision).catch((err) => addItem({ kind: 'tool', title: '审批提交失败', status: 'failed', body: String(err.message || err) }));
-        addItem({ kind: 'system', body: `审批已${selected.decision === 'approved' ? '允许' : '拒绝'}` });
-        setMode('composer');
-      }
-      return;
-    }
-
-    if (key.escape) {
-      if (runningTaskRef.current) {
-        await apiRef.current?.cancelTask(runningTaskRef.current).catch(() => undefined);
-        addItem({ kind: 'system', body: '已请求停止当前任务。' });
-        return;
-      }
-      closeOverlay();
-      return;
-    }
-
-    if (mode === 'status_panel' || mode === 'help_panel') {
-      if (key.return || chunk === 'q') closeOverlay();
-      return;
-    }
-
-    if (mode === 'picker') {
-      if (key.upArrow) setPickerIndex((prev) => Math.max(0, prev - 1));
-      else if (key.downArrow) setPickerIndex((prev) => Math.min(pickerOptions.length - 1, prev + 1));
-      else if (key.return) await pickerOptions[pickerIndex]?.onSelect();
-      return;
-    }
-
-    if (key.ctrl && chunk === 'c') {
-      exit();
-      return;
-    }
-
-    if (mode === 'slash_menu') {
-      if (key.upArrow) setSlashIndex((prev) => Math.max(0, prev - 1));
-      else if (key.downArrow) setSlashIndex((prev) => Math.min(commandMatches.length - 1, prev + 1));
-      else if (key.return) {
-        const command = commandMatches[slashIndex];
-        if (command) await executeCommand(command);
-      }
-      return;
-    }
-
-    if (mode === 'composer') return;
-
-    if (key.return) {
-      const text = input.trim();
-      if (!text) return;
-      if (text.startsWith('/')) {
-        const command = filterCommands(text)[0];
-        if (command) await executeCommand(command);
-        return;
-      }
-      setInput('');
-      await submitUserMessage(text);
-      return;
-    }
-
-    if (key.backspace || key.delete) {
-      setInput((prev) => Array.from(prev).slice(0, -1).join(''));
-      return;
-    }
-
-    if (chunk && !key.ctrl && !key.meta) {
-      const normalized = chunk.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      setInput((prev) => {
-        const next = prev + normalized;
-        if (next.startsWith('/')) {
-          setMode('slash_menu');
-          setSlashIndex(0);
-        }
-        return next;
-      });
-    }
-  }
-
-  if (mode === 'workspace_prompt') {
-    return <WorkspacePrompt cwd={cwd} selectedIndex={workspacePromptIndex} />;
-  }
+  const sf = menu.statusFields;
 
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Box flexDirection="column">
-        {timeline.length === 0 ? <WelcomePanel status={status} /> : <Timeline items={timeline} pulseTick={timelineDotTick} width={Math.max(10, (stdout.columns || 80) - 2)} />}
-        {timeline.length > 0 && timeline[timeline.length - 1]?.kind === 'assistant' ? <Text> </Text> : null}
-      </Box>
-      <Box flexDirection="column">
-        {running ? (
-          <Box marginTop={1}>
-            <Text>
-              <Text color={workingDotTick % 2 === 0 ? 'gray' : undefined}>{workingDotTick % 2 === 0 ? '◦' : '•'}</Text>{' '}
-              <AnimatedSummary text="Working" tick={workingTextTick} />
-              {` (${runningSeconds}s • 按 Esc 停止)`}
-            </Text>
-          </Box>
-        ) : null}
-        {mode === 'slash_menu' ? <SlashMenu query={input} commands={commandMatches} selectedIndex={slashIndex} /> : null}
-        {mode === 'picker' ? <Picker title={pickerTitle} items={pickerOptions} selectedIndex={pickerIndex} /> : null}
-        {mode === 'status_panel' ? <StatusPanel status={status} /> : null}
-        {mode === 'help_panel' ? <HelpPanel commands={slashCommands} /> : null}
-        {mode === 'approval' ? <Picker title={approvalTitle} items={approvalOptions} selectedIndex={approvalIndex} /> : null}
-        {mode === 'composer' || mode === 'slash_menu' ? <><SkillHint skill={status.activeSkill} /><Composer value={input} disabled={running} marginTop={0} cursorYOffset={composerCursorYOffset} refreshTick={layoutRefreshTick} onChange={handleComposerChange} onSubmit={handleComposerSubmit} /></> : null}
-        <StatusLine status={status} />
-      </Box>
-    </Box>
+    <box flexDirection="column" width="100%" height="100%">
+      <HintBar />
+      <scrollbox flexGrow={1} stickyScroll stickyStart="bottom" verticalScrollbarOptions={{ visible: false }}>
+        <box flexDirection="column" paddingX={1}>
+          {blocks.map((block) => (
+            <BlockView key={block.id} block={block} elapsed={elapsed} thinkingExpanded={expanded} />
+          ))}
+        </box>
+      </scrollbox>
+      {queue.length > 0 ? <QueueList queue={queue} /> : null}
+      {menu.slashMenuProps ? <SlashMenu {...menu.slashMenuProps} /> : null}
+      <Composer
+        finished={!running}
+        textareaRef={textareaRef}
+        onSubmitMessage={handleSubmit}
+        onContentChange={menu.handleContentChange}
+        placeholderOverride={menu.inputPlaceholder}
+      />
+      <StatusBar
+        model={sf.model}
+        thinking={sf.thinking}
+        effortLabel={EFFORT_META[sf.effort].label}
+        workMode={sf.workMode}
+        permMode={sf.permMode}
+        execEnv={sf.execEnv}
+        contextUsage={sf.contextUsage}
+      />
+    </box>
   );
-}
-
-function AnimatedSummary({ text, tick }: { text: string; tick: number }) {
-  const chars = Array.from(text || '正在执行...');
-  const cycle = chars.length + 8;
-  const head = tick % cycle;
-  return (
-    <>
-      {chars.map((char, index) => {
-        const distance = head - index;
-        const active = head < chars.length + 4 && distance >= 0 && distance < 5;
-        return (
-          <Text key={`${index}-${char}`} color={active ? undefined : 'gray'}>
-            {char === ' ' ? '\u00A0' : char}
-          </Text>
-        );
-      })}
-    </>
-  );
-}
-
-function getRunModesForModel(model?: ModelDefinition): RunMode[] {
-  if (!model) return ['fast', 'thinking', 'deep'];
-  if (model.deep_only) return ['deep'];
-  if (model.fast_only || !model.supports_thinking) return ['fast'];
-  return ['fast', 'thinking', 'deep'];
 }

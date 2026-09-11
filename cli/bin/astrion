@@ -1,0 +1,41 @@
+#!/bin/sh
+# astrion 启动入口：优先使用 bun（opentui FFI 需要 bun>=1.3 或 node>=26.4）
+# 支持经 symlink 调用（/opt/homebrew/bin/astrion -> cli/bin/astrion）：先解析真实路径再定位 src
+
+# 解析符号链接得到脚本真实路径（macOS 无 readlink -f，手动逐级解析）
+SELF="$0"
+while [ -L "$SELF" ]; do
+  LINK_DIR="$(cd -P "$(dirname "$SELF")" >/dev/null 2>&1 && pwd)"
+  SELF="$(readlink "$SELF")"
+  case "$SELF" in
+    /*) ;;                          # 绝对路径直接用
+    *) SELF="$LINK_DIR/$SELF" ;;    # 相对路径相对链接所在目录展开
+  esac
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SELF")" >/dev/null 2>&1 && pwd)"
+
+# 快速退出分支（不启动 TUI，用于安装验证与信息查询）
+case "${1:-}" in
+  --version|-v)
+    echo "astrion 0.2.0 (opentui)"
+    exit 0
+    ;;
+  --help|-h)
+    echo "用法: astrion"
+    echo "  在当前目录启动 Astrion CLI（当前目录即工作区，未注册时会询问创建）"
+    echo "选项:"
+    echo "  -v, --version   显示版本"
+    echo "  -h, --help      显示本帮助"
+    exit 0
+    ;;
+esac
+
+ENTRY="$SCRIPT_DIR/../src/main.tsx"
+if command -v bun >/dev/null 2>&1; then
+  exec bun "$ENTRY" "$@"
+elif [ -x "$HOME/.bun/bin/bun" ]; then
+  exec "$HOME/.bun/bin/bun" "$ENTRY" "$@"
+else
+  echo "astrion: 未找到 bun 运行时（需要 bun>=1.3；https://bun.sh）" >&2
+  exit 1
+fi

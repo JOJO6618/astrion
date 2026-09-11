@@ -1,0 +1,98 @@
+// 中文文案（源语言；键名扁平 snake，新增键须同步 en-US.ts）
+export default {
+  // ── 启动流程 ──
+  'boot.connecting': '正在连接本地 Astrion 服务…',
+  'boot.connectFailed': '无法连接本地 Astrion 服务（{url}）。请先启动服务后重试。',
+  'boot.starting': '未发现运行中的服务，正在为你启动本地 Astrion 服务（首次启动需要几秒）…',
+  'boot.staleServer': '检测到服务正在运行，但其版本不支持 CLI 接入（未生成 host token）。请重启该服务后重试。',
+  'boot.startTimeout': '本地服务启动超时。请手动启动服务（python -m server.app）后重试。',
+  'boot.workspace.title': '工作区',
+  'boot.workspace.notRegistered': '当前目录还不是 Astrion 工作区：',
+  'boot.workspace.askCreate': '是否将其创建为工作区？',
+  'boot.workspace.create': '创建',
+  'boot.workspace.cancel': '取消',
+  'boot.workspace.creating': '正在创建工作区…',
+  'boot.session.creating': '正在创建会话…',
+  'boot.hint.navigate': '←→ 选择   Enter 确认   Esc 退出',
+
+  // ── 审批 ──
+  'approval.title': '工具审批',
+  'approval.hint': '←→ 选择操作   Enter 执行   Esc 关闭',
+  'approval.run': '运行',
+  'approval.reject': '拒绝',
+  'approval.unrestricted': '切换到无限制',
+  'approval.empty': '暂无待审批操作',
+  'approval.approved': '已批准并运行：',
+  'approval.rejected': '已拒绝：',
+  'approval.switched': '已切换到无限制模式并运行：',
+
+  // ── 推理强度（label 为英文档名不译，仅译默认档与描述） ──
+  'effort.default.label': '默认',
+  'effort.default.desc': '不指定强度，使用 API 默认行为',
+  'effort.low.desc': '最低推理，响应最快',
+  'effort.medium.desc': '较低推理',
+  'effort.high.desc': '均衡推理',
+  'effort.xhigh.desc': '更高推理',
+  'effort.max.desc': '最高推理，适合最复杂任务',
+  'effort.slider': '└ 推理强度',
+
+  // ── 路径授权 ──
+  'path.access.rw': '可读可写',
+  'path.access.ro': '可读',
+
+  // ── 边界四组 ──
+  'boundary.mode.title': '工作模式',
+  'boundary.mode.plan.label': '计划',
+  'boundary.mode.plan.desc': '只制定计划并讨论，批准后才动手',
+  'boundary.mode.ask.label': '询问',
+  'boundary.mode.ask.desc': '先讨论后开工，确认清楚再执行',
+  'boundary.mode.execute.label': '执行',
+  'boundary.mode.execute.desc': '自行梳理计划，直接开工',
+  'boundary.permission.title': '权限模式',
+  'boundary.permission.readonly.label': '只读',
+  'boundary.permission.readonly.desc': '只能读取，写入一律拒绝',
+  'boundary.permission.approval.label': '批准',
+  'boundary.permission.approval.desc': '写入/命令需逐次批准',
+  'boundary.permission.auto.label': '自动审核',
+  'boundary.permission.auto.desc': '审核智能体自动审批写入',
+  'boundary.permission.unrestricted.label': '无限制',
+  'boundary.permission.unrestricted.desc': '工作区内读写自由',
+  'boundary.env.title': '执行环境',
+  'boundary.env.sandbox.label': '沙箱',
+  'boundary.env.sandbox.desc': '命令在 OS 沙箱中执行',
+  'boundary.env.direct.label': '直接执行',
+  'boundary.env.direct.desc': '宿主机直接执行（高风险）',
+  'boundary.network.title': '网络权限',
+  'boundary.network.restricted.label': '受限',
+  'boundary.network.restricted.desc': '仅允许 localhost',
+  'boundary.network.full.label': '完整',
+  'boundary.network.full.desc': '允许访问外部网络',
+
+  // ── 帮助（/help 面板键位说明） ──
+  'help.slash': '命令菜单（行首或空格后输入）',
+  'help.guidance': '引导（运行中注入当前轮）',
+  'help.thinking': '展开 / 收起思考',
+  'help.replay': '重播演示',
+  'help.updown': '面板中选择',
+  'help.leftright': '强度滑块 / 路径分组切换',
+  'help.enter': '确认 / 执行',
+  'help.backspace': '删除 / 拒绝（输入框为空时）',
+  'help.esc': '逐级返回 / 关闭 / 退出',
+
+  // ── 状态栏 ──
+  'status.thinking': '思考',
+  'status.fast': '快速',
+
+  // ── 运行时（消息收发/审批） ──
+  'runtime.sendFailed': '发送失败：',
+  'runtime.decideFailed': '审批操作失败：',
+  'runtime.pollFailed': '事件轮询中断：',
+  'runtime.windowGap': '事件流出现缺口（服务瑞事件窗口溢出），已对齐最新位置续读。',
+  'runtime.stopped': '任务已停止',
+  'runtime.error': '任务出错：',
+  'approval.params': '参数',
+  'tool.run_command': '运行命令',
+  'tool.write_file': '写入文件',
+  'tool.edit_file': '编辑文件',
+  'tool.read_file': '读取文件',
+} as const;
