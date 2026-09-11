@@ -240,6 +240,27 @@ class RuntimeService:
         manager = cm._get_conversation_manager_for_id(conversation_id)
         return manager.load_conversation(conversation_id)
 
+    def get_session_token_stats(
+        self,
+        username: str,
+        workspace_id: str,
+        conversation_id: str,
+        principal: Optional[TrustedPrincipal] = None,
+    ) -> Dict[str, Any]:
+        """会话 token 统计查询（session.token_stats）。
+
+        字段由 context_manager 定义（total_input_tokens/total_output_tokens/
+        total_cached_input_tokens/cache_exempt_input_tokens/current_context_tokens 等），
+        本服务只做资源装配与转发。对话不存在或无统计时返回空 dict。
+        """
+        if not str(conversation_id or "").strip():
+            raise ValueError("runtime_context: conversation_id 不能为空")
+        terminal, _workspace = self._resources_for_query(username, workspace_id, principal)
+        cm = getattr(terminal, "context_manager", None)
+        if cm is None:
+            raise RuntimeError(tr("tasks.system_not_initialized"))
+        return cm.get_conversation_token_statistics(conversation_id) or {}
+
     def create_session(
         self,
         username: str,

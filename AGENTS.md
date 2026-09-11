@@ -111,7 +111,8 @@
 - 兼容启动方式：`python web_server.py`
 - 统一入口：`python main.py`（当前实现会默认进入 Web 启动流程）
 - **Headless 启动（CLI 自启动专用）**：`python -m server.headless_app --path <cwd> --port 8091 --thinking-mode`
-  - 只挂运行时蓝图（gateway / tasks / status / approval / usage 五件套），不含 web 站点路由面（无 /login、无静态页、无会话管理）；根路径 `/` 返回简单 HTML 告知页
+  - 只挂运行时蓝图（gateway / tasks / status / approval / usage 五件套），不含 web 站点路由面（无 /login、无静态页、无会话管理）；根路径 `/` 返回简单 HTML 告知页；非 /api/ 的 GET 路径 404 时回落告知页（对齐 SPA fallback 语义）
+  - **headless 额外挂 host 设置面**（`add_url_rule` 直接共享 chat_bp/conversation_bp/workflow_page_bp 的视图函数，URL 与 full 一致）：`/api/personalization` GET/POST、`/api/path-authorization` GET/POST、`/api/sub_agents` GET、`/api/background_commands` GET、`/api/workflows` GET、`/api/conversations/<cid>/versioning/checkpoints` GET——这些端点装饰器已双通道化（`api_login_or_host_token_required`），list 类端点支持 query 显式传 conversation_id（Bearer 装配的 terminal 无当前对话概念）
   - 与 full 形态同进程模型（RuntimeService 单例/同一数据目录/同一端口 8091），只是启动时挂的路由面不同；**绝不能与 full 形态双进程并存**（MultiAgentState/门闸/审批 Map 是进程内单例）
   - CLI（`cli/src/gateway.ts`）探测无服务时 spawn 的就是这个入口；python 解释器经依赖探测（import yaml/flask）从 .venv → homebrew 3.12/3.11 → python3 中选第一个可用的
 

@@ -36,6 +36,11 @@ function makeApi(setBlocks: React.Dispatch<React.SetStateAction<Block[]>>, getEl
   };
 
   const api: TimelineApi = {
+    reset() {
+      thinkingId = null;
+      assistantId = null;
+      setBlocks([]);
+    },
     addUser(text) {
       setBlocks((prev) => [...prev, { kind: 'user', id: idCounter++, text }]);
     },
@@ -108,6 +113,35 @@ function patchLastTool(blocks: Block[], patch: Partial<Extract<Block, { kind: 't
   return blocks;
 }
 
+/** 子智能体端点状态 → 面板状态（running/idle 直通，失败类归 error，其余终态归 terminated） */
+function mapAgentStatus(status: unknown): 'running' | 'idle' | 'terminated' | 'error' {
+  const s = String(status ?? '').toLowerCase();
+  if (s === 'running' || s === 'idle') return s;
+  if (s === 'failed' || s === 'error') return 'error';
+  return 'terminated';
+}
+
+/** 后台指令端点状态 → 面板状态（completed→done；failed/timeout/cancelled→error） */
+function mapCommandStatus(status: unknown): 'running' | 'done' | 'error' {
+  const s = String(status ?? '').toLowerCase();
+  if (s === 'completed' || s === 'done' || s === 'succeeded') return 'done';
+  if (s === 'failed' || s === 'timeout' || s === 'cancelled' || s === 'error') return 'error';
+  return 'running';
+}
+
+/** created_at（epoch 秒或 ISO）→ 运行时长粗文案（mm:ss / hh:mm） */
+function relativeElapsed(createdAt: unknown): string {
+  let ts = 0;
+  if (typeof createdAt === 'number') ts = createdAt > 1e12 ? createdAt : createdAt * 1000;
+  else ts = Date.parse(String(createdAt ?? ''));
+  if (!Number.isFinite(ts) || ts <= 0) return '';
+  const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  const mm = Math.floor(sec / 60);
+  const ss = sec % 60;
+  if (mm < 60) return `${mm}:${String(ss).padStart(2, '0')}`;
+  return `${Math.floor(mm / 60)}:${String(mm % 60).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
 export function App({ boot }: { boot: BootResult }) {
   const renderer = useRenderer();
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -148,6 +182,103 @@ export function App({ boot }: { boot: BootResult }) {
         );
       }
     },
+    onSessionLoad: (s) => {
+      void runtimeRef.current?.loadSession(s.id);
+    },
+    onContextRefresh: () => {
+      void runtimeRef.current?.refreshTokenStats();
+    },
+    onSaveModelDefaults: (v) => {
+      // patch 语义（服务端 sanitize fallback=existing）；effort 'default' = null（不指定）
+      void boot.gateway
+        .savePersonalization({
+          default_model: v.model,
+          default_run_mode: v.thinking ? 'deep' : 'fast',
+          default_reasoning_effort: v.effort === 'default' ? null : v.effort,
+        })
+        .catch((err) =>
+          apiRef.current?.addSystem(`${t('settings.saveFailed')}${err instanceof Error ? err.message : String(err)}`),
+        );
+    },
+    onSavePathAuths: (auths) => {
+      void boot.gateway
+        .savePathAuths(
+          auths.filter((a) => a.access === 'rw').map((a) => a.path),
+          auths.filter((a) => a.access === 'ro').map((a) => a.path),
+        )
+        .catch((err) =>
+          apiRef.current?.addSystem(`${t('settings.saveFailed')}${err instanceof Error ? err.message : String(err)}`),
+        );
+    },
+    onAgentsRefresh: () => {
+      const cid = runtimeRef.current?.conversationId ?? '';
+      void boot.gateway
+        .listSubAgents(cid)
+        .then((list) => {
+          menuRef.current.setAgents(
+            list.map((a: any) => ({
+              name: String(a.display_name ?? a.agent_name ?? a.task_id ?? '?'),
+              task: String(a.task ?? a.description ?? ''),
+              status: mapAgentStatus(a.status),
+              elapsed: relativeElapsed(a.created_at),
+            })),
+          );
+        })
+        .catch(() => {});
+    },
+    onTasksRefresh: () => {
+      const cid = runtimeRef.current?.conversationId ?? '';
+      void boot.gateway
+        .listBackgroundCommands(cid)
+        .then((list) => {
+          menuRef.current.setTasks(
+            list.map((c: any) => ({
+              id: String(c.command_id ?? ''),
+              command: String(c.command ?? ''),
+              status: mapCommandStatus(c.status),
+              lastLine: typeof c.return_code === 'number' ? `rc=${c.return_code}` : '',
+            })),
+          );
+        })
+        .catch(() => {});
+    },
+    onWorkflowsRefresh: () => {
+      void boot.gateway
+        .listWorkflows()
+        .then((list) => {
+          menuRef.current.setWorkflows(
+            list.map((w: any) => ({
+              name: String(w.name ?? '?'),
+              desc: String(w.description ?? w.desc ?? ''),
+              stages: Number(w.stage_count ?? w.stages ?? 0) || 0,
+            })),
+          );
+        })
+        .catch(() => {});
+    },
+    onCheckpointsRefresh: () => {
+      const cid = runtimeRef.current?.conversationId ?? '';
+      if (!cid) return;
+      void boot.gateway
+        .listCheckpoints(cid)
+        .then(({ items }) => {
+          menuRef.current.setCheckpoints(
+            items.map((c: any) => ({
+              id: String(c.seq ?? c.id ?? ''),
+              when: relativeElapsed(c.created_at ?? c.ts),
+              summary: String(c.summary ?? c.label ?? ''),
+              files: Number(c.files ?? c.file_count ?? 0) || 0,
+            })),
+          );
+        })
+        .catch(() => {});
+    },
+    onNewSession: () => {
+      // /new = web /new 页面语义：空对话草稿，不创建会话；列表全部取消 current
+      runtimeRef.current?.enterNewSession();
+      menuRef.current.setSessions((prev) => prev.map((s) => ({ ...s, current: false })));
+      apiRef.current?.addSystem(t('session.draftHint'));
+    },
   });
   const menuRef = useRef(menu);
   menuRef.current = menu;
@@ -159,6 +290,14 @@ export function App({ boot }: { boot: BootResult }) {
       onRunningChange: setRunning,
       onApprovalRequired: (a) => menuRef.current.openApproval(a),
       onSystemMessage: (text) => apiRef.current?.addSystem(text),
+      onTokenUpdate: (stats) => menuRef.current.setContextStats(stats),
+      onConversationCreated: (id) => {
+        // /new 草稿首发后：真实会话插入列表并标 current
+        menuRef.current.setSessions((prev) => [
+          { id, title: t('session.new'), when: t('time.justNow'), current: true },
+          ...prev.map((s) => ({ ...s, current: false })),
+        ]);
+      },
       tr: t,
     });
     rt.conversationId = boot.conversationId;
@@ -200,11 +339,21 @@ export function App({ boot }: { boot: BootResult }) {
     if (running || queue.length === 0) return;
     const timer = setTimeout(() => {
       const [head, ...rest] = queue;
-      if (head) void runtimeRef.current?.send(head);
+      if (head) sendWithSettings(head);
       setQueue(rest);
     }, 300);
     return () => clearTimeout(timer);
   }, [running, queue]);
+
+  // 发送统一入口：携带 /model 面板的生效值（会话级覆盖，服务端优先级最高）
+  const sendWithSettings = (text: string) => {
+    const sf = menuRef.current.statusFields;
+    void runtimeRef.current?.send(text, {
+      model_key: sf.model || undefined,
+      thinking_mode: sf.thinking,
+      run_mode: sf.thinking ? 'deep' : 'fast',
+    });
+  };
 
   // 引导：输入框有字=直接引导注入当前轮；无字=提升队首为引导
   // TODO(gateway)：接 POST /api/tasks/<id>/runtime_guidance（当前仅本地上屏，服务端注入后续接）
@@ -249,7 +398,7 @@ export function App({ boot }: { boot: BootResult }) {
     if (runningRef.current) {
       setQueue((q) => [...q, text]);
     } else {
-      void runtimeRef.current?.send(text);
+      sendWithSettings(text);
     }
   };
 

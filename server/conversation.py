@@ -71,6 +71,7 @@ from utils.conversation_manager import ConversationManager
 from utils.api_client import APIClient
 
 from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
+from .gateway_auth import api_login_or_host_token_required
 from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
 from .utils_common import (
     build_review_lines,
@@ -1307,7 +1308,7 @@ def update_conversation_versioning(conversation_id, terminal: WebTerminal, works
 
 
 @conversation_bp.route('/api/conversations/<conversation_id>/versioning/checkpoints', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def list_conversation_versioning_checkpoints(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     try:
@@ -1820,7 +1821,7 @@ def cancel_conversation_compression(conversation_id, terminal: WebTerminal, work
 
 
 @conversation_bp.route('/api/sub_agents', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def list_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """返回当前对话的子智能体任务列表。"""
@@ -1833,7 +1834,8 @@ def list_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, username: s
             manager._load_state()
         except Exception:
             pass
-        conversation_id = terminal.context_manager.current_conversation_id
+        # CLI 等 Bearer 客户端经 query 显式指定对话（其装配的 terminal 无当前对话概念）
+        conversation_id = (request.args.get("conversation_id") or "").strip() or terminal.context_manager.current_conversation_id
         data = manager.get_overview(conversation_id=conversation_id)
 
         # 传统模式子智能体列表必须排除多智能体任务，避免 /new 等无当前对话场景
@@ -2067,7 +2069,7 @@ def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWork
 
 
 @conversation_bp.route('/api/background_commands', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def list_background_commands(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """返回当前对话的后台 run_command 列表。"""
@@ -2075,7 +2077,8 @@ def list_background_commands(terminal: WebTerminal, workspace: UserWorkspace, us
     if not manager:
         return jsonify({"success": True, "data": []})
     try:
-        conversation_id = terminal.context_manager.current_conversation_id
+        # CLI 等 Bearer 客户端经 query 显式指定对话（其装配的 terminal 无当前对话概念）
+        conversation_id = (request.args.get("conversation_id") or "").strip() or terminal.context_manager.current_conversation_id
         limit_raw = request.args.get("limit", "200")
         try:
             limit_num = max(1, min(int(limit_raw), 1000))

@@ -95,4 +95,26 @@ export default {
   'tool.write_file': '写入文件',
   'tool.edit_file': '编辑文件',
   'tool.read_file': '读取文件',
+
+  // ── 会话列表 / 加载 ──
+  'session.new': '新对话',
+  'session.untitled': '未命名对话',
+  'session.draftHint': '已进入新对话（发送消息后开始）',
+  'session.loaded': '已加载对话：',
+  'session.loadFailed': '加载对话失败：',
+  'time.justNow': '刚刚',
+  'time.minutesAgo': '分钟前',
+  'time.hoursAgo': '小时前',
+  'time.daysAgo': '天前',
+
+  // ── /context 面板 ──
+  'context.title': '上下文用量   Esc 关闭',
+  'context.current': '当前上下文',
+  'context.totalInput': '累计输入　',
+  'context.totalOutput': '累计输出　',
+  'context.cacheInput': '缓存输入　',
+  'context.cacheHitRate': '缓存命中率',
+
+  // ── 设置保存 ──
+  'settings.saveFailed': '保存设置失败：',
 } as const;

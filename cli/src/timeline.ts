@@ -25,6 +25,8 @@ export type Block =
   | { kind: 'assistant'; id: number; full: string; revealStart: number; cps: number };
 
 export interface TimelineApi {
+  /** 清空全部块（/session 切换对话时用） */
+  reset(): void;
   addUser(text: string): void;
   addGuide(text: string): void;
   addSystem(text: string): void;

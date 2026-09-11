@@ -190,7 +190,8 @@ export class GatewayClient {
 
   async listSessions(limit = 20): Promise<any[]> {
     const res = await this.request<any>(`/api/runtime/sessions?limit=${limit}`, { method: 'GET' });
-    return res.data?.sessions ?? res.sessions ?? res.data?.items ?? res.items ?? [];
+    // 顶层展开风格的实际键是 conversations（8093 实测），兼容 sessions/items 包装
+    return res.data?.sessions ?? res.sessions ?? res.conversations ?? res.data?.items ?? res.items ?? [];
   }
 
   async getSessionHistory(conversationId: string): Promise<any> {
@@ -200,8 +201,72 @@ export class GatewayClient {
     return res.data ?? res.conversation ?? res;
   }
 
+  /** 会话 token 统计（/context 面板；顶层展开风格 res.stats） */
+  async getTokenStats(conversationId: string): Promise<any> {
+    const res = await this.request<any>(`/api/runtime/sessions/${encodeURIComponent(conversationId)}/token-stats`, {
+      method: 'GET',
+    });
+    return res.stats ?? res.data?.stats ?? res.data ?? {};
+  }
+
+  // ── host 全局设置（写操作；端点为 chat_bp 共享视图函数，装饰器双通道化后 Bearer 可达） ──
+
+  /** 保存个性化默认（patch 语义：服务端 sanitize fallback=existing，未传字段不动） */
+  async savePersonalization(patch: Record<string, unknown>): Promise<void> {
+    await this.request<any>('/api/personalization', { method: 'POST', body: patch });
+  }
+
+  /** 路径授权全量保存（端点语义为两组全量提交；返回服务端落定后的两组列表） */
+  async savePathAuths(writable: string[], readableExtra: string[]): Promise<{ writable: string[]; readableExtra: string[] }> {
+    const res = await this.request<any>('/api/path-authorization', {
+      method: 'POST',
+      body: { writable_paths: writable, readable_extra_paths: readableExtra },
+    });
+    return {
+      writable: res.writable_paths ?? res.data?.writable_paths ?? writable,
+      readableExtra: res.readable_extra_paths ?? res.data?.readable_extra_paths ?? readableExtra,
+    };
+  }
+
+  /** 子智能体列表（/agents 面板；conversation_id 经 query 显式指定） */
+  async listSubAgents(conversationId: string): Promise<any[]> {
+    const q = conversationId ? `?conversation_id=${encodeURIComponent(conversationId)}` : '';
+    const res = await this.request<any>(`/api/sub_agents${q}`, { method: 'GET' });
+    return res.data ?? [];
+  }
+
+  /** 后台指令列表（/tasks 面板；conversation_id 经 query 显式指定） */
+  async listBackgroundCommands(conversationId: string): Promise<any[]> {
+    const q = conversationId ? `?conversation_id=${encodeURIComponent(conversationId)}` : '';
+    const res = await this.request<any>(`/api/background_commands${q}`, { method: 'GET' });
+    return res.data ?? [];
+  }
+
+  /** 工作流库列表（/workflow 面板；注意该端点顶层展开为 {workflows}，无 success 包装） */
+  async listWorkflows(): Promise<any[]> {
+    const res = await this.request<any>('/api/workflows', { method: 'GET' });
+    return res.workflows ?? res.data?.workflows ?? [];
+  }
+
+  /** 版本回溯检查点（/rewind 面板；返回 data.items，含 enabled 标记） */
+  async listCheckpoints(conversationId: string): Promise<{ items: any[]; enabled: boolean }> {
+    const res = await this.request<any>(
+      `/api/conversations/${encodeURIComponent(conversationId)}/versioning/checkpoints`,
+      { method: 'GET' },
+    );
+    const data = res.data ?? {};
+    return { items: Array.isArray(data.items) ? data.items : [], enabled: data.enabled !== false };
+  }
+
   // ── Run（任务） ──
-  async createTask(payload: { message: string; conversation_id?: string }): Promise<{ task_id: string; conversation_id?: string }> {
+  async createTask(payload: {
+    message: string;
+    conversation_id?: string;
+    /** 会话级覆盖（/model 面板生效值）；不传则服务端用对话/个性化默认 */
+    model_key?: string;
+    run_mode?: string;
+    thinking_mode?: boolean;
+  }): Promise<{ task_id: string; conversation_id?: string }> {
     const res = await this.request<{ data: any }>('/api/tasks', { method: 'POST', body: payload });
     return res.data;
   }

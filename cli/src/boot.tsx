@@ -6,7 +6,45 @@ import { useEffect, useRef, useState } from 'react';
 import { RGBA, TextAttributes } from '@opentui/core';
 import { GatewayClient, type WorkspaceItem } from './gateway';
 import { t } from './i18n';
-import { WORKSPACE } from './data';
+import { BOOT_STATE, INITIAL_PATH_AUTHS, MODEL_OPTIONS, SESSIONS, WORKSPACE } from './data';
+import { loadCustomModels, loadPathAuths, loadPersonalizationDefaults } from './localconfig';
+
+/** ISO 时间 → 相对时间短文案（会话列表 when 列） */
+function relativeTime(iso: unknown): string {
+  const ts = Date.parse(String(iso ?? ''));
+  if (!Number.isFinite(ts)) return '';
+  const diffMin = Math.floor((Date.now() - ts) / 60000);
+  if (diffMin < 1) return t('time.justNow');
+  if (diffMin < 60) return `${diffMin} ${t('time.minutesAgo')}`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} ${t('time.hoursAgo')}`;
+  return `${Math.floor(diffHour / 24)} ${t('time.daysAgo')}`;
+}
+
+/** 启动数据加载：本地配置（模型清单/个性化默认/路径授权）+ Gateway 会话列表。
+ *  本地配置与读 token 文件同一安全语义（host 本机单人）；会话列表失败不阻塞启动。 */
+async function loadBootData(gw: GatewayClient): Promise<void> {
+  if (MODEL_OPTIONS.length === 0) MODEL_OPTIONS.push(...loadCustomModels());
+  const prefs = loadPersonalizationDefaults();
+  BOOT_STATE.model = prefs.model || MODEL_OPTIONS[0]?.name || '';
+  BOOT_STATE.thinking = prefs.thinking;
+  BOOT_STATE.effort = prefs.effort;
+  BOOT_STATE.workMode = prefs.workMode;
+  BOOT_STATE.permMode = prefs.permMode;
+  BOOT_STATE.autoDeepCompress = prefs.autoDeepCompress;
+  BOOT_STATE.deepCompressLimit = prefs.deepCompressLimit;
+  if (INITIAL_PATH_AUTHS.length === 0) INITIAL_PATH_AUTHS.push(...loadPathAuths());
+  try {
+    const list = await gw.listSessions(20);
+    for (const c of list) {
+      const id = String(c?.id ?? c?.conversation_id ?? '');
+      if (!id) continue;
+      SESSIONS.push({ id, title: String(c?.title || t('session.untitled')), when: relativeTime(c?.updated_at) });
+    }
+  } catch {
+    // 列表失败不阻塞启动（/session 面板将只显示当前新会话）
+  }
+}
 
 const FG = RGBA.defaultForeground();
 const DIM = TextAttributes.DIM;
@@ -45,7 +83,11 @@ export function BootFlow({ cwd, onReady, onExit }: { cwd: string; onReady: (r: B
     WORKSPACE.path = workspace.path;
     setStage('creating');
     try {
+      await loadBootData(gw);
       const session = await gw.createSession();
+      // 新会话置顶并标 current（menuState 初值读 SESSIONS）
+      for (const s of SESSIONS) s.current = false;
+      SESSIONS.unshift({ id: session.conversation_id, title: t('session.new'), when: t('time.justNow'), current: true });
       onReady({ gateway: gw, conversationId: session.conversation_id, workspace });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -10,24 +10,28 @@ import { panelItemCount, type BoundaryKind, type SlashMenuProps } from './menu';
 import type { ModelStep } from './panels/model';
 import { APPROVAL_ACTIONS } from './panels/approvals';
 import {
+  BOOT_STATE,
   BOUNDARY_PANELS,
-  CHECKPOINTS,
   EFFORT_LEVELS,
   EFFORT_META,
+  EMPTY_CONTEXT_STATS,
   INITIAL_AGENTS,
   INITIAL_PATH_AUTHS,
   INITIAL_TASKS,
   MODEL_OPTIONS,
   PATH_ACCESS_LABEL,
   SESSIONS,
-  WORKFLOWS,
+  formatContextUsage,
   type AgentMock,
+  type CheckpointMock,
+  type ContextStats,
   type EffortLevel,
   type PathAccess,
   type PathAuth,
   type PendingApprovalMock,
   type SessionMock,
   type TaskMock,
+  type WorkflowMock,
 } from './data';
 import type { TimelineApi } from './timeline';
 
@@ -58,6 +62,15 @@ export function useSlashMenu({
   width,
   elapsed,
   onApprovalAction,
+  onSessionLoad,
+  onContextRefresh,
+  onSaveModelDefaults,
+  onSavePathAuths,
+  onAgentsRefresh,
+  onTasksRefresh,
+  onWorkflowsRefresh,
+  onCheckpointsRefresh,
+  onNewSession,
 }: {
   textareaRef: React.RefObject<TextareaRenderable | null>;
   apiRef: React.RefObject<TimelineApi | null>;
@@ -66,24 +79,40 @@ export function useSlashMenu({
   elapsed: number;
   /** 审批裁决回调（正式版由 runtime 注入，调 Gateway decision 端点）；缺省只上屏系统消息 */
   onApprovalAction?: (action: 'run' | 'reject' | 'unrestricted', approval: PendingApprovalMock) => void;
+  /** /session Enter：加载选中对话（runtime.loadSession；缺省只上屏系统消息） */
+  onSessionLoad?: (session: SessionMock) => void;
+  /** /context 打开：触发一次 token 统计查询（gw.getTokenStats；结果经 setContextStats 回流） */
+  onContextRefresh?: () => void;
+  /** /model Enter：保存为默认（gw.savePersonalization patch）；失败由注入方上屏提示 */
+  onSaveModelDefaults?: (v: { model: string; thinking: boolean; effort: EffortLevel }) => void;
+  /** /path 增删后：全量保存两组授权（gw.savePathAuths）；失败由注入方上屏提示 */
+  onSavePathAuths?: (auths: PathAuth[]) => void;
+  /** /agents /tasks 打开：拉真实列表（gw.listSubAgents/listBackgroundCommands，结果经 setter 回流） */
+  onAgentsRefresh?: () => void;
+  onTasksRefresh?: () => void;
+  /** /workflow /rewind 打开：拉真实列表（gw.listWorkflows/listCheckpoints，结果经 setter 回流） */
+  onWorkflowsRefresh?: () => void;
+  onCheckpointsRefresh?: () => void;
+  /** /new：进入空对话草稿（runtime.enterNewSession；对齐 web /new 页面语义） */
+  onNewSession?: () => void;
 }) {
   // / 菜单：menuStack=null 关闭；['commands'] 命令层；级联 push（如 ['commands','model']）
   const [menuStack, setMenuStack] = useState<PanelKind[] | null>(null);
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
-  // /model 两级流程
-  const [model, setModel] = useState('kimi-k2.6');
-  const [pendingModel, setPendingModel] = useState('kimi-k2.6');
+  // /model 两级流程（初值 = boot 加载的真实快照 BOOT_STATE）
+  const [model, setModel] = useState(BOOT_STATE.model);
+  const [pendingModel, setPendingModel] = useState(BOOT_STATE.model);
   const [modelStep, setModelStep] = useState<ModelStep>('model');
-  const [thinking, setThinking] = useState(true);
-  const [effort, setEffort] = useState<EffortLevel>('high');
+  const [thinking, setThinking] = useState(BOOT_STATE.thinking);
+  const [effort, setEffort] = useState<EffortLevel>(BOOT_STATE.effort);
   // 面板内编辑中的强度（Enter 才提交到 effort；Esc 放弃不影响已生效值）
-  const [pendingEffort, setPendingEffort] = useState<EffortLevel>('high');
-  // 边界（value 与 mock.BOUNDARY_PANELS 对齐）
-  const [workMode, setWorkMode] = useState('ask');
-  const [permMode, setPermMode] = useState('unrestricted');
-  const [execEnv, setExecEnv] = useState('direct');
-  const [network, setNetwork] = useState('restricted');
+  const [pendingEffort, setPendingEffort] = useState<EffortLevel>(BOOT_STATE.effort);
+  // 边界（value 与 BOUNDARY_PANELS 对齐）
+  const [workMode, setWorkMode] = useState(BOOT_STATE.workMode);
+  const [permMode, setPermMode] = useState(BOOT_STATE.permMode);
+  const [execEnv, setExecEnv] = useState(BOOT_STATE.execEnv);
+  const [network, setNetwork] = useState(BOOT_STATE.network);
   // 路径授权（pathGroup = 当前显示的分组；←→ 切换显示组，不做行内权限切换）
   const [pathAuths, setPathAuths] = useState<PathAuth[]>(INITIAL_PATH_AUTHS.map((p) => ({ ...p })));
   const [pathGroup, setPathGroup] = useState<PathAccess>('rw');
@@ -94,17 +123,22 @@ export function useSlashMenu({
   const [sessions, setSessions] = useState<SessionMock[]>(SESSIONS.map((s) => ({ ...s })));
   const [pendingApproval, setPendingApproval] = useState<PendingApprovalMock | null>(null);
   const [activeWorkflow, setActiveWorkflow] = useState<string | null>(null);
+  // 上下文统计（/context 面板 + 状态栏；token_update 事件与打开时查询双源刷新）
+  const [contextStats, setContextStats] = useState<ContextStats>({ ...EMPTY_CONTEXT_STATS });
+  // 工作流库与检查点（/workflow /rewind；打开时经 API 刷新）
+  const [workflows, setWorkflows] = useState<WorkflowMock[]>([]);
+  const [checkpoints, setCheckpoints] = useState<CheckpointMock[]>([]);
 
   // useKeyboard 回调只注册一次，全部通过 ref 读最新状态，避免过期闭包
   const stateRef = useRef({
     menuStack, query, sel, model, pendingModel, modelStep, thinking, effort, pendingEffort,
     workMode, permMode, execEnv, network, pathAuths, pathGroup, agents, tasks,
-    sessions, pendingApproval, activeWorkflow,
+    sessions, pendingApproval, activeWorkflow, contextStats, workflows, checkpoints,
   });
   stateRef.current = {
     menuStack, query, sel, model, pendingModel, modelStep, thinking, effort, pendingEffort,
     workMode, permMode, execEnv, network, pathAuths, pathGroup, agents, tasks,
-    sessions, pendingApproval, activeWorkflow,
+    sessions, pendingApproval, activeWorkflow, contextStats, workflows, checkpoints,
   };
 
   const currentSessionTitle = sessions.find((s) => s.current)?.title ?? '';
@@ -129,6 +163,9 @@ export function useSlashMenu({
         pathAuths,
         pendingApproval,
         activeWorkflow,
+        contextStats,
+        workflows,
+        checkpoints,
         currentSessionTitle,
       }
     : null;
@@ -158,6 +195,9 @@ export function useSlashMenu({
       pathAuths: stateRef.current.pathAuths,
       pendingApproval: stateRef.current.pendingApproval,
       activeWorkflow: stateRef.current.activeWorkflow,
+      contextStats: stateRef.current.contextStats,
+      workflows: stateRef.current.workflows,
+      checkpoints: stateRef.current.checkpoints,
       currentSessionTitle: stateRef.current.sessions.find((s) => s.current)?.title ?? '',
     } satisfies SlashMenuProps);
 
@@ -194,7 +234,8 @@ export function useSlashMenu({
         sys('/compact  压缩上下文（CLI 尚未接入）');
         break;
       case 'new':
-        sys('已开始新对话（CLI 尚未接入）');
+        // 对齐 web /new 页面：进入空对话草稿（不立即建会话），首条消息惰性创建
+        onNewSession?.();
         break;
       default:
         sys(`/${cmd.name}  ${cmd.desc}（CLI 尚未接入）`);
@@ -219,8 +260,23 @@ export function useSlashMenu({
       case 'session':
         setSel(Math.max(0, st.sessions.findIndex((s) => s.current)));
         break;
+      case 'context':
+        // 打开时触发一次统计查询（结果经 setContextStats 回流；事件流为运行期另一源）
+        onContextRefresh?.();
+        break;
+      case 'agents':
+        onAgentsRefresh?.();
+        break;
+      case 'tasks':
+        onTasksRefresh?.();
+        break;
       case 'workflow':
-        setSel(Math.max(0, WORKFLOWS.findIndex((w) => w.name === st.activeWorkflow)));
+        onWorkflowsRefresh?.();
+        setSel(Math.max(0, st.workflows.findIndex((w) => w.name === st.activeWorkflow)));
+        break;
+      case 'rewind':
+        onCheckpointsRefresh?.();
+        setSel(0);
         break;
       case 'approvals':
         // 单条待审批：光标落在第一个操作「运行」上
@@ -262,8 +318,8 @@ export function useSlashMenu({
     if (top === 'session') {
       const s = st.sessions[st.sel];
       if (s && !s.current) {
-        setSessions((prev) => prev.map((x) => ({ ...x, current: x.title === s.title })));
-        sys(`已切换到对话「${s.title}」（CLI 尚未接入）`);
+        setSessions((prev) => prev.map((x) => ({ ...x, current: x.id === s.id })));
+        onSessionLoad?.(s);
       }
       closeMenu({ clearText: true });
       return;
@@ -332,7 +388,7 @@ export function useSlashMenu({
     }
 
     if (top === 'workflow') {
-      const w = WORKFLOWS[st.sel];
+      const w = st.workflows[st.sel];
       if (!w) return;
       if (st.activeWorkflow === w.name) {
         setActiveWorkflow(null);
@@ -346,7 +402,7 @@ export function useSlashMenu({
     }
 
     if (top === 'rewind') {
-      const c = CHECKPOINTS[st.sel];
+      const c = st.checkpoints[st.sel];
       if (c) sys(`已回溯到检查点「${c.summary}」（${c.when}；CLI 尚未接入）`);
       closeMenu({ clearText: true });
       return;
@@ -376,6 +432,8 @@ export function useSlashMenu({
       setThinking(toThinking);
       setEffort(st.pendingEffort);
       if (before !== after) sys(`已切换：${before} → ${after}`);
+      // 同步保存为个性化默认（影响新对话；当前会话经 createTask 覆盖参数即时生效）
+      onSaveModelDefaults?.({ model: st.pendingModel, thinking: toThinking, effort: st.pendingEffort });
       closeMenu({ clearText: true });
       return;
     }
@@ -402,10 +460,12 @@ export function useSlashMenu({
       const text = (textareaRef.current?.plainText ?? '').trim();
       if (text) {
         const access = st.pathGroup;
-        setPathAuths((prev) => [...prev, { path: text, access }]);
+        const next = [...st.pathAuths, { path: text, access }];
+        setPathAuths(next);
         setInputText('');
         setSel(st.pathAuths.filter((p) => p.access === access).length); // 选中新添加的行
         sys(`已添加路径授权：${text}（${PATH_ACCESS_LABEL[access]}）`);
+        onSavePathAuths?.(next);
       }
       return;
     }
@@ -530,8 +590,10 @@ export function useSlashMenu({
         key.preventDefault();
         // sel 是组内下标，换算成全量数组下标再删
         const target = groupRows[st.sel];
-        setPathAuths((prev) => prev.filter((p) => p !== target));
+        const next = st.pathAuths.filter((p) => p !== target);
+        setPathAuths(next);
         setSel((s) => Math.max(0, Math.min(s, groupRows.length - 2)));
+        onSavePathAuths?.(next);
         return true;
       }
       return false;
@@ -609,7 +671,7 @@ export function useSlashMenu({
     workMode: BOUNDARY_PANELS.mode.options.find((o) => o.value === workMode)?.label ?? workMode,
     permMode: BOUNDARY_PANELS.permission.options.find((o) => o.value === permMode)?.label ?? permMode,
     execEnv: BOUNDARY_PANELS.env.options.find((o) => o.value === execEnv)?.label ?? execEnv,
-    contextUsage: '—',
+    contextUsage: formatContextUsage(contextStats, model),
   };
 
   return {
@@ -621,5 +683,11 @@ export function useSlashMenu({
     closeMenu,
     openApproval,
     resetMenu,
+    setContextStats,
+    setAgents,
+    setTasks,
+    setWorkflows,
+    setCheckpoints,
+    setSessions,
   };
 }

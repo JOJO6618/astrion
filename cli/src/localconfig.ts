@@ -30,7 +30,7 @@ function resolveDeployConfig(name: string): any | null {
   return null;
 }
 
-/** 模型清单（custom_models.json；visible=false 的条目不上架） */
+/** 模型清单（custom_models.json；visible=false 的条目不上架；context_window 透传供上下文百分比） */
 export function loadCustomModels(): ModelOption[] {
   const cfg = resolveDeployConfig('custom_models.json');
   const items = Array.isArray(cfg?.models) ? cfg.models : [];
@@ -39,6 +39,7 @@ export function loadCustomModels(): ModelOption[] {
     .map((m: any) => ({
       name: String(m.model_name),
       meta: String(m.model_description || m.description || ''),
+      contextWindow: typeof m.context_window === 'number' && m.context_window > 0 ? m.context_window : null,
     }));
 }
 
@@ -50,14 +51,18 @@ export interface BootPreferences {
   effort: EffortLevel;
   workMode: string;
   permMode: string;
+  /** 自动深度压缩开关与触发阈值（上下文百分比分母，对齐 web 端算法） */
+  autoDeepCompress: boolean;
+  deepCompressLimit: number;
 }
 
 const EFFORT_VALUES: EffortLevel[] = ['default', 'low', 'medium', 'high', 'xhigh', 'max'];
 
-/** 个性化默认（personalization.json：默认模型/运行模式/推理强度/工作模式/权限模式） */
+/** 个性化默认（personalization.json：默认模型/运行模式/推理强度/工作模式/权限模式/压缩设置） */
 export function loadPersonalizationDefaults(): BootPreferences {
   const p = readJson(resolve(HOST_DATA_DIR, 'personalization.json')) ?? {};
   const effortRaw = String(p.default_reasoning_effort ?? 'default');
+  const limitRaw = Number(p.deep_compress_trigger_tokens);
   return {
     model: String(p.default_model ?? ''),
     runMode: String(p.default_run_mode ?? 'fast'),
@@ -65,6 +70,8 @@ export function loadPersonalizationDefaults(): BootPreferences {
     effort: (EFFORT_VALUES as string[]).includes(effortRaw) ? (effortRaw as EffortLevel) : 'default',
     workMode: String(p.default_work_mode ?? 'ask'),
     permMode: String(p.default_permission_mode ?? 'unrestricted'),
+    autoDeepCompress: !!p.auto_deep_compress_enabled,
+    deepCompressLimit: Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 150000,
   };
 }
 

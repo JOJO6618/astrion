@@ -45,6 +45,7 @@ from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
+from server.gateway_auth import api_login_or_host_token_required
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker, get_user_resources
 from server.security import rate_limited
 from server.utils_common import debug_log
@@ -489,7 +490,7 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
     })
 
 @chat_bp.route('/api/path-authorization', methods=['GET'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def get_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
@@ -506,7 +507,7 @@ def get_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, user
     })
 
 @chat_bp.route('/api/path-authorization', methods=['POST'])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 @rate_limited("path_authorization_update", 20, 60, scope="user")
 def update_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, username: str):

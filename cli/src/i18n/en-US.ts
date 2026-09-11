@@ -95,4 +95,26 @@ export default {
   'tool.write_file': 'Write file',
   'tool.edit_file': 'Edit file',
   'tool.read_file': 'Read file',
+
+  // ── Session list / loading ──
+  'session.new': 'New chat',
+  'session.untitled': 'Untitled chat',
+  'session.draftHint': 'New chat draft (starts on first message)',
+  'session.loaded': 'Loaded conversation: ',
+  'session.loadFailed': 'Failed to load conversation: ',
+  'time.justNow': 'just now',
+  'time.minutesAgo': 'm ago',
+  'time.hoursAgo': 'h ago',
+  'time.daysAgo': 'd ago',
+
+  // ── /context panel ──
+  'context.title': 'Context usage   Esc to close',
+  'context.current': 'Current ',
+  'context.totalInput': 'Input   ',
+  'context.totalOutput': 'Output  ',
+  'context.cacheInput': 'Cached  ',
+  'context.cacheHitRate': 'Hit rate',
+
+  // ── Settings persistence ──
+  'settings.saveFailed': 'Failed to save settings: ',
 } as const;

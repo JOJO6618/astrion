@@ -108,4 +108,24 @@ def get_runtime_session_history(conversation_id: str):
     return jsonify({"success": True, "conversation": result})
 
 
+@gateway_bp.route("/api/runtime/sessions/<conversation_id>/token-stats", methods=["GET"])
+@api_login_or_host_token_required
+def get_runtime_session_token_stats(conversation_id: str):
+    """session.token_stats：会话 token 统计（累计输入/输出/缓存/当前上下文）。"""
+    workspace_id = _resolve_workspace_id(request.args.get("workspace_id", ""))
+    username = str(session.get("username") or "")
+    principal = principal_from_session_snapshot(dict(session), workspace_id, username)
+    try:
+        stats = runtime_service.get_session_token_stats(
+            username, workspace_id, conversation_id, principal
+        )
+        return jsonify({"success": True, "stats": stats})
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+
+
 __all__ = ["gateway_bp"]

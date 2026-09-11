@@ -27,7 +27,7 @@ import secrets
 from datetime import timedelta
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, jsonify, request
 
 from config import (
     DEFAULT_PROJECT_PATH,
@@ -151,9 +151,47 @@ def create_headless_app() -> Flask:
     for _name, bp in HEADLESS_BLUEPRINTS:
         app.register_blueprint(bp)
 
+    # host 全局设置面（personalization / path-authorization）：视图函数定义在 chat_bp 模块内，
+    # 装饰器已双通道化（web session 或 host Bearer 均可）；此处直接注册到 headless app，
+    # URL 与 full 形态一致（Blueprint.route 只登记不包装，函数对象可安全复用）。
+    from server.chat.settings import (
+        get_personalization_settings,
+        update_personalization_settings,
+    )
+    from server.chat.permission import (
+        get_path_authorization,
+        update_path_authorization,
+    )
+    from server.conversation import list_background_commands, list_sub_agents, list_conversation_versioning_checkpoints
+    from server.workflow_page import api_list_workflows
+
+    app.add_url_rule('/api/personalization', view_func=get_personalization_settings, methods=['GET'])
+    app.add_url_rule('/api/personalization', view_func=update_personalization_settings, methods=['POST'])
+    app.add_url_rule('/api/path-authorization', view_func=get_path_authorization, methods=['GET'])
+    app.add_url_rule('/api/path-authorization', view_func=update_path_authorization, methods=['POST'])
+    # 子智能体/后台指令列表（/agents /tasks 面板数据源；conversation_id 走 query 显式指定）
+    app.add_url_rule('/api/sub_agents', view_func=list_sub_agents, methods=['GET'])
+    app.add_url_rule('/api/background_commands', view_func=list_background_commands, methods=['GET'])
+    # 工作流库列表（/workflow）与版本回溯检查点（/rewind）
+    app.add_url_rule('/api/workflows', view_func=api_list_workflows, methods=['GET'])
+    app.add_url_rule(
+        '/api/conversations/<conversation_id>/versioning/checkpoints',
+        view_func=list_conversation_versioning_checkpoints,
+        methods=['GET'],
+    )
+
     @app.route('/')
     def headless_landing():
         return _HEADLESS_LANDING_HTML
+
+    @app.errorhandler(404)
+    def headless_not_found(_err):
+        # 非 API 的 GET 路径（/new、/<conv_id> 等前端路由）统一回落告知页——
+        # 对齐 full 形态的 SPA fallback 行为，避免浏览器打开收藏链接看到裸 404；
+        # API 路径保持 JSON 404。
+        if request.method == 'GET' and not request.path.startswith('/api/'):
+            return _HEADLESS_LANDING_HTML
+        return jsonify({"success": False, "error": "not found"}), 404
 
     return app
 

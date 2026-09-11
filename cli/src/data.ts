@@ -26,6 +26,9 @@ export const BOOT_STATE = {
   execEnv: 'direct',
   network: 'restricted',
   contextUsage: '—',
+  /** 自动深度压缩开关与触发阈值（上下文百分比分母，对齐 web InputComposer 算法） */
+  autoDeepCompress: false,
+  deepCompressLimit: 150000,
 };
 
 // ── 工作区（/session 面板顶部展示；boot 确定后写入） ──
@@ -36,10 +39,12 @@ export interface WorkspaceInfo {
 }
 export const WORKSPACE: WorkspaceInfo = { id: '', name: '', path: '' };
 
-// ── 模型（boot 从 /api/v1/models 加载后填充） ──
+// ── 模型（boot 从本地 custom_models.json 加载后填充） ──
 export interface ModelOption {
   name: string;
   meta: string;
+  /** 上下文窗口上限（token；配置缺省为 null，百分比显示回退压缩阈值） */
+  contextWindow: number | null;
 }
 export const MODEL_OPTIONS: ModelOption[] = [];
 
@@ -77,25 +82,48 @@ export interface PathAuth {
 export const PATH_ACCESS_LABEL: Record<PathAccess, string> = { rw: t('path.access.rw'), ro: t('path.access.ro') };
 export const INITIAL_PATH_AUTHS: PathAuth[] = [];
 
-// ── 上下文统计（/context 面板；后续接会话 token 统计端点） ──
+// ── 上下文统计（/context 面板与状态栏共用；token_update 事件/查询端点刷新，数字型原始值） ──
 export interface ContextStats {
-  used: string;
-  total: string;
-  percent: number;
-  totalInput: string;
-  totalOutput: string;
-  cacheInput: string;
-  cacheHitRate: string;
+  currentTokens: number;
+  totalInput: number;
+  totalOutput: number;
+  cacheInput: number;
+  cacheExemptInput: number;
 }
-export const CONTEXT_STATS: ContextStats = {
-  used: '—',
-  total: '—',
-  percent: 0,
-  totalInput: '—',
-  totalOutput: '—',
-  cacheInput: '—',
-  cacheHitRate: '—',
+export const EMPTY_CONTEXT_STATS: ContextStats = {
+  currentTokens: 0,
+  totalInput: 0,
+  totalOutput: 0,
+  cacheInput: 0,
+  cacheExemptInput: 0,
 };
+
+/** token 数紧凑格式（对齐 web InputComposer：≥1000 转 k，<100k 保留一位小数） */
+export function formatCompactTokens(value: number): string {
+  const n = Math.max(0, Math.round(value || 0));
+  if (n >= 1000) {
+    const raw = n / 1000;
+    const text = raw >= 100 ? String(Math.round(raw)) : raw.toFixed(1).replace(/\.0$/, '');
+    return `${text}k`;
+  }
+  return String(n);
+}
+
+/** 上下文百分比分母（对齐 web：开自动深度压缩用触发阈值，否则模型上下文窗口） */
+export function contextUsageLimitFor(modelName: string): number {
+  if (BOOT_STATE.autoDeepCompress) return BOOT_STATE.deepCompressLimit;
+  const m = MODEL_OPTIONS.find((o) => o.name === modelName);
+  return m?.contextWindow ?? 0;
+}
+
+/** 状态栏上下文用量文案：`45% 90.2k/200k`（limit 未知时 `90.2k/—`） */
+export function formatContextUsage(stats: ContextStats, modelName: string): string {
+  const cur = formatCompactTokens(stats.currentTokens);
+  const limit = contextUsageLimitFor(modelName);
+  if (limit <= 0) return `${cur}/—`;
+  const pct = Math.max(0, Math.min(100, Math.round((stats.currentTokens / limit) * 100)));
+  return `${pct}% ${cur}/${formatCompactTokens(limit)}`;
+}
 
 // ── 边界四选项（/mode /permission /env /network 共用 Selector 面板；切换后调对应 API） ──
 export interface BoundaryOption {

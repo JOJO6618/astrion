@@ -15,6 +15,7 @@ from modules.workflow_manager import (
     save_workflow,
 )
 from server.auth_helpers import api_login_required, login_required
+from server.gateway_auth import api_login_or_host_token_required
 from server.context import with_terminal
 from modules.i18n import tr
 
@@ -39,7 +40,7 @@ def workflow_editor_page(name: str):
 
 
 @workflow_page_bp.route("/api/workflows", methods=["GET"])
-@api_login_required
+@api_login_or_host_token_required
 @with_terminal
 def api_list_workflows(terminal, workspace, username):
     """工作流列表（内置 + 用户库双源合并，仅元信息）。"""

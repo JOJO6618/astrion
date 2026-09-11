@@ -20,15 +20,16 @@ import { padEndWidth } from './width';
 import {
   BOUNDARY_PANELS,
   MODEL_OPTIONS,
-  WORKFLOWS,
-  CHECKPOINTS,
   type AgentMock,
+  type CheckpointMock,
+  type ContextStats,
   type EffortLevel,
   type PathAccess,
   type PathAuth,
   type PendingApprovalMock,
   type SessionMock,
   type TaskMock,
+  type WorkflowMock,
 } from './data';
 
 const FG = RGBA.defaultForeground();
@@ -63,6 +64,12 @@ export interface SlashMenuProps {
   pathAuths: PathAuth[];
   pendingApproval: PendingApprovalMock | null;
   activeWorkflow: string | null;
+  /** 上下文统计（/context 面板；token_update 事件与打开时查询双源刷新） */
+  contextStats: ContextStats;
+  /** 工作流库（/workflow；打开时经 API 刷新） */
+  workflows: WorkflowMock[];
+  /** 版本回溯检查点（/rewind；打开时经 API 刷新） */
+  checkpoints: CheckpointMock[];
   /** 当前对话标题（/rename /delete /export 面板显示用） */
   currentSessionTitle: string;
 }
@@ -164,7 +171,7 @@ export function SlashMenu(props: SlashMenuProps) {
     case 'path':
       return <PathsPanel sel={props.sel} width={props.width} pathAuths={props.pathAuths} group={props.pathGroup} />;
     case 'context':
-      return <ContextPanel width={props.width} />;
+      return <ContextPanel width={props.width} stats={props.contextStats} model={props.model} />;
     case 'rename':
       return <InputPanel title="重命名对话" hint={`当前  ${props.currentSessionTitle}`} width={props.width} />;
     case 'export':
@@ -176,9 +183,9 @@ export function SlashMenu(props: SlashMenuProps) {
     case 'approvals':
       return <ApprovalsPanel sel={props.sel} width={props.width} pending={props.pendingApproval} />;
     case 'workflow':
-      return <WorkflowPanel sel={props.sel} width={props.width} workflows={WORKFLOWS} active={props.activeWorkflow} />;
+      return <WorkflowPanel sel={props.sel} width={props.width} workflows={props.workflows} active={props.activeWorkflow} />;
     case 'rewind':
-      return <RewindPanel sel={props.sel} width={props.width} checkpoints={CHECKPOINTS} />;
+      return <RewindPanel sel={props.sel} width={props.width} checkpoints={props.checkpoints} />;
     case 'help':
       return <HelpPanel sel={props.sel} width={props.width} />;
     case 'agents':
@@ -212,9 +219,9 @@ export function panelItemCount(props: SlashMenuProps): number {
     case 'approvals':
       return 0; // 单条待审批，无 ↑↓ 列表；←→ 选择操作
     case 'workflow':
-      return WORKFLOWS.length;
+      return props.workflows.length;
     case 'rewind':
-      return CHECKPOINTS.length;
+      return props.checkpoints.length;
     case 'help':
       return helpMaxOffset() + 1; // sel 在此面板作为滚动偏移
     case 'context':
