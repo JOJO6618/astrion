@@ -47,6 +47,7 @@ export async function mounted() {
   const initialDataPromise = this.loadInitialData();
   this.startProjectGitSummaryIdleRefresh?.();
   this.startConnectionHeartbeat();
+  this.startStatusIdleRefresh?.();
   this.fetchTerminalCount();
   this.startTerminalCountIdleRefresh();
   this.checkTutorialPrompt();
@@ -123,6 +124,7 @@ export function beforeUnmount() {
   this.teardownMobileViewportWatcher();
   this.stopProjectGitSummaryIdleRefresh?.();
   this.stopTerminalCountIdleRefresh?.();
+  this.stopStatusIdleRefresh?.();
   this.resourceStopContainerStatsPolling();
   this.resourceStopProjectStoragePolling();
   this.resourceStopUsageQuotaPolling();

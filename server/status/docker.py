@@ -18,7 +18,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file, session
 
 from server.auth_helpers import api_login_required, resolve_admin_policy
-from server.context import with_terminal, attach_user_broadcast
+from server.context import with_terminal
 from server.state import (
     PROJECT_STORAGE_CACHE,
     PROJECT_STORAGE_CACHE_TTL_SECONDS,
@@ -141,12 +141,6 @@ def select_docker_project():
     except RuntimeError as exc:
         session["workspace_id"] = previous_workspace_id
         return jsonify({"success": False, "error": str(exc)}), 503
-    terminal = state.user_terminals.get(f"{username}::{session['workspace_id']}")
-    if terminal:
-        try:
-            attach_user_broadcast(terminal, username)
-        except Exception:
-            pass
     default_workspace_id = user_manager._get_user_default_workspace_id(username)
     return jsonify({
         "success": True,

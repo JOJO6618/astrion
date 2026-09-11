@@ -37,7 +37,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { Terminal } from 'xterm';
-import { io as createSocketClient } from 'socket.io-client';
 import 'xterm/css/xterm.css';
 import CloseButton from '@/components/common/CloseButton.vue';
 
@@ -53,32 +52,21 @@ const emit = defineEmits<{
   (event: 'close'): void;
 }>();
 
-// ---- 本地状态（自建 socket，不依赖父组件） ----
+// ---- 本地状态（REST 轮询驱动，不依赖父组件） ----
 const sessions = ref<Record<string, { working_dir?: string; shell?: string }>>({});
 const activeSession = ref('');
 const sessionLogs = ref<Record<string, string>>({});
 const sessionHydrated = ref<Record<string, boolean>>({});
-
-let socket: ReturnType<typeof createSocketClient> | null = null;
 
 const terminalContainer = ref<HTMLElement | null>(null);
 let term: Terminal | null = null;
 let themeObserver: MutationObserver | null = null;
 let resizeObserver: ResizeObserver | null = null;
 const _historyReady = ref<Record<string, boolean>>({});
-// 历史加载完成后记录最后一条事件的时间戳，用于去重刷新后回放的旧 terminal_output 事件
-const _historyLastEventTime = ref<Record<string, number>>({});
+let listPollTimer: number | null = null;
+let outputPollTimer: number | null = null;
 
 const sessionKeys = computed(() => Object.keys(sessions.value));
-
-// 对话级隔离：广播类终端事件（started/list_update/output/input/closed/reset/switched）
-// 由后端注入 conversation_id，仅处理当前对话的事件；
-// 响应类事件（terminal_subscribed / *_history）是请求的直接回应，无此字段，不过滤。
-function acceptTerminalBroadcast(data: any): boolean {
-  const cid = data?.conversation_id;
-  if (!cid || !props.conversationId) return false;
-  return cid === props.conversationId;
-}
 
 // ---- 主题适配 ----
 function getCurrentTheme(): 'light' | 'dark' {
@@ -217,13 +205,9 @@ function switchToSession(name: string) {
   activeSession.value = name;
   if (!sessionHydrated.value[name]) {
     _historyReady.value = { ..._historyReady.value, [name]: false };
-    const updatedTimes = { ..._historyLastEventTime.value };
-    delete updatedTimes[name];
-    _historyLastEventTime.value = updatedTimes;
-    if (socket?.connected) {
-      socket.emit('get_terminal_output', { session: name, lines: 0, conversation_id: props.conversationId });
-    }
   }
+  // 切到新会话立即拉一次输出（不等下一轮轮询）
+  void fetchActiveOutput();
   // renderSessionLog 由 watch(activeSession) 统一触发，此处不重复调用
 }
 
@@ -238,221 +222,121 @@ watch(sessionKeys, (keys) => {
   }
 });
 
-// 工作区切换时重连
+// 工作区/对话切换时重置状态并重新拉取（对话级 terminal：各对话 shell 互相独立）
+function resetPanelState() {
+  sessions.value = {};
+  activeSession.value = '';
+  sessionLogs.value = {};
+  sessionHydrated.value = {};
+  _historyReady.value = {};
+  if (term) term.clear();
+}
+
 watch(() => props.workspaceId, (newId, oldId) => {
   if (newId && oldId && newId !== oldId) {
-    // 断开旧连接，清空状态，重新连接
-    if (socket) {
-      socket.disconnect();
-      socket = null;
-    }
-    sessions.value = {};
-    activeSession.value = '';
-    sessionLogs.value = {};
-    sessionHydrated.value = {};
-    _historyReady.value = {};
-    _historyLastEventTime.value = {};
-    if (term) term.clear();
-    initSocket();
+    resetPanelState();
+    void fetchTerminalList();
   }
 });
 
-// 对话切换时重置并重新订阅（对话级 terminal：各对话 shell 互相独立）
 watch(() => props.conversationId, (newId, oldId) => {
   if (newId !== oldId) {
-    sessions.value = {};
-    activeSession.value = '';
-    sessionLogs.value = {};
-    sessionHydrated.value = {};
-    _historyReady.value = {};
-    _historyLastEventTime.value = {};
-    if (term) term.clear();
-    if (socket?.connected) {
-      socket.emit('terminal_subscribe', { all: true, conversation_id: newId });
-    }
+    resetPanelState();
+    void fetchTerminalList();
   }
 });
 
-// ---- socket 初始化 ----
-async function initSocket() {
-
-  socket = createSocketClient('/', {
-    transports: ['websocket', 'polling'],
-    autoConnect: false
-  });
-
-  const assignToken = async (): Promise<boolean> => {
-    const w = window as any;
-    if (typeof w.requestSocketToken !== 'function') {
-      console.warn('[TerminalPanel] requestSocketToken 不可用');
-      return false;
+// ---- REST 轮询（替代原 WebSocket 订阅与事件推送） ----
+async function fetchTerminalList() {
+  try {
+    const cid = encodeURIComponent(props.conversationId || '');
+    const res = await fetch(`/api/terminals?conversation_id=${cid}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = Array.isArray(data?.sessions) ? data.sessions : [];
+    const map: Record<string, { working_dir?: string; shell?: string }> = {};
+    for (const t of list) {
+      const name = t.session_name || t.name || t.session || t.id;
+      if (name) map[name] = { working_dir: t.working_dir, shell: t.shell || 'bash' };
     }
-    try {
-      const token = await w.requestSocketToken();
-      (socket as any).auth = { socket_token: token };
-      return true;
-    } catch (e) {
-      console.error('[TerminalPanel] 获取 token 失败:', e);
-      return false;
+    sessions.value = map;
+    const keys = Object.keys(map);
+    if (keys.length === 0) {
+      activeSession.value = '';
+    } else if (!activeSession.value || !map[activeSession.value]) {
+      // 新终端出现 / 当前终端被关闭：自动切换
+      switchToSession(keys[0]);
     }
-  };
-
-  socket.io.on('reconnect_attempt', () => assignToken());
-
-  const ready = await assignToken();
-  if (!ready) {
-    console.error('[TerminalPanel] token 获取失败，放弃 socket');
-    socket = null;
-    return;
+  } catch {
+    // 断线判定由全局连接心跳负责，轮询静默失败
   }
+}
 
-  socket.on('connect', () => {
-    socket!.emit('terminal_subscribe', { all: true, conversation_id: props.conversationId });
-  });
+async function fetchActiveOutput() {
+  const s = activeSession.value;
+  if (!s) return;
+  try {
+    const cid = encodeURIComponent(props.conversationId || '');
+    const res = await fetch(
+      `/api/terminals/${encodeURIComponent(s)}/output?lines=1000&conversation_id=${cid}`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.success) return;
+    const output = typeof data.output === 'string' ? data.output : '';
+    applyOutputSnapshot(s, output);
+  } catch {
+    // 静默失败，下一轮重试
+  }
+}
 
-  socket.on('disconnect', () => {
-  });
+// 快照驱动渲染：输出是纯追加时只写增量（避免闪烁）；
+// reset/截断/窗口滚动导致前缀不匹配时全量重绘。
+function applyOutputSnapshot(session: string, output: string) {
+  const prev = sessionLogs.value[session] || '';
+  sessionHydrated.value = { ...sessionHydrated.value, [session]: true };
+  _historyReady.value = { ..._historyReady.value, [session]: true };
+  if (output === prev) return;
+  if (prev && output.startsWith(prev)) {
+    const delta = output.slice(prev.length);
+    sessionLogs.value[session] = output;
+    if (session === activeSession.value) appendToTerm(delta);
+  } else {
+    sessionLogs.value[session] = output;
+    if (session === activeSession.value) renderSessionLog();
+  }
+}
 
-  socket.on('terminal_subscribed', (data: any) => {
-    if (data?.terminals) {
-      const map: Record<string, { working_dir?: string; shell?: string }> = {};
-      for (const t of data.terminals) {
-        map[t.name] = { working_dir: t.working_dir, shell: 'bash' };
-      }
-      sessions.value = map;
-      if (data.terminals.length > 0 && !activeSession.value) {
-        switchToSession(data.terminals[0].name);
-      }
-    }
-  });
+function startPolling() {
+  stopPolling();
+  void fetchTerminalList();
+  listPollTimer = window.setInterval(() => void fetchTerminalList(), 5000);
+  outputPollTimer = window.setInterval(() => void fetchActiveOutput(), 1500);
+}
 
-  socket.on('terminal_started', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    sessions.value = {
-      ...sessions.value,
-      [data.session]: { working_dir: data.working_dir, shell: 'bash' }
-    };
-    if (!activeSession.value) switchToSession(data.session);
-  });
-
-  socket.on('terminal_list_update', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    if (data?.terminals) {
-      const map: Record<string, { working_dir?: string; shell?: string }> = {};
-      for (const t of data.terminals) {
-        map[t.name] = { working_dir: t.working_dir, shell: 'bash' };
-      }
-      sessions.value = map;
-      if (data.active && !activeSession.value) switchToSession(data.active);
-    }
-  });
-
-  socket.on('terminal_output', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    const s = data.session;
-    if (!s) return;
-    const delta = (data.data || '') as string;
-
-    // 去重：刷新页面后后端会回放历史快照（terminal_output_history）
-    // 同时可能回放最近的 terminal_output 事件，导致已有内容被重复写入。
-    // 用历史快照的 last_event_time 作为截止线，跳过更早的事件。
-    const historyTime = _historyLastEventTime.value[s] || 0;
-    const eventTime = typeof data.timestamp === 'number' ? data.timestamp : 0;
-    if (historyTime > 0 && eventTime > 0 && eventTime <= historyTime) {
-      return;
-    }
-
-    // 先把输出暂存到 sessionLogs；历史加载完成后再写入终端，
-    // 避免新终端历史为空时 _historyReady 始终为 false 导致永远写不进去。
-    sessionLogs.value[s] = (sessionLogs.value[s] || '') + delta;
-    if (s === activeSession.value && term && _historyReady.value[s]) {
-      term.write(delta);
-    } else {
-    }
-    if (!activeSession.value) switchToSession(s);
-  });
-
-  socket.on('terminal_input', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    // 原样显示后端输出，此处不重复写入
-    // 仅用于新终端自动切换
-    if (!activeSession.value && data.session) switchToSession(data.session);
-  });
-
-  socket.on('terminal_closed', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    const updated = { ...sessions.value };
-    delete updated[data.session];
-    sessions.value = updated;
-    const remaining = Object.keys(updated);
-    if (activeSession.value === data.session) {
-      activeSession.value = remaining.length > 0 ? remaining[0] : '';
-    }
-  });
-
-  socket.on('terminal_reset', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    const target = data.session || activeSession.value;
-    if (target) {
-      sessionLogs.value = { ...sessionLogs.value, [target]: '' };
-      sessionHydrated.value = { ...sessionHydrated.value, [target]: true };
-      const updatedTimes = { ..._historyLastEventTime.value };
-      delete updatedTimes[target];
-      _historyLastEventTime.value = updatedTimes;
-      if (target === activeSession.value) renderSessionLog();
-    }
-  });
-
-  socket.on('terminal_switched', (data: any) => {
-    if (!acceptTerminalBroadcast(data)) return;
-    if (data.current) switchToSession(data.current);
-  });
-
-  const handleHistory = (data: any) => {
-    const s = data.session || data.active;
-    if (!s) return;
-    const raw = data.output || data.data || '';
-    let payload = '';
-    if (typeof raw === 'string') {
-      payload = raw;
-    } else if (Array.isArray(raw)) {
-      payload = raw.join('\n');
-    }
-    if (payload) {
-      sessionLogs.value[s] = payload;
-    }
-    // 无论历史是否为空，都要标记加载完成；否则新建终端在收到第一条输出前
-    // _historyReady 一直为 false，所有实时输出都会被跳过，终端 seemingly 卡住。
-    sessionHydrated.value = { ...sessionHydrated.value, [s]: true };
-    _historyReady.value = { ..._historyReady.value, [s]: true };
-    // 记录历史快照最后一条事件的时间戳，用于后续 terminal_output 去重
-    const lastEventTime = typeof data.last_event_time === 'number' ? data.last_event_time : 0;
-    _historyLastEventTime.value = { ..._historyLastEventTime.value, [s]: lastEventTime };
-    if (s === activeSession.value) {
-      renderSessionLog();
-    }
-  };
-
-  socket.on('terminal_output_history', handleHistory);
-  socket.on('terminal_history', handleHistory);
-
-  socket.connect();
+function stopPolling() {
+  if (listPollTimer !== null) {
+    window.clearInterval(listPollTimer);
+    listPollTimer = null;
+  }
+  if (outputPollTimer !== null) {
+    window.clearInterval(outputPollTimer);
+    outputPollTimer = null;
+  }
 }
 
 // ---- 生命周期 ----
 onMounted(() => {
   nextTick(() => {
     initTerminal();
-    initSocket();
+    startPolling();
   });
 });
 
 onBeforeUnmount(() => {
+  stopPolling();
   disposeTerminal();
-  if (socket) {
-    socket.disconnect();
-    socket = null;
-  }
 });
 </script>
 

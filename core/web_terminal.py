@@ -687,7 +687,7 @@ class WebTerminal(MainTerminal):
         return "思考模式" if self.thinking_mode else "快速模式"
     
     def broadcast(self, event_type: str, data: Dict):
-        """广播事件到WebSocket"""
+        """经 message_callback 推送事件（Socket.IO 已移除，回调恒为 None 时 no-op）"""
         if self.message_callback:
             payload = dict(data or {})
             payload.setdefault('conversation_id', self.context_manager.current_conversation_id)

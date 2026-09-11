@@ -13,7 +13,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file, session
 
 from server.auth_helpers import api_login_required, resolve_admin_policy
-from server.context import with_terminal, attach_user_broadcast
+from server.context import with_terminal
 from server.state import (
     PROJECT_STORAGE_CACHE,
     PROJECT_STORAGE_CACHE_TTL_SECONDS,

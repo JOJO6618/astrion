@@ -49,9 +49,6 @@ export const panelMethods = {
   },
   toggleTerminalPanel() {
     this.terminalPanelOpen = !this.terminalPanelOpen;
-    if (this.terminalPanelOpen) {
-      this.subscribeTerminalEvents();
-    }
   },
   closeTerminalPanel() {
     this.terminalPanelOpen = false;

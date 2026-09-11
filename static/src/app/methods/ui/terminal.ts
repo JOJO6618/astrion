@@ -34,11 +34,6 @@ export const terminalMethods = {
     }
     this.toggleTerminalPanel();
   },
-  subscribeTerminalEvents() {
-    const socket = this.socket;
-    if (!socket) return;
-    socket.emit('terminal_subscribe', { all: true, conversation_id: this.currentConversationId || undefined });
-  },
   setTerminalSessions(sessions: Record<string, { working_dir?: string; shell?: string }>) {
     this.terminalSessions = sessions;
   },
@@ -47,9 +42,7 @@ export const terminalMethods = {
   },
   switchTerminalSession(name: string) {
     this.terminalActiveSession = name;
-    if (this.socket) {
-      this.socket.emit('get_terminal_output', { session: name, lines: 0, conversation_id: this.currentConversationId || undefined });
-    }
+    // 终端输出由 TerminalPanel 的 REST 轮询获取，无需主动拉取
   },
   async fetchTerminalCount() {
     try {

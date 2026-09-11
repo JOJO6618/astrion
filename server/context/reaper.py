@@ -157,5 +157,4 @@ def start_conversation_terminal_reaper():
     if _conversation_terminal_reaper_started:
         return
     _conversation_terminal_reaper_started = True
-    from server.extensions import socketio
-    socketio.start_background_task(_conversation_terminal_reaper_loop)
+    threading.Thread(target=_conversation_terminal_reaper_loop, daemon=True).start()

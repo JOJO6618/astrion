@@ -55,9 +55,8 @@ def _get_current_user_role(record=None) -> str:
     return get_current_user_role(record)
 
 from server.context.identity import NoWorkspaceError, RuntimeIdentity, _resolve_user_role
-from server.context.broadcast import make_terminal_callback, attach_user_broadcast
 from server.context.personalization import _apply_workspace_personalization_preferences
-from server.context.usage import get_or_create_usage_tracker, emit_user_quota_update
+from server.context.usage import get_or_create_usage_tracker
 
 
 
@@ -316,14 +315,12 @@ def get_user_resources(
                 project_path=str(project_path),
                 thinking_mode=thinking_mode,
                 run_mode=run_mode,
-                message_callback=make_terminal_callback("host"),
+                message_callback=None,
                 data_dir=str(data_dir),
                 container_session=container_handle,
                 usage_tracker=usage_tracker,
                 conversation_id=conversation_id,
             )
-            if terminal.terminal_manager:
-                terminal.terminal_manager.broadcast = terminal.message_callback
             state.user_terminals[term_key] = terminal
             terminal.username = "host"
             terminal.user_role = "admin"
@@ -335,7 +332,6 @@ def get_user_resources(
                 session_set('host_workspace_id', getattr(workspace, "workspace_id", None))
         else:
             terminal.update_container_session(container_handle)
-            attach_user_broadcast(terminal, "host")
             terminal.username = "host"
             terminal.user_role = "admin"
             if can_write_session:
@@ -476,12 +472,10 @@ def get_user_resources(
             usage_tracker=usage_tracker,
             conversation_id=conversation_id,
         )
-        if terminal.terminal_manager:
-            terminal.terminal_manager.broadcast = terminal.message_callback
         state.user_terminals[term_key] = terminal
         terminal.username = username
         terminal.user_role = "api" if is_api_user else _resolve_user_role(identity, record)
-        terminal.quota_update_callback = (lambda metric=None: emit_user_quota_update(username)) if not is_api_user else None
+        terminal.quota_update_callback = None
         if can_write_session:
             session_set('run_mode', terminal.run_mode)
             session_set('thinking_mode', terminal.thinking_mode)
@@ -489,10 +483,9 @@ def get_user_resources(
             session_set('workspace_id', getattr(workspace, "workspace_id", None))
     else:
         terminal.update_container_session(container_handle)
-        attach_user_broadcast(terminal, username)
         terminal.username = username
         terminal.user_role = "api" if is_api_user else _resolve_user_role(identity, record)
-        terminal.quota_update_callback = (lambda metric=None: emit_user_quota_update(username)) if not is_api_user else None
+        terminal.quota_update_callback = None
         if can_write_session:
             session_set('workspace_id', getattr(workspace, "workspace_id", None))
 

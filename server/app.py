@@ -3,7 +3,6 @@ import argparse
 
 from .app_legacy import (
     app,
-    socketio,
     run_server as _run_server,
     parse_arguments as _parse_arguments,
     initialize_system,
@@ -34,7 +33,6 @@ def main():
 
 __all__ = [
     "app",
-    "socketio",
     "run_server",
     "parse_arguments",
     "initialize_system",

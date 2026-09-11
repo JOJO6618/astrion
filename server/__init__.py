@@ -5,7 +5,7 @@
 """
 import importlib
 
-__all__ = ["app", "socketio", "run_server", "parse_arguments", "initialize_system", "resource_busy_page"]
+__all__ = ["app", "run_server", "parse_arguments", "initialize_system", "resource_busy_page"]
 
 
 def __getattr__(name):

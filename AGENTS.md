@@ -23,7 +23,7 @@
   - `server/app.py`: 推荐的 Web 服务入口（封装并转发到 `server/app_legacy.py`）
   - `web_server.py`: 兼容入口，已标记 deprecated，但仍可启动
 - **后端核心目录**
-  - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/广播/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；REST 任务轮询为主，Socket.IO 主要用于兼容与实时辅助通道）
+  - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；**REST 任务轮询为唯一实时通道**——Socket.IO 已于 2026-09-11 整体移除，详见 §12.5）
   - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/queue/get_task_events）；契约见 `docs/runtime_contract.md`
   - `core/`: 终端与工具编排（`main_terminal.py`、`web_terminal.py`、`main_terminal_parts/*`；其中 `main_terminal_parts/context/` 和 `main_terminal_parts/tools_definition` 已拆分为 base + mixin 子包）
   - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）
@@ -31,7 +31,7 @@
   - `utils/`: API client、日志、上下文与对话工具等公共函数（`api_client`、`tool_result_formatter`、`context_manager`、`conversation_manager` 已拆分为子包；原入口文件保留为兼容入口）
 - **前端目录**
   - `static/src/`: Vue 3 + TS 前端
-  - `cli/src/`: React 19 + Ink 6 + TypeScript CLI 前端（正在重写中）
+  - `cli/src/`: opentui（Zig 内核 + Yoga）+ React 19 CLI 前端（2026-09-11 起正式替代 Ink 版；旧 Ink 实现存档于 `cli/legacy-ink-src/` 仅作字段参考）
   - 监控动画相关核心文件：
     - `static/src/components/chat/monitor/MonitorDirector.ts`
     - `static/src/stores/monitor.ts`
@@ -117,12 +117,12 @@
 - 开发监听（当前脚本是 build watch）：`npm run dev`
 - Lint：`npm run lint`
 
-### CLI（React / Ink）
-- 安装依赖：`npm --prefix cli install`
-- 开发启动：`npm run cli` 或 `npm --prefix cli run dev`
-- 构建：`npm run cli:build`
-- 类型检查：`npm run cli:typecheck`
-- 可执行命令名（构建后）：`agents` / `agents-cli`
+### CLI（opentui / bun）
+- 运行环境：bun ≥1.3（opentui FFI；node ≥26.4 亦可，本机 node v24 不可用）
+- 开发启动：`bun cli/src/main.tsx`（或 `npm --prefix cli run dev`）
+- 类型检查：`cd cli && ./node_modules/.bin/tsc --noEmit`
+- 可执行命令名：`astrion`（已装到 `/opt/homebrew/bin/astrion` → `cli/bin/astrion` symlink，bun wrapper 支持 symlink 解析；`--version`/`--help` 快速退出不启 TUI；后续 `bun build --compile` 单文件分发）
+- 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
 ## 3) 测试现状（不要再写过时命令）
 
@@ -133,8 +133,8 @@
 - `test_system_message.py` 依赖外部 `MOONSHOT_API_KEY` 与网络，不属于离线稳定 CI 用例。
 - 当前仓库未发现 `pytest.ini`/`pyproject.toml`/`tox.ini`；不要默认要求 `pytest` 作为唯一入口（仅作为冒烟测试的便捷运行器）。
 - CLI 当前最小可复现验证：
-  - `npm --prefix cli run typecheck`
-  - `npm --prefix cli run build`
+  - `cd cli && ./node_modules/.bin/tsc --noEmit`
+  - 无头冒烟：`testRender` 抓帧脚本（写完即用即删，参考 cli-redesign-demo 的验证模式； gateway 指向 127.0.0.1:9 不碰真实服务）
 - 若改动 `server/chat/`、`server/status/`、`server/tasks/` 等后端接口适配，补充：
   - `python3 -m py_compile server/chat/*.py server/status/*.py server/tasks/*.py`
   - `python -m pytest test/test_server_refactor_smoke.py -q`
@@ -146,7 +146,7 @@
 - **文件编辑方式**：修改文件时优先使用 `apply_patch` 或其他原生文件编辑工具；尽量不要用 `bash`/`python` 脚本批量改文件，除非原生工具明显不适合。
 - **后端改动优先级**：先改 `modules/`、`server/` 内对应模块，最后才动入口。
 - **前端改动优先级**：按 `static/src` 现有分层改（`app/`、`stores/`、`components/`、`composables/`）。
-- **CLI 改动优先级**：优先在 `cli/src/App.tsx`、`cli/src/components.tsx`、`cli/src/eventMapper.ts`、`cli/src/api.ts` 内做最小闭环修改。
+- **CLI 改动优先级**：`cli/src/` 分层——入口编排 `main.tsx`/`boot.tsx`；主界面 `app.tsx`；Gateway 客户端 `gateway.ts`（Bearer）；会话运行时 `runtime.ts`（发消息/事件轮询/审批弹出）；菜单状态机 `menuState.ts`；渲染分发 `menu.tsx`；通用件 `components.tsx`/`selector.tsx`；数据层 `data.ts`；文案 `i18n/`。新交互先定归属层再动手。
 - 涉及 monitor 动画/事件联动时，至少同步检查：
   - `MonitorDirector.ts`（动画与场景执行）
   - `stores/monitor.ts`（事件队列与状态机）
@@ -173,12 +173,14 @@
 - 运行根目录前端构建时，默认使用 `npm run build --silent 2>&1 | tail -n 5`。
 - 构建/安装/Lint 类命令（如 `npm run build`、`npm install`、`npm run lint`）因沙箱权限失败时（如报 `EPERM` / `Operation not permitted` / 沙箱拒绝写入），直接向用户说明失败原因并申请权限或调整路径授权，禁止尝试任何绕过沙箱的做法（如换执行方式规避限制、向其他路径写入等）。
 
-### CLI 当前交互约束（2026-05-15）
+### CLI 当前交互约束（2026-09-11 重写）
 
-- CLI 连接的是现有本地 Web API（默认 `127.0.0.1:8091`），不是独立 agent runtime。
-- 启动 CLI 时应清屏、连接本地服务、创建新会话，并将输入区固定在底部。
-- 当前目录若不在工作区中，应先弹出“是否添加到工作区”的选择。
-- 思考内容当前默认隐藏，只显示“思考中 / 思考完成”标题；相关折叠代码保留，后续可继续修。
+- **CLI 全部走 Gateway host Bearer 通道**（`docs/runtime_protocol.md` §6）：token 读 `~/.astrion/astrion/host/data/host_api_token`，请求带 `Authorization: Bearer`；**禁止** Web 会话通道（Cookie/CSRF/host-login）。工作区经 `X-Astrion-Workspace-Id` 头绑定（server/gateway_auth.py 解析）。
+- **启动指令 `astrion`**：cwd = 工作区，运行内不可切换；cwd 未注册为工作区时先提示并询问创建（确认面板 Esc=取消退出）。
+- **服务自启动**：CLI 不与 Web 端启动绑定——探测无服务时自动 spawn `python3 -m server.app --port 8091 --thinking-mode`（detached+unref，显式端口）；服务在运行但无 host token = 旧版本服务，提示重启（token 由服务端启动时生成，`initialize_system` 内 host 分支）；请求 401 自动重读 token 重试一次（自愈）。**边界：CLI 只在探测无服务时启动新实例，绝不 kill/重启已在运行的进程。**
+- **审批面板自动弹出**：收到 `tool_approval_required` 事件即弹出（不依赖手动 /approvals）；←→ 选 运行/拒绝/切无限制，Enter 裁决（decision 端点）。
+- **多语言读 OS 语言设置**（`cli/src/i18n/`，LC_ALL/LANG 检测 zh/en，启动时定死）；CLI 内所有文案禁按字符长度硬编码布局（选中反色只落文字节点，项间固定间距）。
+- 输入语义：Enter=发送，Shift+Enter=换行（opentui textarea 默认相反，Composer 已用 keyBindings 覆盖）。
 - 不要在未获得用户要求的情况下运行交互式 TUI 压测或长时间模拟输入，以免刷屏占满上下文。
 
 ## 5.5) 前端设计风格统一规范（强制）
@@ -238,7 +240,7 @@
 - **key 奇偶强校验**：en-US 聚合器用 `DeepString<typeof zhCN>` 约束，en 缺/多 key 直接 tsc 报错；新增命名空间须在 `zh-CN.ts` / `en-US.ts` 同步注册。
 - **防回退栏杆**：`npm run lint` 先跑 `scripts/i18n_audit.mjs`（剥离注释后查裸中文，独立命令 `lint:text`）；存量文件列在 `scripts/i18n_baseline.txt`，**迁移完一个文件就删一行**，删除后该文件永久受栏杆保护。
 - **语言切换**：个人空间 → 外观 → 界面语言；默认 zh-CN（不跟随浏览器），持久化 key `agents_ui_locale`。
-- **边界**：后端下发文字（API error、通知、工具结果摘要）不做多语言，前端原样显示；CLI 暂不纳入。
+- **边界**：后端下发文字（API error、通知、工具结果摘要）不做多语言，前端原样显示；CLI 独立成体系（`cli/src/i18n/`，读 OS 语言设置，不跟随 web 个人空间）。
 
 ## 6) Git 工作流（开发 + Review）
 
@@ -460,7 +462,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ### 11.2 子智能体执行机制
 
-- 子智能体在主进程内 `asyncio.Task`，跑在独立后台事件循环线程里（避开 Flask-SocketIO threading 冲突）。工具调用复用主进程沙箱/容器链路，网络调用走 `utils.api_client.APIClient`。
+- 子智能体在主进程内 `asyncio.Task`，跑在独立后台事件循环线程里（历史原因是避开 Flask-SocketIO threading 冲突；Socket.IO 已移除，该线程模型仍保留）。工具调用复用主进程沙箱/容器链路，网络调用走 `utils.api_client.APIClient`。
 - **模型请求重试（2026-08-26 起）**：`_run_loop` 对 `_call_model` 包重试循环，与主智能体 `run_streaming_attempts` 同构——最多 5 次尝试（`_SUB_AGENT_MAX_API_RETRIES=4`）、间隔 10s（`_SUB_AGENT_RETRY_DELAY_SECONDS`，用 `asyncio.sleep` 分段等待并响应软停止/取消）。重试条件：**仅当零接收**（未收到任何文本/思考/工具调用）才重试；已开始收到内容后断流（`SubAgentModelCallError.received_any=True`）直接失败。失败终态分模式：多智能体模式下 5 次全失败 → 转为 idle + `_forward_output_to_master` 报错（等 Team Leader 重新下达指令），输出期间断开 → 直接 failed 并同步向主智能体报错；传统模式一律 `_write_failure`。
 - **工具「正在调用」进度事件（2026-08-26 起）**：`_call_model` 在工具名+id 首个流式 chunk 到达时即 emit `status="calling"` 进度事件（与后续 running/completed 共用同一 tool_call id），前端按 id 原地更新条目；`RunnerDetailPanel.vue` / `SubAgentActivityDialog.vue` 的 normalizeStatus 识别 `calling`（显示 spinner + 「调用中」），并支持同一 id 历史条目跨组原地更新（多工具 calling 事件交错场景）。
 - 子智能体在多智能体模式下：
@@ -570,7 +572,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ## 12) 对话级主任务门闸与单写者不变量（2026-08-12）
 
-> 事故背景：一个对话并发运行了两个主聊天任务（socketio 用户任务 + 完成通知轮询器派发的通知任务），交叉写入共享 `conversation_history`，产生 `assistant→assistant→tool→tool` 乱序段，最终 API 400 `tool_call_id is not found`、通知永久丢失。本节机制即为修复该事故引入。
+> 事故背景：一个对话并发运行了两个主聊天任务（socketio 入口的用户任务 + 完成通知轮询器派发的通知任务），交叉写入共享 `conversation_history`，产生 `assistant→assistant→tool→tool` 乱序段，最终 API 400 `tool_call_id is not found`、通知永久丢失。本节机制即为修复该事故引入。
 
 ### 12.1 单写者不变量（核心约束）
 
@@ -593,6 +595,25 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 1. **新增任何主任务入口必须走门闸**：不要绕过 `process_message_task` 直接驱动一轮模型对话；多智能体 idle 派发（task_type="notice"）目前依赖 `_multi_agent_main_task_active` 标志，后续应统一纳管。
 2. **不要在 return 分支手写 `_tool_loop_active` 恢复**：`execute_tool_calls`（`server/chat_flow_tool_loop.py`）已改为守护包装（try/finally 复位，内层 `_execute_tool_calls_impl`），新增提前返回路径无需也不应手动操作该标志——并发交错「存旧值→置True→恢复旧值」正是此前标志卡死的原因。
 3. **不要依赖 build_messages 防御层掩盖并发问题**：`core/main_terminal_parts/context/messages.py` 的孤儿 tool 消息剥离只是「坏数据不再 400」的止血层，乱序段本身意味着历史已被污染；发现剥离 warning 日志应按事故排查，而不是视为正常。
+
+### 12.5 Socket.IO 已整体移除（2026-09-11）
+
+Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助推送），本次清理后**轮询成为唯一通道**，Socket.IO 及其依赖（flask-socketio / socket.io-client / websockets）已全量移除。
+
+**事件出口唯一权威 = 任务事件流**（`TaskRecord.events`，`_append_event`）：运行期一切事件（text/thinking/tool/token/todo/edited_files/edit_summary/context_warning/quota_exceeded/conversation_changed 标题更新等）都在其中，前端任务轮询与 CLI 共用。历史遗留的 socket 推送只是同一事件的镜像，删除不丢数据。
+
+**各原 socket 功能的替代机制**（改代码前必查）：
+- `status_update`（原 13 处推送）→ 前端 `socketMethods.fetchStatusSnapshot` 空闲 5s 轮询 `/api/status`（运行期跳过，由任务事件流驱动）；发起方操作后的即时状态走 REST 响应载荷。
+- `quota_update/notice/exceeded` → `quota_exceeded` 本就在事件流；配额快照走 resource store 既有的 UsageQuotaPolling。
+- `conversation_list_update / conversation_changed / conversation_loaded` → 发起方操作后主动刷新（既有主路径）；**多标签页被动同步退化为 status 轮询间接感知**（不再即时，属刻意取舍）。
+- `system_ready` → `loadInitialData` 的 `/api/status` 一次性初始化已覆盖。
+- 终端面板实时输出 → `GET /api/terminals/<name>/output` REST 轮询（TerminalPanel 面板打开时输出 1.5s、列表 5s），快照前缀匹配增量写入 xterm。
+- 连接状态指示 → 既有 REST 心跳（`/api/health`，连续失败阈值置灰），与 socket 断开语义等价。
+
+**硬性约束**：
+1. 新增任何「实时通知」一律写任务事件流（`_append_event`）或扩 `/api/status` 载荷，**禁止**重新引入 socket 推送。
+2. `server/extensions.py` 只剩 `run_background`（daemon 线程）；不要再往里加推送类函数。
+3. `WebTerminal.broadcast()` / `terminal_manager.broadcast` 调用点保留但回调恒为 None（判空安全），新代码不要依赖它们产生用户可见效果。
 
 ## 13) 工具动态加载（tool_loading，2026-09 新增）
 

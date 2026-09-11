@@ -11,7 +11,6 @@ import re
 import threading
 from typing import Dict, List, Optional, Callable, Any, Tuple
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, send_file, abort
-from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
 from pathlib import Path
@@ -41,7 +40,6 @@ from server.workflow_page import workflow_page_bp
 from server.workflow_runtime_api import workflow_runtime_bp
 from server.conversation_bootstrap import conversation_bootstrap_bp
 from server.gateway_api import gateway_bp
-from server.socket_handlers import socketio
 from server.security import attach_security_hooks
 from werkzeug.utils import secure_filename
 from werkzeug.routing import BaseConverter
@@ -201,9 +199,6 @@ if not ENABLE_VERBOSE_CONSOLE:
 # 抑制 Flask/Werkzeug 访问日志，只保留 brief_log 输出
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 logging.getLogger('werkzeug').disabled = True
-for noisy_logger in ('engineio.server', 'socketio.server'):
-    logging.getLogger(noisy_logger).setLevel(logging.ERROR)
-    logging.getLogger(noisy_logger).disabled = True
 # 静音子智能体模块错误日志（交由 brief_log 或前端提示处理）
 sub_agent_logger = logging.getLogger('modules.sub_agent.manager')
 sub_agent_logger.setLevel(logging.CRITICAL)
@@ -271,8 +266,6 @@ app.config['SESSION_COOKIE_SECURE'] = _cookie_secure_env in {"1", "true", "yes"}
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 CORS(app)
 
-socketio.init_app(app, cors_allowed_origins='*', async_mode='threading', logger=False, engineio_logger=False)
-
 
 class EndpointFilter(logging.Filter):
     """过滤掉噪声请求日志。"""
@@ -329,7 +322,6 @@ MONITOR_SNAPSHOT_CHAR_LIMIT = state.MONITOR_SNAPSHOT_CHAR_LIMIT
 MONITOR_MEMORY_ENTRY_LIMIT = state.MONITOR_MEMORY_ENTRY_LIMIT
 RATE_LIMIT_BUCKETS = state.RATE_LIMIT_BUCKETS
 FAILURE_TRACKERS = state.FAILURE_TRACKERS
-pending_socket_tokens = state.pending_socket_tokens
 usage_trackers = state.usage_trackers
 
 MONITOR_SNAPSHOT_CACHE = state.MONITOR_SNAPSHOT_CACHE
@@ -350,7 +342,6 @@ CSRF_PROTECTED_PREFIXES = state.CSRF_PROTECTED_PREFIXES
 CSRF_EXEMPT_PATHS = state.CSRF_EXEMPT_PATHS
 FAILED_LOGIN_LIMIT = state.FAILED_LOGIN_LIMIT
 FAILED_LOGIN_LOCK_SECONDS = state.FAILED_LOGIN_LOCK_SECONDS
-SOCKET_TOKEN_TTL_SECONDS = state.SOCKET_TOKEN_TTL_SECONDS
 PROJECT_STORAGE_CACHE = state.PROJECT_STORAGE_CACHE
 PROJECT_STORAGE_CACHE_TTL_SECONDS = state.PROJECT_STORAGE_CACHE_TTL_SECONDS
 USER_IDLE_TIMEOUT_SECONDS = state.USER_IDLE_TIMEOUT_SECONDS
@@ -457,7 +448,7 @@ def start_background_jobs():
         return
     _idle_reaper_started = True
     _load_last_active_cache()
-    socketio.start_background_task(idle_reaper_loop)
+    threading.Thread(target=idle_reaper_loop, daemon=True).start()
     try:
         from .context import start_conversation_terminal_reaper
         start_conversation_terminal_reaper()
@@ -564,18 +555,8 @@ def generate_conversation_title_background(web_terminal: WebTerminal, conversati
             _title_debug_log("title_save_failed", conversation_id=conversation_id, safe_title=safe_title)
             return
         _title_debug_log("title_save_success", conversation_id=conversation_id, safe_title=safe_title)
-        try:
-            socketio.emit('conversation_changed', {
-                'conversation_id': conversation_id,
-                'title': safe_title
-            }, room=f"user_{username}")
-            socketio.emit('conversation_list_update', {
-                'action': 'updated',
-                'conversation_id': conversation_id
-            }, room=f"user_{username}")
-        except Exception as exc:
-            debug_log(f"[TitleGen] 推送标题更新失败: {exc}")
-            _title_debug_log("title_emit_exception", error=str(exc), conversation_id=conversation_id, username=username)
+        # 标题更新推送已随 WebSocket 移除：标题变更已写入任务事件流
+        # （chat_flow_helpers 的 conversation_changed 事件），前端轮询可见。
 
     try:
         asyncio.run(_runner())
@@ -742,31 +723,6 @@ def validate_csrf_request() -> bool:
         return hmac.compare_digest(str(provided), str(expected))
     except Exception:
         return False
-
-
-def prune_socket_tokens(now: Optional[float] = None):
-    current = now or time.time()
-    for token, meta in list(pending_socket_tokens.items()):
-        if meta.get("expires_at", 0) <= current:
-            pending_socket_tokens.pop(token, None)
-
-
-def consume_socket_token(token_value: Optional[str], username: Optional[str]) -> bool:
-    if not token_value or not username:
-        return False
-    prune_socket_tokens()
-    token_meta = pending_socket_tokens.pop(token_value, None)
-    if not token_meta:
-        return False
-    if token_meta.get("username") != username:
-        return False
-    if token_meta.get("expires_at", 0) <= time.time():
-        return False
-    fingerprint = token_meta.get("fingerprint") or ""
-    request_fp = (request.headers.get("User-Agent") or "")[:128]
-    if fingerprint and request_fp and not hmac.compare_digest(fingerprint, request_fp):
-        return False
-    return True
 
 
 def format_tool_result_notice(tool_name: str, tool_call_id: Optional[str], content: str) -> str:
@@ -1047,27 +1003,6 @@ def detect_tool_failure(result_data: Any) -> bool:
         return True
     return False
 
-# 终端广播回调函数
-def terminal_broadcast(event_type, data):
-    """广播终端事件到所有订阅者"""
-    try:
-        # 对于全局事件，发送给所有连接的客户端
-        if event_type in ('token_update', 'todo_updated', 'edited_files_updated'):
-            socketio.emit(event_type, data)  # 全局广播，不限制房间
-            debug_log(f"全局广播{event_type}: {data}")
-        else:
-            # 其他终端事件发送到终端订阅者房间
-            socketio.emit(event_type, data, room='terminal_subscribers')
-            
-            # 如果是特定会话的事件，也发送到该会话的专属房间
-            if 'session' in data:
-                session_room = f"terminal_{data['session']}"
-                socketio.emit(event_type, data, room=session_room)
-        
-        debug_log(f"终端广播: {event_type} - {data}")
-    except Exception as e:
-        debug_log(f"终端广播错误: {e}")
-
 
 # Routes removed; now provided by Blueprints in server/auth.py and server/files.py
 
@@ -1103,6 +1038,15 @@ def initialize_system(path: str, thinking_mode: bool = False):
         print(f"{OUTPUT_FORMATS['success']} 预设子智能体角色同步完成")
     except Exception as _e:
         print(f"{OUTPUT_FORMATS['warning']} 预设子智能体角色同步失败: {_e}")
+    # host 模式启动即生成 CLI Bearer token（原惰性生成依赖首个 Bearer 请求触发，
+    # CLI 无 token 不发请求会形成鸡生蛋死锁；启动时生成根治）
+    if TERMINAL_SANDBOX_MODE == "host":
+        try:
+            from server.gateway_auth import get_or_create_host_api_token
+            if get_or_create_host_api_token():
+                print(f"{OUTPUT_FORMATS['success']} Host API token 已就绪（CLI Bearer 通道）")
+        except Exception as _e:
+            print(f"{OUTPUT_FORMATS['warning']} Host API token 生成失败: {_e}")
     _mode_label = "宿主机模式（单用户）" if TERMINAL_SANDBOX_MODE == "host" else "多用户模式（Web）"
     print(f"{OUTPUT_FORMATS['success']} Web 系统初始化完成（{_mode_label}）")
 
@@ -1116,13 +1060,13 @@ def run_server(path: str, thinking_mode: bool = False, port: int = DEFAULT_PORT,
         app.config['SESSION_COOKIE_NAME'] = f"agents_session_{port}"
     initialize_system(path, thinking_mode)
     start_background_jobs()
-    socketio.run(
-        app,
+    # Socket.IO 已移除，直接使用 Werkzeug 内建服务器（threaded 以支持并发轮询）
+    app.run(
         host=WEB_SERVER_HOST,
         port=port,
         debug=debug,
         use_reloader=debug,
-        allow_unsafe_werkzeug=True
+        threaded=True,
     )
 
 

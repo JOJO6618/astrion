@@ -58,7 +58,6 @@ const AVATAR_TERMINAL_STATUS = new Set([
 export const computed = {
   ...mapWritableState(useConnectionStore, [
     'isConnected',
-    'socket',
     'stopRequested',
     'projectPath',
     'agentVersion',

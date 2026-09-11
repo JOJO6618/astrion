@@ -26,7 +26,6 @@ from io import BytesIO
 from typing import Dict, Any, Optional, List, Tuple
 
 from flask import Blueprint, request, jsonify, session, send_file
-from flask_socketio import emit
 from werkzeug.utils import secure_filename
 import zipfile
 
@@ -72,7 +71,7 @@ from utils.conversation_manager import ConversationManager
 from utils.api_client import APIClient
 
 from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
-from .context import with_terminal, get_terminal_for_sid, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
+from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
 from .utils_common import (
     build_review_lines,
     debug_log,
@@ -86,7 +85,6 @@ from .utils_common import (
     CHUNK_FRONTEND_LOG_FILE,
     STREAMING_DEBUG_LOG_FILE,
 )
-from .extensions import socketio
 from .state import (
     RECENT_UPLOAD_EVENT_LIMIT,
     RECENT_UPLOAD_FEED_LIMIT,
@@ -807,18 +805,7 @@ def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, usernam
             except Exception as exc:
                 debug_log(f"[Versioning] create_conversation apply default failed: {exc}")
             perf_log("create_conversation after default versioning", elapsed_ms=(time.perf_counter() - t0) * 1000, extra={"conv_id": result.get("conversation_id")})
-            # 广播对话列表更新事件
-            socketio.emit('conversation_list_update', {
-                'action': 'created',
-                'conversation_id': result["conversation_id"]
-            }, room=f"user_{username}")
-
-            if not result.get("safe_navigation"):
-                # 安全导航创建不代表后端 terminal 当前对话已切换，因此不广播 conversation_changed。
-                socketio.emit('conversation_changed', {
-                    'conversation_id': result["conversation_id"],
-                    'title': tr("conversation.default_title")
-                }, room=f"user_{username}")
+            # 对话列表/切换推送已随 WebSocket 移除：发起方依据响应刷新，其他标签页由轮询同步。
 
             perf_log("create_conversation route done", elapsed_ms=(time.perf_counter() - t0) * 1000, extra={"conv_id": result.get("conversation_id")})
             return jsonify(result), 201
@@ -941,22 +928,9 @@ def load_conversation(conversation_id, terminal: WebTerminal, workspace: UserWor
                 }
 
             if not result.get("safe_navigation"):
-                # 安全导航只改变前端查看对象，不代表后端 terminal 当前上下文已切换。
-                socketio.emit('conversation_changed', {
-                    'conversation_id': conversation_id,
-                    'title': result.get("title", tr("conversation.unknown_title")),
-                    'messages_count': result.get("messages_count", 0)
-                }, room=f"user_{username}")
-
-                # 广播系统状态更新（因为当前对话改变了）
-                status = terminal.get_status()
-                socketio.emit('status_update', status, room=f"user_{username}")
-
-                # 清理和重置相关UI状态
-                socketio.emit('conversation_loaded', {
-                    'conversation_id': conversation_id,
-                    'clear_ui': True  # 提示前端清理当前UI状态
-                }, room=f"user_{username}")
+                # 安全导航只改变前端查看对象；对话切换/加载推送已随 WebSocket 移除，
+                # 发起方依据响应刷新，其他标签页由轮询同步。
+                pass
 
             return jsonify(result)
         else:
@@ -1007,23 +981,9 @@ def delete_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
         result = terminal.delete_conversation(conversation_id)
         
         if result["success"]:
-            # 广播对话列表更新事件
-            socketio.emit('conversation_list_update', {
-                'action': 'deleted',
-                'conversation_id': conversation_id
-            }, room=f"user_{username}")
-            
-            # 如果删除的是当前对话，广播对话清空事件
-            if is_current:
-                socketio.emit('conversation_changed', {
-                    'conversation_id': None,
-                    'title': None,
-                    'cleared': True
-                }, room=f"user_{username}")
-                
-                # 更新系统状态
-                status = terminal.get_status()
-                socketio.emit('status_update', status, room=f"user_{username}")
+            # 对话删除/清空推送已随 WebSocket 移除：发起方依据响应刷新，
+            # 其他标签页由对话列表轮询同步。is_current 变量保留供下方响应使用。
+            pass
             
             return jsonify(result)
         else:
@@ -1705,14 +1665,7 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
         session['run_mode'] = terminal.run_mode
         session['thinking_mode'] = terminal.thinking_mode
 
-        socketio.emit('conversation_list_update', {
-            'action': 'version_restored',
-            'conversation_id': target_conversation_id
-        }, room=f"user_{username}")
-        socketio.emit('conversation_changed', {
-            'conversation_id': target_conversation_id,
-            'title': (cm.load_conversation(target_conversation_id) or {}).get("title", tr("conversation.version_restored_title")),
-        }, room=f"user_{username}")
+        # 版本恢复后的列表/切换推送已随 WebSocket 移除：发起方依据响应刷新。
 
         return jsonify({
             "success": True,
@@ -1766,17 +1719,9 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
             status_code = 404 if _is_not_found_message(result.get("error", "")) else (409 if result.get("in_progress") else 400)
             return jsonify(result), status_code
 
-        # in-place 压缩：对话 id 不变。通知前端当前对话内容已变化（历史前缀被标记），刷新展示。
+        # in-place 压缩：对话 id 不变。对话内容变化推送已随 WebSocket 移除，
+        # 发起方依据响应（guide_inserted 等字段）刷新历史。
         load_result = terminal.load_conversation(normalized_id)
-        if load_result.get("success"):
-            socketio.emit('conversation_list_update', {
-                'action': 'compressed',
-                'conversation_id': normalized_id
-            }, room=f"user_{username}")
-            socketio.emit('conversation_loaded', {
-                'conversation_id': normalized_id,
-                'clear_ui': True
-            }, room=f"user_{username}")
 
         response_payload = {
             "success": True,
@@ -1802,29 +1747,7 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
                 )
                 response_payload["auto_task_started"] = False
                 response_payload["guide_inserted"] = True
-                # 通知前端实时显示这条 compact 消息（覆盖 socket 与 in-place 未刷新场景）
-                try:
-                    emit(
-                        "user_message",
-                        {
-                            "message": guide_message,
-                            "images": [],
-                            "videos": [],
-                            "media_refs": [],
-                            "message_source": "compression_handoff",
-                            "visibility": "compact",
-                            "starts_work": False,
-                            "metadata": {
-                                "message_source": "compression_handoff",
-                                "visibility": "compact",
-                                "starts_work": False,
-                            },
-                            "conversation_id": normalized_id,
-                        },
-                        room=f"user_{username}",
-                    )
-                except Exception as emit_exc:
-                    debug_log(f"[Compression] 发送 user_message 事件失败: {emit_exc}")
+                # 引导语已写入历史，前端依据响应 guide_inserted 刷新历史即可看到。
             except Exception as exc:
                 debug_log(f"[Compression] 追加引导语消息失败: {exc}")
                 response_payload["auto_task_started"] = False
@@ -2267,21 +2190,6 @@ def duplicate_conversation(conversation_id, terminal: WebTerminal, workspace: Us
         new_conversation_id = result["duplicate_conversation_id"]
         load_result = terminal.load_conversation(new_conversation_id)
 
-        if load_result.get("success"):
-            socketio.emit('conversation_list_update', {
-                'action': 'duplicated',
-                'conversation_id': new_conversation_id
-            }, room=f"user_{username}")
-            socketio.emit('conversation_changed', {
-                'conversation_id': new_conversation_id,
-                'title': load_result.get('title', tr('conversation.duplicated_title')),
-                'messages_count': load_result.get('messages_count', 0)
-            }, room=f"user_{username}")
-            socketio.emit('conversation_loaded', {
-                'conversation_id': new_conversation_id,
-                'clear_ui': True
-            }, room=f"user_{username}")
-
         response_payload = {
             "success": True,
             "duplicate_conversation_id": new_conversation_id,
@@ -2466,23 +2374,8 @@ def get_current_conversation(terminal: WebTerminal, workspace: UserWorkspace, us
             "error": str(e)
         }), 500
     
-@socketio.on('send_command')
-def handle_command(data):
-    """处理系统命令"""
-    command = data.get('command', '')
-    
-    username, terminal, _ = get_terminal_for_sid(request.sid)
-    if not terminal:
-        emit('error', {'message': 'System not initialized'})
-        return
-    record_user_activity(username)
-    
-    result = _execute_system_command(terminal, command)
-    emit('command_result', result)
-
-
 def _execute_system_command(terminal: WebTerminal, command: str) -> Dict[str, Any]:
-    """执行系统命令，供 WebSocket 与 REST API 复用。"""
+    """执行系统命令（REST API 专用；原 WebSocket send_command 通道已移除）。"""
     command = (command or '').strip()
     if command.startswith('/'):
         command = command[1:]

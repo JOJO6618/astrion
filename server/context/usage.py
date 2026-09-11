@@ -1,4 +1,4 @@
-"""配额追踪器（UsageTracker）的获取与广播。"""
+"""配额追踪器（UsageTracker）的获取。"""
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
@@ -24,17 +24,3 @@ def get_or_create_usage_tracker(username: Optional[str], workspace: Optional['mo
     tracker = UsageTracker(str(workspace.data_dir), role=role or "user")
     state.usage_trackers[username] = tracker
     return tracker
-
-
-def emit_user_quota_update(username: Optional[str]):
-    from server.extensions import emit_event
-    if not username:
-        return
-    tracker = get_or_create_usage_tracker(username)
-    if not tracker:
-        return
-    try:
-        snapshot = tracker.get_quota_snapshot()
-        emit_event('quota_update', {'quotas': snapshot}, room=f"user_{username}")
-    except Exception:
-        pass

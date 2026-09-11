@@ -35,11 +35,10 @@ from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
-from server.security import rate_limited, prune_socket_tokens
+from server.security import rate_limited
 from server.utils_common import debug_log
-from server.state import PROJECT_MAX_STORAGE_MB, pending_socket_tokens, SOCKET_TOKEN_TTL_SECONDS
+from server.state import PROJECT_MAX_STORAGE_MB
 from server.state import tool_approval_manager, user_question_manager
-from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
 from modules.i18n import tr
@@ -147,9 +146,8 @@ def tool_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str
             }), 403
         terminal.set_tool_category_enabled(category, enabled)
         snapshot = terminal.get_tool_settings_snapshot()
-        socketio.emit('tool_settings_updated', {
-            'categories': snapshot
-        }, room=f"user_{username}")
+        # tool_settings 变更不再经 WebSocket 广播：发起方直接使用本响应中的
+        # categories，其他标签页在下次操作或 status 轮询时同步。
         return jsonify({
             "success": True,
             "categories": snapshot

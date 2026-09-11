@@ -533,11 +533,6 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
                 })
             except Exception:
                 pass
-            try:
-                from .extensions import emit_event
-                emit_event('status_update', web_terminal.get_status(), room=f"user_{username}")
-            except Exception:
-                pass
             switch_note = tr("tool_loop.plan_switch_note_ok")
         except Exception as exc:
             switch_note = tr("tool_loop.plan_switch_note_failed", error=exc)

@@ -30,6 +30,51 @@ export const socketMethods = {
     // 主网页端已切换为 REST + 轮询模式，这里保留空实现用于兼容旧调用
     this.socket = null;
   },
+  // 状态快照轮询：替代原 WebSocket status_update 推送。
+  // 任务运行期跳过（运行期状态由任务事件流驱动），空闲期每 5s 一次。
+  // 配额轮询已由 resource store 的 UsageQuotaPolling 独立承担，这里不重复。
+  async fetchStatusSnapshot() {
+    try {
+      const res = await fetch('/api/status', { cache: 'no-store' });
+      if (!res.ok) return;
+      const status = await res.json();
+      this.applyStatusSnapshot(status);
+      // 显式新建路由（/new 等）与独立全屏路由不接管当前对话与运行模式
+      const onExplicitNewRoute =
+        typeof this.isExplicitNewConversationRoute === 'function' &&
+        this.isExplicitNewConversationRoute();
+      const onIndependentRoute =
+        typeof this.isConversationIndependentRoute === 'function' &&
+        this.isConversationIndependentRoute();
+      if (status.conversation && status.conversation.current_id) {
+        if (this.initialRouteResolved && !this.currentConversationId && !onExplicitNewRoute && !onIndependentRoute) {
+          this.currentConversationId = status.conversation.current_id;
+        }
+      }
+      if (!onExplicitNewRoute) {
+        if (typeof status.run_mode === 'string') {
+          this.runMode = status.run_mode;
+        } else if (typeof status.thinking_mode !== 'undefined') {
+          this.runMode = status.thinking_mode ? 'thinking' : 'fast';
+        }
+      }
+    } catch {
+      // 断线判定由连接心跳负责，这里静默失败
+    }
+  },
+  startStatusIdleRefresh() {
+    if (this.statusRefreshTimer) return;
+    this.statusRefreshTimer = window.setInterval(() => {
+      if (!this.isConnected) return;
+      if (typeof this.isOutputActive === 'function' && this.isOutputActive()) return;
+      this.fetchStatusSnapshot();
+    }, 5000);
+  },
+  stopStatusIdleRefresh() {
+    if (!this.statusRefreshTimer) return;
+    window.clearInterval(this.statusRefreshTimer);
+    this.statusRefreshTimer = null;
+  },
   async checkConnectionHealth() {
     if (this.connectionHeartbeatInFlight) {
       connectionDiag('log', 'health-skip-inflight', {

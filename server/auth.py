@@ -351,9 +351,6 @@ def logout():
                 state.container_manager.release_container(key, reason="logout")
             except Exception:
                 pass
-        for token_value, meta in list(state.pending_socket_tokens.items()):
-            if meta.get("username") == username:
-                state.pending_socket_tokens.pop(token_value, None)
     auth_debug_log(f"[auth_debug] {request.method} /logout after_clear session={_session_debug_snapshot()}")
     if request.method == 'GET':
         resp = make_response(redirect('/login?logged_out=1'))

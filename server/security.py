@@ -188,31 +188,6 @@ def validate_csrf_request() -> bool:
         return False
 
 
-def prune_socket_tokens(now: Optional[float] = None):
-    current = now or time.time()
-    for token, meta in list(state.pending_socket_tokens.items()):
-        if meta.get("expires_at", 0) <= current:
-            state.pending_socket_tokens.pop(token, None)
-
-
-def consume_socket_token(token_value: Optional[str], username: Optional[str]) -> bool:
-    if not token_value or not username:
-        return False
-    prune_socket_tokens()
-    token_meta = state.pending_socket_tokens.pop(token_value, None)
-    if not token_meta:
-        return False
-    if token_meta.get("username") != username:
-        return False
-    if token_meta.get("expires_at", 0) <= time.time():
-        return False
-    fingerprint = token_meta.get("fingerprint") or ""
-    request_fp = (request.headers.get("User-Agent") or "")[:128]
-    if fingerprint and request_fp and not hmac.compare_digest(fingerprint, request_fp):
-        return False
-    return True
-
-
 def format_tool_result_notice(tool_name: str, tool_call_id: Optional[str], content: str) -> str:
     """将工具执行结果转为系统消息文本，方便在对话中回传。"""
     header = f"[工具结果] {tool_name}"
@@ -301,8 +276,6 @@ __all__ = [
     "get_csrf_token",
     "requires_csrf_protection",
     "validate_csrf_request",
-    "prune_socket_tokens",
-    "consume_socket_token",
     "format_tool_result_notice",
     "compact_web_search_result",
     "attach_security_hooks",
@@ -318,8 +291,6 @@ __all__ = [
     "get_csrf_token",
     "requires_csrf_protection",
     "validate_csrf_request",
-    "prune_socket_tokens",
-    "consume_socket_token",
     "format_tool_result_notice",
     "compact_web_search_result",
 ]

@@ -67,10 +67,10 @@ from .utils_common import (
     CHUNK_FRONTEND_LOG_FILE,
     STREAMING_DEBUG_LOG_FILE,
 )
-from .security import rate_limited, compact_web_search_result, consume_socket_token, prune_socket_tokens, validate_csrf_request, requires_csrf_protection, get_csrf_token
+from .security import rate_limited, compact_web_search_result, validate_csrf_request, requires_csrf_protection, get_csrf_token
 from .main_task_gate import try_acquire_main_task_gate, release_main_task_gate
 from .monitor import cache_monitor_snapshot, get_cached_monitor_snapshot
-from .extensions import emit_event, run_background
+from .extensions import run_background
 from .state import (
     MONITOR_FILE_TOOLS,
     MONITOR_MEMORY_TOOLS,
@@ -78,7 +78,6 @@ from .state import (
     MONITOR_MEMORY_ENTRY_LIMIT,
     RATE_LIMIT_BUCKETS,
     FAILURE_TRACKERS,
-    pending_socket_tokens,
     usage_trackers,
     MONITOR_SNAPSHOT_CACHE,
     MONITOR_SNAPSHOT_CACHE_LIMIT,
@@ -477,7 +476,7 @@ def _persist_and_echo_preceding_notice(
     message: str,
     payload: Dict[str, Any],
 ) -> None:
-    """预写一条「前置完成通知」：写入对话历史 + socketio 回显（不触发新一轮工作）。
+    """预写一条「前置完成通知」：写入对话历史 + 任务事件流回显（不触发新一轮工作）。
 
     用于「通知池」一次取出多条时，前 N-1 条随同一后续任务一起呈现。
     这些通知必须落历史，否则模型看不到、刷新后也会丢失。
@@ -503,8 +502,8 @@ def _persist_and_echo_preceding_notice(
             cm.add_conversation("user", message, metadata=metadata)
     except Exception as exc:
         debug_log(f"[CompletionNotice] 前置通知写入历史失败: {exc}")
-    # socketio 回显（在线客户端即时可见）；轮询客户端由后续任务事件流回放，
-    # 前端按消息内容 dedup，两条通道不会双显。
+    # 回显经 sender 通道（任务内=任务事件流；poll 轮询器=no-op）；
+    # 轮询客户端统一由后续任务事件流回放，前端按消息内容 dedup 不会双显。
     try:
         echo_payload = {
             "message": message,
@@ -553,8 +552,8 @@ async def _dispatch_completion_user_notice(
     if message_source not in _VALID_USER_MESSAGE_SOURCES:
         message_source = "user"
 
-    # 先把前置通知写入历史并 socketio 回显（在线客户端即时可见）。
-    # 轮询客户端则通过后续任务事件流回放（见 _run_chat_task 的 preceding_user_notices 注入）。
+    # 先把前置通知写入历史并经 sender 回显（Socket.IO 移除后无即时推送，
+    # 统一通过后续任务事件流回放，见 _run_chat_task 的 preceding_user_notices 注入）。
     for item in preceding_notices:
         _persist_and_echo_preceding_notice(
             web_terminal=web_terminal,
@@ -576,7 +575,7 @@ async def _dispatch_completion_user_notice(
             **ui_defaults,
             "timestamp": datetime.now().isoformat(),
         }
-        # 轮询客户端通过后续任务事件流回放前置通知（在线客户端已由上面的 socketio 回显覆盖）。
+        # 轮询客户端通过后续任务事件流回放前置通知。
         preceding_list = None
         if preceding_notices:
             preceding_list = [
@@ -965,14 +964,13 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
 
     把子智能体完成通知与后台 run_command 完成通知合并到同一条链路：
     - 每轮把两路所有待通知项一次性取出（池化），按时间排序；
-    - 这一批里前 N-1 条作为「预写通知」随同一个后续任务一起注入（写历史 + 事件流 + socketio），
+    - 这一批里前 N-1 条作为「预写通知」随同一个后续任务一起注入（写历史 + 事件流），
       不各自触发新一轮工作；
     - 仅最后 1 条作为后续 chat task 的触发消息，启动一次「工作 → 停止」循环；
     - 该后续任务结束后回到 handle_task_with_sender 结尾重新 spawn 本轮询器，继续消费剩余通知。
 
     这样多个后台任务同时完成时，会被合并成一次（而非每条都触发一轮停止-再工作）。
     """
-    from .extensions import emit_event
 
     sub_manager = getattr(web_terminal, "sub_agent_manager", None)
     bg_manager = getattr(web_terminal, "background_command_manager", None)
@@ -985,10 +983,9 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
     start_wait = time.time()
 
     def sender(event_type, data):
-        try:
-            emit_event(event_type, data, room=f"user_{username}")
-        except Exception:
-            pass
+        # WebSocket 推送已移除：事件均经任务事件流（_append_event）由轮询消费；
+        # 此 sender 仅保留签名以兼容既有调用点，不再做任何实时推送。
+        return
 
     loop_count = 0
     ma_debug("poll_completion_notifications_start", conversation_id=conversation_id)
@@ -1115,16 +1112,13 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
     与 poll_completion_notifications 完全分离，避免多智能体消息和传统后台
     通知竞争 task_manager 的单工作区互斥。
     """
-    from .extensions import emit_event
 
     max_wait_time = 3600
     start_wait = time.time()
 
     def sender(event_type, data):
-        try:
-            emit_event(event_type, data, room=f"user_{username}")
-        except Exception:
-            pass
+        # WebSocket 推送已移除：事件均经任务事件流（_append_event）由轮询消费。
+        return
 
     import threading as _threading
     ma_debug(
@@ -1258,7 +1252,7 @@ async def _dispatch_multi_agent_idle_messages(
 ):
     """主智能体空闲时，把多智能体 pending 消息作为新一轮用户消息分发。
 
-    所有消息先持久化到对话历史；前 N-1 条作为前置通知通过 socketio 推送；
+    所有消息先持久化到对话历史；前 N-1 条作为前置通知写入任务事件流；
     最后一条创建 task_type="notice" 任务触发 Team Leader 新一轮工作。
     """
     ma_debug(
@@ -1341,8 +1335,8 @@ async def _dispatch_multi_agent_idle_messages(
             error=str(exc),
         )
 
-    # 2) 前置通知的 socketio emit 已在上述注入 inject_multi_agent_master_message 内
-    #    同时完成，避免在多智能体消息场景重复发送相同事件。
+    # 2) 前置通知的回显已在上述注入 inject_multi_agent_master_message 内
+    #    同时完成（经 sender/事件流），避免在多智能体消息场景重复发送相同事件。
 
     # 3) 最后一条触发新一轮工作
     ui_defaults = dict(_user_message_ui_defaults(message_source, auto_user_message_event=True))
@@ -2170,12 +2164,6 @@ async def handle_task_with_sender(
             quota_allowed, quota_info = web_terminal.record_model_call(bool(thinking_expected))
         if not quota_allowed:
             quota_type = 'thinking' if thinking_expected else 'fast'
-            emit_event('quota_notice', {
-                'type': quota_type,
-                'reset_at': quota_info.get('reset_at'),
-                'limit': quota_info.get('limit'),
-                'count': quota_info.get('count')
-            }, room=f"user_{getattr(web_terminal, 'username', '')}")
             sender('quota_exceeded', {
                 'type': quota_type,
                 'reset_at': quota_info.get('reset_at')

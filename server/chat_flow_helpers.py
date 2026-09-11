@@ -119,7 +119,6 @@ def generate_conversation_title_background(
     conversation_id: str,
     user_message: str,
     username: str,
-    socketio_instance,
     title_prompt_path,
     debug_logger,
     title_model: str = "",
@@ -185,21 +184,6 @@ def generate_conversation_title_background(
         except Exception as exc:
             debug_logger(f"[TitleGen] 添加任务事件失败: {exc}")
             _title_debug_log("title_task_event_exception", error=str(exc), conversation_id=conversation_id, username=username)
-
-        try:
-            socketio_instance.emit(
-                'conversation_changed',
-                {'conversation_id': conversation_id, 'title': safe_title},
-                room=f"user_{username}",
-            )
-            socketio_instance.emit(
-                'conversation_list_update',
-                {'action': 'updated', 'conversation_id': conversation_id},
-                room=f"user_{username}",
-            )
-        except Exception as exc:
-            debug_logger(f"[TitleGen] 推送标题更新失败: {exc}")
-            _title_debug_log("title_emit_exception", error=str(exc), conversation_id=conversation_id, username=username)
 
     try:
         asyncio.run(_runner())

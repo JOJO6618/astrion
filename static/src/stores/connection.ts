@@ -1,10 +1,8 @@
 import { defineStore } from 'pinia';
-import type { Socket } from 'socket.io-client';
 import type { ReasoningEffort } from './personalization';
 
 interface ConnectionState {
   isConnected: boolean;
-  socket: Socket | null;
   stopRequested: boolean;
   projectPath: string;
   agentVersion: string;
@@ -16,7 +14,6 @@ interface ConnectionState {
 export const useConnectionStore = defineStore('connection', {
   state: (): ConnectionState => ({
     isConnected: false,
-    socket: null,
     stopRequested: false,
     projectPath: '',
     agentVersion: '',
@@ -25,9 +22,6 @@ export const useConnectionStore = defineStore('connection', {
     reasoningEffort: null
   }),
   actions: {
-    setSocket(socket: Socket | null) {
-      this.socket = socket;
-    },
     setConnected(value: boolean) {
       this.isConnected = value;
     },

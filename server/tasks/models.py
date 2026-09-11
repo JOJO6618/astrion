@@ -912,15 +912,8 @@ class TaskManager:
                         data.setdefault("conversation_id", rec.conversation_id)
                     if rec.workspace_id:
                         data.setdefault("workspace_id", rec.workspace_id)
-                # 记录事件
+                # 记录事件到任务事件流（轮询通道，唯一出口）
                 self._append_event(rec, event_type, data)
-                # 在线用户仍然收到实时推送（房间 user_{username}）；
-                # 安全包装：socketio 未绑定（独立 Gateway 进程）时静默跳过
-                try:
-                    from server.extensions import emit_event
-                    emit_event(event_type, data, room=f"user_{username}")
-                except Exception:
-                    pass
 
             # 轮询模式需要把 context_manager 的回调切到当前任务 sender，
             # 否则 token_update 等事件只走 websocket，前端任务轮询拿不到实时更新。
@@ -1043,7 +1036,6 @@ class TaskManager:
                 )
                 # 统一发送 task_stopped，携带后台任务状态
                 try:
-                    from server.extensions import emit_event
                     stopped_payload = {
                         'message': tr("task_main.task_stopped"),
                         'reason': 'user_requested',
@@ -1052,10 +1044,8 @@ class TaskManager:
                         'has_running_sub_agents': bg_state["has_running_sub_agents"],
                         'has_running_background_commands': bg_state["has_running_background_commands"],
                     }
-                    # 先写权威事件流（轮询客户端可见），再做实时推送——
-                    # 推送失败（含 socketio 未绑定）不得影响事件流记录
+                    # 事件流（轮询通道）为唯一权威出口，不再做 WebSocket 实时推送。
                     self._append_event(rec, "task_stopped", stopped_payload)
-                    emit_event('task_stopped', stopped_payload, room=f"user_{rec.username}")
                     debug_log(
                         f"[TaskRun] 已发送 task_stopped: task_id={rec.task_id}, "
                         f"has_bg={has_bg}, room=user_{rec.username}"

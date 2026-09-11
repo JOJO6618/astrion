@@ -46,11 +46,10 @@ from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker, get_user_resources
-from server.security import rate_limited, prune_socket_tokens
+from server.security import rate_limited
 from server.utils_common import debug_log
-from server.state import PROJECT_MAX_STORAGE_MB, pending_socket_tokens, SOCKET_TOKEN_TTL_SECONDS
+from server.state import PROJECT_MAX_STORAGE_MB
 from server.state import tool_approval_manager, user_question_manager
-from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 import os
 import re
@@ -189,8 +188,6 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
                 "error": str(exc),
                 "message": tr("chat_permission.update_failed")
             }), 500
-        status = terminal.get_status()
-        socketio.emit('status_update', status, room=f"user_{username}")
         return jsonify({
             "success": True,
             "mode": target_mode,
@@ -221,8 +218,6 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
         }), 500
 
     session["permission_mode"] = applied_mode
-    status = terminal.get_status()
-    socketio.emit('status_update', status, room=f"user_{username}")
     return jsonify({
         "success": True,
         "mode": applied_mode,
@@ -284,8 +279,6 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
             _sync_workspace_terminal_mode(username, workspace, "execution_mode", target_mode)
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.execution_update_failed")}), 500
-        status = terminal.get_status()
-        socketio.emit('status_update', status, room=f"user_{username}")
         return jsonify({
             "success": True,
             "state": {
@@ -310,8 +303,6 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
         _sync_workspace_terminal_mode(username, workspace, "execution_mode", state.get("mode", target_mode))
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.execution_update_failed")}), 500
-    status = terminal.get_status()
-    socketio.emit('status_update', status, room=f"user_{username}")
     return jsonify({
         "success": True,
         "state": state,
@@ -368,8 +359,6 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
             _sync_workspace_terminal_mode(username, workspace, "network_permission", target_mode)
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.network_update_failed")}), 500
-        status = terminal.get_status()
-        socketio.emit('status_update', status, room=f"user_{username}")
         return jsonify({
             "success": True,
             "mode": target_mode,
@@ -391,8 +380,6 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
         _sync_workspace_terminal_mode(username, workspace, "network_permission", applied)
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc), "message": tr("chat_permission.network_update_failed")}), 500
-    status = terminal.get_status()
-    socketio.emit('status_update', status, room=f"user_{username}")
     return jsonify({
         "success": True,
         "mode": applied,
@@ -490,8 +477,6 @@ def update_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: 
     except Exception:
         pass
 
-    status = terminal.get_status()
-    socketio.emit('status_update', status, room=f"user_{username}")
     return jsonify({
         "success": True,
         "mode": result.get("mode") or target_mode,

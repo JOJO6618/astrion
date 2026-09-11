@@ -39,11 +39,10 @@ from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
-from server.security import rate_limited, prune_socket_tokens
+from server.security import rate_limited
 from server.utils_common import debug_log
-from server.state import PROJECT_MAX_STORAGE_MB, pending_socket_tokens, SOCKET_TOKEN_TTL_SECONDS
+from server.state import PROJECT_MAX_STORAGE_MB
 from server.state import tool_approval_manager, user_question_manager
-from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 
 from modules.i18n import tr
@@ -103,9 +102,6 @@ def update_thinking_mode(terminal: WebTerminal, workspace: UserWorkspace, userna
                 )
             except Exception as exc:
                 logger.error(f"[API] 保存思考模式到对话失败: {exc}")
-        
-        status = terminal.get_status()
-        socketio.emit('status_update', status, room=f"user_{username}")
         
         return jsonify({
             "success": True,
@@ -169,9 +165,6 @@ def update_reasoning_effort(terminal: WebTerminal, workspace: UserWorkspace, use
                     )
             except Exception as exc:
                 logger.error(f"[API] 保存推理强度到对话失败: {exc}")
-
-        status = terminal.get_status()
-        socketio.emit('status_update', status, room=f"user_{username}")
 
         return jsonify({
             "success": True,
@@ -260,9 +253,6 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                     f"[API] 跳过模型保存：请求对话 {requested_cid} "
                     f"与 terminal 当前对话 {current_cid} 不一致"
                 )
-
-        status = terminal.get_status()
-        socketio.emit('status_update', status, room=f"user_{username}")
 
         return jsonify({
             "success": True,
@@ -377,11 +367,6 @@ def update_personalization_settings(terminal: WebTerminal, workspace: UserWorksp
                     )
                 except Exception as meta_exc:
                     debug_log(f"应用个性化偏好失败: 同步对话元数据异常 {meta_exc}")
-            try:
-                status = terminal.get_status()
-                socketio.emit('status_update', status, room=f"user_{username}")
-            except Exception as status_exc:
-                debug_log(f"广播个性化状态失败: {status_exc}")
         except Exception as exc:
             debug_log(f"应用个性化偏好失败: {exc}")
         config_out = dict(config)

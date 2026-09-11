@@ -428,15 +428,8 @@ def create_multi_agent_conversation():
     except Exception:
         pass
 
-    # 触发对话列表更新事件
-    try:
-        from server.app_legacy import socketio
-        socketio.emit('conversation_list_update', {
-            'action': 'created',
-            'conversation_id': conversation_id,
-        }, room=f"user_{username}")
-    except Exception:
-        pass
+    # 对话列表更新不再经 WebSocket 广播：发起方依据本响应刷新列表，
+    # 其他标签页由对话列表轮询同步。
 
     return jsonify({
         "success": True,

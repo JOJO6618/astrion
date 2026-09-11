@@ -66,10 +66,10 @@ from .utils_common import (
     CHUNK_FRONTEND_LOG_FILE,
     STREAMING_DEBUG_LOG_FILE,
 )
-from .security import rate_limited, format_tool_result_notice, compact_web_search_result, consume_socket_token, prune_socket_tokens, validate_csrf_request, requires_csrf_protection, get_csrf_token
+from .security import rate_limited, format_tool_result_notice, compact_web_search_result, validate_csrf_request, requires_csrf_protection, get_csrf_token
 from .main_task_gate import acquire_adopted_main_task_gate, release_main_task_gate
 from .monitor import cache_monitor_snapshot, get_cached_monitor_snapshot
-from .extensions import socketio, run_background
+from .extensions import run_background
 from .state import (
     MONITOR_FILE_TOOLS,
     MONITOR_MEMORY_TOOLS,
@@ -77,7 +77,6 @@ from .state import (
     MONITOR_MEMORY_ENTRY_LIMIT,
     RATE_LIMIT_BUCKETS,
     FAILURE_TRACKERS,
-    pending_socket_tokens,
     usage_trackers,
     MONITOR_SNAPSHOT_CACHE,
     MONITOR_SNAPSHOT_CACHE_LIMIT,
@@ -118,7 +117,6 @@ def generate_conversation_title_background(web_terminal: WebTerminal, conversati
         conversation_id=conversation_id,
         user_message=user_message,
         username=username,
-        socketio_instance=socketio,
         title_prompt_path=TITLE_PROMPT_PATH,
         debug_logger=debug_log,
         title_model=title_model,

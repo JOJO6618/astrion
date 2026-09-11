@@ -48,7 +48,6 @@ MONITOR_SNAPSHOT_CHAR_LIMIT = 60000
 MONITOR_MEMORY_ENTRY_LIMIT = 256
 RATE_LIMIT_BUCKETS: Dict[str, deque] = defaultdict(deque)
 FAILURE_TRACKERS: Dict[str, Dict[str, float]] = {}
-pending_socket_tokens: Dict[str, Dict[str, Any]] = {}
 usage_trackers: Dict[str, UsageTracker] = {}
 active_login_nonces: Dict[str, set] = defaultdict(set)
 
@@ -71,7 +70,6 @@ CSRF_PROTECTED_PREFIXES = ("/api/",)
 CSRF_EXEMPT_PATHS = {"/api/csrf-token"}
 FAILED_LOGIN_LIMIT = 5
 FAILED_LOGIN_LOCK_SECONDS = 300
-SOCKET_TOKEN_TTL_SECONDS = 45
 USER_IDLE_TIMEOUT_SECONDS = int(os.environ.get("USER_IDLE_TIMEOUT_SECONDS", "900"))
 LAST_ACTIVE_FILE = Path(LOGS_DIR).expanduser().resolve() / "last_active.json"
 _last_active_lock = threading.Lock()
@@ -104,7 +102,6 @@ __all__ = [
     "MONITOR_MEMORY_ENTRY_LIMIT",
     "RATE_LIMIT_BUCKETS",
     "FAILURE_TRACKERS",
-    "pending_socket_tokens",
     "usage_trackers",
     "active_login_nonces",
     "tool_approval_manager",
@@ -123,7 +120,6 @@ __all__ = [
     "CSRF_EXEMPT_PATHS",
     "FAILED_LOGIN_LIMIT",
     "FAILED_LOGIN_LOCK_SECONDS",
-    "SOCKET_TOKEN_TTL_SECONDS",
     "USER_IDLE_TIMEOUT_SECONDS",
     "LAST_ACTIVE_FILE",
     "_last_active_lock",

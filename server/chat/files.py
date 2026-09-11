@@ -34,11 +34,10 @@ from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
-from server.security import rate_limited, prune_socket_tokens
+from server.security import rate_limited
 from server.utils_common import debug_log
-from server.state import PROJECT_MAX_STORAGE_MB, pending_socket_tokens, SOCKET_TOKEN_TTL_SECONDS
+from server.state import PROJECT_MAX_STORAGE_MB
 from server.state import tool_approval_manager, user_question_manager
-from server.extensions import socketio
 from server.monitor import get_cached_monitor_snapshot
 from server.utils_common import sanitize_filename_preserve_unicode
 
