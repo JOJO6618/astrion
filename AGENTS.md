@@ -647,3 +647,24 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 2. 确认后端 formatter（`tool_result_formatter`）与前端 renderer（`toolRenderers.ts`）已覆盖该工具。
 3. 个人空间勾选 UI 自动出现（注册表经 `/api/personalization` 的 `tool_loading_registry` 下发，类目标签 i18n key `personalization.toolLoadingCat.<key>` 需双语补齐）。
 4. 跑 `test/test_tool_loading.py`（注册表完整性断言会校验数量与结构）。
+
+---
+
+## 14) 网页提取白名单直提（2026-09-12 新增）
+
+> 实现唯一权威：`modules/webpage_extractor.py`。
+
+### 14.1 机制一句话
+
+`extract_webpage` / `save_webpage` 不再全部走 Tavily：命中白名单的域名在本机直提（免费、零配额），失败或未命中才回退 Tavily。开关与追加域名在个人空间（工具页），存 personalization.json 的 `webpage_direct_extract_enabled`（默认 true）/ `webpage_direct_extract_domains`。
+
+### 14.2 硬约束（改代码必须知道）
+
+1. **统一入口是 `extract_single_url()`**：白名单判定 → `_direct_extract()` → 失败回退 `tavily_extract()`。两个工具调用点都走它，不要绕过单写 tavily 路径。
+2. **降级链**：GitHub blob 页 → jsDelivr CDN（`cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}`，国内可用、无限速）→ GitHub API contents（备用，匿名限 60 次/时）→ trafilatura 通用提取 → Tavily。**不要用 raw.githubusercontent.com**（国内被 DNS 污染，实测不可达）。
+3. **trafilatura 是可选依赖**：`import` 失败时通用直提静默失效（GitHub 直链不依赖它仍可用），白名单不会报错；已进 `requirements.txt`，正式部署应装上。
+4. **blob URL 的 branch 按单段解析**（`[^/?#]+`）；含斜杠的分支名解析失败会自然降级 trafilatura → Tavily，属预期行为。
+5. **域名匹配 = 精确或子域名后缀**：`github.com` 命中 `gist.github.com`；用户输入经 `_normalize_domain` 清洗（容忍粘贴完整 URL）。
+6. **新增 personalization 键必须双注册**（`DEFAULT_PERSONALIZATION_CONFIG` + `sanitize_personalization_payload`），否则保存后被静默丢弃（见 .astrion/memory/personalization_config_whitelist.md）。
+7. **返回格式**沿用 `🌐 网页内容 (N 字符)` 骨架，新增 `[提取方式: ...]` 标注（i18n key `webpage.method_label` / `webpage.method_*`），模型侧无感知。
+8. **read-before-edit 已读白名单**含 `recall_project_memory`（recall 返回记忆文件全文，视为已读）；`search_project_memory` 只回片段，刻意不标记。

@@ -254,6 +254,14 @@ export default {
     mcp: 'MCP',
     misc: '彩蛋'
   },
+  webDirectExtractTitle: '网页直提白名单',
+  webDirectExtractDesc:
+    '命中白名单的网站直接在本机提取内容（GitHub 代码文件走 CDN 直链，其余用正文识别），无需消耗 Tavily 配额；提取失败会自动回退 Tavily',
+  webDirectExtractEnabledTitle: '启用白名单直提',
+  webDirectExtractDomainsTitle: '追加白名单域名',
+  webDirectExtractBuiltinBadge: '内置',
+  webDirectExtractDomainPlaceholder: '输入域名，如 docs.python.org',
+  webDirectExtractAdd: '添加',
 
   // ── 文件与图片 ──
   imageCompressionTitle: '图片压缩',

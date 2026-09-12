@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, unref } from 'vue';
+import { inject, unref, ref } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 
 defineOptions({ name: 'ToolsTab' });
@@ -57,6 +57,43 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
     }
   }
   personalization.updateField({ key: 'tool_loading_deferred', value: Array.from(current) });
+};
+
+/** 追加的直提白名单域名（内置 github.com 不在此列，直接展示内置徽标） */
+const directExtractDomains = (): string[] => {
+  const f: any = unref(form);
+  return Array.isArray(f?.webpage_direct_extract_domains) ? f.webpage_direct_extract_domains : [];
+};
+
+/** 新增域名输入框的本地草稿 */
+const newDirectDomain = ref('');
+
+const addDirectDomain = () => {
+  let value = newDirectDomain.value.trim().toLowerCase();
+  if (!value) return;
+  // 容忍粘贴完整 URL：提取 hostname 部分
+  if (value.includes('://')) {
+    try {
+      value = new URL(value).hostname;
+    } catch {
+      return;
+    }
+  }
+  value = value.split('/')[0].replace(/^\.+|\.+$/g, '');
+  if (!value || !value.includes('.')) return;
+  const current = [...directExtractDomains()];
+  if (!current.includes(value)) {
+    current.push(value);
+    personalization.updateField({ key: 'webpage_direct_extract_domains', value: current });
+  }
+  newDirectDomain.value = '';
+};
+
+const removeDirectDomain = (domain: string) => {
+  personalization.updateField({
+    key: 'webpage_direct_extract_domains',
+    value: directExtractDomains().filter((d) => d !== domain)
+  });
 };
 </script>
 
@@ -207,6 +244,54 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
                               :checked="form.disabled_tool_categories.includes(category.id)"
                               @change="toggleCategory(category.id)" /><FancyCheck :checked="form.disabled_tool_categories.includes(category.id)" /></label>
                         </div>
+                      </div>
+                      <div class="settings-group-block">
+                        <div class="settings-group-title">
+                          <span class="settings-row-title">{{ $t('personalization.webDirectExtractTitle') }}</span
+                          ><span class="settings-row-desc">{{ $t('personalization.webDirectExtractDesc') }}</span>
+                        </div>
+                        <label class="settings-toggle-row inner"
+                          ><span class="settings-row-title">{{ $t('personalization.webDirectExtractEnabledTitle') }}</span
+                          ><input
+                            type="checkbox"
+                            :checked="form.webpage_direct_extract_enabled"
+                            @change="
+                              personalization.updateField({
+                                key: 'webpage_direct_extract_enabled',
+                                value: $event.target.checked
+                              })
+                            " /><FancyCheck :checked="form.webpage_direct_extract_enabled" /></label>
+                        <template v-if="form.webpage_direct_extract_enabled">
+                          <div class="settings-domain-list">
+                            <div class="settings-domain-row">
+                              <span class="settings-row-title">github.com</span
+                              ><span class="settings-domain-badge">{{
+                                $t('personalization.webDirectExtractBuiltinBadge')
+                              }}</span>
+                            </div>
+                            <div v-for="domain in directExtractDomains()" :key="domain" class="settings-domain-row">
+                              <span class="settings-row-title">{{ domain }}</span
+                              ><button
+                                type="button"
+                                class="settings-domain-remove"
+                                @click="removeDirectDomain(domain)"
+                              >
+                                {{ $t('common.delete') }}
+                              </button>
+                            </div>
+                          </div>
+                          <div class="settings-add-row">
+                            <input
+                              v-model="newDirectDomain"
+                              type="text"
+                              :placeholder="$t('personalization.webDirectExtractDomainPlaceholder')"
+                              @keydown.enter="addDirectDomain"
+                            />
+                            <button type="button" class="settings-secondary-button" @click="addDirectDomain">
+                              {{ $t('personalization.webDirectExtractAdd') }}
+                            </button>
+                          </div>
+                        </template>
                       </div>
                       <div class="settings-group-block" v-if="toolLoadingRegistry.length">
                         <div class="settings-group-title">

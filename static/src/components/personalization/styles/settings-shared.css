@@ -561,6 +561,65 @@ body[data-theme='dark'] .settings-floating-menu {
   gap: 8px;
 }
 
+/* 直提白名单域名列表：分隔线区分行，不套圆角卡片 */
+.settings-domain-list {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 10px;
+}
+
+.settings-domain-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 36px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--theme-control-border);
+}
+
+.settings-domain-row:last-child {
+  border-bottom: none;
+}
+
+.settings-domain-row .settings-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-domain-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 28px; /* 与 .settings-domain-remove 同高同居中机制，保证文字视觉对齐 */
+  margin-right: 10px; /* 抵消删除按钮的水平 padding，使两者文字右缘对齐 */
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.settings-domain-remove {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .settings-domain-remove:hover {
+    background: var(--hover-bg);
+    color: var(--state-warning);
+  }
+}
+
 .settings-add-row input,
 .settings-number-row input {
   min-width: 0;

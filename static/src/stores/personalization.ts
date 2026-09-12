@@ -103,6 +103,10 @@ interface PersonalForm {
   tool_loading_enabled: boolean;
   /** 默认延迟加载的工具名列表（仅影响新建对话） */
   tool_loading_deferred: string[];
+  /** 网页提取白名单直提开关（默认开启） */
+  webpage_direct_extract_enabled: boolean;
+  /** 用户追加的直提白名单域名（内置 github.com 不在此列） */
+  webpage_direct_extract_domains: string[];
   skill_hints_enabled: boolean;
   skill_strict_terminal_enabled: boolean;
   skill_strict_sub_agent_enabled: boolean;
@@ -314,6 +318,8 @@ const defaultForm = (): PersonalForm => ({
   tool_intent_enabled: true,
   tool_loading_enabled: true,
   tool_loading_deferred: [],
+  webpage_direct_extract_enabled: true,
+  webpage_direct_extract_domains: [],
   skill_hints_enabled: false,
   skill_strict_terminal_enabled: false,
   skill_strict_sub_agent_enabled: false,
@@ -539,6 +545,12 @@ export const usePersonalizationStore = defineStore('personalization', {
         tool_loading_enabled: data.tool_loading_enabled !== false,
         tool_loading_deferred: Array.isArray(data.tool_loading_deferred)
           ? data.tool_loading_deferred.filter((item: any) => typeof item === 'string')
+          : [],
+        webpage_direct_extract_enabled: data.webpage_direct_extract_enabled !== false,
+        webpage_direct_extract_domains: Array.isArray(data.webpage_direct_extract_domains)
+          ? data.webpage_direct_extract_domains.filter(
+              (item: any) => typeof item === 'string' && item.trim()
+            )
           : [],
         skill_hints_enabled: !!data.skill_hints_enabled,
         skill_strict_terminal_enabled: !!data.skill_strict_terminal_enabled,

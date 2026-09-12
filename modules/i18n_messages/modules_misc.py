@@ -214,6 +214,26 @@ MESSAGES = {
         "zh-CN": "❌ 未能提取到任何内容",
         "en-US": "❌ No content could be extracted",
     },
+    "webpage.method_label": {
+        "zh-CN": "提取方式: {method}",
+        "en-US": "Extraction method: {method}",
+    },
+    "webpage.method_jsdelivr": {
+        "zh-CN": "直连 jsDelivr",
+        "en-US": "Direct jsDelivr",
+    },
+    "webpage.method_github_api": {
+        "zh-CN": "直连 GitHub API",
+        "en-US": "Direct GitHub API",
+    },
+    "webpage.method_trafilatura": {
+        "zh-CN": "直连 trafilatura",
+        "en-US": "Direct trafilatura",
+    },
+    "webpage.method_tavily": {
+        "zh-CN": "Tavily",
+        "en-US": "Tavily",
+    },
 
     # ── mcp_client_manager（manager.py + http_client.py） ──
     "mcp.server_not_found": {

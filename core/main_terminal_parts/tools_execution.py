@@ -72,7 +72,12 @@ from modules.memory_manager import MemoryManager
 from modules.terminal_manager import TerminalManager
 from modules.todo_manager import TodoManager
 from modules.sub_agent import SubAgentManager
-from modules.webpage_extractor import extract_webpage_content, tavily_extract
+from modules.webpage_extractor import (
+    extract_single_url,
+    extract_webpage_content,
+    resolve_direct_extract_config,
+    tavily_extract,
+)
 from modules.ocr_client import OCRClient
 from modules.easter_egg_manager import EasterEggManager
 from modules.personalization_manager import (
@@ -741,7 +746,9 @@ class MainTerminalToolsExecutionMixin:
                 return visited
 
     def _mark_file_read_from_result(self, tool_name: str, arguments: Dict[str, Any], result: Dict[str, Any]) -> None:
-                if tool_name not in {"read_file", "read_skill"}:
+                # recall_project_memory 内部即读取记忆文件全文（走 _handle_read_tool），
+                # 视为已读，避免后续 edit_file 被要求重复 read_file。
+                if tool_name not in {"read_file", "read_skill", "recall_project_memory"}:
                     return
                 if not isinstance(result, dict) or not result.get("success"):
                     return
@@ -1768,11 +1775,16 @@ class MainTerminalToolsExecutionMixin:
                         try:
                             # 从config获取API密钥
                             from config import TAVILY_API_KEY
+                            try:
+                                _prefs = load_personalization_config(self.data_dir) or {}
+                            except Exception:
+                                _prefs = {}
                             full_content, _ = await extract_webpage_content(
-                                urls=url, 
+                                urls=url,
                                 api_key=TAVILY_API_KEY,
                                 extract_depth="basic",
-                                max_urls=1
+                                max_urls=1,
+                                direct_config=resolve_direct_extract_config(_prefs),
                             )
 
                             # 字符数检查
@@ -1815,92 +1827,57 @@ class MainTerminalToolsExecutionMixin:
                         except ImportError:
                             TAVILY_API_KEY = None
 
-                        if not TAVILY_API_KEY or TAVILY_API_KEY == "your-tavily-api-key":
-                            result = {
-                                "success": False,
-                                "error": tr("tools_exec.tavily_key_missing"),
-                                "url": url,
-                                "path": target_path
-                            }
-                        else:
+                        # 白名单直提优先（无需 Tavily key）；未命中/失败自动回退 Tavily
+                        try:
                             try:
-                                extract_result = await tavily_extract(
-                                    urls=url,
-                                    api_key=TAVILY_API_KEY,
-                                    extract_depth="basic",
-                                    max_urls=1
-                                )
+                                _prefs = load_personalization_config(self.data_dir) or {}
+                            except Exception:
+                                _prefs = {}
+                            extract_one = await extract_single_url(
+                                url,
+                                TAVILY_API_KEY,
+                                extract_depth="basic",
+                                direct_config=resolve_direct_extract_config(_prefs),
+                            )
 
-                                if not extract_result or "error" in extract_result:
-                                    error_message = extract_result.get("error", tr("tools_exec.extract_failed_no_content")) if isinstance(extract_result, dict) else tr("tools_exec.extract_failed")
+                            if not extract_one.get("success"):
+                                result = {
+                                    "success": False,
+                                    "error": extract_one.get("error", tr("tools_exec.extract_failed_no_content")),
+                                    "url": url,
+                                    "path": target_path
+                                }
+                            else:
+                                content_to_save = extract_one.get("content") or ""
+                                write_result = self.file_manager.write_file(target_path, content_to_save, mode="w")
+
+                                if not write_result.get("success"):
                                     result = {
                                         "success": False,
-                                        "error": error_message,
+                                        "error": write_result.get("error", tr("tools_exec.write_file_failed")),
                                         "url": url,
                                         "path": target_path
                                     }
                                 else:
-                                    results_list = extract_result.get("results", []) if isinstance(extract_result, dict) else []
+                                    char_count = len(content_to_save)
+                                    byte_size = len(content_to_save.encode("utf-8"))
+                                    result = {
+                                        "success": True,
+                                        "url": url,
+                                        "path": write_result.get("path", target_path),
+                                        "char_count": char_count,
+                                        "byte_size": byte_size,
+                                        "extract_method": extract_one.get("method"),
+                                        "message": tr("tools_exec.webpage_saved", path=write_result.get('path', target_path))
+                                    }
 
-                                    primary_result = None
-                                    for item in results_list:
-                                        if item.get("raw_content"):
-                                            primary_result = item
-                                            break
-                                    if primary_result is None and results_list:
-                                        primary_result = results_list[0]
-
-                                    if not primary_result:
-                                        failed_list = extract_result.get("failed_results", []) if isinstance(extract_result, dict) else []
-                                        result = {
-                                            "success": False,
-                                            "error": tr("tools_exec.extract_result_empty"),
-                                            "url": url,
-                                            "path": target_path,
-                                            "failed": failed_list
-                                        }
-                                    else:
-                                        content_to_save = primary_result.get("raw_content") or primary_result.get("content") or ""
-
-                                        if not content_to_save:
-                                            result = {
-                                                "success": False,
-                                                "error": tr("tools_exec.webpage_content_empty"),
-                                                "url": url,
-                                                "path": target_path
-                                            }
-                                        else:
-                                            write_result = self.file_manager.write_file(target_path, content_to_save, mode="w")
-
-                                            if not write_result.get("success"):
-                                                result = {
-                                                    "success": False,
-                                                    "error": write_result.get("error", tr("tools_exec.write_file_failed")),
-                                                    "url": url,
-                                                    "path": target_path
-                                                }
-                                            else:
-                                                char_count = len(content_to_save)
-                                                byte_size = len(content_to_save.encode("utf-8"))
-                                                result = {
-                                                    "success": True,
-                                                    "url": url,
-                                                    "path": write_result.get("path", target_path),
-                                                    "char_count": char_count,
-                                                    "byte_size": byte_size,
-                                                    "message": tr("tools_exec.webpage_saved", path=write_result.get('path', target_path))
-                                                }
-
-                                                if isinstance(extract_result, dict) and extract_result.get("failed_results"):
-                                                    result["warnings"] = extract_result["failed_results"]
-
-                            except Exception as e:
-                                result = {
-                                    "success": False,
-                                    "error": tr("tools_exec.webpage_save_failed", error=str(e)),
-                                    "url": url,
-                                    "path": target_path
-                                }
+                        except Exception as e:
+                            result = {
+                                "success": False,
+                                "error": tr("tools_exec.webpage_save_failed", error=str(e)),
+                                "url": url,
+                                "path": target_path
+                            }
 
                     elif tool_name == "run_command":
                         permission_mode = "unrestricted"

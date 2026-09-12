@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 try:
     from config.limits import REASONING_EFFORT_LEVELS
@@ -31,6 +32,9 @@ ALLOWED_UI_LOCALES = {"zh-CN", "en-US"}
 GOAL_MAX_TURNS_MIN = 1
 GOAL_MAX_TURNS_MAX = 100
 GOAL_MAX_TURNS_DEFAULT = 5
+
+# 网页提取直提白名单：用户可追加的域名数量上限
+MAX_DIRECT_EXTRACT_DOMAINS = 50
 GOAL_MAX_TOKENS_MIN = 1_000
 GOAL_MAX_TOKENS_MAX = 100_000_000
 
@@ -98,6 +102,10 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     # 仅在创建对话时快照一次；已有对话以其对话文件中的快照为准，改这里不影响。
     "tool_loading_enabled": True,
     "tool_loading_deferred": None,
+    # 网页提取白名单直提：命中白名单的域名用本机直提（GitHub 直链 / trafilatura），
+    # 未命中才走 Tavily；开关默认开启，domains 为用户追加的白名单域名（内置 github.com 不在此列）。
+    "webpage_direct_extract_enabled": True,
+    "webpage_direct_extract_domains": [],
     "default_model": None,
     "image_compression": "original",  # original / 1080p / 720p / 540p
     "auto_shallow_compress_enabled": False,
@@ -753,6 +761,27 @@ def sanitize_personalization_payload(
         base["review_agents"] = _sanitize_review_agents(data.get("review_agents"))
     else:
         base["review_agents"] = _sanitize_review_agents(base.get("review_agents"))
+
+    # 网页提取白名单直提：开关（默认开启）+ 用户追加的域名列表
+    if "webpage_direct_extract_enabled" in data:
+        base["webpage_direct_extract_enabled"] = bool(data.get("webpage_direct_extract_enabled"))
+    else:
+        base["webpage_direct_extract_enabled"] = bool(base.get("webpage_direct_extract_enabled", True))
+
+    raw_domains = data.get("webpage_direct_extract_domains", base.get("webpage_direct_extract_domains"))
+    if not isinstance(raw_domains, list):
+        raw_domains = []
+    clean_domains: List[str] = []
+    for item in raw_domains[:MAX_DIRECT_EXTRACT_DOMAINS]:
+        if not isinstance(item, str):
+            continue
+        d = item.strip().lower().strip(".")
+        if "//" in d:
+            d = d.split("//", 1)[1]
+        d = d.split("/")[0].split("?")[0]
+        if d and re.fullmatch(r"[a-z0-9.-]+", d) and "." in d and d not in clean_domains:
+            clean_domains.append(d)
+    base["webpage_direct_extract_domains"] = clean_domains
 
     return base
 

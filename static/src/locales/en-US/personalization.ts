@@ -253,6 +253,14 @@ export default {
     mcp: 'MCP',
     misc: 'Easter egg'
   },
+  webDirectExtractTitle: 'Direct extraction whitelist',
+  webDirectExtractDesc:
+    'Whitelisted sites are extracted locally (GitHub code files via CDN raw links, others via readability-style parsing) at no Tavily quota cost; falls back to Tavily automatically on failure',
+  webDirectExtractEnabledTitle: 'Enable whitelist direct extraction',
+  webDirectExtractDomainsTitle: 'Additional whitelisted domains',
+  webDirectExtractBuiltinBadge: 'Built-in',
+  webDirectExtractDomainPlaceholder: 'Enter a domain, e.g. docs.python.org',
+  webDirectExtractAdd: 'Add',
 
   // ── Files & Images ──
   imageCompressionTitle: 'Image compression',

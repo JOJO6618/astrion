@@ -8,3 +8,6 @@ openai
 cryptography
 pillow
 pyyaml>=6.0
+# 网页白名单直提的正文识别引擎（可选依赖：import 失败时代码自动降级为全走 Tavily，
+# 但正式部署应装上，否则直提白名单只剩 GitHub 直链可用）
+trafilatura
