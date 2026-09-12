@@ -186,11 +186,8 @@ def check_lifecycle():
 
     assert not is_main_task_gate_busy(terminal), "任务终态后门闸必须释放（否则下一任务无法受理）"
 
-    # 全程无 Flask app 初始化（socketio 未绑定 app）
+    # 全程无 Flask app 初始化
     assert not has_app_context(), "验收结束仍应无 Flask app 上下文"
-    import server.extensions as ext
-
-    assert getattr(ext.socketio, "server", None) is None, "socketio 不应初始化 server（无 Web 应用装配）"
 
 
 def check_chain():

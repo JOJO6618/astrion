@@ -5,7 +5,6 @@
 import warnings
 from server.app import (
     app,
-    socketio,
     run_server,
     parse_arguments,
     resource_busy_page,
@@ -14,7 +13,6 @@ from server.app import (
 
 __all__ = [
     "app",
-    "socketio",
     "run_server",
     "parse_arguments",
     "resource_busy_page",
