@@ -345,7 +345,7 @@
                 aria-haspopup="true"
               >
                 <span>{{ agentTypeLabel }}</span>
-                <span class="agent-type-switcher__caret" :class="{ open: agentTypeMenuOpen }" aria-hidden="true">›</span>
+                <svg class="agent-type-switcher__caret" :class="{ open: agentTypeMenuOpen }" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.75 3.75L5 6.25L7.25 3.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <div v-if="agentTypeMenuOpen && !agentTypeLocked" class="agent-type-switcher__menu" @click.stop>
                 <button
@@ -372,7 +372,7 @@
                 :title="workModeLocked ? $t('input.workModeLockedTitle') : $t('input.workModeTitle')"
               >
                 <span>{{ workModeLabel }}</span>
-                <span class="agent-type-switcher__caret" :class="{ open: workModeMenuOpen }" aria-hidden="true">›</span>
+                <svg class="agent-type-switcher__caret" :class="{ open: workModeMenuOpen }" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.75 3.75L5 6.25L7.25 3.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <div v-if="workModeMenuOpen && !workModeLocked" class="agent-type-switcher__menu" @click.stop>
                 <button
@@ -531,7 +531,7 @@
               :class="{ 'permission-switcher__exec--warn': currentExecutionMode === 'direct' }"
               >{{ currentExecutionShortLabel }}</span
             >
-            <span class="permission-switcher__caret" :class="{ open: permissionMenuOpen }">›</span>
+            <svg class="permission-switcher__caret" :class="{ open: permissionMenuOpen }" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.75 3.75L5 6.25L7.25 3.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <div
             v-if="permissionMenuOpen"

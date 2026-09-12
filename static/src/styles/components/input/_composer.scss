@@ -613,9 +613,10 @@ body[data-theme='light'] {
 }
 
 .permission-switcher__caret {
-  font-size: 14px;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
   color: var(--text-secondary);
-  transform: rotate(90deg);
   transition: transform 0.18s ease;
 }
 
@@ -628,7 +629,7 @@ body[data-theme='light'] {
 }
 
 .permission-switcher__caret.open {
-  transform: rotate(270deg);
+  transform: rotate(180deg);
 }
 
 .permission-switcher__item {
@@ -1545,15 +1546,15 @@ body[data-theme='light'] {
 }
 
 .agent-type-switcher__caret {
-  font-size: 13px;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
   color: var(--text-secondary);
-  transform: rotate(90deg);
   transition: transform 0.18s ease;
-  line-height: 1;
 }
 
 .agent-type-switcher__caret.open {
-  transform: rotate(270deg);
+  transform: rotate(180deg);
 }
 
 /* 菜单底色/边框/圆角与 + 菜单（.quick-menu）一致 */
