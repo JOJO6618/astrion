@@ -33,6 +33,9 @@ export default {
   previewCount: '{n} lines',
   sendToModel: 'Send to model',
   generating: 'Generating...',
+  fullRecord: 'Full record',
+  fullRecordHint: 'Switch to full record: preview and output will include tool calls and results',
+  cleanDialogueHint: 'Switch back to clean dialogue: only the actual conversation',
 
   // ── GoalProgressDialog ──
   goalDoneTitle: 'Goal completed',

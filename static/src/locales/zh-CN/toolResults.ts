@@ -89,6 +89,7 @@ export default {
     title: '标题：',
     reviewFile: '回顾文件：',
     charCount: '字符数：',
+    contentMode: '内容模式：',
     skill: 'Skill：',
     workflow: '工作流：',
     workflowCount: '工作流数量：',
@@ -259,6 +260,8 @@ export default {
     colon: '：',
     optionLabel: '选项 {n}',
     line: '行 {line}',
+    reviewContentModeDialogue: '纯净对话',
+    reviewContentModeFull: '完整记录',
   },
 
   // —— 搜索主题 / 时间范围 / 网站限定 ——

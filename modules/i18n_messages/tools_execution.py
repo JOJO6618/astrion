@@ -453,6 +453,10 @@ MESSAGES = {
         "zh-CN": "mode 必须为 read 或 save",
         "en-US": "mode must be read or save",
     },
+    "tools_exec.review_content_mode_invalid": {
+        "zh-CN": "content_mode 必须为 dialogue 或 full",
+        "en-US": "content_mode must be dialogue or full",
+    },
     "tools_exec.review_conversation_missing": {
         "zh-CN": "对话不存在或不属于当前工作区",
         "en-US": "Conversation does not exist or does not belong to the current workspace",

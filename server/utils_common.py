@@ -33,10 +33,16 @@ def sanitize_filename_preserve_unicode(filename: str) -> str:
     return cleaned[:255]
 
 
-def build_review_lines(messages, limit=None):
+# 对话回顾内容模式：dialogue=纯净对话（默认，仅含实际内容的 user/assistant）；full=完整记录（含工具调用/结果与 system）
+REVIEW_CONTENT_MODES = ("dialogue", "full")
+
+
+def build_review_lines(messages, limit=None, content_mode="dialogue"):
     """
     将对话消息序列拍平成简化文本。
-    保留 user / assistant / system 以及 assistant 内的 tool 调用与 tool 消息。
+    content_mode="dialogue"（默认）：只保留提取文本后非空的 user / assistant 消息，
+        不含 tool / tool_call / system 行，空内容消息整条跳过。
+    content_mode="full"：保留 user / assistant / system 以及 assistant 内的 tool 调用与 tool 消息。
     limit 为正整数时，最多返回该数量的行（用于预览）。
     """
     lines: List[str] = []
@@ -70,6 +76,14 @@ def build_review_lines(messages, limit=None):
         role = msg.get("role")
         base_content_raw = msg.get("content") if isinstance(msg.get("content"), (str, list, dict)) else msg.get("text") or ""
         base_content = extract_text(base_content_raw)
+
+        if content_mode == "dialogue":
+            # 纯净模式：仅保留有实际内容的 user / assistant 消息
+            if role in ("user", "assistant") and base_content.strip():
+                append_line(f"{role}：{base_content}")
+            if isinstance(limit, int) and limit > 0 and len(lines) >= limit:
+                return lines[:limit]
+            continue
 
         if role in ("user", "assistant", "system"):
             append_line(f"{role}：{base_content}")

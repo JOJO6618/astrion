@@ -522,12 +522,14 @@
           :preview-error="reviewPreviewError"
           :preview-limit="reviewPreviewLimit"
           :send-to-model="reviewSendToModel"
+          :content-mode="reviewContentMode"
           :generated-path="reviewGeneratedPath"
           :icon-style="iconStyle"
           @close="reviewDialogOpen = false"
           @select="handleReviewSelect"
           @load-more="loadMoreReviewConversations"
           @toggle-send="reviewSendToModel = $event"
+          @toggle-content-mode="toggleReviewContentMode"
           @confirm="handleConfirmReview"
         />
       </transition>

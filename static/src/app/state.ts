@@ -344,6 +344,8 @@ export function dataState() {
     reviewPreviewLimit: 20,
     reviewSendToModel: true,
     reviewGeneratedPath: null,
+    // 回顾内容模式：dialogue=纯净对话（默认推荐）；full=完整记录（含工具调用与结果）
+    reviewContentMode: 'dialogue',
     // 回顾弹窗独立的对话列表（只含有内容的对话，不污染侧边栏）
     reviewConversations: [],
     reviewListLoading: false,

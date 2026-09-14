@@ -82,6 +82,7 @@ export default {
     title: 'Title:',
     reviewFile: 'Review file:',
     charCount: 'Characters:',
+    contentMode: 'Content mode:',
     skill: 'Skill:',
     workflow: 'Workflow:',
     workflowCount: 'Workflows:',
@@ -252,6 +253,8 @@ export default {
     colon: ':',
     optionLabel: 'Option {n}',
     line: 'Line {line}',
+    reviewContentModeDialogue: 'Clean dialogue',
+    reviewContentModeFull: 'Full record',
   },
 
   // —— Search topic / time range / domain limits ——

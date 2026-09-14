@@ -75,6 +75,7 @@ from .gateway_auth import api_login_or_host_token_required
 from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
 from .utils_common import (
     build_review_lines,
+    REVIEW_CONTENT_MODES,
     debug_log,
     _sanitize_filename_component,
     log_backend_chunk,
@@ -2235,7 +2236,10 @@ def review_conversation_preview(conversation_id, terminal: WebTerminal, workspac
             }), 404
 
         limit = request.args.get('limit', default=20, type=int) or 20
-        lines = build_review_lines(conversation_data.get("messages", []), limit=limit)
+        content_mode = (request.args.get('content_mode') or 'dialogue').strip().lower()
+        if content_mode not in REVIEW_CONTENT_MODES:
+            content_mode = 'dialogue'
+        lines = build_review_lines(conversation_data.get("messages", []), limit=limit, content_mode=content_mode)
 
         return jsonify({
             "success": True,
@@ -2278,7 +2282,11 @@ def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
             }), 404
 
         messages = conversation_data.get("messages", [])
-        lines = build_review_lines(messages)
+        payload = request.get_json(silent=True) or {}
+        content_mode = str(payload.get("content_mode") or "dialogue").strip().lower()
+        if content_mode not in REVIEW_CONTENT_MODES:
+            content_mode = "dialogue"
+        lines = build_review_lines(messages, content_mode=content_mode)
         content = "\n".join(lines) + "\n"
         char_count = len(content)
 
@@ -2291,13 +2299,19 @@ def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
         filename = f"review_{safe_title}_{timestamp}.md"
         target = review_dir / filename
 
-        target.write_text(content, encoding='utf-8')
+        annotation = tr(
+            "conversation.review_annotation_dialogue"
+            if content_mode == "dialogue"
+            else "conversation.review_annotation_full"
+        )
+        target.write_text(f"> {annotation}\n\n" + content, encoding='utf-8')
 
         return jsonify({
             "success": True,
             "data": {
                 "path": f".astrion/review/{filename}",
-                "char_count": char_count
+                "char_count": char_count,
+                "content_mode": content_mode
             }
         })
     except Exception as e:

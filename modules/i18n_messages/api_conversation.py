@@ -273,6 +273,14 @@ MESSAGES = {
         "zh-CN": "生成对话回顾时发生异常",
         "en-US": "An error occurred while generating the conversation review",
     },
+    "conversation.review_annotation_dialogue": {
+        "zh-CN": "回顾模式：纯净对话（仅含用户与助手的实际对话内容）",
+        "en-US": "Review mode: clean dialogue (only actual user/assistant messages)",
+    },
+    "conversation.review_annotation_full": {
+        "zh-CN": "回顾模式：完整记录（含工具调用与结果）",
+        "en-US": "Review mode: full record (including tool calls and results)",
+    },
 
     # ── 统计 / 当前对话 ──
     "conversation.get_statistics_exception": {

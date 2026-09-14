@@ -1159,6 +1159,13 @@ function renderConversationReview(result: any, args: any): string {
   html += `<div><strong>${escapeHtml(t('toolResults.labels.conversationId'))}</strong>${escapeHtml(result?.conversation_id || args?.conversation_id || '')}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(result?.mode || args?.mode || '')}</div>`;
+  const reviewContentMode = result?.content_mode || args?.content_mode || '';
+  if (reviewContentMode) {
+    const reviewContentModeLabel = reviewContentMode === 'full'
+      ? t('toolResults.values.reviewContentModeFull')
+      : t('toolResults.values.reviewContentModeDialogue');
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.contentMode'))}</strong>${escapeHtml(reviewContentModeLabel)}</div>`;
+  }
   if (result?.title) {
     html += `<div><strong>${escapeHtml(t('toolResults.labels.title'))}</strong>${escapeHtml(result.title)}</div>`;
   }

@@ -178,6 +178,8 @@ export const dialogMethods = {
     this.reviewPreviewLines = [];
     this.reviewPreviewError = null;
     this.reviewGeneratedPath = null;
+    // 每次打开默认回到纯净对话模式（推荐项）
+    this.reviewContentMode = 'dialogue';
     this.closeQuickMenu();
     // 弹窗使用独立列表（仅含有内容的对话），加载完成后自动选中首个可用项
     this.loadReviewConversations();

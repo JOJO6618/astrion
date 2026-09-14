@@ -109,14 +109,27 @@
           <span class="switch"></span>
           <span class="label">{{ $t('overlay.sendToModel') }}</span>
         </label>
-        <button
-          type="button"
-          class="primary-btn"
-          @click="$emit('confirm')"
-          :disabled="!selectedId || submitting"
-        >
-          {{ submitting ? $t('overlay.generating') : $t('common.confirm') }}
-        </button>
+        <div class="footer-actions">
+          <button
+            type="button"
+            class="secondary-btn"
+            :class="{ active: contentMode === 'full' }"
+            :aria-pressed="contentMode === 'full'"
+            :title="contentMode === 'full' ? $t('overlay.cleanDialogueHint') : $t('overlay.fullRecordHint')"
+            @click="$emit('toggle-content-mode')"
+            :disabled="submitting"
+          >
+            {{ $t('overlay.fullRecord') }}
+          </button>
+          <button
+            type="button"
+            class="primary-btn"
+            @click="$emit('confirm')"
+            :disabled="!selectedId || submitting"
+          >
+            {{ submitting ? $t('overlay.generating') : $t('common.confirm') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -147,6 +160,7 @@ const props = defineProps<{
   previewError?: string | null;
   previewLimit?: number;
   sendToModel: boolean;
+  contentMode: 'dialogue' | 'full';
   generatedPath?: string | null;
   iconStyle?: (key: string) => Record<string, string>;
 }>();
@@ -158,6 +172,7 @@ defineEmits<{
   (event: 'select', id: string): void;
   (event: 'load-more'): void;
   (event: 'confirm'): void;
+  (event: 'toggle-content-mode'): void;
   (event: 'toggle-send', value: boolean): void;
 }>();
 
@@ -567,6 +582,46 @@ const formatUpdatedAt = (value: string | number) => {
 
 .toggle-send .label {
   white-space: nowrap;
+}
+
+/* ===== 底部按钮组 ===== */
+.footer-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 次操作按钮（完整记录）：中性色、固定高度，与主按钮对齐 */
+.secondary-btn {
+  flex: 0 0 auto;
+  height: 38px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 0 16px;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.secondary-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+/* 切换按下态（完整记录模式）：中性灰阶区分，不用彩色 */
+.secondary-btn.active {
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
+  font-weight: 600;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ===== 主操作按钮：固定高度，无彩色光晕 ===== */

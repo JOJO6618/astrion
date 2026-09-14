@@ -50,8 +50,14 @@ def _format_conversation_search(result_data: Dict[str, Any]) -> str:
 def _format_conversation_review(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("conversation_review", result_data)
+    content_mode = result_data.get("content_mode")
+    mode_note = ""
+    if content_mode == "full":
+        mode_note = "（完整记录，含工具调用与结果）"
+    elif content_mode == "dialogue":
+        mode_note = "（纯净对话，仅含实际对话内容）"
     if result_data.get("mode") == "read" and result_data.get("content"):
-        lines = ["对话回顾内容："]
+        lines = [f"对话回顾内容{mode_note}："]
         if result_data.get("title"):
             lines.append(f"标题：{result_data.get('title')}")
         if result_data.get("char_count") is not None:
@@ -70,7 +76,7 @@ def _format_conversation_review(result_data: Dict[str, Any]) -> str:
             lines.insert(1, f"标题：{result_data.get('title')}")
         return "\n".join(lines)
     lines = [
-        "已生成对话回顾文件：",
+        f"已生成对话回顾文件{mode_note}：",
         str(path),
     ]
     if result_data.get("title"):

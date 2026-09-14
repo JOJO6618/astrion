@@ -87,6 +87,14 @@ export const reviewMethods = {
       this.reviewListLoadingMore = false;
     }
   },
+  toggleReviewContentMode() {
+    if (this.reviewSubmitting) return;
+    this.reviewContentMode = this.reviewContentMode === 'full' ? 'dialogue' : 'full';
+    // 预览跟随模式实时刷新
+    if (this.reviewSelectedConversationId) {
+      this.loadReviewPreview(this.reviewSelectedConversationId);
+    }
+  },
   async handleConfirmReview() {
     if (this.reviewSubmitting) return;
     if (!this.reviewSelectedConversationId) {
@@ -105,19 +113,12 @@ export const reviewMethods = {
       });
       return;
     }
-    if (!this.currentConversationId) {
-      this.uiPushToast({
-        title: t('appUi.cannotSend'),
-        message: t('appUi.noActiveConversationMessage'),
-        type: 'warning'
-      });
-      return;
-    }
 
     this.reviewSubmitting = true;
     try {
       const { path, char_count } = await this.generateConversationReview(
-        this.reviewSelectedConversationId
+        this.reviewSelectedConversationId,
+        this.reviewContentMode
       );
       if (!path) {
         throw new Error(t('appUi.reviewPathMissing'));
@@ -132,7 +133,11 @@ export const reviewMethods = {
           count: count || t('appUi.unknown'),
           suggestion
         });
-        const sent = await this.sendAutoUserMessage(message);
+        // /new 页面（无活跃对话）时走正常发送入口：自动创建新对话并跳转，
+        // 与用户手动发送首条消息的体验一致；有活跃对话时保持原自动消息路径。
+        const sent = this.currentConversationId
+          ? await this.sendAutoUserMessage(message)
+          : await this.sendMessage({ presetText: message });
         if (sent) {
           this.reviewDialogOpen = false;
         }
@@ -160,7 +165,7 @@ export const reviewMethods = {
     this.reviewPreviewLines = [];
     try {
       const resp = await fetch(
-        `/api/conversations/${conversationId}/review_preview?limit=${this.reviewPreviewLimit}`
+        `/api/conversations/${conversationId}/review_preview?limit=${this.reviewPreviewLimit}&content_mode=${this.reviewContentMode}`
       );
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
@@ -175,9 +180,11 @@ export const reviewMethods = {
       this.reviewPreviewLoading = false;
     }
   },
-  async generateConversationReview(conversationId) {
+  async generateConversationReview(conversationId, contentMode = 'dialogue') {
     const response = await fetch(`/api/conversations/${conversationId}/review`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_mode: contentMode })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || !payload?.success) {

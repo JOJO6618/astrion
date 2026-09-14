@@ -34,6 +34,9 @@ export default {
   previewCount: '{n} 条',
   sendToModel: '是否发送给模型',
   generating: '生成中...',
+  fullRecord: '完整记录',
+  fullRecordHint: '切换到完整记录：预览与生成将包含工具调用与结果',
+  cleanDialogueHint: '点击切回纯净对话：仅含双方的实际对话内容',
 
   // ── GoalProgressDialog：目标进度 ──
   goalDoneTitle: '目标已完成',

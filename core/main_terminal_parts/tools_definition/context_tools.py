@@ -202,7 +202,7 @@ class ToolsDefinitionContextToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "conversation_review",
-                            "description": "按 id 回顾当前工作区内的历史对话。mode=read 时直接返回回顾内容；若内容超过 50000 字符，将自动保存到 .astrion/review/ 并提示分段或查找阅读。mode=save 时保存 Markdown 文件到 .astrion/review/ 并返回路径。若 id 不属于当前工作区，将返回不存在或不属于当前工作区。",
+                            "description": "按 id 回顾当前工作区内的历史对话。mode=read 时直接返回回顾内容；若内容超过 50000 字符，将自动保存到 .astrion/review/ 并提示分段或查找阅读。mode=save 时保存 Markdown 文件到 .astrion/review/ 并返回路径。若 id 不属于当前工作区，将返回不存在或不属于当前工作区。默认只保留有实际对话内容的 user 与 assistant 消息（不含工具调用/结果与空消息），需要含工具细节时用 content_mode=full。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -211,6 +211,11 @@ class ToolsDefinitionContextToolsMixin:
                                         "type": "string",
                                         "enum": ["read", "save"],
                                         "description": "必要参数。read=直接返回回顾内容；save=保存为 .astrion/review/ 下的 Markdown 文件并返回路径。"
+                                    },
+                                    "content_mode": {
+                                        "type": "string",
+                                        "enum": ["dialogue", "full"],
+                                        "description": "可选参数，默认 dialogue（推荐）。dialogue=纯净对话：只保留有实际内容的 user 与 assistant 消息，不含工具调用、工具结果、system 与空消息；full=完整记录：含工具调用与结果等全部内容。"
                                     }
                                 }),
                                 "required": ["conversation_id", "mode"]

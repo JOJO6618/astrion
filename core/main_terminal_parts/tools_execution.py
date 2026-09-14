@@ -2094,10 +2094,13 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "conversation_review":
                         conversation_id = str(arguments.get("conversation_id") or "").strip()
                         review_mode = str(arguments.get("mode") or "").strip().lower()
+                        content_mode = str(arguments.get("content_mode") or "dialogue").strip().lower()
                         if not conversation_id:
                             result = {"success": False, "error": tr("tools_exec.conversation_id_empty")}
                         elif review_mode not in {"read", "save"}:
                             result = {"success": False, "error": tr("tools_exec.review_mode_invalid"), "conversation_id": conversation_id}
+                        elif content_mode not in {"dialogue", "full"}:
+                            result = {"success": False, "error": tr("tools_exec.review_content_mode_invalid"), "conversation_id": conversation_id}
                         else:
                             manager = getattr(self.context_manager, "conversation_manager", None)
                             conversation_data = manager.load_conversation(conversation_id) if manager else None
@@ -2111,7 +2114,7 @@ class MainTerminalToolsExecutionMixin:
                                 from server.utils_common import build_review_lines, _sanitize_filename_component
 
                                 messages = conversation_data.get("messages", [])
-                                content = "\n".join(build_review_lines(messages)) + "\n"
+                                content = "\n".join(build_review_lines(messages, content_mode=content_mode)) + "\n"
                                 title = conversation_data.get("title") or "untitled"
                                 char_count = len(content)
 
@@ -2122,13 +2125,19 @@ class MainTerminalToolsExecutionMixin:
                                     review_dir.mkdir(parents=True, exist_ok=True)
                                     filename = f"review_{safe_title}_{timestamp}.md"
                                     target = review_dir / filename
-                                    target.write_text(content, encoding="utf-8")
+                                    annotation = tr(
+                                        "conversation.review_annotation_dialogue"
+                                        if content_mode == "dialogue"
+                                        else "conversation.review_annotation_full"
+                                    )
+                                    target.write_text(f"> {annotation}\n\n" + content, encoding="utf-8")
                                     return f"{WORKSPACE_REVIEW_DIRNAME}/{filename}"
 
                                 if review_mode == "read" and char_count <= 50000:
                                     result = {
                                         "success": True,
                                         "mode": "read",
+                                        "content_mode": content_mode,
                                         "conversation_id": conversation_id,
                                         "title": title,
                                         "content": content,
@@ -2141,6 +2150,7 @@ class MainTerminalToolsExecutionMixin:
                                     result = {
                                         "success": True,
                                         "mode": review_mode,
+                                        "content_mode": content_mode,
                                         "conversation_id": conversation_id,
                                         "title": title,
                                         "path": rel_path,
