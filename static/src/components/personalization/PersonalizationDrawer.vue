@@ -253,7 +253,6 @@ const baseTabs = [
   { id: 'general', labelKey: 'personalization.tabGeneral', icon: 'settings' },
   { id: 'preferences', labelKey: 'personalization.tabPreferences', icon: 'userPen' },
   { id: 'model', labelKey: 'personalization.tabModel', icon: 'brainCog' },
-  { id: 'codex', labelKey: 'personalization.tabCodex', icon: 'codex' },
   { id: 'appearance', labelKey: 'personalization.tabAppearance', icon: 'monitor' },
   { id: 'workspace', labelKey: 'personalization.tabWorkspace', icon: 'folder' },
   { id: 'context', labelKey: 'personalization.tabContext', icon: 'chatBubble' },
@@ -290,12 +289,23 @@ const isAppShell = computed(() => {
 const personalTabs = computed(() => {
   const tabs: Array<{ id: PersonalTab; labelKey: string; icon: IconKey }> = [...baseTabs];
   if (isAdmin.value) {
+    // Codex 订阅由管理员统一登录/设置（docker 多用户共享一份凭证），仅管理员可见；
+    // 模型列表不受此限，全员可直接选用 codex/ 模型。
+    const modelIndex = tabs.findIndex((tab) => tab.id === 'model');
+    tabs.splice(modelIndex + 1, 0, { id: 'codex', labelKey: 'personalization.tabCodex', icon: 'codex' });
     tabs.push({ id: 'admin', labelKey: 'personalization.tabAdmin', icon: 'wrench' });
   }
   return tabs;
 });
 
 const activeTab = ref<PersonalTab>('general');
+
+// 管理员身份变化（如会话角色刷新）导致当前 tab 不再可见时，回退到常规页
+watch(personalTabs, (tabs) => {
+  if (!tabs.some((tab) => tab.id === activeTab.value)) {
+    activeTab.value = 'general';
+  }
+});
 const activeDropdown = ref<string | null>(null);
 const floatingMenuStyle = ref<Record<string, string>>({});
 

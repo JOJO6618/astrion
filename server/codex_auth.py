@@ -1,9 +1,14 @@
 """Codex 账号管理 API：连接状态、OAuth 登录流程、登出。
 
-host 单用户语义，opencode 模式（独立凭证）：凭证唯一事实源是 astrion 自己的
+opencode 模式（独立凭证）：凭证唯一事实源是 astrion 自己的
 ``codex_auth.json``，与 Codex CLI 的 ``~/.codex/auth.json`` 完全解耦——
 - 「登出」= 删除 astrion 自己的凭证文件（真登出），CLI 登录态不受影响；
 - 登录走独立 OAuth 会话（独立 refresh token 族），刷新只回写自己的文件。
+
+权限模型（2026-09-24）：本蓝图全部端点仅管理员可用（登录 + 管理员双重校验）。
+docker 多用户模式下由管理员统一登录一个 Codex 账号，订阅凭证全局共享；
+模型列表对全员可见（模型暴露只看凭证文件存在性，见 codex/models.py），
+普通用户可直接选用 codex/ 模型，消耗的是管理员账号的订阅额度。
 """
 
 from __future__ import annotations
@@ -12,7 +17,7 @@ import threading
 
 from flask import Blueprint, jsonify
 
-from server.auth_helpers import api_login_required
+from server.auth_helpers import admin_api_required, api_login_required
 
 from utils.api_client.codex.auth import get_auth_manager
 from utils.api_client.codex.models import get_models_manager
@@ -27,6 +32,7 @@ codex_auth_bp = Blueprint("codex_auth", __name__)
 
 @codex_auth_bp.route("/api/codex/status", methods=["GET"])
 @api_login_required
+@admin_api_required
 def codex_status():
     """连接状态 + 模型缓存摘要（个人空间 Codex 区块轮询）。
 
@@ -47,6 +53,7 @@ def codex_status():
 
 @codex_auth_bp.route("/api/codex/login/start", methods=["POST"])
 @api_login_required
+@admin_api_required
 def codex_login_start():
     """启动 OAuth 登录：起 1455 监听，返回授权 URL（前端负责打开浏览器）。"""
     auth = get_auth_manager()
@@ -58,6 +65,7 @@ def codex_login_start():
 
 @codex_auth_bp.route("/api/codex/login/poll", methods=["GET"])
 @api_login_required
+@admin_api_required
 def codex_login_poll():
     """轮询登录进度；完成时后台刷新模型列表。"""
     state = poll_login_flow()
@@ -71,12 +79,14 @@ def codex_login_poll():
 
 @codex_auth_bp.route("/api/codex/login/cancel", methods=["POST"])
 @api_login_required
+@admin_api_required
 def codex_login_cancel():
     return jsonify({"success": True, **cancel_login_flow()})
 
 
 @codex_auth_bp.route("/api/codex/logout", methods=["POST"])
 @api_login_required
+@admin_api_required
 def codex_logout():
     """登出：删除 astrion 自己的凭证文件（真登出；Codex CLI 登录态不受影响）。"""
     get_auth_manager().logout()
@@ -85,6 +95,7 @@ def codex_logout():
 
 @codex_auth_bp.route("/api/codex/models/refresh", methods=["POST"])
 @api_login_required
+@admin_api_required
 def codex_models_refresh():
     """手动刷新模型列表（在线拉取，ETag 条件请求）。"""
     result = get_models_manager().refresh_sync()
@@ -127,6 +138,7 @@ def _wham_request(method: str, url: str, json_body: dict | None = None):
 
 @codex_auth_bp.route("/api/codex/usage", methods=["GET"])
 @api_login_required
+@admin_api_required
 def codex_usage():
     """订阅用量查询（转发 chatgpt.com wham/usage，CLI /status 的数据源）。"""
     from utils.api_client.codex.settings import USAGE_URL
@@ -139,6 +151,7 @@ def codex_usage():
 
 @codex_auth_bp.route("/api/codex/reset-credits", methods=["GET"])
 @api_login_required
+@admin_api_required
 def codex_reset_credits():
     """列出储存的限额重置额度（available/redeemed 同数组，status 区分，含获得/使用/过期时间）。"""
     from utils.api_client.codex.settings import RESET_CREDITS_URL
@@ -151,6 +164,7 @@ def codex_reset_credits():
 
 @codex_auth_bp.route("/api/codex/reset-credits/consume", methods=["POST"])
 @api_login_required
+@admin_api_required
 def codex_reset_credits_consume():
     """兑换一个重置额度（不可逆）。body: {credit_id}；redeem_request_id 后端生成 uuid4（幂等键）。"""
     import uuid
@@ -172,6 +186,7 @@ def codex_reset_credits_consume():
 
 @codex_auth_bp.route("/api/codex/settings", methods=["GET", "POST"])
 @api_login_required
+@admin_api_required
 def codex_settings():
     """codex 设置（proxy / client_version）。
 
