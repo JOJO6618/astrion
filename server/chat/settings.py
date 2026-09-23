@@ -219,6 +219,19 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                 _new_ctx.has_images = False
                 _new_ctx.has_videos = False
 
+        # Codex 对话绑定：已打开的对话禁止 codex↔外部模型互切（codex 家族内放行）。
+        # /new 页（对话尚未创建、terminal 未绑定对话）不受限——模型随首个任务落盘即绑定。
+        _bound_cid = requested_cid or getattr(terminal, "_bound_conversation_id", None)
+        if _bound_cid:
+            _current_key = str(getattr(terminal, "model_key", "") or "")
+            _cur_is_codex = _current_key.startswith("codex/")
+            _new_is_codex = str(model_key).startswith("codex/")
+            if _cur_is_codex != _new_is_codex:
+                return jsonify({
+                    "success": False,
+                    "error": tr("chat_settings.codex_switch_locked"),
+                }), 409
+
         terminal.set_model(model_key)
         # fast-only 时 run_mode 可能被强制为 fast
         session["model_key"] = terminal.model_key

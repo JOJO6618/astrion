@@ -77,7 +77,7 @@ const sanitizeReviewAgents = (raw: any): Record<ReviewAgentKey, ReviewAgentSetti
 /** 审核智能体键：自动审批 / 目标审核 / 工作流审核 */
 export type ReviewAgentKey = 'auto_approval' | 'goal_review' | 'workflow_review';
 export interface ReviewAgentSetting {
-  /** 模型名（子智能体模型库条目）；留空 = 模型库 default_model */
+  /** 注册表模型 key（与主模型选择器同源，含 codex/ 前缀）；留空 = 自动规则 */
   model: string;
   /** 思考模式开关（模型不支持思考时后端自动回落 fast 段） */
   thinking: boolean;
@@ -94,8 +94,10 @@ interface PersonalForm {
   communication_style: CommunicationStyle;
   conversation_continuity: ConversationContinuity;
   auto_generate_title: boolean;
-  /** 标题生成模型（子智能体模型库条目名）；留空 = 模型库 default_model */
+  /** 标题生成模型（注册表模型 key）；留空 = 自动规则 */
   title_model: string;
+  /** 传统模式子智能体模型（注册表模型 key）；留空 = 自动规则；多智能体成员走角色设置 */
+  sub_agent_model: string;
   recent_conversations_prompt_enabled: boolean;
   recent_conversations_prompt_limit: number | string;
   project_memory_inject_limit: number | string | null;
@@ -312,6 +314,7 @@ const defaultForm = (): PersonalForm => ({
   conversation_continuity: 'medium',
   auto_generate_title: true,
   title_model: '',
+  sub_agent_model: '',
   recent_conversations_prompt_enabled: false,
   recent_conversations_prompt_limit: DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT,
   project_memory_inject_limit: DEFAULT_PROJECT_MEMORY_INJECT_LIMIT,
@@ -534,6 +537,7 @@ export const usePersonalizationStore = defineStore('personalization', {
             : 'medium',
         auto_generate_title: data.auto_generate_title !== false,
         title_model: typeof data.title_model === 'string' ? data.title_model : '',
+        sub_agent_model: typeof data.sub_agent_model === 'string' ? data.sub_agent_model : '',
         recent_conversations_prompt_enabled: !!data.recent_conversations_prompt_enabled,
         recent_conversations_prompt_limit: this.normalizeRecentConversationsPromptLimit(
           data.recent_conversations_prompt_limit

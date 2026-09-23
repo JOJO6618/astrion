@@ -11,6 +11,41 @@ export const watchers = {
       this.scheduleComposerDraftPersist('watch-input-message');
     }
   },
+  // 模型菜单分页切换时高度动画：grid 同格堆叠容器的高度由当前页决定，
+  // 常规模型页与 Codex 子页项数不同，切换时高度突变——记录切换前高度，
+  // DOM 更新后量新页高度，inline height 过渡（220ms，与 slide 动画同步）。
+  // 清理必须等 leave 页真正移除（模板 @after-leave 调 clearModelMenuPaneHeight）：
+  // 过早清 inline 时 leave 页仍在 DOM，行高 = max(两页) 会瞬间弹回旧高度——
+  // 高→矮切换时这就是用户看到的「弹一下/闪一下」（矮→高因行高本就被新页
+  // 撑到目标值而无感，方向不对称的根因）。此 timeout 仅为事件丢失的保底。
+  headerModelMenuPage() {
+    const panes = Array.from(document.querySelectorAll('.model-menu-panes')).filter(
+      (el) => el instanceof HTMLElement && el.getClientRects().length > 0
+    );
+    if (!panes.length) return;
+    const startHeights = panes.map((el) => el.offsetHeight);
+    this.$nextTick(() => {
+      panes.forEach((el, i) => {
+        const startHeight = startHeights[i];
+        const target = el.querySelector('.model-menu-pane:not([class*="-leave-active"])');
+        const endHeight = target ? target.offsetHeight : startHeight;
+        if (Math.abs(endHeight - startHeight) < 2) return;
+        el.style.height = `${startHeight}px`;
+        el.style.transition = 'none';
+        void el.offsetHeight; // 强制 reflow 让起始值生效
+        el.style.transition = 'height 220ms ease';
+        el.style.height = `${endHeight}px`;
+        // 序号防快速来回切换时旧 timeout 误清新一轮动画的 inline 样式；
+        // 1000ms 是保底（正常路径由 @after-leave 立即清理并作废本 timeout）
+        const seq = (el.__heightAnimSeq = (el.__heightAnimSeq || 0) + 1);
+        window.setTimeout(() => {
+          if (el.__heightAnimSeq !== seq) return;
+          el.style.transition = '';
+          el.style.height = '';
+        }, 1000);
+      });
+    });
+  },
   messages: {
     deep: true,
     handler() {

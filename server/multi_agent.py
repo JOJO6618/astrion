@@ -441,33 +441,13 @@ def create_multi_agent_conversation():
 @multi_agent_bp.route("/api/multiagent/models", methods=["GET"])
 @api_login_required
 def list_sub_agent_models_api():
-    """列出子智能体可用的模型列表（从 sub_agent_models.json 读取，脱敏后返回）。"""
+    """列出子智能体可用的模型列表（统一来源 = 主注册表，含 codex 动态模型，脱敏后返回）。"""
     try:
-        from config.sub_agent import SUB_AGENT_MODELS_CONFIG_FILE
-        from pathlib import Path as _Path
-        import json as _json
-        config_path = SUB_AGENT_MODELS_CONFIG_FILE
-        if not _Path(config_path).exists():
-            return jsonify({"success": True, "models": [], "default_model": ""})
-        raw = _json.loads(_Path(config_path).read_text(encoding="utf-8"))
-        models_raw = raw.get("models", []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
-        default_model = str(raw.get("default_model", "")) if isinstance(raw, dict) else ""
-        # 脱敏：只返回 name / modes / multimodal / max_output / max_context
-        safe_models = []
-        for m in models_raw:
-            if not isinstance(m, dict):
-                continue
-            safe_models.append({
-                "name": m.get("name") or m.get("model_name") or "",
-                "modes": m.get("modes") or m.get("mode") or "",
-                "multimodal": m.get("multimodal") or "none",
-                "max_output": m.get("max_output") or m.get("max_tokens") or 0,
-                "max_context": m.get("max_context") or m.get("context_window") or 0,
-            })
+        from modules.aux_model_resolver import list_aux_models
+
         return jsonify({
             "success": True,
-            "models": safe_models,
-            "default_model": default_model,
+            "models": list_aux_models(),
         })
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500

@@ -41,6 +41,7 @@ from server.workflow_page import workflow_page_bp
 from server.workflow_runtime_api import workflow_runtime_bp
 from server.conversation_bootstrap import conversation_bootstrap_bp
 from server.gateway_api import gateway_bp
+from server.codex_auth import codex_auth_bp
 from server.security import attach_security_hooks
 from werkzeug.utils import secure_filename
 from werkzeug.routing import BaseConverter
@@ -305,6 +306,7 @@ app.register_blueprint(workflow_page_bp)
 app.register_blueprint(workflow_runtime_bp)
 app.register_blueprint(conversation_bootstrap_bp)
 app.register_blueprint(gateway_bp)
+app.register_blueprint(codex_auth_bp)
 
 # 安全钩子（CSRF 校验 + 响应头）
 attach_security_hooks(app)
@@ -517,17 +519,28 @@ async def _generate_title_async(user_message: str, conversation_id: Optional[str
         {"role": "user", "content": user_prompt}
     ]
     try:
-        async for resp in client.chat(messages, tools=[], stream=False):
+        # 统一走流式（Codex 通道仅支持流式；常规通道同样适用）
+        accumulated: list = []
+        async for resp in client.chat(messages, tools=[], stream=True):
             try:
-                content = resp.get("choices", [{}])[0].get("message", {}).get("content")
-                if content:
-                    normalized = " ".join(str(content).strip().split())
-                    _title_debug_log("title_api_success", title_preview=normalized[:200], title_len=len(normalized))
-                    return normalized
-                _title_debug_log("title_api_empty_content", resp_preview=str(resp)[:500])
+                if not isinstance(resp, dict) or resp.get("error"):
+                    continue
+                choices = resp.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                piece = delta.get("content")
+                if isinstance(piece, str) and piece:
+                    accumulated.append(piece)
             except Exception:
                 _title_debug_log("title_api_parse_error", resp_preview=str(resp)[:500])
                 continue
+        content = "".join(accumulated).strip()
+        if content:
+            normalized = " ".join(content.split())
+            _title_debug_log("title_api_success", title_preview=normalized[:200], title_len=len(normalized))
+            return normalized
+        _title_debug_log("title_api_empty_content")
     except Exception as exc:
         debug_log(f"[TitleGen] 生成标题异常: {exc}")
         _title_debug_log("title_api_exception", error=str(exc))

@@ -6,11 +6,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-import httpx
-
 from config import LOGS_DIR
-from modules.external_session import build_user_agent, resolve_ephemeral_headers
 from modules.review_agent_config import resolve_review_agent_config
+from modules.review_model_caller import ReviewModelCallError, call_review_model
 from modules.i18n import tr
 
 
@@ -97,20 +95,13 @@ class ApprovalAgent:
             except Exception:
                 pass
 
-        url = str(self.cfg.get("url") or "").strip()
-        key = str(self.cfg.get("key") or "").strip()
-        model = str(self.cfg.get("model") or "").strip()
-        if not url or not key or not model:
+        profile = self.cfg.get("profile")
+        if not isinstance(profile, dict):
             out = {"decision": "rejected", "reason": tr("approval_agent.config_missing"), "source": "approval_agent"}
             _flush_trace(out)
             return out
-        endpoint = f"{url.rstrip('/')}/chat/completions"
-        # 以「产品名/版本号」自标识；审核调用无对话连续性，每次审核生成一次性 session ID
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": build_user_agent()}
-        headers.update(resolve_ephemeral_headers(url))
         max_rounds = int(self.cfg.get("max_rounds") or DEFAULT_MAX_ROUNDS)
         timeout_seconds = int(self.cfg.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
-        extra_params = dict(self.cfg.get("extra_params") or {})
         tools = [
             {
                 "type": "function",
@@ -169,152 +160,108 @@ class ApprovalAgent:
             {"role": "system", "content": self._system_prompt()},
             {"role": "user", "content": payload_text},
         ]
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            rounds = 0
-            forced_tool_retry_used = False
-            while rounds < max_rounds + 2:
-                rounds += 1
-                if cancel_check:
-                    external = cancel_check()
-                    if external:
-                        return external
-                if progress_cb:
-                    progress_cb({"stage": "model_call", "round": rounds, "message": tr("approval_agent.round_progress", rounds=rounds)})
-                req = {
-                    "model": model,
-                    "messages": messages,
-                    "tools": tools,
-                    "tool_choice": "auto",
-                    "temperature": 0.0,
-                    **extra_params,
+        rounds = 0
+        forced_tool_retry_used = False
+        while rounds < max_rounds + 2:
+            rounds += 1
+            if cancel_check:
+                external = cancel_check()
+                if external:
+                    return external
+            if progress_cb:
+                progress_cb({"stage": "model_call", "round": rounds, "message": tr("approval_agent.round_progress", rounds=rounds)})
+            _trace("request", {"round": rounds, "messages": messages, "tools": tools})
+            try:
+                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds)
+            except ReviewModelCallError as exc:
+                _trace("http_error", {"round": rounds, "error": str(exc)})
+                out = {
+                    "decision": "rejected",
+                    "reason": tr("approval_agent.request_failed", status=str(exc)),
+                    "source": "approval_agent",
                 }
-                _trace("request", {"round": rounds, "request": req})
+                _flush_trace(out)
+                return out
+            reasoning_content = str(choice.get("reasoning_content") or "")
+            _trace(
+                "response",
+                {
+                    "round": rounds,
+                    "message": choice,
+                    "reasoning_content": reasoning_content,
+                },
+            )
+            tool_calls = choice.get("tool_calls") or []
+            content = choice.get("content")
+            if not tool_calls:
+                if content or reasoning_content:
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": str(content or ""),
+                            "reasoning_content": str(reasoning_content or ""),
+                        }
+                    )
+                if rounds <= max_rounds:
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "禁止直接输出结论文本。必须调用工具：先按需调用 run_command，再调用 approve_decision 给出最终结论。"
+                        }
+                    )
+                    continue
+                if not forced_tool_retry_used:
+                    forced_tool_retry_used = True
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "你刚刚未通过工具给出明确结果。必须调用工具，禁止直接输出内容。请立即调用 approve_decision 返回最终结论。"
+                        }
+                    )
+                    continue
+                out = {"decision": "rejected", "reason": tr("approval_agent.no_decision"), "source": "approval_agent"}
+                _flush_trace(out)
+                return out
+            # 有 tool_calls 时追加一条完整 assistant 消息（与主智能体结构对齐）
+            assistant_message = {
+                "role": "assistant",
+                "content": str(content or ""),
+                "reasoning_content": str(reasoning_content or ""),
+                "tool_calls": tool_calls,
+            }
+            messages.append(assistant_message)
+            for call in tool_calls:
+                fn = (call.get("function") or {}).get("name")
+                raw_args = (call.get("function") or {}).get("arguments") or "{}"
                 try:
-                    resp = await client.post(endpoint, headers=headers, json=req)
-                    resp.raise_for_status()
-                except httpx.HTTPStatusError as exc:
-                    body = ""
-                    try:
-                        body = exc.response.text
-                    except Exception:
-                        body = str(exc)
-                    _trace("http_error", {"round": rounds, "status_code": exc.response.status_code if exc.response else None, "body": body})
-                    # 兼容某些模型/网关不接受额外参数：自动降级重试一次（去掉 extra_params）
-                    if extra_params:
-                        retry_req = {
-                            "model": model,
-                            "messages": messages,
-                            "tools": tools,
-                            "tool_choice": "auto",
-                            "temperature": 0.0,
-                        }
-                        _trace("retry_request_without_extra_params", {"round": rounds, "request": retry_req})
-                        retry_resp = await client.post(endpoint, headers=headers, json=retry_req)
-                        try:
-                            retry_resp.raise_for_status()
-                            resp = retry_resp
-                        except httpx.HTTPStatusError:
-                            out = {
-                                "decision": "rejected",
-                                "reason": tr("approval_agent.request_failed", status=retry_resp.status_code),
-                                "source": "approval_agent",
-                            }
-                            _flush_trace(out)
-                            return out
-                    else:
-                        out = {
-                            "decision": "rejected",
-                            "reason": tr("approval_agent.request_failed", status=exc.response.status_code if exc.response else 'unknown'),
-                            "source": "approval_agent",
-                        }
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                except Exception:
+                    args = {}
+                if fn == "approve_decision":
+                    decision = str(args.get("decision") or "").strip().lower()
+                    reason = str(args.get("reason") or "").strip() or tr("approval_agent.no_reason")
+                    if decision in {"approved", "rejected"}:
+                        out = {"decision": decision, "reason": reason, "source": "approval_agent"}
                         _flush_trace(out)
                         return out
-                choice = ((resp.json().get("choices") or [{}])[0] or {}).get("message") or {}
-                reasoning_content = (
-                    choice.get("reasoning_content")
-                    or choice.get("reasoning")
-                    or choice.get("thinking")
-                    or ""
-                )
-                _trace(
-                    "response",
-                    {
-                        "round": rounds,
-                        "message": choice,
-                        "reasoning_content": reasoning_content,
-                    },
-                )
-                tool_calls = choice.get("tool_calls") or []
-                content = choice.get("content")
-                if not tool_calls:
-                    if content or reasoning_content:
-                        messages.append(
-                            {
-                                "role": "assistant",
-                                "content": str(content or ""),
-                                "reasoning_content": str(reasoning_content or ""),
-                            }
-                        )
-                    if rounds <= max_rounds:
-                        messages.append(
-                            {
-                                "role": "user",
-                                "content": "禁止直接输出结论文本。必须调用工具：先按需调用 run_command，再调用 approve_decision 给出最终结论。"
-                            }
-                        )
-                        continue
-                    if not forced_tool_retry_used:
-                        forced_tool_retry_used = True
-                        messages.append(
-                            {
-                                "role": "user",
-                                "content": "你刚刚未通过工具给出明确结果。必须调用工具，禁止直接输出内容。请立即调用 approve_decision 返回最终结论。"
-                            }
-                        )
-                        continue
-                    out = {"decision": "rejected", "reason": tr("approval_agent.no_decision"), "source": "approval_agent"}
+                    out = {"decision": "rejected", "reason": tr("approval_agent.invalid_decision"), "source": "approval_agent"}
                     _flush_trace(out)
                     return out
-                # 有 tool_calls 时追加一条完整 assistant 消息（与主智能体结构对齐）
-                assistant_message = {
-                    "role": "assistant",
-                    "content": str(content or ""),
-                    "reasoning_content": str(reasoning_content or ""),
-                    "tool_calls": tool_calls,
-                }
-                messages.append(assistant_message)
-                for call in tool_calls:
-                    fn = (call.get("function") or {}).get("name")
-                    raw_args = (call.get("function") or {}).get("arguments") or "{}"
-                    try:
-                        args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
-                    except Exception:
-                        args = {}
-                    if fn == "approve_decision":
-                        decision = str(args.get("decision") or "").strip().lower()
-                        reason = str(args.get("reason") or "").strip() or tr("approval_agent.no_reason")
-                        if decision in {"approved", "rejected"}:
-                            out = {"decision": decision, "reason": reason, "source": "approval_agent"}
-                            _flush_trace(out)
-                            return out
-                        out = {"decision": "rejected", "reason": tr("approval_agent.invalid_decision"), "source": "approval_agent"}
-                        _flush_trace(out)
-                        return out
-                    if fn == "run_command":
-                        cmd = str(args.get("command") or "").strip()
-                        if progress_cb:
-                            progress_cb({"stage": "run_command", "round": rounds, "command": cmd})
-                        tool_result = await self._run_readonly_command(cmd) if cmd else {"success": False, "error": "command 不能为空"}
-                        _trace("tool_result", {"round": rounds, "tool": "run_command", "command": cmd, "result": tool_result})
-                        tool_content = json.dumps(tool_result, ensure_ascii=False)
-                        messages.append({
-                            "role": "tool",
-                            "content": tool_content,
-                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()) + f".{int((time.time()%1)*1000000):06d}",
-                            "message_id": f"msg_{uuid.uuid4().hex}",
-                            "tool_call_id": call.get("id"),
-                            "name": "run_command",
-                        })
+                if fn == "run_command":
+                    cmd = str(args.get("command") or "").strip()
+                    if progress_cb:
+                        progress_cb({"stage": "run_command", "round": rounds, "command": cmd})
+                    tool_result = await self._run_readonly_command(cmd) if cmd else {"success": False, "error": "command 不能为空"}
+                    _trace("tool_result", {"round": rounds, "tool": "run_command", "command": cmd, "result": tool_result})
+                    tool_content = json.dumps(tool_result, ensure_ascii=False)
+                    messages.append({
+                        "role": "tool",
+                        "content": tool_content,
+                        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()) + f".{int((time.time()%1)*1000000):06d}",
+                        "message_id": f"msg_{uuid.uuid4().hex}",
+                        "tool_call_id": call.get("id"),
+                        "name": "run_command",
+                    })
         out = {"decision": "rejected", "reason": tr("approval_agent.max_rounds"), "source": "approval_agent"}
         _flush_trace(out)
         return out

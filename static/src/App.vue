@@ -161,21 +161,70 @@
             <transition name="header-menu">
               <div v-if="headerMenuOpen" class="model-mode-dropdown" ref="headerMenu">
                 <div class="dropdown-column" data-tutorial="header-model-options">
-                  <div class="dropdown-title">{{ $t('appCore.model') }}</div>
-                  <div class="dropdown-list dropdown-list--models">
+                  <div class="dropdown-title">
                     <button
-                      v-for="option in modelOptions"
-                      :key="option.key"
+                      v-if="headerModelMenuPage === 'codex'"
                       type="button"
-                      class="dropdown-item"
-                      :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
-                      @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
-                      :disabled="streamingMessage || !isConnected || option.disabled"
+                      class="dropdown-title-back"
+                      @click.stop="headerModelMenuPage = 'main'"
                     >
-                      <div class="item-label">{{ option.label }}</div>
-                      <div class="item-desc">{{ option.description }}</div>
-                      <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                      ‹ {{ $t('appCore.back') }}
                     </button>
+                    <template v-else>{{ $t('appCore.model') }}</template>
+                  </div>
+                  <div class="model-menu-panes">
+                    <Transition
+                      :name="headerModelMenuPage === 'codex' ? 'type-slide-left' : 'type-slide-right'"
+                      @after-leave="clearModelMenuPaneHeight"
+                    >
+                      <div
+                        v-if="headerModelMenuPage === 'main'"
+                        key="main"
+                        class="dropdown-list dropdown-list--models model-menu-pane"
+                      >
+                        <button
+                          v-for="option in regularModelOptions"
+                          :key="option.key"
+                          type="button"
+                          class="dropdown-item"
+                          :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                          @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
+                          :disabled="streamingMessage || !isConnected || option.disabled"
+                        >
+                          <div class="item-label">{{ option.label }}</div>
+                          <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="dropdown-item dropdown-item--codex-entry"
+                          @click.stop="headerModelMenuPage = 'codex'"
+                        >
+                          <div class="item-label">{{ $t('appCore.codexEntry') }}</div>
+                          <span class="item-chevron">›</span>
+                        </button>
+                      </div>
+                      <div
+                        v-else
+                        key="codex"
+                        class="dropdown-list dropdown-list--models model-menu-pane"
+                      >
+                        <button
+                          v-for="option in codexModelOptions"
+                          :key="option.key"
+                          type="button"
+                          class="dropdown-item"
+                          :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                          @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
+                          :disabled="streamingMessage || !isConnected || option.disabled"
+                        >
+                          <div class="item-label">{{ option.label }}</div>
+                          <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                        </button>
+                        <div v-if="!codexModelOptions.length" class="dropdown-empty-hint">
+                          {{ $t('appCore.codexNotConnected') }}
+                        </div>
+                      </div>
+                    </Transition>
                   </div>
                 </div>
 
@@ -715,20 +764,70 @@
             ref="headerMenu"
           >
             <div class="dropdown-column" data-tutorial="header-model-options">
-              <div class="dropdown-title">{{ $t('appCore.model') }}</div>
-              <div class="dropdown-list dropdown-list--models">
+              <div class="dropdown-title">
                 <button
-                  v-for="option in modelOptions"
-                  :key="option.key"
+                  v-if="headerModelMenuPage === 'codex'"
                   type="button"
-                  class="dropdown-item"
-                  :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
-                  @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
-                  :disabled="streamingMessage || !isConnected || option.disabled"
+                  class="dropdown-title-back"
+                  @click.stop="headerModelMenuPage = 'main'"
                 >
-                  <div class="item-label">{{ option.label }}</div>
-                  <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                  ‹ {{ $t('appCore.back') }}
                 </button>
+                <template v-else>{{ $t('appCore.model') }}</template>
+              </div>
+              <div class="model-menu-panes">
+                <Transition
+                  :name="headerModelMenuPage === 'codex' ? 'type-slide-left' : 'type-slide-right'"
+                  @after-leave="clearModelMenuPaneHeight"
+                >
+                  <div
+                    v-if="headerModelMenuPage === 'main'"
+                    key="main"
+                    class="dropdown-list dropdown-list--models model-menu-pane"
+                  >
+                    <button
+                      v-for="option in regularModelOptions"
+                      :key="option.key"
+                      type="button"
+                      class="dropdown-item"
+                      :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                      @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
+                      :disabled="streamingMessage || !isConnected || option.disabled"
+                    >
+                      <div class="item-label">{{ option.label }}</div>
+                      <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="dropdown-item dropdown-item--codex-entry"
+                      @click.stop="headerModelMenuPage = 'codex'"
+                    >
+                      <div class="item-label">{{ $t('appCore.codexEntry') }}</div>
+                      <span class="item-chevron">›</span>
+                    </button>
+                  </div>
+                  <div
+                    v-else
+                    key="codex"
+                    class="dropdown-list dropdown-list--models model-menu-pane"
+                  >
+                    <button
+                      v-for="option in codexModelOptions"
+                      :key="option.key"
+                      type="button"
+                      class="dropdown-item"
+                      :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                      @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
+                      :disabled="streamingMessage || !isConnected || option.disabled"
+                    >
+                      <div class="item-label">{{ option.label }}</div>
+                      <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                    </button>
+                    <div v-if="!codexModelOptions.length" class="dropdown-empty-hint">
+                      {{ $t('appCore.codexNotConnected') }}
+                    </div>
+                  </div>
+                </Transition>
               </div>
             </div>
 

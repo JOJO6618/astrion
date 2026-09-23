@@ -46,6 +46,7 @@ export default {
   // —— 思考块状态 ——
   thinking: '思考过程',
   thinkingRunning: '正在思考...',
+  thoughtSummary: '思考摘要',
 
   // —— 行内引用（citation chip / popover） ——
   citationOpenSource: '打开来源',

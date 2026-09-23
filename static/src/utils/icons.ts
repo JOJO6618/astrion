@@ -13,6 +13,7 @@ export const ICONS = Object.freeze({
   chevronDown: '/static/icons/chevron-down.svg',
   circleAlert: '/static/icons/circle-alert.svg',
   clipboard: '/static/icons/clipboard.svg',
+  codex: '/static/icons/codex.svg',
   copy: '/static/icons/copy.svg',
   clock: '/static/icons/clock.svg',
   eye: '/static/icons/eye.svg',

@@ -83,6 +83,14 @@ MESSAGES = {
         "zh-CN": "未找到可用子智能体模型配置: {path}",
         "en-US": "No usable sub-agent model configuration found: {path}",
     },
+    "sub_agent_task2.locked_model_missing": {
+        "zh-CN": "子智能体任务缺少创建时锁定的模型记录",
+        "en-US": "The sub-agent task is missing the model locked in at creation time.",
+    },
+    "sub_agent_task2.locked_model_unavailable": {
+        "zh-CN": "子智能体创建时锁定的模型「{model}」当前不可用（已删除或未连接）",
+        "en-US": "The model '{model}' locked in at sub-agent creation is currently unavailable (deleted or not connected).",
+    },
     "sub_agent_task2.api_call_failed": {
         "zh-CN": "API 调用失败: {error}",
         "en-US": "API call failed: {error}",

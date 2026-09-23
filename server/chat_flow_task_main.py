@@ -2315,6 +2315,15 @@ async def handle_task_with_sender(
                 debug_log(f"[Citations] 行内引用处理失败，保留原文: {_cite_exc}")
                 round_citations = []
         
+        # Codex 通道：取出本轮收集的加密 reasoning items（读后清空防残留），
+        # 内存消息与落盘 metadata 各挂一份，供后续轮次回插上下文
+        codex_reasoning_items = getattr(web_terminal.api_client, "last_codex_reasoning_items", None)
+        if codex_reasoning_items:
+            try:
+                web_terminal.api_client.last_codex_reasoning_items = None
+            except Exception:
+                pass
+
         # 添加到消息历史（用于API继续对话，不保存到文件）
         assistant_message = {
             "role": "assistant",
@@ -2324,15 +2333,20 @@ async def handle_task_with_sender(
         }
         if tool_calls:
             assistant_message["tool_calls"] = tool_calls
-        
+        if codex_reasoning_items:
+            assistant_message["codex_reasoning_items"] = codex_reasoning_items
+
         messages.append(assistant_message)
         if assistant_content or current_thinking or tool_calls:
+            assistant_metadata = {"citations": round_citations} if round_citations else {}
+            if codex_reasoning_items:
+                assistant_metadata["codex_reasoning_items"] = codex_reasoning_items
             web_terminal.context_manager.add_conversation(
                 "assistant",
                 assistant_content,
                 tool_calls=tool_calls if tool_calls else None,
                 reasoning_content=current_thinking or "",
-                metadata={"citations": round_citations} if round_citations else None
+                metadata=assistant_metadata or None
             )
         
         # 为下一轮迭代重置流状态标志，但保留 full_response 供上面保存使用

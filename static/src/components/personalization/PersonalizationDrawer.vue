@@ -111,6 +111,8 @@
 
                     <ModelTab v-else-if="activeTab === 'model'" key="model" />
 
+                    <CodexTab v-else-if="activeTab === 'codex'" key="codex" />
+
                     <AppearanceTab v-else-if="activeTab === 'appearance'" key="appearance" />
 
                     <WorkspaceTab v-else-if="activeTab === 'workspace'" key="workspace" />
@@ -158,6 +160,7 @@ import CloseButton from '@/components/common/CloseButton.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
 import PreferencesTab from './tabs/PreferencesTab.vue';
 import ModelTab from './tabs/ModelTab.vue';
+import CodexTab from './tabs/CodexTab.vue';
 import AppearanceTab from './tabs/AppearanceTab.vue';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ContextTab from './tabs/ContextTab.vue';
@@ -235,6 +238,7 @@ type PersonalTab =
   | 'general'
   | 'preferences'
   | 'model'
+  | 'codex'
   | 'appearance'
   | 'workspace'
   | 'context'
@@ -249,6 +253,7 @@ const baseTabs = [
   { id: 'general', labelKey: 'personalization.tabGeneral', icon: 'settings' },
   { id: 'preferences', labelKey: 'personalization.tabPreferences', icon: 'userPen' },
   { id: 'model', labelKey: 'personalization.tabModel', icon: 'brainCog' },
+  { id: 'codex', labelKey: 'personalization.tabCodex', icon: 'codex' },
   { id: 'appearance', labelKey: 'personalization.tabAppearance', icon: 'monitor' },
   { id: 'workspace', labelKey: 'personalization.tabWorkspace', icon: 'folder' },
   { id: 'context', labelKey: 'personalization.tabContext', icon: 'chatBubble' },

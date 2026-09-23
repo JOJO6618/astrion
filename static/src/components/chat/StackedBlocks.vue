@@ -54,7 +54,7 @@
                   <span class="icon icon-sm" :style="iconStyle('brain')" aria-hidden="true"></span>
                 </span>
               </div>
-              <span class="status-text">{{ action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking') }}</span>
+              <span class="status-text">{{ thinkingTitle(action) }}</span>
             </div>
             <div class="collapsible-content" :style="contentStyle(blockKey(action, idx))">
               <div
@@ -108,6 +108,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
+import { useModelStore } from '@/stores/model';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
 
 defineOptions({ name: 'StackedBlocks' });
@@ -142,8 +143,19 @@ const stackKey = `stacked-${++stackInstanceCounter}`;
 
 // 初始化 personalization store
 const personalizationStore = usePersonalizationStore();
+const modelStore = useModelStore();
 
 const hideBorders = computed(() => personalizationStore.form.stacked_hide_borders);
+
+// Codex 对话的思考内容是官方摘要（非完整思维链），标题区分显示；
+// 历史消息读 action.modelKey（落库 metadata.model_key），流式回退当前模型
+const thinkingTitle = (action: any): string => {
+  const mk = String(action?.modelKey || modelStore.currentModelKey || '');
+  if (mk.startsWith('codex/')) {
+    return t('chat.thoughtSummary');
+  }
+  return action?.streaming ? t('chat.thinkingRunning') : t('chat.thinking');
+};
 
 const renderToolResult = (action: any) => {
   return renderEnhancedToolResult(

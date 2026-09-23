@@ -486,6 +486,12 @@ class MessagesMixin:
                     # API 判定为“未回传 reasoning_content”并返回 400。
                     if "reasoning_content" in conv:
                         message["reasoning_content"] = conv.get("reasoning_content", "")
+                    # Codex 通道：加密 reasoning items 随消息透传给适配层回插上下文
+                    # （仅 codex 对话会产生该 metadata；其他模型无此字段不受影响，
+                    #  非 codex 模型的字段清洗也会将其剥离）
+                    _codex_items = metadata.get("codex_reasoning_items")
+                    if _codex_items:
+                        message["codex_reasoning_items"] = _codex_items
                     # 如果有工具调用信息，添加到消息中
                     tool_calls = conv.get("tool_calls") or []
                     if tool_calls and self._tool_calls_followed_by_tools(conversation, idx, tool_calls):

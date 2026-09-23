@@ -191,10 +191,27 @@ body[data-theme='dark'] .settings-redesign-card {
   border-bottom: 1px solid var(--theme-control-border);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 18px;
   padding: 13px 0;
   color: var(--text-primary);
+}
+
+/* 右列控件与左侧标题行垂直居中对齐，而不是相对「标题+描述」整块居中：
+   标题行盒 = 14px × 1.32 ≈ 18.5px；32px 控件（按钮/输入框/下拉）中心需上移 ≈ 6.8px，
+   22px 开关（FancyCheck）上移 ≈ 1.8px。stackable 行右列本身为堆叠结构，不参与。 */
+.settings-select-row > .settings-select-wrap,
+.settings-input-row:not(.stackable) > .settings-number-row,
+.settings-input-row:not(.stackable) > input,
+.settings-input-row:not(.stackable) > button,
+.settings-action-row > .settings-number-row,
+.settings-action-row > .settings-inline-actions,
+.settings-action-row > button {
+  margin-top: calc((1.32 * 14px - 32px) / 2);
+}
+
+.settings-toggle-row > .fancy-check {
+  margin-top: calc((1.32 * 14px - 22px) / 2);
 }
 
 .settings-list-row.tall,

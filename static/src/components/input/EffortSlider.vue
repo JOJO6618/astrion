@@ -1,9 +1,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ReasoningEffort } from '../../stores/personalization';
+import { useModelStore } from '../../stores/model';
 import FancyCheck from '../common/FancyCheck.vue';
 
-const LEVELS: ReasoningEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+const DEFAULT_LEVELS: ReasoningEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+const modelStore = useModelStore();
+// 档位按当前模型动态过滤（Codex 各模型支持 4~6 档；astrion 未定义的档位如
+// ultra 天然被过滤掉）；常规模型无 supportedReasoningLevels 时用全集
+const levels = computed<ReasoningEffort[]>(() => {
+  const supported = modelStore.currentModel?.supportedReasoningLevels;
+  if (Array.isArray(supported) && supported.length) {
+    const filtered = DEFAULT_LEVELS.filter((lv) =>
+      supported.some((s: any) => s?.effort === lv)
+    );
+    if (filtered.length) return filtered;
+  }
+  return DEFAULT_LEVELS;
+});
 // 轨道两端档位圆钮中心 inset；比圆钮半径(23)小 3px，
 // 让圆钮在两端时外凸 3px，完整盖住填充条端头（避免相切处露出杂边）
 const EDGE = 20;
@@ -40,14 +54,14 @@ let visualX = 0;
 
 const isDefault = computed(() => props.modelValue === null);
 
-const posRatio = (i: number) => i / (LEVELS.length - 1);
+const posRatio = (i: number) => i / (levels.value.length - 1);
 const posPct = (i: number) => `calc(${EDGE}px + (100% - ${EDGE * 2}px) * ${posRatio(i)})`;
 const posPx = (i: number) => EDGE + (trackWidth.value - EDGE * 2) * posRatio(i);
 const pxToLevel = (x: number) => {
   const w = trackWidth.value;
   if (w <= EDGE * 2) return 0;
   const ratio = (x - EDGE) / (w - EDGE * 2);
-  return Math.max(0, Math.min(LEVELS.length - 1, Math.round(ratio * (LEVELS.length - 1))));
+  return Math.max(0, Math.min(levels.value.length - 1, Math.round(ratio * (levels.value.length - 1))));
 };
 
 const clampEventX = (clientX: number) => {
@@ -77,7 +91,7 @@ const applyVisualX = (x: number) => {
   if (fill) {
     fill.style.clipPath = `inset(0 calc(100% - (${expr})) 0 0 round 17px)`;
   }
-  for (let i = 0; i < LEVELS.length; i++) {
+  for (let i = 0; i < levels.value.length; i++) {
     const el = dotEls[i];
     if (!el) continue;
     const covered = measured ? posPx(i) <= x : i <= levelIndex.value;
@@ -129,7 +143,7 @@ const syncToLevel = (animate = false) => {
 };
 
 const commitLevel = () => {
-  emit('update:modelValue', LEVELS[levelIndex.value]);
+  emit('update:modelValue', levels.value[levelIndex.value]);
 };
 
 const onPointerDown = (e: PointerEvent) => {
@@ -172,7 +186,7 @@ const onPointerUp = (e: PointerEvent) => {
 };
 
 const toggleDefault = () => {
-  emit('update:modelValue', isDefault.value ? LEVELS[levelIndex.value] : null);
+  emit('update:modelValue', isDefault.value ? levels.value[levelIndex.value] : null);
 };
 
 const measure = () => {
@@ -184,7 +198,7 @@ watch(
   () => props.modelValue,
   (value) => {
     if (value === null) return; // 勾选默认：保留档位记忆，圆钮不动
-    const i = LEVELS.indexOf(value);
+    const i = levels.value.indexOf(value);
     if (i < 0 || i === levelIndex.value) return; // 自己 emit 的回声：不打扰进行中的动画
     // 外部变更（如父组件异步修正）：瞬间同步
     levelIndex.value = i;
@@ -194,6 +208,17 @@ watch(
   // 否则弹窗每次打开都停在初始值 high
   { immediate: true }
 );
+
+// 档位集合随模型切换变化时：夹紧越界档位并重新就位
+watch(levels, () => {
+  if (levelIndex.value > levels.value.length - 1) {
+    levelIndex.value = Math.max(0, levels.value.length - 1);
+  }
+  if (activeLevel.value > levels.value.length - 1) {
+    activeLevel.value = Math.max(0, levels.value.length - 1);
+  }
+  syncToLevel(false);
+});
 
 onMounted(() => {
   measure();
@@ -237,14 +262,14 @@ onBeforeUnmount(() => {
       >
         <div ref="fillRef" class="fill-stack">
           <div
-            v-for="(_, i) in LEVELS"
+            v-for="(_, i) in levels"
             :key="`lv-${i}`"
             class="fill-layer"
             :class="[`lv-${i}`, { on: i === activeLevel }]"
           ></div>
         </div>
         <div
-          v-for="(_, i) in LEVELS"
+          v-for="(_, i) in levels"
           :key="`dot-${i}`"
           class="dot"
           :ref="(el) => setDotRef(el as Element | null, i)"
@@ -254,7 +279,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="level-labels">
         <span
-          v-for="(name, i) in LEVELS"
+          v-for="(name, i) in levels"
           :key="`label-${i}`"
           class="level-label"
           :class="{ active: i === activeLevel }"

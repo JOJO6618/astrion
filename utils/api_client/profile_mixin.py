@@ -69,6 +69,7 @@ class APIClientProfileMixin:
         self.fast_extra_params = fast.get("extra_params") or {}
         self.thinking_extra_params = thinking.get("extra_params") or {}
         self.supports_reasoning_effort = bool(profile.get("supports_reasoning_effort"))
+        self.provider_type = str(profile.get("provider_type") or "") or None
         self.model_multimodal = self._normalize_multimodal_capability(profile.get("multimodal"))
         self.default_context_window = profile.get("context_window") or fast.get("context_window")
         # 同步旧字段

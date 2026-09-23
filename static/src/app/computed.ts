@@ -186,10 +186,25 @@ export const computed = {
   modelOptions() {
     const disabledSet = this.adminDisabledModels || new Set();
     const options = this.models || [];
-    return options.map((opt) => ({
-      ...opt,
-      disabled: disabledSet.has(opt.key)
-    }));
+    // Codex 对话绑定：对话创建后 codex↔外部模型互切锁定（/new 页不受限，
+    // 首个任务落盘时模型即对话绑定；codex 家族内互切放行）
+    const lockActive = !!this.currentConversationId;
+    const curCodex = String(this.currentModelKey || '').startsWith('codex/');
+    return options.map((opt) => {
+      const optCodex = String(opt.key).startsWith('codex/');
+      const locked = lockActive && optCodex !== curCodex;
+      return {
+        ...opt,
+        disabled: disabledSet.has(opt.key) || locked,
+        codexLocked: locked
+      };
+    });
+  },
+  regularModelOptions() {
+    return (this.modelOptions || []).filter((o) => !String(o.key).startsWith('codex/'));
+  },
+  codexModelOptions() {
+    return (this.modelOptions || []).filter((o) => String(o.key).startsWith('codex/'));
   },
   titleRibbonVisible() {
     return !this.isMobileViewport && this.chatDisplayMode === 'chat';

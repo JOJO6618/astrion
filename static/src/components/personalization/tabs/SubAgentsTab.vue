@@ -15,6 +15,8 @@ const {
   closeRoleEditor,
   deleteRole,
   editingRole,
+  floatingMenuStyle,
+  form,
   handleRoleEditorOverlayPressEnd,
   handleRoleEditorOverlayPressStart,
   openRoleEditor,
@@ -37,6 +39,51 @@ const {
 <template>
   <section class="settings-page">
     <div class="settings-section-desc" style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6">{{ $t('personalization.subAgentsIntro') }}
+    </div>
+
+    <!-- 传统模式子智能体模型（多智能体成员走角色设置，不受此影响） -->
+    <div class="settings-select-row" style="margin-bottom: 16px">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.subAgentModelTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.subAgentModelDesc') }}</span>
+      </span>
+      <div
+        class="settings-select-wrap"
+        :class="{ open: activeDropdown === 'sub-agent-model' }"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="settings-select-button"
+          @click="toggleDropdown('sub-agent-model')"
+        >
+          {{ form.sub_agent_model || $t('personalization.defaultModelOption') }}
+          <span class="select-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+          :style="activeDropdown === 'sub-agent-model' ? floatingMenuStyle : undefined"
+        >
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: !form.sub_agent_model }"
+            @click="personalization.updateField({ key: 'sub_agent_model', value: '' }); closeDropdown()"
+          >
+            <strong>{{ $t('personalization.defaultModelOption') }}</strong><span>{{ $t('personalization.roleDefaultModelDesc') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+          <button
+            v-for="m in subAgentModels"
+            :key="m.key"
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.sub_agent_model === m.key }"
+            @click="personalization.updateField({ key: 'sub_agent_model', value: m.key }); closeDropdown()"
+          >
+            <strong>{{ m.name }}</strong><span>{{ m.key }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 压缩阈值配置 -->
@@ -267,13 +314,13 @@ const {
                   </button>
                   <button
                     v-for="m in subAgentModels"
-                    :key="m.name"
+                    :key="m.key"
                     type="button"
                     class="settings-menu-option"
-                    :class="{ selected: roleForm.model_key === m.name }"
-                    @click="roleForm.model_key = m.name; closeDropdown()"
+                    :class="{ selected: roleForm.model_key === m.key }"
+                    @click="roleForm.model_key = m.key; closeDropdown()"
                   >
-                    <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || $t('personalization.textOnly') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                    <strong>{{ m.name }}</strong><span>{{ m.key }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                   </button>
                 </div>
               </div>

@@ -87,7 +87,8 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "default_permission_mode": "approval",
     "default_work_mode": "plan",  # 默认运行模式：plan / ask / execute
     "auto_generate_title": True,
-    "title_model": "",  # 对话标题生成使用的子智能体模型条目名（空=跟随主对话默认模型）
+    "title_model": "",  # 对话标题生成使用的注册表模型 key（空=自动规则）
+    "sub_agent_model": "",  # 传统模式子智能体使用的注册表模型 key（空=自动规则；多智能体成员走角色 model_key，不受此影响）
     "external_session_header": False,  # 向 opencode.ai 端点发送 x-opencode-session 头（默认关闭，opt-in）
     "recent_conversations_prompt_enabled": False,
     "recent_conversations_prompt_limit": RECENT_CONVERSATIONS_PROMPT_LIMIT_DEFAULT,
@@ -152,7 +153,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     # 传统模式子智能体设置（个人空间-子智能体管理；与多智能体无关）
     "sub_agent_compress_threshold_tokens": 150000,  # 子智能体上下文压缩阈值，最小 10000
     "sub_agent_max_turns": None,  # 子智能体最大执行轮次：None-默认 50 / 0-无上限 / 正整数-该值
-    # 审核智能体统一配置（个人空间-审核智能体页）：模型名留空则用子智能体模型库 default_model
+    # 审核智能体统一配置（个人空间-审核智能体页）：模型留空走自动规则（注册表第一个可见模型；纯 codex 时选 -luna）
     "review_agents": {
         "auto_approval": {"model": "", "thinking": False, "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 20},
         "goal_review": {"model": "", "thinking": False, "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 60},
@@ -294,6 +295,7 @@ def sanitize_personalization_payload(
     )
     base["auto_generate_title"] = bool(data.get("auto_generate_title", base["auto_generate_title"]))
     base["title_model"] = str(data.get("title_model", base.get("title_model", "")) or "").strip()
+    base["sub_agent_model"] = str(data.get("sub_agent_model", base.get("sub_agent_model", "")) or "").strip()
     base["external_session_header"] = bool(
         data.get("external_session_header", base.get("external_session_header", False))
     )

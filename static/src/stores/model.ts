@@ -3,6 +3,11 @@ import { t } from '@/locales';
 
 export type ModelKey = string;
 
+export interface ReasoningLevel {
+  effort: string;
+  description: string;
+}
+
 export interface ModelOption {
   key: ModelKey;
   label: string;
@@ -17,6 +22,11 @@ export interface ModelOption {
   supportsThinking: boolean;
   thinkingOnly?: boolean;
   supportsReasoningEffort?: boolean;
+  /** 'codex' = ChatGPT 订阅通道；其余/缺省为 OpenAI 兼容通道 */
+  providerType?: string | null;
+  /** Codex 动态模型的 reasoning 档位（用于 EffortSlider 过滤） */
+  supportedReasoningLevels?: ReasoningLevel[] | null;
+  defaultReasoningLevel?: string | null;
 }
 
 interface ModelState {
@@ -92,7 +102,14 @@ export const useModelStore = defineStore('model', {
             fastOnly: !!item.fast_only,
             supportsThinking: !!item.supports_thinking,
             thinkingOnly: !!item.thinking_only,
-            supportsReasoningEffort: !!item.supports_reasoning_effort
+            supportsReasoningEffort: !!item.supports_reasoning_effort,
+            providerType: item.provider_type ? String(item.provider_type) : null,
+            supportedReasoningLevels: Array.isArray(item.supported_reasoning_levels)
+              ? item.supported_reasoning_levels
+              : null,
+            defaultReasoningLevel: item.default_reasoning_level
+              ? String(item.default_reasoning_level)
+              : null
           };
         });
       this.setModels(mapped);

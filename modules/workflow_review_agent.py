@@ -22,12 +22,10 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-import httpx
-
 from config import PROMPTS_DIR, LOGS_DIR
-from modules.external_session import build_user_agent, resolve_ephemeral_headers
 from modules.goal_state_manager import REVIEW_MODE_ACTIVE, REVIEW_MODE_READONLY
 from modules.review_agent_config import resolve_review_agent_config
+from modules.review_model_caller import ReviewModelCallError, call_review_model
 from modules.i18n import tr
 
 PROMPT_NAME = "workflow_review_agent.txt"
@@ -184,20 +182,13 @@ class WorkflowReviewAgent:
         def _reject(message: str) -> Dict[str, Any]:
             return {"decision": "reject", "message": message or tr("workflow_review.fallback_reject"), "source": "workflow_review_agent"}
 
-        url = str(self.cfg.get("url") or "").strip()
-        key = str(self.cfg.get("key") or "").strip()
-        model = str(self.cfg.get("model") or "").strip()
-        if not url or not key or not model:
+        profile = self.cfg.get("profile")
+        if not isinstance(profile, dict):
             out = _reject(tr("workflow_review.config_missing"))
             _flush_trace(out)
             return out
-        endpoint = f"{url.rstrip('/')}/chat/completions"
-        # 以「产品名/版本号」自标识；审核调用无对话连续性，每次审核生成一次性 session ID
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": build_user_agent()}
-        headers.update(resolve_ephemeral_headers(url))
         timeout_seconds = int(self.cfg.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
         max_rounds = max(1, int(self.cfg.get("max_rounds") or DEFAULT_MAX_ROUNDS))
-        extra_params = dict(self.cfg.get("extra_params") or {})
         tools = self._build_tools(review_mode)
 
         messages: List[Dict[str, Any]] = [
@@ -205,142 +196,97 @@ class WorkflowReviewAgent:
             {"role": "user", "content": payload_text},
         ]
 
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            rounds = 0
-            forced_tool_retry_used = False
-            while True:
-                rounds += 1
-                if cancel_check:
-                    external = cancel_check()
-                    if external:
-                        return external
-                if rounds > max_rounds:
-                    out = _reject(tr("workflow_review.max_rounds_no_conclusion"))
-                    _flush_trace(out)
-                    return out
-                if progress_cb:
-                    progress_cb({"stage": "model_call", "round": rounds, "message": tr("workflow_review.round_progress", round=rounds)})
-                req = {
-                    "model": model,
-                    "messages": messages,
-                    "tools": tools,
-                    "tool_choice": "auto",
-                    "temperature": 0.0,
-                    **extra_params,
-                }
-                _trace("request", {"round": rounds, "request": req})
-                try:
-                    resp = await client.post(endpoint, headers=headers, json=req)
-                    resp.raise_for_status()
-                except httpx.HTTPStatusError as exc:
-                    body = ""
-                    try:
-                        body = exc.response.text
-                    except Exception:
-                        body = str(exc)
-                    _trace("http_error", {"round": rounds, "status_code": exc.response.status_code if exc.response else None, "body": body})
-                    # 兼容某些模型/网关不接受额外参数：自动降级重试一次（去掉 extra_params）
-                    if extra_params:
-                        retry_req = {
-                            "model": model,
-                            "messages": messages,
-                            "tools": tools,
-                            "tool_choice": "auto",
-                            "temperature": 0.0,
+        rounds = 0
+        forced_tool_retry_used = False
+        while True:
+            rounds += 1
+            if cancel_check:
+                external = cancel_check()
+                if external:
+                    return external
+            if rounds > max_rounds:
+                out = _reject(tr("workflow_review.max_rounds_no_conclusion"))
+                _flush_trace(out)
+                return out
+            if progress_cb:
+                progress_cb({"stage": "model_call", "round": rounds, "message": tr("workflow_review.round_progress", round=rounds)})
+            _trace("request", {"round": rounds, "messages": messages, "tools": tools})
+            try:
+                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds)
+            except ReviewModelCallError as exc:
+                _trace("http_error", {"round": rounds, "error": str(exc)})
+                out = _reject(tr("workflow_review.request_failed", code=str(exc)))
+                _flush_trace(out)
+                return out
+            reasoning_content = str(choice.get("reasoning_content") or "")
+            _trace("response", {"round": rounds, "message": choice, "reasoning_content": reasoning_content})
+            tool_calls = choice.get("tool_calls") or []
+            content = choice.get("content")
+
+            if not tool_calls:
+                if content or reasoning_content:
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": str(content or ""),
+                            "reasoning_content": str(reasoning_content or ""),
                         }
-                        _trace("retry_request_without_extra_params", {"round": rounds, "request": retry_req})
-                        retry_resp = await client.post(endpoint, headers=headers, json=retry_req)
-                        try:
-                            retry_resp.raise_for_status()
-                            resp = retry_resp
-                        except httpx.HTTPStatusError:
-                            out = _reject(tr("workflow_review.request_failed", code=retry_resp.status_code))
-                            _flush_trace(out)
-                            return out
-                    else:
-                        out = _reject(
-                            tr("workflow_review.request_failed", code=exc.response.status_code if exc.response else "unknown")
-                        )
+                    )
+                reminder = (
+                    "禁止直接输出结论文本。必须调用工具：必要时先调用 run_command 核实，"
+                    "再调用 report_workflow_review 给出最终结论。"
+                )
+                if not forced_tool_retry_used:
+                    forced_tool_retry_used = True
+                    reminder = "你刚刚未通过工具给出明确结果。必须调用工具，禁止直接输出内容。请立即调用 report_workflow_review 返回最终结论。"
+                messages.append({"role": "user", "content": reminder})
+                continue
+
+            # 有 tool_calls：追加完整 assistant 消息（与主智能体结构对齐）
+            assistant_message = {
+                "role": "assistant",
+                "content": str(content or ""),
+                "reasoning_content": str(reasoning_content or ""),
+                "tool_calls": tool_calls,
+            }
+            messages.append(assistant_message)
+            for call in tool_calls:
+                fn = (call.get("function") or {}).get("name")
+                raw_args = (call.get("function") or {}).get("arguments") or "{}"
+                try:
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                except Exception:
+                    args = {}
+                if fn == "report_workflow_review":
+                    decision = str(args.get("decision") or "").strip().lower()
+                    message = str(args.get("message") or "").strip()
+                    if decision == "pass":
+                        out = {"decision": "pass", "message": message or tr("workflow_review.pass_default_message"), "source": "workflow_review_agent"}
                         _flush_trace(out)
                         return out
-                except Exception as exc:
-                    _trace("request_exception", {"round": rounds, "error": str(exc)})
-                    out = _reject(tr("workflow_review.request_exception", error=exc))
+                    if decision == "reject":
+                        out = _reject(message or tr("workflow_review.reject_default_message"))
+                        _flush_trace(out)
+                        return out
+                    # 非法 decision：保守驳回
+                    out = _reject(message or tr("workflow_review.unrecognized_conclusion"))
                     _flush_trace(out)
                     return out
-
-                choice = ((resp.json().get("choices") or [{}])[0] or {}).get("message") or {}
-                reasoning_content = (
-                    choice.get("reasoning_content") or choice.get("reasoning") or choice.get("thinking") or ""
-                )
-                _trace("response", {"round": rounds, "message": choice, "reasoning_content": reasoning_content})
-                tool_calls = choice.get("tool_calls") or []
-                content = choice.get("content")
-
-                if not tool_calls:
-                    if content or reasoning_content:
-                        messages.append(
-                            {
-                                "role": "assistant",
-                                "content": str(content or ""),
-                                "reasoning_content": str(reasoning_content or ""),
-                            }
-                        )
-                    reminder = (
-                        "禁止直接输出结论文本。必须调用工具：必要时先调用 run_command 核实，"
-                        "再调用 report_workflow_review 给出最终结论。"
+                if fn == "run_command":
+                    cmd = str(args.get("command") or "").strip()
+                    if progress_cb:
+                        progress_cb({"stage": "run_command", "round": rounds, "command": cmd})
+                    tool_result = await self._run_readonly_command(cmd) if cmd else {"success": False, "error": "command 不能为空"}
+                    _trace("tool_result", {"round": rounds, "tool": "run_command", "command": cmd, "result": tool_result})
+                    tool_content = json.dumps(tool_result, ensure_ascii=False)
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "content": tool_content,
+                            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+                            + f".{int((time.time() % 1) * 1000000):06d}",
+                            "message_id": f"msg_{uuid.uuid4().hex}",
+                            "tool_call_id": call.get("id"),
+                            "name": "run_command",
+                        }
                     )
-                    if not forced_tool_retry_used:
-                        forced_tool_retry_used = True
-                        reminder = "你刚刚未通过工具给出明确结果。必须调用工具，禁止直接输出内容。请立即调用 report_workflow_review 返回最终结论。"
-                    messages.append({"role": "user", "content": reminder})
-                    continue
-
-                # 有 tool_calls：追加完整 assistant 消息（与主智能体结构对齐）
-                assistant_message = {
-                    "role": "assistant",
-                    "content": str(content or ""),
-                    "reasoning_content": str(reasoning_content or ""),
-                    "tool_calls": tool_calls,
-                }
-                messages.append(assistant_message)
-                for call in tool_calls:
-                    fn = (call.get("function") or {}).get("name")
-                    raw_args = (call.get("function") or {}).get("arguments") or "{}"
-                    try:
-                        args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
-                    except Exception:
-                        args = {}
-                    if fn == "report_workflow_review":
-                        decision = str(args.get("decision") or "").strip().lower()
-                        message = str(args.get("message") or "").strip()
-                        if decision == "pass":
-                            out = {"decision": "pass", "message": message or tr("workflow_review.pass_default_message"), "source": "workflow_review_agent"}
-                            _flush_trace(out)
-                            return out
-                        if decision == "reject":
-                            out = _reject(message or tr("workflow_review.reject_default_message"))
-                            _flush_trace(out)
-                            return out
-                        # 非法 decision：保守驳回
-                        out = _reject(message or tr("workflow_review.unrecognized_conclusion"))
-                        _flush_trace(out)
-                        return out
-                    if fn == "run_command":
-                        cmd = str(args.get("command") or "").strip()
-                        if progress_cb:
-                            progress_cb({"stage": "run_command", "round": rounds, "command": cmd})
-                        tool_result = await self._run_readonly_command(cmd) if cmd else {"success": False, "error": "command 不能为空"}
-                        _trace("tool_result", {"round": rounds, "tool": "run_command", "command": cmd, "result": tool_result})
-                        tool_content = json.dumps(tool_result, ensure_ascii=False)
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "content": tool_content,
-                                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
-                                + f".{int((time.time() % 1) * 1000000):06d}",
-                                "message_id": f"msg_{uuid.uuid4().hex}",
-                                "tool_call_id": call.get("id"),
-                                "name": "run_command",
-                            }
-                        )

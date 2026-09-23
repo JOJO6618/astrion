@@ -25,6 +25,17 @@ import {
 } from './shared';
 
 export const modelMethods = {
+  // 模型菜单 slide 过渡的 leave 完成回调（模板 @after-leave）：此刻旧页已从
+  // DOM 移除，清理高度动画的 inline 样式不会再弹回（见 watchers.ts 注释）。
+  clearModelMenuPaneHeight() {
+    const panes = document.querySelectorAll('.model-menu-panes');
+    panes.forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      el.__heightAnimSeq = (el.__heightAnimSeq || 0) + 1; // 作废保底 timeout
+      el.style.transition = '';
+      el.style.height = '';
+    });
+  },
   toggleModelMenu() {
     if (!this.isConnected || this.streamingMessage) {
       return;
@@ -32,6 +43,10 @@ export const modelMethods = {
     const next = !this.modelMenuOpen;
     this.modelMenuOpen = next;
     if (next) {
+      // 当前是 codex 模型时直接进入 Codex 子页，否则进常规模型页
+      this.headerModelMenuPage = String(this.currentModelKey || '').startsWith('codex/')
+        ? 'codex'
+        : 'main';
       this.modeMenuOpen = false;
       this.inputSetToolMenuOpen(false);
       this.inputSetSettingsOpen(false);

@@ -350,7 +350,9 @@ export const historyMethods = {
             streaming: false,
             collapsed: true,
             timestamp: Date.now(),
-            blockId
+            blockId,
+            // 产生该思考内容的模型（codex 对话渲染为「思考摘要」标题）
+            modelKey: message.metadata?.model_key || null
           });
           debugLog('添加思考内容:', reasoningText.substring(0, 50) + '...');
         }

@@ -18,8 +18,8 @@ from modules.sub_agent.toolkit import (
     SUB_AGENT_TOOLS,
     FINISH_TOOL,
     _format_tool_result,
-    _build_sub_agent_profile,
 )
+from modules.aux_model_resolver import resolve_locked_model_profile
 from utils.api_client import APIClient
 from utils.logger import setup_logger
 
@@ -352,7 +352,7 @@ class SubAgentTask:
                 if self._cancelled:
                     raise asyncio.CancelledError()
                 try:
-                    assistant_message, reasoning, tool_calls, usage = await self._call_model(client, model_key, tools)
+                    assistant_message, reasoning, tool_calls, usage, codex_reasoning_items = await self._call_model(client, model_key, tools)
                     call_error = None
                     break
                 except SubAgentModelCallError as exc:
@@ -459,6 +459,9 @@ class SubAgentTask:
                 final_message["reasoning_content"] = reasoning
             if tool_calls:
                 final_message["tool_calls"] = tool_calls
+            if codex_reasoning_items:
+                # codex 加密思考链：随消息持久化，下次请求由 translate 原样回传
+                final_message["codex_reasoning_items"] = codex_reasoning_items
             self.messages.append(final_message)
             self._persist_conversation(partial_summary=assistant_message[:200])
 
@@ -736,37 +739,18 @@ class SubAgentTask:
         return True
 
     def _build_client(self) -> tuple:
-        """加载模型配置并初始化 APIClient。"""
-        config_path = self.manager.models_config_file
-        models: List[Dict[str, Any]] = []
-        default_key = ""
-        if Path(config_path).exists():
-            try:
-                raw = json.loads(Path(config_path).read_text(encoding="utf-8"))
-                models = raw.get("models", []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
-                default_key = str(raw.get("default_model", "")) if isinstance(raw, dict) else ""
-            except Exception as exc:
-                logger.error(f"[SubAgent] 加载模型配置失败: {exc}")
+        """按创建时锁定的模型 key 解析配置并初始化 APIClient（模型级创建锁）。
 
-        model_map = {}
-        valid_models = []
-        for item in models:
-            profile = _build_sub_agent_profile(item)
-            if profile:
-                key = profile["name"]
-                model_map[key] = profile
-                valid_models.append(key)
-
-        chosen_key = self.model_key or default_key
-        if chosen_key not in model_map and valid_models:
-            chosen_key = valid_models[0]
-        if chosen_key not in model_map:
-            raise RuntimeError(tr("sub_agent_task2.no_model_config", path=config_path))
+        模型来源唯一 = 主注册表（custom_models + codex 动态）；
+        解析失败（未记录 key / key 当前不可用）明确报错，禁止静默回落。
+        """
+        chosen_key = self.model_key
+        profile = resolve_locked_model_profile(chosen_key)
 
         client = APIClient(thinking_mode=(self.thinking_mode == "thinking"), web_mode=True)
         client.model_key = chosen_key
         client.project_path = str(self.manager.project_path)
-        client.apply_profile(model_map[chosen_key])
+        client.apply_profile(profile)
         # 外部会话标识（x-opencode-session）：随子对话生命周期稳定，压缩后重置
         client.extra_headers_resolver = self._resolve_external_session_headers
         return client, chosen_key
@@ -893,7 +877,11 @@ class SubAgentTask:
                 calling_tools=calling_tools,
             ) from exc
 
-        return assistant_message, reasoning, tool_calls, usage
+        # codex：读取并清空本轮加密 reasoning items（回填 messages 持久化，下次请求原样回传）
+        codex_reasoning_items = getattr(client, "last_codex_reasoning_items", None)
+        if codex_reasoning_items is not None:
+            client.last_codex_reasoning_items = None
+        return assistant_message, reasoning, tool_calls, usage, codex_reasoning_items
 
     def _parse_args(self, tool_call: Dict[str, Any]) -> Dict[str, Any]:
         raw = tool_call.get("function", {}).get("arguments") or "{}"

@@ -176,8 +176,24 @@ def _load_custom_models() -> Dict[str, Dict[str, Any]]:
 
 
 def get_registered_model_profiles() -> Dict[str, Dict[str, Any]]:
-    """返回 API 扩展注册的模型。项目不再内置任何供应商模型。"""
-    return _load_custom_models()
+    """返回 API 扩展注册的模型 + Codex 订阅动态发现的模型。"""
+    profiles = _load_custom_models()
+    profiles.update(_load_codex_models())
+    return profiles
+
+
+def _load_codex_models() -> Dict[str, Dict[str, Any]]:
+    """合并 Codex 订阅动态模型（host 模式；无凭证/无缓存时静默返回空）。
+
+    延迟导入避免配置层与 api_client 层的导入耦合；codex 子包任何异常
+    都不应影响常规模型列表的可用性。
+    """
+    try:
+        from utils.api_client.codex.models import get_models_manager
+
+        return get_models_manager().get_profiles()
+    except Exception:
+        return {}
 
 
 def get_registered_model_keys(visible_only: bool = False) -> List[str]:
@@ -216,7 +232,9 @@ def get_model_profile(key: Optional[str]) -> dict:
     profiles = get_registered_model_profiles()
     profile = profiles[resolved_key]
     fast = profile.get("fast") or {}
-    if not fast.get("api_key"):
+    # Codex 订阅模型经 OAuth 凭证请求，不配置 api_key
+    is_codex = str(profile.get("provider_type") or "") == "codex"
+    if not is_codex and not fast.get("api_key"):
         raise ValueError(f"模型 {resolved_key} 缺少 API Key 配置")
     if not fast.get("base_url") or not fast.get("model_id"):
         raise ValueError(f"模型 {resolved_key} 缺少 API 地址或模型 ID 配置")

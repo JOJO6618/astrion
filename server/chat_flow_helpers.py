@@ -38,12 +38,12 @@ async def _generate_title_async(
     conversation_id: Optional[str] = None,
     web_terminal=None,
 ) -> Optional[str]:
-    """使用子智能体模型生成对话标题。
+    """使用辅助模型生成对话标题。
 
-    model_profile 来自个人空间「标题生成模型」配置解析出的子智能体模型库条目
-    （未配置时为模型库 default_model）。个人空间是唯一配置来源：不使用主智能体
-    默认模型，也不支持 AGENT_TITLE_* 环境变量覆盖；profile 缺失或应用失败时
-    直接放弃生成（带日志），不做其他回退。
+    model_profile 由个人空间「标题生成模型」配置经 modules/aux_model_resolver.py
+    从主注册表解析（未配置时走自动规则；codex 模型经 APIClient 协议层自动适配）。
+    个人空间是唯一配置来源：不使用主智能体默认模型，也不支持 AGENT_TITLE_* 环境变量
+    覆盖；profile 缺失或应用失败时直接放弃生成（带日志），不做其他回退。
     """
     if not user_message:
         _title_debug_log("skip_empty_user_message")
@@ -96,17 +96,28 @@ async def _generate_title_async(
     ]
 
     try:
-        async for resp in client.chat(messages, tools=[], stream=False):
+        # 统一走流式（Codex 通道仅支持流式；常规通道同样适用）
+        accumulated: list = []
+        async for resp in client.chat(messages, tools=[], stream=True):
             try:
-                content = resp.get("choices", [{}])[0].get("message", {}).get("content")
-                if content:
-                    normalized = " ".join(str(content).strip().split())
-                    _title_debug_log("title_api_success", title_preview=normalized[:200], title_len=len(normalized))
-                    return normalized
-                _title_debug_log("title_api_empty_content", resp_preview=str(resp)[:500])
+                if not isinstance(resp, dict) or resp.get("error"):
+                    continue
+                choices = resp.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                piece = delta.get("content")
+                if isinstance(piece, str) and piece:
+                    accumulated.append(piece)
             except Exception:
                 _title_debug_log("title_api_parse_error", resp_preview=str(resp)[:500])
                 continue
+        content = "".join(accumulated).strip()
+        if content:
+            normalized = " ".join(content.split())
+            _title_debug_log("title_api_success", title_preview=normalized[:200], title_len=len(normalized))
+            return normalized
+        _title_debug_log("title_api_empty_content")
     except Exception as exc:
         debug_logger(f"[TitleGen] 生成标题异常: {exc}")
         _title_debug_log("title_api_exception", error=str(exc))
@@ -125,17 +136,17 @@ def generate_conversation_title_background(
 ):
     """在后台生成对话标题并更新索引、推送给前端。
 
-    title_model 为个人空间配置的子智能体模型条目名（空 = 子智能体模型库
-    default_model）。个人空间是唯一配置来源。
+    title_model 为个人空间配置的注册表模型 key（空 = 自动规则：注册表第一个
+    可见模型；纯 codex 环境选 -luna）。个人空间是唯一配置来源。
     """
     if not conversation_id or not user_message:
         return
 
     async def _runner():
         try:
-            from modules.review_agent_config import resolve_sub_agent_model_profile
-            # 未配置（空）时回落子智能体模型库 default_model，个人空间为唯一配置来源
-            model_profile = resolve_sub_agent_model_profile(title_model)
+            from modules.aux_model_resolver import resolve_aux_model_profile
+            # 未配置（空）时走统一自动规则，个人空间为唯一配置来源
+            model_profile = resolve_aux_model_profile(title_model)
         except Exception:
             model_profile = None
         if model_profile is None:

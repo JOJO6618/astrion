@@ -244,6 +244,10 @@ MESSAGES = {
         "zh-CN": "该模型已被管理员禁用",
         "en-US": "This model has been disabled by the admin",
     },
+    "chat_settings.codex_switch_locked": {
+        "zh-CN": "Codex 对话与常规模型不可互相切换，请新建对话使用",
+        "en-US": "Codex conversations cannot switch to regular models and vice versa. Please start a new conversation.",
+    },
     "chat_settings.admin_forced_disabled": {
         "zh-CN": "被管理员强制禁用",
         "en-US": "Force-disabled by admin",

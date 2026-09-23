@@ -36,6 +36,7 @@ export default {
   // —— Thinking block status ——
   thinking: 'Thinking',
   thinkingRunning: 'Thinking...',
+  thoughtSummary: 'Thought summary',
 
   // —— Inline citations (citation chip / popover) ——
   citationOpenSource: 'Open source',

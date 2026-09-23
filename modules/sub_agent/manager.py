@@ -19,10 +19,10 @@ from config import (
     OUTPUT_FORMATS,
     SUB_AGENT_DEFAULT_TIMEOUT,
     SUB_AGENT_MAX_ACTIVE,
-    SUB_AGENT_MODELS_CONFIG_FILE,
     SUB_AGENT_STATUS_POLL_INTERVAL,
 )
 from utils.logger import setup_logger
+from modules.aux_model_resolver import auto_default_model_key, resolve_aux_model_profile
 from modules.sub_agent.task import SubAgentTask
 from modules.sub_agent.prompts import build_user_message, build_system_prompt
 from modules.sub_agent.tools import handle_read_mediafile
@@ -65,7 +65,6 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         # 子智能体任务和状态按 data_dir 隔离（web 模式下按用户/工作区自动隔离）
         self.base_dir = self.data_dir / "sub_agent_tasks"
         self.state_file = self.data_dir / "sub_agents.json"
-        self.models_config_file = SUB_AGENT_MODELS_CONFIG_FILE
         self.container_session: Optional["ContainerHandle"] = container_session
         self.host_execution_mode: str = "sandbox"
         self.terminal: Optional["WebTerminal"] = None
@@ -314,6 +313,14 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         system_prompt_file.write_text(final_system_prompt, encoding="utf-8")
 
         # timeout_seconds 为 None 表示永久子智能体（不会被时间终结）
+        # 模型级创建锁：留空时按自动规则解析一次并锁死进任务记录；显式指定时
+        # 校验当前可用，不可用直接拒绝创建（绝不静默回落，保证前缀缓存稳定）
+        if not model_key:
+            model_key = auto_default_model_key()
+        resolved_profile = resolve_aux_model_profile(model_key or "")
+        if resolved_profile is None:
+            return {"success": False, "error": tr("sub_agent_task2.locked_model_unavailable", model=model_key or "")}
+        provider_type = str(resolved_profile.get("provider_type") or "")
         task_record = {
             "task_id": task_id,
             "agent_id": agent_id,
@@ -334,6 +341,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "progress_file": str(progress_file),
             "conversation_file": str(conversation_file),
             "model_key": model_key,
+            "provider_type": provider_type,
             "role_id": role_id,
             "display_name": display_name,
             "execution_mode": "in_process",

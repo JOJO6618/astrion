@@ -6,7 +6,6 @@ from .paths import (
     _resolve_repo_path,
     DATA_DIR,
     DEFAULT_PROJECT_PATH,
-    deploy_config_path,
 )
 
 # 子智能体服务
@@ -22,8 +21,8 @@ SUB_AGENT_STATE_FILE = _resolve_repo_path(os.environ.get("SUB_AGENT_STATE_FILE",
 SUB_AGENT_PROJECT_RESULTS_DIR = _resolve_repo_path(os.environ.get("SUB_AGENT_PROJECT_RESULTS_DIR", ""), f"{DEFAULT_PROJECT_PATH}/sub_agent_results")
 SUB_AGENT_MAX_ACTIVE = int(os.environ.get("SUB_AGENT_MAX_ACTIVE", "5"))
 
-# 子智能体模型配置文件（仅从部署目录读取，读不到就报错）
-SUB_AGENT_MODELS_CONFIG_FILE = os.environ.get("SUB_AGENT_MODELS_CONFIG_FILE", "") or deploy_config_path("sub_agent_models.json")
+# 注：子智能体独立模型库（sub_agent_models.json）已于 2026-09 废弃，
+# 模型来源唯一 = 主注册表（见 modules/aux_model_resolver.py）。
 
 __all__ = [
     "SUB_AGENT_SERVICE_BASE_URL",
@@ -33,5 +32,4 @@ __all__ = [
     "SUB_AGENT_PROJECT_RESULTS_DIR",
     "SUB_AGENT_STATE_FILE",
     "SUB_AGENT_MAX_ACTIVE",
-    "SUB_AGENT_MODELS_CONFIG_FILE",
 ]

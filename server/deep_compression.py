@@ -373,16 +373,18 @@ async def _generate_summary(web_terminal, prompt: str, retries: int = 5) -> Tupl
     tools = web_terminal.define_tools()
     for _ in range(max(1, retries)):
         try:
-            response_text = ""
-            async for chunk in web_terminal.api_client.chat(messages, tools=tools, stream=False):
-                if not isinstance(chunk, dict):
+            # 统一走流式（Codex 通道仅支持流式；常规通道同样适用）
+            response_parts: list = []
+            async for chunk in web_terminal.api_client.chat(messages, tools=tools, stream=True):
+                if not isinstance(chunk, dict) or chunk.get("error"):
                     continue
                 choices = chunk.get("choices") or []
                 if choices:
-                    msg = choices[0].get("message") or {}
-                    content = msg.get("content")
-                    if isinstance(content, str):
-                        response_text = content
+                    delta = choices[0].get("delta") or {}
+                    piece = delta.get("content")
+                    if isinstance(piece, str) and piece:
+                        response_parts.append(piece)
+            response_text = "".join(response_parts)
             if response_text.strip():
                 return response_text.strip(), None
             last_reason = tr("deep_compression.empty_model_content")

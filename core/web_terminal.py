@@ -156,12 +156,12 @@ class WebTerminal(MainTerminal):
         debug_log(f"[WebTerminal] 初始模式: {self.run_mode}")
         debug_log(f"[WebTerminal] 对话管理已就绪")
         
-        # 设置token更新回调
+        # 设置token更新回调。Socket.IO 移除后构造时 message_callback 恒为 None 属常态：
+        # 任务运行时由 server/tasks/models.py 动态 set_web_terminal_callback(sender)
+        # 接到任务事件流，token_update / todo_updated 均经此进事件流由前端轮询消费。
         if message_callback is not None:
             self.context_manager._web_terminal_callback = message_callback
             debug_log(f"[WebTerminal] 实时token统计已启用")
-        else:
-            logger.warning("[WebTerminal] message_callback为None，无法启用实时token统计")
     # ===========================================
     # 新增：对话管理相关方法（Web版本）
     # ===========================================

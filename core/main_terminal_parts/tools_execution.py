@@ -2279,6 +2279,14 @@ class MainTerminalToolsExecutionMixin:
                                     _max_turns = int(_raw_max_turns)
                             except Exception:
                                 pass
+                            # 传统模式子智能体模型：个人空间设置（留空 = None 走自动规则）；
+                            # 多智能体分支不走这里（角色自带 model_key）
+                            _sub_agent_model = None
+                            try:
+                                _raw_model = str((_prefs or {}).get("sub_agent_model") or "").strip()
+                                _sub_agent_model = _raw_model or None
+                            except Exception:
+                                pass
                             result = self.sub_agent_manager.create_sub_agent(
                                 agent_id=arguments.get("agent_id"),
                                 summary=arguments.get("summary", ""),
@@ -2288,6 +2296,7 @@ class MainTerminalToolsExecutionMixin:
                                 timeout_seconds=arguments.get("timeout_seconds"),
                                 thinking_mode=arguments.get("thinking_mode"),
                                 conversation_id=self.context_manager.current_conversation_id,
+                                model_key=_sub_agent_model,
                                 max_turns=_max_turns,
                             )
 

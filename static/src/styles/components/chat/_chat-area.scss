@@ -542,6 +542,7 @@
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
+  border: 1px solid var(--border-default); /* 与输入栏 .stadium-shell 外边线一致 */
   background: var(--surface-soft);
   box-shadow: none;
   pointer-events: auto;
@@ -591,10 +592,17 @@
 }
 
 .dropdown-list--models {
-  max-height: 320px; /* 最多显示约 5 个模型 */
+  max-height: 320px; /* 紧凑单项约 32px，约 9 个模型可见 */
+  gap: 2px; /* 项间距（覆盖 .dropdown-list 的 6px） */
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* 模型项紧凑化：单项只显名称，压缩上下空白（hover 背景随项高收缩）；
+   仅作用模型列，右列运行模式项保留原 padding（仍有 desc 小字） */
+.dropdown-list--models .dropdown-item {
+  padding: 6px 12px;
 }
 
 .dropdown-list--models::-webkit-scrollbar {
@@ -607,10 +615,13 @@
 }
 
 .dropdown-title {
+  display: flex;
+  align-items: center;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  line-height: 1.4;
   color: var(--text-secondary);
   padding: 2px 12px;
 }
@@ -653,6 +664,71 @@
   align-self: center;
   font-weight: 800;
   color: var(--text-primary);
+}
+
+/* 模型菜单两页滑动容器（Codex 子页）：grid 同格堆叠——两页在同一个 grid
+   单元格中叠加（均为流内定位），只做 translateX 位移，不做 absolute↔static
+   切换，从机制上消除动画结束瞬间的位置回跳；type-slide-* 关键帧复用侧边栏 */
+.model-menu-panes {
+  display: grid;
+  overflow: hidden;
+}
+
+.model-menu-pane {
+  grid-area: 1 / 1;
+  /* 高度由内容决定，不被 grid 行拉伸——同格堆叠时行高 = max(两页)，默认 stretch
+     会把矮页拉高，导致高度动画量到的目标高度失真（高→矮切换无动画的根因） */
+  align-self: start;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 抵消侧边栏 type-slide 全局 enter 规则（absolute + padding-top: 8px 是为侧边栏
+   容器结构定制）：本容器用 grid 堆叠，enter 页保持流内定位，动画期间零排版切换 */
+.model-menu-panes .type-slide-left-enter-active,
+.model-menu-panes .type-slide-right-enter-active {
+  position: static;
+  padding-top: 0;
+}
+
+/* 返回标题按钮（Codex 子页标题位）：容器已 flex 居中且自带 padding，
+   按钮自身 padding 清零，文字位置与主页「模型」标题逐像素重合 */
+.dropdown-title-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dropdown-title-back:hover {
+  color: var(--text-primary);
+}
+
+/* Codex 入口项（常规模型列表底部）：形状与其他模型项一致（全圆角），无上边线 */
+.dropdown-item--codex-entry {
+  margin-top: 2px;
+}
+
+.item-chevron {
+  align-self: center;
+  margin-left: auto;
+  color: var(--text-secondary);
+}
+
+.dropdown-empty-hint {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .header-menu-enter-active,

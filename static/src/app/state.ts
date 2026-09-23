@@ -166,6 +166,9 @@ export function dataState() {
     titleReady: false,
     suppressTitleTyping: false,
     headerMenuOpen: false,
+    // 头部模型菜单分页：'main' = 常规模型列表（含 Codex 入口项）；
+    // 'codex' = Codex 模型子页（标题变为返回）
+    headerModelMenuPage: 'main',
     blankWelcomePool: [
       t('appCore.welcomeHelp'),
       t('appCore.welcomeHot'),

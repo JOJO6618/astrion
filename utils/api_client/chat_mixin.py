@@ -56,6 +56,14 @@ class APIClientChatMixin:
         Yields:
             响应内容块
         """
+        # Codex 通道：provider_type 为 codex 时走独立的请求编排（OAuth +
+        # Responses API 适配层），产出与本方法完全同形的 chunk，下游零改动。
+        # 必须在 api_key 检查之前分发——codex 模型不配置 api_key。
+        if str(getattr(self, "provider_type", "") or "") == "codex":
+            async for chunk in self.chat_codex(messages, tools, stream=stream):
+                yield chunk
+            return
+
         # 检查API密钥
         if not self.api_key or self.api_key.startswith("your-"):
             self._print(f"{OUTPUT_FORMATS['error']} API密钥未配置，请检查模型配置")

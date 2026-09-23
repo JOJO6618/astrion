@@ -74,13 +74,13 @@ const {
                               </button>
                               <button
                                 v-for="m in subAgentModels"
-                                :key="m.name"
+                                :key="m.key"
                                 type="button"
                                 class="settings-menu-option"
-                                :class="{ selected: reviewAgentOf(agent.key).model === m.name }"
-                                @click="updateReviewAgent(agent.key, { model: m.name }); closeDropdown()"
+                                :class="{ selected: reviewAgentOf(agent.key).model === m.key }"
+                                @click="updateReviewAgent(agent.key, { model: m.key }); closeDropdown()"
                               >
-                                <strong>{{ m.name }}</strong><span>{{ m.modes }} · {{ m.multimodal || $t('personalization.textOnly') }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+                                <strong>{{ m.name }}</strong><span>{{ m.key }}</span><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
                               </button>
                             </div>
                           </div>

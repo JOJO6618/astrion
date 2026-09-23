@@ -40,6 +40,9 @@ export default {
   backgroundRunning: '运行中...',
   thinking: '思考中...',
   waitingApiResponse: '等待 API 响应...',
+  back: '返回',
+  codexEntry: 'Codex 订阅',
+  codexNotConnected: '未连接，请在个人空间连接 Codex 账号',
 
   // ── 空白页欢迎语（state.ts blankWelcomePool） ──
   welcomeHelp: '有什么可以帮忙的？',

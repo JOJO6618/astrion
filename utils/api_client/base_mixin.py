@@ -70,6 +70,11 @@ class APIClientBaseMixin:
         # 推理强度（reasoning effort）：None=默认（不传参）；由会话级设置注入
         self.reasoning_effort: Optional[str] = None
         self.supports_reasoning_effort = False  # 当前模型是否支持推理强度，由 apply_profile 注入
+        # 模型提供方类型（None=OpenAI 兼容；"codex"=ChatGPT 订阅 OAuth 通道）
+        self.provider_type: Optional[str] = None
+        # Codex 通道专用：本轮响应收集到的加密 reasoning items，
+        # 由 server 落盘逻辑读走写入消息 metadata（供下轮回插上下文）
+        self.last_codex_reasoning_items: Optional[list] = None
         # 最近一次API错误详情
         self.last_error_info: Optional[Dict[str, Any]] = None
         # 附加请求头解析器：每次发请求时以 base_url 为参数回调，返回需合并的

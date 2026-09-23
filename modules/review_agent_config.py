@@ -2,77 +2,39 @@
 
 三个审核智能体（自动审批 auto_approval / 目标审核 goal_review / 工作流审核 workflow_review）
 的模型与运行参数统一来自个人空间设置（personalization.json 的 review_agents 键）：
-- model / thinking：模型名与思考模式；模型条目复用子智能体模型库 sub_agent_models.json，
-  模型名留空时使用模型库的 default_model；
+- model / thinking：注册表模型 key 与思考模式；模型来源唯一 = 主注册表
+  （custom_models + codex 动态发现，见 modules/aux_model_resolver.py），留空走自动规则；
 - timeout_seconds / max_rounds / max_command_timeout：审核请求超时、最大轮次、只读命令超时。
 
 历史上三个智能体各自读取独立的部署级 json 配置（auto_approval.json / goal_review.json /
-workflow_review.json），该方式已彻底废弃，不再做任何向后兼容。
+workflow_review.json），该方式已彻底废弃；此前的「子智能体独立模型库
+sub_agent_models.json（含库级 default_model）」同样已废弃，不做任何向后兼容。
 """
 
-import json
-from pathlib import Path
 from typing import Any, Dict
 
 from config import DATA_DIR
-from config.sub_agent import SUB_AGENT_MODELS_CONFIG_FILE
+from modules.aux_model_resolver import resolve_aux_model_profile
 from modules.personalization_manager import REVIEW_AGENT_KEYS
 
-__all__ = ["resolve_review_agent_config", "resolve_sub_agent_model_profile", "REVIEW_AGENT_KEYS"]
-
-
-def _load_model_entry(model_name: str) -> Dict[str, Any]:
-    """从子智能体模型库解析出指定模型的 profile；名称留空则用 default_model。
-
-    返回 APIClient.apply_profile 格式的 profile（含 fast/thinking 两段），失败返回 None。
-    """
-    config_path = Path(SUB_AGENT_MODELS_CONFIG_FILE)
-    if not config_path.exists():
-        return None
-    try:
-        raw = json.loads(config_path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-    models = raw.get("models", []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
-    default_key = str(raw.get("default_model", "")) if isinstance(raw, dict) else ""
-
-    from modules.sub_agent.toolkit import _build_sub_agent_profile
-
-    model_map: Dict[str, Dict[str, Any]] = {}
-    for item in models:
-        if not isinstance(item, dict):
-            continue
-        profile = _build_sub_agent_profile(item)
-        if profile:
-            model_map[profile["name"]] = profile
-
-    chosen = model_name or default_key
-    if chosen not in model_map and model_map:
-        chosen = next(iter(model_map))
-    return model_map.get(chosen)
-
-
-def resolve_sub_agent_model_profile(model_name: str) -> Dict[str, Any]:
-    """按名称从子智能体模型库解析模型 profile（APIClient.apply_profile 格式）。
-
-    名称留空或不存在时回落模型库 default_model（模型库也不可用时返回 None，
-    由调用方决定兜底行为）。
-    """
-    return _load_model_entry(str(model_name).strip() if model_name and str(model_name).strip() else "")
+__all__ = ["resolve_review_agent_config", "REVIEW_AGENT_KEYS"]
 
 
 def resolve_review_agent_config(agent_key: str) -> Dict[str, Any]:
     """解析指定审核智能体的完整运行配置。
 
-    返回字段：name / url / key / model / extra_params / timeout_seconds / max_rounds /
-    max_command_timeout。模型未配置或模型库不可用时 url/key/model 为空字符串，
-    由各审核智能体走既有的「配置缺失」兜底行为。
+    返回字段：name / profile / thinking / extra_params / timeout_seconds /
+    max_rounds / max_command_timeout。
+    - profile：APIClient.apply_profile 同形的模型配置（含 provider_type），
+      模型未配置或注册表不可用时为 None，由各审核智能体走既有的
+      「配置缺失」兜底行为；
+    - extra_params：仅常规模型的裸 HTTP 路径使用（max_tokens 注入等），
+      codex 路径忽略。
     """
     base: Dict[str, Any] = {
         "name": f"{agent_key}-agent",
-        "url": "",
-        "key": "",
-        "model": "",
+        "profile": None,
+        "thinking": False,
         "extra_params": {},
         "timeout_seconds": 60,
         "max_rounds": 3,
@@ -94,23 +56,21 @@ def resolve_review_agent_config(agent_key: str) -> Dict[str, Any]:
     base["timeout_seconds"] = int(settings.get("timeout_seconds") or base["timeout_seconds"])
     base["max_rounds"] = max(1, int(settings.get("max_rounds") or base["max_rounds"]))
     base["max_command_timeout"] = max(1, int(settings.get("max_command_timeout") or base["max_command_timeout"]))
+    base["thinking"] = bool(settings.get("thinking"))
 
-    model_name = str(settings.get("model") or "").strip()
-    profile = _load_model_entry(model_name)
+    model_key = str(settings.get("model") or "").strip()
+    profile = resolve_aux_model_profile(model_key)
     if not profile:
         return base
+    base["profile"] = profile
 
-    # 按思考模式选段；模型不支持 thinking 时回落 fast 段
-    thinking = bool(settings.get("thinking"))
-    segment = profile.get("thinking") if thinking else None
-    if not segment:
-        segment = profile.get("fast") or {}
-    base["url"] = str(segment.get("base_url") or "").strip()
-    base["key"] = str(segment.get("api_key") or "").strip()
-    base["model"] = str(segment.get("model_id") or "").strip()
-    extra = segment.get("extra_params")
-    base["extra_params"] = dict(extra) if isinstance(extra, dict) else {}
-    max_tokens = segment.get("max_tokens")
-    if isinstance(max_tokens, int) and max_tokens > 0 and "max_tokens" not in base["extra_params"]:
-        base["extra_params"]["max_tokens"] = max_tokens
+    # 仅常规模型裸 HTTP 路径需要 max_tokens 注入；codex 路径由 profile 自带参数
+    if str(profile.get("provider_type") or "") != "codex":
+        thinking = base["thinking"]
+        segment = profile.get("thinking") if thinking else None
+        if not segment:
+            segment = profile.get("fast") or {}
+        max_tokens = segment.get("max_tokens")
+        if isinstance(max_tokens, int) and max_tokens > 0:
+            base["extra_params"]["max_tokens"] = max_tokens
     return base

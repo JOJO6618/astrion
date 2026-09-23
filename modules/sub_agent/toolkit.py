@@ -1,12 +1,10 @@
-"""子智能体工具定义、结果格式化与模型配置解析。"""
+"""子智能体工具定义与结果格式化。"""
 
 from __future__ import annotations
 
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-
-from config.model_profiles import _parse_env_ref
 
 # 子智能体可用工具定义（与前端进度展示兼容）
 SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
@@ -378,90 +376,4 @@ def _format_tool_result(name: str, raw: Any) -> str:
         from utils.tool_result_formatter.agent_context import _format_active_sub_agents_list
         return _format_active_sub_agents_list(raw.get("agents") or [])
     return json.dumps(raw, ensure_ascii=False)
-
-
-def _build_sub_agent_profile(model_raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """把 sub_agent_models.json 中的模型条目转成 APIClient.apply_profile 所需格式。"""
-    name = str(model_raw.get("name") or model_raw.get("model_name") or model_raw.get("model") or "").strip()
-    url = str(_parse_env_ref(model_raw.get("url") or model_raw.get("base_url") or "") or "").strip()
-    api_key = str(_parse_env_ref(model_raw.get("apikey") or model_raw.get("api_key") or "") or "").strip()
-    if not name or not url or not api_key:
-        return None
-
-    modes_text = str(model_raw.get("modes") or model_raw.get("mode") or model_raw.get("supported_modes") or "").lower()
-    supports_thinking = "thinking" in modes_text or "思考" in modes_text
-    fast_only = modes_text == "fast" or modes_text == "快速"
-
-    multimodal_text = str(model_raw.get("multimodal") or model_raw.get("multi_modal") or model_raw.get("multi") or "none").lower()
-    multimodal = "none"
-    if "video" in multimodal_text:
-        multimodal = "image+video"
-    elif "image" in multimodal_text:
-        multimodal = "image"
-
-    max_output = _to_int(model_raw.get("max_output") or model_raw.get("max_tokens") or model_raw.get("max_output_tokens"))
-    max_context = _to_int(model_raw.get("max_context") or model_raw.get("context_window") or model_raw.get("max_context_tokens"))
-
-    model_id = str(model_raw.get("model_id") or name).strip()
-    extra = _pick_dict(model_raw, ["extra_parameter", "extra_params", "extra"])
-    # 优先从顶层查找 fast/thinking extra_parameter；如果没有，从 thinkmode_status 中查找
-    fast_extra = _pick_dict(model_raw, ["fast_extra_parameter", "fast_extra_params", "fast_extra"])
-    thinking_extra = _pick_dict(model_raw, ["thinking_extra_parameter", "thinking_extra_params", "thinking_extra"])
-    # 从 thinkmode_status 中提取（与主智能体 custom_models.json 结构对齐）
-    thinkmode_status = model_raw.get("thinkmode_status") or {}
-    if isinstance(thinkmode_status, dict):
-        if not fast_extra:
-            fast_extra = _pick_dict(thinkmode_status, ["fast_extra_parameter", "fast_extra_params", "fast_extra"])
-        if not thinking_extra:
-            thinking_extra = _pick_dict(thinkmode_status, ["thinking_extra_parameter", "thinking_extra_params", "thinking_extra"])
-        # thinkmode_status 内部的 model_id 可以覆盖默认 model_id
-        ts_model_id = str(thinkmode_status.get("model_id") or "").strip()
-        if ts_model_id:
-            model_id = ts_model_id
-
-    profile: Dict[str, Any] = {
-        "name": name,
-        "multimodal": multimodal,
-        "context_window": max_context,
-        "supports_thinking": supports_thinking,
-        "fast_only": fast_only,
-        "fast": {
-            "base_url": url.rstrip("/"),
-            "api_key": api_key,
-            "model_id": model_id,
-            "max_tokens": max_output,
-            "context_window": max_context,
-            "extra_params": {**extra, **fast_extra},
-        },
-    }
-    if supports_thinking:
-        profile["thinking"] = {
-            "base_url": url.rstrip("/"),
-            "api_key": api_key,
-            "model_id": model_id,
-            "max_tokens": max_output,
-            "context_window": max_context,
-            "extra_params": {**extra, **thinking_extra},
-        }
-    else:
-        # 即使不支持 thinking，也保留 fast 的 extra_params（含 disabled 参数）
-        # 避免不支持 thinking 的模型在 fast 模式下漏掉 thinking.type=disabled 参数
-        profile["thinking"] = None
-    return profile
-
-
-def _to_int(value: Any) -> Optional[int]:
-    try:
-        num = int(value)
-        return num if num > 0 else None
-    except Exception:
-        return None
-
-
-def _pick_dict(source: Dict[str, Any], keys: List[str]) -> Dict[str, Any]:
-    for key in keys:
-        value = source.get(key)
-        if isinstance(value, dict):
-            return value
-    return {}
 

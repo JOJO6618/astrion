@@ -36,6 +36,9 @@ export default {
   backgroundRunning: 'running...',
   thinking: 'Thinking...',
   waitingApiResponse: 'Waiting for API response...',
+  back: 'Back',
+  codexEntry: 'Codex',
+  codexNotConnected: 'Not connected. Connect a Codex account in Personal Space.',
 
   // Blank hero welcome lines (state.ts blankWelcomePool)
   welcomeHelp: 'How can I help?',
