@@ -34,6 +34,18 @@ const loginFlowStatus = computed<string>(
 );
 const loginPending = computed(() => loginFlowStatus.value === 'pending');
 const loginError = computed(() => status.value?.login_flow?.error || '');
+const loginFlowMode = computed<string>(
+  () => status.value?.login_flow?.flow_mode || 'browser'
+);
+const deviceUserCode = computed<string>(
+  () => status.value?.login_flow?.user_code || ''
+);
+const deviceVerificationUri = computed<string>(
+  () => status.value?.login_flow?.verification_uri || ''
+);
+const deviceLoginPending = computed(
+  () => loginPending.value && loginFlowMode.value === 'device'
+);
 const modelsInfo = computed(() => status.value?.models || {});
 
 const expiresText = computed(() => {
@@ -313,17 +325,70 @@ const startLogin = async () => {
   try {
     const resp = await fetch('/api/codex/login/start', { method: 'POST' });
     const data = await resp.json();
-    if (!data?.success || !data?.authorize_url) {
+    if (!data?.success) {
+      loadError.value = data?.error || t('personalization.codexLoginStartFailed');
+      return;
+    }
+    if (data.flow_mode === 'device') {
+      // 两流互斥：已有设备码流程进行中，直接展示其状态，不开浏览器
+      status.value = { ...status.value, login_flow: data };
+      startPolling();
+      return;
+    }
+    if (!data?.authorize_url) {
       loadError.value = data?.error || t('personalization.codexLoginStartFailed');
       return;
     }
     window.open(data.authorize_url, '_blank', 'noopener');
-    status.value = { ...status.value, login_flow: { status: 'pending' } };
+    status.value = {
+      ...status.value,
+      login_flow: { status: 'pending', flow_mode: 'browser' }
+    };
     startPolling();
   } catch (e: any) {
     loadError.value = String(e?.message || e);
   } finally {
     actionBusy.value = false;
+  }
+};
+
+const startDeviceLogin = async () => {
+  actionBusy.value = true;
+  try {
+    const resp = await fetch('/api/codex/login/device/start', { method: 'POST' });
+    const data = await resp.json();
+    if (!data?.success) {
+      loadError.value = data?.error || t('personalization.codexLoginStartFailed');
+      return;
+    }
+    status.value = { ...status.value, login_flow: data };
+    startPolling();
+    // 设备码流：顺带帮用户打开官方授权页（仍需手动输入页面上的验证码）；
+    // 互斥命中浏览器流时则打开其授权 URL
+    const url =
+      data.flow_mode === 'device' ? data.verification_uri : data.authorize_url;
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+    }
+  } catch (e: any) {
+    loadError.value = String(e?.message || e);
+  } finally {
+    actionBusy.value = false;
+  }
+};
+
+const openDevicePage = () => {
+  if (deviceVerificationUri.value) {
+    window.open(deviceVerificationUri.value, '_blank', 'noopener');
+  }
+};
+
+const copyUserCode = async () => {
+  try {
+    await navigator.clipboard.writeText(deviceUserCode.value);
+    uiStore.pushToast({ message: t('common.copied'), type: 'success' });
+  } catch (_) {
+    uiStore.pushToast({ message: t('common.copyFailed'), type: 'error' });
   }
 };
 
@@ -421,14 +486,22 @@ onBeforeUnmount(stopPolling);
           >
             {{ $t('common.cancel') }}
           </button>
-          <button
-            v-else-if="!connected"
-            type="button"
-            :disabled="actionBusy"
-            @click="startLogin"
-          >
-            {{ $t('personalization.codexConnect') }}
-          </button>
+          <template v-else-if="!connected">
+            <button
+              type="button"
+              :disabled="actionBusy"
+              @click="startLogin"
+            >
+              {{ $t('personalization.codexLoginBrowser') }}
+            </button>
+            <button
+              type="button"
+              :disabled="actionBusy"
+              @click="startDeviceLogin"
+            >
+              {{ $t('personalization.codexLoginDevice') }}
+            </button>
+          </template>
           <button
             v-else
             type="button"
@@ -440,7 +513,34 @@ onBeforeUnmount(stopPolling);
         </div>
       </div>
       <div v-if="loginPending" class="settings-section-desc codex-login-pending">
-        {{ $t('personalization.codexLoginPending') }}
+        <div v-if="deviceLoginPending && deviceUserCode" class="codex-device-panel">
+          <span class="codex-device-panel__hint">
+            {{ $t('personalization.codexLoginDeviceHint') }}
+          </span>
+          <span class="codex-device-code">
+            <span class="codex-device-code__text">{{ deviceUserCode }}</span>
+            <button type="button" class="settings-secondary-button" @click="copyUserCode">
+              {{ $t('common.copy') }}
+            </button>
+            <button
+              v-if="deviceVerificationUri"
+              type="button"
+              class="settings-secondary-button"
+              @click="openDevicePage"
+            >
+              {{ $t('personalization.codexLoginDeviceOpen') }}
+            </button>
+          </span>
+          <span class="codex-device-panel__first">
+            {{ $t('personalization.codexLoginDeviceFirstTime') }}
+          </span>
+          <span class="codex-device-panel__waiting">
+            {{ $t('personalization.codexLoginPendingDevice') }}
+          </span>
+        </div>
+        <template v-else>
+          {{ $t('personalization.codexLoginPending') }}
+        </template>
       </div>
       <div v-if="loginError" class="settings-section-desc codex-login-error">
         {{ loginError }}
@@ -572,6 +672,42 @@ onBeforeUnmount(stopPolling);
 </template>
 
 <style scoped>
+.codex-device-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 4px;
+}
+
+.codex-device-panel__hint {
+  color: var(--text-secondary);
+}
+
+.codex-device-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.codex-device-code__text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-primary);
+  user-select: all;
+}
+
+.codex-device-panel__first {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.codex-device-panel__waiting {
+  color: var(--text-secondary);
+}
+
 .codex-login-pending {
   color: var(--text-secondary);
   font-size: 12px;

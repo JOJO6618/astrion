@@ -39,6 +39,23 @@ OAUTH_REDIRECT_URI = "http://localhost:1455/auth/callback"
 OAUTH_LISTEN_PORT = 1455
 OAUTH_SCOPE = "openid profile email offline_access"
 
+# Device Code 授权流（OpenAI 官方无头登录，与 Codex CLI / opencode headless
+# 同一套端点与 client_id；字段以 codex-rs login/src/device_code_auth.rs 官方
+# 实现 + 2026-09-24 实测为准）：
+# 1) POST deviceauth/usercode，JSON 仅 {client_id} →
+#    {device_auth_id, user_code, interval(字符串秒), expires_at}
+# 2) 用户在任意浏览器开固定验证页 OAUTH_DEVICE_VERIFY_URL 输 user_code 授权
+# 3) 轮询 deviceauth/token，JSON {device_auth_id, user_code} → pending 为
+#    403/404（官方）或 400+error.code=deviceauth_authorization_pending（实测），
+#    成功 200 + {authorization_code, code_challenge, code_verifier}
+#    ——PKCE 对由服务端随授权码下发，客户端不事先生成
+# 4) 同一 token 端点交换（redirect_uri 换设备流专用 + 服务端下发的 verifier）
+# 前提：ChatGPT 账号设置 → 安全里开启「Enable device code authentication for Codex」。
+OAUTH_DEVICE_CODE_URL = "https://auth.openai.com/api/accounts/deviceauth/usercode"
+OAUTH_DEVICE_TOKEN_URL = "https://auth.openai.com/api/accounts/deviceauth/token"
+OAUTH_DEVICE_REDIRECT_URI = "https://auth.openai.com/deviceauth/callback"
+OAUTH_DEVICE_VERIFY_URL = "https://auth.openai.com/codex/device"
+
 API_BASE = "https://chatgpt.com/backend-api/codex"
 RESPONSES_URL = f"{API_BASE}/responses"
 MODELS_URL = f"{API_BASE}/models"

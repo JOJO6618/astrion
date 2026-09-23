@@ -24,6 +24,7 @@ from utils.api_client.codex.models import get_models_manager
 from utils.api_client.codex.oauth import (
     cancel_login_flow,
     poll_login_flow,
+    start_device_login_flow,
     start_login_flow,
 )
 
@@ -75,6 +76,22 @@ def codex_login_poll():
             target=models.refresh_sync, daemon=True, name="codex-models-refresh"
         ).start()
     return jsonify({"success": True, **state})
+
+
+@codex_auth_bp.route("/api/codex/login/device/start", methods=["POST"])
+@api_login_required
+@admin_api_required
+def codex_login_device_start():
+    """启动设备码登录（无头场景，管理员任选）：返回 verification_uri + user_code。
+
+    浏览器只与 OpenAI 官方授权页交互，无 localhost 回调，docker 部署可用。
+    前提：ChatGPT 账号设置 → 安全里已开启 device code authentication。
+    """
+    auth = get_auth_manager()
+    result = start_device_login_flow(auth)
+    if result.get("status") == "failed":
+        return jsonify({"success": False, "error": result.get("error")}), 500
+    return jsonify({"success": True, **result})
 
 
 @codex_auth_bp.route("/api/codex/login/cancel", methods=["POST"])
