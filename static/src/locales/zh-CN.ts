@@ -2,6 +2,7 @@
 // 新增命名空间：在 zh-CN/ 与 en-US/ 下各建同名文件后，在此与 en-US.ts 同步注册。
 import common from './zh-CN/common';
 import personalization from './zh-CN/personalization';
+import settings from './zh-CN/settings';
 import toolResults from './zh-CN/toolResults';
 import input from './zh-CN/input';
 import tutorial from './zh-CN/tutorial';
@@ -29,6 +30,7 @@ import sandbox from './zh-CN/sandbox';
 export default {
   common,
   personalization,
+  settings,
   toolResults,
   input,
   tutorial,

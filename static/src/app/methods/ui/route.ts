@@ -49,7 +49,11 @@ export const routeMethods = {
         history.replaceState({}, '', '/workflows');
         path = 'workflows';
       }
-      this.workflowDemoRoute = path;
+      if (path === 'settings' || path.startsWith('settings/')) {
+        this.settingsRoute = path;
+      } else {
+        this.workflowDemoRoute = path;
+      }
       this.currentConversationId = null;
       this.currentConversationTitle = '';
       this.messages = [];
@@ -158,7 +162,7 @@ export const routeMethods = {
     return normalizedPath === 'new';
   },
   /**
-   * 当前 URL 是否为独立于对话体系的全屏路由（当前：/workflows、/workflow/*）。
+   * 当前 URL 是否为独立于对话体系的全屏路由（当前：/workflows、/workflow/*、/settings、/settings/*）。
    * 与 isExplicitNewConversationRoute 一样直接读 location.pathname，不依赖
    * bootstrap 阶段写入的状态字段，任意时机调用结果都正确。
    * 对话体系的自动恢复/广播接管/任务接管/URL 写回在这些路由下必须全部禁用，
@@ -169,12 +173,22 @@ export const routeMethods = {
     return (
       normalizedPath === 'workflows' ||
       normalizedPath === 'workflow' ||
-      normalizedPath.startsWith('workflow/')
+      normalizedPath.startsWith('workflow/') ||
+      normalizedPath === 'settings' ||
+      normalizedPath.startsWith('settings/')
     );
   },
   openWorkflowsPage() {
     // 工作流编辑器是 bootstrap 级全屏路由，与退出方向（/new）对称使用整页跳转，保证状态干净
     window.location.assign('/workflows');
+  },
+  openSettingsPage() {
+    // 设置页同样是 bootstrap 级全屏路由，整页跳转保证状态干净
+    window.location.assign('/settings');
+  },
+  closeSettingsPage() {
+    // 设置页返回出口：整页跳回空对话（与 workflows 的进出方式对称）
+    window.location.assign('/new');
   },
   stripConversationPrefix(conversationId) {
     if (!conversationId) return '';

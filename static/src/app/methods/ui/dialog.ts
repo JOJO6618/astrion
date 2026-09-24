@@ -25,11 +25,12 @@ import {
 } from './shared';
 
 export const dialogMethods = {
-  openPersonalPage() {
+  openPersonalPage(tab) {
     if (this.isPolicyBlocked('block_personal_space', t('appUi.policyBlockedPersonalSpace'))) {
       return;
     }
-    this.personalizationOpenDrawer();
+    // tab 可选：'preferences' 时抽屉直接定位到个性化页（侧边栏二级菜单入口）
+    this.personalizationOpenDrawer(tab);
   },
   minimizeUserQuestionDialog() {
     if (!Array.isArray(this.pendingUserQuestions) || !this.pendingUserQuestions.length) {

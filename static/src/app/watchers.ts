@@ -11,64 +11,6 @@ export const watchers = {
       this.scheduleComposerDraftPersist('watch-input-message');
     }
   },
-  // 模型菜单分页切换的高度动画（2026-09 重写：WAAPI 直接驱动弹窗本体）。
-  // 旧实现给 .model-menu-panes 容器设 inline height 过渡——弹窗是多列 grid，
-  // 渲染高度 = max(各列)，容器动画不必然传导到弹窗可视边框（曾出现容器过渡
-  // 完整播放、弹窗却方向不对称跳变的问题）。现直接测量弹窗渲染高度并用
-  // WAAPI 插值：切换期间弹窗钉在动画值，overflow 裁切堆叠页溢出内容；
-  // after-leave（旧页移除、auto 高度稳定）后 cancel 动画回落 auto，零跳变。
-  headerModelMenuPage() {
-    const panes = Array.from(document.querySelectorAll('.model-menu-panes')).filter(
-      (el) => el instanceof HTMLElement && el.getClientRects().length > 0
-    );
-    if (!panes.length) return;
-    const popups = panes.map((el) => el.closest('.model-mode-dropdown'));
-    if (popups.some((p) => !(p instanceof HTMLElement))) return;
-    // 起始高度在 DOM 更新前量（watcher 默认 pre flush），此时只有旧页；
-    // 若上一轮动画 fill:forwards 未清理，offsetHeight 反映动画当前值，
-    // 恰好是新动画的正确起点
-    const startHeights = popups.map((p) => p.offsetHeight);
-    this.$nextTick(() => {
-      panes.forEach((el, i) => {
-        const popup = popups[i];
-        const startHeight = startHeights[i];
-        // 终止上一轮未完的动画（快速来回切换），让真实 auto 高度参与目标测量
-        if (popup.__menuHeightAnim) {
-          popup.__menuHeightAnim.cancel();
-          popup.__menuHeightAnim = null;
-        }
-        // 量「仅新页」时弹窗的稳定高度：leave 页临时脱离 grid 流，同帧测量后
-        // 恢复（同步代码不触发渲染，无闪烁；leave 页 transform 过渡由类驱动，
-        // position 还原后不受影响）
-        const leavePane = el.querySelector('.model-menu-pane[class*="-leave-"]');
-        if (leavePane instanceof HTMLElement) {
-          leavePane.style.position = 'absolute';
-        }
-        const endHeight = popup.offsetHeight;
-        if (leavePane instanceof HTMLElement) {
-          leavePane.style.position = '';
-        }
-        if (Math.abs(endHeight - startHeight) < 2) return;
-        popup.style.overflow = 'hidden'; // 动画期间裁切堆叠页溢出部分
-        const anim = popup.animate(
-          [{ height: `${startHeight}px` }, { height: `${endHeight}px` }],
-          { duration: 220, easing: 'ease', fill: 'forwards' }
-        );
-        popup.__menuHeightAnim = anim;
-        // 保底：after-leave 事件丢失时 1s 后强制回落 auto（序号防快速切换时
-        // 旧 timeout 误清新一轮动画）
-        const seq = (popup.__menuHeightAnimSeq = (popup.__menuHeightAnimSeq || 0) + 1);
-        window.setTimeout(() => {
-          if (popup.__menuHeightAnimSeq !== seq) return;
-          if (popup.__menuHeightAnim) {
-            popup.__menuHeightAnim.cancel();
-            popup.__menuHeightAnim = null;
-          }
-          popup.style.overflow = '';
-        }, 1000);
-      });
-    });
-  },
   messages: {
     deep: true,
     handler() {

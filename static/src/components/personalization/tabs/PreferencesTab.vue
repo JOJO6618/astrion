@@ -5,7 +5,7 @@ import FancyCheck from '@/components/common/FancyCheck.vue';
 defineOptions({ name: 'PreferencesTab' });
 
 /**
- * 共享上下文由 PersonalizationDrawer.vue 通过 provide 注入。
+ * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
  * 解构出的名称与主文件 script 顶层绑定一致，模板可直接引用。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;

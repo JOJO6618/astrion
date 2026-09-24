@@ -72,6 +72,25 @@ class APIClientProfileMixin:
         self.provider_type = str(profile.get("provider_type") or "") or None
         self.model_multimodal = self._normalize_multimodal_capability(profile.get("multimodal"))
         self.default_context_window = profile.get("context_window") or fast.get("context_window")
+        # 提供商自定义请求头（provider 体系）：profile["headers"] 为静态字典，
+        # 包装为 resolver 并与宿主已注入的 resolver 链式合并（宿主动态头优先）。
+        profile_headers = profile.get("headers")
+        if isinstance(profile_headers, dict) and profile_headers:
+            static_headers = {str(k): str(v) for k, v in profile_headers.items()}
+            previous_resolver = self.extra_headers_resolver
+
+            def _profile_headers_resolver(base_url, _static=static_headers, _prev=previous_resolver):
+                merged = dict(_static)
+                if _prev is not None:
+                    try:
+                        dynamic = _prev(base_url) or {}
+                        if isinstance(dynamic, dict):
+                            merged.update({str(k): str(v) for k, v in dynamic.items()})
+                    except Exception:
+                        pass
+                return merged
+
+            self.extra_headers_resolver = _profile_headers_resolver
         # 同步旧字段
         self.api_base_url = self.fast_api_config["base_url"]
         self.api_key = self.fast_api_config["api_key"]

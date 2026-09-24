@@ -750,6 +750,9 @@ def list_models_api():
             "max_output_tokens": (profile.get("fast") or {}).get("max_tokens"),
             # Codex 动态模型字段（常规模型为 None/缺省，前端按 provider_type 分支）
             "provider_type": profile.get("provider_type"),
+            # 提供商同步模型的分组字段（手写 custom / Codex 为 None）
+            "provider_id": profile.get("provider_id"),
+            "provider_name": profile.get("provider_name"),
             "supported_reasoning_levels": profile.get("supported_reasoning_levels"),
             "default_reasoning_level": profile.get("default_reasoning_level"),
         })

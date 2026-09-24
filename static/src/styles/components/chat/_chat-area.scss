@@ -595,8 +595,9 @@
   max-height: 320px; /* 紧凑单项约 32px，约 9 个模型可见 */
   gap: 2px; /* 项间距（覆盖 .dropdown-list 的 6px） */
   overflow-y: auto;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  /* 显示细滚动条（样式适配，不暴露原生粗滚动条） */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 32%, transparent) transparent;
 }
 
 /* 模型项紧凑化：单项只显名称，压缩上下空白（hover 背景随项高收缩）；
@@ -606,8 +607,135 @@
 }
 
 .dropdown-list--models::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 6px;
+}
+
+.dropdown-list--models::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-secondary) 32%, transparent);
+  border-radius: 3px;
+}
+
+.dropdown-list--models::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 提供商组容器：组头 sticky 的约束盒——组内容滚完时组头被下一组自然推走
+   （挤压从「下一组顶边接触当前组头底边」开始，而非完全重合） */
+.model-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-group + .model-group {
+  margin-top: 4px;
+}
+
+/* 组内容展开/收起动画：grid 行高 1fr↔0fr 过渡（可动画 auto 高度的标准技巧）；
+   DOM 常驻（不用 v-if），收起时 inner overflow 裁切 */
+.model-group-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  /* visibility 随行动画：收起结束后隐藏（防 Tab 聚焦进折叠区），展开立即可见 */
+  transition:
+    grid-template-rows 0.2s ease,
+    visibility 0.2s ease;
+}
+
+.model-group-body.collapsed {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+}
+
+.model-group-body__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 搜索框行（取代原「模型」标题行）：浅底圆角条，放大镜 + 无边框输入；
+   尺寸/圆角与底部管理行一致（30px 高、12px 圆角 = 模型行 hover 圆角） */
+.dropdown-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.dropdown-search:focus-within {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.dropdown-search-icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.dropdown-search-input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.dropdown-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* 提供商组头（opencode 式分组）：sticky 锁定滚动容器顶部，被下一组挤走；
+   点击折叠/展开该组。背景与弹窗同色不透明，遮盖滚过的模型行 */
+.dropdown-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px 4px;
+  border: none;
+  background: var(--surface-soft);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.dropdown-group-header:hover .group-name {
+  color: var(--text-primary);
+}
+
+.group-chevron {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.dropdown-empty-hint {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .model-mode-dropdown--mobile .dropdown-list--models {
@@ -649,6 +777,29 @@
   cursor: not-allowed;
 }
 
+/* 底部「管理模型」入口行：位于滚动列表之外的文档流中（滚动容器兄弟节点），
+   列表滚动时始终钉在菜单底部且不遮挡模型行。
+   尺寸与顶部搜索框一致（30px 高、0 10px padding、12px 圆角走 .dropdown-item 基础值），
+   无独立底色、无分隔线；图标内嵌 label（grid item 块级化为 flex），内容垂直居中。
+   ⚠️ 本块必须位于 .dropdown-item 基础块之后——同特异性下 padding 覆盖依赖源码顺序 */
+.dropdown-item--manage {
+  height: 30px;
+  margin-top: 2px;
+  padding: 0 10px;
+}
+
+.dropdown-item--manage .item-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dropdown-item--manage .manage-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--text-secondary);
+}
+
 .item-label {
   font-weight: 700;
   font-size: 14px;
@@ -664,81 +815,6 @@
   align-self: center;
   font-weight: 800;
   color: var(--text-primary);
-}
-
-/* 模型菜单两页滑动容器（Codex 子页）：grid 同格堆叠——两页在同一个 grid
-   单元格中叠加（均为流内定位），只做 translateX 位移，不做 absolute↔static
-   切换，从机制上消除动画结束瞬间的位置回跳；type-slide-* 关键帧复用侧边栏 */
-.model-menu-panes {
-  display: grid;
-  overflow: hidden;
-}
-
-.model-menu-pane {
-  grid-area: 1 / 1;
-  /* 高度由内容决定，不被 grid 行拉伸——同格堆叠时行高 = max(两页)，默认 stretch
-     会把矮页拉高，导致高度动画量到的目标高度失真（高→矮切换无动画的根因） */
-  align-self: start;
-  width: 100%;
-  min-width: 0;
-}
-
-/* 抵消侧边栏 type-slide 全局 enter 规则（absolute + padding-top: 8px 是为侧边栏
-   容器结构定制）：本容器用 grid 堆叠，enter 页保持流内定位，动画期间零排版切换 */
-.model-menu-panes .type-slide-left-enter-active,
-.model-menu-panes .type-slide-right-enter-active {
-  position: static;
-  padding-top: 0;
-}
-
-/* 分页滑动期间禁用两页指针命中：点击瞬间被点项的 hover 高亮若不清除，
-   会随 slide 被 overflow 裁切着滑过可视区（视觉瑕疵）；过渡结束类移除后
-   命中自动恢复（鼠标仍悬停时 hover 重新出现，属正常行为） */
-.model-menu-panes .type-slide-left-enter-active,
-.model-menu-panes .type-slide-left-leave-active,
-.model-menu-panes .type-slide-right-enter-active,
-.model-menu-panes .type-slide-right-leave-active {
-  pointer-events: none;
-}
-
-/* 返回标题按钮（Codex 子页标题位）：容器已 flex 居中且自带 padding，
-   按钮自身 padding 清零，文字位置与主页「模型」标题逐像素重合 */
-.dropdown-title-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0;
-  border: none;
-  background: none;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.4;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.dropdown-title-back:hover {
-  color: var(--text-primary);
-}
-
-/* Codex 入口项（常规模型列表底部）：形状与其他模型项一致（全圆角），无上边线 */
-.dropdown-item--codex-entry {
-  margin-top: 2px;
-}
-
-.item-chevron {
-  align-self: center;
-  margin-left: auto;
-  color: var(--text-secondary);
-}
-
-.dropdown-empty-hint {
-  padding: 14px 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-align: center;
 }
 
 .header-menu-enter-active,
@@ -2860,6 +2936,11 @@ body[data-theme='dark'] {
   .model-mode-dropdown {
     background: var(--badge-bg) !important;
     box-shadow: none !important;
+  }
+
+  /* sticky 提供商组头底色同步弹窗（遮盖滚过的模型行，不有色差） */
+  .model-mode-dropdown .dropdown-group-header {
+    background: var(--badge-bg) !important;
   }
 
   /* hover 与输入栏按钮一致（--hover-bg），与菜单底色拉开对比 */

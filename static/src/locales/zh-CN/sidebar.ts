@@ -36,6 +36,9 @@ export default {
   renameTitle: '重命名{kind}',
   renamePlaceholder: '请输入名称',
   personalSpace: '个人空间',
+  preferences: '个性化',
+  help: '帮助',
+  helpComingSoon: '即将推出',
 
   // ── WorkspaceSwitcher：工作区/项目切换浮层 ──
   workspaceCount: '{n} 个',

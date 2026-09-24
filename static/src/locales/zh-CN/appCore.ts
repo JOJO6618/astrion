@@ -41,8 +41,11 @@ export default {
   thinking: '思考中...',
   waitingApiResponse: '等待 API 响应...',
   back: '返回',
-  codexEntry: 'Codex 订阅',
-  codexNotConnected: '未连接，请在个人空间连接 Codex 账号',
+  manageModels: '管理模型',
+  modelGroupCodex: 'OpenAI（ChatGPT 订阅）',
+  modelGroupCustom: '自定义',
+  searchModel: '搜索模型',
+  noModelsMatched: '没有匹配的模型',
 
   // ── 空白页欢迎语（state.ts blankWelcomePool） ──
   welcomeHelp: '有什么可以帮忙的？',

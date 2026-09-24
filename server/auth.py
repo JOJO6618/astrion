@@ -448,6 +448,15 @@ def new_page():
     return current_app.send_static_file('index.html')
 
 
+@auth_bp.route('/settings')
+@auth_bp.route('/settings/<path:section>')
+@login_required
+def settings_page(section=None):
+    # 设置页与 /new 同为 SPA 入口：前端 bootstrapRoute 识别 settings/settings/* 路径
+    # （参考 server/workflow_page.py 的 /workflows 同模式）
+    return current_app.send_static_file('index.html')
+
+
 @auth_bp.route('/<conv:conversation_id>')
 @login_required
 def conversation_page(conversation_id):

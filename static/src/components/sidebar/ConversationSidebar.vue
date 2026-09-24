@@ -716,13 +716,13 @@
         @reveal="$emit('reveal-workspace', $event)"
       />
 
-      <div class="conversation-personal-entry" :class="{ active: personalPageVisible }">
+      <div class="conversation-personal-entry" :class="{ active: personalPageVisible || personalMenuOpen }">
         <button
           type="button"
           class="sidebar-nav-row personal-page-btn"
           data-tutorial="open-personal-space"
-          :title="$t('sidebar.personalSpace')"
-          @click="$emit('personal')"
+          :title="sessionUsername || $t('sidebar.personalSpace')"
+          @click.stop="togglePersonalMenu"
         >
           <span class="sidebar-nav-icon" aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -733,8 +733,34 @@
               ></path>
             </svg>
           </span>
-          <span class="sidebar-nav-label personal-label">{{ $t('sidebar.personalSpace') }}</span>
+          <span class="sidebar-nav-label personal-label">{{ sessionUsername || $t('sidebar.personalSpace') }}</span>
+          <span class="personal-menu-caret" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+              <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
         </button>
+        <!-- 二级菜单：个人空间 / 个性化 / 设置 / 帮助（帮助暂置灰） -->
+        <div v-if="personalMenuOpen" class="personal-menu" role="menu" @click.stop>
+          <button type="button" class="personal-menu-item" role="menuitem" @click="openPersonalSpacePage">
+            {{ $t('sidebar.personalSpace') }}
+          </button>
+          <button type="button" class="personal-menu-item" role="menuitem" @click="openPreferencesPage">
+            {{ $t('sidebar.preferences') }}
+          </button>
+          <button type="button" class="personal-menu-item" role="menuitem" @click="openSettingsPage">
+            {{ $t('common.settings') }}
+          </button>
+          <button
+            type="button"
+            class="personal-menu-item"
+            role="menuitem"
+            disabled
+            :title="$t('sidebar.helpComingSoon')"
+          >
+            {{ $t('sidebar.help') }}
+          </button>
+        </div>
       </div>
     </div>
   </aside>
@@ -803,7 +829,7 @@ const emit = defineEmits<{
   (event: 'select-running-task', task: any): void;
   (event: 'load-more'): void;
   (event: 'search-more'): void;
-  (event: 'personal'): void;
+  (event: 'personal', tab?: string): void;
   (event: 'delete', id: string): void;
   (event: 'duplicate', id: string): void;
   (event: 'switch-workspace', workspaceId: string): void;
@@ -822,6 +848,40 @@ const emit = defineEmits<{
 const uiStore = useUiStore();
 const conversationStore = useConversationStore();
 const personalizationStore = usePersonalizationStore();
+
+// ── 个人入口：用户名按钮 + 二级菜单（个人空间/个性化/设置/帮助） ──
+const personalMenuOpen = ref(false);
+const sessionUsername = ref('');
+
+function togglePersonalMenu() {
+  personalMenuOpen.value = !personalMenuOpen.value;
+}
+function closePersonalMenu() {
+  if (personalMenuOpen.value) personalMenuOpen.value = false;
+}
+function openPersonalSpacePage() {
+  closePersonalMenu();
+  emit('personal');
+}
+function openPreferencesPage() {
+  closePersonalMenu();
+  emit('personal', 'preferences');
+}
+function openSettingsPage() {
+  closePersonalMenu();
+  // 设置页是 bootstrap 级全屏路由，整页跳转保证状态干净（与 workflows 对称）
+  window.location.assign('/settings');
+}
+async function fetchSessionUsername() {
+  try {
+    const resp = await fetch('/api/session-status', { credentials: 'same-origin' });
+    if (!resp.ok) return;
+    const payload = await resp.json();
+    sessionUsername.value = String(payload?.session?.username || '');
+  } catch (_err) {
+    sessionUsername.value = '';
+  }
+}
 
 /** 侧边栏对话类型过滤器（普通/多智能体），唯一真相在 conversation store */
 const sidebarType = computed(() => conversationStore.sidebarConversationType);
@@ -1324,6 +1384,8 @@ const loadMoreWorkspaceConversations = (workspaceId: string) => {
 onMounted(() => {
   document.addEventListener('click', closeActionMenu);
   document.addEventListener('click', closeWorkspaceMenu);
+  document.addEventListener('click', closePersonalMenu);
+  fetchSessionUsername();
   if (isGroupByWorkspaceActive.value) {
     sortedWorkspaces.value.forEach((ws: any) => ensureWorkspaceGroup(String(ws?.workspace_id || '')));
   }
@@ -1332,5 +1394,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeActionMenu);
   document.removeEventListener('click', closeWorkspaceMenu);
+  document.removeEventListener('click', closePersonalMenu);
 });
 </script>

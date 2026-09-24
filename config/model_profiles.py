@@ -176,10 +176,25 @@ def _load_custom_models() -> Dict[str, Dict[str, Any]]:
 
 
 def get_registered_model_profiles() -> Dict[str, Dict[str, Any]]:
-    """返回 API 扩展注册的模型 + Codex 订阅动态发现的模型。"""
+    """返回 API 扩展注册的模型 + 提供商动态发现的模型 + Codex 订阅动态发现的模型。"""
     profiles = _load_custom_models()
+    profiles.update(_load_provider_models())
     profiles.update(_load_codex_models())
     return profiles
+
+
+def _load_provider_models() -> Dict[str, Dict[str, Any]]:
+    """合并第三方提供商（OpenAI 兼容，provider 体系）动态发现的模型。
+
+    延迟导入避免配置层与 modules 层的导入耦合；provider_manager 任何异常
+    都不应影响常规模型列表的可用性。
+    """
+    try:
+        from modules.provider_manager import get_provider_manager
+
+        return get_provider_manager().get_profiles()
+    except Exception:
+        return {}
 
 
 def _load_codex_models() -> Dict[str, Dict[str, Any]]:

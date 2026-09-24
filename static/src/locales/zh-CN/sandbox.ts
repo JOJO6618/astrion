@@ -1,7 +1,7 @@
 // 文案命名空间：sandbox（zh-CN 源语言）
 // 沙箱环境检测与一键安装向导（Windows 宿主机模式）。
 // 使用方：static/src/components/overlay/SandboxSetupDialog.vue
-//        static/src/components/personalization/tabs/GeneralTab.vue
+//        static/src/components/settings/tabs/WorkspaceTab.vue（沙箱环境区块，设置页「工作区」分区）
 //        static/src/stores/sandboxSetup.ts
 export default {
   // ── 弹窗框架 ──

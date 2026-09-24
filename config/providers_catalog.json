@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。protocol_note=chat_completions_only 表示该网关为多协议，当前版本仅支持其 OpenAI Chat Completions 模型子集。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。",
+  "providers": [
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "base_url": "https://api.deepseek.com",
+      "icon": "deepseek-color.svg",
+      "auth": "api_key",
+      "key_url": "https://platform.deepseek.com/api_keys"
+    },
+    {
+      "id": "moonshot",
+      "name": "Moonshot AI",
+      "base_url": "https://api.moonshot.cn/v1",
+      "icon": "moonshot.svg",
+      "icon_mono": true,
+      "auth": "api_key",
+      "key_url": "https://platform.moonshot.cn/console/api-keys"
+    },
+    {
+      "id": "zhipu-cn",
+      "name": "智谱（国内）",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "icon": "zhipu-color.svg",
+      "auth": "api_key",
+      "key_url": "https://open.bigmodel.cn/usercenter/proj-apikeys"
+    },
+    {
+      "id": "zhipu-global",
+      "name": "Z.AI（国际）",
+      "base_url": "https://api.z.ai/api/paas/v4",
+      "icon": "zhipu-color.svg",
+      "auth": "api_key",
+      "key_url": "https://z.ai/manage-apikey/apikey-list"
+    },
+    {
+      "id": "bailian",
+      "name": "阿里云百炼",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "icon": "bailian-color.svg",
+      "auth": "api_key",
+      "key_url": "https://bailian.console.aliyun.com/"
+    },
+    {
+      "id": "volcengine",
+      "name": "火山方舟",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "icon": "volcengine-color.svg",
+      "auth": "api_key",
+      "key_url": "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey"
+    },
+    {
+      "id": "siliconflow",
+      "name": "SiliconFlow",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "icon": "siliconcloud-color.svg",
+      "auth": "api_key",
+      "key_url": "https://cloud.siliconflow.cn/account/ak"
+    },
+    {
+      "id": "minimax-cn",
+      "name": "MiniMax（国内）",
+      "base_url": "https://api.minimaxi.com/v1",
+      "icon": "minimax-color.svg",
+      "auth": "api_key",
+      "key_url": "https://platform.minimaxi.com/user-center/basic-information/interface-key"
+    },
+    {
+      "id": "minimax-global",
+      "name": "MiniMax（国际）",
+      "base_url": "https://api.minimax.io/v1",
+      "icon": "minimax-color.svg",
+      "auth": "api_key",
+      "key_url": "https://platform.minimax.io/user-center/basic-information/interface-key"
+    },
+    {
+      "id": "openai-api",
+      "name": "OpenAI",
+      "base_url": "https://api.openai.com/v1",
+      "icon": "openai.svg",
+      "icon_mono": true,
+      "auth": "api_key",
+      "badge": "API 密钥",
+      "key_url": "https://platform.openai.com/api-keys"
+    },
+    {
+      "id": "openai-codex",
+      "name": "OpenAI",
+      "base_url": "https://chatgpt.com/backend-api/codex",
+      "icon": "openai.svg",
+      "icon_mono": true,
+      "auth": "codex_oauth",
+      "badge": "ChatGPT 订阅 · OAuth"
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "icon": "openrouter-color.svg",
+      "auth": "api_key",
+      "key_url": "https://openrouter.ai/settings/keys"
+    },
+    {
+      "id": "google",
+      "name": "Google Gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "icon": "gemini-color.svg",
+      "auth": "api_key",
+      "key_url": "https://aistudio.google.com/apikey"
+    },
+    {
+      "id": "xai",
+      "name": "xAI",
+      "base_url": "https://api.x.ai/v1",
+      "icon": "xai.svg",
+      "icon_mono": true,
+      "auth": "api_key",
+      "key_url": "https://console.x.ai/"
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "base_url": "https://api.groq.com/openai/v1",
+      "icon": "groq.svg",
+      "icon_mono": true,
+      "auth": "api_key",
+      "key_url": "https://console.groq.com/keys"
+    },
+    {
+      "id": "together",
+      "name": "Together AI",
+      "base_url": "https://api.together.ai/v1",
+      "icon": "together-color.svg",
+      "auth": "api_key",
+      "key_url": "https://api.together.ai/settings/api-keys"
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "base_url": "https://api.mistral.ai/v1",
+      "icon": "mistral-color.svg",
+      "auth": "api_key",
+      "key_url": "https://console.mistral.ai/api-keys",
+      "models_response": "bare_list"
+    },
+    {
+      "id": "oczen",
+      "name": "OpenCode Zen",
+      "base_url": "https://opencode.ai/zen/v1",
+      "icon": "opencode.svg",
+      "auth": "api_key",
+      "badge": "仅 Chat Completions",
+      "protocol_note": "chat_completions_only",
+      "key_url": "https://opencode.ai/auth"
+    },
+    {
+      "id": "ocgo",
+      "name": "OpenCode Go",
+      "base_url": "https://opencode.ai/zen/go/v1",
+      "icon": "opencode.svg",
+      "auth": "api_key",
+      "badge": "仅 Chat Completions",
+      "protocol_note": "chat_completions_only",
+      "key_url": "https://opencode.ai/auth"
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "base_url": "http://localhost:11434/v1",
+      "icon": "ollama.svg",
+      "icon_mono": true,
+      "auth": "none",
+      "badge": "本地",
+      "local": true
+    },
+    {
+      "id": "lmstudio",
+      "name": "LM Studio",
+      "base_url": "http://localhost:1234/v1",
+      "icon": "lmstudio.svg",
+      "icon_mono": true,
+      "auth": "none",
+      "badge": "本地",
+      "local": true
+    }
+  ]
+}

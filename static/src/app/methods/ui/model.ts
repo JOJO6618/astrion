@@ -25,22 +25,19 @@ import {
 } from './shared';
 
 export const modelMethods = {
-  // 模型菜单 slide 过渡的 leave 完成回调（模板 @after-leave）：此刻旧页已从
-  // DOM 移除，弹窗 auto 高度已稳定为新页高度——cancel WAAPI 动画回落 auto
-  //（fill:forwards 终值与 auto 一致，无跳变），并还原 overflow（见 watchers.ts）。
-  clearModelMenuPaneHeight() {
-    const panes = document.querySelectorAll('.model-menu-panes');
-    panes.forEach((el) => {
-      if (!(el instanceof HTMLElement)) return;
-      const popup = el.closest('.model-mode-dropdown');
-      if (!(popup instanceof HTMLElement)) return;
-      popup.__menuHeightAnimSeq = (popup.__menuHeightAnimSeq || 0) + 1; // 作废保底 timeout
-      if (popup.__menuHeightAnim) {
-        popup.__menuHeightAnim.cancel();
-        popup.__menuHeightAnim = null;
-      }
-      popup.style.overflow = '';
-    });
+  // 模型菜单：提供商组折叠/展开（opencode 式分组，2026-09-25 改造后不再有 Codex 子页）
+  isModelGroupCollapsed(groupId) {
+    return (this.collapsedModelGroups || []).includes(groupId);
+  },
+  toggleModelGroup(groupId) {
+    const list = Array.isArray(this.collapsedModelGroups) ? this.collapsedModelGroups : [];
+    this.collapsedModelGroups = list.includes(groupId)
+      ? list.filter((id) => id !== groupId)
+      : [...list, groupId];
+  },
+  // 底部「管理模型」入口：整页跳设置页模型分区
+  openManageModels() {
+    window.location.assign('/settings/models');
   },
   toggleModelMenu() {
     if (!this.isConnected || this.streamingMessage) {
@@ -49,10 +46,8 @@ export const modelMethods = {
     const next = !this.modelMenuOpen;
     this.modelMenuOpen = next;
     if (next) {
-      // 当前是 codex 模型时直接进入 Codex 子页，否则进常规模型页
-      this.headerModelMenuPage = String(this.currentModelKey || '').startsWith('codex/')
-        ? 'codex'
-        : 'main';
+      // 每次打开菜单从空搜索词开始
+      this.modelMenuSearchQuery = '';
       this.modeMenuOpen = false;
       this.inputSetToolMenuOpen(false);
       this.inputSetSettingsOpen(false);

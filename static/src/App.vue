@@ -161,71 +161,87 @@
             <transition name="header-menu">
               <div v-if="headerMenuOpen" class="model-mode-dropdown" ref="headerMenu">
                 <div class="dropdown-column" data-tutorial="header-model-options">
-                  <div class="dropdown-title">
-                    <button
-                      v-if="headerModelMenuPage === 'codex'"
-                      type="button"
-                      class="dropdown-title-back"
-                      @click.stop="headerModelMenuPage = 'main'"
-                    >
-                      ‹ {{ $t('appCore.back') }}
-                    </button>
-                    <template v-else>{{ $t('appCore.model') }}</template>
+                  <div class="dropdown-search">
+                    <svg class="dropdown-search-icon" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8" />
+                      <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                    <input
+                      v-model="modelMenuSearchQuery"
+                      type="text"
+                      class="dropdown-search-input"
+                      :placeholder="$t('appCore.searchModel')"
+                      @click.stop
+                    />
                   </div>
-                  <div class="model-menu-panes">
-                    <Transition
-                      :name="headerModelMenuPage === 'codex' ? 'type-slide-left' : 'type-slide-right'"
-                      @after-leave="clearModelMenuPaneHeight"
-                    >
-                      <div
-                        v-if="headerModelMenuPage === 'main'"
-                        key="main"
-                        class="dropdown-list dropdown-list--models model-menu-pane"
+                  <div class="dropdown-list dropdown-list--models">
+                    <div v-for="group in filteredGroupedModelOptions" :key="group.id" class="model-group">
+                      <button
+                        type="button"
+                        class="dropdown-group-header"
+                        :aria-expanded="!isModelGroupCollapsed(group.id) || !!modelMenuSearchQuery"
+                        @click.stop="toggleModelGroup(group.id)"
                       >
-                        <button
-                          v-for="option in regularModelOptions"
-                          :key="option.key"
-                          type="button"
-                          class="dropdown-item"
-                          :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
-                          @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
-                          :disabled="streamingMessage || !isConnected || option.disabled"
+                        <span class="group-name">{{ group.name }}</span>
+                        <svg
+                          class="group-chevron"
+                          :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
                         >
-                          <div class="item-label">{{ option.label }}</div>
-                          <span v-if="option.key === currentModelKey" class="item-check">✓</span>
-                        </button>
-                        <button
-                          type="button"
-                          class="dropdown-item dropdown-item--codex-entry"
-                          @click.stop="headerModelMenuPage = 'codex'"
-                        >
-                          <div class="item-label">{{ $t('appCore.codexEntry') }}</div>
-                          <span class="item-chevron">›</span>
-                        </button>
-                      </div>
+                          <path
+                            d="M7 10l5 5 5-5"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </button>
                       <div
-                        v-else
-                        key="codex"
-                        class="dropdown-list dropdown-list--models model-menu-pane"
+                        class="model-group-body"
+                        :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
                       >
-                        <button
-                          v-for="option in codexModelOptions"
-                          :key="option.key"
-                          type="button"
-                          class="dropdown-item"
-                          :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
-                          @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
-                          :disabled="streamingMessage || !isConnected || option.disabled"
-                        >
-                          <div class="item-label">{{ option.label }}</div>
-                          <span v-if="option.key === currentModelKey" class="item-check">✓</span>
-                        </button>
-                        <div v-if="!codexModelOptions.length" class="dropdown-empty-hint">
-                          {{ $t('appCore.codexNotConnected') }}
+                        <div class="model-group-body__inner">
+                          <button
+                            v-for="option in group.options"
+                            :key="option.key"
+                            type="button"
+                            class="dropdown-item"
+                            :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                            @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
+                            :disabled="streamingMessage || !isConnected || option.disabled"
+                          >
+                            <div class="item-label">{{ option.label }}</div>
+                            <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                          </button>
                         </div>
                       </div>
-                    </Transition>
+                    </div>
+                    <div v-if="!filteredGroupedModelOptions.length" class="dropdown-empty-hint">
+                      {{ $t('appCore.noModelsMatched') }}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    class="dropdown-item dropdown-item--manage"
+                    @click.stop="openManageModels"
+                  >
+                    <div class="item-label">
+                      <svg class="manage-icon" viewBox="0 0 18 18" width="13" height="13" aria-hidden="true">
+                        <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                          <line x1="2" y1="5" x2="16" y2="5" />
+                          <circle cx="6.5" cy="5" r="1.8" />
+                          <line x1="2" y1="9" x2="16" y2="9" />
+                          <circle cx="11.5" cy="9" r="1.8" />
+                          <line x1="2" y1="13" x2="16" y2="13" />
+                          <circle cx="7.5" cy="13" r="1.8" />
+                        </g>
+                      </svg>
+                      {{ $t('appCore.manageModels') }}
+                    </div>
+                  </button>
                 </div>
 
                 <div class="dropdown-column" data-tutorial="header-runmode-options">
@@ -697,71 +713,87 @@
             ref="headerMenu"
           >
             <div class="dropdown-column" data-tutorial="header-model-options">
-              <div class="dropdown-title">
-                <button
-                  v-if="headerModelMenuPage === 'codex'"
-                  type="button"
-                  class="dropdown-title-back"
-                  @click.stop="headerModelMenuPage = 'main'"
-                >
-                  ‹ {{ $t('appCore.back') }}
-                </button>
-                <template v-else>{{ $t('appCore.model') }}</template>
+              <div class="dropdown-search">
+                <svg class="dropdown-search-icon" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+                <input
+                  v-model="modelMenuSearchQuery"
+                  type="text"
+                  class="dropdown-search-input"
+                  :placeholder="$t('appCore.searchModel')"
+                  @click.stop
+                />
               </div>
-              <div class="model-menu-panes">
-                <Transition
-                  :name="headerModelMenuPage === 'codex' ? 'type-slide-left' : 'type-slide-right'"
-                  @after-leave="clearModelMenuPaneHeight"
-                >
-                  <div
-                    v-if="headerModelMenuPage === 'main'"
-                    key="main"
-                    class="dropdown-list dropdown-list--models model-menu-pane"
+              <div class="dropdown-list dropdown-list--models">
+                <div v-for="group in filteredGroupedModelOptions" :key="group.id" class="model-group">
+                  <button
+                    type="button"
+                    class="dropdown-group-header"
+                    :aria-expanded="!isModelGroupCollapsed(group.id) || !!modelMenuSearchQuery"
+                    @click.stop="toggleModelGroup(group.id)"
                   >
-                    <button
-                      v-for="option in regularModelOptions"
-                      :key="option.key"
-                      type="button"
-                      class="dropdown-item"
-                      :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
-                      @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
-                      :disabled="streamingMessage || !isConnected || option.disabled"
+                    <span class="group-name">{{ group.name }}</span>
+                    <svg
+                      class="group-chevron"
+                      :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
-                      <div class="item-label">{{ option.label }}</div>
-                      <span v-if="option.key === currentModelKey" class="item-check">✓</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="dropdown-item dropdown-item--codex-entry"
-                      @click.stop="headerModelMenuPage = 'codex'"
-                    >
-                      <div class="item-label">{{ $t('appCore.codexEntry') }}</div>
-                      <span class="item-chevron">›</span>
-                    </button>
-                  </div>
+                      <path
+                        d="M7 10l5 5 5-5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
                   <div
-                    v-else
-                    key="codex"
-                    class="dropdown-list dropdown-list--models model-menu-pane"
+                    class="model-group-body"
+                    :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
                   >
-                    <button
-                      v-for="option in codexModelOptions"
-                      :key="option.key"
-                      type="button"
-                      class="dropdown-item"
-                      :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
-                      @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
-                      :disabled="streamingMessage || !isConnected || option.disabled"
-                    >
-                      <div class="item-label">{{ option.label }}</div>
-                      <span v-if="option.key === currentModelKey" class="item-check">✓</span>
-                    </button>
-                    <div v-if="!codexModelOptions.length" class="dropdown-empty-hint">
-                      {{ $t('appCore.codexNotConnected') }}
+                    <div class="model-group-body__inner">
+                      <button
+                        v-for="option in group.options"
+                        :key="option.key"
+                        type="button"
+                        class="dropdown-item"
+                        :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                        @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
+                        :disabled="streamingMessage || !isConnected || option.disabled"
+                      >
+                        <div class="item-label">{{ option.label }}</div>
+                        <span v-if="option.key === currentModelKey" class="item-check">✓</span>
+                      </button>
                     </div>
                   </div>
-                </Transition>
+                </div>
+                <div v-if="!filteredGroupedModelOptions.length" class="dropdown-empty-hint">
+                  {{ $t('appCore.noModelsMatched') }}
+                </div>
               </div>
+              <button
+                type="button"
+                class="dropdown-item dropdown-item--manage"
+                @click.stop="openManageModels"
+              >
+                <div class="item-label">
+                  <svg class="manage-icon" viewBox="0 0 18 18" width="13" height="13" aria-hidden="true">
+                    <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                      <line x1="2" y1="5" x2="16" y2="5" />
+                      <circle cx="6.5" cy="5" r="1.8" />
+                      <line x1="2" y1="9" x2="16" y2="9" />
+                      <circle cx="11.5" cy="9" r="1.8" />
+                      <line x1="2" y1="13" x2="16" y2="13" />
+                      <circle cx="7.5" cy="13" r="1.8" />
+                    </g>
+                  </svg>
+                  {{ $t('appCore.manageModels') }}
+                </div>
+              </button>
             </div>
 
             <div class="dropdown-column" data-tutorial="header-runmode-options">
@@ -900,8 +932,10 @@
         </div>
       </transition>
 
+      <!-- 设置页：/settings 与 /settings/<section> 全屏覆盖层 -->
+      <SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />
       <!-- 工作流编辑器 demo：/workflows 与 /workflow/<name> 全屏覆盖层 -->
-      <WorkflowDemoShell v-if="workflowDemoRoute" :route-path="workflowDemoRoute" />
+      <WorkflowDemoShell v-else-if="workflowDemoRoute" :route-path="workflowDemoRoute" />
     </template>
   </AppShell>
 </template>

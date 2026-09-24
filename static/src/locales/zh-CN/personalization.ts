@@ -10,6 +10,7 @@ export default {
   // ── 标签页 ──
   tabGeneral: '常规',
   tabPreferences: '个性化',
+  tabAccount: '账户',
   tabModel: '模型与思考',
   tabCodex: 'Codex',
   tabAppearance: '外观与显示',

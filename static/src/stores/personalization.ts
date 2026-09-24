@@ -16,6 +16,10 @@ const TONE_PRESET_KEYS = [
 
 export type BlockDisplayMode = 'traditional' | 'stacked' | 'minimal';
 export type CompactMessageDisplay = 'full' | 'brief';
+/** 个人空间抽屉标签页（精简后只剩「个性化 / 账户」两个，其余迁入全屏设置页） */
+export type PersonalDrawerTab = 'preferences' | 'account';
+/** 个人空间默认落地标签页 */
+export const DEFAULT_PERSONAL_DRAWER_TAB: PersonalDrawerTab = 'preferences';
 type RunMode = 'fast' | 'thinking';
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type PermissionMode = 'readonly' | 'approval' | 'auto_approval' | 'unrestricted';
@@ -145,6 +149,8 @@ interface PersonalForm {
   versioning_backup_mode: VersioningBackupMode;
   versioning_restore_mode: 'overwrite';
   default_model: string | null;
+  /** 用户级模型可见性：模型选择器中隐藏的注册表模型 key 列表（每用户独立） */
+  hidden_models: string[];
   external_session_header: boolean;
   image_compression: string;
   auto_shallow_compress_enabled: boolean;
@@ -179,6 +185,8 @@ interface ExperimentState {
 
 interface PersonalizationState {
   visible: boolean;
+  /** 抽屉当前标签页（openDrawer 可指定落地 tab） */
+  activeTab: PersonalDrawerTab;
   loading: boolean;
   saving: boolean;
   loaded: boolean;
@@ -359,6 +367,7 @@ const defaultForm = (): PersonalForm => ({
   versioning_backup_mode: 'shallow',
   versioning_restore_mode: 'overwrite',
   default_model: null,
+  hidden_models: [],
   external_session_header: false,
   image_compression: 'original',
   auto_shallow_compress_enabled: false,
@@ -439,6 +448,7 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 export const usePersonalizationStore = defineStore('personalization', {
   state: (): PersonalizationState => ({
     visible: false,
+    activeTab: DEFAULT_PERSONAL_DRAWER_TAB,
     loading: false,
     saving: false,
     loaded: false,
@@ -462,12 +472,18 @@ export const usePersonalizationStore = defineStore('personalization', {
     }
   },
   actions: {
-    async openDrawer() {
+    async openDrawer(tab?: PersonalDrawerTab) {
+      // 支持指定落地 tab（如 openDrawer('account')），默认回到第一个 tab
+      this.activeTab =
+        tab === 'preferences' || tab === 'account' ? tab : DEFAULT_PERSONAL_DRAWER_TAB;
       this.visible = true;
       // 每次打开都刷新数据，确保显示最新内容
       if (!this.loading) {
         await this.fetchPersonalization();
       }
+    },
+    setActiveTab(tab: PersonalDrawerTab) {
+      this.activeTab = tab;
     },
     closeDrawer() {
       this.visible = false;
@@ -633,6 +649,9 @@ export const usePersonalizationStore = defineStore('personalization', {
         versioning_backup_mode: data.versioning_backup_mode === 'full' ? 'full' : 'shallow',
         versioning_restore_mode: 'overwrite',
         default_model: typeof data.default_model === 'string' ? data.default_model : fallbackModel,
+        hidden_models: Array.isArray(data.hidden_models)
+          ? data.hidden_models.filter((item: unknown) => typeof item === 'string' && item.trim())
+          : [],
         external_session_header: !!data.external_session_header,
         image_compression:
           typeof data.image_compression === 'string' ? data.image_compression : 'original',
@@ -701,6 +720,8 @@ export const usePersonalizationStore = defineStore('personalization', {
       persistStackedHideBorders(this.form.stacked_hide_borders);
       persistMinimalExpandHeightLimited(this.form.minimal_expand_height_limited);
       persistQuickDockAutoExpand(this.form.quick_dock_auto_expand);
+      // 模型可见性镜像同步到 model store（选择器过滤单一数据源）
+      useModelStore().setHiddenModels(this.form.hidden_models);
       // 简略消息显示：以配置文件为准，同步到旧版 localStorage 镜像供 ChatArea 读取。
       // 一次性迁移：后端仍为默认 full，但本地缓存遗留 brief（旧版纯前端记录）时，回写到配置文件。
       const cachedCompact = this.experiments.compactMessageDisplay;
@@ -1103,6 +1124,19 @@ export const usePersonalizationStore = defineStore('personalization', {
         ...this.form,
         default_model: target
       };
+      this.clearFeedback();
+      this.scheduleAutoSave();
+    },
+    /** 模型可见性（用户级）：更新 hidden_models 并同步 model store 过滤，走防抖自动保存 */
+    setHiddenModels(keys: string[]) {
+      const target = Array.isArray(keys)
+        ? keys.filter((k): k is string => typeof k === 'string' && !!k.trim())
+        : [];
+      this.form = {
+        ...this.form,
+        hidden_models: target
+      };
+      useModelStore().setHiddenModels(target);
       this.clearFeedback();
       this.scheduleAutoSave();
     },

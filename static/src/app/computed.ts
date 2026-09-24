@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { t, currentLocale } from '@/locales';
+import { groupModelOptions, filterModelGroups } from '@/utils/modelGroups';
 import { mapState, mapWritableState } from 'pinia';
 import { useConnectionStore } from '../stores/connection';
 import { useFileStore } from '../stores/file';
@@ -167,7 +168,9 @@ export const computed = {
   // 推理强度滑块：仅思考模式 + 当前模型支持推理强度参数时显示
   showEffortSlider() {
     const modelStore = useModelStore();
-    return this.resolvedRunMode === 'thinking' && !!modelStore.currentModel?.supportsReasoningEffort;
+    return (
+      this.resolvedRunMode === 'thinking' && !!modelStore.currentModel?.supportsReasoningEffort
+    );
   },
   currentModelLabel() {
     const modelStore = useModelStore();
@@ -199,11 +202,21 @@ export const computed = {
       };
     });
   },
-  regularModelOptions() {
-    return (this.modelOptions || []).filter((o) => !String(o.key).startsWith('codex/'));
+  // 模型菜单分组（opencode 式）：可见模型按提供商分组，组顺序=注册表首次出现顺序。
+  // 分组键规则：provider 同步模型用 providerId/providerName；codex/* 归 Codex 组；
+  // 其余（手写 custom_models）归「自定义」组。Codex 不再单独开子页（2026-09-25 改造）。
+  // 分组/过滤实现与设置页模型选择下拉共用（utils/modelGroups.ts）。
+  groupedModelOptions() {
+    return groupModelOptions(this.modelOptions || [], {
+      codex: t('appCore.modelGroupCodex'),
+      custom: t('appCore.modelGroupCustom')
+    });
   },
-  codexModelOptions() {
-    return (this.modelOptions || []).filter((o) => String(o.key).startsWith('codex/'));
+  // 模型菜单搜索过滤：只匹配菜单里显示出来的名字（label 小写子串），
+  // 不匹配 key/模型 id（前缀会污染：搜 "co" 命中全部 codex/*），也不匹配组名。
+  // 空组剔除；无搜索词时原样返回。
+  filteredGroupedModelOptions() {
+    return filterModelGroups(this.groupedModelOptions || [], this.modelMenuSearchQuery);
   },
   titleRibbonVisible() {
     return !this.isMobileViewport && this.chatDisplayMode === 'chat';
@@ -378,8 +391,10 @@ export const computed = {
     const cmdCount = countRunning(bgStore.commands);
     const bgText = (() => {
       const parts = [];
-      if (cmdCount > 0) parts.push(t('appCore.backgroundCommandCount', { n: cmdCount, count: cmdCount }));
-      if (agentCount > 0) parts.push(t('appCore.backgroundAgentCount', { n: agentCount, count: agentCount }));
+      if (cmdCount > 0)
+        parts.push(t('appCore.backgroundCommandCount', { n: cmdCount, count: cmdCount }));
+      if (agentCount > 0)
+        parts.push(t('appCore.backgroundAgentCount', { n: agentCount, count: agentCount }));
       return parts.length ? `${parts.join('，')}${t('appCore.backgroundRunning')}` : '';
     })();
 
@@ -433,7 +448,13 @@ export const computed = {
 
     // ---- 决策 ----
     if (isThinking) {
-      return { mode: 'think', toolKeys: [], toolTexts: [], text: t('appCore.thinking'), tracking: false };
+      return {
+        mode: 'think',
+        toolKeys: [],
+        toolTexts: [],
+        text: t('appCore.thinking'),
+        tracking: false
+      };
     }
     if (runningTools.length > 0) {
       const keys = runningTools.map((a) => toolFaceKey(a?.tool?.name));
@@ -461,13 +482,22 @@ export const computed = {
       // 「等待 API 响应…」优先于随机等待文案：后端已发出请求、尚未开始回复
       // （api_request_start 事件驱动，覆盖首轮与工具轮次间的每一次等待）
       if (!text && this.apiRequestPending) {
-        return { mode: 'work', toolKeys: [], toolTexts: [], text: t('appCore.waitingApiResponse'), tracking: false, apiWaiting: true };
+        return {
+          mode: 'work',
+          toolKeys: [],
+          toolTexts: [],
+          text: t('appCore.waitingApiResponse'),
+          tracking: false,
+          apiWaiting: true
+        };
       }
       if (!text) {
-        const awaitingMsg = lastAssistant && lastAssistant.awaitingFirstContent ? lastAssistant : null;
+        const awaitingMsg =
+          lastAssistant && lastAssistant.awaitingFirstContent ? lastAssistant : null;
         if (awaitingMsg) {
           text =
-            (typeof awaitingMsg.generatingLabel === 'string' && awaitingMsg.generatingLabel.trim()) ||
+            (typeof awaitingMsg.generatingLabel === 'string' &&
+              awaitingMsg.generatingLabel.trim()) ||
             '';
         }
       }

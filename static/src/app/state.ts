@@ -55,6 +55,8 @@ export function dataState() {
     dropToolEvents: false,
     // 工作流编辑器 demo 路由（'workflows' | 'workflow/<name>'，空串 = 不在 demo 视图）
     workflowDemoRoute: '',
+    // 设置页路由（'settings' | 'settings/<section>'，空串 = 不在设置视图）
+    settingsRoute: '',
     // 当前打开对话的类型（'normal' | 'multi_agent'，创建时确定、不可变）；
     // 空对话态为 null。权威来源是对话 metadata.multi_agent_mode。
     currentConversationType: null,
@@ -166,9 +168,10 @@ export function dataState() {
     titleReady: false,
     suppressTitleTyping: false,
     headerMenuOpen: false,
-    // 头部模型菜单分页：'main' = 常规模型列表（含 Codex 入口项）；
-    // 'codex' = Codex 模型子页（标题变为返回）
-    headerModelMenuPage: 'main',
+    // 头部模型菜单里被折叠的提供商组 id 列表（会话内状态，不持久化）
+    collapsedModelGroups: [],
+    // 头部模型菜单搜索词（会话内状态，打开菜单时重置）
+    modelMenuSearchQuery: '',
     blankWelcomePool: [
       t('appCore.welcomeHelp'),
       t('appCore.welcomeHot'),

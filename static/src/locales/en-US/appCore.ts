@@ -37,8 +37,11 @@ export default {
   thinking: 'Thinking...',
   waitingApiResponse: 'Waiting for API response...',
   back: 'Back',
-  codexEntry: 'Codex',
-  codexNotConnected: 'Not connected. Connect a Codex account in Personal Space.',
+  manageModels: 'Manage models',
+  modelGroupCodex: 'OpenAI (ChatGPT Subscription)',
+  modelGroupCustom: 'Custom',
+  searchModel: 'Search models',
+  noModelsMatched: 'No matching models',
 
   // Blank hero welcome lines (state.ts blankWelcomePool)
   welcomeHelp: 'How can I help?',

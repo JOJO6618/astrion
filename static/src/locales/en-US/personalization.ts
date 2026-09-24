@@ -9,6 +9,7 @@ export default {
   // ── Tabs ──
   tabGeneral: 'General',
   tabPreferences: 'Personalization',
+  tabAccount: 'Account',
   tabModel: 'Model & Thinking',
   tabCodex: 'Codex',
   tabAppearance: 'Appearance & Display',

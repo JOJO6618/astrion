@@ -3,6 +3,7 @@
 import type zhCN from './zh-CN';
 import common from './en-US/common';
 import personalization from './en-US/personalization';
+import settings from './en-US/settings';
 import toolResults from './en-US/toolResults';
 import input from './en-US/input';
 import tutorial from './en-US/tutorial';
@@ -32,6 +33,7 @@ type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString
 const enUS: DeepString<typeof zhCN> = {
   common,
   personalization,
+  settings,
   toolResults,
   input,
   tutorial,

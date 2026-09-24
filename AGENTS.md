@@ -176,6 +176,7 @@
 - 提交前至少做与改动相关的最小验证（命令输出或手工步骤要可复现）。
 - 视觉验证默认由用户完成：除非用户特别说明，所有需要视觉确认的修改（尤其是动画/过渡效果），构建/lint 通过后交由用户亲自查看确认，不要用 Playwright 截图或浏览器自动化代替用户验收。
 - 运行根目录前端构建时，默认使用 `npm run build --silent 2>&1 | tail -n 5`。
+- **构建沙箱已知问题（2026-09 实测）**：vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件（如 `/Users/jojo/package.json`），宿主机沙箱内被 EPERM 拒绝导致 build 失败（tsc/stylelint 前置步骤正常）。这不是代码问题，禁止通过修改构建配置绕过；需要完整构建时请用户在有权限的环境执行，或把对应文件加入路径授权（仅可读）。
 - 构建/安装/Lint 类命令（如 `npm run build`、`npm install`、`npm run lint`）因沙箱权限失败时（如报 `EPERM` / `Operation not permitted` / 沙箱拒绝写入），直接向用户说明失败原因并申请权限或调整路径授权，禁止尝试任何绕过沙箱的做法（如换执行方式规避限制、向其他路径写入等）。
 
 ### CLI 当前交互约束（2026-09-11 重写）
@@ -669,3 +670,39 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 6. **新增 personalization 键必须双注册**（`DEFAULT_PERSONALIZATION_CONFIG` + `sanitize_personalization_payload`），否则保存后被静默丢弃（见 .astrion/memory/personalization_config_whitelist.md）。
 7. **返回格式**沿用 `🌐 网页内容 (N 字符)` 骨架，新增 `[提取方式: ...]` 标注（i18n key `webpage.method_label` / `webpage.method_*`），模型侧无感知。
 8. **read-before-edit 已读白名单**含 `recall_project_memory`（recall 返回记忆文件全文，视为已读）；`search_project_memory` 只回片段，刻意不标记。
+
+---
+
+## 15) 设置页与提供商体系（2026-09-24 新增）
+
+> 设计稿：`cache/settings-demo/index.html`（用户拍板的静态稿）；后端 API 契约：`docs/providers_api.md`。
+
+### 15.1 个人空间拆分：/settings 全屏设置页
+
+**机制一句话**：原个人空间抽屉（13 Tab）拆分——「个性化 + 账户」留在抽屉（PersonalizationDrawer，2 Tab），其余设置项迁到 `/settings` 全屏页（SettingsShell，5 组 13 分区）；路由沿用 workflows 已验证的手写 History API 分支（**不引 vue-router**）。
+
+**硬约束（改代码必须知道）**：
+
+1. **路由必须前后端双登记**（2026-09-24 踩坑：只登前端导致整页跳转 404）：后端 `server/auth.py` 页面路由组注册 `/settings` 与 `/settings/<path:section>` 返回 `index.html`（conv converter 只匹配时间戳格式 `\d{8}_\d{6}_\d{3}`，不会收容任意路径——`/workflows` 能通则是因为 `server/workflow_page.py` 专门注册过）；前端 `route.ts` 的 `isConversationIndependentRoute()` 登记 `settings` 与 `settings/*`，`bootstrapRoute` 独立路由分支写 `state.settingsRoute`（空串=不在设置视图）；进出都是整页跳转（`openSettingsPage` → `/settings`，`closeSettingsPage` → `/new`），**不做 SPA 内 pushState**——pinia store 每次重建，`activeSection` 永远从 `general` 开始（用户拍板默认落「通用」），不存在跨页会话记忆。
+2. **挂载在 App.vue**：`<SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />`（与 WorkflowDemoShell 同位置、v-else-if 互斥）；组件在 `app/components.ts` 异步注册。
+3. **URL 深链**：`/settings/<section>` 由 SettingsShell onMounted 解析（先 `await fetchSessionStatus()` 确保管理员判定就绪），非法分区、或非管理员访问管理员分区时不生效回默认。
+4. **两宿主互斥**：SettingsShell 与 PersonalizationDrawer 都 `provide('personalizationDrawer')` 同一份 context（`usePersonalizationContext.ts`，124 键）且各自注册全局监听——**禁止同时可见**（路由层已天然互斥：抽屉只在非 settings 路由渲染，注意保持）。
+5. **新增设置分区三处同步**：SettingsShell 的 NAV_GROUPS + SECTION_META、stores/settings.ts 的 SettingsSection 类型；文案走 `settings` 命名空间（zh-CN 为源）。
+6. **管理员分区**：`SETTINGS_ADMIN_SECTIONS`（stores/settings.ts）= codex/admin/providers；导航过滤 + 运行时降级回退 general 由 SettingsShell 处理。
+7. **侧边栏个人入口**：用户名 + 上弹二级菜单（个人空间/个性化/设置/帮助-置灰），`ConversationSidebar.vue` emit `personal(tab?)` → `openPersonalPage(tab)` 透传 → `personalization.openDrawer(tab)`（'preferences'|'account'）。
+
+### 15.2 提供商体系（opencode 式）
+
+**机制一句话**：设置页「提供商」分区选服务商 → 填 API key → 后端 GET 其 `/models` 自动拉取全部模型注册进模型库；「模型」分区按提供商分组做可见性开关（用户级）+ custom_models.json 的 UI 化管理。
+
+**硬约束（改代码必须知道）**：
+
+1. **目录与存储**：`config/providers_catalog.json`（21 条静态目录：id/name/base_url/icon/auth/protocol_note/key_url；**双站拆分原则=一个 base_url 一条目**，如 minimax-cn/minimax-global、zhipu-cn/zhipu-global）；凭证存 `<DATA_DIR>/providers.json`（0600 原子写，**不纳入 git**）；`modules/provider_manager.py` 是唯一权威（catalog 合并连接状态 / connect / refresh / disconnect / parse_models_payload）。
+2. **协议只支持 OpenAI Chat Completions**：不做 Anthropic /messages（OpenCode Zen/Go 目录内 protocol_note 标注「仅 Chat Completions」，其 Claude/GPT/Gemini 大头实际不可用属已知）；`_fetch_models` 在 fetch 层剔除非聊天模型（embedding/tts 等），**解析层 `parse_models_payload` 保持纯净**（兼容 `{data:[]}` / 裸数组 / `{models:[]}` 三种形状）——过滤逻辑不要下沉到解析层。
+3. **注册表三路合并**：`get_registered_model_profiles()` = 手写 custom + provider 同步 + Codex；provider 模型 key = `{provider_id}/{model_id}`、`provider_type="provider"`，请求层零新协议（复用 chat_completions 链路 + `profile["headers"]` 经 `extra_headers_resolver` 链式合并，不破坏宿主动态头）。
+4. **权限=管理员级**：`server/providers.py` 全部端点 `@api_login_required + @admin_api_required`；前端 SETTINGS_ADMIN_SECTIONS 含 providers；用户级 key 是后续预留方向（注册表全局单例，改动深，勿擅自做）。
+5. **custom_models.json UI 化**：`/api/custom-models` CRUD 直接读写部署目录 custom_models.json（存量手写条目自动出现在 UI「自定义」分组，`${ENV_VAR}` 引用原文保留可编辑）；`_sanitize_custom_model` 白名单校验，写入始终落 `DEPLOY_CONFIG_DIR`。
+6. **模型可见性=用户级**：`personalization.hidden_models`（后端只注册字段 + sanitize，**过滤在前端** stores/model.ts 做，所有选择器消费同一过滤后数据源）；与提供商管理（管理员级）是两条独立权限线，不要混。
+7. **Codex 即 openai-codex**：OpenAI 拆两条——openai-api（api key）与 openai-codex（ChatGPT 订阅 OAuth，auth=codex_oauth，连接状态用现有 Codex 凭证文件判定，前端复用 `/api/codex/login/*` 既有流程，不要为 OAuth 发明新端点）。
+8. **图标**：`static/icons/providers/`（61 个 SVG，来自 lobehub/icons，按 catalog 的 icon 字段引用 `/static/icons/providers/<icon>.svg`）；新增提供商先补图标再补目录。
+9. **ollama/lmstudio 是 auth=none**：本地服务无需 key，connect 直接探 `/models`。

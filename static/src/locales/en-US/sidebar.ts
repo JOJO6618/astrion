@@ -32,6 +32,9 @@ export default {
   renameTitle: 'Rename {kind}',
   renamePlaceholder: 'Enter a name',
   personalSpace: 'Personal space',
+  preferences: 'Personalization',
+  help: 'Help',
+  helpComingSoon: 'Coming soon',
 
   // ── WorkspaceSwitcher: workspace/project switcher popover ──
   workspaceCount: '{n} items',

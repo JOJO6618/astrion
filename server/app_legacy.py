@@ -42,6 +42,7 @@ from server.workflow_runtime_api import workflow_runtime_bp
 from server.conversation_bootstrap import conversation_bootstrap_bp
 from server.gateway_api import gateway_bp
 from server.codex_auth import codex_auth_bp
+from server.providers import providers_bp
 from server.security import attach_security_hooks
 from werkzeug.utils import secure_filename
 from werkzeug.routing import BaseConverter
@@ -307,6 +308,7 @@ app.register_blueprint(workflow_runtime_bp)
 app.register_blueprint(conversation_bootstrap_bp)
 app.register_blueprint(gateway_bp)
 app.register_blueprint(codex_auth_bp)
+app.register_blueprint(providers_bp)
 
 # 安全钩子（CSRF 校验 + 响应头）
 attach_security_hooks(app)

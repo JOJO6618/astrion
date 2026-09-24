@@ -82,6 +82,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "disabled_tool_categories": [],
     "enabled_skills": None,
     "skills_catalog_snapshot": None,
+    "hidden_models": [],  # 用户级模型可见性：模型选择器中隐藏的注册表模型 key 列表（每用户独立）
     "default_run_mode": "thinking",
     "default_reasoning_effort": None,  # 默认推理强度：None=默认（不传参）
     "default_permission_mode": "approval",
@@ -375,6 +376,11 @@ def sanitize_personalization_payload(
         base["enabled_skills"] = _sanitize_skills(data.get("enabled_skills"))
     else:
         base["enabled_skills"] = _sanitize_skills(base.get("enabled_skills"))
+
+    if "hidden_models" in data:
+        base["hidden_models"] = _sanitize_hidden_models(data.get("hidden_models"))
+    else:
+        base["hidden_models"] = _sanitize_hidden_models(base.get("hidden_models"))
 
     if "skills_catalog_snapshot" in data:
         base["skills_catalog_snapshot"] = _sanitize_skills(data.get("skills_catalog_snapshot"))
@@ -881,6 +887,25 @@ def _sanitize_skills(value: Any) -> Optional[list]:
             continue
         cleaned.append(skill_id)
         seen.add(skill_id)
+    return cleaned
+
+
+def _sanitize_hidden_models(value: Any) -> list:
+    """清洗用户级隐藏模型 key 列表（不校验注册表——模型断开后保留隐藏状态无害）。"""
+    if not isinstance(value, list):
+        return []
+    cleaned: list = []
+    seen = set()
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        key = item.strip()
+        if not key or key in seen:
+            continue
+        cleaned.append(key)
+        seen.add(key)
+        if len(cleaned) >= 500:
+            break
     return cleaned
 
 

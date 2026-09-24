@@ -48,6 +48,7 @@ const GoalProgressDialog = defineAsyncComponent(
 const WorkflowDemoShell = defineAsyncComponent(
   () => import('../components/workflow/WorkflowDemoShell.vue')
 );
+const SettingsShell = defineAsyncComponent(() => import('../components/settings/SettingsShell.vue'));
 
 export const appComponents = {
   ChatArea,
@@ -73,5 +74,6 @@ export const appComponents = {
   TutorialOverlay,
   NewUserTutorialPrompt,
   GoalProgressDialog,
-  WorkflowDemoShell
+  WorkflowDemoShell,
+  SettingsShell
 };
