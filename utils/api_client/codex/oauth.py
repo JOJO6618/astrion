@@ -8,17 +8,19 @@
    （2026-09-24 真实事故：回调落到 opencode 报 "Invalid state"）；
 3. 前端打开系统浏览器到授权 URL；
 4. 用户授权后浏览器回调 /auth/callback?code&state；
-5. 校验 state，code + verifier 换 token，原子写入 astrion 独立凭证文件。
+5. 校验 state，code + verifier 换 token（后台线程执行，网络失败自动重试），
+   原子写入 astrion 独立凭证文件；poll() 只读状态快照，请求线程零网络 IO。
 
 Device Code 流（docker/无头场景，OpenAI 官方端点，2026-09-24 落地；字段与行为
 逐行对齐 codex-rs login/src/device_code_auth.rs + 实测）：
 1. POST deviceauth/usercode（JSON 仅 client_id）拿 device_auth_id/user_code/interval；
 2. 管理员在任意设备浏览器开固定官方验证页 auth.openai.com/codex/device 输码授权；
-3. 按服务端 interval 轮询 deviceauth/token（JSON device_auth_id+user_code；
+3. 后台线程按服务端 interval 轮询 deviceauth/token（JSON device_auth_id+user_code；
    pending = 403/404 或 400+deviceauth_authorization_pending），授权完成后响应
    同时下发 authorization_code 与 PKCE code_verifier（服务端生成，客户端不事先持有）；
-4. 同一 token 端点交换（redirect_uri 换设备流专用 + 服务端 verifier），
-   token 与浏览器流完全一致；总上限 15 分钟。
+4. 同一 token 端点交换（redirect_uri 换设备流专用 + 服务端 verifier，网络失败自动重试），
+   token 与浏览器流完全一致；总上限 15 分钟；
+5. 全流程（请求码/轮询/换 token）都在后台 daemon 线程，poll() 只读状态快照。
 前提：ChatGPT 账号设置 → 安全里开启 device code authentication。
 两流共用 _current_flow 互斥（同时只允许一个登录流程）与同一凭证落盘逻辑。
 """
@@ -103,6 +105,9 @@ class CodexOAuthFlow:
         self._challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
         self._state = secrets.token_urlsafe(24)
         self._code: Optional[str] = None
+        # phase: waiting=等待浏览器授权回调；exchanging=换 token 中（后台线程）
+        self._phase = "waiting"
+        self._exchange_started = False
 
     # ------------------------------------------------------------- 生命周期
 
@@ -182,18 +187,33 @@ class CodexOAuthFlow:
             ).start()
 
     def poll(self) -> Dict[str, Any]:
-        """前端轮询入口：回调到达后同步完成换 token（幂等）。"""
+        """前端轮询入口：纯内存状态快照，零网络 IO。
+
+        回调到达后换 token 在后台线程执行（带重试，单次最长 30s 网络超时），
+        本方法只负责 spawn 一次并返回当前 phase。
+        """
         if self._status == "pending":
             if time.time() - self._started_at > FLOW_TIMEOUT_SECONDS:
                 self._fail("登录超时（5 分钟未完成授权）")
-            elif self._done.is_set() and self._code:
-                self._exchange()
-        return {
+            elif (
+                self._done.is_set()
+                and self._code
+                and not self._exchange_started
+            ):
+                self._exchange_started = True
+                self._phase = "exchanging"
+                threading.Thread(
+                    target=self._exchange, daemon=True, name="codex-oauth-exchange"
+                ).start()
+        result: Dict[str, Any] = {
             "status": self._status,
             "error": self._error,
             "account_id": self._account_id,
             "flow_mode": "browser",
         }
+        if self._status == "pending":
+            result["phase"] = self._phase
+        return result
 
     def cancel(self) -> None:
         if self._status == "pending":
@@ -203,14 +223,17 @@ class CodexOAuthFlow:
     # ------------------------------------------------------------- 内部步骤
 
     def _exchange(self) -> None:
-        """授权码换 token 并落盘（仅在 poll 中执行一次）。"""
+        """后台线程：授权码换 token（网络失败自动重试）并落盘。"""
         assert self._code is not None
-        error, account_id = _exchange_code_for_tokens(
+        error, account_id = _exchange_code_for_tokens_with_retry(
             self._auth,
             code=self._code,
             verifier=self._verifier,
             redirect_uri=OAUTH_REDIRECT_URI,
+            should_abort=lambda: self._status != "pending",
         )
+        if self._status != "pending":
+            return  # 已取消/超时判负：不覆盖终态
         if error:
             self._fail(error)
             return
@@ -293,8 +316,13 @@ def _exchange_code_for_tokens(
     code: str,
     verifier: str,
     redirect_uri: str,
-) -> tuple[Optional[str], Optional[str]]:
-    """授权码 + PKCE verifier 换 token 并原子落盘。返回 (error, account_id)。"""
+) -> tuple[Optional[str], Optional[str], bool]:
+    """授权码 + PKCE verifier 换 token 并原子落盘。
+
+    返回 (error, account_id, retryable)：retryable=True 表示网络层异常
+    （连接/握手/读超时等，请求可能未到达服务端），值得自动重试；
+    HTTP 非 200（授权码无效等终态错误）与凭证落盘失败不重试。
+    """
     body = urllib.parse.urlencode(
         {
             "grant_type": "authorization_code",
@@ -312,21 +340,57 @@ def _exchange_code_for_tokens(
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
     except Exception as exc:
-        return f"换取 token 网络失败: {exc}", None
+        return f"换取 token 网络失败: {exc}", None, True
     if resp.status_code != 200:
-        return f"换取 token 失败 (HTTP {resp.status_code}): {resp.text[:300]}", None
+        return f"换取 token 失败 (HTTP {resp.status_code}): {resp.text[:300]}", None, False
     payload = resp.json()
     access = payload.get("access_token")
     refresh = payload.get("refresh_token")
     id_token = payload.get("id_token") or ""
     if not access or not refresh:
-        return "token 响应缺少 access_token/refresh_token", None
+        return "token 响应缺少 access_token/refresh_token", None, False
     account_id = account_id_from_id_token(id_token)
     try:
         _persist_tokens(auth_manager, access, refresh, id_token, account_id)
     except Exception as exc:
-        return f"写入凭证失败: {exc}", None
-    return None, account_id
+        return f"写入凭证失败: {exc}", None, False
+    return None, account_id, False
+
+
+_EXCHANGE_RETRY_DELAYS = (2.0, 4.0)  # 第 2/3 次尝试前的等待秒数
+
+
+def _exchange_code_for_tokens_with_retry(
+    auth_manager: CodexAuthManager,
+    *,
+    code: str,
+    verifier: str,
+    redirect_uri: str,
+    should_abort: Optional[Any] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    """换 token 带网络重试（最多 3 次，间隔 2s/4s）。返回 (error, account_id)。
+
+    仅在后台线程中调用（单次尝试最长 30s 网络超时，严禁放请求线程）。
+    should_abort（可选回调）在重试等待期间以 0.2s 粒度检查，返回 True
+    表示流程已被取消/超时，立即放弃且保留原错误（调用方据状态丢弃）。
+    """
+    delays = (0.0, *_EXCHANGE_RETRY_DELAYS)
+    error: Optional[str] = None
+    for attempt, delay in enumerate(delays, start=1):
+        if delay > 0:
+            deadline = time.monotonic() + delay
+            while time.monotonic() < deadline:
+                if should_abort is not None and should_abort():
+                    return error, None
+                time.sleep(min(0.2, deadline - time.monotonic()))
+        error, account_id, retryable = _exchange_code_for_tokens(
+            auth_manager, code=code, verifier=verifier, redirect_uri=redirect_uri
+        )
+        if error is None:
+            return None, account_id
+        if not retryable:
+            return error, None
+    return error, None
 
 
 class CodexDeviceFlow:
@@ -335,6 +399,10 @@ class CodexDeviceFlow:
     无 localhost 回调：管理员在任意设备浏览器开固定官方验证页输 user_code，
     本类按服务端 interval 轮询 deviceauth/token；授权码与 PKCE verifier 均由
     服务端在授权完成后随轮询响应下发（官方 codex-rs 同款，客户端不事先生成）。
+
+    执行模型：start() 仅 spawn 后台 daemon 线程（请求设备码 → 按 interval 轮询 →
+    拿码换 token，全程网络 IO 都在线程内），poll() 只读内存状态快照——
+    status/poll 等 Flask 请求端点零阻塞，慢代理下不会再卡住页面加载。
     """
 
     def __init__(self, auth_manager: CodexAuthManager) -> None:
@@ -343,16 +411,44 @@ class CodexDeviceFlow:
         self._error: Optional[str] = None
         self._account_id: Optional[str] = None
         self._started_at = time.time()
+        # phase: starting=请求设备码中；waiting=等待用户输码授权；exchanging=换 token 中
+        self._phase = "starting"
+        self._wake = threading.Event()  # cancel 唤醒，中断轮询间隔等待
 
         self._device_auth_id: Optional[str] = None
         self.user_code: Optional[str] = None
         self.verification_uri: Optional[str] = None
         self._poll_interval = DEVICE_POLL_INTERVAL_SECONDS
-        self._next_poll_at = 0.0
 
     # ------------------------------------------------------------- 生命周期
 
     def start(self) -> None:
+        """起后台线程执行整个设备码流程（调用方立即返回，零网络 IO）。"""
+        threading.Thread(
+            target=self._run, daemon=True, name="codex-device-flow"
+        ).start()
+
+    def _run(self) -> None:
+        """后台线程主流程：请求设备码 → 轮询授权 → 拿码换 token。"""
+        try:
+            self._request_user_code()
+            if self._status != "pending":
+                return
+            self._phase = "waiting"
+            while self._status == "pending":
+                if time.time() - self._started_at > DEVICE_FLOW_TIMEOUT_SECONDS:
+                    self._fail("登录超时（15 分钟未完成授权）")
+                    return
+                # 可唤醒等待：cancel 时立即退出；不打断已发出的单个请求
+                if self._wake.wait(timeout=self._poll_interval):
+                    return
+                if self._status != "pending":
+                    return
+                self._poll_once()
+        except Exception as exc:  # 兜底：线程异常静默死会让前端永远 pending
+            self._fail(f"登录流程内部错误: {exc}")
+
+    def _request_user_code(self) -> None:
         """请求设备码（JSON，官方口径仅 client_id）；失败直接进入 failed。"""
         try:
             with httpx.Client(proxy=resolve_proxy(), timeout=30) as client:
@@ -391,14 +487,8 @@ class CodexDeviceFlow:
             self._fail("设备码响应缺少必要字段（device_auth_id/user_code）")
 
     def poll(self) -> Dict[str, Any]:
-        """前端轮询入口：按 interval 轮询授权状态，拿到授权码即同步换 token。"""
-        if self._status == "pending":
-            if time.time() - self._started_at > DEVICE_FLOW_TIMEOUT_SECONDS:
-                self._fail("登录超时（15 分钟未完成授权）")
-            elif self._device_auth_id and time.monotonic() >= self._next_poll_at:
-                self._next_poll_at = time.monotonic() + self._poll_interval
-                self._poll_once()
-        return {
+        """前端轮询入口：纯内存状态快照（网络 IO 全部在后台线程），零阻塞。"""
+        result: Dict[str, Any] = {
             "status": self._status,
             "error": self._error,
             "account_id": self._account_id,
@@ -406,10 +496,14 @@ class CodexDeviceFlow:
             "verification_uri": self.verification_uri,
             "flow_mode": "device",
         }
+        if self._status == "pending":
+            result["phase"] = self._phase
+        return result
 
     def cancel(self) -> None:
         if self._status == "pending":
             self._status = "cancelled"
+        self._wake.set()
 
     # ------------------------------------------------------------- 内部步骤
 
@@ -454,12 +548,17 @@ class CodexDeviceFlow:
         self._fail(f"设备授权失败 (HTTP {resp.status_code}): {resp.text[:300]}")
 
     def _exchange(self, code: str, verifier: str) -> None:
-        error, account_id = _exchange_code_for_tokens(
+        """授权码换 token（网络失败自动重试）；仅在后台线程中调用。"""
+        self._phase = "exchanging"
+        error, account_id = _exchange_code_for_tokens_with_retry(
             self._auth,
             code=code,
             verifier=verifier,
             redirect_uri=OAUTH_DEVICE_REDIRECT_URI,
+            should_abort=lambda: self._status != "pending",
         )
+        if self._status != "pending":
+            return  # 已取消：不覆盖终态
         if error:
             self._fail(error)
             return
@@ -500,7 +599,11 @@ def start_login_flow(auth_manager: CodexAuthManager) -> Dict[str, Any]:
 
 
 def start_device_login_flow(auth_manager: CodexAuthManager) -> Dict[str, Any]:
-    """开启设备码登录流程；已有进行中的流程时直接返回其状态（幂等）。"""
+    """开启设备码登录流程；已有进行中的流程时直接返回其状态（幂等）。
+
+    start() 仅 spawn 后台线程，本函数立即返回 pending（phase=starting）；
+    设备码请求失败等错误由后台线程异步置 failed，经 poll 呈现给前端。
+    """
     global _current_flow
     with _flow_lock:
         if _current_flow is not None:

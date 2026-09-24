@@ -117,6 +117,8 @@ export default {
   codexConnect: 'Connect Codex',
   codexDisconnect: 'Disconnect',
   codexLoginPending: 'Waiting for browser sign-in…',
+  codexLoginStartingDevice: 'Fetching device code…',
+  codexLoginExchanging: 'Authorization approved, finishing sign-in…',
   codexLoginBrowser: 'Browser',
   codexLoginDevice: 'Headless',
   codexLoginDeviceHint: 'Open the authorization page in any browser and enter this code to sign in:',

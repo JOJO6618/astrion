@@ -118,6 +118,8 @@ export default {
   codexConnect: '连接 Codex',
   codexDisconnect: '断开连接',
   codexLoginPending: '等待浏览器登录完成…',
+  codexLoginStartingDevice: '正在获取授权码，请稍候…',
+  codexLoginExchanging: '授权成功，正在完成登录…',
   codexLoginBrowser: '浏览器授权',
   codexLoginDevice: '无头模式',
   codexLoginDeviceHint: '在任意设备的浏览器打开授权页，输入以下验证码完成登录：',

@@ -82,13 +82,16 @@ def codex_login_poll():
 @api_login_required
 @admin_api_required
 def codex_login_device_start():
-    """启动设备码登录（无头场景，管理员任选）：返回 verification_uri + user_code。
+    """启动设备码登录（无头场景，管理员任选）：立即返回 pending（phase=starting）。
 
-    浏览器只与 OpenAI 官方授权页交互，无 localhost 回调，docker 部署可用。
+    设备码请求/授权轮询/换 token 全部在后端后台线程执行；user_code 与
+    verification_uri 由前端轮询 /api/codex/login/poll 异步补齐，前端手动打开
+    官方授权页（无 localhost 回调，docker 部署可用）。
     前提：ChatGPT 账号设置 → 安全里已开启 device code authentication。
     """
     auth = get_auth_manager()
     result = start_device_login_flow(auth)
+    # 失败不再同步返回（后台线程异步置 failed，经 poll 呈现）；保留分支作防御
     if result.get("status") == "failed":
         return jsonify({"success": False, "error": result.get("error")}), 500
     return jsonify({"success": True, **result})

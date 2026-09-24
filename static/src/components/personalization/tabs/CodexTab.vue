@@ -46,6 +46,17 @@ const deviceVerificationUri = computed<string>(
 const deviceLoginPending = computed(
   () => loginPending.value && loginFlowMode.value === 'device'
 );
+const loginPhase = computed<string>(
+  () => status.value?.login_flow?.phase || ''
+);
+/** 设备码流：后端后台线程正在请求授权码（点按钮后立即出现，替代原来的静默等待） */
+const deviceLoginStarting = computed(
+  () => deviceLoginPending.value && loginPhase.value === 'starting'
+);
+/** 任一流程：用户已授权，后端后台线程正在换 token（可重试，可能持续数秒） */
+const loginExchanging = computed(
+  () => loginPending.value && loginPhase.value === 'exchanging'
+);
 const modelsInfo = computed(() => status.value?.models || {});
 
 const expiresText = computed(() => {
@@ -363,13 +374,9 @@ const startDeviceLogin = async () => {
     }
     status.value = { ...status.value, login_flow: data };
     startPolling();
-    // 设备码流：顺带帮用户打开官方授权页（仍需手动输入页面上的验证码）；
-    // 互斥命中浏览器流时则打开其授权 URL
-    const url =
-      data.flow_mode === 'device' ? data.verification_uri : data.authorize_url;
-    if (url) {
-      window.open(url, '_blank', 'noopener');
-    }
+    // 不自动打开授权页：设备码由后端后台线程异步获取（phase=starting），
+    // 拿到码后由用户手动点「打开授权页」（openDevicePage），避免弹窗被拦截
+    // 或在无头环境错误跳转；互斥命中浏览器流时同样只展示其进行中的状态。
   } catch (e: any) {
     loadError.value = String(e?.message || e);
   } finally {
@@ -513,30 +520,38 @@ onBeforeUnmount(stopPolling);
         </div>
       </div>
       <div v-if="loginPending" class="settings-section-desc codex-login-pending">
-        <div v-if="deviceLoginPending && deviceUserCode" class="codex-device-panel">
-          <span class="codex-device-panel__hint">
-            {{ $t('personalization.codexLoginDeviceHint') }}
+        <template v-if="loginExchanging">
+          {{ $t('personalization.codexLoginExchanging') }}
+        </template>
+        <div v-else-if="deviceLoginPending" class="codex-device-panel">
+          <span v-if="deviceLoginStarting" class="codex-device-panel__hint">
+            {{ $t('personalization.codexLoginStartingDevice') }}
           </span>
-          <span class="codex-device-code">
-            <span class="codex-device-code__text">{{ deviceUserCode }}</span>
-            <button type="button" class="settings-secondary-button" @click="copyUserCode">
-              {{ $t('common.copy') }}
-            </button>
-            <button
-              v-if="deviceVerificationUri"
-              type="button"
-              class="settings-secondary-button"
-              @click="openDevicePage"
-            >
-              {{ $t('personalization.codexLoginDeviceOpen') }}
-            </button>
-          </span>
-          <span class="codex-device-panel__first">
-            {{ $t('personalization.codexLoginDeviceFirstTime') }}
-          </span>
-          <span class="codex-device-panel__waiting">
-            {{ $t('personalization.codexLoginPendingDevice') }}
-          </span>
+          <template v-else-if="deviceUserCode">
+            <span class="codex-device-panel__hint">
+              {{ $t('personalization.codexLoginDeviceHint') }}
+            </span>
+            <span class="codex-device-code">
+              <span class="codex-device-code__text">{{ deviceUserCode }}</span>
+              <button type="button" class="settings-secondary-button" @click="copyUserCode">
+                {{ $t('common.copy') }}
+              </button>
+              <button
+                v-if="deviceVerificationUri"
+                type="button"
+                class="settings-secondary-button"
+                @click="openDevicePage"
+              >
+                {{ $t('personalization.codexLoginDeviceOpen') }}
+              </button>
+            </span>
+            <span class="codex-device-panel__first">
+              {{ $t('personalization.codexLoginDeviceFirstTime') }}
+            </span>
+            <span class="codex-device-panel__waiting">
+              {{ $t('personalization.codexLoginPendingDevice') }}
+            </span>
+          </template>
         </div>
         <template v-else>
           {{ $t('personalization.codexLoginPending') }}
