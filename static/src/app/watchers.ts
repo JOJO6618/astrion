@@ -11,37 +11,60 @@ export const watchers = {
       this.scheduleComposerDraftPersist('watch-input-message');
     }
   },
-  // 模型菜单分页切换时高度动画：grid 同格堆叠容器的高度由当前页决定，
-  // 常规模型页与 Codex 子页项数不同，切换时高度突变——记录切换前高度，
-  // DOM 更新后量新页高度，inline height 过渡（220ms，与 slide 动画同步）。
-  // 清理必须等 leave 页真正移除（模板 @after-leave 调 clearModelMenuPaneHeight）：
-  // 过早清 inline 时 leave 页仍在 DOM，行高 = max(两页) 会瞬间弹回旧高度——
-  // 高→矮切换时这就是用户看到的「弹一下/闪一下」（矮→高因行高本就被新页
-  // 撑到目标值而无感，方向不对称的根因）。此 timeout 仅为事件丢失的保底。
+  // 模型菜单分页切换的高度动画（2026-09 重写：WAAPI 直接驱动弹窗本体）。
+  // 旧实现给 .model-menu-panes 容器设 inline height 过渡——弹窗是多列 grid，
+  // 渲染高度 = max(各列)，容器动画不必然传导到弹窗可视边框（曾出现容器过渡
+  // 完整播放、弹窗却方向不对称跳变的问题）。现直接测量弹窗渲染高度并用
+  // WAAPI 插值：切换期间弹窗钉在动画值，overflow 裁切堆叠页溢出内容；
+  // after-leave（旧页移除、auto 高度稳定）后 cancel 动画回落 auto，零跳变。
   headerModelMenuPage() {
     const panes = Array.from(document.querySelectorAll('.model-menu-panes')).filter(
       (el) => el instanceof HTMLElement && el.getClientRects().length > 0
     );
     if (!panes.length) return;
-    const startHeights = panes.map((el) => el.offsetHeight);
+    const popups = panes.map((el) => el.closest('.model-mode-dropdown'));
+    if (popups.some((p) => !(p instanceof HTMLElement))) return;
+    // 起始高度在 DOM 更新前量（watcher 默认 pre flush），此时只有旧页；
+    // 若上一轮动画 fill:forwards 未清理，offsetHeight 反映动画当前值，
+    // 恰好是新动画的正确起点
+    const startHeights = popups.map((p) => p.offsetHeight);
     this.$nextTick(() => {
       panes.forEach((el, i) => {
+        const popup = popups[i];
         const startHeight = startHeights[i];
-        const target = el.querySelector('.model-menu-pane:not([class*="-leave-active"])');
-        const endHeight = target ? target.offsetHeight : startHeight;
+        // 终止上一轮未完的动画（快速来回切换），让真实 auto 高度参与目标测量
+        if (popup.__menuHeightAnim) {
+          popup.__menuHeightAnim.cancel();
+          popup.__menuHeightAnim = null;
+        }
+        // 量「仅新页」时弹窗的稳定高度：leave 页临时脱离 grid 流，同帧测量后
+        // 恢复（同步代码不触发渲染，无闪烁；leave 页 transform 过渡由类驱动，
+        // position 还原后不受影响）
+        const leavePane = el.querySelector('.model-menu-pane[class*="-leave-"]');
+        if (leavePane instanceof HTMLElement) {
+          leavePane.style.position = 'absolute';
+        }
+        const endHeight = popup.offsetHeight;
+        if (leavePane instanceof HTMLElement) {
+          leavePane.style.position = '';
+        }
         if (Math.abs(endHeight - startHeight) < 2) return;
-        el.style.height = `${startHeight}px`;
-        el.style.transition = 'none';
-        void el.offsetHeight; // 强制 reflow 让起始值生效
-        el.style.transition = 'height 220ms ease';
-        el.style.height = `${endHeight}px`;
-        // 序号防快速来回切换时旧 timeout 误清新一轮动画的 inline 样式；
-        // 1000ms 是保底（正常路径由 @after-leave 立即清理并作废本 timeout）
-        const seq = (el.__heightAnimSeq = (el.__heightAnimSeq || 0) + 1);
+        popup.style.overflow = 'hidden'; // 动画期间裁切堆叠页溢出部分
+        const anim = popup.animate(
+          [{ height: `${startHeight}px` }, { height: `${endHeight}px` }],
+          { duration: 220, easing: 'ease', fill: 'forwards' }
+        );
+        popup.__menuHeightAnim = anim;
+        // 保底：after-leave 事件丢失时 1s 后强制回落 auto（序号防快速切换时
+        // 旧 timeout 误清新一轮动画）
+        const seq = (popup.__menuHeightAnimSeq = (popup.__menuHeightAnimSeq || 0) + 1);
         window.setTimeout(() => {
-          if (el.__heightAnimSeq !== seq) return;
-          el.style.transition = '';
-          el.style.height = '';
+          if (popup.__menuHeightAnimSeq !== seq) return;
+          if (popup.__menuHeightAnim) {
+            popup.__menuHeightAnim.cancel();
+            popup.__menuHeightAnim = null;
+          }
+          popup.style.overflow = '';
         }, 1000);
       });
     });

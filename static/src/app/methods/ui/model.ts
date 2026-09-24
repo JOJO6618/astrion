@@ -26,14 +26,20 @@ import {
 
 export const modelMethods = {
   // 模型菜单 slide 过渡的 leave 完成回调（模板 @after-leave）：此刻旧页已从
-  // DOM 移除，清理高度动画的 inline 样式不会再弹回（见 watchers.ts 注释）。
+  // DOM 移除，弹窗 auto 高度已稳定为新页高度——cancel WAAPI 动画回落 auto
+  //（fill:forwards 终值与 auto 一致，无跳变），并还原 overflow（见 watchers.ts）。
   clearModelMenuPaneHeight() {
     const panes = document.querySelectorAll('.model-menu-panes');
     panes.forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
-      el.__heightAnimSeq = (el.__heightAnimSeq || 0) + 1; // 作废保底 timeout
-      el.style.transition = '';
-      el.style.height = '';
+      const popup = el.closest('.model-mode-dropdown');
+      if (!(popup instanceof HTMLElement)) return;
+      popup.__menuHeightAnimSeq = (popup.__menuHeightAnimSeq || 0) + 1; // 作废保底 timeout
+      if (popup.__menuHeightAnim) {
+        popup.__menuHeightAnim.cancel();
+        popup.__menuHeightAnim = null;
+      }
+      popup.style.overflow = '';
     });
   },
   toggleModelMenu() {
