@@ -87,7 +87,6 @@ export const computed = {
     'confirmDialog',
     'easterEgg',
     'isMobileViewport',
-    'mobileOverlayMenuOpen',
     'activeMobileOverlay'
   ]),
   ...mapWritableState(useConversationStore, [

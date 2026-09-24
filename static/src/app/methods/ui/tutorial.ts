@@ -4,7 +4,7 @@ import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
+import { useTutorialStore, TUTORIAL_ENABLED } from '../../../stores/tutorial';
 import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
 import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
 import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
@@ -26,6 +26,11 @@ import {
 
 export const tutorialMethods = {
   async checkTutorialPrompt() {
+    // 新手教程暂时关闭不开放（TUTORIAL_ENABLED=false），不再弹出新用户教程提示
+    if (!TUTORIAL_ENABLED) {
+      this.tutorialPromptVisible = false;
+      return;
+    }
     this.tutorialPromptVisible = false;
     this.tutorialPromptUsername = '';
     try {

@@ -58,8 +58,6 @@ const appOptions = {
       uiSetSidebarCollapsed: 'setSidebarCollapsed',
       uiSetChatDisplayMode: 'setChatDisplayMode',
       uiSetMobileViewport: 'setIsMobileViewport',
-      uiSetMobileOverlayMenuOpen: 'setMobileOverlayMenuOpen',
-      uiToggleMobileOverlayMenu: 'toggleMobileOverlayMenu',
       uiSetActiveMobileOverlay: 'setActiveMobileOverlay',
       uiCloseMobileOverlay: 'closeMobileOverlay',
       uiPushToast: 'pushToast',

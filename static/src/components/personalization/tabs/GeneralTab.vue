@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
+import { TUTORIAL_ENABLED } from '@/stores/tutorial';
 
 defineOptions({ name: 'GeneralTab' });
 
@@ -101,7 +102,8 @@ const {
       </div>
     </div>
 
-    <div class="settings-action-row">
+    <!-- 新手教程暂时关闭不开放（TUTORIAL_ENABLED=false），入口行隐藏 -->
+    <div class="settings-action-row" v-if="TUTORIAL_ENABLED">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('personalization.tutorialTitle') }}</span>
         <span class="settings-row-desc">{{ $t('personalization.tutorialDesc') }}</span>

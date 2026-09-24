@@ -8,6 +8,8 @@ export default {
   more: 'More',
   fileWindowTitle: 'Files',
   todoWindowTitle: 'To-dos',
+  // Mobile quick dock overlay empty hint (mobile revamp 2026-09-24)
+  emptyHint: 'Nothing here yet. Content appears when tasks run or files are created.',
 
   // —— QuickDock global ⋯ menu ——
   menuForceStop: 'Force stop',

@@ -15,6 +15,8 @@ export default {
   more: '更多',
   fileWindowTitle: '文件',
   todoWindowTitle: '待办事项',
+  // 移动端快捷窗口悬浮层空态提示（2026-09-24 移动端改造）
+  emptyHint: '暂无内容，运行任务或产生文件后会显示在这里',
 
   // —— QuickDock 全局 ⋯ 菜单 ——
   menuForceStop: '强制关闭',

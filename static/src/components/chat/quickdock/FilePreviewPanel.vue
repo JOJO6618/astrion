@@ -1,6 +1,8 @@
 <template>
   <transition name="qd-preview-slide">
-    <aside v-if="previewPath" class="qd-preview" :style="{ width: previewWidth + 'px' }">
+    <!-- 内联宽度仅桌面端输出（拖拽调宽持久化）；移动端由 quickdock.css
+         媒体查询改为固定定位悬浮层，宽高自适应屏幕 -->
+    <aside v-if="previewPath" class="qd-preview" :style="previewInlineStyle">
       <!-- 左缘拖拽手柄：拖动调整面板宽度，localStorage 持久化 -->
       <div
         class="qd-preview__resize"
@@ -64,6 +66,7 @@ import { storeToRefs } from 'pinia';
 import CloseButton from '@/components/common/CloseButton.vue';
 import { t } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
+import { useUiStore } from '@/stores/ui';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { highlightCode, prismLangForPath } from '@/utils/prismHighlight';
 
@@ -129,6 +132,9 @@ const PREVIEWABLE_EXTS = new Set([
 const quickDock = useQuickDockStore();
 const { previewPath } = storeToRefs(quickDock);
 
+const uiStore = useUiStore();
+const { isMobileViewport } = storeToRefs(uiStore);
+
 /** 预览面板宽度（含右侧 12px padding），localStorage 持久化 */
 const PREVIEW_WIDTH_STORAGE_KEY = 'agents_qd_preview_width';
 const PREVIEW_WIDTH_MIN = 320;
@@ -147,6 +153,11 @@ const loadPreviewWidth = (): number => {
 };
 
 const previewWidth = ref(loadPreviewWidth());
+
+/** 内联宽度仅桌面端输出（拖拽调宽）；移动端宽度由 quickdock.css 媒体查询接管 */
+const previewInlineStyle = computed(() =>
+  isMobileViewport.value ? {} : { width: `${previewWidth.value}px` }
+);
 
 function startPreviewResize(event: MouseEvent) {
   event.preventDefault();

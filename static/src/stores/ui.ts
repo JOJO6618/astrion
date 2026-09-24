@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { t } from '@/locales';
 
 type ResizingPanel = 'left' | 'right' | null;
-type MobileOverlayTarget = 'conversation' | 'focus' | 'approval' | null;
+type MobileOverlayTarget = 'conversation' | 'focus' | 'approval' | 'quickdock' | null;
 
 interface QuotaToast {
   message: string;
@@ -69,7 +69,6 @@ interface UiState {
   pendingConfirmResolver: ((value: boolean) => void) | null;
   easterEgg: EasterEggState;
   isMobileViewport: boolean;
-  mobileOverlayMenuOpen: boolean;
   activeMobileOverlay: MobileOverlayTarget;
   // 图片大图预览（Lightbox）：url 为空表示关闭
   imagePreview: { url: string; name: string } | null;
@@ -109,7 +108,6 @@ export const useUiStore = defineStore('ui', {
       destroyPromise: null
     },
     isMobileViewport: initialIsMobileViewport,
-    mobileOverlayMenuOpen: false,
     activeMobileOverlay: null,
     imagePreview: null
   }),
@@ -154,15 +152,8 @@ export const useUiStore = defineStore('ui', {
     setIsMobileViewport(isMobile: boolean) {
       this.isMobileViewport = isMobile;
       if (!isMobile) {
-        this.mobileOverlayMenuOpen = false;
         this.activeMobileOverlay = null;
       }
-    },
-    setMobileOverlayMenuOpen(open: boolean) {
-      this.mobileOverlayMenuOpen = open;
-    },
-    toggleMobileOverlayMenu() {
-      this.mobileOverlayMenuOpen = !this.mobileOverlayMenuOpen;
     },
     setActiveMobileOverlay(target: MobileOverlayTarget) {
       this.activeMobileOverlay = target;

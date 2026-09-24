@@ -1540,6 +1540,23 @@
   height: 22px;
 }
 
+/* 顶栏右侧快捷窗口展开按钮：与桌面端 qd-toggle 同款同尺寸线条图标（16px / 线宽 1.8），
+   与悬浮层顶部关闭按钮（复用 qd-toggle）视觉一致 */
+.mobile-topbar-quickdock {
+  margin-left: 2px;
+}
+
+.mobile-topbar-quickdock svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mobile-topbar-quickdock svg line {
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
 @media (max-width: 768px) {
   .mobile-panel-fab {
     width: 30px;
@@ -1550,81 +1567,6 @@
     width: 22px;
     height: 22px;
   }
-}
-
-.mobile-panel-menu {
-  pointer-events: auto;
-  display: grid;
-  grid-auto-flow: column;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: var(--theme-mobile-menu);
-  box-shadow: var(--theme-mobile-menu-shadow);
-  align-self: flex-start;
-}
-
-/* 新的下拉菜单样式 */
-.mobile-panel-menu--dropdown {
-  position: fixed;
-  top: 52px;
-  left: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--surface-soft);
-  box-shadow: none;
-  min-width: 200px;
-  z-index: 1600;
-}
-
-.mobile-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  color: var(--text-primary);
-  text-align: left;
-}
-
-.mobile-menu-item:hover {
-  background: var(--hover-bg);
-}
-
-.mobile-menu-item .item-label {
-  font-size: 14px;
-  font-weight: 500;
-  flex: 1;
-}
-
-/* 统一所有图标容器宽度为 30px，确保文字左对齐 */
-.mobile-menu-icon {
-  width: 24px !important;
-  height: 24px !important;
-  min-width: 30px;
-  max-width: 30px;
-  flex-shrink: 0;
-  display: block;
-}
-
-/* 对话记录图标特殊尺寸，但容器宽度保持 30px */
-.mobile-menu-item:nth-child(1) svg.mobile-menu-icon {
-  width: 30px !important;
-  height: 30px !important;
-  margin-top: 2px;
-}
-
-/* 个人空间图标稍大一点 */
-.mobile-menu-item--personal img.mobile-menu-icon {
-  width: 26px !important;
-  height: 26px !important;
 }
 
 .mobile-topbar-title {
@@ -1706,45 +1648,6 @@
   color: var(--text-secondary);
 }
 
-.mobile-menu-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.mobile-menu-btn img,
-.mobile-menu-svg {
-  width: 26px;
-  height: 26px;
-  display: block;
-}
-
-.mobile-menu-btn--conversation .mobile-menu-svg {
-  width: 30px;
-  height: 30px;
-  transition: color 0.2s ease;
-}
-
-.mobile-panel-menu-enter-active,
-.mobile-panel-menu-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.mobile-panel-menu-enter-from,
-.mobile-panel-menu-leave-to {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.95);
-}
-
 /* ========================================= */
 /* 移动端半覆盖面板 */
 /* ========================================= */
@@ -1805,6 +1708,53 @@
   width: min(460px, 92vw);
   max-width: 92vw;
   padding-top: 0;
+}
+
+/* 快捷窗口悬浮层（2026-09-24 移动端改造）：右侧滑入；
+   宽度与桌面端 dock 相同（294px = 卡片 270 + 左右各 12 留白），小屏兜底 92vw */
+.mobile-panel-sheet--quickdock {
+  background: var(--surface-panel);
+  width: min(294px, 92vw);
+  max-width: 92vw;
+  padding-top: 0;
+}
+
+/* sheet 内的 QuickDock 占位列重置：桌面端的收起/空态（宽 0、透明、位移）
+   在悬浮层里一律不生效——打开悬浮层即展开语义；优先级高于 .quick-dock--empty 单类；
+   padding 与桌面端一致（顶 44 避开顶部悬浮按钮，右 12；窗口右对齐后左缘自然留 12） */
+.mobile-panel-sheet--quickdock .quick-dock {
+  width: 100%;
+  height: 100%;
+  padding: 44px 12px 20px 0;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+/* 悬浮层顶部关闭按钮：复用桌面端 qd-toggle 的样式（quickdock.css）；
+   位置与顶栏快捷窗口按钮完全重合（顶栏高 36px / padding 3px 10px / 按钮 30×30），
+   展开/收起时图标原地切换，无位移感 */
+.mobile-quickdock-close {
+  position: absolute;
+  top: 3px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  z-index: 10;
+}
+
+/* 悬浮层空态提示：五个窗口均无内容时展示 */
+.mobile-quickdock-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  pointer-events: none;
 }
 
 .mobile-panel-sheet--focus {
@@ -3079,44 +3029,8 @@ body[data-theme='dark'] {
     color: var(--text-primary) !important;
   }
 
+  /* img 图标无法继承 currentColor，暗色下反转让其可见（沿用改造前存量做法） */
   .mobile-panel-fab img {
-    filter: brightness(0) invert(1) !important;
-  }
-
-  /* 手机端展开菜单 - 黑色背景 */
-  .mobile-panel-menu {
-    background: var(--surface-base) !important;
-  }
-
-  /* 新的下拉菜单样式 - 暗色主题 */
-  .mobile-panel-menu--dropdown {
-    background: var(--badge-bg) !important;
-    box-shadow: none !important;
-  }
-
-  .mobile-menu-item {
-    color: var(--text-primary) !important;
-  }
-
-  .mobile-menu-item:hover {
-    background: var(--surface-muted) !important;
-  }
-
-  /* 图标颜色反转为白色 */
-  .mobile-menu-icon {
-    filter: brightness(0) invert(1) !important;
-  }
-
-  /* 手机端菜单按钮 - SVG 白色 */
-  .mobile-menu-btn {
-    color: var(--text-primary) !important;
-  }
-
-  .mobile-menu-svg {
-    filter: brightness(0) invert(1) !important;
-  }
-
-  .mobile-menu-btn img {
     filter: brightness(0) invert(1) !important;
   }
 

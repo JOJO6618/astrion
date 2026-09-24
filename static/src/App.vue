@@ -450,9 +450,9 @@
             </svg>
           </button>
         </div>
-        <FilePreviewPanel
-          v-if="!isMobileViewport"
-        />
+        <!-- 文件预览面板：桌面端挤压式占位列；移动端由 CSS 改为叠加悬浮层，
+             常驻挂载（内部由 previewPath 驱动显隐），保证移动端悬浮层之上可再叠加预览 -->
+        <FilePreviewPanel />
         <CitationPopover :host-mode="versioningHostMode" />
         <div
           v-if="!isMobileViewport && (terminalPanelOpen || gitChangesPanelOpen)"
@@ -650,9 +650,8 @@
           <button
             type="button"
             class="mobile-panel-fab"
-            data-tutorial="mobile-menu-trigger"
-            :aria-label="$t('appCore.switchWorkspace')"
-            @click="toggleMobileOverlayMenu"
+            :aria-label="$t('appCore.conversationHistory')"
+            @click="openMobileOverlay('conversation')"
           >
             <img :src="mobilePanelIcon" alt="" aria-hidden="true" />
           </button>
@@ -676,87 +675,21 @@
           >
             {{ currentConversationTitle || $t('overlay.unnamedConversation') }}
           </div>
+          <button
+            type="button"
+            class="mobile-panel-fab mobile-topbar-quickdock"
+            :aria-label="$t('appCore.expandQuickDock')"
+            :aria-pressed="activeMobileOverlay === 'quickdock'"
+            @click="openMobileOverlay('quickdock')"
+          >
+            <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true">
+              <line x1="2" y1="3.5" x2="16" y2="3.5" />
+              <line x1="2" y1="7.5" x2="10" y2="7.5" />
+              <line x1="2" y1="11.5" x2="14" y2="11.5" />
+              <line x1="2" y1="15.5" x2="7" y2="15.5" />
+            </svg>
+          </button>
         </div>
-        <transition name="mobile-panel-menu">
-          <div v-if="mobileOverlayMenuOpen" class="mobile-panel-menu mobile-panel-menu--dropdown">
-            <button
-              type="button"
-              class="dropdown-item mobile-menu-item"
-              data-tutorial="mobile-menu-conversation"
-              :aria-label="$t('appCore.conversationHistory')"
-              @click="openMobileOverlay('conversation')"
-            >
-              <svg class="mobile-menu-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M4 5.5c0-1.38 1.12-2.5 2.5-2.5h11c1.38 0 2.5 1.12 2.5 2.5v7.5c0 1.38-1.12 2.5-2.5 2.5h-4.8l-2.9 2.7.5-2.7H6.5c-1.38 0-2.5-1.12-2.5-2.5V5.5z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.7"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M8 8.5h8"
-                  stroke="currentColor"
-                  stroke-width="1.7"
-                  stroke-linecap="round"
-                />
-                <path
-                  d="M8 11.5h5"
-                  stroke="currentColor"
-                  stroke-width="1.7"
-                  stroke-linecap="round"
-                />
-              </svg>
-              <div class="item-label">{{ $t('appCore.conversationHistory') }}</div>
-            </button>
-            <button
-              type="button"
-              class="dropdown-item mobile-menu-item mobile-menu-item--personal"
-              data-tutorial="mobile-menu-personal"
-              :aria-label="$t('appCore.personalSpace')"
-              @click="handleMobilePersonalClick"
-            >
-              <img
-                class="mobile-menu-icon"
-                :src="mobileMenuIcons.personal"
-                alt=""
-                aria-hidden="true"
-              />
-              <div class="item-label">{{ $t('appCore.personalSpace') }}</div>
-            </button>
-            <button
-              type="button"
-              class="dropdown-item mobile-menu-item"
-              data-tutorial="mobile-menu-new-chat"
-              :aria-label="$t('common.newConversation')"
-              @click="createNewConversation"
-            >
-              <img
-                class="mobile-menu-icon"
-                :src="mobileMenuIcons.newChat"
-                alt=""
-                aria-hidden="true"
-              />
-              <div class="item-label">{{ $t('common.newConversation') }}</div>
-            </button>
-            <button
-              v-if="isAppShell"
-              type="button"
-              class="dropdown-item mobile-menu-item mobile-menu-item--refresh"
-              :aria-label="$t('appCore.refreshPage')"
-              @click="handleMobileRefreshClick"
-            >
-              <img
-                class="mobile-menu-icon"
-                :src="mobileMenuIcons.refresh"
-                alt=""
-                aria-hidden="true"
-              />
-              <div class="item-label">{{ $t('appCore.refreshPage') }}</div>
-            </button>
-          </div>
-        </transition>
         <transition name="header-menu">
           <div
             v-if="headerMenuOpen && isMobileViewport"
@@ -881,8 +814,10 @@
               :group-by-workspace="personalizationStore?.form?.group_sidebar_by_workspace"
               :versioning-host-mode="versioningHostMode"
               :show-collapse-button="true"
+              :show-refresh-button="isAppShell"
               collapse-button-variant="close"
               @toggle="closeMobileOverlay"
+              @refresh="refreshCurrentPage"
               @create="createNewConversation"
               @search="handleSidebarSearchInput"
               @search-submit="handleSidebarSearchSubmit"
@@ -928,6 +863,39 @@
               @reject="rejectToolApproval"
               @close="closeMobileOverlay('approval-panel-close-btn')"
             />
+          </div>
+        </div>
+      </transition>
+
+      <!-- 快捷窗口悬浮层：QuickDock 常驻挂载（v-show 控显隐），轮询与状态与桌面端一致；
+           关闭悬浮层时由 closeMobileOverlay 负责清掉瞬态面板（详情/预览/菜单） -->
+      <transition name="mobile-panel-overlay">
+        <div
+          v-if="isMobileViewport"
+          v-show="activeMobileOverlay === 'quickdock'"
+          class="mobile-panel-overlay mobile-panel-overlay--right mobile-quickdock-overlay"
+          @click.self="closeMobileOverlay('backdrop-click')"
+        >
+          <div class="mobile-panel-sheet mobile-panel-sheet--quickdock">
+            <!-- 顶部关闭按钮：与桌面端 qd-toggle 同款图标与位置（quickdock.css），
+                 点击关闭悬浮层；点遮罩空白处同样关闭 -->
+            <button
+              type="button"
+              class="qd-toggle mobile-quickdock-close"
+              :aria-label="$t('appCore.collapseQuickDock')"
+              @click="closeMobileOverlay('quickdock-close-btn')"
+            >
+              <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true">
+                <line x1="2" y1="3.5" x2="16" y2="3.5" />
+                <line x1="2" y1="7.5" x2="10" y2="7.5" />
+                <line x1="2" y1="11.5" x2="14" y2="11.5" />
+                <line x1="2" y1="15.5" x2="7" y2="15.5" />
+              </svg>
+            </button>
+            <QuickDock :host-mode="versioningHostMode" />
+            <div v-if="!qdHasContent" class="mobile-quickdock-empty">
+              {{ $t('quickdock.emptyHint') }}
+            </div>
           </div>
         </div>
       </transition>
@@ -980,11 +948,6 @@ onMounted(() => {
   }, 300);
 
 });
-const mobileMenuIcons = {
-  personal: new URL('../icons/user.svg', import.meta.url).href,
-  newChat: new URL('../icons/pencil.svg', import.meta.url).href,
-  refresh: new URL('../icons/refresh-cw.svg', import.meta.url).href
-};
 
 defineOptions(appOptions);
 </script>

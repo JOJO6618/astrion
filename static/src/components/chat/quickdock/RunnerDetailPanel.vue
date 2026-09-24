@@ -1,10 +1,13 @@
 <template>
+  <!-- 移动端 Teleport 到 body：详情是独立弹窗，摆脱快捷窗口悬浮层的
+       backdrop-filter 包含块与 sheet 宽度限制（2026-09-24 移动端改造） -->
+  <Teleport to="body" :disabled="!isMobileViewport">
   <section
     v-if="renderVisible"
     ref="rootRef"
     class="qd-detail"
     :class="{ 'panel-enter': entering, 'panel-leave': leaving }"
-    :style="{ right: `${panelRight}px` }"
+    :style="panelInlineStyle"
   >
     <header class="qd-detail__header">
       <span class="qd-detail__dot" :class="`is-${stateClass}`"></span>
@@ -64,6 +67,7 @@
       </template>
     </div>
   </section>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -73,6 +77,7 @@ import { t, currentLocale } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
+import { useUiStore } from '@/stores/ui';
 import CloseButton from '@/components/common/CloseButton.vue';
 
 /**
@@ -147,11 +152,24 @@ const rootRef = ref<HTMLElement | null>(null);
 /* ---------------- 面板水平定位：跟随快捷栏实际位置 ----------------
    CSS 里的 right 兜底值假设快捷栏贴视口最右缘；右侧再开预览/终端面板时
    快捷栏左移，写死的 right 会让面板盖住快捷栏。显示期间逐帧测量
-   快捷栏左缘（顺带跟随面板开合过渡与拖拽调宽），保持 12px 间距。 */
+   快捷栏左缘（顺带跟随面板开合过渡与拖拽调宽），保持 12px 间距。
+   移动端（2026-09-24 改造）：面板由 CSS 媒体查询改为近全屏悬浮，
+   不输出内联 right、也不启动位置跟踪。 */
+const uiStore = useUiStore();
+const { isMobileViewport } = storeToRefs(uiStore);
+
 const panelRight = ref(294 + 12);
 let positionRafId = 0;
 
+/** 内联定位仅桌面端输出；移动端 right 由 quickdock.css 媒体查询固定 */
+const panelInlineStyle = computed(() =>
+  isMobileViewport.value ? {} : { right: `${panelRight.value}px` }
+);
+
 function trackDockPosition() {
+  if (isMobileViewport.value) {
+    return;
+  }
   const aside = rootRef.value?.parentElement;
   if (aside) {
     const next = Math.round(window.innerWidth - aside.getBoundingClientRect().left + 12);

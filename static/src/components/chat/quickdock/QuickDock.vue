@@ -18,8 +18,11 @@
     <RunnerDetailPanel />
 
     <!-- 全局 ⋯ 菜单（fixed 单例）；Transition 提供进入/离开动画，
-         离开期间用 effectiveMenu 快照保持内容与定位不变 -->
-    <Transition name="qd-menu">
+         离开期间用 effectiveMenu 快照保持内容与定位不变。
+         移动端 Teleport 到 body：摆脱悬浮层 backdrop-filter 包含块与 sheet 裁剪，
+         保证菜单按按钮的视口坐标精确落位（2026-09-24 移动端改造） -->
+    <Teleport to="body" :disabled="!isMobileViewport">
+      <Transition name="qd-menu">
       <div
         v-if="menu"
         class="qd-menu"
@@ -44,7 +47,8 @@
           <button class="qd-menu__item" @click="copyPath">{{ $t('quickdock.menuCopyPath') }}</button>
         </template>
       </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </aside>
 </template>
 
@@ -84,6 +88,7 @@ const subAgentStore = useSubAgentStore();
 const bgStore = useBackgroundCommandStore();
 const conversationStore = useConversationStore();
 const uiStore = useUiStore();
+const { isMobileViewport } = storeToRefs(uiStore);
 const fileStore = useFileStore();
 const workflowStore = useWorkflowStore();
 const personalizationStore = usePersonalizationStore();

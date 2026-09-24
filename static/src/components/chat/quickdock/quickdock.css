@@ -800,23 +800,26 @@
   overflow: hidden;
 }
 
-/* 预览侧边栏滑入滑出（对齐 git/终端面板 right-panels-slide 的参数） */
-.qd-preview-slide-enter-active,
-.qd-preview-slide-leave-active {
-  transition:
-    width 0.24s ease,
-    padding 0.24s ease,
-    opacity 0.2s ease,
-    transform 0.24s var(--qd-ease-out);
-  overflow: hidden;
-}
+/* 预览侧边栏滑入滑出：桌面端为宽度挤压式（对齐 git/终端面板 right-panels-slide 的参数）；
+   移动端为悬浮层淡入上浮（无布局可挤压，见文件末尾移动端适配块） */
+@media (min-width: 769px) {
+  .qd-preview-slide-enter-active,
+  .qd-preview-slide-leave-active {
+    transition:
+      width 0.24s ease,
+      padding 0.24s ease,
+      opacity 0.2s ease,
+      transform 0.24s var(--qd-ease-out);
+    overflow: hidden;
+  }
 
-.qd-preview-slide-enter-from,
-.qd-preview-slide-leave-to {
-  width: 0 !important;
-  padding-right: 0 !important;
-  opacity: 0;
-  transform: translateX(24px);
+  .qd-preview-slide-enter-from,
+  .qd-preview-slide-leave-to {
+    width: 0 !important;
+    padding-right: 0 !important;
+    opacity: 0;
+    transform: translateX(24px);
+  }
 }
 
 .qd-preview__header {
@@ -1419,4 +1422,92 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+
+/* ============================================================
+   移动端适配（max-width: 768px，2026-09-24 移动端改造）
+   - QuickDock 本体在移动端渲染于右侧悬浮层内，样式覆盖见
+     styles/components/overlays/_overlays.scss 的 sheet--quickdock 块
+   - 详情面板 / 文件预览 / ⋯ 菜单统一为独立悬浮弹窗样式（近全屏卡片），
+     移动端 Teleport 到 body（见组件模板），摆脱悬浮层包含块与裁剪；
+     进出动画统一从右到左滑入，不用纵向位移
+   ============================================================ */
+@media (max-width: 768px) {
+  .qd-detail {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    /* Teleport 到 body 后与文件预览同级：高于移动端悬浮层（2000） */
+    z-index: 2100;
+  }
+
+  /* 详情面板进出动画：与预览一致，从右到左 */
+  .qd-detail.panel-enter {
+    animation: qd-mobile-panel-in 0.24s var(--qd-ease-out);
+  }
+
+  .qd-detail.panel-leave {
+    animation: qd-mobile-panel-out 0.18s ease-in forwards;
+  }
+
+  .qd-preview {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    padding: 0;
+    z-index: 2100;
+  }
+
+  /* 左缘拖拽调宽手柄在移动端无意义（宽度由屏幕自适应） */
+  .qd-preview__resize {
+    display: none;
+  }
+
+  /* 预览悬浮层进出动画：从右到左滑入（桌面端宽度挤压动画见上方 min-width: 769px 块） */
+  .qd-preview-slide-enter-active,
+  .qd-preview-slide-leave-active {
+    transition:
+      opacity 0.2s ease,
+      transform 0.24s var(--qd-ease-out);
+    overflow: hidden;
+  }
+
+  .qd-preview-slide-enter-from,
+  .qd-preview-slide-leave-to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  /* ⋯ 菜单 Teleport 到 body 后提升层级：高于悬浮层与详情/预览弹窗 */
+  .qd-menu {
+    z-index: 2200;
+  }
+}
+
+@keyframes qd-mobile-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes qd-mobile-panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
 }

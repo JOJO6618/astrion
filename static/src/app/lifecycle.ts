@@ -78,7 +78,6 @@ export async function mounted() {
 
   document.addEventListener('click', this.handleClickOutsideQuickMenu);
   document.addEventListener('click', this.handleClickOutsideHeaderMenu);
-  document.addEventListener('click', this.handleClickOutsideMobileMenu);
   document.addEventListener('click', this.handleCopyCodeClick);
   window.addEventListener('popstate', this.handlePopState);
   window.addEventListener('keydown', this.handleMobileOverlayEscape);
@@ -116,7 +115,6 @@ export function beforeUnmount() {
 
   document.removeEventListener('click', this.handleClickOutsideQuickMenu);
   document.removeEventListener('click', this.handleClickOutsideHeaderMenu);
-  document.removeEventListener('click', this.handleClickOutsideMobileMenu);
   document.removeEventListener('click', this.handleCopyCodeClick);
   window.removeEventListener('popstate', this.handlePopState);
   window.removeEventListener('keydown', this.handleMobileOverlayEscape);

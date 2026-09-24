@@ -126,6 +126,35 @@
           </span>
           <span class="sidebar-nav-label">{{ $t('sidebar.workflows') }}</span>
         </button>
+
+        <!-- 刷新页面：仅移动端 App 壳内由父级开启（浏览器有自带刷新，不显示） -->
+        <button
+          v-if="showRefreshButton"
+          type="button"
+          class="sidebar-nav-row sidebar-refresh-btn"
+          :title="$t('appCore.refreshPage')"
+          @click="$emit('refresh')"
+        >
+          <span class="sidebar-nav-icon refresh-icon" aria-hidden="true">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" />
+            </svg>
+          </span>
+          <span class="sidebar-nav-label">{{ $t('appCore.refreshPage') }}</span>
+        </button>
       </div>
 
       <div class="conversation-search">
@@ -727,6 +756,8 @@ const props = withDefaults(
     iconStyle?: (key: string) => Record<string, string>;
     showCollapseButton?: boolean;
     collapseButtonVariant?: 'toggle' | 'close';
+    /** 移动端 App 壳内专用：在导航区末尾显示「刷新页面」按钮（2026-09-24 移动端改造） */
+    showRefreshButton?: boolean;
     runningTasks?: any[];
     currentWorkspaceId?: string;
     defaultWorkspaceId?: string;
@@ -745,6 +776,7 @@ const props = withDefaults(
   {
     showCollapseButton: true,
     collapseButtonVariant: 'toggle',
+    showRefreshButton: false,
     runningTasks: () => [],
     currentWorkspaceId: '',
     defaultWorkspaceId: '',
@@ -764,6 +796,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (event: 'toggle'): void;
   (event: 'create'): void;
+  (event: 'refresh'): void;
   (event: 'search', value: string): void;
   (event: 'search-submit', value: string): void;
   (event: 'select', id: string): void;

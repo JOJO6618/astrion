@@ -41,6 +41,14 @@ const STORAGE_COMPLETED_KEY = 'agents_tutorial_completed_v1';
 const STORAGE_VERSION_KEY = 'agents_tutorial_version';
 const TUTORIAL_VERSION = 'v1';
 
+/**
+ * 新手教程总开关（2026-09-24）：暂时关闭不开放。
+ * false 时：新用户教程弹窗不再出现（checkTutorialPrompt 直接跳过）、
+ * 个人空间「新手教程」入口行隐藏。步骤定义与 TutorialOverlay 保留，
+ * 恢复时改回 true 并同步适配新的移动端入口（旧下拉菜单已废弃）。
+ */
+export const TUTORIAL_ENABLED = false;
+
 const TUTORIAL_STEP_DEFS: TutorialStepDef[] = [
   {
     id: 'welcome',

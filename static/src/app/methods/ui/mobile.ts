@@ -4,6 +4,7 @@ import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { useTutorialStore } from '../../../stores/tutorial';
+import { useQuickDockStore } from '../../../stores/quickDock';
 import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
 import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
 import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
@@ -56,15 +57,8 @@ export const mobileMethods = {
   updateMobileViewportState(isMobile) {
     this.uiSetMobileViewport(!!isMobile);
     if (!isMobile) {
-      this.uiSetMobileOverlayMenuOpen(false);
       this.closeMobileOverlay();
     }
-  },
-  toggleMobileOverlayMenu() {
-    if (!this.isMobileViewport) {
-      return;
-    }
-    this.uiToggleMobileOverlayMenu();
   },
   openMobileOverlay(target) {
     if (!this.isMobileViewport) {
@@ -80,11 +74,14 @@ export const mobileMethods = {
     if (this.activeMobileOverlay === 'conversation') {
       this.uiSetSidebarCollapsed(true);
     }
+    if (this.activeMobileOverlay === 'quickdock') {
+      // 离开快捷窗口悬浮层时关闭其瞬态面板（详情/预览/菜单），避免 fixed 层悬空
+      useQuickDockStore().resetTransient();
+    }
     if (target === 'conversation') {
       this.uiSetSidebarCollapsed(false);
     }
     this.uiSetActiveMobileOverlay(target);
-    this.uiSetMobileOverlayMenuOpen(false);
   },
   closeMobileOverlay(source = 'unknown') {
     if (!this.activeMobileOverlay) {
@@ -94,41 +91,34 @@ export const mobileMethods = {
     if (this.activeMobileOverlay === 'conversation') {
       this.uiSetSidebarCollapsed(true);
     }
+    if (this.activeMobileOverlay === 'quickdock') {
+      useQuickDockStore().resetTransient();
+    }
     this.uiCloseMobileOverlay();
   },
   handleMobileOverlayEscape(event) {
     if (event.key !== 'Escape' || !this.isMobileViewport) {
       return;
     }
-    if (this.mobileOverlayMenuOpen) {
-      this.uiSetMobileOverlayMenuOpen(false);
-      return;
+    if (this.activeMobileOverlay === 'quickdock') {
+      // 快捷窗口悬浮层有自己的 Esc 分层关闭链（菜单 > 详情 > 预览，见 QuickDock.vue）。
+      // 两层防御避免一次 Esc 同时关掉瞬态面板和悬浮层：
+      // 1. defaultPrevented：QuickDock 处理器先执行并已关闭一层时跳过；
+      // 2. store 状态：本处理器先执行时，有瞬态面板开着则让位给 QuickDock。
+      if (event.defaultPrevented) {
+        return;
+      }
+      const quickDock = useQuickDockStore();
+      if (quickDock.menu || quickDock.detail || quickDock.previewPath) {
+        return;
+      }
     }
     if (this.activeMobileOverlay) {
-      this.closeMobileOverlay();
+      this.closeMobileOverlay('escape');
     }
   },
   handleMobileOverlaySelect(conversationId) {
     this.loadConversation(conversationId);
     this.closeMobileOverlay();
-  },
-  handleMobilePersonalClick() {
-    this.closeMobileOverlay();
-    this.uiSetMobileOverlayMenuOpen(false);
-    this.openPersonalPage();
-  },
-  handleMobileRefreshClick() {
-    this.uiSetMobileOverlayMenuOpen(false);
-    this.refreshCurrentPage();
-  },
-  handleClickOutsideMobileMenu(event) {
-    if (!this.isMobileViewport || !this.mobileOverlayMenuOpen) {
-      return;
-    }
-    const trigger = this.$refs.mobilePanelTrigger;
-    if (trigger && typeof trigger.contains === 'function' && trigger.contains(event.target)) {
-      return;
-    }
-    this.uiSetMobileOverlayMenuOpen(false);
   }
 };
