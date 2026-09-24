@@ -277,7 +277,7 @@ def build_load_tools_definition() -> Dict[str, Any]:
                 "按名加载「按需加载的工具」目录中列出的未加载工具：在工具结果中返回这些工具的"
                 "完整 JSON 定义，之后即可像普通工具一样直接调用。一次可传多个工具名；"
                 "用户意图明确属于某个类目时，建议一次性加载该类目所需的全部工具。"
-                "已加载的工具在本对话中持续可用，重复传入会再次返回定义。"
+                "已加载的工具在本对话中持续可用；请勿重复传入已加载的工具，重复加载会被拒绝。"
             ),
             "parameters": {
                 "type": "object",
@@ -293,6 +293,34 @@ def build_load_tools_definition() -> Dict[str, Any]:
                 },
                 "required": ["tool_names"],
             },
+        },
+    }
+
+
+def build_tool_stub(tool_def: Dict[str, Any]) -> Dict[str, Any]:
+    """把完整工具定义折叠为 stub：保留 name 与一句引导式描述，参数置空。
+
+    stub 常驻 tools 数组的意义：模型只敢调用「出现在工具列表里」的工具
+    （训练先验），纯靠 tool result 塞定义会导致模型反复 load 而不敢调。
+    stub 内容只由完整定义决定（与加载状态无关），tools 数组每轮逐字节
+    一致，前缀缓存不受影响。
+    """
+    fn = (tool_def or {}).get("function") or {}
+    name = fn.get("name") or ""
+    desc = (fn.get("description") or "").strip()
+    # 取首句作为用途摘要（首行/首个中文句号截断，60 字符兑底），避免 stub
+    # 携带整段说明。描述主要起「何时用」与「先 load」的引导作用。
+    first = desc.split("\n", 1)[0].split("。", 1)[0].strip() if desc else ""
+    if len(first) > 60:
+        first = first[:60].rstrip() + "…"
+    guide = "（调用前需先通过 load_tools 加载本工具的参数定义）"
+    stub_desc = f"{first}。{guide}" if first else guide
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": stub_desc,
+            "parameters": {"type": "object", "properties": {}},
         },
     }
 

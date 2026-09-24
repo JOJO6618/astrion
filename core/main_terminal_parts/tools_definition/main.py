@@ -70,6 +70,7 @@ from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from core.tool_loading import (
     build_load_tools_definition,
+    build_tool_stub,
     get_tool_loading_state,
 )
 from utils.api_client import APIClient
@@ -179,9 +180,17 @@ class ToolsDefinitionMainMixin:
                         tl_state = None
                 if tl_state:
                     _deferred = set(tl_state["deferred_set"])
+                    # deferred 工具不整个剔除，替换为 stub（name + 引导式短描述 +
+                    # 空 parameters）：模型只敢调用「出现在工具列表里」的工具（训练
+                    # 先验），纯靠 tool result 塞定义会导致模型反复 load 而不敢调。
+                    # stub 只由完整定义决定、与加载状态无关，数组每轮逐字节一致，
+                    # 前缀缓存不受影响。被禁用的工具在上游过滤后不在 tools 里，不会
+                    # 变成 stub。
                     tools = [
-                        tool for tool in tools
-                        if (tool.get("function") or {}).get("name") not in _deferred
+                        build_tool_stub(tool)
+                        if (tool.get("function") or {}).get("name") in _deferred
+                        else tool
+                        for tool in tools
                     ]
                     if _deferred:
                         tools.append(build_load_tools_definition())

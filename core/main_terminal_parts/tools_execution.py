@@ -2590,33 +2590,47 @@ class MainTerminalToolsExecutionMixin:
                                     else:
                                         _already = [n for n in _names if n in _tl_state["loaded"]]
                                         _new = [n for n in _names if n not in _tl_state["loaded"] and n in _def_map]
-                                        _new_state = _tl_mark_loaded(_tl_state, [n for n in _names if n in _def_map])
-                                        # 持久化 loaded/pending（与冻结 prompt 同一 metadata 写入通道）
-                                        try:
-                                            _conv_id = getattr(_tl_cm, "current_conversation_id", None) if _tl_cm else None
-                                            if _conv_id:
-                                                _mgr = (
-                                                    _tl_cm._get_conversation_manager_for_id(_conv_id)
-                                                    if hasattr(_tl_cm, "_get_conversation_manager_for_id")
-                                                    else _tl_cm.conversation_manager
-                                                )
-                                                _mgr.update_conversation_metadata(_conv_id, {"tool_loading": _new_state})
-                                                if isinstance(_tl_cm.conversation_metadata, dict):
-                                                    _tl_cm.conversation_metadata["tool_loading"] = _new_state
-                                        except Exception:
-                                            pass
-                                        result = {
-                                            "success": True,
-                                            "tools": _defs,
-                                            "loaded_now": _new,
-                                            "already_loaded": _already,
-                                            **({"unavailable": _missing} if _missing else {}),
-                                            "message": tr(
-                                                "tools_exec.load_tools_loaded",
-                                                n=len(_defs),
-                                                names=", ".join(n for n in _names if n in _def_map),
-                                            ),
-                                        }
+                                        if _already and not _new:
+                                            # 重复加载拒绝：请求的工具全部已加载，定义本就留在
+                                            # 对话历史中（压缩会同步重置 loaded 状态，不存在有
+                                            # 状态无定义的窗口），重复返回纯浪费 token，且成功
+                                            # 返回会诱导模型陷入「再加载一次」循环。拒绝是明确
+                                            # 的行为信号，error 文案引导模型直接调用目标工具。
+                                            result = {
+                                                "success": False,
+                                                "error": tr(
+                                                    "tools_exec.load_tools_all_already",
+                                                    names=", ".join(_already),
+                                                ),
+                                            }
+                                        else:
+                                            _new_state = _tl_mark_loaded(_tl_state, [n for n in _names if n in _def_map])
+                                            # 持久化 loaded/pending（与冻结 prompt 同一 metadata 写入通道）
+                                            try:
+                                                _conv_id = getattr(_tl_cm, "current_conversation_id", None) if _tl_cm else None
+                                                if _conv_id:
+                                                    _mgr = (
+                                                        _tl_cm._get_conversation_manager_for_id(_conv_id)
+                                                        if hasattr(_tl_cm, "_get_conversation_manager_for_id")
+                                                        else _tl_cm.conversation_manager
+                                                    )
+                                                    _mgr.update_conversation_metadata(_conv_id, {"tool_loading": _new_state})
+                                                    if isinstance(_tl_cm.conversation_metadata, dict):
+                                                        _tl_cm.conversation_metadata["tool_loading"] = _new_state
+                                            except Exception:
+                                                pass
+                                            result = {
+                                                "success": True,
+                                                "tools": _defs,
+                                                "loaded_now": _new,
+                                                "already_loaded": _already,
+                                                **({"unavailable": _missing} if _missing else {}),
+                                                "message": tr(
+                                                    "tools_exec.load_tools_loaded",
+                                                    n=len(_defs),
+                                                    names=", ".join(n for n in _names if n in _def_map),
+                                                ),
+                                            }
 
                     elif tool_name == "manage_personalization":
                         logger.info("[handle_tool_call] 进入manage_personalization分支")

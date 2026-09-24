@@ -173,12 +173,12 @@ MESSAGES = {
         "en-US": "Loaded {n} tool(s): {names}",
     },
     "fmt_tool_loading.already": {
-        "zh-CN": "其中此前已加载：{names}",
-        "en-US": "Already loaded before: {names}",
+        "zh-CN": "警告：{names} 此前已加载过（定义见更早的对话历史），本次未重复返回。不要再次加载它们，直接调用即可。",
+        "en-US": "Warning: {names} were already loaded before (definitions in earlier history); not returned again. Do NOT reload them — call them directly.",
     },
     "fmt_tool_loading.defs_header": {
-        "zh-CN": "工具完整定义（之后可直接调用，无需重复加载）：",
-        "en-US": "Full tool definitions (call them directly afterwards; no need to reload):",
+        "zh-CN": "工具完整定义（此后直接按此定义调用——它们不会进入你的工具列表，但系统会正常执行你的调用；禁止再次 load）：",
+        "en-US": "Full tool definitions (call them directly using these definitions — they will not be added to your tools list, but the system will execute your calls normally; do NOT load again):",
     },
     "fmt_agent2.paused": {
         "zh-CN": "子智能体已暂停。",

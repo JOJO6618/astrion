@@ -119,6 +119,46 @@ class StateTransitionTest(unittest.TestCase):
         self.assertEqual(reset["initial_exposed"], loaded["initial_exposed"])
 
 
+class ToolStubTest(unittest.TestCase):
+    FULL_DEF = {
+        "type": "function",
+        "function": {
+            "name": "create_sub_agent",
+            "description": "创建一个子智能体来处理独立任务。\n\n适用场景：……（长文）",
+            "parameters": {
+                "type": "object",
+                "properties": {"task": {"type": "string"}},
+                "required": ["task"],
+            },
+        },
+    }
+
+    def test_stub_shape(self):
+        stub = tl.build_tool_stub(self.FULL_DEF)
+        fn = stub["function"]
+        self.assertEqual(fn["name"], "create_sub_agent")
+        self.assertEqual(fn["parameters"], {"type": "object", "properties": {}})
+        self.assertIn("load_tools", fn["description"])
+        self.assertIn("创建一个子智能体来处理独立任务", fn["description"])
+        self.assertNotIn("适用场景", fn["description"])
+
+    def test_stub_is_deterministic(self):
+        # 同一定义两次折叠结果一致（tools 数组逐字节稳定是缓存前提）
+        import json
+        a = json.dumps(tl.build_tool_stub(self.FULL_DEF), sort_keys=True)
+        b = json.dumps(tl.build_tool_stub(self.FULL_DEF), sort_keys=True)
+        self.assertEqual(a, b)
+
+    def test_stub_empty_description(self):
+        stub = tl.build_tool_stub({"type": "function", "function": {"name": "x"}})
+        self.assertIn("load_tools", stub["function"]["description"])
+
+    def test_stub_long_description_truncated(self):
+        long_desc = "甲" * 100 + "。第二句"
+        stub = tl.build_tool_stub({"function": {"name": "x", "description": long_desc}})
+        self.assertLess(len(stub["function"]["description"]), 120)
+
+
 class CatalogRenderTest(unittest.TestCase):
     def test_subset_and_empty_categories_omitted(self):
         catalog = tl.render_catalog(["activate_workflow", "create_sub_agent"])

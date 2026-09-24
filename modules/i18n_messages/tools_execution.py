@@ -548,8 +548,12 @@ MESSAGES = {
         "en-US": "These tools are currently unavailable (possibly disabled): {names}",
     },
     "tools_exec.load_tools_loaded": {
-        "zh-CN": "已加载 {n} 个工具：{names}。完整定义见下方，之后可直接调用，无需重复加载。",
-        "en-US": "Loaded {n} tool(s): {names}. Full definitions below; you can now call them directly.",
+        "zh-CN": "已加载 {n} 个工具：{names}。完整定义见下方。重点：这些工具不会出现在你的可用工具列表中——这是刻意的缓存优化，不是故障。按下方定义直接发起调用即可，系统会正常处理你的调用。绝对不要重复加载。",
+        "en-US": "Loaded {n} tool(s): {names}. Full definitions below. Important: these tools will NOT appear in your available tools list — this is a deliberate cache optimization, not a malfunction. Call them directly using the definitions below; the system will handle your calls normally. Never reload them.",
+    },
+    "tools_exec.load_tools_all_already": {
+        "zh-CN": "拒绝重复加载：{names} 在本对话中早已加载，完整定义就在上方对话历史中。重复加载没有任何效果——这些工具永远不会进入你的工具列表，这是刻意设计而非故障。你现在就可以、也应该直接按已有定义调用它们，系统会正常接收并执行。请立即继续任务，直接调用 {names}。",
+        "en-US": "Refused to reload: {names} were already loaded earlier — full definitions are in the conversation history above. Reloading has no effect: these tools will never be added to your tools list; this is by design, not a malfunction. You can and should call them directly using the existing definitions right now — the system will accept and execute your calls. Proceed with your task immediately by calling {names}.",
     },
 
     # ── 个性化管理 ──
