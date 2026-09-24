@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from config import PROMPTS_DIR
 from utils.api_client.codex.settings import INSTRUCTIONS_OVERRIDE_PATH
 
 # codex-rs main 分支 gpt_5_codex_prompt.md（2026-09-23 取回，最终兜底）
@@ -87,10 +88,10 @@ You are producing plain text that will later be styled by the CLI. Follow these 
   * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5
 """
 
-# astrion 桥接说明：拼接在官方提示之后、astrion 系统提示之前
-_BRIDGE_INSTRUCTIONS = """## Runtime bridge
-
-You are being used through Astrion, an AI agent platform that manages its own tools, conversation history, and workspace on the user's machine. Follow the Codex instructions above, then the Astrion system instructions below. Tool calls you emit are executed by Astrion and their results are returned to you. The conversation history you receive is complete and client-managed (the backend stores nothing)."""
+# Astrion 桥接说明：拼接在官方提示之后、Astrion 系统提示之前
+_BRIDGE_INSTRUCTIONS = (Path(PROMPTS_DIR) / "codex_bridge.txt").read_text(
+    encoding="utf-8"
+).strip()
 
 
 def get_base_instructions(
