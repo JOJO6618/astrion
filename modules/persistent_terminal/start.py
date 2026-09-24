@@ -13,30 +13,20 @@ import threading
 import queue
 from collections import deque
 import shutil
-import uuid
 import codecs
 from modules.host_sandbox_runner import (
     HostSandboxError,
     build_host_sandbox_shell_plan,
     host_sandbox_enabled,
 )
+# 注意：本模块不再导入任何 TERMINAL_SANDBOX_* 配置常量——历史上它们是为
+# 「docker run 新建临时容器」路径（_start_new_container_terminal /
+# toolbox_container）准备的，该路径 2026-09 核实为不可达死代码已删除；
+# 现有唯一容器路径是 docker exec 进入 UserContainerManager 拥有的用户容器，
+# 所有参数来自 TerminalManager 构建的 sandbox_options。
 try:
     from config import (
         OUTPUT_FORMATS,
-        TERMINAL_OUTPUT_WAIT,
-        TERMINAL_INPUT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
     )
 except ImportError:
     import sys
@@ -46,23 +36,9 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import (
         OUTPUT_FORMATS,
-        TERMINAL_OUTPUT_WAIT,
-        TERMINAL_INPUT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
     )
 
-from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_uid_gid, docker_readonly_wrap_inner
+from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
 
 
@@ -134,8 +110,6 @@ class StartMixin:
         except Exception as e:
             print(f"{OUTPUT_FORMATS['error']} 终端启动失败: {e}")
             self.is_running = False
-            if self.using_container:
-                self._stop_sandbox_container(force=True)
             return False
 
     def _start_host_terminal(self):
@@ -145,7 +119,6 @@ class StartMixin:
         if not host_sandbox_enabled():
             raise RuntimeError(tr("terminal_start.host_sandbox_disabled"))
         self.using_container = False
-        self._owns_container = False
         self.is_windows = sys.platform == "win32"
 
         env = os.environ.copy()
@@ -201,7 +174,6 @@ class StartMixin:
 
     def _start_plain_host_terminal(self):
         self.using_container = False
-        self._owns_container = False
         self.is_windows = sys.platform == "win32"
         shell_cmd = self.host_shell_command
         if self.is_windows:
@@ -239,7 +211,7 @@ class StartMixin:
         return process
 
     def _start_docker_terminal(self):
-        """启动或连接容器化终端。"""
+        """连接容器化终端（docker exec 进入已有用户容器）。"""
         docker_bin = self.sandbox_options.get("bin") or "docker"
         docker_path = shutil.which(docker_bin)
         if not docker_path:
@@ -249,11 +221,18 @@ class StartMixin:
             print(f"{OUTPUT_FORMATS['warning']} {message}")
             return None
 
-        self._sandbox_bin_path = docker_path
         target_container = self.sandbox_options.get("container_name")
-        if target_container:
-            return self._start_existing_container_terminal(docker_path, target_container)
-        return self._start_new_container_terminal(docker_path)
+        if not target_container:
+            # 架构不变量（2026-09 核实）：docker 模式下容器会话必然存在——
+            # ensure_container() 要么返回有效句柄、要么直接抛异常，TerminalManager
+            # 构建 sandbox_options 时必然写入 container_name，本分支理论上不可达。
+            # 历史上这里曾 fallback 到「docker run 新建临时容器」
+            # （_start_new_container_terminal / modules/toolbox_container.py），
+            # 该路径缺 --memory-swap/--pids-limit 等防护参数，且曾在服务器宕机
+            # 排查中误导分析方向，已整体删除。此处直接报错，防止未来新入口在
+            # 无会话时静默创建无防护容器。
+            raise RuntimeError(tr("terminal_start.container_name_missing"))
+        return self._start_existing_container_terminal(docker_path, target_container)
 
     def _start_existing_container_terminal(self, docker_path: str, container_name: str):
         """通过 docker exec 连接到已有容器。"""
@@ -309,98 +288,6 @@ class StartMixin:
         self.shell_command = f"{shell_path} (attach:{container_name})"
         self.using_container = True
         self.is_windows = False
-        self._owns_container = False
-        return process
-
-    def _start_new_container_terminal(self, docker_path: str):
-        """启动全新的容器终端。"""
-        image = self.sandbox_options.get("image")
-        if not image:
-            raise RuntimeError(tr("terminal_start.image_not_configured"))
-
-        mount_path = self.sandbox_options.get("mount_path") or "/workspace"
-        working_dir = str(self.working_dir)
-        if not self.working_dir.exists():
-            self.working_dir.mkdir(parents=True, exist_ok=True)
-
-        container_name = f"{self.sandbox_options.get('name_prefix', 'agent-term')}-{uuid.uuid4().hex[:10]}"
-        cmd = [
-            docker_path,
-            "run",
-            "--rm",
-            "-i",
-        ]
-        cmd += [
-            "--name",
-            container_name,
-            "-w",
-            mount_path,
-            "-v",
-            f"{working_dir}:{mount_path}",
-        ]
-
-        if self.sandbox_options.get("docker_readonly_exec"):
-            # 只读身份会话（新建容器）：docker run 用 --user 指定非特权 uid
-            ro_uid, ro_gid = docker_readonly_uid_gid()
-            cmd += ["--user", f"{ro_uid}:{ro_gid}"]
-            for ro_env in ("HOME=/tmp", "GIT_CONFIG_COUNT=1",
-                           "GIT_CONFIG_KEY_0=safe.directory", "GIT_CONFIG_VALUE_0=*"):
-                cmd += ["-e", ro_env]
-
-        network = self.sandbox_options.get("network")
-        if network:
-            cmd += ["--network", network]
-        cpus = self.sandbox_options.get("cpus")
-        if cpus:
-            cmd += ["--cpus", cpus]
-        memory = self.sandbox_options.get("memory")
-        if memory:
-            cmd += ["--memory", memory]
-
-        for bind in self.sandbox_options.get("binds", []):
-            bind = bind.strip()
-            if bind:
-                cmd += ["-v", bind]
-
-        envs = {
-            "PYTHONIOENCODING": "utf-8",
-            "TERM": "xterm-256color",
-        }
-        for key, value in (self.sandbox_options.get("env") or {}).items():
-            if value is not None:
-                envs[key] = value
-        for key, value in envs.items():
-            cmd += ["-e", f"{key}={value}"]
-
-        cmd.append(image)
-        shell_path = self.sandbox_options.get("shell") or "/bin/bash"
-        if shell_path:
-            cmd.append(shell_path)
-            if shell_path.endswith("sh"):
-                cmd.append("-i")
-
-        env = os.environ.copy()
-        try:
-            process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=0,
-                env=env
-            )
-        except FileNotFoundError:
-            message = tr("terminal_start.runtime_exec_failed", runtime=docker_path)
-            if self.sandbox_required:
-                raise RuntimeError(message)
-            print(f"{OUTPUT_FORMATS['warning']} {message}")
-            return None
-
-        self.sandbox_container_name = container_name
-        self.shell_command = f"{shell_path} (sandbox:{image})"
-        self.using_container = True
-        self.is_windows = False
-        self._owns_container = True
         return process
 
     def _resolve_container_workdir(self, mount_path: str) -> str:

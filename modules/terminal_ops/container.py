@@ -17,7 +17,6 @@ try:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
 except ImportError:
@@ -29,10 +28,8 @@ except ImportError:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
-from modules.toolbox_container import ToolboxContainer
 from modules.host_sandbox_runner import (
     HostSandboxError,
     NETWORK_PERMISSION_RESTRICTED,
@@ -71,21 +68,3 @@ class ContainerMixin:
         except Exception:
             mount_path = "/workspace"
         return SimpleNamespace(mode="docker", container_name=container_name, mount_path=mount_path)
-
-    def _will_use_container(self, session_override: Optional["ContainerHandle"]) -> bool:
-        """根据会话/回退策略判断此次执行是否在容器中进行。"""
-        if session_override:
-            return getattr(session_override, "mode", None) == "docker"
-        if self.container_session:
-            return getattr(self.container_session, "mode", None) == "docker"
-        # 未绑定容器会话时会使用工具箱容器（同样是 Docker）
-        return True
-
-    def _get_toolbox(self) -> ToolboxContainer:
-        if self._toolbox is None:
-            self._toolbox = ToolboxContainer(
-                project_path=str(self.project_path),
-                idle_timeout=TOOLBOX_TERMINAL_IDLE_SECONDS,
-                container_session=self.container_session,
-            )
-        return self._toolbox

@@ -17,7 +17,6 @@ try:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
 except ImportError:
@@ -29,10 +28,8 @@ except ImportError:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
-from modules.toolbox_container import ToolboxContainer
 from modules.host_sandbox_runner import (
     HostSandboxError,
     NETWORK_PERMISSION_RESTRICTED,

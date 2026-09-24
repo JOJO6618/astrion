@@ -99,7 +99,7 @@ class PersistentTerminalBase:
         self.max_buffer_size = max_buffer_size
         self.display_size = display_size
         # 网络权限来源：优先由所属 WebTerminal 注入 getter 实时取值；
-        # 不可用时才回落进程级环境变量（兼容 toolbox_container 等独立使用方）。
+        # 不可用时才回落进程级环境变量。
         self.network_permission_getter = network_permission_getter
         
         # 进程相关
@@ -164,8 +164,6 @@ class PersistentTerminalBase:
         self.sandbox_container_name = None
         self.execution_mode = "host"
         self.using_container = False
-        self._sandbox_bin_path = None
-        self._owns_container = False
 
     def _resolve_network_permission(self) -> str:
         """取当前网络权限设置：getter 实时值优先，环境变量兼容回落。"""

@@ -2,8 +2,7 @@
 
 Covers modules/gui_file_manager.py (gui_file.*), modules/host_sandbox_runner.py
 (sandbox.*), modules/user_container_manager.py (container_mgr.*),
-modules/persistent_terminal/start.py (terminal_start.*),
-modules/toolbox_container.py (toolbox.*) and
+modules/persistent_terminal/start.py (terminal_start.*) and
 modules/background_command_manager.py (bg_cmd.*).
 
 Pure data module — do not import anything here. Auto-discovered and merged by
@@ -261,23 +260,13 @@ MESSAGES = {
         "zh-CN": "目标容器未运行: {container_name}",
         "en-US": "Target container is not running: {container_name}",
     },
-    "terminal_start.image_not_configured": {
-        "zh-CN": "TERMINAL_SANDBOX_IMAGE 未配置",
-        "en-US": "TERMINAL_SANDBOX_IMAGE is not configured",
+    "terminal_start.container_name_missing": {
+        "zh-CN": "容器终端缺少 container_name：docker 模式下必须先有用户容器（架构不变量被破坏）",
+        "en-US": "container_name is missing for the container terminal: a user container must already exist in docker mode (architectural invariant violated)",
     },
     "terminal_start.runtime_not_found": {
         "zh-CN": "未找到容器运行时: {runtime}",
         "en-US": "Container runtime not found: {runtime}",
-    },
-    "terminal_start.runtime_exec_failed": {
-        "zh-CN": "无法执行容器运行时: {runtime}",
-        "en-US": "Cannot execute container runtime: {runtime}",
-    },
-
-    # ── modules/toolbox_container.py（工具容器管理器） ──
-    "toolbox.container_start_failed": {
-        "zh-CN": "工具容器启动失败，请检查 Docker 或本地 shell 环境。",
-        "en-US": "Failed to start the toolbox container; check Docker or the local shell environment",
     },
 
     # ── modules/background_command_manager.py（后台命令管理器） ──

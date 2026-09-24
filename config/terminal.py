@@ -54,7 +54,6 @@ TERMINAL_SANDBOX_ENV = {
 }
 TERMINAL_SANDBOX_REQUIRE = os.environ.get("TERMINAL_SANDBOX_REQUIRE", "0") not in {"0", "false", "False"}
 LINUX_SAFETY = os.environ.get("LINUX_SAFETY", "0") not in {"0", "false", "False"}
-TOOLBOX_TERMINAL_IDLE_SECONDS = int(os.environ.get("TOOLBOX_TERMINAL_IDLE_SECONDS", "900"))
 MAX_ACTIVE_USER_CONTAINERS = int(os.environ.get("MAX_ACTIVE_USER_CONTAINERS", "8"))
 # 每用户同时活跃的容器上限（防单用户多工作区占满全局容器池，2026-09-02 审计新增）
 # 仅统计 docker 句柄（host 句柄不计入）；默认值 8 与全局上限对齐（2026-09-02 调整）
@@ -96,7 +95,6 @@ __all__ = [
     "TERMINAL_SANDBOX_ENV",
     "TERMINAL_SANDBOX_REQUIRE",
     "LINUX_SAFETY",
-    "TOOLBOX_TERMINAL_IDLE_SECONDS",
     "MAX_ACTIVE_USER_CONTAINERS",
     "MAX_ACTIVE_CONTAINERS_PER_USER",
     "HOST_EXECUTION_MODE_DEFAULT",

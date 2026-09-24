@@ -17,7 +17,6 @@ try:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
 except ImportError:
@@ -29,10 +28,8 @@ except ImportError:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
-from modules.toolbox_container import ToolboxContainer
 from modules.host_sandbox_runner import (
     HostSandboxError,
     NETWORK_PERMISSION_RESTRICTED,
@@ -85,32 +82,3 @@ class CommandMixin:
             work_path.relative_to(self.project_path)
             return work_path
         return self.project_path
-
-    def _format_toolbox_output(self, payload: Dict) -> Dict:
-        success = bool(payload.get("success"))
-        output_text = payload.get("output", "") or ""
-        # 去掉常见的交互式shell警告
-        noisy_lines = (
-            "bash: cannot set terminal process group",
-            "bash: no job control in this shell",
-        )
-        filtered = []
-        for line in output_text.splitlines():
-            if any(noise in line for noise in noisy_lines):
-                continue
-            filtered.append(line)
-        output_text = "\n".join(filtered)
-        result = {
-            "success": success,
-            "output": output_text,
-            "return_code": 0 if success else -1
-        }
-        if not success:
-            result["error"] = payload.get("error") or payload.get("message") or tr("terminal.command_failed")
-        if "message" in payload:
-            result["message"] = payload["message"]
-        if "status" in payload:
-            result["status"] = payload["status"]
-        if "truncated" in payload:
-            result["truncated"] = payload["truncated"]
-        return result

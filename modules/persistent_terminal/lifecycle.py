@@ -202,7 +202,10 @@ class LifecycleMixin:
                 })
             
             if self.using_container:
-                self._stop_sandbox_container()
+                # 终端经 docker exec 附着到 UserContainerManager 拥有的用户容器，
+                # 关闭终端只结束 exec 进程，绝不停容器本身（容器生命周期由容器
+                # 管理器负责）。历史上「终端自建临时容器」路径使用的
+                # _stop_sandbox_container 已随该路径一并删除。
                 self.using_container = False
                 self.execution_mode = "host"
 
@@ -212,22 +215,3 @@ class LifecycleMixin:
         except Exception as e:
             print(f"{OUTPUT_FORMATS['error']} 关闭终端失败: {e}")
             return False
-
-    def _stop_sandbox_container(self, force: bool = False):
-        """确保容器终端被停止"""
-        if not self._owns_container or not self.sandbox_container_name or not self._sandbox_bin_path:
-            return
-        try:
-            subprocess.run(
-                [self._sandbox_bin_path, "kill", self.sandbox_container_name],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=3,
-                check=False
-            )
-        except Exception:
-            if force:
-                print(f"{OUTPUT_FORMATS['warning']} 强制终止容器 {self.sandbox_container_name} 失败，可能已退出。")
-        finally:
-            self.sandbox_container_name = None
-            self._owns_container = False

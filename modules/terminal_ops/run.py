@@ -17,7 +17,6 @@ try:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
 except ImportError:
@@ -29,10 +28,8 @@ except ImportError:
         FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        TOOLBOX_TERMINAL_IDLE_SECONDS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
-from modules.toolbox_container import ToolboxContainer
 from modules.host_sandbox_runner import (
     HostSandboxError,
     NETWORK_PERMISSION_RESTRICTED,
@@ -458,8 +455,6 @@ class RunMixin:
                 "output": tr("terminal.timeout_missing"),
                 "return_code": -1
             }
-        # 每次执行前重置工具容器（保持隔离），但下面改用一次性子进程执行，仍保留重置以兼容后续逻辑
-        self._reset_toolbox()
         # 尝试复用活动终端的容器（CLI 场景与 terminal_input 环境保持一致）
         session_override = None
         if not self.container_session:
@@ -493,45 +488,22 @@ class RunMixin:
 
         start_ts = time.time()
 
-        # 优先在绑定的容器或活动终端的容器内执行，保证与实时终端环境一致
+        # 不变量（2026-09 核实）：container_session 恒非 None——TerminalOperator 唯一
+        # 构造点（core/main_terminal.py）总是传入 ensure_container() 的返回值；docker
+        # 模式下该函数要么返回有效句柄、要么直接抛异常，host 模式也返回 mode="host"
+        # 句柄。历史上此处曾有一条「无会话时经 ToolboxContainer 新建临时容器」的
+        # else 分支，在该架构下不可达，且新建容器缺 --memory-swap/--pids-limit 等
+        # 防护参数，已连同 modules/toolbox_container.py 一并删除。未来新增构造点时
+        # 必须维持同一不变量，严禁复活临时容器路径。
         try:
-            if self.container_session or session_override:
-                result_payload = await self._run_command_subprocess(
-                    command,
-                    work_path,
-                    timeout,
-                    session_override=session_override,
-                    sandbox_write_access=sandbox_write_access,
-                    network_permission=network_permission,
-                )
-            else:
-                # 若未绑定用户容器，则使用工具箱容器（与终端相同镜像/预装包）
-                toolbox = self._get_toolbox()
-                try:
-                    payload = await toolbox.run(command, work_path, timeout)
-                except asyncio.CancelledError:
-                    # 任务被取消时强制关闭工具箱终端，避免后台命令继续运行
-                    try:
-                        toolbox.shutdown()
-                    except Exception:
-                        pass
-                    raise
-                result_payload = self._format_toolbox_output(payload)
-                # 追加耗时信息以对齐接口
-                result_payload["elapsed_ms"] = int((time.time() - start_ts) * 1000)
-                result_payload["timeout"] = timeout
-                # 字符数检查（与主流程一致）
-                if result_payload.get("success") and "output" in result_payload:
-                    char_count = len(result_payload["output"])
-                    if char_count > MAX_RUN_COMMAND_CHARS:
-                        return {
-                            "success": False,
-                            "error": tr("terminal.output_too_large", char_count=char_count),
-                            "char_count": char_count,
-                            "limit": MAX_RUN_COMMAND_CHARS,
-                            "command": command
-                        }
-                return result_payload
+            result_payload = await self._run_command_subprocess(
+                command,
+                work_path,
+                timeout,
+                session_override=session_override,
+                sandbox_write_access=sandbox_write_access,
+                network_permission=network_permission,
+            )
         except asyncio.CancelledError:
             return {
                 "success": False,
@@ -542,11 +514,6 @@ class RunMixin:
                 "timeout": timeout,
                 "elapsed_ms": int((time.time() - start_ts) * 1000)
             }
-
-        # 改为一次性子进程执行，确保等待到超时或命令结束
-        result_payload = result_payload if result_payload is not None else await self._run_command_subprocess(
-            command, work_path, timeout, sandbox_write_access=sandbox_write_access, network_permission=network_permission
-        )
         
         # 字符数检查
         if result_payload.get("success") and "output" in result_payload:
