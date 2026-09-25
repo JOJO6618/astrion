@@ -3456,7 +3456,7 @@ const autoDeepCompressEnabled = computed(() => {
 const deepCompressLimit = computed(() => {
   const custom = Number(personalizationStore?.form?.deep_compress_trigger_tokens || 0);
   if (custom > 0) return custom;
-  return 150000;
+  return 250000;
 });
 
 const contextUsageLimit = computed(() => {

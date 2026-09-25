@@ -365,7 +365,7 @@ export default {
   // ── 子智能体 ──
   subAgentsIntro: '管理多智能体模式下的子智能体角色。预设角色可编辑（创建自定义覆盖），自定义角色可创建/编辑/删除。',
   compressThresholdTitle: '上下文压缩阈值',
-  compressThresholdDesc: '子智能体上下文 tokens 超过此值时触发深度压缩（默认 150000）',
+  compressThresholdDesc: '子智能体上下文 tokens 超过此值时触发深度压缩（默认 250000）',
   subAgentModelTitle: '传统模式子智能体模型',
   subAgentModelDesc: '传统后台子智能体使用的模型；留空自动选择。多智能体团队成员使用角色上的模型设置，不受此项影响',
   maxTurnsTitle: '最大执行轮次',

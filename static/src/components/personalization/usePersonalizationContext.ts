@@ -757,7 +757,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
   // ----- 子智能体管理 -----
   const subAgentRoles = ref<any[]>([]);
   const subAgentRolesLoading = ref(false);
-  const subAgentCompressThreshold = ref(150000);
+  const subAgentCompressThreshold = ref(250000);
   /** 子智能体最大执行轮次（仅传统后台子智能体；多智能体成员不受限）：null/'' = 默认 50；0 = 无上限；正整数 = 该值 */
   const subAgentMaxTurns = ref<number | null>(null);
   const subAgentSettingsSaving = ref(false);
@@ -857,7 +857,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
       const data = await resp.json();
       if (data.success && data.settings) {
         subAgentCompressThreshold.value =
-          data.settings.sub_agent_compress_threshold_tokens || 150000;
+          data.settings.sub_agent_compress_threshold_tokens || 250000;
         // 未设置时为 null，输入框留空（placeholder 提示默认 50）
         subAgentMaxTurns.value = data.settings.sub_agent_max_turns ?? null;
       }

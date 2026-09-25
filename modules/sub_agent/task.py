@@ -103,8 +103,8 @@ class SubAgentTask:
         self.system_prompt_file = Path(task_record.get("task_root", "")) / "system_prompt.txt"
 
         # 上下文压缩配置
-        # 默认阈值 150k tokens，可由外部覆盖（如个人空间子智能体管理配置）
-        self.compress_threshold_tokens: int = int(task_record.get("compress_threshold_tokens") or 150_000)
+        # 默认阈值 250k tokens，可由外部覆盖（如个人空间子智能体管理配置）
+        self.compress_threshold_tokens: int = int(task_record.get("compress_threshold_tokens") or 250_000)
         # 最大执行轮次（对应个人空间子智能体设置项 sub_agent_max_turns，仅传统模式生效）：
         # 未设置 → 默认 50；0（或负数）→ None 表示无上限；正整数 → 该值
         # 多智能体模式的子智能体是长期协作成员，一律无上限，不受该设置约束

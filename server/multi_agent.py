@@ -227,7 +227,7 @@ def get_multi_agent_settings_api():
         # 从个人化配置中读取子智能体设置
         from modules.personalization_manager import load_personalization_config
         prefs = load_personalization_config(workspace.data_dir) or {}
-        compress_threshold = prefs.get("sub_agent_compress_threshold_tokens", 150000)
+        compress_threshold = prefs.get("sub_agent_compress_threshold_tokens", 250000)
         # 最大执行轮次：None（未设置）表示默认 50；0 表示无上限；正整数为该值
         max_turns = prefs.get("sub_agent_max_turns")
         return jsonify({

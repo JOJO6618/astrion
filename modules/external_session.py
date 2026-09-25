@@ -39,7 +39,7 @@ def is_opencode_endpoint(base_url: Optional[str]) -> bool:
 
 
 def external_session_header_enabled(base_dir=None) -> bool:
-    """读取个人空间开关 external_session_header（默认关闭）。
+    """读取个人空间开关 external_session_header（默认开启，opt-out）。
 
     无工作区上下文的调用方（如审核智能体）使用全局 DATA_DIR；
     有工作区上下文的调用方可传入 workspace.data_dir。

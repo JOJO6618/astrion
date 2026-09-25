@@ -53,7 +53,7 @@ DEFAULT_SHALLOW_COMPRESS_TRIGGER_TOKENS = 80_000
 DEFAULT_SHALLOW_COMPRESS_KEEP_RECENT_TOOLS = 15
 DEFAULT_SHALLOW_COMPRESS_MAX_REPLACE_PER_ROUND = 10
 DEFAULT_SHALLOW_COMPRESS_TRIGGER_TOOL_CALLS_INTERVAL = 10
-DEFAULT_DEEP_COMPRESS_TRIGGER_TOKENS = 150_000
+DEFAULT_DEEP_COMPRESS_TRIGGER_TOKENS = 250_000
 MIN_COMPRESSION_TRIGGER_TOKENS = 1_000
 MAX_COMPRESSION_TRIGGER_TOKENS = 2_000_000
 MIN_SHALLOW_KEEP_RECENT_TOOLS = 0
@@ -152,7 +152,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "goal_max_turns": GOAL_MAX_TURNS_DEFAULT,  # 最多自动续命轮数
     "goal_max_tokens": None,  # 累计(输入+输出)token 上限；None 表示不启用
     # 传统模式子智能体设置（个人空间-子智能体管理；与多智能体无关）
-    "sub_agent_compress_threshold_tokens": 150000,  # 子智能体上下文压缩阈值，最小 10000
+    "sub_agent_compress_threshold_tokens": 250000,  # 子智能体上下文压缩阈值，最小 10000
     "sub_agent_max_turns": None,  # 子智能体最大执行轮次：None-默认 50 / 0-无上限 / 正整数-该值
     # 审核智能体统一配置（个人空间-审核智能体页）：模型留空走自动规则（注册表第一个可见模型；纯 codex 时选 -luna）
     "review_agents": {
@@ -740,7 +740,7 @@ def sanitize_personalization_payload(
                 min_value=10000,
                 max_value=10_000_000,
             )
-            or 150000
+            or 250000
         )
     else:
         base["sub_agent_compress_threshold_tokens"] = (
@@ -749,7 +749,7 @@ def sanitize_personalization_payload(
                 min_value=10000,
                 max_value=10_000_000,
             )
-            or 150000
+            or 250000
         )
 
     # 传统模式子智能体：最大执行轮次（None-默认 50 / 0-无上限 / 正整数-该值）

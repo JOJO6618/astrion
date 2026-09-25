@@ -2236,11 +2236,11 @@ class MainTerminalToolsExecutionMixin:
                                         thinking_mode = arguments.get("thinking_mode") or role.thinking_mode or "fast"
                                         # 读取子智能体压缩阈值配置（多智能体成员长期存在，不设轮次上限，
                                         # sub_agent_max_turns 仅对传统后台子智能体生效，这里不读取）
-                                        _compress_threshold = 150_000
+                                        _compress_threshold = 250_000
                                         try:
                                             from modules.personalization_manager import load_personalization_config
                                             _prefs = load_personalization_config(data_dir) or {}
-                                            _compress_threshold = int(_prefs.get("sub_agent_compress_threshold_tokens", 150_000))
+                                            _compress_threshold = int(_prefs.get("sub_agent_compress_threshold_tokens", 250_000))
                                         except Exception:
                                             pass
                                         # 走原行 发事件创建（避免后期重建提供重复工能重费，直接使用 multi_agent_mode=True 调用）

@@ -364,7 +364,7 @@ export default {
   // ── Sub-agents ──
   subAgentsIntro: 'Manage sub-agent roles for multi-agent mode. Preset roles can be edited (creating a custom override); custom roles can be created, edited and deleted.',
   compressThresholdTitle: 'Context compression threshold',
-  compressThresholdDesc: 'Deep compression triggers when a sub-agent\'s context tokens exceed this value (default 150000)',
+  compressThresholdDesc: 'Deep compression triggers when a sub-agent\'s context tokens exceed this value (default 250000)',
   subAgentModelTitle: 'Traditional sub-agent model',
   subAgentModelDesc: 'Model used by traditional background sub-agents; leave empty for automatic selection. Multi-agent team members use the model set on their role and are not affected by this setting',
   maxTurnsTitle: 'Max execution turns',

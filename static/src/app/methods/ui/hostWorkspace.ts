@@ -407,7 +407,10 @@ export const hostWorkspaceMethods = {
     if (!(this.versioningHostMode || this.dockerProjectMode)) {
       return;
     }
-    const workspaceId = String(payload?.workspace_id || '').trim();
+    /* 组件事件契约为 workspaceId 字符串（WorkspaceSwitcher/ConversationSidebar 声明），兼容对象形式 */
+    const workspaceId = String(
+      typeof payload === 'string' ? payload : (payload?.workspace_id || '')
+    ).trim();
     if (!workspaceId) return;
     if (workspaceId === this.defaultHostWorkspaceId) return;
 

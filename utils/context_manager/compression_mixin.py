@@ -122,7 +122,7 @@ class CompressionMixin:
         *,
         enable_shallow: bool = True,
         shallow_trigger_tokens: int = 80_000,
-        deep_trigger_tokens: int = 150_000,
+        deep_trigger_tokens: int = 250_000,
         shallow_batch_size: int = 10,
         shallow_keep_recent_tools: int = 15,
         shallow_trigger_tool_calls_interval: int = 10,
@@ -149,7 +149,7 @@ class CompressionMixin:
         shallow_trigger_tokens = max(1, int(80_000 if shallow_trigger_tokens is None else shallow_trigger_tokens))
         deep_trigger_tokens = max(
             shallow_trigger_tokens + 1,
-            int(150_000 if deep_trigger_tokens is None else deep_trigger_tokens),
+            int(250_000 if deep_trigger_tokens is None else deep_trigger_tokens),
         )
         shallow_batch_size = max(1, int(10 if shallow_batch_size is None else shallow_batch_size))
         shallow_keep_recent_tools = max(0, int(15 if shallow_keep_recent_tools is None else shallow_keep_recent_tools))
