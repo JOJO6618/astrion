@@ -7,7 +7,7 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "prepare-backend": "bash scripts/prepare-backend.sh",
+    "prepare-backend": "python scripts/prepare_backend.py || python3 scripts/prepare_backend.py",
     "build": "npm run prepare-backend && tauri build",
     "build:debug": "npm run prepare-backend && tauri build --debug"
   },

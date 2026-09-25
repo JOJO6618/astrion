@@ -19,8 +19,12 @@ fn main() {
         .setup(|app| {
             if let Err(err) = backend::start_backend_and_create_window(app.handle()) {
                 // 后端起不来属致命错误：打日志并以非零码退出。
+                // release 是 GUI 子系统无控制台，eprintln 用户不可见——
+                // 同步落盘 %TEMP%/astrion-desktop-startup.log，安装版排错可回溯。
                 // （生产期再升级为应用内错误页，骨架阶段不过度设计）
                 eprintln!("[astrion-desktop] 启动后端失败: {err}");
+                let log_path = std::env::temp_dir().join("astrion-desktop-startup.log");
+                let _ = std::fs::write(&log_path, format!("[astrion-desktop] 启动失败\n{err}\n"));
                 app.handle().exit(1);
             }
             Ok(())

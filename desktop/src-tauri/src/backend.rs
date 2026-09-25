@@ -126,6 +126,14 @@ fn resolve_repo_root() -> Result<PathBuf, String> {
 
 /// python 候选解释器（按优先级）：要求 `import yaml, flask` 成功才接受。
 fn detect_python(repo_root: &Path) -> Option<PathBuf> {
+    python_candidates(repo_root)
+        .into_iter()
+        .find(|c| python_has_deps(c))
+}
+
+/// macOS / Linux 开发形态候选：项目 .venv → homebrew → PATH python3。
+#[cfg(not(windows))]
+fn python_candidates(repo_root: &Path) -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     candidates.push(repo_root.join(".venv/bin/python"));
     for v in ["python3.13", "python3.12", "python3.11", "python3"] {
@@ -136,12 +144,48 @@ fn detect_python(repo_root: &Path) -> Option<PathBuf> {
             candidates.push(PathBuf::from(dir).join("python3"));
         }
     }
-    for c in candidates {
-        if python_has_deps(&c) {
-            return Some(c);
+    candidates
+}
+
+/// Windows 开发形态候选：项目 .venv → py launcher（3.13→3.12→3.11→3）→ PATH python.exe。
+/// 注意 WindowsApps 下的 python.exe 是商店占位符（运行会弹商店而非执行），
+/// python_has_deps 的真实 import 检查会自动把它过滤掉。
+#[cfg(windows)]
+fn python_candidates(repo_root: &Path) -> Vec<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    candidates.push(repo_root.join(".venv/Scripts/python.exe"));
+    for v in ["3.13", "3.12", "3.11", "3"] {
+        if let Some(p) = resolve_py_launcher(v) {
+            candidates.push(p);
         }
     }
-    None
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in path_var.split(';') {
+            candidates.push(PathBuf::from(dir).join("python.exe"));
+        }
+    }
+    candidates
+}
+
+/// 通过 py launcher 解析指定版本的真实解释器路径（py 是启动器不是解释器，
+/// spawn 需要真实路径，故用 `-c "import sys; print(sys.executable)"` 解析）。
+#[cfg(windows)]
+fn resolve_py_launcher(version: &str) -> Option<PathBuf> {
+    let output = Command::new("py")
+        .args([format!("-{version}"), "-c".into(), "import sys; print(sys.executable)".into()])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if path.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(path))
+    }
 }
 
 fn python_has_deps(python: &Path) -> bool {
@@ -168,8 +212,10 @@ fn spawn_backend(python: &Path, backend_dir: &Path, port: u16) -> Result<Child, 
     // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建。
     // 生产形态下 backend_dir 在 .app 内（只读），兜底路径给用户主目录；
     // 开发形态给源码树的 project/（原行为）。
+    // Windows 无 HOME 变量，走 USERPROFILE 兜底。
     let default_ws = std::env::var_os("HOME")
         .map(PathBuf::from)
+        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
         .unwrap_or_else(|| backend_dir.join("project"));
     let mut cmd = Command::new(python);
     cmd.current_dir(backend_dir)
@@ -180,7 +226,11 @@ fn spawn_backend(python: &Path, backend_dir: &Path, port: u16) -> Result<Child, 
         ])
         // .app 内为只读目录：禁写 __pycache__（staging 已用内嵌解释器预编译，
         // 运行时直接读现成 pyc；开发形态下 python 会自行写缓存，无副作用）
-        .env("PYTHONDONTWRITEBYTECODE", "1");
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        // Windows 中文系统默认代码页 GBK：后端 print 含 emoji/Unicode 符号时
+        // GBK 编码直接崩溃（UnicodeEncodeError）。PEP 540 UTF-8 模式根治：
+        // stdio 全部 UTF-8，无视系统代码页。macOS/Linux 本就 UTF-8，无害。
+        .env("PYTHONUTF8", "1");
 
     // 环境清洗：剥离全部 ASTRION_*/AGENT_* 继承变量（双向泄漏都防：
     // 既不读他人的数据根，也不把自己的配置透给后端）。
@@ -205,19 +255,37 @@ fn spawn_backend(python: &Path, backend_dir: &Path, port: u16) -> Result<Child, 
         cmd.env("ASTRION_DATA_ROOT", root);
     }
 
+    // Windows 桌面壳是 GUI 子系统进程（release 下 windows_subsystem），
+    // 若不加 CREATE_NO_WINDOW，spawn 控制台子进程（python.exe）会弹出黑框终端窗口。
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
     let mut child = cmd
-        // 后端日志直通壳 stderr（tauri dev 控制台可见）；生产期可改接文件
+        // 后端 stdout/stderr 均接管转发（dev 终端可见；release 无控制台，
+        // 后端日志走自身 logs/ 文件）
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("spawn 后端失败: {e}"))?;
 
-    // 独立线程转发后端 stdout，避免管道打满阻塞后端
+    // 独立线程转发后端 stdout/stderr，避免管道打满阻塞后端
     if let Some(stdout) = child.stdout.take() {
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
                 println!("[astrion-backend] {line}");
+            }
+        });
+    }
+    if let Some(stderr) = child.stderr.take() {
+        std::thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().map_while(Result::ok) {
+                eprintln!("[astrion-backend] {line}");
             }
         });
     }

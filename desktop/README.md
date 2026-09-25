@@ -35,17 +35,49 @@ npm run dev                # = tauri dev
 ```
 
 Python 探测顺序（要求 `import yaml/flask/httpx/openai` 可用）：
-项目 `.venv` → homebrew 3.13/3.12/3.11 → PATH `python3`。
+- **macOS**：项目 `.venv` → homebrew 3.13/3.12/3.11 → PATH `python3`
+- **Windows**：项目 `.venv/Scripts` → py launcher（3.13→3.12→3.11→3，解析真实解释器路径）→ PATH `python.exe`
+
 可用 `ASTRION_DESKTOP_REPO=<仓库根>` 显式覆盖仓库路径。
 
-## 打包路线（TODO）
+若 `desktop/src-tauri/runtime/` 存在（python-build-standalone + staging 后端），
+dev 也会直接使用内嵌运行时（与生产形态一致）；不存在才回退系统 Python 开发形态。
 
-- [ ] python-build-standalone + uv 锁依赖，作为 sidecar 打进安装包
+## 打包
+
+```bash
+npm run build   # = prepare-backend（staging）+ tauri build（MSI + NSIS / dmg）
+```
+
+- staging 脚本：`scripts/prepare_backend.py`（跨平台，排除清单单一来源；
+  `prepare-backend.sh` 仅为 macOS 兼容入口的薄壳）
+- 内嵌运行时：`desktop/src-tauri/runtime/python`（python-build-standalone，
+  已 gitignore）+ `runtime/backend`（staging 产物）。Windows 放 `python.exe`，
+  macOS 放 `bin/python3.12`——`backend.rs` 按平台解析
+- 依赖安装：`runtime/python` 就位后，用它 `pip install -r requirements.lock.txt`
+
+### Windows 特有坑（已踩过）
+
+1. **WiX / NSIS 工具链下载超时**（GitHub 直连）：手动下载放到
+   `%LOCALAPPDATA%\tauri\WixTools314`（wix314-binaries.zip 解开）与
+   `%LOCALAPPDATA%\tauri\NSIS`（nsis-3.11.zip 解开；
+   `Plugins/x86-unicode/additional/nsis_tauri_utils.dll` 需单独下载，
+   SHA1 与 bundler 常量匹配——用错版本会被判 mis-hashed 并删目录重下）
+2. **icon.ico 必须**：MSI/NSIS bundle 需要 .ico，`tauri.conf.json` 的
+   `bundle.icon` 要同时列出 `icons/icon.png` 与 `icons/icon.ico`
+3. **后端黑框**：release 是 GUI 子系统，spawn python 必须加
+   `CREATE_NO_WINDOW`（`backend.rs` 已处理）
+4. **GBK 代码页崩溃**：后端 print 含 Unicode 符号时 GBK stdout 直接
+   UnicodeEncodeError——spawn 时注入 `PYTHONUTF8=1`（PEP 540）根治
+
+### 打包路线（TODO）
+
+- [x] python-build-standalone 内嵌运行时（Windows/macOS）+ 锁依赖打进安装包
       （不能用 PyInstaller 冻结：skills 需要完整可 pip install 的 Python 环境）
-- [ ] 打包时排除 `config/custom_models.json`（开发者私有配置，
-      分发回退链应为：部署目录 → `.example` 种子）
-- [ ] 图标全套生成：`npx tauri icon <source.png>`
-- [ ] 签名 / 公证（macOS Developer ID + Windows 签名证书）
+- [x] 打包时排除 `config/custom_models.json` 及其 `.example`（开发者私有配置，
+      全新用户模型库为干净空态）
+- [ ] 图标全套生成：`npx tauri icon <source.png>`（当前 180x180 源图，ico 为多尺寸转换）
+- [ ] 签名 / 公证（macOS Developer ID + Windows 签名证书；未签名时 SmartScreen 拦截）
 - [ ] 自动更新：tauri-plugin-updater
 - [ ] 首启向导（创建首个工作区 + 配置首个提供商）
 - [ ] 单实例：tauri-plugin-single-instance
