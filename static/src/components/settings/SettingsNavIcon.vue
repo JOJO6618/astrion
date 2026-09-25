@@ -48,7 +48,6 @@ const iconStyle = computed(() => {
   height: 15px;
   flex-shrink: 0;
   display: block;
-  opacity: 0.75;
   background-color: currentColor;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;

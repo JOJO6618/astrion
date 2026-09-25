@@ -400,7 +400,7 @@ onMounted(() => {
   border-radius: 6px;
   background: transparent;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   text-align: left;
   cursor: pointer;
 }

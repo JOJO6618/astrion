@@ -718,10 +718,12 @@
 
       <div class="conversation-personal-entry" :class="{ active: personalPageVisible || personalMenuOpen }">
         <button
+          ref="personalEntryBtn"
           type="button"
           class="sidebar-nav-row personal-page-btn"
           data-tutorial="open-personal-space"
           :title="sessionUsername || $t('sidebar.personalSpace')"
+          :aria-expanded="personalMenuOpen"
           @click.stop="togglePersonalMenu"
         >
           <span class="sidebar-nav-icon" aria-hidden="true">
@@ -740,27 +742,89 @@
             </svg>
           </span>
         </button>
-        <!-- 二级菜单：个人空间 / 个性化 / 设置 / 帮助（帮助暂置灰） -->
-        <div v-if="personalMenuOpen" class="personal-menu" role="menu" @click.stop>
-          <button type="button" class="personal-menu-item" role="menuitem" @click="openPersonalSpacePage">
-            {{ $t('sidebar.personalSpace') }}
-          </button>
-          <button type="button" class="personal-menu-item" role="menuitem" @click="openPreferencesPage">
-            {{ $t('sidebar.preferences') }}
-          </button>
-          <button type="button" class="personal-menu-item" role="menuitem" @click="openSettingsPage">
-            {{ $t('common.settings') }}
-          </button>
-          <button
-            type="button"
-            class="personal-menu-item"
-            role="menuitem"
-            disabled
-            :title="$t('sidebar.helpComingSoon')"
+        <!-- 二级菜单：个人空间 / 个性化 / 设置 / 帮助（置灰） / 退出登录。
+             Teleport 到 body + fixed 定位：侧边栏 collapsed 时自身 overflow: hidden
+             会把 absolute 菜单裁成窄条，与 conversation-actions-menu--fixed 同方案 -->
+        <Teleport to="body">
+          <div
+            v-if="personalMenuOpen"
+            class="personal-menu"
+            role="menu"
+            :style="{
+              bottom: personalMenuPosition.bottom + 'px',
+              left: personalMenuPosition.left + 'px'
+            }"
+            @click.stop
           >
-            {{ $t('sidebar.help') }}
-          </button>
-        </div>
+            <button
+              type="button"
+              class="personal-menu-item"
+              role="menuitem"
+              @click="openPersonalSpacePage"
+            >
+              <span
+                class="icon personal-menu-icon"
+                :style="personalMenuIconStyle('user')"
+                aria-hidden="true"
+              ></span>
+              <span class="personal-menu-label">{{ $t('sidebar.personalSpace') }}</span>
+            </button>
+            <button
+              type="button"
+              class="personal-menu-item"
+              role="menuitem"
+              @click="openPreferencesPage"
+            >
+              <span
+                class="icon personal-menu-icon"
+                :style="personalMenuIconStyle('userPen')"
+                aria-hidden="true"
+              ></span>
+              <span class="personal-menu-label">{{ $t('sidebar.preferences') }}</span>
+            </button>
+            <button
+              type="button"
+              class="personal-menu-item"
+              role="menuitem"
+              @click="openSettingsPage"
+            >
+              <span
+                class="icon personal-menu-icon"
+                :style="personalMenuIconStyle('settings')"
+                aria-hidden="true"
+              ></span>
+              <span class="personal-menu-label">{{ $t('common.settings') }}</span>
+            </button>
+            <button
+              type="button"
+              class="personal-menu-item"
+              role="menuitem"
+              disabled
+              :title="$t('sidebar.helpComingSoon')"
+            >
+              <span
+                class="icon personal-menu-icon"
+                :style="personalMenuIconStyle('messageQuestion')"
+                aria-hidden="true"
+              ></span>
+              <span class="personal-menu-label">{{ $t('sidebar.help') }}</span>
+            </button>
+            <div class="personal-menu-divider" role="separator"></div>
+            <button
+              type="button"
+              class="personal-menu-item danger"
+              role="menuitem"
+              @click="handleLogout"
+            >
+              <span
+                class="icon personal-menu-icon"
+                :style="personalMenuIconStyle('logOut')"
+                aria-hidden="true"
+              ></span>
+              <span class="personal-menu-label">{{ $t('personalization.logoutTitle') }}</span>
+            </button>
+          </div>
+        </Teleport>
       </div>
     </div>
   </aside>
@@ -774,6 +838,7 @@ import { storeToRefs } from 'pinia';
 import { useUiStore } from '@/stores/ui';
 import { useConversationStore } from '@/stores/conversation';
 import { usePersonalizationStore } from '@/stores/personalization';
+import { ICONS } from '@/utils/icons';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 
 const props = withDefaults(
@@ -849,11 +914,33 @@ const uiStore = useUiStore();
 const conversationStore = useConversationStore();
 const personalizationStore = usePersonalizationStore();
 
-// ── 个人入口：用户名按钮 + 二级菜单（个人空间/个性化/设置/帮助） ──
+// ── 个人入口：用户名按钮 + 二级菜单（个人空间/个性化/设置/帮助/退出登录） ──
 const personalMenuOpen = ref(false);
 const sessionUsername = ref('');
+const personalEntryBtn = ref<HTMLElement | null>(null);
+/* 菜单 Teleport 到 body 后的 fixed 定位（向上弹出）：bottom 锚定按钮顶缘 */
+const personalMenuPosition = ref<{ bottom: number; left: number }>({ bottom: 0, left: 0 });
+
+/* 菜单项图标：本地直接查 ICONS 注册表（与 PersonalizationDrawer 同款），
+   不依赖父级可选 prop iconStyle，保证菜单在任何宿主下都有图标 */
+const personalMenuIconStyle = (key: keyof typeof ICONS) => ({
+  '--icon-src': `url(${ICONS[key]})`
+});
+
+function updatePersonalMenuPosition() {
+  const el = personalEntryBtn.value;
+  if (!el || typeof window === 'undefined') return;
+  const rect = el.getBoundingClientRect();
+  personalMenuPosition.value = {
+    bottom: window.innerHeight - rect.top + 6,
+    left: rect.left
+  };
+}
 
 function togglePersonalMenu() {
+  if (!personalMenuOpen.value) {
+    updatePersonalMenuPosition();
+  }
   personalMenuOpen.value = !personalMenuOpen.value;
 }
 function closePersonalMenu() {
@@ -871,6 +958,11 @@ function openSettingsPage() {
   closePersonalMenu();
   // 设置页是 bootstrap 级全屏路由，整页跳转保证状态干净（与 workflows 对称）
   window.location.assign('/settings');
+}
+function handleLogout() {
+  closePersonalMenu();
+  // 与 AccountTab 原退出按钮同一入口（store 内含 POST /logout + GET 兜底），不 await
+  personalizationStore.logout();
 }
 async function fetchSessionUsername() {
   try {

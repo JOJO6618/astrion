@@ -31,6 +31,7 @@ export const ICONS = Object.freeze({
   layers: '/static/icons/layers.svg',
   keyboard: '/static/icons/keyboard.svg',
   layoutGrid: '/static/icons/layout-grid.svg',
+  logOut: '/static/icons/log-out.svg',
   menu: '/static/icons/menu.svg',
   mic: '/static/icons/mic.svg',
   mcpLogo: '/static/icons/mcp-logo.svg',

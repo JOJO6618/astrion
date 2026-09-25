@@ -5,14 +5,13 @@ import { TUTORIAL_ENABLED } from '@/stores/tutorial';
 defineOptions({ name: 'AccountTab' });
 
 /**
- * 个人空间「账户」页签：用量统计 + 新手教程 + 退出登录。
- * （标题生成设置 / App 更新检查已迁入设置页「通用」分区 settings/tabs/GeneralTab.vue。）
+ * 个人空间「账户」页签：用量统计 + 新手教程。
+ * （退出登录已迁至侧边栏用户菜单；标题生成设置 / App 更新检查已迁入设置页「通用」分区 settings/tabs/GeneralTab.vue。）
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
  * 解构出的名称与主文件 script 顶层绑定一致，模板可直接引用。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  personalization,
   startTutorial,
   fetchUsageSummary,
   formatTokenCount,
@@ -97,20 +96,6 @@ const {
       </span>
       <button type="button" class="settings-secondary-button" @click="startTutorial">
         {{ $t('personalization.tutorialButton') }}
-      </button>
-    </div>
-
-    <div class="settings-action-row danger-zone">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.logoutTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.logoutDesc') }}</span>
-      </span>
-      <button
-        type="button"
-        class="settings-secondary-button danger"
-        @click="personalization.logout()"
-      >
-        {{ $t('personalization.logoutTitle') }}
       </button>
     </div>
   </section>
