@@ -716,6 +716,8 @@
         @reveal="$emit('reveal-workspace', $event)"
       />
 
+      <SoftwareUpdateDialog v-if="desktopUpdateStore.isDesktop" />
+
       <div class="conversation-personal-entry" :class="{ active: personalPageVisible || personalMenuOpen }">
         <button
           ref="personalEntryBtn"
@@ -734,6 +736,8 @@
                 d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
               ></path>
             </svg>
+            <!-- 新版本红点：入口藏在菜单里，不展开菜单也要能感知 -->
+            <span v-if="desktopUpdateStore.updateAvailable" class="update-dot"></span>
           </span>
           <span class="sidebar-nav-label personal-label">{{ sessionUsername || $t('sidebar.personalSpace') }}</span>
           <span class="personal-menu-caret" aria-hidden="true">
@@ -808,6 +812,26 @@
               ></span>
               <span class="personal-menu-label">{{ $t('sidebar.help') }}</span>
             </button>
+            <!-- 软件更新：仅桌面壳渲染；菜单项红点与个人按钮红点同源 -->
+            <button
+              v-if="desktopUpdateStore.isDesktop"
+              type="button"
+              class="personal-menu-item"
+              role="menuitem"
+              @click="openSoftwareUpdate"
+            >
+              <span
+                class="icon personal-menu-icon"
+                :style="personalMenuIconStyle('refreshCw')"
+                aria-hidden="true"
+              ></span>
+              <span class="personal-menu-label">{{ $t('update.entryTitle') }}</span>
+              <span
+                v-if="desktopUpdateStore.updateAvailable"
+                class="update-dot update-dot--inline"
+                :title="$t('update.newVersionBadge')"
+              ></span>
+            </button>
             <div class="personal-menu-divider" role="separator"></div>
             <button
               type="button"
@@ -837,8 +861,10 @@ import { storeToRefs } from 'pinia';
 import { useUiStore } from '@/stores/ui';
 import { useConversationStore } from '@/stores/conversation';
 import { usePersonalizationStore } from '@/stores/personalization';
+import { useDesktopUpdateStore } from '@/stores/desktopUpdate';
 import { ICONS } from '@/utils/icons';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
+import SoftwareUpdateDialog from './SoftwareUpdateDialog.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -912,6 +938,8 @@ const emit = defineEmits<{
 const uiStore = useUiStore();
 const conversationStore = useConversationStore();
 const personalizationStore = usePersonalizationStore();
+/** 桌面端软件更新（非桌面壳环境 isDesktop=false，入口不渲染、检查不发起） */
+const desktopUpdateStore = useDesktopUpdateStore();
 
 // ── 个人入口：用户名按钮 + 二级菜单（个人空间/个性化/设置/帮助/退出登录） ──
 const personalMenuOpen = ref(false);
@@ -962,6 +990,11 @@ function handleLogout() {
   closePersonalMenu();
   // 与 AccountTab 原退出按钮同一入口（store 内含 POST /logout + GET 兜底），不 await
   personalizationStore.logout();
+}
+/** 软件更新（个人菜单项，仅桌面壳渲染）：关菜单开弹窗，弹窗打开即强制回源检查 */
+function openSoftwareUpdate() {
+  closePersonalMenu();
+  desktopUpdateStore.openDialog();
 }
 /** 帮助文档地址（官网文档页） */
 const HELP_DOCS_URL = 'https://astrion.cyjai.com/docs.html';
@@ -1501,6 +1534,8 @@ onMounted(() => {
   if (isGroupByWorkspaceActive.value) {
     sortedWorkspaces.value.forEach((ws: any) => ensureWorkspaceGroup(String(ws?.workspace_id || '')));
   }
+  // 桌面壳启动静默检查一次：有新版只亮红点，不弹窗打扰（store 内部判定桌面环境）
+  desktopUpdateStore.checkUpdate({ silent: true });
 });
 
 onBeforeUnmount(() => {

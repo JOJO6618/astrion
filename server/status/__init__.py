@@ -10,3 +10,4 @@ from server.status.docker import *
 from server.status.host_workspace import *
 from server.status.app import *
 from server.status.sandbox import *
+from server.status.desktop_update import *

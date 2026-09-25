@@ -133,7 +133,9 @@
 - 形态：系统 WebView + 内嵌 Python 后端 sidecar；WebView 直接加载 `http://127.0.0.1:<动态端口>/`（前后端同源，cookie/CSRF/相对路径 API 零改动复用 Web 版）；壳注入 `window.__ASTRION_DESKTOP__` 标记（`initialization_script`），登录页据此自动免登录
 - 开发：`cd desktop && npm install && npm run dev`（= tauri dev；首次 cargo 编译 10-20 分钟）；前端需先 `npm run build`（壳加载的是后端 serve 的 dist 产物）
 - Python 探测顺序（要求 import yaml/flask/httpx/openai 可用）：项目 `.venv` → homebrew 3.13/3.12/3.11 → PATH python3；`ASTRION_DESKTOP_REPO` 可覆盖仓库根
-- 注意：`frontendDist` 相对 `desktop/src-tauri/`（`../../static/dist`）；`tauri dev` 后台运行禁止管道截断（head/tail 会杀进程）；打包路线（python-build-standalone sidecar、签名公证、自动更新）见 `desktop/README.md`
+- 注意：`frontendDist` 相对 `desktop/src-tauri/`（`../../static/dist`）；`tauri dev` 后台运行禁止管道截断（head/tail 会杀进程）；打包路线（python-build-standalone sidecar、签名公证）见 `desktop/README.md`
+- **自动更新体系（2026-09-26 新增）**：`tauri-plugin-updater` 无感更新（下载→验签→安装→自动重启）。关键架构：WebView 是 External URL 拿不到 Tauri JS API，壳侧开 **localhost 控制桥**（`src/bridge.rs`：GET /version、POST /update/install、GET /update/progress，手写最小 HTTP），经环境变量 `ASTRION_DESKTOP_BRIDGE_PORT`/`ASTRION_DESKTOP_VERSION` 传给后端；**前端只同源调后端代理**（`server/status/desktop_update.py`：`/api/desktop/update/check|install|progress`），非桌面环境返回 `code:"not_desktop"`。更新清单与安装包托管在 `https://astrion.cyjai.com/downloads/`（`latest-{{target}}-{{arch}}.json` 模板端点，mac/win 清单互相独立）；服务器侧 `regen_manifest.py` 扫描目录重生成 `latest-*.json` + 官网下载页用的 `downloads.json`。前端入口=左下角个人菜单内「软件更新」项（帮助之下、退出登录之上，仅桌面壳渲染；个人按钮与菜单项双红点）+ `SoftwareUpdateDialog.vue` + `stores/desktopUpdate.ts`；启动静默检查一次只亮红点不弹窗
+- **发布**：mac 半一键 `bash desktop/scripts/release_mac.sh [版本]`（同步版本号→构建→签名→上传→重生成清单）；更新签名私钥 `~/.astrion-desktop-keys/updater.key`（minisign，**不进 git、丢失则永远无法再签名更新**），公钥在 `tauri.conf.json` plugins.updater.pubkey；构建需 `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""`（脚本已处理）。Windows 半：同版本号在 Win 机构建（需同一私钥）→ `Astrion_<ver>_x64-setup.exe[.sig]` 传服务器 downloads/ → 重跑 regen 脚本。注意：mac updater 产物名恒为 `Astrion.app.tar.gz`（无版本号），发布脚本上传时重命名；bundle targets 必须含 `app` 否则不出 updater 包。版本更新说明唯一来源=`desktop/DESKTOP_CHANGELOG.md` 顶部小节
 
 ## 3) 测试现状（不要再写过时命令）
 

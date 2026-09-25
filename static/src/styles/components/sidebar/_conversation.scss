@@ -1314,3 +1314,30 @@ body[data-theme='dark'] .conversation-type-option.active {
 .type-slide-right-leave-to {
   transform: translateX(100%);
 }
+
+/* 软件更新（个人菜单项，仅桌面壳渲染）：新版本红点两处同源——
+   个人按钮图标右上角（不展开菜单也能感知）+ 菜单项行内右端。
+   描边跟随侧栏底色，保证任何主题下可读。 */
+.personal-page-btn .sidebar-nav-icon {
+  position: relative;
+}
+
+.personal-page-btn .update-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state-danger);
+  box-shadow: 0 0 0 2px var(--surface-sidebar);
+}
+
+.personal-menu-item .update-dot--inline {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state-danger);
+  margin-left: auto;
+}

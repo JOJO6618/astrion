@@ -10,11 +10,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod backend;
+mod bridge;
 
 use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(backend::BackendState::default())
         .setup(|app| {
             if let Err(err) = backend::start_backend_and_create_window(app.handle()) {

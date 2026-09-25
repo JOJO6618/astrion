@@ -39,7 +39,16 @@ pub fn start_backend_and_create_window(app: &AppHandle) -> Result<(), String> {
         }
     };
 
-    let child = spawn_backend(&python, &backend_dir, port)?;
+    // 控制桥（自动更新）：失败不致命——应用照常运行，仅更新功能不可用。
+    let bridge_port = match crate::bridge::start_bridge(app) {
+        Ok(p) => Some(p),
+        Err(err) => {
+            eprintln!("[astrion-desktop] 控制桥启动失败（更新功能不可用）: {err}");
+            None
+        }
+    };
+
+    let child = spawn_backend(&python, &backend_dir, port, bridge_port)?;
     app.state::<BackendState>()
         .child
         .lock()
@@ -208,7 +217,12 @@ fn python_has_deps(python: &Path) -> bool {
 /// 一律剥离；数据根由桌面壳在下面显式指定，确定性隔离。
 const CHILD_ENV_SCRUB_PREFIXES: [&str; 2] = ["ASTRION_", "AGENT_"];
 
-fn spawn_backend(python: &Path, backend_dir: &Path, port: u16) -> Result<Child, String> {
+fn spawn_backend(
+    python: &Path,
+    backend_dir: &Path,
+    port: u16,
+    bridge_port: Option<u16>,
+) -> Result<Child, String> {
     // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建。
     // 生产形态下 backend_dir 在 .app 内（只读），兜底路径给用户主目录；
     // 开发形态给源码树的 project/（原行为）。
@@ -253,6 +267,13 @@ fn spawn_backend(python: &Path, backend_dir: &Path, port: u16) -> Result<Child, 
         });
     if let Some(root) = data_root {
         cmd.env("ASTRION_DATA_ROOT", root);
+    }
+
+    // 桌面应用身份与控制桥地址：后端据此判定「自己是桌面壳内嵌实例」并代理更新接口。
+    // 显式设置在清洗之后（同 ASTRION_DATA_ROOT 模式），不受继承环境影响。
+    cmd.env("ASTRION_DESKTOP_VERSION", crate::bridge::APP_VERSION);
+    if let Some(bp) = bridge_port {
+        cmd.env("ASTRION_DESKTOP_BRIDGE_PORT", bp.to_string());
     }
 
     // Windows 桌面壳是 GUI 子系统进程（release 下 windows_subsystem），

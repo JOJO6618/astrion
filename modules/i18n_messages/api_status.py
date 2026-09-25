@@ -84,6 +84,28 @@ MESSAGES = {
         "en-US": "Failed to open file",
     },
 
+    # ── server/status/desktop_update.py ──
+    "desktop_update.not_desktop": {
+        "zh-CN": "当前环境不是桌面应用",
+        "en-US": "Not running inside the desktop app",
+    },
+    "desktop_update.unsupported_platform": {
+        "zh-CN": "当前平台不支持自动更新",
+        "en-US": "Auto-update is not supported on this platform",
+    },
+    "desktop_update.check_failed": {
+        "zh-CN": "检查更新失败，请稍后重试",
+        "en-US": "Failed to check for updates, please try again later",
+    },
+    "desktop_update.bridge_unavailable": {
+        "zh-CN": "更新服务不可用，请重启应用后重试",
+        "en-US": "Update service unavailable, please restart the app and retry",
+    },
+    "desktop_update.bridge_unreachable": {
+        "zh-CN": "无法连接更新服务",
+        "en-US": "Cannot reach the update service",
+    },
+
     # ── server/status/docker.py ──
     "status_docker.docker_web_only": {
         "zh-CN": "仅 Docker Web 模式可用",

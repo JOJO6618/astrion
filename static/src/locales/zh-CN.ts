@@ -26,6 +26,7 @@ import sidebar from './zh-CN/sidebar';
 import auth from './zh-CN/auth';
 import utils from './zh-CN/utils';
 import sandbox from './zh-CN/sandbox';
+import update from './zh-CN/update';
 
 export default {
   common,
@@ -54,4 +55,5 @@ export default {
   auth,
   utils,
   sandbox,
+  update,
 } as const;

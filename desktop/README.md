@@ -78,6 +78,38 @@ npm run build   # = prepare-backend（staging）+ tauri build（MSI + NSIS / dmg
       全新用户模型库为干净空态）
 - [ ] 图标全套生成：`npx tauri icon <source.png>`（当前 180x180 源图，ico 为多尺寸转换）
 - [ ] 签名 / 公证（macOS Developer ID + Windows 签名证书；未签名时 SmartScreen 拦截）
-- [ ] 自动更新：tauri-plugin-updater
+- [x] 自动更新：tauri-plugin-updater（见下「自动更新与发布」）
 - [ ] 首启向导（创建首个工作区 + 配置首个提供商）
 - [ ] 单实例：tauri-plugin-single-instance
+
+### 自动更新与发布（2026-09-26 上线）
+
+**链路**：应用内检查 `https://astrion.cyjai.com/downloads/latest-{{target}}-{{arch}}.json`
+→ 发现新版本侧边栏「软件更新」亮红点 → 弹窗确认 → 壳侧 updater 后台下载 →
+minisign 验签 → 原地安装 → 自动重启（macOS 替换 .app / Windows NSIS passive 覆盖）。
+
+**架构关键点**：WebView 是 External URL，拿不到 Tauri JS API——壳侧开 localhost
+控制桥（`src/bridge.rs`：`GET /version`、`POST /update/install`、`GET /update/progress`，
+手写最小 HTTP），端口与应用版本经 `ASTRION_DESKTOP_BRIDGE_PORT` /
+`ASTRION_DESKTOP_VERSION` 环境变量注入后端；前端只同源调后端代理
+（`server/status/desktop_update.py`），无 CORS、鉴权沿用会话。
+
+**密钥**：minisign 签名私钥 `~/.astrion-desktop-keys/updater.key`（**不进 git、
+不能丢失**，丢失则永远无法再签名更新包）；公钥写死在 `tauri.conf.json`
+`plugins.updater.pubkey`。构建需环境变量 `TAURI_SIGNING_PRIVATE_KEY` +
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""`（密钥为空密码，不显式置空会交互式卡死）。
+
+**发布（macOS）**：`bash desktop/scripts/release_mac.sh [版本号]`——同步版本号
+（tauri.conf.json / Cargo.toml / package.json）→ 构建前端 → tauri build → 上传
+服务器 `downloads/` → 远端 `regen_manifest.py` 重新生成清单（`latest-*.json` 供
+updater、`downloads.json` 供官网下载页）。更新说明唯一来源 =
+`DESKTOP_CHANGELOG.md` 顶部小节（发布脚本自动提取进清单）。
+
+**发布（Windows）**：Windows 机上同版本号 `tauri build`（需同一私钥的两个环境变量）
+→ 把 `Astrion_<ver>_x64-setup.exe` 与 `.sig` 传到服务器 `/var/www/astrion/downloads/`
+→ 服务器上跑 `python3 /var/www/astrion/downloads/regen_manifest.py`。
+mac/win 清单互相独立（模板端点），两端可以不同步发布。
+
+**坑（已踩过）**：bundle targets 必须含 `app`（macOS updater 包 .app.tar.gz 是 app
+目标产出的，只写 dmg 不出包）；mac updater 产物名恒为 `Astrion.app.tar.gz`
+（无版本号），发布脚本上传时重命名为 `Astrion_<ver>_aarch64.app.tar.gz`。

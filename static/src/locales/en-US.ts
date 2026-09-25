@@ -27,6 +27,7 @@ import sidebar from './en-US/sidebar';
 import auth from './en-US/auth';
 import utils from './en-US/utils';
 import sandbox from './en-US/sandbox';
+import update from './en-US/update';
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
@@ -57,6 +58,7 @@ const enUS: DeepString<typeof zhCN> = {
   auth,
   utils,
   sandbox,
+  update,
 };
 
 export default enUS;
