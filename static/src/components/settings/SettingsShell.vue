@@ -10,6 +10,7 @@ import CodexTab from './tabs/CodexTab.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ToolsTab from './tabs/ToolsTab.vue';
+import SearchTab from './tabs/SearchTab.vue';
 import ContextTab from './tabs/ContextTab.vue';
 import FilesTab from './tabs/FilesTab.vue';
 import VoiceTab from './tabs/VoiceTab.vue';
@@ -76,6 +77,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'general', labelKey: 'settings.navGeneral', icon: 'general' },
       { id: 'workspace', labelKey: 'settings.navWorkspace', icon: 'workspace' },
+      { id: 'search', labelKey: 'settings.navSearch', icon: 'search' },
       { id: 'tools', labelKey: 'settings.navTools', icon: 'tools' },
       { id: 'context', labelKey: 'settings.navContext', icon: 'context' },
       { id: 'files', labelKey: 'settings.navFiles', icon: 'files' },
@@ -127,6 +129,7 @@ const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string 
   codex: { titleKey: 'settings.codexTitle', descKey: 'settings.codexDesc' },
   general: { titleKey: 'settings.generalTitle', descKey: 'settings.generalDesc' },
   workspace: { titleKey: 'settings.workspaceTitle', descKey: 'settings.workspaceDesc' },
+  search: { titleKey: 'settings.searchTitle', descKey: 'settings.searchDesc' },
   tools: { titleKey: 'settings.toolsTitle', descKey: 'settings.toolsDesc' },
   context: { titleKey: 'settings.contextTitle', descKey: 'settings.contextDesc' },
   files: { titleKey: 'settings.filesTitle', descKey: 'settings.filesDesc' },
@@ -144,6 +147,7 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   codex: CodexTab,
   general: GeneralTab,
   workspace: WorkspaceTab,
+  search: SearchTab,
   tools: ToolsTab,
   context: ContextTab,
   files: FilesTab,

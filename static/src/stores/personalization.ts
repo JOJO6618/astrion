@@ -113,6 +113,8 @@ interface PersonalForm {
   webpage_direct_extract_enabled: boolean;
   /** 用户追加的直提白名单域名（内置 github.com 不在此列） */
   webpage_direct_extract_domains: string[];
+  /** Tavily API 密钥（设置页「网络搜索」配置；为空时后端回退环境变量） */
+  tavily_api_key: string;
   skill_hints_enabled: boolean;
   skill_strict_terminal_enabled: boolean;
   skill_strict_sub_agent_enabled: boolean;
@@ -331,6 +333,7 @@ const defaultForm = (): PersonalForm => ({
   tool_loading_deferred: [],
   webpage_direct_extract_enabled: true,
   webpage_direct_extract_domains: [],
+  tavily_api_key: '',
   skill_hints_enabled: false,
   skill_strict_terminal_enabled: false,
   skill_strict_sub_agent_enabled: false,
@@ -572,6 +575,8 @@ export const usePersonalizationStore = defineStore('personalization', {
               (item: any) => typeof item === 'string' && item.trim()
             )
           : [],
+        tavily_api_key:
+          typeof data.tavily_api_key === 'string' ? data.tavily_api_key.trim() : '',
         skill_hints_enabled: !!data.skill_hints_enabled,
         skill_strict_terminal_enabled: !!data.skill_strict_terminal_enabled,
         skill_strict_sub_agent_enabled: !!data.skill_strict_sub_agent_enabled,

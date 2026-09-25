@@ -129,7 +129,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.container_session: Optional["ContainerHandle"] = None
             self.memory_manager = MemoryManager(data_dir=str(self.data_dir))
             self.file_manager = FileManager(project_path, container_session=container_session, data_dir=str(self.data_dir))
-            self.search_engine = SearchEngine()
+            self.search_engine = SearchEngine(data_dir=str(self.data_dir))
             self.terminal_ops = TerminalOperator(project_path, container_session=container_session)
             self.ocr_client = OCRClient(project_path, self.file_manager)
             self.pending_image_view = None  # 供 view_image 工具使用，保存一次性图片附加请求

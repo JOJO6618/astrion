@@ -38,7 +38,6 @@ export default {
   personalSpace: '个人空间',
   preferences: '个性化',
   help: '帮助',
-  helpComingSoon: '即将推出',
 
   // ── WorkspaceSwitcher：工作区/项目切换浮层 ──
   workspaceCount: '{n} 个',
@@ -53,6 +52,9 @@ export default {
   workspaceNamePlaceholder: '工作区名称（可选）',
   pathPlaceholder: '路径：绝对路径或相对仓库路径',
   creating: '创建中...',
+  pickFolder: '在文件管理器中选择',
+  pickingFolder: '等待选择...',
+  pickFolderFailed: '无法打开系统文件夹选择窗口',
   create: '创建',
   setDefault: '设为默认',
 

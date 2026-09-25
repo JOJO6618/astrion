@@ -310,6 +310,15 @@ export default {
     mcp: 'MCP',
     misc: 'Easter egg'
   },
+  tavilyApiKeyTitle: 'Tavily API Key',
+  tavilyApiKeyDesc:
+    'Used for web search and webpage extraction. Get one at tavily.com; save an empty value to fall back to the server environment variable',
+  tavilyApiKeyPlaceholder: 'tvly-...',
+  tavilyApiKeyShow: 'Show key',
+  tavilyApiKeyHide: 'Hide key',
+  tavilyApiKeyClear: 'Clear',
+  tavilyApiKeyStatusCustom: 'Using the key configured here',
+  tavilyApiKeyStatusEnv: 'Not configured — using the key from the environment variable',
   webDirectExtractTitle: 'Direct extraction whitelist',
   webDirectExtractDesc:
     'Whitelisted sites are extracted locally (GitHub code files via CDN raw links, others via readability-style parsing) at no Tavily quota cost; falls back to Tavily automatically on failure',

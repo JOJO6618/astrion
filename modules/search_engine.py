@@ -19,8 +19,30 @@ except ImportError:
 from modules.i18n import tr
 
 
+def resolve_tavily_api_key(prefs: Optional[Dict[str, Any]] = None, data_dir=None) -> str:
+    """运行时解析 Tavily API 密钥。
+
+    优先级：设置页 UI 配置（personalization.tavily_api_key）> 环境变量（config.TAVILY_API_KEY）。
+    - prefs：已加载的个性化配置 dict（调用方已持有时传入，避免重复读盘）；
+    - data_dir：未传 prefs 时按数据目录现读 personalization.json；两者都不传则只用环境变量。
+    """
+    if prefs is None and data_dir is not None:
+        try:
+            from modules.personalization_manager import load_personalization_config
+            prefs = load_personalization_config(data_dir) or {}
+        except Exception:
+            prefs = {}
+    ui_key = str((prefs or {}).get("tavily_api_key") or "").strip()
+    if ui_key:
+        return ui_key
+    return TAVILY_API_KEY or ""
+
+
 class SearchEngine:
-    def __init__(self):
+    def __init__(self, data_dir=None):
+        # data_dir 用于运行时读取当前用户个性化配置中的 UI 密钥；
+        # 未提供时退化为进程启动时的环境变量密钥（旧行为）。
+        self.data_dir = data_dir
         self.api_key = TAVILY_API_KEY
         self.api_url = "https://api.tavily.com/search"
         
@@ -66,7 +88,8 @@ class SearchEngine:
         Returns:
             搜索结果字典
         """
-        if not self.api_key or self.api_key == "your-tavily-api-key":
+        api_key = resolve_tavily_api_key(data_dir=self.data_dir) or self.api_key
+        if not api_key or api_key == "your-tavily-api-key":
             return {
                 "success": False,
                 "error": tr("search_engine.api_key_not_configured"),
@@ -103,7 +126,7 @@ class SearchEngine:
                         **payload
                     },
                     headers={
-                        "Authorization": f"Bearer {self.api_key}",
+                        "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json"
                     }
                 )

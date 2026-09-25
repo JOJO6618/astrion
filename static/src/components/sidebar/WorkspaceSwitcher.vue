@@ -115,8 +115,17 @@
               autocomplete="off"
               :disabled="createSubmitting"
             />
-            <div v-if="errorMessage" class="ws-create-error">{{ errorMessage }}</div>
+            <div v-if="errorMessage || pickFolderError" class="ws-create-error">{{ errorMessage || pickFolderError }}</div>
             <div class="ws-create-actions">
+              <button
+                v-if="!isProject"
+                type="button"
+                class="ws-btn ghost ws-pick-folder"
+                :disabled="createSubmitting || pickingFolder"
+                @click.stop="pickFolderViaNativeDialog"
+              >
+                {{ pickingFolder ? $t('sidebar.pickingFolder') : $t('sidebar.pickFolder') }}
+              </button>
               <button type="button" class="ws-btn ghost" :disabled="createSubmitting" @click.stop="closeCreateForm">
                 {{ $t('common.cancel') }}
               </button>
@@ -158,6 +167,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { t } from '@/locales';
 
 defineOptions({ name: 'WorkspaceSwitcher' });
 
@@ -391,6 +401,35 @@ const submitCreate = () => {
     path: createPath.value.trim(),
     label: createLabel.value.trim()
   });
+};
+
+/* ---------- 原生「选择文件夹」对话框（仅宿主机模式；project 模式无路径框不显示按钮） ---------- */
+const pickingFolder = ref(false);
+const pickFolderError = ref('');
+
+const pickFolderViaNativeDialog = async () => {
+  if (pickingFolder.value || props.createSubmitting) return;
+  pickingFolder.value = true;
+  pickFolderError.value = '';
+  try {
+    const resp = await fetch('/api/project/pick-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const result = await resp.json().catch(() => ({}));
+    if (!resp.ok || !result?.success) {
+      throw new Error(result?.error || t('sidebar.pickFolderFailed'));
+    }
+    const picked = String(result?.data?.path || '').trim();
+    if (picked) {
+      createPath.value = picked;
+    }
+  } catch (error) {
+    pickFolderError.value = error instanceof Error ? error.message : String(error || t('sidebar.pickFolderFailed'));
+  } finally {
+    pickingFolder.value = false;
+  }
 };
 
 /* 创建成功后由父级刷新列表；成功后收起表单 */
@@ -865,6 +904,11 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* 「在文件管理器中选择」按钮：靠左，取消/确定保持靠右 */
+.ws-create-actions .ws-pick-folder {
+  margin-right: auto;
 }
 
 /* 「…」浮动菜单（Teleport 到 body，fixed 定位逃逸裁切）；
