@@ -25,6 +25,7 @@ import httpx
 
 from modules.i18n import tr
 
+from utils.api_client.error_hints import region_block_hint
 from utils.api_client.responses.translate import (
     ResponsesAPIError,
     _ReasoningCollector,
@@ -317,6 +318,7 @@ class APIClientResponsesMixin:
     def _responses_http_error(self, status_code: int, error_text: str) -> Dict[str, Any]:
         error_type = None
         error_message = None
+        err: Optional[Dict[str, Any]] = None
         try:
             parsed = json.loads(error_text)
             err = parsed.get("error") if isinstance(parsed, dict) else None
@@ -329,6 +331,13 @@ class APIClientResponsesMixin:
                 error_message = error_message or detail.get("message")
         except Exception:
             pass
+
+        # 地区封锁/拦截类人话提示（命中则覆盖误导性原始文案，如
+        # ocgo 包装的 "Upstream response was not valid JSON"）
+        hint = region_block_hint(status_code, error_text, err)
+        if hint:
+            error_type = error_type or "region_blocked"
+            error_message = hint
 
         if status_code == 429 and self._is_codex_oauth():
             # codex 订阅限额：尽量提取重置时间友好展示

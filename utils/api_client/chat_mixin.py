@@ -37,6 +37,7 @@ from modules.i18n import tr
 
 
 from utils.api_client.utils import _api_dump_enabled
+from utils.api_client.error_hints import region_block_hint
 
 class APIClientChatMixin:
     async def chat(
@@ -176,6 +177,7 @@ class APIClientChatMixin:
                                 "model_id": api_config.get("model_id"),
                                 "model_key": self.model_key
                             }
+                            err = None
                             try:
                                 parsed = json.loads(error_text)
                                 err = parsed.get("error") if isinstance(parsed, dict) else {}
@@ -184,6 +186,11 @@ class APIClientChatMixin:
                                     self.last_error_info["error_message"] = err.get("message")
                             except Exception:
                                 pass
+                            # 地区封锁/拦截类人话提示（含 error_text 为 HTML 拦截页场景）
+                            hint = region_block_hint(response.status_code, error_text, err)
+                            if hint:
+                                self.last_error_info["error_type"] = self.last_error_info["error_type"] or "region_blocked"
+                                self.last_error_info["error_message"] = hint
                             self._debug_log({
                                 "event": "http_error_stream",
                                 "status_code": response.status_code,
@@ -230,6 +237,7 @@ class APIClientChatMixin:
                             "model_id": api_config.get("model_id"),
                             "model_key": self.model_key
                         }
+                        err = None
                         try:
                             parsed = response.json()
                             err = parsed.get("error") if isinstance(parsed, dict) else {}
@@ -238,6 +246,11 @@ class APIClientChatMixin:
                                 self.last_error_info["error_message"] = err.get("message")
                         except Exception:
                             pass
+                        # 地区封锁/拦截类人话提示（含 error_text 为 HTML 拦截页场景）
+                        hint = region_block_hint(response.status_code, error_text, err)
+                        if hint:
+                            self.last_error_info["error_type"] = self.last_error_info["error_type"] or "region_blocked"
+                            self.last_error_info["error_message"] = hint
                         self._debug_log({
                             "event": "http_error",
                             "status_code": response.status_code,

@@ -21,6 +21,15 @@ MESSAGES = {
         "zh-CN": "API服务器连接断开: {error}",
         "en-US": "Disconnected from the API server: {error}",
     },
+    # ── api_client/error_hints.py（地区封锁/拦截类人话提示） ──
+    "api_client.region_blocked": {
+        "zh-CN": "当前地区不支持访问该模型（服务商地区限制）。原始错误: {detail}",
+        "en-US": "This model is not available in the current region. Original error: {detail}",
+    },
+    "api_client.region_blocked_suspected": {
+        "zh-CN": "当前地区疑似不支持访问该模型（或为上游临时故障）。原始错误: {detail}",
+        "en-US": "This model is likely unavailable in the current region (or a temporary upstream failure). Original error: {detail}",
+    },
 
     # ── tool_result_formatter/file.py（操作结果确认文案） ──
     "fmt_file.unsupported_read_mode": {
