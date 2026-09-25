@@ -129,6 +129,12 @@
 - 可执行命令名：`astrion`（已装到 `/opt/homebrew/bin/astrion` → `cli/bin/astrion` symlink，bun wrapper 支持 symlink 解析；`--version`/`--help` 快速退出不启 TUI；后续 `bun build --compile` 单文件分发）
 - 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
+### Desktop（`desktop/`，Tauri 2 桌面壳，2026-09-25 新增）
+- 形态：系统 WebView + 内嵌 Python 后端 sidecar；WebView 直接加载 `http://127.0.0.1:<动态端口>/`（前后端同源，cookie/CSRF/相对路径 API 零改动复用 Web 版）；壳注入 `window.__ASTRION_DESKTOP__` 标记（`initialization_script`），登录页据此自动免登录
+- 开发：`cd desktop && npm install && npm run dev`（= tauri dev；首次 cargo 编译 10-20 分钟）；前端需先 `npm run build`（壳加载的是后端 serve 的 dist 产物）
+- Python 探测顺序（要求 import yaml/flask/httpx/openai 可用）：项目 `.venv` → homebrew 3.13/3.12/3.11 → PATH python3；`ASTRION_DESKTOP_REPO` 可覆盖仓库根
+- 注意：`frontendDist` 相对 `desktop/src-tauri/`（`../../static/dist`）；`tauri dev` 后台运行禁止管道截断（head/tail 会杀进程）；打包路线（python-build-standalone sidecar、签名公证、自动更新）见 `desktop/README.md`
+
 ## 3) 测试现状（不要再写过时命令）
 
 - 当前仓库内可见自动化冒烟：`test/test_server_refactor_smoke.py`（`unittest`）

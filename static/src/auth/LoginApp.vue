@@ -149,6 +149,15 @@ onMounted(async () => {
     hostModeEnabled.value = false;
   }
 
+  // 桌面壳（Tauri WebView）+ 宿主机模式：登录页对本机用户纯属多余，
+  // 直接自动完成免登录跳转，实现「打开 App 即进主界面」。
+  // window.__ASTRION_DESKTOP__ 由壳的 initialization_script 在页面脚本前注入，
+  // Web 浏览器环境不存在不受影响。
+  if (hostModeEnabled.value && (window as any).__ASTRION_DESKTOP__) {
+    await doHostLogin('/');
+    return;
+  }
+
   try {
     const resp = await fetch('/api/session-status', { credentials: 'same-origin' });
     const data = await resp.json();

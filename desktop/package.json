@@ -1,0 +1,17 @@
+{
+  "name": "astrion-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Astrion 桌面壳（Tauri 2）：系统 WebView + 内嵌 Python 后端",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "prepare-backend": "bash scripts/prepare-backend.sh",
+    "build": "npm run prepare-backend && tauri build",
+    "build:debug": "npm run prepare-backend && tauri build --debug"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

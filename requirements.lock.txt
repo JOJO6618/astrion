@@ -8,14 +8,18 @@
 # 更新：在已验证可用的环境执行 python -m scripts.gen_requirements_lock
 #
 # 注：这里只锁项目运行时直接依赖；其传递依赖由 pip 在安装时解析。
+#
+# 2026-09-25 桌面打包时与 requirements.txt 重新对齐（Python 3.12 解析）：
+# 移除 flask-socketio / websockets（Socket.IO 已于 2026-09-11 整体移除），
+# 补齐 pyyaml / trafilatura。
 
-flask==2.3.3
-flask-socketio==5.3.6
-flask-cors==3.0.10
-werkzeug==2.3.7
+flask==3.1.3
+flask-cors==6.0.5
+werkzeug==3.1.8
 httpx[http2]==0.28.1
-h2==4.1.0  # 由 httpx[http2] 引入
-openai==2.8.1
-cryptography==43.0.3
-pillow==9.3.0
-websockets==10.4
+h2==4.4.1  # 由 httpx[http2] 引入
+openai==3.19.2
+cryptography==50.0.1
+pillow==12.3.0
+pyyaml==6.0.3
+trafilatura==2.2.0

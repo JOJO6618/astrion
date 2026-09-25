@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Astrion 主窗口默认能力集（骨架阶段：不开放额外 JS 桥权限）","local":true,"windows":["main"],"permissions":["core:default"]}}

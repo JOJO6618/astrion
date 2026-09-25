@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Astrion",
+  "version": "0.1.0",
+  "identifier": "com.astrion.desktop",
+  "build": {
+    "frontendDist": "../../static/dist",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ],
+    "resources": [
+      "runtime/python",
+      "runtime/backend"
+    ],
+    "macOS": {
+      "signingIdentity": "Astrion Local Sign"
+    }
+  }
+}
