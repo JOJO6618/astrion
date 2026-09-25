@@ -329,7 +329,7 @@ const defaultForm = (): PersonalForm => ({
   recent_conversations_prompt_limit: DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT,
   project_memory_inject_limit: DEFAULT_PROJECT_MEMORY_INJECT_LIMIT,
   tool_intent_enabled: true,
-  tool_loading_enabled: true,
+  tool_loading_enabled: false,
   tool_loading_deferred: [],
   webpage_direct_extract_enabled: true,
   webpage_direct_extract_domains: [],
@@ -565,7 +565,7 @@ export const usePersonalizationStore = defineStore('personalization', {
           data.project_memory_inject_limit
         ),
         tool_intent_enabled: !!data.tool_intent_enabled,
-        tool_loading_enabled: data.tool_loading_enabled !== false,
+        tool_loading_enabled: data.tool_loading_enabled === true,
         tool_loading_deferred: Array.isArray(data.tool_loading_deferred)
           ? data.tool_loading_deferred.filter((item: any) => typeof item === 'string')
           : [],

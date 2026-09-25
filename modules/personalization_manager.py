@@ -100,9 +100,9 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "skill_strict_sub_agent_enabled": False,  # 强约束：子智能体系列工具需先阅读 sub-agent-guide
     "skill_strict_run_command_foreground_enabled": False,  # 强约束：run_command 前台模式需先阅读 run-command-guide
     "skill_strict_run_command_background_enabled": False,  # 强约束：run_command 后台模式需先阅读 run-command-guide
-    # 工具动态加载：总开关（默认开启）+ 默认延迟工具集（None=注册表全集）。
+    # 工具动态加载：总开关（默认关闭）+ 默认延迟工具集（None=注册表全集）。
     # 仅在创建对话时快照一次；已有对话以其对话文件中的快照为准，改这里不影响。
-    "tool_loading_enabled": True,
+    "tool_loading_enabled": False,
     "tool_loading_deferred": None,
     # 网页提取白名单直提：命中白名单的域名用本机直提（GitHub 直链 / trafilatura），
     # 未命中才走 Tavily；开关默认开启，domains 为用户追加的白名单域名（内置 github.com 不在此列）。
@@ -332,7 +332,7 @@ def sanitize_personalization_payload(
     if "tool_loading_enabled" in data:
         base["tool_loading_enabled"] = bool(data.get("tool_loading_enabled"))
     else:
-        base["tool_loading_enabled"] = bool(base.get("tool_loading_enabled", True))
+        base["tool_loading_enabled"] = bool(base.get("tool_loading_enabled", False))
     if "tool_loading_deferred" in data:
         base["tool_loading_deferred"] = _sanitize_tool_loading_deferred(data.get("tool_loading_deferred"))
     else:

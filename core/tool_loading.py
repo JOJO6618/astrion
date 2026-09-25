@@ -229,7 +229,7 @@ def snapshot_overrides_from_prefs(
     if multi_agent_mode:
         return {}
     prefs = personalization_config if isinstance(personalization_config, dict) else {}
-    if prefs.get("tool_loading_enabled", True) is not True:
+    if prefs.get("tool_loading_enabled", False) is not True:
         return {}
     return {METADATA_KEY: build_snapshot(prefs.get("tool_loading_deferred"))}
 

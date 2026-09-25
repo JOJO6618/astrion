@@ -71,7 +71,10 @@ class SnapshotTest(unittest.TestCase):
     def test_overrides_from_prefs(self):
         self.assertEqual(tl.snapshot_overrides_from_prefs({}, multi_agent_mode=True), {})
         self.assertEqual(tl.snapshot_overrides_from_prefs({"tool_loading_enabled": False}), {})
-        overrides = tl.snapshot_overrides_from_prefs({})
+        # 默认关闭：空配置不启用
+        self.assertEqual(tl.snapshot_overrides_from_prefs({}), {})
+        # 显式开启才启用
+        overrides = tl.snapshot_overrides_from_prefs({"tool_loading_enabled": True})
         self.assertIn(tl.METADATA_KEY, overrides)
         self.assertTrue(overrides[tl.METADATA_KEY]["enabled"])
 
@@ -183,7 +186,7 @@ class PersonalizationFieldsTest(unittest.TestCase):
         from modules.personalization_manager import sanitize_personalization_payload
 
         result = sanitize_personalization_payload({})
-        self.assertTrue(result["tool_loading_enabled"])
+        self.assertFalse(result["tool_loading_enabled"])
         self.assertEqual(len(result["tool_loading_deferred"]), 18)
 
     def test_sanitize_explicit_values(self):
