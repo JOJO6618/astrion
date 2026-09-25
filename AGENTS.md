@@ -386,10 +386,10 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ### 10.5 审核智能体配置与调试
 
-- 审核智能体配置：统一在个人空间「审核智能体」页设置（2026-08 起），存于 personalization.json 的 `review_agents` 键
+- 审核智能体配置：统一在设置页「审核智能体」分区设置（2026-08 起在个人空间，2026-09 迁设置页），存于 personalization.json 的 `review_agents` 键
   - 三个审核智能体：`auto_approval`（自动审批）/ `goal_review`（目标审核）/ `workflow_review`（工作流审核）
-  - 字段：`model`（子智能体模型库条目名，留空=模型库 default_model）/ `thinking` / `timeout_seconds` / `max_rounds` / `max_command_timeout`
-  - 解析入口：`modules/review_agent_config.py::resolve_review_agent_config`（复用 `sub_agent_models.json` + `_build_sub_agent_profile`）
+  - 字段：`model`（主模型注册表 key，留空=自动规则：第一个可见模型，纯 Codex 环境优先 -luna）/ `thinking` / `timeout_seconds` / `max_rounds` / `max_command_timeout`
+  - 解析入口：`modules/review_agent_config.py::resolve_review_agent_config`（复用 `modules/aux_model_resolver.py` 统一解析主注册表；独立 `sub_agent_models.json` 库已于 2026-09 彻底废弃无兼容，子智能体/审核/标题生成模型同源）
   - 旧的独立 json 配置（`config/auto_approval.json` / `goal_review.json` / `workflow_review.json.example`）已彻底废除，无向后兼容
 - 调试开关（代码变量）：`modules/approval_agent.py` 中 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`
   - 开启后写入：`logs/approval_agent/`

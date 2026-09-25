@@ -184,11 +184,11 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
 
 ### 模型注册（提供商 / 手写 / Codex）
 
-系统不内置任何供应商模型，模型库由三条路径合并而成：
+系统不内置任何供应商模型。**推荐通过设置页连接提供商**；旧版的手写 `custom_models.json` 方式完整保留兼容。模型库由三条路径合并而成：
 
 1. **设置页连接提供商（推荐）**：Web 界面「设置 → 提供商」内置 21 家服务商目录（DeepSeek、Moonshot、智谱、阿里云百炼、火山方舟、SiliconFlow、MiniMax、OpenAI、OpenRouter、Google Gemini、xAI、Groq、Together、Mistral、OpenCode Zen/Go，以及本地 Ollama / LM Studio），填入 API key 即自动拉取该服务商全部可用模型注册进模型库；也可以添加自定义 OpenAI 兼容提供商。凭证保存在 `<数据根目录>/<模式>/data/providers.json`（0600 权限，不纳入 git）。
-2. **手写 custom_models.json（高级）**：完全手动配置单个模型条目（字段见下表），适合需要精细控制思考参数/多模态/上下文窗口的场景。该文件已 UI 化——手写条目自动出现在设置页「模型」分区的「自定义」分组，可在界面直接增删改。
-3. **Codex 订阅 OAuth**：OpenAI 在目录中拆为两条——`OpenAI`（API key）与 `OpenAI Codex`（ChatGPT Pro/Plus 订阅授权，在设置页连接，授权后自动获取订阅包含的模型）。
+2. **手写 custom_models.json（旧版兼容）**：旧版的手动注册方式，完整保留且已 UI 化——手写条目自动出现在设置页「模型」分区的「自定义」分组，可在界面直接增删改（字段见下表）。
+3. **Codex 订阅 OAuth**：OpenAI 在目录中拆为两条——`OpenAI`（API key）与 `OpenAI Codex`（ChatGPT Pro/Plus 订阅授权，在设置页连接，授权后自动获取订阅包含的模型；docker 多用户部署下管理员连接的 Codex 模型对全员可见）。
 
 **协议支持**：Chat Completions 与 OpenAI **Responses** 双协议（Responses 按加密 reasoning 处理，多轮回传保持推理连续性）；Anthropic Messages / Google 原生协议的模型会正常注册显示，但当前版本调用时会明确报错（不做协议适配）。
 
@@ -216,10 +216,13 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
 | `context_window` / `max_output_tokens` | | 上下文窗口 / 单轮输出上限 |
 | `extra_parameter` | | 注入每次请求的额外参数（与 fast/thinking 参数合并） |
 
-### sub_agent_models.json（子智能体模型）
+### 子智能体 / 审核智能体模型
 
-- 位置：`<数据根目录>/config/sub_agent_models.json`（可用环境变量 `SUB_AGENT_MODELS_CONFIG_FILE` 覆盖）
-- 结构与 `custom_models.json` 相同（`models` 数组，字段一致），用于限制子智能体可选用的模型列表
+子智能体、审核智能体、标题生成等辅助调用的模型**统一来自主模型注册表**（提供商同步 + 手写 custom + Codex 合并），不再有独立的子智能体模型库——旧版 `sub_agent_models.json` 已于 2026-09 彻底废弃（无向后兼容，`SUB_AGENT_MODELS_CONFIG_FILE` 同步失效）。
+
+- **配置点各自独立**：设置页「子智能体」默认模型、「审核智能体」各自的模型、「通用」标题生成模型、多智能体角色定义的 `model` 字段；
+- **留空走自动规则**：注册表第一个可见模型（纯 Codex 环境下优先选 `-luna` 轻量款）；
+- **创建锁**：子智能体创建时记录所用模型 key，重跑/恢复强制复用同一模型。
 
 ### 管理员账户
 
