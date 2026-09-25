@@ -7,7 +7,6 @@ export default {
   title: 'Settings',
   backAriaLabel: 'Back to chats',
   navAriaLabel: 'Switch settings sections',
-  adminBadge: 'Admin',
 
   // ── Nav groups ──
   groupModel: 'Model',

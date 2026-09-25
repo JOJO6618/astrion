@@ -3,11 +3,11 @@ import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
 
 /**
- * Codex OAuth 登录流程（浏览器授权 / 无头设备码）的可复用 composable。
+ * Codex OAuth 登录流程（浏览器授权 / 无头设备码）的唯一实现（同一组 /api/codex/login/* 端点）。
  *
- * 逻辑与 settings/tabs/CodexTab.vue 的现有实现一致（同一组 /api/codex/login/* 端点），
- * 抽取出来供「提供商」分区的 openai-codex（auth=codex_oauth）条目复用；
- * CodexTab.vue 本身不改动。
+ * 唯一使用方 = 「提供商」分区 openai-codex（auth=codex_oauth）条目的连接对话框
+ * （CodexConnectDialog.vue）；Codex 分区（CodexTab.vue）只保留状态展示与
+ * 高级管理（用量/重置/代理），不再内联登录 / 断开 / 刷新模型。
  */
 export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
   const uiStore = useUiStore();

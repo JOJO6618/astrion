@@ -238,9 +238,6 @@ onMounted(() => {
           >
             <SettingsNavIcon :name="item.icon" />
             <span class="settings-shell-nav-label">{{ $t(item.labelKey) }}</span>
-            <span v-if="SETTINGS_ADMIN_SECTIONS.has(item.id)" class="settings-shell-admin-badge">
-              {{ $t('settings.adminBadge') }}
-            </span>
           </button>
         </div>
       </nav>
@@ -421,20 +418,6 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.settings-shell-admin-badge {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  padding: 0 5px;
-  line-height: 16px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
 }
 
 /* ===== 内容区 ===== */

@@ -7,7 +7,6 @@ export default {
   title: '设置',
   backAriaLabel: '返回对话',
   navAriaLabel: '设置分组切换',
-  adminBadge: '管理员',
 
   // ── 导航分组 ──
   groupModel: '模型',

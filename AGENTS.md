@@ -704,7 +704,7 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 5. **推理强度滑块绑思考能力（2026-09-25 用户拍板）**：`supports_reasoning_effort` 在所有路径统一跟随 `supports_thinking`——provider 同步（provider_manager.get_profiles）、手写 custom（model_profiles.py）、codex（codex/models.py 硬编码 True）三方一致；Responses 链路 effort 透传，chat 链路随请求体发 `reasoning_effort`。
 6. **custom_models.json UI 化**：`/api/custom-models` CRUD 直接读写部署目录 custom_models.json（存量手写条目自动出现在 UI「自定义」分组，`${ENV_VAR}` 引用原文保留可编辑）；`_sanitize_custom_model` 白名单校验，写入始终落 `DEPLOY_CONFIG_DIR`。
 6. **模型可见性=用户级**：`personalization.hidden_models`（后端只注册字段 + sanitize，**过滤在前端** stores/model.ts 做，所有选择器消费同一过滤后数据源）；与提供商管理（管理员级）是两条独立权限线，不要混。
-7. **Codex 即 openai-codex**：OpenAI 拆两条——openai-api（api key）与 openai-codex（ChatGPT 订阅 OAuth，auth=codex_oauth，连接状态用现有 Codex 凭证文件判定，前端复用 `/api/codex/login/*` 既有流程，不要为 OAuth 发明新端点）。
+7. **Codex 即 openai-codex**：OpenAI 拆两条——openai-api（api key）与 openai-codex（ChatGPT 订阅 OAuth，auth=codex_oauth，连接状态用现有 Codex 凭证文件判定，前端复用 `/api/codex/login/*` 既有流程，不要为 OAuth 发明新端点）。**连接管理单一入口（2026-09-25 用户拍板）**：openai-codex 的连接/断开/刷新模型只在「提供商」分区操作（登录唯一实现 = `settings/tabs/providers/useCodexLogin.ts` + `CodexConnectDialog.vue`）；设置页 Codex 分区（CodexTab.vue）只保留状态展示 + 用量/重置额度/代理等高级管理，**禁止**再内联登录/断开/刷新按钮。契约对齐：`/api/codex/models/refresh` 与普通提供商 refresh 一样返回 `models_count`（含 304 路径）。
 8. **图标**：`static/icons/providers/`（61 个 SVG，来自 lobehub/icons，按 catalog 的 icon 字段引用 `/static/icons/providers/<icon>.svg`）；新增提供商先补图标再补目录。
 9. **ollama/lmstudio 是 auth=none**：本地服务无需 key，connect 直接探 `/models`。
 10. **models.dev 数据源（D 方案）**：`config/modelsdev_snapshot.json` 仓库瘦身快照兄底（`scripts/update_modelsdev_snapshot.py` 生成）+ 在线缓存 6h 节流刷新（connect/refresh_models 顺带）；`protocol_source` 门控必须存在（openai 官方 npm=@ai-sdk/openai、xai/openrouter 用自家包名，无脑按 npm 裁决会误判单协议 provider）。

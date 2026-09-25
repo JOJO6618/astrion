@@ -117,9 +117,18 @@ def codex_logout():
 @api_login_required
 @admin_api_required
 def codex_models_refresh():
-    """手动刷新模型列表（在线拉取，ETag 条件请求）。"""
-    result = get_models_manager().refresh_sync()
-    return jsonify({"success": True, **result})
+    """手动刷新模型列表（在线拉取，ETag 条件请求）。
+
+    契约对齐 /api/providers/<id>/refresh：始终携带 models_count（当前模型
+    原始总数），供「提供商」分区统一展示「已刷新，共 N 个模型」。
+    """
+    manager = get_models_manager()
+    result = manager.refresh_sync()
+    count = result.get("count")
+    if not isinstance(count, int):
+        # 304 / 降级路径 refresh_sync 不带 count：回读当前缓存原始总数
+        count = int(manager.status_summary().get("total_models") or 0)
+    return jsonify({"success": True, "models_count": count, **result})
 
 
 def _wham_request(method: str, url: str, json_body: dict | None = None):

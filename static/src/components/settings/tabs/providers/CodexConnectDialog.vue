@@ -9,8 +9,9 @@ import { useCodexLogin } from './useCodexLogin';
 
 /**
  * OpenAI · ChatGPT 订阅（auth=codex_oauth）连接对话框。
- * 提供「浏览器授权 / 无头设备码」两种方式，流程复用 CodexTab 的
- * /api/codex/login/* 链路（经 useCodexLogin 抽取，CodexTab 本身不改）。
+ * 提供「浏览器授权 / 无头设备码」两种方式，是 Codex 登录的唯一入口
+ * （走 /api/codex/login/* 链路，逻辑在 useCodexLogin）；
+ * Codex 分区（CodexTab.vue）不再内联登录 / 断开 / 刷新模型。
  */
 defineProps<{
   entry: ProviderCatalogEntry;
