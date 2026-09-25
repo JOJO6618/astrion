@@ -28,6 +28,11 @@
     ],
     "macOS": {
       "signingIdentity": "Astrion Local Sign"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
     }
   }
 }
