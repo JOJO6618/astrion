@@ -72,7 +72,6 @@ const enrichedOptions = computed(() => {
 const groups = computed(() => {
   void currentLocale.value;
   return groupModelOptions(enrichedOptions.value, {
-    codex: t('appCore.modelGroupCodex'),
     custom: t('appCore.modelGroupCustom')
   });
 });

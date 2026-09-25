@@ -37,12 +37,12 @@ def _visible_profiles() -> Dict[str, Dict[str, Any]]:
 
 
 def auto_default_model_key() -> Optional[str]:
-    """留空自动规则：常规取注册表第一个可见模型；纯 codex 时选 -luna。"""
+    """留空自动规则：常规取注册表第一个可见模型；纯 Codex（openai-codex）时选 -luna。"""
     profiles = _visible_profiles()
     if not profiles:
         return None
     keys = list(profiles.keys())
-    if all(k.startswith("codex/") for k in keys):
+    if all(profiles[k].get("provider_id") == "openai-codex" for k in keys):
         for key in keys:
             if "-luna" in key:
                 return key

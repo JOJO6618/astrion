@@ -88,6 +88,25 @@ logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 
 
+def _same_responses_provider(source_model_key: str, current_model_key: str) -> bool:
+    """两个 model_key 是否同属一个 responses provider（加密 reasoning 块可回放的边界）。
+
+    双方都解析出非空 provider_id 且相等才放行；解析失败（模型已失效/未知）一律剥离，
+    避免把不兼容的加密块发给错误上游。
+    """
+    if not source_model_key or not current_model_key:
+        return False
+    try:
+        from config.model_profiles import get_registered_model_profiles
+
+        profiles = get_registered_model_profiles()
+        src = (profiles.get(source_model_key) or {}).get("provider_id")
+        cur = (profiles.get(current_model_key) or {}).get("provider_id")
+        return bool(src) and bool(cur) and src == cur
+    except Exception:
+        return False
+
+
 def _build_sub_md_notice(filename: str, sub_paths: List[str], total: int) -> str:
     """构建子目录指令文件路径通知文案（只列相对路径，不注入内容）。无子目录文件时返回空串。"""
     if not sub_paths:
@@ -486,12 +505,17 @@ class MessagesMixin:
                     # API 判定为“未回传 reasoning_content”并返回 400。
                     if "reasoning_content" in conv:
                         message["reasoning_content"] = conv.get("reasoning_content", "")
-                    # Codex 通道：加密 reasoning items 随消息透传给适配层回插上下文
-                    # （仅 codex 对话会产生该 metadata；其他模型无此字段不受影响，
-                    #  非 codex 模型的字段清洗也会将其剥离）
-                    _codex_items = metadata.get("codex_reasoning_items")
-                    if _codex_items:
-                        message["codex_reasoning_items"] = _codex_items
+                    # Responses 通道（通用）：加密 reasoning items 随消息透传给适配层回插上下文
+                    # （仅 responses 协议模型会产生该 metadata；其他模型无此字段不受影响）
+                    # 跨 provider 剥离：加密块由各自上游加密、互不兼容（ChatGPT 后端 /
+                    # OpenAI API / xAI），provider 不同则不回插（对话仍能继续，仅丢
+                    # 推理连续性——互切锁只按协议二分，responses 跨 provider 放行）
+                    _responses_items = metadata.get("responses_reasoning_items")
+                    if _responses_items:
+                        _src_key = str(metadata.get("model_key") or "")
+                        _cur_key = str(getattr(self, "model_key", None) or "")
+                        if _same_responses_provider(_src_key, _cur_key):
+                            message["responses_reasoning_items"] = _responses_items
                     # 如果有工具调用信息，添加到消息中
                     tool_calls = conv.get("tool_calls") or []
                     if tool_calls and self._tool_calls_followed_by_tools(conversation, idx, tool_calls):

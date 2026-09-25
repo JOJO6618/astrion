@@ -24,6 +24,8 @@ export interface ModelOption {
   supportsReasoningEffort?: boolean;
   /** 'codex' = ChatGPT 订阅通道；'provider' = 提供商同步；其余/缺省为手写自定义 */
   providerType?: string | null;
+  /** 协议标识（2026-09-25 泛化）：'chat_completions'（缺省）/ 'responses' / 其他暂不支持 */
+  apiProtocol?: string | null;
   /** 提供商同步模型的分组字段（手写 custom / Codex 为 null） */
   providerId?: string | null;
   providerName?: string | null;
@@ -138,6 +140,7 @@ export const useModelStore = defineStore('model', {
             multimodal,
             supportsImage,
             supportsVideo,
+            apiProtocol: item.api_protocol || 'chat_completions',
             contextWindow: typeof item.context_window === 'number' ? item.context_window : null,
             maxOutputTokens:
               typeof item.max_output_tokens === 'number' ? item.max_output_tokens : null,

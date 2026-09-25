@@ -38,7 +38,6 @@ export default {
   waitingApiResponse: 'Waiting for API response...',
   back: 'Back',
   manageModels: 'Manage models',
-  modelGroupCodex: 'OpenAI (ChatGPT Subscription)',
   modelGroupCustom: 'Custom',
   searchModel: 'Search models',
   noModelsMatched: 'No matching models',

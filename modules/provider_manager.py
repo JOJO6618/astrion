@@ -176,6 +176,21 @@ class ProviderManager:
                 item["models_count"] = len(summary.get("models") or [])
                 item["models_fetched_at"] = summary.get("models_fetched_at")
                 item["models_error"] = summary.get("models_error")
+                # 多协议网关提示：统计协议暂不支持调用的模型数（前端配置页展示）
+                from modules import modelsdev_registry
+
+                unsupported = 0
+                for model in summary.get("models") or []:
+                    model_id = str(model.get("id") or "").strip()
+                    if not model_id:
+                        continue
+                    if (
+                        modelsdev_registry.resolve_protocol(entry, model_id)
+                        not in modelsdev_registry.SUPPORTED_PROTOCOLS
+                    ):
+                        unsupported += 1
+                if unsupported:
+                    item["unsupported_protocol_count"] = unsupported
             output.append(item)
         return output
 
@@ -281,6 +296,7 @@ class ProviderManager:
             record["models_fetched_at"] = _now_iso()
             record["models_error"] = error
             self._save(data)
+        self._refresh_modelsdev_cache()
 
         result: Dict[str, Any] = {
             "success": True,
@@ -317,6 +333,7 @@ class ProviderManager:
                 record["models_fetched_at"] = _now_iso()
             record["models_error"] = error
             self._save(data)
+        self._refresh_modelsdev_cache()
         result: Dict[str, Any] = {
             "success": not error or bool(models),
             "models_count": len(record.get("models") or []),
@@ -327,6 +344,20 @@ class ProviderManager:
         return result
 
     # ------------------------------------------------------------ 模型发现
+
+    @staticmethod
+    def _modelsdev_keys() -> set:
+        """catalog 中配置了 modelsdev_key 的集合（在线缓存瘦身范围）。"""
+        return {e["modelsdev_key"] for e in ProviderManager.catalog_entries() if e.get("modelsdev_key")}
+
+    def _refresh_modelsdev_cache(self) -> None:
+        """顺带刷新 models.dev 在线缓存（6h 节流；失败静默，不影响 /models 主流程）。"""
+        try:
+            from modules import modelsdev_registry
+
+            modelsdev_registry.refresh_cache(self._modelsdev_keys())
+        except Exception:
+            pass
 
     @staticmethod
     def _fetch_models(
@@ -365,7 +396,15 @@ class ProviderManager:
     # ------------------------------------------------------------ profile 输出
 
     def get_profiles(self) -> Dict[str, Dict[str, Any]]:
-        """把已连接提供商的已发现模型转成注册表 profile（key = ``{pid}/{model_id}``）。"""
+        """把已连接提供商的已发现模型转成注册表 profile（key = ``{pid}/{model_id}``）。
+
+        2026-09-25 协议泛化：按 catalog 条目裁决 ``api_protocol``（静态 protocol_map
+        → models.dev npm → 默认 chat_completions），并用 models.dev 能力数据 enrich
+        四字段（思考支持/图片视频多模态/上下文窗口/最大输出），查不到回退原默认。
+        """
+        from modules import modelsdev_registry
+
+        catalog_by_id = {e["id"]: e for e in self.catalog_entries()}
         profiles: Dict[str, Dict[str, Any]] = {}
         for pid, record in self._load()["providers"].items():
             if not record.get("enabled", True):
@@ -375,12 +414,50 @@ class ProviderManager:
             headers = record.get("headers") or {}
             if not base_url:
                 continue
+            catalog_entry = catalog_by_id.get(str(record.get("catalog_id") or pid))
             for model in record.get("models") or []:
                 model_id = str(model.get("id") or "").strip()
                 if not model_id:
                     continue
                 ctx = model.get("context_length")
                 display_name = str(model.get("name") or model_id)
+
+                # ── 协议裁决与能力 enrich（models.dev，命中才覆盖）──
+                api_protocol = (
+                    modelsdev_registry.resolve_protocol(catalog_entry, model_id)
+                    if catalog_entry
+                    else modelsdev_registry.DEFAULT_PROTOCOL
+                )
+                meta = (
+                    modelsdev_registry.get_model_meta(catalog_entry, model_id)
+                    if catalog_entry
+                    else None
+                ) or {}
+                reasoning = meta.get("reasoning")  # True / False / None（未知）
+                supports_thinking = True if reasoning is None else bool(reasoning)
+                # 推理强度滑块跟随思考能力（用户拍板 2026-09-25）：所有支持思考的模型
+                # 一律开放档位，不看协议/提供商；Responses 链路 effort 透传，chat 链路随请求体发
+                supports_reasoning_effort = supports_thinking
+                mods = meta.get("modalities_input")
+                if isinstance(mods, list):
+                    has_image = "image" in mods
+                    has_video = "video" in mods
+                    multimodal = (
+                        "image,video"
+                        if (has_image and has_video)
+                        else "image"
+                        if has_image
+                        else "video"
+                        if has_video
+                        else "none"
+                    )
+                else:
+                    # 未知时保持原默认：provider 同步模型默认全能（用户拍板）
+                    multimodal = "image,video"
+                if meta.get("context"):
+                    ctx = meta["context"]
+                max_output = meta.get("max_output")
+
                 profile: Dict[str, Any] = {
                     "name": display_name,
                     "description": str(record.get("name") or pid),
@@ -388,33 +465,31 @@ class ProviderManager:
                     "provider_type": "provider",
                     "provider_id": pid,
                     "provider_name": str(record.get("name") or pid),
+                    "api_protocol": api_protocol,
                     "is_custom_model": False,
                     "hidden": False,
-                    # 默认图片+视频双模态（用户拍板：provider 同步模型默认全能，
-                    # 与思考/快速双支持同理；此前写死 none 导致全部标记为纯文本）
-                    "multimodal": "image,video",
+                    "multimodal": multimodal,
                     "context_window": ctx,
+                    "supports_reasoning_effort": supports_reasoning_effort,
                     "fast": {
                         "base_url": base_url,
                         "api_key": api_key,
                         "model_id": model_id,
-                        "max_tokens": None,
+                        "max_tokens": max_output,
                         "context_window": ctx,
                         "extra_params": {},
                     },
-                    # 默认 fast+thinking 双支持（对齐手写模型 param_toggle 无参形态：
-                    # thinking 块与 fast 同端点同模型，思考行为由 run_mode 请求层处理；
-                    # 此前写死 fast_only 导致所有提供商模型只显示「快速」）
+                    # thinking 块与 fast 同端点同模型，思考行为由 run_mode 请求层处理
                     "thinking": {
                         "base_url": base_url,
                         "api_key": api_key,
                         "model_id": model_id,
-                        "max_tokens": None,
+                        "max_tokens": max_output,
                         "context_window": ctx,
                         "extra_params": {},
                     },
-                    "supports_thinking": True,
-                    "fast_only": False,
+                    "supports_thinking": supports_thinking,
+                    "fast_only": not supports_thinking,
                 }
                 if headers:
                     profile["headers"] = dict(headers)

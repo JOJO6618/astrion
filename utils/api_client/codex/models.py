@@ -56,7 +56,16 @@ def _profile_from_model_info(slug: str, info: Dict[str, Any]) -> Dict[str, Any]:
         "name": display_name,
         "description": description,
         "model_description": model_description,
-        "provider_type": "codex",
+        # 2026-09-25 协议泛化：codex 不再是特殊 provider_type，统一为普通
+        # provider（openai-codex）；行为差异全部配置化——api_protocol 走
+        # Responses 通用通道，responses_auth/instructions_source 声明订阅特性。
+        "provider_type": "provider",
+        "provider_id": "openai-codex",
+        # 与 openai-api（API Key 条目）在模型菜单分组中区分
+        "provider_name": "OpenAI（ChatGPT 订阅）",
+        "api_protocol": "responses",
+        "responses_auth": "codex_oauth",
+        "instructions_source": "codex_models_cache",
         "is_custom_model": False,
         "hidden": False,
         "multimodal": "image" if supports_image else "none",
@@ -233,7 +242,8 @@ class CodexModelsManager:
         """输出合并进 get_registered_model_profiles() 的动态 profile。
 
         仅暴露 ``visibility == "list"`` 且 ``supported_in_api`` 的模型；
-        key 统一加 ``codex/`` 前缀。凭证文件不存在（未登录/已登出）时返回空，
+        key 统一加 ``openai-codex/`` 前缀（2026-09-25 泛化，原 codex/ 前缀废除，
+        不做向后兼容）。凭证文件不存在（未登录/已登出）时返回空，
         模型从选择器消失；缓存本身保留，重新登录后立即可用。
         """
         data = self._load()
@@ -248,7 +258,7 @@ class CodexModelsManager:
                 continue
             if info.get("visibility") != "list" or not info.get("supported_in_api"):
                 continue
-            profiles[f"codex/{slug}"] = _profile_from_model_info(slug, info)
+            profiles[f"openai-codex/{slug}"] = _profile_from_model_info(slug, info)
         return profiles
 
     def get_base_instructions(self, model_id: str) -> Optional[str]:

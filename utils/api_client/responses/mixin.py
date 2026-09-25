@@ -1,8 +1,18 @@
-"""APIClient 的 Codex 通道：``chat_codex()`` 产出与 ``chat()`` 完全同形的 chunk。
+"""APIClient 的通用 Responses API 通道（2026-09-25 协议泛化）。
 
-分发入口在 ``APIClientChatMixin.chat()`` 开头（provider_type == "codex"）。
-凭证、模型发现、instructions、映射全部委托 codex 子包各模块；
-本文件只负责请求编排、401 自愈、错误形状对齐与 reasoning items 落属性。
+``chat_responses()`` 产出与 ``chat()`` 完全同形的 chunk。分发入口在
+``APIClientChatMixin.chat()`` 开头（按 profile 的 ``api_protocol == "responses"``
+路由，不再看 provider_type）。
+
+auth 模式（profile["responses_auth"]）：
+- 缺省/``"bearer"``：静态 api_key，``_build_headers``（含 extra_headers_resolver
+  链——x-opencode-session 等动态头由此进入）；httpx trust_env 默认读环境代理
+- ``"codex_oauth"``：ChatGPT 订阅 OAuth（codex 子包凭证管理：401 自愈刷新、
+  chatgpt-account-id/originator 头、官方 base_instructions 注入与
+  supported_reasoning_levels 档位校验、429 订阅限额文案、prompt_cache_key 亲和）
+
+加密 reasoning 处理对全部 Responses 模型统一生效（采集 → 旁路落盘 →
+下轮回插），无 per-provider 策略分叉（2026-09-25 用户拍板）。
 """
 
 from __future__ import annotations
@@ -15,12 +25,8 @@ import httpx
 
 from modules.i18n import tr
 
-from utils.api_client.codex.auth import CodexAuthError, get_auth_manager
-from utils.api_client.codex.models import get_models_manager
-from utils.api_client.codex.prompt import build_instructions
-from utils.api_client.codex.settings import RESPONSES_URL, resolve_proxy
-from utils.api_client.codex.translate import (
-    CodexAPIError,
+from utils.api_client.responses.translate import (
+    ResponsesAPIError,
     _ReasoningCollector,
     build_responses_body,
     responses_sse_to_chat_chunks,
@@ -28,20 +34,32 @@ from utils.api_client.codex.translate import (
 )
 
 
-class APIClientCodexMixin:
+class APIClientResponsesMixin:
     # ------------------------------------------------------------ 辅助
 
-    def _codex_session_id(self) -> str:
-        """进程内固定的会话 id（prompt 缓存亲和）。"""
-        if not getattr(self, "_codex_session_id_value", None):
-            self._codex_session_id_value = str(uuid.uuid4())
-        return self._codex_session_id_value
+    def _responses_session_id(self) -> str:
+        """进程内固定的会话 id（codex prompt_cache_key 亲和用）。"""
+        if not getattr(self, "_responses_session_id_value", None):
+            self._responses_session_id_value = str(uuid.uuid4())
+        return self._responses_session_id_value
 
-    def _resolve_codex_effort(self, models_mgr, model_id: str) -> str:
-        """会话 reasoning_effort → codex effort（按模型支持档位校验回落）。"""
+    def _is_codex_oauth(self) -> bool:
+        return str(getattr(self, "responses_auth", None) or "") == "codex_oauth"
+
+    def _resolve_responses_effort(self, model_id: str) -> Optional[str]:
+        """会话 reasoning_effort → Responses effort。
+
+        codex_oauth：按 codex 模型发现的 supported_reasoning_levels 校验回落；
+        通用：直接透传（网关/上游自行处理不支持的档位）。
+        """
+        requested = str(getattr(self, "reasoning_effort", None) or "").strip()
+        if not self._is_codex_oauth():
+            return requested or None
         info = None
         try:
-            info = models_mgr.get_model_info(model_id)
+            from utils.api_client.codex.models import get_models_manager
+
+            info = get_models_manager().get_model_info(model_id)
         except Exception:
             pass
         supported = {
@@ -49,15 +67,28 @@ class APIClientCodexMixin:
             for lv in (info or {}).get("supported_reasoning_levels") or []
             if isinstance(lv, dict) and lv.get("effort")
         }
-        requested = str(getattr(self, "reasoning_effort", None) or "").strip()
         if requested and (not supported or requested in supported):
             return requested
         default = str((info or {}).get("default_reasoning_level") or "").strip()
-        if default:
-            return default
-        return "medium"
+        return default or "medium"
 
-    def _codex_error_chunk(
+    def _build_responses_instructions(self, model_id: str) -> str:
+        """instructions 来源（profile["instructions_source"]）。
+
+        codex_models_cache：ChatGPT 后端强制校验的官方 base_instructions；
+        其他（缺省）：空——astrion 自身 system 提示由 build_responses_body 并入。
+        """
+        if str(getattr(self, "responses_instructions_source", None) or "") == "codex_models_cache":
+            try:
+                from utils.api_client.codex.models import get_models_manager
+                from utils.api_client.codex.prompt import build_instructions
+
+                return build_instructions(model_id, "", get_models_manager())
+            except Exception:
+                return ""
+        return ""
+
+    def _responses_error_chunk(
         self,
         *,
         status_code: Optional[int],
@@ -72,7 +103,7 @@ class APIClientCodexMixin:
             "error_message": error_message or error_text,
             "model_id": getattr(self, "model_id", None),
             "model_key": getattr(self, "model_key", None),
-            "provider": "codex",
+            "provider": getattr(self, "provider_id", None) or getattr(self, "provider_type", None),
         }
         self.last_error_info = info
         return {"error": info}
@@ -87,24 +118,30 @@ class APIClientCodexMixin:
 
     # ------------------------------------------------------------ 主入口
 
-    async def chat_codex(
+    async def chat_responses(
         self,
         messages: List[Dict],
         tools: Optional[List[Dict]] = None,
         stream: bool = True,
     ) -> AsyncGenerator[Dict, None]:
-        auth = get_auth_manager()
-        models_mgr = get_models_manager()
+        codex_oauth = self._is_codex_oauth()
+        auth = None
+        if codex_oauth:
+            from utils.api_client.codex.auth import CodexAuthError, get_auth_manager
+            from utils.api_client.codex.models import get_models_manager
 
-        # 模型发现（懒加载 + 陈旧后台刷新）；失败不阻塞请求（有缓存兜底）
-        try:
-            await models_mgr.ensure_fresh()
-        except Exception:
-            pass
+            auth = get_auth_manager()
+            # 模型发现（懒加载 + 陈旧后台刷新）；失败不阻塞请求（有缓存兜底）
+            try:
+                await get_models_manager().ensure_fresh()
+            except Exception:
+                pass
 
         current_thinking_mode = self.get_current_thinking_mode()
         api_config = self._select_api_config(current_thinking_mode)
+        base_url = str(api_config.get("base_url") or "").rstrip("/")
         model_id = api_config["model_id"]
+        url = f"{base_url}/responses"
 
         # max_output_tokens：与 chat() 同款的预算收缩逻辑
         try:
@@ -123,8 +160,8 @@ class APIClientCodexMixin:
             elif max_tokens is not None:
                 max_tokens = min(max_tokens, available)
 
-        effort = self._resolve_codex_effort(models_mgr, model_id)
-        instructions = build_instructions(model_id, "", models_mgr)
+        effort = self._resolve_responses_effort(model_id)
+        instructions = self._build_responses_instructions(model_id)
 
         body = build_responses_body(
             messages=messages,
@@ -134,42 +171,50 @@ class APIClientCodexMixin:
             effort=effort,
             summary="detailed",
             max_output_tokens=max_tokens,
-            session_id=self._codex_session_id(),
+            session_id=self._responses_session_id() if codex_oauth else None,
         )
 
-        # 请求（401 自愈后整体重试一次）
+        # 请求（codex_oauth：401 自愈后整体重试一次；bearer：单次）
+        max_attempts = 2 if codex_oauth else 1
         attempt = 0
-        while attempt < 2:
+        while attempt < max_attempts:
             attempt += 1
-            try:
-                access_token = await auth.get_access_token()
-            except CodexAuthError as exc:
-                yield self._codex_error_chunk(
-                    status_code=None,
-                    error_text=str(exc),
-                    error_type="auth_error",
-                    error_message=str(exc),
+            if codex_oauth:
+                try:
+                    access_token = await auth.get_access_token()
+                except CodexAuthError as exc:
+                    yield self._responses_error_chunk(
+                        status_code=None,
+                        error_text=str(exc),
+                        error_type="auth_error",
+                        error_message=str(exc),
+                    )
+                    return
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                    "OpenAI-Beta": "responses=experimental",
+                    "originator": "codex_cli_rs",
+                    "session_id": self._responses_session_id(),
+                }
+                account_id = auth.get_account_id()
+                if account_id:
+                    headers["chatgpt-account-id"] = account_id
+            else:
+                headers = self._build_headers(
+                    str(api_config.get("api_key") or ""), base_url=base_url
                 )
-                return
-
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream",
-                "OpenAI-Beta": "responses=experimental",
-                "originator": "codex_cli_rs",
-                "session_id": self._codex_session_id(),
-            }
-            account_id = auth.get_account_id()
-            if account_id:
-                headers["chatgpt-account-id"] = account_id
+                headers["Accept"] = "text/event-stream"
 
             try:
                 self._debug_log(
                     {
-                        "event": "codex_request_prepare",
+                        "event": "responses_request_prepare",
                         "model_key": getattr(self, "model_key", None),
                         "model_id": model_id,
+                        "api_protocol": "responses",
+                        "auth": "codex_oauth" if codex_oauth else "bearer",
                         "effort": effort,
                         "attempt": attempt,
                         "input_items": len(body.get("input") or []),
@@ -182,22 +227,25 @@ class APIClientCodexMixin:
 
             collector = _ReasoningCollector()
             required_map = tool_required_map(tools)
-            produced_any = False
             try:
-                async with httpx.AsyncClient(
-                    proxy=resolve_proxy(), timeout=300
-                ) as client:
+                if codex_oauth:
+                    from utils.api_client.codex.settings import resolve_proxy
+
+                    client_ctx = httpx.AsyncClient(proxy=resolve_proxy(), timeout=300)
+                else:
+                    client_ctx = httpx.AsyncClient(http2=True, timeout=300)
+                async with client_ctx as client:
                     async with client.stream(
-                        "POST", RESPONSES_URL, json=body, headers=headers
+                        "POST", url, json=body, headers=headers
                     ) as response:
-                        if response.status_code == 401 and attempt < 2:
+                        if response.status_code == 401 and codex_oauth and attempt < max_attempts:
                             # token_expired：重读/刷新凭证后整体重试
                             await response.aread()
                             try:
                                 await auth.handle_unauthorized()
                                 continue
                             except CodexAuthError as exc:
-                                yield self._codex_error_chunk(
+                                yield self._responses_error_chunk(
                                     status_code=401,
                                     error_text=str(exc),
                                     error_type="auth_error",
@@ -211,7 +259,7 @@ class APIClientCodexMixin:
                                 if hasattr(error_bytes, "decode")
                                 else str(error_bytes)
                             )
-                            yield self._codex_http_error(
+                            yield self._responses_http_error(
                                 response.status_code, error_text
                             )
                             return
@@ -223,19 +271,18 @@ class APIClientCodexMixin:
                         async for chunk in responses_sse_to_chat_chunks(
                             _lines(), collector, required_map
                         ):
-                            produced_any = True
                             yield chunk
 
-            except CodexAPIError as exc:
-                yield self._codex_error_chunk(
+            except ResponsesAPIError as exc:
+                yield self._responses_error_chunk(
                     status_code=None,
                     error_text=str(exc),
-                    error_type=exc.code or "codex_api_error",
+                    error_type=exc.code or "responses_api_error",
                     error_message=str(exc),
                 )
                 return
             except httpx.ConnectError as exc:
-                yield self._codex_error_chunk(
+                yield self._responses_error_chunk(
                     status_code=None,
                     error_text=f"connect_error: {exc}",
                     error_type="connection_error",
@@ -243,7 +290,7 @@ class APIClientCodexMixin:
                 )
                 return
             except (httpx.TimeoutException, httpx.RemoteProtocolError) as exc:
-                yield self._codex_error_chunk(
+                yield self._responses_error_chunk(
                     status_code=None,
                     error_text=str(exc),
                     error_type="connection_error",
@@ -251,7 +298,7 @@ class APIClientCodexMixin:
                 )
                 return
             except Exception as exc:
-                yield self._codex_error_chunk(
+                yield self._responses_error_chunk(
                     status_code=None,
                     error_text=str(exc) or repr(exc),
                     error_type="exception",
@@ -260,13 +307,14 @@ class APIClientCodexMixin:
                 return
 
             # 成功收尾：加密 reasoning items 落实例属性，供落盘进消息 metadata
-            self.last_codex_reasoning_items = collector.items or None
+            # （2026-09-25 泛化后统一命名 last_responses_reasoning_items）
+            self.last_responses_reasoning_items = collector.items or None
             self.last_error_info = None
             return
 
     # ------------------------------------------------------------ 错误整形
 
-    def _codex_http_error(self, status_code: int, error_text: str) -> Dict[str, Any]:
+    def _responses_http_error(self, status_code: int, error_text: str) -> Dict[str, Any]:
         error_type = None
         error_message = None
         try:
@@ -282,8 +330,8 @@ class APIClientCodexMixin:
         except Exception:
             pass
 
-        if status_code == 429:
-            # 限额错误：尽量提取重置时间友好展示
+        if status_code == 429 and self._is_codex_oauth():
+            # codex 订阅限额：尽量提取重置时间友好展示
             reset_hint = ""
             for key in ("resets_at", "reset_at", "resets_in_seconds"):
                 if key in error_text:
@@ -293,10 +341,10 @@ class APIClientCodexMixin:
                 f"Codex 订阅限额已用尽（5 小时/每周窗口），请等待重置后重试{reset_hint}"
             ) if not error_message else error_message
 
-        return self._codex_error_chunk(
+        return self._responses_error_chunk(
             status_code=status_code,
             error_text=error_text,
             error_type=error_type,
             error_message=error_message
-            or f"Codex 请求失败 (HTTP {status_code})",
+            or f"Responses 请求失败 (HTTP {status_code})",
         )

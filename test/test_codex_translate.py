@@ -38,7 +38,7 @@ messages = [
         "role": "assistant",
         "content": "我来看一下",
         "reasoning_content": "摘要不应回传",
-        "codex_reasoning_items": [
+        "responses_reasoning_items": [
             {"type": "reasoning", "id": "rs_x", "encrypted_content": "ENC1", "summary": []}
         ],
         "tool_calls": [

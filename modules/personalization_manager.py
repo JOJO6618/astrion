@@ -90,7 +90,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "auto_generate_title": True,
     "title_model": "",  # 对话标题生成使用的注册表模型 key（空=自动规则）
     "sub_agent_model": "",  # 传统模式子智能体使用的注册表模型 key（空=自动规则；多智能体成员走角色 model_key，不受此影响）
-    "external_session_header": False,  # 向 opencode.ai 端点发送 x-opencode-session 头（默认关闭，opt-in）
+    "external_session_header": True,  # 向 opencode.ai 端点发送 x-opencode-session 头（默认开启，opt-out）
     "recent_conversations_prompt_enabled": False,
     "recent_conversations_prompt_limit": RECENT_CONVERSATIONS_PROMPT_LIMIT_DEFAULT,
     "project_memory_inject_limit": PROJECT_MEMORY_INJECT_LIMIT_DEFAULT,  # 项目记忆索引最大注入条数：None-无上限 / >=5-该值
@@ -298,7 +298,7 @@ def sanitize_personalization_payload(
     base["title_model"] = str(data.get("title_model", base.get("title_model", "")) or "").strip()
     base["sub_agent_model"] = str(data.get("sub_agent_model", base.get("sub_agent_model", "")) or "").strip()
     base["external_session_header"] = bool(
-        data.get("external_session_header", base.get("external_session_header", False))
+        data.get("external_session_header", base.get("external_session_header", True))
     )
     base["recent_conversations_prompt_enabled"] = bool(
         data.get("recent_conversations_prompt_enabled", base.get("recent_conversations_prompt_enabled", False))

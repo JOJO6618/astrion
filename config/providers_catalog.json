@@ -1,10 +1,11 @@
 {
   "version": 1,
-  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。protocol_note=chat_completions_only 表示该网关为多协议，当前版本仅支持其 OpenAI Chat Completions 模型子集。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。",
+  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。modelsdev_key=该提供商在 models.dev 的 provider key（协议裁决与能力 enrich 数据源；本地/特殊发现链路条目不配）。protocol_note=multi_protocol_partial 表示多协议网关：Chat Completions 与 Responses 模型可用，Anthropic/Google 协议模型正常注册但暂不支持调用（前端提示）。protocol_map=静态协议裁决表（最高优先级，覆盖 models.dev 标注）。protocol_source=models.dev 表示启用 models.dev 在线裁决/enrich。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。",
   "providers": [
     {
       "id": "deepseek",
       "name": "DeepSeek",
+      "modelsdev_key": "deepseek",
       "base_url": "https://api.deepseek.com",
       "icon": "deepseek-color.svg",
       "auth": "api_key",
@@ -13,6 +14,7 @@
     {
       "id": "moonshot",
       "name": "Moonshot AI",
+      "modelsdev_key": "moonshotai-cn",
       "base_url": "https://api.moonshot.cn/v1",
       "icon": "moonshot.svg",
       "icon_mono": true,
@@ -22,6 +24,7 @@
     {
       "id": "zhipu-cn",
       "name": "智谱（国内）",
+      "modelsdev_key": "zhipuai",
       "base_url": "https://open.bigmodel.cn/api/paas/v4",
       "icon": "zhipu-color.svg",
       "auth": "api_key",
@@ -30,6 +33,7 @@
     {
       "id": "zhipu-global",
       "name": "Z.AI（国际）",
+      "modelsdev_key": "zai",
       "base_url": "https://api.z.ai/api/paas/v4",
       "icon": "zhipu-color.svg",
       "auth": "api_key",
@@ -38,6 +42,7 @@
     {
       "id": "bailian",
       "name": "阿里云百炼",
+      "modelsdev_key": "alibaba-cn",
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "icon": "bailian-color.svg",
       "auth": "api_key",
@@ -46,6 +51,7 @@
     {
       "id": "volcengine",
       "name": "火山方舟",
+      "modelsdev_key": "volcengine",
       "base_url": "https://ark.cn-beijing.volces.com/api/v3",
       "icon": "volcengine-color.svg",
       "auth": "api_key",
@@ -54,6 +60,7 @@
     {
       "id": "siliconflow",
       "name": "SiliconFlow",
+      "modelsdev_key": "siliconflow-cn",
       "base_url": "https://api.siliconflow.cn/v1",
       "icon": "siliconcloud-color.svg",
       "auth": "api_key",
@@ -62,6 +69,7 @@
     {
       "id": "minimax-cn",
       "name": "MiniMax（国内）",
+      "modelsdev_key": "minimax-cn",
       "base_url": "https://api.minimaxi.com/v1",
       "icon": "minimax-color.svg",
       "auth": "api_key",
@@ -70,6 +78,7 @@
     {
       "id": "minimax-global",
       "name": "MiniMax（国际）",
+      "modelsdev_key": "minimax",
       "base_url": "https://api.minimax.io/v1",
       "icon": "minimax-color.svg",
       "auth": "api_key",
@@ -78,6 +87,7 @@
     {
       "id": "openai-api",
       "name": "OpenAI",
+      "modelsdev_key": "openai",
       "base_url": "https://api.openai.com/v1",
       "icon": "openai.svg",
       "icon_mono": true,
@@ -97,6 +107,7 @@
     {
       "id": "openrouter",
       "name": "OpenRouter",
+      "modelsdev_key": "openrouter",
       "base_url": "https://openrouter.ai/api/v1",
       "icon": "openrouter-color.svg",
       "auth": "api_key",
@@ -105,6 +116,7 @@
     {
       "id": "google",
       "name": "Google Gemini",
+      "modelsdev_key": "google",
       "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
       "icon": "gemini-color.svg",
       "auth": "api_key",
@@ -113,6 +125,7 @@
     {
       "id": "xai",
       "name": "xAI",
+      "modelsdev_key": "xai",
       "base_url": "https://api.x.ai/v1",
       "icon": "xai.svg",
       "icon_mono": true,
@@ -122,6 +135,7 @@
     {
       "id": "groq",
       "name": "Groq",
+      "modelsdev_key": "groq",
       "base_url": "https://api.groq.com/openai/v1",
       "icon": "groq.svg",
       "icon_mono": true,
@@ -131,6 +145,7 @@
     {
       "id": "together",
       "name": "Together AI",
+      "modelsdev_key": "togetherai",
       "base_url": "https://api.together.ai/v1",
       "icon": "together-color.svg",
       "auth": "api_key",
@@ -139,6 +154,7 @@
     {
       "id": "mistral",
       "name": "Mistral AI",
+      "modelsdev_key": "mistral",
       "base_url": "https://api.mistral.ai/v1",
       "icon": "mistral-color.svg",
       "auth": "api_key",
@@ -148,21 +164,36 @@
     {
       "id": "oczen",
       "name": "OpenCode Zen",
+      "modelsdev_key": "opencode",
       "base_url": "https://opencode.ai/zen/v1",
       "icon": "opencode.svg",
       "auth": "api_key",
-      "badge": "仅 Chat Completions",
-      "protocol_note": "chat_completions_only",
+      "badge": "Chat + Responses",
+      "protocol_note": "multi_protocol_partial",
+      "protocol_source": "models.dev",
       "key_url": "https://opencode.ai/auth"
     },
     {
       "id": "ocgo",
       "name": "OpenCode Go",
+      "modelsdev_key": "opencode-go",
       "base_url": "https://opencode.ai/zen/go/v1",
       "icon": "opencode.svg",
       "auth": "api_key",
-      "badge": "仅 Chat Completions",
-      "protocol_note": "chat_completions_only",
+      "badge": "Chat + Responses",
+      "protocol_note": "multi_protocol_partial",
+      "protocol_source": "models.dev",
+      "protocol_map": {
+        "_comment": "minimax/qwen 系在 models.dev 标 anthropic，但本网关 chat 转换实测可用且本项目暂不适配 Anthropic 协议，强制按 Chat Completions 处理",
+        "minimax-m2.5": "chat_completions",
+        "minimax-m2.7": "chat_completions",
+        "minimax-m3": "chat_completions",
+        "qwen3.6-plus": "chat_completions",
+        "qwen3.7-max": "chat_completions",
+        "qwen3.7-plus": "chat_completions",
+        "qwen3.8-max": "chat_completions",
+        "qwen3.8-flash": "chat_completions"
+      },
       "key_url": "https://opencode.ai/auth"
     },
     {

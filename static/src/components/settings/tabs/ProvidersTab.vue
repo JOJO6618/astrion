@@ -36,8 +36,10 @@ const toggleNote = (id: string) => {
 };
 
 const protocolNoteText = (entry: ProviderCatalogEntry): string => {
-  if (entry.protocol_note === 'chat_completions_only') {
-    return t('settings.protocolNoteChatOnly');
+  if (entry.protocol_note === 'multi_protocol_partial') {
+    const base = t('settings.protocolNoteMultiPartial');
+    const count = entry.unsupported_protocol_count || 0;
+    return count > 0 ? `${base} ${t('settings.protocolNoteMultiPartialCount', { count })}` : base;
   }
   return String(entry.protocol_note || '');
 };

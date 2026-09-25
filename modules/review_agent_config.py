@@ -64,8 +64,8 @@ def resolve_review_agent_config(agent_key: str) -> Dict[str, Any]:
         return base
     base["profile"] = profile
 
-    # 仅常规模型裸 HTTP 路径需要 max_tokens 注入；codex 路径由 profile 自带参数
-    if str(profile.get("provider_type") or "") != "codex":
+    # 仅 chat 裸 HTTP 路径需要 max_tokens 注入；responses 路径由 profile 自带参数
+    if str(profile.get("api_protocol") or "") != "responses":
         thinking = base["thinking"]
         segment = profile.get("thinking") if thinking else None
         if not segment:

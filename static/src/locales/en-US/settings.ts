@@ -68,8 +68,9 @@ export default {
   providersConnectedSection: 'Connected',
   providersCatalogSection: 'Add provider',
   providersCatalogDesc: 'Pick a provider and enter an API key; its model list syncs automatically.',
-  protocolNoteChatOnly:
-    'This gateway speaks multiple protocols; only its OpenAI Chat Completions model subset is supported in this version.',
+  protocolNoteMultiPartial:
+    'Multi-protocol gateway: Chat Completions and Responses models work out of the box; Anthropic / Google protocol models are registered and listed, but calls are not supported in this version.',
+  protocolNoteMultiPartialCount: '{count} of them use protocols not yet supported for calls.',
   localBadge: 'Local',
   providerConnected: 'Connected',
   providerModelsCount: '{count} models available',
@@ -121,7 +122,6 @@ export default {
   addCustomProvider: 'Add custom provider',
   modelsEmpty: 'No registered models yet.',
   modelGroupProviderBadge: 'Provider synced',
-  modelGroupCodexBadge: 'ChatGPT subscription',
   modelGroupCustom: 'Custom',
   modelGroupCustomBadge: 'Manually configured',
   modelVisibleSwitch: 'Visible to me in model pickers (per-user setting)',

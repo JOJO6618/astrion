@@ -27,11 +27,12 @@ export interface ProviderCatalogEntry {
   key_url?: string | null;
   badge?: string | null;
   local?: boolean;
-  protocol_note?: string | null; // 'chat_completions_only' 等
+  protocol_note?: string | null; // 'multi_protocol_partial' 等
   connected: boolean;
   models_count?: number;
   models_fetched_at?: string | null;
   models_error?: string | null;
+  unsupported_protocol_count?: number; // 多协议网关中协议暂不支持调用的模型数
 }
 
 export interface CustomModelEntry {

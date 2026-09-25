@@ -1,7 +1,8 @@
 /**
  * 模型选项分组工具：输入栏模型菜单与设置页/个人空间模型选择下拉共用。
- * 分组规则：provider 同步模型按 providerId/providerName 分组；codex/* 归 Codex 组；
- * 其余（手写 custom_models）归「自定义」组。组顺序 = 选项首次出现顺序。
+ * 分组规则：provider 同步模型按 providerId/providerName 分组（openai-codex 泛化后
+ * 同样走此规则归 OpenAI 组）；其余（手写 custom_models）归「自定义」组。
+ * 组顺序 = 选项首次出现顺序。
  */
 export interface ModelGroupOption {
   key: string;
@@ -20,20 +21,16 @@ export interface ModelGroup<O extends ModelGroupOption = ModelGroupOption> {
 
 export function groupModelOptions<O extends ModelGroupOption>(
   options: O[],
-  labels: { codex: string; custom: string }
+  labels: { custom: string }
 ): Array<ModelGroup<O>> {
   const groups: Array<ModelGroup<O>> = [];
   const byId = new Map<string, ModelGroup<O>>();
   for (const opt of options) {
-    const key = String(opt.key || '');
     let groupId: string;
     let groupName: string;
     if (opt.providerId) {
       groupId = `provider:${opt.providerId}`;
       groupName = opt.providerName || opt.providerId;
-    } else if (key.startsWith('codex/')) {
-      groupId = 'codex';
-      groupName = labels.codex;
     } else {
       groupId = 'custom';
       groupName = labels.custom;

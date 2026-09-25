@@ -6,7 +6,7 @@ from utils.api_client.tool_mixin import APIClientToolMixin
 from utils.api_client.logging_mixin import APIClientLoggingMixin
 from utils.api_client.formatting_mixin import APIClientFormattingMixin
 from utils.api_client.chat_mixin import APIClientChatMixin
-from utils.api_client.codex.mixin import APIClientCodexMixin
+from utils.api_client.responses.mixin import APIClientResponsesMixin
 
 class APIClient(
     APIClientBaseMixin,
@@ -15,7 +15,7 @@ class APIClient(
     APIClientToolMixin,
     APIClientLoggingMixin,
     APIClientFormattingMixin,
-    APIClientCodexMixin,
+    APIClientResponsesMixin,
     APIClientChatMixin):
     pass
 

@@ -1,12 +1,12 @@
 """审核智能体模型调用统一出口。
 
 三个审核智能体（approval / goal_review / workflow_review）历史上各自裸发
-chat.completions HTTP 请求；接入 codex 后统一收敛到本模块：
+chat.completions HTTP 请求；接入 Responses 协议后统一收敛到本模块：
 
-- codex 模型（profile.provider_type == "codex"）：走 APIClient.chat_codex
-  流式聚合（Responses API，协议差异由 utils/api_client/codex 层处理，
-  工具参数 nullable 适配与 sanitize 已内置）；
-- 常规模型：保留既有裸 HTTP 行为（含 extra_params 降级重试一次），
+- Responses 模型（profile.api_protocol == "responses"）：走 APIClient 统一通道
+  流式聚合（协议差异由 utils/api_client/responses 层处理，含 OAuth（codex）/
+  静态 key 两种 auth；工具参数 nullable 适配与 sanitize 已内置）；
+- Chat Completions 模型：保留既有裸 HTTP 行为（含 extra_params 降级重试一次），
   不改变既有语义。
 
 返回 chat.completions 的 message 形状：
@@ -29,12 +29,13 @@ class ReviewModelCallError(RuntimeError):
     """审核模型调用失败（HTTP 错误 / 网络异常 / 流内 error chunk）。"""
 
 
-async def _call_codex(
+async def _call_via_api_client(
     profile: Dict[str, Any],
     thinking: bool,
     messages: List[Dict[str, Any]],
     tools: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """经 APIClient 统一通道调用（Responses 协议模型；分发由 chat() 按 api_protocol 路由）。"""
     from utils.api_client import APIClient
 
     client = APIClient(thinking_mode=thinking, web_mode=True)
@@ -156,8 +157,8 @@ async def call_review_model(
     if not isinstance(profile, dict):
         raise ReviewModelCallError("review agent model not configured")
     thinking = bool(cfg.get("thinking"))
-    if str(profile.get("provider_type") or "") == "codex":
-        return await _call_codex(profile, thinking, messages, tools)
+    if str(profile.get("api_protocol") or "") == "responses":
+        return await _call_via_api_client(profile, thinking, messages, tools)
     return await _call_regular(
         profile,
         thinking,

@@ -748,6 +748,8 @@ def list_models_api():
             "multimodal": multimodal,
             "context_window": profile.get("context_window"),
             "max_output_tokens": (profile.get("fast") or {}).get("max_tokens"),
+            # 协议标识（2026-09-25 泛化）：前端按它区分 chat / responses 行为
+            "api_protocol": profile.get("api_protocol") or "chat_completions",
             # Codex 动态模型字段（常规模型为 None/缺省，前端按 provider_type 分支）
             "provider_type": profile.get("provider_type"),
             # 提供商同步模型的分组字段（手写 custom / Codex 为 None）

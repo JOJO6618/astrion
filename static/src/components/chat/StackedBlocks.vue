@@ -147,11 +147,13 @@ const modelStore = useModelStore();
 
 const hideBorders = computed(() => personalizationStore.form.stacked_hide_borders);
 
-// Codex 对话的思考内容是官方摘要（非完整思维链），标题区分显示；
-// 历史消息读 action.modelKey（落库 metadata.model_key），流式回退当前模型
+// Responses 协议模型的思考内容是上游摘要（非完整思维链），标题区分显示；
+// 历史消息读 action.modelKey（落库 metadata.model_key），流式回退当前模型。
+// 判定按 api_protocol（2026-09-25 泛化，原 codex/ 前缀 sniff 废除）
 const thinkingTitle = (action: any): string => {
   const mk = String(action?.modelKey || modelStore.currentModelKey || '');
-  if (mk.startsWith('codex/')) {
+  const opt = modelStore.allModels.find((m) => m.key === mk);
+  if (opt?.apiProtocol === 'responses') {
     return t('chat.thoughtSummary');
   }
   return action?.streaming ? t('chat.thinkingRunning') : t('chat.thinking');

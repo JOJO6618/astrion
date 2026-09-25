@@ -66,7 +66,9 @@ export default {
   providersConnectedSection: '已连接',
   providersCatalogSection: '添加提供商',
   providersCatalogDesc: '选择服务商并填入 API 密钥，模型列表将自动同步。',
-  protocolNoteChatOnly: '该网关为多协议网关，当前版本仅支持其 OpenAI Chat Completions 模型子集。',
+  protocolNoteMultiPartial:
+    '多协议网关：Chat Completions 与 Responses 模型可直接使用；Anthropic / Google 协议模型会正常注册显示，但当前版本暂不支持调用。',
+  protocolNoteMultiPartialCount: '其中 {count} 个模型的协议暂不支持调用。',
   localBadge: '本地',
   providerConnected: '已连接',
   providerModelsCount: '{count} 个模型可用',
@@ -113,7 +115,6 @@ export default {
   addCustomProvider: '添加自定义提供商',
   modelsEmpty: '暂无已注册模型。',
   modelGroupProviderBadge: '提供商同步',
-  modelGroupCodexBadge: 'ChatGPT 订阅',
   modelGroupCustom: '自定义',
   modelGroupCustomBadge: '手动配置',
   modelVisibleSwitch: '模型选择器中对我可见（用户级设置）',

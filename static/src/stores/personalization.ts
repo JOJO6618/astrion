@@ -81,7 +81,7 @@ const sanitizeReviewAgents = (raw: any): Record<ReviewAgentKey, ReviewAgentSetti
 /** 审核智能体键：自动审批 / 目标审核 / 工作流审核 */
 export type ReviewAgentKey = 'auto_approval' | 'goal_review' | 'workflow_review';
 export interface ReviewAgentSetting {
-  /** 注册表模型 key（与主模型选择器同源，含 codex/ 前缀）；留空 = 自动规则 */
+  /** 注册表模型 key（与主模型选择器同源，含 openai-codex/ 前缀）；留空 = 自动规则 */
   model: string;
   /** 思考模式开关（模型不支持思考时后端自动回落 fast 段） */
   thinking: boolean;
@@ -368,7 +368,7 @@ const defaultForm = (): PersonalForm => ({
   versioning_restore_mode: 'overwrite',
   default_model: null,
   hidden_models: [],
-  external_session_header: false,
+  external_session_header: true,
   image_compression: 'original',
   auto_shallow_compress_enabled: false,
   auto_deep_compress_enabled: true,

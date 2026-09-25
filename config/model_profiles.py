@@ -133,8 +133,9 @@ def _build_custom_profile(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
     if flags["thinking_only"]:
         profile["thinking_only"] = True
-    # 推理强度开关：配置为真值（如 "reasoning_effort": true）时，思考模式下前端可选档位
-    if bool(item.get("reasoning_effort")):
+    # 推理强度开关：所有支持思考的模型一律开放档位（2026-09-25 用户拍板，滑块绑思考能力）；
+    # 显式 "reasoning_effort": true 的旧配置路径保留兼容
+    if flags["supports_thinking"] or bool(item.get("reasoning_effort")):
         profile["supports_reasoning_effort"] = True
     if flags["supports_thinking"]:
         profile["thinking"] = {
@@ -247,9 +248,10 @@ def get_model_profile(key: Optional[str]) -> dict:
     profiles = get_registered_model_profiles()
     profile = profiles[resolved_key]
     fast = profile.get("fast") or {}
-    # Codex 订阅模型经 OAuth 凭证请求，不配置 api_key
-    is_codex = str(profile.get("provider_type") or "") == "codex"
-    if not is_codex and not fast.get("api_key"):
+    # codex 订阅模型经 OAuth 凭证请求，不配置静态 api_key（2026-09-25 泛化后按
+    # responses_auth 判定，不再看 provider_type）
+    is_codex_oauth = str(profile.get("responses_auth") or "") == "codex_oauth"
+    if not is_codex_oauth and not fast.get("api_key"):
         raise ValueError(f"模型 {resolved_key} 缺少 API Key 配置")
     if not fast.get("base_url") or not fast.get("model_id"):
         raise ValueError(f"模型 {resolved_key} 缺少 API 地址或模型 ID 配置")

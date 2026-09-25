@@ -5,7 +5,7 @@ OpenCode Go/Zen 自 2026-09-05 起要求发往其端点的请求携带
 路由与 prompt 缓存优化（https://opencode.ai/docs/go/）。
 
 设计约定：
-- 开关：个人空间「模型与思考」-> ``external_session_header``，默认关闭（opt-in）。
+- 开关：个人空间「模型与思考」-> ``external_session_header``，默认开启（opt-out）。
 - ID 取值：随机 uuid4 hex，不复用 conversation_id（避免向 vendor 暴露本地标识）。
 - 生命周期：对话首次请求时惰性生成并存入对话 metadata；深压缩完成后重置
   （压缩重写上下文后，旧 session 的缓存亲和已失去意义，语义上等同新 session）。

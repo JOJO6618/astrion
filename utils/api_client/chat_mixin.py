@@ -56,12 +56,28 @@ class APIClientChatMixin:
         Yields:
             响应内容块
         """
-        # Codex 通道：provider_type 为 codex 时走独立的请求编排（OAuth +
-        # Responses API 适配层），产出与本方法完全同形的 chunk，下游零改动。
-        # 必须在 api_key 检查之前分发——codex 模型不配置 api_key。
-        if str(getattr(self, "provider_type", "") or "") == "codex":
-            async for chunk in self.chat_codex(messages, tools, stream=stream):
+        # Responses 协议通道（2026-09-25 泛化）：api_protocol 为 responses 时走
+        # 通用 Responses 编排，产出与本方法完全同形的 chunk，下游零改动。
+        # 必须在 api_key 检查之前分发——codex_oauth 模型不配置静态 api_key。
+        _api_protocol = str(getattr(self, "api_protocol", "") or "")
+        if _api_protocol == "responses":
+            async for chunk in self.chat_responses(messages, tools, stream=stream):
                 yield chunk
+            return
+
+        # 暂不支持协议的模型（正常注册但不可调用，见泛化文档决策 7）
+        if _api_protocol in ("anthropic_messages", "google"):
+            yield {
+                "error": {
+                    "status_code": None,
+                    "error_text": f"api_protocol_unsupported: {_api_protocol}",
+                    "error_type": "api_protocol_unsupported",
+                    "error_message": f"该模型使用 {_api_protocol} 协议，当前版本暂不支持调用（协议适配规划中）。",
+                    "model_id": getattr(self, "model_id", None),
+                    "model_key": getattr(self, "model_key", None),
+                    "provider": getattr(self, "provider_id", None),
+                }
+            }
             return
 
         # 检查API密钥

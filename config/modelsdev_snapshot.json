@@ -1,0 +1,8628 @@
+{
+ "version": 1,
+ "source": "https://models.dev/api.json",
+ "fetched_at": "2026-09-24T20:16:48Z",
+ "providers": {
+  "alibaba-cn": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "qwen-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 32768
+    },
+    "qwen3.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen2-5-coder-32b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "deepseek-v3-2-exp": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "deepseek-r1-distill-qwen-14b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "qwen-math-plus": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4096,
+     "max_output": 3072
+    },
+    "qwen-deep-research": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 32768
+    },
+    "qwen3.7-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen2-5-32b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwq-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwq-32b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen2-5-vl-72b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "deepseek-v3-1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "qwen3-vl-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen-plus-character": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 4096
+    },
+    "qwen-max": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen3-next-80b-a3b-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen3.8-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "kimi-k3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 1048576
+    },
+    "qwen2-5-math-7b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4096,
+     "max_output": 3072
+    },
+    "qwen3.5-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen2-5-72b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "glm-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 16384
+    },
+    "deepseek-v4.1-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "deepseek-r1-distill-llama-8b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "qwen3-32b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "qwen2-5-coder-7b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 32768
+    },
+    "qwen3.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "kimi-k2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 16384
+    },
+    "qwen3-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen-omni-turbo-realtime": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 32768,
+     "max_output": 2048
+    },
+    "deepseek-v3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 65536,
+     "max_output": 8192
+    },
+    "deepseek-r1-distill-llama-70b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "qwen3-coder-480b-a35b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 16384
+    },
+    "deepseek-r1-distill-qwen-7b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "qwen2-5-math-72b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4096,
+     "max_output": 3072
+    },
+    "qwen3-coder-30b-a3b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen-doc-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "kimi-k2-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 16384
+    },
+    "qvq-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen2-5-7b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen3-omni-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 65536,
+     "max_output": 16384
+    },
+    "qwen-vl-max": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen3-235b-a22b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "qwen3-vl-30b-a3b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "kimi-k2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen3-next-80b-a3b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen-vl-plus": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "deepseek-r1-distill-qwen-1-5b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "qwen3.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen3-coder-flash": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen2-5-omni-7b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 32768,
+     "max_output": 2048
+    },
+    "qwen-mt-plus": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 16384,
+     "max_output": 8192
+    },
+    "tongyi-intent-detect-v3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 1024
+    },
+    "qwen3-vl-235b-a22b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen3-coder-plus": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "moonshot-kimi-k2-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "MiniMax-M2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "qwen2-5-14b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen3.8-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen2-5-vl-7b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen-math-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4096,
+     "max_output": 3072
+    },
+    "qwen-long": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 10000000,
+     "max_output": 8192
+    },
+    "qwen3.6-max-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 245800,
+     "max_output": 65536
+    },
+    "qwen-mt-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 16384,
+     "max_output": 8192
+    },
+    "qwen3.5-397b-a17b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen3-8b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "glm-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "qwen-omni-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 32768,
+     "max_output": 2048
+    },
+    "glm-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 128000
+    },
+    "qwen3-omni-flash-realtime": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 65536,
+     "max_output": 16384
+    },
+    "qwen3-asr-flash": {
+     "reasoning": false,
+     "modalities_input": [
+      "audio"
+     ],
+     "context": 53248,
+     "max_output": 4096
+    },
+    "deepseek-r1-distill-qwen-32b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "deepseek-r1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "deepseek-v4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "deepseek-r1-0528": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "qwen3.6-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen3-14b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "glm-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen3.7-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 64000
+    },
+    "deepseek-v4-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "qwen-vl-ocr": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 34096,
+     "max_output": 4096
+    },
+    "siliconflow/deepseek-v3-0324": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 163840
+    },
+    "siliconflow/deepseek-v3.1-terminus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 65536
+    },
+    "siliconflow/deepseek-r1-0528": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 32768
+    },
+    "siliconflow/deepseek-v3.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 65536
+    },
+    "kimi/kimi-k2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "MiniMax/MiniMax-M2.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    }
+   }
+  },
+  "deepseek": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "deepseek-v4-flash-vision-exp": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 393216
+    },
+    "deepseek-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 393216
+    },
+    "deepseek-v4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 393216
+    },
+    "deepseek-v4-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 393216
+    }
+   }
+  },
+  "google": {
+   "npm": "@ai-sdk/google",
+   "models": {
+    "gemini-flash-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemma-4-31b-it": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "gemini-omni-flash-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "gemini-3.1-flash-image-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 65536,
+     "max_output": 65536
+    },
+    "veo-3.1-lite-generate-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 480,
+     "max_output": 8192
+    },
+    "lyria-3-pro-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3.1-flash-tts-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 16384
+    },
+    "gemini-2.5-flash-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 32768,
+     "max_output": 32768
+    },
+    "gemini-flash-lite-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-embedding-2": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 8192,
+     "max_output": 1
+    },
+    "gemini-3.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemma-4-26b-a4b-it": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "gemini-3-pro-image-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "gemini-2.5-pro-preview-tts": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 16384
+    },
+    "gemini-3.5-flash-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3.1-flash-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "lyria-3-clip-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3.1-pro-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-2.5-computer-use-preview-10-2025": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 64000
+    },
+    "gemini-3.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-2.5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3-pro-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 65536,
+     "max_output": 32768
+    },
+    "gemini-2.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-2.5-flash-preview-tts": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 16384
+    },
+    "gemini-3.1-flash-lite-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 65536,
+     "max_output": 4096
+    },
+    "deep-research-preview-04-2026": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "deep-research-max-preview-04-2026": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "veo-3.1-fast-generate-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 480,
+     "max_output": 8192
+    },
+    "gemini-3.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "veo-3.1-generate-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 480,
+     "max_output": 8192
+    },
+    "gemini-3.1-pro-preview-customtools": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3-flash-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3.8-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3.5-live-translate-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "audio"
+     ],
+     "context": 16384,
+     "max_output": 32768
+    },
+    "gemini-2.5-flash-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-embedding-001": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 2048,
+     "max_output": 1
+    },
+    "gemini-3.1-flash-lite-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "gemini-3.1-flash-live-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "gemini-3.1-flash-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    }
+   }
+  },
+  "groq": {
+   "npm": "@ai-sdk/groq",
+   "models": {
+    "whisper-large-v3": {
+     "reasoning": false,
+     "modalities_input": [
+      "audio"
+     ]
+    },
+    "llama-3.3-70b-versatile": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "allam-2-7b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4096,
+     "max_output": 4096
+    },
+    "whisper-large-v3-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "audio"
+     ]
+    },
+    "llama-3.1-8b-instant": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "groq/compound-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "groq/compound": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "meta-llama/llama-prompt-guard-2-86m": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 512,
+     "max_output": 512
+    },
+    "meta-llama/llama-prompt-guard-2-22m": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 512,
+     "max_output": 512
+    },
+    "canopylabs/orpheus-v1-english": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4000,
+     "max_output": 50000
+    },
+    "canopylabs/orpheus-arabic-saudi": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4000,
+     "max_output": 50000
+    },
+    "qwen/qwen3.8-27b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131042,
+     "max_output": 16384
+    },
+    "qwen/qwen3.6-27b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "openai/gpt-oss-20b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "openai/gpt-oss-safeguard-20b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "openai/gpt-oss-120b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    }
+   }
+  },
+  "minimax": {
+   "npm": "@ai-sdk/anthropic",
+   "models": {
+    "MiniMax-M3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 512000
+    },
+    "MiniMax-M2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.7-highspeed": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.5-highspeed": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    }
+   }
+  },
+  "minimax-cn": {
+   "npm": "@ai-sdk/anthropic",
+   "models": {
+    "MiniMax-M3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 512000
+    },
+    "MiniMax-M2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.7-highspeed": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMax-M2.5-highspeed": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    }
+   }
+  },
+  "mistral": {
+   "npm": "@ai-sdk/mistral",
+   "models": {
+    "open-mistral-nemo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "codestral-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 4096
+    },
+    "mistral-large-2411": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "mistral-nemo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "voxtral-mini-tts-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ]
+    },
+    "mistral-medium-2508": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "mistral-large-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "mistral-small-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "zai-glm-5-2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "ministral-8b-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "devstral-medium-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "open-mixtral-8x22b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 64000,
+     "max_output": 64000
+    },
+    "devstral-2512": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "mistral-medium-2505": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "magistral-medium-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "pixtral-12b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "mistral-embed": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8000,
+     "max_output": 3072
+    },
+    "devstral-small-2505": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "mistral-small-2603": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "devstral-medium-2507": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "magistral-small": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "voxtral-mini-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "audio"
+     ]
+    },
+    "labs-devstral-small-2512": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "mistral-large-2512": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "devstral-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "devstral-small-2507": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "pixtral-large-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "voxtral-small-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "audio"
+     ],
+     "context": 32000,
+     "max_output": 32000
+    },
+    "open-mixtral-8x7b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32000,
+     "max_output": 32000
+    },
+    "mistral-small-2506": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "zai-glm-5-3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "mistral-medium-2604": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "open-mistral-7b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8000,
+     "max_output": 8000
+    },
+    "ministral-3b-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "mistral-medium-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    }
+   }
+  },
+  "moonshotai-cn": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "kimi-k2.7-code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "kimi-k2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "kimi-k2.7-code-highspeed": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "kimi-k3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 1048576
+    }
+   }
+  },
+  "openai": {
+   "npm": "@ai-sdk/openai",
+   "models": {
+    "chatgpt-image-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ]
+    },
+    "gpt-5.4": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-5.4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-3.5-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 16385,
+     "max_output": 4096
+    },
+    "gpt-5.5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "text-embedding-3-small": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8191,
+     "max_output": 1536
+    },
+    "gpt-5.4-nano": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-realtime-2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "audio",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 32000
+    },
+    "gpt-4o-2024-05-13": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 4096
+    },
+    "gpt-4o": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "gpt-5-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-image-2": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ]
+    },
+    "gpt-5.2-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "o4-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "o3-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "text-embedding-ada-002": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 1536
+    },
+    "gpt-4": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 8192
+    },
+    "gpt-5.3-codex": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-4.1-nano": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1047576,
+     "max_output": 32768
+    },
+    "gpt-5-nano": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-5.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-5.2-chat-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "o1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "gpt-5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 272000
+    },
+    "gpt-5.3-codex-spark": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 32000
+    },
+    "text-embedding-3-large": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8191,
+     "max_output": 3072
+    },
+    "gpt-4o-2024-08-06": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "gpt-6-astra": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-4o-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "o3-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "gpt-image-1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ]
+    },
+    "gpt-5.4-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-5.6-luna": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-5.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-4.1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1047576,
+     "max_output": 32768
+    },
+    "gpt-4o-2024-11-20": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "gpt-4.1-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1047576,
+     "max_output": 32768
+    },
+    "gpt-6-luna": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-5.3-chat-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "gpt-image-1-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ]
+    },
+    "gpt-image-1.5": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ]
+    },
+    "gpt-5.6-terra": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-4-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 4096
+    },
+    "o3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "gpt-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-5.6-sol": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "gpt-6-sol": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "o1-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    }
+   }
+  },
+  "opencode": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "ling-3.0-flash-fin-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "gpt-5.4": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "qwen3.6-plus-free": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "claude-haiku-4-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 64000
+    },
+    "gpt-5.4-pro": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "mimo-v2-pro-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 64000
+    },
+    "muse-spark-1.2-contributor-free": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "muse-spark-1.3": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "glm-5-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "trinity-large-preview-free": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "gpt-5.5-pro": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "grok-4.7": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "gpt-5.4-nano": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "gpt-5.2-codex": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "ling-3.0-tiny-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "gpt-5.1-codex": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "glm-5.3-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "kimi-k2.5-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "glm-4.7-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "laguna-s-2.1-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 32000
+    },
+    "kimi-k3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "gpt-5-codex": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "qwen3-coder": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "minimax-m3-free": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 200000,
+     "max_output": 32000
+    },
+    "qwen3.5-plus": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "claude-opus-4-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 64000
+    },
+    "glm-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "deepseek-v4.1-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "gpt-5.3-codex": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "minimax-m2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "gpt-5-nano": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "deepseek-v4-flash-vision-exp": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "kimi-k2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "claude-sonnet-4-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 64000
+    },
+    "claude-opus-5-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "claude-fable-5-1": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "gemini-3.6-flash": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "kimi-k2-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "minimax-m2.5-free": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "gpt-5.3-codex-spark": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "gemini-3.5-flash-lite": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "claude-opus-4-1": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 32000
+    },
+    "gpt-6-astra": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "grok-4.5": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "ring-2.6-1t-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 66000
+    },
+    "kimi-k2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "longcat-2.0-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "gpt-5.1": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "claude-opus-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "claude-3-5-haiku": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 8192
+    },
+    "hy3-preview-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 64000
+    },
+    "gemini-3-flash": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "minimax-m2.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "gemini-3.5-flash": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "space-bunny-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 524288
+    },
+    "claude-fable-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "nemotron-3-super-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 128000
+    },
+    "minimax-m2.1-free": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "mimo-v2.6-flash-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 200000,
+     "max_output": 32000
+    },
+    "gemini-3-pro": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "nemotron-3-ultra-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "claude-sonnet-4": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 64000
+    },
+    "muse-spark-1.2": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "gpt-5.4-mini": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "glm-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "minimax-m3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 512000,
+     "max_output": 128000
+    },
+    "gpt-5.6-luna": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "qwen3.8-flash": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "gpt-5.1-codex-max": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "mimo-v2.5-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 200000,
+     "max_output": 32000
+    },
+    "grok-code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "gpt-5.2": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "claude-opus-4-8": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "gpt-5.5": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "ling-2.6-flash-free": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262100,
+     "max_output": 32800
+    },
+    "claude-sonnet-5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "deepseek-v4-flash-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 128000
+    },
+    "hy3-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 190000,
+     "max_output": 64000
+    },
+    "nemotron-3.5-lightning-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "claude-opus-4-6": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "gemini-3.7-flash": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "glm-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "kimi-k2": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "glm-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "mimo-v2-omni-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "pdf"
+     ],
+     "context": 262144,
+     "max_output": 64000
+    },
+    "grok-build-0.1": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "ling-3.0-flash-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "gemini-3.8-flash": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "north-mini-code-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 64000
+    },
+    "gpt-6-luna": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "deepseek-v4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "claude-sonnet-4-6": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 64000
+    },
+    "big-pickle": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 32000
+    },
+    "qwen3.6-plus": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "gpt-5.6-terra": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "mimo-v2-flash-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "gpt-5.1-codex-mini": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "glm-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "claude-opus-4-7": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "kimi-k2.7-code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "gpt-5": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "grok-4.6": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "gemini-3.1-pro": {
+     "npm": "@ai-sdk/google",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "minimax-m2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "gpt-5.6-sol": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "x-preview-f-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "muse-spark-1.3-contributor-free": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "deepseek-v4-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "gpt-6-sol": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    }
+   }
+  },
+  "opencode-go": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "mimo-v2.6-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "qwen3.7-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "mimo-v2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "grok-4.7": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "mimo-v2-omni": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "pdf"
+     ],
+     "context": 262144,
+     "max_output": 128000
+    },
+    "glm-5.3-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen3.8-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "kimi-k3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "qwen3.5-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "glm-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 32768
+    },
+    "deepseek-v4.1-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "minimax-m2.5": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 65536
+    },
+    "deepseek-v4-flash-vision-exp": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "kimi-k2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "longcat-2.0": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "ox-alpha-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "grok-4.5": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "kimi-k2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "mimo-v2-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 128000
+    },
+    "minimax-m2.7": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "space-bunny-free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 524288
+    },
+    "mimo-v2.5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 128000
+    },
+    "mimo-v2.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "minimax-m3": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "gpt-5.6-luna": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "qwen3.8-flash": {
+     "npm": "@ai-sdk/anthropic",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "hy3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 128000
+    },
+    "glm-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 32768
+    },
+    "omen-alpha": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 500000,
+     "max_output": 128000
+    },
+    "muse-spark-1.2-contributor": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "gpt-6-luna": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "deepseek-v4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "qwen3.6-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "hy4-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1024000,
+     "max_output": 64000
+    },
+    "muse-spark-1.3-contributor": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "glm-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "kimi-k2.7-code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "grok-4.6": {
+     "npm": "@ai-sdk/openai",
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "qwen3.7-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "deepseek-v4-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    }
+   }
+  },
+  "openrouter": {
+   "npm": "@openrouter/ai-sdk-provider",
+   "models": {
+    "sao10k/l3-lunaris-8b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 7372
+    },
+    "sao10k/l3.3-euryale-70b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "sao10k/l3.1-euryale-70b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "kwaipilot/kat-coder-pro-v2.5": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "stealth/space-bunny-alpha": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 524288
+    },
+    "bytedance-seed/seed-1.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "bytedance-seed/seed-2.0-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "bytedance-seed/seed-2-1-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "bytedance-seed/seed-2.0-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "bytedance-seed/seed-2.0-code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "bytedance-seed/seed-1.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "~moonshotai/kimi-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "poolside/laguna-s-2.1:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "poolside/laguna-s-2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "poolside/laguna-xs-2.1:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "poolside/laguna-xs-2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "prism-ml/ternary-bonsai-2-27b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "anthropic/claude-opus-4.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 32000
+    },
+    "anthropic/claude-opus-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 64000
+    },
+    "anthropic/claude-opus-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-opus-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-3-haiku": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 4096
+    },
+    "anthropic/claude-opus-4.8": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-haiku-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 64000
+    },
+    "anthropic/claude-opus-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-fable-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-sonnet-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 64000
+    },
+    "anthropic/claude-fable-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-sonnet-4": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 64000
+    },
+    "anthropic/claude-sonnet-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-sonnet-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "anthropic/claude-opus-5.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "nex-agi/nex-n2.5-mini:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "nex-agi/nex-n2.5-pro:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "cohere/command-r-08-2024": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 4000
+    },
+    "cohere/command-a-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 192000,
+     "max_output": 64000
+    },
+    "cohere/command-a": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 8192
+    },
+    "cohere/north-mini-code:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 64000
+    },
+    "cohere/command-r7b-12-2024": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 4000
+    },
+    "cohere/command-r-plus-08-2024": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 4000
+    },
+    "deepseek/deepseek-chat-v3.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 32768
+    },
+    "deepseek/deepseek-v4-flash-0731": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1310720,
+     "max_output": 943718
+    },
+    "deepseek/deepseek-v4.1-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 393216
+    },
+    "deepseek/deepseek-v4-flash-vision-exp": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "deepseek/deepseek-r1-distill-llama-70b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 7372
+    },
+    "deepseek/deepseek-v3.1-terminus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 32768
+    },
+    "deepseek/deepseek-chat": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 16384
+    },
+    "deepseek/deepseek-v4-pro-0813": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 384000
+    },
+    "deepseek/deepseek-v3.2-exp": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 65536
+    },
+    "deepseek/deepseek-chat-v3-0324": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 147456
+    },
+    "deepseek/deepseek-r1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 64000,
+     "max_output": 16000
+    },
+    "deepseek/deepseek-v4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 384000
+    },
+    "deepseek/deepseek-r1-0528": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 32768
+    },
+    "deepseek/deepseek-v3.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 65536
+    },
+    "deepseek/deepseek-v4-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 384000
+    },
+    "unbiased/pareto": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "tencent/hy3-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "tencent/hunyuan-a13b-instruct": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "tencent/hy-mt2-30b-a3b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 4096
+    },
+    "tencent/hy-mt2-1.8b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 4096
+    },
+    "tencent/hy3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 128000
+    },
+    "tencent/hy-mt2-7b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 4096
+    },
+    "tencent/hy4-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 64000
+    },
+    "anthracite-org/magnum-v4-72b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 4096
+    },
+    "meta-llama/llama-4-scout": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1310720,
+     "max_output": 16384
+    },
+    "meta-llama/llama-guard-4-12b": {
+     "reasoning": false,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 16384
+    },
+    "meta-llama/llama-4-maverick": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 16384
+    },
+    "meta-llama/llama-3.3-70b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "meta-llama/llama-3.1-8b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "meta-llama/llama-3.2-1b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 60000,
+     "max_output": 54000
+    },
+    "meta-llama/llama-3.2-3b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "meta-llama/llama-3.1-70b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "~google/gemini-flash-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "~google/gemini-pro-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "audio",
+      "pdf",
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "perceptron/perceptron-mk1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 32768,
+     "max_output": 8192
+    },
+    "z-ai/glm-4.6v": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "z-ai/glm-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "z-ai/glm-5.3-prime": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "z-ai/glm-5v-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 202752,
+     "max_output": 131072
+    },
+    "z-ai/glm-5.3-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1310720,
+     "max_output": 131072
+    },
+    "z-ai/glm-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 16384
+    },
+    "z-ai/glm-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 128000
+    },
+    "z-ai/glm-4.5v": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 65536,
+     "max_output": 16384
+    },
+    "z-ai/glm-5.3-flashx": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "z-ai/glm-4.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 117964
+    },
+    "z-ai/glm-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "z-ai/glm-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "z-ai/glm-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 128000
+    },
+    "z-ai/glm-5-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 131072
+    },
+    "z-ai/glm-5.2:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 29491
+    },
+    "z-ai/glm-4.5-air": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "z-ai/glm-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1310720,
+     "max_output": 943717
+    },
+    "inference-net/schematron-v2-small": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 4096
+    },
+    "inference-net/schematron-v2-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 8192
+    },
+    "thinkingmachines/inkling-small:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 262144
+    },
+    "thinkingmachines/inkling-small": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 262144
+    },
+    "thinkingmachines/inkling:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 262144
+    },
+    "thinkingmachines/inkling": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 471859
+    },
+    "meituan/longcat-2.0": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048756,
+     "max_output": 262144
+    },
+    "openrouter/bodybuilder": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 128000
+    },
+    "openrouter/free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 8000
+    },
+    "openrouter/pareto-code": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 2000000,
+     "max_output": 200000
+    },
+    "openrouter/fusion": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "openrouter/auto": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "pdf",
+      "video"
+     ],
+     "context": 2000000,
+     "max_output": 2000000
+    },
+    "perplexity/sonar-pro": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 8000
+    },
+    "perplexity/sonar-deep-research": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 115200
+    },
+    "perplexity/sonar": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 127072,
+     "max_output": 114364
+    },
+    "perplexity/sonar-reasoning-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 115200
+    },
+    "perplexity/sonar-pro-search": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 8000
+    },
+    "meta/muse-spark-1.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "meta/muse-glimmer-30b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "meta/muse-spark-1.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "meta/muse-spark-1.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "meta/muse-spark-1.2-contributor": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "meta/muse-spark-1.3-contributor": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "nousresearch/hermes-3-llama-3.1-70b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "nousresearch/hermes-3-llama-3.1-405b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "nousresearch/hermes-4-405b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "~z-ai/glm-flash-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1310720,
+     "max_output": 128000
+    },
+    "~z-ai/glm-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1310720,
+     "max_output": 131072
+    },
+    "arcee-ai/trinity-large-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 80000
+    },
+    "~openai/gpt-terra-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "~openai/gpt-luna-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "~openai/gpt-sol-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "~openai/gpt-astra-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "~openai/gpt-mini-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 8192
+    },
+    "thedrummer/skyfall-36b-v2": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 29491
+    },
+    "thedrummer/unslopnemo-12b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1024000,
+     "max_output": 819200
+    },
+    "thedrummer/cydonia-24b-v4.1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "baidu/ernie-4.5-vl-424b-a47b": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 123000,
+     "max_output": 16000
+    },
+    "x-ai/grok-4.20-multi-agent": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 2000000,
+     "max_output": 1800000
+    },
+    "x-ai/grok-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 450000
+    },
+    "x-ai/grok-4.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 900000
+    },
+    "x-ai/grok-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 450000
+    },
+    "x-ai/grok-build-0.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 256000,
+     "max_output": 230400
+    },
+    "x-ai/grok-4.20": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 2000000,
+     "max_output": 1800000
+    },
+    "x-ai/grok-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 450000
+    },
+    "~anthropic/claude-opus-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "~anthropic/claude-haiku-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 64000
+    },
+    "~anthropic/claude-sonnet-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "~anthropic/claude-fable-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "upstage/solar-pro-3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "upstage/solar-pro4": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 524288,
+     "max_output": 131072
+    },
+    "upstage/solar-mini4": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 524288,
+     "max_output": 131072
+    },
+    "~deepseek/deepseek-flash-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "~deepseek/deepseek-pro-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 393216
+    },
+    "~deepseek/deepseek-v4-flash-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1310720,
+     "max_output": 943718
+    },
+    "~x-ai/grok-latest": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 450000
+    },
+    "bytedance/ui-tars-1.5-7b": {
+     "reasoning": false,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 2048
+    },
+    "liquid/lfm-2.5-2.6b:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 65536,
+     "max_output": 8192
+    },
+    "google/gemma-4-31b-it": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 16384
+    },
+    "google/gemini-3.1-flash-image-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 65536,
+     "max_output": 58982
+    },
+    "google/lyria-3-pro-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemma-3-27b-it": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "google/gemma-4-31b-it:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "google/gemini-2.5-flash-image": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 32768,
+     "max_output": 8192
+    },
+    "google/gemma-4-26b-a4b-it:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "google/gemma-2-27b-it": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 2048
+    },
+    "google/gemini-3.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemma-4-26b-a4b-it": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "google/gemini-3-pro-image-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 65536,
+     "max_output": 32768
+    },
+    "google/gemini-3.5-flash-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3.1-flash-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "google/lyria-3-clip-preview": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3.1-pro-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemma-3-12b-it": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "google/gemini-3.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-2.5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3-pro-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "google/gemini-2.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65535
+    },
+    "google/gemini-3.1-flash-lite-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 65536,
+     "max_output": 58982
+    },
+    "google/gemini-3.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3.1-pro-preview-customtools": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3-flash-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3.8-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemma-3-4b-it": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "google/gemini-2.5-flash-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65535
+    },
+    "google/gemini-2.5-pro-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text",
+      "audio"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3.1-flash-lite-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "google/gemini-3.1-flash-lite": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio",
+      "pdf"
+     ],
+     "context": 1048576,
+     "max_output": 65536
+    },
+    "writer/palmyra-x5": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1040000,
+     "max_output": 8192
+    },
+    "ibm-granite/granite-4.0-h-micro": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 117900
+    },
+    "ibm-granite/granite-4.2-8b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "fireworks/ember-1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "mistralai/mistral-nemo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "mistralai/ministral-8b-2512": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 209715
+    },
+    "mistralai/mistral-small-24b-instruct-2501": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "mistralai/mistral-saba": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 32768,
+     "max_output": 26214
+    },
+    "mistralai/mistral-medium-3-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 262144,
+     "max_output": 209715
+    },
+    "mistralai/mistral-medium-3.1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 131072,
+     "max_output": 104857
+    },
+    "mistralai/mistral-small-3.2-24b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 16384
+    },
+    "mistralai/mistral-large": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 102400
+    },
+    "mistralai/mistral-small-2603": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 209715
+    },
+    "mistralai/mistral-medium-3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 131072,
+     "max_output": 104857
+    },
+    "mistralai/voxtral-small-24b-2507": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "audio",
+      "pdf"
+     ],
+     "context": 32768,
+     "max_output": 26214
+    },
+    "mistralai/mistral-large-2407": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 131072,
+     "max_output": 104857
+    },
+    "mistralai/ministral-14b-2512": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 209715
+    },
+    "mistralai/mistral-small-3.1-24b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 102400
+    },
+    "mistralai/ministral-3b-2512": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 104857
+    },
+    "mistralai/mixtral-8x22b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 65536,
+     "max_output": 52428
+    },
+    "mistralai/codestral-2508": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 256000,
+     "max_output": 204800
+    },
+    "sakana/fugu-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "sakana/fugu-ultra-v2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "sakana/fugu-ultra": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 128000
+    },
+    "sakana/sakana-namazu": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "inclusionai/ling-3.0-flash-fin:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "inclusionai/ling-3.0-flash-sante:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "inclusionai/ling-3.0-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "inclusionai/ling-3.0-flash-vl": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "inclusionai/ling-3.0-flash-fin": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "moonshotai/kimi-k3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 943718
+    },
+    "moonshotai/kimi-k2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "moonshotai/kimi-k2-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 98304
+    },
+    "moonshotai/kimi-k2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "moonshotai/kimi-k2-0905": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 98304
+    },
+    "moonshotai/kimi-k2": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "moonshotai/kimi-k2.7-code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "rekaai/reka-flash-3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 65536,
+     "max_output": 58982
+    },
+    "rekaai/reka-edge": {
+     "reasoning": false,
+     "modalities_input": [
+      "image",
+      "text",
+      "video"
+     ],
+     "context": 16384,
+     "max_output": 14745
+    },
+    "nvidia/nemotron-3-nano-30b-a3b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "nvidia/nemotron-3.5-content-safety:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 8192
+    },
+    "nvidia/nemotron-3.5-lightning": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "audio"
+     ],
+     "context": 256000,
+     "max_output": 65536
+    },
+    "nvidia/nemotron-3-super-120b-a12b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "nvidia/nemotron-3-ultra-550b-a55b:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "nvidia/nemotron-3-ultra-550b-a55b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 182520
+    },
+    "nvidia/nemotron-3-super-120b-a12b:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "nvidia/nemotron-3.5-content-safety": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "nvidia/nemotron-3.5-lightning:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "xiaomi/mimo-v2.6-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "xiaomi/mimo-v2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1050000,
+     "max_output": 131072
+    },
+    "xiaomi/mimo-v2.6-pro-ultraspeed": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "xiaomi/mimo-v2.5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 131072
+    },
+    "xiaomi/mimo-v2.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "undi95/remm-slerp-l2-13b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 6144,
+     "max_output": 5529
+    },
+    "gryphe/mythomax-l2-13b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 3686
+    },
+    "minimax/minimax-m2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 128000
+    },
+    "minimax/minimax-01": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000192,
+     "max_output": 40000
+    },
+    "minimax/minimax-m2-her": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 65536,
+     "max_output": 2048
+    },
+    "minimax/minimax-m2.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "minimax/minimax-m1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 40000
+    },
+    "minimax/minimax-m3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 512000
+    },
+    "minimax/minimax-m2.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "minimax/minimax-m2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 176947
+    },
+    "mancer/weaver": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8000,
+     "max_output": 6000
+    },
+    "stepfun/step-3.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "stepfun/step-3.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 230400
+    },
+    "dots-studio/dots-3-note-preview:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 512000,
+     "max_output": 460800
+    },
+    "inception/mercury-2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 260000,
+     "max_output": 65536
+    },
+    "inception/mercury-2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 50000
+    },
+    "amazon/nova-lite-v1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 300000,
+     "max_output": 5120
+    },
+    "amazon/nova-2-lite-v1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 65535
+    },
+    "amazon/nova-pro-v1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 300000,
+     "max_output": 5120
+    },
+    "amazon/nova-premier-v1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 32000
+    },
+    "amazon/nova-micro-v1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 5120
+    },
+    "relace/relace-search": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 128000
+    },
+    "relace/relace-apply-3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 128000
+    },
+    "aion-labs/aion-2.0": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "aion-labs/aion-rp-llama-3.1-8b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 29491
+    },
+    "aion-labs/aion-3.0": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "aion-labs/aion-3.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "aion-labs/aion-3.5-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "aion-labs/aion-3.0-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen/qwen3-235b-a22b-2507": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3-vl-235b-a22b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen/qwen3.7-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen/qwen3.8-27b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen/qwen3-vl-235b-a22b-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen/qwen3.8-2.4t-a95b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "qwen/qwen3.5-27b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen/qwen3-next-80b-a3b-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3-coder-next": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3-coder": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen/qwen3-32b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "qwen/qwen-plus": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 32768
+    },
+    "qwen/qwen3.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen3-max": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen/qwen3-coder-30b-a3b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3.8-omni-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen/qwen3-vl-30b-a3b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen/qwen3-235b-a22b-thinking-2507": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 117964
+    },
+    "qwen/qwen3-235b-a22b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen/qwen3.5-122b-a10b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen/qwen-plus-2025-07-28": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 32768
+    },
+    "qwen/qwen3.6-35b-a3b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3-next-80b-a3b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3-vl-30b-a3b-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen/qwen3.6-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen3-coder-flash": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen-2.5-coder-32b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 29491
+    },
+    "qwen/qwen3.5-flash-02-23": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen3-max-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen/qwen3-coder-plus": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen3.5-9b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen/qwen3.8-max-prime": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen/qwen3.5-plus-20260420": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen3.8-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen/qwen3.5-35b-a3b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 16384
+    },
+    "qwen/qwen3.6-max-preview": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "qwen/qwen3-30b-a3b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "qwen/qwen3.5-397b-a17b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3-8b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 8192
+    },
+    "qwen/qwen3-vl-32b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen/qwen3-vl-8b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 32768
+    },
+    "qwen/qwen3-30b-a3b-instruct-2507": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen2.5-vl-72b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 115200
+    },
+    "qwen/qwen-2.5-7b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 29491
+    },
+    "qwen/qwen3.5-plus-02-15": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen-2.5-72b-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 16384
+    },
+    "qwen/qwen3-30b-a3b-thinking-2507": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 81920,
+     "max_output": 32768
+    },
+    "qwen/qwen3.6-27b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 262140
+    },
+    "qwen/qwen3.6-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 65536
+    },
+    "qwen/qwen3-14b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 16384
+    },
+    "qwen/qwen3-vl-8b-thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "qwen/qwen3.7-plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "qwen/qwen3.8-27b:free": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 235929
+    },
+    "qwen/qwen3.8-max-0902": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "morph/morph-v3-large": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "morph/morph-v3-fast": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 81920,
+     "max_output": 38000
+    },
+    "openai/gpt-5.4": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.4-image-2": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 272000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.4-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-audio": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "audio"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/gpt-3.5-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 16385,
+     "max_output": 4096
+    },
+    "openai/gpt-6-astra-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.4-nano": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-4o-2024-05-13": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 4096
+    },
+    "openai/gpt-4o-mini-2024-07-18": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/gpt-5.2-codex": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.1-codex": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-4o": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/gpt-chat-latest": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-audio-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "audio"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/gpt-5.6-sol-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.2-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/o4-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/o3-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/gpt-4": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8191,
+     "max_output": 4096
+    },
+    "openai/gpt-5.3-codex": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-4.1-nano": {
+     "reasoning": false,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 1047576,
+     "max_output": 32768
+    },
+    "openai/gpt-5-nano": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/o1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/gpt-5-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-3.5-turbo-instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4095,
+     "max_output": 3685
+    },
+    "openai/gpt-4o-2024-08-06": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/gpt-6-astra": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.6-luna-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5-image-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-4o-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/o3-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "pdf",
+      "image"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/gpt-oss-20b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 32768
+    },
+    "openai/gpt-oss-safeguard-20b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "openai/o3-mini-high": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/gpt-3.5-turbo-16k": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 16385,
+     "max_output": 4096
+    },
+    "openai/gpt-5.2-chat": {
+     "reasoning": false,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 128000,
+     "max_output": 32000
+    },
+    "openai/gpt-6-sol-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5-image": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.4-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.6-luna": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.1-codex-max": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-4.1": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1047576,
+     "max_output": 32768
+    },
+    "openai/gpt-4o-2024-11-20": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 128000,
+     "max_output": 16384
+    },
+    "openai/gpt-3.5-turbo-0613": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 4095,
+     "max_output": 3685
+    },
+    "openai/gpt-4.1-mini": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1047576,
+     "max_output": 32768
+    },
+    "openai/gpt-5.6-terra-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-6-luna": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/o4-mini-high": {
+     "reasoning": true,
+     "modalities_input": [
+      "image",
+      "text",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/gpt-6-luna-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "pdf",
+      "image",
+      "text"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.6-terra": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-4-turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 128000,
+     "max_output": 4096
+    },
+    "openai/gpt-oss-120b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 65536
+    },
+    "openai/gpt-5.1-codex-mini": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/o3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "openai/gpt-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 400000,
+     "max_output": 128000
+    },
+    "openai/gpt-5.6-sol": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/gpt-6-sol": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1050000,
+     "max_output": 128000
+    },
+    "openai/o1-pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 100000
+    },
+    "microsoft/phi-4": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 16384,
+     "max_output": 14745
+    },
+    "microsoft/wizardlm-2-8x22b": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 65535,
+     "max_output": 8000
+    }
+   }
+  },
+  "siliconflow-cn": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "ByteDance-Seed/Seed-OSS-36B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "tencent/Hunyuan-A13B-Instruct": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 131000
+    },
+    "Qwen/Qwen3.5-4B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3.5-27B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3.6-35B-A3B": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3-235B-A22B-Thinking-2507": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen3-14B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 131000
+    },
+    "Qwen/Qwen3-8B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 131000
+    },
+    "Qwen/Qwen3-32B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 131000
+    },
+    "Qwen/Qwen3.5-35B-A3B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3.5-122B-A10B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3.5-9B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3.5-397B-A17B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen3-VL-32B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen2.5-7B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 33000,
+     "max_output": 4000
+    },
+    "Qwen/Qwen3-Coder-30B-A3B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen2.5-72B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 33000,
+     "max_output": 4000
+    },
+    "Qwen/Qwen3-VL-30B-A3B-Thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen3-VL-32B-Thinking": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen3-VL-8B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Qwen/Qwen3-VL-30B-A3B-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "deepseek-ai/DeepSeek-R1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "deepseek-ai/DeepSeek-V4-Flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "deepseek-ai/DeepSeek-OCR": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 8192,
+     "max_output": 8192
+    },
+    "deepseek-ai/DeepSeek-V4-Pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1049000,
+     "max_output": 393000
+    },
+    "deepseek-ai/DeepSeek-V3.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "deepseek-ai/DeepSeek-V3.1-Terminus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "deepseek-ai/DeepSeek-V3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "stepfun-ai/Step-3.5-Flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "inclusionAI/Ling-flash-2.0": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 131000
+    },
+    "zai-org/GLM-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1049000,
+     "max_output": 262000
+    },
+    "zai-org/GLM-4.5-Air": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131000,
+     "max_output": 131000
+    },
+    "Pro/deepseek-ai/DeepSeek-R1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "Pro/deepseek-ai/DeepSeek-V3.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "Pro/deepseek-ai/DeepSeek-V3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "Pro/deepseek-ai/DeepSeek-V3.1-Terminus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 164000,
+     "max_output": 164000
+    },
+    "Pro/MiniMaxAI/MiniMax-M2.5": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 192000,
+     "max_output": 131000
+    },
+    "Pro/moonshotai/Kimi-K2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Pro/moonshotai/Kimi-K2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262000,
+     "max_output": 262000
+    },
+    "Pro/zai-org/GLM-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 205000,
+     "max_output": 205000
+    },
+    "Pro/zai-org/GLM-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 205000,
+     "max_output": 205000
+    },
+    "PaddlePaddle/PaddleOCR-VL-1.5": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 16384,
+     "max_output": 16384
+    }
+   }
+  },
+  "togetherai": {
+   "npm": "@ai-sdk/togetherai",
+   "models": {
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "meta-llama/Meta-Llama-3-8B-Instruct-Lite": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 8192,
+     "max_output": 8192
+    },
+    "pearl-ai/gemma-4-31b-it": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32000,
+     "max_output": 32000
+    },
+    "deepcogito/cogito-v2-1-671b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163840,
+     "max_output": 163840
+    },
+    "thinkingmachines/Inkling": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio"
+     ],
+     "context": 524288,
+     "max_output": 131072
+    },
+    "essentialai/Rnj-1-Instruct": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 32768
+    },
+    "google/gemma-3n-E4B-it": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 32768
+    },
+    "google/gemma-4-31B-it": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "Qwen/Qwen3.7-Max": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 500000
+    },
+    "Qwen/Qwen2.5-7B-Instruct-Turbo": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 32768
+    },
+    "Qwen/Qwen3-Coder-Next-FP8": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "Qwen/Qwen3-235B-A22B-Instruct-2507-tput": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "Qwen/Qwen3.5-9B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 65536
+    },
+    "Qwen/Qwen3.5-397B-A17B": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 130000
+    },
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "Qwen/Qwen3.6-Plus": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 500000
+    },
+    "LiquidAI/LFM2-24B-A2B": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 32768,
+     "max_output": 32768
+    },
+    "deepseek-ai/DeepSeek-V4-Flash-0731": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 384000
+    },
+    "deepseek-ai/DeepSeek-R1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 163839,
+     "max_output": 163839
+    },
+    "deepseek-ai/DeepSeek-V4-Pro-0813": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 384000
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 1048576,
+     "max_output": 384000
+    },
+    "deepseek-ai/DeepSeek-V3-1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "deepseek-ai/DeepSeek-V4-Pro": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 512000,
+     "max_output": 384000
+    },
+    "deepseek-ai/DeepSeek-V3": {
+     "reasoning": false,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "MiniMaxAI/MiniMax-M3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 524288,
+     "max_output": 250000
+    },
+    "MiniMaxAI/MiniMax-M2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "MiniMaxAI/MiniMax-M2.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 196608,
+     "max_output": 131072
+    },
+    "moonshotai/Kimi-K2.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 131000
+    },
+    "moonshotai/Kimi-K3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048576,
+     "max_output": 131072
+    },
+    "moonshotai/Kimi-K2.7-Code": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "moonshotai/Kimi-K2.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 262144,
+     "max_output": 262144
+    },
+    "zai-org/GLM-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 131072
+    },
+    "zai-org/GLM-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048575,
+     "max_output": 164000
+    },
+    "zai-org/GLM-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 202752,
+     "max_output": 131072
+    },
+    "zai-org/GLM-5.3-Flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 1048575,
+     "max_output": 400000
+    },
+    "zai-org/GLM-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1048576,
+     "max_output": 262144
+    },
+    "nvidia/nemotron-3-ultra-550b-a55b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 512300,
+     "max_output": 512300
+    },
+    "openai/gpt-oss-20b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    },
+    "openai/gpt-oss-120b": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 131072
+    }
+   }
+  },
+  "volcengine": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "glm-5-3-flash-260828": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "doubao-seed-1-6-251015": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 256000,
+     "max_output": 64000
+    },
+    "doubao-seed-2-0-pro-260215": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 128000
+    },
+    "doubao-seed-2-0-lite-260428": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 131072
+    },
+    "doubao-seed-2-1-pro-260628": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "doubao-seed-1-6-vision-250815": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 256000,
+     "max_output": 32000
+    },
+    "doubao-seed-2-0-mini-260428": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 131072
+    },
+    "doubao-seed-2-0-code-preview-260215": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 262144,
+     "max_output": 131072
+    },
+    "doubao-seed-2-1-turbo-260628": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "glm-5-2-260617": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "doubao-seed-1-8-251228": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 256000,
+     "max_output": 64000
+    },
+    "doubao-seed-evolving": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "doubao-seed-1-6-flash-250828": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image"
+     ],
+     "context": 256000,
+     "max_output": 32000
+    },
+    "doubao-seed-character-260628": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "deepseek-v4-pro-ga-260813": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    },
+    "deepseek-v4-flash-ga-260731": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 384000
+    }
+   }
+  },
+  "xai": {
+   "npm": "@ai-sdk/xai",
+   "models": {
+    "grok-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "grok-imagine-image": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 16000
+    },
+    "grok-imagine-video": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1024
+    },
+    "grok-4.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 30000
+    },
+    "grok-4.20-0309-reasoning": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 30000
+    },
+    "grok-imagine-video-1.5": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "audio",
+      "pdf"
+     ],
+     "context": 1024
+    },
+    "grok-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    },
+    "grok-4.20-0309-non-reasoning": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 30000
+    },
+    "grok-imagine-image-quality": {
+     "reasoning": false,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 16000
+    },
+    "grok-build-0.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 256000,
+     "max_output": 256000
+    },
+    "grok-4.20-multi-agent-0309": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 30000
+    },
+    "grok-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "context": 500000,
+     "max_output": 500000
+    }
+   }
+  },
+  "zai": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "glm-4.6v": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 128000,
+     "max_output": 32768
+    },
+    "glm-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "glm-5v-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-5.3-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-4.6v-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 128000,
+     "max_output": 32768
+    },
+    "glm-4.5v": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 64000,
+     "max_output": 16384
+    },
+    "glm-5.3-flashx": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-4.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-4.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "glm-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-4.7-flashx": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-5-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-4.5-air": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "glm-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    }
+   }
+  },
+  "zhipuai": {
+   "npm": "@ai-sdk/openai-compatible",
+   "models": {
+    "glm-5v-turbo": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-5.3-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-5.3-flashx": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video",
+      "pdf"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-5.2": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-5.1": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-5.3": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 1000000,
+     "max_output": 131072
+    },
+    "glm-4.5-air": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "glm-4.7-flashx": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-4.5-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "glm-4.7": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-4.7-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 200000,
+     "max_output": 131072
+    },
+    "glm-4.5v": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 64000,
+     "max_output": 16384
+    },
+    "glm-4.6v-flash": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 128000,
+     "max_output": 32768
+    },
+    "glm-4.6": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 204800,
+     "max_output": 131072
+    },
+    "glm-4.5": {
+     "reasoning": true,
+     "modalities_input": [
+      "text"
+     ],
+     "context": 131072,
+     "max_output": 98304
+    },
+    "glm-4.6v": {
+     "reasoning": true,
+     "modalities_input": [
+      "text",
+      "image",
+      "video"
+     ],
+     "context": 128000,
+     "max_output": 32768
+    }
+   }
+  }
+ }
+}

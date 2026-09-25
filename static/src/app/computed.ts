@@ -188,27 +188,27 @@ export const computed = {
   modelOptions() {
     const disabledSet = this.adminDisabledModels || new Set();
     const options = this.models || [];
-    // Codex 对话绑定：对话创建后 codex↔外部模型互切锁定（/new 页不受限，
-    // 首个任务落盘时模型即对话绑定；codex 家族内互切放行）
+    // 协议级互切锁定（2026-09-25 泛化）：对话创建后 chat_completions ↔ responses
+    // 禁切（/new 页不受限，首个任务落盘时模型即对话绑定）；同协议内互切放行
     const lockActive = !!this.currentConversationId;
-    const curCodex = String(this.currentModelKey || '').startsWith('codex/');
+    const curProto =
+      (options.find((o) => o.key === this.currentModelKey) as any)?.apiProtocol ||
+      'chat_completions';
     return options.map((opt) => {
-      const optCodex = String(opt.key).startsWith('codex/');
-      const locked = lockActive && optCodex !== curCodex;
+      const locked =
+        lockActive && String((opt as any).apiProtocol || 'chat_completions') !== curProto;
       return {
         ...opt,
-        disabled: disabledSet.has(opt.key) || locked,
-        codexLocked: locked
+        disabled: disabledSet.has(opt.key) || locked
       };
     });
   },
   // 模型菜单分组（opencode 式）：可见模型按提供商分组，组顺序=注册表首次出现顺序。
-  // 分组键规则：provider 同步模型用 providerId/providerName；codex/* 归 Codex 组；
-  // 其余（手写 custom_models）归「自定义」组。Codex 不再单独开子页（2026-09-25 改造）。
+  // 分组键规则：provider 同步模型用 providerId/providerName（openai-codex 归 OpenAI 组）；
+  // 其余（手写 custom_models）归「自定义」组。
   // 分组/过滤实现与设置页模型选择下拉共用（utils/modelGroups.ts）。
   groupedModelOptions() {
     return groupModelOptions(this.modelOptions || [], {
-      codex: t('appCore.modelGroupCodex'),
       custom: t('appCore.modelGroupCustom')
     });
   },

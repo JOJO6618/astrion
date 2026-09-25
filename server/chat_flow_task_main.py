@@ -2315,12 +2315,12 @@ async def handle_task_with_sender(
                 debug_log(f"[Citations] 行内引用处理失败，保留原文: {_cite_exc}")
                 round_citations = []
         
-        # Codex 通道：取出本轮收集的加密 reasoning items（读后清空防残留），
+        # Responses 通道（通用）：取出本轮收集的加密 reasoning items（读后清空防残留），
         # 内存消息与落盘 metadata 各挂一份，供后续轮次回插上下文
-        codex_reasoning_items = getattr(web_terminal.api_client, "last_codex_reasoning_items", None)
-        if codex_reasoning_items:
+        responses_reasoning_items = getattr(web_terminal.api_client, "last_responses_reasoning_items", None)
+        if responses_reasoning_items:
             try:
-                web_terminal.api_client.last_codex_reasoning_items = None
+                web_terminal.api_client.last_responses_reasoning_items = None
             except Exception:
                 pass
 
@@ -2333,14 +2333,14 @@ async def handle_task_with_sender(
         }
         if tool_calls:
             assistant_message["tool_calls"] = tool_calls
-        if codex_reasoning_items:
-            assistant_message["codex_reasoning_items"] = codex_reasoning_items
+        if responses_reasoning_items:
+            assistant_message["responses_reasoning_items"] = responses_reasoning_items
 
         messages.append(assistant_message)
         if assistant_content or current_thinking or tool_calls:
             assistant_metadata = {"citations": round_citations} if round_citations else {}
-            if codex_reasoning_items:
-                assistant_metadata["codex_reasoning_items"] = codex_reasoning_items
+            if responses_reasoning_items:
+                assistant_metadata["responses_reasoning_items"] = responses_reasoning_items
             web_terminal.context_manager.add_conversation(
                 "assistant",
                 assistant_content,

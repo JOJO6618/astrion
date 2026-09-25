@@ -70,6 +70,12 @@ class APIClientProfileMixin:
         self.thinking_extra_params = thinking.get("extra_params") or {}
         self.supports_reasoning_effort = bool(profile.get("supports_reasoning_effort"))
         self.provider_type = str(profile.get("provider_type") or "") or None
+        # 协议泛化（2026-09-25）：api_protocol 驱动分发路由；responses_auth /
+        # responses_instructions_source 为 Responses 通道的 auth/instructions 配置
+        self.provider_id = str(profile.get("provider_id") or "") or None
+        self.api_protocol = str(profile.get("api_protocol") or "") or None
+        self.responses_auth = str(profile.get("responses_auth") or "") or None
+        self.responses_instructions_source = str(profile.get("instructions_source") or "") or None
         self.model_multimodal = self._normalize_multimodal_capability(profile.get("multimodal"))
         self.default_context_window = profile.get("context_window") or fast.get("context_window")
         # 提供商自定义请求头（provider 体系）：profile["headers"] 为静态字典，

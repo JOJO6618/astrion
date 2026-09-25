@@ -110,7 +110,6 @@ const displayModelId = (model: ModelOption): string => {
 const groups = computed<ModelGroup[]>(() => {
   const out: ModelGroup[] = [];
   const providerGroups = new Map<string, ModelGroup>();
-  const codexRows: ModelRow[] = [];
   const registryCustomRows: ModelRow[] = [];
 
   for (const model of allModels.value) {
@@ -121,6 +120,7 @@ const groups = computed<ModelGroup[]>(() => {
       caps: registryCaps(model)
     };
     if (model.providerType === 'provider' && model.providerId) {
+      // openai-codex 泛化后同为 provider 分组（组名 OpenAI（ChatGPT 订阅））
       const gid = model.providerId;
       if (!providerGroups.has(gid)) {
         providerGroups.set(gid, {
@@ -131,21 +131,11 @@ const groups = computed<ModelGroup[]>(() => {
         });
       }
       providerGroups.get(gid)!.rows.push(row);
-    } else if (model.providerType === 'codex') {
-      codexRows.push(row);
     } else {
       registryCustomRows.push(row);
     }
   }
   out.push(...providerGroups.values());
-  if (codexRows.length) {
-    out.push({
-      id: 'codex',
-      title: 'Codex',
-      badge: t('settings.modelGroupCodexBadge'),
-      rows: codexRows
-    });
-  }
 
   // 「自定义」分组置底：管理员用 custom_models.json 原始条目（可编辑/删除）；
   // 非管理员端点 403，退回注册表里的手写 custom 模型（只读）。

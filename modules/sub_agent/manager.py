@@ -321,6 +321,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         if resolved_profile is None:
             return {"success": False, "error": tr("sub_agent_task2.locked_model_unavailable", model=model_key or "")}
         provider_type = str(resolved_profile.get("provider_type") or "")
+        api_protocol = str(resolved_profile.get("api_protocol") or "")
         task_record = {
             "task_id": task_id,
             "agent_id": agent_id,
@@ -342,6 +343,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "conversation_file": str(conversation_file),
             "model_key": model_key,
             "provider_type": provider_type,
+            "api_protocol": api_protocol,
             "role_id": role_id,
             "display_name": display_name,
             "execution_mode": "in_process",

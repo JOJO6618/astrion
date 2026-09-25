@@ -352,7 +352,7 @@ class SubAgentTask:
                 if self._cancelled:
                     raise asyncio.CancelledError()
                 try:
-                    assistant_message, reasoning, tool_calls, usage, codex_reasoning_items = await self._call_model(client, model_key, tools)
+                    assistant_message, reasoning, tool_calls, usage, responses_reasoning_items = await self._call_model(client, model_key, tools)
                     call_error = None
                     break
                 except SubAgentModelCallError as exc:
@@ -459,9 +459,9 @@ class SubAgentTask:
                 final_message["reasoning_content"] = reasoning
             if tool_calls:
                 final_message["tool_calls"] = tool_calls
-            if codex_reasoning_items:
-                # codex 加密思考链：随消息持久化，下次请求由 translate 原样回传
-                final_message["codex_reasoning_items"] = codex_reasoning_items
+            if responses_reasoning_items:
+                # Responses 加密思考链（通用）：随消息持久化，下次请求由 translate 原样回传
+                final_message["responses_reasoning_items"] = responses_reasoning_items
             self.messages.append(final_message)
             self._persist_conversation(partial_summary=assistant_message[:200])
 
@@ -877,11 +877,11 @@ class SubAgentTask:
                 calling_tools=calling_tools,
             ) from exc
 
-        # codex：读取并清空本轮加密 reasoning items（回填 messages 持久化，下次请求原样回传）
-        codex_reasoning_items = getattr(client, "last_codex_reasoning_items", None)
-        if codex_reasoning_items is not None:
-            client.last_codex_reasoning_items = None
-        return assistant_message, reasoning, tool_calls, usage, codex_reasoning_items
+        # Responses（通用）：读取并清空本轮加密 reasoning items（回填 messages 持久化，下次请求原样回传）
+        responses_reasoning_items = getattr(client, "last_responses_reasoning_items", None)
+        if responses_reasoning_items is not None:
+            client.last_responses_reasoning_items = None
+        return assistant_message, reasoning, tool_calls, usage, responses_reasoning_items
 
     def _parse_args(self, tool_call: Dict[str, Any]) -> Dict[str, Any]:
         raw = tool_call.get("function", {}).get("arguments") or "{}"
