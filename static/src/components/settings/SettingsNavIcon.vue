@@ -18,6 +18,7 @@ const ICON_FILES: Record<string, string> = {
   codex: 'codex',
   general: 'settings',
   workspace: 'folder-git-2',
+  search: 'globe',
   tools: 'wrench',
   context: 'notebook',
   files: 'file',

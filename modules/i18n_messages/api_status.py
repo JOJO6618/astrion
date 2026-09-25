@@ -35,6 +35,26 @@ MESSAGES = {
         "zh-CN": "仅宿主机模式可用",
         "en-US": "Available in host mode only",
     },
+    "status_file_open.pick_folder_prompt": {
+        "zh-CN": "选择工作区文件夹",
+        "en-US": "Choose a workspace folder",
+    },
+    "status_file_open.pick_folder_unsupported": {
+        "zh-CN": "当前平台不支持系统文件夹选择",
+        "en-US": "Native folder picker is not supported on this platform",
+    },
+    "status_file_open.pick_folder_failed": {
+        "zh-CN": "无法打开系统文件夹选择窗口",
+        "en-US": "Failed to open the native folder picker",
+    },
+    "status_file_open.invalid_external_url": {
+        "zh-CN": "无效的外部链接",
+        "en-US": "Invalid external URL",
+    },
+    "status_file_open.open_external_failed": {
+        "zh-CN": "无法在系统浏览器中打开链接",
+        "en-US": "Failed to open the link in the system browser",
+    },
     "status_file_open.app_icon_unavailable": {
         "zh-CN": "应用图标不可用",
         "en-US": "App icon unavailable",

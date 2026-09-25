@@ -21,6 +21,7 @@ export type SettingsSection =
   // 系统
   | 'general'
   | 'workspace'
+  | 'search'
   | 'tools'
   | 'context'
   | 'files'

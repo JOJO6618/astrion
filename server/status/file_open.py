@@ -432,3 +432,109 @@ def open_project_file_with_app(terminal, workspace, username):
     if _open_file_with_app(target, app_id):
         return jsonify({"success": True})
     return jsonify({"success": False, "error": tr("status_file_open.open_file_failed")}), 500
+
+# ────────────────────────────────────────────────────────────────
+# 宿主 GUI 交互：原生选文件夹对话框 / 系统浏览器打开外部链接
+# 与 open-in-file-manager 同族：仅 host（单机）模式合理，docker/web 模式禁止。
+# ────────────────────────────────────────────────────────────────
+
+def _pick_folder_macos(prompt: str) -> tuple[bool, str]:
+    """macOS：osascript choose folder。返回 (ok, path)；用户取消 → (True, '')。"""
+    # prompt 走 AppleScript 字符串字面量，去掉会破坏字面量的字符
+    safe_prompt = (prompt or "").replace("\\", " ").replace('"', "'")[:120]
+    script = f'POSIX path of (choose folder with prompt "{safe_prompt}")'
+    try:
+        proc = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+    except Exception:
+        return False, ""
+    if proc.returncode == 0:
+        return True, (proc.stdout or "").strip()
+    # error number -128 = User canceled（用户主动取消，不算失败）
+    if "-128" in (proc.stderr or ""):
+        return True, ""
+    return False, ""
+
+
+def _pick_folder_windows(prompt: str) -> tuple[bool, str]:
+    """Windows：PowerShell FolderBrowserDialog。返回 (ok, path)；取消 → (True, '')。"""
+    safe_prompt = (prompt or "").replace("'", " ").replace("`", " ")[:120]
+    ps_script = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        f"$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = '{safe_prompt}'; "
+        "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath }"
+    )
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Sta", "-Command", ps_script],
+            capture_output=True,
+            timeout=600,
+            check=False,
+        )
+    except Exception:
+        return False, ""
+    if proc.returncode != 0:
+        return False, ""
+    try:
+        out = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+    except Exception:
+        out = ""
+    return True, out
+
+
+@status_bp.route('/api/project/pick-folder', methods=['POST'])
+@api_login_required
+def pick_folder_via_native_dialog():
+    """在宿主 GUI 上弹原生「选择文件夹」对话框，返回选中的绝对路径（取消返回空串）。"""
+    if not _is_host_mode_request():
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
+    prompt = tr("status_file_open.pick_folder_prompt")
+    if sys.platform == "darwin":
+        ok, path = _pick_folder_macos(prompt)
+    elif os.name == "nt":
+        ok, path = _pick_folder_windows(prompt)
+    else:
+        return jsonify({"success": False, "error": tr("status_file_open.pick_folder_unsupported")}), 400
+    if not ok:
+        return jsonify({"success": False, "error": tr("status_file_open.pick_folder_failed")}), 500
+    return jsonify({"success": True, "data": {"path": path}})
+
+
+@status_bp.route('/api/system/open-external', methods=['POST'])
+@api_login_required
+def open_external_url():
+    """用系统默认浏览器打开外部 URL（桌面壳等 window.open 不可用的宿主环境）。
+
+    仅放行 http/https；host 模式限定（与文件管理器族端点同一安全语义：
+    docker/web 多用户模式下会在服务器桌面弹窗）。
+    """
+    if not _is_host_mode_request():
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+    except Exception:
+        parsed = None
+    if not parsed or parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return jsonify({"success": False, "error": tr("status_file_open.invalid_external_url")}), 400
+    try:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif os.name == "nt":
+            os.startfile(url)  # type: ignore[attr-defined]
+        else:
+            opener = shutil.which("xdg-open")
+            if not opener:
+                return jsonify({"success": False, "error": tr("status_file_open.open_external_failed")}), 500
+            subprocess.Popen([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        return jsonify({"success": False, "error": tr("status_file_open.open_external_failed")}), 500
+    return jsonify({"success": True})

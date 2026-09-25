@@ -799,8 +799,7 @@
               type="button"
               class="personal-menu-item"
               role="menuitem"
-              disabled
-              :title="$t('sidebar.helpComingSoon')"
+              @click="openHelpDocs"
             >
               <span
                 class="icon personal-menu-icon"
@@ -963,6 +962,27 @@ function handleLogout() {
   closePersonalMenu();
   // 与 AccountTab 原退出按钮同一入口（store 内含 POST /logout + GET 兜底），不 await
   personalizationStore.logout();
+}
+/** 帮助文档地址（官网文档页） */
+const HELP_DOCS_URL = 'https://astrion.cyjai.com/docs.html';
+async function openHelpDocs() {
+  closePersonalMenu();
+  // 桌面壳（Tauri WebView）里 window.open 不可用，走后端调系统浏览器；
+  // 网页端 / Android WebView 直接 window.open——App 侧 shouldOverrideUrlLoading
+  // 会把外部链接转交系统浏览器（与打开网页同一路径）。
+  if ((window as any).__ASTRION_DESKTOP__) {
+    try {
+      await fetch('/api/system/open-external', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: HELP_DOCS_URL })
+      });
+    } catch (_err) {
+      /* 打开失败静默：桌面壳后端不可达时无兜底通道 */
+    }
+    return;
+  }
+  window.open(HELP_DOCS_URL, '_blank', 'noopener,noreferrer');
 }
 async function fetchSessionUsername() {
   try {

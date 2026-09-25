@@ -1773,15 +1773,15 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "extract_webpage":
                         url = arguments["url"]
                         try:
-                            # 从config获取API密钥
-                            from config import TAVILY_API_KEY
+                            # 密钥运行时解析：设置页 UI 配置优先，环境变量兜底
+                            from modules.search_engine import resolve_tavily_api_key
                             try:
                                 _prefs = load_personalization_config(self.data_dir) or {}
                             except Exception:
                                 _prefs = {}
                             full_content, _ = await extract_webpage_content(
                                 urls=url,
-                                api_key=TAVILY_API_KEY,
+                                api_key=resolve_tavily_api_key(_prefs),
                                 extract_depth="basic",
                                 max_urls=1,
                                 direct_config=resolve_direct_extract_config(_prefs),
@@ -1822,12 +1822,10 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "save_webpage":
                         url = arguments["url"]
                         target_path = arguments["target_path"]
-                        try:
-                            from config import TAVILY_API_KEY
-                        except ImportError:
-                            TAVILY_API_KEY = None
+                        from modules.search_engine import resolve_tavily_api_key
 
                         # 白名单直提优先（无需 Tavily key）；未命中/失败自动回退 Tavily
+                        # 密钥运行时解析：设置页 UI 配置优先，环境变量兜底
                         try:
                             try:
                                 _prefs = load_personalization_config(self.data_dir) or {}
@@ -1835,7 +1833,7 @@ class MainTerminalToolsExecutionMixin:
                                 _prefs = {}
                             extract_one = await extract_single_url(
                                 url,
-                                TAVILY_API_KEY,
+                                resolve_tavily_api_key(_prefs),
                                 extract_depth="basic",
                                 direct_config=resolve_direct_extract_config(_prefs),
                             )

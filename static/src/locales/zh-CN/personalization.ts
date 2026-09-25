@@ -311,6 +311,15 @@ export default {
     mcp: 'MCP',
     misc: '彩蛋'
   },
+  tavilyApiKeyTitle: 'Tavily API 密钥',
+  tavilyApiKeyDesc:
+    '用于网络搜索与网页提取。在 tavily.com 注册获取；留空并保存后回退使用服务器环境变量中的密钥',
+  tavilyApiKeyPlaceholder: 'tvly-...',
+  tavilyApiKeyShow: '显示密钥',
+  tavilyApiKeyHide: '隐藏密钥',
+  tavilyApiKeyClear: '清除',
+  tavilyApiKeyStatusCustom: '当前使用此处配置的密钥',
+  tavilyApiKeyStatusEnv: '未配置，当前使用环境变量中的密钥',
   webDirectExtractTitle: '网页直提白名单',
   webDirectExtractDesc:
     '命中白名单的网站直接在本机提取内容（GitHub 代码文件走 CDN 直链，其余用正文识别），无需消耗 Tavily 配额；提取失败会自动回退 Tavily',

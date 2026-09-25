@@ -108,6 +108,8 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     # 未命中才走 Tavily；开关默认开启，domains 为用户追加的白名单域名（内置 github.com 不在此列）。
     "webpage_direct_extract_enabled": True,
     "webpage_direct_extract_domains": [],
+    # Tavily API 密钥（设置页「网络搜索」分区配置；为空时回退环境变量 AGENT_TAVILY_API_KEY）
+    "tavily_api_key": "",
     "default_model": None,
     "image_compression": "original",  # original / 1080p / 720p / 540p
     "auto_shallow_compress_enabled": False,
@@ -790,6 +792,10 @@ def sanitize_personalization_payload(
         if d and re.fullmatch(r"[a-z0-9.-]+", d) and "." in d and d not in clean_domains:
             clean_domains.append(d)
     base["webpage_direct_extract_domains"] = clean_domains
+
+    # Tavily API 密钥：纯字符串，trim + 长度上限（密钥正常几十字符，512 足够冗余）
+    raw_tavily_key = data.get("tavily_api_key", base.get("tavily_api_key"))
+    base["tavily_api_key"] = str(raw_tavily_key).strip()[:512] if raw_tavily_key else ""
 
     return base
 

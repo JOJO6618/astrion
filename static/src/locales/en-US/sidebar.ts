@@ -34,7 +34,6 @@ export default {
   personalSpace: 'Personal space',
   preferences: 'Personalization',
   help: 'Help',
-  helpComingSoon: 'Coming soon',
 
   // ── WorkspaceSwitcher: workspace/project switcher popover ──
   workspaceCount: '{n} items',
@@ -49,6 +48,9 @@ export default {
   workspaceNamePlaceholder: 'Workspace name (optional)',
   pathPlaceholder: 'Path: absolute or repo-relative path',
   creating: 'Creating...',
+  pickFolder: 'Choose in File Manager',
+  pickingFolder: 'Waiting for selection...',
+  pickFolderFailed: 'Failed to open the native folder picker',
   create: 'Create',
   setDefault: 'Set as default',
 
