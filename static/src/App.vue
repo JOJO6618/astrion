@@ -220,7 +220,17 @@
                       </div>
                     </div>
                     <div v-if="!filteredGroupedModelOptions.length" class="dropdown-empty-hint">
-                      {{ $t('appCore.noModelsMatched') }}
+                      <template v-if="hasAnyModels">{{ $t('appCore.noModelsMatched') }}</template>
+                      <template v-else>
+                        <div class="empty-hint-text">{{ $t('appCore.noModelsConfigured') }}</div>
+                        <button
+                          type="button"
+                          class="empty-hint-action"
+                          @click.stop="openSettingsProviders"
+                        >
+                          {{ $t('appCore.goAddProvider') }}
+                        </button>
+                      </template>
                     </div>
                   </div>
                   <button
@@ -772,7 +782,17 @@
                   </div>
                 </div>
                 <div v-if="!filteredGroupedModelOptions.length" class="dropdown-empty-hint">
-                  {{ $t('appCore.noModelsMatched') }}
+                  <template v-if="hasAnyModels">{{ $t('appCore.noModelsMatched') }}</template>
+                  <template v-else>
+                    <div class="empty-hint-text">{{ $t('appCore.noModelsConfigured') }}</div>
+                    <button
+                      type="button"
+                      class="empty-hint-action"
+                      @click.stop="openSettingsProviders"
+                    >
+                      {{ $t('appCore.goAddProvider') }}
+                    </button>
+                  </template>
                 </div>
               </div>
               <button

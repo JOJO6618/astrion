@@ -41,6 +41,8 @@ export default {
   modelGroupCustom: 'Custom',
   searchModel: 'Search models',
   noModelsMatched: 'No matching models',
+  noModelsConfigured: 'No models configured yet',
+  goAddProvider: 'Add a provider',
 
   // Blank hero welcome lines (state.ts blankWelcomePool)
   welcomeHelp: 'How can I help?',

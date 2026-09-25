@@ -2,7 +2,7 @@ from __future__ import annotations
 from server.chat import chat_bp
 import json, logging, time
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 from io import BytesIO
 import zipfile
@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import secrets
 
-from config import MAX_UPLOAD_SIZE, OUTPUT_FORMATS
+from config import MAX_UPLOAD_SIZE, OUTPUT_FORMATS, DATA_DIR
 from modules.personalization_manager import (
     load_personalization_config,
     resolve_context_compression_settings,
@@ -37,7 +37,7 @@ from core.web_terminal import WebTerminal
 from core.tool_loading import build_registry_payload
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
+from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username, get_current_user_role
 from server.gateway_auth import api_login_or_host_token_required
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
 from server.security import rate_limited
@@ -66,6 +66,76 @@ def _save_conversation_meta_via_disk(ctx, conversation_id: str, **meta_kwargs) -
         messages=existing.get("messages") or [],
         **meta_kwargs,
     )
+
+
+def _personalization_data_dir(workspace: Optional[UserWorkspace]) -> str:
+    """个性化配置目录：有工作区时沿用 workspace.data_dir；
+    无工作区（host 模式空态）时退化为全局 DATA_DIR——与 resources.py 中
+    host 分支的 workspace.data_dir 取值（Path(DATA_DIR)）完全一致，
+    保证「先配模型、后建工作区」时配置落在同一文件上。"""
+    if workspace is not None:
+        return workspace.data_dir
+    data_dir = Path(DATA_DIR).expanduser().resolve()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return str(data_dir)
+
+
+def _build_tool_categories_snapshot_fallback(username: str, config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """无工作区（无终端）时的工具类目快照，输出与 WebTerminal.get_tool_settings_snapshot 同构。
+
+    分类定义与强制状态取自管理员策略（与 terminal 初始化时 set_admin_policy 同源），
+    启用态按个性化 disabled_tool_categories 推导后叠加强制状态。
+    """
+    categories: Dict[str, Any] = {}
+    forced_states: Dict[str, Any] = {}
+    try:
+        from modules import admin_policy_manager
+        record = get_current_user_record()
+        role = get_current_user_role(record) if record else "admin"
+        invite_code = getattr(record, "invite_code", None) if record else None
+        policy = admin_policy_manager.get_effective_policy(username, role, invite_code)
+        categories = policy.get("categories") or {}
+        forced_states = policy.get("forced_category_states") or {}
+    except Exception as exc:
+        debug_log(f"[API] 无终端工具快照：管理员策略解析失败，回退默认分类: {exc}")
+    if not categories:
+        try:
+            from core.tool_config import TOOL_CATEGORIES
+            categories = {
+                key: {
+                    "label": cat.label,
+                    "tools": list(cat.tools),
+                    "default_enabled": bool(cat.default_enabled),
+                }
+                for key, cat in TOOL_CATEGORIES.items()
+            }
+        except Exception:
+            categories = {}
+    disabled_raw = config.get("disabled_tool_categories") if isinstance(config, dict) else None
+    disabled = {key for key in (disabled_raw or []) if isinstance(key, str)}
+    snapshot: List[Dict[str, Any]] = []
+    for key, cat in categories.items():
+        if isinstance(cat, dict):
+            label = cat.get("label") or key
+            tools = list(cat.get("tools") or [])
+            default_enabled = bool(cat.get("default_enabled", True))
+        else:
+            label = getattr(cat, "label", key)
+            tools = list(getattr(cat, "tools", []) or [])
+            default_enabled = bool(getattr(cat, "default_enabled", True))
+        forced = forced_states.get(key)
+        enabled = default_enabled and key not in disabled
+        if isinstance(forced, bool):
+            enabled = forced
+        snapshot.append({
+            "id": key,
+            "label": label,
+            "enabled": enabled,
+            "tools": tools,
+            "locked": isinstance(forced, bool),
+            "locked_state": forced if isinstance(forced, bool) else None,
+        })
+    return snapshot
 
 @chat_bp.route('/api/thinking-mode', methods=['POST'])
 @api_login_required
@@ -290,15 +360,16 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
 
 @chat_bp.route('/api/personalization', methods=['GET'])
 @api_login_or_host_token_required
-@with_terminal
-def get_personalization_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取个性化配置"""
+@with_terminal(allow_no_workspace=True)
+def get_personalization_settings(terminal: Optional[WebTerminal], workspace: Optional[UserWorkspace], username: str):
+    """获取个性化配置（无工作区时也可读取——配置模型不要求先建工作区）"""
     try:
         policy = resolve_admin_policy(get_current_user_record())
         if policy.get("ui_blocks", {}).get("block_personal_space"):
             return jsonify({"success": False, "error": tr("chat_settings.personal_space_admin_disabled")}), 403
-        data = load_personalization_config(workspace.data_dir)
-        private_skills_dir = infer_private_skills_dir(workspace.data_dir)
+        data_dir = _personalization_data_dir(workspace)
+        data = load_personalization_config(data_dir)
+        private_skills_dir = infer_private_skills_dir(data_dir)
         skills_catalog = get_skills_catalog(private_dir=private_skills_dir)
         enabled_skills = merge_enabled_skills(
             data.get("enabled_skills"),
@@ -312,10 +383,15 @@ def get_personalization_settings(terminal: WebTerminal, workspace: UserWorkspace
             model_window = get_model_context_window(getattr(terminal, "model_key", None))
         except Exception:
             model_window = None
+        tool_categories = (
+            terminal.get_tool_settings_snapshot()
+            if terminal is not None
+            else _build_tool_categories_snapshot_fallback(username, data)
+        )
         return jsonify({
             "success": True,
             "data": data_out,
-            "tool_categories": terminal.get_tool_settings_snapshot(),
+            "tool_categories": tool_categories,
             "skills_catalog": skills_catalog,
             "tool_loading_registry": build_registry_payload(),
             "context_compression_settings": {
@@ -339,17 +415,18 @@ def get_personalization_settings(terminal: WebTerminal, workspace: UserWorkspace
 
 @chat_bp.route('/api/personalization', methods=['POST'])
 @api_login_or_host_token_required
-@with_terminal
+@with_terminal(allow_no_workspace=True)
 @rate_limited("personalization_update", 20, 300, scope="user")
-def update_personalization_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """更新个性化配置"""
+def update_personalization_settings(terminal: Optional[WebTerminal], workspace: Optional[UserWorkspace], username: str):
+    """更新个性化配置（无工作区时也可写入——配置模型不要求先建工作区）"""
     payload = request.get_json() or {}
     try:
         policy = resolve_admin_policy(get_current_user_record())
         if policy.get("ui_blocks", {}).get("block_personal_space"):
             return jsonify({"success": False, "error": tr("chat_settings.personal_space_admin_disabled")}), 403
-        config = save_personalization_config(workspace.data_dir, payload)
-        private_skills_dir = infer_private_skills_dir(workspace.data_dir)
+        data_dir = _personalization_data_dir(workspace)
+        config = save_personalization_config(data_dir, payload)
+        private_skills_dir = infer_private_skills_dir(data_dir)
         skills_catalog = get_skills_catalog(private_dir=private_skills_dir)
         enabled_skills = merge_enabled_skills(
             config.get("enabled_skills"),
@@ -362,34 +439,36 @@ def update_personalization_settings(terminal: WebTerminal, workspace: UserWorksp
             config = dict(config)
             config["enabled_skills"] = stored_skills
             config["skills_catalog_snapshot"] = catalog_snapshot
-            config = save_personalization_config(workspace.data_dir, config)
-        try:
-            sync_workspace_skills(workspace.project_path, enabled_skills, private_dir=private_skills_dir)
-        except Exception as sync_exc:
-            debug_log(f"[Skills] 同步失败: {sync_exc}")
-        try:
-            # 对话级 terminal 的 模型/模式/推理强度 以对话 meta 为权威，
-            # 保存个性化默认值不得回写当前对话；工作区级（/new）则立即生效
-            terminal.apply_personalization_preferences(
-                config,
-                apply_default_modes=not bool(getattr(terminal, '_bound_conversation_id', None)),
-            )
-            session['run_mode'] = terminal.run_mode
-            session['thinking_mode'] = terminal.thinking_mode
-            ctx = getattr(terminal, 'context_manager', None)
-            if ctx and getattr(ctx, 'current_conversation_id', None):
-                try:
-                    _save_conversation_meta_via_disk(
-                        ctx,
-                        ctx.current_conversation_id,
-                        project_path=str(ctx.project_path),
-                        thinking_mode=terminal.thinking_mode,
-                        run_mode=terminal.run_mode
-                    )
-                except Exception as meta_exc:
-                    debug_log(f"应用个性化偏好失败: 同步对话元数据异常 {meta_exc}")
-        except Exception as exc:
-            debug_log(f"应用个性化偏好失败: {exc}")
+            config = save_personalization_config(data_dir, config)
+        if workspace is not None:
+            try:
+                sync_workspace_skills(workspace.project_path, enabled_skills, private_dir=private_skills_dir)
+            except Exception as sync_exc:
+                debug_log(f"[Skills] 同步失败: {sync_exc}")
+        if terminal is not None:
+            try:
+                # 对话级 terminal 的 模型/模式/推理强度 以对话 meta 为权威，
+                # 保存个性化默认值不得回写当前对话；工作区级（/new）则立即生效
+                terminal.apply_personalization_preferences(
+                    config,
+                    apply_default_modes=not bool(getattr(terminal, '_bound_conversation_id', None)),
+                )
+                session['run_mode'] = terminal.run_mode
+                session['thinking_mode'] = terminal.thinking_mode
+                ctx = getattr(terminal, 'context_manager', None)
+                if ctx and getattr(ctx, 'current_conversation_id', None):
+                    try:
+                        _save_conversation_meta_via_disk(
+                            ctx,
+                            ctx.current_conversation_id,
+                            project_path=str(ctx.project_path),
+                            thinking_mode=terminal.thinking_mode,
+                            run_mode=terminal.run_mode
+                        )
+                    except Exception as meta_exc:
+                        debug_log(f"应用个性化偏好失败: 同步对话元数据异常 {meta_exc}")
+            except Exception as exc:
+                debug_log(f"应用个性化偏好失败: {exc}")
         config_out = dict(config)
         config_out["enabled_skills"] = enabled_skills
         compression_settings = resolve_context_compression_settings(config_out)
@@ -397,10 +476,15 @@ def update_personalization_settings(terminal: WebTerminal, workspace: UserWorksp
             model_window = get_model_context_window(getattr(terminal, "model_key", None))
         except Exception:
             model_window = None
+        tool_categories = (
+            terminal.get_tool_settings_snapshot()
+            if terminal is not None
+            else _build_tool_categories_snapshot_fallback(username, config)
+        )
         return jsonify({
             "success": True,
             "data": config_out,
-            "tool_categories": terminal.get_tool_settings_snapshot(),
+            "tool_categories": tool_categories,
             "skills_catalog": skills_catalog,
             "context_compression_settings": {
                 **compression_settings,

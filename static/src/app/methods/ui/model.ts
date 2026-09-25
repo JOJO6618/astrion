@@ -39,6 +39,10 @@ export const modelMethods = {
   openManageModels() {
     window.location.assign('/settings/models');
   },
+  // 模型菜单真空态引导：跳设置页提供商分区（未配置任何模型时使用）
+  openSettingsProviders() {
+    window.location.assign('/settings/providers');
+  },
   toggleModelMenu() {
     if (!this.isConnected || this.streamingMessage) {
       return;
@@ -89,22 +93,38 @@ export const modelMethods = {
     }
     const prev = this.currentModelKey;
     try {
-      // 携带当前对话 id：对话级隔离后，后端需要把模型设置到该对话专属的
-      // 对话级 terminal 并保存到正确的对话文件，避免写到工作区级 terminal
-      // 的陈旧对话（否则重启后模型回变为默认）。
-      const resp = await fetch('/api/model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model_key: key,
-          conversation_id: this.currentConversationId || undefined
-        })
-      });
-      const payload = await resp.json();
-      if (!resp.ok || !payload.success) {
-        throw new Error(payload.error || payload.message || t('appUi.switchFailed'));
+      let data: any = {};
+      if (this.versioningHostMode && !this.currentHostWorkspaceId) {
+        // 空态（尚未创建/选择工作区）：/api/model 依赖工作区终端，会返回 no_workspace。
+        // 但「配模型」与「建工作区」没有逻辑先后——此时改写个性化 default_model，
+        // 首个工作区/对话创建时按个性化默认模型落地。
+        const resp = await fetch('/api/personalization', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ default_model: key })
+        });
+        const payload = await resp.json();
+        if (!resp.ok || !payload.success) {
+          throw new Error(payload.error || payload.message || t('appUi.switchFailed'));
+        }
+      } else {
+        // 携带当前对话 id：对话级隔离后，后端需要把模型设置到该对话专属的
+        // 对话级 terminal 并保存到正确的对话文件，避免写到工作区级 terminal
+        // 的陈旧对话（否则重启后模型回变为默认）。
+        const resp = await fetch('/api/model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model_key: key,
+            conversation_id: this.currentConversationId || undefined
+          })
+        });
+        const payload = await resp.json();
+        if (!resp.ok || !payload.success) {
+          throw new Error(payload.error || payload.message || t('appUi.switchFailed'));
+        }
+        data = payload.data || {};
       }
-      const data = payload.data || {};
       modelStore.setModel(data.model_key || key);
       if (data.run_mode) {
         this.runMode = data.run_mode;

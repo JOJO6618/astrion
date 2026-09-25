@@ -230,7 +230,7 @@ def get_default_model_key(visible_only: bool = True) -> str:
         return preferred
     if candidates:
         return candidates[0]
-    raise ValueError("未配置可用模型，请在 config/custom_models.json 中添加至少一个可用模型")
+    raise ValueError("尚未配置任何模型，请先在设置页的「提供商」中添加")
 
 
 def resolve_model_key(candidate: Optional[str], *, visible_only: bool = False) -> str:

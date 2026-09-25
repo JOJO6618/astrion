@@ -55,7 +55,12 @@ def rebuild_conversation_index_api():
         username = get_current_username()
         if not username:
             return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
-        terminal, _ = get_user_resources(username)
+        from server.context.identity import NoWorkspaceError
+        try:
+            terminal, _ = get_user_resources(username)
+        except NoWorkspaceError:
+            # 与 with_terminal 装饰器一致：无工作区是正常空态，返回 200 + 业务码
+            return jsonify({"success": False, "code": "no_workspace", "error": tr("multi_agent_api.workspace_not_ready")}), 200
         if not terminal:
             return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
         ctx_manager = getattr(terminal, "context_manager", None)

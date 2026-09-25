@@ -106,8 +106,16 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             # 仅个人空间开关开启且端点为 opencode.ai 时附加；对话 ID 在请求时
             # 从 context_manager 读取（构造时对话尚未创建/加载）。
             self.api_client.extra_headers_resolver = self._resolve_external_session_headers
-            self.model_key = get_default_model_key()
-            self.model_profile = get_model_profile(self.model_key)
+            # 空模型注册表（全新部署/尚未配置提供商）时允许终端完成构造：
+            # model_key/model_profile 置 None，模型相关能力在真正使用时
+            # （发消息/切模型）才报「尚未配置任何模型」的引导错误，
+            # 而不是让所有经 with_terminal 的接口（status/terminals/git 等）全部 500。
+            try:
+                self.model_key = get_default_model_key()
+                self.model_profile = get_model_profile(self.model_key)
+            except ValueError:
+                self.model_key = None
+                self.model_profile = None
             self.apply_model_profile(self.model_profile)
             self.context_manager = ContextManager(project_path, data_dir=str(self.data_dir))
             self.context_manager.main_terminal = self

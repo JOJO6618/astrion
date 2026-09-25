@@ -114,6 +114,10 @@ export const composerMethods = {
       keepalive: !!options?.keepalive
     });
     const data = await response.json().catch(() => ({}));
+    // 无工作区空态（200 + code）：草稿无处存储属预期，静默丢弃
+    if (data?.code === 'no_workspace') {
+      return { success: true, skipped: true, reason };
+    }
     if (!response.ok || !data?.success) {
       throw new Error(data?.error || t('appUi.saveInputDraftFailed'));
     }
@@ -130,6 +134,10 @@ export const composerMethods = {
         credentials: 'same-origin'
       });
       const payload = await response.json().catch(() => ({}));
+      // 无工作区空态（200 + code）：草稿无处存储属预期，静默跳过
+      if (payload?.code === 'no_workspace') {
+        return;
+      }
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || t('appUi.fetchInputDraftFailed'));
       }

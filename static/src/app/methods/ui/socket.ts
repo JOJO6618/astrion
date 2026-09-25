@@ -38,6 +38,8 @@ export const socketMethods = {
       const res = await fetch('/api/status', { cache: 'no-store' });
       if (!res.ok) return;
       const status = await res.json();
+      // 无工作区空态（200 + code）：不是故障，不应用快照、静默跳过
+      if (status?.code === 'no_workspace') return;
       this.applyStatusSnapshot(status);
       // 显式新建路由（/new 等）与独立全屏路由不接管当前对话与运行模式
       const onExplicitNewRoute =
@@ -276,6 +278,7 @@ export const socketMethods = {
   // 创建完成后用户刷新页面即走正常初始化。
   async enterWorkspaceBootstrapMode() {
     debugLog('尚未创建任何工作区，进入工作区引导模式');
+    this.workspaceBootstrapActive = true;
     this.versioningHostMode = true;
     this.dockerProjectMode = false;
     persistWorkspaceMode(true);
@@ -303,19 +306,22 @@ export const socketMethods = {
       });
 
       const statusResponse = await fetch('/api/status');
+      const statusBody = await statusResponse.json().catch(() => ({}));
+      // 零工作区的新部署：/api/status 返回 code=no_workspace（现以 200 表达，
+      // 历史上曾用 503，此处按业务码判定与状态码无关，两种形态都兼容）。
+      // 此时不能按普通失败中断初始化——host/docker 模式标志只在 status 成功后
+      // 才会设置，一旦中断，侧边栏工作区入口永不显示，用户无法创建第一个
+      // 工作区（死锁）。改为进入「工作区引导」降级流程后直接返回。
+      if (statusBody?.code === 'no_workspace') {
+        await this.enterWorkspaceBootstrapMode();
+        return;
+      }
       if (!statusResponse.ok) {
-        // 零工作区的新部署：/api/status 依赖终端资源，会返回 503 code=no_workspace。
-        // 此时不能按普通失败中断初始化——host/docker 模式标志只在 status 成功后
-        // 才会设置，一旦中断，侧边栏工作区入口永不显示，用户无法创建第一个
-        // 工作区（死锁）。改为进入「工作区引导」降级流程后直接返回。
-        const errBody = await statusResponse.json().catch(() => ({}));
-        if (errBody?.code === 'no_workspace') {
-          await this.enterWorkspaceBootstrapMode();
-          return;
-        }
         throw new Error(t('appUi.statusApiRequestFailed', { status: statusResponse.status }));
       }
-      const statusData = await statusResponse.json();
+      const statusData = statusBody;
+      // status 正常返回意味着工作区已就绪，退出引导模式标志
+      this.workspaceBootstrapActive = false;
       this.socket = null;
       this.projectPath = statusData.project_path || '';
       this.agentVersion = statusData.version || this.agentVersion;

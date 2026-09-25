@@ -761,11 +761,12 @@ class MainTerminalCommandMixin:
             allowed = ["fast", "thinking"]
             if normalized not in allowed:
                 raise ValueError(tr("commands_raise.unsupported_mode", mode=mode))
-            # 仅思考模型限制
-            if getattr(self, "model_profile", {}).get("thinking_only") and normalized != "thinking":
+            # 仅思考模型限制（空模型注册表时 model_profile 为 None，视为无限制）
+            model_profile = getattr(self, "model_profile", None) or {}
+            if model_profile.get("thinking_only") and normalized != "thinking":
                 raise ValueError(tr("commands_raise.thinking_only_model"))
             # fast-only 模型限制
-            if getattr(self, "model_profile", {}).get("fast_only") and normalized != "fast":
+            if model_profile.get("fast_only") and normalized != "fast":
                 raise ValueError(tr("commands_raise.fast_only_model"))
             self.run_mode = normalized
             self.thinking_mode = normalized != "fast"

@@ -218,6 +218,12 @@ export const computed = {
   filteredGroupedModelOptions() {
     return filterModelGroups(this.groupedModelOptions || [], this.modelMenuSearchQuery);
   },
+  // 是否已配置任何模型（全量含隐藏）：用于模型菜单区分「搜索无结果」
+  // 与「新装应用真空态未配置」两种空态，后者显示添加提供商引导
+  hasAnyModels() {
+    const modelStore = useModelStore();
+    return Array.isArray(modelStore.allModels) && modelStore.allModels.length > 0;
+  },
   titleRibbonVisible() {
     return !this.isMobileViewport && this.chatDisplayMode === 'chat';
   },
@@ -273,7 +279,15 @@ export const computed = {
   displayLockEngaged() {
     // 对话级并行后：运行中的任务不再硬锁输入栏——当前对话需要保持可输入以排队/停止，
     // 其他对话需要保持可输入以并行运行。仅当前对话压缩期间保持锁定。
-    return this.compressionActiveForCurrentConversation;
+    if (this.compressionActiveForCurrentConversation) {
+      return true;
+    }
+    // 空态锁定：host 模式下尚未创建/选择工作区时，发送必然失败，输入栏整体锁定
+    // （textarea/语音/发送均吃 inputLocked，引导用户先创建工作区）。
+    if (this.versioningHostMode && !this.currentHostWorkspaceId) {
+      return true;
+    }
+    return false;
   },
   currentWorkspaceHasRunningTask() {
     // 对话级隔离后：仅当「当前对话」有运行中任务时才拦截发送；

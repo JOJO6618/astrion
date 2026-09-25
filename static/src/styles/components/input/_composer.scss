@@ -848,6 +848,19 @@ body[data-theme='light'] {
   cursor: not-allowed;
 }
 
+// 输入栏整体锁定（如无工作区空态）：整个区域灰化且不可点击。
+// 不透明度+灰度滤镜做整体视觉降级；子元素 pointer-events 全禁，
+// 容器自身保留 cursor:not-allowed 悬停反馈。颜色无关实现，三主题通用。
+.stadium-input-wrapper.composer-locked {
+  opacity: 0.55;
+  filter: grayscale(35%);
+  cursor: not-allowed;
+
+  > * {
+    pointer-events: none;
+  }
+}
+
 .stadium-input-editor {
   cursor: text;
   min-height: 20px;

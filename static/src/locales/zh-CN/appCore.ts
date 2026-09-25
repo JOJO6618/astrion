@@ -45,6 +45,8 @@ export default {
   modelGroupCustom: '自定义',
   searchModel: '搜索模型',
   noModelsMatched: '没有匹配的模型',
+  noModelsConfigured: '尚未配置任何模型',
+  goAddProvider: '去添加提供商',
 
   // ── 空白页欢迎语（state.ts blankWelcomePool） ──
   welcomeHelp: '有什么可以帮忙的？',

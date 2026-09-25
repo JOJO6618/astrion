@@ -218,6 +218,12 @@ export const hostWorkspaceMethods = {
         message: createdLabel,
         type: 'success'
       });
+      // 引导模式下创建首个工作区：后端已自动选中为当前工作区，
+      // 补跑一次完整初始化（策略/个性化/模式等），无需用户手动刷新页面
+      if (this.workspaceBootstrapActive) {
+        this.workspaceBootstrapActive = false;
+        await this.loadInitialData();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || t('appUi.createFailed'));
       this.hostWorkspaceCreateError = message;

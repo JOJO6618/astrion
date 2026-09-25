@@ -238,6 +238,9 @@ export function dataState() {
     pathAuthorizationSaving: false,
     versioningHostMode: cachedWorkspaceMode === 'host',
     dockerProjectMode: cachedWorkspaceMode === 'docker',
+    // 零工作区引导模式：新装应用尚无工作区时由 loadInitialData 进入，
+    // 创建首个工作区成功后据此触发一次完整重新初始化，无需手动刷新页面
+    workspaceBootstrapActive: false,
     hostWorkspaces: [],
     currentHostWorkspaceId: '',
     defaultHostWorkspaceId: '',

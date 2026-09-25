@@ -1,6 +1,6 @@
 <template>
   <div class="input-area compact-input-area" ref="inputAreaRoot">
-    <div class="stadium-input-wrapper" ref="stadiumShellOuter">
+    <div class="stadium-input-wrapper" :class="{ 'composer-locked': inputLocked }" ref="stadiumShellOuter">
       <div
         class="runtime-queue-list"
         :class="{ 'runtime-queue-list--empty': !runtimeQueuedMessagesForRender.length }"

@@ -50,7 +50,7 @@ from modules.shallow_versioning import ShallowVersioningManager
 from core.web_terminal import WebTerminal
 from utils.tool_result_formatter import format_tool_result_for_context
 from utils.conversation_manager import ConversationManager
-from config.model_profiles import get_model_context_window, get_model_profile
+from config.model_profiles import get_default_model_key, get_model_context_window, get_model_profile
 
 from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
@@ -1973,6 +1973,29 @@ async def handle_task_with_sender(
         web_terminal.apply_model_profile(profile)
     except Exception as exc:
         debug_log(f"更新模型配置失败: {exc}")
+
+    # === 空模型注册表守卫：终端未持有模型（全新部署/未配置提供商，构造时
+    # 注册表为空置 None）时，发消息应得到干净的引导错误并终止任务，而不是让
+    # 后续 get_model_context_window 抛未处理 ValueError 变成任务级 500。
+    # 若终端构造后用户已新配模型（注册表非空），这里顺手补上默认模型继续任务。
+    if not getattr(web_terminal, "model_key", None):
+        try:
+            resolved_key = get_default_model_key()
+            resolved_profile = get_model_profile(resolved_key)
+        except ValueError as exc:
+            err_msg = str(exc)
+            web_terminal.context_manager.add_conversation("system", err_msg)
+            sender('error', {
+                'message': err_msg,
+                'status_code': 400,
+                'error_type': 'no_model_configured'
+            })
+            finalize_user_work_timer()
+            finalize_run_versioning_checkpoint("no_model_configured")
+            return
+        web_terminal.model_key = resolved_key
+        web_terminal.model_profile = resolved_profile
+        web_terminal.apply_model_profile(resolved_profile)
 
     # === 上下文预算与安全校验（避免超出模型上下文） ===
     max_context_tokens = get_model_context_window(getattr(web_terminal, "model_key", None))
