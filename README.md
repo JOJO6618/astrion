@@ -22,7 +22,7 @@
 - **子智能体与多智能体**：主进程内并行子智能体（独立上下文、可后台运行）；实验性多智能体团队模式
 - **技能系统（Skills）**：可插拔技能包，模型按需加载（内置技能包未随公开仓库分发，可在 `<数据根目录>/<模式>/agentskills/` 下自行创建）
 - **MCP 扩展**：接入任意 MCP 服务，工具自动映射进 Agent 工具箱
-- **多模型动态注册**：不绑定供应商，任何 OpenAI 兼容接口均可注册，支持思考模式切换、推理强度档位、多模态声明
+- **提供商与模型体系**：内置 21 家服务商目录，填入 API key 自动拉取全部可用模型；Chat Completions / Responses 双协议支持；也兼容手写 OpenAI 兼容条目与 Codex 订阅 OAuth；模型可见性按用户开关，思考模式切换、推理强度档位、多模态声明齐全
 - **工程化细节**：对话持久化与跨工作区搜索、文件版本快照回滚、Token 统计、日志轮转、运行态数据外置（源码树零污染）
 
 ## 运行模式
@@ -70,12 +70,15 @@ npm install && npm run build
 > 说明：`setup.sh` 向导当前将配置写入仓库根目录 `.env`（开发备用方式）。
 > 生产部署建议按「配置」一节迁移为 `<数据根目录>/settings.json` 或系统环境变量。
 
-### CLI
+### CLI（beta）
+
+终端 TUI 客户端（opentui + React 19，需 bun ≥ 1.3）：
 
 ```bash
-npm --prefix cli install
-npm run cli          # 自动连接本地 8091 服务
+bun cli/src/main.tsx   # 或 npm --prefix cli run dev；当前目录即工作区
 ```
+
+CLI 通过 host Bearer 通道连接本地服务（探测到无服务时自动启动后端）；命令入口为 `cli/bin/astrion`，加入 PATH 后可直接使用 `astrion` 命令。
 
 ## Docker 沙箱镜像（web 模式必需）
 
@@ -175,13 +178,25 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
 
 > ⚠️ **以下字段已弃用/无效**，存在于旧配置中可删除：
 > - `terminal.direct_ttl_seconds`（direct 模式自动回退 TTL，已从代码移除）
-> - `models.default_model_key`（无效；默认模型请用环境变量 `AGENT_DEFAULT_MODEL`，否则取 custom_models.json 第一个可见模型）
+> - `models.default_model_key`（无效；默认模型用环境变量 `AGENT_DEFAULT_MODEL` 或设置页「模型偏好」的用户级默认值，否则取模型库第一个可见模型）
 > - `flags.api_dump_enabled`（无效；API 请求落盘请用环境变量 `AGENT_API_DUMP_ENABLED=1`）
 > - `env_vars` 中的 `AGENT_API_*` / `AGENT_THINKING_*` / `AGENT_TITLE_*` 三件套（已从代码移除，模型统一走 custom_models.json）
 
-### custom_models.json（模型注册）
+### 模型注册（提供商 / 手写 / Codex）
 
-系统不内置任何供应商模型，全部由本文件注册。读取回退链：
+系统不内置任何供应商模型，模型库由三条路径合并而成：
+
+1. **设置页连接提供商（推荐）**：Web 界面「设置 → 提供商」内置 21 家服务商目录（DeepSeek、Moonshot、智谱、阿里云百炼、火山方舟、SiliconFlow、MiniMax、OpenAI、OpenRouter、Google Gemini、xAI、Groq、Together、Mistral、OpenCode Zen/Go，以及本地 Ollama / LM Studio），填入 API key 即自动拉取该服务商全部可用模型注册进模型库；也可以添加自定义 OpenAI 兼容提供商。凭证保存在 `<数据根目录>/<模式>/data/providers.json`（0600 权限，不纳入 git）。
+2. **手写 custom_models.json（高级）**：完全手动配置单个模型条目（字段见下表），适合需要精细控制思考参数/多模态/上下文窗口的场景。该文件已 UI 化——手写条目自动出现在设置页「模型」分区的「自定义」分组，可在界面直接增删改。
+3. **Codex 订阅 OAuth**：OpenAI 在目录中拆为两条——`OpenAI`（API key）与 `OpenAI Codex`（ChatGPT Pro/Plus 订阅授权，在设置页连接，授权后自动获取订阅包含的模型）。
+
+**协议支持**：Chat Completions 与 OpenAI **Responses** 双协议（Responses 按加密 reasoning 处理，多轮回传保持推理连续性）；Anthropic Messages / Google 原生协议的模型会正常注册显示，但当前版本调用时会明确报错（不做协议适配）。
+
+**模型可见性与偏好**：设置页「模型」分区的可见性开关为**每用户独立**；「模型偏好」分区设置每用户的默认模型 / 默认思考模式 / 默认推理强度。
+
+#### custom_models.json 字段参考
+
+读取回退链：
 `<数据根目录>/config/custom_models.json` → 源码树 `config/custom_models.json` → `config/custom_models.json.example`。
 
 完整示例见 [config/custom_models.json.example](config/custom_models.json.example)。字段说明：
@@ -237,7 +252,7 @@ python3 -c "from werkzeug.security import generate_password_hash; print(generate
 ├── prompts/                 # 系统提示词
 ├── multi_agent_roles/       # 多智能体预设角色
 ├── static/src/              # Vue 3 + TypeScript Web 前端
-├── cli/                     # React 19 + Ink 6 终端 CLI
+├── cli/                     # opentui + React 19 终端 CLI（bun，命令名 astrion）
 ├── docs/                    # 设计文档
 └── docker/                  # 沙箱镜像定义
 ```
@@ -246,10 +261,11 @@ python3 -c "from werkzeug.security import generate_password_hash; print(generate
 
 - 宿主机沙箱与权限模型：[docs/host_sandbox_and_permission_model.md](docs/host_sandbox_and_permission_model.md)
 - 多智能体模式设计：[docs/multi_agent_mode/](docs/multi_agent_mode/01_overview.md)
+- 提供商与设置页 API 契约：[docs/providers_api.md](docs/providers_api.md)
 
 ```bash
-python -m unittest test.test_server_refactor_smoke          # 后端冒烟
-npm --prefix cli run typecheck && npm --prefix cli run build # CLI
+python -m pytest test/test_server_refactor_smoke.py -q       # 后端冒烟
+cd cli && ./node_modules/.bin/tsc --noEmit                   # CLI 类型检查
 ```
 
 ## 致谢

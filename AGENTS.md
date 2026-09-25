@@ -679,7 +679,7 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 
 ### 15.1 个人空间拆分：/settings 全屏设置页
 
-**机制一句话**：原个人空间抽屉（13 Tab）拆分——「个性化 + 账户」留在抽屉（PersonalizationDrawer，2 Tab），其余设置项迁到 `/settings` 全屏页（SettingsShell，5 组 13 分区）；路由沿用 workflows 已验证的手写 History API 分支（**不引 vue-router**）。
+**机制一句话**：原个人空间抽屉（13 Tab）拆分——「个性化 + 账户」留在抽屉（PersonalizationDrawer，2 Tab），其余设置项迁到 `/settings` 全屏页（SettingsShell，5 组 14 分区）；路由沿用 workflows 已验证的手写 History API 分支（**不引 vue-router**）。
 
 **硬约束（改代码必须知道）**：
 
