@@ -160,8 +160,9 @@ class ProviderManager:
         """目录 + 连接状态合并（供提供商页展示）。"""
         connected = self._load()["providers"]
         codex_connected = self._codex_connected()
+        entries = self.catalog_entries()
         output: List[Dict[str, Any]] = []
-        for entry in self.catalog_entries():
+        for entry in entries:
             item = dict(entry)
             # 图标 URL 由后端拼接（静态目录伺服），前端零约定开箱即用
             icon = item.get("icon")
@@ -192,6 +193,37 @@ class ProviderManager:
                 if unsupported:
                     item["unsupported_protocol_count"] = unsupported
             output.append(item)
+
+        # 自定义提供商（connect 时 catalog_id=None、不在静态目录中）以及目录条目
+        # 已下线的孤儿记录：追加为同构条目输出——否则已连接区域永远看不到它们，
+        # 也没有任何删除入口（disconnect/refresh 对它们本就可用）。无 protocol_map
+        # 与 models.dev 门控，resolve_protocol 恒默认 chat_completions，无需统计
+        # unsupported_protocol_count。
+        catalog_ids = {e["id"] for e in entries}
+        for pid, record in connected.items():
+            catalog_id = record.get("catalog_id")
+            if catalog_id and catalog_id in catalog_ids:
+                continue  # 目录条目，已在上方合并
+            summary = self._public_summary(pid, record)
+            output.append(
+                {
+                    "id": pid,
+                    "name": summary.get("name") or pid,
+                    "base_url": summary.get("base_url") or "",
+                    "icon": None,
+                    "icon_url": None,
+                    "auth": "none" if record.get("api_key") == "not-required" else "api_key",
+                    "key_url": None,
+                    "badge": None,
+                    "local": False,
+                    "protocol_note": None,
+                    "custom": True,
+                    "connected": bool(record.get("enabled", True)),
+                    "models_count": len(summary.get("models") or []),
+                    "models_fetched_at": summary.get("models_fetched_at"),
+                    "models_error": summary.get("models_error"),
+                }
+            )
         return output
 
     @staticmethod

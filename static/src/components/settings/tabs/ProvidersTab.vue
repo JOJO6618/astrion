@@ -88,10 +88,15 @@ const refresh = async (entry: ProviderCatalogEntry) => {
 };
 
 const disconnect = async (entry: ProviderCatalogEntry) => {
+  // 自定义提供商不在目录中，断开即彻底删除（凭证+模型一并移除），文案区分
   const ok = await uiStore.requestConfirm({
-    title: t('settings.disconnectConfirmTitle'),
-    message: t('settings.disconnectConfirmMessage', { name: entry.name }),
-    confirmText: t('settings.providerDisconnect'),
+    title: entry.custom
+      ? t('settings.deleteProviderConfirmTitle')
+      : t('settings.disconnectConfirmTitle'),
+    message: entry.custom
+      ? t('settings.deleteProviderConfirmMessage', { name: entry.name })
+      : t('settings.disconnectConfirmMessage', { name: entry.name }),
+    confirmText: entry.custom ? t('settings.providerDelete') : t('settings.providerDisconnect'),
     confirmVariant: 'danger'
   });
   if (!ok) return;
@@ -145,6 +150,9 @@ onMounted(() => {
               <div class="providers-row__name">
                 <span class="providers-row__name-text">{{ entry.name }}</span>
                 <span v-if="entry.badge" class="providers-badge">{{ entry.badge }}</span>
+                <span v-if="entry.custom" class="providers-badge">{{
+                  $t('settings.customBadge')
+                }}</span>
                 <span v-if="entry.local" class="providers-badge">{{
                   $t('settings.localBadge')
                 }}</span>
@@ -205,8 +213,12 @@ onMounted(() => {
             >
               {{
                 busyOf[entry.id] === 'disconnect'
-                  ? $t('settings.providerDisconnecting')
-                  : $t('settings.providerDisconnect')
+                  ? entry.custom
+                    ? $t('settings.providerDeleting')
+                    : $t('settings.providerDisconnecting')
+                  : entry.custom
+                    ? $t('settings.providerDelete')
+                    : $t('settings.providerDisconnect')
               }}
             </button>
           </div>

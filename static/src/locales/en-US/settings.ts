@@ -79,6 +79,8 @@ export default {
   providerRefresh: 'Refresh models',
   providerDisconnect: 'Disconnect',
   providerDisconnecting: 'Disconnecting…',
+  providerDelete: 'Delete',
+  providerDeleting: 'Deleting…',
   providerConnect: 'Connect',
   providerConnecting: 'Connecting…',
   providerLastSync: 'Last synced {time}',
@@ -86,6 +88,10 @@ export default {
   disconnectConfirmTitle: 'Disconnect provider',
   disconnectConfirmMessage:
     'After disconnecting {name}, all of its models are removed from the model list immediately.',
+  deleteProviderConfirmTitle: 'Delete custom provider',
+  deleteProviderConfirmMessage:
+    'After deleting {name}, its credentials and all of its models are removed immediately.',
+  customBadge: 'Custom',
   connectSuccess: 'Connected. Fetched {count} models.',
   connectDialogTitle: 'Connect {name}',
   connectApiDesc: 'Enter an API key to automatically fetch all available models from {url}.',

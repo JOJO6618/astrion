@@ -29,6 +29,8 @@ export interface ProviderCatalogEntry {
   local?: boolean;
   protocol_note?: string | null; // 'multi_protocol_partial' 等
   connected: boolean;
+  /** 自定义提供商（或目录已下线的孤儿记录）：无图标，断开即彻底删除 */
+  custom?: boolean;
   models_count?: number;
   models_fetched_at?: string | null;
   models_error?: string | null;
