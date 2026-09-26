@@ -37,11 +37,23 @@ $BundleDir  = Join-Path $DesktopDir "src-tauri\target\release\bundle\nsis"
 
 # ── 版本号：显式参数 > tauri.conf.json；参数时同步写回三处 ──
 function Set-VersionText($File, [string]$Pattern, [string]$Replacement) {
-  $text = Get-Content $File -Raw
-  $escaped = [regex]::Escape($Replacement)
-  $newText = [regex]::Replace($text, $Pattern, $escaped, 1)
-  if ($newText -eq $text) { throw "在 $File 中未找到版本号行（pattern: $Pattern）" }
-  [System.IO.File]::WriteAllText($File, $newText, (New-Object System.Text.UTF8Encoding($true)))
+  # 编码：显式 UTF8 读取（无 BOM 的 UTF-8 文件被 Get-Content 默认按 ANSI/GBK
+  # 解码会乱码，0.3.2 踩实）；写回无 BOM UTF-8（JSON/TOML 解析器对 BOM 敏感）。
+  # 读入统一转 LF 再匹配（编辑器可能写成 CRLF，原 pattern 行尾 ` *$` 不匹配 \r）。
+  # Replacement 不得用 [regex]::Escape——替换串里的 ${1} 是组引用语义，
+  # Escape 会把组引用变成字面文本写入文件（0.3.2 踩实）。
+  $text = (Get-Content $File -Raw -Encoding UTF8) -replace "`r`n", "`n"
+  $newText = [regex]::Replace($text, $Pattern, $Replacement, 1)
+  if ($newText -eq $text) {
+    # 幂等：匹配成功但替换后无变化 = 当前版本已是目标值（重跑场景），跳过；
+    # 只有匹配失败才是真的"未找到版本号行"。
+    if ([regex]::IsMatch($text, $Pattern)) {
+      Write-Host "    $File 版本号已是目标值，跳过"
+      return
+    }
+    throw "在 $File 中未找到版本号行（pattern: $Pattern）"
+  }
+  [System.IO.File]::WriteAllText($File, $newText, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 if ($Version -eq "") {
@@ -69,7 +81,10 @@ Write-Host "==> 构建 Web 前端"
 $fLog = Join-Path $LogDir "build_frontend.log"
 Push-Location $RepoRoot
 try {
-  npm run build --silent *> $fLog
+  # cmd /c 包裹：npm.ps1 包装器下 node 向 stderr 写 warning 会被 PS 5.1 包装成
+  # ErrorRecord，EAP=Stop 时直接终止（NativeCommandError，0.3.2 发布踩实）。
+  # cmd 无此概念；顺带解决 *> 重定向产出 UTF-16 日志的问题（cmd 重定向为原文）。
+  cmd /c "npm run build --silent > `"$fLog`" 2>&1"
   if ($LASTEXITCODE -ne 0) { throw "前端构建失败，日志: $fLog" }
   Get-Content $fLog -Tail 5
 } finally { Pop-Location }
@@ -79,7 +94,7 @@ Write-Host "==> 构建桌面端（tauri build）"
 $dLog = Join-Path $LogDir "build_desktop.log"
 Push-Location $DesktopDir
 try {
-  npm run build *> $dLog
+  cmd /c "npm run build > `"$dLog`" 2>&1"
   Write-Host "    npm run build 退出码 $LASTEXITCODE（因未设私钥环境变量报错退出属预期，exe 已产出）"
   Get-Content $dLog -Tail 6
 } finally { Pop-Location }
@@ -91,7 +106,9 @@ $Sig = "$Exe.sig"
 Write-Host "==> 手动补 updater 签名"
 Push-Location $DesktopDir
 try {
-  & (Join-Path $DesktopDir "node_modules\.bin\tauri.cmd") signer sign -f $KeyFile -p "" $Exe 2>&1 | Select-Object -Last 20
+  # 空密码参数在 PowerShell->cmd 边界会丢失（PS 5.1 丢弃空串实参，导致 -p
+  # 吞掉 exe 路径、FILE 缺失，0.3.2 踩实）。cmd /c 显式传字面 "" 保证 argv 完整。
+  cmd /c "node_modules\.bin\tauri.cmd signer sign -f `"$KeyFile`" -p `"`" `"$Exe`" 2>&1" | Select-Object -Last 20
   if ($LASTEXITCODE -ne 0) { throw "补签失败" }
 } finally { Pop-Location }
 if (-not (Test-Path $Sig)) { throw "签名产物缺失: $Sig" }
@@ -112,7 +129,8 @@ if ($SigKn -ne $PubKn) { throw "keynum 不匹配，签名校验失败" }
 
 # ── 5) 提取 changelog 顶部小节为更新说明（对齐 mac 半 awk 语义） ──
 Write-Host "==> 提取 changelog 更新说明"
-$lines    = Get-Content $Changelog
+# 显式 UTF8：changelog 是无 BOM UTF-8，默认 ANSI/GBK 读取会让中文 notes 变乱码（0.3.2 踩实）
+$lines    = Get-Content $Changelog -Encoding UTF8
 $notes    = New-Object System.Collections.Generic.List[string]
 $inFirst  = $false
 foreach ($line in $lines) {

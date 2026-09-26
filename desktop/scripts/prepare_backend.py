@@ -93,6 +93,15 @@ def main() -> int:
         print("[prepare-backend] 请先完成 python-build-standalone 运行时就位", file=sys.stderr)
         return 1
 
+    # 0) Windows：后端解释器改名副本（astrion-backend.exe，与本体同目录）
+    #    NSIS 安装/卸载钩子需按进程名精确清理残留后端；python.exe 按名杀会
+    #    误伤用户系统 Python，故复制一份唯一名副本供壳 spawn（0.3.2 起）。
+    #    python-build-standalone 的 python.exe 是小型 launcher，改名不影响运行。
+    if sys.platform == "win32":
+        renamed = PYBIN.with_name("astrion-backend.exe")
+        shutil.copy2(PYBIN, renamed)
+        print(f"[prepare-backend] 后端解释器改名副本: {renamed.name}")
+
     print(f"[prepare-backend] 清理旧 staging: {BACKEND_DIR}")
     shutil.rmtree(BACKEND_DIR, ignore_errors=True)
     BACKEND_DIR.mkdir(parents=True)

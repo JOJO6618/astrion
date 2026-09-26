@@ -241,8 +241,19 @@ fn try_start_install(app: &AppHandle) -> Result<(), String> {
 }
 
 async fn run_update(app: AppHandle) -> Result<(), String> {
+    // Windows 的 install_inner 在启动 NSIS 安装器后立即 std::process::exit(0)
+    // 自杀壳进程——不跑 Drop 与 RunEvent::Exit，正常收尸链路（shutdown_backend）
+    // 被绕过，后端孤儿锁死安装目录文件会导致 NSIS 报 "Error opening file for
+    // writing"。on_before_exit 是 updater 官方预留钩子，恰在安装器启动前、
+    // process::exit 前执行：此处先杀死后端并等待其退出，再放安装器进场。
+    // （非 Windows 平台该钩子不被调用，mac 更新走原地替换无此问题。）
+    let app_for_hook = app.clone();
     let update = app
-        .updater()
+        .updater_builder()
+        .on_before_exit(move || {
+            crate::backend::shutdown_backend(&app_for_hook);
+        })
+        .build()
         .map_err(|e| format!("updater 初始化失败: {e}"))?
         .check()
         .await

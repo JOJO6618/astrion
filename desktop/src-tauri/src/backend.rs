@@ -97,7 +97,15 @@ fn pick_free_port() -> Result<u16, String> {
 fn resolve_embedded_runtime(app: &AppHandle) -> Option<(PathBuf, PathBuf)> {
     let resource_dir = app.path().resource_dir().ok()?;
     let python = if cfg!(windows) {
-        resource_dir.join("runtime/python/python.exe")
+        // 0.3.2 起后端进程名唯一化（astrion-backend.exe）：NSIS 安装/卸载钩子
+        // 按进程名精确清理残留后端，杀 python.exe 会误伤用户系统 Python。
+        // 旧包（或开发期未跑 prepare_backend）无此文件时回退 python.exe。
+        let renamed = resource_dir.join("runtime/python/astrion-backend.exe");
+        if renamed.exists() {
+            renamed
+        } else {
+            resource_dir.join("runtime/python/python.exe")
+        }
     } else {
         resource_dir.join("runtime/python/bin/python3.12")
     };
@@ -293,6 +301,13 @@ fn spawn_backend(
         .spawn()
         .map_err(|e| format!("spawn 后端失败: {e}"))?;
 
+    // Windows：后端挂入 KILL_ON_JOB_CLOSE 的 Job Object。壳任何方式退出
+    // （正常关窗 / 崩溃 / 被 taskkill / updater 启动安装器后 process::exit 自杀）
+    // 都会触发内核收尸，根治后端孤儿残留（锁安装目录文件导致覆盖安装失败、
+    // 占用端口）。失败仅降级为无 job 保护，不阻断启动。
+    #[cfg(windows)]
+    attach_kill_on_close_job(&child);
+
     // 独立线程转发后端 stdout/stderr，避免管道打满阻塞后端
     if let Some(stdout) = child.stdout.take() {
         std::thread::spawn(move || {
@@ -357,6 +372,59 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         .initialization_script("window.__ASTRION_DESKTOP__ = true;")
         .build()?;
     Ok(())
+}
+
+/// Windows：创建 Job Object 并挂入后端子进程，设 KILL_ON_JOB_CLOSE。
+///
+/// job 句柄故意泄漏不 CloseHandle：句柄生命周期 == 壳进程生命周期，壳死亡时
+/// 内核回收句柄、触发 kill-on-close 杀光 job 内进程（含后端 spawn 的孙进程）。
+/// 这正是兜底收尸语义，与 shutdown_backend 的正常链路互补而非冲突。
+#[cfg(windows)]
+fn attach_kill_on_close_job(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null_mut(), std::ptr::null());
+        if job.is_null() {
+            eprintln!(
+                "[astrion-desktop] 创建 Job Object 失败（后端无崩溃收尸保护）: {}",
+                std::io::Error::last_os_error()
+            );
+            return;
+        }
+
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) == 0
+        {
+            eprintln!(
+                "[astrion-desktop] 配置 Job Object 失败: {}",
+                std::io::Error::last_os_error()
+            );
+            let _ = CloseHandle(job);
+            return;
+        }
+
+        if AssignProcessToJobObject(job, child.as_raw_handle() as _) == 0 {
+            eprintln!(
+                "[astrion-desktop] 后端挂入 Job Object 失败: {}",
+                std::io::Error::last_os_error()
+            );
+            let _ = CloseHandle(job);
+        }
+        // 成功路径不 CloseHandle(job)：泄漏至进程退出，由内核完成收尸
+    }
 }
 
 
