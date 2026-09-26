@@ -6,12 +6,20 @@ by modules/i18n.py at import time.
 
 MESSAGES = {
     "search_engine.api_key_not_configured": {
-        "zh-CN": "Tavily API密钥未配置",
-        "en-US": "Tavily API key is not configured",
+        "zh-CN": "搜索服务 {provider} 的 API 密钥未配置（可在设置页「网络搜索」分区配置，或设置对应环境变量）",
+        "en-US": "API key for search provider {provider} is not configured (set it in Settings > Web Search, or via the corresponding env var)",
+    },
+    "search_engine.base_url_not_configured": {
+        "zh-CN": "搜索服务 {provider} 的实例地址未配置（可在设置页「网络搜索」分区配置，或设置对应环境变量）",
+        "en-US": "Instance base URL for search provider {provider} is not configured (set it in Settings > Web Search, or via the corresponding env var)",
     },
     "search_engine.api_request_failed": {
         "zh-CN": "API请求失败: {status_code}",
         "en-US": "API request failed: {status_code}",
+    },
+    "search_engine.api_request_failed_detail": {
+        "zh-CN": "API请求失败: HTTP {status_code}，{detail}",
+        "en-US": "API request failed: HTTP {status_code}, {detail}",
     },
     "search_engine.search_timeout": {
         "zh-CN": "搜索超时",

@@ -1,6 +1,8 @@
-# modules/search_engine.py - 网络搜索模块
+# modules/search_engine.py - 网络搜索模块（多服务商调度层）
+#
+# 架构：本模块负责参数校验/归一化、凭证解析、结果包装与摘要；
+# 各服务商的请求构造与响应解析在 modules/search_providers/ 适配器包中。
 
-import httpx
 import json
 from typing import Dict, Optional, Any, List
 from datetime import datetime
@@ -17,6 +19,11 @@ except ImportError:
     from config import TAVILY_API_KEY, SEARCH_MAX_RESULTS, OUTPUT_FORMATS, DATA_DIR
 
 from modules.i18n import tr
+from modules.search_providers import (
+    get_search_provider,
+    resolve_search_credential,
+    resolve_search_provider_name,
+)
 
 
 def resolve_tavily_api_key(prefs: Optional[Dict[str, Any]] = None, data_dir=None) -> str:
@@ -40,12 +47,10 @@ def resolve_tavily_api_key(prefs: Optional[Dict[str, Any]] = None, data_dir=None
 
 class SearchEngine:
     def __init__(self, data_dir=None):
-        # data_dir 用于运行时读取当前用户个性化配置中的 UI 密钥；
-        # 未提供时退化为进程启动时的环境变量密钥（旧行为）。
+        # data_dir 用于运行时读取当前用户个性化配置（搜索服务商选择与各家密钥）；
+        # 未提供时退化为默认服务商 + 进程启动时的环境变量密钥（旧行为）。
         self.data_dir = data_dir
-        self.api_key = TAVILY_API_KEY
-        self.api_url = "https://api.tavily.com/search"
-        
+
         self._valid_topics = {"general", "news", "finance"}
         self._valid_time_ranges = {
             "day": "day",
@@ -88,16 +93,33 @@ class SearchEngine:
         Returns:
             搜索结果字典
         """
-        api_key = resolve_tavily_api_key(data_dir=self.data_dir) or self.api_key
-        if not api_key or api_key == "your-tavily-api-key":
+        prefs: Dict[str, Any] = {}
+        if self.data_dir is not None:
+            try:
+                from modules.personalization_manager import load_personalization_config
+                prefs = load_personalization_config(self.data_dir) or {}
+            except Exception:
+                prefs = {}
+
+        provider_name = resolve_search_provider_name(prefs)
+        provider = get_search_provider(provider_name)
+        if provider is None:  # 理论不可达（resolve 已回退默认），防御
+            provider_name = "tavily"
+            provider = get_search_provider("tavily")
+        credential = resolve_search_credential(provider_name, prefs)
+        if not credential or credential == "your-tavily-api-key":
+            error_key = (
+                "search_engine.base_url_not_configured"
+                if provider.auth_kind == "base_url"
+                else "search_engine.api_key_not_configured"
+            )
             return {
                 "success": False,
-                "error": tr("search_engine.api_key_not_configured"),
+                "error": tr(error_key, provider=provider_name),
                 "results": []
             }
-        
-        validation = self._build_payload(
-            query=query,
+
+        validation = self._validate_params(
             max_results=max_results,
             topic=topic,
             time_range=time_range,
@@ -107,73 +129,57 @@ class SearchEngine:
             country=country,
             include_domains=include_domains
         )
-        
+
         if not validation["success"]:
             return validation
-        
-        payload = validation["payload"]
+
+        normalized_params = validation["params"]
         applied_filters = validation["filters"]
-        
-        max_results = payload.get("max_results", SEARCH_MAX_RESULTS)
-        
-        print(f"{OUTPUT_FORMATS['search']} 搜索: {query}")
-        
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.post(
-                    self.api_url,
-                    json={
-                        **payload
-                    },
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    }
-                )
-                
-                if response.status_code != 200:
-                    return {
-                        "success": False,
-                        "error": tr("search_engine.api_request_failed", status_code=response.status_code),
-                        "results": []
-                    }
-                
-                data = response.json()
-                
-                # 格式化结果
-                formatted_results = self._format_results(data, applied_filters)
-                
-                print(f"{OUTPUT_FORMATS['success']} 搜索完成，找到 {len(formatted_results['results'])} 条结果")
-                
-                return formatted_results
-                
-        except httpx.TimeoutException:
+        applied_filters["provider"] = provider_name
+
+        print(f"{OUTPUT_FORMATS['search']} 搜索({provider_name}): {query}")
+
+        outcome = await provider.search(query, normalized_params, credential)
+        if not outcome.get("ok"):
             return {
                 "success": False,
-                "error": tr("search_engine.search_timeout"),
+                "error": outcome.get("error") or tr("search_engine.unknown_error"),
                 "results": []
             }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": tr("search_engine.search_failed", error=str(e)),
-                "results": []
-            }
-    
-    def _format_results(self, raw_data: Dict, filters: Dict[str, Any]) -> Dict:
-        """格式化搜索结果"""
+
+        dropped = outcome.get("dropped") or []
+        if dropped:
+            applied_filters["provider_dropped"] = dropped
+
+        formatted_results = self._wrap_results(
+            query,
+            outcome.get("results") or [],
+            applied_filters,
+            answer=outcome.get("answer") or "",
+        )
+
+        print(f"{OUTPUT_FORMATS['success']} 搜索完成，找到 {len(formatted_results['results'])} 条结果")
+        return formatted_results
+
+    def _wrap_results(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+        filters: Dict[str, Any],
+        answer: str = ""
+    ) -> Dict:
+        """把适配器归一化结果包装为对外契约（加序号与 domain 字段）。"""
         formatted = {
             "success": True,
-            "query": raw_data.get("query", ""),
-            "answer": raw_data.get("answer", ""),
+            "query": query,
+            "answer": answer,
             "results": [],
             "timestamp": datetime.now().isoformat(),
             "filters": filters,
-            "total_results": len(raw_data.get("results", []))
+            "total_results": len(results)
         }
-        
-        # 处理每个搜索结果
-        for idx, result in enumerate(raw_data.get("results", []), 1):
+
+        for idx, result in enumerate(results, 1):
             url = result.get("url", "")
             formatted_result = {
                 "index": idx,
@@ -185,7 +191,7 @@ class SearchEngine:
                 "published_date": result.get("published_date", "")
             }
             formatted["results"].append(formatted_result)
-        
+
         return formatted
 
     def build_summary_text(
@@ -356,9 +362,8 @@ class SearchEngine:
             print(f"{OUTPUT_FORMATS['error']} 加载失败: {e}")
             return None
 
-    def _build_payload(
+    def _validate_params(
         self,
-        query: str,
         max_results: Optional[int],
         topic: Optional[str],
         time_range: Optional[str],
@@ -368,22 +373,16 @@ class SearchEngine:
         country: Optional[str],
         include_domains: Optional[List[str]]
     ) -> Dict[str, Any]:
-        """验证并构建 Tavily 请求参数"""
-        payload: Dict[str, Any] = {
-            "query": query,
-            "search_depth": "advanced",
-            "include_answer": False,
-            "include_images": False,
-            "include_raw_content": False
-        }
-        
+        """校验并归一化搜索参数（服务商无关）；具体请求构造在各适配器中。"""
+        params: Dict[str, Any] = {}
+
         filters: Dict[str, Any] = {}
-        
+
         if max_results:
-            payload["max_results"] = max_results
+            params["max_results"] = max_results
         else:
-            payload["max_results"] = SEARCH_MAX_RESULTS
-        
+            params["max_results"] = SEARCH_MAX_RESULTS
+
         normalized_topic = (topic or "general").strip().lower()
         if not normalized_topic:
             normalized_topic = "general"
@@ -393,9 +392,9 @@ class SearchEngine:
                 "error": tr("search_engine.invalid_topic", topic=topic, valid=", ".join(self._valid_topics)),
                 "results": []
             }
-        payload["topic"] = normalized_topic
+        params["topic"] = normalized_topic
         filters["topic"] = normalized_topic
-        
+
         # 时间参数互斥检查
         has_time_range = bool(time_range)
         has_days = days is not None
@@ -407,7 +406,7 @@ class SearchEngine:
                 "error": tr("search_engine.time_params_mutually_exclusive"),
                 "results": []
             }
-        
+
         # 验证 days
         if has_days:
             try:
@@ -430,9 +429,9 @@ class SearchEngine:
                     "error": tr("search_engine.days_only_for_news"),
                     "results": []
                 }
-            payload["days"] = days_value
+            params["days"] = days_value
             filters["days"] = days_value
-        
+
         # 验证 time_range
         if has_time_range:
             normalized_range = time_range.strip().lower()  # type: ignore[union-attr]
@@ -443,9 +442,9 @@ class SearchEngine:
                     "error": tr("search_engine.invalid_time_range", time_range=time_range),
                     "results": []
                 }
-            payload["time_range"] = normalized_range
+            params["time_range"] = normalized_range
             filters["time_range"] = normalized_range
-        
+
         # 验证日期范围
         if has_date_range:
             if not start_date or not end_date:
@@ -481,11 +480,11 @@ class SearchEngine:
                     "error": tr("search_engine.start_date_after_end_date", start_date=start_date, end_date=end_date),
                     "results": []
                 }
-            payload["start_date"] = start_date
-            payload["end_date"] = end_date
+            params["start_date"] = start_date
+            params["end_date"] = end_date
             filters["start_date"] = start_date
             filters["end_date"] = end_date
-        
+
         # 国家过滤
         if country:
             normalized_country = country.strip().lower()
@@ -496,7 +495,7 @@ class SearchEngine:
                         "error": tr("search_engine.country_only_for_general"),
                         "results": []
                     }
-                payload["country"] = normalized_country
+                params["country"] = normalized_country
                 filters["country"] = normalized_country
 
         # 域名白名单
@@ -525,39 +524,44 @@ class SearchEngine:
                     "results": []
                 }
             if cleaned_domains:
-                payload["include_domains"] = cleaned_domains
+                params["include_domains"] = cleaned_domains
                 filters["include_domains"] = cleaned_domains
-        
+
         return {
             "success": True,
-            "payload": payload,
+            "params": params,
             "filters": filters,
             "results": []
         }
 
     def _summarize_filters(self, filters: Dict[str, Any]) -> str:
-        """构建过滤条件摘要"""
+        """构建过滤条件摘要（含服务商与不支持被忽略的参数）"""
         if not filters:
             return ""
-        
+
         parts = []
+        provider = filters.get("provider")
+        if provider:
+            parts.append(f"Provider: {provider}")
         topic = filters.get("topic")
         if topic:
             parts.append(f"Topic: {topic}")
-        
+
         if "time_range" in filters:
             parts.append(f"Time Range: {filters['time_range']}")
         elif "days" in filters:
             parts.append(f"最近 {filters['days']} 天")
         elif "start_date" in filters and "end_date" in filters:
             parts.append(f"{filters['start_date']} 至 {filters['end_date']}")
-        
+
         if "country" in filters:
             parts.append(f"Country: {filters['country']}")
         if "include_domains" in filters:
             parts.append(f"Domains: {len(filters['include_domains'])}")
-        
+        if filters.get("provider_dropped"):
+            parts.append(f"该服务商不支持已忽略: {', '.join(filters['provider_dropped'])}")
+
         if not parts:
             return ""
-        
+
         return "🎯 过滤条件: " + " | ".join(parts)

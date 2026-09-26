@@ -115,6 +115,20 @@ interface PersonalForm {
   webpage_direct_extract_domains: string[];
   /** Tavily API 密钥（设置页「网络搜索」配置；为空时后端回退环境变量） */
   tavily_api_key: string;
+  /** 搜索服务商选择（tavily/bocha/exa/parallel/searxng） */
+  search_provider: string;
+  /** 博查 API 密钥 */
+  bocha_api_key: string;
+  /** Exa API 密钥 */
+  exa_api_key: string;
+  /** Parallel API 密钥 */
+  parallel_api_key: string;
+  /** SearXNG 实例地址（自托管，无需密钥） */
+  searxng_base_url: string;
+  /** 网页提取商选择（jina/tavily/exa/parallel；白名单直提为唯一自动回退层） */
+  webpage_extract_provider: string;
+  /** Jina Reader API 密钥（可选；为空=匿名限速调用） */
+  jina_api_key: string;
   skill_hints_enabled: boolean;
   skill_strict_terminal_enabled: boolean;
   skill_strict_sub_agent_enabled: boolean;
@@ -334,6 +348,13 @@ const defaultForm = (): PersonalForm => ({
   webpage_direct_extract_enabled: true,
   webpage_direct_extract_domains: [],
   tavily_api_key: '',
+  search_provider: 'tavily',
+  bocha_api_key: '',
+  exa_api_key: '',
+  parallel_api_key: '',
+  searxng_base_url: '',
+  webpage_extract_provider: 'jina',
+  jina_api_key: '',
   skill_hints_enabled: false,
   skill_strict_terminal_enabled: false,
   skill_strict_sub_agent_enabled: false,
@@ -577,6 +598,24 @@ export const usePersonalizationStore = defineStore('personalization', {
           : [],
         tavily_api_key:
           typeof data.tavily_api_key === 'string' ? data.tavily_api_key.trim() : '',
+        search_provider: ['tavily', 'bocha', 'exa', 'parallel', 'searxng'].includes(
+          String(data.search_provider || '')
+        )
+          ? String(data.search_provider)
+          : 'tavily',
+        bocha_api_key:
+          typeof data.bocha_api_key === 'string' ? data.bocha_api_key.trim() : '',
+        exa_api_key: typeof data.exa_api_key === 'string' ? data.exa_api_key.trim() : '',
+        parallel_api_key:
+          typeof data.parallel_api_key === 'string' ? data.parallel_api_key.trim() : '',
+        searxng_base_url:
+          typeof data.searxng_base_url === 'string' ? data.searxng_base_url.trim() : '',
+        webpage_extract_provider: ['jina', 'tavily', 'exa', 'parallel'].includes(
+          String(data.webpage_extract_provider || '')
+        )
+          ? String(data.webpage_extract_provider)
+          : 'jina',
+        jina_api_key: typeof data.jina_api_key === 'string' ? data.jina_api_key.trim() : '',
         skill_hints_enabled: !!data.skill_hints_enabled,
         skill_strict_terminal_enabled: !!data.skill_strict_terminal_enabled,
         skill_strict_sub_agent_enabled: !!data.skill_strict_sub_agent_enabled,

@@ -1,9 +1,11 @@
 # modules/webpage_extractor.py - 网页内容提取模块
 #
 # 提取分两层：
-# 1. 白名单域名走本机直提（免费、零配额）：GitHub 代码文件页有专属直链适配
-#    （jsDelivr CDN → GitHub API 备用），其余白名单页面用 trafilatura 提取正文。
-# 2. 未命中白名单（或直提失败）回退 Tavily 云端提取。
+# 1. 白名单域名走本机直提（免费、零配额，唯一自动回退层）：GitHub 代码文件页
+#    有专属直链适配（jsDelivr CDN → GitHub API 备用），其余白名单页面用 trafilatura。
+# 2. 未命中白名单（或直提失败）走用户在设置页选定的提取商：Jina Reader（默认，
+#    无 key 匿名限速可用）/ Tavily / Exa / Parallel。选定商失败即报错，
+#    不再向其他家回退（避免在用户不知情时消耗多家付费额度）。
 #
 # trafilatura 为可选依赖：未安装时通用直提静默失效，仅 GitHub 直链仍可用。
 
@@ -26,6 +28,16 @@ except ImportError:  # 可选依赖
 
 # 内置直提白名单域名（个人空间可追加；子域名自动匹配）
 BUILTIN_DIRECT_EXTRACT_DOMAINS: Tuple[str, ...] = ("github.com",)
+
+# 可选网页提取商（personalization.webpage_extract_provider 的白名单值）
+EXTRACT_PROVIDERS: Tuple[str, ...] = ("jina", "tavily", "exa", "parallel")
+DEFAULT_EXTRACT_PROVIDER = "jina"
+_EXTRACT_PROVIDER_LABELS: Dict[str, str] = {
+    "jina": "Jina Reader",
+    "tavily": "Tavily",
+    "exa": "Exa",
+    "parallel": "Parallel",
+}
 
 _DIRECT_REQUEST_HEADERS = {
     "User-Agent": (
@@ -292,18 +304,145 @@ def _format_single_result(url: str, content: str, method: Optional[str] = None) 
     ])
 
 
+async def jina_extract(url: str, api_key: str = "") -> Optional[str]:
+    """Jina Reader 提取（可选提取商之一，默认；无 key 匿名限速可用）。
+
+    GET https://r.jina.ai/<url>；无 key 匿名限速（约 20 RPM），带 key 提额。
+    成功返回 markdown 文本，失败（含 429 限流）返回 None。
+    """
+    target = str(url).split("#", 1)[0]  # fragment 不由客户端发送，先剥离
+    headers = {"Accept": "text/plain"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        async with httpx.AsyncClient(timeout=45, follow_redirects=True) as client:
+            resp = await client.get(f"https://r.jina.ai/{target}", headers=headers)
+        if resp.status_code == 200 and resp.text and resp.text.strip():
+            return resp.text.strip()
+        logger.info(f"Jina Reader 返回 {resp.status_code}: {url}")
+    except Exception as e:
+        logger.info(f"Jina Reader 失败 {url}: {e}")
+    return None
+
+
+_EXA_MAX_CHARACTERS = 50000
+
+
+async def exa_extract(url: str, api_key: str) -> Optional[str]:
+    """Exa /contents 提取（可选提取商之一；按页计费 $1/1k pages，x-api-key 认证）。
+
+    POST https://api.exa.ai/contents，text 视图返回干净正文。
+    成功返回文本，失败返回 None。
+    """
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.exa.ai/contents",
+                json={"urls": [url], "text": {"maxCharacters": _EXA_MAX_CHARACTERS}},
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            )
+        if resp.status_code != 200:
+            logger.info(f"Exa contents 返回 {resp.status_code}: {url}")
+            return None
+        data = resp.json()
+        for item in (data or {}).get("results") or []:
+            if isinstance(item, dict):
+                text = (item.get("text") or "").strip()
+                if text:
+                    return text
+    except Exception as e:
+        logger.info(f"Exa contents 失败 {url}: {e}")
+    return None
+
+
+_PARALLEL_MAX_CHARS = 50000
+
+
+async def parallel_extract(url: str, api_key: str) -> Optional[str]:
+    """Parallel /v1/extract 提取（可选提取商之一；按 URL 计费 $1/1k，600 次/分钟）。
+
+    POST https://api.parallel.ai/v1/extract（x-api-key 认证）；GA 版 excerpts 总是返回，
+    full_content 需经 advanced_settings.full_content 显式开启（官方 OpenAPI 契约）。
+    HTTP 200 可能是部分成功：目标 URL 出现在 errors 而非 results 时视为失败。
+    成功返回文本（优先 full_content，否则拼接 excerpts），失败返回 None。
+    """
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.parallel.ai/v1/extract",
+                json={
+                    "urls": [url],
+                    "advanced_settings": {
+                        "full_content": {"max_chars_per_result": _PARALLEL_MAX_CHARS}
+                    },
+                },
+                headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            )
+        if resp.status_code != 200:
+            logger.info(f"Parallel extract 返回 {resp.status_code}: {url}")
+            return None
+        data = resp.json()
+        for item in (data or {}).get("results") or []:
+            if not isinstance(item, dict):
+                continue
+            full = item.get("full_content")
+            if isinstance(full, str) and full.strip():
+                return full.strip()
+            excerpts = item.get("excerpts")
+            if isinstance(excerpts, list):
+                text = "\n".join(str(e) for e in excerpts if e).strip()
+                if text:
+                    return text
+        errors = (data or {}).get("errors")
+        if errors:
+            logger.info(f"Parallel extract 部分失败 {url}: {errors}")
+    except Exception as e:
+        logger.info(f"Parallel extract 失败 {url}: {e}")
+    return None
+
+
+def resolve_extract_provider_config(personalization: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """从 personalization 解析网页提取商与凭证（UI 配置优先、环境变量兜底）。
+
+    Returns:
+        {"provider": "jina"|"tavily"|"exa"|"parallel", "api_key": str}
+        jina 无需 key（匿名限速）；其余三家复用搜索的同源凭证解析。
+    """
+    personalization = personalization or {}
+    name = str(personalization.get("webpage_extract_provider") or "").strip().lower()
+    if name not in EXTRACT_PROVIDERS:
+        name = DEFAULT_EXTRACT_PROVIDER
+    if name == "jina":
+        api_key = str(personalization.get("jina_api_key") or "").strip()
+        if not api_key:
+            try:
+                import config as _config
+
+                api_key = str(getattr(_config, "JINA_API_KEY", "") or "").strip()
+            except Exception:
+                api_key = ""
+    else:
+        from modules.search_providers import resolve_search_credential
+
+        api_key = resolve_search_credential(name, personalization)
+    return {
+        "provider": name,
+        "api_key": api_key,
+    }
+
+
 async def extract_single_url(
     url: str,
-    api_key: Optional[str],
+    extract_config: Optional[Dict[str, Any]] = None,
     extract_depth: str = "basic",
     direct_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """统一单 URL 提取：白名单直提优先，失败/未命中回退 Tavily。
+    """统一单 URL 提取：白名单直提（唯一自动回退层）→ 用户选定的提取商。
 
     Args:
         url: 目标 URL
-        api_key: Tavily API 密钥（可为 None；直提命中时不需要）
-        extract_depth: Tavily 提取深度
+        extract_config: resolve_extract_provider_config() 的返回；None 视为默认 Jina
+        extract_depth: Tavily 提取深度（仅 provider=tavily 时生效）
         direct_config: resolve_direct_extract_config() 的返回；None 视为关闭直提
 
     Returns:
@@ -311,7 +450,14 @@ async def extract_single_url(
         {"success": False, "url": str, "error": str, "method": str}
     """
     direct_config = direct_config or {}
+    extract_config = extract_config or {}
+    provider = str(extract_config.get("provider") or "").strip().lower()
+    if provider not in EXTRACT_PROVIDERS:
+        provider = DEFAULT_EXTRACT_PROVIDER
+    api_key = str(extract_config.get("api_key") or "")
+    label = _EXTRACT_PROVIDER_LABELS.get(provider, provider)
 
+    # 第一层（唯一自动回退）：白名单域名本机直提
     if direct_config.get("enabled") and is_whitelisted_url(url, direct_config.get("domains") or []):
         content, method = None, ""
         try:
@@ -321,32 +467,53 @@ async def extract_single_url(
             logger.info(f"白名单直提异常 {url}: {e}")
         if content is not None:
             return {"success": True, "url": url, "content": content, "method": method}
-        logger.info(f"白名单直提未取到内容，回退 Tavily: {url}")
+        logger.info(f"白名单直提未取到内容，转交选定的提取商: {url}")
 
-    results = await tavily_extract(url, api_key, extract_depth, 1)
-    if "error" in results:
-        return {"success": False, "url": url, "error": results["error"], "method": "tavily"}
-    for item in results.get("results") or []:
-        raw = (item.get("raw_content") or "").strip()
-        if raw:
-            return {"success": True, "url": url, "content": raw, "method": "tavily"}
-    return {"success": False, "url": url, "error": tr("webpage.no_content"), "method": "tavily"}
+    # 第二层：用户选定的提取商；失败即报错，不再向其他家回退
+    if provider == "tavily":
+        results = await tavily_extract(url, api_key, extract_depth, 1)
+        if "error" in results:
+            return {"success": False, "url": url, "error": results["error"], "method": "tavily"}
+        for item in results.get("results") or []:
+            raw = (item.get("raw_content") or "").strip()
+            if raw:
+                return {"success": True, "url": url, "content": raw, "method": "tavily"}
+        return {"success": False, "url": url, "error": tr("webpage.no_content"), "method": "tavily"}
+
+    # jina / exa / parallel 三家同构（jina 无需 key）
+    if provider != "jina" and not api_key:
+        return {
+            "success": False,
+            "url": url,
+            "error": tr("webpage.provider_key_missing", provider=label),
+            "method": provider,
+        }
+    extractor = {"jina": jina_extract, "exa": exa_extract, "parallel": parallel_extract}[provider]
+    content = await extractor(url, api_key)
+    if content is not None:
+        return {"success": True, "url": url, "content": content, "method": provider}
+    return {
+        "success": False,
+        "url": url,
+        "error": tr("webpage.provider_failed", provider=label),
+        "method": provider,
+    }
 
 
 async def extract_webpage_content(
     urls: Union[str, List[str]],
-    api_key: str,
+    extract_config: Optional[Dict[str, Any]] = None,
     extract_depth: str = "basic",
     max_urls: int = 1,
     direct_config: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, str]:
     """
-    完整的网页内容提取流程（白名单直提优先，Tavily 兜底）
+    完整的网页内容提取流程（白名单直提 → 用户选定的提取商，失败不回退）
 
     Args:
         urls: 要提取的URL（字符串或列表）
-        api_key: Tavily API密钥
-        extract_depth: 提取深度 (basic/advanced)
+        extract_config: 提取商配置（resolve_extract_provider_config 返回）；None=默认 Jina
+        extract_depth: 提取深度 (basic/advanced，仅 provider=tavily 时生效)
         max_urls: 最大提取URL数量
         direct_config: 直提配置（resolve_direct_extract_config 返回）；None=关闭直提
 
@@ -359,7 +526,9 @@ async def extract_webpage_content(
 
     formatted_parts: List[str] = []
     for url in urls:
-        result = await extract_single_url(url, api_key, extract_depth=extract_depth, direct_config=direct_config)
+        result = await extract_single_url(
+            url, extract_config=extract_config, extract_depth=extract_depth, direct_config=direct_config
+        )
         if result.get("success"):
             formatted_parts.append(_format_single_result(url, result["content"], result.get("method")))
         else:

@@ -76,7 +76,7 @@ from modules.webpage_extractor import (
     extract_single_url,
     extract_webpage_content,
     resolve_direct_extract_config,
-    tavily_extract,
+    resolve_extract_provider_config,
 )
 from modules.ocr_client import OCRClient
 from modules.easter_egg_manager import EasterEggManager
@@ -1773,15 +1773,14 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "extract_webpage":
                         url = arguments["url"]
                         try:
-                            # 密钥运行时解析：设置页 UI 配置优先，环境变量兜底
-                            from modules.search_engine import resolve_tavily_api_key
+                            # 提取商与密钥运行时解析：设置页 UI 配置优先，环境变量兜底
                             try:
                                 _prefs = load_personalization_config(self.data_dir) or {}
                             except Exception:
                                 _prefs = {}
                             full_content, _ = await extract_webpage_content(
                                 urls=url,
-                                api_key=resolve_tavily_api_key(_prefs),
+                                extract_config=resolve_extract_provider_config(_prefs),
                                 extract_depth="basic",
                                 max_urls=1,
                                 direct_config=resolve_direct_extract_config(_prefs),
@@ -1822,10 +1821,9 @@ class MainTerminalToolsExecutionMixin:
                     elif tool_name == "save_webpage":
                         url = arguments["url"]
                         target_path = arguments["target_path"]
-                        from modules.search_engine import resolve_tavily_api_key
 
-                        # 白名单直提优先（无需 Tavily key）；未命中/失败自动回退 Tavily
-                        # 密钥运行时解析：设置页 UI 配置优先，环境变量兜底
+                        # 白名单直提优先（本地免费，唯一自动回退层）；未命中/失败转交设置页选定的提取商
+                        # 提取商与密钥运行时解析：设置页 UI 配置优先，环境变量兜底
                         try:
                             try:
                                 _prefs = load_personalization_config(self.data_dir) or {}
@@ -1833,7 +1831,7 @@ class MainTerminalToolsExecutionMixin:
                                 _prefs = {}
                             extract_one = await extract_single_url(
                                 url,
-                                resolve_tavily_api_key(_prefs),
+                                extract_config=resolve_extract_provider_config(_prefs),
                                 extract_depth="basic",
                                 direct_config=resolve_direct_extract_config(_prefs),
                             )

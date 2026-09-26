@@ -109,7 +109,7 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "网络搜索（Tavily）。用于外部资料或最新信息检索。",
+            "description": "网络搜索（服务商由主系统设置决定，如 Tavily/博查/Exa 等）。用于外部资料或最新信息检索。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -131,7 +131,7 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "extract_webpage",
-            "description": "网页内容提取（Tavily）。mode=read 直接返回内容，mode=save 保存为文件。",
+            "description": "网页内容提取。mode=read 直接返回内容，mode=save 保存为文件。",
             "parameters": {
                 "type": "object",
                 "properties": {

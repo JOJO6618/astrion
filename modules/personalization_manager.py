@@ -110,6 +110,18 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "webpage_direct_extract_domains": [],
     # Tavily API 密钥（设置页「网络搜索」分区配置；为空时回退环境变量 AGENT_TAVILY_API_KEY）
     "tavily_api_key": "",
+    # 搜索服务商选择与其余各家密钥（均为空时回退对应 AGENT_*_API_KEY 环境变量；
+    # searxng 无需密钥，填实例地址）。可选值见 modules/search_providers/ 注册表。
+    "search_provider": "tavily",
+    "bocha_api_key": "",
+    "exa_api_key": "",
+    "parallel_api_key": "",
+    "searxng_base_url": "",
+    # 网页提取商选择（白名单直提为唯一自动回退层；选定商失败即报错不再回退。
+    # 可选值：jina（默认，无 key 匿名限速可用）/ tavily / exa / parallel，
+    # 后三家复用上方搜索的同源密钥；jina_api_key 留空时回退环境变量 AGENT_JINA_API_KEY）
+    "webpage_extract_provider": "jina",
+    "jina_api_key": "",
     "default_model": None,
     "image_compression": "original",  # original / 1080p / 720p / 540p
     "auto_shallow_compress_enabled": False,
@@ -796,6 +808,26 @@ def sanitize_personalization_payload(
     # Tavily API 密钥：纯字符串，trim + 长度上限（密钥正常几十字符，512 足够冗余）
     raw_tavily_key = data.get("tavily_api_key", base.get("tavily_api_key"))
     base["tavily_api_key"] = str(raw_tavily_key).strip()[:512] if raw_tavily_key else ""
+
+    # 搜索服务商选择：白名单校验（与 modules/search_providers/_PROVIDERS 注册表保持一致）
+    raw_provider = data.get("search_provider", base.get("search_provider"))
+    provider_name = str(raw_provider or "").strip().lower()
+    base["search_provider"] = (
+        provider_name if provider_name in ("tavily", "bocha", "exa", "parallel", "searxng") else "tavily"
+    )
+
+    # 各家搜索密钥 / SearXNG 实例地址 / Jina 密钥：同 tavily_api_key 的清洗规则
+    for key in ("bocha_api_key", "exa_api_key", "parallel_api_key", "searxng_base_url", "jina_api_key"):
+        raw_value = data.get(key, base.get(key))
+        base[key] = str(raw_value).strip()[:512] if raw_value else ""
+
+    # 网页提取商选择：白名单校验（与 modules/webpage_extractor.EXTRACT_PROVIDERS 保持一致）
+    base.pop("webpage_jina_extract_enabled", None)  # 旧键一次性清除（已被提取商选择取代）
+    raw_extract_provider = data.get("webpage_extract_provider", base.get("webpage_extract_provider"))
+    extract_provider = str(raw_extract_provider or "").strip().lower()
+    base["webpage_extract_provider"] = (
+        extract_provider if extract_provider in ("jina", "tavily", "exa", "parallel") else "jina"
+    )
 
     return base
 

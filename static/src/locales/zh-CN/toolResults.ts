@@ -52,6 +52,7 @@ export default {
     error: '错误：',
     query: '搜索内容：',
     topic: '主题：',
+    provider: '搜索引擎：',
     timeRange: '时间范围：',
     domains: '限定网站：',
     resultCount: '结果数量：',
@@ -132,6 +133,15 @@ export default {
     reviewContent: '回顾内容：',
     rename: '重命名：',
     waitedSubAgents: '已等待 {n} 个子智能体：',
+  },
+
+  // —— 搜索引擎名称（web_search 结果 meta 的服务商标识）——
+  searchProviders: {
+    tavily: 'Tavily',
+    bocha: '博查',
+    exa: 'Exa',
+    parallel: 'Parallel',
+    searxng: 'SearXNG（自托管）',
   },
 
   // —— 区块标题（无冒号）——

@@ -280,8 +280,20 @@ function renderWebSearch(
   const totalResults = result.total_results || 0;
   const results = result.results || [];
 
+  // 服务商来源（filters.provider 由后端 SearchEngine 写入；未知 id 原样显示）
+  const KNOWN_SEARCH_PROVIDERS = ['tavily', 'bocha', 'exa', 'parallel', 'searxng'];
+  const providerName =
+    typeof filters.provider === 'string' && filters.provider
+      ? KNOWN_SEARCH_PROVIDERS.includes(filters.provider)
+        ? t(`toolResults.searchProviders.${filters.provider}`)
+        : filters.provider
+      : '';
+
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>${escapeHtml(t('toolResults.labels.query'))}</strong>${escapeHtml(query)}</div>`;
+  if (providerName) {
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.provider'))}</strong>${escapeHtml(providerName)}</div>`;
+  }
   html += `<div><strong>${escapeHtml(t('toolResults.labels.topic'))}</strong>${escapeHtml(formatSearchTopic(filters))}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.timeRange'))}</strong>${escapeHtml(formatSearchTime(filters))}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.domains'))}</strong>${escapeHtml(formatSearchDomains(filters))}</div>`;

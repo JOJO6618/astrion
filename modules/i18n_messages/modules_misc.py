@@ -214,6 +214,14 @@ MESSAGES = {
         "zh-CN": "❌ 未能提取到任何内容",
         "en-US": "❌ No content could be extracted",
     },
+    "webpage.provider_key_missing": {
+        "zh-CN": "{provider} API密钥未配置，请在设置页配置或更换网页提取方式",
+        "en-US": "{provider} API key is not configured; set it in Settings or switch the extraction provider",
+    },
+    "webpage.provider_failed": {
+        "zh-CN": "{provider} 提取失败或未返回内容",
+        "en-US": "{provider} extraction failed or returned no content",
+    },
     "webpage.method_label": {
         "zh-CN": "提取方式: {method}",
         "en-US": "Extraction method: {method}",
@@ -233,6 +241,18 @@ MESSAGES = {
     "webpage.method_tavily": {
         "zh-CN": "Tavily",
         "en-US": "Tavily",
+    },
+    "webpage.method_jina": {
+        "zh-CN": "Jina Reader",
+        "en-US": "Jina Reader",
+    },
+    "webpage.method_exa": {
+        "zh-CN": "Exa",
+        "en-US": "Exa",
+    },
+    "webpage.method_parallel": {
+        "zh-CN": "Parallel",
+        "en-US": "Parallel",
     },
 
     # ── mcp_client_manager（manager.py + http_client.py） ──

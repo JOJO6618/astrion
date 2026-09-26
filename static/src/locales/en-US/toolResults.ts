@@ -45,6 +45,7 @@ export default {
     error: 'Error:',
     query: 'Search query:',
     topic: 'Topic:',
+    provider: 'Search engine:',
     timeRange: 'Time range:',
     domains: 'Domains:',
     resultCount: 'Results:',
@@ -125,6 +126,15 @@ export default {
     reviewContent: 'Review content:',
     rename: 'Renamed:',
     waitedSubAgents: 'Waited for {n} sub-agents:',
+  },
+
+  // —— Search engine names (provider badge in web_search result meta) ——
+  searchProviders: {
+    tavily: 'Tavily',
+    bocha: 'Bocha',
+    exa: 'Exa',
+    parallel: 'Parallel',
+    searxng: 'SearXNG (self-hosted)',
   },
 
   // —— Section titles (no colon) ——

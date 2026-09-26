@@ -660,24 +660,39 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 
 ---
 
-## 14) 网页提取白名单直提（2026-09-12 新增）
+## 14) 网页提取（白名单直提 + 可选提取商）
 
 > 实现唯一权威：`modules/webpage_extractor.py`。
 
 ### 14.1 机制一句话
 
-`extract_webpage` / `save_webpage` 不再全部走 Tavily：命中白名单的域名在本机直提（免费、零配额），失败或未命中才回退 Tavily。开关与追加域名在个人空间（工具页），存 personalization.json 的 `webpage_direct_extract_enabled`（默认 true）/ `webpage_direct_extract_domains`。
+`extract_webpage` / `save_webpage` 的提取链为**两层**：白名单直提（本机、免费、**唯一自动回退层**）→ **用户在设置页选定的提取商**。可选提取商四家（2026-09-26 从「直提→Jina→Tavily 三级降级链」改为可选模式）：**Jina Reader**（默认，无 key 匿名限速可用）/ **Tavily** / **Exa**（`POST /contents`）/ **Parallel**（`POST /v1/extract`）。选定商失败即报错，**不再向其他家回退**（避免在用户不知情时消耗多家付费额度）。直提开关与追加域名存 personalization.json 的 `webpage_direct_extract_enabled`（默认 true）/ `webpage_direct_extract_domains`；提取商选择为 `webpage_extract_provider`（默认 `"jina"`）+ `jina_api_key`（空=匿名，回退环境变量 `AGENT_JINA_API_KEY`），解析入口 `resolve_extract_provider_config()`。
 
 ### 14.2 硬约束（改代码必须知道）
 
-1. **统一入口是 `extract_single_url()`**：白名单判定 → `_direct_extract()` → 失败回退 `tavily_extract()`。两个工具调用点都走它，不要绕过单写 tavily 路径。
-2. **降级链**：GitHub blob 页 → jsDelivr CDN（`cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}`，国内可用、无限速）→ GitHub API contents（备用，匿名限 60 次/时）→ trafilatura 通用提取 → Tavily。**不要用 raw.githubusercontent.com**（国内被 DNS 污染，实测不可达）。
+1. **统一入口是 `extract_single_url()`**：白名单判定 → `_direct_extract()` → 按 `extract_config.provider` 分发到 `jina_extract` / `tavily_extract` / `exa_extract` / `parallel_extract`。两个工具调用点都走它，不要绕过单写某一层路径。
+2. **直提层内部降级链**：GitHub blob 页 → jsDelivr CDN（`cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}`，国内可用、无限速）→ GitHub API contents（备用，匿名限 60 次/时）→ trafilatura 通用提取 → 失败转交选定提取商。**不要用 raw.githubusercontent.com**（国内被 DNS 污染，实测不可达）。
 3. **trafilatura 是可选依赖**：`import` 失败时通用直提静默失效（GitHub 直链不依赖它仍可用），白名单不会报错；已进 `requirements.txt`，正式部署应装上。
-4. **blob URL 的 branch 按单段解析**（`[^/?#]+`）；含斜杠的分支名解析失败会自然降级 trafilatura → Tavily，属预期行为。
+4. **blob URL 的 branch 按单段解析**（`[^/?#]+`）；含斜杠的分支名解析失败会自然降级 trafilatura → 选定提取商，属预期行为。
 5. **域名匹配 = 精确或子域名后缀**：`github.com` 命中 `gist.github.com`；用户输入经 `_normalize_domain` 清洗（容忍粘贴完整 URL）。
-6. **新增 personalization 键必须双注册**（`DEFAULT_PERSONALIZATION_CONFIG` + `sanitize_personalization_payload`），否则保存后被静默丢弃（见 .astrion/memory/personalization_config_whitelist.md）。
-7. **返回格式**沿用 `🌐 网页内容 (N 字符)` 骨架，新增 `[提取方式: ...]` 标注（i18n key `webpage.method_label` / `webpage.method_*`），模型侧无感知。
-8. **read-before-edit 已读白名单**含 `recall_project_memory`（recall 返回记忆文件全文，视为已读）；`search_project_memory` 只回片段，刻意不标记。
+6. **提取商凭证复用搜索同源解析**：tavily/exa/parallel 的 key 走 `resolve_search_credential()`（UI 配置优先、环境变量兜底），零新增配置项；jina 的 key 单独解析（`jina_api_key` → `AGENT_JINA_API_KEY`）。选定 tavily/exa/parallel 而无 key 时返回明确错误（`webpage.provider_key_missing`），不静默换家。
+7. **Exa/Parallel 提取契约**：Exa `POST https://api.exa.ai/contents`（body `{"urls":[url],"text":{"maxCharacters":N}}`，取 `results[0].text`）；Parallel `POST https://api.parallel.ai/v1/extract`（`advanced_settings.full_content` 需显式开启，响应优先 `full_content`、否则拼接 `excerpts`，HTTP 200 可能部分成功——目标 URL 进 `errors` 视为失败）。两家均为付费端点（约 $1/1k），x-api-key 认证。
+8. **新增 personalization 键必须双注册**（`DEFAULT_PERSONALIZATION_CONFIG` + `sanitize_personalization_payload`），否则保存后被静默丢弃（见 .astrion/memory/personalization_config_whitelist.md）。
+9. **返回格式**沿用 `🌐 网页内容 (N 字符)` 骨架，附 `[提取方式: ...]` 标注（i18n key `webpage.method_label` / `webpage.method_*`），模型侧无感知。
+10. **read-before-edit 已读白名单**含 `recall_project_memory`（recall 返回记忆文件全文，视为已读）；`search_project_memory` 只回片段，刻意不标记。
+
+### 14.3 搜索多服务商（2026-09-26 新增）
+
+**机制一句话**：`web_search` 从仅 Tavily 扩展为可插拔多服务商——`modules/search_engine.py` 只做参数校验/归一化、凭证解析、结果包装（`_validate_params` / `_wrap_results`），各服务商的请求构造与响应解析在 **`modules/search_providers/` 适配器包**（base/tavily/bocha/exa/parallel/searxng）。
+
+**硬约束（改代码必须知道）：**
+
+1. **适配器契约**：入参为归一化 params（`max_results/topic/time_range/days/start_date/end_date/country/include_domains`），出参 `{"ok", "results": [{title,url,content,published_date,score}], "answer", "dropped"}`；`dropped`=该服务商不支持而被忽略的参数（按基类的 `supports_*` 能力声明自动判定），透传到 `filters.provider_dropped` 展示，禁止静默吞掉。
+2. **凭证解析**：`resolve_search_provider_name()` / `resolve_search_credential()`（`search_providers/__init__.py`）——personalization UI 配置优先、环境变量兜底（`config/search.py` 的 `AGENT_*_API_KEY` / `AGENT_SEARXNG_BASE_URL`）；searxng 的 credential 是实例地址而非密钥（`auth_kind="base_url"`）。
+3. **前端契约不变**：`filters` 与 `results[]` 结构对所有服务商保持一致（前端 `renderWebSearch` 直接消费）；仅新增 `filters.provider`（服务商 id）与 `provider_dropped`，前端经 `toolResults.searchProviders.*` 显示名称。
+4. **新增服务商 checklist** 见 `modules/search_providers/__init__.py` 文件头注释（适配器 → config env → personalization 双注册 + stores 三处 → SearchTab + locales 双语 → i18n 文案）。
+5. **密钥权限线**：设置页「网络搜索」分区的搜索引擎选择、网页提取方式选择与各家密钥（含 Jina 密钥）均仅 host/管理员可见（对齐提供商分区）。
+6. **Tavily key 同时是提取层凭证**：选定提取商为 tavily 时经 `resolve_search_credential("tavily")` 取 key（与搜索同源）；`resolve_tavily_api_key`（`modules/search_engine.py`）为其环境变量兜底实现，不要删。
 
 ---
 
@@ -705,7 +720,7 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 
 **硬约束（改代码必须知道）**：
 
-1. **目录与存储**：`config/providers_catalog.json`（21 条静态目录：id/name/base_url/icon/auth/protocol_note/key_url + 2026-09-25 新增 modelsdev_key/protocol_map/protocol_source；**双站拆分原则=一个 base_url 一条目**，如 minimax-cn/minimax-global、zhipu-cn/zhipu-global）；凭证存 `<DATA_DIR>/providers.json`（0600 原子写，**不纳入 git**）；`modules/provider_manager.py` 是唯一权威（catalog 合并连接状态 / connect / refresh / disconnect / parse_models_payload）。
+1. **目录与存储**：`config/providers_catalog.json`（28 条静态目录：id/name/base_url/icon/auth/protocol_note/key_url + 2026-09-25 新增 modelsdev_key/protocol_map/protocol_source + 2026-09-26 新增 static_models；**双站拆分原则=一个 base_url 一条目**，如 minimax-cn/minimax-global、zhipu-cn/zhipu-global；**编程订阅套餐条目**（badge=「编程订阅」，如 kimi-code-cn、glm-coding-cn、bailian-coding、volcengine-coding）与按量条目并列，套餐 Key 与按量 Key 不通用；`static_models`=可选静态模型清单，仅当 GET /models 失败或为空时由 `provider_manager._static_models_fallback` 回退使用——部分套餐端点官方不提供模型列表，在线发现永远优先）；凭证存 `<DATA_DIR>/providers.json`（0600 原子写，**不纳入 git**）；`modules/provider_manager.py` 是唯一权威（catalog 合并连接状态 / connect / refresh / disconnect / parse_models_payload）。
 2. **协议支持 = Chat Completions + Responses 双协议（2026-09-25 泛化）**：`/models` 不标注协议，裁决走混合策略——catalog 静态 `protocol_map`（最高优先）→ models.dev `npm` 字段（`protocol_source="models.dev"` 门控，裁决唯一权威 `modules/modelsdev_registry.py::resolve_protocol`）→ 默认 chat；Responses 请求统一走通用层 `utils/api_client/responses/`（translate.py 纯协议转换 + mixin.py `chat_responses` 编排，bearer / codex_oauth 双 auth），按加密 reasoning 处理（无策略配置）。Anthropic Messages / Google 原生协议**不做适配**：模型正常注册显示，`chat()` 按 `api_protocol` 明确报错，配置页 tooltip 提示（catalog() 输出 `unsupported_protocol_count`）。`_fetch_models` 在 fetch 层剔除非聊天模型（embedding/tts 等），**解析层 `parse_models_payload` 保持纯净**（兼容 `{data:[]}` / 裸数组 / `{models:[]}` 三种形状）——过滤逻辑不要下沉到解析层。
 3. **注册表三路合并**：`get_registered_model_profiles()` = 手写 custom + provider 同步 + Codex；provider 模型 key = `{provider_id}/{model_id}`（codex 为 `openai-codex/{slug}`）、`provider_type="provider"` + `api_protocol` 字段（chat_completions/responses/anthropic_messages/google），chat 链路复用 chat_completions + `profile["headers"]` 经 `extra_headers_resolver` 链式合并；get_profiles() 同时用 models.dev enrich 四字段（思考支持/图片视频多模态/上下文窗口/最大输出），查不到回退原默认。
 4. **权限=管理员级**：`server/providers.py` 全部端点 `@api_login_required + @admin_api_required`；前端 SETTINGS_ADMIN_SECTIONS 含 providers；用户级 key 是后续预留方向（注册表全局单例，改动深，勿擅自做）。
