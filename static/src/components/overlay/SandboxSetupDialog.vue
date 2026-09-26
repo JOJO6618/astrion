@@ -165,6 +165,7 @@ const stateDescription = computed(() => {
   const s = store.status;
   if (!s || !s.applicable) return '';
   if (s.state === 'wsl_missing') return t('sandbox.stateWslMissing');
+  if (s.state === 'vm_platform_missing') return t('sandbox.stateVmPlatformMissing');
   if (s.state === 'distro_missing') return t('sandbox.stateDistroMissing');
   if (s.state === 'bwrap_missing') return t('sandbox.stateBwrapMissing');
   return '';

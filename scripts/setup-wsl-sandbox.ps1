@@ -39,6 +39,19 @@ function Invoke-Wsl {
     return @{ Code = $LASTEXITCODE; Output = ($output -join "`n") }
 }
 
+function Test-RootfsIntact {
+    # 完整性校验：历史失败可能在 TEMP 残留半截/损坏的下载文件，仅靠 Test-Path
+    # 复用会让 wsl --import 解压失败。gzip 魔数 1F 8B + 最小体积双重校验。
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $false }
+    if ((Get-Item $Path).Length -lt 1MB) { return $false }
+    $fs = [System.IO.File]::OpenRead($Path)
+    try {
+        $b1 = $fs.ReadByte(); $b2 = $fs.ReadByte()
+        return ($b1 -eq 0x1F -and $b2 -eq 0x8B)
+    } finally { $fs.Close() }
+}
+
 Write-Host "==> [1/6] 检查 WSL 环境"
 $wslStatus = Invoke-Wsl @('--status')
 if ($wslStatus.Code -ne 0) {
@@ -52,16 +65,32 @@ if ($probe.Code -eq 0) {
 } else {
     Write-Host "==> [3/6] 下载 Alpine rootfs"
     $rootfs = Join-Path $env:TEMP "astrion-alpine-minirootfs.tar.gz"
-    if (-not (Test-Path $rootfs)) {
+    if (-not (Test-RootfsIntact $rootfs)) {
+        # 残留的不完整文件直接删掉重下
+        Remove-Item -Force $rootfs -ErrorAction SilentlyContinue
         Invoke-WebRequest -Uri $RootfsUrl -OutFile $rootfs -UseBasicParsing
+        if (-not (Test-RootfsIntact $rootfs)) { throw "rootfs 下载不完整或已损坏: $rootfs" }
     }
     Write-Host "    rootfs: $rootfs ($([math]::Round((Get-Item $rootfs).Length/1MB,1)) MB)"
 
     Write-Host "==> [4/6] 导入为 WSL2 发行版"
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    $null = Invoke-Wsl @('--import', $DistroName, $InstallDir, $rootfs, '--version', '2')
+    $import = Invoke-Wsl @('--import', $DistroName, $InstallDir, $rootfs, '--version', '2')
+    if ($import.Code -ne 0) {
+        # 清理残留安装目录，避免下次重试因目录非空再失败。
+        # 必须透出 import 的真实输出：旧版用 $null= 吞掉后，下游探测只能报
+        # WSL_E_DISTRO_NOT_FOUND，真实原因（虚拟机平台缺失/文件损坏等）完全丢失。
+        Remove-Item -Recurse -Force $InstallDir -ErrorAction SilentlyContinue
+        $hint = ""
+        if ($import.Output -match "HCS_E_SERVICE_NOT_AVAILABLE|0x80370102|未安装所需的特性") {
+            $hint = "`n提示：WSL2 依赖的「虚拟机平台」Windows 功能未启用或 CPU 虚拟化未开启。" +
+                    "`n请以管理员身份执行: dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all" +
+                    "`n然后重启电脑再重试（若仍报 0x80370102，需在 BIOS 中开启 VT-x/SVM）。"
+        }
+        throw "发行版导入失败: $($import.Output)$hint"
+    }
     $check = Invoke-Wsl @('-d', $DistroName, '-e', 'true')
-    if ($check.Code -ne 0) { throw "发行版导入失败: $($check.Output)" }
+    if ($check.Code -ne 0) { throw "发行版导入后探测失败: $($check.Output)" }
 }
 
 Write-Host "==> [5/6] 写入沙箱配置（关闭 interop / 固定 DNS / 国内镜像）"

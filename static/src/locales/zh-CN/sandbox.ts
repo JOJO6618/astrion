@@ -17,6 +17,7 @@ export default {
 
   // ── 状态描述（检测分级） ──
   stateWslMissing: '检测到系统尚未启用 WSL2。安装过程需要先启用 WSL2（系统将弹出管理员授权，授权后可能需要重启电脑）。',
+  stateVmPlatformMissing: '检测到 WSL 已安装，但 Windows「虚拟机平台」功能未启用，WSL2 无法运行。安装过程将请求管理员授权启用该功能，之后需要重启电脑才能完成安装。',
   stateDistroMissing: '检测到 WSL2 已就绪，但尚未安装沙箱专用发行版。点击安装即可自动完成。',
   stateBwrapMissing: '检测到沙箱发行版存在，但缺少 bubblewrap 组件。点击安装将自动修复。',
   stateChecking: '正在检测沙箱环境…',

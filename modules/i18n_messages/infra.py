@@ -156,6 +156,10 @@ MESSAGES = {
         "zh-CN": "未检测到可用的 WSL2（Windows Subsystem for Linux）",
         "en-US": "No usable WSL2 (Windows Subsystem for Linux) detected",
     },
+    "sandbox.setup_vm_platform_missing": {
+        "zh-CN": "WSL 已安装，但 Windows「虚拟机平台」功能未启用，WSL2 无法运行",
+        "en-US": "WSL is installed, but the Windows 'Virtual Machine Platform' feature is not enabled; WSL2 cannot run",
+    },
     "sandbox.setup_distro_missing": {
         "zh-CN": "未找到沙箱发行版 '{distro}'",
         "en-US": "Sandbox distro '{distro}' not found",

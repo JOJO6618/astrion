@@ -84,7 +84,10 @@ def _wsl_available() -> bool:
     """WSL 功能是否可用（wsl.exe 存在且能正常列出发行版）。
 
     未安装任何发行版时 `wsl -l -q` 返回空但 exit==0；
-    WSL 功能未启用 / 虚拟机平台缺失时 exit!=0。
+    WSL 功能未启用时 exit!=0。
+    注意：虚拟机平台（VirtualMachinePlatform）缺失时本探测仍返回 True
+    （2026-09 实测：wsl --status/-l 均正常，导入发行版才在 CreateVm 阶段报
+    HCS_E_SERVICE_NOT_AVAILABLE），WSL2 可用性必须叠加 _vm_platform_ready()。
     """
     wsl = shutil.which("wsl.exe")
     if not wsl:
@@ -92,6 +95,22 @@ def _wsl_available() -> bool:
     try:
         proc = _run_probe([wsl, "-l", "-q"])
         return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def _vm_platform_ready() -> bool:
+    """WSL2 依赖的「虚拟机平台」Windows 特性是否可用。
+
+    探针 = vmcompute（Hyper-V Host Compute Service）服务是否存在：
+    虚拟机平台未启用时该服务根本不存在（HCS_E_SERVICE_NOT_AVAILABLE 的根源），
+    已启用则服务常驻（平时 STOPPED 属正常，按需拉起）。sc query 无需管理员权限。
+    """
+    sc = shutil.which("sc.exe")
+    if not sc:
+        return False
+    try:
+        return _run_probe([sc, "query", "vmcompute"]).returncode == 0
     except Exception:
         return False
 
@@ -163,6 +182,9 @@ class SandboxSetupManager:
             if not _wsl_available():
                 result["state"] = "wsl_missing"
                 result["detail"] = tr("sandbox.setup_wsl_missing")
+            elif not _vm_platform_ready():
+                result["state"] = "vm_platform_missing"
+                result["detail"] = tr("sandbox.setup_vm_platform_missing")
             elif not _distro_usable(distro):
                 result["state"] = "distro_missing"
                 result["detail"] = tr("sandbox.setup_distro_missing", distro=distro)
@@ -252,8 +274,10 @@ class SandboxSetupManager:
 
     def _run_setup(self, enable_wsl_if_needed: bool) -> None:
         try:
-            # 阶段一：WSL 功能缺失时先提权安装（UAC 弹窗由用户在系统层确认）
-            if not _wsl_available():
+            # 阶段一：WSL 功能或虚拟机平台缺失时先提权安装（UAC 弹窗由用户在系统层确认）
+            # wsl --install --no-distribution 会同时启用 VirtualMachinePlatform 特性，
+            # 两种缺失走同一条提权启用链路，启用后大概率需要重启（needs_reboot）。
+            if not _wsl_available() or not _vm_platform_ready():
                 if not enable_wsl_if_needed:
                     self._finish(PHASE_ERROR, tr("sandbox.setup_wsl_missing"), "wsl_enable_failed")
                     return
@@ -349,7 +373,7 @@ class SandboxSetupManager:
             self._finish(PHASE_ERROR, tr("sandbox.setup_wsl_enable_failed"), "wsl_enable_failed")
             return False
         # 提权安装完成后复查：仍不可用 → 大概率需要重启（虚拟机平台刚启用）
-        if not _wsl_available():
+        if not _wsl_available() or not _vm_platform_ready():
             self._finish(PHASE_NEEDS_REBOOT)
             return False
         self._append_log(tr("sandbox.setup_wsl_enabled_log"))

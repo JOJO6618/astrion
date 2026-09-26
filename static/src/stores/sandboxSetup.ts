@@ -37,6 +37,7 @@ function readSnoozed(): boolean {
 export type SandboxState =
   | 'ready'
   | 'wsl_missing'
+  | 'vm_platform_missing'
   | 'distro_missing'
   | 'bwrap_missing'
   | 'not_applicable'
@@ -104,11 +105,16 @@ export const useSandboxSetupStore = defineStore('sandboxSetup', {
         return false;
       }
     },
-    /** 沙箱未就绪（仅统计 applicable 且非 ready 的三种缺失状态） */
+    /** 沙箱未就绪（仅统计 applicable 且非 ready 的缺失状态） */
     missing(): boolean {
       const s = this.status;
       if (!s || !s.applicable) return false;
-      return s.state === 'wsl_missing' || s.state === 'distro_missing' || s.state === 'bwrap_missing';
+      return (
+        s.state === 'wsl_missing' ||
+        s.state === 'vm_platform_missing' ||
+        s.state === 'distro_missing' ||
+        s.state === 'bwrap_missing'
+      );
     },
     /** 进页面是否应自动弹出向导 */
     shouldAutoPrompt(): boolean {

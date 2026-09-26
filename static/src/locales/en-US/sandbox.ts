@@ -14,6 +14,7 @@ export default {
 
   // ── Detection states ──
   stateWslMissing: 'WSL2 is not enabled on this system. Setup will first enable WSL2 (a system administrator prompt will appear, and a reboot may be required afterwards).',
+  stateVmPlatformMissing: 'WSL is installed, but the Windows "Virtual Machine Platform" feature is not enabled, so WSL2 cannot run. Setup will request administrator approval to enable it, and a reboot is required to finish installation.',
   stateDistroMissing: 'WSL2 is ready, but the dedicated sandbox distro is not installed yet. Click install to finish automatically.',
   stateBwrapMissing: 'The sandbox distro exists, but the bubblewrap component is missing. Click install to repair automatically.',
   stateChecking: 'Checking sandbox environment...',
