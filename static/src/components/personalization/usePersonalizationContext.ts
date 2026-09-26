@@ -723,37 +723,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     await settingsStore.fetchSessionStatus();
   });
 
-  // tab 懒加载：切到对应分区时才拉取数据（Drawer 与设置页共用同一套触发逻辑）
-  watch(
-    () => [activeTab.value, hostVisible.value],
-    ([tab, isVisible]) => {
-      if (!isVisible) return;
-      if (tab === 'sub-agents') {
-        loadSubAgentRoles();
-        loadSubAgentSettings();
-        loadSubAgentModels();
-      }
-      if (tab === 'review-agents') {
-        loadSubAgentModels();
-      }
-      if (tab === 'model' || tab === 'model-pref') {
-        // 「标题生成模型」菜单复用子智能体模型库，需在模型页签加载模型列表
-        loadSubAgentModels();
-      }
-      if (tab === 'account') {
-        // 个人空间「账户」页签（用量统计）：切到时拉取一次
-        fetchUsageSummary();
-      }
-      if (tab === 'general') {
-        // 设置页「通用」分区：App Shell 下自动做一次更新检查
-        if (isAppShell.value && !appUpdateInfo.value && !appUpdateChecking.value) {
-          checkAppUpdate();
-        }
-      }
-    },
-    { immediate: true }
-  );
-
   // ----- 子智能体管理 -----
   const subAgentRoles = ref<any[]>([]);
   const subAgentRolesLoading = ref(false);
@@ -865,6 +834,41 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
       // 静默处理
     }
   };
+
+  // tab 懒加载：切到对应分区时才拉取数据（Drawer 与设置页共用同一套触发逻辑）。
+  // 注意：immediate 会在 setup 阶段同步执行，本 watcher 必须位于其引用的
+  // 全部 load* 函数定义之后，否则触发 TDZ（Cannot access before initialization）
+  watch(
+    () => [activeTab.value, hostVisible.value],
+    ([tab, isVisible]) => {
+      if (!isVisible) return;
+      if (tab === 'sub-agents') {
+        loadSubAgentRoles();
+        loadSubAgentSettings();
+        loadSubAgentModels();
+      }
+      if (tab === 'review-agents') {
+        loadSubAgentModels();
+      }
+      if (tab === 'model' || tab === 'model-pref') {
+        // 模型页签的辅助模型选择器复用子智能体模型库
+        loadSubAgentModels();
+      }
+      if (tab === 'account') {
+        // 个人空间「账户」页签（用量统计）：切到时拉取一次
+        fetchUsageSummary();
+      }
+      if (tab === 'general') {
+        // 「标题生成模型」菜单（设置页「通用」分区）复用子智能体模型库
+        loadSubAgentModels();
+        // 设置页「通用」分区：App Shell 下自动做一次更新检查
+        if (isAppShell.value && !appUpdateInfo.value && !appUpdateChecking.value) {
+          checkAppUpdate();
+        }
+      }
+    },
+    { immediate: true }
+  );
 
   const saveSubAgentSettings = async () => {
     subAgentSettingsSaving.value = true;
