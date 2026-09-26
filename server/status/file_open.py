@@ -462,20 +462,125 @@ def _pick_folder_macos(prompt: str) -> tuple[bool, str]:
 
 
 def _pick_folder_windows(prompt: str) -> tuple[bool, str]:
-    """Windows：PowerShell FolderBrowserDialog。返回 (ok, path)；取消 → (True, '')。"""
-    safe_prompt = (prompt or "").replace("'", " ").replace("`", " ")[:120]
+    """Windows：优先新式 IFileOpenDialog（FOS_PICKFOLDERS），失败回退旧式 FolderBrowserDialog。
+
+    返回 (ok, path)；用户取消 → (True, '')。
+    新式对话框 = 与「上传文件」一致的现代文件资源管理器大窗口（地址栏/导航树/盘符齐全）；
+    旧式 FolderBrowserDialog 是树形小窗口，仅作为兜底。
+    prompt 通过环境变量传递，避免 PowerShell 内嵌引号转义问题。
+    """
+    # C# COM 互操作包装 IFileOpenDialog（Vista+ 通用）。注意：
+    # - 接口方法顺序必须严格匹配 COM vtbl（只声明到 SetFilter 为止，后续方法不调用）
+    # - Show 返回 ERROR_CANCELLED(0x800704C7) 视为用户取消，返回 null，不触发回退
+    # - 其余失败抛异常，由 PowerShell 捕获后降级到旧式对话框
+    cs_source = r"""
+using System;
+using System.Runtime.InteropServices;
+
+namespace AstrionFolderPicker
+{
+    public static class Picker
+    {
+        private const uint FOS_PICKFOLDERS = 0x20;
+        private const uint FOS_FORCEFILESYSTEM = 0x40;
+        private const uint SIGDN_FILESYSPATH = 0x80058000;
+        private const int ERROR_CANCELLED = unchecked((int)0x800704C7);
+
+        [ComImport, Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
+        private class FileOpenDialog { }
+
+        [ComImport, Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IFileOpenDialog
+        {
+            [PreserveSig] int Show(IntPtr parent);
+            void SetFileTypes(uint cFileTypes, IntPtr rgFilterSpec);
+            void SetFileTypeIndex(uint iFileType);
+            void GetFileTypeIndex(out uint piFileType);
+            void Advise(IntPtr pfde, out uint pdwCookie);
+            void Unadvise(uint dwCookie);
+            void SetOptions(uint fos);
+            void GetOptions(out uint pfos);
+            void SetDefaultFolder(IntPtr psi);
+            void SetFolder(IntPtr psi);
+            void GetFolder(out IntPtr ppsi);
+            void GetCurrentSelection(out IntPtr ppsi);
+            void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+            void GetFileName(out IntPtr pszName);
+            void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+            void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string pszText);
+            void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+            void GetResult(out IShellItem ppsi);
+            void AddPlace(IntPtr psi, int fdap);
+            void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+            void ClearClientData();
+            void SetFilter(IntPtr pFilter);
+        }
+
+        [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IShellItem
+        {
+            void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+            void GetParent(out IShellItem ppsi);
+            void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+            void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+            void Compare(IShellItem psi, uint hint, out int piOrder);
+        }
+
+        public static string Pick(string title)
+        {
+            IFileOpenDialog dlg = (IFileOpenDialog)new FileOpenDialog();
+            try
+            {
+                uint opts;
+                dlg.GetOptions(out opts);
+                dlg.SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+                if (!string.IsNullOrEmpty(title)) dlg.SetTitle(title);
+                int hr = dlg.Show(IntPtr.Zero);
+                if (hr == ERROR_CANCELLED) return null;
+                if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+                IShellItem item;
+                dlg.GetResult(out item);
+                string path;
+                item.GetDisplayName(SIGDN_FILESYSPATH, out path);
+                return path;
+            }
+            finally
+            {
+                Marshal.FinalReleaseComObject(dlg);
+            }
+        }
+    }
+}
+"""
+    # C# 源码走单引号 here-string（@'...'@ 不做变量插值）；prompt 走环境变量
     ps_script = (
         "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-        "Add-Type -AssemblyName System.Windows.Forms; "
-        f"$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = '{safe_prompt}'; "
-        "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath }"
+        "$prompt = $env:ASTRION_PICK_FOLDER_PROMPT; "
+        "$cs = @'" + cs_source + "'@; "
+        "$path = $null; $usedModern = $false; "
+        "try { "
+        "  Add-Type -TypeDefinition $cs; "
+        "  $path = [AstrionFolderPicker.Picker]::Pick($prompt); "
+        "  $usedModern = $true "
+        "} catch { $usedModern = $false }; "
+        "if (-not $usedModern) { "
+        "  try { "
+        "    Add-Type -AssemblyName System.Windows.Forms; "
+        "    $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = $prompt; "
+        "    if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $path = $d.SelectedPath } "
+        "  } catch {} "
+        "}; "
+        "if ($path) { [Console]::Out.Write($path) }"
     )
+    env = dict(os.environ)
+    env["ASTRION_PICK_FOLDER_PROMPT"] = (prompt or "")[:120]
     try:
         proc = subprocess.run(
             ["powershell", "-NoProfile", "-Sta", "-Command", ps_script],
             capture_output=True,
             timeout=600,
             check=False,
+            env=env,
         )
     except Exception:
         return False, ""
