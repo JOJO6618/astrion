@@ -109,6 +109,24 @@ if ($apkRepo.Code -ne 0) { throw "写入 apk 镜像源失败: $($apkRepo.Output)
 $null = Invoke-Wsl @('--terminate', $DistroName)
 Start-Sleep -Seconds 2
 
+# 首次导入后沙箱网络自检：wsl --import 拉起的 WSL 工具虚拟机，其 NAT/DNS 转发
+# 有概率处于半初始化状态（WSL 已知毛病，多台设备实测必现）——--terminate 只停
+# 发行版命名空间、VM 还在跑，DNS 依旧不通；必须 --shutdown 重启整个 VM 才恢复。
+# 故先探测 DNS，不通就自动 shutdown 重试（最多 3 次），避免用户手动干预。
+# 注意：--shutdown 会停掉该机器所有 WSL 发行版（含 docker-desktop，会自动拉起），
+# 仅在探测失败时执行，全新安装场景影响可接受。
+$netOk = $false
+for ($i = 1; $i -le 3; $i++) {
+    $netProbe = Invoke-Wsl @('-d', $DistroName, '--', 'nslookup', 'mirrors.aliyun.com', '223.5.5.5')
+    if ($netProbe.Code -eq 0) { $netOk = $true; break }
+    Write-Host "    沙箱网络未就绪，重启 WSL 虚拟机后重试（第 $i/3 次）"
+    $null = Invoke-Wsl @('--shutdown')
+    Start-Sleep -Seconds 3
+}
+if (-not $netOk) {
+    throw "沙箱网络不可用（DNS 解析失败，已自动重启 WSL 虚拟机重试 3 次）。请检查代理/VPN 软件或防火墙是否拦截了 WSL 网络流量，然后重试。"
+}
+
 Write-Host "==> [6/6] 安装沙箱工具链（bubblewrap / bash / python3 / git）"
 $apk = Invoke-Wsl @('-d', $DistroName, '--', 'sh', '-c', "apk update && apk add bubblewrap bash ncurses-libs python3 git")
 if ($apk.Code -ne 0) { throw "apk 安装失败: $($apk.Output)" }
