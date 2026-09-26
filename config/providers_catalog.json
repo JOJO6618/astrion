@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。modelsdev_key=该提供商在 models.dev 的 provider key（协议裁决与能力 enrich 数据源；本地/特殊发现链路条目不配）。protocol_note=multi_protocol_partial 表示多协议网关：Chat Completions 与 Responses 模型可用，Anthropic/Google 协议模型正常注册但暂不支持调用（前端提示）。protocol_map=静态协议裁决表（最高优先级，覆盖 models.dev 标注）。protocol_source=models.dev 表示启用 models.dev 在线裁决/enrich。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。",
+  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。modelsdev_key=该提供商在 models.dev 的 provider key（协议裁决与能力 enrich 数据源；本地/特殊发现链路条目不配）。protocol_note=multi_protocol_partial 表示多协议网关：Chat Completions 与 Responses 模型可用，Anthropic/Google 协议模型正常注册但暂不支持调用（前端提示）。protocol_map=静态协议裁决表（最高优先级，覆盖 models.dev 标注）。protocol_source=models.dev 表示启用 models.dev 在线裁决/enrich。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。static_models=可选静态模型清单：仅当 GET /models 失败或为空时回退使用（部分编程订阅套餐端点官方不提供模型列表），/models 可用时以在线发现为准，清单需随官网更新人工维护。badge 含「编程订阅」的条目为套餐计费（非按量），套餐 Key 与按量 API Key 不通用。",
   "providers": [
     {
       "id": "deepseek",
@@ -22,6 +22,28 @@
       "key_url": "https://platform.moonshot.cn/console/api-keys"
     },
     {
+      "id": "kimi-code-cn",
+      "name": "Kimi Code（国内）",
+      "base_url": "https://api.kimi.com/coding/v1",
+      "icon": "moonshot.svg",
+      "icon_mono": true,
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://www.kimi.com/code",
+      "static_models": ["k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"]
+    },
+    {
+      "id": "kimi-code-global",
+      "name": "Kimi Code（国际）",
+      "base_url": "https://api.kimi.ai/coding/v1",
+      "icon": "moonshot.svg",
+      "icon_mono": true,
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://www.kimi.com/code",
+      "static_models": ["k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"]
+    },
+    {
       "id": "zhipu-cn",
       "name": "智谱（国内）",
       "modelsdev_key": "zhipuai",
@@ -40,6 +62,26 @@
       "key_url": "https://z.ai/manage-apikey/apikey-list"
     },
     {
+      "id": "glm-coding-cn",
+      "name": "智谱 GLM Coding Plan（国内）",
+      "base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+      "icon": "zhipu-color.svg",
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://open.bigmodel.cn/",
+      "static_models": ["glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6"]
+    },
+    {
+      "id": "glm-coding-global",
+      "name": "Z.AI GLM Coding Plan（国际）",
+      "base_url": "https://api.z.ai/api/coding/paas/v4",
+      "icon": "zhipu-color.svg",
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://z.ai/manage-apikey/apikey-list",
+      "static_models": ["glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6"]
+    },
+    {
       "id": "bailian",
       "name": "阿里云百炼",
       "modelsdev_key": "alibaba-cn",
@@ -49,6 +91,26 @@
       "key_url": "https://bailian.console.aliyun.com/"
     },
     {
+      "id": "bailian-coding",
+      "name": "阿里云百炼 Coding Plan（国内）",
+      "base_url": "https://coding.dashscope.aliyuncs.com/v1",
+      "icon": "bailian-color.svg",
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://bailian.console.aliyun.com/",
+      "static_models": ["qwen3.7-plus", "qwen3.6-plus", "qwen3.5-plus", "qwen3-max-2026-01-23", "kimi-k2.5", "glm-5", "MiniMax-M2.5"]
+    },
+    {
+      "id": "bailian-coding-intl",
+      "name": "阿里云百炼 Coding Plan（国际）",
+      "base_url": "https://coding-intl.dashscope.aliyuncs.com/v1",
+      "icon": "bailian-color.svg",
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://www.alibabacloud.com/help/en/model-studio/coding-plan",
+      "static_models": ["qwen3.7-plus", "qwen3.6-plus", "qwen3.5-plus", "qwen3-max-2026-01-23", "kimi-k2.5", "glm-5", "MiniMax-M2.5"]
+    },
+    {
       "id": "volcengine",
       "name": "火山方舟",
       "modelsdev_key": "volcengine",
@@ -56,6 +118,16 @@
       "icon": "volcengine-color.svg",
       "auth": "api_key",
       "key_url": "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey"
+    },
+    {
+      "id": "volcengine-coding",
+      "name": "火山方舟 Coding Plan",
+      "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "icon": "volcengine-color.svg",
+      "auth": "api_key",
+      "badge": "编程订阅",
+      "key_url": "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
+      "static_models": ["ark-code-latest", "doubao-seed-2.0-code", "doubao-seed-2.0-pro", "minimax-m2.7", "glm-5.1", "deepseek-v4-pro", "kimi-k2.6"]
     },
     {
       "id": "siliconflow",

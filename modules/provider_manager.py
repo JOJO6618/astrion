@@ -285,6 +285,7 @@ class ProviderManager:
             base_url = entry["base_url"]
             auth = entry.get("auth") or "api_key"
         else:
+            entry = None
             provider_id = str(payload.get("provider_id") or "").strip()
             name = str(payload.get("name") or "").strip() or provider_id
             base_url = str(payload.get("base_url") or "").strip()
@@ -324,6 +325,7 @@ class ProviderManager:
         with self._lock:
             data["providers"][provider_id] = record
             models, error = self._fetch_models(record["base_url"], record["api_key"], headers)
+            models, error = self._static_models_fallback(entry, models, error)
             record["models"] = models
             record["models_fetched_at"] = _now_iso()
             record["models_error"] = error
@@ -353,10 +355,17 @@ class ProviderManager:
         record = data["providers"].get(provider_id)
         if not record:
             return {"success": False, "error": "provider_not_found"}
+        catalog_id = str(record.get("catalog_id") or "")
+        entry = (
+            next((e for e in self.catalog_entries() if e["id"] == catalog_id), None)
+            if catalog_id
+            else None
+        )
         with self._lock:
             models, error = self._fetch_models(
                 record["base_url"], record.get("api_key") or "", record.get("headers") or {}
             )
+            models, error = self._static_models_fallback(entry, models, error)
             if error and models:
                 # 部分失败（如解析告警）仍更新列表
                 pass
@@ -424,6 +433,25 @@ class ProviderManager:
         if not models:
             return [], "empty_models"
         return models, None
+
+    @staticmethod
+    def _static_models_fallback(
+        entry: Optional[Dict[str, Any]],
+        models: List[Dict[str, Any]],
+        error: Optional[str],
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """目录静态模型清单回退（catalog 条目的 ``static_models`` 字段）。
+
+        部分编程订阅套餐端点官方不提供 /models（如百炼 Coding Plan 的 Anthropic 端点
+        官方 FAQ 明文 404），或列表接口未公开。/models 失败或返回空时回退到目录里
+        人工维护的模型清单；/models 可用时永远以在线发现为准。
+        """
+        if not entry or (models and not error):
+            return models, error
+        fallback = parse_models_payload(entry.get("static_models"))
+        if fallback:
+            return fallback, None
+        return models, error
 
     # ------------------------------------------------------------ profile 输出
 
