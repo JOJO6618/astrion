@@ -370,8 +370,42 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         // 桌面壳环境标记：页面在任意脚本执行前可读到（登录页据此自动免登录）。
         // 不用 withGlobalTauri——它对 External URL 页面不注入，且语义过重。
         .initialization_script("window.__ASTRION_DESKTOP__ = true;")
+        // 外链导航拦截：只放行后端同源导航（页面自身路由/刷新）；其余 http(s)
+        // 一律拦下并转交系统默认浏览器。WebView 里 window.open 不可用、
+        // <a href> 跳转会顶替应用页面（点模型输出的链接把 Astrion 变成目标站），
+        // 统一在壳侧根治，不依赖每个前端入口自觉走 openExternal。
+        .on_navigation(move |nav_url| {
+            if nav_url.scheme() != "http" && nav_url.scheme() != "https" {
+                return true; // about:blank / data: / blob: 等非页面跳转放行
+            }
+            let is_backend = matches!(nav_url.host_str(), Some("127.0.0.1") | Some("localhost"))
+                && nav_url.port() == Some(port);
+            if !is_backend {
+                open_in_system_browser(nav_url.as_str());
+            }
+            is_backend
+        })
         .build()?;
     Ok(())
+}
+
+/// 用系统默认浏览器打开外部 URL（导航拦截的转交目标）。
+/// 不引 tauri-plugin-shell：三个平台各一行系统命令即可。
+/// Windows 用 explorer.exe 而非 cmd /c start——后者是控制台子系统，
+/// 从 GUI 壳 spawn 会闪黑框；explorer.exe 是 GUI 程序，无此问题。
+fn open_in_system_browser(url: &str) {
+    #[cfg(windows)]
+    {
+        let _ = Command::new("explorer.exe").arg(url).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = Command::new("open").arg(url).spawn();
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let _ = Command::new("xdg-open").arg(url).spawn();
+    }
 }
 
 /// Windows：创建 Job Object 并挂入后端子进程，设 KILL_ON_JOB_CLOSE。

@@ -863,6 +863,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useDesktopUpdateStore } from '@/stores/desktopUpdate';
 import { ICONS } from '@/utils/icons';
+import { openExternal } from '@/utils/openExternal';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 import SoftwareUpdateDialog from './SoftwareUpdateDialog.vue';
 
@@ -1000,22 +1001,8 @@ function openSoftwareUpdate() {
 const HELP_DOCS_URL = 'https://astrion.cyjai.com/docs.html';
 async function openHelpDocs() {
   closePersonalMenu();
-  // 桌面壳（Tauri WebView）里 window.open 不可用，走后端调系统浏览器；
-  // 网页端 / Android WebView 直接 window.open——App 侧 shouldOverrideUrlLoading
-  // 会把外部链接转交系统浏览器（与打开网页同一路径）。
-  if ((window as any).__ASTRION_DESKTOP__) {
-    try {
-      await fetch('/api/system/open-external', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: HELP_DOCS_URL })
-      });
-    } catch (_err) {
-      /* 打开失败静默：桌面壳后端不可达时无兜底通道 */
-    }
-    return;
-  }
-  window.open(HELP_DOCS_URL, '_blank', 'noopener,noreferrer');
+  // 桌面壳 window.open 不可用 / 网页与 Android 开新页，差异收敛在 openExternal 内
+  await openExternal(HELP_DOCS_URL);
 }
 async function fetchSessionUsername() {
   try {

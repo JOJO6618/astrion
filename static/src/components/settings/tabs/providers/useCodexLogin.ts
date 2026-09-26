@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { t } from '@/locales';
+import { openExternal } from '@/utils/openExternal';
 import { useUiStore } from '@/stores/ui';
 
 /**
@@ -80,7 +81,9 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
         error.value = data?.error || t('personalization.codexLoginStartFailed');
         return;
       }
-      window.open(data.authorize_url, '_blank', 'noopener');
+      // 桌面壳里 window.open 不可用（静默失败），统一走 openExternal
+      // （桌面 → /api/system/open-external 调系统浏览器；网页 → window.open）
+      void openExternal(data.authorize_url);
       loginFlow.value = { status: 'pending', flow_mode: 'browser' };
       startPolling();
     } catch (e: any) {
@@ -122,7 +125,7 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
 
   const openDevicePage = () => {
     if (verificationUri.value) {
-      window.open(verificationUri.value, '_blank', 'noopener');
+      void openExternal(verificationUri.value);
     }
   };
 
