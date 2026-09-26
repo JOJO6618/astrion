@@ -101,6 +101,14 @@ def main() -> int:
     for item in ITEMS:
         shutil.copytree(REPO_ROOT / item, BACKEND_DIR / item, ignore=SOURCE_IGNORE)
 
+    # 1.5) 运行时脚本（仅复制运行依赖的文件，不带 dev 工具）
+    # - setup-wsl-sandbox.ps1：沙箱安装向导唯一依赖（modules/sandbox_setup_manager.py
+    #   的 _SETUP_SCRIPT 在打包形态下解析为 runtime/backend/scripts/...，遗漏会致
+    #   桌面版沙箱安装报「安装脚本不存在」；copy2 保留 UTF-8 BOM，PS 5.1 依赖它解析中文）
+    (BACKEND_DIR / "scripts").mkdir(exist_ok=True)
+    shutil.copy2(REPO_ROOT / "scripts" / "setup-wsl-sandbox.ps1",
+                 BACKEND_DIR / "scripts" / "setup-wsl-sandbox.ps1")
+
     # 2) 前端构建产物（Flask 同源 serve）
     copy_static_payload()
 
