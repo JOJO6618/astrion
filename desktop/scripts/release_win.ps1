@@ -162,11 +162,13 @@ if ($LASTEXITCODE -ne 0) { throw "regen_manifest 失败" }
 
 # ── 7) 公网验证 ──
 Write-Host "==> 公网验证"
-$manifest = Invoke-RestMethod "https://astrion.cyjai.com/downloads/latest-windows-x86_64.json"
+# -UseBasicParsing 必须：PS 5.1 在未完成 IE 首次运行配置的机器上，
+# 默认引擎解析会直接抛 "Operation cancelled due to security concerns"
+$manifest = Invoke-RestMethod -UseBasicParsing "https://astrion.cyjai.com/downloads/latest-windows-x86_64.json"
 if ($manifest.version -ne $Version) { throw "清单版本不符: $($manifest.version)（应为 $Version）" }
 Write-Host "    清单 version: $($manifest.version)"
 Write-Host "    更新说明 notes: $($manifest.notes)"
-$head = Invoke-WebRequest -Method Head ("https://astrion.cyjai.com/downloads/Astrion_${Version}_x64-setup.exe")
+$head = Invoke-WebRequest -UseBasicParsing -Method Head ("https://astrion.cyjai.com/downloads/Astrion_${Version}_x64-setup.exe")
 $srvLen = [long]$head.Headers["Content-Length"]
 $locLen = (Get-Item $Exe).Length
 Write-Host "    exe 字节数: 服务器 $srvLen / 本地 $locLen"

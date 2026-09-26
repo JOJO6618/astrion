@@ -1,7 +1,7 @@
 {
   "name": "astrion-desktop",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Astrion 桌面壳（Tauri 2）：系统 WebView + 内嵌 Python 后端",
   "type": "module",
   "scripts": {
