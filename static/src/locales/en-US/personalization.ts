@@ -180,6 +180,8 @@ export default {
   autoOpenTerminalDesc: 'Open the sidebar terminal panel automatically when a terminal is created',
   quickDockAutoExpandTitle: 'Auto-expand quick dock',
   quickDockAutoExpandDesc: 'Expand the quick dock automatically when it has content; when off, expand it only with the side button',
+  previewAutoOpenTitle: 'Auto-open preview panel',
+  previewAutoOpenDesc: 'Open the preview panel automatically when a new preview target (local server / HTML file) is detected; when off, only the dock counter lights up',
   editSummaryLiveTitle: 'Show edit summary live',
   editSummaryLiveDesc: 'Show edited files in real time during a run; when off, show them only after the run completes',
   filePreviewWrapTitle: 'Wrap file preview lines',

@@ -222,6 +222,21 @@ const {
                           " /><FancyCheck :checked="form.quick_dock_auto_expand" /></label>
                       <label class="settings-toggle-row"
                         ><span class="settings-row-copy"
+                          ><span class="settings-row-title">{{ $t('personalization.previewAutoOpenTitle') }}</span
+                          ><span class="settings-row-desc"
+                            >{{ $t('personalization.previewAutoOpenDesc') }}</span
+                          ></span
+                        ><input
+                          type="checkbox"
+                          :checked="form.preview_auto_open"
+                          @change="
+                            personalization.updateField({
+                              key: 'preview_auto_open',
+                              value: $event.target.checked
+                            })
+                          " /><FancyCheck :checked="form.preview_auto_open" /></label>
+                      <label class="settings-toggle-row"
+                        ><span class="settings-row-copy"
                           ><span class="settings-row-title">{{ $t('personalization.editSummaryLiveTitle') }}</span
                           ><span class="settings-row-desc"
                             >{{ $t('personalization.editSummaryLiveDesc') }}</span

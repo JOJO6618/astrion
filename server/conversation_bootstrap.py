@@ -228,6 +228,31 @@ def bootstrap_conversation(conversation_id: str):
                     "ts": item.get("ts") or "",
                 })
 
+    # 预览面板：本对话的预览目标（文件目标同样过滤已删除的文件）
+    from modules.preview_targets import _normalize as _normalize_preview_targets, is_preview_enabled
+    preview_targets: list = []
+    for item in _normalize_preview_targets(raw_meta.get("preview_targets")):
+        if item.get("type") == "file":
+            rel = str(item.get("path") or "").strip()
+            try:
+                valid, _err, full_path = file_manager._validate_path(rel) if file_manager else (False, None)
+            except Exception:
+                valid, full_path = False, None
+            if not (valid and full_path is not None and full_path.exists() and full_path.is_file()):
+                continue
+        preview_targets.append(item)
+    # docker/web 模式整体禁用预览：老对话残留数据不下发
+    if not is_preview_enabled():
+        preview_targets = []
+
+    # 预览安全隔离：本机回环访问时下发独立预览服务器的 base+token（远端域名访问为 None，
+    # 前端回退旧同源端点）
+    try:
+        from server.chat.preview import build_preview_runtime
+        preview_runtime = build_preview_runtime(ws_terminal, username, _workspace, normalized_id)
+    except Exception:
+        preview_runtime = {"preview_base": None, "preview_token": None}
+
     data: Dict[str, Any] = {
         "conversation_id": normalized_id,
         "meta": {
@@ -245,6 +270,9 @@ def bootstrap_conversation(conversation_id: str):
         "messages": messages,
         "running": running,
         "edited_files": edited_files,
+        "preview_targets": preview_targets,
+        "preview_base": preview_runtime["preview_base"],
+        "preview_token": preview_runtime["preview_token"],
     }
 
     if is_main_running:

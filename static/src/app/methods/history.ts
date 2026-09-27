@@ -2,6 +2,7 @@
 import { debugLog } from './common';
 import { t } from '@/locales';
 import { useQuickDockStore } from '../../stores/quickDock';
+import { usePreviewStore } from '../../stores/preview';
 const jsonDebug = (...args: any[]) => {
 };
 const RESTORE_DEBUG_PREFIX = '[RESTORE_DEBUG]';
@@ -162,6 +163,16 @@ export const historyMethods = {
         // 快捷窗口：回填本次对话编辑/创建文件记录（后端已过滤不存在文件）
         useQuickDockStore().setEditedFiles(
           Array.isArray(messagesData?.data?.edited_files) ? messagesData.data.edited_files : []
+        );
+        // 预览窗口：回填本对话的预览目标（后端已过滤不存在的文件目标）
+        // + 预览运行时（独立预览服务器 base/token，跨站隔离 iframe 用）
+        usePreviewStore().setRuntime(
+          messagesData?.data?.preview_base,
+          messagesData?.data?.preview_token
+        );
+        usePreviewStore().setTargets(
+          Array.isArray(messagesData?.data?.preview_targets) ? messagesData.data.preview_targets : [],
+          false
         );
         const lastAssistantRaw = [...rawMessages]
           .reverse()

@@ -20,6 +20,9 @@ from modules.i18n import tr
 async def run_streaming_attempts(*, web_terminal, messages, tools, sender, client_sid: str, username: str, conversation_id: Optional[str], current_iteration: int, max_api_retries: int, retry_delay_seconds: int, detected_tool_intent: Dict[str, str], full_response: str, tool_calls: list, current_thinking: str, detected_tools: Dict[str, str], last_usage_payload, in_thinking: bool, thinking_started: bool, thinking_ended: bool, text_started: bool, text_has_content: bool, text_streaming: bool, text_chunk_index: int, last_text_chunk_time, chunk_count: int, reasoning_chunks: int, content_chunks: int, tool_chunks: int, last_finish_reason: Optional[str], accumulated_response: str) -> Dict[str, Any]:
     api_error = None
     tool_call_stream_active = False
+    # 预览面板：流式文本的本地 URL 增量检测状态（滚动缓冲 + 本次回复已报告集合）
+    preview_scan_tail = ""
+    preview_seen_urls: set = set()
     for api_attempt in range(max_api_retries + 1):
         api_error = None
         if api_attempt > 0:
@@ -265,6 +268,34 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                     full_response += content
                     accumulated_response += content
                     text_has_content = True
+                    # 预览面板：滚动缓冲增量扫描 localhost/127.0.0.1 链接，
+                    # URL 可能横跨两个 chunk，保留尾部拼接匹配；触及缓冲末尾的
+                    # 半截 URL 推迟到下一轮判定（防「:812」截断假条目）
+                    try:
+                        from modules.preview_targets import (
+                            STREAM_SCAN_OVERLAP,
+                            purge_partial_stream_servers,
+                            record_url_targets,
+                            scan_stream_urls,
+                        )
+                        scan_text = preview_scan_tail + content
+                        new_urls = scan_stream_urls(scan_text, preview_seen_urls)
+                        if new_urls:
+                            preview_seen_urls.update(new_urls)
+                            purge_partial_stream_servers(
+                                getattr(web_terminal, "context_manager", None),
+                                conversation_id,
+                                new_urls,
+                            )
+                            record_url_targets(
+                                getattr(web_terminal, "context_manager", None),
+                                conversation_id,
+                                new_urls,
+                                source="model_output",
+                            )
+                        preview_scan_tail = scan_text[-STREAM_SCAN_OVERLAP:]
+                    except Exception:
+                        pass
                     emit_time = time.time()
                     elapsed = 0.0 if last_text_chunk_time is None else emit_time - last_text_chunk_time
                     last_text_chunk_time = emit_time
@@ -282,6 +313,35 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                         'index': text_chunk_index,
                         'elapsed': elapsed
                     })
+
+        # 预览面板：流结束收尾——滚动缓冲尾部若有以文本结尾的完整 URL，
+        # 会被 scan_stream_urls 的「末尾推迟判定」一直挂起，这里补一个空格
+        # 强制让它落判，同样先 purge 半截假条目再记录。
+        if preview_scan_tail:
+            try:
+                from modules.preview_targets import (
+                    purge_partial_stream_servers,
+                    record_url_targets,
+                    scan_text_for_local_urls,
+                )
+                tail_urls = scan_text_for_local_urls(preview_scan_tail + " ")
+                tail_urls = [u for u in tail_urls if u not in preview_seen_urls]
+                if tail_urls:
+                    preview_seen_urls.update(tail_urls)
+                    purge_partial_stream_servers(
+                        getattr(web_terminal, "context_manager", None),
+                        conversation_id,
+                        tail_urls,
+                    )
+                    record_url_targets(
+                        getattr(web_terminal, "context_manager", None),
+                        conversation_id,
+                        tail_urls,
+                        source="model_output",
+                    )
+            except Exception:
+                pass
+            preview_scan_tail = ""
 
         # 检查是否被停止
         client_stop_info = get_stop_flag(client_sid, username, include_user=False)

@@ -2,6 +2,7 @@
 import { debugLog, goalModeDebugLog } from '../common';
 import { useTaskStore } from '../../../stores/task';
 import { useQuickDockStore } from '../../../stores/quickDock';
+import { usePreviewStore } from '../../../stores/preview';
 import { useChatStore } from '../../../stores/chat';
 import { getMessageVisibility, messageStartsWork } from '../../../utils/messageVisibility';
 import {
@@ -346,6 +347,15 @@ export const lifecycleMethods = {
         // 快捷窗口文件记录：edit/write/delete/rename 后广播，payload 携带最新列表
         useQuickDockStore().setEditedFiles(
           Array.isArray(eventData?.edited_files) ? eventData.edited_files : [],
+          true
+        );
+        break;
+
+      case 'preview_targets_updated':
+        // 预览面板目标：文件编辑/命令检测/模型输出链接实时登记后广播
+        // live=true 供自动展开判定（设置项 preview_auto_open）
+        usePreviewStore().setTargets(
+          Array.isArray(eventData?.preview_targets) ? eventData.preview_targets : [],
           true
         );
         break;

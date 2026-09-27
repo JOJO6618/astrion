@@ -116,6 +116,14 @@ export const sendMethods = {
     const presetText = typeof options?.presetText === 'string' ? options.presetText : null;
     const usePresetText = presetText !== null;
 
+    // 新任务开始：重置预览面板的自动展开抑制（用户上轮手动关过面板，本轮恢复自动展开资格）
+    try {
+      const { usePreviewStore } = await import('../../../stores/preview');
+      usePreviewStore().resetAutoOpen();
+    } catch (_e) {
+      // ignore
+    }
+
     if (this.compressionActiveForCurrentConversation) {
       this.uiPushToast({
         title: t('appMessages.autoCompressingTitle'),

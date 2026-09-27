@@ -12,6 +12,7 @@
       <RunnerWindow kind="agent" />
       <RunnerWindow kind="cmd" />
       <FileWindow />
+      <PreviewWindow />
     </div>
 
     <!-- 详情面板（fixed 浮在列左侧） -->
@@ -74,6 +75,7 @@ import WorkflowWindow from './WorkflowWindow.vue';
 import RunnerWindow from './RunnerWindow.vue';
 import RunnerDetailPanel from './RunnerDetailPanel.vue';
 import FileWindow from './FileWindow.vue';
+import PreviewWindow from './PreviewWindow.vue';
 
 /**
  * 快捷窗口（Quick Dock）容器

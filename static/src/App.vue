@@ -480,6 +480,8 @@
         <!-- 文件预览面板：桌面端挤压式占位列；移动端由 CSS 改为叠加悬浮层，
              常驻挂载（内部由 previewPath 驱动显隐），保证移动端悬浮层之上可再叠加预览 -->
         <FilePreviewPanel />
+        <!-- 预览面板（预览窗口的展开视图）：服务器 / HTML 文件的内嵌 iframe 预览 -->
+        <PreviewPanel :host-mode="versioningHostMode" />
         <CitationPopover :host-mode="versioningHostMode" />
         <div
           v-if="!isMobileViewport && (terminalPanelOpen || gitChangesPanelOpen)"
@@ -971,6 +973,7 @@ import VideoPicker from './components/overlay/VideoPicker.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
 import QuickDock from './components/chat/quickdock/QuickDock.vue';
 import FilePreviewPanel from './components/chat/quickdock/FilePreviewPanel.vue';
+import PreviewPanel from './components/chat/quickdock/PreviewPanel.vue';
 import CitationPopover from './components/chat/CitationPopover.vue';
 import { useTutorialStore } from './stores/tutorial';
 import { usePersonalizationStore } from './stores/personalization';

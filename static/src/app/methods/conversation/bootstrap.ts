@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { debugLog, traceLog } from '../common';
 import { useQuickDockStore } from '../../../stores/quickDock';
+import { usePreviewStore } from '../../../stores/preview';
 import { useConversationStore } from '../../../stores/conversation';
 import { useWorkflowStore } from '../../../stores/workflow';
 
@@ -119,6 +120,13 @@ export const bootstrapMethods = {
     await new Promise((resolve) => setTimeout(resolve, 0));
     useQuickDockStore().setEditedFiles(
       Array.isArray(data.edited_files) ? data.edited_files : []
+    );
+    // 预览窗口：回填本对话预览目标（同一时机，避免被 watcher 清空覆盖）
+    // + 预览运行时（独立预览服务器 base/token，跨站隔离 iframe 用）
+    usePreviewStore().setRuntime(data.preview_base, data.preview_token);
+    usePreviewStore().setTargets(
+      Array.isArray(data.preview_targets) ? data.preview_targets : [],
+      false
     );
 
     // 4.6 快捷窗口：回填工作流运行状态（静态呈现，不播动画）。

@@ -143,6 +143,7 @@ interface PersonalForm {
   show_git_status_bar: boolean;
   auto_open_terminal_panel: boolean;
   quick_dock_auto_expand: boolean;
+  preview_auto_open: boolean;
   file_preview_auto_wrap: boolean;
   edit_summary_live_display: boolean;
   modify_history_enabled: boolean;
@@ -369,6 +370,7 @@ const defaultForm = (): PersonalForm => ({
   show_git_status_bar: true,
   auto_open_terminal_panel: true,
   quick_dock_auto_expand: loadCachedQuickDockAutoExpand(),
+  preview_auto_open: false,
   file_preview_auto_wrap: false,
   edit_summary_live_display: false,
   modify_history_enabled: true,
@@ -637,6 +639,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         show_git_status_bar: data.show_git_status_bar !== false,
         auto_open_terminal_panel: data.auto_open_terminal_panel !== false,
         quick_dock_auto_expand: data.quick_dock_auto_expand !== false,
+        preview_auto_open: !!data.preview_auto_open,
         file_preview_auto_wrap: !!data.file_preview_auto_wrap,
         edit_summary_live_display: !!data.edit_summary_live_display,
         modify_history_enabled: data.modify_history_enabled !== false,

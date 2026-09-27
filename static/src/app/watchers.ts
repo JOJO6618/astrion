@@ -2,6 +2,7 @@
 import { debugLog, traceLog } from './methods/common';
 import { useConversationStore } from '../stores/conversation';
 import { useQuickDockStore } from '../stores/quickDock';
+import { usePreviewStore } from '../stores/preview';
 import { useFileStore } from '../stores/file';
 
 export const watchers = {
@@ -81,9 +82,11 @@ export const watchers = {
         const quickDock = useQuickDockStore();
         // 关闭详情/预览/菜单等瞬态（必须立即）
         quickDock.resetTransient();
+        usePreviewStore().resetTransient();
         if (!newValue) {
           // /new 等无对话场景：不会有 bootstrap 回填，立即清空让列折叠
           quickDock.setEditedFiles([]);
+          usePreviewStore().setTargets([]);
           useFileStore().setTodoList(null);
         }
         // 切到另一对话：不清列表 —— 旧内容短暂保留，由 bootstrap/fetch 回填自然覆盖；

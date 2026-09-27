@@ -57,6 +57,12 @@ export default {
   previewTypeUnsupported: '该文件类型不支持预览',
   loadFailedHttp: '加载失败（HTTP {status}）',
 
+  // —— 预览面板（PreviewWindow / PreviewPanel） ——
+  previewWindowTitle: '预览',
+  previewRemove: '从列表移除',
+  previewRefresh: '刷新预览',
+  previewOpenExternal: '在外部浏览器打开',
+
   // —— 工作流窗口（WorkflowWindow） ——
   reviewing: '审核中',
   roundsLabel: '{n} 轮',

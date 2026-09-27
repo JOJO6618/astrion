@@ -181,6 +181,8 @@ export default {
   autoOpenTerminalDesc: '创建终端时自动打开侧边栏终端面板',
   quickDockAutoExpandTitle: '快捷窗口自动展开',
   quickDockAutoExpandDesc: '有内容时自动展开快捷窗口；关闭后只能通过右侧按钮手动展开',
+  previewAutoOpenTitle: '预览面板自动展开',
+  previewAutoOpenDesc: '检测到新的预览目标（本地服务器 / HTML 文件）时自动展开预览面板；关闭后仅在预览窗口亮起计数，手动点击展开',
   editSummaryLiveTitle: '编辑摘要实时显示',
   editSummaryLiveDesc: '工作运行期间实时显示本次编辑过的文件；关闭时仅在每次工作完成后显示',
   filePreviewWrapTitle: '预览窗口自动换行显示',

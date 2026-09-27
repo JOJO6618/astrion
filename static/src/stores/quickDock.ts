@@ -3,6 +3,7 @@ import { useFileStore } from './file';
 import { useSubAgentStore } from './subAgent';
 import { useBackgroundCommandStore } from './backgroundCommand';
 import { useWorkflowStore } from './workflow';
+import { usePreviewStore } from './preview';
 
 /**
  * 快捷窗口（Quick Dock）状态
@@ -171,6 +172,7 @@ export const useQuickDockStore = defineStore('quickDock', {
       const bgStore = useBackgroundCommandStore();
       const workflowStore = useWorkflowStore();
       const todoCount = fileStore.todoList?.tasks?.length || 0;
+      const previewStore = usePreviewStore();
       // 工作流是「实时状态」（激活/完成/停用即刻变化），不是回填内容，不参与乐观掩码——
       // 否则切换对话时 assumedContent=false 会把刚激活的工作流掩盖掉（/new 激活闪烁根因）。
       // 切对话时旧工作流残留走「保留至回填覆盖」策略，与其余窗口一致。
@@ -178,6 +180,7 @@ export const useQuickDockStore = defineStore('quickDock', {
         todoCount > 0 ||
         subAgentStore.subAgents.length > 0 ||
         bgStore.commands.length > 0 ||
+        previewStore.targets.length > 0 ||
         state.editedFiles.length > 0;
       // 乐观掩码生效期间（初始加载/切换对话的内容未到齐窗口）以假定状态为准；
       // 掩码关闭后纯真实状态。

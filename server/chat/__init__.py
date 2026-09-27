@@ -9,3 +9,4 @@ from server.chat.permission import *
 from server.chat.approval import *
 from server.chat.terminal import *
 from server.chat.misc import *
+from server.chat.preview import *

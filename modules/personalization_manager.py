@@ -177,6 +177,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "default_hide_workspace": False,  # 默认隐藏工作区
     "hide_quick_dock": False,  # 隐藏快捷窗口（对话区右侧的待办/子智能体/后台指令/文件窗口列）
     "quick_dock_auto_expand": True,  # 快捷窗口自动展开：True-有内容时自动展开 / False-只能手动点击按钮展开
+    "preview_auto_open": False,  # 预览面板：检测到新预览目标时自动展开（默认关闭，仅亮徽章）
     "file_preview_auto_wrap": False,  # 文件预览窗口自动换行：True-按面板宽度换行显示 / False-长行横向滚动
     "edit_summary_live_display": False,  # 编辑摘要卡片显示时机：False-一次工作完成后才显示（默认） / True-工作运行期间实时显示
     "modify_history_enabled": True,  # 修改留痕：True-任务完成时把本轮净修改落盘到工作区 .astrion/modify_history/（默认开启） / False-不落盘也不注入 prompt
@@ -785,6 +786,12 @@ def sanitize_personalization_payload(
         base["quick_dock_auto_expand"] = bool(data.get("quick_dock_auto_expand"))
     else:
         base["quick_dock_auto_expand"] = bool(base.get("quick_dock_auto_expand", True))
+
+    # 预览面板自动展开（默认关闭）
+    if "preview_auto_open" in data:
+        base["preview_auto_open"] = bool(data.get("preview_auto_open"))
+    else:
+        base["preview_auto_open"] = bool(base.get("preview_auto_open", False))
 
     # 文件预览窗口自动换行
     if "file_preview_auto_wrap" in data:

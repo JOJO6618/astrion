@@ -415,6 +415,28 @@ class MessagesMixin:
                 if tool_loading_prompt:
                     messages.append({"role": "system", "content": tool_loading_prompt})
 
+            # 预览面板说明（冻结段）：检测机制永远开启，无条件注入。
+            # 与 tool_loading 目录同一模式：创建即冻结、终身不变，不动前缀缓存。
+            def _build_preview_panel_prompt() -> str:
+                # docker/web 模式整体禁用预览：冻结段直接为空（创建对话时即冻结）
+                try:
+                    from modules.preview_targets import is_preview_enabled
+                    if not is_preview_enabled():
+                        return ""
+                except Exception:
+                    pass
+                try:
+                    return self.load_prompt("preview_panel").strip()
+                except Exception:
+                    return ""
+
+            preview_panel_prompt = self._get_or_init_frozen_prompt(
+                "frozen_preview_panel_prompt",
+                _build_preview_panel_prompt,
+            )
+            if preview_panel_prompt:
+                messages.append({"role": "system", "content": preview_panel_prompt})
+
             # 工作流（Workflow）上下文：不冻结，每次按当前状态现生成。
             # 阶段推进时由 workflow_flow.refresh_workflow_system_segment 同步刷新，
             # 压缩不影响（system 段不在压缩范围），天然免疫压缩丢失。

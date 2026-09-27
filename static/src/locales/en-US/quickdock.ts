@@ -50,6 +50,12 @@ export default {
   previewTypeUnsupported: 'This file type cannot be previewed',
   loadFailedHttp: 'Failed to load (HTTP {status})',
 
+  // —— Preview panel (PreviewWindow / PreviewPanel) ——
+  previewWindowTitle: 'Preview',
+  previewRemove: 'Remove from list',
+  previewRefresh: 'Refresh preview',
+  previewOpenExternal: 'Open in external browser',
+
   // —— Workflow window ——
   reviewing: 'Reviewing',
   roundsLabel: 'Round {n}',
