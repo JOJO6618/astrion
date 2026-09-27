@@ -12,10 +12,18 @@ interface ChatState {
   currentMessageIndex: number;
   streamingMessage: boolean;
   expandedBlocks: Set<string>;
+  // 收起动画宽限期：收起后 260ms（max-height 过渡时长）内保持子树渲染，
+  // 动画播完再跳过（content-visibility）。WebKit 对 content-visibility 的
+  // 离散过渡不生效，纯 CSS 方案会导致收起瞬间内容瞬消，故由 JS 定时控制。
+  collapsingBlocks: Set<string>;
   autoScrollEnabled: boolean;
   userScrolling: boolean;
   thinkingScrollLocks: Map<string, boolean>;
 }
+
+// collapsible-content 的 max-height 过渡时长（_chat-area.scss），宽限期与之对齐
+const COLLAPSE_ANIMATION_MS = 260;
+const collapseSkipTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // 生成中的趣味占位标签：模块顶层禁止调 t()，这里只存 key，在创建消息时 t(key) 求值
 const GENERATING_LABEL_KEYS = [
@@ -94,6 +102,7 @@ export const useChatStore = defineStore('chat', {
     currentMessageIndex: -1,
     streamingMessage: false,
     expandedBlocks: new Set<string>(),
+    collapsingBlocks: new Set<string>(),
     autoScrollEnabled: true,
     userScrolling: false,
     thinkingScrollLocks: new Map<string, boolean>()
@@ -140,27 +149,61 @@ export const useChatStore = defineStore('chat', {
         }
       }
     },
+    // 收起宽限期：动画期间保持渲染，播完才允许 CSS 跳过子树渲染
+    _beginCollapseGrace(blockId: string) {
+      const next = cloneSet(this.collapsingBlocks);
+      next.add(blockId);
+      this.collapsingBlocks = next;
+      clearTimeout(collapseSkipTimers.get(blockId));
+      collapseSkipTimers.set(
+        blockId,
+        setTimeout(() => {
+          collapseSkipTimers.delete(blockId);
+          const settled = cloneSet(this.collapsingBlocks);
+          settled.delete(blockId);
+          this.collapsingBlocks = settled;
+        }, COLLAPSE_ANIMATION_MS)
+      );
+    },
+    // 展开立即恢复渲染；快速往返时取消待执行的跳过
+    _cancelCollapseGrace(blockId: string) {
+      if (!this.collapsingBlocks.has(blockId)) return;
+      clearTimeout(collapseSkipTimers.get(blockId));
+      collapseSkipTimers.delete(blockId);
+      const next = cloneSet(this.collapsingBlocks);
+      next.delete(blockId);
+      this.collapsingBlocks = next;
+    },
     toggleBlock(blockId: string) {
       const next = cloneSet(this.expandedBlocks);
       if (next.has(blockId)) {
         next.delete(blockId);
+        this.expandedBlocks = next;
+        this._beginCollapseGrace(blockId);
       } else {
         next.add(blockId);
+        this.expandedBlocks = next;
+        this._cancelCollapseGrace(blockId);
       }
-      this.expandedBlocks = next;
     },
     expandBlock(blockId: string) {
       const next = cloneSet(this.expandedBlocks);
       next.add(blockId);
       this.expandedBlocks = next;
+      this._cancelCollapseGrace(blockId);
     },
     collapseBlock(blockId: string) {
       const next = cloneSet(this.expandedBlocks);
       next.delete(blockId);
       this.expandedBlocks = next;
+      this._beginCollapseGrace(blockId);
     },
     clearExpandedBlocks() {
+      // 批量清理（切换对话等场景）无动画语境，直接全部复位
+      collapseSkipTimers.forEach((timer) => clearTimeout(timer));
+      collapseSkipTimers.clear();
       this.expandedBlocks = new Set<string>();
+      this.collapsingBlocks = new Set<string>();
     },
     setThinkingLock(blockId: string, locked: boolean) {
       const next = cloneMap(this.thinkingScrollLocks);

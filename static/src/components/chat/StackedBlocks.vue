@@ -44,7 +44,11 @@
           <div
             v-if="action.type === 'thinking'"
             class="collapsible-block thinking-block stacked-block"
-            :class="{ expanded: isExpanded(action, idx), processing: action.streaming }"
+            :class="{
+              expanded: isExpanded(action, idx),
+              processing: action.streaming,
+              collapsing: collapsingBlocks?.has(blockKey(action, idx))
+            }"
             :data-block-id="blockKey(action, idx)"
           >
             <div class="collapsible-header" @click="toggleBlock(blockKey(action, idx))">
@@ -74,7 +78,8 @@
             :class="{
               expanded: isExpanded(action, idx),
               processing: isToolProcessing(action),
-              completed: isToolCompleted(action)
+              completed: isToolCompleted(action),
+              collapsing: collapsingBlocks?.has(blockKey(action, idx))
             }"
             :data-block-id="blockKey(action, idx)"
           >
@@ -116,6 +121,7 @@ defineOptions({ name: 'StackedBlocks' });
 const props = defineProps<{
   actions: any[];
   expandedBlocks: Set<string>;
+  collapsingBlocks?: Set<string>;
   conversationRunning?: boolean;
   isLatestMessage?: boolean;
   iconStyle: (key: string, size?: string) => Record<string, string>;
@@ -231,6 +237,8 @@ const isToolCompleted = (action: any) => action?.tool?.status === 'completed';
 
 const toggleMore = () => {
   showAll.value = !showAll.value;
+  // 同步测量：showAll 是本地 ref 已翻转，传送带/外壳过渡与块过渡同帧起步
+  measureAndCompute();
   scheduleMeasure();
   const el = moreBlock.value;
   if (el instanceof HTMLElement) {
@@ -240,7 +248,12 @@ const toggleMore = () => {
 
 const toggleBlock = (blockId: string) => {
   if (typeof props.toggleBlock === 'function') {
+    // 先取切换后的目标态，同步测量并写入外壳高度——与内容 max-height 过渡同帧起步
+    // （详见 measureAndCompute 的 expandedOverride 注释）；随后的 scheduleMeasure 是
+    // DOM 更新后的复核，值一致则不会重启过渡。
+    const willExpand = !isExpandedById(blockId);
     props.toggleBlock(blockId);
+    measureAndCompute({ [blockId]: willExpand });
     scheduleMeasure();
   }
 };
@@ -285,7 +298,10 @@ const moreBaseHeight = () => {
 //    稳定的完整值（裁切不影响子级布局高度）。
 // 因此任何时刻读到的都是「目标态」高度，不是动画中间帧 → 写入 shellHeight/innerOffset 后由
 // CSS transition 平滑（外框增高 / 传送带上移 / 展开收起），绝不抖动。
-const measureAndCompute = () => {
+// expandedOverride：点击切换时同步传入「即将生效」的展开态，使外壳高度写入与内容
+// max-height 过渡同帧起步——Safari 18.6 会把 rAF 内写入的样式过渡推迟 1-2 帧启动，
+// 异步测量会让外壳下边缘明显慢一拍（实测差值峰值 >200px）。
+const measureAndCompute = (expandedOverride?: Record<string, boolean>) => {
   const innerEl = resolveEl(inner.value);
   const shellEl = resolveEl(shell.value);
   if (!shellEl || !innerEl) return;
@@ -305,7 +321,10 @@ const measureAndCompute = () => {
     // max-height:240 限制，工具块为内容自然高），不受 collapsible-content 过渡影响。
     const fullContent = innerC ? Math.min(Math.ceil(innerC.offsetHeight), COLLAPSE_MAX_HEIGHT) : 0;
     nextContentHeights[key] = fullContent;
-    const expanded = isExpandedById(key);
+    const expanded =
+      expandedOverride && key in expandedOverride
+        ? expandedOverride[key]
+        : isExpandedById(key);
     // 分隔线：隐藏边线模式下统一为 0，否则最后一块无 border-bottom
     const borderH = hideBorders.value ? 0 : idx === children.length - 1 ? 0 : 1;
     heights.push(headerH + (expanded ? fullContent : 0) + borderH);

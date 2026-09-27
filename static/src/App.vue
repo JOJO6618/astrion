@@ -286,6 +286,7 @@
             :messages="messages"
             :icon-style="iconStyle"
             :expanded-blocks="expandedBlocks"
+            :collapsing-blocks="collapsingBlocks"
             :render-markdown="renderMarkdown"
             :toggle-block="toggleBlock"
             :handle-thinking-scroll="handleThinkingScroll"

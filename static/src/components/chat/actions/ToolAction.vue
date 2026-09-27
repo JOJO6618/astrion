@@ -3,6 +3,7 @@
     class="collapsible-block tool-block"
     :class="{
       expanded,
+      collapsing,
       processing: action.tool.status === 'preparing' || action.tool.status === 'running',
       completed: action.tool.status === 'completed'
     }"
@@ -46,6 +47,7 @@ defineOptions({ name: 'ToolAction' });
 const props = defineProps<{
   action: any;
   expanded: boolean;
+  collapsing?: boolean;
   blockId?: string;
   iconStyle: (key: string) => Record<string, string>;
   getToolAnimationClass: (tool: any) => Record<string, unknown>;

@@ -1638,15 +1638,9 @@ body[data-theme='dark'] .collapsible-header:hover {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
-  /* content-visibility 也进过渡列表：收起动画播完才跳过子树渲染，
-     展开时立即恢复渲染（离散属性的方向性插值），收起动画得以完整呈现 */
   transition:
     max-height 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    content-visibility 260ms;
-  /* 让离散属性可过渡；不支持的引擎忽略此属性，退化为收起时立即跳过渲染，
-     max-height/opacity 动画本体不受影响 */
-  transition-behavior: allow-discrete;
+    opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
   /* 始终隐藏滚动条，避免堆叠模式展开时闪现 */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1659,9 +1653,13 @@ body[data-theme='dark'] .collapsible-header:hover {
 
 /* 折叠态跳过整个子树渲染：max-height:0 只裁视觉，DOM 仍全量参与布局，
    大步骤组/长思维链会在窗口拖拽时逐帧重排导致卡顿。
-   隐藏翻转由上方过渡延迟到收起动画结束后生效；展开时立即恢复渲染，
-   由 rAF 测量强制同步布局取真实高度，不受影响。 */
-.collapsible-block:not(.expanded) .collapsible-content {
+   收起动画的宽限期（.collapsing，由 stores/chat.ts 定时 260ms 控制）内不跳过，
+   动画播完宽限期结束才真正跳过；展开时立即恢复渲染，
+   由 rAF 测量强制同步布局取真实高度，不受影响。
+   不用 content-visibility 离散过渡（transition-behavior）的原因：
+   WebKit（Safari/桌面壳 WKWebView）不生效，收起瞬间跳过会导致内容瞬消、
+   外壳高度慢一拍（与 MinimalBlocks 2026-09-27 修复同源）。 */
+.collapsible-block:not(.expanded):not(.collapsing) .collapsible-content {
   content-visibility: hidden;
   contain-intrinsic-size: 0;
 }
@@ -1843,9 +1841,8 @@ body[data-theme='dark'] .more-icon {
 }
 
 /* 堆叠块收起/展开不做淡出：内容保持不透明，由收缩的容器自然裁切（与极简模式一致）。
-   注意：不要再给 .stacked-block .collapsible-content 重声明 transition——
-   它会以更高特异性覆盖 .collapsible-content 基础规则（含 content-visibility 过渡），
-   曾因漏写 content-visibility 导致收起时内容瞬间消失、块高瞬间坍塌。 */
+   注意：不要给 .stacked-block .collapsible-content 重声明 transition——
+   它会以更高特异性覆盖 .collapsible-content 基础规则的 max-height/opacity 过渡。 */
 .stacked-block .collapsible-content {
   opacity: 1;
 }

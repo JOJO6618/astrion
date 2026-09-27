@@ -72,7 +72,13 @@
         </div>
 
         <!-- 步骤容器（展开时显示所有步骤） -->
-        <div class="steps-container" :class="{ show: expandedGroups.has(group.id) }">
+        <div
+          class="steps-container"
+          :class="{
+            show: expandedGroups.has(group.id),
+            'collapse-animating': collapsingGroups.has(group.id)
+          }"
+        >
           <div
             class="steps-wrapper"
             :class="{ 'height-limited': heightLimited }"
@@ -218,6 +224,14 @@ const emit = defineEmits<{
 }>();
 
 const expandedGroups = ref(new Set<string>());
+// 收起动画宽限期：收起后 300ms（grid 过渡时长）内保持子树渲染，动画播完再跳过。
+// WebKit（Safari/桌面壳 WKWebView）对 content-visibility 的离散过渡不生效——
+// transition-behavior: allow-discrete 无法把「隐藏」延迟到动画结束，收起瞬间跳过
+// 渲染会导致内容瞬消 + contain-intrinsic-size:0 高度瞬塌（展开正常、收起瞬消）。
+// 故放弃纯 CSS 离散过渡方案，改为 JS 定时控制跳过渲染的时机，全引擎行为一致。
+const collapsingGroups = ref(new Set<string>());
+const collapseSkipTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const COLLAPSE_ANIMATION_MS = 300;
 const thinkingRefs = new Map<string, HTMLElement>();
 const stepsWrapperRefs = new Map<string, HTMLElement>();
 const stepsWrapperScrollLocks = new Map<string, boolean>();
@@ -921,6 +935,16 @@ const scrollStepsWrapperToBottom = (groupId: string) => {
 const toggleExpand = (groupId: string) => {
   if (expandedGroups.value.has(groupId)) {
     expandedGroups.value.delete(groupId);
+    // 收起动画（grid 0.3s）期间保持子树渲染，播完才跳过（见状态声明处注释）
+    collapsingGroups.value.add(groupId);
+    clearTimeout(collapseSkipTimers.get(groupId));
+    collapseSkipTimers.set(
+      groupId,
+      setTimeout(() => {
+        collapsingGroups.value.delete(groupId);
+        collapseSkipTimers.delete(groupId);
+      }, COLLAPSE_ANIMATION_MS)
+    );
     emit('group-toggle', { groupId, expanded: false });
 
     // 折叠后，取消注册该组中的思考内容 ref
@@ -939,6 +963,10 @@ const toggleExpand = (groupId: string) => {
     });
   } else {
     expandedGroups.value.add(groupId);
+    // 展开立即恢复渲染；若还在收起宽限期内（快速往返），取消待执行的跳过
+    clearTimeout(collapseSkipTimers.get(groupId));
+    collapseSkipTimers.delete(groupId);
+    collapsingGroups.value.delete(groupId);
     emit('group-toggle', { groupId, expanded: true });
 
     // 展开后，注册该组中的思考内容 ref
@@ -1100,6 +1128,8 @@ watch(
 
 onBeforeUnmount(() => {
   Object.keys(toolReelStates).forEach(clearToolReelTimers);
+  collapseSkipTimers.forEach((timer) => clearTimeout(timer));
+  collapseSkipTimers.clear();
   stepsWrapperRefs.forEach((el) => {
     el.removeEventListener('scroll', handleStepsWrapperScroll as EventListener);
   });
@@ -1314,16 +1344,15 @@ body[data-theme='light'] .summary-line-text.running .summary-char {
 .steps-wrapper {
   overflow: hidden;
   min-height: 0;
-  /* content-visibility 进过渡列表：收起动画（grid 0.3s）播完才跳过子树渲染，
-     展开时立即恢复渲染；不支持的引擎退化为收起时立即跳过 */
-  transition: content-visibility 0.3s;
-  transition-behavior: allow-discrete;
 }
 
 /* 折叠态跳过整个子树渲染：0fr 折叠只裁视觉，DOM 仍全量参与布局，
    几千节点的步骤组会在窗口拖拽时逐帧重排导致卡顿。
-   隐藏翻转由上方过渡延迟到收起动画结束后生效 */
-.steps-container:not(.show) .steps-wrapper {
+   收起动画的宽限期（.collapse-animating，JS 定时 300ms）内不跳过，
+   动画播完宽限期结束才真正跳过；展开时立即恢复渲染。
+   不用 content-visibility 离散过渡（transition-behavior）的原因：
+   WebKit 不生效，收起瞬间跳过会导致内容瞬消（见脚本区注释）。 */
+.steps-container:not(.show):not(.collapse-animating) .steps-wrapper {
   content-visibility: hidden;
   contain-intrinsic-size: 0;
 }

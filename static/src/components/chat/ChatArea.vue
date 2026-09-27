@@ -211,6 +211,7 @@
                 class="stacked-blocks-wrapper"
                 :actions="group.actions"
                 :expanded-blocks="expandedBlocks"
+                :collapsing-blocks="collapsingBlocks"
                 :conversation-running="streamingMessage"
                 :is-latest-message="index === latestMessageIndex"
                 :icon-style="iconStyleSafe"
@@ -246,6 +247,9 @@
                   class="collapsible-block thinking-block"
                   :class="{
                     expanded: expandedBlocks?.has(
+                      group.action.blockId || `${index}-thinking-${group.actionIndex}`
+                    ),
+                    collapsing: collapsingBlocks?.has(
                       group.action.blockId || `${index}-thinking-${group.actionIndex}`
                     )
                   }"
@@ -436,6 +440,11 @@
                       group.action.blockId || `${index}-tool-${group.actionIndex}`
                     )
                   "
+                  :collapsing="
+                    collapsingBlocks?.has(
+                      group.action.blockId || `${index}-tool-${group.actionIndex}`
+                    )
+                  "
                   :icon-style="iconStyleSafe"
                   :get-tool-animation-class="getToolAnimationClass"
                   :get-tool-icon="getToolIcon"
@@ -478,6 +487,9 @@
                   class="collapsible-block thinking-block"
                   :class="{
                     expanded: expandedBlocks?.has(
+                      action.blockId || `${index}-thinking-${actionIndex}`
+                    ),
+                    collapsing: collapsingBlocks?.has(
                       action.blockId || `${index}-thinking-${actionIndex}`
                     )
                   }"
@@ -648,6 +660,7 @@
                   v-else-if="action.type === 'tool'"
                   :action="action"
                   :expanded="expandedBlocks?.has(action.blockId || `${index}-tool-${actionIndex}`)"
+                  :collapsing="collapsingBlocks?.has(action.blockId || `${index}-tool-${actionIndex}`)"
                   :icon-style="iconStyleSafe"
                   :get-tool-animation-class="getToolAnimationClass"
                   :get-tool-icon="getToolIcon"
@@ -676,7 +689,10 @@
         <div v-else class="system-message">
           <div
             class="collapsible-block system-block"
-            :class="{ expanded: expandedBlocks?.has(`system-${index}`) }"
+            :class="{
+              expanded: expandedBlocks?.has(`system-${index}`),
+              collapsing: collapsingBlocks?.has(`system-${index}`)
+            }"
             :data-block-id="`system-${index}`"
           >
             <div class="collapsible-header" @click="toggleBlock(`system-${index}`)">
@@ -760,6 +776,7 @@ const props = defineProps<{
   messages: Array<any>;
   iconStyle: (key: string, size?: string) => Record<string, string>;
   expandedBlocks: Set<string>;
+  collapsingBlocks?: Set<string>;
   streamingMessage: boolean;
   toggleBlock: (blockId: string) => void;
   handleThinkingScroll: (blockId: string, event: Event) => void;

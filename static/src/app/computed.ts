@@ -122,6 +122,7 @@ export const computed = {
     'currentMessageIndex',
     'streamingMessage',
     'expandedBlocks',
+    'collapsingBlocks',
     'autoScrollEnabled',
     'userScrolling',
     'thinkingScrollLocks'
