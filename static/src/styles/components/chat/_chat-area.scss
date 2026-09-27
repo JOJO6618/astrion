@@ -319,6 +319,10 @@
   overflow-y: auto;
   overflow-x: hidden;
   overflow-anchor: none;
+  /* 常驻预留滚动条槽位：滚动条出现/消失不再改变可用宽度，
+     消息轨居中轴不随内容长短漂移；JS 实测（--chat-scrollbar-width）
+     因此恒等于槽位宽度，既有 left/宽度补偿在两态下自动一致 */
+  scrollbar-gutter: stable;
   padding: 24px;
   padding-top: 30px;
   padding-bottom: 20px;
@@ -425,6 +429,9 @@
    三级渐进模糊条带才有内容可模糊 */
 .chat-container--mobile .messages-area {
   padding-top: 52px;
+  /* 移动端/app-shell 语义为 0 补偿（--chat-scrollbar-width: 0 !important），
+     不预留槽位，否则会凭空偏左半槽宽 */
+  scrollbar-gutter: auto;
 }
 
 /* monitor 面板是 flex 文档流子项、无滚动区，保留容器级留白避开 fixed 顶栏 */
@@ -451,6 +458,7 @@
     padding-top: 8px;
     padding-left: 12px !important;
     padding-right: 12px !important;
+    scrollbar-gutter: auto;
   }
 
   /* 窗口化后每个 message-block 都是包装项的首子，:first-child 会匹配所有块，改用显式 class */
