@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from copy import deepcopy
 from pathlib import Path
@@ -39,6 +40,30 @@ GOAL_MAX_TOKENS_MIN = 1_000
 GOAL_MAX_TOKENS_MAX = 100_000_000
 
 PERSONALIZATION_FILENAME = "personalization.json"
+# 拆分存储（2026-09-27）：原本所有键都塞在 personalization.json 一个文件里，
+# 且搜索/提取各家 API 密钥与普通偏好混存。现拆为三个文件：
+#   - personalization.json：纯 UI/行为偏好
+#   - service_config.json：搜索/提取服务配置（非密钥：服务商选择、直提白名单等）
+#   - secrets.json：所有 API 密钥（0600 权限、原子写，对齐 providers.json 惯例）
+# 模块对外 API（load/save/sanitize 的签名与返回结构）不变，调用方无感知；
+# 旧格式 personalization.json 中的密钥/服务键在首次加载时自动迁移并抹除。
+SECRETS_FILENAME = "secrets.json"
+SERVICE_CONFIG_FILENAME = "service_config.json"
+SECRET_KEYS = (
+    "tavily_api_key",
+    "bocha_api_key",
+    "exa_api_key",
+    "parallel_api_key",
+    "jina_api_key",
+)
+SERVICE_CONFIG_KEYS = (
+    "search_provider",
+    "webpage_extract_provider",
+    "webpage_direct_extract_enabled",
+    "webpage_direct_extract_domains",
+    "searxng_base_url",
+)
+_SPLIT_AWAY_KEYS = frozenset(SECRET_KEYS) | frozenset(SERVICE_CONFIG_KEYS)
 MAX_SHORT_FIELD_LENGTH = 20
 MAX_CONSIDERATION_TEXT_LENGTH = 2000
 MAX_CONSIDERATION_ITEMS = 10
@@ -178,6 +203,10 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
 
 __all__ = [
     "PERSONALIZATION_FILENAME",
+    "SECRETS_FILENAME",
+    "SERVICE_CONFIG_FILENAME",
+    "SECRET_KEYS",
+    "SERVICE_CONFIG_KEYS",
     "DEFAULT_PERSONALIZATION_CONFIG",
     "TONE_PRESETS",
     "MAX_CONSIDERATION_ITEMS",
@@ -212,40 +241,142 @@ def _to_path(base: PathLike) -> Path:
     return base_path
 
 
+def _to_split_paths(base: PathLike) -> tuple:
+    """返回 (personalization, service_config, secrets) 三个文件路径。
+
+    personalization.json 在宿主机多工作区下是指向「用户级共享目录」的符号链接
+    （user_manager._ensure_shared_user_state_links），拆分出的两个新文件必须落在
+    链接解析后的真实目录里，才能继承同样的跨工作区共享语义（与
+    atomic_write_json 的符号链接写穿同一原则）。
+    """
+    personalization = _to_path(base)
+    try:
+        if personalization.is_symlink():
+            personalization = personalization.resolve()
+    except Exception:
+        pass
+    directory = personalization.parent
+    return (
+        personalization,
+        directory / SERVICE_CONFIG_FILENAME,
+        directory / SECRETS_FILENAME,
+    )
+
+
+def _read_json_object(path: Path) -> Optional[Dict[str, Any]]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _split_config(config: Dict[str, Any]) -> tuple:
+    """把完整配置拆成 (personal, service, secrets) 三个部分。"""
+    personal = {k: v for k, v in config.items() if k not in _SPLIT_AWAY_KEYS}
+    service = {k: config.get(k) for k in SERVICE_CONFIG_KEYS}
+    secrets = {k: config.get(k) for k in SECRET_KEYS}
+    return personal, service, secrets
+
+
+def _write_json_with_mode(path: Path, data: Dict[str, Any], mode: Optional[int] = None) -> None:
+    atomic_write_json(path, data)
+    if mode is not None:
+        try:
+            os.chmod(path, mode)
+        except Exception:
+            pass
+
+
+def _write_split_configs(
+    personalization_path: Path,
+    service_path: Path,
+    secrets_path: Path,
+    config: Dict[str, Any],
+    *,
+    only_if_changed: bool = False,
+) -> None:
+    """把完整配置按拆分布局落盘。secrets.json 固定 0600 权限。"""
+    personal, service, secrets = _split_config(config)
+    targets = (
+        (personalization_path, personal, None),
+        (service_path, service, None),
+        (secrets_path, secrets, 0o600),
+    )
+    for path, data, mode in targets:
+        if only_if_changed:
+            existing = _read_json_object(path)
+            if existing == data:
+                continue
+        try:
+            _write_json_with_mode(path, data, mode)
+        except Exception:
+            pass
+
+
 def ensure_personalization_config(base_dir: PathLike) -> Dict[str, Any]:
-    """Ensure the personalization file exists and return its content."""
-    path = _to_path(base_dir)
-    _ensure_parent(path)
-    if not path.exists():
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_PERSONALIZATION_CONFIG, f, ensure_ascii=False, indent=2)
-        return deepcopy(DEFAULT_PERSONALIZATION_CONFIG)
+    """Ensure the personalization files exist and return merged content."""
+    personalization_path, service_path, secrets_path = _to_split_paths(base_dir)
+    _ensure_parent(personalization_path)
+    if not personalization_path.exists():
+        config = deepcopy(DEFAULT_PERSONALIZATION_CONFIG)
+        _write_split_configs(personalization_path, service_path, secrets_path, config)
+        return config
     return load_personalization_config(base_dir)
 
 
 def load_personalization_config(base_dir: PathLike) -> Dict[str, Any]:
-    """Load personalization config; fall back to defaults on errors."""
-    path = _to_path(base_dir)
-    _ensure_parent(path)
-    if not path.exists():
+    """Load merged personalization config; fall back to defaults on errors.
+
+    读取三个拆分文件并合并为完整配置；旧格式（密钥/服务键还留在
+    personalization.json 里）在首次加载时自动迁移到 service_config.json /
+    secrets.json，并从 personalization.json 抹除。
+    """
+    personalization_path, service_path, secrets_path = _to_split_paths(base_dir)
+    _ensure_parent(personalization_path)
+    if not personalization_path.exists():
         return ensure_personalization_config(base_dir)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-            sanitized = sanitize_personalization_payload(raw)
-            # 若发现缺失字段（如默认模型）或数据被规范化，主动写回文件，避免下一次读取仍为旧格式
-            if sanitized != raw:
-                with open(path, "w", encoding="utf-8") as wf:
-                    json.dump(sanitized, wf, ensure_ascii=False, indent=2)
-            _sync_ui_locale(sanitized)
-            return sanitized
-    except (json.JSONDecodeError, OSError):
+    raw = _read_json_object(personalization_path)
+    if raw is None:
         # 重置为默认配置，避免错误阻塞
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_PERSONALIZATION_CONFIG, f, ensure_ascii=False, indent=2)
         fallback = deepcopy(DEFAULT_PERSONALIZATION_CONFIG)
+        _write_split_configs(personalization_path, service_path, secrets_path, fallback)
         _sync_ui_locale(fallback)
         return fallback
+
+    # 旧格式迁移：先把还留在 personalization.json 里的服务/密钥键提取出来
+    legacy_service = {k: raw.pop(k) for k in SERVICE_CONFIG_KEYS if k in raw}
+    legacy_secrets = {k: raw.pop(k) for k in SECRET_KEYS if k in raw}
+    migrated = bool(legacy_service or legacy_secrets)
+
+    service_raw = _read_json_object(service_path) or {}
+    secrets_raw = _read_json_object(secrets_path) or {}
+
+    merged = dict(raw)
+    # 服务键：service_config.json 优先，其次旧格式遗留值
+    for key in SERVICE_CONFIG_KEYS:
+        if key in service_raw:
+            merged[key] = service_raw[key]
+        elif key in legacy_service:
+            merged[key] = legacy_service[key]
+    # 密钥键：secrets.json 非空值优先，其次旧格式遗留值（空串视为未设置）
+    for key in SECRET_KEYS:
+        file_value = secrets_raw.get(key)
+        if isinstance(file_value, str) and file_value.strip():
+            merged[key] = file_value
+        elif key in legacy_secrets:
+            merged[key] = legacy_secrets[key]
+
+    sanitized = sanitize_personalization_payload(merged)
+    # 迁移或规范化后写回拆分文件（仅内容变化时写），避免下次读取仍为旧格式
+    if migrated or raw != _split_config(sanitized)[0]:
+        _write_split_configs(
+            personalization_path, service_path, secrets_path, sanitized,
+            only_if_changed=True,
+        )
+    _sync_ui_locale(sanitized)
+    return sanitized
 
 
 def _sync_ui_locale(config: Dict[str, Any]) -> None:
@@ -948,14 +1079,14 @@ def _sanitize_hidden_models(value: Any) -> list:
 
 
 def save_personalization_config(base_dir: PathLike, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Persist sanitized personalization config and return it."""
+    """Persist sanitized personalization config (split layout) and return it."""
     existing = load_personalization_config(base_dir)
     config = sanitize_personalization_payload(payload, fallback=existing)
     validate_context_compression_settings(config)
-    path = _to_path(base_dir)
-    _ensure_parent(path)
+    personalization_path, service_path, secrets_path = _to_split_paths(base_dir)
+    _ensure_parent(personalization_path)
     # 原子写：防止写中断留下半截 JSON（与对话保存链路的原子替换对齐，S10 修复）
-    atomic_write_json(path, config)
+    _write_split_configs(personalization_path, service_path, secrets_path, config)
     _sync_ui_locale(config)
     return config
 
