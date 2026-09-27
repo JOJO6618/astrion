@@ -556,6 +556,64 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
                     plan_file=plan_file)
 
 
+def _write_cancelled_tool_messages(*, web_terminal, tool_calls, sender, messages) -> None:
+    """为本批 tool_calls 中尚未落盘 tool 结果的调用补写 cancelled 消息（内存 + 磁盘）。
+
+    背景：assistant.tool_calls 消息在工具执行前就已落盘（chat_flow_task_main.py）。
+    硬取消（cancel_task 的 task.cancel()）会让 CancelledError 在任意 await 点穿透
+    工具循环，绕过循环内的优雅取消落盘路径；停止于工具执行前的分支同理曾只写内存。
+    缺少对应 tool 响应时，下一轮 build_messages 剥离悬空 tool_calls 后会产生空
+    assistant 消息，被 API 400 拒绝（对话永久不可用）。
+    本函数幂等：已落盘 tool 结果的 tool_call_id 会被跳过。兜底逻辑自身不再抛异常。
+    """
+    try:
+        cancelled_text = tr("tool_loop.cancelled_by_user")
+        context_manager = getattr(web_terminal, "context_manager", None)
+        history = getattr(context_manager, "conversation_history", None) or []
+        persisted_ids = {
+            str(item.get("tool_call_id"))
+            for item in history
+            if isinstance(item, dict) and item.get("role") == "tool" and item.get("tool_call_id")
+        }
+        for tc in tool_calls or []:
+            tc_id = (tc or {}).get("id")
+            func_name = ((tc or {}).get("function") or {}).get("name")
+            if not tc_id or str(tc_id) in persisted_ids:
+                continue
+            if sender is not None:
+                try:
+                    sender('update_action', {
+                        'preparing_id': tc_id,
+                        'status': 'cancelled',
+                        'result': {
+                            "success": False,
+                            "status": "cancelled",
+                            "message": cancelled_text,
+                            "tool": func_name,
+                        },
+                    })
+                except Exception:
+                    pass
+            if isinstance(messages, list):
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "name": func_name,
+                    "content": cancelled_text,
+                })
+            if context_manager is not None:
+                context_manager.add_conversation(
+                    "tool",
+                    cancelled_text,
+                    tool_call_id=tc_id,
+                    name=func_name,
+                    metadata={"status": "cancelled"},
+                )
+            persisted_ids.add(str(tc_id))
+    except Exception as exc:
+        debug_log(f"[停止] 补写 cancelled tool 消息失败: {exc}")
+
+
 async def execute_tool_calls(**kwargs):
     """_execute_tool_calls_impl 的守护包装：保证 _tool_loop_active 在任何退出路径都复位。
 
@@ -569,6 +627,17 @@ async def execute_tool_calls(**kwargs):
     previous_tool_loop_active = getattr(web_terminal, "_tool_loop_active", False)
     try:
         return await _execute_tool_calls_impl(**kwargs)
+    except asyncio.CancelledError:
+        # 硬取消（cancel_task 的 task.cancel()）：CancelledError 在任意 await 点穿透
+        # 工具循环，绕过循环内的优雅取消落盘路径。为未落盘的 tool_calls 补写
+        # cancelled tool 消息，避免 assistant.tool_calls 悬空损坏对话历史。
+        _write_cancelled_tool_messages(
+            web_terminal=web_terminal,
+            tool_calls=kwargs.get("tool_calls"),
+            sender=kwargs.get("sender"),
+            messages=kwargs.get("messages"),
+        )
+        raise
     finally:
         web_terminal._tool_loop_active = previous_tool_loop_active
 
@@ -671,34 +740,22 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
     pending_tool_system_messages: List[Dict[str, Any]] = []
     last_completed_tool_call_id: Optional[str] = None
     deep_compression_pending = False
-    for tool_call in tool_calls:
+    for tool_call_idx, tool_call in enumerate(tool_calls):
         # 检查停止标志
         client_stop_info = get_stop_flag(client_sid, username, include_user=False)
         if client_stop_info:
             stop_requested = client_stop_info.get('stop', False) if isinstance(client_stop_info, dict) else client_stop_info
             if stop_requested:
                 debug_log("在工具调用过程中检测到停止状态")
-                tool_call_id = tool_call.get("id")
-                function_name = tool_call.get("function", {}).get("name")
-                # 通知前端该工具已被取消，避免界面卡住
-                sender('update_action', {
-                    'preparing_id': tool_call_id,
-                    'status': 'cancelled',
-                    'result': {
-                        "success": False,
-                        "status": "cancelled",
-                        "message": tr("tool_loop.cancelled_by_user"),
-                        "tool": function_name
-                    }
-                })
-                # 在消息列表中记录取消结果，防止重新加载时仍显示运行中
-                if tool_call_id:
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "name": function_name,
-                        "content": tr("tool_loop.cancelled_by_user"),
-                    })
+                # 为本个及本批后续所有未执行的 tool_call 补写 cancelled 消息
+                # （内存 + 磁盘落盘；此前只写内存且只处理当前一个，重建后
+                # assistant.tool_calls 悬空会产生空 assistant 消息导致 API 400）
+                _write_cancelled_tool_messages(
+                    web_terminal=web_terminal,
+                    tool_calls=tool_calls[tool_call_idx:],
+                    sender=sender,
+                    messages=messages,
+                )
                 sender('task_stopped', {
                     'message': tr("tool_loop.cancelled_by_user"),
                     'reason': 'user_stop'

@@ -1372,10 +1372,17 @@ class MainTerminalToolsExecutionMixin:
                         output_wait = arguments.get("output_wait")
                         if output_wait is None:
                             output_wait = arguments.get("timeout")
-                        result = self.terminal_manager.send_to_terminal(
-                            command=arguments["command"],
-                            session_name=arguments.get("session_name"),
-                            output_wait=output_wait
+                        # send_to_terminal 内部是同步阻塞等待（_wait_for_output
+                        # 最多等满 output_wait）。必须放到线程池执行：直接同步调用
+                        # 会冻结整个后台事件循环，导致等待期间停止标志看护循环与
+                        # cancel_task 投递的硬取消全部无法送达（停止按钮假成功）。
+                        # 注意：协程被取消时线程内的等待无法强杀，会读完队列自然
+                        # 结束，无副作用（不触碰共享状态，仅读终端输出队列）。
+                        result = await asyncio.to_thread(
+                            self.terminal_manager.send_to_terminal,
+                            arguments["command"],
+                            arguments.get("session_name"),
+                            output_wait,
                         )
                         if result["success"]:
                             print(f"{OUTPUT_FORMATS['terminal']} 执行命令: {arguments['command']}")

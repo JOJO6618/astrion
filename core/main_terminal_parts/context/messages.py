@@ -524,6 +524,12 @@ class MessagesMixin:
                             _tcid = (_tc or {}).get("id")
                             if _tcid:
                                 emitted_tool_call_ids.add(_tcid)
+                    elif tool_calls:
+                        # 悬空 tool_calls 被剥离（工具结果缺失：任务在工具执行中被
+                        # 硬取消/进程中断）。若 assistant 内容为空，部分提供商会
+                        # 400（assistant 内容不能为空），填占位文本保证请求合法。
+                        if not str(message.get("content") or "").strip():
+                            message["content"] = "（本轮工具调用被中断）"
                     messages.append(message)
 
                 elif conv["role"] == "tool":
