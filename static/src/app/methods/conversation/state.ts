@@ -129,9 +129,6 @@ export const stateMethods = {
 
     debugLog('前端状态重置完成');
     this._scrollListenerReady = false;
-    this._manualScrollSuppressUntil = 0;
-    this._escapedByUserScroll = false;
-    this._autoRelockCooldownUntil = 0;
     this.$nextTick(() => {
       this.ensureScrollListener();
       const composerRef = typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;

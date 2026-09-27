@@ -78,62 +78,26 @@ export const scrollMethods = {
     this._scrollListenerReady = true;
   },
   handleStickStateChange(payload) {
-    const escaped = !!payload?.escapedFromLock;
-    const isAtBottom = !!payload?.isAtBottom;
-    const isNearBottom = !!payload?.isNearBottom;
-    const userEscaped = !!this._escapedByUserScroll;
+    const follow = payload?.followState === 'escaped' ? 'escaped' : 'locked';
     uiBounceTrace(
       'stick-state-change',
       {
-        isAtBottom,
-        isNearBottom,
-        escapedFromLock: escaped,
-        userEscaped,
+        isAtBottom: !!payload?.isAtBottom,
+        isNearBottom: !!payload?.isNearBottom,
+        escapedFromLock: !!payload?.escapedFromLock,
+        followState: follow,
         autoScrollEnabled: this.autoScrollEnabled,
         userScrolling: this.userScrolling
       },
       'stick-state-change',
       180
     );
-    this.stickIsAtBottom = isAtBottom;
-    this.stickIsNearBottom = isNearBottom;
-
-    // 用户主动脱离锁定：只要没真正回到底部，就保持“手动滚动中”状态。
-    // 注意不能用 nearBottom（70px 容差）判定“已回底”：移动端浅滚动脱锁常停在
-    // 70px 以内，若据此清除脱锁标志会立刻重新上锁，表现为「第一次滚动必被拽回底部」。
-    // 另外脱锁意图后的冷却期（_manualScrollSuppressUntil）内禁止重置：移动端触摸滚动
-    // 由合成器驱动，scrollTop 更新滞后于状态事件，此时 scrollTop 可能仍贴着底部，
-    // 若立即按位置判定“已回底”会误清脱锁标志。
-    if (userEscaped) {
-      const inIntentCooldown = Date.now() <= (this._manualScrollSuppressUntil || 0);
-      const area = this.getMessagesAreaElement();
-      const strictAtBottom = area
-        ? area.scrollHeight - area.scrollTop - area.clientHeight <= 4
-        : isAtBottom;
-      if (strictAtBottom && !inIntentCooldown) {
-        this._escapedByUserScroll = false;
-        this.chatSetScrollState({ userScrolling: false });
-      } else {
-        this.chatSetScrollState({ userScrolling: true });
-      }
-      return;
-    }
-
-    // 非用户触发的 escaped（例如高度突增导致的短暂锚点漂移）不应解除锁定
-    this.chatSetScrollState({ userScrolling: false });
-    if (!escaped) {
-      return;
-    }
-    const active = typeof this.isOutputActive === 'function' ? this.isOutputActive() : true;
-    if (!this.autoScrollEnabled || !active) {
-      return;
-    }
-    const chatArea = this.getChatAreaController();
-    if (chatArea && typeof chatArea.conditionalStickToBottom === 'function') {
-      chatArea.conditionalStickToBottom({ force: false });
-      return;
-    }
-    conditionalScrollToBottomHelper(this);
+    this.stickIsAtBottom = !!payload?.isAtBottom;
+    this.stickIsNearBottom = !!payload?.isNearBottom;
+    // 脱锁/回锁裁决已收敛到 ChatArea 的 followState 权威（可信用户输入驱动）；
+    // 库层 escapedFromLock / nearBottom 不再反向驱动锁定决策，这里只做展示态同步。
+    // escaped 即视为「用户滚动中」，供条件追底阻断与旧版 fallback 路径使用。
+    this.chatSetScrollState({ userScrolling: follow === 'escaped' });
   },
   handleUserScrollIntent(payload) {
     const ts = Number(payload?.ts || Date.now());
@@ -141,24 +105,21 @@ export const scrollMethods = {
     if (chatArea && typeof chatArea.stopStickScroll === 'function') {
       chatArea.stopStickScroll();
     }
-    // 用户手动滚动后，短时间内禁止任何自动追底，规避 escapedFromLock 状态抖动竞态
-    this._manualScrollSuppressUntil = Math.max(this._manualScrollSuppressUntil || 0, ts + 1600);
-    this._escapedByUserScroll = true;
+    // 脱锁状态由 ChatArea followState 权威持有（其内部输入监听已先行置 escaped），
+    // 这里仅同步展示态。不再设冷却期——escaped 不因时间流逝自动恢复，只由触底回锁。
     this.chatSetScrollState({ userScrolling: true });
     uiBounceTrace(
       'ui.user-scroll-intent',
       {
         ts,
         delta: Number(payload?.delta || 0),
-        top: Number(payload?.top || 0),
-        suppressUntil: this._manualScrollSuppressUntil
+        top: Number(payload?.top || 0)
       },
       'ui.user-scroll-intent',
       80
     );
   },
   scrollHistoryToBottomInstant() {
-    this._escapedByUserScroll = false;
     const chatArea = this.getChatAreaController();
     if (chatArea && typeof chatArea.stopStickScroll === 'function') {
       chatArea.stopStickScroll();
@@ -175,10 +136,13 @@ export const scrollMethods = {
       jump();
       requestAnimationFrame(jump);
     });
+    // 历史落定 = 明确回锁
+    if (chatArea && typeof chatArea.scrollToBottom === 'function') {
+      chatArea.scrollToBottom({ behavior: 'auto', force: true });
+    }
     this.chatSetScrollState({ userScrolling: false });
   },
   async settleHistoryRenderAndScroll() {
-    this._escapedByUserScroll = false;
     const chatArea = this.getChatAreaController();
     if (chatArea && typeof chatArea.stopStickScroll === 'function') {
       chatArea.stopStickScroll();
@@ -213,6 +177,10 @@ export const scrollMethods = {
     jump();
     await nextFrame();
     jump();
+    // 历史落定 = 明确回锁
+    if (chatArea && typeof chatArea.scrollToBottom === 'function') {
+      chatArea.scrollToBottom({ behavior: 'auto', force: true });
+    }
     this.chatSetScrollState({ userScrolling: false });
   },
   scrollToBottom() {
@@ -225,12 +193,12 @@ export const scrollMethods = {
       'ui.scrollToBottom:called',
       80
     );
-    this._escapedByUserScroll = false;
     const chatArea = this.getChatAreaController();
     if (chatArea && typeof chatArea.scrollToBottom === 'function') {
+      // 主动滚到底 = 明确回锁意图（发送消息等场景），一律强制
       chatArea.scrollToBottom({
         behavior: 'auto',
-        force: this.autoScrollEnabled
+        force: true
       });
       this.chatSetScrollState({ userScrolling: false });
       return;
@@ -257,47 +225,20 @@ export const scrollMethods = {
     if (!active) {
       return;
     }
-    const now = Date.now();
-    if (now <= (this._manualScrollSuppressUntil || 0)) {
+    // 脱锁期间一律不自动追底（唯一权威：ChatArea followState）；
+    // 旧实现依赖 escapedFromLock + _escapedByUserScroll + 冷却期的三重猜测，
+    // 库「任意下滚即清锁」会让阻断失效，表现为微滚向下被瞬间拽回底部。
+    if (stickState?.followState === 'escaped') {
       uiBounceTrace(
-        'ui.conditionalScrollToBottom:skip-manual-cooldown',
-        {
-          now,
-          suppressUntil: this._manualScrollSuppressUntil
-        },
-        'ui.conditionalScrollToBottom:skip-manual-cooldown',
+        'ui.conditionalScrollToBottom:skip-escaped',
+        { followState: stickState.followState },
+        'ui.conditionalScrollToBottom:skip-escaped',
         120
       );
       return;
     }
-    // 仅在“确认是用户主动脱离锁定”时才阻断自动追底；
-    // 对于内容高度突变导致的 escapedFromLock，不应长期卡住锁定。
-    if (stickState?.escapedFromLock && this._escapedByUserScroll) {
-      uiBounceTrace(
-        'ui.conditionalScrollToBottom:skip-escaped-lock',
-        {
-          escapedFromLock: !!stickState?.escapedFromLock,
-          escapedByUser: !!this._escapedByUserScroll,
-          isNearBottom: !!stickState?.isNearBottom,
-          isAtBottom: !!stickState?.isAtBottom
-        },
-        'ui.conditionalScrollToBottom:skip-escaped-lock',
-        120
-      );
-      return;
-    }
-    // 只要用户处于手动滚动状态，就停止自动追底，避免“被弹回”
-    // （stickIsNearBottom 在 show_html 动态重排时可能短暂失真，不可作为阻断前置条件）
-    if (this.userScrolling) {
-      uiBounceTrace(
-        'ui.conditionalScrollToBottom:skip-user-scrolling',
-        {
-          userScrolling: this.userScrolling,
-          stickIsNearBottom: this.stickIsNearBottom
-        },
-        'ui.conditionalScrollToBottom:skip-user-scrolling',
-        120
-      );
+    // 旧版 fallback 路径（非 stick 引擎）仍尊重 userScrolling
+    if (!stickState && this.userScrolling) {
       return;
     }
     if (chatArea && typeof chatArea.conditionalStickToBottom === 'function') {
@@ -328,7 +269,6 @@ export const scrollMethods = {
         force: true
       });
     }
-    this._escapedByUserScroll = false;
     this.chatSetScrollState({ autoScrollEnabled: true, userScrolling: false });
     return true;
   },

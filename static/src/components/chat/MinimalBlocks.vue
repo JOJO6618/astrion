@@ -1183,7 +1183,9 @@ onBeforeUnmount(() => {
   min-width: 0;
   font-size: 15px;
   color: var(--text-secondary);
-  line-height: 1.7;
+  /* 固定 26px 与工具轮播窗口（summary-tool-reel-window）严格同高：
+     轮播态与纯文本态高度不一致会导致贴底锁定时内容随轮播切换上下晃动 */
+  line-height: 26px;
   padding: 0;
   position: relative;
   z-index: 0;
@@ -1259,7 +1261,8 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   margin-left: 0;
   align-self: start;
-  margin-top: calc((1.7em - 18px) / 2);
+  /* (26px 行高 - 18px 图标) / 2，与 summary-content-wrapper 固定行高对齐 */
+  margin-top: 4px;
   display: flex;
   align-items: center;
   justify-content: center;

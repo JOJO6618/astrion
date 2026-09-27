@@ -376,9 +376,6 @@ export function dataState() {
     _boundDragOver: null,
     _boundDragLeave: null,
     _boundDrop: null,
-    _manualScrollSuppressUntil: 0,
-    _escapedByUserScroll: false,
-    _autoRelockCooldownUntil: 0,
 
     // stick-to-bottom 状态（用于“回到底部”按钮显隐）
     stickIsAtBottom: true,
