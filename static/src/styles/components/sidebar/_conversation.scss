@@ -663,18 +663,32 @@ body[data-theme='dark'] .conversation-sidebar .conversation-item.active:focus-wi
   box-shadow: var(--shadow-mid);
   padding: 6px;
   z-index: 2300;
-  animation: personal-menu-in 140ms ease;
 }
 
-@keyframes personal-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* 进入/离开动画（对齐 quickdock qd-menu 方案）：菜单锚定在按钮上方，
+   动画始终以按钮为起点——进入时从按钮向上弹出，离开时向下收回到按钮 */
+.personal-menu-enter-active,
+.personal-menu-leave-active {
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out;
+  transform-origin: bottom center;
+}
+
+.personal-menu-leave-active {
+  transition-duration: 130ms;
+  transition-timing-function: ease-in;
+  pointer-events: none;
+}
+
+.personal-menu-enter-from {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+}
+
+.personal-menu-leave-to {
+  opacity: 0;
+  transform: translateY(3px) scale(0.98);
 }
 
 .personal-menu-item {

@@ -750,16 +750,20 @@
              Teleport 到 body + fixed 定位：侧边栏 collapsed 时自身 overflow: hidden
              会把 absolute 菜单裁成窄条，与 conversation-actions-menu--fixed 同方案 -->
         <Teleport to="body">
-          <div
-            v-if="personalMenuOpen"
-            class="personal-menu"
-            role="menu"
-            :style="{
-              bottom: personalMenuPosition.bottom + 'px',
-              left: personalMenuPosition.left + 'px'
-            }"
-            @click.stop
-          >
+          <!-- Transition 提供进入/离开动画（对齐 quickdock qd-menu 方案）：
+               菜单锚定在按钮上方，动画始终以按钮为起点——向上弹出、向下收回。
+               位置在 personalMenuPosition ref 中保留，离开动画期间不会跳变 -->
+          <Transition name="personal-menu">
+            <div
+              v-if="personalMenuOpen"
+              class="personal-menu"
+              role="menu"
+              :style="{
+                bottom: personalMenuPosition.bottom + 'px',
+                left: personalMenuPosition.left + 'px'
+              }"
+              @click.stop
+            >
             <button
               type="button"
               class="personal-menu-item"
@@ -846,7 +850,8 @@
               ></span>
               <span class="personal-menu-label">{{ $t('personalization.logoutTitle') }}</span>
             </button>
-          </div>
+            </div>
+          </Transition>
         </Teleport>
       </div>
     </div>
