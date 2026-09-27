@@ -370,6 +370,11 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         // 桌面壳环境标记：页面在任意脚本执行前可读到（登录页据此自动免登录）。
         // 不用 withGlobalTauri——它对 External URL 页面不注入，且语义过重。
         .initialization_script("window.__ASTRION_DESKTOP__ = true;")
+        // 恢复 HTML5 文件拖放：Tauri 2 默认 dragDropEnabled=true，壳会拦截系统拖放
+        // 改发 tauri://drag-drop 事件、吃掉页面自身的 drop 事件；而 External URL
+        // 页面没有 Tauri JS API，事件无人接收，拖文件进窗口直接失效。关掉壳的拖放
+        // 处理，前端 drag.ts 的 HTML5 dragenter/dragover/drop 链路即恢复原样工作。
+        .disable_drag_drop_handler()
         // 外链导航拦截：只放行后端同源导航（页面自身路由/刷新）；其余 http(s)
         // 一律拦下并转交系统默认浏览器。WebView 里 window.open 不可用、
         // <a href> 跳转会顶替应用页面（点模型输出的链接把 Astrion 变成目标站），
