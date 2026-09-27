@@ -298,7 +298,7 @@ def _macos_readonly_profile_for_workspace(
     workspace = str(work_path.resolve())
 
     readable_paths = list(MACOS_MINIMAL_READABLE_PATHS)
-    readable_paths.extend(get_macos_readable_paths())
+    readable_paths.extend(get_macos_readable_paths(str(work_path)))
     readable_paths.append(str(work_path))  # 原始形式（可能含符号链接）
     readable_paths.append(workspace)       # 解析形式
     allow_rules = _build_macos_whitelist_read_rules(readable_paths)
@@ -362,7 +362,7 @@ def _macos_profile_for_workspace(
                 writable_paths.append(user_tmp_parent)
         except Exception:
             pass
-    for raw in get_macos_writable_paths():
+    for raw in get_macos_writable_paths(str(work_path)):
         try:
             expanded = str(Path(raw).expanduser().resolve())
         except Exception:
@@ -383,7 +383,7 @@ def _macos_profile_for_workspace(
     # 是「路径授权」。历史模型为「全局可读 + 黑名单」，导致无限制模式/审批批准后
     # 能读授权范围外文件（读放大），本次按方案一修复：审批不放大读取。
     readable_paths = list(MACOS_MINIMAL_READABLE_PATHS)
-    readable_paths.extend(get_macos_readable_paths())
+    readable_paths.extend(get_macos_readable_paths(str(work_path)))
     readable_paths.append(str(work_path))  # 原始形式（可能含符号链接）
     readable_paths.append(workspace)       # 解析形式
     allow_rules = _build_macos_whitelist_read_rules(readable_paths)

@@ -80,6 +80,10 @@ export default {
 
   // ── PathAuthorizationDialog：路径授权 ──
   pathAuthTitle: '路径授权',
+  pathAuthScopeWorkspace: '当前工作区',
+  pathAuthScopeGlobal: '全局',
+  pathAuthWorkspaceHint: '仅对当前工作区生效，叠加在全局授权之上；实际生效 = 全局 + 以上条目。',
+  pathAuthGlobalHint: '对所有工作区生效。',
   writableMode: '可读可写',
   readableMode: '仅可读',
   writableHint: '可读可写路径在可写沙箱中可写入，在只读沙箱中仅可读。',

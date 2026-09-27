@@ -170,10 +170,11 @@ class PathMixin:
         else:
             temp_roots = [Path("/tmp").resolve(), Path("/private/tmp").resolve()]
         roots: List[Path] = [self.project_path.resolve(), *temp_roots]
+        # 2026-09-27 起传入工作区路径：并入该工作区的工作区级路径授权（只增不减）
         if access == "write":
-            raw_items = get_macos_writable_paths()
+            raw_items = get_macos_writable_paths(str(self.project_path))
         else:
-            raw_items = get_macos_readable_paths()
+            raw_items = get_macos_readable_paths(str(self.project_path))
             if platform.system() == "Darwin":
                 # 读 roots 与只读沙箱白名单同源：系统路径（/usr、/System 等）
                 # 在只读沙箱里可读，原生读工具应对齐（2026-08-30 白名单化）

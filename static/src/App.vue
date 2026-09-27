@@ -549,9 +549,12 @@
         :open="pathAuthorizationDialogOpen"
         :value="pathAuthorizationDraft"
         :mode="pathAuthorizationMode"
+        :scope="pathAuthorizationScope"
+        :workspace-path="pathAuthorizationWorkspacePath"
         :saving="pathAuthorizationSaving"
         @update:value="(v) => (pathAuthorizationDraft = v)"
         @update:mode="setPathAuthorizationMode"
+        @update:scope="setPathAuthorizationScope"
         @close="closePathAuthorizationDialog"
         @save="savePathAuthorization"
       />

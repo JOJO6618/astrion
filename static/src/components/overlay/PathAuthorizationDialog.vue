@@ -10,6 +10,25 @@
           <button
             type="button"
             class="mode-btn"
+            :class="{ active: scope === 'workspace' }"
+            @click="$emit('update:scope', 'workspace')"
+          >
+            {{ $t('overlay.pathAuthScopeWorkspace') }}
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: scope === 'global' }"
+            @click="$emit('update:scope', 'global')"
+          >
+            {{ $t('overlay.pathAuthScopeGlobal') }}
+          </button>
+        </div>
+        <p v-if="scope === 'workspace' && workspacePath" class="scope-path">{{ workspacePath }}</p>
+        <div class="mode-switch">
+          <button
+            type="button"
+            class="mode-btn"
             :class="{ active: mode === 'writable' }"
             @click="$emit('update:mode', 'writable')"
           >
@@ -41,6 +60,13 @@
               : $t('overlay.readablePlaceholder')
           "
         />
+        <p class="hint scope-hint">
+          {{
+            scope === 'workspace'
+              ? $t('overlay.pathAuthWorkspaceHint')
+              : $t('overlay.pathAuthGlobalHint')
+          }}
+        </p>
         <div class="actions">
           <button type="button" class="btn" @click="$emit('save')" :disabled="saving">{{ $t('common.save') }}</button>
           <button type="button" class="btn btn-muted" @click="$emit('close')">{{ $t('common.cancel') }}</button>
@@ -53,12 +79,20 @@
 <script setup lang="ts">
 import CloseButton from '@/components/common/CloseButton.vue';
 
-defineProps<{ open: boolean; value: string; mode: 'writable' | 'readable'; saving?: boolean }>();
+defineProps<{
+  open: boolean;
+  value: string;
+  mode: 'writable' | 'readable';
+  scope: 'workspace' | 'global';
+  workspacePath?: string;
+  saving?: boolean;
+}>();
 defineEmits<{
   (e: 'close'): void;
   (e: 'save'): void;
   (e: 'update:value', v: string): void;
   (e: 'update:mode', v: 'writable' | 'readable'): void;
+  (e: 'update:scope', v: 'workspace' | 'global'): void;
 }>();
 </script>
 
@@ -68,6 +102,8 @@ defineEmits<{
 .overlay-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .overlay-header h3 { margin: 0; font-size: 16px; color: var(--text-primary); }
 .hint { font-size: 12px; color: var(--text-secondary); margin: 0 0 8px 0; }
+.scope-path { font-size: 12px; color: var(--text-secondary); margin: -4px 0 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-hint { margin-top: 8px; }
 .mode-switch { display: inline-flex; border: 1px solid var(--theme-control-border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
 .mode-btn { border: none; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 12px; }
 .mode-btn.active { background: var(--theme-tab-active); font-weight: 600; }

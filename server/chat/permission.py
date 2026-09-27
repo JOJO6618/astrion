@@ -36,6 +36,8 @@ from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import (
     load_policy,
     save_policy,
+    get_workspace_entry,
+    save_workspace_entry,
     get_macos_deny_read_paths,
     get_macos_deny_read_regexes,
     get_windows_deny_read_paths,
@@ -496,6 +498,8 @@ def get_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, user
     is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
     can_manage = is_host and getattr(terminal, "user_role", "user") == "admin"
     data = load_policy()
+    workspace_path = str(getattr(workspace, "project_path", "") or "")
+    workspace_entry = get_workspace_entry(workspace_path) if workspace_path else {"writable": [], "readable_extra": []}
     return jsonify({
         "success": True,
         "enabled": can_manage,
@@ -504,6 +508,10 @@ def get_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, user
         "deny_read_paths": data.get("macos_deny_read_paths", []),
         "deny_read_regexes": data.get("macos_deny_read_regexes", []),
         "windows_deny_read_paths": data.get("windows_deny_read_paths", []),
+        # 工作区级授权（2026-09-27）：当前工作区的追加授权，只增不减
+        "workspace_path": workspace_path,
+        "workspace_writable_paths": workspace_entry.get("writable", []),
+        "workspace_readable_extra_paths": workspace_entry.get("readable_extra", []),
     })
 
 @chat_bp.route('/api/path-authorization', methods=['POST'])
@@ -532,14 +540,39 @@ def update_path_authorization(terminal: WebTerminal, workspace: UserWorkspace, u
         conflict = _path_conflicts_with_deny_list(p)
         if conflict:
             return jsonify({"success": False, "error": conflict}), 400
+    # 作用域：global-全球授权（默认，兼容旧客户端）/ workspace-仅当前工作区（只增不减追加）
+    scope = str(data.get("scope") or "global").strip().lower()
+    if scope == "workspace":
+        workspace_path = str(getattr(workspace, "project_path", "") or "")
+        if not workspace_path:
+            return jsonify({"success": False, "error": tr("chat_permission.paths_must_be_arrays")}), 400
+        entry = save_workspace_entry(workspace_path, writable, readable_extra)
+        policy = load_policy()
+        return jsonify({
+            "success": True,
+            "scope": "workspace",
+            "writable_paths": policy.get("macos_writable_paths", []),
+            "readable_extra_paths": policy.get("macos_readable_extra_paths", []),
+            "deny_read_paths": policy.get("macos_deny_read_paths", []),
+            "deny_read_regexes": policy.get("macos_deny_read_regexes", []),
+            "workspace_path": workspace_path,
+            "workspace_writable_paths": entry.get("writable", []),
+            "workspace_readable_extra_paths": entry.get("readable_extra", []),
+        })
     payload = save_policy({
         "macos_writable_paths": writable,
         "macos_readable_extra_paths": readable_extra
     })
+    workspace_path = str(getattr(workspace, "project_path", "") or "")
+    workspace_entry = get_workspace_entry(workspace_path) if workspace_path else {"writable": [], "readable_extra": []}
     return jsonify({
         "success": True,
+        "scope": "global",
         "writable_paths": payload.get("macos_writable_paths", []),
         "readable_extra_paths": payload.get("macos_readable_extra_paths", []),
         "deny_read_paths": payload.get("macos_deny_read_paths", []),
         "deny_read_regexes": payload.get("macos_deny_read_regexes", []),
+        "workspace_path": workspace_path,
+        "workspace_writable_paths": workspace_entry.get("writable", []),
+        "workspace_readable_extra_paths": workspace_entry.get("readable_extra", []),
     })

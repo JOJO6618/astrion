@@ -267,53 +267,93 @@ export const permissionMethods = {
         const readableExtraPaths = Array.isArray(payload.readable_extra_paths)
           ? payload.readable_extra_paths
           : [];
+        const wsWritable = Array.isArray(payload.workspace_writable_paths)
+          ? payload.workspace_writable_paths
+          : [];
+        const wsReadable = Array.isArray(payload.workspace_readable_extra_paths)
+          ? payload.workspace_readable_extra_paths
+          : [];
         this.pathAuthorizationWritableDraft = writablePaths.join('\n');
         this.pathAuthorizationReadableDraft = readableExtraPaths.join('\n');
+        this.pathAuthorizationWorkspaceWritableDraft = wsWritable.join('\n');
+        this.pathAuthorizationWorkspaceReadableDraft = wsReadable.join('\n');
+        this.pathAuthorizationWorkspacePath =
+          typeof payload.workspace_path === 'string' ? payload.workspace_path : '';
+        // 默认选中「当前工作区」作用域（最小权限原则）
+        this.pathAuthorizationScope = 'workspace';
         this.pathAuthorizationMode = 'writable';
-        this.pathAuthorizationDraft = this.pathAuthorizationWritableDraft;
+        this.pathAuthorizationDraft = this.pathAuthorizationWorkspaceWritableDraft;
       }
     } catch (_error) {
       // ignore
     }
   },
-  setPathAuthorizationMode(mode) {
-    if (this.pathAuthorizationMode === 'readable') {
-      this.pathAuthorizationReadableDraft = String(this.pathAuthorizationDraft || '');
+  _stashPathAuthorizationDraft() {
+    // 切换作用域/类型前把 textarea 当前内容暂存到对应草稿槽，切来切去不丢未保存内容
+    const text = String(this.pathAuthorizationDraft || '');
+    if (this.pathAuthorizationScope === 'workspace') {
+      if (this.pathAuthorizationMode === 'readable') {
+        this.pathAuthorizationWorkspaceReadableDraft = text;
+      } else {
+        this.pathAuthorizationWorkspaceWritableDraft = text;
+      }
+    } else if (this.pathAuthorizationMode === 'readable') {
+      this.pathAuthorizationReadableDraft = text;
     } else {
-      this.pathAuthorizationWritableDraft = String(this.pathAuthorizationDraft || '');
+      this.pathAuthorizationWritableDraft = text;
     }
-    const next = mode === 'readable' ? 'readable' : 'writable';
-    this.pathAuthorizationMode = next;
-    this.pathAuthorizationDraft =
-      next === 'readable' ? this.pathAuthorizationReadableDraft : this.pathAuthorizationWritableDraft;
+  },
+  _currentPathAuthorizationDraft() {
+    if (this.pathAuthorizationScope === 'workspace') {
+      return this.pathAuthorizationMode === 'readable'
+        ? this.pathAuthorizationWorkspaceReadableDraft
+        : this.pathAuthorizationWorkspaceWritableDraft;
+    }
+    return this.pathAuthorizationMode === 'readable'
+      ? this.pathAuthorizationReadableDraft
+      : this.pathAuthorizationWritableDraft;
+  },
+  setPathAuthorizationMode(mode) {
+    this._stashPathAuthorizationDraft();
+    this.pathAuthorizationMode = mode === 'readable' ? 'readable' : 'writable';
+    this.pathAuthorizationDraft = this._currentPathAuthorizationDraft();
+  },
+  setPathAuthorizationScope(scope) {
+    this._stashPathAuthorizationDraft();
+    this.pathAuthorizationScope = scope === 'global' ? 'global' : 'workspace';
+    this.pathAuthorizationDraft = this._currentPathAuthorizationDraft();
   },
   closePathAuthorizationDialog() {
     this.pathAuthorizationDialogOpen = false;
   },
   async savePathAuthorization() {
-    const currentLines = String(this.pathAuthorizationDraft || '')
-      .split('\n')
-      .map((x) => x.trim())
-      .filter(Boolean);
-    if (this.pathAuthorizationMode === 'readable') {
-      this.pathAuthorizationReadableDraft = currentLines.join('\n');
+    this._stashPathAuthorizationDraft();
+    const isWorkspace = this.pathAuthorizationScope === 'workspace';
+    const toLines = (text) =>
+      String(text || '')
+        .split('\n')
+        .map((x) => x.trim())
+        .filter(Boolean);
+    const writableLines = toLines(
+      isWorkspace ? this.pathAuthorizationWorkspaceWritableDraft : this.pathAuthorizationWritableDraft
+    );
+    const readableLines = toLines(
+      isWorkspace ? this.pathAuthorizationWorkspaceReadableDraft : this.pathAuthorizationReadableDraft
+    );
+    if (isWorkspace) {
+      this.pathAuthorizationWorkspaceWritableDraft = writableLines.join('\n');
+      this.pathAuthorizationWorkspaceReadableDraft = readableLines.join('\n');
     } else {
-      this.pathAuthorizationWritableDraft = currentLines.join('\n');
+      this.pathAuthorizationWritableDraft = writableLines.join('\n');
+      this.pathAuthorizationReadableDraft = readableLines.join('\n');
     }
-    const writableLines = String(this.pathAuthorizationWritableDraft || '')
-      .split('\n')
-      .map((x) => x.trim())
-      .filter(Boolean);
-    const readableLines = String(this.pathAuthorizationReadableDraft || '')
-      .split('\n')
-      .map((x) => x.trim())
-      .filter(Boolean);
     this.pathAuthorizationSaving = true;
     try {
       const response = await fetch('/api/path-authorization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          scope: isWorkspace ? 'workspace' : 'global',
           writable_paths: writableLines,
           readable_extra_paths: readableLines
         })
@@ -322,16 +362,20 @@ export const permissionMethods = {
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || t('appUi.saveFailed'));
       }
-      const savedWritable = Array.isArray(payload.writable_paths) ? payload.writable_paths : writableLines;
-      const savedReadable = Array.isArray(payload.readable_extra_paths)
-        ? payload.readable_extra_paths
-        : readableLines;
+      // 响应带回两个作用域的最新值，全部同步回草稿槽
+      const savedWritable = Array.isArray(payload.writable_paths) ? payload.writable_paths : [];
+      const savedReadable = Array.isArray(payload.readable_extra_paths) ? payload.readable_extra_paths : [];
+      const savedWsWritable = Array.isArray(payload.workspace_writable_paths)
+        ? payload.workspace_writable_paths
+        : [];
+      const savedWsReadable = Array.isArray(payload.workspace_readable_extra_paths)
+        ? payload.workspace_readable_extra_paths
+        : [];
       this.pathAuthorizationWritableDraft = savedWritable.join('\n');
       this.pathAuthorizationReadableDraft = savedReadable.join('\n');
-      this.pathAuthorizationDraft =
-        this.pathAuthorizationMode === 'readable'
-          ? this.pathAuthorizationReadableDraft
-          : this.pathAuthorizationWritableDraft;
+      this.pathAuthorizationWorkspaceWritableDraft = savedWsWritable.join('\n');
+      this.pathAuthorizationWorkspaceReadableDraft = savedWsReadable.join('\n');
+      this.pathAuthorizationDraft = this._currentPathAuthorizationDraft();
       this.uiPushToast({
         title: t('appUi.pathAuthorizationSaved'),
         message: t('appUi.pathAuthApplyMessage'),

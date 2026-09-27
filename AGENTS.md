@@ -386,6 +386,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   - 可读集合 = 可读可写 + 仅可读
   - 可写集合 = 可读可写
 - 配置来源（2026-08-30 收敛为两个）：`config/host_sandbox_policy.json`（UI 唯一读写目标）+ 真·环境变量 `HOST_SANDBOX_MACOS_WRITABLE_PATHS`（部署通道，与文件合并去重）。settings.json 的 `terminal.macos_writable_paths` 映射已移除（历史值一次性失效，需用路径授权重新添加）；.env 注入技术上仍生效，但不是受支持的通道，不推荐使用
+- **工作区级授权（2026-09-27 新增）**：弹窗内分「作用域」（当前工作区 / 全局，默认当前工作区）与「类型」两个切换器，保存只写当前作用域。工作区级条目存 `host_sandbox_policy.json` 的 `workspaces` 字典（key=工作区根目录 resolve 后绝对路径，value=`{writable, readable_extra}`），合并语义**只增不减**（工作区级只能在全球基础上追加；deny 清单仍仅全球级）。生效集合 = 全球 + 当前工作区（`get_macos_writable_paths(workspace_path)` / `get_macos_readable_paths(workspace_path)`，调用方：host_sandbox_runner 沙箱 profile、file_manager 原生工具读边界）。工作区移动/重命名后其授权条目自然失效（fail-safe 方向）。该模块锁为 `threading.RLock`（save_workspace_entry 持锁期间回调 load/save_policy，普通 Lock 会自死锁）。
 
 ### 10.4 维护约束
 
@@ -666,7 +667,7 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 
 ### 14.1 机制一句话
 
-`extract_webpage` / `save_webpage` 的提取链为**两层**：白名单直提（本机、免费、**唯一自动回退层**）→ **用户在设置页选定的提取商**。可选提取商四家（2026-09-26 从「直提→Jina→Tavily 三级降级链」改为可选模式）：**Jina Reader**（默认，无 key 匿名限速可用）/ **Tavily** / **Exa**（`POST /contents`）/ **Parallel**（`POST /v1/extract`）。选定商失败即报错，**不再向其他家回退**（避免在用户不知情时消耗多家付费额度）。直提开关与追加域名存 personalization.json 的 `webpage_direct_extract_enabled`（默认 true）/ `webpage_direct_extract_domains`；提取商选择为 `webpage_extract_provider`（默认 `"jina"`）+ `jina_api_key`（空=匿名，回退环境变量 `AGENT_JINA_API_KEY`），解析入口 `resolve_extract_provider_config()`。
+`extract_webpage` / `save_webpage` 的提取链为**两层**：白名单直提（本机、免费、**唯一自动回退层**）→ **用户在设置页选定的提取商**。可选提取商四家（2026-09-26 从「直提→Jina→Tavily 三级降级链」改为可选模式）：**Jina Reader**（默认，无 key 匿名限速可用）/ **Tavily** / **Exa**（`POST /contents`）/ **Parallel**（`POST /v1/extract`）。选定商失败即报错，**不再向其他家回退**（避免在用户不知情时消耗多家付费额度）。**个性化存储已拆分（2026-09-27）**：`personalization.json` 只存 UI/行为偏好；搜索/提取服务配置（直提开关 `webpage_direct_extract_enabled`、追加域名 `webpage_direct_extract_domains`、提取商 `webpage_extract_provider`、搜索商 `search_provider`、`searxng_base_url`）存 `service_config.json`；所有 API 密钥（tavily/bocha/exa/parallel/jina）存 `secrets.json`（0600 权限、原子写）。三文件由 `modules/personalization_manager.py` 统一读写（load/save/sanitize 对外签名与返回结构不变，调用方无感知），旧格式首次加载自动迁移并抹除；文件落在 personalization.json 符号链接解析后的用户级共享目录，跨工作区共享语义不变。提取商解析入口 `resolve_extract_provider_config()`。
 
 ### 14.2 硬约束（改代码必须知道）
 

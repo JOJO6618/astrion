@@ -79,6 +79,11 @@ export default {
 
   // ── PathAuthorizationDialog ──
   pathAuthTitle: 'Path Authorization',
+  pathAuthScopeWorkspace: 'This workspace',
+  pathAuthScopeGlobal: 'Global',
+  pathAuthWorkspaceHint:
+    'Applies to this workspace only, on top of the global grants. Effective set = global + the entries above.',
+  pathAuthGlobalHint: 'Applies to all workspaces.',
   writableMode: 'Read & write',
   readableMode: 'Read-only',
   writableHint:
