@@ -1380,9 +1380,22 @@ provide('mathRenderedCallback', () => {
 });
 
 const rootEl = scrollRef;
+// 锚定启动时 composable 会调 stopScroll() 解除库引擎（isAtBottom=false），
+// 此后库的 RO 增长追底完全停摆：锁定态下展开块会直接往视口下长、不跟随；
+// 折叠帧也失去库 RO 的逐帧收敛，只剩浏览器 clamp 一次性拽动（页面整体上跳）。
+// 这里包一层：锁定态下停止动画后立即重新武装引擎（setIsAtBottom(true)），
+// 让展开帧恢复逐帧追底、折叠帧由库 RO 平滑收敛；脱锁态保持停摆，不打扰浏览。
+// 注意这只是恢复库引擎的执行能力，脱锁/回锁裁决仍由 followState 唯一权威持有。
+function stopScrollForExpansionAnchor() {
+  stopScroll();
+  if (followState.value === 'locked') {
+    markProgrammaticHint('ChatArea.anchorRearm');
+    scrollToBottom({ animation: 'instant', preserveScrollPosition: false });
+  }
+}
 const { anchorBlockElement, stopAll: stopBlockExpansionAnchors } = useBlockExpansionAnchor(
   scrollRef,
-  { stopScroll }
+  { stopScroll: stopScrollForExpansionAnchor }
 );
 
 // —— 运行中逐帧贴底锁（增长量补偿式）——
