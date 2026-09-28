@@ -17,6 +17,16 @@
   gap: 4px;
   user-select: none;
   transition: background 0.25s;
+  // Electron 壳：整条标签栏作为窗口拖拽区（Chromium 专属属性，其他引擎忽略），
+  // 替代 Tauri 壳的 mousedown → /api/desktop/window/drag → start_dragging 链路
+  -webkit-app-region: drag;
+}
+
+// 交互元素退出拖拽区（点击/双击事件恢复页面内分发）
+.chrome-tab-strip .chrome-icon,
+.chrome-tab-strip .tab,
+.chrome-tab-strip .tab-close {
+  -webkit-app-region: no-drag;
 }
 
 // ─── chrome 图标按钮（新建） ───

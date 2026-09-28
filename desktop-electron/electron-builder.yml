@@ -1,0 +1,55 @@
+# Astrion 桌面壳（Electron）打包配置。
+# 产物：dmg（安装）+ zip（electron-updater mac 自动更新必需）+ latest-mac.yml（更新清单）。
+# 发布链路：npm run build → 上传 dist/ 产物到服务器 downloads/ → 服务端 regen 清单。
+appId: com.astrion.desktop
+productName: Astrion
+copyright: Copyright © 2026
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**
+  - package.json
+
+# 内嵌 Python 运行时（复用 Tauri 壳 prepare_backend.py 的产出，目录结构一致：
+# runtime/python = python-build-standalone + 预装依赖；runtime/backend = 源码）。
+# 主进程 backend.js::resolveEmbeddedRuntime 按 resourcesPath/runtime/... 解析。
+extraResources:
+  - from: ../desktop/src-tauri/runtime
+    to: runtime
+
+mac:
+  category: public.app-category.productivity
+  icon: ../desktop/src-tauri/icons/icon.icns
+  # 签名身份：electron-updater 的 mac 更新验签走 codesign（不像 tauri 用 minisign），
+  # 只接受有效（受信任）身份——Tauri 时代的自签名证书 "Astrion Local Sign"
+  # （CSSMERR_TP_NOT_TRUSTED）会被 electron-builder 跳过导致包未签名、自动更新不可用。
+  # 故改用钥匙串里的 Apple Development 证书（公证待办落地后再换 Developer ID）。
+  identity: "Apple Development: 8613991190618 (LUX53G96H4)"
+  # 内嵌 Python 运行时不参与逐文件签名：八千多个文件（zoneinfo/pyc/脚本）
+  # 逐个 codesign 需要 45 分钟且会对不可签文件重试失败。顶层 bundle 封签
+  # 已覆盖资源完整性；默认 entitlements 含 disable-library-validation，
+  # 未签名的 python dylib 可正常加载。
+  signIgnore:
+    - "Resources/runtime/"
+  target:
+    - dmg
+    - zip
+  # 隐藏标题栏 + 红绿灯悬浮所需的窗口特性在主进程 window.js 配置，此处无需 entitlements
+
+win:
+  icon: ../desktop/src-tauri/icons/icon.ico
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+# electron-updater generic provider：清单 latest-mac.yml 由 electron-builder 构建时生成，
+# 上传至 https://astrion.cyjai.com/downloads/ 目录（与 Tauri 清单并存，文件名不冲突）
+publish:
+  provider: generic
+  url: https://astrion.cyjai.com/downloads/

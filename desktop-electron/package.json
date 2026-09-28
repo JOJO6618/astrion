@@ -1,0 +1,21 @@
+{
+  "name": "astrion-desktop-electron",
+  "private": true,
+  "version": "0.4.0",
+  "description": "Astrion 桌面壳（Electron/Chromium）：内嵌 Python 后端 + 双 WebContentsView 标签条",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "prepare-backend": "python3 ../desktop/scripts/prepare_backend.py",
+    "build": "npm run prepare-backend && electron-builder",
+    "build:dir": "electron-builder --dir"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}
