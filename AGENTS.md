@@ -129,7 +129,14 @@
 - 可执行命令名：`astrion`（已装到 `/opt/homebrew/bin/astrion` → `cli/bin/astrion` symlink，bun wrapper 支持 symlink 解析；`--version`/`--help` 快速退出不启 TUI；后续 `bun build --compile` 单文件分发）
 - 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
-### Desktop（`desktop/`，Tauri 2 桌面壳，2026-09-25 新增）
+### Desktop（`desktop-electron/`，Electron/Chromium 桌面壳，2026-09-28 起为 macOS 现行形态）
+- **2026-09-28 引擎迁移（用户拍板）**：macOS 壳从 Tauri/WKWebView 迁到 Electron/Chromium（commit b53e8c3a）——WKWebView 反复引擎级兼容问题（折叠动画瞬消、rAF 样式延迟、virtua 首项不挂载、拖放被吞、上滚估值补偿抖动），统一 Chromium 后与 Windows（WebView2）/ Chrome web 同引擎。**web 版只支持 Chromium 系浏览器**（Safari 不再兼容）。Windows 端仍沿用 Tauri+WebView2（本来就是 Chromium 内核）
+- 形态：Electron 主进程 + 内嵌 Python 后端 sidecar；BaseWindow + **双 WebContentsView**（chrome 46px 独立标签条常驻不闪动 + main 加载 `http://127.0.0.1:<动态端口>/`，前后端同源）；**控制桥五端点契约与 Tauri 版逐字节一致**（version/update install/update progress/window drag 空操作/chrome dispatch），后端 `desktop_update.py` 与前端业务零改动；壳经 preload + contextBridge 注入 `window.__ASTRION_DESKTOP__`/`__ASTRION_CHROME__`
+- 开发：`cd desktop-electron && npm install && npm run dev`（装依赖需 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`）；前端需先 `npm run build`
+- 关键差异：窗口拖拽走 `app-region` CSS（_tab-strip.scss）；红绿灯 `trafficLightPosition` 一行配置；菜单不占 Cmd+W/Cmd+T（留给前端标签条，关窗=Cmd+Shift+W）；子进程 `ASTRION_IGNORE_DOTENV=1`（防仓库 .env 强制覆盖数据根）；Ctrl+Enter/拖放原生正常（WebKit 特有问题全消）
+- 打包发布：`electron-builder`（dmg+zip+latest-mac.yml，签名=Apple Development 证书，`signIgnore` 排除内嵌 Python 运行时）；`bash desktop-electron/scripts/release_mac.sh [版本]`；安装后 ~458MB（Chromium 244MB 为换引擎固有代价）。详细坑与决策见 `desktop-electron/README.md` 与项目记忆 `desktop_electron_shell`
+
+### Desktop（`desktop/`，Tauri 2 桌面壳，2026-09-25 新增；mac 已退役、Windows 沿用）
 - 形态：系统 WebView + 内嵌 Python 后端 sidecar；WebView 直接加载 `http://127.0.0.1:<动态端口>/`（前后端同源，cookie/CSRF/相对路径 API 零改动复用 Web 版）；壳注入 `window.__ASTRION_DESKTOP__` 标记（`initialization_script`），登录页据此自动免登录
 - 开发：`cd desktop && npm install && npm run dev`（= tauri dev；首次 cargo 编译 10-20 分钟）；前端需先 `npm run build`（壳加载的是后端 serve 的 dist 产物）
 - Python 探测顺序（要求 import yaml/flask/httpx/openai 可用）：项目 `.venv` → homebrew 3.13/3.12/3.11 → PATH python3；`ASTRION_DESKTOP_REPO` 可覆盖仓库根
