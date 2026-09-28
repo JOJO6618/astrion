@@ -757,7 +757,6 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
-import { useStickToBottom } from 'vue-stick-to-bottom';
 import { Virtualizer } from 'virtua/vue';
 import { useBlockExpansionAnchor } from '@/composables/useBlockExpansionAnchor';
 import ToolAction from '@/components/chat/actions/ToolAction.vue';
@@ -1269,76 +1268,129 @@ const userMDebug = (...args: any[]) => {
   }
   console.log('[USERMDEBUG]', ...args);
 };
-const {
-  scrollRef,
-  contentRef,
-  isAtBottom,
-  isNearBottom,
-  escapedFromLock,
-  scrollToBottom,
-  stopScroll
-} = useStickToBottom({
-  // 宽度拖拽挤压时不再弹簧追底：逐帧瞬时吸附底部，
-  // 视觉上内容向上生长（底部锚定），消除“变高→追底”的反复计算循环
-  resize: 'instant',
-  initial: 'instant'
-});
+// —— 手写滚动跟随引擎（2026-09-28 替代 vue-stick-to-bottom）——
+// 旧架构的病根是「双状态对账」：库的 escapedFromLock/isAtBottom 与我们的 followState
+// 互相猜测，配平代码（噪声 escape 复核 / rearm 包装）本身成为 bug 源——库一旦噪声
+// escape 且 watch 边沿错过，追底能力永久停摆（插入消息/展开块全部锁不住）。
+// 新架构：followState 是唯一状态权威；跟随引擎是唯一追底写入者，事件驱动
+// （内容/视口 ResizeObserver + 显式调用），单向写入——只在内容增长导致 remain>1
+// 时向下写 scrollTop；shrink 帧交给浏览器 clamp（同向不打架，无抖动源）。
+// 脱锁（escaped）期间引擎完全停写，「触底即可信」因此成立。
+const scrollRef = ref<HTMLElement | null>(null);
+const contentRef = ref<HTMLElement | null>(null);
 
-// —— 跟随状态权威（locked=追底 / escaped=用户脱锁）——
-// vue-stick-to-bottom 库自身的回锁裁决过于激进：任意向下滚动即清 escapedFromLock、
-// 70px nearBottom 即对外视为「回底」、内容 shrink 即回锁。直接信任库状态会导致
-// 「脱锁浏览后微微下滚就被瞬间拽回底部」。这里以「可信用户输入」为唯一脱锁/回锁依据，
-// 库降级为纯执行引擎：escaped 期间库若自行回锁则压回；locked 期间库的噪声 escape
-// （clamp-shrink 竞态等）延迟复核后自愈，保证「锁得住」。
 type FollowState = 'locked' | 'escaped';
 const followState = ref<FollowState>('locked');
-// 最近一次可信用户滚动输入时间（wheel / touch / scroll 推断），用于回锁判定与复核
+// 最近一次可信用户滚动输入时间（wheel / touch / scroll 推断），用于回锁判定
 let lastUserScrollInputTs = 0;
-// 用户输入驱动的滚动真正触底（距底 <= 该值）才允许回锁
-const RELOCK_BOTTOM_THRESHOLD_PX = 8;
-// 鼠标按住拖选文本时不做回锁复核（选择滚动是合法脱锁）
-let areaMouseDown = false;
-let relockVerifyTimer: number | null = null;
+// 用户输入驱动的滚动进入底部区域（距底 <= 该值）即允许回锁。
+// 8px「精确触底」过严：触控板/滚轮很难停在个位数像素，表现为「要使劲滚一下
+// 才能锁上」；100px 配合证据门控（只认用户输入驱动的下滚）不会误伤高位浏览——
+// 在 2000px 外微滚向下，remain 仍远大于阈值，不会触发回锁。
+const RELOCK_BOTTOM_THRESHOLD_PX = 100;
+// 脱锁必须真正「离开底部」：内容 shrink 时浏览器 clamp 会把 scrollTop 向下收
+// （delta<0 但 remain≈0），这不是用户上滚。
+const ESCAPE_LEAVE_BOTTOM_PX = 8;
+
+// 几何派生态：仅用于对外展示（回底按钮显隐 / trace / getStickState 契约），
+// 不参与锁定裁决
+const isAtBottom = ref(true);
+const isNearBottom = ref(true);
+// 兼容旧契约：escapedFromLock 现在是 followState 的纯镜像，不再是第二套状态
+const escapedFromLock = computed(() => followState.value === 'escaped');
+
+function syncStickState() {
+  const el = scrollRef.value;
+  if (!el) return;
+  const remain = el.scrollHeight - el.scrollTop - el.clientHeight;
+  isAtBottom.value = remain <= 2;
+  isNearBottom.value = remain <= 70;
+}
+
+// 跟随引擎唯一写入口：所有追底都经由此处（RO 回调 / KaTeX / 显式追底）。
+// 单向：只在内容增长导致 remain>1 时向下写；shrink（remain<0）由浏览器 clamp 处理。
+function requestFollowWrite(source: string) {
+  if (followState.value !== 'locked') return;
+  if (quickNavJumpActive) return;
+  const el = scrollRef.value;
+  if (!el) return;
+  const maxTop = el.scrollHeight - el.clientHeight;
+  const remain = maxTop - el.scrollTop;
+  if (remain > 1) {
+    markProgrammaticHint(`ChatArea.follow:${source}`);
+    el.scrollTop = maxTop;
+  }
+}
 
 function escapeFollowLock(reason: string) {
   if (followState.value === 'escaped') return;
   followState.value = 'escaped';
-  stopScroll();
+  cancelBottomFollowLock();
   bounceTraceLog('follow:escape', { reason }, 'follow:escape', 0);
 }
 
 function relockFollow(source: string) {
   if (followState.value === 'locked') return;
   followState.value = 'locked';
+  // 引擎接管滚动，进行中的锚定动画让位（锚定 tick 内也有同款自查兑底）
+  stopBlockExpansionAnchors();
   markProgrammaticHint(`ChatArea.relock:${source}`);
-  // 同步库状态（isAtBottom=true），让 resize 追底引擎恢复工作
-  scrollToBottom({ animation: 'instant', preserveScrollPosition: false });
+  const el = scrollRef.value;
+  if (el) {
+    el.scrollTop = el.scrollHeight - el.clientHeight;
+  }
   bounceTraceLog('follow:relock', { source }, 'follow:relock', 0);
 }
 
-// locked 期间库发生 escape 多为噪声（virtua 补偿 / clamp-shrink 竞态），
-// 延迟复核：确认无用户输入且非按住拖选后重新锁定
-function scheduleRelockVerify() {
-  if (relockVerifyTimer !== null) return;
-  relockVerifyTimer = window.setTimeout(() => {
-    relockVerifyTimer = null;
-    if (followState.value !== 'locked' || !escapedFromLock.value) return;
-    if (Date.now() - lastUserScrollInputTs <= 900) return;
-    if (areaMouseDown) return;
-    bounceTraceLog('follow:relock-verify', {}, 'follow:relock-verify', 0);
-    markProgrammaticHint('ChatArea.relockVerify');
-    scrollToBottom({ animation: 'instant', preserveScrollPosition: false });
-  }, 300);
+// —— 底部块「临时锁定动画」——
+// 脱锁状态下用户手动展开/收起对话最底部的块（如极简模式摘要组）：块下方没有更多
+// 内容，锚定顶边会露出大片空白、锚定底边会把页面拽走。正确语义是视同仍锁定——
+// 过渡期间逐帧钉底，块变矮多少上方内容同步滑下多少，动画结束正好停在底部并回锁。
+const BOTTOM_BLOCK_EDGE_TOLERANCE_PX = 120; // 块底边与对话底部的距离容差
+const BOTTOM_FOLLOW_MAX_REMAIN_PX = 400; // 距底超过该值说明用户在浏览历史，保持位置不拽
+
+let bottomFollowRaf: number | null = null;
+let bottomFollowUntil = 0;
+
+function cancelBottomFollowLock() {
+  if (bottomFollowRaf !== null) {
+    cancelAnimationFrame(bottomFollowRaf);
+    bottomFollowRaf = null;
+  }
+  bottomFollowUntil = 0;
 }
 
-watch(escapedFromLock, (escaped) => {
-  if (followState.value === 'escaped') {
-    // escaped 期间库的激进回锁（任意下滚清锁 / shrink re-lock / 70px 误判）一律压回
-    if (!escaped) stopScroll();
-    return;
-  }
-  if (escaped) scheduleRelockVerify();
-});
+function isConversationBottomBlock(element: HTMLElement): boolean {
+  const container = scrollRef.value;
+  if (!container) return false;
+  const containerRect = container.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  const remain = container.scrollHeight - container.scrollTop - container.clientHeight;
+  // 对话底部在视口坐标系中的位置 = 视口底 + remain；块底与之重合即底部块
+  return Math.abs(containerRect.bottom + remain - rect.bottom) <= BOTTOM_BLOCK_EDGE_TOLERANCE_PX;
+}
+
+function startBottomFollowLock(duration: number) {
+  cancelBottomFollowLock();
+  bottomFollowUntil = performance.now() + duration + 120; // 余量覆盖过渡尾帧
+  const tick = () => {
+    bottomFollowRaf = null;
+    const el = scrollRef.value;
+    if (!el) return;
+    const maxTop = el.scrollHeight - el.clientHeight;
+    if (Math.abs(maxTop - el.scrollTop) > 1) {
+      markProgrammaticHint('ChatArea.bottomFollow');
+      el.scrollTop = maxTop;
+    }
+    if (performance.now() < bottomFollowUntil) {
+      bottomFollowRaf = requestAnimationFrame(tick);
+    } else {
+      // 落定在底部 = 明确回锁（用户中途滚轮会走 escape 路径提前取消本动画）
+      relockFollow('bottom-follow');
+    }
+  };
+  bottomFollowRaf = requestAnimationFrame(tick);
+}
 
 // —— 虚拟列表支撑 ——
 // 消息对象没有后端 id，这里按对象身份（WeakMap）分配稳定 key，
@@ -1371,93 +1423,53 @@ const keepMountedIndexes = computed<number[]>(() => {
   return mounted;
 });
 
-// 公式渲染后如果已经在底部附近，主动追底，避免 KaTeX 渲染导致的高度跳变让 stick-to-bottom 锁不住
+// 公式渲染后的高度跳变走跟随引擎兜底（内容 RO 通常已覆盖，这里双保险）；
+// 仅锁定态追底，浅脱锁浏览时不拽回底部
 provide('mathRenderedCallback', () => {
   // 快捷导航补间进行中不追底，避免取消跳转动画
   if (quickNavJumpActive) return;
-  // 仅锁定态追底；旧实现用 isNearBottom 判定，浅脱锁（70px 内）时会误拽回底部
-  if (followState.value === 'locked' && stickScrollToBottom) {
-    requestAnimationFrame(() => {
-      stickScrollToBottom({ animation: 'instant', preserveScrollPosition: false });
-    });
+  if (followState.value === 'locked') {
+    requestAnimationFrame(() => requestFollowWrite('katex'));
   }
 });
 
 const rootEl = scrollRef;
-// 锚定启动时 composable 会调 stopScroll() 解除库引擎（isAtBottom=false），
-// 此后库的 RO 增长追底完全停摆：锁定态下展开块会直接往视口下长、不跟随；
-// 折叠帧也失去库 RO 的逐帧收敛，只剩浏览器 clamp 一次性拽动（页面整体上跳）。
-// 这里包一层：锁定态下停止动画后立即重新武装引擎（setIsAtBottom(true)），
-// 让展开帧恢复逐帧追底、折叠帧由库 RO 平滑收敛；脱锁态保持停摆，不打扰浏览。
-// 注意这只是恢复库引擎的执行能力，脱锁/回锁裁决仍由 followState 唯一权威持有。
-function stopScrollForExpansionAnchor() {
-  stopScroll();
-  if (followState.value === 'locked') {
-    markProgrammaticHint('ChatArea.anchorRearm');
-    scrollToBottom({ animation: 'instant', preserveScrollPosition: false });
-  }
-}
+// 锚定只在脱锁态运行（锁定态跟随引擎是唯一写入者，见 decideExpansionScroll）；
+// isFollowEngineActive 自查：锚定动画进行中若用户触底回锁，锚定立即让位给引擎，
+// 避免两个写入者同帧打架。
 const { anchorBlockElement, stopAll: stopBlockExpansionAnchors } = useBlockExpansionAnchor(
   scrollRef,
-  { stopScroll: stopScrollForExpansionAnchor }
-);
-
-// —— 运行中逐帧贴底锁（增长量补偿式）——
-// 背景：stick 库的 resize 追底在 ResizeObserver 回调里再经 rAF 才真正写 scrollTop，
-// 且它观察的 .messages-flow 自身高度要等 virtua 回写占位高度后才变化，整体滞后内容
-// 增长 1~2 帧。运行中块高度过渡（思考块自动展开/流式增长/手动展开）的每一帧会先按
-// 新高度绘制、下一帧才被追底拉回，表现为「块外框先动、内部文字慢一步」的不同步。
-// 这里在对话运行期间持有 rAF 做同帧补偿。
-// 关键：只补偿「净增长」——maxTop 变大的帧才把缺口吃掉；shrink 帧交给浏览器 clamp
-// 自然处理，避免折叠动画/高度修正与吸底互相打架造成内容上下抖动。
-// 脱锁（followState=escaped）期间完全停止写入，滚回底部后自动恢复。
-let liveStickLockRaf: number | null = null;
-let lastLockMaxTop = 0;
-
-function liveStickLockTick() {
-  liveStickLockRaf = null;
-  if (!props.streamingMessage) return;
-  const el = scrollRef.value;
-  if (el) {
-    const maxTop = el.scrollHeight - el.clientHeight;
-    const deltaMax = maxTop - lastLockMaxTop;
-    lastLockMaxTop = maxTop;
-    // 快捷导航补间进行中不贴底，避免与补间覆写打架
-    if (!quickNavJumpActive && followState.value === 'locked' && !escapedFromLock.value) {
-      const gap = maxTop - el.scrollTop;
-      // 缺口≈增长量时才补偿；缺口远大于增长量说明是历史偏离（库 RO 会兜底），不拽
-      if (deltaMax > 0 && gap > 1 && gap <= deltaMax + 2) {
-        markProgrammaticHint('ChatArea.liveStickLock');
-        el.scrollTop = maxTop;
-      }
-    }
-  }
-  liveStickLockRaf = requestAnimationFrame(liveStickLockTick);
-}
-
-function stopLiveStickLock() {
-  if (liveStickLockRaf !== null) {
-    cancelAnimationFrame(liveStickLockRaf);
-    liveStickLockRaf = null;
-  }
-}
-
-watch(
-  () => props.streamingMessage,
-  (streaming) => {
-    if (streaming) {
-      if (liveStickLockRaf === null) {
-        liveStickLockRaf = requestAnimationFrame(liveStickLockTick);
-      }
-    } else {
-      stopLiveStickLock();
-    }
-  },
-  { immediate: true }
+  { isFollowEngineActive: () => followState.value === 'locked' }
 );
 
 const thinkingRefs = new Map<string, HTMLElement | null>();
 let scrollbarResizeObserver: ResizeObserver | null = null;
+// 跟随引擎的内容尺寸观察：.messages-flow 高度变化（流式增长/插入消息/块过渡/
+// virtua 占位回写/窗口挤压回流）都会触发，是跟随追底的主要驱动源
+let contentResizeObserver: ResizeObserver | null = null;
+
+function setupContentResizeObserver() {
+  if (typeof ResizeObserver === 'undefined') return;
+  if (contentResizeObserver) {
+    contentResizeObserver.disconnect();
+    contentResizeObserver = null;
+  }
+  if (contentRef.value) {
+    contentResizeObserver = new ResizeObserver(() => {
+      requestFollowWrite('content-resize');
+      syncStickState();
+    });
+    contentResizeObserver.observe(contentRef.value);
+  }
+}
+
+// 视口尺寸变化（窗口拖拽/输入栏高度变化）：同样驱动跟随追底
+function handleViewportResize() {
+  updateChatScrollbarWidth();
+  requestFollowWrite('viewport-resize');
+  syncStickState();
+}
+
 let bounceTraceCount = 0;
 const BOUNCE_TRACE_MAX = 240;
 const bounceTraceLastTsByKey = new Map<string, number>();
@@ -1467,11 +1479,8 @@ let lastUserDownScrollTs = 0;
 let lastProgrammaticHintTs = 0;
 let lastProgrammaticHintSource = '';
 let suppressUserIntentUntil = 0;
-let isHandlingLargeGrowth = false;
 let scrollListener: ((event: Event) => void) | null = null;
 let wheelListener: ((event: WheelEvent) => void) | null = null;
-let mouseDownListener: ((event: Event) => void) | null = null;
-let mouseUpListener: ((event: Event) => void) | null = null;
 let touchStartListener: ((event: TouchEvent) => void) | null = null;
 let touchMoveListener: ((event: TouchEvent) => void) | null = null;
 let touchEndListener: ((event: TouchEvent) => void) | null = null;
@@ -1568,12 +1577,6 @@ function detachBounceListener() {
   if (el && wheelListener) {
     el.removeEventListener('wheel', wheelListener as EventListener, true);
   }
-  if (el && mouseDownListener) {
-    el.removeEventListener('mousedown', mouseDownListener as EventListener);
-  }
-  if (mouseUpListener) {
-    document.removeEventListener('mouseup', mouseUpListener as EventListener);
-  }
   if (el && touchStartListener) {
     el.removeEventListener('touchstart', touchStartListener as EventListener, true);
   }
@@ -1586,8 +1589,6 @@ function detachBounceListener() {
   }
   scrollListener = null;
   wheelListener = null;
-  mouseDownListener = null;
-  mouseUpListener = null;
   touchStartListener = null;
   touchMoveListener = null;
   touchEndListener = null;
@@ -1601,12 +1602,6 @@ function attachBounceListener() {
   }
   if (wheelListener) {
     el.removeEventListener('wheel', wheelListener as EventListener, true);
-  }
-  if (mouseDownListener) {
-    el.removeEventListener('mousedown', mouseDownListener as EventListener);
-  }
-  if (mouseUpListener) {
-    document.removeEventListener('mouseup', mouseUpListener as EventListener);
   }
   if (touchStartListener) {
     el.removeEventListener('touchstart', touchStartListener as EventListener, true);
@@ -1697,15 +1692,6 @@ function attachBounceListener() {
     );
   };
   el.addEventListener('wheel', wheelListener, { passive: true, capture: true });
-  // 鼠标按住状态跟踪：按住拖选文本期间禁止回锁复核（选择滚动是合法脱锁）
-  mouseDownListener = () => {
-    areaMouseDown = true;
-  };
-  mouseUpListener = () => {
-    areaMouseDown = false;
-  };
-  el.addEventListener('mousedown', mouseDownListener, { passive: true });
-  document.addEventListener('mouseup', mouseUpListener, { passive: true });
   scrollListener = (event: Event) => {
     const target = event.target as HTMLElement | null;
     if (!target) return;
@@ -1737,44 +1723,8 @@ function attachBounceListener() {
       );
     }
 
-    // 大幅高度增长检测：当 scrollHeight 突增（内容大幅展开/渲染），
-    // 且用户没有主动脱离锁定（escapedFromLock=false）时，
-    // 用 instant 瞬间追底，绕过 spring 动画的延迟。
-    // 这解决了思考块展开、Markdown 表格渲染等场景下滚动跟不上内容增长的问题。
-    const largeGrowthThreshold = Math.max(200, target.clientHeight * 0.35 || 200);
-    if (
-      !isHandlingLargeGrowth &&
-      heightDelta > largeGrowthThreshold &&
-      followState.value === 'locked'
-    ) {
-      bounceTraceLog(
-        'large-growth:trigger',
-        {
-          heightDelta,
-          threshold: largeGrowthThreshold,
-          top,
-          delta,
-          escapedFromLock: escapedFromLock.value,
-          isAtBottom: isAtBottom.value,
-          isNearBottom: isNearBottom.value
-        },
-        'large-growth:trigger',
-        0
-      );
-      isHandlingLargeGrowth = true;
-      markProgrammaticHint('ChatArea.largeGrowth');
-      suppressUserIntentUntil = Date.now() + 900;
-      scrollToBottom({ animation: 'instant', preserveScrollPosition: false });
-      bounceTraceLog(
-        'large-growth:instant-scroll',
-        { heightDelta, threshold: largeGrowthThreshold, ...getScrollMetrics(target) },
-        'large-growth:instant-scroll',
-        120
-      );
-      setTimeout(() => {
-        isHandlingLargeGrowth = false;
-      }, 400);
-    }
+    // 几何派生态同步（回底按钮显隐 / trace）——高度变化与用户滚动都走这里
+    syncStickState();
 
     const now = Date.now();
     const closeToProgrammaticHint = now - lastProgrammaticHintTs <= 140;
@@ -1789,10 +1739,18 @@ function attachBounceListener() {
     // 脱锁：locked 期间检测到用户向上滚动。
     // 流式期间程序标记几乎逐帧刷新，证据法会被压制，故保留大幅快速上滚的直通路径
     // （对齐旧 strongManualUp 行为：拖拽滚动条上滚依赖它）。
+    // 关键不变量（2026-09-28）：必须真正「离开底部」才算脱锁——内容 shrink（折叠动画/
+    // 思考块自动收起）时浏览器 clamp 会把 scrollTop 向下收，产生 delta<-18 的 scroll
+    // 事件但 remain≈0；此前 strongManualUp 直通不区分这个，把 clamp 帧误判为用户上滚
+    // 脱锁，且无任何自愈——之后所有增长（下次展开/下一条引导）全部锁不住，必须手动
+    // 滚一轮 escape→relock 才能恢复（「向上再使劲向下滚一下下次就能锁上」的根因）。
+    // virtua 补偿写入保持视口位置（remain 不变），同样被本条件天然排除。
+    const remainAfterScroll = height - top - target.clientHeight;
     const strongManualUp = delta < -18 && now > suppressUserIntentUntil;
     if (
       followState.value === 'locked' &&
       delta < -2 &&
+      remainAfterScroll > ESCAPE_LEAVE_BOTTOM_PX &&
       now > suppressUserIntentUntil &&
       (strongManualUp || userScrollEvidence)
     ) {
@@ -1823,7 +1781,7 @@ function attachBounceListener() {
     // 回锁：escaped 期间，用户输入驱动的滚动真正触底才恢复跟随。
     // 惯性滚动期间 scrollHeight 可能随流式增长而变化（证据法失效），故允许
     // 「近期有用户输入」作为兼容；escaped 期间无任何程序路径会把内容拉到底部
-    // （KaTeX/大幅增长/liveStickLock 均已按 followState 门控），触底即可信。
+    // （跟随引擎/KaTeX 兑底均已按 followState 门控，锚定只保持视口相对位置），触底即可信。
     if (
       followState.value === 'escaped' &&
       delta > 0 &&
@@ -1914,22 +1872,27 @@ function escapeBlockSelector(value: string) {
 
 const prevExpandedBlocks = ref(new Set<string>());
 
-// 运行期间是否跳过展开锚定（保持 f43b5ea7 的旧行为）：
-// 仅当「贴底锁定中」且目标块是运行态块（自动展开/收起的 thinking/tool）时，
-// 才交给 stick-to-bottom / liveStickLock 逐帧追底，避免锚定与贴底防输入栏遮挡打架。
-// 其余情况——用户已上滑脱锁，或操作的是历史/已结束块（手动展开）——一律走锚定，
-// 否则运行期间手动展开块没有任何逐帧滚动补偿，文字与外框移动会不同步。
-function shouldSkipExpansionAnchor(element?: HTMLElement | null): boolean {
-  if (!props.streamingMessage) return false;
-  // 快捷导航补间进行中不启动新锚定，避免覆写 scrollTop 取消跳转
-  if (quickNavJumpActive) return true;
-  const gluedToBottom = followState.value === 'locked' && !escapedFromLock.value;
-  if (!gluedToBottom || !element) return false;
-  return (
-    element.classList.contains('processing') ||
-    element.classList.contains('running') ||
-    !!element.querySelector('.processing, .running, .thinking-animation')
-  );
+type ExpansionScrollDecision = 'engine' | 'bottom-follow' | 'anchor';
+
+// 块展开/收起的滚动补偿决策（2026-09-28 重写，替代旧 shouldSkipExpansionAnchor）：
+// - engine：locked 状态下跟随引擎是唯一写入者，锚定不参与（消除 stopScroll/rearm
+//   双写打架——旧架构锚定启动先记录边位置、rearm 紧接着跳底、首帧再猛拽回来，
+//   就是「收起时页面像惯性一样上拉」的来源）。
+// - bottom-follow：escaped + 对话底部块 + 距底较近——临时锁定动画（钉底，
+//   收起时上方内容同步下滑，不露空白；结束停在底部并回锁）。
+// - anchor：escaped 其余情况——锚定顶/底边保持视口稳定。距底较远的底部块
+//   自动收起也走这里：用户在浏览历史，任何方案都不应拽动视口。
+function decideExpansionScroll(element?: HTMLElement | null): ExpansionScrollDecision {
+  // 快捷导航补间进行中不启动新写入，避免覆写 scrollTop 取消跳转
+  if (quickNavJumpActive) return 'engine';
+  if (followState.value === 'locked') return 'engine';
+  const container = scrollRef.value;
+  if (!container || !element) return 'anchor';
+  const remain = container.scrollHeight - container.scrollTop - container.clientHeight;
+  if (remain <= BOTTOM_FOLLOW_MAX_REMAIN_PX && isConversationBottomBlock(element)) {
+    return 'bottom-follow';
+  }
+  return 'anchor';
 }
 
 watch(
@@ -1954,9 +1917,12 @@ watch(
       const el = container.querySelector(
         `[data-block-id="${escapeBlockSelector(id)}"]`
       ) as HTMLElement | null;
-      // 运行期贴底时的运行态块交给 liveStickLock 逐帧追底；
-      // 手动展开（含运行期上滑后操作历史块）走锚定
-      if (shouldSkipExpansionAnchor(el)) continue;
+      const decision = decideExpansionScroll(el);
+      if (decision === 'engine') continue;
+      if (decision === 'bottom-follow') {
+        startBottomFollowLock(260);
+        continue;
+      }
       if (el) {
         anchorBlockElement(el, id, {
           direction: 'auto',
@@ -1974,8 +1940,12 @@ function handleStackedMoreToggle(payload: {
   expanded: boolean;
   stackKey: string;
 }) {
-  // 「更多」是用户手动操作，除运行期贴底的运行态块外一律锚定
-  if (shouldSkipExpansionAnchor(payload.element)) return;
+  const decision = decideExpansionScroll(payload.element);
+  if (decision === 'engine') return;
+  if (decision === 'bottom-follow') {
+    startBottomFollowLock(260);
+    return;
+  }
 
   anchorBlockElement(payload.element, `more-${payload.stackKey}`, {
     direction: 'auto',
@@ -1991,8 +1961,12 @@ function handleMinimalGroupToggle(payload: { groupId: string; expanded: boolean 
   const el = container.querySelector(
     `[data-group-id="${escapeBlockSelector(groupId)}"]`
   ) as HTMLElement | null;
-  // 手动展开/收起摘要组，除运行期贴底的运行态块外一律锚定
-  if (shouldSkipExpansionAnchor(el)) return;
+  const decision = decideExpansionScroll(el);
+  if (decision === 'engine') return;
+  if (decision === 'bottom-follow') {
+    startBottomFollowLock(300);
+    return;
+  }
   if (el) {
     anchorBlockElement(el, groupId, {
       direction: 'auto',
@@ -2053,18 +2027,18 @@ async function stickScrollToBottom(
   // 强制滚动到底 = 明确回锁意图（发送消息 / 点击回底按钮 / 历史加载落定）
   if (options.force) {
     followState.value = 'locked';
-  }
-  // 点击“滚动到底部”按钮时会触发 smooth 动画滚动；期间会产生 trusted scroll 事件，
-  // 若不短暂抑制会被误判为“用户手动滚动”从而中断动画，表现为只滚动一点点。
-  if (options.force || options.behavior === 'smooth') {
     suppressUserIntentUntil = Date.now() + 900;
   }
-  return await scrollToBottom({
-    animation: options.behavior === 'smooth' ? 'smooth' : 'auto',
-    ignoreEscapes: !!options.force,
-    preserveScrollPosition: !!options.preserveScrollPosition,
-    duration: options.force ? 260 : 0
-  });
+  // 非强制且已脱锁：拒绝（双保险，App 层已按 followState 阻断）
+  if (followState.value !== 'locked' || !el) {
+    return false;
+  }
+  // 决策（2026-09-28）：回底按钮/发送消息一律 instant，不做 smooth 补间——
+  // 补间是一个无法被用户输入即时打断的临时写入者，与常驻跟随引擎必然打架。
+  // 瞬时写底后，后续内容增长由 RO 驱动的跟随引擎接管。
+  el.scrollTop = el.scrollHeight - el.clientHeight;
+  syncStickState();
+  return true;
 }
 
 async function stickConditionalScrollToBottom(options: { force?: boolean } = {}) {
@@ -2085,13 +2059,10 @@ async function stickConditionalScrollToBottom(options: { force?: boolean } = {})
   if (!options.force && followState.value === 'escaped') {
     return false;
   }
-  markProgrammaticHint('ChatArea.stickConditionalScrollToBottom');
   if (options.force) {
-    return await stickScrollToBottom({ force: true, preserveScrollPosition: false });
+    return await stickScrollToBottom({ force: true });
   }
-  // conditional 场景由上层先判断“是否需要追底”，这里不要再使用 preserveScrollPosition，
-  // 否则一旦高度突增导致 escapedFromLock=true，后续会被卡在非底部。
-  return await stickScrollToBottom({ preserveScrollPosition: false });
+  return await stickScrollToBottom({});
 }
 
 function getStickState() {
@@ -2480,10 +2451,16 @@ watch(
 onMounted(() => {
   attachBounceListener();
   updateChatScrollbarWidth();
+  setupContentResizeObserver();
   if (typeof ResizeObserver !== 'undefined' && scrollRef.value) {
-    scrollbarResizeObserver = new ResizeObserver(updateChatScrollbarWidth);
+    scrollbarResizeObserver = new ResizeObserver(handleViewportResize);
     scrollbarResizeObserver.observe(scrollRef.value);
   }
+  // 初始落定：历史/首屏内容在 RO 接入前的增长兑底
+  requestAnimationFrame(() => {
+    requestFollowWrite('mount');
+    syncStickState();
+  });
   if (typeof ResizeObserver !== 'undefined') {
     userBubbleResizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(measureUserBubbles);
@@ -2509,16 +2486,24 @@ watch(scrollRef, () => {
     scrollbarResizeObserver = null;
   }
   if (typeof ResizeObserver !== 'undefined' && scrollRef.value) {
-    scrollbarResizeObserver = new ResizeObserver(updateChatScrollbarWidth);
+    scrollbarResizeObserver = new ResizeObserver(handleViewportResize);
     scrollbarResizeObserver.observe(scrollRef.value);
   }
+});
+
+watch(contentRef, () => {
+  setupContentResizeObserver();
 });
 
 onBeforeUnmount(() => {
   detachBounceListener();
   stopBlockExpansionAnchors();
   cancelQuickNavJump();
-  stopLiveStickLock();
+  cancelBottomFollowLock();
+  if (contentResizeObserver) {
+    contentResizeObserver.disconnect();
+    contentResizeObserver = null;
+  }
   if (scrollbarResizeObserver) {
     scrollbarResizeObserver.disconnect();
     scrollbarResizeObserver = null;
@@ -2856,7 +2841,7 @@ function teardownQuickNavLayoutObserver() {
 
 // ===== 快捷导航跳转（自驱 rAF 补间）=====
 // 不用 virtua scrollToIndex 的 smooth：其内部是原生 scrollTo({behavior:'smooth'})，
-// 会被任何一帧外部 scrollTop 覆写（liveStickLock 追底/块过渡锚定/KaTeX 回调）取消，
+// 会被任何一帧外部 scrollTop 覆写（跟随引擎追底/块过渡锚定/KaTeX 回调）取消，
 // 且平滑滚动前等待未测量条目仅有 150ms 引信，超时静默放弃（运行期表现为
 // 「点第一下不动、第二下才跳」）。这里改为每帧自写 scrollTop 的补间：
 // 目标偏移每帧经 getItemOffset 重新解析（随条目测量/流式增长自我校正），
@@ -2908,12 +2893,11 @@ function startQuickNavJump(msgIndex: number) {
 
 function onQuickNavLineClick(item: any) {
   // 点击横线跳转 = 用户主动脱离底部锁定，与 wheel-up / 触摸下拉同路径：
-  // 先 stopScroll() 解除 stick 锁定（库内置 escapedFromLock=true / isAtBottom=false，
-  // 运行期 liveStickLock 随之停止逐帧拽回），再同步 emit 用户滚动意图让父级
-  // 抑制自动追底，最后由自驱补间平滑滚动到目标轮次。
+  // 先脱锁（跟随引擎随之停写），再同步 emit 用户滚动意图让父级抑制自动追底，
+  // 最后由自驱补间平滑滚动到目标轮次。
   const target = scrollRef.value;
   const now = Date.now();
-  stopScroll();
+  escapeFollowLock('quicknav-click');
   stopBlockExpansionAnchors();
   emit('user-scroll-intent', {
     ts: now,
