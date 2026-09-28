@@ -4,6 +4,7 @@
 @use './base/prism-overrides';
 @use './layout/app-shell';
 @use './layout/panels';
+@use './components/chrome/tab-strip';
 @use './components/sidebar/conversation';
 @use './components/panels/right-panel';
 @use './components/panels/resource-panel';

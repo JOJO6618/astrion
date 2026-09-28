@@ -361,12 +361,28 @@ fn http_get_ok(port: u16, path: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// 顶部 chrome 标签条高度（CSS px）。前端 _tab-strip.scss 的 46px 与主页面
+/// 预留空间都对齐这个值；改动需三处同步。
+pub const CHROME_STRIP_HEIGHT: f64 = 46.0;
+
 fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     let url = format!("http://127.0.0.1:{port}/");
-    WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse().expect("valid url")))
+    let chrome_url = format!("http://127.0.0.1:{port}/chrome");
+    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse().expect("valid url")))
         .title("Astrion")
         .inner_size(1280.0, 800.0)
-        .min_inner_size(960.0, 600.0)
+        .min_inner_size(960.0, 600.0);
+    // macOS 顶部浏览器式对话标签条：标题栏 Overlay（红绿灯悬浮在 chrome webview 之上），
+    // 隐藏窗口标题文字。红绿灯位置不再走 traffic_light_position——tauri #14072：
+    // unstable feature 下该 API 失效、灯组被钉在 (0,0)；改为窗口创建后用 objc2
+    // 手动定位（见 position_traffic_lights，在 create 后与每次 Resized 时调用）。
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true);
+    }
+    let window = builder
         // 桌面壳环境标记：页面在任意脚本执行前可读到（登录页据此自动免登录）。
         // 不用 withGlobalTauri——它对 External URL 页面不注入，且语义过重。
         .initialization_script("window.__ASTRION_DESKTOP__ = true;")
@@ -383,15 +399,134 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
             if nav_url.scheme() != "http" && nav_url.scheme() != "https" {
                 return true; // about:blank / data: / blob: 等非页面跳转放行
             }
-            let is_backend = matches!(nav_url.host_str(), Some("127.0.0.1") | Some("localhost"))
-                && nav_url.port() == Some(port);
-            if !is_backend {
-                open_in_system_browser(nav_url.as_str());
+            // 回环地址一律放行：预览面板的 iframe（独立预览服务器端口 / 智能体起的
+            // dev server 端口）就是回环非同源——拦截会把预览内容顶去系统浏览器，
+            // 与「窗口内预览」语义冲突；聊天里的回环链接点击由前端 document 级
+            // capture 拦截转预览面板（App.vue），到不了这里。
+            if matches!(nav_url.host_str(), Some("127.0.0.1") | Some("localhost") | Some("::1")) {
+                return true;
             }
-            is_backend
+            open_in_system_browser(nav_url.as_str());
+            false
         })
         .build()?;
+
+    // 顶部对话标签条 = 独立 chrome webview（加载后常驻，主页面导航/刷新/进设置页
+    // 都不会让它重载或闪动）。主 webview 显式钉在 chrome 条下方：
+    // tauri 默认的按比例 auto_resize 会把固定 46px 高度也缩放，所以两个 webview
+    // 都关掉比例缩放，由 layout_webviews 在窗口缩放时手动布局。
+    let main_webview = window.get_webview("main").expect("主 webview 与窗口同 label");
+    let _ = main_webview.set_auto_resize(false);
+    let chrome_builder = tauri::WebviewBuilder::new(
+        "chrome",
+        WebviewUrl::External(chrome_url.parse().expect("valid url")),
+    )
+    // chrome 页同样有桌面标记（标签 store 以 __ASTRION_DESKTOP__ 判定启用）；
+    // __ASTRION_CHROME__ 供页面自检加载位置
+    .initialization_script("window.__ASTRION_DESKTOP__ = true; window.__ASTRION_CHROME__ = true;")
+    // 不抢键盘焦点（输入主权始终在主页面）
+    .focused(false);
+    // add_child 定义在 Window 上（unstable）；窗口与主 webview 同 label（main），
+    // WebviewWindow 无 Deref 到 Webview，经 Manager::get_window 取宿主 Window。
+    let host_window = window
+        .get_window("main")
+        .expect("主窗口与主 webview 同 label");
+    host_window.add_child(
+        chrome_builder,
+        tauri::LogicalPosition::new(0.0, 0.0),
+        tauri::LogicalSize::new(1280.0, CHROME_STRIP_HEIGHT),
+    )?;
+    layout_webviews(&host_window);
+    #[cfg(target_os = "macos")]
+    position_traffic_lights(&host_window);
     Ok(())
+}
+
+/// macOS 红绿灯手动定位（tauri #14072 绕行：unstable 下 builder API 钉死 (0,0)）。
+/// 实测纠偏法：直接量出「关闭按钮顶边到窗口顶」的当前距离，与目标值的差量
+/// 整体平移 row view——不依赖 tao 容器高度 trick 的锚定行为（实测偏上），
+/// 每次调用都从实测位置重算，天然冪等。间距取「上下相等、左距相同」：
+/// spacing = (46 - 按钮实测高) / 2（SDK26=16 → 15；旧 SDK=14 → 16），x = y = spacing。
+/// 创建后与每次 Resized 时调用（AppKit 在全屏/缩放时会重排灯组）。
+#[cfg(target_os = "macos")]
+pub fn position_traffic_lights(window: &tauri::Window) {
+    use objc2_app_kit::{NSWindow, NSWindowButton};
+
+    let Ok(ptr) = window.ns_window() else {
+        return;
+    };
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let ns_window = &*(ptr as *const NSWindow);
+        let (Some(close), Some(miniaturize), Some(zoom)) = (
+            ns_window.standardWindowButton(NSWindowButton::CloseButton),
+            ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
+            ns_window.standardWindowButton(NSWindowButton::ZoomButton),
+        ) else {
+            return;
+        };
+        let close_rect = close.frame();
+        let btn_h = close_rect.size.height;
+        let spacing = ((CHROME_STRIP_HEIGHT - btn_h) / 2.0).max(0.0);
+        let x: f64 = std::env::var("ASTRION_TRAFFIC_LIGHT_X")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(spacing);
+        let y: f64 = std::env::var("ASTRION_TRAFFIC_LIGHT_Y")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(spacing);
+
+        let Some(row) = close.superview() else {
+            return;
+        };
+        let Some(container) = row.superview() else {
+            return;
+        };
+        // 垂直纠偏：Cocoa 坐标原点在左下，按钮顶边到窗口顶的距离 =
+        // 窗口高 - (容器.y + row.y + 按钮.y + 按钮高)。要增大顶距就减小 origin.y。
+        let window_h = ns_window.frame().size.height;
+        let current_top = window_h
+            - (container.frame().origin.y + row.frame().origin.y + close_rect.origin.y + btn_h);
+        let dy = y - current_top;
+        if dy.abs() > 0.1 {
+            let mut origin = row.frame().origin;
+            origin.y -= dy;
+            row.setFrameOrigin(origin);
+        }
+        // 水平：各按钮 x = x + i*间距（间距保持系统原值）
+        let space_between = miniaturize.frame().origin.x - close_rect.origin.x;
+        for (i, button) in [close, miniaturize, zoom].into_iter().enumerate() {
+            let mut origin = button.frame().origin;
+            origin.x = x + i as f64 * space_between;
+            button.setFrameOrigin(origin);
+        }
+    }
+}
+
+/// 双 webview 布局：chrome 条钉顶部（全宽 × 固定 46px），主 webview 占剩余区域。
+/// 窗口创建后与每次 Resized 时调用（main.rs 的 on_window_event）。
+pub fn layout_webviews(window: &tauri::Window) {
+    let Ok(size) = window.inner_size() else {
+        return;
+    };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let w = size.width as f64 / scale;
+    let h = size.height as f64 / scale;
+    if let Some(chrome) = window.get_webview("chrome") {
+        let _ = chrome.set_bounds(tauri::Rect {
+            position: tauri::LogicalPosition::new(0.0, 0.0).into(),
+            size: tauri::LogicalSize::new(w, CHROME_STRIP_HEIGHT).into(),
+        });
+    }
+    if let Some(main) = window.get_webview("main") {
+        let _ = main.set_bounds(tauri::Rect {
+            position: tauri::LogicalPosition::new(0.0, CHROME_STRIP_HEIGHT).into(),
+            size: tauri::LogicalSize::new(w, (h - CHROME_STRIP_HEIGHT).max(0.0)).into(),
+        });
+    }
 }
 
 /// 用系统默认浏览器打开外部 URL（导航拦截的转交目标）。

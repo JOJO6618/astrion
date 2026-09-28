@@ -1,0 +1,21 @@
+// 桌面壳 chrome webview（顶部对话标签条）样式入口。
+// 只装配标签条需要的最小集合：reset + token 层 + 标签条组件样式，
+// 不引入主应用的组件样式全量（chrome 页面没有那些 DOM）。
+@use './base/reset';
+@use './base/tokens';
+@use './components/chrome/tab-strip';
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--chrome-bar-bg);
+}
+
+#chrome-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}

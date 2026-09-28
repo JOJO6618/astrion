@@ -448,6 +448,16 @@ def new_page():
     return current_app.send_static_file('index.html')
 
 
+@auth_bp.route('/chrome')
+def chrome_page():
+    # 桌面壳双 webview 的顶部对话标签条页面（chrome webview 同源加载，
+    # fetch/CSRF/cookie 零改动复用；见 desktop/src-tauri/src/backend.rs）。
+    # 刻意不加 login_required：页面本身无数据（数据接口仍受保护），
+    # 未登录时标签条空白轮询，主页面自动登录完成后下轮轮询自愈；
+    # 若加登录重定向，chrome webview 会被导到登录页再跳进主应用
+    return current_app.send_static_file('chrome.html')
+
+
 @auth_bp.route('/settings')
 @auth_bp.route('/settings/<path:section>')
 @login_required

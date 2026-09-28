@@ -4,6 +4,19 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Astrion</title>
+        <script>
+        // 首屏防白闪：样式表生效前把持久化主题写到 <html data-theme>，
+        // 否则 JS 加载前走 :root:not([data-theme)] 的浅色回退，深色用户整页重载会闪白。
+        // 与 utils/theme.ts 的存储键/取值保持一致；body 上的同名属性由 theme.ts 启动时补齐。
+        (function () {
+            try {
+                var t = window.localStorage.getItem('agents_ui_theme');
+                if (t === 'classic' || t === 'light' || t === 'dark') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { /* localStorage 不可用时按默认浅色回退 */ }
+        })();
+        </script>
         <link rel="icon" type="image/svg+xml" href="/static/astrion-avatar.svg">
         <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
         <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
@@ -53,6 +66,20 @@
         <script src="/static/easter-eggs/flood.js"></script>
         <script src="/static/easter-eggs/snake.js"></script>
         <script src="/static/security.js"></script>
+        <script>
+        // 桌面壳双 webview：chrome 标签条（独立 webview）经壳控制桥 eval 调用
+        // __astrionChromeDispatch 派发意图（activate/new/close）。主应用未就绪时
+        // 先排队，App mounted 注册 __astrionChrome 后 drain（见 app/lifecycle.ts）。
+        window.__astrionChromeQueue = [];
+        window.__astrionChrome = null;
+        window.__astrionChromeDispatch = function (m) {
+            if (window.__astrionChrome && window.__astrionChrome.handle) {
+                try { window.__astrionChrome.handle(m); } catch (e) {}
+            } else if (m) {
+                window.__astrionChromeQueue.push(m);
+            }
+        };
+        </script>
         <script type="module" src="/static/dist/assets/main.js"></script>
     </body>
 </html>

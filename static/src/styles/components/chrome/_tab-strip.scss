@@ -1,0 +1,212 @@
+// ═══ 桌面端顶部 chrome 条（浏览器式对话标签条）═══
+// 仅桌面壳启用（.chrome-tab-strip 由 ConversationTabStrip.vue 渲染）。
+// 形态规则（用户定稿，与 cache/tab-strip-demo 一致）：
+// - hover（未选中）：完整圆角矩形，四向间距 6px（距上边界 6、距交界线 6、相邻 3+3=6）
+// - 选中：主体与 hover 同边界，仅底部延伸直落交界线，下两角反向圆角外翻与内容区融合
+// - 切换瞬时无动画；关闭 = 沉入下方消失 + 其余标签 FLIP 补位
+// 颜色全部走 token（--chrome-bar-* 定义于 base/_tokens.scss，三主题+首屏回退已补齐）。
+
+.chrome-tab-strip {
+  height: 46px;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  background: var(--chrome-bar-bg);
+  // 左侧预留 macOS 红绿灯悬浮区（Overlay 标题栏，红绿灯于 x=20 起约 52px 宽）
+  padding: 0 10px 0 84px;
+  gap: 4px;
+  user-select: none;
+  transition: background 0.25s;
+}
+
+// ─── chrome 图标按钮（新建） ───
+.chrome-tab-strip .chrome-icon {
+  align-self: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // 重置浏览器原生按钮样式（原生 buttonface 浅灰底会在深色模式下透出）
+  border: none;
+  padding: 0;
+  background: transparent;
+  border-radius: 7px;
+  color: var(--text-tertiary);
+  transition: background 0.15s, color 0.15s;
+}
+.chrome-tab-strip .chrome-icon:hover {
+  background: var(--chrome-bar-hover);
+  color: var(--text-primary);
+}
+.chrome-tab-strip .chrome-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+// ─── 标签条 ───
+.chrome-tab-strip .tab-strip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+.chrome-tab-strip .tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 12px 0 4px;
+  overflow-x: auto;
+  overflow-y: hidden; // 关闭时标签沉入下方被裁掉
+  scrollbar-width: none;
+}
+.chrome-tab-strip .tabs::-webkit-scrollbar {
+  display: none;
+}
+
+// ─── 标签基础 ───
+.chrome-tab-strip .tab {
+  position: relative;
+  isolation: isolate; // 关键：让 hover 伪元素的 z-index:-1 只落在标签文字之下，不穿透 chrome 条背景
+  flex: 1 1 0;
+  min-width: 104px;
+  max-width: 184px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 0 10px; // 上下差 2px = 文字从居中微移下 1px
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+// hover（未选中）：完整圆角矩形，四向间距均为 6px；文字颜色不变，只靠底色区分
+.chrome-tab-strip .tab:not(.active):hover::before {
+  content: '';
+  position: absolute;
+  inset: 6px 3px;
+  background: var(--chrome-bar-hover);
+  border-radius: 6px;
+  z-index: -1;
+}
+
+// 选中：主体与 hover 同边界（顶 6px、两侧 3px 内缩），仅底部延伸到交界线，
+// 下两角反向圆角外翻，与下方内容区同色融合
+.chrome-tab-strip .tab.active {
+  cursor: default;
+}
+.chrome-tab-strip .tab.active::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 6px;
+  bottom: 0; // 底部落到交界线
+  background: var(--surface-base);
+  border-radius: 8px 8px 0 0;
+  z-index: -1;
+  // 选中态瞬时切换：点击后 hover 立刻变选中，无背景过渡动画
+}
+
+// 反向圆角脚：位于选中主体（内缩 3px）的底部两角外侧，交界线处填满
+.chrome-tab-strip .tab .foot {
+  display: none;
+}
+.chrome-tab-strip .tab.active .foot {
+  display: block;
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.chrome-tab-strip .tab.active .foot-l {
+  left: -7px; // = 主体内缩 3px - 脚宽 10px
+  background: radial-gradient(circle at 0 0, transparent 9.5px, var(--surface-base) 10px);
+}
+.chrome-tab-strip .tab.active .foot-r {
+  right: -7px;
+  background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--surface-base) 10px);
+}
+
+.chrome-tab-strip .tab .tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  line-height: 1;
+}
+
+// 状态点：固定色，不随主题变化（项目惯例：蓝=运行中，绿=已完成）
+.chrome-tab-strip .tab-status {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+}
+.chrome-tab-strip .tab-status.running {
+  background: var(--tab-status-running);
+  animation: chrome-tab-pulse 1.6s ease-in-out infinite;
+}
+.chrome-tab-strip .tab-status.done {
+  background: var(--state-success);
+}
+// 无状态点时标题微微右移（不占位对齐）
+.chrome-tab-strip .tab:not(.has-status) .tab-title {
+  margin-left: 3px;
+}
+@keyframes chrome-tab-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+// 关闭动画：沉入下方消失（补位动画由组件 FLIP 承担）
+.chrome-tab-strip .tab.closing {
+  transition: transform 0.22s ease-in, opacity 0.22s ease-in;
+  transform: translateY(110%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+// 关闭按钮
+.chrome-tab-strip .tab-close {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // 重置原生按钮样式；项目惯例：圆角矩形 hover，平时无底
+  border: none;
+  padding: 0;
+  background: transparent;
+  border-radius: 5px;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s;
+}
+.chrome-tab-strip .tab-close svg {
+  width: 9px;
+  height: 9px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.chrome-tab-strip .tab:hover .tab-close,
+.chrome-tab-strip .tab.active .tab-close {
+  opacity: 1;
+}
+.chrome-tab-strip .tab-close:hover {
+  background: var(--chrome-bar-hover);
+}
+.chrome-tab-strip .tab.active .tab-close:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}

@@ -155,6 +155,27 @@ export const bootstrapMethods = {
       needsRebuild: data.task_replay?.needs_rebuild
     });
 
+    // 桌面端标签条：成功进入对话后登记/激活对应标签（跨工作区混排）。
+    // 动态引入避免非桌面环境加载；失败不影响对话进入。
+    try {
+      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      const tabsStore = useConversationTabsStore();
+      if (tabsStore.enabled) {
+        const wsId = String(workspaceId || this.currentHostWorkspaceId || '');
+        const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
+          (item: any) => String(item?.workspace_id || '') === wsId
+        );
+        tabsStore.openConversationTab({
+          conversationId: normalizedId,
+          workspaceId: wsId,
+          workspaceLabel: String(ws?.label || ''),
+          title: meta.title || ''
+        });
+      }
+    } catch (_tabsErr) {
+      // ignore
+    }
+
     return {
       success: true,
       title: meta.title || '',

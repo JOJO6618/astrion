@@ -192,4 +192,9 @@ export default {
   // ── Sub-agent / background command done labels (shared.ts) ──
   subAgentTaskDone: 'Sub-agent {agentId} finished',
   backgroundRunCommandDone: 'Background run_command finished',
+
+  // ── Desktop top conversation tab strip (chrome/ConversationTabStrip.vue) ──
+  tabStripNewTab: 'New conversation',
+  tabStripNewTabHint: 'New conversation (⌘T)',
+  tabStripCloseHint: 'Close (⌘W / middle-click)',
 } as const;

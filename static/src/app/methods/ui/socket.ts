@@ -41,6 +41,9 @@ export const socketMethods = {
       // 无工作区空态（200 + code）：不是故障，不应用快照、静默跳过
       if (status?.code === 'no_workspace') return;
       this.applyStatusSnapshot(status);
+      // 桌面端标签条模式下禁用后端单槽位「当前对话」恢复：多标签各有自己的对话，
+      // 恢复权威是持久化的标签列表（restoreConversationTabView），不是 status 快照
+      const desktopTabsEnabled = Boolean((window as any).__ASTRION_DESKTOP__);
       // 显式新建路由（/new 等）与独立全屏路由不接管当前对话与运行模式
       const onExplicitNewRoute =
         typeof this.isExplicitNewConversationRoute === 'function' &&
@@ -49,7 +52,7 @@ export const socketMethods = {
         typeof this.isConversationIndependentRoute === 'function' &&
         this.isConversationIndependentRoute();
       if (status.conversation && status.conversation.current_id) {
-        if (this.initialRouteResolved && !this.currentConversationId && !onExplicitNewRoute && !onIndependentRoute) {
+        if (this.initialRouteResolved && !this.currentConversationId && !onExplicitNewRoute && !onIndependentRoute && !desktopTabsEnabled) {
           this.currentConversationId = status.conversation.current_id;
         }
       }
@@ -426,12 +429,14 @@ export const socketMethods = {
       // 显式新建对话路由（/new、/multiagent/new）与独立全屏路由（工作流编辑器等）
       // 永不自动恢复运行中的对话：前者是用户明确要空白页，后者不归对话体系，
       // 运行中任务可从侧边栏随时切回。
+      // 桌面端标签条模式同样禁用：恢复权威是持久化标签列表而非后端单槽位状态。
       if (
         resumeConversationId &&
         !this.currentConversationId &&
         !isMultiAgentNewRoute &&
         !isExplicitNewRoute &&
-        !this.isConversationIndependentRoute()
+        !this.isConversationIndependentRoute() &&
+        !Boolean((window as any).__ASTRION_DESKTOP__)
       ) {
         this.skipConversationHistoryReload = true;
         // 首次从状态恢复对话时，避免 socket 的 conversation_loaded 再次触发历史加载

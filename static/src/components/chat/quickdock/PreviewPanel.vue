@@ -62,6 +62,7 @@ import { storeToRefs } from 'pinia';
 import CloseButton from '@/components/common/CloseButton.vue';
 import { usePreviewStore } from '@/stores/preview';
 import { useUiStore } from '@/stores/ui';
+import { openExternal as openExternalUrl } from '@/utils/openExternal';
 
 /**
  * 预览面板（预览窗口的展开视图，与文件预览侧边栏同位）
@@ -151,9 +152,8 @@ function openExternal() {
   const target = activeTarget.value;
   if (!target) return;
   const url = target.type === 'server' ? target.url : iframeSrc.value;
-  if (url) {
-    window.open(url, '_blank', 'noopener');
-  }
+  // 统一走 openExternal：桌面壳 window.open 静默失败，由后端转系统浏览器
+  if (url) void openExternalUrl(url);
 }
 
 function close() {

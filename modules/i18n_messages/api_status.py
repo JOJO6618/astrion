@@ -105,6 +105,10 @@ MESSAGES = {
         "zh-CN": "无法连接更新服务",
         "en-US": "Cannot reach the update service",
     },
+    "desktop_update.chrome_invalid_action": {
+        "zh-CN": "不支持的标签操作",
+        "en-US": "Unsupported tab action",
+    },
 
     # ── server/status/docker.py ──
     "status_docker.docker_web_only": {

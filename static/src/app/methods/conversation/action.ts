@@ -56,6 +56,24 @@ export const actionMethods = {
       } catch (_e) {
         // ignore
       }
+      // 桌面端标签条：点「新建」= 新增一个 /new 标签（发首条消息才落地为对话）
+      try {
+        const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+        const tabsStore = useConversationTabsStore();
+        if (tabsStore.enabled) {
+          const wsId = String(this.currentHostWorkspaceId || '');
+          const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
+            (item: any) => String(item?.workspace_id || '') === wsId
+          );
+          tabsStore.addNewTab({ workspaceId: wsId, workspaceLabel: String(ws?.label || '') });
+          // 双 webview：主页面 SPA 进入 /new（chrome 标签条常驻顶部，
+          // 不再整页跳转——旧方案 location.href 会全屏闪白并重建标签条）
+          this.enterNewConversationPage?.();
+          return;
+        }
+      } catch (_tabsErr) {
+        // ignore
+      }
       const target = '/new';
       const normalize = (p) => String(p || '/').replace(/^\/+|\/+$/g, '');
       if (normalize(window.location.pathname) !== normalize(target)) {

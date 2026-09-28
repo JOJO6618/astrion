@@ -1361,10 +1361,14 @@ const getMessageKey = (msg: any, index: number): string => {
 // 等模板 ref 就绪后再挂载 Virtualizer，确保其内部滚动监听一次到位
 const stickScrollElement = computed<HTMLElement | undefined>(() => scrollRef.value ?? undefined);
 // 流式期间保持最后一条消息常驻，避免用户上翻时流式块反复卸载/重挂载
+// 首条消息始终常驻：WebKit（桌面壳 WKWebView）下 virtua 的初始范围计算会
+// 漏掉 index 0（尺寸缓存为 0、永不挂载→用户气泡消失），常驻后挂载即测量自愈。
 const keepMountedIndexes = computed<number[]>(() => {
-  if (!props.streamingMessage) return [];
+  const mounted: number[] = (filteredMessages.value || []).length > 0 ? [0] : [];
+  if (!props.streamingMessage) return mounted;
   const last = latestMessageIndex.value;
-  return last >= 0 ? [last] : [];
+  if (last > 0) mounted.push(last);
+  return mounted;
 });
 
 // 公式渲染后如果已经在底部附近，主动追底，避免 KaTeX 渲染导致的高度跳变让 stick-to-bottom 锁不住

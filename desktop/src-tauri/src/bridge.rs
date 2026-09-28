@@ -6,6 +6,10 @@
 //!   GET  /version           应用版本（构建期 CARGO_PKG_VERSION）
 //!   POST /update/install    触发 updater 检查 → 下载 → 安装 → 重启（无感更新）
 //!   GET  /update/progress   查询更新进度（前端经后端代理轮询）
+//!   POST /window/drag       开始拖拽移动窗口（顶部对话标签条的空白区域按下时调用）
+//!   POST /chrome/dispatch   chrome 标签条 webview 的意图（激活/新建/关闭标签）→
+//!                           eval 注入主 webview（External URL 页面拿不到 Tauri JS API，
+//!                           但壳可以主动向页面执行 JS）
 //! 仅绑定 loopback，不鉴权：同机进程本就在同一威胁域内。
 
 use std::io::{Read, Write};
@@ -13,7 +17,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 /// 应用版本（构建期写入；与 tauri.conf.json version 由发布脚本保持同步）
@@ -147,19 +151,28 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
     let method = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");
 
-    // POST 的 body 按 Content-Length 丢弃读取（接口不需要 body，
-    // 但不读完就关连接可能触发 RST，对端收不到响应）
+    // POST 的 body：chrome/dispatch 需要内容（JSON 意图，独立上限 64KB）；
+    // 其余端点不需要 body，读完只为让 TCP 正常收尾（不读完就关连接可能触发 RST）
+    let want_body = method == "POST" && path == "/chrome/dispatch";
     let content_length: usize = lines
         .filter_map(|l| l.split_once(':'))
         .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
         .and_then(|(_, v)| v.trim().parse().ok())
         .unwrap_or(0)
         .min(MAX_BODY_DRAIN);
+    let mut body: Vec<u8> = if want_body {
+        buf[header_end..].to_vec()
+    } else {
+        Vec::new()
+    };
     let mut body_have = buf.len().saturating_sub(header_end);
     while body_have < content_length {
         let n = stream.read(&mut chunk)?;
         if n == 0 {
             break;
+        }
+        if want_body {
+            body.extend_from_slice(&chunk[..n]);
         }
         body_have += n;
     }
@@ -188,6 +201,34 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
                 Err(_) => "{\"state\":\"error\",\"error\":\"lock_poisoned\"}".to_string(),
             };
             respond(&mut stream, 200, &body)
+        }
+        ("POST", "/window/drag") => match app.get_webview_window("main") {
+            Some(window) => match window.start_dragging() {
+                Ok(()) => respond(&mut stream, 200, "{\"started\":true}"),
+                Err(e) => {
+                    let body = serde_json::json!({ "started": false, "error": e.to_string() }).to_string();
+                    respond(&mut stream, 409, &body)
+                }
+            },
+            None => respond(&mut stream, 409, "{\"started\":false,\"error\":\"window_missing\"}"),
+        },
+        ("POST", "/chrome/dispatch") => {
+            // body 是 JSON Value，重序列化后就是合法 JS 字面量，无注入面
+            let payload = serde_json::from_slice::<serde_json::Value>(&body)
+                .unwrap_or(serde_json::Value::Null);
+            let js = format!(
+                "window.__astrionChromeDispatch && window.__astrionChromeDispatch({payload})"
+            );
+            match app.get_webview("main") {
+                Some(webview) => match webview.eval(&js) {
+                    Ok(()) => respond(&mut stream, 200, "{\"dispatched\":true}"),
+                    Err(e) => {
+                        let body = serde_json::json!({ "dispatched": false, "error": e.to_string() }).to_string();
+                        respond(&mut stream, 409, &body)
+                    }
+                },
+                None => respond(&mut stream, 409, "{\"dispatched\":false,\"error\":\"webview_missing\"}"),
+            }
         }
         _ => respond(&mut stream, 404, "{\"error\":\"not_found\"}"),
     }

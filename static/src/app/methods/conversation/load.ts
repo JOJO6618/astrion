@@ -182,6 +182,43 @@ export const loadMethods = {
       return;
     }
 
+    // 桌面端标签条：进入对话的公共漏斗（侧边栏普通列表直接绑本方法）。
+    // 新对话：点击瞬间乐观开标签；已有标签：立即激活——两者都 persistNow，
+    // 不等对话加载完（原来要等 bootstrap 登记 + 防抖，chrome 选中滞后几秒）
+    try {
+      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      const tabsStore = useConversationTabsStore();
+      if (tabsStore.enabled) {
+        const bareId = String(conversationId).replace(/^conv_/, '');
+        const existing = tabsStore.tabs.find(
+          (item: any) =>
+            item.kind === 'conv' &&
+            [String(conversationId), bareId, `conv_${bareId}`].includes(item.conversationId)
+        );
+        if (existing) {
+          tabsStore.setActive(existing.key);
+          tabsStore.persistNow();
+        } else {
+          const conv = (Array.isArray(this.conversations) ? this.conversations : []).find(
+            (item: any) => String(item?.id || '') === String(conversationId)
+          );
+          const wsId = workspaceId || String(this.currentHostWorkspaceId || '');
+          const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
+            (item: any) => String(item?.workspace_id || '') === wsId
+          );
+          tabsStore.openConversationTab({
+            conversationId,
+            workspaceId: wsId,
+            workspaceLabel: String(ws?.label || ''),
+            title: String(conv?.title || '')
+          });
+          tabsStore.persistNow();
+        }
+      }
+    } catch (_tabsErr) {
+      // ignore
+    }
+
     // 切换对话前把 debounce 中的推理强度保存立即落盘（随请求带原对话 id，
     // 不会串到新对话）；fire-and-forget，不阻塞加载
     this.flushReasoningEffortSave?.();

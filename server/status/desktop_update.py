@@ -66,7 +66,7 @@ def _not_desktop():
     }), 200
 
 
-def _bridge_request(ctx: dict, method: str, path: str, timeout: float):
+def _bridge_request(ctx: dict, method: str, path: str, timeout: float, json_body: dict | None = None):
     """调用壳控制桥；返回 (payload, error_response)。"""
     if not ctx.get("bridge_port"):
         return None, (jsonify({
@@ -76,7 +76,7 @@ def _bridge_request(ctx: dict, method: str, path: str, timeout: float):
         }), 200)
     url = f"http://127.0.0.1:{ctx['bridge_port']}{path}"
     try:
-        resp = httpx.request(method, url, timeout=timeout)
+        resp = httpx.request(method, url, timeout=timeout, json=json_body)
         return resp.json(), None
     except Exception as exc:  # noqa: BLE001 - 桥不可达统一包装，细节进 detail
         return None, (jsonify({
@@ -165,6 +165,53 @@ def desktop_update_progress():
     if not ctx:
         return _not_desktop()
     body, err = _bridge_request(ctx, "GET", "/update/progress", timeout=3.0)
+    if err:
+        return err
+    return jsonify({"success": True, "data": body})
+
+
+@status_bp.route('/api/desktop/window/drag', methods=['POST'])
+@api_login_required
+def desktop_window_drag():
+    """开始拖拽移动窗口（桌面壳顶部对话标签条空白区域按下时调用）。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    body, err = _bridge_request(ctx, "POST", "/window/drag", timeout=3.0)
+    if err:
+        return err
+    return jsonify({"success": bool(body.get("started")), "data": body})
+
+
+# chrome 标签条（独立 webview）允许派发的意图白名单——桥侧会 eval 进主 webview，
+# 必须收窄动作集，防止借道向主页面注入任意脚本。
+_CHROME_DISPATCH_ACTIONS = {"activate", "new", "close"}
+
+
+@status_bp.route('/api/desktop/chrome-dispatch', methods=['POST'])
+@api_login_required
+def desktop_chrome_dispatch():
+    """chrome 标签条 → 主页面的意图中继（同源代理到壳控制桥 /chrome/dispatch）。
+
+    chrome webview 与主页面同为 External URL，页面 JS 拿不到 Tauri API；
+    壳控制桥暴露 /chrome/dispatch，壳侧收到后 eval 注入主 webview 的
+    window.__astrionChromeDispatch。本端点做同源代理 + action 白名单。
+    """
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action") or "").strip()
+    if action not in _CHROME_DISPATCH_ACTIONS:
+        return jsonify({
+            "success": False,
+            "code": "invalid_action",
+            "error": tr("desktop_update.chrome_invalid_action"),
+        }), 200
+    body, err = _bridge_request(
+        ctx, "POST", "/chrome/dispatch", timeout=5.0,
+        json_body={"action": action, "payload": payload.get("payload")},
+    )
     if err:
         return err
     return jsonify({"success": True, "data": body})

@@ -187,4 +187,9 @@ export default {
   // ── 子智能体/后台命令完成标签（shared.ts） ──
   subAgentTaskDone: '子智能体{agentId} 任务完成',
   backgroundRunCommandDone: '后台 run_command 完成',
+
+  // ── 桌面端顶部对话标签条（chrome/ConversationTabStrip.vue） ──
+  tabStripNewTab: '新对话',
+  tabStripNewTabHint: '新对话（⌘T）',
+  tabStripCloseHint: '关闭（⌘W / 中键）',
 } as const;

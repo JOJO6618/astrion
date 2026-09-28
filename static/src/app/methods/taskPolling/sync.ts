@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { debugLog } from '../common';
 import { useTaskStore } from '../../../stores/task';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { getMessageVisibility, messageStartsWork } from '../../../utils/messageVisibility';
 import {
   debugNotifyLog,
@@ -86,6 +87,16 @@ export const syncMethods = {
   },
   handleConversationChanged(data: any, eventIdx: number) {
     debugLog('[TaskPolling] 对话标题已更新, idx:', eventIdx, data);
+
+    // 桌面端标签条：任何对话的标题更新都同步标签（chrome 轮询收敛前
+    // 主页面快照先落地，保证「标题有了就瞬间变」）
+    if (data && data.title && data.conversation_id) {
+      try {
+        useConversationTabsStore().updateTitle(data.conversation_id, data.title);
+      } catch (_tabsErr) {
+        // 标签 store 不可用时忽略
+      }
+    }
 
     if (data && data.conversation_id === this.currentConversationId) {
       // 更新当前对话标题

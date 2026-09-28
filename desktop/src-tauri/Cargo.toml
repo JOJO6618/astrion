@@ -9,7 +9,7 @@ rust-version = "1.77.2"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }  # unstable: 多 webview（add_child/WebviewBuilder）
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,3 +22,10 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_JobObjects",
   "Win32_System_Threading",
 ] }
+
+# 红绿灯手动定位（tauri #14072：unstable 下 traffic_light_position 失效钉在 (0,0)，
+# 改为直接用 objc2 复刻 tao 的 inset 逻辑）；版本与 tao 依赖树一致，feature 靠统一机制复用
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSView"] }
+objc2-foundation = "0.3"

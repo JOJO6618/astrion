@@ -58,6 +58,8 @@ export async function mounted() {
       .then(() => {
         // 初始数据加载完成后再刷新 git 摘要，确保 workspace/project_path 已就绪
         this.refreshProjectGitSummary?.();
+        // 桌面端标签条：工作区列表就绪后按持久化激活标签还原视图
+        this.restoreConversationTabView?.().catch(() => {});
         // 避免在初始加载阶段被覆盖，加载完成后再兜底检查一次
         this.checkTutorialPrompt();
       })
@@ -71,6 +73,25 @@ export async function mounted() {
     }
   };
 
+  // 桌面壳双 webview：接收 chrome 标签条意图（activate/new/close）。
+  // 壳控制桥 eval 调用 window.__astrionChromeDispatch；未就绪期间的消息在
+  // __astrionChromeQueue 排队，这里注册后一并 drain（shim 见 static/index.html）。
+  if ((window as any).__ASTRION_DESKTOP__) {
+    (window as any).__astrionChrome = {
+      handle: (msg: any) => this.handleChromeIntent?.(msg)
+    };
+    const pending = (window as any).__astrionChromeQueue;
+    if (Array.isArray(pending) && pending.length) {
+      pending.splice(0).forEach((msg: any) => {
+        try {
+          (window as any).__astrionChrome.handle(msg);
+        } catch (_e) {
+          // 单条意图失败不影响后续
+        }
+      });
+    }
+  }
+
   // 立即尝试恢复运行中的任务（不延迟）
   if (typeof this.restoreTaskState === 'function') {
     this.restoreTaskState();
@@ -81,6 +102,8 @@ export async function mounted() {
   document.addEventListener('click', this.handleCopyCodeClick);
   window.addEventListener('popstate', this.handlePopState);
   window.addEventListener('keydown', this.handleMobileOverlayEscape);
+  // 桌面端标签快捷键（⌘T/⌘W）：双 webview 后主页面聚焦时按键到不了 chrome 条
+  window.addEventListener('keydown', this.handleGlobalTabShortcut);
   window.addEventListener('beforeunload', this.handleBeforeUnloadDraftPersist);
 
   this.subAgentFetch();
@@ -118,6 +141,7 @@ export function beforeUnmount() {
   document.removeEventListener('click', this.handleCopyCodeClick);
   window.removeEventListener('popstate', this.handlePopState);
   window.removeEventListener('keydown', this.handleMobileOverlayEscape);
+  window.removeEventListener('keydown', this.handleGlobalTabShortcut);
   window.removeEventListener('beforeunload', this.handleBeforeUnloadDraftPersist);
   this.teardownMobileViewportWatcher();
   this.stopProjectGitSummaryIdleRefresh?.();

@@ -967,7 +967,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, ref } from 'vue';
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import appOptions from './app';
 import VideoPicker from './components/overlay/VideoPicker.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
@@ -977,6 +977,7 @@ import PreviewPanel from './components/chat/quickdock/PreviewPanel.vue';
 import CitationPopover from './components/chat/CitationPopover.vue';
 import { useTutorialStore } from './stores/tutorial';
 import { usePersonalizationStore } from './stores/personalization';
+import { usePreviewStore } from './stores/preview';
 
 const VirtualMonitorSurface = defineAsyncComponent(
   () => import('./components/chat/VirtualMonitorSurface.vue')
@@ -1002,12 +1003,38 @@ const detectAppShell = () => {
   );
 };
 const isAppShell = ref(detectAppShell());
+
+// 桌面端：界面里的 localhost/127.0.0.1 链接点击 → 窗口内预览面板，
+// 而不是被壳的 on_navigation 拦去系统浏览器（预览功能的本机预览语义）。
+// 同源（后端自身端口）链接是应用内部导航，必须放行。
+const onDesktopLocalhostLinkClick = (event: MouseEvent) => {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]');
+  if (!anchor) return;
+  const raw = anchor.getAttribute('href') || '';
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(raw)) return;
+  try {
+    if (new URL(raw).host === window.location.host) return;
+  } catch {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  usePreviewStore().openServerUrl(raw);
+};
+
 onMounted(() => {
   isAppShell.value = detectAppShell();
   window.setTimeout(() => {
     isAppShell.value = detectAppShell();
   }, 300);
-
+  if ((window as any).__ASTRION_DESKTOP__) {
+    document.addEventListener('click', onDesktopLocalhostLinkClick, true);
+  }
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDesktopLocalhostLinkClick, true);
 });
 
 defineOptions(appOptions);

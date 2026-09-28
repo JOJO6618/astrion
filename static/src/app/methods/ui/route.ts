@@ -4,6 +4,7 @@ import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { useTutorialStore } from '../../../stores/tutorial';
 import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
 import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
@@ -26,6 +27,17 @@ import {
 
 export const routeMethods = {
   async bootstrapRoute() {
+    // 桌面端标签条：先于路由解析恢复标签列表（后续 enterConversation 挂钩与
+    // 启动恢复都依赖它；await 保证 hydrate 与标签登记不竞争）
+    try {
+      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      const tabsStore = useConversationTabsStore();
+      if (tabsStore.enabled) {
+        await tabsStore.hydrate();
+      }
+    } catch (_tabsErr) {
+      // 恢复失败不阻断路由
+    }
     // 在路由解析期间抑制标题动画，避免预置"新对话"闪烁
     this.suppressTitleTyping = true;
     this.titleReady = false;
@@ -54,6 +66,9 @@ export const routeMethods = {
       } else {
         this.workflowDemoRoute = path;
       }
+      // 桌面端标签条：独立全屏路由不属于任何对话标签，清空激活态——
+      // chrome 条所有标签取消选中（暂存当前标签供返回时恢复）
+      this.stashAndClearActiveTab?.();
       this.currentConversationId = null;
       this.currentConversationTitle = '';
       this.messages = [];
@@ -180,14 +195,31 @@ export const routeMethods = {
   },
   openWorkflowsPage() {
     // 工作流编辑器是 bootstrap 级全屏路由，与退出方向（/new）对称使用整页跳转，保证状态干净
+    // 跳转前暂存当前激活标签（返回时恢复）并立刻清空激活态（chrome 选中效果即时消失）
+    this.stashAndClearActiveTab?.();
     window.location.assign('/workflows');
   },
   openSettingsPage() {
     // 设置页同样是 bootstrap 级全屏路由，整页跳转保证状态干净
+    this.stashAndClearActiveTab?.();
     window.location.assign('/settings');
   },
   closeSettingsPage() {
-    // 设置页返回出口：整页跳回空对话（与 workflows 的进出方式对称）
+    // 设置页返回出口：直接回到进入时的对话（暂存标签），避免先闪一个空 /new
+    // 再加载对话记录；暂存标签已不存在才落 /new（restore 会补一个新对话标签）
+    try {
+      const tabsStore = useConversationTabsStore();
+      const resume = tabsStore.consumeResumeTarget();
+      if (resume) {
+        // 选中态立即持久化，chrome 在页面加载期间就已恢复选中
+        tabsStore.setActive(resume.key);
+        tabsStore.persistNow();
+        window.location.assign(resume.url);
+        return;
+      }
+    } catch (_tabsErr) {
+      // ignore
+    }
     window.location.assign('/new');
   },
   stripConversationPrefix(conversationId) {

@@ -366,6 +366,20 @@ export const sendMethods = {
         const pathFragment = this.stripConversationPrefix(targetConversationId);
         // 对话类型不再是路由概念，统一裸路径 /<id>
         history.replaceState({ conversationId: targetConversationId }, '', `/${pathFragment}`);
+
+        // 桌面端标签条：首条消息落地为真实对话，把当前激活的 new 标签转换为 conv 标签
+        try {
+          const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+          const tabsStore = useConversationTabsStore();
+          if (tabsStore.enabled) {
+            tabsStore.convertActiveNewTab({
+              conversationId: targetConversationId,
+              title: t('common.newConversation')
+            });
+          }
+        } catch (_tabsErr) {
+          // ignore
+        }
       } catch (error) {
         this.uiPushToast({
           title: t('appMessages.sendFailedTitle'),

@@ -32,6 +32,16 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            match event {
+                // 双 webview 手动布局：chrome 条钉顶部固定 46px，主 webview 占剩余
+                tauri::WindowEvent::Resized(_) => {
+                    backend::layout_webviews(window);
+                    // AppKit 在缩放/全屏切换时会重排红绿灯，需重新定位（tauri #14072 绕行）
+                    #[cfg(target_os = "macos")]
+                    backend::position_traffic_lights(window);
+                }
+                _ => {}
+            }
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
                     window.app_handle().exit(0);

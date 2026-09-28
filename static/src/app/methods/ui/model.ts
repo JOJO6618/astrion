@@ -37,10 +37,12 @@ export const modelMethods = {
   },
   // 底部「管理模型」入口：整页跳设置页模型分区
   openManageModels() {
+    this.stashAndClearActiveTab?.();
     window.location.assign('/settings/models');
   },
   // 模型菜单真空态引导：跳设置页提供商分区（未配置任何模型时使用）
   openSettingsProviders() {
+    this.stashAndClearActiveTab?.();
     window.location.assign('/settings/providers');
   },
   toggleModelMenu() {

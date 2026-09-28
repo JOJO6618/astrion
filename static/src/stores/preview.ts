@@ -14,7 +14,8 @@ export interface PreviewTarget {
   origin?: string;
   path?: string;
   label: string;
-  source?: 'file_edit' | 'model_output' | 'command_output';
+  /** link_click = 桌面端点击聊天中的 localhost 链接登记的临时目标（不写后端） */
+  source?: 'file_edit' | 'model_output' | 'command_output' | 'link_click';
   ts?: string;
 }
 
@@ -24,6 +25,8 @@ export const previewTargetKey = (t: PreviewTarget): string =>
 
 interface PreviewState {
   targets: PreviewTarget[];
+  /** 链接点击登记的临时服务器目标（不持久化、不出现在 dock 列表，随对话切换清除） */
+  ephemeralTargets: PreviewTarget[];
   /** true = 来自任务期实时事件（可用于动画/自动展开）；false = 加载/bootstrap */
   targetsLive: boolean;
   /** 当前在预览面板中打开的目标 key（null = 面板关闭） */
@@ -41,6 +44,7 @@ interface PreviewState {
 export const usePreviewStore = defineStore('preview', {
   state: (): PreviewState => ({
     targets: [],
+    ephemeralTargets: [],
     targetsLive: false,
     activeKey: null,
     autoOpenSuppressed: false,
@@ -51,7 +55,11 @@ export const usePreviewStore = defineStore('preview', {
   getters: {
     activeTarget(state): PreviewTarget | null {
       if (!state.activeKey) return null;
-      return state.targets.find((t) => previewTargetKey(t) === state.activeKey) || null;
+      return (
+        state.targets.find((t) => previewTargetKey(t) === state.activeKey) ||
+        state.ephemeralTargets.find((t) => previewTargetKey(t) === state.activeKey) ||
+        null
+      );
     }
   },
   actions: {
@@ -68,8 +76,12 @@ export const usePreviewStore = defineStore('preview', {
       }
       this.targetsLive = live;
       this.targets = normalized;
-      // 列表移除正在预览的目标时，同步关闭面板
-      if (this.activeKey && !seen.has(this.activeKey)) {
+      // 列表移除正在预览的目标时，同步关闭面板（临时目标不受影响）
+      if (
+        this.activeKey &&
+        !seen.has(this.activeKey) &&
+        !this.ephemeralTargets.some((t) => previewTargetKey(t) === this.activeKey)
+      ) {
         this.activeKey = null;
       }
       // 实时新增目标：按设置决定是否自动展开（最新优先）
@@ -93,6 +105,27 @@ export const usePreviewStore = defineStore('preview', {
       if (!key) return;
       // 再点同一目标 = 收起
       this.activeKey = this.activeKey === key ? null : key;
+    },
+    /** 桌面端点击聊天中的 localhost 链接：打开窗口内预览面板（而不是让壳拦去系统浏览器）。
+     *  已登记的目标直接激活；未登记的记为临时目标（不写后端 metadata）。 */
+    openServerUrl(url: unknown) {
+      const clean = String(url || '').trim();
+      if (!clean) return;
+      const key = `server:${clean}`;
+      const exists =
+        this.targets.some((t) => previewTargetKey(t) === key) ||
+        this.ephemeralTargets.some((t) => previewTargetKey(t) === key);
+      if (!exists) {
+        // 标签与后端 _server_label 同风格：:端口[/路径]
+        const label = clean.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])/i, '') || clean;
+        this.ephemeralTargets.push({
+          type: 'server',
+          url: clean,
+          label,
+          source: 'link_click'
+        });
+      }
+      this.activeKey = key;
     },
     /** 记录预览运行时（独立预览服务器基址 + 对话 token），由 targets/bootstrap/messages 响应下发 */
     setRuntime(base: unknown, token: unknown) {
@@ -138,6 +171,7 @@ export const usePreviewStore = defineStore('preview', {
       this.lastAutoOpenedKey = '';
       this.previewBase = '';
       this.previewToken = '';
+      this.ephemeralTargets = [];
     },
     async removeTarget(key: string) {
       try {

@@ -16,6 +16,9 @@ const adminCustomToolsGuideEntry = fileURLToPath(
 const adminApiEntry = fileURLToPath(new URL('./static/src/admin/apiMain.ts', import.meta.url));
 const loginEntry = fileURLToPath(new URL('./static/src/auth/loginMain.ts', import.meta.url));
 const registerEntry = fileURLToPath(new URL('./static/src/auth/registerMain.ts', import.meta.url));
+// 桌面壳顶部对话标签条（独立 chrome webview 的页面入口，双 webview 架构见
+// desktop/src-tauri/src/backend.rs）
+const chromeEntry = fileURLToPath(new URL('./static/src/chrome.ts', import.meta.url));
 
 export default defineConfig({
   // 统一静态资源基路径，避免动态 import 走到 /assets/* 导致 404
@@ -43,7 +46,8 @@ export default defineConfig({
         adminCustomToolsGuide: adminCustomToolsGuideEntry,
         adminApi: adminApiEntry,
         login: loginEntry,
-        register: registerEntry
+        register: registerEntry,
+        chrome: chromeEntry
       },
       output: {
         entryFileNames: 'assets/[name].js',

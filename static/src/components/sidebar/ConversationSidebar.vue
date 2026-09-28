@@ -867,6 +867,7 @@ import { useUiStore } from '@/stores/ui';
 import { useConversationStore } from '@/stores/conversation';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useDesktopUpdateStore } from '@/stores/desktopUpdate';
+import { useConversationTabsStore } from '@/stores/conversationTabs';
 import { ICONS } from '@/utils/icons';
 import { openExternal } from '@/utils/openExternal';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
@@ -989,7 +990,13 @@ function openPreferencesPage() {
 }
 function openSettingsPage() {
   closePersonalMenu();
-  // 设置页是 bootstrap 级全屏路由，整页跳转保证状态干净（与 workflows 对称）
+  // 设置页是 bootstrap 级全屏路由，整页跳转保证状态干净（与 workflows 对称）；
+  // 跳转前暂存当前激活标签（返回时恢复）并清空激活态（chrome 选中即时消失）
+  try {
+    useConversationTabsStore().stashAndClearActive();
+  } catch (_e) {
+    // ignore
+  }
   window.location.assign('/settings');
 }
 function handleLogout() {

@@ -364,6 +364,30 @@ export const hostWorkspaceMethods = {
   async handleSelectWorkspaceConversation(payload: { conversationId: string; workspaceId: string }) {
     const { conversationId, workspaceId } = payload || {};
     if (!conversationId || !workspaceId) return;
+    // 桌面端标签条：点击瞬间乐观开标签（标题先用列表里的，进入对话后经
+    // bootstrap 的 openConversationTab 用真实标题更新）；persistNow 让 chrome
+    // 轮询尽快拿到——原来要等对话完全加载完才登记，标签出现滞后 1s+
+    try {
+      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      const tabsStore = useConversationTabsStore();
+      if (tabsStore.enabled && !tabsStore.hasConversationTab(conversationId)) {
+        const conv = (Array.isArray(this.conversations) ? this.conversations : []).find(
+          (item: any) => String(item?.id || '') === String(conversationId)
+        );
+        const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
+          (item: any) => String(item?.workspace_id || '') === String(workspaceId)
+        );
+        tabsStore.openConversationTab({
+          conversationId,
+          workspaceId,
+          workspaceLabel: String(ws?.label || ''),
+          title: String(conv?.title || '')
+        });
+        tabsStore.persistNow();
+      }
+    } catch (_tabsErr) {
+      // ignore
+    }
     if ((this.versioningHostMode || this.dockerProjectMode) && workspaceId !== this.currentHostWorkspaceId) {
       await this.handleHostWorkspaceSwitch(workspaceId, { preserveConversationView: true });
     }

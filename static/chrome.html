@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Astrion</title>
+        <script>
+        // 首屏防白闪：与 static/index.html 同段——样式表生效前把持久化主题写到
+        // <html data-theme>，否则深色用户窗口创建时标签条区域闪白。
+        (function () {
+            try {
+                var t = window.localStorage.getItem('agents_ui_theme');
+                if (t === 'classic' || t === 'light' || t === 'dark') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { /* localStorage 不可用时按默认浅色回退 */ }
+        })();
+        </script>
+        <link rel="stylesheet" href="/static/dist/assets/chrome.css">
+    </head>
+    <body>
+        <div id="chrome-app"></div>
+        <script src="/static/security.js"></script>
+        <script type="module" src="/static/dist/assets/chrome.js"></script>
+    </body>
+</html>

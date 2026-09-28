@@ -97,6 +97,11 @@
   --surface-raised: #ffffff;
   --surface-soft: #f5f0e8;
   --surface-muted: #e8e0d2;
+  /* Chrome 顶部对话标签条（桌面壳） */
+  --chrome-bar-bg: #e8e0d2;
+  --chrome-bar-hover: rgba(250, 249, 245, 0.55);
+  /* 运行状态点：刻意固定色，不随主题变化 */
+  --tab-status-running: #0285ff;
   /* Text 文字 */
   --text-primary: #141413;
   --text-secondary: #3d3d3a;
@@ -159,6 +164,11 @@
   --surface-raised: #ffffff;
   --surface-soft: #f9f9f9;
   --surface-muted: #f3f3f3;
+  /* Chrome 顶部对话标签条（桌面壳） */
+  --chrome-bar-bg: #ebebeb;
+  --chrome-bar-hover: rgba(255, 255, 255, 0.7);
+  /* 运行状态点：刻意固定色，不随主题变化 */
+  --tab-status-running: #0285ff;
   /* Text 文字 —— ChatGPT */
   --text-primary: #0d0d0d;
   --text-secondary: #5d5d5d;
@@ -222,6 +232,11 @@
   --surface-raised: #1a1a1a;
   --surface-soft: #212121;
   --surface-muted: #2b2b2b;
+  /* Chrome 顶部对话标签条（桌面壳） */
+  --chrome-bar-bg: #2b2b2b;
+  --chrome-bar-hover: rgba(255, 255, 255, 0.07);
+  /* 运行状态点：刻意固定色，不随主题变化 */
+  --tab-status-running: #0285ff;
   /* Text 文字 */
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
@@ -284,6 +299,11 @@
   --surface-raised: #ffffff;
   --surface-soft: #f5f0e8;
   --surface-muted: #e8e0d2;
+  /* Chrome 顶部对话标签条（桌面壳）—— 同 classic */
+  --chrome-bar-bg: #e8e0d2;
+  --chrome-bar-hover: rgba(250, 249, 245, 0.55);
+  /* 运行状态点：刻意固定色，不随主题变化 */
+  --tab-status-running: #0285ff;
   /* Text 文字 */
   --text-primary: #141413;
   --text-secondary: #3d3d3a;

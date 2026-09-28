@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { t } from '@/locales';
+import { useConversationTabsStore } from '@/stores/conversationTabs';
 import CloseButton from '@/components/common/CloseButton.vue';
 import WorkflowLibraryView from './WorkflowLibraryView.vue';
 import WorkflowEditorView from './WorkflowEditorView.vue';
@@ -158,7 +159,20 @@ async function onSaved() {
 }
 
 function exitDemo() {
-  // 与对话体系完全隔离，直接整页跳回新对话，避免状态残留
+  // 与对话体系完全隔离，整页返回；优先回到进入时暂存的对话标签，
+  // 找不到才落 /new（restoreConversationTabView 会补一个新对话标签）
+  try {
+    const tabsStore = useConversationTabsStore();
+    const resume = tabsStore.consumeResumeTarget();
+    if (resume) {
+      tabsStore.setActive(resume.key);
+      tabsStore.persistNow();
+      window.location.assign(resume.url);
+      return;
+    }
+  } catch (_e) {
+    // ignore
+  }
   window.location.assign('/new');
 }
 
