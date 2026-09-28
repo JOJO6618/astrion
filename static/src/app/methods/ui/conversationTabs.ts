@@ -19,13 +19,16 @@ export const conversationTabsMethods = {
   /** 点击标签：conv → 跨工作区打开对话；new → /new 页（本质是多个 /new 实例）。 */
   async handleTabActivate(tab) {
     if (!tab) return;
+    const tabsStore = useConversationTabsStore();
     // 独立全屏路由（设置/工作流）没有对话体系状态，整跳回对话/新建页
     if (this.isConversationIndependentRoute?.()) {
       const target =
         tab.kind === 'conv' && tab.conversationId
           ? `/${String(tab.conversationId).replace(/^conv_/, '')}`
           : '/new';
-      useConversationTabsStore().persistNow();
+      // 整跳前把激活态落地——跳转后新页面 hydrate 才能恢复正确的选中标签
+      tabsStore.setActive(tab.key);
+      tabsStore.persistNow();
       window.location.assign(target);
       return;
     }
@@ -36,6 +39,10 @@ export const conversationTabsMethods = {
       });
       return;
     }
+    // new 标签：主页面是标签数据唯一写者——必须把激活态写进主 store 并持久化。
+    // 此前这里只导航不 setActive，主 store 的 activeKey 停在旧对话标签，
+    // chrome 乐观窗口（2.5s）过期后轮询快照把选中态收敛回旧标签（点击回弹）。
+    tabsStore.setActive(tab.key);
     this.navigateToTabNewPage();
   },
 

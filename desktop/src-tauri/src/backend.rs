@@ -439,7 +439,56 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     layout_webviews(&host_window);
     #[cfg(target_os = "macos")]
     position_traffic_lights(&host_window);
+    #[cfg(target_os = "macos")]
+    install_ctrl_return_send_interceptor(app);
     Ok(())
+}
+
+/// macOS Sequoia（15+）起 Ctrl+Return 是系统级「打开上下文菜单」快捷键：
+/// 按键在 AppKit 层被消费、DOM keydown 收不到——输入栏 Ctrl+Enter 发送失效
+/// 且弹出系统右键菜单。本地事件监视器在事件到达 WKWebView 前拦截该组合键：
+/// 吞掉原生事件（系统菜单不再触发），并向主 webview 注入合成 ctrl+Enter
+/// keydown——输入栏 ProseMirror 既有 handler 收到后走正常发送链路。
+/// （页面内 preventDefault 拦不住系统快捷键，必须在原生层拦截。）
+#[cfg(target_os = "macos")]
+fn install_ctrl_return_send_interceptor(app: &AppHandle) {
+    use block2::RcBlock;
+    use objc2_app_kit::{NSEvent, NSEventMask, NSEventModifierFlags};
+    use std::ptr::NonNull;
+
+    let handle = app.clone();
+    let block = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
+        let should_swallow = unsafe {
+            let ev = event.as_ref();
+            let flags = ev.modifierFlags();
+            let ctrl_only = flags.contains(NSEventModifierFlags::Control)
+                && !flags.contains(NSEventModifierFlags::Command)
+                && !flags.contains(NSEventModifierFlags::Option);
+            // keyCode 36 = Return，76 = 小键盘 Enter
+            ctrl_only && matches!(ev.keyCode(), 36 | 76)
+        };
+        if !should_swallow {
+            return event.as_ptr();
+        }
+        if let Some(webview) = handle.get_webview("main") {
+            // 焦点不在编辑器时派发到 activeElement 无害（无 handler 消费）
+            let js = r#"(() => {
+    const el = document.activeElement;
+    if (!el || typeof el.dispatchEvent !== "function") return;
+    el.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter", code: "Enter",
+        ctrlKey: true, bubbles: true, cancelable: true
+    }));
+})();"#;
+            let _ = webview.eval(js);
+        }
+        std::ptr::null_mut()
+    });
+    let monitor = unsafe {
+        NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &block)
+    };
+    // 监视器需存活整个应用生命周期；进程退出时由系统回收
+    std::mem::forget(monitor);
 }
 
 /// macOS 红绿灯手动定位（tauri #14072 绕行：unstable 下 builder API 钉死 (0,0)）。

@@ -33,12 +33,12 @@
   padding: 0;
   background: transparent;
   border-radius: 7px;
-  color: var(--text-tertiary);
-  transition: background 0.15s, color 0.15s;
+  // 常态即 hover 色（不要暗色），hover 只变化背景
+  color: var(--text-primary);
+  transition: background 0.15s;
 }
 .chrome-tab-strip .chrome-icon:hover {
   background: var(--chrome-bar-hover);
-  color: var(--text-primary);
 }
 .chrome-tab-strip .chrome-icon svg {
   width: 16px;
