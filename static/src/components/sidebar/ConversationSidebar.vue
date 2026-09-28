@@ -1533,6 +1533,10 @@ onMounted(() => {
   if (isGroupByWorkspaceActive.value) {
     sortedWorkspaces.value.forEach((ws: any) => ensureWorkspaceGroup(String(ws?.workspace_id || '')));
   }
+  // 启动即校准侧边栏状态的 localStorage 同步值：ui store 每次启动都重置为
+  // 收起态，而 localStorage 可能残留上一会话的展开态——不写初始值会让桌面壳
+  // 标签条的首标签融合色停留在错误状态（直到用户首次切换侧边栏才自愈）
+  uiStore.setSidebarCollapsed(uiStore.sidebarCollapsed);
   // 桌面壳启动静默检查一次：有新版只亮红点，不弹窗打扰（store 内部判定桌面环境）
   desktopUpdateStore.checkUpdate({ silent: true });
 });

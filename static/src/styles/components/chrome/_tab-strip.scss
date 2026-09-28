@@ -6,7 +6,20 @@
 // - 切换瞬时无动画；关闭 = 沉入下方消失 + 其余标签 FLIP 补位
 // 颜色全部走 token（--chrome-bar-* 定义于 base/_tokens.scss，三主题+首屏回退已补齐）。
 
+// 首标签融合色注册为 <color> 自定义属性：未注册的自定义属性不可过渡（只能瞬变），
+// 注册后才能随侧边栏展开/收起做 320ms 渐变（见下方 sidebar-fuse 注释块）。
+// initial-value 实际不会用到（.chrome-tab-strip 上总是显式赋值），仅满足注册要求；
+// 不支持 @property 的旧引擎退化为瞬变，功能无损。
+@property --first-tab-fuse-bg {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
 .chrome-tab-strip {
+  // 首标签融合色：选中态「与下方内容融合」的底色。默认 = 主内容区底色
+  // （--surface-base）；对话记录侧边栏展开时渐变为侧边栏底色（--surface-rail）
+  --first-tab-fuse-bg: var(--surface-base);
   height: 46px;
   flex: none;
   display: flex;
@@ -16,10 +29,31 @@
   padding: 0 10px 0 84px;
   gap: 4px;
   user-select: none;
-  transition: background 0.25s;
+  // 融合色渐变时长/缓动对齐侧边栏展开动画（_conversation.scss 的 width 320ms），
+  // 使首标签变色与侧边栏展开「同期进行」而非事后跳变
+  transition:
+    background 0.25s,
+    --first-tab-fuse-bg 320ms cubic-bezier(0.22, 1, 0.36, 1);
   // Electron 壳：整条标签栏作为窗口拖拽区（Chromium 专属属性，其他引擎忽略），
   // 替代 Tauri 壳的 mousedown → /api/desktop/window/drag → start_dragging 链路
   -webkit-app-region: drag;
+}
+
+// ═══ 首标签与对话记录侧边栏的融合（sidebar-fuse）═══
+// 背景：chrome 条钉在主 webview 正上方，对话记录侧边栏（.conversation-sidebar，
+// 底色 --surface-rail）展开后占据主页面左缘——最左侧标签恰好位于侧边栏上方。
+// 选中态的融合设计是「标签底色 = 正下方区域的底色」，因此侧边栏展开期间首标签
+// 的融合色必须从主内容底色（--surface-base）渐变为侧边栏底色（--surface-rail），
+// 否则首标签底部会残留一块与侧边栏不同色的补丁。
+// 状态同步：侧边栏展开态由主页面写 localStorage（stores/ui.ts），本页轮询读取
+// （跨 webview 无 storage 事件）；sidebar-fuse 类只跟随侧边栏展开态，是否作用于
+// 首标签由下方 :first-child 选择器决定——不叠加「首标签激活」进类名，避免切换
+// 标签时融合色额外播一次渐变（破坏「切换瞬时无动画」）。
+// 触发时机：侧边栏展开动画 320ms，本渐变同为 320ms 同缓动，变色在展开期间完成。
+// 已知取舍：融合脚（.foot-*）用的是 radial-gradient 背景图，CSS 渐变图不可
+// 插值，只能瞬变——10px 小角在主体渐变掩护下不可感知。
+.chrome-tab-strip.sidebar-fuse {
+  --first-tab-fuse-bg: var(--surface-rail);
 }
 
 // Windows：原生标题栏自带三大键，无红绿灯悬浮区——左侧预留收窄，
@@ -171,11 +205,27 @@
   background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--surface-base) 10px);
 }
 
+// 首标签（最左侧）选中主体：融合色走可过渡的自定义属性（见文件头 sidebar-fuse
+// 设计说明）；其余选中标签仍直接用 --surface-base
+.chrome-tab-strip .tab.active:first-child::before {
+  background: var(--first-tab-fuse-bg);
+}
+// 首标签融合脚在侧边栏展开时同步换色（渐变图不可插值，瞬变，见 sidebar-fuse 注释）
+.chrome-tab-strip.sidebar-fuse .tab.active:first-child .foot-l {
+  background: radial-gradient(circle at 0 0, transparent 9.5px, var(--surface-rail) 10px);
+}
+.chrome-tab-strip.sidebar-fuse .tab.active:first-child .foot-r {
+  background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--surface-rail) 10px);
+}
+
 .chrome-tab-strip .tab .tab-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+  // 长标题不用省略号：右侧 15% 淡出消失（参数对齐对话内容极简模式摘要的尾部
+  // 淡出，MinimalBlocks.vue 同款 mask-image）
+  mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
   font-size: 12.5px;
   line-height: 1;
 }

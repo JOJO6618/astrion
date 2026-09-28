@@ -81,6 +81,12 @@ const initialIsMobileViewport =
     ? window.matchMedia('(max-width: 768px)').matches
     : false;
 
+// 对话记录侧边栏展开状态的跨 webview 同步 key：桌面壳 chrome 标签条（独立
+// webview）需感知侧边栏展开态——侧边栏展开后首个对话标签位于侧边栏上方，
+// 其选中融合色要切换为侧边栏底色。跨 webview 无 storage 事件，chrome 侧
+// 轮询 localStorage（与主题同步同模式，见 ConversationTabStrip.vue）。
+export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'agents_sidebar_collapsed';
+
 export const useUiStore = defineStore('ui', {
   state: (): UiState => ({
     sidebarCollapsed: true,
@@ -122,9 +128,16 @@ export const useUiStore = defineStore('ui', {
     },
     setSidebarCollapsed(collapsed: boolean) {
       this.sidebarCollapsed = collapsed;
+      // 同步给桌面壳 chrome 标签条（见文件顶部 SIDEBAR_COLLAPSED_STORAGE_KEY 注释）
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0');
+      } catch {
+        // localStorage 不可用时忽略（仅影响桌面壳标签条首标签的融合色）
+      }
     },
     toggleSidebar() {
-      this.sidebarCollapsed = !this.sidebarCollapsed;
+      // 走 setSidebarCollapsed 保证 localStorage 同步是唯一写点
+      this.setSidebarCollapsed(!this.sidebarCollapsed);
     },
     setChatDisplayMode(mode: 'chat' | 'monitor') {
       this.chatDisplayMode = mode;

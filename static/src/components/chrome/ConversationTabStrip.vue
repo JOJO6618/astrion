@@ -1,7 +1,7 @@
 <template>
   <header
     class="chrome-tab-strip"
-    :class="{ 'is-windows': isWindows }"
+    :class="{ 'is-windows': isWindows, 'sidebar-fuse': sidebarOpen }"
     @mousedown="onBarMouseDown"
     @dblclick="onBarDoubleClick"
   >
@@ -83,6 +83,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
 import { ICONS } from '@/utils/icons';
+import { SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/stores/ui';
 import { useConversationTabsStore, type ConversationTab } from '@/stores/conversationTabs';
 
 const tabsStore = useConversationTabsStore();
@@ -92,6 +93,26 @@ const { activeKey } = storeToRefs(tabsStore);
    继承文字颜色。chrome 页不加载 base/_global.scss 的 .icon 工具类，
    mask 样式在 _tab-strip.scss 的 .settings-icon 里自带。 */
 const settingsIconStyle = { '--icon-src': `url(${ICONS.settings})` };
+
+/* 对话记录侧边栏展开状态：主页面 ui store 变更时写 localStorage
+   （stores/ui.ts SIDEBAR_COLLAPSED_STORAGE_KEY），本页轮询读取——跨 webview
+   无 storage 事件，与 ChromeApp 的主题同步同模式。用途：侧边栏展开后首个
+   对话标签位于侧边栏上方，其选中融合色需在侧边栏展开动画期间渐变为侧边栏
+   底色（sidebar-fuse 样式与完整设计说明见 _tab-strip.scss 对应注释块）。
+   轮询周期 150ms：足够跟上 320ms 的展开动画，localStorage 读取开销可忽略。
+   注意：融合类只跟随侧边栏状态、不叠加「首标签激活」条件——否则侧边栏
+   展开期间点击激活首标签时，融合色会额外播一次 320ms 渐变，破坏「切换
+   标签瞬时无动画」的规则；是否作用于首标签由 CSS :first-child 选择器决定。 */
+const sidebarOpen = ref(false);
+let sidebarPollTimer = 0;
+
+function syncSidebarState() {
+  try {
+    sidebarOpen.value = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '0';
+  } catch {
+    // localStorage 不可用时保持当前值
+  }
+}
 
 /* 平台标记：壳 initialization_script 注入（desktop/src-tauri/src/backend.rs）。
    Windows 是原生标题栏（三大键在标题栏里），无红绿灯悬浮区——标签条左侧
@@ -383,10 +404,13 @@ onMounted(() => {
     syncWindowState();
     windowStateTimer = window.setInterval(syncWindowState, 1000);
   }
+  syncSidebarState();
+  sidebarPollTimer = window.setInterval(syncSidebarState, 150);
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown);
   if (windowStateTimer) window.clearInterval(windowStateTimer);
+  if (sidebarPollTimer) window.clearInterval(sidebarPollTimer);
   cleanupDragArm();
 });
 </script>
