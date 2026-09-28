@@ -189,7 +189,14 @@ export default {
   backgroundRunCommandDone: '后台 run_command 完成',
 
   // ── 桌面端顶部对话标签条（chrome/ConversationTabStrip.vue） ──
+  // {mod} = 平台修饰键（mac=⌘ / Windows=Ctrl），由组件按 __ASTRION_PLATFORM__ 注入
   tabStripNewTab: '新对话',
-  tabStripNewTabHint: '新对话（⌘T）',
-  tabStripCloseHint: '关闭（⌘W / 中键）',
+  tabStripNewTabHint: '新对话（{mod}+T）',
+  tabStripCloseHint: '关闭（{mod}+W / 中键）',
+  tabStripSettingsHint: '设置',
+  // Windows 无边框模式自绘三大键（window-controls）
+  tabStripWinMinimize: '最小化',
+  tabStripWinMaximize: '最大化',
+  tabStripWinRestore: '还原',
+  tabStripWinClose: '关闭',
 } as const;

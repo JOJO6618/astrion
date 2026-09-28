@@ -1,8 +1,21 @@
 <template>
-  <header class="chrome-tab-strip" @mousedown="onBarMouseDown">
+  <header
+    class="chrome-tab-strip"
+    :class="{ 'is-windows': isWindows }"
+    @mousedown="onBarMouseDown"
+    @dblclick="onBarDoubleClick"
+  >
+    <button
+      v-if="isWindows"
+      class="chrome-icon settings-btn"
+      :title="t('appUi.tabStripSettingsHint')"
+      @click="onOpenSettings"
+    >
+      <span class="settings-icon" :style="settingsIconStyle" aria-hidden="true"></span>
+    </button>
     <button
       class="chrome-icon new-tab-btn"
-      :title="t('appUi.tabStripNewTabHint')"
+      :title="newTabHint"
       @click="onNewTab"
     >
       <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></svg>
@@ -28,13 +41,29 @@
           <button
             v-if="canClose(tab)"
             class="tab-close"
-            :title="t('appUi.tabStripCloseHint')"
+            :title="closeHint"
             @click.stop="requestClose(tab)"
           >
             <svg viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
           </button>
         </div>
       </div>
+    </div>
+    <div v-if="isWindows" class="window-controls">
+      <button class="wc-btn" :title="t('appUi.tabStripWinMinimize')" @click="onWindowControl('minimize')">
+        <svg viewBox="0 0 12 12"><path d="M2 6h8" /></svg>
+      </button>
+      <button
+        class="wc-btn"
+        :title="maximized ? t('appUi.tabStripWinRestore') : t('appUi.tabStripWinMaximize')"
+        @click="onWindowControl('maximize-toggle')"
+      >
+        <svg v-if="!maximized" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1" /></svg>
+        <svg v-else viewBox="0 0 12 12"><path d="M4 3.2V2.8A1.3 1.3 0 0 1 5.3 1.5h4.2a1.3 1.3 0 0 1 1.3 1.3v4.2a1.3 1.3 0 0 1-1.3 1.3h-.4" /><rect x="1.5" y="4" width="6.5" height="6.5" rx="1" /></svg>
+      </button>
+      <button class="wc-btn wc-close" :title="t('appUi.tabStripWinClose')" @click="onWindowControl('close')">
+        <svg viewBox="0 0 12 12"><path d="M2.8 2.8l6.4 6.4M9.2 2.8L2.8 9.2" /></svg>
+      </button>
     </div>
   </header>
 </template>
@@ -50,13 +79,27 @@
 // - 形态与交互对齐 cache/tab-strip-demo 定稿：
 //   hover 圆角矩形 / 选中反向圆角融合脚（纯 CSS） / 切换瞬时 / 关闭沉入+FLIP 补位。
 // 窗口拖拽：chrome 条空白区域 mousedown → 后端代理 → 壳控制桥 start_dragging。
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
+import { ICONS } from '@/utils/icons';
 import { useConversationTabsStore, type ConversationTab } from '@/stores/conversationTabs';
 
 const tabsStore = useConversationTabsStore();
 const { activeKey } = storeToRefs(tabsStore);
+
+/* 设置齿轮用项目图标库（utils/icons.ts + static/icons/settings.svg），mask 方式
+   继承文字颜色。chrome 页不加载 base/_global.scss 的 .icon 工具类，
+   mask 样式在 _tab-strip.scss 的 .settings-icon 里自带。 */
+const settingsIconStyle = { '--icon-src': `url(${ICONS.settings})` };
+
+/* 平台标记：壳 initialization_script 注入（desktop/src-tauri/src/backend.rs）。
+   Windows 是原生标题栏（三大键在标题栏里），无红绿灯悬浮区——标签条左侧
+   预留位改放「设置」入口按钮；快捷键提示修饰键用 Ctrl 而非 ⌘。 */
+const isWindows = (window as unknown as { __ASTRION_PLATFORM__?: string }).__ASTRION_PLATFORM__ === 'windows';
+const modKey = isWindows ? 'Ctrl' : '⌘';
+const newTabHint = computed(() => t('appUi.tabStripNewTabHint', { mod: modKey }));
+const closeHint = computed(() => t('appUi.tabStripCloseHint', { mod: modKey }));
 
 const tabsEl = ref<HTMLElement | null>(null);
 const closingKeys = ref(new Set<string>());
@@ -110,6 +153,12 @@ function dispatch(action: string, payload: Record<string, unknown> = {}) {
   }).catch(() => {
     // 桥不可达（旧壳）静默忽略；快照轮询会收敛显示态
   });
+}
+
+/** Windows 左侧设置入口：意图派发给主页面，由主页面整跳 /settings
+   （复用 openSettingsPage 既有链路：暂存激活标签 + 整页跳转）。 */
+function onOpenSettings() {
+  dispatch('open-settings');
 }
 
 function onTabClick(tab: ConversationTab) {
@@ -224,14 +273,89 @@ function scrollTabIntoView(key: string) {
   });
 }
 
-/* chrome 条空白区域按下 → 拖拽窗口（标签/按钮自身不触发）。
-   双击空白 = macOS 惯例的缩放行为暂不做（MVP 只拖拽）。 */
+/* chrome 条空白区域按下 → 拖拽窗口（标签/按钮/三大键自身不触发）。
+   Windows 无边框模式用位移阈值模式：按下即触发的 start_dragging（HTCAPTION
+   接管）会吞掉后续双击序列导致双击最大化失效，故按下只记录起点，移动超过
+   阈值才触发拖拽；静止双击不触发，dblclick 事件正常到达。mac 保持原链路
+   （Electron 壳由 CSS app-region 接管拖拽，该请求是空操作兼容）。 */
+let dragArm: { x: number; y: number } | null = null;
+let dragFired = false;
+
+function startWindowDrag() {
+  fetch('/api/desktop/window/drag', { method: 'POST', credentials: 'same-origin' }).catch(() => {
+    // 桥不可达（非桌面壳/旧壳）静默忽略
+  });
+}
+
+function cleanupDragArm() {
+  dragArm = null;
+  dragFired = false;
+  window.removeEventListener('mousemove', onDragMouseMove);
+  window.removeEventListener('mouseup', onDragMouseUp);
+}
+
+function onDragMouseMove(event: MouseEvent) {
+  if (!dragArm || dragFired) return;
+  if (Math.abs(event.clientX - dragArm.x) + Math.abs(event.clientY - dragArm.y) < 4) return;
+  dragFired = true;
+  startWindowDrag();
+  // HTCAPTION 接管后 webview 不再收到后续鼠标事件，主动解除监听防泄漏
+  cleanupDragArm();
+}
+
+function onDragMouseUp() {
+  cleanupDragArm();
+}
+
 function onBarMouseDown(event: MouseEvent) {
   if (event.button !== 0) return;
   const target = event.target as HTMLElement | null;
-  if (target?.closest('.tab, .chrome-icon')) return;
-  fetch('/api/desktop/window/drag', { method: 'POST', credentials: 'same-origin' }).catch(() => {
-    // 桥不可达（非桌面壳/旧壳）静默忽略
+  if (target?.closest('.tab, .chrome-icon, .window-controls')) return;
+  if (isWindows) {
+    dragArm = { x: event.clientX, y: event.clientY };
+    dragFired = false;
+    window.addEventListener('mousemove', onDragMouseMove);
+    window.addEventListener('mouseup', onDragMouseUp);
+    return;
+  }
+  startWindowDrag();
+}
+
+/** Windows 无边框模式：双击空白区域 = 最大化/还原（浏览器惯例）。 */
+function onBarDoubleClick(event: MouseEvent) {
+  if (!isWindows) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest('.tab, .chrome-icon, .window-controls')) return;
+  onWindowControl('maximize-toggle');
+}
+
+/* Windows 自绘三大键：maximized 决定最大化/还原图标。1s 轮询收敛外部改变
+   （拖边贴靠/Win+方向键等不经本组件的路径）；点击本身做乐观更新立即换图标。 */
+const maximized = ref(false);
+let windowStateTimer = 0;
+
+async function syncWindowState() {
+  try {
+    const resp = await fetch('/api/desktop/window/state', { credentials: 'same-origin' });
+    const payload = await resp.json().catch(() => null);
+    if (payload?.success && payload.data) {
+      maximized.value = Boolean(payload.data.maximized);
+    }
+  } catch {
+    // 桥不可达保持当前值，下轮再试
+  }
+}
+
+/** 三大键动作 → 后端代理 → 壳控制桥 /window/control。 */
+function onWindowControl(action: string) {
+  if (action === 'maximize-toggle') maximized.value = !maximized.value;
+  fetch('/api/desktop/window/control', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action })
+  }).catch(() => {
+    // 桥不可达静默忽略
   });
 }
 
@@ -253,6 +377,16 @@ function onKeydown(event: KeyboardEvent) {
     if (active && canClose(active)) requestClose(active);
   }
 }
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
+  if (isWindows) {
+    syncWindowState();
+    windowStateTimer = window.setInterval(syncWindowState, 1000);
+  }
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown);
+  if (windowStateTimer) window.clearInterval(windowStateTimer);
+  cleanupDragArm();
+});
 </script>

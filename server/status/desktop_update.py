@@ -183,9 +183,51 @@ def desktop_window_drag():
     return jsonify({"success": bool(body.get("started")), "data": body})
 
 
+# Windows 无边框模式自绘三大键的动作白名单——与 chrome-dispatch 同理收窄，
+# 防止借道向壳注入任意窗口操作。
+_WINDOW_CONTROL_ACTIONS = {"minimize", "maximize-toggle", "close"}
+
+
+@status_bp.route('/api/desktop/window/control', methods=['POST'])
+@api_login_required
+def desktop_window_control():
+    """窗口控制（Windows 无边框模式的自绘三大键）→ 壳控制桥 /window/control。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action") or "").strip()
+    if action not in _WINDOW_CONTROL_ACTIONS:
+        return jsonify({
+            "success": False,
+            "code": "invalid_action",
+            "error": tr("desktop_update.chrome_invalid_action"),
+        }), 200
+    body, err = _bridge_request(
+        ctx, "POST", "/window/control", timeout=3.0, json_body={"action": action},
+    )
+    if err:
+        return err
+    return jsonify({"success": True, "data": body})
+
+
+@status_bp.route('/api/desktop/window/state')
+@api_login_required
+def desktop_window_state():
+    """窗口状态（当前仅 maximized）：自绘三大键据以切换最大化/还原图标。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    body, err = _bridge_request(ctx, "GET", "/window/state", timeout=3.0)
+    if err:
+        return err
+    return jsonify({"success": True, "data": body})
+
+
 # chrome 标签条（独立 webview）允许派发的意图白名单——桥侧会 eval 进主 webview，
 # 必须收窄动作集，防止借道向主页面注入任意脚本。
-_CHROME_DISPATCH_ACTIONS = {"activate", "new", "close"}
+# open-settings：Windows 标签条左侧「设置」入口按钮（主页面整跳 /settings）。
+_CHROME_DISPATCH_ACTIONS = {"activate", "new", "close", "open-settings"}
 
 
 @status_bp.route('/api/desktop/chrome-dispatch', methods=['POST'])

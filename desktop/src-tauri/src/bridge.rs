@@ -7,9 +7,15 @@
 //!   POST /update/install    触发 updater 检查 → 下载 → 安装 → 重启（无感更新）
 //!   GET  /update/progress   查询更新进度（前端经后端代理轮询）
 //!   POST /window/drag       开始拖拽移动窗口（顶部对话标签条的空白区域按下时调用）
+//!   POST /window/control    窗口控制（无边框模式的自绘三大键）：
+//!                           minimize / maximize-toggle / close
+//!   GET  /window/state      窗口状态（当前仅 maximized，供自绘三大键切换图标）
 //!   POST /chrome/dispatch   chrome 标签条 webview 的意图（激活/新建/关闭标签）→
 //!                           eval 注入主 webview（External URL 页面拿不到 Tauri JS API，
 //!                           但壳可以主动向页面执行 JS）
+//! 注意：窗口句柄一律用 get_window("main")——tauri 的 get_webview_window 内部
+//! 要求窗口所有 webview 与窗口同 label（is_webview_window），主窗口挂了 chrome
+//! 子 webview 后该判定恒为 false，会静默返回 None（2026-09-28 三大键失效事故）。
 //! 仅绑定 loopback，不鉴权：同机进程本就在同一威胁域内。
 
 use std::io::{Read, Write};
@@ -151,9 +157,9 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
     let method = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");
 
-    // POST 的 body：chrome/dispatch 需要内容（JSON 意图，独立上限 64KB）；
-    // 其余端点不需要 body，读完只为让 TCP 正常收尾（不读完就关连接可能触发 RST）
-    let want_body = method == "POST" && path == "/chrome/dispatch";
+    // POST 的 body：chrome/dispatch 与 window/control 需要内容（JSON，独立上限
+    // 64KB）；其余端点不需要 body，读完只为让 TCP 正常收尾（不读完就关连接可能触发 RST）
+    let want_body = method == "POST" && (path == "/chrome/dispatch" || path == "/window/control");
     let content_length: usize = lines
         .filter_map(|l| l.split_once(':'))
         .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
@@ -202,7 +208,7 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
             };
             respond(&mut stream, 200, &body)
         }
-        ("POST", "/window/drag") => match app.get_webview_window("main") {
+        ("POST", "/window/drag") => match app.get_window("main") {
             Some(window) => match window.start_dragging() {
                 Ok(()) => respond(&mut stream, 200, "{\"started\":true}"),
                 Err(e) => {
@@ -212,6 +218,53 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
             },
             None => respond(&mut stream, 409, "{\"started\":false,\"error\":\"window_missing\"}"),
         },
+        ("GET", "/window/state") => match app.get_window("main") {
+            Some(window) => {
+                let body = serde_json::json!({
+                    "maximized": window.is_maximized().unwrap_or(false),
+                })
+                .to_string();
+                respond(&mut stream, 200, &body)
+            }
+            None => respond(&mut stream, 409, "{\"error\":\"window_missing\"}"),
+        },
+        ("POST", "/window/control") => {
+            // Windows 无边框模式：自绘三大键的动作转发。close 走 window.close()
+            // 触发 CloseRequested，main.rs 的既有处理会退出进程并收尸后端。
+            let payload = serde_json::from_slice::<serde_json::Value>(&body)
+                .unwrap_or(serde_json::Value::Null);
+            let action = payload.get("action").and_then(|a| a.as_str()).unwrap_or("");
+            match app.get_window("main") {
+                Some(window) => {
+                    let result = match action {
+                        "minimize" => window.minimize(),
+                        "maximize-toggle" => {
+                            if window.is_maximized().unwrap_or(false) {
+                                window.unmaximize()
+                            } else {
+                                window.maximize()
+                            }
+                        }
+                        "close" => window.close(),
+                        _ => {
+                            return respond(
+                                &mut stream,
+                                409,
+                                "{\"ok\":false,\"error\":\"invalid_action\"}",
+                            );
+                        }
+                    };
+                    match result {
+                        Ok(()) => respond(&mut stream, 200, "{\"ok\":true}"),
+                        Err(e) => {
+                            let body = serde_json::json!({ "ok": false, "error": e.to_string() }).to_string();
+                            respond(&mut stream, 409, &body)
+                        }
+                    }
+                }
+                None => respond(&mut stream, 409, "{\"ok\":false,\"error\":\"window_missing\"}"),
+            }
+        }
         ("POST", "/chrome/dispatch") => {
             // body 是 JSON Value，重序列化后就是合法 JS 字面量，无注入面
             let payload = serde_json::from_slice::<serde_json::Value>(&body)

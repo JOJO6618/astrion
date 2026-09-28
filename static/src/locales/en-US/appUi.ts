@@ -194,7 +194,14 @@ export default {
   backgroundRunCommandDone: 'Background run_command finished',
 
   // ── Desktop top conversation tab strip (chrome/ConversationTabStrip.vue) ──
+  // {mod} = platform modifier key (mac=⌘ / Windows=Ctrl), injected per __ASTRION_PLATFORM__
   tabStripNewTab: 'New conversation',
-  tabStripNewTabHint: 'New conversation (⌘T)',
-  tabStripCloseHint: 'Close (⌘W / middle-click)',
+  tabStripNewTabHint: 'New conversation ({mod}+T)',
+  tabStripCloseHint: 'Close ({mod}+W / middle-click)',
+  tabStripSettingsHint: 'Settings',
+  // Windows frameless-mode custom caption buttons (window-controls)
+  tabStripWinMinimize: 'Minimize',
+  tabStripWinMaximize: 'Maximize',
+  tabStripWinRestore: 'Restore',
+  tabStripWinClose: 'Close',
 } as const;

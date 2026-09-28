@@ -365,6 +365,16 @@ fn http_get_ok(port: u16, path: &str) -> bool {
 /// 预留空间都对齐这个值；改动需三处同步。
 pub const CHROME_STRIP_HEIGHT: f64 = 46.0;
 
+/// 前端平台标记：壳注入 window.__ASTRION_PLATFORM__，chrome 标签条据此做平台
+/// 差异化 UI——macOS 左侧预留红绿灯悬浮区；Windows 原生标题栏自带三大键，
+/// 标签条左侧预留位改放「设置」入口按钮（见 ConversationTabStrip.vue）。
+#[cfg(windows)]
+const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'windows';";
+#[cfg(target_os = "macos")]
+const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'macos';";
+#[cfg(all(unix, not(target_os = "macos")))]
+const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'linux';";
+
 fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     let url = format!("http://127.0.0.1:{port}/");
     let chrome_url = format!("http://127.0.0.1:{port}/chrome");
@@ -382,10 +392,21 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
             .title_bar_style(tauri::TitleBarStyle::Overlay)
             .hidden_title(true);
     }
+    // Windows：去掉原生标题栏——顶部 chrome 标签条即标题栏（浏览器式：左侧设置
+    // 入口/新建/标签，右侧自绘最小化/最大化/关闭，经控制桥 /window/control 转发）。
+    // shadow(true) 恢复 DWM 阴影 + Win11 圆角；tao 的 MARKER_UNDECORATED_SHADOW
+    // 保留四边缩放与拖边吸附（详见 tao windows event_loop WM_NCHITTEST 处理）。
+    #[cfg(windows)]
+    {
+        builder = builder.decorations(false).shadow(true);
+    }
     let window = builder
         // 桌面壳环境标记：页面在任意脚本执行前可读到（登录页据此自动免登录）。
         // 不用 withGlobalTauri——它对 External URL 页面不注入，且语义过重。
-        .initialization_script("window.__ASTRION_DESKTOP__ = true;")
+        // 平台标记供 chrome 标签条做平台差异化 UI（Windows 左侧设置按钮）。
+        .initialization_script(&format!(
+            "window.__ASTRION_DESKTOP__ = true; {PLATFORM_MARKER}"
+        ))
         // 恢复 HTML5 文件拖放：Tauri 2 默认 dragDropEnabled=true，壳会拦截系统拖放
         // 改发 tauri://drag-drop 事件、吃掉页面自身的 drop 事件；而 External URL
         // 页面没有 Tauri JS API，事件无人接收，拖文件进窗口直接失效。关掉壳的拖放
@@ -422,8 +443,10 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         WebviewUrl::External(chrome_url.parse().expect("valid url")),
     )
     // chrome 页同样有桌面标记（标签 store 以 __ASTRION_DESKTOP__ 判定启用）；
-    // __ASTRION_CHROME__ 供页面自检加载位置
-    .initialization_script("window.__ASTRION_DESKTOP__ = true; window.__ASTRION_CHROME__ = true;")
+    // __ASTRION_CHROME__ 供页面自检加载位置；平台标记同上。
+    .initialization_script(&format!(
+        "window.__ASTRION_DESKTOP__ = true; window.__ASTRION_CHROME__ = true; {PLATFORM_MARKER}"
+    ))
     // 不抢键盘焦点（输入主权始终在主页面）
     .focused(false);
     // add_child 定义在 Window 上（unstable）；窗口与主 webview 同 label（main），

@@ -22,10 +22,17 @@
   -webkit-app-region: drag;
 }
 
+// Windows：原生标题栏自带三大键，无红绿灯悬浮区——左侧预留收窄，
+// 该位置改放「设置」入口按钮（模板中的 .settings-btn）
+.chrome-tab-strip.is-windows {
+  padding: 0 10px;
+}
+
 // 交互元素退出拖拽区（点击/双击事件恢复页面内分发）
 .chrome-tab-strip .chrome-icon,
 .chrome-tab-strip .tab,
-.chrome-tab-strip .tab-close {
+.chrome-tab-strip .tab-close,
+.chrome-tab-strip .window-controls {
   -webkit-app-region: no-drag;
 }
 
@@ -58,6 +65,23 @@
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+// 设置齿轮（图标库 mask 图标，颜色随 currentColor）。
+// 注意：chrome 页只装配 reset+tokens+本文件（styles/chrome.scss），不加载
+// base/_global.scss 的 .icon 工具类——mask 样式必须此处自带，否则图标空白
+.chrome-tab-strip .chrome-icon .settings-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-color: currentColor;
+  mask-image: var(--icon-src);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: var(--icon-src);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
 }
 
 // ─── 标签条 ───
@@ -217,6 +241,45 @@
 .chrome-tab-strip .tab-close:hover {
   background: var(--chrome-bar-hover);
 }
+// 选中态的关闭按钮 hover 底色比未选中深一点，保证在选中底色上有区分度
 .chrome-tab-strip .tab.active .tab-close:hover {
   background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+// ─── Windows 窗口控制按钮（无边框模式自绘三大键：最小化/最大化/关闭） ───
+// 尺寸对齐 Windows 惯例（46px 宽、全高），关闭键 hover 用危险色+白图标
+.chrome-tab-strip .window-controls {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  // 抵掉 .chrome-tab-strip 的右 padding，让关闭按钮贴住窗口右缘（Windows 惯例）
+  margin-right: -10px;
+}
+.chrome-tab-strip .wc-btn {
+  width: 46px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+  transition: background 0.12s;
+}
+.chrome-tab-strip .wc-btn svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 1;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chrome-tab-strip .wc-btn:hover {
+  background: var(--chrome-bar-hover);
+}
+.chrome-tab-strip .wc-btn.wc-close:hover {
+  background: var(--state-danger);
+  color: var(--on-accent);
 }

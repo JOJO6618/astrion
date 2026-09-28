@@ -74,6 +74,14 @@ export const conversationTabsMethods = {
       this.handleTabNew();
       return;
     }
+    if (action === 'open-settings') {
+      // Windows 标签条左侧「设置」入口：复用现有整跳链路（暂存激活标签 +
+      // 整页跳转）；已在设置页时不重复跳转（避免无意义整页重载）
+      const path = String(window.location.pathname || '').replace(/^\/+|\/+$/g, '');
+      if (path === 'settings' || path.startsWith('settings/')) return;
+      this.openSettingsPage?.();
+      return;
+    }
     if (action === 'close') {
       const key = String(payload.key || '');
       const tab = tabsStore.tabs.find((item) => item.key === key);
