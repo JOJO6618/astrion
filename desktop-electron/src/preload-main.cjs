@@ -4,3 +4,4 @@
 const { contextBridge } = require('electron');
 
 contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);
+contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);

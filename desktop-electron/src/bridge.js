@@ -8,6 +8,8 @@
 // 仅绑定 loopback，不鉴权：同机进程本就在同一威胁域内。
 
 import http from 'node:http';
+import { app, dialog } from 'electron';
+import { applyRunDataRoot, getRunDataInfo } from './rundata.js';
 
 /** 更新状态机（字符串与 Tauri 版一致，后端/前端按此渲染） */
 const UpdateState = {
@@ -131,6 +133,47 @@ export function startBridge(ctx) {
       // Electron 下窗口拖拽由 chrome 条的 -webkit-app-region: drag 原生处理，
       // 此端点仅为兼容旧前端调用保留（空操作成功）
       send(200, { started: true });
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/rundata/info') {
+      getRunDataInfo()
+        .then((info) => send(200, info))
+        .catch((err) => send(500, { success: false, error: String(err?.message || err) }));
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/rundata/choose') {
+      dialog
+        .showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
+        .then((result) => send(200, { success: true, canceled: result.canceled, path: result.filePaths[0] || '' }))
+        .catch((err) => send(500, { success: false, error: String(err?.message || err) }));
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/rundata/apply') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 64 * 1024) req.destroy();
+      });
+      req.on('end', () => {
+        let payload;
+        try {
+          payload = JSON.parse(body || '{}');
+        } catch {
+          send(400, { success: false, error: 'invalid_json' });
+          return;
+        }
+        applyRunDataRoot(payload)
+          .then((result) => send(200, result))
+          .catch((err) => send(400, { success: false, error: String(err?.message || err) }));
+      });
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/rundata/restart') {
+      send(202, { success: true, restarting: true });
+      setTimeout(() => {
+        app.relaunch();
+        app.exit(0);
+      }, 250);
       return;
     }
     if (req.method === 'POST' && pathname === '/chrome/dispatch') {

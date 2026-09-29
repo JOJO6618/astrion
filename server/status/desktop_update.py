@@ -39,6 +39,59 @@ def _desktop_context() -> dict | None:
     return {"version": version, "bridge_port": bridge_port or None}
 
 
+@status_bp.route('/api/desktop/rundata/info')
+@api_login_required
+def desktop_rundata_info():
+    """读取桌面壳的运行数据目录设置。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    body, err = _bridge_request(ctx, 'GET', '/rundata/info', timeout=10.0)
+    if err:
+        return err
+    return jsonify(body)
+
+
+@status_bp.route('/api/desktop/rundata/choose', methods=['POST'])
+@api_login_required
+def desktop_rundata_choose():
+    """打开桌面壳原生目录选择器。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    body, err = _bridge_request(ctx, 'POST', '/rundata/choose', timeout=300.0, json_body={})
+    if err:
+        return err
+    return jsonify(body)
+
+
+@status_bp.route('/api/desktop/rundata/apply', methods=['POST'])
+@api_login_required
+def desktop_rundata_apply():
+    """切换数据目录，可选先复制当前桌面数据。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    payload = request.get_json(silent=True) or {}
+    body, err = _bridge_request(ctx, 'POST', '/rundata/apply', timeout=1800.0, json_body=payload)
+    if err:
+        return err
+    return jsonify(body)
+
+
+@status_bp.route('/api/desktop/rundata/restart', methods=['POST'])
+@api_login_required
+def desktop_rundata_restart():
+    """请求桌面壳重启，以新目录启动后端。"""
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    body, err = _bridge_request(ctx, 'POST', '/rundata/restart', timeout=5.0, json_body={})
+    if err:
+        return err
+    return jsonify(body), 202
+
+
 def _update_channel() -> str | None:
     """当前系统对应的 updater 清单通道（与 Tauri 端点模板 {{target}}-{{arch}} 对齐）。"""
     if sys.platform == "darwin":

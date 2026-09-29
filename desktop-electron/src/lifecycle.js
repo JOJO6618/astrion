@@ -10,6 +10,7 @@ import {
   resolveRuntime
 } from './backend.js';
 import { startBridge } from './bridge.js';
+import { resolveRunDataRoot } from './rundata.js';
 import { loadLoginShellPath } from './shell_env.js';
 import { createMainWindow, getMainView } from './window.js';
 
@@ -34,6 +35,7 @@ export async function startBackendAndCreateWindow() {
     console.error('[astrion-desktop] 控制桥启动失败（更新功能不可用）:', err);
   }
 
+  const desktopDataRoot = await resolveRunDataRoot();
   const shellEnvironment = await loadLoginShellPath();
   if (shellEnvironment.status === 'loaded') {
     console.info('[astrion-desktop] 已从用户登录 shell 加载 PATH');
@@ -47,7 +49,8 @@ export async function startBackendAndCreateWindow() {
     port,
     bridgePort,
     version: app.getVersion(),
-    shellPath: shellEnvironment.path
+    shellPath: shellEnvironment.path,
+    desktopDataRoot
   });
 
   await waitBackendReady(port);

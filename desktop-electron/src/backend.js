@@ -127,7 +127,7 @@ const CHILD_ENV_SCRUB_PREFIXES = ['ASTRION_', 'AGENT_'];
  * spawn 后端：环境清洗 → 显式指定数据根/桌面身份/控制桥端口。
  * @param {{python: string, backendDir: string, port: number, bridgePort: number | null, version: string, shellPath?: string | null}} opts
  */
-export function spawnBackend({ python, backendDir, port, bridgePort, version, shellPath }) {
+export function spawnBackend({ python, backendDir, port, bridgePort, version, shellPath, desktopDataRoot }) {
   // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建
   const defaultWs = os.homedir() || path.join(backendDir, 'project');
 
@@ -151,9 +151,8 @@ export function spawnBackend({ python, backendDir, port, bridgePort, version, sh
   // 不禁用会读穿到共享数据根 ~/.astrion/astrion（桌面数据隔离被破坏）。
   // 生产形态后端在 .app 内无 .env，此变量无害；桌面配置一律走自己的 settings.json。
   env.ASTRION_IGNORE_DOTENV = '1';
-  // 桌面版数据根：固定独立目录，绝不与任何 server 实例（8091 等）共享
-  env.ASTRION_DATA_ROOT =
-    process.env.ASTRION_DESKTOP_DATA_ROOT || path.join(os.homedir(), '.astrion', 'astrion-desktop');
+  // 桌面版数据根由壳在启动前从固定运行数据设置文件解析，绝不与 server 实例共享
+  env.ASTRION_DATA_ROOT = desktopDataRoot || path.join(os.homedir(), '.astrion', 'astrion-desktop');
   // 桌面应用身份与控制桥地址：后端据此判定「自己是桌面壳内嵌实例」并代理更新接口
   env.ASTRION_DESKTOP_VERSION = version;
   if (bridgePort) env.ASTRION_DESKTOP_BRIDGE_PORT = String(bridgePort);
