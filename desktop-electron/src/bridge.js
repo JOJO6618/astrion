@@ -9,7 +9,8 @@
 
 import http from 'node:http';
 import { app, dialog } from 'electron';
-import { applyRunDataRoot, getRunDataInfo } from './rundata.js';
+import { migrationPageHtml } from './migration-window.js';
+import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
 
 /** 更新状态机（字符串与 Tauri 版一致，后端/前端按此渲染） */
 const UpdateState = {
@@ -139,6 +140,20 @@ export function startBridge(ctx) {
       getRunDataInfo()
         .then((info) => send(200, info))
         .catch((err) => send(500, { success: false, error: String(err?.message || err) }));
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/rundata/migration') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(migrationPageHtml);
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/rundata/migration/progress') {
+      send(200, getMigrationProgress());
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/rundata/migration/continue') {
+      send(202, { accepted: true });
+      setTimeout(() => ctx.onMigrationContinue?.(), 150);
       return;
     }
     if (req.method === 'POST' && pathname === '/rundata/choose') {

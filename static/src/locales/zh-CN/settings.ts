@@ -44,7 +44,7 @@ export default {
   generalTitle: '通用',
   generalDesc: '对话与应用的基础行为。',
   runDataTitle: '运行数据目录',
-  runDataDesc: '设置桌面端保存对话、用户数据与运行配置的位置。切换后需要重启应用。',
+  runDataDesc: '设置桌面端保存对话、用户数据与运行配置的位置。切换后重启时会先迁移数据，并显示进度窗口。',
   runDataEnvLocked: '检测到 ASTRION_DESKTOP_DATA_ROOT 环境变量，应用内目录切换已停用。请修改或删除该环境变量后再使用此设置。',
   runDataPathLabel: '数据目录路径',
   runDataPathPlaceholder: '输入新的数据目录路径',

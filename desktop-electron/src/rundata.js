@@ -18,40 +18,81 @@ function configuredEnvRoot(env = process.env) {
   return raw ? path.resolve(raw) : '';
 }
 
+const migrationProgress = {
+  active: false,
+  phase: 'idle',
+  files_done: 0,
+  files_total: 0,
+  bytes_done: 0,
+  bytes_total: 0,
+  error: null,
+  backend_ready: false,
+  completed_at: null
+};
+
+function setMigrationProgress(phase, values = {}) {
+  Object.assign(migrationProgress, values, {
+    active: !['idle', 'done', 'error'].includes(phase),
+    phase
+  });
+}
+
+export function getMigrationProgress() {
+  return { ...migrationProgress };
+}
+
+export function markMigrationBackendReady() {
+  migrationProgress.backend_ready = true;
+}
+
 async function readSettings() {
   try {
     const value = JSON.parse(await fs.readFile(SETTINGS_FILE, 'utf8'));
     const root = typeof value.data_root === 'string' ? value.data_root.trim() : '';
-    return root ? path.resolve(root) : '';
+    return {
+      data_root: root ? path.resolve(root) : '',
+      pending_migration: value.pending_migration && typeof value.pending_migration === 'object'
+        ? value.pending_migration
+        : null,
+      last_error: typeof value.last_error === 'string' ? value.last_error : null
+    };
   } catch (error) {
-    if (error?.code === 'ENOENT') return '';
+    if (error?.code === 'ENOENT') return { data_root: '', pending_migration: null, last_error: null };
     console.error('[astrion-desktop] 无法读取运行数据目录设置:', error);
     throw new Error('rundata_settings_invalid');
   }
 }
 
 export async function resolveRunDataRoot(env = process.env) {
-  return configuredEnvRoot(env) || (await readSettings()) || DEFAULT_DATA_ROOT;
+  if (configuredEnvRoot(env)) return configuredEnvRoot(env);
+  return (await readSettings()).data_root || DEFAULT_DATA_ROOT;
+}
+
+export async function hasPendingMigration(env = process.env) {
+  if (configuredEnvRoot(env)) return false;
+  return Boolean((await readSettings()).pending_migration);
 }
 
 export async function getRunDataInfo(env = process.env) {
   const envRoot = configuredEnvRoot(env);
-  const storedRoot = envRoot ? '' : await readSettings();
-  const activeRoot = envRoot || storedRoot || DEFAULT_DATA_ROOT;
+  const settings = envRoot ? null : await readSettings();
+  const storedRoot = settings?.data_root || '';
+  const activeRoot = envRoot || settings?.pending_migration?.from || storedRoot || DEFAULT_DATA_ROOT;
   return {
     success: true,
     env_locked: Boolean(envRoot),
     env_path: envRoot,
     configured_path: storedRoot,
     active_path: activeRoot,
-    default_path: DEFAULT_DATA_ROOT
+    default_path: DEFAULT_DATA_ROOT,
+    last_error: settings?.last_error || null
   };
 }
 
-async function writeSettings(dataRoot) {
+async function writeSettings(settings) {
   await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true, mode: 0o700 });
-  const tempPath = `${SETTINGS_FILE}.${process.pid}.tmp`;
-  await fs.writeFile(tempPath, `${JSON.stringify({ data_root: dataRoot }, null, 2)}\n`, {
+  const tempPath = `${SETTINGS_FILE}.${process.pid}.${randomUUID()}.tmp`;
+  await fs.writeFile(tempPath, `${JSON.stringify(settings, null, 2)}\n`, {
     encoding: 'utf8',
     mode: 0o600
   });
@@ -103,17 +144,22 @@ async function assertNoOverlap(source, target) {
 
 async function countEntries(root) {
   let count = 0;
+  let files = 0;
   let bytes = 0;
   async function walk(dir) {
     for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+      if (isFinderMetadata(entry.name)) continue;
       count += 1;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) await walk(fullPath);
-      else if (entry.isFile()) bytes += (await fs.stat(fullPath)).size;
+      else if (entry.isFile()) {
+        files += 1;
+        bytes += (await fs.stat(fullPath)).size;
+      }
     }
   }
   await walk(root);
-  return { count, bytes };
+  return { count, files, bytes };
 }
 
 export async function applyRunDataRoot(payload = {}, env = process.env) {
@@ -135,42 +181,103 @@ export async function applyRunDataRoot(payload = {}, env = process.env) {
       throw new Error('target_not_directory');
     }
     if (!(await directoryIsEmpty(target))) throw new Error('target_not_empty');
-
-    const parent = path.dirname(target);
-    await fs.mkdir(parent, { recursive: true });
-    const stage = path.join(parent, `.${path.basename(target)}.astrion-migration-${randomUUID()}`);
-    try {
-      await fs.mkdir(stage, { recursive: false });
-      const sourceExists = await fs.stat(source).then((s) => s.isDirectory()).catch((error) => {
-        if (error?.code === 'ENOENT') return false;
-        throw error;
-      });
-      if (sourceExists) await fs.cp(source, stage, { recursive: true, errorOnExist: true, force: false });
-      const sourceStats = sourceExists ? await countEntries(source) : { count: 0, bytes: 0 };
-      const copiedStats = await countEntries(stage);
-      if (sourceStats.count !== copiedStats.count || sourceStats.bytes !== copiedStats.bytes) {
-        throw new Error('verification_failed');
-      }
-      if (targetStat) {
-        const targetEntries = await fs.readdir(target);
-        for (const name of targetEntries) {
-          if (isFinderMetadata(name)) {
-            await fs.rm(path.join(target, name), { recursive: true, force: true });
-          }
-        }
-        await fs.rmdir(target);
-      }
-      await fs.rename(stage, target);
-    } catch (error) {
-      await fs.rm(stage, { recursive: true, force: true }).catch(() => {});
-      throw error;
-    }
   } else {
     await fs.mkdir(target, { recursive: true });
   }
 
-  await writeSettings(target);
+  await writeSettings({
+    data_root: target,
+    pending_migration: migrate ? { from: source, to: target } : null,
+    last_error: null
+  });
   return { success: true, active_path: target, restart_required: true };
+}
+
+export async function runPendingMigration() {
+  if (configuredEnvRoot()) return configuredEnvRoot();
+  const settings = await readSettings();
+  const pending = settings.pending_migration;
+  if (!pending) return settings.data_root || DEFAULT_DATA_ROOT;
+  if (typeof pending.from !== 'string' || !pending.from.trim() || typeof pending.to !== 'string' || !pending.to.trim()) {
+    const error = 'migration_settings_invalid';
+    setMigrationProgress('error', { error, backend_ready: false });
+    throw new Error(error);
+  }
+
+  const source = path.resolve(pending.from);
+  const target = path.resolve(pending.to);
+  setMigrationProgress('scanning', { files_done: 0, files_total: 0, bytes_done: 0, bytes_total: 0, error: null, backend_ready: false, completed_at: null });
+  let stage = '';
+  try {
+    await assertNoOverlap(source, target);
+    const sourceExists = await fs.stat(source).then((stat) => stat.isDirectory()).catch((error) => {
+      if (error?.code === 'ENOENT') return false;
+      throw error;
+    });
+    const sourceStats = sourceExists ? await countEntries(source) : { count: 0, files: 0, bytes: 0 };
+    const targetStat = await fs.lstat(target).catch((error) => {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (targetStat?.isSymbolicLink() || (targetStat && !targetStat.isDirectory())) {
+      throw new Error('target_not_directory');
+    }
+    if (!(await directoryIsEmpty(target))) throw new Error('target_not_empty');
+
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    stage = path.join(path.dirname(target), `.${path.basename(target)}.astrion-migration-${randomUUID()}`);
+    await fs.mkdir(stage, { recursive: false });
+    setMigrationProgress('copying', {
+      files_done: 0,
+      files_total: sourceStats.files,
+      bytes_done: 0,
+      bytes_total: sourceStats.bytes
+    });
+    if (sourceExists) {
+      await fs.cp(source, stage, {
+        recursive: true,
+        errorOnExist: true,
+        force: false,
+        filter: async (entryPath) => {
+          if (isFinderMetadata(path.basename(entryPath))) return false;
+          const stat = await fs.lstat(entryPath);
+          if (stat.isFile()) {
+            migrationProgress.files_done += 1;
+            migrationProgress.bytes_done += stat.size;
+          }
+          return true;
+        }
+      });
+    }
+    setMigrationProgress('verifying');
+    const copiedStats = await countEntries(stage);
+    if (sourceStats.count !== copiedStats.count || sourceStats.bytes !== copiedStats.bytes) {
+      throw new Error('verification_failed');
+    }
+    if (targetStat) {
+      for (const name of await fs.readdir(target)) {
+        if (isFinderMetadata(name)) await fs.rm(path.join(target, name), { recursive: true, force: true });
+      }
+      await fs.rmdir(target);
+    }
+    await fs.rename(stage, target);
+    stage = '';
+    await writeSettings({ data_root: target, pending_migration: null, last_error: null });
+    setMigrationProgress('done', { completed_at: Date.now() });
+    return target;
+  } catch (error) {
+    if (stage) await fs.rm(stage, { recursive: true, force: true }).catch(() => {});
+    const message = String(error?.message || error || 'unknown');
+    try {
+      await writeSettings({ data_root: source, pending_migration: null, last_error: message });
+    } catch (persistError) {
+      const fatalMessage = `migration_state_write_failed: ${persistError?.message || persistError}`;
+      setMigrationProgress('error', { error: fatalMessage });
+      throw new Error(fatalMessage);
+    }
+    setMigrationProgress('error', { error: message });
+    return source;
+  }
 }
 
 export { DEFAULT_DATA_ROOT };

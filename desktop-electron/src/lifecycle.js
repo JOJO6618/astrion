@@ -1,7 +1,7 @@
-// 启动编排：选端口 → 解析运行时 → 启动控制桥 → spawn 后端 → 等就绪 → 建窗。
-// （对齐 Tauri 壳 backend.rs::start_backend_and_create_window 的步骤与失败语义）
+// 启动编排：控制桥 → （必要时启动前迁移）→ 解析运行时 → spawn 后端 → 等就绪 → 建窗。
+// 迁移必须在后端启动前完成，避免运行中的日志与任务数据在复制/校验期间继续变化。
 
-import { app } from 'electron';
+import { app, dialog } from 'electron';
 import {
   pickFreePort,
   spawnBackend,
@@ -10,32 +10,75 @@ import {
   resolveRuntime
 } from './backend.js';
 import { startBridge } from './bridge.js';
-import { resolveRunDataRoot } from './rundata.js';
+import {
+  getMigrationProgress,
+  hasPendingMigration,
+  markMigrationBackendReady,
+  resolveRunDataRoot,
+  runPendingMigration
+} from './rundata.js';
 import { loadLoginShellPath } from './shell_env.js';
-import { createMainWindow, getMainView } from './window.js';
+import { createMigrationWindow } from './migration-window.js';
+import { createMainWindow, focusMainWindow, getMainView } from './window.js';
 
 export { shutdownBackend };
 
 export async function startBackendAndCreateWindow() {
   app.setName('Astrion');
 
-  const port = await pickFreePort();
-  // 生产优先：.app 内嵌运行时；不存在则回退开发模式（系统 python + 源码树）
-  const { python, backendDir } = resolveRuntime();
-
-  // 控制桥（自动更新/chrome 派发）：失败不致命——应用照常运行，仅更新功能不可用
+  let migrationWindow = null;
+  let migrationWindowClosed = false;
+  let backendReady = false;
   let bridgePort = null;
   try {
     bridgePort = await startBridge({
       version: app.getVersion(),
       isPackaged: app.isPackaged,
-      getMainView
+      getMainView,
+      getMigrationProgress,
+      onMigrationContinue: () => {
+        if (backendReady) {
+          if (migrationWindow && !migrationWindow.isDestroyed()) migrationWindow.close();
+          focusMainWindow();
+        } else {
+          app.quit();
+        }
+      }
     });
   } catch (err) {
     console.error('[astrion-desktop] 控制桥启动失败（更新功能不可用）:', err);
   }
 
-  const desktopDataRoot = await resolveRunDataRoot();
+  let desktopDataRoot;
+  if (await hasPendingMigration()) {
+    if (!bridgePort) {
+      dialog.showErrorBox(
+        '运行数据迁移无法开始',
+        '迁移进度窗口无法启动，因此本次没有执行迁移。请重新打开应用后重试。'
+      );
+      throw new Error('migration_progress_unavailable');
+    }
+    migrationWindow = await createMigrationWindow(bridgePort);
+    migrationWindow.on('closed', () => {
+      migrationWindowClosed = true;
+    });
+    try {
+      desktopDataRoot = await runPendingMigration();
+    } catch (err) {
+      // 设置无法安全提交时不启动后端。错误保留在进度窗，用户可退出后处理目录权限。
+      console.error('[astrion-desktop] 迁移状态无法安全提交:', err);
+      if (migrationWindow && !migrationWindow.isDestroyed()) migrationWindow.setAlwaysOnTop(false);
+      if (migrationWindowClosed) return;
+      return;
+    }
+    if (migrationWindowClosed) return;
+  } else {
+    desktopDataRoot = await resolveRunDataRoot();
+  }
+
+  const port = await pickFreePort();
+  // 生产优先：.app 内嵌运行时；不存在则回退开发模式（系统 python + 源码树）
+  const { python, backendDir } = resolveRuntime();
   const shellEnvironment = await loadLoginShellPath();
   if (shellEnvironment.status === 'loaded') {
     console.info('[astrion-desktop] 已从用户登录 shell 加载 PATH');
@@ -55,4 +98,19 @@ export async function startBackendAndCreateWindow() {
 
   await waitBackendReady(port);
   createMainWindow(port);
+  backendReady = true;
+
+  const migration = getMigrationProgress();
+  if (migrationWindow && !migrationWindow.isDestroyed()) {
+    migrationWindow.setAlwaysOnTop(false);
+    if (migration.phase === 'error') {
+      markMigrationBackendReady();
+    } else if (migration.phase === 'done') {
+      const completedAt = migration.completed_at || Date.now();
+      const closeDelay = Math.max(0, 3000 - (Date.now() - completedAt));
+      setTimeout(() => {
+        if (migrationWindow && !migrationWindow.isDestroyed()) migrationWindow.close();
+      }, closeDelay);
+    }
+  }
 }

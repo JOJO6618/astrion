@@ -46,7 +46,7 @@ export default {
   generalTitle: 'General',
   generalDesc: 'Basic behavior for conversations and the app.',
   runDataTitle: 'Runtime data directory',
-  runDataDesc: 'Choose where the desktop app stores conversations, user data, and runtime settings. A restart is required after switching.',
+  runDataDesc: 'Choose where the desktop app stores conversations, user data, and runtime settings. After restart, data migration runs before the app opens and shows a progress window.',
   runDataEnvLocked: 'ASTRION_DESKTOP_DATA_ROOT is set, so in-app directory changes are disabled. Change or remove this environment variable to use this setting.',
   runDataPathLabel: 'Data directory path',
   runDataPathPlaceholder: 'Enter a new data directory path',
