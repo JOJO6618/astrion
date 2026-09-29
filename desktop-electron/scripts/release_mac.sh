@@ -78,9 +78,12 @@ awk -v ver="$VERSION" '
 [ -s "$NOTES_FILE" ] || { echo "!! 未能从 CHANGELOG 提取更新说明"; exit 1; }
 
 # ── 5) 上传安装包 + 更新清单 + 更新说明 → 服务器重新生成清单 ──
+# 更新说明按平台分文件（2026-09-29 起 win/mac 两套版本号与日志分开维护）：
+# mac → release-notes-macos.txt，Windows → release-notes-windows.txt
+# （服务器 regen_manifest.py 各取各的，平台文件缺失时才回退共享的 release-notes.txt）
 echo "==> 上传服务器"
 rsync -az "$DMG" "$ZIP" "$YML" "$DEST"
-scp -q "$NOTES_FILE" "59.110.19.30:/var/www/astrion/downloads/release-notes.txt"
+scp -q "$NOTES_FILE" "59.110.19.30:/var/www/astrion/downloads/release-notes-macos.txt"
 rm -f "$NOTES_FILE"
 
 echo "==> 服务器重新生成更新清单"

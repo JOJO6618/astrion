@@ -3,6 +3,7 @@ import { computed, inject, nextTick, onMounted, ref } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
 import { t } from '@/locales';
+import { desktopPlatform, isDesktopShell } from '@/utils/desktopPlatform';
 
 defineOptions({ name: 'GeneralTab' });
 
@@ -25,9 +26,13 @@ const {
   subAgentModels
 } = ctx;
 
-const isMacDesktop = computed(
-  () => Boolean((window as any).__ASTRION_DESKTOP__) && (window as any).__ASTRION_PLATFORM__ === 'darwin'
-);
+// 运行数据目录：两个桌面壳（macOS Electron / Windows Tauri）都支持——
+// 壳侧各自实现了 /rundata/info|apply|restart 与启动前迁移，网页版不显示该区块。
+// 平台判定统一走 desktopPlatform（两个壳注入的标记口径不同，见该模块注释）。
+const runDataSupported = isDesktopShell();
+// 目录选择器分别：macOS 壳自带原生对话框（桥端 /rundata/choose）；
+// Windows 壳没实现该端点，复用后端已有的 /api/project/pick-folder（PowerShell + IFileOpenDialog）
+const runDataNativeDialog = desktopPlatform() === 'macos';
 const runDataInfo = ref<any>(null);
 const runDataPath = ref('');
 const runDataMode = ref<'migrate' | 'empty'>('migrate');
@@ -35,6 +40,7 @@ const runDataDialogOpen = ref(false);
 const runDataDialogElement = ref<HTMLElement | null>(null);
 const runDataBusy = ref(false);
 const runDataError = ref('');
+const runDataErrorDetail = ref('');
 const restartPending = ref(false);
 const restarting = ref(false);
 
@@ -51,8 +57,17 @@ const knownRunDataErrors = new Set([
 ]);
 
 function setRunDataError(error: any) {
-  const key = String(error?.message || error || 'unknown');
-  runDataError.value = knownRunDataErrors.has(key) ? key : 'unknown';
+  const raw = String(error?.message || error || 'unknown');
+  const known = knownRunDataErrors.has(raw);
+  runDataError.value = known ? raw : 'unknown';
+  // 非已知错误码时把原文一并回显：迁移链路的 I/O 失败都是带系统原因的描述
+  //（如「复制文件失败: 拒绝访问」），只显示「未知错误」用户无从下手
+  runDataErrorDetail.value = known ? '' : raw;
+}
+
+function clearRunDataError() {
+  runDataError.value = '';
+  runDataErrorDetail.value = '';
 }
 
 async function requestRunData(path: string, options: RequestInit = {}) {
@@ -74,16 +89,37 @@ async function loadRunDataInfo() {
     const payload = await requestRunData('/api/desktop/rundata/info');
     runDataInfo.value = payload;
     runDataPath.value = payload.configured_path || payload.active_path || '';
+    // 上一次启动时的迁移失败原因（迁移发生在启动早期，用户当时看不到结果）
+    if (payload.last_error) {
+      setRunDataError({ message: payload.last_error });
+    } else if (!runDataBusy.value) {
+      clearRunDataError();
+    }
   } catch (error: any) {
     setRunDataError(error);
   }
 }
 
 async function chooseRunDataFolder() {
-  runDataError.value = '';
+  clearRunDataError();
   try {
-    const payload = await requestRunData('/api/desktop/rundata/choose', { method: 'POST' });
-    if (!payload.canceled && payload.path) runDataPath.value = payload.path;
+    if (runDataNativeDialog) {
+      const payload = await requestRunData('/api/desktop/rundata/choose', { method: 'POST' });
+      if (!payload.canceled && payload.path) runDataPath.value = payload.path;
+      return;
+    }
+    // Windows 壳：走后端已有的原生文件夹选择端点（宿主模式限定；取消时 path 为空串）
+    const response = await fetch('/api/project/pick-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error || 'request_failed');
+    }
+    const picked = String(result?.data?.path || '').trim();
+    if (picked) runDataPath.value = picked;
   } catch (error: any) {
     setRunDataError(error);
   }
@@ -91,7 +127,7 @@ async function chooseRunDataFolder() {
 
 async function openRunDataDialog() {
   if (runDataInfo.value?.env_locked || runDataBusy.value || restartPending.value) return;
-  runDataError.value = '';
+  clearRunDataError();
   runDataMode.value = 'migrate';
   runDataDialogOpen.value = true;
   await nextTick();
@@ -105,7 +141,7 @@ function closeRunDataDialog() {
 async function applyRunDataChange() {
   if (runDataBusy.value || !runDataPath.value.trim()) return;
   runDataBusy.value = true;
-  runDataError.value = '';
+  clearRunDataError();
   try {
     await requestRunData('/api/desktop/rundata/apply', {
       method: 'POST',
@@ -125,7 +161,7 @@ async function applyRunDataChange() {
 async function restartDesktop() {
   if (restarting.value) return;
   restarting.value = true;
-  runDataError.value = '';
+  clearRunDataError();
   try {
     await requestRunData('/api/desktop/rundata/restart', { method: 'POST' });
   } catch {
@@ -140,7 +176,7 @@ async function restartDesktop() {
 }
 
 onMounted(() => {
-  if (isMacDesktop.value) void loadRunDataInfo();
+  if (runDataSupported) void loadRunDataInfo();
 });
 </script>
 
@@ -177,7 +213,7 @@ onMounted(() => {
       />
     </div>
 
-    <div v-if="isMacDesktop" class="settings-action-row">
+    <div v-if="runDataSupported" class="settings-action-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('settings.runDataTitle') }}</span>
         <span class="settings-row-desc">{{ $t('settings.runDataDesc') }}</span>
@@ -230,6 +266,7 @@ onMounted(() => {
         </div>
         <p v-if="runDataError && !runDataDialogOpen" class="run-data-error" role="alert">
           {{ $t(`settings.runDataError.${runDataError}`) }}
+          <span v-if="runDataErrorDetail" class="run-data-error-detail">{{ runDataErrorDetail }}</span>
         </p>
       </div>
     </div>
@@ -390,6 +427,15 @@ onMounted(() => {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* 迁移失败的系统原因原文（后端下发文字，前端原样展示、不做多语言） */
+.run-data-error-detail {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  word-break: break-all;
 }
 
 .run-data-error {

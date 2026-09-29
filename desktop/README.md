@@ -105,10 +105,20 @@ minisign 验签 → 原地安装 → 自动重启（macOS 替换 .app / Windows 
 updater、`downloads.json` 供官网下载页）。更新说明唯一来源 =
 `DESKTOP_CHANGELOG.md` 顶部小节（发布脚本自动提取进清单）。
 
-**发布（Windows）**：Windows 机上同版本号 `tauri build`（需同一私钥的两个环境变量）
+**发布（Windows）**：推荐 `powershell -ExecutionPolicy Bypass -File desktop/scripts/release_win.ps1 [版本号]`
+（与 mac 半语义对齐：同步版本号 → 前端构建 → tauri build → 手动补 updater 签名 →
+校验 keynum → 提取 changelog 顶部小节 → 上传 exe/sig/notes → 服务器 regen → 公网验证）。
+手动流程：Windows 机上同版本号 `tauri build`（需同一私钥的两个环境变量）
 → 把 `Astrion_<ver>_x64-setup.exe` 与 `.sig` 传到服务器 `/var/www/astrion/downloads/`
 → 服务器上跑 `python3 /var/www/astrion/downloads/regen_manifest.py`。
 mac/win 清单互相独立（模板端点），两端可以不同步发布。
+
+**版本号与更新日志按平台分开维护（2026-09-29 / 0.4.2 起）**：Windows 用本目录这套
+（`tauri.conf.json` / `Cargo.toml` / `package.json` + `DESKTOP_CHANGELOG.md`），
+macOS 用 `desktop-electron/` 那套（Electron 壳）。更新说明分文件上传：
+Windows → `release-notes-windows.txt`，macOS → `release-notes-macos.txt`；
+服务器 `regen_manifest.py` 各取各的，平台文件缺失时才回退共享的 `release-notes.txt`。
+此前两端共用同一个 `release-notes.txt`，Windows 更新弹窗会显示 mac 的文案。
 
 **坑（已踩过）**：bundle targets 必须含 `app`（macOS updater 包 .app.tar.gz 是 app
 目标产出的，只写 dmg 不出包）；mac updater 产物名恒为 `Astrion.app.tar.gz`

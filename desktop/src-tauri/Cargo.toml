@@ -1,6 +1,6 @@
 [package]
 name = "astrion-desktop"
-version = "0.3.9"
+version = "0.4.2"
 description = "Astrion desktop shell (system WebView + embedded Python backend)"
 edition = "2021"
 rust-version = "1.77.2"
@@ -15,11 +15,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Job Object（后端孤儿收尸）：仅 Windows 需要
+# Win32_System_Registry：读注册表 PATH（桌面命令环境对齐用户真实环境）
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_System_JobObjects",
+  "Win32_System_Registry",
   "Win32_System_Threading",
 ] }
 

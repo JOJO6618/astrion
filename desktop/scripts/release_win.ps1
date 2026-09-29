@@ -9,8 +9,13 @@
 # 前置条件：
 #   1. 更新签名私钥 %USERPROFILE%\.astrion-desktop-keys\updater.key（同 mac 半，一次生成）
 #   2. 服务器 SSH 免密 59.110.19.30
-#   3. desktop/DESKTOP_CHANGELOG.md 顶部已写好本版本小节（发布脚本提取为 release-notes.txt）
+#   3. desktop/DESKTOP_CHANGELOG.md 顶部已写好本版本小节（发布脚本提取为 release-notes-windows.txt）
 #   4. 内嵌运行时就位（desktop/src-tauri/runtime/python/python.exe）
+#
+# 更新说明按平台分文件（2026-09-29 起 win/mac 两套版本号与日志分开维护）：
+#   Windows → release-notes-windows.txt；macOS → release-notes-macos.txt
+#   服务器 regen_manifest.py 各取各的，平台文件缺失时才回退共享的 release-notes.txt。
+#   （此前两边共用 release-notes.txt，Windows 更新弹窗会显示 mac 的文案）
 #
 # 与 mac 半的关键差异（Windows 特有坑，勿改）：
 #   - Windows 不允许空值环境变量（$env:X="" 是删除语义），TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
@@ -148,11 +153,11 @@ if ($notes.Count -eq 0) { throw "未能从 CHANGELOG 提取更新说明" }
 $NotesFile = Join-Path $env:TEMP "astrion-release-notes-$Version.txt"
 [System.IO.File]::WriteAllLines($NotesFile, $notes, (New-Object System.Text.UTF8Encoding($false)))
 
-# ── 6) 上传 exe / sig / release-notes.txt -> 服务器 regen 清单 ──
+# ── 6) 上传 exe / sig / release-notes-windows.txt -> 服务器 regen 清单 ──
 Write-Host "==> 上传服务器"
 & scp $Exe $Sig ($Server + ":" + $DestDir)
 if ($LASTEXITCODE -ne 0) { throw "scp 上传安装包/签名失败" }
-& scp $NotesFile ($Server + ":" + $DestDir + "release-notes.txt")
+& scp $NotesFile ($Server + ":" + $DestDir + "release-notes-windows.txt")
 if ($LASTEXITCODE -ne 0) { throw "scp 上传更新说明失败" }
 Remove-Item $NotesFile -Force
 

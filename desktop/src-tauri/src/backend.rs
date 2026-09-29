@@ -18,28 +18,29 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 const BACKEND_READY_TIMEOUT: Duration = Duration::from_secs(60);
 /// 就绪轮询间隔
 const READY_POLL_INTERVAL: Duration = Duration::from_millis(200);
+/// 迁移进度窗口尺寸（逻辑像素）：只放标题 + 进度条 + 一行状态，别撑大
+const MIGRATION_WINDOW_SIZE: (f64, f64) = (420.0, 168.0);
+/// 迁移窗口创建后先等一小段再跑迁移：给 webview 进程留出加载进度页的时间，
+/// 否则小数据量下窗口还没画出来就已经关掉了
+const MIGRATION_PROGRESS_LEAD_IN: Duration = Duration::from_millis(500);
+/// 主线程窗口创建等待上限（超时说明主线程不可用，直接当启动失败处理）
+const MAIN_WINDOW_TIMEOUT: Duration = Duration::from_secs(60);
+/// 迁移进度窗口 label（run_on_main_thread 里按它关闭）
+const MIGRATION_WINDOW_LABEL: &str = "migrate";
 
 #[derive(Default)]
 pub struct BackendState {
     child: Mutex<Option<Child>>,
 }
 
-/// 入口：选端口 → spawn 后端 → 等就绪 → 建主窗口。
+/// 入口：解析运行数据目录 → （必要时先迁移）→ spawn 后端 → 等就绪 → 建主窗口。
+///
+/// 迁移时机说明（与 Electron 壳的关键差异）：数据目录迁移必须发生在 **spawn 后端之前**。
+/// 后端在跑的时候源目录持续被写入，上游那套「复制完再统计源目录做校验」会稳定误判
+/// verification_failed（本机实测日志追加场景 10 次失败 9 次），而且放宽校验只会把
+/// 「明确报错」换成「静默切到撕裂的副本」，更糟。停机迁移则精确且可校验。
 pub fn start_backend_and_create_window(app: &AppHandle) -> Result<(), String> {
-    let port = pick_free_port()?;
-    // 生产优先：.app 内嵌的运行时（python-build-standalone + 预装依赖 + 源码）；
-    // 不存在则回退开发模式：系统 python + 源码树。
-    let (python, backend_dir) = match resolve_embedded_runtime(app) {
-        Some(pair) => pair,
-        None => {
-            let repo_root = resolve_repo_root()?;
-            let python = detect_python(&repo_root)
-                .ok_or_else(|| "未找到可用 Python（需要 import yaml/flask 可用）".to_string())?;
-            (python, repo_root)
-        }
-    };
-
-    // 控制桥（自动更新）：失败不致命——应用照常运行，仅更新功能不可用。
+    // 控制桥（自动更新 + 迁移进度页）：失败不致命——应用照常运行，仅更新与进度页不可用。
     let bridge_port = match crate::bridge::start_bridge(app) {
         Ok(p) => Some(p),
         Err(err) => {
@@ -48,7 +49,129 @@ pub fn start_backend_and_create_window(app: &AppHandle) -> Result<(), String> {
         }
     };
 
-    let child = spawn_backend(&python, &backend_dir, port, bridge_port)?;
+    // 命令环境：Windows 上把注册表里进程缺失的 PATH 条目追加到末尾（只增不减）
+    let shell_path = crate::shell_env::shell_path_additions();
+
+    let pending = crate::rundata::read_settings().pending_migration.is_some();
+
+    if pending && bridge_port.is_some() {
+        // 进度窗口必须能画出东西，而 setup 是同步阻塞的（阻塞即冻结事件循环）——
+        // 所以先同步建窗口再返回 setup，迁移与后端启动全交给后台线程。
+        // 迁移期间窗口始终 ≥ 1（退出的前提是零窗口），不存在意外自杀风险。
+        create_migration_window(app, bridge_port.expect("已判非空"))?;
+        let handle = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(MIGRATION_PROGRESS_LEAD_IN);
+            let data_root = crate::rundata::run_pending_migration();
+            match spawn_backend_and_wait(&handle, bridge_port, shell_path, data_root) {
+                Ok(port) => show_main_window(&handle, port),
+                Err(err) => {
+                    eprintln!("[astrion-desktop] 启动后端失败: {err}");
+                    let log_path = std::env::temp_dir().join("astrion-desktop-startup.log");
+                    let _ = std::fs::write(&log_path, format!("[astrion-desktop] 启动失败\n{err}\n"));
+                    handle.exit(1);
+                }
+            }
+        });
+        return Ok(());
+    }
+
+    // 无待迁移（或桥不可用、进度页无法展示）：沿用同步路径
+    let data_root = if pending {
+        crate::rundata::run_pending_migration()
+    } else {
+        crate::rundata::resolve_data_root()
+    };
+    let port = spawn_backend_and_wait(app, bridge_port, shell_path, data_root)?;
+    create_main_window(app, port).map_err(|e| format!("创建主窗口失败: {e}"))
+}
+
+/// 迁移进度窗口：页面由控制桥自身 serve（此刻后端还没启动，没有别的宿主）。
+/// 保留原生标题栏——迁移卡住时用户至少能关掉窗口退出（下次启动会重试迁移）。
+fn create_migration_window(app: &AppHandle, bridge_port: u16) -> Result<(), String> {
+    let url = format!("http://127.0.0.1:{bridge_port}/migration");
+    WebviewWindowBuilder::new(
+        app,
+        MIGRATION_WINDOW_LABEL,
+        WebviewUrl::External(url.parse().map_err(|e| format!("进度页地址无效: {e}"))?),
+    )
+    .title("Astrion")
+    .inner_size(MIGRATION_WINDOW_SIZE.0, MIGRATION_WINDOW_SIZE.1)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .always_on_top(true)
+    .center()
+    .build()
+    .map_err(|e| format!("创建迁移进度窗口失败: {e}"))?;
+    Ok(())
+}
+
+/// 后台线程 → 主线程：建主窗口（先建后关，任意时刻至少有一个窗口存活）
+fn show_main_window(app: &AppHandle, port: u16) {
+    let handle = app.clone();
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    let dispatched = app.run_on_main_thread(move || {
+        let result = create_main_window(&handle, port).map_err(|e| e.to_string());
+        if result.is_ok() {
+            close_migration_window(&handle);
+        }
+        let _ = tx.send(result);
+    });
+    if let Err(err) = dispatched {
+        eprintln!("[astrion-desktop] 主线程调度失败，主窗口未创建: {err}");
+        app.exit(1);
+        return;
+    }
+    match rx.recv_timeout(MAIN_WINDOW_TIMEOUT) {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => {
+            eprintln!("[astrion-desktop] 创建主窗口失败: {err}");
+            app.exit(1);
+        }
+        Err(_) => {
+            eprintln!("[astrion-desktop] 创建主窗口超时");
+            app.exit(1);
+        }
+    }
+}
+
+fn close_migration_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(MIGRATION_WINDOW_LABEL) {
+        let _ = window.close();
+    }
+}
+
+/// 解析 Python 与后端源码目录：生产优先内嵌运行时，否则开发形态（系统 python + 源码树）。
+fn resolve_runtime(app: &AppHandle) -> Result<(PathBuf, PathBuf), String> {
+    // 生产优先：.app 内嵌的运行时（python-build-standalone + 预装依赖 + 源码）；
+    // 不存在则回退开发模式：系统 python + 源码树。
+    if let Some(pair) = resolve_embedded_runtime(app) {
+        return Ok(pair);
+    }
+    let repo_root = resolve_repo_root()?;
+    let python = detect_python(&repo_root)
+        .ok_or_else(|| "未找到可用 Python（需要 import yaml/flask 可用）".to_string())?;
+    Ok((python, repo_root))
+}
+
+/// 选端口 → spawn 后端 → 等就绪；返回后端端口。
+fn spawn_backend_and_wait(
+    app: &AppHandle,
+    bridge_port: Option<u16>,
+    shell_path: Option<Vec<String>>,
+    data_root: PathBuf,
+) -> Result<u16, String> {
+    let port = pick_free_port()?;
+    let (python, backend_dir) = resolve_runtime(app)?;
+    let child = spawn_backend(
+        &python,
+        &backend_dir,
+        port,
+        bridge_port,
+        &data_root,
+        shell_path.as_deref(),
+    )?;
     app.state::<BackendState>()
         .child
         .lock()
@@ -56,9 +179,7 @@ pub fn start_backend_and_create_window(app: &AppHandle) -> Result<(), String> {
         .replace(child);
 
     wait_backend_ready(port)?;
-
-    create_main_window(app, port).map_err(|e| format!("创建主窗口失败: {e}"))?;
-    Ok(())
+    Ok(port)
 }
 
 /// 退出时 kill 后端子进程（Drop 兜底，防止孤儿进程残留）。
@@ -230,6 +351,8 @@ fn spawn_backend(
     backend_dir: &Path,
     port: u16,
     bridge_port: Option<u16>,
+    data_root: &Path,
+    shell_path: Option<&[String]>,
 ) -> Result<Child, String> {
     // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建。
     // 生产形态下 backend_dir 在 .app 内（只读），兜底路径给用户主目录；
@@ -261,20 +384,20 @@ fn spawn_backend(
             cmd.env_remove(&key);
         }
     }
-    // 桌面版数据根：固定独立目录，绝不与任何 server 实例（8091/8092 等）共享。
-    // ASTRION_DESKTOP_DATA_ROOT 仅供测试/调试覆盖（从父环境读取，不受清洗影响）。
-    let data_root = std::env::var_os("ASTRION_DESKTOP_DATA_ROOT")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .map(|h| PathBuf::from(h).join(".astrion").join("astrion-desktop"))
-        })
-        .or_else(|| {
-            std::env::var_os("USERPROFILE")
-                .map(|h| PathBuf::from(h).join(".astrion").join("astrion-desktop"))
-        });
-    if let Some(root) = data_root {
-        cmd.env("ASTRION_DATA_ROOT", root);
+    // 桌面版数据根：由壳侧统一解析（ASTRION_DESKTOP_DATA_ROOT > 设置文件 > 默认目录），
+    // 固定独立目录，绝不与任何 server 实例（8091/8092 等）共享。
+    // 显式设置在清洗之后（否则会被上面的 env_remove 抹掉）。
+    cmd.env("ASTRION_DATA_ROOT", data_root);
+
+    // 命令环境：Windows 上没有「登录 shell」概念，环境变量的权威来源是注册表。
+    // 从资源管理器/开始菜单启动的 GUI 进程只拿到系统变量，用户自己装的
+    // node/python/git 等不在 PATH 里——智能体执行的命令会找不到它们。
+    // 口径对齐 PowerShell 团队给 VS Code 的建议：读注册表，但【只做增量】——
+    // 进程已有条目顺序原样保留，注册表里多出来的追加到末尾（整体替换会把
+    // “用户专门带特定环境启动”的场景破坏掉）。
+    if let Some(additions) = shell_path {
+        let current = std::env::var("PATH").unwrap_or_default();
+        cmd.env("PATH", crate::shell_env::merge_path_entries(&current, additions));
     }
 
     // 桌面应用身份与控制桥地址：后端据此判定「自己是桌面壳内嵌实例」并代理更新接口。

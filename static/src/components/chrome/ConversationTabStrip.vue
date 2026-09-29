@@ -83,6 +83,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
 import { ICONS } from '@/utils/icons';
+import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/stores/ui';
 import { useConversationTabsStore, type ConversationTab } from '@/stores/conversationTabs';
 
@@ -114,10 +115,11 @@ function syncSidebarState() {
   }
 }
 
-/* 平台标记：壳 initialization_script 注入（desktop/src-tauri/src/backend.rs）。
+/* 平台标记：壳注入（Tauri 壳 'windows'，Electron 壳 'darwin'/'win32'）——
+   口径差异统一由 desktopPlatform 归一，勿在本文件再写裸字符串比较。
    Windows 是原生标题栏（三大键在标题栏里），无红绿灯悬浮区——标签条左侧
    预留位改放「设置」入口按钮；快捷键提示修饰键用 Ctrl 而非 ⌘。 */
-const isWindows = (window as unknown as { __ASTRION_PLATFORM__?: string }).__ASTRION_PLATFORM__ === 'windows';
+const isWindows = isWindowsDesktopShell();
 const modKey = isWindows ? 'Ctrl' : '⌘';
 const newTabHint = computed(() => t('appUi.tabStripNewTabHint', { mod: modKey }));
 const closeHint = computed(() => t('appUi.tabStripCloseHint', { mod: modKey }));

@@ -11,6 +11,8 @@
 
 mod backend;
 mod bridge;
+mod rundata;
+mod shell_env;
 
 use tauri::Manager;
 

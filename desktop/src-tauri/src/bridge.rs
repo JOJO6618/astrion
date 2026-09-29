@@ -13,6 +13,12 @@
 //!   POST /chrome/dispatch   chrome 标签条 webview 的意图（激活/新建/关闭标签）→
 //!                           eval 注入主 webview（External URL 页面拿不到 Tauri JS API，
 //!                           但壳可以主动向页面执行 JS）
+//!   GET  /rundata/info      运行数据目录设置（环境变量锁定/已配置/生效中/默认）
+//!   POST /rundata/apply     切换数据目录（含可选迁移）——只写设置与待迁移标记，
+//!                           真正的复制在下次启动、spawn 后端之前完成（见 rundata.rs）
+//!   POST /rundata/restart   请求壳重启（迁移在重启后的启动链里执行）
+//!   GET  /migration         迁移进度窗口页面（自包含 HTML，无外部资源）
+//!   GET  /migration/progress 迁移进度 JSON（供上述页面轮询）
 //! 注意：窗口句柄一律用 get_window("main")——tauri 的 get_webview_window 内部
 //! 要求窗口所有 webview 与窗口同 label（is_webview_window），主窗口挂了 chrome
 //! 子 webview 后该判定恒为 false，会静默返回 None（2026-09-28 三大键失效事故）。
@@ -33,6 +39,134 @@ pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const MAX_HEADER_BYTES: usize = 16 * 1024;
 /// POST body 丢弃读取上限（本桥接口不需要 body，读完只为让 TCP 正常收尾）
 const MAX_BODY_DRAIN: usize = 1024 * 1024;
+
+/// 迁移进度窗口页面（自包含，无外部资源；由桥自身 serve——此刻后端还没启动）。
+/// 轮询 /migration/progress；完成后由壳关闭窗口。
+const MIGRATION_PAGE: &str = r##"<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>正在迁移数据</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column;
+    justify-content: center; gap: 14px; padding: 22px 24px;
+    font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+    background: #faf9f5; color: #1f1e1c; user-select: none;
+  }
+  .title { font-size: 14px; font-weight: 600; }
+  .bar { height: 6px; border-radius: 3px; background: rgba(0,0,0,.08); overflow: hidden; }
+  .fill { height: 100%; width: 0%; border-radius: 3px; background: #cc785c; transition: width .18s ease; }
+  .fill.busy { width: 35%; animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+  .meta { display: flex; justify-content: space-between; gap: 12px; color: #6b675f; font-size: 12px; }
+  .meta .detail { white-space: nowrap; }
+  .err { color: #b3261e; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1c1b1a; color: #ece9e4; }
+    .bar { background: rgba(255,255,255,.12); }
+    .meta { color: #a8a29a; }
+    .err { color: #f2b8b5; }
+  }
+</style>
+</head>
+<body>
+  <div class="title" id="title">正在迁移运行数据…</div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div class="meta"><span id="status"></span><span class="detail" id="detail"></span></div>
+<script>
+  // 壳级页面不走前端 i18n 引擎，按浏览器语言自选一份文案（zh 开头用中文，其余英文）
+  var ZH = (navigator.language || '').toLowerCase().indexOf('zh') === 0;
+  var T = ZH ? {
+    moving: '正在迁移运行数据…',
+    doneTitle: '数据迁移完成',
+    failTitle: '数据迁移未完成',
+    unit: ' 项',
+    failPrefix: '迁移失败：',
+    unknown: '未知错误',
+    phases: {
+      idle: '准备中', scanning: '正在统计文件…', copying: '正在复制数据…',
+      verifying: '正在校验…', done: '迁移完成'
+    },
+    errors: {
+      verification_failed: '复制后的校验未通过，已保留原目录',
+      target_not_empty: '目标目录包含现有数据，已保留原目录',
+      target_not_directory: '目标路径不是可用目录，已保留原目录',
+      overlapping_directories: '新目录与当前目录互相包含',
+      same_directory: '新旧目录相同',
+      path_required: '数据目录路径无效'
+    }
+  } : {
+    moving: 'Moving app data…',
+    doneTitle: 'Data moved',
+    failTitle: 'Data migration incomplete',
+    unit: ' items',
+    failPrefix: 'Migration failed: ',
+    unknown: 'unknown error',
+    phases: {
+      idle: 'Preparing', scanning: 'Scanning files…', copying: 'Copying data…',
+      verifying: 'Verifying…', done: 'Finished'
+    },
+    errors: {
+      verification_failed: 'Copy verification failed; the original folder was kept',
+      target_not_empty: 'The target folder already has data; the original folder was kept',
+      target_not_directory: 'The target path is not a usable folder; the original folder was kept',
+      overlapping_directories: 'The new folder overlaps the current one',
+      same_directory: 'The new folder is the same as the current one',
+      path_required: 'The data folder path is invalid'
+    }
+  };
+  var title = document.getElementById('title');
+  var fill = document.getElementById('fill');
+  var status = document.getElementById('status');
+  var detail = document.getElementById('detail');
+  var stopped = false;
+
+  title.textContent = T.moving;
+  status.textContent = T.phases.idle;
+
+  function render(p) {
+    var total = p.bytes_total || 0;
+    var done = p.bytes_done || 0;
+    var pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+    if (p.phase === 'scanning' || (p.phase === 'copying' && total === 0)) {
+      fill.classList.add('busy');
+      fill.style.width = '';
+    } else {
+      fill.classList.remove('busy');
+      fill.style.width = pct + '%';
+    }
+    status.textContent = T.phases[p.phase] || p.phase;
+    detail.textContent = total > 0 && p.phase !== 'error'
+      ? pct + '%  ·  ' + (p.files_done || 0) + '/' + (p.files_total || 0) + T.unit
+      : '';
+    if (p.phase === 'error') {
+      stopped = true;
+      title.textContent = T.failTitle;
+      status.className = 'err';
+      status.textContent = T.errors[p.error] || (T.failPrefix + (p.error || T.unknown));
+    } else if (p.phase === 'done') {
+      stopped = true;
+      title.textContent = T.doneTitle;
+      fill.classList.remove('busy');
+      fill.style.width = '100%';
+    }
+  }
+
+  function tick() {
+    if (stopped) return;
+    fetch('/migration/progress', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (p) { render(p); setTimeout(tick, 200); })
+      .catch(function () { setTimeout(tick, 400); });
+  }
+  tick();
+</script>
+</body>
+</html>
+"##;
 
 #[derive(Clone, Copy, PartialEq)]
 enum UpdateState {
@@ -157,9 +291,10 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
     let method = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");
 
-    // POST 的 body：chrome/dispatch 与 window/control 需要内容（JSON，独立上限
+    // POST 的 body：chrome/dispatch、window/control、rundata/apply 需要内容（JSON，独立上限
     // 64KB）；其余端点不需要 body，读完只为让 TCP 正常收尾（不读完就关连接可能触发 RST）
-    let want_body = method == "POST" && (path == "/chrome/dispatch" || path == "/window/control");
+    let want_body = method == "POST"
+        && (path == "/chrome/dispatch" || path == "/window/control" || path == "/rundata/apply");
     let content_length: usize = lines
         .filter_map(|l| l.split_once(':'))
         .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
@@ -283,11 +418,86 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
                 None => respond(&mut stream, 409, "{\"dispatched\":false,\"error\":\"webview_missing\"}"),
             }
         }
+        ("GET", "/rundata/info") => {
+            let body = crate::rundata::info_payload();
+            respond(&mut stream, 200, &body)
+        }
+        ("POST", "/rundata/apply") => {
+            let payload = serde_json::from_slice::<serde_json::Value>(&body)
+                .unwrap_or(serde_json::Value::Null);
+            let data_root = payload
+                .get("data_root")
+                .or_else(|| payload.get("dataRoot"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let migrate = payload
+                .get("migrate")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            match crate::rundata::schedule_data_root_change(data_root, migrate) {
+                Ok(target) => {
+                    let body = serde_json::json!({
+                        "success": true,
+                        "active_path": target.to_string_lossy(),
+                        "restart_required": true,
+                    })
+                    .to_string();
+                    respond(&mut stream, 200, &body)
+                }
+                Err(code) => {
+                    let body =
+                        serde_json::json!({ "success": false, "error": code }).to_string();
+                    respond(&mut stream, 400, &body)
+                }
+            }
+        }
+        ("POST", "/rundata/restart") => {
+            // 先把 202 写回去，再稍后重启——重启会杀掉后端，前端此时可能收不到响应，
+            // 前端已有「连接先于响应断开视为已交给壳重启」的处理
+            let result = respond(&mut stream, 202, "{\"success\":true,\"restarting\":true}");
+            let handle = app.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                handle.restart();
+            });
+            result
+        }
+        ("GET", "/migration") => respond_raw(
+            &mut stream,
+            200,
+            "text/html; charset=utf-8",
+            MIGRATION_PAGE,
+        ),
+        ("GET", "/migration/progress") => {
+            let body = match crate::rundata::migration_progress().lock() {
+                Ok(p) => serde_json::json!({
+                    "active": p.active,
+                    "phase": p.phase,
+                    "files_done": p.files_done,
+                    "files_total": p.files_total,
+                    "bytes_done": p.bytes_done,
+                    "bytes_total": p.bytes_total,
+                    "error": p.error,
+                })
+                .to_string(),
+                Err(_) => "{\"phase\":\"error\",\"error\":\"lock_poisoned\"}".to_string(),
+            };
+            respond(&mut stream, 200, &body)
+        }
         _ => respond(&mut stream, 404, "{\"error\":\"not_found\"}"),
     }
 }
 
 fn respond(stream: &mut TcpStream, status: u16, body: &str) -> std::io::Result<()> {
+    respond_raw(stream, status, "application/json; charset=utf-8", body)
+}
+
+fn respond_raw(
+    stream: &mut TcpStream,
+    status: u16,
+    content_type: &str,
+    body: &str,
+) -> std::io::Result<()> {
     let reason = match status {
         200 => "OK",
         202 => "Accepted",
@@ -297,7 +507,7 @@ fn respond(stream: &mut TcpStream, status: u16, body: &str) -> std::io::Result<(
         _ => "OK",
     };
     let resp = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
     stream.write_all(resp.as_bytes())?;
