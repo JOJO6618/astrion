@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -25,6 +26,8 @@ from utils.api_client.codex.settings import (
     API_BASE,
     CODEX_AUTH_PATH,
     CODEX_CLI_MODELS_CACHE,
+    CODEX_NPM_LATEST_URL,
+    CODEX_VERSION_DISCOVERY_TIMEOUT_SECONDS,
     MODELS_TTL_SECONDS,
     MODELS_URL,
     get_client_version,
@@ -90,6 +93,36 @@ def _profile_from_model_info(slug: str, info: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+_CODEX_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
+
+
+def _discover_latest_client_version() -> Optional[str]:
+    """从官方 npm Registry 读取 Codex CLI latest 版本。
+
+    /models 没有提供版本发现接口，因此使用 OpenAI 发布的
+    ``@openai/codex`` 元数据作为候选版本；调用方仍必须用 /models
+    实际验证，失败时回退到上一次成功版本。
+    """
+    try:
+        with httpx.Client(
+            proxy=resolve_proxy(),
+            timeout=CODEX_VERSION_DISCOVERY_TIMEOUT_SECONDS,
+        ) as client:
+            response = client.get(
+                CODEX_NPM_LATEST_URL,
+                headers={"Accept": "application/json"},
+            )
+        if response.status_code != 200:
+            return None
+        version = response.json().get("version")
+        if not isinstance(version, str):
+            return None
+        version = version.strip()
+        return version if _CODEX_VERSION_RE.fullmatch(version) else None
+    except Exception:
+        return None
+
+
 class CodexModelsManager:
     """模型列表的拉取/缓存/读取（host 单用户进程级单例）。"""
 
@@ -148,9 +181,13 @@ class CodexModelsManager:
     # ---------------------------------------------------------------- 刷新
 
     def refresh_sync(self) -> Dict[str, Any]:
-        """同步在线刷新（持锁）。失败降级旧缓存/CLI 缓存，返回结果状态。"""
+        """同步在线刷新（持锁），自动发现并验证 Codex CLI 版本。"""
         with self._lock:
             current = load_codex_data()
+            cached_version = get_client_version()
+            discovered_version = _discover_latest_client_version()
+            candidates = [v for v in (discovered_version, cached_version) if v]
+            candidates = list(dict.fromkeys(candidates))
             headers = {
                 "OpenAI-Beta": "responses=experimental",
                 "originator": "codex_cli_rs",
@@ -166,49 +203,88 @@ class CodexModelsManager:
                 if self._auth._is_fresh(access) is False:
                     # 刷新是同步持锁操作，这里直接复用
                     self._auth._refresh_sync()
-                    access = self._auth._get_cached()["tokens"]["access_token"]
+                    tokens = self._auth._get_cached().get("tokens") or {}
+                    access = tokens.get("access_token")
                 headers["Authorization"] = f"Bearer {access}"
                 account_id = tokens.get("account_id")
                 if account_id:
                     headers["chatgpt-account-id"] = account_id
-                etag = current.get("etag")
-                if etag:
-                    headers["If-None-Match"] = etag
+
+                last_error = "models_request_failed"
                 with httpx.Client(proxy=resolve_proxy(), timeout=30) as client:
-                    resp = client.get(
-                        MODELS_URL,
-                        params={"client_version": get_client_version()},
-                        headers=headers,
-                    )
-                if resp.status_code == 304:
-                    current["fetched_at"] = _now_iso()
-                    current["source"] = "online"
-                    save_codex_data(current)
-                    self._memory = current
-                    result.update({"refreshed": True, "not_modified": True})
-                    return result
-                if resp.status_code != 200:
-                    result["error"] = f"http_{resp.status_code}"
-                    return self._fallback(current, result)
-                body = resp.json()
-                models = body.get("models")
-                if not isinstance(models, list):
-                    result["error"] = "bad_payload"
-                    return self._fallback(current, result)
-                new_data = load_codex_data()  # 保留 proxy 等配置键
-                new_data.update(
-                    {
-                        "models": models,
-                        "fetched_at": _now_iso(),
-                        "etag": resp.headers.get("etag"),
-                        "client_version": get_client_version(),
-                        "source": "online",
-                    }
-                )
-                save_codex_data(new_data)
-                self._memory = new_data
-                result.update({"refreshed": True, "count": len(models)})
-                return result
+                    for version in candidates:
+                        request_headers = dict(headers)
+                        # ETag 与模型目录版本绑定；版本变化时不能拿旧 ETag
+                        # 误判为 304，否则会把旧目录保存到新版本下。
+                        if version == cached_version and current.get("etag"):
+                            request_headers["If-None-Match"] = current["etag"]
+                        try:
+                            resp = client.get(
+                                MODELS_URL,
+                                params={"client_version": version},
+                                headers=request_headers,
+                            )
+                        except Exception as exc:
+                            last_error = str(exc)
+                            continue
+
+                        if resp.status_code == 304 and version == cached_version:
+                            current["fetched_at"] = _now_iso()
+                            current["source"] = "online"
+                            save_codex_data(current)
+                            self._memory = current
+                            result.update(
+                                {
+                                    "refreshed": True,
+                                    "not_modified": True,
+                                    "count": len(current.get("models") or []),
+                                    "client_version": version,
+                                    "version_source": "cache",
+                                }
+                            )
+                            return result
+                        if resp.status_code != 200:
+                            last_error = f"http_{resp.status_code}"
+                            continue
+                        try:
+                            models = resp.json().get("models")
+                        except Exception as exc:
+                            last_error = f"bad_json: {exc}"
+                            continue
+                        if not isinstance(models, list) or not models:
+                            last_error = "bad_payload"
+                            continue
+
+                        new_data = load_codex_data()  # 保留 proxy 等配置键
+                        new_data.update(
+                            {
+                                "models": models,
+                                "fetched_at": _now_iso(),
+                                "etag": resp.headers.get("etag"),
+                                "client_version": version,
+                                "source": "online",
+                            }
+                        )
+                        save_codex_data(new_data)
+                        self._memory = new_data
+                        result.update(
+                            {
+                                "refreshed": True,
+                                "count": len(models),
+                                "client_version": version,
+                                "version_source": (
+                                    "npm_latest" if version == discovered_version else "cache"
+                                ),
+                            }
+                        )
+                        if version != cached_version:
+                            result["version_fallback"] = False
+                        return result
+
+                result["error"] = last_error
+                if discovered_version and discovered_version != cached_version:
+                    result["version_fallback"] = True
+                return self._fallback(current, result)
             except Exception as exc:
                 result["error"] = str(exc)
                 return self._fallback(current, result)

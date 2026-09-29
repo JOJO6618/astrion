@@ -65,10 +65,12 @@ USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
 RESET_CREDITS_CONSUME_URL = f"{RESET_CREDITS_URL}/consume"
 
-# 拉取模型列表时自报的客户端版本（/models 强制要求，缺了 400）；
-# 初始值跟随本机 Codex CLI 缓存的 0.153.4，必要时可在 codex_models.json
-# 用 "client_version" 键覆盖。
+# 拉取模型列表时自报的客户端版本（/models 强制要求，缺了 400）。
+# 该值只作为网络发现失败时的安全兜底；正常刷新会从官方 npm Registry
+# 获取 @openai/codex 的 latest 版本，并在模型请求成功后写入缓存。
 DEFAULT_CLIENT_VERSION = "0.153.4"
+CODEX_NPM_LATEST_URL = "https://registry.npmjs.org/@openai%2fcodex/latest"
+CODEX_VERSION_DISCOVERY_TIMEOUT_SECONDS = 5.0
 
 # access_token 过期前多久触发刷新（秒）
 REFRESH_SKEW_SECONDS = 300
