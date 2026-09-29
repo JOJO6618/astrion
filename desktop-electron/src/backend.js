@@ -125,9 +125,9 @@ const CHILD_ENV_SCRUB_PREFIXES = ['ASTRION_', 'AGENT_'];
 
 /**
  * spawn 后端：环境清洗 → 显式指定数据根/桌面身份/控制桥端口。
- * @param {{python: string, backendDir: string, port: number, bridgePort: number | null, version: string}} opts
+ * @param {{python: string, backendDir: string, port: number, bridgePort: number | null, version: string, shellPath?: string | null}} opts
  */
-export function spawnBackend({ python, backendDir, port, bridgePort, version }) {
+export function spawnBackend({ python, backendDir, port, bridgePort, version, shellPath }) {
   // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建
   const defaultWs = os.homedir() || path.join(backendDir, 'project');
 
@@ -136,6 +136,12 @@ export function spawnBackend({ python, backendDir, port, bridgePort, version }) 
   for (const [key, value] of Object.entries(process.env)) {
     if (CHILD_ENV_SCRUB_PREFIXES.some((p) => key.startsWith(p))) continue;
     env[key] = value;
+  }
+  if (shellPath) {
+    const pathEntries = [...shellPath.split(path.delimiter), ...(env.PATH || '').split(path.delimiter)]
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    env.PATH = [...new Set(pathEntries)].join(path.delimiter);
   }
   // .app 内为只读目录：禁写 __pycache__；Windows GBK 代码页下 print 崩溃用 UTF-8 模式根治
   env.PYTHONDONTWRITEBYTECODE = '1';

@@ -14,6 +14,7 @@
 Electron 主进程
 ├─ backend.js    Python sidecar：探测解释器（.venv → homebrew → PATH）→ spawn
 │                -m server.app --port <动态端口> → 轮询 /api/host-mode-enabled 就绪
+├─ shell_env.js  从 macOS 用户登录 shell 读取 PATH（限时；仅 PATH 传给后端）
 ├─ bridge.js     127.0.0.1 控制桥（与 Tauri 版端点契约逐字节一致）：
 │                GET /version · POST /update/install · GET /update/progress
 │                · POST /window/drag（兼容空操作）· POST /chrome/dispatch
@@ -23,6 +24,7 @@ Electron 主进程
 └─ menu.js       应用菜单（保留 Edit 菜单保 Cmd+C/V；不占用 Cmd+W/Cmd+T 给前端标签）
 ```
 
+- 桌面命令环境：启动时最多等待 10 秒读取用户登录 shell 的 PATH（zsh/bash/fish）；只把 PATH 合并进后端环境，其他 shell 变量不导入。读取失败时记录状态并沿用原 PATH，不阻断启动。
 - 后端契约：`ASTRION_DESKTOP_VERSION` / `ASTRION_DESKTOP_BRIDGE_PORT` /
   `ASTRION_DATA_ROOT`（~/.astrion/astrion-desktop）环境变量语义不变；
   控制桥五个端点行为与 Tauri 版一致（`server/status/desktop_update.py` 无感知）。
