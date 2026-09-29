@@ -1292,6 +1292,24 @@ const RELOCK_BOTTOM_THRESHOLD_PX = 100;
 // （delta<0 但 remain≈0），这不是用户上滚。
 const ESCAPE_LEAVE_BOTTOM_PX = 8;
 
+// —— 回锁补间（2026-09-29 新增）——
+// 用户滚动进入底部阈值区触发回锁时，最多 100px 的剩余距离瞬跳有明显「吸底」感，
+// 改为 200ms easeOutCubic 平滑到位。设计要点：
+// - 每帧重算目标 maxTop：流式增长时目标自然延伸，不会定格在旧位置；
+// - 补间期间压制跟随引擎（requestFollowWrite 判 relockAnimRaf），否则引擎瞬时写底
+//   会顶掉动画——补间本身就是这 200ms 内的临时写入者；
+// - 可被用户输入即时打断：escapeFollowLock 统一取消（wheel-up / 触摸下拉 / 证据推断
+//   都走该入口），不与用户抢滚动。
+const RELOCK_ANIMATION_MS = 200;
+let relockAnimRaf: number | null = null;
+
+function cancelRelockAnimation() {
+  if (relockAnimRaf !== null) {
+    cancelAnimationFrame(relockAnimRaf);
+    relockAnimRaf = null;
+  }
+}
+
 // 几何派生态：仅用于对外展示（回底按钮显隐 / trace / getStickState 契约），
 // 不参与锁定裁决
 const isAtBottom = ref(true);
@@ -1312,6 +1330,8 @@ function syncStickState() {
 function requestFollowWrite(source: string) {
   if (followState.value !== 'locked') return;
   if (quickNavJumpActive) return;
+  // 回锁补间进行中：补间每帧自己写底，引擎此刻瞬时写入会顶掉动画
+  if (relockAnimRaf !== null) return;
   const el = scrollRef.value;
   if (!el) return;
   const maxTop = el.scrollHeight - el.clientHeight;
@@ -1326,6 +1346,7 @@ function escapeFollowLock(reason: string) {
   if (followState.value === 'escaped') return;
   followState.value = 'escaped';
   cancelBottomFollowLock();
+  cancelRelockAnimation();
   bounceTraceLog('follow:escape', { reason }, 'follow:escape', 0);
 }
 
@@ -1334,10 +1355,38 @@ function relockFollow(source: string) {
   followState.value = 'locked';
   // 引擎接管滚动，进行中的锚定动画让位（锚定 tick 内也有同款自查兑底）
   stopBlockExpansionAnchors();
-  markProgrammaticHint(`ChatArea.relock:${source}`);
   const el = scrollRef.value;
   if (el) {
-    el.scrollTop = el.scrollHeight - el.clientHeight;
+    const startTop = el.scrollTop;
+    const distance = el.scrollHeight - el.clientHeight - startTop;
+    if (distance > 2) {
+      // 平滑回锁：200ms easeOutCubic。动画期间跟随引擎被压制（requestFollowWrite
+      // 判 relockAnimRaf），由本补间独占写入；用户上滚经 escapeFollowLock 即时取消。
+      cancelRelockAnimation();
+      const startTs = performance.now();
+      const tick = () => {
+        relockAnimRaf = null;
+        const cur = scrollRef.value;
+        if (!cur) return;
+        const liveTarget = cur.scrollHeight - cur.clientHeight;
+        const t = Math.min(1, (performance.now() - startTs) / RELOCK_ANIMATION_MS);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const next = t >= 1 ? liveTarget : startTop + (liveTarget - startTop) * eased;
+        markProgrammaticHint('ChatArea.relock-anim');
+        // 单调推进：用户同向下滚比补间快时不回拽（shrink 由浏览器 clamp 处理）
+        if (next > cur.scrollTop) {
+          cur.scrollTop = next;
+        }
+        if (t < 1) {
+          relockAnimRaf = requestAnimationFrame(tick);
+        }
+      };
+      relockAnimRaf = requestAnimationFrame(tick);
+    } else {
+      // 已在底部（如 bottom-follow 动画落定后回锁）：瞬时写底即可
+      markProgrammaticHint(`ChatArea.relock:${source}`);
+      el.scrollTop = el.scrollHeight - el.clientHeight;
+    }
   }
   bounceTraceLog('follow:relock', { source }, 'follow:relock', 0);
 }
@@ -2029,6 +2078,8 @@ async function stickScrollToBottom(
     followState.value = 'locked';
     suppressUserIntentUntil = Date.now() + 900;
   }
+  // 瞬时写底前取消可能进行中的回锁补间，避免两个写入者叠写
+  cancelRelockAnimation();
   // 非强制且已脱锁：拒绝（双保险，App 层已按 followState 阻断）
   if (followState.value !== 'locked' || !el) {
     return false;
@@ -2500,6 +2551,7 @@ onBeforeUnmount(() => {
   stopBlockExpansionAnchors();
   cancelQuickNavJump();
   cancelBottomFollowLock();
+  cancelRelockAnimation();
   if (contentResizeObserver) {
     contentResizeObserver.disconnect();
     contentResizeObserver = null;
