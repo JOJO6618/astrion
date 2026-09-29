@@ -1,10 +1,22 @@
-"""预览面板目标检测与记录（2026-09-27 新增）。
+"""预览面板目标检测与记录（2026-09-27 新增，2026-09-29 简化）。
 
-三类捕获源（实时检测，非任务末尾统一扫描）：
+两类捕获源（实时检测）：
 1. write_file / edit_file 创建/修改的 .html 文件（tools_execution 挂钩）
 2. 模型流式输出中的 localhost / 127.0.0.1 / [::1] 链接（stream_loop 滚动缓冲增量匹配）
-3. run_command / terminal_input 的命令特征 + 输出中的 URL（命令关键词判"疑似服务器"，
-   输出中的 URL 才是确切地址——Vite 会打印 Local: http://localhost:5173）
+
+2026-09-29 简化（用户拍板）：删除 run_command / terminal_input / terminal_snapshot
+三处命令输出挂钩——实测它们是脏数据主来源（浏览器控制台日志 `@ url:行号` 后缀、
+代码模板字符串 f"http://127.0.0.1:{port}/" 假地址），且放行条件里「输出非空」
+几乎恒真，门禁形同虚设。服务器地址改由 prompt 要求模型在回复中主动给出完整
+URL（prompts/preview_panel.txt），模型输出源负责捕捉。
+
+URL 识别规则（2026-09-29 重写，修复 Markdown/中文粘连）：
+- 路径采用 ASCII 白名单字符集（排除 `* ' " ( ) [ ] { } < > :` 与一切非 ASCII），
+  Markdown 加粗符、中文、全角括号自然截断——旧黑名单字符集曾把
+  `index.html**（预览面板里也有）` 整段粘进 URL 并生成多条脏记录；
+- 裸主机（无端口且无路径）不记录——真实 dev server 必有端口，裸主机几乎
+  都是代码模板（f"http://127.0.0.1:{port}/"）或散文提及；
+- favicon.ico 等静态资源请求不记录（控制台 404 噪音）。
 
 存储：对话 metadata.preview_targets（跟随对话，压缩/重启不丢），结构见 _normalize。
 广播：与 edited_files 同款——写 metadata 后经 context_manager 回调发
@@ -18,12 +30,24 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 # 本地 URL 匹配：localhost / 127.0.0.1 / [::1]，可选端口与路径
-# Flask 打印 127.0.0.1、Vite 打印 localhost，两者都必须覆盖；
 # 0.0.0.0 是监听地址（python -m http.server 等横幅打印它），匹配后归一化为 127.0.0.1
+# 路径 = ASCII 白名单（2026-09-29）：Markdown/中文/全角符号/行号后缀一概不粘；
+# 代码模板 f"http://127.0.0.1:{port}/" 匹配不到数字端口，落成裸主机后由
+# _accept_url 拒绝，无需额外的结尾前瞻
 _LOCAL_URL_RE = re.compile(
-    r"https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d{1,5})?(?:/[^\s)\]}>\"'`，。；]*)?",
+    r"https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d{1,5})?"
+    r"(?:/[A-Za-z0-9\-._~%/@?#=&+]*)?",
     re.IGNORECASE,
 )
+
+# URL 结构解析（判裸主机用）：host + 可选端口 + 可选路径
+_URL_STRUCTURE_RE = re.compile(
+    r"^(https?://(?:localhost|127\.0\.0\.1|\[::1\]))(:\d{1,5})?(/.*)?$",
+    re.IGNORECASE,
+)
+
+# 静态资源噪音路径（浏览器自动请求，不是用户要预览的页面）
+_NOISE_PATH_SUFFIXES = ("/favicon.ico",)
 
 
 def _normalize_url(url: str) -> str:
@@ -31,13 +55,6 @@ def _normalize_url(url: str) -> str:
     预览统一映射为 127.0.0.1。"""
     return re.sub(r"^(https?://)0\.0\.0\.0", r"\g<1>127.0.0.1", url, flags=re.IGNORECASE)
 
-# 服务器启动命令特征（弱信号：只判"疑似服务器"，地址以输出中的 URL 为准）
-_SERVER_COMMAND_HINTS = (
-    "npm run dev", "npm run serve", "npm start", "yarn dev", "pnpm dev", "bun dev",
-    "vite", "next dev", "nuxt dev", "flask run", "uvicorn", "gunicorn",
-    "http.server", "php -s", "rails s", "hugo server", "jekyll serve",
-    "live-server", "serve -s", "--port", "manage.py runserver",
-)
 
 _HTML_SUFFIXES = (".html", ".htm")
 
@@ -69,14 +86,34 @@ def is_previewable_file(path: Any) -> bool:
     return rel.endswith(_HTML_SUFFIXES)
 
 
+def _accept_url(url: str) -> Optional[str]:
+    """URL 有效性判定 + 规范化。返回可记录的 URL，无效返回 None。
+
+    - 剥离尾部残留标点（正则白名单之外的兜底，如句末英文句号紧贴）；
+    - 尾部 `/` 归一（`…:8321/` 与 `…:8321` 同一条）；
+    - 裸主机（无端口且无路径）拒绝；
+    - favicon.ico 等静态资源噪音拒绝。
+    """
+    url = _normalize_url(url.rstrip(".,;:!?")).rstrip("/")
+    match = _URL_STRUCTURE_RE.match(url)
+    if not match:
+        return None
+    _host, port, path = match.group(1), match.group(2), match.group(3)
+    if not port and not path:
+        return None  # 裸主机：无端口无路径，无预览价值（多为代码模板残留）
+    if path and path.lower().endswith(_NOISE_PATH_SUFFIXES):
+        return None
+    return url
+
+
 def scan_text_for_local_urls(text: str) -> List[str]:
     """从文本中提取本地 URL 列表（去重、保序）。"""
     if not text:
         return []
     urls: List[str] = []
     for match in _LOCAL_URL_RE.finditer(text):
-        url = _normalize_url(match.group(0).rstrip(".,;:!?"))
-        if url not in urls:
+        url = _accept_url(match.group(0))
+        if url and url not in urls:
             urls.append(url)
     return urls
 
@@ -91,20 +128,12 @@ def scan_stream_urls(buffer: str, seen: set) -> List[str]:
     """
     urls: List[str] = []
     for match in _LOCAL_URL_RE.finditer(buffer):
-        url = _normalize_url(match.group(0).rstrip(".,;:!?"))
         if match.end() >= len(buffer):
             continue  # 触及末尾，可能未完，推迟
+        url = _accept_url(match.group(0))
         if url and url not in seen:
             urls.append(url)
     return urls
-
-
-def looks_like_server_command(command: str) -> bool:
-    """命令文本是否疑似启动服务器（弱信号，用于标注来源与 label）。"""
-    if not command:
-        return False
-    lowered = command.lower()
-    return any(hint in lowered for hint in _SERVER_COMMAND_HINTS)
 
 
 def _target_key(target: Dict[str, Any]) -> str:
@@ -119,8 +148,8 @@ def _origin(url: str) -> str:
     return match.group(1) if match else url
 
 
-def _server_label(url: str, command: str = "") -> str:
-    """服务器标签：:端口[/路径] · 猜测的框架名。同 origin 保留多条后，
+def _server_label(url: str) -> str:
+    """服务器标签：:端口[/路径]。同 origin 保留多条后，
     路径必须进 label，否则同端口的根地址与具体页面在列表里无法区分。"""
     port_match = re.search(r":(\d{1,5})(?:/|$)", url)
     port = port_match.group(1) if port_match else "80"
@@ -130,22 +159,16 @@ def _server_label(url: str, command: str = "") -> str:
         path = path_match.group(1)
         if len(path) > 24:
             path = path[:23] + "…"
-    lowered = (command or "").lower()
-    framework = ""
-    for hint, name in (
-        ("vite", "Vite"), ("next", "Next.js"), ("nuxt", "Nuxt"),
-        ("flask", "Flask"), ("uvicorn", "Uvicorn"), ("django", "Django"),
-        ("manage.py", "Django"), ("rails", "Rails"), ("hugo", "Hugo"),
-        ("http.server", "HTTP Server"),
-    ):
-        if hint in lowered:
-            framework = name
-            break
-    base = f":{port}{path}"
-    return f"{base} · {framework}" if framework else base
+    return f":{port}{path}"
 
 
 def _normalize(entries: Any) -> List[Dict[str, Any]]:
+    """加载时清洗 + 去重（所有读取出口统一走这里，老对话读出自愈）。
+
+    服务器条目按 2026-09-29 新规则重新过一遍 `_accept_url`：脏 URL
+    （Markdown/中文粘连）截回干净形态重新去重，裸主机/噪音条目直接剔除——
+    旧对话的存量垃圾无需迁移脚本即自动消失。
+    """
     if not isinstance(entries, list):
         return []
     result: List[Dict[str, Any]] = []
@@ -153,6 +176,21 @@ def _normalize(entries: Any) -> List[Dict[str, Any]]:
     for item in entries:
         if not isinstance(item, dict):
             continue
+        if item.get("type") == "server":
+            raw_url = str(item.get("url") or "")
+            # 脏 URL 可能粘着非 ASCII 尾巴，用新正则重新提取干净前缀
+            clean = None
+            rematch = _LOCAL_URL_RE.search(raw_url)
+            if rematch:
+                clean = _accept_url(rematch.group(0))
+            if not clean:
+                continue  # 裸主机/噪音/不可修复的脏条目，剔除
+            # 无论 URL 是否变化都重算 origin/label：旧条目可能带着已删除的
+            # 框架猜测后缀（「· HTTP Server」），统一为新格式
+            item = dict(item)
+            item["url"] = clean
+            item["origin"] = _origin(clean)
+            item["label"] = _server_label(clean)
         key = _target_key(item)
         if key in seen or key.endswith(":"):
             continue
@@ -180,7 +218,6 @@ def record_url_targets(
     urls: List[str],
     *,
     source: str,
-    command: str = "",
 ) -> None:
     """记录服务器 URL 预览目标（同完整 URL 去重，同 origin 不同 path 保留多条）。"""
     if not is_preview_enabled():
@@ -188,7 +225,7 @@ def record_url_targets(
     for url in urls:
         _mutate(context_manager, conversation_id, {
             "type": "server", "url": url, "origin": _origin(url),
-            "label": _server_label(url, command), "source": source,
+            "label": _server_label(url), "source": source,
         })
 
 

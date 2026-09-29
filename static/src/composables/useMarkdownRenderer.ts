@@ -639,12 +639,53 @@ const sanitizedSchema: Record<string, any> = {
   }
 };
 
+// remark-gfm 的 autolink-literal 按 GFM 规范只修剪尾随 ASCII 标点，中文语境下
+// 网址后面的文字会被整段粘进链接（2026-09-29 用户反馈：`**url**（中文）` 全粘）。
+// 此插件在 rehype 层把 autolink 生成的 <a>（显示文本即 href）在第一个
+// 「URL 不可能字符」处截断：显示文字不变，只修正链接范围。
+// 截断字符集 = Markdown 定界符 + 全角/CJK 标点 + 弯引号；刻意保留 CJK 表意文字
+//（维基百科 https://zh.wikipedia.org/wiki/计算机 类链接是合法 URL，不能误伤）。
+const AUTOLINK_CUT_RE =
+  /[*_"'`<>[\]{}\\^|]|[\u3000-\u303F\uFF00-\uFFEF\u2013\u2014\u2018\u2019\u201C\u201D\u2026]/;
+
+function cleanAutolinkLiteralsPlugin() {
+  return (tree: any) => {
+    visit(tree, 'element', (node: any, index: number | undefined, parent: any) => {
+      if (!node || node.tagName !== 'a' || !parent || typeof index !== 'number') return;
+      const href = node.properties?.href;
+      if (typeof href !== 'string' || !/^https?:\/\//i.test(href)) return;
+      if (!Array.isArray(node.children) || node.children.length !== 1) return;
+      const child = node.children[0];
+      if (!child || child.type !== 'text' || typeof child.value !== 'string') return;
+      const text: string = child.value;
+      // 只处理 autolink 字面量（显示文本即 URL），不动作者写的 [文字](链接)
+      if (text !== href && href !== `http://${text}`) return;
+      const cut = text.search(AUTOLINK_CUT_RE);
+      if (cut === -1) return;
+      const cleaned = text.slice(0, cut).replace(/[.,;:!?]+$/, '');
+      if (!cleaned) return;
+      const remainder = text.slice(cleaned.length);
+      const isWww = !/^https?:\/\//i.test(text);
+      const newHref = isWww ? `http://${cleaned}` : cleaned;
+      const newLink = {
+        ...node,
+        properties: { ...node.properties, href: newHref },
+        children: [{ type: 'text', value: cleaned }]
+      };
+      const nodes = remainder ? [newLink, { type: 'text', value: remainder }] : [newLink];
+      parent.children.splice(index, 1, ...nodes);
+      return index + nodes.length;
+    });
+  };
+}
+
 const markdownProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkBreaks)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRaw)
+  .use(cleanAutolinkLiteralsPlugin)
   .use(normalizeShowTagsPlugin)
   .use(transformDownloadLinksPlugin)
   .use(wrapMarkdownTablesPlugin)

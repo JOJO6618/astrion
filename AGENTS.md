@@ -597,10 +597,12 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 
 ### 16.1 检测与存储
 
-- **检测模块唯一权威**：`modules/preview_targets.py`。三类捕获源全部**实时**检测（非任务末尾统一扫描）：
+- **检测模块唯一权威**：`modules/preview_targets.py`。**两类捕获源**（2026-09-29 简化，原为三类）：
   1. `write_file`/`edit_file` 的 `.html`/`.htm` 文件（挂钩 `tools_execution._record_edited_file`）
   2. 模型流式输出的 localhost/127.0.0.1/[::1] 链接（`chat_flow_stream_loop` 滚动缓冲 120 字符增量扫描，防 URL 跨 chunk 断裂；每次回复内去重）
-  3. `run_command`/`terminal_input`/`terminal_snapshot`：命令关键词是弱信号（判「疑似服务器」与生成 label），**确切地址以输出中的 URL 为准**（Vite/Flask 会自打印）；terminal_snapshot 挂钩是为补捕 output_wait 窗口之后才打印的服务器横幅（如 http.server 的 Serving HTTP 行），滚动窗口反复扫到同一 URL 靠 URL 去重防刷屏
+  - **run_command/terminal_input/terminal_snapshot 输出检测已删除**（2026-09-29 用户拍板）：实测命令输出是脏数据主来源（浏览器控制台 `@ url:行号` 后缀、代码模板 `f"http://127.0.0.1:{port}/"` 假地址），且放行条件「输出非空」几乎恒真形同虚设；服务器地址改由 prompt（`prompts/preview_panel.txt`）要求模型在回复中主动写出完整 URL
+- **URL 识别规则**（2026-09-29 重写，修复 Markdown/中文粘连）：路径为 ASCII 白名单字符集（`* ' " ( ) [ ] :` 与非 ASCII 一概不粘）；裸主机（无端口无路径）不记录；favicon.ico 等静态资源噪音不记录；尾部 `/` 归一后去重。`_normalize` 对存量条目按新规则自愈清洗（脏 URL 截回干净形态重新去重、无效条目剔除、label 统一重算），所有读取出口（preview.py / conversation.py / conversation_bootstrap.py）均走 `_normalize`，老对话读出自愈无需迁移。测试：`test/test_preview_targets.py`。
+- **聊天消息裸 URL 渲染截断**（2026-09-29）：remark-gfm autolink-literal 按 GFM 规范只修剪尾随 ASCII 标点，中文/全角符号/Markdown 残余会被整段粘进链接；`useMarkdownRenderer.ts` 的 `cleanAutolinkLiteralsPlugin`（rehype 层）把 autolink 生成的 <a> 在第一个「URL 不可能字符」处截断（Markdown 定界符 + 全角/CJK 标点 + 弯引号），显示文字不变只修链接范围；刻意保留 CJK 表意文字（维基百科类合法 URL）。
 - **0.0.0.0 归一化**：`0.0.0.0` 是监听地址不是访问地址（Chrome 已禁访问），扫描时统一映射为 127.0.0.1 再记录。
 - **存储**：对话 `metadata.preview_targets`（按对话隔离，跟随压缩/重启）；服务器按**完整 URL** 去重——同 origin 不同 path 保留多条（用户拍板：根地址与具体页面是独立预览目标），同 URL 重复命中不写不广播（防流式刷屏）；label 格式 `:端口[/路径] · 框架`（同端口多条靠路径区分）。
 - **广播**：与 edited_files 同一链路——`context_manager._web_terminal_callback("preview_targets_updated", {preview_targets})` 进任务事件流；bootstrap 回填走对话 messages 接口的 `data.preview_targets`（文件目标过滤已删除文件）。

@@ -1396,26 +1396,8 @@ class MainTerminalToolsExecutionMixin:
                         )
                         if result["success"]:
                             print(f"{OUTPUT_FORMATS['terminal']} 执行命令: {arguments['command']}")
-                        # 预览面板：终端命令特征 + 输出 URL 检测（同 run_command）
-                        try:
-                            from modules.preview_targets import (
-                                looks_like_server_command,
-                                record_url_targets,
-                                scan_text_for_local_urls,
-                            )
-                            _cmd_text = str(arguments.get("command") or "")
-                            _output_text = str(result.get("output") or "") if isinstance(result, dict) else ""
-                            _urls = scan_text_for_local_urls(_output_text) or scan_text_for_local_urls(_cmd_text)
-                            if _urls and (looks_like_server_command(_cmd_text) or _output_text):
-                                record_url_targets(
-                                    getattr(self, "context_manager", None),
-                                    getattr(self.context_manager, "current_conversation_id", None),
-                                    _urls,
-                                    source="command_output",
-                                    command=_cmd_text,
-                                )
-                        except Exception:
-                            pass
+                        # （2026-09-29 预览捕捉简化：终端输出不再作为预览 URL 来源，
+                        #  只保留模型输出 + 文件编辑两源，见 modules/preview_targets.py）
 
                     elif tool_name == "terminal_snapshot":
                         result = self.terminal_manager.get_terminal_snapshot(
@@ -1423,26 +1405,6 @@ class MainTerminalToolsExecutionMixin:
                             lines=arguments.get("lines"),
                             max_chars=arguments.get("max_chars")
                         )
-                        # 预览面板：快照输出中的 URL 检测——服务器启动横幅可能在
-                        # terminal_input 的 output_wait 窗口之后才打印（如 http.server
-                        # 的 Serving HTTP on ... 行），快照是唯一能补捕的时机；
-                        # 滚动窗口会反复扫到同一 URL，靠 record 的 URL 去重防刷屏
-                        try:
-                            from modules.preview_targets import (
-                                record_url_targets,
-                                scan_text_for_local_urls,
-                            )
-                            _snap_text = str(result.get("output") or "") if isinstance(result, dict) else ""
-                            _snap_urls = scan_text_for_local_urls(_snap_text)
-                            if _snap_urls:
-                                record_url_targets(
-                                    getattr(self, "context_manager", None),
-                                    getattr(self.context_manager, "current_conversation_id", None),
-                                    _snap_urls,
-                                    source="command_output",
-                                )
-                        except Exception:
-                            pass
 
                     # sleep工具
                     elif tool_name == "sleep":
@@ -2029,31 +1991,8 @@ class MainTerminalToolsExecutionMixin:
                                             "command": arguments["command"]
                                         }
 
-                        # 预览面板：命令特征 + 输出中的本地 URL 检测服务器
-                        # （前后台、成功失败都扫——服务器启动后命令仍在跑属正常）
-                        try:
-                            from modules.preview_targets import (
-                                looks_like_server_command,
-                                record_url_targets,
-                                scan_text_for_local_urls,
-                            )
-                            _cmd_text = str(arguments.get("command") or "")
-                            _output_text = ""
-                            if isinstance(result, dict):
-                                _output_text = str(result.get("output") or "")
-                            _urls = scan_text_for_local_urls(_output_text)
-                            if not _urls:
-                                _urls = scan_text_for_local_urls(_cmd_text)
-                            if _urls and (looks_like_server_command(_cmd_text) or _output_text):
-                                record_url_targets(
-                                    getattr(self, "context_manager", None),
-                                    getattr(self.context_manager, "current_conversation_id", None),
-                                    _urls,
-                                    source="command_output",
-                                    command=_cmd_text,
-                                )
-                        except Exception:
-                            pass
+                        # （2026-09-29 预览捕捉简化：run_command 输出不再作为
+                        #  预览 URL 来源，见 modules/preview_targets.py）
 
                     elif tool_name == "update_memory":
                         operation = arguments["operation"]
