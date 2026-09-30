@@ -129,7 +129,11 @@ def _bridge_request(ctx: dict, method: str, path: str, timeout: float, json_body
         }), 200)
     url = f"http://127.0.0.1:{ctx['bridge_port']}{path}"
     try:
-        resp = httpx.request(method, url, timeout=timeout, json=json_body)
+        # 本机控制桥必须直连；Windows 系统代理也会被 httpx 默认读取。
+        resp = httpx.request(
+            method, url, timeout=timeout, json=json_body, trust_env=False,
+        )
+        resp.raise_for_status()
         return resp.json(), None
     except Exception as exc:  # noqa: BLE001 - 桥不可达统一包装，细节进 detail
         return None, (jsonify({
