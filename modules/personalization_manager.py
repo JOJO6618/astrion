@@ -98,6 +98,8 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "enabled": False,
     "communication_style": "default",  # default / human_like / auto
     "conversation_continuity": "medium",  # high / medium / low
+    "morality_level": "medium",  # low / medium / high
+    "adult_content_restriction": "medium",  # none / low / medium / high
     "self_identify": "",
     "user_name": "",
     "use_custom_names": False,
@@ -440,6 +442,12 @@ def sanitize_personalization_payload(
         if _conversation_continuity in ALLOWED_CONVERSATION_CONTINUITY
         else "medium"
     )
+    for key, allowed in (
+        ("morality_level", ("low", "medium", "high")),
+        ("adult_content_restriction", ("none", "low", "medium", "high")),
+    ):
+        value = data.get(key, base.get(key, "medium"))
+        base[key] = value if value in allowed else "medium"
     base["auto_generate_title"] = bool(data.get("auto_generate_title", base["auto_generate_title"]))
     base["title_model"] = str(data.get("title_model", base.get("title_model", "")) or "").strip()
     base["sub_agent_model"] = str(data.get("sub_agent_model", base.get("sub_agent_model", "")) or "").strip()
@@ -1211,6 +1219,18 @@ def _load_prompt_file(filename: str) -> str:
     return ""
 
 
+def _build_content_preference_prompt(kind: str, value: Any) -> str:
+    """Render one independent level from file-backed personalization templates."""
+    allowed = ("low", "medium", "high") if kind == "morality" else ("none", "low", "medium", "high")
+    level = value if value in allowed else "medium"
+    template = _load_prompt_file(f"personalization/{kind}.txt")
+    content = _load_prompt_file(f"personalization/{kind}/{level}.txt")
+    if not template or not content:
+        return ""
+    label = {"none": "无", "low": "低", "medium": "中", "high": "高"}[level]
+    return template.format(level=label, content=content)
+
+
 def build_personalization_prompt(
     config: Optional[Dict[str, Any]],
     include_header: bool = True
@@ -1258,6 +1278,14 @@ def build_personalization_prompt(
             "当前对话优先，但可以在适当时候参考历史。若用户问题明显与过往偏好、项目背景或未完成事项有关，"
             "可以调用记忆或历史对话工具；不要为了普通问题主动翻历史。"
         )
+
+    for kind, key in (
+        ("morality", "morality_level"),
+        ("adult_content", "adult_content_restriction"),
+    ):
+        block = _build_content_preference_prompt(kind, config.get(key, "medium"))
+        if block:
+            lines.append("\n" + block)
 
     communication_style = str(config.get("communication_style") or "default").strip().lower()
     if communication_style == "auto":

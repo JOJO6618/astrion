@@ -79,6 +79,18 @@ export default {
   continuityMediumDesc: '当前对话优先，必要时参考历史',
   continuityLow: '低',
   continuityLowDesc: '当前对话尽量独立，少主动翻历史',
+  moralityTitle: '道德准则',
+  moralityDesc: '控制智能体对道德、诚信和他人权益的考量程度',
+  moralityLowDesc: '务实宽容，保留必要底线',
+  moralityMediumDesc: '重视诚实、公平、授权与尊重',
+  moralityHighDesc: '谨慎仁厚，主动考虑弱势方与长期影响',
+  adultContentTitle: '成人内容限制',
+  adultContentDesc: '控制成年人题材与亲密情节的表达范围',
+  adultContentNone: '无',
+  adultContentNoneDesc: '宽容讨论虚构成年人题材，亲密描写仍非露骨',
+  adultContentLowDesc: '允许自愿、非剥削的成年人非露骨亲密情节',
+  adultContentMediumDesc: '亲密情节服务剧情，不以性刺激为目的',
+  adultContentHighDesc: '仅非性化的恋爱互动与客观性教育',
 
   // ── 模型与思考 ──
   defaultModelTitle: '默认模型',

@@ -21,8 +21,41 @@ const {
   communicationStyleLabel,
   conversationContinuityLabel,
   selectCommunicationStyle,
-  selectConversationContinuity
+  selectConversationContinuity,
+  closeDropdown
 } = ctx;
+
+const contentPreferences = [
+  {
+    key: 'morality_level',
+    title: 'personalization.moralityTitle',
+    description: 'personalization.moralityDesc',
+    options: [
+      { value: 'low', label: 'personalization.continuityLow', description: 'personalization.moralityLowDesc' },
+      { value: 'medium', label: 'personalization.continuityMedium', description: 'personalization.moralityMediumDesc' },
+      { value: 'high', label: 'personalization.continuityHigh', description: 'personalization.moralityHighDesc' }
+    ]
+  },
+  {
+    key: 'adult_content_restriction',
+    title: 'personalization.adultContentTitle',
+    description: 'personalization.adultContentDesc',
+    options: [
+      { value: 'none', label: 'personalization.adultContentNone', description: 'personalization.adultContentNoneDesc' },
+      { value: 'low', label: 'personalization.continuityLow', description: 'personalization.adultContentLowDesc' },
+      { value: 'medium', label: 'personalization.continuityMedium', description: 'personalization.adultContentMediumDesc' },
+      { value: 'high', label: 'personalization.continuityHigh', description: 'personalization.adultContentHighDesc' }
+    ]
+  }
+] as const;
+
+const selectContentPreference = (
+  key: 'morality_level' | 'adult_content_restriction',
+  value: string
+) => {
+  personalization.updateField({ key, value });
+  closeDropdown();
+};
 </script>
 
 <template>
@@ -252,5 +285,37 @@ const {
                           </div>
                         </div>
                       </div>
+    <div v-for="preference in contentPreferences" :key="preference.key" class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t(preference.title) }}</span>
+        <span class="settings-row-desc">{{ $t(preference.description) }}</span>
+      </span>
+      <div
+        class="settings-select-wrap"
+        :class="{ open: activeDropdown === preference.key }"
+        @click.stop
+      >
+        <button type="button" class="settings-select-button" @click="toggleDropdown(preference.key)">
+          {{ $t(preference.options.find(option => option.value === form[preference.key])?.label || 'personalization.continuityMedium') }}
+          <span class="select-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+          :style="activeDropdown ? floatingMenuStyle : undefined"
+        >
+          <button
+            v-for="option in preference.options"
+            :key="option.value"
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form[preference.key] === option.value }"
+            @click="selectContentPreference(preference.key, option.value)"
+          >
+            <strong>{{ $t(option.label) }}</strong><span>{{ $t(option.description) }}</span>
+            <svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

@@ -97,6 +97,8 @@ interface PersonalForm {
   enabled: boolean;
   communication_style: CommunicationStyle;
   conversation_continuity: ConversationContinuity;
+  morality_level: 'low' | 'medium' | 'high';
+  adult_content_restriction: 'none' | 'low' | 'medium' | 'high';
   auto_generate_title: boolean;
   /** 标题生成模型（注册表模型 key）；留空 = 自动规则 */
   title_model: string;
@@ -337,6 +339,8 @@ const defaultForm = (): PersonalForm => ({
   enabled: false,
   communication_style: 'default',
   conversation_continuity: 'medium',
+  morality_level: 'medium',
+  adult_content_restriction: 'medium',
   auto_generate_title: true,
   title_model: '',
   sub_agent_model: '',
@@ -576,6 +580,16 @@ export const usePersonalizationStore = defineStore('personalization', {
         conversation_continuity:
           data.conversation_continuity === 'low' || data.conversation_continuity === 'high'
             ? data.conversation_continuity
+            : 'medium',
+        morality_level:
+          data.morality_level === 'low' || data.morality_level === 'high'
+            ? data.morality_level
+            : 'medium',
+        adult_content_restriction:
+          data.adult_content_restriction === 'none' ||
+          data.adult_content_restriction === 'low' ||
+          data.adult_content_restriction === 'high'
+            ? data.adult_content_restriction
             : 'medium',
         auto_generate_title: data.auto_generate_title !== false,
         title_model: typeof data.title_model === 'string' ? data.title_model : '',

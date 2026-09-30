@@ -78,6 +78,18 @@ export default {
   continuityMediumDesc: 'Prioritizes the current conversation; references history when needed',
   continuityLow: 'Low',
   continuityLowDesc: 'Keeps conversations independent; rarely looks at history',
+  moralityTitle: 'Moral guidelines',
+  moralityDesc: 'How strongly the agent considers ethics, integrity and others’ rights',
+  moralityLowDesc: 'Pragmatic and tolerant, with essential boundaries',
+  moralityMediumDesc: 'Values honesty, fairness, authorization and respect',
+  moralityHighDesc: 'Carefully considers vulnerable people and long-term effects',
+  adultContentTitle: 'Adult content restrictions',
+  adultContentDesc: 'Controls the treatment of adult themes and intimate scenes',
+  adultContentNone: 'None',
+  adultContentNoneDesc: 'Broad fictional adult themes; intimacy remains non-graphic',
+  adultContentLowDesc: 'Consensual, non-exploitative and non-graphic adult intimacy',
+  adultContentMediumDesc: 'Intimacy serves the story, rather than sexual stimulation',
+  adultContentHighDesc: 'Only non-sexual romance and factual sex education',
 
   // ── Model & Thinking ──
   defaultModelTitle: 'Default model',
