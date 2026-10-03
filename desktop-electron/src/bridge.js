@@ -46,7 +46,16 @@ function setProgress(state, error = null) {
 async function getAutoUpdater() {
   if (autoUpdater) return autoUpdater;
   const mod = await import('electron-updater');
-  autoUpdater = mod.autoUpdater;
+  // electron-updater 是纯 CJS 包（out/main.js，无 ESM 入口）：Node 的 ESM 互操作
+  // 只把 module.exports 挂在 default 上，命名导出拿不到（实测 6.8.9 的
+  // mod.autoUpdater === undefined），必须从 default 取。两种形状都兼容，
+  // 取不到时明确报错——否则后续 autoDownload 赋值会抛出误导性的
+  // "Cannot set properties of undefined"，掩盖真实原因。
+  const resolved = mod?.autoUpdater ?? mod?.default?.autoUpdater;
+  if (!resolved) {
+    throw new Error('electron-updater: autoUpdater export not found (module shape changed?)');
+  }
+  autoUpdater = resolved;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.on('update-not-available', () => {

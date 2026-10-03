@@ -978,6 +978,7 @@ import CitationPopover from './components/chat/CitationPopover.vue';
 import { useTutorialStore } from './stores/tutorial';
 import { usePersonalizationStore } from './stores/personalization';
 import { usePreviewStore } from './stores/preview';
+import { useDesktopUpdateStore } from './stores/desktopUpdate';
 
 const VirtualMonitorSurface = defineAsyncComponent(
   () => import('./components/chat/VirtualMonitorSurface.vue')
@@ -1031,6 +1032,9 @@ onMounted(() => {
   }, 300);
   if ((window as any).__ASTRION_DESKTOP__) {
     document.addEventListener('click', onDesktopLocalhostLinkClick, true);
+    // 桌面壳：应用入口静默检查一次更新（任何路由进入都覆盖，store 内部只跑一次）；
+    // 有新版本只亮侧边栏红点，不弹窗打扰
+    useDesktopUpdateStore().checkStartupUpdate();
   }
 });
 onBeforeUnmount(() => {

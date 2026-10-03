@@ -102,6 +102,20 @@ def _update_channel() -> str | None:
     return None
 
 
+def _update_manifest_name(channel: str) -> str:
+    """检查清单文件名。
+
+    macOS 桌面端现行形态是 Electron 壳：检查走 latest-mac.json（由服务器
+    regen_manifest.py 从 Electron 产物生成，与安装清单 latest-mac.yml 同源，
+    版本必然一致）。Tauri 时代的 latest-darwin-aarch64.json 已停止生成
+    （mac 无 Tauri 存量用户）——曾因该文件冻结在 Tauri 末版 0.3.9，导致 0.4.0
+    起 macOS 检查更新全部失效。Windows 仍是 Tauri 壳，沿用 latest-<channel>.json。
+    """
+    if channel.startswith("darwin"):
+        return "latest-mac.json"
+    return f"latest-{channel}.json"
+
+
 def _parse_version(text: str) -> tuple:
     """宽松语义化版本解析：'0.2.0' → (0, 2, 0)，非法段按 0 计。"""
     parts = []
@@ -166,7 +180,7 @@ def desktop_update_check():
             "error": tr("desktop_update.unsupported_platform"),
         }), 200
 
-    manifest_url = f"{_UPDATE_MANIFEST_BASE}/latest-{channel}.json"
+    manifest_url = f"{_UPDATE_MANIFEST_BASE}/{_update_manifest_name(channel)}"
     try:
         resp = httpx.get(manifest_url, timeout=8.0, follow_redirects=True)
         resp.raise_for_status()

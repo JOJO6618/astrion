@@ -1537,8 +1537,8 @@ onMounted(() => {
   // 收起态，而 localStorage 可能残留上一会话的展开态——不写初始值会让桌面壳
   // 标签条的首标签融合色停留在错误状态（直到用户首次切换侧边栏才自愈）
   uiStore.setSidebarCollapsed(uiStore.sidebarCollapsed);
-  // 桌面壳启动静默检查一次：有新版只亮红点，不弹窗打扰（store 内部判定桌面环境）
-  desktopUpdateStore.checkUpdate({ silent: true });
+  // 桌面壳的启动静默更新检查已移到应用入口 App.vue（覆盖任意路由进入的场景），
+  // 此处不再触发以免重复请求；侧边栏只按 store 状态渲染红点。
 });
 
 onBeforeUnmount(() => {

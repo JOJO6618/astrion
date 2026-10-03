@@ -3,7 +3,8 @@
 // 职责：
 // - 仅桌面壳内启用（壳 initialization_script 注入 window.__ASTRION_DESKTOP__）；
 //   Web/移动浏览器环境不检测、不显示入口
-// - 启动静默检查一次（侧边栏挂载时触发）：发现新版本只亮红点，不弹窗打扰
+// - 启动静默检查一次（应用入口 App.vue 挂载时触发，任何路由进入都覆盖）：
+//   发现新版本只亮红点，不弹窗打扰
 // - 手动检查（弹窗打开时强制回源）+ 无感更新安装（进度 1s 轮询直到应用重启）
 //
 // 后端链路：/api/desktop/update/* → 壳控制桥 / 官网更新清单（见 server/status/desktop_update.py）
@@ -53,6 +54,8 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
     dialogOpen: false,
     /** 检查中（启动静默检查也置位，但无 UI 展示） */
     checking: false,
+    /** 启动静默检查是否已触发（防止重挂载/HMR 重复请求） */
+    startupChecked: false,
     /** 已至少成功/失败检查过一次（红点逻辑据此避免误亮） */
     checked: false,
     /** 最近一次检查结果（null = 尚未检查成功） */
@@ -78,6 +81,16 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
   },
 
   actions: {
+    /**
+     * 启动静默检查：应用入口（App.vue）挂载时调用一次。
+     * 与手动检查共用同一链路，只是失败不打扰、且只跑一次；发现新版由红点提示。
+     */
+    checkStartupUpdate() {
+      if (this.startupChecked) return;
+      this.startupChecked = true;
+      void this.checkUpdate({ silent: true });
+    },
+
     /** 检查更新。silent=true 为启动静默检查：失败只记录不展示。 */
     async checkUpdate(opts: { silent?: boolean; force?: boolean } = {}) {
       if (!this.isDesktop || this.checking) return;
