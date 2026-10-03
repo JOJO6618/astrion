@@ -15,12 +15,12 @@
       </template>
       <div class="append-meta" v-if="action.append">
         <span v-if="action.append.path">{{ action.append.path }}</span>
-        <span v-if="action.append.lines !== null && action.append.lines !== undefined"
-          >{{ $t('chat.linesCount', { n: action.append.lines }) }}</span
-        >
-        <span v-if="action.append.bytes !== null && action.append.bytes !== undefined"
-          >{{ $t('chat.bytesCount', { n: action.append.bytes }) }}</span
-        >
+        <span v-if="action.append.lines !== null && action.append.lines !== undefined">{{
+          $t('chat.linesCount', { n: action.append.lines })
+        }}</span>
+        <span v-if="action.append.bytes !== null && action.append.bytes !== undefined">{{
+          $t('chat.bytesCount', { n: action.append.bytes })
+        }}</span>
       </div>
       <div class="append-warning icon-label" v-if="action.append?.forced">
         <span class="icon icon-sm" :style="iconStyle('triangleAlert')" aria-hidden="true"></span>
@@ -46,7 +46,7 @@ const successText = computed(() => {
   void currentLocale.value;
   if (props.variant === 'payload') {
     return t('chat.appendSuccess', {
-      path: props.action.append?.path || t('chat.targetFile'),
+      path: props.action.append?.path || t('chat.targetFile')
     });
   }
   return props.action.append?.summary || t('chat.appendDone');

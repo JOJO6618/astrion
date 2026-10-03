@@ -7,7 +7,9 @@
             <div class="title">{{ $t('personalization.expTitle') }}</div>
             <div class="subtitle">{{ $t('personalization.expSubtitle') }}</div>
           </div>
-          <button class="confirm-btn" type="button" @click="confirmSelection">{{ $t('personalization.expConfirmStart') }}</button>
+          <button class="confirm-btn" type="button" @click="confirmSelection">
+            {{ $t('personalization.expConfirmStart') }}
+          </button>
         </div>
         <div class="grid">
           <div

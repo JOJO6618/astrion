@@ -25,7 +25,9 @@ export const pickerMethods = {
       return;
     }
     // 快速上传与拖拽/粘贴统一走三路分发：图片→图片附加，视频→视频附加，其余→文件附加
-    const list = Array.isArray(files) ? files.filter(Boolean) : Array.from(files || []).filter(Boolean);
+    const list = Array.isArray(files)
+      ? files.filter(Boolean)
+      : Array.from(files || []).filter(Boolean);
     if (!list.length) return;
     this.processDroppedFiles(list);
   },

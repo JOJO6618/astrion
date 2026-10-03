@@ -5,724 +5,754 @@
       :class="{ 'messages-area--render-pending': renderPending }"
       ref="scrollRef"
     >
-    <div class="messages-flow" ref="contentRef">
-      <!-- 窗口化渲染：virtua 只挂载可视区+buffer 的消息块，未挂载项按实测高度缓存占位 -->
-      <Virtualizer
-        ref="virtualizerRef"
-        class="chat-message-list"
-        v-if="stickScrollElement"
-        :data="filteredMessages || []"
-        :scroll-ref="stickScrollElement"
-        :buffer-size="400"
-        :keep-mounted="keepMountedIndexes"
-      >
-        <template #default="{ item: msg, index }">
-      <div
-        :key="getMessageKey(msg, index)"
-        class="message-block"
-        :class="{
-          'message-block--compact-user': getMessageVisibility(msg) === 'compact',
-          'message-block--sub-agent-notice': isSubAgentNoticeOnlyMessage(msg),
-          'message-block--before-sub-agent-notice': isFollowedBySubAgentNotice(index),
-          'message-block--multi-agent': isMultiAgentMessage(msg),
-          'message-block--first': index === 0,
-          'message-block--last': index === (filteredMessages || []).length - 1
-        }"
-      >
-        <div
-          v-if="msg.role === 'user'"
-          class="user-message"
-          :class="{
-            'user-message--multi-agent': isMultiAgentMessage(msg),
-            'user-message--compact': getMessageVisibility(msg) === 'compact',
-            'user-message--brief': isBriefCompactMessage(msg)
-          }"
+      <div class="messages-flow" ref="contentRef">
+        <!-- 窗口化渲染：virtua 只挂载可视区+buffer 的消息块，未挂载项按实测高度缓存占位 -->
+        <Virtualizer
+          ref="virtualizerRef"
+          class="chat-message-list"
+          v-if="stickScrollElement"
+          :data="filteredMessages || []"
+          :scroll-ref="stickScrollElement"
+          :buffer-size="400"
+          :keep-mounted="keepMountedIndexes"
         >
-          <div v-if="isBriefCompactMessage(msg)" class="compact-brief-line" role="separator">
-            <span class="compact-brief-text">{{ compactBriefLabel(msg) }}</span>
-          </div>
-          <template v-else>
+          <template #default="{ item: msg, index }">
             <div
-              class="message-header icon-label"
+              :key="getMessageKey(msg, index)"
+              class="message-block"
               :class="{
-                'message-header--multi-agent': isMultiAgentMessage(msg),
-                'message-header--hidden':
-                  isMultiAgentMessage(msg) && isContinuousMultiAgentMessage(msg, index)
-              }"
-            >
-              <template v-if="isMultiAgentMessage(msg)">
-                <span>{{ multiAgentHeaderLabel(msg) }}</span>
-              </template>
-              <template v-else>
-                <span
-                  class="icon icon-sm"
-                  :style="iconStyleSafe(userHeaderIconKey(msg))"
-                  aria-hidden="true"
-                ></span>
-                <span>{{ userHeaderLabel(msg) }}</span>
-              </template>
-            </div>
-            <div
-              class="message-text user-bubble-text"
-              :class="{
-                'is-collapsed': isUserBubbleCollapsed(msg, index),
-                'is-expandable': isUserBubbleExpandable(msg, index),
-                'is-history-loading': props.historyLoading || userBubbleTransitionSuppressed
+                'message-block--compact-user': getMessageVisibility(msg) === 'compact',
+                'message-block--sub-agent-notice': isSubAgentNoticeOnlyMessage(msg),
+                'message-block--before-sub-agent-notice': isFollowedBySubAgentNotice(index),
+                'message-block--multi-agent': isMultiAgentMessage(msg),
+                'message-block--first': index === 0,
+                'message-block--last': index === (filteredMessages || []).length - 1
               }"
             >
               <div
-                v-if="msg.content"
-                class="bubble-text"
-                :class="{ 'is-expanded': isUserBubbleExpanded(msg, index) }"
-                :ref="(el) => registerUserBubbleRef(msg, index, el)"
-              >
-                <template v-if="isMultiAgentMessage(msg)">
-                  <MarkdownRenderer
-                    :content="multiAgentBubbleContent(msg)"
-                    :is-streaming="false"
-                  />
-                </template>
-                <template v-else>
-                  <span v-html="renderUserMessageContent(msg.content)"></span>
-                </template>
-              </div>
-              <div
-                v-if="(msg.images && msg.images.length) || messageFiles(msg).length"
-                class="image-inline-row"
-              >
-                <div
-                  class="image-thumbnail-wrapper"
-                  v-for="(img, imgIndex) in msg.images"
-                  :key="mediaPreviewKey(msg, img, imgIndex)"
-                  @click.stop="previewMessageImage(msg, img)"
-                >
-                  <img
-                    :src="getPreviewUrl(msg, img, 'image')"
-                    :alt="formatImageName(img)"
-                    class="image-thumbnail"
-                  />
-                </div>
-                <FileChips v-if="messageFiles(msg).length" :files="messageFiles(msg)" />
-              </div>
-              <div v-if="msg.videos && msg.videos.length" class="image-inline-row video-inline-row">
-                <div
-                  class="image-thumbnail-wrapper"
-                  v-for="(video, videoIndex) in msg.videos"
-                  :key="mediaPreviewKey(msg, video, videoIndex)"
-                >
-                  <img
-                    :src="getPreviewUrl(msg, video, 'video')"
-                    :alt="formatImageName(video)"
-                    class="image-thumbnail"
-                  />
-                </div>
-              </div>
-              <div
-                v-if="isUserBubbleExpandable(msg, index)"
-                class="user-bubble-expand-row"
-              >
-                <button
-                  class="user-bubble-action-btn user-bubble-expand-btn"
-                  :class="{ expanded: isUserBubbleExpanded(msg, index) }"
-                  :title="isUserBubbleExpanded(msg, index) ? $t('chat.collapse') : $t('chat.expand')"
-                  :aria-label="isUserBubbleExpanded(msg, index) ? $t('chat.collapse') : $t('chat.expand')"
-                  @click.stop="toggleUserBubble(msg, index)"
-                ></button>
-              </div>
-            </div>
-            <div v-if="!isMultiAgentMessage(msg)" class="user-bubble-actions">
-              <button
-                class="user-bubble-action-btn copy"
-                :class="{ copied: isUserBubbleCopied(msg, index) }"
-                :title="isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')"
-                :aria-label="isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')"
-                @click="copyUserMessage(msg, index)"
-              ></button>
-              <button
-                class="user-bubble-action-btn branch"
-                :title="$t('chat.branch')"
-                :aria-label="$t('chat.branch')"
-                @click="branchUserMessage(msg)"
-              ></button>
-              <span class="user-bubble-time">{{ formatUserMessageTime(msg) }}</span>
-            </div>
-          </template>
-        </div>
-        <div v-else-if="msg.role === 'assistant'" class="assistant-message">
-          <!-- 在 assistant 消息前显示 Astrion 头部 -->
-          <!-- 只有当前一条消息是 user 且当前消息有内容时才显示 -->
-          <div
-            v-if="
-              shouldShowAssistantHeader(index) &&
-              (hasRenderableAssistantActions(msg.actions || []) || msg.awaitingFirstContent)
-            "
-            class="message-header icon-label"
-          >
-            <span>{{ aiAssistantName }}</span>
-            <span v-if="assistantWorkLabel(index)" class="assistant-work-status">{{
-              assistantWorkLabel(index)
-            }}</span>
-          </div>
-          <div
-            v-if="msg.awaitingFirstContent"
-            class="action-item streaming-content immediate-show assistant-generating-block"
-          >
-            <div class="text-output">
-              <div
-                class="text-content assistant-generating-placeholder"
-                role="status"
-                aria-live="polite"
-              >
-                <span
-                  v-for="(letter, letterIndex) in getGeneratingLetters(msg)"
-                  :key="letterIndex"
-                  class="assistant-generating-letter"
-                  :style="{ animationDelay: `${letterIndex * 0.08}s` }"
-                >
-                  {{ letter }}
-                </span>
-              </div>
-            </div>
-          </div>
-          <template v-if="blockDisplayMode === 'minimal'">
-            <MinimalBlocks
-              v-if="hasRenderableAssistantActions(msg.actions || [])"
-              :actions="msg.actions || []"
-              :citations="citationsForMessage(msg)"
-              :citations-final="citationsFinalForMessage(msg)"
-              enable-citations
-              :conversation-running="streamingMessage"
-              :is-latest-message="index === latestMessageIndex"
-              :icon-style="iconStyleSafe"
-              :get-tool-icon="getToolIcon"
-              :get-tool-status-text="getToolStatusText"
-              :get-tool-description="getToolDescription"
-              :format-search-topic="formatSearchTopic"
-              :format-search-time="formatSearchTime"
-              :format-search-domains="formatSearchDomains"
-              :register-thinking-ref="registerThinkingRef"
-              :handle-thinking-scroll="props.handleThinkingScroll"
-              @group-toggle="handleMinimalGroupToggle"
-              @group-collapse-finished="handleMinimalGroupCollapseFinished"
-            />
-          </template>
-          <template v-else-if="stackedBlocksEnabled">
-            <template v-for="group in splitActionGroups(msg.actions || [], index)" :key="group.key">
-              <StackedBlocks
-                v-if="group.kind === 'stack'"
-                class="stacked-blocks-wrapper"
-                :actions="group.actions"
-                :expanded-blocks="expandedBlocks"
-                :collapsing-blocks="collapsingBlocks"
-                :conversation-running="streamingMessage"
-                :is-latest-message="index === latestMessageIndex"
-                :icon-style="iconStyleSafe"
-                :toggle-block="toggleBlock"
-                :register-thinking-ref="registerThinkingRef"
-                :handle-thinking-scroll="handleThinkingScroll"
-                :get-tool-animation-class="getToolAnimationClass"
-                :get-tool-icon="getToolIcon"
-                :get-tool-status-text="getToolStatusText"
-                :get-tool-description="getToolDescription"
-                :format-search-topic="formatSearchTopic"
-                :format-search-time="formatSearchTime"
-                :format-search-domains="formatSearchDomains"
-                @more-toggle="handleStackedMoreToggle"
-              />
-              <div
-                v-else-if="isActionVisible(group.action)"
-                class="action-item"
-                :key="group.action?.id || `${index}-${group.actionIndex}`"
+                v-if="msg.role === 'user'"
+                class="user-message"
                 :class="{
-                  'streaming-content': group.action?.streaming,
-                  'completed-tool': group.action?.type === 'tool' && !group.action?.streaming,
-                  'immediate-show':
-                    group.action?.streaming ||
-                    group.action?.type === 'text' ||
-                    group.action?.type === 'thinking',
-                  'thinking-finished': group.action?.type === 'thinking' && !group.action?.streaming,
-                  'no-entry-animation': !streamingMessage || index !== latestMessageIndex
+                  'user-message--multi-agent': isMultiAgentMessage(msg),
+                  'user-message--compact': getMessageVisibility(msg) === 'compact',
+                  'user-message--brief': isBriefCompactMessage(msg)
                 }"
               >
-                <div
-                  v-if="group.action?.type === 'thinking'"
-                  class="collapsible-block thinking-block"
-                  :class="{
-                    expanded: expandedBlocks?.has(
-                      group.action.blockId || `${index}-thinking-${group.actionIndex}`
-                    ),
-                    collapsing: collapsingBlocks?.has(
-                      group.action.blockId || `${index}-thinking-${group.actionIndex}`
-                    )
-                  }"
-                  :data-block-id="group.action.blockId || `${index}-thinking-${group.actionIndex}`"
-                >
+                <div v-if="isBriefCompactMessage(msg)" class="compact-brief-line" role="separator">
+                  <span class="compact-brief-text">{{ compactBriefLabel(msg) }}</span>
+                </div>
+                <template v-else>
                   <div
-                    class="collapsible-header"
-                    @click="
-                      toggleBlock(group.action.blockId || `${index}-thinking-${group.actionIndex}`)
-                    "
+                    class="message-header icon-label"
+                    :class="{
+                      'message-header--multi-agent': isMultiAgentMessage(msg),
+                      'message-header--hidden':
+                        isMultiAgentMessage(msg) && isContinuousMultiAgentMessage(msg, index)
+                    }"
                   >
+                    <template v-if="isMultiAgentMessage(msg)">
+                      <span>{{ multiAgentHeaderLabel(msg) }}</span>
+                    </template>
+                    <template v-else>
+                      <span
+                        class="icon icon-sm"
+                        :style="iconStyleSafe(userHeaderIconKey(msg))"
+                        aria-hidden="true"
+                      ></span>
+                      <span>{{ userHeaderLabel(msg) }}</span>
+                    </template>
+                  </div>
+                  <div
+                    class="message-text user-bubble-text"
+                    :class="{
+                      'is-collapsed': isUserBubbleCollapsed(msg, index),
+                      'is-expandable': isUserBubbleExpandable(msg, index),
+                      'is-history-loading': props.historyLoading || userBubbleTransitionSuppressed
+                    }"
+                  >
+                    <div
+                      v-if="msg.content"
+                      class="bubble-text"
+                      :class="{ 'is-expanded': isUserBubbleExpanded(msg, index) }"
+                      :ref="(el) => registerUserBubbleRef(msg, index, el)"
+                    >
+                      <template v-if="isMultiAgentMessage(msg)">
+                        <MarkdownRenderer
+                          :content="multiAgentBubbleContent(msg)"
+                          :is-streaming="false"
+                        />
+                      </template>
+                      <template v-else>
+                        <span v-html="renderUserMessageContent(msg.content)"></span>
+                      </template>
+                    </div>
+                    <div
+                      v-if="(msg.images && msg.images.length) || messageFiles(msg).length"
+                      class="image-inline-row"
+                    >
+                      <div
+                        class="image-thumbnail-wrapper"
+                        v-for="(img, imgIndex) in msg.images"
+                        :key="mediaPreviewKey(msg, img, imgIndex)"
+                        @click.stop="previewMessageImage(msg, img)"
+                      >
+                        <img
+                          :src="getPreviewUrl(msg, img, 'image')"
+                          :alt="formatImageName(img)"
+                          class="image-thumbnail"
+                        />
+                      </div>
+                      <FileChips v-if="messageFiles(msg).length" :files="messageFiles(msg)" />
+                    </div>
+                    <div
+                      v-if="msg.videos && msg.videos.length"
+                      class="image-inline-row video-inline-row"
+                    >
+                      <div
+                        class="image-thumbnail-wrapper"
+                        v-for="(video, videoIndex) in msg.videos"
+                        :key="mediaPreviewKey(msg, video, videoIndex)"
+                      >
+                        <img
+                          :src="getPreviewUrl(msg, video, 'video')"
+                          :alt="formatImageName(video)"
+                          class="image-thumbnail"
+                        />
+                      </div>
+                    </div>
+                    <div v-if="isUserBubbleExpandable(msg, index)" class="user-bubble-expand-row">
+                      <button
+                        class="user-bubble-action-btn user-bubble-expand-btn"
+                        :class="{ expanded: isUserBubbleExpanded(msg, index) }"
+                        :title="
+                          isUserBubbleExpanded(msg, index) ? $t('chat.collapse') : $t('chat.expand')
+                        "
+                        :aria-label="
+                          isUserBubbleExpanded(msg, index) ? $t('chat.collapse') : $t('chat.expand')
+                        "
+                        @click.stop="toggleUserBubble(msg, index)"
+                      ></button>
+                    </div>
+                  </div>
+                  <div v-if="!isMultiAgentMessage(msg)" class="user-bubble-actions">
+                    <button
+                      class="user-bubble-action-btn copy"
+                      :class="{ copied: isUserBubbleCopied(msg, index) }"
+                      :title="
+                        isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                      "
+                      :aria-label="
+                        isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                      "
+                      @click="copyUserMessage(msg, index)"
+                    ></button>
+                    <button
+                      class="user-bubble-action-btn branch"
+                      :title="$t('chat.branch')"
+                      :aria-label="$t('chat.branch')"
+                      @click="branchUserMessage(msg)"
+                    ></button>
+                    <span class="user-bubble-time">{{ formatUserMessageTime(msg) }}</span>
+                  </div>
+                </template>
+              </div>
+              <div v-else-if="msg.role === 'assistant'" class="assistant-message">
+                <!-- 在 assistant 消息前显示 Astrion 头部 -->
+                <!-- 只有当前一条消息是 user 且当前消息有内容时才显示 -->
+                <div
+                  v-if="
+                    shouldShowAssistantHeader(index) &&
+                    (hasRenderableAssistantActions(msg.actions || []) || msg.awaitingFirstContent)
+                  "
+                  class="message-header icon-label"
+                >
+                  <span>{{ aiAssistantName }}</span>
+                  <span v-if="assistantWorkLabel(index)" class="assistant-work-status">{{
+                    assistantWorkLabel(index)
+                  }}</span>
+                </div>
+                <div
+                  v-if="msg.awaitingFirstContent"
+                  class="action-item streaming-content immediate-show assistant-generating-block"
+                >
+                  <div class="text-output">
+                    <div
+                      class="text-content assistant-generating-placeholder"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span
+                        v-for="(letter, letterIndex) in getGeneratingLetters(msg)"
+                        :key="letterIndex"
+                        class="assistant-generating-letter"
+                        :style="{ animationDelay: `${letterIndex * 0.08}s` }"
+                      >
+                        {{ letter }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <template v-if="blockDisplayMode === 'minimal'">
+                  <MinimalBlocks
+                    v-if="hasRenderableAssistantActions(msg.actions || [])"
+                    :actions="msg.actions || []"
+                    :citations="citationsForMessage(msg)"
+                    :citations-final="citationsFinalForMessage(msg)"
+                    enable-citations
+                    :conversation-running="streamingMessage"
+                    :is-latest-message="index === latestMessageIndex"
+                    :icon-style="iconStyleSafe"
+                    :get-tool-icon="getToolIcon"
+                    :get-tool-status-text="getToolStatusText"
+                    :get-tool-description="getToolDescription"
+                    :format-search-topic="formatSearchTopic"
+                    :format-search-time="formatSearchTime"
+                    :format-search-domains="formatSearchDomains"
+                    :register-thinking-ref="registerThinkingRef"
+                    :handle-thinking-scroll="props.handleThinkingScroll"
+                    @group-toggle="handleMinimalGroupToggle"
+                    @group-collapse-finished="handleMinimalGroupCollapseFinished"
+                  />
+                </template>
+                <template v-else-if="stackedBlocksEnabled">
+                  <template
+                    v-for="group in splitActionGroups(msg.actions || [], index)"
+                    :key="group.key"
+                  >
+                    <StackedBlocks
+                      v-if="group.kind === 'stack'"
+                      class="stacked-blocks-wrapper"
+                      :actions="group.actions"
+                      :expanded-blocks="expandedBlocks"
+                      :collapsing-blocks="collapsingBlocks"
+                      :conversation-running="streamingMessage"
+                      :is-latest-message="index === latestMessageIndex"
+                      :icon-style="iconStyleSafe"
+                      :toggle-block="toggleBlock"
+                      :register-thinking-ref="registerThinkingRef"
+                      :handle-thinking-scroll="handleThinkingScroll"
+                      :get-tool-animation-class="getToolAnimationClass"
+                      :get-tool-icon="getToolIcon"
+                      :get-tool-status-text="getToolStatusText"
+                      :get-tool-description="getToolDescription"
+                      :format-search-topic="formatSearchTopic"
+                      :format-search-time="formatSearchTime"
+                      :format-search-domains="formatSearchDomains"
+                      @more-toggle="handleStackedMoreToggle"
+                    />
+                    <div
+                      v-else-if="isActionVisible(group.action)"
+                      class="action-item"
+                      :key="group.action?.id || `${index}-${group.actionIndex}`"
+                      :class="{
+                        'streaming-content': group.action?.streaming,
+                        'completed-tool': group.action?.type === 'tool' && !group.action?.streaming,
+                        'immediate-show':
+                          group.action?.streaming ||
+                          group.action?.type === 'text' ||
+                          group.action?.type === 'thinking',
+                        'thinking-finished':
+                          group.action?.type === 'thinking' && !group.action?.streaming,
+                        'no-entry-animation': !streamingMessage || index !== latestMessageIndex
+                      }"
+                    >
+                      <div
+                        v-if="group.action?.type === 'thinking'"
+                        class="collapsible-block thinking-block"
+                        :class="{
+                          expanded: expandedBlocks?.has(
+                            group.action.blockId || `${index}-thinking-${group.actionIndex}`
+                          ),
+                          collapsing: collapsingBlocks?.has(
+                            group.action.blockId || `${index}-thinking-${group.actionIndex}`
+                          )
+                        }"
+                        :data-block-id="
+                          group.action.blockId || `${index}-thinking-${group.actionIndex}`
+                        "
+                      >
+                        <div
+                          class="collapsible-header"
+                          @click="
+                            toggleBlock(
+                              group.action.blockId || `${index}-thinking-${group.actionIndex}`
+                            )
+                          "
+                        >
+                          <div class="arrow"></div>
+                          <div class="status-icon">
+                            <span
+                              class="thinking-icon"
+                              :class="{ 'thinking-animation': group.action.streaming }"
+                            >
+                              <span
+                                class="icon icon-sm"
+                                :style="iconStyleSafe('brain')"
+                                aria-hidden="true"
+                              ></span>
+                            </span>
+                          </div>
+                          <span class="status-text">{{
+                            group.action.streaming
+                              ? $t('chat.thinkingRunning')
+                              : $t('chat.thinking')
+                          }}</span>
+                        </div>
+                        <div
+                          class="collapsible-content"
+                          :ref="
+                            (el) =>
+                              registerCollapseContent(
+                                group.action.blockId || `${index}-thinking-${group.actionIndex}`,
+                                el
+                              )
+                          "
+                        >
+                          <div
+                            class="content-inner thinking-content"
+                            :ref="
+                              (el) =>
+                                registerThinkingRef(
+                                  group.action.blockId || `${index}-thinking-${group.actionIndex}`,
+                                  el
+                                )
+                            "
+                            @scroll="
+                              handleThinkingScroll(
+                                group.action.blockId || `${index}-thinking-${group.actionIndex}`,
+                                $event
+                              )
+                            "
+                            style="max-height: 240px; overflow-y: auto"
+                          >
+                            {{ group.action.content }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div v-else-if="group.action?.type === 'text'" class="text-output">
+                        <div
+                          class="text-content"
+                          :class="{ 'streaming-text': group.action.streaming }"
+                        >
+                          <MarkdownRenderer
+                            :content="group.action.content || ''"
+                            :is-streaming="group.action.streaming"
+                            :citations="citationsForMessage(msg)"
+                            :citations-final="citationsFinalForMessage(msg)"
+                            enable-citations
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        v-else-if="
+                          group.action?.type === 'system' &&
+                          getSubAgentSystemNoticeLabel(group.action)
+                        "
+                        class="sub-agent-system-summary-line"
+                      >
+                        {{ getSubAgentSystemNoticeLabel(group.action) }}
+                      </div>
+
+                      <div
+                        v-else-if="group.action?.type === 'append_payload'"
+                        class="append-placeholder"
+                        :class="{ 'append-error': group.action.append?.success === false }"
+                      >
+                        <div class="append-placeholder-content">
+                          <template v-if="group.action.append?.success !== false">
+                            <div class="icon-label append-status">
+                              <span
+                                class="icon icon-sm"
+                                :style="iconStyleSafe('pencil')"
+                                aria-hidden="true"
+                              ></span>
+                              <span>{{
+                                $t('chat.appendSuccess', {
+                                  path: group.action.append?.path || $t('chat.targetFile')
+                                })
+                              }}</span>
+                            </div>
+                          </template>
+                          <template v-else>
+                            <div class="icon-label append-status append-error-text">
+                              <span
+                                class="icon icon-sm"
+                                :style="iconStyleSafe('x')"
+                                aria-hidden="true"
+                              ></span>
+                              <span>{{
+                                $t('chat.appendFailed', {
+                                  path: group.action.append?.path || $t('chat.targetFile')
+                                })
+                              }}</span>
+                            </div>
+                          </template>
+                          <div class="append-meta" v-if="group.action.append">
+                            <span
+                              v-if="
+                                group.action.append.lines !== null &&
+                                group.action.append.lines !== undefined
+                              "
+                            >
+                              {{ $t('chat.linesCount', { n: group.action.append.lines }) }}
+                            </span>
+                            <span
+                              v-if="
+                                group.action.append.bytes !== null &&
+                                group.action.append.bytes !== undefined
+                              "
+                            >
+                              {{ $t('chat.bytesCount', { n: group.action.append.bytes }) }}
+                            </span>
+                          </div>
+                          <div class="append-warning icon-label" v-if="group.action.append?.forced">
+                            <span
+                              class="icon icon-sm"
+                              :style="iconStyleSafe('triangleAlert')"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ $t('chat.appendWarning') }}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        v-else-if="group.action?.type === 'append'"
+                        class="append-placeholder"
+                        :class="{ 'append-error': group.action.append?.success === false }"
+                      >
+                        <div class="append-placeholder-content">
+                          <div class="icon-label append-status">
+                            <span
+                              class="icon icon-sm"
+                              :style="iconStyleSafe('pencil')"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ group.action.append?.summary || $t('chat.appendDone') }}</span>
+                          </div>
+                          <div class="append-meta" v-if="group.action.append">
+                            <span>{{ group.action.append.path || $t('chat.targetFile') }}</span>
+                            <span v-if="group.action.append.lines">{{
+                              $t('chat.linesCount', { n: group.action.append.lines })
+                            }}</span>
+                            <span v-if="group.action.append.bytes">{{
+                              $t('chat.bytesCount', { n: group.action.append.bytes })
+                            }}</span>
+                          </div>
+                          <div class="append-warning icon-label" v-if="group.action.append?.forced">
+                            <span
+                              class="icon icon-sm"
+                              :style="iconStyleSafe('triangleAlert')"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ $t('chat.appendWarningFollow') }}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ToolAction
+                        v-else-if="group.action?.type === 'tool'"
+                        :action="group.action"
+                        :expanded="
+                          expandedBlocks?.has(
+                            group.action.blockId || `${index}-tool-${group.actionIndex}`
+                          )
+                        "
+                        :collapsing="
+                          collapsingBlocks?.has(
+                            group.action.blockId || `${index}-tool-${group.actionIndex}`
+                          )
+                        "
+                        :icon-style="iconStyleSafe"
+                        :get-tool-animation-class="getToolAnimationClass"
+                        :get-tool-icon="getToolIcon"
+                        :get-tool-status-text="getToolStatusText"
+                        :get-tool-description="getToolDescription"
+                        :format-search-topic="formatSearchTopic"
+                        :format-search-time="formatSearchTime"
+                        :format-search-domains="formatSearchDomains"
+                        :streaming-message="streamingMessage"
+                        :register-collapse-content="registerCollapseContent"
+                        :collapse-key="group.action.blockId || `${index}-tool-${group.actionIndex}`"
+                        :block-id="group.action.blockId || `${index}-tool-${group.actionIndex}`"
+                        @toggle="
+                          toggleBlock(group.action.blockId || `${index}-tool-${group.actionIndex}`)
+                        "
+                      />
+                    </div>
+                  </template>
+                </template>
+
+                <template v-else>
+                  <template
+                    v-for="(action, actionIndex) in msg.actions || []"
+                    :key="action.id || `${index}-${actionIndex}`"
+                  >
+                    <div
+                      v-if="isActionVisible(action)"
+                      class="action-item"
+                      :class="{
+                        'streaming-content': action.streaming,
+                        'completed-tool': action.type === 'tool' && !action.streaming,
+                        'immediate-show':
+                          action.streaming || action.type === 'text' || action.type === 'thinking',
+                        'thinking-finished': action.type === 'thinking' && !action.streaming,
+                        'no-entry-animation': !streamingMessage || index !== latestMessageIndex
+                      }"
+                    >
+                      <div
+                        v-if="action.type === 'thinking'"
+                        class="collapsible-block thinking-block"
+                        :class="{
+                          expanded: expandedBlocks?.has(
+                            action.blockId || `${index}-thinking-${actionIndex}`
+                          ),
+                          collapsing: collapsingBlocks?.has(
+                            action.blockId || `${index}-thinking-${actionIndex}`
+                          )
+                        }"
+                        :data-block-id="action.blockId || `${index}-thinking-${actionIndex}`"
+                      >
+                        <div
+                          class="collapsible-header"
+                          @click="toggleBlock(action.blockId || `${index}-thinking-${actionIndex}`)"
+                        >
+                          <div class="arrow"></div>
+                          <div class="status-icon">
+                            <span
+                              class="thinking-icon"
+                              :class="{ 'thinking-animation': action.streaming }"
+                            >
+                              <span
+                                class="icon icon-sm"
+                                :style="iconStyleSafe('brain')"
+                                aria-hidden="true"
+                              ></span>
+                            </span>
+                          </div>
+                          <span class="status-text">{{
+                            action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking')
+                          }}</span>
+                        </div>
+                        <div
+                          class="collapsible-content"
+                          :ref="
+                            (el) =>
+                              registerCollapseContent(
+                                action.blockId || `${index}-thinking-${actionIndex}`,
+                                el
+                              )
+                          "
+                        >
+                          <div
+                            class="content-inner thinking-content"
+                            :ref="
+                              (el) =>
+                                registerThinkingRef(
+                                  action.blockId || `${index}-thinking-${actionIndex}`,
+                                  el
+                                )
+                            "
+                            @scroll="
+                              handleThinkingScroll(
+                                action.blockId || `${index}-thinking-${actionIndex}`,
+                                $event
+                              )
+                            "
+                            style="max-height: 240px; overflow-y: auto"
+                          >
+                            {{ action.content }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div v-else-if="action.type === 'text'" class="text-output">
+                        <div class="text-content" :class="{ 'streaming-text': action.streaming }">
+                          <MarkdownRenderer
+                            :content="action.content || ''"
+                            :is-streaming="action.streaming"
+                            :citations="citationsForMessage(msg)"
+                            :citations-final="citationsFinalForMessage(msg)"
+                            enable-citations
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        v-else-if="action.type === 'system' && getSubAgentSystemNoticeLabel(action)"
+                        class="sub-agent-system-summary-line"
+                      >
+                        {{ getSubAgentSystemNoticeLabel(action) }}
+                      </div>
+
+                      <div
+                        v-else-if="action.type === 'append_payload'"
+                        class="append-placeholder"
+                        :class="{ 'append-error': action.append?.success === false }"
+                      >
+                        <div class="append-placeholder-content">
+                          <template v-if="action.append?.success !== false">
+                            <div class="icon-label append-status">
+                              <span
+                                class="icon icon-sm"
+                                :style="iconStyleSafe('pencil')"
+                                aria-hidden="true"
+                              ></span>
+                              <span>{{
+                                $t('chat.appendSuccess', {
+                                  path: action.append?.path || $t('chat.targetFile')
+                                })
+                              }}</span>
+                            </div>
+                          </template>
+                          <template v-else>
+                            <div class="icon-label append-status append-error-text">
+                              <span
+                                class="icon icon-sm"
+                                :style="iconStyleSafe('x')"
+                                aria-hidden="true"
+                              ></span>
+                              <span>{{
+                                $t('chat.appendFailed', {
+                                  path: action.append?.path || $t('chat.targetFile')
+                                })
+                              }}</span>
+                            </div>
+                          </template>
+                          <div class="append-meta" v-if="action.append">
+                            <span
+                              v-if="
+                                action.append.lines !== null && action.append.lines !== undefined
+                              "
+                            >
+                              {{ $t('chat.linesCount', { n: action.append.lines }) }}
+                            </span>
+                            <span
+                              v-if="
+                                action.append.bytes !== null && action.append.bytes !== undefined
+                              "
+                            >
+                              {{ $t('chat.bytesCount', { n: action.append.bytes }) }}
+                            </span>
+                          </div>
+                          <div class="append-warning icon-label" v-if="action.append?.forced">
+                            <span
+                              class="icon icon-sm"
+                              :style="iconStyleSafe('triangleAlert')"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ $t('chat.appendWarning') }}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        v-else-if="action.type === 'append'"
+                        class="append-placeholder"
+                        :class="{ 'append-error': action.append?.success === false }"
+                      >
+                        <div class="append-placeholder-content">
+                          <div class="icon-label append-status">
+                            <span
+                              class="icon icon-sm"
+                              :style="iconStyleSafe('pencil')"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ action.append?.summary || $t('chat.appendDone') }}</span>
+                          </div>
+                          <div class="append-meta" v-if="action.append">
+                            <span>{{ action.append.path || $t('chat.targetFile') }}</span>
+                            <span v-if="action.append.lines">{{
+                              $t('chat.linesCount', { n: action.append.lines })
+                            }}</span>
+                            <span v-if="action.append.bytes">{{
+                              $t('chat.bytesCount', { n: action.append.bytes })
+                            }}</span>
+                          </div>
+                          <div class="append-warning icon-label" v-if="action.append?.forced">
+                            <span
+                              class="icon icon-sm"
+                              :style="iconStyleSafe('triangleAlert')"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ $t('chat.appendWarningFollow') }}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ToolAction
+                        v-else-if="action.type === 'tool'"
+                        :action="action"
+                        :expanded="
+                          expandedBlocks?.has(action.blockId || `${index}-tool-${actionIndex}`)
+                        "
+                        :collapsing="
+                          collapsingBlocks?.has(action.blockId || `${index}-tool-${actionIndex}`)
+                        "
+                        :icon-style="iconStyleSafe"
+                        :get-tool-animation-class="getToolAnimationClass"
+                        :get-tool-icon="getToolIcon"
+                        :get-tool-status-text="getToolStatusText"
+                        :get-tool-description="getToolDescription"
+                        :format-search-topic="formatSearchTopic"
+                        :format-search-time="formatSearchTime"
+                        :format-search-domains="formatSearchDomains"
+                        :streaming-message="streamingMessage"
+                        :register-collapse-content="registerCollapseContent"
+                        :collapse-key="action.blockId || `${index}-tool-${actionIndex}`"
+                        :block-id="action.blockId || `${index}-tool-${actionIndex}`"
+                        @toggle="toggleBlock(action.blockId || `${index}-tool-${actionIndex}`)"
+                      />
+                    </div>
+                  </template>
+                </template>
+
+                <!-- 本次工作编辑摘要：仅在该工作段最后一条 assistant 末尾渲染 -->
+                <EditSummaryCard
+                  v-if="editSummarySegmentEnds.has(index)"
+                  :summary="editSummarySegmentEnds.get(index)"
+                  :icon-style="iconStyleSafe"
+                />
+              </div>
+              <div v-else class="system-message">
+                <div
+                  class="collapsible-block system-block"
+                  :class="{
+                    expanded: expandedBlocks?.has(`system-${index}`),
+                    collapsing: collapsingBlocks?.has(`system-${index}`)
+                  }"
+                  :data-block-id="`system-${index}`"
+                >
+                  <div class="collapsible-header" @click="toggleBlock(`system-${index}`)">
                     <div class="arrow"></div>
                     <div class="status-icon">
                       <span
-                        class="thinking-icon"
-                        :class="{ 'thinking-animation': group.action.streaming }"
-                      >
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyleSafe('brain')"
-                          aria-hidden="true"
-                        ></span>
-                      </span>
+                        class="tool-icon icon icon-md"
+                        :style="iconStyleSafe('info')"
+                        aria-hidden="true"
+                      ></span>
                     </div>
                     <span class="status-text">{{
-                      group.action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking')
+                      $t('chat.systemMessage', { role: msg.role })
                     }}</span>
                   </div>
                   <div
                     class="collapsible-content"
-                    :ref="
-                      (el) =>
-                        registerCollapseContent(
-                          group.action.blockId || `${index}-thinking-${group.actionIndex}`,
-                          el
-                        )
-                    "
+                    :ref="(el) => registerCollapseContent(`system-${index}`, el)"
                   >
-                    <div
-                      class="content-inner thinking-content"
-                      :ref="
-                        (el) =>
-                          registerThinkingRef(
-                            group.action.blockId || `${index}-thinking-${group.actionIndex}`,
-                            el
-                          )
-                      "
-                      @scroll="
-                        handleThinkingScroll(
-                          group.action.blockId || `${index}-thinking-${group.actionIndex}`,
-                          $event
-                        )
-                      "
-                      style="max-height: 240px; overflow-y: auto"
-                    >
-                      {{ group.action.content }}
+                    <div class="content-inner">
+                      {{ msg.content }}
                     </div>
                   </div>
                 </div>
-
-                <div v-else-if="group.action?.type === 'text'" class="text-output">
-                  <div class="text-content" :class="{ 'streaming-text': group.action.streaming }">
-                    <MarkdownRenderer
-                      :content="group.action.content || ''"
-                      :is-streaming="group.action.streaming"
-                      :citations="citationsForMessage(msg)"
-                      :citations-final="citationsFinalForMessage(msg)"
-                      enable-citations
-                    />
-                  </div>
-                </div>
-
-                <div
-                  v-else-if="
-                    group.action?.type === 'system' && getSubAgentSystemNoticeLabel(group.action)
-                  "
-                  class="sub-agent-system-summary-line"
-                >
-                  {{ getSubAgentSystemNoticeLabel(group.action) }}
-                </div>
-
-                <div
-                  v-else-if="group.action?.type === 'append_payload'"
-                  class="append-placeholder"
-                  :class="{ 'append-error': group.action.append?.success === false }"
-                >
-                  <div class="append-placeholder-content">
-                    <template v-if="group.action.append?.success !== false">
-                      <div class="icon-label append-status">
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyleSafe('pencil')"
-                          aria-hidden="true"
-                        ></span>
-                        <span
-                          >{{
-                            $t('chat.appendSuccess', {
-                              path: group.action.append?.path || $t('chat.targetFile')
-                            })
-                          }}</span
-                        >
-                      </div>
-                    </template>
-                    <template v-else>
-                      <div class="icon-label append-status append-error-text">
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyleSafe('x')"
-                          aria-hidden="true"
-                        ></span>
-                        <span
-                          >{{
-                            $t('chat.appendFailed', {
-                              path: group.action.append?.path || $t('chat.targetFile')
-                            })
-                          }}</span
-                        >
-                      </div>
-                    </template>
-                    <div class="append-meta" v-if="group.action.append">
-                      <span
-                        v-if="
-                          group.action.append.lines !== null &&
-                          group.action.append.lines !== undefined
-                        "
-                      >
-                        {{ $t('chat.linesCount', { n: group.action.append.lines }) }}
-                      </span>
-                      <span
-                        v-if="
-                          group.action.append.bytes !== null &&
-                          group.action.append.bytes !== undefined
-                        "
-                      >
-                        {{ $t('chat.bytesCount', { n: group.action.append.bytes }) }}
-                      </span>
-                    </div>
-                    <div class="append-warning icon-label" v-if="group.action.append?.forced">
-                      <span
-                        class="icon icon-sm"
-                        :style="iconStyleSafe('triangleAlert')"
-                        aria-hidden="true"
-                      ></span>
-                      <span>{{ $t('chat.appendWarning') }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  v-else-if="group.action?.type === 'append'"
-                  class="append-placeholder"
-                  :class="{ 'append-error': group.action.append?.success === false }"
-                >
-                  <div class="append-placeholder-content">
-                    <div class="icon-label append-status">
-                      <span
-                        class="icon icon-sm"
-                        :style="iconStyleSafe('pencil')"
-                        aria-hidden="true"
-                      ></span>
-                      <span>{{ group.action.append?.summary || $t('chat.appendDone') }}</span>
-                    </div>
-                    <div class="append-meta" v-if="group.action.append">
-                      <span>{{ group.action.append.path || $t('chat.targetFile') }}</span>
-                      <span v-if="group.action.append.lines"
-                        >{{ $t('chat.linesCount', { n: group.action.append.lines }) }}</span
-                      >
-                      <span v-if="group.action.append.bytes"
-                        >{{ $t('chat.bytesCount', { n: group.action.append.bytes }) }}</span
-                      >
-                    </div>
-                    <div class="append-warning icon-label" v-if="group.action.append?.forced">
-                      <span
-                        class="icon icon-sm"
-                        :style="iconStyleSafe('triangleAlert')"
-                        aria-hidden="true"
-                      ></span>
-                      <span>{{ $t('chat.appendWarningFollow') }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <ToolAction
-                  v-else-if="group.action?.type === 'tool'"
-                  :action="group.action"
-                  :expanded="
-                    expandedBlocks?.has(
-                      group.action.blockId || `${index}-tool-${group.actionIndex}`
-                    )
-                  "
-                  :collapsing="
-                    collapsingBlocks?.has(
-                      group.action.blockId || `${index}-tool-${group.actionIndex}`
-                    )
-                  "
-                  :icon-style="iconStyleSafe"
-                  :get-tool-animation-class="getToolAnimationClass"
-                  :get-tool-icon="getToolIcon"
-                  :get-tool-status-text="getToolStatusText"
-                  :get-tool-description="getToolDescription"
-                  :format-search-topic="formatSearchTopic"
-                  :format-search-time="formatSearchTime"
-                  :format-search-domains="formatSearchDomains"
-                  :streaming-message="streamingMessage"
-                  :register-collapse-content="registerCollapseContent"
-                  :collapse-key="group.action.blockId || `${index}-tool-${group.actionIndex}`"
-                  :block-id="group.action.blockId || `${index}-tool-${group.actionIndex}`"
-                  @toggle="
-                    toggleBlock(group.action.blockId || `${index}-tool-${group.actionIndex}`)
-                  "
-                />
-              </div>
-            </template>
-          </template>
-
-          <template v-else>
-            <template
-              v-for="(action, actionIndex) in msg.actions || []"
-              :key="action.id || `${index}-${actionIndex}`"
-            >
-              <div
-                v-if="isActionVisible(action)"
-                class="action-item"
-                :class="{
-                  'streaming-content': action.streaming,
-                  'completed-tool': action.type === 'tool' && !action.streaming,
-                  'immediate-show':
-                    action.streaming || action.type === 'text' || action.type === 'thinking',
-                  'thinking-finished': action.type === 'thinking' && !action.streaming,
-                  'no-entry-animation': !streamingMessage || index !== latestMessageIndex
-                }"
-              >
-                <div
-                  v-if="action.type === 'thinking'"
-                  class="collapsible-block thinking-block"
-                  :class="{
-                    expanded: expandedBlocks?.has(
-                      action.blockId || `${index}-thinking-${actionIndex}`
-                    ),
-                    collapsing: collapsingBlocks?.has(
-                      action.blockId || `${index}-thinking-${actionIndex}`
-                    )
-                  }"
-                  :data-block-id="action.blockId || `${index}-thinking-${actionIndex}`"
-                >
-                  <div
-                    class="collapsible-header"
-                    @click="toggleBlock(action.blockId || `${index}-thinking-${actionIndex}`)"
-                  >
-                    <div class="arrow"></div>
-                    <div class="status-icon">
-                      <span
-                        class="thinking-icon"
-                        :class="{ 'thinking-animation': action.streaming }"
-                      >
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyleSafe('brain')"
-                          aria-hidden="true"
-                        ></span>
-                      </span>
-                    </div>
-                    <span class="status-text">{{ action.streaming ? $t('chat.thinkingRunning') : $t('chat.thinking') }}</span>
-                  </div>
-                  <div
-                    class="collapsible-content"
-                    :ref="
-                      (el) =>
-                        registerCollapseContent(
-                          action.blockId || `${index}-thinking-${actionIndex}`,
-                          el
-                        )
-                    "
-                  >
-                    <div
-                      class="content-inner thinking-content"
-                      :ref="
-                        (el) =>
-                          registerThinkingRef(
-                            action.blockId || `${index}-thinking-${actionIndex}`,
-                            el
-                          )
-                      "
-                      @scroll="
-                        handleThinkingScroll(
-                          action.blockId || `${index}-thinking-${actionIndex}`,
-                          $event
-                        )
-                      "
-                      style="max-height: 240px; overflow-y: auto"
-                    >
-                      {{ action.content }}
-                    </div>
-                  </div>
-                </div>
-
-                <div v-else-if="action.type === 'text'" class="text-output">
-                  <div class="text-content" :class="{ 'streaming-text': action.streaming }">
-                    <MarkdownRenderer
-                      :content="action.content || ''"
-                      :is-streaming="action.streaming"
-                      :citations="citationsForMessage(msg)"
-                      :citations-final="citationsFinalForMessage(msg)"
-                      enable-citations
-                    />
-                  </div>
-                </div>
-
-                <div
-                  v-else-if="action.type === 'system' && getSubAgentSystemNoticeLabel(action)"
-                  class="sub-agent-system-summary-line"
-                >
-                  {{ getSubAgentSystemNoticeLabel(action) }}
-                </div>
-
-                <div
-                  v-else-if="action.type === 'append_payload'"
-                  class="append-placeholder"
-                  :class="{ 'append-error': action.append?.success === false }"
-                >
-                  <div class="append-placeholder-content">
-                    <template v-if="action.append?.success !== false">
-                      <div class="icon-label append-status">
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyleSafe('pencil')"
-                          aria-hidden="true"
-                        ></span>
-                        <span
-                          >{{
-                            $t('chat.appendSuccess', {
-                              path: action.append?.path || $t('chat.targetFile')
-                            })
-                          }}</span
-                        >
-                      </div>
-                    </template>
-                    <template v-else>
-                      <div class="icon-label append-status append-error-text">
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyleSafe('x')"
-                          aria-hidden="true"
-                        ></span>
-                        <span
-                          >{{
-                            $t('chat.appendFailed', {
-                              path: action.append?.path || $t('chat.targetFile')
-                            })
-                          }}</span
-                        >
-                      </div>
-                    </template>
-                    <div class="append-meta" v-if="action.append">
-                      <span
-                        v-if="action.append.lines !== null && action.append.lines !== undefined"
-                      >
-                        {{ $t('chat.linesCount', { n: action.append.lines }) }}
-                      </span>
-                      <span
-                        v-if="action.append.bytes !== null && action.append.bytes !== undefined"
-                      >
-                        {{ $t('chat.bytesCount', { n: action.append.bytes }) }}
-                      </span>
-                    </div>
-                    <div class="append-warning icon-label" v-if="action.append?.forced">
-                      <span
-                        class="icon icon-sm"
-                        :style="iconStyleSafe('triangleAlert')"
-                        aria-hidden="true"
-                      ></span>
-                      <span>{{ $t('chat.appendWarning') }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  v-else-if="action.type === 'append'"
-                  class="append-placeholder"
-                  :class="{ 'append-error': action.append?.success === false }"
-                >
-                  <div class="append-placeholder-content">
-                    <div class="icon-label append-status">
-                      <span
-                        class="icon icon-sm"
-                        :style="iconStyleSafe('pencil')"
-                        aria-hidden="true"
-                      ></span>
-                      <span>{{ action.append?.summary || $t('chat.appendDone') }}</span>
-                    </div>
-                    <div class="append-meta" v-if="action.append">
-                      <span>{{ action.append.path || $t('chat.targetFile') }}</span>
-                      <span v-if="action.append.lines">{{ $t('chat.linesCount', { n: action.append.lines }) }}</span>
-                      <span v-if="action.append.bytes">{{ $t('chat.bytesCount', { n: action.append.bytes }) }}</span>
-                    </div>
-                    <div class="append-warning icon-label" v-if="action.append?.forced">
-                      <span
-                        class="icon icon-sm"
-                        :style="iconStyleSafe('triangleAlert')"
-                        aria-hidden="true"
-                      ></span>
-                      <span>{{ $t('chat.appendWarningFollow') }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <ToolAction
-                  v-else-if="action.type === 'tool'"
-                  :action="action"
-                  :expanded="expandedBlocks?.has(action.blockId || `${index}-tool-${actionIndex}`)"
-                  :collapsing="collapsingBlocks?.has(action.blockId || `${index}-tool-${actionIndex}`)"
-                  :icon-style="iconStyleSafe"
-                  :get-tool-animation-class="getToolAnimationClass"
-                  :get-tool-icon="getToolIcon"
-                  :get-tool-status-text="getToolStatusText"
-                  :get-tool-description="getToolDescription"
-                  :format-search-topic="formatSearchTopic"
-                  :format-search-time="formatSearchTime"
-                  :format-search-domains="formatSearchDomains"
-                  :streaming-message="streamingMessage"
-                  :register-collapse-content="registerCollapseContent"
-                  :collapse-key="action.blockId || `${index}-tool-${actionIndex}`"
-                  :block-id="action.blockId || `${index}-tool-${actionIndex}`"
-                  @toggle="toggleBlock(action.blockId || `${index}-tool-${actionIndex}`)"
-                />
-              </div>
-            </template>
-          </template>
-
-          <!-- 本次工作编辑摘要：仅在该工作段最后一条 assistant 末尾渲染 -->
-          <EditSummaryCard
-            v-if="editSummarySegmentEnds.has(index)"
-            :summary="editSummarySegmentEnds.get(index)"
-            :icon-style="iconStyleSafe"
-          />
-        </div>
-        <div v-else class="system-message">
-          <div
-            class="collapsible-block system-block"
-            :class="{
-              expanded: expandedBlocks?.has(`system-${index}`),
-              collapsing: collapsingBlocks?.has(`system-${index}`)
-            }"
-            :data-block-id="`system-${index}`"
-          >
-            <div class="collapsible-header" @click="toggleBlock(`system-${index}`)">
-              <div class="arrow"></div>
-              <div class="status-icon">
-                <span
-                  class="tool-icon icon icon-md"
-                  :style="iconStyleSafe('info')"
-                  aria-hidden="true"
-                ></span>
-              </div>
-              <span class="status-text">{{ $t('chat.systemMessage', { role: msg.role }) }}</span>
-            </div>
-            <div
-              class="collapsible-content"
-              :ref="(el) => registerCollapseContent(`system-${index}`, el)"
-            >
-              <div class="content-inner">
-                {{ msg.content }}
               </div>
             </div>
-          </div>
-        </div>
+          </template>
+        </Virtualizer>
       </div>
-        </template>
-      </Virtualizer>
-    </div>
-    <div class="messages-bottom-spacer" aria-hidden="true"></div>
+      <div class="messages-bottom-spacer" aria-hidden="true"></div>
     </div>
     <!-- 左侧用户输入快捷跳转导航：每个真实用户输入一根横线，hover 波浪 + 预览，点击跳转 -->
     <nav
@@ -1120,13 +1150,17 @@ const escapeUserHtml = (value: string): string =>
 
 // 兼容 Windows 反斜杠路径：skills 目录与 SKILL.md 前的分隔符同时接受 / 和 \
 // 路径前缀可选：后端自 cedef87d 起返回相对工作区路径（.astrion/skills/...），历史消息仍可能是绝对路径
-const USER_SKILL_LINK_RE = /\[\$([^\]\n]+)\]\(((?:[^)\n]*[\\/])?\.astrion[\\/]skills[\\/][^)\n]+[\\/]SKILL\.md)\)/g;
+const USER_SKILL_LINK_RE =
+  /\[\$([^\]\n]+)\]\(((?:[^)\n]*[\\/])?\.astrion[\\/]skills[\\/][^)\n]+[\\/]SKILL\.md)\)/g;
 const USER_FILE_LINK_RE = /\[([^\]\n]+)\]\(file:\/\/([^)\n]+)\)/g;
 // 前端自身生成的完成标签识别（chat.subAgentDoneLabel / appUi.backgroundRunCommandDone 的 zh/en 两种产出）
-const SUB_AGENT_DONE_LABEL_RE = /^(?:\u5b50\u667a\u80fd\u4f53\d+\s*\u4efb\u52a1\u5b8c\u6210|Sub-agent\s*\d+\s*complete)$/;
+const SUB_AGENT_DONE_LABEL_RE =
+  /^(?:\u5b50\u667a\u80fd\u4f53\d+\s*\u4efb\u52a1\u5b8c\u6210|Sub-agent\s*\d+\s*complete)$/;
 // 后端子智能体摘要前缀（modules/i18n.py sub_agent.summary_*，双语）
-const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
-const BG_RUN_COMMAND_DONE_LABEL_RE = /^(?:\[)?(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)(?:\])?$/;
+const SUB_AGENT_DONE_PREFIX_RE =
+  /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
+const BG_RUN_COMMAND_DONE_LABEL_RE =
+  /^(?:\[)?(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)(?:\])?$/;
 const RENDERABLE_ACTION_TYPES = new Set([
   'thinking',
   'text',
@@ -1176,7 +1210,12 @@ const isEmptyAssistantMessage = (message: any) => {
     return false;
   }
   // 无可渲染 action 且不在等待首包、也不在流式中的 assistant 视为“空壳”并过滤。
-  const streaming = !!(message.streaming || message.currentStreamingType || message.streamingText || message.streamingThinking);
+  const streaming = !!(
+    message.streaming ||
+    message.currentStreamingType ||
+    message.streamingText ||
+    message.streamingThinking
+  );
   return !streaming;
 };
 
@@ -1322,7 +1361,8 @@ let followWriteSource = '';
 const pendingMinimalCollapses = new Map<string, symbol>();
 
 function tryRelockAfterMinimalCollapse() {
-  if (followState.value !== 'escaped' || quickNavJumpActive || pendingMinimalCollapses.size === 0) return;
+  if (followState.value !== 'escaped' || quickNavJumpActive || pendingMinimalCollapses.size === 0)
+    return;
   const el = scrollRef.value;
   if (!el || !el.isConnected || renderPending.value) return;
   for (const id of pendingMinimalCollapses.keys()) {
@@ -2144,7 +2184,10 @@ function messageFiles(message: any): any[] {
   const raw = message?.metadata?.files;
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((item: any) => (typeof item === 'string' && item) || (item && typeof item.path === 'string' && item.path))
+    .filter(
+      (item: any) =>
+        (typeof item === 'string' && item) || (item && typeof item.path === 'string' && item.path)
+    )
     .slice(0, 9);
 }
 
@@ -2228,8 +2271,7 @@ function getSubAgentSystemNoticeLabel(action: any): string | null {
   }
   if (
     action.variant === 'sub_agent_done' &&
-    (SUB_AGENT_DONE_LABEL_RE.test(content) ||
-      BG_RUN_COMMAND_DONE_LABEL_RE.test(content))
+    (SUB_AGENT_DONE_LABEL_RE.test(content) || BG_RUN_COMMAND_DONE_LABEL_RE.test(content))
   ) {
     if (!debugLoggedSystemActionKeys.has(`${key}-variant-pass`)) {
       debugLoggedSystemActionKeys.add(`${key}-variant-pass`);
@@ -2267,7 +2309,10 @@ function isActionVisible(action: any): boolean {
     const hasName = typeof tool.name === 'string' && tool.name.trim().length > 0;
     const hasMessage = typeof tool.message === 'string' && tool.message.trim().length > 0;
     const hasResult = tool.result !== null && tool.result !== undefined;
-    const hasArgs = tool.arguments && typeof tool.arguments === 'object' && Object.keys(tool.arguments).length > 0;
+    const hasArgs =
+      tool.arguments &&
+      typeof tool.arguments === 'object' &&
+      Object.keys(tool.arguments).length > 0;
     const visible = hasName || hasMessage || hasResult || hasArgs;
     return visible;
   }
@@ -2457,8 +2502,7 @@ function compactBriefLabel(msg: any): string {
 }
 
 watch(
-  () =>
-    getFilteredMessagesSafe().map((m) => m?.id ?? m?.content?.slice(0, 80)),
+  () => getFilteredMessagesSafe().map((m) => m?.id ?? m?.content?.slice(0, 80)),
   () => {
     userBubbleTransitionSuppressed.value = true;
     // 先同步估算折叠状态，再异步精确测量，避免长气泡先展开后收起
@@ -2625,7 +2669,9 @@ const isRealUserNavMessage = (msg: any): boolean => {
   if (!msg || msg.role !== 'user') {
     return false;
   }
-  const source = String(msg?.metadata?.message_source || 'user').trim().toLowerCase();
+  const source = String(msg?.metadata?.message_source || 'user')
+    .trim()
+    .toLowerCase();
   return source === 'user' || source === 'presend';
 };
 

@@ -121,5 +121,5 @@ export default {
   daysAgo: '{count} 天前',
   remainingLeft: '剩余 {count}',
   usedUp: '已用完',
-  cannotLoadData: '无法加载监控数据',
+  cannotLoadData: '无法加载监控数据'
 } as const;

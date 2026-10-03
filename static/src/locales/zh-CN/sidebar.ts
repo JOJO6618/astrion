@@ -80,5 +80,5 @@ export default {
   quotaTierSearch: '搜索',
   unknown: '未知',
   stopped: '停止',
-  containerRunning: '运行',
+  containerRunning: '运行'
 } as const;

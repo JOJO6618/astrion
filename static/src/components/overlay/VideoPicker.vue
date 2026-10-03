@@ -41,7 +41,9 @@
         <div class="footer">
           <div class="count">{{ $t('overlay.videoSelectedCount', { n: selectedSet.size }) }}</div>
           <div class="actions">
-            <button type="button" class="btn secondary" @click="close">{{ $t('common.cancel') }}</button>
+            <button type="button" class="btn secondary" @click="close">
+              {{ $t('common.cancel') }}
+            </button>
             <button
               type="button"
               class="btn primary"
@@ -221,7 +223,11 @@ onMounted(() => {
 .video-thumb {
   height: 110px;
   border-radius: 8px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--state-info) 12%, transparent), color-mix(in srgb, var(--state-info) 5%, transparent));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-info) 12%, transparent),
+    color-mix(in srgb, var(--state-info) 5%, transparent)
+  );
   border: 1px solid var(--border-strong);
   display: flex;
   align-items: center;

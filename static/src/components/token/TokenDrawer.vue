@@ -33,7 +33,9 @@
               <div class="stat-block">
                 <div class="stat-label">{{ $t('sidebar.cumulativeCachedInput') }}</div>
                 <div class="stat-value">
-                  {{ formatTokenCount(currentConversationTokens.cumulative_cached_input_tokens || 0) }}
+                  {{
+                    formatTokenCount(currentConversationTokens.cumulative_cached_input_tokens || 0)
+                  }}
                 </div>
               </div>
               <div class="stat-block">
@@ -72,7 +74,9 @@
                   </div>
                 </div>
               </template>
-              <div class="usage-placeholder" v-else>{{ $t('sidebar.containerMetricsPending') }}</div>
+              <div class="usage-placeholder" v-else>
+                {{ $t('sidebar.containerMetricsPending') }}
+              </div>
             </template>
             <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoContainer') }}</div>
           </div>

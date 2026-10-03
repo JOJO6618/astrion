@@ -120,5 +120,5 @@ export default {
   daysAgo: '{count}d ago',
   remainingLeft: '{count} left',
   usedUp: 'Used up',
-  cannotLoadData: 'Unable to load monitoring data',
+  cannotLoadData: 'Unable to load monitoring data'
 } as const;

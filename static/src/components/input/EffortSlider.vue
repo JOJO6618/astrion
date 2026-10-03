@@ -11,9 +11,7 @@ const modelStore = useModelStore();
 const levels = computed<ReasoningEffort[]>(() => {
   const supported = modelStore.currentModel?.supportedReasoningLevels;
   if (Array.isArray(supported) && supported.length) {
-    const filtered = DEFAULT_LEVELS.filter((lv) =>
-      supported.some((s: any) => s?.effort === lv)
-    );
+    const filtered = DEFAULT_LEVELS.filter((lv) => supported.some((s: any) => s?.effort === lv));
     if (filtered.length) return filtered;
   }
   return DEFAULT_LEVELS;
@@ -61,7 +59,10 @@ const pxToLevel = (x: number) => {
   const w = trackWidth.value;
   if (w <= EDGE * 2) return 0;
   const ratio = (x - EDGE) / (w - EDGE * 2);
-  return Math.max(0, Math.min(levels.value.length - 1, Math.round(ratio * (levels.value.length - 1))));
+  return Math.max(
+    0,
+    Math.min(levels.value.length - 1, Math.round(ratio * (levels.value.length - 1)))
+  );
 };
 
 const clampEventX = (clientX: number) => {
@@ -231,10 +232,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    class="effort-slider"
-    :class="{ 'is-default': isDefault, 'live-drag': liveDrag }"
-  >
+  <div class="effort-slider" :class="{ 'is-default': isDefault, 'live-drag': liveDrag }">
     <!-- 顶部：非拖动 = 推理强度 + 默认；拖动中 = 更高效 / 更智能 -->
     <div class="effort-header">
       <div class="header-state header-idle">

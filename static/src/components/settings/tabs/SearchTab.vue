@@ -10,7 +10,8 @@ defineOptions({ name: 'SearchTab' });
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const { form, personalization, activeDropdown, activeTheme, floatingMenuStyle, toggleDropdown } = ctx;
+const { form, personalization, activeDropdown, activeTheme, floatingMenuStyle, toggleDropdown } =
+  ctx;
 
 const settingsStore = useSettingsStore();
 /** 服务端密钥可见性：host 单机模式不受限；docker/web 多用户模式仅管理员可见
@@ -56,7 +57,9 @@ const currentExtractProvider = computed(() => {
   return extractProviderOptions.some((o) => o.id === value) ? value : 'jina';
 });
 const currentExtractProviderOption = computed(
-  () => extractProviderOptions.find((o) => o.id === currentExtractProvider.value) || extractProviderOptions[0]
+  () =>
+    extractProviderOptions.find((o) => o.id === currentExtractProvider.value) ||
+    extractProviderOptions[0]
 );
 
 const selectExtractProvider = (id: string) => {
@@ -296,7 +299,9 @@ const removeDirectDomain = (domain: string) => {
       </div>
       <div class="settings-select-row">
         <span class="settings-row-copy"
-          ><span class="settings-row-title">{{ $t(currentExtractProviderOption.labelKey) }}</span></span
+          ><span class="settings-row-title">{{
+            $t(currentExtractProviderOption.labelKey)
+          }}</span></span
         >
         <div
           class="settings-select-wrap"
@@ -390,7 +395,9 @@ const removeDirectDomain = (domain: string) => {
         ><span class="settings-row-desc">{{ $t('personalization.webDirectExtractDesc') }}</span>
       </div>
       <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{ $t('personalization.webDirectExtractEnabledTitle') }}</span
+        ><span class="settings-row-title">{{
+          $t('personalization.webDirectExtractEnabledTitle')
+        }}</span
         ><input
           type="checkbox"
           :checked="form.webpage_direct_extract_enabled"
@@ -399,7 +406,8 @@ const removeDirectDomain = (domain: string) => {
               key: 'webpage_direct_extract_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.webpage_direct_extract_enabled" /></label>
+          " /><FancyCheck :checked="form.webpage_direct_extract_enabled"
+      /></label>
       <template v-if="form.webpage_direct_extract_enabled">
         <div class="settings-domain-list">
           <div class="settings-domain-row">

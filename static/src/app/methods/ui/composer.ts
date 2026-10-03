@@ -53,7 +53,8 @@ export const composerMethods = {
       this.composerDraftSaveTimer = null;
     }
 
-    const composerRef = typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
+    const composerRef =
+      typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
     const composerMeta =
       composerRef && typeof composerRef.getComposerDraftMeta === 'function'
         ? composerRef.getComposerDraftMeta()

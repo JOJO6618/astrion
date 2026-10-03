@@ -11,14 +11,22 @@ import { t } from '@/locales';
 export const workflowMethods = {
   handleWorkflowProgress(data: any) {
     // 对话隔离：忽略不属于当前对话的工作流事件
-    if (data?.conversation_id && this.currentConversationId && data.conversation_id !== this.currentConversationId) {
+    if (
+      data?.conversation_id &&
+      this.currentConversationId &&
+      data.conversation_id !== this.currentConversationId
+    ) {
       return;
     }
     useWorkflowStore().setWorkflow(data, true);
   },
 
   handleWorkflowReviewProgress(data: any) {
-    if (data?.conversation_id && this.currentConversationId && data.conversation_id !== this.currentConversationId) {
+    if (
+      data?.conversation_id &&
+      this.currentConversationId &&
+      data.conversation_id !== this.currentConversationId
+    ) {
       return;
     }
     const progress = data?.progress || data || {};
@@ -33,7 +41,9 @@ export const workflowMethods = {
       this.autoApprovalFeedLines = [t('appTasks.reviewStarted')];
       this.autoApprovalFinalMessage = '';
     } else if (progress.stage === 'model_call') {
-      this.autoApprovalFeedLines.push(String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim());
+      this.autoApprovalFeedLines.push(
+        String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim()
+      );
     } else if (progress.stage === 'run_command' && progress.command) {
       this.autoApprovalFeedLines.push(String(progress.command));
     } else if (progress.message) {

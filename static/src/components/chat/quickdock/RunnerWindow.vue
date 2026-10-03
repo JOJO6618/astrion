@@ -43,7 +43,11 @@
       >
         <span class="qd-run-status"></span>
         <span class="qd-run-name" :title="row.name">{{ row.name }}</span>
-        <button class="qd-row-menu-btn" :title="$t('quickdock.more')" @click.stop="openMenu($event, row)">
+        <button
+          class="qd-row-menu-btn"
+          :title="$t('quickdock.more')"
+          @click.stop="openMenu($event, row)"
+        >
           <svg viewBox="0 0 16 16">
             <circle cx="3.5" cy="8" r="1.3" fill="currentColor" />
             <circle cx="8" cy="8" r="1.3" fill="currentColor" />
@@ -77,7 +81,12 @@ type RowState = 'running' | 'idle' | 'done' | 'ended';
 function agentStateOf(status: string): RowState {
   if (status === 'idle') return 'idle';
   if (status === 'completed') return 'done';
-  if (status === 'failed' || status === 'timeout' || status === 'terminated' || status === 'cancelled') {
+  if (
+    status === 'failed' ||
+    status === 'timeout' ||
+    status === 'terminated' ||
+    status === 'cancelled'
+  ) {
     return 'ended';
   }
   return 'running';

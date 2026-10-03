@@ -23,15 +23,15 @@
           <button type="button" class="ghost" @click="refresh" :disabled="loading">
             {{ loading ? $t('common.refreshing') : $t('adminCustomTools.main.refreshList') }}
           </button>
-          <a class="ghost" href="/static/custom_tools/guide.html" target="_blank" rel="noopener"
-            >{{ $t('adminCustomTools.main.viewGuide') }}</a
-          >
-          <a class="ghost" href="/admin/monitor" target="_blank" rel="noopener"
-            >{{ $t('adminCustomTools.main.backToMonitor') }}</a
-          >
-          <a class="ghost" href="/admin/policy" target="_blank" rel="noopener"
-            >{{ $t('adminCustomTools.main.policyConfig') }}</a
-          >
+          <a class="ghost" href="/static/custom_tools/guide.html" target="_blank" rel="noopener">{{
+            $t('adminCustomTools.main.viewGuide')
+          }}</a>
+          <a class="ghost" href="/admin/monitor" target="_blank" rel="noopener">{{
+            $t('adminCustomTools.main.backToMonitor')
+          }}</a>
+          <a class="ghost" href="/admin/policy" target="_blank" rel="noopener">{{
+            $t('adminCustomTools.main.policyConfig')
+          }}</a>
         </div>
       </header>
 
@@ -42,7 +42,9 @@
       <section class="panel" v-else>
         <div class="tool-list-header">
           <h2>{{ $t('adminCustomTools.main.toolList') }}</h2>
-          <span class="muted">{{ $t('adminCustomTools.main.toolCount', { count: tools.length }) }}</span>
+          <span class="muted">{{
+            $t('adminCustomTools.main.toolCount', { count: tools.length })
+          }}</span>
         </div>
         <div v-if="!tools.length" class="empty">{{ $t('adminCustomTools.main.emptyTools') }}</div>
         <div class="tool-grid">
@@ -54,7 +56,9 @@
             <p class="desc">{{ tool.description || $t('adminCustomTools.main.noDescription') }}</p>
             <div class="meta">
               <span>{{ $t('adminCustomTools.main.params', { count: paramCount(tool) }) }}</span>
-              <span>{{ $t('adminCustomTools.main.timeout', { seconds: tool.timeout || 30 }) }}</span>
+              <span>{{
+                $t('adminCustomTools.main.timeout', { seconds: tool.timeout || 30 })
+              }}</span>
             </div>
             <div class="files">
               <span>{{ tool.execution_file || 'execution.py' }}</span>
@@ -88,7 +92,9 @@
             <button type="button" class="danger" @click="openDeleteConfirm()">
               {{ $t('common.delete') }}
             </button>
-            <button type="button" class="ghost" @click="closeEditor">{{ $t('common.close') }}</button>
+            <button type="button" class="ghost" @click="closeEditor">
+              {{ $t('common.close') }}
+            </button>
           </div>
         </header>
 
@@ -140,14 +146,23 @@
       <div v-if="createModal" class="modal-backdrop">
         <div class="modal">
           <h3>{{ $t('adminCustomTools.create.title') }}</h3>
-          <label>{{ $t('adminCustomTools.create.toolIdLabel') }}<input v-model="createForm.id" /></label>
-          <label>{{ $t('adminCustomTools.create.descriptionLabel') }}<input v-model="createForm.description" /></label>
+          <label
+            >{{ $t('adminCustomTools.create.toolIdLabel') }}<input v-model="createForm.id"
+          /></label>
+          <label
+            >{{ $t('adminCustomTools.create.descriptionLabel')
+            }}<input v-model="createForm.description"
+          /></label>
           <div class="modal-actions">
             <button type="button" class="ghost" @click="createModal = false">
               {{ $t('common.cancel') }}
             </button>
             <button type="button" class="primary" @click="createTool" :disabled="creating">
-              {{ creating ? $t('adminCustomTools.create.creating') : $t('adminCustomTools.create.create') }}
+              {{
+                creating
+                  ? $t('adminCustomTools.create.creating')
+                  : $t('adminCustomTools.create.create')
+              }}
             </button>
           </div>
         </div>
@@ -169,7 +184,11 @@
               {{ $t('common.cancel') }}
             </button>
             <button type="button" class="danger" @click="performDelete" :disabled="deleting">
-              {{ deleting ? $t('adminCustomTools.delete.deleting') : $t('adminCustomTools.delete.title') }}
+              {{
+                deleting
+                  ? $t('adminCustomTools.delete.deleting')
+                  : $t('adminCustomTools.delete.title')
+              }}
             </button>
           </div>
         </div>
@@ -724,11 +743,7 @@ watch(secondaryVerified, async (val) => {
   padding: 10px 18px;
 }
 .primary {
-  background: linear-gradient(
-    135deg,
-    var(--accent) 0%,
-    var(--accent-strong) 100%
-  );
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -789,5 +804,4 @@ watch(secondaryVerified, async (val) => {
     min-height: 220px;
   }
 }
-
 </style>

@@ -7,9 +7,9 @@
         <p class="desc">{{ $t('adminCustomTools.guide.subtitle') }}</p>
       </div>
       <div class="actions">
-        <a class="ghost" href="/admin/custom-tools" target="_blank" rel="noopener"
-          >{{ $t('adminCustomTools.backToList') }}</a
-        >
+        <a class="ghost" href="/admin/custom-tools" target="_blank" rel="noopener">{{
+          $t('adminCustomTools.backToList')
+        }}</a>
       </div>
     </header>
 

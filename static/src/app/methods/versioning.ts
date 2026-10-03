@@ -95,7 +95,9 @@ export const versioningMethods = {
       this.versioningEnabled = !!enabled;
       this.uiPushToast({
         title: t('common.versioning'),
-        message: enabled ? t('appMessages.versioningEnabledForNext') : t('appMessages.versioningDisabledForNext'),
+        message: enabled
+          ? t('appMessages.versioningEnabledForNext')
+          : t('appMessages.versioningDisabledForNext'),
         type: 'success'
       });
       return;
@@ -119,7 +121,9 @@ export const versioningMethods = {
       this.versioningRestoreMode = 'overwrite';
       this.uiPushToast({
         title: t('common.versioning'),
-        message: this.versioningEnabled ? t('appMessages.versioningOn') : t('appMessages.versioningOff'),
+        message: this.versioningEnabled
+          ? t('appMessages.versioningOn')
+          : t('appMessages.versioningOff'),
         type: 'success'
       });
       if (this.versioningEnabled) {
@@ -141,7 +145,13 @@ export const versioningMethods = {
   },
 
   async selectVersioningCheckpoint(seq: number) {
-    if (!this.currentConversationId || seq === null || seq === undefined || Number.isNaN(Number(seq))) return;
+    if (
+      !this.currentConversationId ||
+      seq === null ||
+      seq === undefined ||
+      Number.isNaN(Number(seq))
+    )
+      return;
     const targetSeq = Number(seq);
     this.versioningSelectedSeq = targetSeq;
     this.versioningDetailLoading = true;
@@ -155,8 +165,17 @@ export const versioningMethods = {
         data = text ? JSON.parse(text) : {};
       } catch (parseErr: any) {
         // eslint-disable-next-line no-console
-        console.error('[VersioningDetail] parse failed:', parseErr?.message, 'status=', resp.status, 'text=', text);
-        throw new Error(`${t('appMessages.versioningDetailParseFailed')}: ${parseErr?.message || t('common.unknownError')}`);
+        console.error(
+          '[VersioningDetail] parse failed:',
+          parseErr?.message,
+          'status=',
+          resp.status,
+          'text=',
+          text
+        );
+        throw new Error(
+          `${t('appMessages.versioningDetailParseFailed')}: ${parseErr?.message || t('common.unknownError')}`
+        );
       }
       // eslint-disable-next-line no-console
       if (!resp.ok || !data?.success) {
@@ -184,7 +203,8 @@ export const versioningMethods = {
       !this.currentConversationId ||
       this.versioningSelectedSeq === null ||
       this.versioningSelectedSeq === undefined
-    ) return;
+    )
+      return;
 
     const restoreMode = this.versioningRestoreMode || 'overwrite';
     const trackingMode = normalizeTrackingMode(this.versioningTrackingMode);
@@ -193,7 +213,9 @@ export const versioningMethods = {
         ? t('appMessages.versioningScopeConversationOnly')
         : t('appMessages.versioningScopeConversationAndWorkspace');
     const modeLabel =
-      restoreMode === 'copy' ? t('appMessages.versioningModeCopy') : t('appMessages.versioningModeOverwrite');
+      restoreMode === 'copy'
+        ? t('appMessages.versioningModeCopy')
+        : t('appMessages.versioningModeOverwrite');
     const confirmed = await this.confirmAction({
       title: t('appMessages.versioningRestoreConfirmTitle'),
       message: t('appMessages.versioningRestoreConfirmMessage', {
@@ -208,15 +230,18 @@ export const versioningMethods = {
 
     this.versioningRestoring = true;
     try {
-      const resp = await fetch(`/api/conversations/${this.currentConversationId}/versioning/restore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          seq: this.versioningSelectedSeq,
-          mode: restoreMode,
-          tracking_mode: trackingMode
-        })
-      });
+      const resp = await fetch(
+        `/api/conversations/${this.currentConversationId}/versioning/restore`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            seq: this.versioningSelectedSeq,
+            mode: restoreMode,
+            tracking_mode: trackingMode
+          })
+        }
+      );
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data?.success) {
         throw new Error(data?.error || t('appMessages.versioningRestoreFailed'));
@@ -228,17 +253,29 @@ export const versioningMethods = {
       this.conversationsOffset = 0;
       await this.loadConversationsList();
       // copy 模式下给侧边栏一个即时占位，随后列表刷新会补齐真实数据
-      if (restoreMode === 'copy' && !this.conversations.some((c) => c && c.id === targetConversationId)) {
+      if (
+        restoreMode === 'copy' &&
+        !this.conversations.some((c) => c && c.id === targetConversationId)
+      ) {
         this.conversations.splice(
           0,
           this.conversations.length,
-          { id: targetConversationId, title: t('appMessages.versioningRestoreConversationTitle'), updated_at: new Date().toISOString(), total_messages: 0, total_tools: 0 },
+          {
+            id: targetConversationId,
+            title: t('appMessages.versioningRestoreConversationTitle'),
+            updated_at: new Date().toISOString(),
+            total_messages: 0,
+            total_tools: 0
+          },
           ...this.conversations.filter((c) => c && c.id !== targetConversationId)
         );
       }
       this.uiPushToast({
         title: t('common.versioning'),
-        message: restoreMode === 'copy' ? t('appMessages.versioningRestoreCopyDone') : t('appMessages.versioningRestoreDone'),
+        message:
+          restoreMode === 'copy'
+            ? t('appMessages.versioningRestoreCopyDone')
+            : t('appMessages.versioningRestoreDone'),
         type: 'success'
       });
     } catch (error) {
@@ -250,6 +287,5 @@ export const versioningMethods = {
     } finally {
       this.versioningRestoring = false;
     }
-  },
-
+  }
 };

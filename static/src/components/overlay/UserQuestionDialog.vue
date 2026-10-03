@@ -1,7 +1,16 @@
 <template>
   <transition name="user-question-fade" appear>
-    <div v-if="visible && questions.length" class="user-question-overlay" @click.self="emit('minimize')">
-      <section class="user-question-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.userQuestionAriaLabel')">
+    <div
+      v-if="visible && questions.length"
+      class="user-question-overlay"
+      @click.self="emit('minimize')"
+    >
+      <section
+        class="user-question-card"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="$t('overlay.userQuestionAriaLabel')"
+      >
         <header class="user-question-windowbar">
           <div class="user-question-traffic">
             <CloseButton :label="$t('overlay.minimizeAria')" @click="emit('minimize')" />
@@ -12,13 +21,41 @@
         <header class="user-question-header">
           <div class="user-question-title-block">
             <div v-if="questions.length > 1" class="user-question-kicker-row">
-              <span class="user-question-kicker">{{ $t('overlay.questionIndex', { current: currentIndex + 1, total: questions.length }) }}</span>
+              <span class="user-question-kicker">{{
+                $t('overlay.questionIndex', { current: currentIndex + 1, total: questions.length })
+              }}</span>
               <span class="user-question-nav" :aria-label="$t('overlay.questionNavAria')">
-                <button type="button" :disabled="currentIndex <= 0" @click="go(-1)" :aria-label="$t('overlay.prevQuestionAria')">
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l-5 5 5 5" /></svg>
+                <button
+                  type="button"
+                  :disabled="currentIndex <= 0"
+                  @click="go(-1)"
+                  :aria-label="$t('overlay.prevQuestionAria')"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 5l-5 5 5 5" />
+                  </svg>
                 </button>
-                <button type="button" :disabled="currentIndex >= questions.length - 1" @click="go(1)" :aria-label="$t('overlay.nextQuestionAria')">
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5" /></svg>
+                <button
+                  type="button"
+                  :disabled="currentIndex >= questions.length - 1"
+                  @click="go(1)"
+                  :aria-label="$t('overlay.nextQuestionAria')"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M8 5l5 5-5 5" />
+                  </svg>
                 </button>
               </span>
             </div>
@@ -26,8 +63,13 @@
           </div>
         </header>
 
-        <div class="user-question-body" :class="{ 'user-question-body--no-options': !currentOptions.length }">
-          <p v-if="currentQuestion.context" class="user-question-context">{{ currentQuestion.context }}</p>
+        <div
+          class="user-question-body"
+          :class="{ 'user-question-body--no-options': !currentOptions.length }"
+        >
+          <p v-if="currentQuestion.context" class="user-question-context">
+            {{ currentQuestion.context }}
+          </p>
 
           <div v-if="currentOptions.length" class="user-question-options">
             <button
@@ -39,7 +81,9 @@
               @click="selectOption(option.id)"
             >
               <span class="user-question-option__label">{{ option.label }}</span>
-              <span v-if="option.description" class="user-question-option__desc">{{ option.description }}</span>
+              <span v-if="option.description" class="user-question-option__desc">{{
+                option.description
+              }}</span>
             </button>
           </div>
 
@@ -68,7 +112,12 @@
           </button>
           <div class="user-question-spacer"></div>
           <div class="user-question-actions">
-            <button type="button" class="user-question-btn primary" :disabled="!canSubmit || submitting" @click="submit">
+            <button
+              type="button"
+              class="user-question-btn primary"
+              :disabled="!canSubmit || submitting"
+              @click="submit"
+            >
               {{ submitting ? $t('overlay.submittingAnswer') : $t('common.ok') }}
             </button>
           </div>
@@ -117,7 +166,9 @@ const currentIndex = computed(() => {
 });
 
 const currentQuestion = computed(() => props.questions[currentIndex.value] || {});
-const currentOptions = computed(() => Array.isArray(currentQuestion.value.options) ? currentQuestion.value.options : []);
+const currentOptions = computed(() =>
+  Array.isArray(currentQuestion.value.options) ? currentQuestion.value.options : []
+);
 const currentKey = computed(() => questionKey(currentQuestion.value, currentIndex.value));
 watch(
   currentKey,
@@ -142,7 +193,8 @@ function go(delta: number) {
 }
 
 function selectOption(optionId: string) {
-  currentDraft.value.selected_option_id = currentDraft.value.selected_option_id === optionId ? '' : optionId;
+  currentDraft.value.selected_option_id =
+    currentDraft.value.selected_option_id === optionId ? '' : optionId;
 }
 
 function submit() {

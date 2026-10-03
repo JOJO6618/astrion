@@ -40,7 +40,11 @@ function clearPages() {
 function cancelPendingRenders() {
   renderTasks.forEach((task) => {
     // pdf.js 的 RenderTask.cancel 在任务已结束/已取消时会抛错，属预期内，忽略即可
-    try { task.cancel(); } catch { /* 任务已结束时重复取消属预期，忽略 */ }
+    try {
+      task.cancel();
+    } catch {
+      /* 任务已结束时重复取消属预期，忽略 */
+    }
   });
   renderTasks = [];
 }
@@ -50,7 +54,11 @@ async function destroyDocument() {
   clearPages();
   if (pdfDoc) {
     // destroy 在文档已销毁/加载中断时会抛错，不影响后续重建，忽略即可
-    try { await pdfDoc.destroy(); } catch { /* 文档已销毁时重复调用属预期，忽略 */ }
+    try {
+      await pdfDoc.destroy();
+    } catch {
+      /* 文档已销毁时重复调用属预期，忽略 */
+    }
     pdfDoc = null;
   }
 }
@@ -123,9 +131,12 @@ onBeforeUnmount(() => {
   destroyDocument();
 });
 
-watch(() => props.source, () => {
-  renderPdf();
-});
+watch(
+  () => props.source,
+  () => {
+    renderPdf();
+  }
+);
 </script>
 
 <style scoped lang="scss">

@@ -10,11 +10,7 @@
         <header class="qd-preview__header">
           <span class="qd-preview__name" :title="addressText">{{ activeTarget.label }}</span>
           <span class="qd-preview__path" :title="addressText">{{ addressText }}</span>
-          <button
-            class="qd-preview__tool"
-            :title="$t('quickdock.previewRefresh')"
-            @click="refresh"
-          >
+          <button class="qd-preview__tool" :title="$t('quickdock.previewRefresh')" @click="refresh">
             <svg viewBox="0 0 16 16" fill="none">
               <path
                 d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"

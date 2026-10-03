@@ -5,10 +5,7 @@ import { persistWorkspaceMode } from '../../state';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
-import {
-  isConnectionDiagEnabled,
-  connectionDiag,
-} from './shared';
+import { isConnectionDiagEnabled, connectionDiag } from './shared';
 
 export const socketMethods = {
   async initSocket() {
@@ -37,7 +34,13 @@ export const socketMethods = {
         typeof this.isConversationIndependentRoute === 'function' &&
         this.isConversationIndependentRoute();
       if (status.conversation && status.conversation.current_id) {
-        if (this.initialRouteResolved && !this.currentConversationId && !onExplicitNewRoute && !onIndependentRoute && !desktopTabsEnabled) {
+        if (
+          this.initialRouteResolved &&
+          !this.currentConversationId &&
+          !onExplicitNewRoute &&
+          !onIndependentRoute &&
+          !desktopTabsEnabled
+        ) {
           this.currentConversationId = status.conversation.current_id;
         }
       }
@@ -111,24 +114,20 @@ export const socketMethods = {
       this.connectionHeartbeatLastError = '';
       if (!wasConnected) {
         this.connectionHeartbeatLastChangeAt = Date.now();
-        connectionDiag(
-          'warn',
-          'health-recovered',
-          {
-            requestId,
-            seq,
-            elapsedMs: this.connectionHeartbeatLastLatencyMs,
-            failCountBeforeRecover,
-            status: responseStatus,
-            diagEnabled,
-            endpoint: healthUrl,
-            conversationId: this.currentConversationId || null,
-            taskInProgress: !!this.taskInProgress,
-            streamingMessage: !!this.streamingMessage,
-            visibility: document?.visibilityState || 'unknown',
-            online: typeof navigator !== 'undefined' ? navigator.onLine : null
-          }
-        );
+        connectionDiag('warn', 'health-recovered', {
+          requestId,
+          seq,
+          elapsedMs: this.connectionHeartbeatLastLatencyMs,
+          failCountBeforeRecover,
+          status: responseStatus,
+          diagEnabled,
+          endpoint: healthUrl,
+          conversationId: this.currentConversationId || null,
+          taskInProgress: !!this.taskInProgress,
+          streamingMessage: !!this.streamingMessage,
+          visibility: document?.visibilityState || 'unknown',
+          online: typeof navigator !== 'undefined' ? navigator.onLine : null
+        });
       } else if (
         isConnectionDiagEnabled() &&
         (this.connectionHeartbeatLastLatencyMs >= 700 || seq <= 3 || seq % 60 === 0)
@@ -206,14 +205,10 @@ export const socketMethods = {
     }
     this.connectionHeartbeatActive = true;
     this.connectionHeartbeatFailCount = 0;
-    connectionDiag(
-      'log',
-      'heartbeat-start',
-      {
-        connectedIntervalMs: this.connectionHeartbeatIntervalMs,
-        disconnectedIntervalMs: this.connectionHeartbeatDisconnectedIntervalMs
-      }
-    );
+    connectionDiag('log', 'heartbeat-start', {
+      connectedIntervalMs: this.connectionHeartbeatIntervalMs,
+      disconnectedIntervalMs: this.connectionHeartbeatDisconnectedIntervalMs
+    });
     const runHeartbeat = async () => {
       if (!this.connectionHeartbeatActive) {
         return;

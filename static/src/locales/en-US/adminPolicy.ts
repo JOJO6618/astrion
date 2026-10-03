@@ -98,6 +98,5 @@ export default {
   saveFailed: 'Failed to save',
   savedSuccess: 'Saved',
   loadPolicyFailed: 'Failed to load policy',
-  toolConflict:
-    'Tool {tool} is already in category {category}. Remove it first, then reassign.',
+  toolConflict: 'Tool {tool} is already in category {category}. Remove it first, then reassign.'
 } as const;

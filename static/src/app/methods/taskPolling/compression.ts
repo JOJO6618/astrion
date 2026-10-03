@@ -1,8 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import {
-  restoreDebugLog,
-} from './shared';
+import { restoreDebugLog } from './shared';
 import { t } from '@/locales';
 
 export const compressionMethods = {
@@ -14,12 +12,15 @@ export const compressionMethods = {
     this.compressionInProgress = !!data.in_progress;
     // 记录压缩所属对话：压缩锁只作用于该对话，不影响其他对话与 /new 新建页
     this.compressionConversationId = this.compressionInProgress
-      ? (data.conversation_id || this.currentConversationId || null)
+      ? data.conversation_id || this.currentConversationId || null
       : null;
     this.compressionMode = data.mode || '';
     this.compressionStage = data.stage || '';
     if (this.compressionInProgress && !wasInProgress) {
-      const modeLabel = this.compressionMode === 'manual' ? t('appTasks.compressionManual') : t('appTasks.compressionAuto');
+      const modeLabel =
+        this.compressionMode === 'manual'
+          ? t('appTasks.compressionManual')
+          : t('appTasks.compressionAuto');
       if (this.compressionToastId) {
         this.uiDismissToast(this.compressionToastId);
         this.compressionToastId = null;
@@ -161,7 +162,9 @@ export const compressionMethods = {
         taskStore.lastEventIndex =
           typeof bootstrapReplay.replay_from === 'number'
             ? bootstrapReplay.replay_from
-            : (Array.isArray(bootstrapReplay.events) ? bootstrapReplay.events.length : 0);
+            : Array.isArray(bootstrapReplay.events)
+              ? bootstrapReplay.events.length
+              : 0;
       } else {
         runningTask = await taskStore.loadRunningTask(this.currentConversationId);
       }
@@ -199,12 +202,12 @@ export const compressionMethods = {
         conversationId: runningTask?.conversation_id
       });
       if (runningTask?.goal_mode) {
-        const existingGoalProgress = this.goalProgress && typeof this.goalProgress === 'object'
-          ? this.goalProgress
-          : {};
-        const taskGoalProgress = runningTask?.goal_progress && typeof runningTask.goal_progress === 'object'
-          ? runningTask.goal_progress
-          : {};
+        const existingGoalProgress =
+          this.goalProgress && typeof this.goalProgress === 'object' ? this.goalProgress : {};
+        const taskGoalProgress =
+          runningTask?.goal_progress && typeof runningTask.goal_progress === 'object'
+            ? runningTask.goal_progress
+            : {};
         this.goalRunning = true;
         this.goalModeArmed = false;
         this.goalProgress = {
@@ -213,9 +216,13 @@ export const compressionMethods = {
           goal: taskGoalProgress?.goal || existingGoalProgress?.goal || runningTask?.message || '',
           status: 'running',
           turn_count: Number(taskGoalProgress?.turn_count ?? existingGoalProgress?.turn_count ?? 0),
-          tokens_used: Number(taskGoalProgress?.tokens_used ?? existingGoalProgress?.tokens_used ?? 0),
+          tokens_used: Number(
+            taskGoalProgress?.tokens_used ?? existingGoalProgress?.tokens_used ?? 0
+          ),
           tool_calls: Number(taskGoalProgress?.tool_calls ?? existingGoalProgress?.tool_calls ?? 0),
-          duration_seconds: Number(taskGoalProgress?.duration_seconds ?? existingGoalProgress?.duration_seconds ?? 0)
+          duration_seconds: Number(
+            taskGoalProgress?.duration_seconds ?? existingGoalProgress?.duration_seconds ?? 0
+          )
         };
       }
       restoreDebugLog('restore:running-task-found', {
@@ -384,15 +391,18 @@ export const compressionMethods = {
       const forceRebuildForStreamingText = inText || hasTextChunkEvent || inThinking;
 
       // 检查 assistant 消息的 actions 是否有仍在进行中的
-      const hasInProgressActions = isAssistantMessage && Array.isArray(lastMessage.actions) && lastMessage.actions.some((action: any) => {
-        if (!action) return false;
-        if (action.streaming) return true;
-        if (action.type === 'tool' && action.tool) {
-          const status = String(action.tool.status || '').toLowerCase();
-          if (['preparing', 'running', 'pending', 'queued'].includes(status)) return true;
-        }
-        return false;
-      });
+      const hasInProgressActions =
+        isAssistantMessage &&
+        Array.isArray(lastMessage.actions) &&
+        lastMessage.actions.some((action: any) => {
+          if (!action) return false;
+          if (action.streaming) return true;
+          if (action.type === 'tool' && action.tool) {
+            const status = String(action.tool.status || '').toLowerCase();
+            if (['preparing', 'running', 'pending', 'queued'].includes(status)) return true;
+          }
+          return false;
+        });
 
       // 仅当确实需要时才重建，避免引导消息等场景下不必要的 assistant 消息移除和事件重放
       //
@@ -406,9 +416,7 @@ export const compressionMethods = {
       // 注意：思考→输出→工具调用 场景不会触发，因为 text_chunk 事件会让
       // forceRebuildForStreamingText 在两侧一致为 true，掩盖该分歧。
       // 方向考量：重建（重放）是安全方向，follow 是风险方向，故对服务端判定取 OR。
-      const serverNeedsRebuild = !!(
-        bootstrapReplay && bootstrapReplay.needs_rebuild === true
-      );
+      const serverNeedsRebuild = !!(bootstrapReplay && bootstrapReplay.needs_rebuild === true);
       const serverHasPendingToolCalls = !!(
         injectedDecision && injectedDecision.has_pending_tool_calls === true
       );
@@ -459,7 +467,9 @@ export const compressionMethods = {
           }
           // 压缩续接引导语走任务递归入口持久化，没有 runtime_injected 标记，
           // 但它同样是运行中插入、且事件流中有对应 user_message 事件。
-          const src = String(meta.message_source || '').trim().toLowerCase();
+          const src = String(meta.message_source || '')
+            .trim()
+            .toLowerCase();
           return src === 'compression' || src === 'compression_handoff';
         };
         let runBoundaryIdx = this.messages.length - 1;
@@ -504,7 +514,8 @@ export const compressionMethods = {
           // 重放事件会恢复内容，不显示等待提示。
           // 如果还没有内容事件，说明回复还没开始，应该显示等待提示。
           rebuildContainer.awaitingFirstContent = !hasAssistantContentEvent;
-          rebuildContainer.generatingLabel = rebuildContainer.generatingLabel || t('appTasks.thinkingLabel');
+          rebuildContainer.generatingLabel =
+            rebuildContainer.generatingLabel || t('appTasks.thinkingLabel');
           // 清理旧的流式标记，确保新事件能正确设置
           if (typeof rebuildContainer.streaming === 'boolean') {
             rebuildContainer.streaming = true;

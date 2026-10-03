@@ -2,7 +2,11 @@
 import { useChatActionStore } from '../stores/chatActions';
 import { useSandboxSetupStore } from '../stores/sandboxSetup';
 import { normalizeScrollLock } from '../composables/useScrollControl';
-import { setupShowImageObserver, teardownShowImageObserver, setupImagePreviewDelegation } from './bootstrap';
+import {
+  setupShowImageObserver,
+  teardownShowImageObserver,
+  setupImagePreviewDelegation
+} from './bootstrap';
 import { debugLog } from './methods/common';
 
 export function created() {

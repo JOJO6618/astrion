@@ -9,70 +9,79 @@
       <CloseButton :label="$t('shell.closeApprovalPanel')" @click="handleCloseClick" />
     </div>
     <div class="approval-panel-body" v-if="!collapsed">
-      <div v-if="!approvals.length && !isGoalApprovalMode" class="no-files">{{ $t('shell.noPendingApprovals') }}</div>
-        <div v-else class="approval-list">
-          <div v-for="item in approvals" :key="item.approval_id" class="approval-card">
-            <div class="approval-card__title">{{ item.tool_name }}</div>
-            <div class="approval-card__summary">{{ getToolLabel(item.tool_name) }}</div>
+      <div v-if="!approvals.length && !isGoalApprovalMode" class="no-files">
+        {{ $t('shell.noPendingApprovals') }}
+      </div>
+      <div v-else class="approval-list">
+        <div v-for="item in approvals" :key="item.approval_id" class="approval-card">
+          <div class="approval-card__title">{{ item.tool_name }}</div>
+          <div class="approval-card__summary">{{ getToolLabel(item.tool_name) }}</div>
 
-            <div v-if="isEditPreview(item)" class="approval-edit-preview">
-              <div class="approval-path">{{ item.preview?.file_path || item.preview?.resolved_path }}</div>
-              <div class="tool-result-diff approval-diff">
-                <div
-                  class="diff-line diff-remove"
-                  v-for="(line, idx) in getEditOldLines(item)"
-                  :key="`o-${item.approval_id}-${idx}`"
-                >
-                  - {{ line }}
-                </div>
-                <div
-                  class="diff-line diff-add"
-                  v-for="(line, idx) in getEditNewLines(item)"
-                  :key="`n-${item.approval_id}-${idx}`"
-                >
-                  + {{ line }}
-                </div>
+          <div v-if="isEditPreview(item)" class="approval-edit-preview">
+            <div class="approval-path">
+              {{ item.preview?.file_path || item.preview?.resolved_path }}
+            </div>
+            <div class="tool-result-diff approval-diff">
+              <div
+                class="diff-line diff-remove"
+                v-for="(line, idx) in getEditOldLines(item)"
+                :key="`o-${item.approval_id}-${idx}`"
+              >
+                - {{ line }}
+              </div>
+              <div
+                class="diff-line diff-add"
+                v-for="(line, idx) in getEditNewLines(item)"
+                :key="`n-${item.approval_id}-${idx}`"
+              >
+                + {{ line }}
               </div>
             </div>
+          </div>
 
-            <div v-else-if="isWritePreview(item)" class="approval-edit-preview">
-              <div class="approval-path">{{ item.preview?.file_path }}</div>
-              <div class="tool-result-diff approval-diff">
-                <div
-                  class="diff-line diff-add"
-                  v-for="(line, idx) in getWriteLines(item)"
-                  :key="`w-${item.approval_id}-${idx}`"
-                >
-                  + {{ line }}
-                </div>
+          <div v-else-if="isWritePreview(item)" class="approval-edit-preview">
+            <div class="approval-path">{{ item.preview?.file_path }}</div>
+            <div class="tool-result-diff approval-diff">
+              <div
+                class="diff-line diff-add"
+                v-for="(line, idx) in getWriteLines(item)"
+                :key="`w-${item.approval_id}-${idx}`"
+              >
+                + {{ line }}
               </div>
             </div>
+          </div>
 
-            <div v-else-if="isPathOnlyPreview(item)" class="approval-kv">
-              <div>
-                <strong>{{ $t('shell.pathLabel') }}</strong
-                ><span class="approval-value approval-value--path">{{ resolvePath(item) }}</span>
-              </div>
+          <div v-else-if="isPathOnlyPreview(item)" class="approval-kv">
+            <div>
+              <strong>{{ $t('shell.pathLabel') }}</strong
+              ><span class="approval-value approval-value--path">{{ resolvePath(item) }}</span>
             </div>
+          </div>
 
-            <div v-else-if="isRenamePreview(item)" class="approval-kv">
-              <div>
-                <strong>{{ $t('shell.renameLabel') }}</strong
-                ><span class="approval-value approval-value--path"
-                  >{{ item.preview?.old_path }} → {{ item.preview?.new_path }}</span
-                >
-              </div>
+          <div v-else-if="isRenamePreview(item)" class="approval-kv">
+            <div>
+              <strong>{{ $t('shell.renameLabel') }}</strong
+              ><span class="approval-value approval-value--path"
+                >{{ item.preview?.old_path }} → {{ item.preview?.new_path }}</span
+              >
             </div>
+          </div>
 
-            <pre
-            v-else-if="isCommandPreview(item)"
-            class="approval-lines approval-lines--cmd"
-            >{{ item.preview?.code || item.preview?.command || '' }}</pre>
+          <pre v-else-if="isCommandPreview(item)" class="approval-lines approval-lines--cmd">{{
+            item.preview?.code || item.preview?.command || ''
+          }}</pre>
 
-            <div v-else class="approval-kv">
-              <div><strong>{{ $t('shell.toolLabel') }}</strong>{{ item.tool_name }}</div>
-              <div v-if="item.preview?.summary"><strong>{{ $t('shell.summaryLabel') }}</strong>{{ item.preview.summary }}</div>
+          <div v-else class="approval-kv">
+            <div>
+              <strong>{{ $t('shell.toolLabel') }}</strong
+              >{{ item.tool_name }}
             </div>
+            <div v-if="item.preview?.summary">
+              <strong>{{ $t('shell.summaryLabel') }}</strong
+              >{{ item.preview.summary }}
+            </div>
+          </div>
           <div class="approval-actions">
             <button
               type="button"
@@ -106,7 +115,9 @@
         class="auto-approval-block"
         :class="{ 'auto-approval-block--goal': isGoalApprovalMode }"
       >
-        <div v-if="!isGoalApprovalMode" class="auto-approval-block__title">{{ autoApprovalTitle }}</div>
+        <div v-if="!isGoalApprovalMode" class="auto-approval-block__title">
+          {{ autoApprovalTitle }}
+        </div>
         <pre class="auto-approval-block__content">{{ autoApprovalFeedLines.join('\n') }}</pre>
         <div v-if="autoApprovalFinalMessage" class="auto-approval-block__final">
           <div
@@ -120,7 +131,9 @@
           >
             {{ parseFinalMessage(autoApprovalFinalMessage).title }}
           </div>
-          <div class="auto-approval-block__reason">{{ parseFinalMessage(autoApprovalFinalMessage).reason }}</div>
+          <div class="auto-approval-block__reason">
+            {{ parseFinalMessage(autoApprovalFinalMessage).reason }}
+          </div>
         </div>
       </div>
     </div>
@@ -177,8 +190,7 @@ const isMobileViewport = computed(() => {
 });
 
 const isEditPreview = (item: any) => item?.tool_name === 'edit_file' && item?.preview?.edit_context;
-const isCommandPreview = (item: any) =>
-  ['run_command', 'terminal_input'].includes(item?.tool_name);
+const isCommandPreview = (item: any) => ['run_command', 'terminal_input'].includes(item?.tool_name);
 const isWritePreview = (item: any) => item?.tool_name === 'write_file';
 const isRenamePreview = (item: any) => item?.tool_name === 'rename_file';
 const isPathOnlyPreview = (item: any) =>
@@ -188,7 +200,13 @@ const isDeciding = (approvalId: string) =>
   Array.isArray(props.decidingApprovalIds) && props.decidingApprovalIds.includes(approvalId);
 
 const resolvePath = (item: any) => {
-  return item?.preview?.path || item?.preview?.file_path || item?.arguments?.path || item?.arguments?.file_path || '';
+  return (
+    item?.preview?.path ||
+    item?.preview?.file_path ||
+    item?.arguments?.path ||
+    item?.arguments?.file_path ||
+    ''
+  );
 };
 
 const getToolLabel = (toolName: string) => {
@@ -235,7 +253,6 @@ const parseFinalMessage = (text: string) => {
     isApproved: title.includes(t('appTasks.approvalApproved'))
   };
 };
-
 </script>
 
 <style scoped>

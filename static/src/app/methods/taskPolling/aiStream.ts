@@ -1,9 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import {
-  userMDebug,
-  restoreDebugLog,
-} from './shared';
+import { userMDebug, restoreDebugLog } from './shared';
 import { t } from '@/locales';
 
 export const aiStreamMethods = {
@@ -29,7 +26,14 @@ export const aiStreamMethods = {
       if (action.streaming) return true;
       if (action.type === 'tool' && action.tool) {
         const status = String(action.tool.status || '').toLowerCase();
-        return ['preparing', 'running', 'pending', 'queued', 'awaiting_approval', 'awaiting_user_answer'].includes(status);
+        return [
+          'preparing',
+          'running',
+          'pending',
+          'queued',
+          'awaiting_approval',
+          'awaiting_user_answer'
+        ].includes(status);
       }
       return false;
     });
@@ -254,9 +258,10 @@ export const aiStreamMethods = {
     debugLog('[TaskPolling] 断流重试，清理本轮半截内容');
     const retryAttempt = Number(data?.attempt) || 0;
     const retryMax = Number(data?.max_attempts) || 0;
-    const retryLabel = retryAttempt && retryMax
-      ? t('appTasks.streamRetrying', { attempt: retryAttempt, max: retryMax })
-      : t('appTasks.streamRetryingGeneric');
+    const retryLabel =
+      retryAttempt && retryMax
+        ? t('appTasks.streamRetrying', { attempt: retryAttempt, max: retryMax })
+        : t('appTasks.streamRetryingGeneric');
     const removedActions = this.chatResetStreamingAttemptActions?.(retryLabel) || [];
     for (const action of removedActions) {
       if (action?.id) {

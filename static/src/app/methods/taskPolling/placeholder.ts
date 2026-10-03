@@ -1,9 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import {
-  userMDebug,
-  isEmptyAssistantPlaceholderMessage,
-} from './shared';
+import { userMDebug, isEmptyAssistantPlaceholderMessage } from './shared';
 
 export const placeholderMethods = {
   cleanupTrailingEmptyAssistantPlaceholder(reason = 'unspecified') {
@@ -37,10 +34,13 @@ export const placeholderMethods = {
     if (typeof this.currentMessageIndex === 'number') {
       this.currentMessageIndex = -1;
     }
-    userMDebug('taskPolling.moveTrailingEmptyAssistantPlaceholderAfterUserInsert:removed-before-insert', {
-      reason,
-      messagesLengthAfterRemove: this.messages.length
-    });
+    userMDebug(
+      'taskPolling.moveTrailingEmptyAssistantPlaceholderAfterUserInsert:removed-before-insert',
+      {
+        reason,
+        messagesLengthAfterRemove: this.messages.length
+      }
+    );
     return true;
   },
   ensureRunningAssistantPlaceholder(runningTask: any = null, reason = 'restore-running-task') {

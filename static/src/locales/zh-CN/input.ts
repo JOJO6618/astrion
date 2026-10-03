@@ -181,5 +181,5 @@ export default {
   executionFullAccess: '完全访问',
   executionSandbox: '沙箱',
   runModeFast: '快速',
-  runModeThinking: '思考',
+  runModeThinking: '思考'
 } as const;

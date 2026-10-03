@@ -29,5 +29,5 @@ export default {
   haveAccount: '已有账号？',
   backToLogin: '返回登录',
   fillAllFields: '请完整填写所有字段',
-  registerFailed: '注册失败',
+  registerFailed: '注册失败'
 } as const;

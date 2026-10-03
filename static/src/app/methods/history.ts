@@ -34,8 +34,10 @@ function restoreDebugLog(event: string, payload: Record<string, any> = {}) {
 }
 
 // 后端子智能体完成消息格式匹配（须与后端 modules/i18n.py 的 zh/en 两种产出一致；\u 转义仅为通过 i18n 审计）
-const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
-const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)\]/;
+const SUB_AGENT_DONE_PREFIX_RE =
+  /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
+const BG_RUN_COMMAND_DONE_PREFIX_RE =
+  /^\[(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)\]/;
 
 function parseSubAgentDoneLabel(rawContent: any): string | null {
   const content = (rawContent || '').toString().trim();
@@ -161,7 +163,9 @@ export const historyMethods = {
           messagesData?.data?.preview_token
         );
         usePreviewStore().setTargets(
-          Array.isArray(messagesData?.data?.preview_targets) ? messagesData.data.preview_targets : [],
+          Array.isArray(messagesData?.data?.preview_targets)
+            ? messagesData.data.preview_targets
+            : [],
           false
         );
         const lastAssistantRaw = [...rawMessages]

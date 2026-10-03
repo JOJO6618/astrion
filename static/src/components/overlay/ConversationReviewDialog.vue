@@ -29,7 +29,9 @@
           </div>
           <div class="scroll-area conversation-list" :class="{ loading }">
             <div v-if="loading" class="empty">{{ $t('common.loading') }}</div>
-            <div v-else-if="!conversations.length" class="empty">{{ $t('overlay.noConversations') }}</div>
+            <div v-else-if="!conversations.length" class="empty">
+              {{ $t('overlay.noConversations') }}
+            </div>
             <template v-else>
               <button
                 v-for="conv in conversations"
@@ -44,14 +46,20 @@
                 :disabled="submitting || conv.id === currentConversationId"
               >
                 <div class="row">
-                  <span class="item-title">{{ conv.title || $t('overlay.unnamedConversation') }}</span>
-                  <span v-if="conv.id === currentConversationId" class="tag current-tag">{{ $t('overlay.currentTag') }}</span>
+                  <span class="item-title">{{
+                    conv.title || $t('overlay.unnamedConversation')
+                  }}</span>
+                  <span v-if="conv.id === currentConversationId" class="tag current-tag">{{
+                    $t('overlay.currentTag')
+                  }}</span>
                 </div>
                 <div class="meta">
                   <span>{{ formatUpdatedAt(conv.updated_at) }}</span>
                   <span>
                     {{ $t('overlay.messageCount', { n: conv.total_messages || 0 }) }}
-                    <span v-if="(conv.total_tools || 0) > 0">{{ $t('overlay.toolCount', { n: conv.total_tools }) }}</span>
+                    <span v-if="(conv.total_tools || 0) > 0">{{
+                      $t('overlay.toolCount', { n: conv.total_tools })
+                    }}</span>
                   </span>
                 </div>
               </button>
@@ -63,7 +71,13 @@
                 @click="$emit('load-more')"
                 :disabled="loadingMore || !hasMore || submitting"
               >
-                {{ loadingMore ? $t('overlay.loadingMore') : hasMore ? $t('overlay.loadMore') : $t('overlay.noMore') }}
+                {{
+                  loadingMore
+                    ? $t('overlay.loadingMore')
+                    : hasMore
+                      ? $t('overlay.loadMore')
+                      : $t('overlay.noMore')
+                }}
               </button>
             </div>
           </div>
@@ -71,22 +85,36 @@
 
         <div class="review-right">
           <div class="pane-head">
-            <span class="pane-head-label">{{ $t('overlay.previewTitle', { n: previewLimit }) }}</span>
+            <span class="pane-head-label">{{
+              $t('overlay.previewTitle', { n: previewLimit })
+            }}</span>
             <span v-if="preview && preview.length" class="pane-head-meta">
               {{ $t('overlay.previewCount', { n: preview.length }) }}
             </span>
           </div>
           <div class="scroll-area preview-box" :class="{ loading: previewLoading }">
             <div v-if="previewLoading" class="placeholder">
-              <span class="icon icon-xl placeholder-icon" :style="iconStyle('clock')" aria-hidden="true"></span>
+              <span
+                class="icon icon-xl placeholder-icon"
+                :style="iconStyle('clock')"
+                aria-hidden="true"
+              ></span>
               <div class="text-main">{{ $t('overlay.previewGenerating') }}</div>
             </div>
             <div v-else-if="previewError" class="placeholder error">
-              <span class="icon icon-xl placeholder-icon" :style="iconStyle('triangleAlert')" aria-hidden="true"></span>
+              <span
+                class="icon icon-xl placeholder-icon"
+                :style="iconStyle('triangleAlert')"
+                aria-hidden="true"
+              ></span>
               <div class="text-main">{{ previewError }}</div>
             </div>
             <div v-else-if="!preview || !preview.length" class="placeholder">
-              <span class="icon icon-xl placeholder-icon" :style="iconStyle('file')" aria-hidden="true"></span>
+              <span
+                class="icon icon-xl placeholder-icon"
+                :style="iconStyle('file')"
+                aria-hidden="true"
+              ></span>
               <div class="text-main">{{ $t('overlay.previewEmptyHint') }}</div>
               <div class="text-sub">{{ $t('overlay.previewLimitHint', { n: previewLimit }) }}</div>
             </div>
@@ -115,7 +143,11 @@
             class="secondary-btn"
             :class="{ active: contentMode === 'full' }"
             :aria-pressed="contentMode === 'full'"
-            :title="contentMode === 'full' ? $t('overlay.cleanDialogueHint') : $t('overlay.fullRecordHint')"
+            :title="
+              contentMode === 'full'
+                ? $t('overlay.cleanDialogueHint')
+                : $t('overlay.fullRecordHint')
+            "
             @click="$emit('toggle-content-mode')"
             :disabled="submitting"
           >

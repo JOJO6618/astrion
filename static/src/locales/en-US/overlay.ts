@@ -172,5 +172,5 @@ export default {
   // ── VideoPicker ──
   videoPickerTitle: 'Select video (1 at a time)',
   noVideos: 'No video files found',
-  videoSelectedCount: 'Selected {n} / 1',
+  videoSelectedCount: 'Selected {n} / 1'
 } as const;

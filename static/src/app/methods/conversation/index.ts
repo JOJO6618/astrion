@@ -8,5 +8,5 @@ export const conversationMethods = {
   ...stateMethods,
   ...loadMethods,
   ...actionMethods,
-  ...bootstrapMethods,
+  ...bootstrapMethods
 };

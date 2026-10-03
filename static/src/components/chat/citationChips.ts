@@ -33,7 +33,7 @@ export const citationPopover = reactive({
   visible: false,
   pinned: false,
   anchor: null as HTMLElement | null,
-  annotations: [] as CitationAnnotation[],
+  annotations: [] as CitationAnnotation[]
 });
 
 const HOVER_OPEN_DELAY = 250; // 悬停多久后打开
@@ -52,7 +52,11 @@ function clearPopoverTimers() {
   closeTimer = undefined;
 }
 
-export function openCitationPopover(anchor: HTMLElement, annotations: CitationAnnotation[], pinned: boolean) {
+export function openCitationPopover(
+  anchor: HTMLElement,
+  annotations: CitationAnnotation[],
+  pinned: boolean
+) {
   closeCitationPopover();
   citationPopover.anchor = anchor;
   citationPopover.annotations = annotations;
@@ -129,7 +133,7 @@ export function fileAnnotationFromToken(token: string): CitationAnnotation | nul
     id: token,
     type: 'file_citation',
     file_path: path,
-    file_name: path.split('/').pop() || path,
+    file_name: path.split('/').pop() || path
   };
   if (m) {
     if (m[4]) ann.page = parseInt(m[4], 10);
@@ -164,7 +168,9 @@ function shortDomain(domain?: string): string {
 }
 
 function chipLabel(ann: CitationAnnotation): string {
-  return ann.type === 'file_citation' ? (ann.file_name || ann.file_path || '') : shortDomain(ann.domain);
+  return ann.type === 'file_citation'
+    ? ann.file_name || ann.file_path || ''
+    : shortDomain(ann.domain);
 }
 
 const FILE_ICON_SVG =
@@ -190,7 +196,7 @@ function chipIconHtml(ann: CitationAnnotation): string {
 export function enhanceCitationChips(
   container: HTMLElement,
   citations: CitationAnnotation[] | undefined,
-  opts: { final?: boolean } = {},
+  opts: { final?: boolean } = {}
 ) {
   const chips = container.querySelectorAll<ChipWithAnnotations>('.md-citation-chip');
   if (!chips.length) return;
@@ -206,17 +212,13 @@ export function enhanceCitationChips(
     // 已渲染的 chip：final 到达时换权威富化数据（供 popover 读取），DOM 不动
     if (chip.dataset.citeEnhanced === '1' && chip.dataset.citeLoaded === '1') {
       if (final) {
-        const enriched = ids
-          .map((id) => map.get(id))
-          .filter((a): a is CitationAnnotation => !!a);
+        const enriched = ids.map((id) => map.get(id)).filter((a): a is CitationAnnotation => !!a);
         if (enriched.length) chip._citationAnnotations = enriched;
       }
       return;
     }
 
-    let annotations = ids
-      .map((id) => map.get(id))
-      .filter((a): a is CitationAnnotation => !!a);
+    let annotations = ids.map((id) => map.get(id)).filter((a): a is CitationAnnotation => !!a);
 
     // 非 final：file token 自解析作为临时数据（查表未命中时），让 chip 即时渲染
     if (!annotations.length && !final) {

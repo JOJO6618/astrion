@@ -75,11 +75,8 @@ onBeforeUnmount(() => syncLock(false));
   align-items: center;
   justify-content: center;
   /* 移动端安全区适配 */
-  padding:
-    calc(12px + env(safe-area-inset-top, 0px))
-    calc(12px + env(safe-area-inset-right, 0px))
-    calc(12px + env(safe-area-inset-bottom, 0px))
-    calc(12px + env(safe-area-inset-left, 0px));
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
   box-sizing: border-box;
 }
 

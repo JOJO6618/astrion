@@ -272,8 +272,6 @@ function readShowHtmlJsMode(node: Element) {
   return normalizeShowHtmlJsMode(node.getAttribute('js'));
 }
 
-
-
 function decodeBase64Utf8(input: string) {
   if (!input) return '';
   try {
@@ -544,7 +542,14 @@ function renderShowImages(root: ParentNode | null = document) {
   if (htmlNodes.length > 0 || fileNodes.length > 0) {
     markShowTagDrawingActive();
   }
-  if (!verbose && imageNodes.length === 0 && htmlNodes.length === 0 && fileNodes.length === 0 && !hasDownloadLinks) return;
+  if (
+    !verbose &&
+    imageNodes.length === 0 &&
+    htmlNodes.length === 0 &&
+    fileNodes.length === 0 &&
+    !hasDownloadLinks
+  )
+    return;
 
   const rootNode = root as Node;
   debugShowImageLog('render:start', {
@@ -691,8 +696,7 @@ function renderShowImages(root: ParentNode | null = document) {
     if (inStreaming) {
       const locked = showHtmlStreamingRatioLockByPath.get(pathKey);
       if (locked) {
-        const shouldUpgradeRatio =
-          ratioKey !== locked && (locked === '1:1' || ratioKey !== '1:1');
+        const shouldUpgradeRatio = ratioKey !== locked && (locked === '1:1' || ratioKey !== '1:1');
         if (shouldUpgradeRatio) {
           ratioKey = computedRatioKey;
           showHtmlStreamingRatioLockByPath.set(pathKey, ratioKey);
@@ -732,7 +736,8 @@ function renderShowImages(root: ParentNode | null = document) {
         wrapper.className =
           'chat-inline-card chat-inline-card--html chat-inline-card--pending chat-inline-html chat-inline-html--pending';
         const host = document.createElement('div');
-        host.className = 'chat-inline-card__body chat-inline-html__host chat-inline-html__host--pending';
+        host.className =
+          'chat-inline-card__body chat-inline-html__host chat-inline-html__host--pending';
         const tip = document.createElement('div');
         tip.className = 'chat-inline-card__pending-tip chat-inline-html__pending-tip';
         tip.textContent = t('appCore.renderingContent');
@@ -954,9 +959,7 @@ function renderShowImages(root: ParentNode | null = document) {
       }
     });
 
-    const needsUpdate =
-      persistent.encoded !== effectiveEncoded ||
-      persistent.ratioKey !== ratioKey;
+    const needsUpdate = persistent.encoded !== effectiveEncoded || persistent.ratioKey !== ratioKey;
     if (needsUpdate) {
       persistent.root.innerHTML = safeHtml;
       persistent.encoded = effectiveEncoded;
@@ -982,11 +985,11 @@ function renderShowImages(root: ParentNode | null = document) {
     node.setAttribute('data-rendered', '1');
     const rect = persistent.wrapper.getBoundingClientRect();
     debugShowHtmlLog('render:node-done', {
-        renderId,
-        pathKey,
-        jsMode,
-        ratioKey,
-        rect: {
+      renderId,
+      pathKey,
+      jsMode,
+      ratioKey,
+      rect: {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
         w: Math.round(rect.width),
@@ -1031,8 +1034,8 @@ const SHOW_HTML_STREAMING_RENDER_INTERVAL_MS = 180;
 const showHtmlCompletedSnapshotByPath = new Map<
   string,
   {
-    encoded: string,
-    ratioKey: string
+    encoded: string;
+    ratioKey: string;
   }
 >();
 // 流式期间只锁定比例；具体尺寸由 CSS min()+aspect-ratio 自适应计算
@@ -1040,30 +1043,30 @@ const showHtmlStreamingRatioLockByPath = new Map<string, string>();
 const showHtmlPersistentRenderByPath = new Map<
   string,
   {
-    encoded: string,
-    safeHtml: string,
-    ratioKey: string,
-    wrapper: HTMLElement,
-    host: HTMLElement,
-    root: HTMLElement
+    encoded: string;
+    safeHtml: string;
+    ratioKey: string;
+    wrapper: HTMLElement;
+    host: HTMLElement;
+    root: HTMLElement;
   }
 >();
 const showHtmlJsPendingRenderByPath = new Map<
   string,
   {
-    wrapper: HTMLElement,
-    host: HTMLElement,
-    tip: HTMLElement
+    wrapper: HTMLElement;
+    host: HTMLElement;
+    tip: HTMLElement;
   }
 >();
 const showHtmlJsIframeRenderByPath = new Map<
   string,
   {
-    encoded: string,
-    ratioKey: string,
-    srcdoc: string,
-    wrapper: HTMLElement,
-    iframe: HTMLIFrameElement
+    encoded: string;
+    ratioKey: string;
+    srcdoc: string;
+    wrapper: HTMLElement;
+    iframe: HTMLIFrameElement;
   }
 >();
 let layoutDebugObserver: MutationObserver | null = null;
@@ -1333,9 +1336,17 @@ export function setupShowImageObserver() {
         const addedHasShowTag = Array.from(mutation.addedNodes).some(
           (n) =>
             n instanceof Element &&
-            (['show_image', 'show_html', 'show_file', 'show-image', 'show-html', 'show-file'].includes(
-              n.tagName.toLowerCase()
-            ) || !!n.querySelector?.('show_image,show_html,show_file,show-image,show-html,show-file,a.md-download-link,a[data-download="1"]'))
+            ([
+              'show_image',
+              'show_html',
+              'show_file',
+              'show-image',
+              'show-html',
+              'show-file'
+            ].includes(n.tagName.toLowerCase()) ||
+              !!n.querySelector?.(
+                'show_image,show_html,show_file,show-image,show-html,show-file,a.md-download-link,a[data-download="1"]'
+              ))
         );
         return targetIsShowImage || addedHasShowTag;
       });
@@ -1455,11 +1466,14 @@ function dispatchShowFileDownload(path: string) {
   fetch(url)
     .then((resp) => {
       if (!resp.ok) {
-        return resp.json().then((j) => {
-          throw new Error(j.error || j.message || resp.statusText);
-        }).catch(() => {
-          throw new Error(resp.statusText || t('common.downloadFailed'));
-        });
+        return resp
+          .json()
+          .then((j) => {
+            throw new Error(j.error || j.message || resp.statusText);
+          })
+          .catch(() => {
+            throw new Error(resp.statusText || t('common.downloadFailed'));
+          });
       }
       return resp.blob();
     })

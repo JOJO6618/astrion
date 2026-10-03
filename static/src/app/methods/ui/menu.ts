@@ -37,7 +37,12 @@ export const menuMethods = {
     }
   },
   handleClickOutsideQuickMenu(event) {
-    if (!this.quickMenuOpen && !this.permissionMenuOpen && !this.agentTypeMenuOpen && !this.workModeMenuOpen) {
+    if (
+      !this.quickMenuOpen &&
+      !this.permissionMenuOpen &&
+      !this.agentTypeMenuOpen &&
+      !this.workModeMenuOpen
+    ) {
       return;
     }
     const shell =

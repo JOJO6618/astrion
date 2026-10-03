@@ -44,11 +44,7 @@
           </button>
         </div>
         <p class="hint">
-          {{
-            mode === 'writable'
-              ? $t('overlay.writableHint')
-              : $t('overlay.readableHint')
-          }}
+          {{ mode === 'writable' ? $t('overlay.writableHint') : $t('overlay.readableHint') }}
         </p>
         <textarea
           class="path-input"
@@ -68,8 +64,12 @@
           }}
         </p>
         <div class="actions">
-          <button type="button" class="btn" @click="$emit('save')" :disabled="saving">{{ $t('common.save') }}</button>
-          <button type="button" class="btn btn-muted" @click="$emit('close')">{{ $t('common.cancel') }}</button>
+          <button type="button" class="btn" @click="$emit('save')" :disabled="saving">
+            {{ $t('common.save') }}
+          </button>
+          <button type="button" class="btn btn-muted" @click="$emit('close')">
+            {{ $t('common.cancel') }}
+          </button>
         </div>
       </div>
     </div>
@@ -97,24 +97,99 @@ defineEmits<{
 </script>
 
 <style scoped>
-.overlay-backdrop { position: fixed; inset: 0; background: var(--overlay-scrim); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.overlay-card { width: min(680px, 92vw); background: var(--theme-surface-soft); border: 1px solid var(--theme-control-border); border-radius: 12px; padding: 12px; }
-.overlay-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.overlay-header h3 { margin: 0; font-size: 16px; color: var(--text-primary); }
-.hint { font-size: 12px; color: var(--text-secondary); margin: 0 0 8px 0; }
-.scope-path { font-size: 12px; color: var(--text-secondary); margin: -4px 0 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scope-hint { margin-top: 8px; }
-.mode-switch { display: inline-flex; border: 1px solid var(--theme-control-border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
-.mode-btn { border: none; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 12px; }
-.mode-btn.active { background: var(--theme-tab-active); font-weight: 600; }
-.path-input { width: 100%; min-height: 220px; resize: vertical; border: 1px solid var(--theme-control-border); border-radius: 8px; padding: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.actions { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
-.btn { border: 1px solid var(--theme-control-border); background: var(--theme-tab-active); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
-.btn-muted { background: transparent; }
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.overlay-card {
+  width: min(680px, 92vw);
+  background: var(--theme-surface-soft);
+  border: 1px solid var(--theme-control-border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.overlay-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+.scope-path {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: -4px 0 8px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scope-hint {
+  margin-top: 8px;
+}
+.mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.mode-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.mode-btn.active {
+  background: var(--theme-tab-active);
+  font-weight: 600;
+}
+.path-input {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 8px;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.btn {
+  border: 1px solid var(--theme-control-border);
+  background: var(--theme-tab-active);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-muted {
+  background: transparent;
+}
 
 .path-auth-fade-enter-active,
 .path-auth-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .path-auth-fade-enter-from,

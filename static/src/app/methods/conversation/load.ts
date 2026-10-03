@@ -55,7 +55,9 @@ export const loadMethods = {
     try {
       // 列表过滤由请求发起时的侧边栏类型过滤器（普通/多智能体）决定
       const maParam = listType === 'multi_agent' ? '&multi_agent_mode=1' : '&multi_agent_mode=0';
-      const response = await fetch(`/api/conversations?limit=${queryLimit}&offset=${queryOffset}${maParam}`);
+      const response = await fetch(
+        `/api/conversations?limit=${queryLimit}&offset=${queryOffset}${maParam}`
+      );
       const data = await response.json();
 
       if (data.success) {

@@ -24,5 +24,5 @@ export default {
   haveAccount: 'Already have an account?',
   backToLogin: 'Back to login',
   fillAllFields: 'Please fill in all fields',
-  registerFailed: 'Registration failed',
+  registerFailed: 'Registration failed'
 } as const;

@@ -291,7 +291,9 @@ function lineNumber(line: any): string {
         :style="props.iconStyle('filePen')"
         aria-hidden="true"
       ></span>
-      <span class="edit-summary-card__title">{{ $t('chat.filesEdited', { n: files.length }) }}</span>
+      <span class="edit-summary-card__title">{{
+        $t('chat.filesEdited', { n: files.length })
+      }}</span>
       <span class="edit-summary-card__totals">
         <span class="edit-summary-plus">+{{ totals.added }}</span>
         <span class="edit-summary-minus">-{{ totals.removed }}</span>
@@ -360,7 +362,9 @@ function lineNumber(line: any): string {
                   <span class="es-diff-content">{{ line.content }}</span>
                 </div>
               </template>
-              <div v-if="activeFile.truncated" class="es-diff-note">{{ $t('chat.diffTruncated') }}</div>
+              <div v-if="activeFile.truncated" class="es-diff-note">
+                {{ $t('chat.diffTruncated') }}
+              </div>
             </template>
             <div v-else class="es-diff-empty">{{ $t('chat.diffEmpty') }}</div>
           </div>

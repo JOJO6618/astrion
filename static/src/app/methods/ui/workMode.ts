@@ -79,15 +79,24 @@ export const workModeMethods = {
       } else {
         this.fetchExecutionMode();
       }
-      const labelMap: Record<string, string> = { plan: t('appUi.workModePlan'), ask: t('appUi.workModeAsk'), execute: t('appUi.workModeExecute') };
+      const labelMap: Record<string, string> = {
+        plan: t('appUi.workModePlan'),
+        ask: t('appUi.workModeAsk'),
+        execute: t('appUi.workModeExecute')
+      };
       this.uiPushToast({
         title: t('appUi.runModeUpdated'),
-        message: payload?.message || t('appUi.switchedToMode', { mode: labelMap[this.currentWorkMode] || this.currentWorkMode }),
+        message:
+          payload?.message ||
+          t('appUi.switchedToMode', {
+            mode: labelMap[this.currentWorkMode] || this.currentWorkMode
+          }),
         type: 'info',
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchRunModeFailed'));
+      const msg =
+        error instanceof Error ? error.message : String(error || t('appUi.switchRunModeFailed'));
       this.uiPushToast({
         title: t('appUi.switchRunModeFailed'),
         message: msg,

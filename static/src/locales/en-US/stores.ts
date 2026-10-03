@@ -92,7 +92,8 @@ export default {
   updateFailed: 'Failed to update',
   enabled: 'Enabled',
   disabled: 'Disabled',
-  deepCompressMustExceedShallow: 'Deep compression trigger context must be greater than shallow compression trigger context',
+  deepCompressMustExceedShallow:
+    'Deep compression trigger context must be greater than shallow compression trigger context',
   saveFailed: 'Failed to save',
   saved: 'Saved',
   autoSaveFailed: 'Failed to auto-save',
@@ -118,5 +119,5 @@ export default {
   inProgress: 'In progress',
   playbackStatus: 'Replaying {label}',
   toolPlayback: 'Tool playback',
-  toolExecFailed: 'Tool execution failed',
+  toolExecFailed: 'Tool execution failed'
 } as const;

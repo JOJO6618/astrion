@@ -70,7 +70,12 @@ export const toolingMethods = {
         }
         const status =
           typeof action.tool.status === 'string' ? action.tool.status.toLowerCase() : '';
-        if (!status || ['preparing', 'running', 'pending', 'queued', 'stale', 'awaiting_user_answer'].includes(status)) {
+        if (
+          !status ||
+          ['preparing', 'running', 'pending', 'queued', 'stale', 'awaiting_user_answer'].includes(
+            status
+          )
+        ) {
           action.tool.status = 'cancelled';
           action.tool.message = action.tool.message || t('appTasks.stopped');
         }
@@ -115,7 +120,10 @@ export const toolingMethods = {
         }
         const status =
           typeof action.tool.status === 'string' ? action.tool.status.toLowerCase() : '';
-        return !status || ['preparing', 'running', 'pending', 'queued', 'awaiting_user_answer'].includes(status);
+        return (
+          !status ||
+          ['preparing', 'running', 'pending', 'queued', 'awaiting_user_answer'].includes(status)
+        );
       });
     });
   },

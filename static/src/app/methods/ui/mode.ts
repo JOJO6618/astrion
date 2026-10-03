@@ -229,7 +229,8 @@ export const modeMethods = {
       this.runMode = data.mode || mode;
     } catch (error) {
       console.error('切换运行模式失败:', error);
-      const message = error instanceof Error ? error.message : String(error || t('common.unknownError'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('common.unknownError'));
       this.uiPushToast({
         title: t('appUi.switchThinkingModeFailed'),
         message: message || t('common.retryLater'),
@@ -299,7 +300,8 @@ export const modeMethods = {
         this.reasoningEffort = rollback;
       }
       console.error('设置推理强度失败:', error);
-      const message = error instanceof Error ? error.message : String(error || t('common.unknownError'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('common.unknownError'));
       this.uiPushToast({
         title: t('appUi.setReasoningEffortFailed'),
         message: message || t('common.retryLater'),
@@ -310,7 +312,9 @@ export const modeMethods = {
   async handleStopAllSubAgents() {
     const isMultiAgent = this.currentConversationType === 'multi_agent';
     const mode = isMultiAgent ? 'soft_stop' : 'terminate';
-    const title = isMultiAgent ? t('appUi.pauseAllSubAgentsTitle') : t('appUi.terminateAllSubAgentsTitle');
+    const title = isMultiAgent
+      ? t('appUi.pauseAllSubAgentsTitle')
+      : t('appUi.terminateAllSubAgentsTitle');
     const message = isMultiAgent
       ? t('appUi.pauseAllSubAgentsMessage')
       : t('appUi.terminateAllSubAgentsMessage');
@@ -354,7 +358,7 @@ export const modeMethods = {
         title: t('appUi.stopSubAgentsFailed'),
         message: error?.message || String(error),
         type: 'error'
-        });
+      });
     }
   }
 };

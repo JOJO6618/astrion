@@ -141,9 +141,15 @@ export function createEmptyWorkflow(name: string): WorkflowDef {
     source: 'user',
     updatedAt: '',
     nodes: [
-      { kind: 'start', id: 'start-1', name: t('workflow.defaultStartNode'), next: 'end-1', position: { x: 60, y: 220 } },
-      { kind: 'end', id: 'end-1', name: t('workflow.defaultEndNode'), position: { x: 480, y: 220 } },
-    ],
+      {
+        kind: 'start',
+        id: 'start-1',
+        name: t('workflow.defaultStartNode'),
+        next: 'end-1',
+        position: { x: 60, y: 220 }
+      },
+      { kind: 'end', id: 'end-1', name: t('workflow.defaultEndNode'), position: { x: 480, y: 220 } }
+    ]
   };
 }
 
@@ -192,7 +198,10 @@ const STROKE_REJECT = 'var(--state-danger)';
  * `in-${j}`——按对端节点垂直方位排序分配（上方的对端占靠上的桩，线不
  * 交叉、方位一致）；阶段/审核/开始出入桩固定；结束左入桩同分支规则。
  */
-export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { nodes: Node[]; edges: Edge[] } {
+export function workflowToFlow(
+  def: WorkflowDef,
+  issueNodeIds: Set<string>
+): { nodes: Node[]; edges: Edge[] } {
   // 入边收集（target -> {source, isReject} 列表），用于分支/结束节点入桩分配
   interface IncomingEdge {
     source: string;
@@ -234,9 +243,18 @@ export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { n
    * 目标入桩：branch/end 按入边方位序分配独立桩；stage/review 固定单桩 'in'。
    * 驳回红线进 stage/branch 按相对位置选向（上进或下进，纯美观）。
    */
-  const targetHandleOf = (target: string, source: string, isRejectEdge: boolean, rejectFromAbove = true): string => {
+  const targetHandleOf = (
+    target: string,
+    source: string,
+    isRejectEdge: boolean,
+    rejectFromAbove = true
+  ): string => {
     const targetNode = findNode(def, target);
-    if (isRejectEdge && targetNode && (targetNode.kind === 'stage' || targetNode.kind === 'branch')) {
+    if (
+      isRejectEdge &&
+      targetNode &&
+      (targetNode.kind === 'stage' || targetNode.kind === 'branch')
+    ) {
       return rejectFromAbove ? 'in-top' : 'in-bottom';
     }
     if (targetNode?.kind === 'branch' || targetNode?.kind === 'end') {
@@ -263,8 +281,8 @@ export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { n
         hasIssue: issueNodeIds.has(n.id),
         // 左入桩已占用数量（只含前进线，不含上/下入的红线）；分支/结束组件会加 1 个常驻空桩渲染
         inCount: leftIncomingOf(n.id).length,
-        outCount: n.kind === 'branch' ? n.next.length : 1,
-      },
+        outCount: n.kind === 'branch' ? n.next.length : 1
+      }
     };
   });
   const edges: Edge[] = [];
@@ -275,7 +293,8 @@ export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { n
       const sortedRoutes = [...n.next].sort((a, b) => yOf(a.target) - yOf(b.target));
       sortedRoutes.forEach((route, i) => {
         // 条件文字作为边标签，超长截断
-        const label = route.condition.length > 14 ? `${route.condition.slice(0, 14)}…` : route.condition;
+        const label =
+          route.condition.length > 14 ? `${route.condition.slice(0, 14)}…` : route.condition;
         edges.push({
           id: `${n.id}->${route.target}`,
           source: n.id,
@@ -283,7 +302,7 @@ export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { n
           sourceHandle: `out-${i}`,
           targetHandle: targetHandleOf(route.target, n.id, false),
           ...(label ? { label } : {}),
-          markerEnd: { type: MarkerType.ArrowClosed, color: STROKE_FORWARD },
+          markerEnd: { type: MarkerType.ArrowClosed, color: STROKE_FORWARD }
         });
       });
       continue;
@@ -299,8 +318,8 @@ export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { n
         ...(n.kind === 'review' ? { class: 'wf-edge-approved' } : {}),
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: n.kind === 'review' ? STROKE_PASS : STROKE_FORWARD,
-        },
+          color: n.kind === 'review' ? STROKE_PASS : STROKE_FORWARD
+        }
       });
     }
     if (n.kind === 'review' && n.rejectTo) {
@@ -312,7 +331,7 @@ export function workflowToFlow(def: WorkflowDef, issueNodeIds: Set<string>): { n
         sourceHandle: up ? 'reject-out' : 'reject-out-b',
         targetHandle: targetHandleOf(n.rejectTo, n.id, true, up),
         class: 'wf-edge-back',
-        markerEnd: { type: MarkerType.ArrowClosed, color: STROKE_REJECT },
+        markerEnd: { type: MarkerType.ArrowClosed, color: STROKE_REJECT }
       });
     }
   }
@@ -338,11 +357,13 @@ export function addStage(def: WorkflowDef, position: { x: number; y: number }): 
   const stage: WorkflowStageDef = {
     kind: 'stage',
     id: genNodeId(def, 'stage'),
-    name: t('workflow.defaultStageName', { n: def.nodes.filter((x) => x.kind === 'stage').length + 1 }),
+    name: t('workflow.defaultStageName', {
+      n: def.nodes.filter((x) => x.kind === 'stage').length + 1
+    }),
     goal: '',
     instructions: '',
     next: null,
-    position,
+    position
   };
   def.nodes.push(stage);
   return stage;
@@ -352,12 +373,14 @@ export function addReview(def: WorkflowDef, position: { x: number; y: number }):
   const review: WorkflowReviewDef = {
     kind: 'review',
     id: genNodeId(def, 'review'),
-    name: t('workflow.defaultReviewName', { n: def.nodes.filter((x) => x.kind === 'review').length + 1 }),
+    name: t('workflow.defaultReviewName', {
+      n: def.nodes.filter((x) => x.kind === 'review').length + 1
+    }),
     prompt: '',
     next: null,
     rejectTo: null,
     maxRejects: 3,
-    position,
+    position
   };
   def.nodes.push(review);
   return review;
@@ -367,9 +390,11 @@ export function addBranch(def: WorkflowDef, position: { x: number; y: number }):
   const branch: WorkflowBranchDef = {
     kind: 'branch',
     id: genNodeId(def, 'branch'),
-    name: t('workflow.defaultBranchName', { n: def.nodes.filter((x) => x.kind === 'branch').length + 1 }),
+    name: t('workflow.defaultBranchName', {
+      n: def.nodes.filter((x) => x.kind === 'branch').length + 1
+    }),
     next: [],
-    position,
+    position
   };
   def.nodes.push(branch);
   return branch;
@@ -381,7 +406,7 @@ export function addStart(def: WorkflowDef, position: { x: number; y: number }): 
     id: genNodeId(def, 'start'),
     name: t('workflow.defaultStartNode'),
     next: null,
-    position,
+    position
   };
   def.nodes.push(start);
   return start;
@@ -392,7 +417,7 @@ export function addEnd(def: WorkflowDef, position: { x: number; y: number }): Wo
     kind: 'end',
     id: genNodeId(def, 'end'),
     name: t('workflow.defaultEndNode'),
-    position,
+    position
   };
   def.nodes.push(end);
   return end;
@@ -440,7 +465,12 @@ export function connectNext(def: WorkflowDef, sourceId: string, targetId: string
  * slotIndex 是桩位序号（按对端方位排序，与画布渲染的 out-i 一致）。
  * 返回错误信息，null 为成功。
  */
-export function replaceBranchTarget(def: WorkflowDef, sourceId: string, slotIndex: number, newTarget: string): string | null {
+export function replaceBranchTarget(
+  def: WorkflowDef,
+  sourceId: string,
+  slotIndex: number,
+  newTarget: string
+): string | null {
   const source = findNode(def, sourceId);
   if (!source) return t('workflow.sourceMissing');
   if (source.kind !== 'branch') return t('workflow.onlyBranchHasOuts');
@@ -458,7 +488,11 @@ export function replaceBranchTarget(def: WorkflowDef, sourceId: string, slotInde
 }
 
 /** 驳回连线（菱形上/下连桩拉出，语义相同仅方向不同）。单值替换语义。 */
-export function connectRejectTo(def: WorkflowDef, sourceId: string, targetId: string): string | null {
+export function connectRejectTo(
+  def: WorkflowDef,
+  sourceId: string,
+  targetId: string
+): string | null {
   if (sourceId === targetId) return t('workflow.rejectToSelf');
   const source = findNode(def, sourceId);
   if (!source) return t('workflow.sourceMissing');
@@ -514,7 +548,11 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
   if (starts.length === 0) {
     issues.push({ level: 'error', message: t('workflow.missingStart') });
   } else if (starts.length > 1) {
-    issues.push({ level: 'error', message: t('workflow.multipleStarts', { n: starts.length }), nodeId: starts[1].id });
+    issues.push({
+      level: 'error',
+      message: t('workflow.multipleStarts', { n: starts.length }),
+      nodeId: starts[1].id
+    });
   }
   if (ends.length === 0) {
     issues.push({ level: 'error', message: t('workflow.missingEnd') });
@@ -527,59 +565,123 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
     }
     ids.add(n.id);
     if (!n.name.trim()) {
-      issues.push({ level: 'error', message: t('workflow.nodeMissingName', { id: n.id }), nodeId: n.id });
+      issues.push({
+        level: 'error',
+        message: t('workflow.nodeMissingName', { id: n.id }),
+        nodeId: n.id
+      });
     }
     switch (n.kind) {
       case 'start':
         if (n.next === null) {
           issues.push({ level: 'error', message: t('workflow.startNotConnected'), nodeId: n.id });
         } else if (!targetValid(n.next)) {
-          issues.push({ level: 'error', message: t('workflow.startBadTarget', { target: n.next }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.startBadTarget', { target: n.next }),
+            nodeId: n.id
+          });
         }
         break;
       case 'end':
         break;
       case 'stage':
         if (!n.goal.trim()) {
-          issues.push({ level: 'warning', message: t('workflow.stageMissingGoal', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'warning',
+            message: t('workflow.stageMissingGoal', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         }
         if (n.next === null) {
-          issues.push({ level: 'error', message: t('workflow.stageNotConnected', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.stageNotConnected', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         } else if (!targetValid(n.next)) {
-          issues.push({ level: 'error', message: t('workflow.stageBadTarget', { name: n.name, target: n.next }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.stageBadTarget', { name: n.name, target: n.next }),
+            nodeId: n.id
+          });
         } else if (isStart(n.next)) {
-          issues.push({ level: 'error', message: t('workflow.stageToStart', { name: n.name }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.stageToStart', { name: n.name }),
+            nodeId: n.id
+          });
         }
         break;
       case 'review':
         if (!n.prompt.trim()) {
-          issues.push({ level: 'warning', message: t('workflow.reviewMissingFocus', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'warning',
+            message: t('workflow.reviewMissingFocus', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         }
         if (n.next === null) {
-          issues.push({ level: 'error', message: t('workflow.reviewNoPassRoute', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.reviewNoPassRoute', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         } else if (!targetValid(n.next)) {
-          issues.push({ level: 'error', message: t('workflow.reviewBadTarget', { name: n.name, target: n.next }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.reviewBadTarget', { name: n.name, target: n.next }),
+            nodeId: n.id
+          });
         }
         if (n.rejectTo === null) {
-          issues.push({ level: 'error', message: t('workflow.reviewNoRejectRoute', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.reviewNoRejectRoute', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         } else if (!targetValid(n.rejectTo)) {
-          issues.push({ level: 'error', message: t('workflow.reviewBadRejectTarget', { name: n.name, target: n.rejectTo }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.reviewBadRejectTarget', { name: n.name, target: n.rejectTo }),
+            nodeId: n.id
+          });
         } else if (isStart(n.rejectTo)) {
-          issues.push({ level: 'error', message: t('workflow.reviewRejectToStart', { name: n.name }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.reviewRejectToStart', { name: n.name }),
+            nodeId: n.id
+          });
         }
         if (!Number.isFinite(n.maxRejects) || n.maxRejects < 1) {
-          issues.push({ level: 'error', message: t('workflow.reviewBadMaxRejects', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'error',
+            message: t('workflow.reviewBadMaxRejects', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         }
         break;
       case 'branch':
         if (n.next.length === 0) {
-          issues.push({ level: 'warning', message: t('workflow.branchNoOutsNamed', { name: n.name || n.id }), nodeId: n.id });
+          issues.push({
+            level: 'warning',
+            message: t('workflow.branchNoOutsNamed', { name: n.name || n.id }),
+            nodeId: n.id
+          });
         }
         for (const route of n.next) {
           if (!targetValid(route.target)) {
-            issues.push({ level: 'error', message: t('workflow.branchBadTarget', { name: n.name, target: route.target }), nodeId: n.id });
+            issues.push({
+              level: 'error',
+              message: t('workflow.branchBadTarget', { name: n.name, target: route.target }),
+              nodeId: n.id
+            });
           } else if (isStart(route.target)) {
-            issues.push({ level: 'error', message: t('workflow.branchToStart', { name: n.name }), nodeId: n.id });
+            issues.push({
+              level: 'error',
+              message: t('workflow.branchToStart', { name: n.name }),
+              nodeId: n.id
+            });
           }
         }
         // 多条出线 = AI 决策点，每条都必须写条件，否则 AI 无法选择
@@ -588,8 +690,11 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
             if (!route.condition.trim()) {
               issues.push({
                 level: 'warning',
-                message: t('workflow.branchRouteMissingCondition', { name: n.name, target: nodeNameOfLocal(def, route.target) }),
-                nodeId: n.id,
+                message: t('workflow.branchRouteMissingCondition', {
+                  name: n.name,
+                  target: nodeNameOfLocal(def, route.target)
+                }),
+                nodeId: n.id
               });
             }
           }
@@ -612,14 +717,20 @@ export function validateWorkflow(def: WorkflowDef): WorkflowIssue[] {
       const outs: string[] =
         curNode.kind === 'branch'
           ? curNode.next.map((r) => r.target)
-          : [curNode.next, curNode.kind === 'review' ? curNode.rejectTo : null].filter((t): t is string => Boolean(t));
+          : [curNode.next, curNode.kind === 'review' ? curNode.rejectTo : null].filter(
+              (t): t is string => Boolean(t)
+            );
       for (const t of outs) {
         if (!reachable.has(t)) queue.push(t);
       }
     }
     for (const n of def.nodes) {
       if (!reachable.has(n.id)) {
-        issues.push({ level: 'warning', message: t('workflow.nodeUnreachable', { name: n.name }), nodeId: n.id });
+        issues.push({
+          level: 'warning',
+          message: t('workflow.nodeUnreachable', { name: n.name }),
+          nodeId: n.id
+        });
       }
     }
   }

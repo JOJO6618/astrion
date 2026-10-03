@@ -3,11 +3,16 @@
     class="review-node"
     :class="{
       'review-node--selected': selected,
-      'review-node--issue': data.hasIssue,
+      'review-node--issue': data.hasIssue
     }"
   >
     <!-- 菱形衬底：内联 SVG polygon（clip-path 会裁掉描边，故用矢量描边） -->
-    <svg class="review-node__shape" viewBox="0 0 170 96" preserveAspectRatio="none" aria-hidden="true">
+    <svg
+      class="review-node__shape"
+      viewBox="0 0 170 96"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
       <polygon class="review-node__polygon" points="85,1 169,48 85,95 1,48" />
     </svg>
     <!-- 左：前进入桩 -->
@@ -15,12 +20,24 @@
     <!-- 右：通过出桩（蓝线，至多 1 条） -->
     <Handle id="out-0" type="source" :position="Position.Right" class="review-node__pass-out" />
     <!-- 上/下：驳回出桩（红线，同一 rejectTo，方向按目标相对位置自动选） -->
-    <Handle id="reject-out" type="source" :position="Position.Top" class="review-node__reject-out" />
-    <Handle id="reject-out-b" type="source" :position="Position.Bottom" class="review-node__reject-out" />
+    <Handle
+      id="reject-out"
+      type="source"
+      :position="Position.Top"
+      class="review-node__reject-out"
+    />
+    <Handle
+      id="reject-out-b"
+      type="source"
+      :position="Position.Bottom"
+      class="review-node__reject-out"
+    />
     <div class="review-node__body">
       <span class="icon review-node__eye" :style="iconSrc(ICONS.eye)" aria-hidden="true"></span>
       <span class="review-node__name">{{ data.node.name || data.node.id }}</span>
-      <span class="review-node__meta">{{ $t('workflow.rejectLimitMeta', { n: data.node.maxRejects }) }}</span>
+      <span class="review-node__meta">{{
+        $t('workflow.rejectLimitMeta', { n: data.node.maxRejects })
+      }}</span>
     </div>
   </div>
 </template>

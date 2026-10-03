@@ -80,7 +80,8 @@ export const permissionMethods = {
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchPermissionFailed'));
+      const msg =
+        error instanceof Error ? error.message : String(error || t('appUi.switchPermissionFailed'));
       this.uiPushToast({
         title: t('appUi.switchPermissionFailed'),
         message: msg,
@@ -91,7 +92,9 @@ export const permissionMethods = {
     }
   },
   async changeExecutionMode(mode) {
-    const target = String(mode || '').trim().toLowerCase();
+    const target = String(mode || '')
+      .trim()
+      .toLowerCase();
     if (!this.executionModeEnabled || !target) {
       return;
     }
@@ -123,7 +126,10 @@ export const permissionMethods = {
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchExecutionModeFailed'));
+      const msg =
+        error instanceof Error
+          ? error.message
+          : String(error || t('appUi.switchExecutionModeFailed'));
       this.uiPushToast({
         title: t('appUi.switchExecutionModeFailed'),
         message: msg,
@@ -138,7 +144,9 @@ export const permissionMethods = {
     }
   },
   async changeNetworkPermission(mode) {
-    const target = String(mode || '').trim().toLowerCase();
+    const target = String(mode || '')
+      .trim()
+      .toLowerCase();
     if (!this.networkPermissionEnabled || !target) {
       return;
     }
@@ -156,21 +164,34 @@ export const permissionMethods = {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || payload?.error || t('appUi.switchNetworkPermissionFailed'));
+        throw new Error(
+          payload?.message || payload?.error || t('appUi.switchNetworkPermissionFailed')
+        );
       }
       if (typeof payload.mode === 'string') {
         this.currentNetworkPermission = payload.mode;
       }
-      this.pendingNetworkPermission = typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
-      const labelMap: Record<string, string> = { restricted: t('appUi.networkRestricted'), full: t('appUi.networkFull') };
+      this.pendingNetworkPermission =
+        typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
+      const labelMap: Record<string, string> = {
+        restricted: t('appUi.networkRestricted'),
+        full: t('appUi.networkFull')
+      };
       this.uiPushToast({
         title: t('appUi.networkPermissionUpdated'),
-        message: payload?.message || t('appUi.switchedToMode', { mode: labelMap[this.currentNetworkPermission] || this.currentNetworkPermission }),
+        message:
+          payload?.message ||
+          t('appUi.switchedToMode', {
+            mode: labelMap[this.currentNetworkPermission] || this.currentNetworkPermission
+          }),
         type: this.currentNetworkPermission === 'full' ? 'warning' : 'info',
         duration: 1800
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.switchNetworkPermissionFailed'));
+      const msg =
+        error instanceof Error
+          ? error.message
+          : String(error || t('appUi.switchNetworkPermissionFailed'));
       this.uiPushToast({
         title: t('appUi.switchNetworkPermissionFailed'),
         message: msg,
@@ -192,7 +213,8 @@ export const permissionMethods = {
       if (typeof payload.mode === 'string') {
         this.currentNetworkPermission = payload.mode;
       }
-      this.pendingNetworkPermission = typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
+      this.pendingNetworkPermission =
+        typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
     } catch (_error) {
       // ignore
     }
@@ -210,7 +232,8 @@ export const permissionMethods = {
       if (typeof payload.mode === 'string') {
         this.currentPermissionMode = payload.mode;
       }
-      this.pendingPermissionMode = typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
+      this.pendingPermissionMode =
+        typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
     } catch (_error) {
       // ignore
     }
@@ -230,7 +253,8 @@ export const permissionMethods = {
       if (typeof state.mode === 'string') {
         this.currentExecutionMode = state.mode;
       }
-      this.pendingExecutionMode = typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
+      this.pendingExecutionMode =
+        typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
     } catch (_error) {
       // ignore
     }
@@ -314,10 +338,14 @@ export const permissionMethods = {
         .map((x) => x.trim())
         .filter(Boolean);
     const writableLines = toLines(
-      isWorkspace ? this.pathAuthorizationWorkspaceWritableDraft : this.pathAuthorizationWritableDraft
+      isWorkspace
+        ? this.pathAuthorizationWorkspaceWritableDraft
+        : this.pathAuthorizationWritableDraft
     );
     const readableLines = toLines(
-      isWorkspace ? this.pathAuthorizationWorkspaceReadableDraft : this.pathAuthorizationReadableDraft
+      isWorkspace
+        ? this.pathAuthorizationWorkspaceReadableDraft
+        : this.pathAuthorizationReadableDraft
     );
     if (isWorkspace) {
       this.pathAuthorizationWorkspaceWritableDraft = writableLines.join('\n');
@@ -343,7 +371,9 @@ export const permissionMethods = {
       }
       // 响应带回两个作用域的最新值，全部同步回草稿槽
       const savedWritable = Array.isArray(payload.writable_paths) ? payload.writable_paths : [];
-      const savedReadable = Array.isArray(payload.readable_extra_paths) ? payload.readable_extra_paths : [];
+      const savedReadable = Array.isArray(payload.readable_extra_paths)
+        ? payload.readable_extra_paths
+        : [];
       const savedWsWritable = Array.isArray(payload.workspace_writable_paths)
         ? payload.workspace_writable_paths
         : [];
@@ -363,7 +393,11 @@ export const permissionMethods = {
       this.pathAuthorizationDialogOpen = false;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error || t('appUi.saveFailed'));
-      this.uiPushToast({ title: t('appUi.savePathAuthorizationFailed'), message: msg, type: 'error' });
+      this.uiPushToast({
+        title: t('appUi.savePathAuthorizationFailed'),
+        message: msg,
+        type: 'error'
+      });
     } finally {
       this.pathAuthorizationSaving = false;
     }

@@ -20,12 +20,12 @@ export default {
     passwordPlaceholder: '二级密码',
     verifying: '校验中...',
     confirmEnter: '确认进入',
-    defaultDescription: '为保护敏感数据，需二级校验后查看。',
+    defaultDescription: '为保护敏感数据，需二级校验后查看。'
   },
   // —— CustomToolsGuideApp（开发指南页）——
   guide: {
     title: '开发指南',
-    subtitle: '如何编写、组织与调试自定义工具的完整说明。',
+    subtitle: '如何编写、组织与调试自定义工具的完整说明。'
   },
   renderFailed: '渲染指南失败',
   // —— CustomToolsApp（工具列表 + 编辑器 + 弹窗）——
@@ -46,14 +46,14 @@ export default {
     params: '参数：{count} 个',
     timeout: '超时：{seconds}s',
     noReturnLayer: '（无返回层）',
-    toolNotFound: '未找到工具 {id}',
+    toolNotFound: '未找到工具 {id}'
   },
   editor: {
     noDescription: '未填写描述',
     hint1Pre: '提示：execution.py 中的字典/集合需要用',
     hint1Post: '包裹，避免被模板替换。',
     hint2: '保存后无需重启，系统会自动 reload 自定义工具。',
-    loadingTool: '正在加载工具...',
+    loadingTool: '正在加载工具...'
   },
   create: {
     title: '创建新工具',
@@ -63,16 +63,16 @@ export default {
     create: '创建',
     idRequired: '请填写工具 ID',
     idInvalid: '工具 ID 需以字母开头，可包含字母/数字/_/-',
-    failed: '创建失败',
+    failed: '创建失败'
   },
   delete: {
     title: '确认删除',
     confirmPre: '确定删除工具',
     confirmPost: '吗？该操作不可恢复。',
     deleting: '删除中...',
-    failed: '删除失败',
+    failed: '删除失败'
   },
   save: {
-    failed: '保存 {name} 失败',
-  },
+    failed: '保存 {name} 失败'
+  }
 } as const;

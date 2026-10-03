@@ -129,5 +129,5 @@ export default {
 
   // 完成
   doneTitle: '教程完成！',
-  doneDesc: '恭喜你完成新手教程。可随时在个人空间「新手教程」再次查看。',
+  doneDesc: '恭喜你完成新手教程。可随时在个人空间「新手教程」再次查看。'
 } as const;

@@ -72,10 +72,7 @@ export const gitMethods = {
       if (Object.keys(foldContextMap).length > 0) {
         params.set('fold_context_map', JSON.stringify(foldContextMap));
       }
-      const resp = await fetch(
-        `/api/project/git-diff?${params.toString()}`,
-        { cache: 'no-store' }
-      );
+      const resp = await fetch(`/api/project/git-diff?${params.toString()}`, { cache: 'no-store' });
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
         this.gitChangesError = payload?.error || t('appUi.loadGitChangesFailed');
@@ -120,7 +117,8 @@ export const gitMethods = {
       this.gitChangesFoldContexts && typeof this.gitChangesFoldContexts === 'object'
         ? this.gitChangesFoldContexts
         : {};
-    const fileMap = currentMap[filePath] && typeof currentMap[filePath] === 'object' ? currentMap[filePath] : {};
+    const fileMap =
+      currentMap[filePath] && typeof currentMap[filePath] === 'object' ? currentMap[filePath] : {};
     const current = Number(fileMap[key] || 0);
     this.gitChangesFoldContexts = {
       ...currentMap,

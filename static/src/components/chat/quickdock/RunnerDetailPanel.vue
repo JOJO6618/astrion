@@ -2,71 +2,99 @@
   <!-- 移动端 Teleport 到 body：详情是独立弹窗，摆脱快捷窗口悬浮层的
        backdrop-filter 包含块与 sheet 宽度限制（2026-09-24 移动端改造） -->
   <Teleport to="body" :disabled="!isMobileViewport">
-  <section
-    v-if="renderVisible"
-    ref="rootRef"
-    class="qd-detail"
-    :class="{ 'panel-enter': entering, 'panel-leave': leaving }"
-    :style="panelInlineStyle"
-  >
-    <header class="qd-detail__header">
-      <span class="qd-detail__dot" :class="`is-${stateClass}`"></span>
-      <span class="qd-detail__title" :title="title">{{ title }}</span>
-      <span class="qd-detail__badge" :class="`is-${stateClass}`">{{ statusText }}</span>
-      <span v-if="tokensText" class="qd-detail__tokens" :title="tokensTitle">{{ tokensText }}</span>
-      <span class="qd-detail__close">
-        <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="close" />
-      </span>
-    </header>
-    <div ref="bodyRef" class="qd-detail__body" :class="{ 'body-fade': bodyFading }">
-      <!-- 子智能体：工具调用 + 文本输出时间线 -->
-      <template v-if="effectiveDetail?.kind === 'agent'">
-        <div v-if="!timelineItems.length" class="qd-detail__empty">
-          {{ activityLoading ? $t('common.loading') : $t('quickdock.noProgress') }}
-        </div>
-        <div
-          v-for="item in timelineItems"
-          :key="item.key"
-          class="qd-feed-row"
-          :class="[item.kind === 'tool' ? 'feed-tool' : item.kind === 'compression' ? 'feed-compressed' : 'feed-text', { 'is-new': animatedKeys.has(item.key) }]"
-        >
-          <template v-if="item.kind === 'tool'">
-            <span class="tool-name">{{ item.toolName }}</span>
-            <span class="tool-param" :title="item.text">{{ item.text }}</span>
-            <span class="tool-status" :class="{ 'is-error': item.state === 'failed' }">
-              <span v-if="item.state === 'running' || item.state === 'calling'" class="qd-tool-spinner"></span>
-              <span v-else class="qd-tool-done">{{ item.state === 'failed' ? '✕' : '✓' }}</span>
-            </span>
-          </template>
-          <template v-else-if="item.kind === 'compression'">
-            <span class="feed-compressed__label">
-              <svg class="feed-compressed__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M8 1.5 13.5 4v4.5c0 3-2.2 5-5.5 6-3.3-1-5.5-3-5.5-6V4L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-                <path d="M5.5 8.2 7.2 9.9 11 5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              {{ t('quickdock.contextCompressed', { round: item.round }) }}
-            </span>
-          </template>
-          <template v-else>{{ item.content }}</template>
-        </div>
-      </template>
+    <section
+      v-if="renderVisible"
+      ref="rootRef"
+      class="qd-detail"
+      :class="{ 'panel-enter': entering, 'panel-leave': leaving }"
+      :style="panelInlineStyle"
+    >
+      <header class="qd-detail__header">
+        <span class="qd-detail__dot" :class="`is-${stateClass}`"></span>
+        <span class="qd-detail__title" :title="title">{{ title }}</span>
+        <span class="qd-detail__badge" :class="`is-${stateClass}`">{{ statusText }}</span>
+        <span v-if="tokensText" class="qd-detail__tokens" :title="tokensTitle">{{
+          tokensText
+        }}</span>
+        <span class="qd-detail__close">
+          <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="close" />
+        </span>
+      </header>
+      <div ref="bodyRef" class="qd-detail__body" :class="{ 'body-fade': bodyFading }">
+        <!-- 子智能体：工具调用 + 文本输出时间线 -->
+        <template v-if="effectiveDetail?.kind === 'agent'">
+          <div v-if="!timelineItems.length" class="qd-detail__empty">
+            {{ activityLoading ? $t('common.loading') : $t('quickdock.noProgress') }}
+          </div>
+          <div
+            v-for="item in timelineItems"
+            :key="item.key"
+            class="qd-feed-row"
+            :class="[
+              item.kind === 'tool'
+                ? 'feed-tool'
+                : item.kind === 'compression'
+                  ? 'feed-compressed'
+                  : 'feed-text',
+              { 'is-new': animatedKeys.has(item.key) }
+            ]"
+          >
+            <template v-if="item.kind === 'tool'">
+              <span class="tool-name">{{ item.toolName }}</span>
+              <span class="tool-param" :title="item.text">{{ item.text }}</span>
+              <span class="tool-status" :class="{ 'is-error': item.state === 'failed' }">
+                <span
+                  v-if="item.state === 'running' || item.state === 'calling'"
+                  class="qd-tool-spinner"
+                ></span>
+                <span v-else class="qd-tool-done">{{ item.state === 'failed' ? '✕' : '✓' }}</span>
+              </span>
+            </template>
+            <template v-else-if="item.kind === 'compression'">
+              <span class="feed-compressed__label">
+                <svg
+                  class="feed-compressed__icon"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M8 1.5 13.5 4v4.5c0 3-2.2 5-5.5 6-3.3-1-5.5-3-5.5-6V4L8 1.5Z"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M5.5 8.2 7.2 9.9 11 5.8"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                {{ t('quickdock.contextCompressed', { round: item.round }) }}
+              </span>
+            </template>
+            <template v-else>{{ item.content }}</template>
+          </div>
+        </template>
 
-      <!-- 后台指令：终端输出行 -->
-      <template v-else>
-        <div v-if="!outputLines.length" class="qd-detail__empty">
-          {{ detailLoading ? $t('common.loading') : $t('quickdock.noOutput') }}
-        </div>
-        <div
-          v-for="(line, i) in outputLines"
-          :key="i"
-          class="qd-feed-row feed-term"
-          :class="{ 'is-new': animatedKeys.has(`term-${i}`) }"
-        >
-          {{ line }}
-        </div>
-      </template>
-    </div>
-  </section>
+        <!-- 后台指令：终端输出行 -->
+        <template v-else>
+          <div v-if="!outputLines.length" class="qd-detail__empty">
+            {{ detailLoading ? $t('common.loading') : $t('quickdock.noOutput') }}
+          </div>
+          <div
+            v-for="(line, i) in outputLines"
+            :key="i"
+            class="qd-feed-row feed-term"
+            :class="{ 'is-new': animatedKeys.has(`term-${i}`) }"
+          >
+            {{ line }}
+          </div>
+        </template>
+      </div>
+    </section>
   </Teleport>
 </template>
 
@@ -231,7 +259,10 @@ const title = computed(() => {
   if (effectiveDetail.value.kind === 'agent') {
     const agent = subAgentStore.subAgents.find((a) => a.task_id === effectiveDetail.value?.id);
     return (
-      agent?.display_name || agent?.summary || subAgentStore.activeAgent?.display_name || t('quickdock.subAgent')
+      agent?.display_name ||
+      agent?.summary ||
+      subAgentStore.activeAgent?.display_name ||
+      t('quickdock.subAgent')
     );
   }
   const cmd = bgStore.commands.find((c) => c.command_id === effectiveDetail.value?.id);
@@ -337,14 +368,19 @@ function isEntryTerminal(status?: string) {
 function buildText(entry: any): string {
   const tool = entry.tool || '';
   const args = entry.args || {};
-  if (tool === 'read_file') return t('quickdock.toolReadFile', { path: args.path || args.file_path || '' });
-  if (tool === 'write_file') return t('quickdock.toolWriteFile', { path: args.file_path || args.path || '' });
+  if (tool === 'read_file')
+    return t('quickdock.toolReadFile', { path: args.path || args.file_path || '' });
+  if (tool === 'write_file')
+    return t('quickdock.toolWriteFile', { path: args.file_path || args.path || '' });
   if (tool === 'read_skill') return t('quickdock.toolReadSkill', { name: args.skill_name || '' });
-  if (tool === 'web_search') return t('quickdock.toolSearch', { query: args.query || args.q || '' });
+  if (tool === 'web_search')
+    return t('quickdock.toolSearch', { query: args.query || args.q || '' });
   if (tool === 'extract_webpage') return t('quickdock.toolExtract', { url: args.url || '' });
   if (tool === 'run_command') return t('quickdock.toolRunCommand', { command: args.command || '' });
-  if (tool === 'edit_file') return t('quickdock.toolEditFile', { path: args.path || args.file_path || '' });
-  if (tool === 'read_mediafile') return t('quickdock.toolReadMedia', { path: args.path || args.file_path || '' });
+  if (tool === 'edit_file')
+    return t('quickdock.toolEditFile', { path: args.path || args.file_path || '' });
+  if (tool === 'read_mediafile')
+    return t('quickdock.toolReadMedia', { path: args.path || args.file_path || '' });
   return tool || t('common.tool');
 }
 
@@ -368,111 +404,119 @@ interface CompressionTimelineItem {
   round: number;
 }
 
-const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | CompressionTimelineItem)[]>(() => {
-  void currentLocale.value;
-  const entries = activityEntries.value || [];
-  const rawItems: ({ kind: 'tool'; key: string; entry: any } | OutputTimelineItem | CompressionTimelineItem)[] = [];
-  let currentToolGroup: { kind: 'tool'; key: string; entry: any } | null = null;
+const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | CompressionTimelineItem)[]>(
+  () => {
+    void currentLocale.value;
+    const entries = activityEntries.value || [];
+    const rawItems: (
+      | { kind: 'tool'; key: string; entry: any }
+      | OutputTimelineItem
+      | CompressionTimelineItem
+    )[] = [];
+    let currentToolGroup: { kind: 'tool'; key: string; entry: any } | null = null;
 
-  const flushToolGroup = () => {
-    if (currentToolGroup) {
-      rawItems.push(currentToolGroup);
-      currentToolGroup = null;
-    }
-  };
-
-  entries.forEach((entry: any, index: number) => {
-    if (
-      entry?.type === 'progress' &&
-      entry?.subtype === 'output' &&
-      typeof entry.content === 'string'
-    ) {
-      flushToolGroup();
-      // 语义顺序修正：工具「正在调用」事件在流式期间先于文本 output 落盘，
-      // 但 assistant 消息里文本永远在 tool_calls 之前——把 output 插入到
-      // 尾部连续的非终态工具条目（同一条 assistant 消息发起的调用）之前
-      const outputItem: OutputTimelineItem = {
-        kind: 'output',
-        key: `output-${entry.ts || index}`,
-        content: entry.content
-      };
-      let cut = rawItems.length;
-      while (cut > 0) {
-        const tail = rawItems[cut - 1];
-        if (tail.kind === 'tool' && !isEntryTerminal(tail.entry?.status)) {
-          cut -= 1;
-        } else {
-          break;
-        }
+    const flushToolGroup = () => {
+      if (currentToolGroup) {
+        rawItems.push(currentToolGroup);
+        currentToolGroup = null;
       }
-      rawItems.splice(cut, 0, outputItem);
-      return;
-    }
+    };
 
-    // 上下文压缩提示：在压缩发生的位置插入一条提示条目
-    if (entry?.type === 'progress' && entry?.subtype === 'compression') {
-      flushToolGroup();
-      rawItems.push({
-        kind: 'compression',
-        key: `compression-${entry.ts || index}`,
-        round: Number(entry.round) || 0,
-      });
-      return;
-    }
-
-    if (!entry || entry.type !== 'progress' || !entry.tool) {
-      return;
-    }
-
-    const baseKey = entry.id || `${entry.tool}-${entry.ts || index}`;
-    if (
-      currentToolGroup &&
-      (currentToolGroup.entry.id === entry.id || currentToolGroup.key === baseKey) &&
-      !isEntryTerminal(currentToolGroup.entry.status)
-    ) {
-      currentToolGroup.entry = { ...currentToolGroup.entry, ...entry };
-      return;
-    }
-
-    // 同一 tool_call id 的历史条目仍非终态时原地更新（「正在调用」事件可能与其他
-    // 工具的调用事件交错到达），避免出现永远转圈的重复条目
-    if (entry.id) {
-      const prior = rawItems.find(
-        (item) =>
-          item.kind === 'tool' && item.entry.id === entry.id && !isEntryTerminal(item.entry.status)
-      );
-      if (prior && prior.kind === 'tool') {
-        prior.entry = { ...prior.entry, ...entry };
+    entries.forEach((entry: any, index: number) => {
+      if (
+        entry?.type === 'progress' &&
+        entry?.subtype === 'output' &&
+        typeof entry.content === 'string'
+      ) {
+        flushToolGroup();
+        // 语义顺序修正：工具「正在调用」事件在流式期间先于文本 output 落盘，
+        // 但 assistant 消息里文本永远在 tool_calls 之前——把 output 插入到
+        // 尾部连续的非终态工具条目（同一条 assistant 消息发起的调用）之前
+        const outputItem: OutputTimelineItem = {
+          kind: 'output',
+          key: `output-${entry.ts || index}`,
+          content: entry.content
+        };
+        let cut = rawItems.length;
+        while (cut > 0) {
+          const tail = rawItems[cut - 1];
+          if (tail.kind === 'tool' && !isEntryTerminal(tail.entry?.status)) {
+            cut -= 1;
+          } else {
+            break;
+          }
+        }
+        rawItems.splice(cut, 0, outputItem);
         return;
       }
-    }
+
+      // 上下文压缩提示：在压缩发生的位置插入一条提示条目
+      if (entry?.type === 'progress' && entry?.subtype === 'compression') {
+        flushToolGroup();
+        rawItems.push({
+          kind: 'compression',
+          key: `compression-${entry.ts || index}`,
+          round: Number(entry.round) || 0
+        });
+        return;
+      }
+
+      if (!entry || entry.type !== 'progress' || !entry.tool) {
+        return;
+      }
+
+      const baseKey = entry.id || `${entry.tool}-${entry.ts || index}`;
+      if (
+        currentToolGroup &&
+        (currentToolGroup.entry.id === entry.id || currentToolGroup.key === baseKey) &&
+        !isEntryTerminal(currentToolGroup.entry.status)
+      ) {
+        currentToolGroup.entry = { ...currentToolGroup.entry, ...entry };
+        return;
+      }
+
+      // 同一 tool_call id 的历史条目仍非终态时原地更新（「正在调用」事件可能与其他
+      // 工具的调用事件交错到达），避免出现永远转圈的重复条目
+      if (entry.id) {
+        const prior = rawItems.find(
+          (item) =>
+            item.kind === 'tool' &&
+            item.entry.id === entry.id &&
+            !isEntryTerminal(item.entry.status)
+        );
+        if (prior && prior.kind === 'tool') {
+          prior.entry = { ...prior.entry, ...entry };
+          return;
+        }
+      }
+
+      flushToolGroup();
+      let key = baseKey;
+      let suffix = 0;
+      while (rawItems.some((item) => item.kind === 'tool' && item.key === key)) {
+        suffix += 1;
+        key = `${baseKey}--${suffix}`;
+      }
+      currentToolGroup = { kind: 'tool', key, entry: { ...entry } };
+    });
 
     flushToolGroup();
-    let key = baseKey;
-    let suffix = 0;
-    while (rawItems.some((item) => item.kind === 'tool' && item.key === key)) {
-      suffix += 1;
-      key = `${baseKey}--${suffix}`;
-    }
-    currentToolGroup = { kind: 'tool', key, entry: { ...entry } };
-  });
 
-  flushToolGroup();
-
-  return rawItems.map((item) => {
-    if (item.kind === 'output' || item.kind === 'compression') {
-      return item;
-    }
-    const state = normalizeStatus(item.entry.status);
-    return {
-      kind: 'tool' as const,
-      key: item.key,
-      state,
-      toolName: item.entry.tool || t('common.tool'),
-      text: buildText(item.entry)
-    };
-  });
-});
+    return rawItems.map((item) => {
+      if (item.kind === 'output' || item.kind === 'compression') {
+        return item;
+      }
+      const state = normalizeStatus(item.entry.status);
+      return {
+        kind: 'tool' as const,
+        key: item.key,
+        state,
+        toolName: item.entry.tool || t('common.tool'),
+        text: buildText(item.entry)
+      };
+    });
+  }
+);
 
 /* ---------------- 后台指令输出 ---------------- */
 

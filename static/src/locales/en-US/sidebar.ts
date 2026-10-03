@@ -37,7 +37,8 @@ export default {
 
   // ── WorkspaceSwitcher: workspace/project switcher popover ──
   workspaceCount: '{n} items',
-  deleteProjectConfirm: 'Delete "{label}"? The project folder and its conversation history will be removed.',
+  deleteProjectConfirm:
+    'Delete "{label}"? The project folder and its conversation history will be removed.',
   deleteWorkspaceConfirm: 'Delete "{label}"? The folder on disk will not be deleted.',
   unconfiguredPath: '(No path set)',
   default: 'Default',
@@ -76,5 +77,5 @@ export default {
   quotaTierSearch: 'Search',
   unknown: 'Unknown',
   stopped: 'Stopped',
-  containerRunning: 'Running',
+  containerRunning: 'Running'
 } as const;

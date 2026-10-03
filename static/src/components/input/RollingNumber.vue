@@ -8,11 +8,7 @@
   -->
   <span class="rolling-number">
     <TransitionGroup name="rn-place" tag="span" class="rolling-number__track">
-      <span
-        v-for="item in renderPlaces"
-        :key="item.place"
-        class="rolling-number__digit"
-      >
+      <span v-for="item in renderPlaces" :key="item.place" class="rolling-number__digit">
         <span
           class="rolling-number__strip"
           :class="{ 'is-animating': item.state.animate }"
@@ -37,18 +33,18 @@ const STEP = 38;
 const DUR = 360;
 
 type PlaceState = {
-  top: number;      // 上格数字
-  bottom: number;   // 下格数字
-  offset: number;   // 当前停靠格:0=显示上格,1=显示下格
+  top: number; // 上格数字
+  bottom: number; // 下格数字
+  offset: number; // 当前停靠格:0=显示上格,1=显示下格
   animate: boolean; // 是否启用过渡(false 时为瞬时落位)
-  delay: number;    // transition-delay,实现高→低位错开
+  delay: number; // transition-delay,实现高→低位错开
 };
 
 // place:位权,0=个位,越大位权越高。
-const order = ref<number[]>([]);            // 渲染顺序(高位在前)
+const order = ref<number[]>([]); // 渲染顺序(高位在前)
 const states = new Map<number, PlaceState>(); // place => 该位的滚动状态(reactive)
 let booted = false;
-let gen = 0;                                 // 代次,防止过期定时器回写
+let gen = 0; // 代次,防止过期定时器回写
 const normalizeTimers = new Set<number>();
 const removeTimers = new Map<number, number>();
 
@@ -238,7 +234,9 @@ onBeforeUnmount(() => {
 /* 位数增减时整位的进出:新增位淡入下沉,消失位淡出上移 */
 .rn-place-enter-active,
 .rn-place-leave-active {
-  transition: opacity 220ms ease, transform 220ms ease;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
 .rn-place-enter-from {

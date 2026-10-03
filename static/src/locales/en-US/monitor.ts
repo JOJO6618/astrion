@@ -108,5 +108,5 @@ export default {
 
   // Reader fallbacks
   readerEmptyFallback: 'No content',
-  noVisibleContent: 'Nothing to display',
+  noVisibleContent: 'Nothing to display'
 } as const;

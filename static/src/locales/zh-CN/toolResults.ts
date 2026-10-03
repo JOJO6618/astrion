@@ -41,7 +41,7 @@ export default {
     done: '已完成',
     notFound: '不存在',
     terminated: '已终止',
-    waiting: '等待中',
+    waiting: '等待中'
   },
 
   // —— html 片段中的 <strong>字段标签：</strong>（含冒号）——
@@ -132,7 +132,7 @@ export default {
     backgroundCommandOutput: '后台命令输出：',
     reviewContent: '回顾内容：',
     rename: '重命名：',
-    waitedSubAgents: '已等待 {n} 个子智能体：',
+    waitedSubAgents: '已等待 {n} 个子智能体：'
   },
 
   // —— 搜索引擎名称（web_search 结果 meta 的服务商标识）——
@@ -141,14 +141,14 @@ export default {
     bocha: '博查',
     exa: 'Exa',
     parallel: 'Parallel',
-    searxng: 'SearXNG（自托管）',
+    searxng: 'SearXNG（自托管）'
   },
 
   // —— 区块标题（无冒号）——
   sectionLabels: {
     executionStats: '执行统计',
     finalReply: '最终回复',
-    replyContent: '回复内容',
+    replyContent: '回复内容'
   },
 
   // —— 结构性字段名映射（renderDefaultResult 的 labelMap 等，名词不带冒号）——
@@ -161,7 +161,7 @@ export default {
     targetDisplayName: '目标子智能体',
     question: '问题',
     roleId: '角色 ID',
-    url: 'URL',
+    url: 'URL'
   },
 
   // —— 个性化管理字段 ——
@@ -175,7 +175,7 @@ export default {
       theme: '主题',
       communicationStyle: '交流风格',
       conversationContinuity: '对话连续性',
-      enabled: '个性化开关',
+      enabled: '个性化开关'
     },
     values: {
       enabled: '开启',
@@ -185,10 +185,10 @@ export default {
       styleAuto: 'auto（自动）',
       independenceLow: 'low（低）',
       independenceMedium: 'medium（中）',
-      independenceHigh: 'high（高）',
+      independenceHigh: 'high（高）'
     },
     actionUpdate: '更新配置',
-    actionRead: '读取配置',
+    actionRead: '读取配置'
   },
 
   // —— 时长格式化 ——
@@ -199,7 +199,7 @@ export default {
     minutes: '{minutes} 分',
     hours: '{hours} 小时',
     hoursMinutesSeconds: '{hours} 小时 {minutes} 分 {seconds} 秒',
-    runtimeNote: '运行 {n} 秒',
+    runtimeNote: '运行 {n} 秒'
   },
 
   // —— 计数 / 统计（整句含标签，便于英文调整语序）——
@@ -215,7 +215,7 @@ export default {
     statEditFiles: '编辑 {n} 次',
     statSearches: '搜索 {n} 次',
     statWebPages: '网页 {n} 个',
-    statCommands: '命令 {n} 个',
+    statCommands: '命令 {n} 个'
   },
 
   // —— 完整句子 ——
@@ -246,7 +246,7 @@ export default {
     subAgentResultMeta: '（任务 {taskId}）· {status} · {outcome}',
     searchQuote: '「{text}」',
     readSearch: '搜索{query}，得到{count}个结果',
-    readExtract: '提取了{n}行',
+    readExtract: '提取了{n}行'
   },
 
   // —— 通用取值 / 兜底值 ——
@@ -271,7 +271,7 @@ export default {
     optionLabel: '选项 {n}',
     line: '行 {line}',
     reviewContentModeDialogue: '纯净对话',
-    reviewContentModeFull: '完整记录',
+    reviewContentModeFull: '完整记录'
   },
 
   // —— 搜索主题 / 时间范围 / 网站限定 ——
@@ -287,14 +287,14 @@ export default {
     timeRelative: '相对范围：{range}',
     timeLastDays: '过去{n}天',
     timeRangeTo: '{start} 至 {end}',
-    domainsUnlimited: '未限定网站',
+    domainsUnlimited: '未限定网站'
   },
 
   // —— 图片媒体属性 ——
   media: {
     ocrImgAlt: 'OCR图片',
     viewImgAlt: '查看图片',
-    viewImgTitle: '在新窗口查看原图',
+    viewImgTitle: '在新窗口查看原图'
   },
 
   // —— MCP 工具兜底名 ——
@@ -326,7 +326,7 @@ export default {
     readFile: '正在读取文件...',
     readSearch: '正在执行搜索...',
     readExtract: '正在提取内容...',
-    fallback: '调用工具中',
+    fallback: '调用工具中'
   },
 
   // —— 工具完成状态文案（chatDisplay 动作标签映射）——
@@ -354,6 +354,6 @@ export default {
     createSkill: '技能归档完成',
     askUser: '用户已回答',
     readFile: '文件读取完成',
-    fallback: '执行完成',
-  },
+    fallback: '执行完成'
+  }
 } as const;

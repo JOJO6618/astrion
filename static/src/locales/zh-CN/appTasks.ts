@@ -77,5 +77,5 @@ export default {
   quotaMessage: '您的使用配额已用尽',
 
   // ── 下载（resources.ts） ──
-  cannotCompleteDownload: '无法完成下载',
+  cannotCompleteDownload: '无法完成下载'
 } as const;

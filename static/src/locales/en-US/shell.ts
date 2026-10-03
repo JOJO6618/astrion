@@ -54,5 +54,5 @@ export default {
   toolRenameFile: 'Rename file',
   toolWriteFile: 'Write file',
   toolEditFile: 'Edit file',
-  pendingApproval: 'Pending approval',
+  pendingApproval: 'Pending approval'
 } as const;

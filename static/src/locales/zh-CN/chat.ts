@@ -198,5 +198,5 @@ export default {
   progressOcr: '正在提取',
   progressMemory: '正在同步记忆',
   progressTodo: '正在管理待办',
-  progressGenericTool: '调用工具',
+  progressGenericTool: '调用工具'
 } as const;

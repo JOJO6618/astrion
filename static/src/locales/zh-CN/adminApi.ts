@@ -58,5 +58,5 @@ export default {
   cannotVerifySecondaryPass: '无法验证二级密码状态',
   secondaryPassVerifyFailed: '二级密码验证失败',
   // TODO(common): 候选公共词
-  verifyFailed: '验证失败',
+  verifyFailed: '验证失败'
 } as const;

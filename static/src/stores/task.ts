@@ -73,7 +73,8 @@ export const useTaskStore = defineStore('task', {
 
   getters: {
     hasActiveTask: (state) => state.currentTaskId !== null && state.taskStatus === 'running',
-    isTaskCompleted: (state) => ['succeeded', 'failed', 'canceled', 'stopped'].includes(state.taskStatus)
+    isTaskCompleted: (state) =>
+      ['succeeded', 'failed', 'canceled', 'stopped'].includes(state.taskStatus)
   },
 
   actions: {
@@ -113,8 +114,7 @@ export const useTaskStore = defineStore('task', {
             message_source: options.message_source ?? undefined,
             goal_mode: options.goal_mode === true ? true : undefined,
             skill_refs: Array.isArray(options.skill_refs) ? options.skill_refs : undefined,
-            files:
-              Array.isArray(options.files) && options.files.length ? options.files : undefined
+            files: Array.isArray(options.files) && options.files.length ? options.files : undefined
           })
         });
 
@@ -175,15 +175,12 @@ export const useTaskStore = defineStore('task', {
       const startedAt = Date.now();
 
       try {
-        const response = await fetch(
-          `/api/tasks/${taskId}?from=${fromOffset}`,
-          {
-            signal: AbortSignal.timeout(this.pollingRequestTimeoutMs),
-            headers: {
-              'X-Task-Poll': requestId
-            }
+        const response = await fetch(`/api/tasks/${taskId}?from=${fromOffset}`, {
+          signal: AbortSignal.timeout(this.pollingRequestTimeoutMs),
+          headers: {
+            'X-Task-Poll': requestId
           }
-        );
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -214,7 +211,12 @@ export const useTaskStore = defineStore('task', {
           nextOffset: data?.next_offset,
           eventsCount
         });
-        if (eventsCount > 0 || this.pollingErrorCount > 0 || data?.status !== 'running' || fromOffset === 0) {
+        if (
+          eventsCount > 0 ||
+          this.pollingErrorCount > 0 ||
+          data?.status !== 'running' ||
+          fromOffset === 0
+        ) {
           taskPollDiag('task-poll-ok', {
             requestId,
             taskId,
@@ -231,7 +233,7 @@ export const useTaskStore = defineStore('task', {
           taskId,
           from: fromOffset,
           status: data.status,
-          isTaskCompleted: this.isTaskCompleted,
+          isTaskCompleted: this.isTaskCompleted
         });
         this.taskStatus = data.status;
         this.taskUpdatedAt = data.updated_at;
@@ -594,7 +596,11 @@ export const useTaskStore = defineStore('task', {
       this.pollingInFlight = false;
       this.pollingWarned = false;
       this.runtimeQueueSnapshotKey = '';
-      goalModeDebugLog('taskStore.stopPolling', { reason, taskStatus: this.taskStatus, currentTaskId: this.currentTaskId });
+      goalModeDebugLog('taskStore.stopPolling', {
+        reason,
+        taskStatus: this.taskStatus,
+        currentTaskId: this.currentTaskId
+      });
       this.currentTaskId = null; // 清除任务 ID
     },
 

@@ -5,9 +5,7 @@ export const workspaceTaskMethods = {
     const id = String(conversationId || '').trim();
     if (!id) return null;
     const tasks = Array.isArray(this.runningWorkspaceTasks) ? this.runningWorkspaceTasks : [];
-    return (
-      tasks.find((task: any) => String(task?.conversation_id || '') === id) || null
-    );
+    return tasks.find((task: any) => String(task?.conversation_id || '') === id) || null;
   },
   getStoredWorkspaceTaskIdSet(kind = 'tracked') {
     if (typeof window === 'undefined') return new Set();
@@ -57,9 +55,8 @@ export const workspaceTaskMethods = {
     const tracked = this.getStoredWorkspaceTaskIdSet?.('tracked') || new Set();
     tracked.delete(id);
     this.setStoredWorkspaceTaskIdSet?.('tracked', tracked);
-    this.runningWorkspaceTasks = (Array.isArray(this.runningWorkspaceTasks)
-      ? this.runningWorkspaceTasks
-      : []
+    this.runningWorkspaceTasks = (
+      Array.isArray(this.runningWorkspaceTasks) ? this.runningWorkspaceTasks : []
     ).filter((item: any) => String(item?.task_id || '') !== id);
   },
   async getRunningTaskConversationId() {

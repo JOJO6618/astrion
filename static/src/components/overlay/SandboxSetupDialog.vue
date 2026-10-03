@@ -18,7 +18,17 @@
           <!-- ── 未开始：说明 + 状态描述 ── -->
           <template v-if="!progress">
             <div class="sandbox-setup-hero">
-              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="34"
+                height="34"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z" />
                 <path d="M9 12l2 2 4-4" />
               </svg>
@@ -49,24 +59,52 @@
                 :class="stepStatus(i + 1)"
               >
                 <span class="sandbox-setup-step-icon" aria-hidden="true">
-                  <svg v-if="stepStatus(i + 1) === 'done'" viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    v-if="stepStatus(i + 1) === 'done'"
+                    viewBox="0 0 20 20"
+                    width="13"
+                    height="13"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <path d="M4 10.5l4 4 8-9" />
                   </svg>
-                  <span v-else-if="stepStatus(i + 1) === 'active'" class="sandbox-setup-spinner small"></span>
-                  <svg v-else-if="stepStatus(i + 1) === 'error'" viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <span
+                    v-else-if="stepStatus(i + 1) === 'active'"
+                    class="sandbox-setup-spinner small"
+                  ></span>
+                  <svg
+                    v-else-if="stepStatus(i + 1) === 'error'"
+                    viewBox="0 0 20 20"
+                    width="13"
+                    height="13"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                  >
                     <path d="M5 5l10 10M15 5L5 15" />
                   </svg>
                   <span v-else class="sandbox-setup-step-dot"></span>
                 </span>
                 <span class="sandbox-setup-step-title">{{ step }}</span>
-                <span v-if="i + 1 === 3 && progress.step_index === 3 && downloadText" class="sandbox-setup-step-extra">
+                <span
+                  v-if="i + 1 === 3 && progress.step_index === 3 && downloadText"
+                  class="sandbox-setup-step-extra"
+                >
                   {{ downloadText }}
                 </span>
               </li>
             </ul>
 
             <div class="sandbox-setup-progress">
-              <div class="sandbox-setup-progress-fill" :style="{ width: progressPercent + '%' }"></div>
+              <div
+                class="sandbox-setup-progress-fill"
+                :style="{ width: progressPercent + '%' }"
+              ></div>
             </div>
 
             <div v-if="progress.phase === 'done'" class="sandbox-setup-result ok">
@@ -76,7 +114,9 @@
               {{ $t('sandbox.phaseNeedsReboot') }}
             </div>
             <div v-else-if="progress.phase === 'error'" class="sandbox-setup-result error">
-              <p class="sandbox-setup-error-line">{{ progress.error || $t('sandbox.phaseError') }}</p>
+              <p class="sandbox-setup-error-line">
+                {{ progress.error || $t('sandbox.phaseError') }}
+              </p>
               <p v-if="progress.error_kind === 'uac_cancelled'" class="sandbox-setup-error-hint">
                 {{ $t('sandbox.uacCancelledHint') }}
               </p>
@@ -93,7 +133,11 @@
           <!-- 未开始 -->
           <template v-if="!progress">
             <label class="sandbox-setup-never">
-              <input type="checkbox" :checked="neverChecked" @change="neverChecked = ($event.target as HTMLInputElement).checked" />
+              <input
+                type="checkbox"
+                :checked="neverChecked"
+                @change="neverChecked = ($event.target as HTMLInputElement).checked"
+              />
               <FancyCheck :checked="neverChecked" :size="16" />
               <span>{{ $t('sandbox.neverAgain') }}</span>
             </label>
@@ -120,7 +164,9 @@
               :disabled="store.starting"
               @click="store.retrySetup()"
             >
-              {{ progress.phase === 'needs_reboot' ? $t('sandbox.rebootDone') : $t('common.retry') }}
+              {{
+                progress.phase === 'needs_reboot' ? $t('sandbox.rebootDone') : $t('common.retry')
+              }}
             </button>
             <button type="button" class="sandbox-setup-btn ghost" @click="onClose">
               {{ $t('common.close') }}
@@ -544,7 +590,6 @@ function onClose() {
 .sandbox-setup-spacer {
   flex: 1 1 auto;
 }
-
 
 .sandbox-setup-btn {
   height: 32px;

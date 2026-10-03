@@ -12,7 +12,9 @@
               @change="$emit('toggle-enabled', ($event.target as HTMLInputElement).checked)"
             />
             <span class="switch"></span>
-            <span class="switch-text">{{ enabled ? $t('overlay.switchOn') : $t('overlay.switchOff') }}</span>
+            <span class="switch-text">{{
+              enabled ? $t('overlay.switchOn') : $t('overlay.switchOff')
+            }}</span>
           </label>
         </div>
         <div class="versioning-header-actions">
@@ -42,7 +44,9 @@
             <div class="row stats">
               <span class="plus">+{{ item.insertions || 0 }}</span>
               <span class="minus">-{{ item.deletions || 0 }}</span>
-              <span class="files">{{ $t('overlay.filesCount', { n: item.files_changed || 0 }) }}</span>
+              <span class="files">{{
+                $t('overlay.filesCount', { n: item.files_changed || 0 })
+              }}</span>
             </div>
           </button>
           <div v-if="!items.length" class="empty">{{ $t('overlay.noCheckpoints') }}</div>
@@ -55,11 +59,20 @@
             <div class="summary">
               <span class="plus">+{{ detail.insertions || 0 }}</span>
               <span class="minus">-{{ detail.deletions || 0 }}</span>
-              <span class="files">{{ $t('overlay.filesCount', { n: detail.files_changed || 0 }) }}</span>
+              <span class="files">{{
+                $t('overlay.filesCount', { n: detail.files_changed || 0 })
+              }}</span>
             </div>
             <div class="file-list">
-              <template v-for="(file, idx) in detail.files || []" :key="`${file.status}:${file.path}:${idx}`">
-                <div class="file-row" :class="{ expanded: isFileExpanded(file, idx) }" @click="toggleFileExpand(file, idx)">
+              <template
+                v-for="(file, idx) in detail.files || []"
+                :key="`${file.status}:${file.path}:${idx}`"
+              >
+                <div
+                  class="file-row"
+                  :class="{ expanded: isFileExpanded(file, idx) }"
+                  @click="toggleFileExpand(file, idx)"
+                >
                   <span class="status">{{ statusLabel(file.status) }}</span>
                   <span class="path">{{ file.path }}</span>
                   <span class="delta">
@@ -67,20 +80,38 @@
                     <span class="minus">-{{ file.deletions || 0 }}</span>
                   </span>
                 </div>
-                <div v-if="isFileExpanded(file, idx)" class="tool-result-diff scroll-area versioning-diff">
-                  <div v-if="!(file.patch_lines || []).length" class="empty">{{ $t('overlay.noDiffLines') }}</div>
-                  <template v-for="(line, lineIdx) in file.patch_lines || []" :key="`line:${idx}:${lineIdx}`">
+                <div
+                  v-if="isFileExpanded(file, idx)"
+                  class="tool-result-diff scroll-area versioning-diff"
+                >
+                  <div v-if="!(file.patch_lines || []).length" class="empty">
+                    {{ $t('overlay.noDiffLines') }}
+                  </div>
+                  <template
+                    v-for="(line, lineIdx) in file.patch_lines || []"
+                    :key="`line:${idx}:${lineIdx}`"
+                  >
                     <div
                       v-for="(subLine, subIdx) in splitDiffContent(line.content)"
                       :key="`line:${idx}:${lineIdx}:${subIdx}`"
                       class="diff-line"
-                      :class="line.type === 'add' ? 'diff-add' : (line.type === 'remove' ? 'diff-remove' : 'diff-context')"
+                      :class="
+                        line.type === 'add'
+                          ? 'diff-add'
+                          : line.type === 'remove'
+                            ? 'diff-remove'
+                            : 'diff-context'
+                      "
                     >
-                      <span class="diff-marker">{{ line.type === 'add' ? '+' : (line.type === 'remove' ? '-' : ' ') }}</span>
+                      <span class="diff-marker">{{
+                        line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '
+                      }}</span>
                       <span class="diff-content">{{ subLine }}</span>
                     </div>
                   </template>
-                  <div v-if="file.patch_truncated" class="approval-note">{{ $t('overlay.diffTruncated') }}</div>
+                  <div v-if="file.patch_truncated" class="approval-note">
+                    {{ $t('overlay.diffTruncated') }}
+                  </div>
                 </div>
               </template>
             </div>
@@ -106,7 +137,10 @@
               <button
                 type="button"
                 class="restore-option-btn"
-                :class="{ active: trackingMode === 'workspace_and_conversation', disabled: !hostMode }"
+                :class="{
+                  active: trackingMode === 'workspace_and_conversation',
+                  disabled: !hostMode
+                }"
                 :disabled="restoring || !hostMode"
                 @click="$emit('update:tracking-mode', 'workspace_and_conversation')"
               >
@@ -188,7 +222,8 @@ const orderedItems = computed(() => {
 });
 
 const expandedFileKey = ref<string | null>(null);
-const fileKey = (file: any, idx: number) => `${file?.status || ''}:${file?.old_path || ''}:${file?.path || ''}:${idx}`;
+const fileKey = (file: any, idx: number) =>
+  `${file?.status || ''}:${file?.old_path || ''}:${file?.path || ''}:${idx}`;
 const toggleFileExpand = (file: any, idx: number) => {
   const key = fileKey(file, idx);
   expandedFileKey.value = expandedFileKey.value === key ? null : key;
@@ -223,7 +258,12 @@ const statusLabel = (status: string): string => {
     deleted: 'D',
     renamed: 'R'
   };
-  return map[String(status || '').toLowerCase()] || String(status || '').toUpperCase().slice(0, 1);
+  return (
+    map[String(status || '').toLowerCase()] ||
+    String(status || '')
+      .toUpperCase()
+      .slice(0, 1)
+  );
 };
 
 const splitDiffContent = (content: any): string[] => {

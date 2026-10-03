@@ -68,9 +68,7 @@ export const useBackgroundCommandStore = defineStore('backgroundCommand', {
         this.commands = this.commands.filter(
           (item) => !item.conversation_id || item.conversation_id === convId
         );
-        const resp = await fetch(
-          `/api/background_commands?limit=200${query ? `&${query}` : ''}`
-        );
+        const resp = await fetch(`/api/background_commands?limit=200${query ? `&${query}` : ''}`);
         if (!resp.ok) {
           throw new Error(await resp.text());
         }
@@ -202,7 +200,9 @@ export const useBackgroundCommandStore = defineStore('backgroundCommand', {
         this.stoppingCommandIds = next;
       }
     },
-    async stopAllCommands(conversationId?: string): Promise<{ success: boolean; stoppedCount?: number; error?: string }> {
+    async stopAllCommands(
+      conversationId?: string
+    ): Promise<{ success: boolean; stoppedCount?: number; error?: string }> {
       try {
         const resp = await fetch('/api/background_commands/stop_all', {
           method: 'POST',

@@ -333,7 +333,6 @@ watch(
     const myGen = ++gen;
     const live = workflowStore.live;
 
-
     // 工作流消失（停用/切换对话清空）
     if (!newSnap.active) {
       // 同对话内事件驱动消失（live=true，如 slash 停用）：与出现对称播退出动画；

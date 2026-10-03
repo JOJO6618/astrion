@@ -65,7 +65,7 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
     /** 安装进度（安装中由轮询驱动） */
     progress: null as UpdateProgress | null,
     /** 安装轮询定时器 */
-    _progressTimer: 0 as number,
+    _progressTimer: 0 as number
   }),
 
   getters: {
@@ -77,7 +77,7 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
     installBusy(state): boolean {
       const s = state.progress?.state;
       return s === 'checking' || s === 'downloading' || s === 'installing' || s === 'restarting';
-    },
+    }
   },
 
   actions: {
@@ -132,7 +132,7 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
       try {
         const resp = await fetch('/api/desktop/update/install', {
           method: 'POST',
-          credentials: 'same-origin',
+          credentials: 'same-origin'
         });
         const payload = await parseJson(resp);
         if (!payload?.success) {
@@ -140,7 +140,7 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
             state: 'error',
             downloaded: 0,
             total: null,
-            error: payload?.error || payload?.data?.error || 'install_rejected',
+            error: payload?.error || payload?.data?.error || 'install_rejected'
           };
           return;
         }
@@ -176,6 +176,6 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
         window.clearInterval(this._progressTimer);
         this._progressTimer = 0;
       }
-    },
-  },
+    }
+  }
 });

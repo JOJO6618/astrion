@@ -8,5 +8,5 @@ export const messageMethods = {
   ...runtimeQueueMethods,
   ...systemCommandMethods,
   ...sendMethods,
-  ...chatMethods,
+  ...chatMethods
 };

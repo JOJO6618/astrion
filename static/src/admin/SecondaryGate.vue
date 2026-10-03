@@ -22,7 +22,9 @@
       </ol>
       <div class="secondary-actions">
         <button type="button" :disabled="loading" @click="$emit('recheck')">
-          {{ loading ? $t('adminCustomTools.gate.rechecking') : $t('adminCustomTools.gate.recheck') }}
+          {{
+            loading ? $t('adminCustomTools.gate.rechecking') : $t('adminCustomTools.gate.recheck')
+          }}
         </button>
       </div>
       <p v-if="error" class="secondary-error">{{ error }}</p>
@@ -42,7 +44,11 @@
       />
       <div class="secondary-actions">
         <button type="button" :disabled="loading" @click="submit">
-          {{ loading ? $t('adminCustomTools.gate.verifying') : $t('adminCustomTools.gate.confirmEnter') }}
+          {{
+            loading
+              ? $t('adminCustomTools.gate.verifying')
+              : $t('adminCustomTools.gate.confirmEnter')
+          }}
         </button>
         <button type="button" class="ghost-btn" :disabled="loading" @click="$emit('recheck')">
           {{ $t('adminCustomTools.gate.recheck') }}

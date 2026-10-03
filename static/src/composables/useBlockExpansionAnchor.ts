@@ -42,7 +42,12 @@ export function useBlockExpansionAnchor(
   scrollRef: Ref<HTMLElement | null>,
   options: UseBlockExpansionAnchorOptions
 ) {
-  const { isFollowEngineActive, onBeforeScroll, duration = 300, defaultDirection = 'auto' } = options;
+  const {
+    isFollowEngineActive,
+    onBeforeScroll,
+    duration = 300,
+    defaultDirection = 'auto'
+  } = options;
   const animations = new Map<string, AnchorAnimation>();
   const preferredModes = new Map<string, 'up' | 'down'>();
   let rafId: number | null = null;
@@ -75,8 +80,7 @@ export function useBlockExpansionAnchor(
 
     for (const [id, anim] of animations) {
       const elapsed = now - anim.startTime;
-      const stillInDom =
-        document.body.contains(container) && container.contains(anim.element);
+      const stillInDom = document.body.contains(container) && container.contains(anim.element);
       if (!stillInDom) {
         animations.delete(id);
         continue;

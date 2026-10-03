@@ -92,17 +92,14 @@ export const dialogMethods = {
     }
     this.answeringPlanApprovalIds = [approvalId];
     try {
-      const response = await fetch(
-        `/api/plan-approvals/${encodeURIComponent(approvalId)}/answer`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            approved: payload?.approved === true,
-            comment: String(payload?.comment || '').trim()
-          })
-        }
-      );
+      const response = await fetch(`/api/plan-approvals/${encodeURIComponent(approvalId)}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approved: payload?.approved === true,
+          comment: String(payload?.comment || '').trim()
+        })
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
         throw new Error(result?.message || result?.error || t('appUi.submitPlanDecisionFailed'));
@@ -130,7 +127,10 @@ export const dialogMethods = {
         });
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.submitPlanDecisionFailed'));
+      const msg =
+        error instanceof Error
+          ? error.message
+          : String(error || t('appUi.submitPlanDecisionFailed'));
       this.uiPushToast({ title: t('appUi.submitPlanDecisionFailed'), message: msg, type: 'error' });
     } finally {
       this.answeringPlanApprovalIds = [];
@@ -201,15 +201,18 @@ export const dialogMethods = {
         if (!questionId) {
           continue;
         }
-        const response = await fetch(`/api/user-questions/${encodeURIComponent(questionId)}/answer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            selected_option_id: answer?.selected_option_id || undefined,
-            text: answer?.text || '',
-            dismissed: answer?.dismissed === true
-          })
-        });
+        const response = await fetch(
+          `/api/user-questions/${encodeURIComponent(questionId)}/answer`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              selected_option_id: answer?.selected_option_id || undefined,
+              text: answer?.text || '',
+              dismissed: answer?.dismissed === true
+            })
+          }
+        );
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.message || payload?.error || t('appUi.submitAnswerFailed'));
@@ -226,10 +229,14 @@ export const dialogMethods = {
           this.restoreUserQuestionTitle();
         }
       } else {
-        this.userQuestionActiveIndex = Math.min(this.userQuestionActiveIndex, this.pendingUserQuestions.length - 1);
+        this.userQuestionActiveIndex = Math.min(
+          this.userQuestionActiveIndex,
+          this.pendingUserQuestions.length - 1
+        );
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.submitAnswerFailed'));
+      const msg =
+        error instanceof Error ? error.message : String(error || t('appUi.submitAnswerFailed'));
       this.uiPushToast({ title: t('appUi.submitAnswerFailed'), message: msg, type: 'error' });
     } finally {
       this.answeringUserQuestionIds = [];
@@ -297,7 +304,8 @@ export const dialogMethods = {
         }
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.approvalFailed'));
+      const msg =
+        error instanceof Error ? error.message : String(error || t('appUi.approvalFailed'));
       this.uiPushToast({
         title: t('appUi.approvalFailed'),
         message: msg,

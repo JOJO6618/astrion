@@ -23,7 +23,11 @@
         :title="row.path"
         @click="openRow(row)"
       >
-        <button class="qd-row-menu-btn" :title="$t('quickdock.more')" @click.stop="openMenu($event, row)">
+        <button
+          class="qd-row-menu-btn"
+          :title="$t('quickdock.more')"
+          @click.stop="openMenu($event, row)"
+        >
           <svg viewBox="0 0 16 16">
             <circle cx="3.5" cy="8" r="1.3" fill="currentColor" />
             <circle cx="8" cy="8" r="1.3" fill="currentColor" />

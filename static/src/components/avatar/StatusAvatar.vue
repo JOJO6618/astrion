@@ -52,7 +52,11 @@
       </g>
 
       <!-- 子智能体：六边形分裂-聚合 -->
-      <g class="sa-fc sa-icon" :class="{ active: activeFaceKey === 'subagent' }" :clip-path="`url(#${clipId})`">
+      <g
+        class="sa-fc sa-icon"
+        :class="{ active: activeFaceKey === 'subagent' }"
+        :clip-path="`url(#${clipId})`"
+      >
         <g class="sa-sub-scene">
           <line class="sa-sub-ray" x1="180" y1="100" x2="140" y2="100" />
           <line class="sa-sub-ray" x1="140" y1="30.718" x2="120" y2="65.359" />
@@ -60,10 +64,27 @@
           <line class="sa-sub-ray" x1="20" y1="100" x2="60" y2="100" />
           <line class="sa-sub-ray" x1="60" y1="169.282" x2="80" y2="134.641" />
           <line class="sa-sub-ray" x1="140" y1="169.282" x2="120" y2="134.641" />
-          <path class="sa-sub-hex" d="M 137.9795,103.5 Q 140,100 137.9795,96.5 L 122.0205,68.859 Q 120,65.359 115.9585,65.359 L 84.0415,65.359 Q 80,65.359 77.9795,68.859 L 62.0205,96.5 Q 60,100 62.0205,103.5 L 77.9795,131.141 Q 80,134.641 84.0415,134.641 L 115.9585,134.641 Q 120,134.641 122.0205,131.141 Z" />
+          <path
+            class="sa-sub-hex"
+            d="M 137.9795,103.5 Q 140,100 137.9795,96.5 L 122.0205,68.859 Q 120,65.359 115.9585,65.359 L 84.0415,65.359 Q 80,65.359 77.9795,68.859 L 62.0205,96.5 Q 60,100 62.0205,103.5 L 77.9795,131.141 Q 80,134.641 84.0415,134.641 L 115.9585,134.641 Q 120,134.641 122.0205,131.141 Z"
+          />
           <g class="sa-sub-eyes">
-            <line class="sa-sub-eye" x1="0" y1="0" x2="11" y2="0" style="transform: translate(92px, 92px) rotate(90deg);" />
-            <line class="sa-sub-eye" x1="0" y1="0" x2="11" y2="0" style="transform: translate(108px, 92px) rotate(90deg);" />
+            <line
+              class="sa-sub-eye"
+              x1="0"
+              y1="0"
+              x2="11"
+              y2="0"
+              style="transform: translate(92px, 92px) rotate(90deg)"
+            />
+            <line
+              class="sa-sub-eye"
+              x1="0"
+              y1="0"
+              x2="11"
+              y2="0"
+              style="transform: translate(108px, 92px) rotate(90deg)"
+            />
           </g>
         </g>
       </g>
@@ -125,25 +146,98 @@ interface ToolDef {
   raw?: string;
 }
 const TOOLS: ToolDef[] = [
-  { key: 'search', motion: 'wiggle', svg: '<path class="sa-inner" d="m21 21-4.34-4.34"/><circle class="sa-inner" cx="11" cy="11" r="8"/>' },
-  { key: 'webpage', motion: 'bob', svg: '<circle class="sa-inner" cx="12" cy="12" r="10"/><path class="sa-inner" d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><line class="sa-inner" x1="2" x2="22" y1="12" y2="12"/>' },
-  { key: 'write', motion: 'wiggle', svg: '<path class="sa-inner" d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path class="sa-inner" d="m15 5 4 4"/>' },
-  { key: 'read', motion: 'bob', svg: '<path class="sa-inner" d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>' },
-  { key: 'save', motion: 'bob', svg: '<path class="sa-inner" d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path class="sa-inner" d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path class="sa-inner" d="M7 3v4a1 1 0 0 0 1 1h7"/>' },
-  { key: 'camera', motion: 'bob', svg: '<path class="sa-inner" d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle class="sa-inner" cx="12" cy="13" r="3"/>' },
-  { key: 'monitor', motion: 'bob', svg: '<rect class="sa-inner" width="20" height="14" x="2" y="3" rx="2"/><line class="sa-inner" x1="8" x2="16" y1="21" y2="21"/><line class="sa-inner" x1="12" x2="12" y1="17" y2="21"/>' },
-  { key: 'keyboard', motion: 'bob', svg: '<path class="sa-inner" d="M10 8h.01M12 12h.01M14 8h.01M16 12h.01M18 8h.01M6 8h.01M7 16h10m-9-4h.01"/><rect class="sa-inner" width="20" height="16" x="2" y="4" rx="2"/>' },
-  { key: 'clipboard', motion: 'bob', svg: '<rect class="sa-inner" width="8" height="4" x="8" y="2" rx="1" ry="1"/><path class="sa-inner" d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>' },
-  { key: 'command', motion: 'bob', svg: '<path class="sa-inner" d="M12 19h8"/><path class="sa-inner" d="m4 17 6-6-6-6"/>' },
-  { key: 'brain', motion: 'bob', svg: '<path class="sa-inner" d="M12 18V5"/><path class="sa-inner" d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path class="sa-inner" d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path class="sa-inner" d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path class="sa-inner" d="M18 18a4 4 0 0 0 2-7.464"/><path class="sa-inner" d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path class="sa-inner" d="M6 18a4 4 0 0 1-2-7.464"/><path class="sa-inner" d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>' },
-  { key: 'notebook', motion: 'bob', svg: '<path class="sa-inner" d="M2 6h4m-4 4h4m-4 4h4m-4 4h4"/><rect class="sa-inner" width="16" height="20" x="4" y="2" rx="2"/><path class="sa-inner" d="M16 2v20"/>' },
-  { key: 'note', motion: 'bob', svg: '<path class="sa-inner" d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path class="sa-inner" d="M15 3v5a1 1 0 0 0 1 1h5"/>' },
+  {
+    key: 'search',
+    motion: 'wiggle',
+    svg: '<path class="sa-inner" d="m21 21-4.34-4.34"/><circle class="sa-inner" cx="11" cy="11" r="8"/>'
+  },
+  {
+    key: 'webpage',
+    motion: 'bob',
+    svg: '<circle class="sa-inner" cx="12" cy="12" r="10"/><path class="sa-inner" d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><line class="sa-inner" x1="2" x2="22" y1="12" y2="12"/>'
+  },
+  {
+    key: 'write',
+    motion: 'wiggle',
+    svg: '<path class="sa-inner" d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path class="sa-inner" d="m15 5 4 4"/>'
+  },
+  {
+    key: 'read',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>'
+  },
+  {
+    key: 'save',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path class="sa-inner" d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path class="sa-inner" d="M7 3v4a1 1 0 0 0 1 1h7"/>'
+  },
+  {
+    key: 'camera',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle class="sa-inner" cx="12" cy="13" r="3"/>'
+  },
+  {
+    key: 'monitor',
+    motion: 'bob',
+    svg: '<rect class="sa-inner" width="20" height="14" x="2" y="3" rx="2"/><line class="sa-inner" x1="8" x2="16" y1="21" y2="21"/><line class="sa-inner" x1="12" x2="12" y1="17" y2="21"/>'
+  },
+  {
+    key: 'keyboard',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M10 8h.01M12 12h.01M14 8h.01M16 12h.01M18 8h.01M6 8h.01M7 16h10m-9-4h.01"/><rect class="sa-inner" width="20" height="16" x="2" y="4" rx="2"/>'
+  },
+  {
+    key: 'clipboard',
+    motion: 'bob',
+    svg: '<rect class="sa-inner" width="8" height="4" x="8" y="2" rx="1" ry="1"/><path class="sa-inner" d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'
+  },
+  {
+    key: 'command',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M12 19h8"/><path class="sa-inner" d="m4 17 6-6-6-6"/>'
+  },
+  {
+    key: 'brain',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M12 18V5"/><path class="sa-inner" d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path class="sa-inner" d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path class="sa-inner" d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path class="sa-inner" d="M18 18a4 4 0 0 0 2-7.464"/><path class="sa-inner" d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path class="sa-inner" d="M6 18a4 4 0 0 1-2-7.464"/><path class="sa-inner" d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>'
+  },
+  {
+    key: 'notebook',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M2 6h4m-4 4h4m-4 4h4m-4 4h4"/><rect class="sa-inner" width="16" height="20" x="4" y="2" rx="2"/><path class="sa-inner" d="M16 2v20"/>'
+  },
+  {
+    key: 'note',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path class="sa-inner" d="M15 3v5a1 1 0 0 0 1 1h5"/>'
+  },
   { key: 'check', motion: 'bob', svg: '<path class="sa-inner" d="M20 6 9 17l-5-5"/>' },
-  { key: 'skill', motion: 'bob', svg: '<path class="sa-inner" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path class="sa-inner" d="M20 2v4"/><path class="sa-inner" d="M22 4h-4"/><circle class="sa-inner" cx="4" cy="20" r="2"/>' },
-  { key: 'persona', motion: 'bob', svg: '<path class="sa-inner" d="M11.5 15H7a4 4 0 0 0-4 4v2m18.378-4.374a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle class="sa-inner" cx="10" cy="7" r="4"/>' },
-  { key: 'mcp', motion: 'bob', raw: '<g transform="translate(100,100) scale(0.30) translate(-90,-90)"><path class="sa-inner" style="stroke-width:16.8" d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/><path class="sa-inner" style="stroke-width:16.8" d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/><path class="sa-inner" style="stroke-width:16.8" d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/></g>' },
-  { key: 'ask', motion: 'bob', scale: 3.7, svg: '<path class="sa-inner" style="stroke-width:1.6" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path class="sa-inner" style="stroke-width:1.6" d="M12 17h.01"/>' },
-  { key: 'sleep', motion: 'special', raw: '<g class="sa-z z3"><text x="130" y="94" text-anchor="middle" font-size="34" font-weight="600">Z</text></g><g class="sa-z z2"><text x="100" y="109" text-anchor="middle" font-size="26" font-weight="600">Z</text></g><g class="sa-z z1"><text x="70" y="123" text-anchor="middle" font-size="18" font-weight="600">Z</text></g>' }
+  {
+    key: 'skill',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path class="sa-inner" d="M20 2v4"/><path class="sa-inner" d="M22 4h-4"/><circle class="sa-inner" cx="4" cy="20" r="2"/>'
+  },
+  {
+    key: 'persona',
+    motion: 'bob',
+    svg: '<path class="sa-inner" d="M11.5 15H7a4 4 0 0 0-4 4v2m18.378-4.374a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle class="sa-inner" cx="10" cy="7" r="4"/>'
+  },
+  {
+    key: 'mcp',
+    motion: 'bob',
+    raw: '<g transform="translate(100,100) scale(0.30) translate(-90,-90)"><path class="sa-inner" style="stroke-width:16.8" d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/><path class="sa-inner" style="stroke-width:16.8" d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/><path class="sa-inner" style="stroke-width:16.8" d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/></g>'
+  },
+  {
+    key: 'ask',
+    motion: 'bob',
+    scale: 3.7,
+    svg: '<path class="sa-inner" style="stroke-width:1.6" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path class="sa-inner" style="stroke-width:1.6" d="M12 17h.01"/>'
+  },
+  {
+    key: 'sleep',
+    motion: 'special',
+    raw: '<g class="sa-z z3"><text x="130" y="94" text-anchor="middle" font-size="34" font-weight="600">Z</text></g><g class="sa-z z2"><text x="100" y="109" text-anchor="middle" font-size="26" font-weight="600">Z</text></g><g class="sa-z z1"><text x="70" y="123" text-anchor="middle" font-size="18" font-weight="600">Z</text></g>'
+  }
 ];
 
 function buildFaceInner(tool: ToolDef): string {

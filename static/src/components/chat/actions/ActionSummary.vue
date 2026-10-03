@@ -6,13 +6,18 @@
         :style="iconStyle(action.type === 'apply' ? 'pencil' : 'clipboard')"
         aria-hidden="true"
       ></span>
-      <span>{{ action.title || (action.type === 'apply' ? $t('chatActions.applyModify') : $t('chatActions.appendContent')) }}</span>
+      <span>{{
+        action.title ||
+        (action.type === 'apply' ? $t('chatActions.applyModify') : $t('chatActions.appendContent'))
+      }}</span>
     </div>
     <div class="summary-content" v-if="action.content">
       <pre>{{ action.content }}</pre>
     </div>
     <div class="summary-actions">
-      <button type="button" class="ghost" @click="$emit('copy', action, blockId)">{{ $t('common.copy') }}</button>
+      <button type="button" class="ghost" @click="$emit('copy', action, blockId)">
+        {{ $t('common.copy') }}
+      </button>
       <button
         type="button"
         class="ghost"

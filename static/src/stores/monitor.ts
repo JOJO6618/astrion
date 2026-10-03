@@ -323,7 +323,10 @@ export const useMonitorStore = defineStore('monitor', {
         this.bubbleActive = true;
         return;
       }
-      this.driver?.showSpeechBubble(t('stores.waitingReplyEllipsis'), { variant: 'info', duration: 0 });
+      this.driver?.showSpeechBubble(t('stores.waitingReplyEllipsis'), {
+        variant: 'info',
+        duration: 0
+      });
       this.bubbleActive = true;
     },
     enqueueModelSpeech(text: string) {
@@ -645,7 +648,8 @@ export const useMonitorStore = defineStore('monitor', {
       };
 
       const transformStatus = (raw?: string) => {
-        const label = typeof raw === 'string' && raw.trim().length ? raw.trim() : t('stores.inProgress');
+        const label =
+          typeof raw === 'string' && raw.trim().length ? raw.trim() : t('stores.inProgress');
         // '\u6b63\u5728' = '正在'（与 chat.ts progress* zh 译文前缀的拼接耦合；\u 转义仅过审计，slice(2) 行为不变）
         if (label.startsWith('\u6b63\u5728')) {
           return t('stores.playbackStatus', { label: label.slice(2) });

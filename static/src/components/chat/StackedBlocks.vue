@@ -327,9 +327,7 @@ const measureAndCompute = (expandedOverride?: Record<string, boolean>) => {
     const fullContent = innerC ? Math.min(Math.ceil(innerC.offsetHeight), COLLAPSE_MAX_HEIGHT) : 0;
     nextContentHeights[key] = fullContent;
     const expanded =
-      expandedOverride && key in expandedOverride
-        ? expandedOverride[key]
-        : isExpandedById(key);
+      expandedOverride && key in expandedOverride ? expandedOverride[key] : isExpandedById(key);
     // 分隔线：隐藏边线模式下统一为 0，否则最后一块无 border-bottom
     const borderH = hideBorders.value ? 0 : idx === children.length - 1 ? 0 : 1;
     heights.push(headerH + (expanded ? fullContent : 0) + borderH);

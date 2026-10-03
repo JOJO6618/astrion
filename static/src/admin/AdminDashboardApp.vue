@@ -17,16 +17,26 @@
       <div>
         <h1>{{ $t('adminDashboard.title') }}</h1>
         <p>
-          {{ $t('adminDashboard.lastUpdated', { time: timeAgo(snapshot?.generated_at || overview.generated_at) }) }}
+          {{
+            $t('adminDashboard.lastUpdated', {
+              time: timeAgo(snapshot?.generated_at || overview.generated_at)
+            })
+          }}
         </p>
       </div>
       <div class="header-actions">
-        <label> <input type="checkbox" v-model="autoRefresh" /> {{ $t('adminDashboard.autoRefresh') }} </label>
+        <label>
+          <input type="checkbox" v-model="autoRefresh" /> {{ $t('adminDashboard.autoRefresh') }}
+        </label>
         <button type="button" :disabled="refreshing" @click="handleManualRefresh">
           {{ refreshing ? $t('common.refreshing') : $t('adminDashboard.refreshNow') }}
         </button>
-        <a class="link-btn" href="/admin/policy" target="_blank" rel="noopener">{{ $t('adminDashboard.policyConfig') }}</a>
-        <a class="link-btn" href="/admin/api" target="_blank" rel="noopener">{{ $t('adminDashboard.apiAdmin') }}</a>
+        <a class="link-btn" href="/admin/policy" target="_blank" rel="noopener">{{
+          $t('adminDashboard.policyConfig')
+        }}</a>
+        <a class="link-btn" href="/admin/api" target="_blank" rel="noopener">{{
+          $t('adminDashboard.apiAdmin')
+        }}</a>
       </div>
     </header>
 
@@ -62,7 +72,9 @@
             <h2>{{ $t('adminDashboard.usageTitle') }}</h2>
             <div class="stats-row">
               <span>{{ $t('adminDashboard.fastMode', { count: usageTotals.fast || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.thinkingMode', { count: usageTotals.thinking || 0 }) }}</span>
+              <span>{{
+                $t('adminDashboard.thinkingMode', { count: usageTotals.thinking || 0 })
+              }}</span>
               <span>{{ $t('adminDashboard.searchMode', { count: usageTotals.search || 0 }) }}</span>
             </div>
             <div class="token-summary">
@@ -152,7 +164,11 @@
                     <td>{{ user.role || 'user' }}</td>
                     <td>
                       <span :class="['status-badge', user.status?.online ? 'online' : 'offline']">
-                        {{ user.status?.online ? $t('adminDashboard.online') : $t('adminDashboard.offline') }}
+                        {{
+                          user.status?.online
+                            ? $t('adminDashboard.online')
+                            : $t('adminDashboard.offline')
+                        }}
                       </span>
                     </td>
                     <td>
@@ -209,7 +225,12 @@
                     </td>
                     <td>
                       <span :class="['status-badge', containerStatusClass(item)]">
-                        {{ item.state?.status || (item.state?.running ? $t('common.running') : $t('adminDashboard.unknown')) }}
+                        {{
+                          item.state?.status ||
+                          (item.state?.running
+                            ? $t('common.running')
+                            : $t('adminDashboard.unknown'))
+                        }}
                       </span>
                     </td>
                     <td>{{ timeAgo(item.last_active) }}</td>
@@ -222,9 +243,17 @@
             <h2>{{ $t('adminDashboard.uploadsTitle') }}</h2>
             <div class="stats-row">
               <span>{{ $t('adminDashboard.last24h', { count: uploadStats.last_24h || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.blocked', { count: uploadStats.blocked_last_24h || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.skippedScan', { count: uploadStats.skipped_scan_last_24h || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.quarantineUsage', { size: formatBytes(uploadStats.quarantine_bytes) }) }}</span>
+              <span>{{
+                $t('adminDashboard.blocked', { count: uploadStats.blocked_last_24h || 0 })
+              }}</span>
+              <span>{{
+                $t('adminDashboard.skippedScan', { count: uploadStats.skipped_scan_last_24h || 0 })
+              }}</span>
+              <span>{{
+                $t('adminDashboard.quarantineUsage', {
+                  size: formatBytes(uploadStats.quarantine_bytes)
+                })
+              }}</span>
             </div>
             <div class="stats-row">
               <span v-if="!uploadSources.length">{{ $t('adminDashboard.noSourceStats') }}</span>
@@ -233,20 +262,30 @@
               </span>
             </div>
             <ul class="upload-feed">
-              <li v-if="!recentUploads.length" class="upload-item">{{ $t('adminDashboard.noRecentUploads') }}</li>
+              <li v-if="!recentUploads.length" class="upload-item">
+                {{ $t('adminDashboard.noRecentUploads') }}
+              </li>
               <li v-for="upload in recentUploads" :key="upload.upload_id" class="upload-item">
                 <div>
                   <strong>{{ upload.original_name || $t('adminDashboard.unnamedFile') }}</strong>
                   <div class="upload-meta">
                     <span>{{ $t('adminDashboard.uploadUser', { name: upload.username }) }}</span>
-                    <span>{{ $t('adminDashboard.uploadSource', { name: upload.source || 'unknown' }) }}</span>
-                    <span>{{ $t('adminDashboard.uploadSize', { size: formatBytes(upload.size) }) }}</span>
+                    <span>{{
+                      $t('adminDashboard.uploadSource', { name: upload.source || 'unknown' })
+                    }}</span>
+                    <span>{{
+                      $t('adminDashboard.uploadSize', { size: formatBytes(upload.size) })
+                    }}</span>
                   </div>
                 </div>
                 <div class="upload-meta">
                   <span>{{ timeAgo(upload.timestamp) }}</span>
                   <span :class="['status-badge', upload.accepted ? 'online' : 'danger']">
-                    {{ upload.accepted ? $t('adminDashboard.accepted') : $t('adminDashboard.blockedBadge') }}
+                    {{
+                      upload.accepted
+                        ? $t('adminDashboard.accepted')
+                        : $t('adminDashboard.blockedBadge')
+                    }}
                   </span>
                   <span v-if="upload.error?.message" class="status-badge danger">{{
                     upload.error.message
@@ -258,10 +297,18 @@
           <section v-else-if="activeSection === 'invites'" key="invites" class="panel">
             <h2>{{ $t('adminDashboard.invitesTitle') }}</h2>
             <div class="stats-row">
-              <span>{{ $t('adminDashboard.inviteTotal', { count: inviteSummary.total || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.inviteActive', { count: inviteSummary.active || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.inviteConsumed', { count: inviteSummary.consumed || 0 }) }}</span>
-              <span>{{ $t('adminDashboard.inviteUnlimited', { count: inviteSummary.unlimited || 0 }) }}</span>
+              <span>{{
+                $t('adminDashboard.inviteTotal', { count: inviteSummary.total || 0 })
+              }}</span>
+              <span>{{
+                $t('adminDashboard.inviteActive', { count: inviteSummary.active || 0 })
+              }}</span>
+              <span>{{
+                $t('adminDashboard.inviteConsumed', { count: inviteSummary.consumed || 0 })
+              }}</span>
+              <span>{{
+                $t('adminDashboard.inviteUnlimited', { count: inviteSummary.unlimited || 0 })
+              }}</span>
             </div>
             <div class="invite-manage">
               <input
@@ -284,12 +331,18 @@
                 {{ $t('adminDashboard.unlimitedLabel') }}
               </label>
               <button type="button" :disabled="inviteSubmitting" @click="createInvite">
-                {{ inviteSubmitting ? $t('adminDashboard.processing') : $t('adminDashboard.addInvite') }}
+                {{
+                  inviteSubmitting
+                    ? $t('adminDashboard.processing')
+                    : $t('adminDashboard.addInvite')
+                }}
               </button>
             </div>
             <p v-if="inviteError" class="secondary-error">{{ inviteError }}</p>
             <div class="invite-grid">
-              <div v-if="!inviteCodes.length" class="invite-card">{{ $t('adminDashboard.noInviteData') }}</div>
+              <div v-if="!inviteCodes.length" class="invite-card">
+                {{ $t('adminDashboard.noInviteData') }}
+              </div>
               <div v-for="code in inviteCodes" :key="code.code" class="invite-card">
                 <h4>{{ code.code }}</h4>
                 <span>{{ inviteStatus(code.remaining) }}</span>
@@ -331,7 +384,9 @@
                       <strong>{{ passwordTargetUser }}</strong>
                       <span class="user-search-email">{{ selectedUserEmail }}</span>
                     </span>
-                    <span v-else class="user-search-placeholder">{{ $t('adminDashboard.userSearchPlaceholder') }}</span>
+                    <span v-else class="user-search-placeholder">{{
+                      $t('adminDashboard.userSearchPlaceholder')
+                    }}</span>
                     <span class="user-search-arrow">▾</span>
                   </div>
                   <div v-if="passwordDropdownOpen" class="user-search-dropdown">
@@ -353,7 +408,9 @@
                       >
                         <span class="user-search-name">{{ user.username }}</span>
                         <span class="user-search-email">{{ user.email || '—' }}</span>
-                        <span v-if="user.role === 'admin'" class="user-search-role">{{ $t('adminDashboard.adminRole') }}</span>
+                        <span v-if="user.role === 'admin'" class="user-search-role">{{
+                          $t('adminDashboard.adminRole')
+                        }}</span>
                       </div>
                       <div v-if="!filteredUsers.length" class="user-search-empty">
                         {{ $t('adminDashboard.noMatchingUsers') }}
@@ -379,13 +436,22 @@
                   :disabled="!passwordTargetUser || !passwordNewValue || passwordSubmitting"
                   @click="handleResetPassword"
                 >
-                  {{ passwordSubmitting ? $t('adminDashboard.resetting') : $t('adminDashboard.resetPassword') }}
+                  {{
+                    passwordSubmitting
+                      ? $t('adminDashboard.resetting')
+                      : $t('adminDashboard.resetPassword')
+                  }}
                 </button>
                 <button
                   type="button"
                   class="ghost-btn"
                   :disabled="passwordSubmitting"
-                  @click="passwordTargetUser = ''; passwordNewValue = ''; passwordResult = ''; passwordError = ''"
+                  @click="
+                    passwordTargetUser = '';
+                    passwordNewValue = '';
+                    passwordResult = '';
+                    passwordError = '';
+                  "
                 >
                   {{ $t('adminDashboard.clear') }}
                 </button>
@@ -414,7 +480,14 @@ import SecondaryGate from './SecondaryGate.vue';
 
 type Snapshot = Record<string, any> | null;
 
-type SectionId = 'overview' | 'usage' | 'users' | 'containers' | 'uploads' | 'invites' | 'passwords';
+type SectionId =
+  | 'overview'
+  | 'usage'
+  | 'users'
+  | 'containers'
+  | 'uploads'
+  | 'invites'
+  | 'passwords';
 
 const {
   verified: secondaryVerified,
@@ -628,8 +701,7 @@ const filteredUsers = computed(() => {
   if (!query) return users.value;
   return users.value.filter(
     (u: any) =>
-      u.username.toLowerCase().includes(query) ||
-      (u.email || '').toLowerCase().includes(query)
+      u.username.toLowerCase().includes(query) || (u.email || '').toLowerCase().includes(query)
   );
 });
 

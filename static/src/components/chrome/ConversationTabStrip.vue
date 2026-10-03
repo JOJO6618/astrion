@@ -13,11 +13,7 @@
     >
       <span class="settings-icon" :style="settingsIconStyle" aria-hidden="true"></span>
     </button>
-    <button
-      class="chrome-icon new-tab-btn"
-      :title="newTabHint"
-      @click="onNewTab"
-    >
+    <button class="chrome-icon new-tab-btn" :title="newTabHint" @click="onNewTab">
       <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></svg>
     </button>
     <div class="tab-strip">
@@ -50,7 +46,11 @@
       </div>
     </div>
     <div v-if="isWindows" class="window-controls">
-      <button class="wc-btn" :title="t('appUi.tabStripWinMinimize')" @click="onWindowControl('minimize')">
+      <button
+        class="wc-btn"
+        :title="t('appUi.tabStripWinMinimize')"
+        @click="onWindowControl('minimize')"
+      >
         <svg viewBox="0 0 12 12"><path d="M2 6h8" /></svg>
       </button>
       <button
@@ -58,10 +58,21 @@
         :title="maximized ? t('appUi.tabStripWinRestore') : t('appUi.tabStripWinMaximize')"
         @click="onWindowControl('maximize-toggle')"
       >
-        <svg v-if="!maximized" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1" /></svg>
-        <svg v-else viewBox="0 0 12 12"><path d="M4 3.2V2.8A1.3 1.3 0 0 1 5.3 1.5h4.2a1.3 1.3 0 0 1 1.3 1.3v4.2a1.3 1.3 0 0 1-1.3 1.3h-.4" /><rect x="1.5" y="4" width="6.5" height="6.5" rx="1" /></svg>
+        <svg v-if="!maximized" viewBox="0 0 12 12">
+          <rect x="2.5" y="2.5" width="7" height="7" rx="1" />
+        </svg>
+        <svg v-else viewBox="0 0 12 12">
+          <path
+            d="M4 3.2V2.8A1.3 1.3 0 0 1 5.3 1.5h4.2a1.3 1.3 0 0 1 1.3 1.3v4.2a1.3 1.3 0 0 1-1.3 1.3h-.4"
+          />
+          <rect x="1.5" y="4" width="6.5" height="6.5" rx="1" />
+        </svg>
       </button>
-      <button class="wc-btn wc-close" :title="t('appUi.tabStripWinClose')" @click="onWindowControl('close')">
+      <button
+        class="wc-btn wc-close"
+        :title="t('appUi.tabStripWinClose')"
+        @click="onWindowControl('close')"
+      >
         <svg viewBox="0 0 12 12"><path d="M2.8 2.8l6.4 6.4M9.2 2.8L2.8 9.2" /></svg>
       </button>
     </div>

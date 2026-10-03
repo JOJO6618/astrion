@@ -44,8 +44,10 @@ export default {
   generalTitle: '通用',
   generalDesc: '对话与应用的基础行为。',
   runDataTitle: '运行数据目录',
-  runDataDesc: '设置桌面端保存对话、用户数据与运行配置的位置。切换后重启时会先迁移数据，并显示进度窗口。',
-  runDataEnvLocked: '检测到 ASTRION_DESKTOP_DATA_ROOT 环境变量，应用内目录切换已停用。请修改或删除该环境变量后再使用此设置。',
+  runDataDesc:
+    '设置桌面端保存对话、用户数据与运行配置的位置。切换后重启时会先迁移数据，并显示进度窗口。',
+  runDataEnvLocked:
+    '检测到 ASTRION_DESKTOP_DATA_ROOT 环境变量，应用内目录切换已停用。请修改或删除该环境变量后再使用此设置。',
   runDataPathLabel: '数据目录路径',
   runDataPathPlaceholder: '输入新的数据目录路径',
   runDataBrowse: '在文件管理器中选择',
@@ -56,7 +58,8 @@ export default {
   runDataConfirm: '确定',
   runDataMigrate: '迁移当前数据',
   runDataStartFresh: '使用目标目录数据',
-  runDataMigrateDesc: '复制当前目录的全部内容；目标目录不能有数据（Finder 生成的 .DS_Store 不影响迁移）。开始前请等待运行中的任务结束。原目录会保留。',
+  runDataMigrateDesc:
+    '复制当前目录的全部内容；目标目录不能有数据（Finder 生成的 .DS_Store 不影响迁移）。开始前请等待运行中的任务结束。原目录会保留。',
   runDataFreshDesc: '不复制旧数据，切换后使用目标目录中已有的数据，或从空目录开始。',
   runDataApply: '应用目录设置',
   runDataWorking: '正在处理…',

@@ -73,7 +73,8 @@ export default {
   rejectRoute: '驳回路由',
   removeRejectRouteAriaLabel: '移除到 {name} 的驳回路由',
   rejectRequired: '必须连接驳回路由',
-  rejectRouteHint: '审核不通过时的回退目标，从菱形顶部或底部连桩拖线（红线；上下出口语义相同，按目标方位自动选向）',
+  rejectRouteHint:
+    '审核不通过时的回退目标，从菱形顶部或底部连桩拖线（红线；上下出口语义相同，按目标方位自动选向）',
 
   // 分支属性
   branchProps: '分支属性',
@@ -83,7 +84,8 @@ export default {
   removeOutAriaLabel: '移除到 {name} 的出线',
   branchConditionPlaceholder: '条件：当……时走这条路',
   branchNoOuts: '无出线（死端）',
-  branchRouteHint: '从节点右侧连桩逐条拖线；1 入 n 出 = 分线，n 入 1 出 = 并线。多条出线时每条都要写条件，AI 汇报时按条件选择去向',
+  branchRouteHint:
+    '从节点右侧连桩逐条拖线；1 入 n 出 = 分线，n 入 1 出 = 并线。多条出线时每条都要写条件，AI 汇报时按条件选择去向',
 
   // 开始/结束节点
   startNode: '开始节点',
@@ -179,5 +181,5 @@ export default {
   defaultEndNode: '结束',
   defaultStageName: '阶段 {n}',
   defaultReviewName: '审核 {n}',
-  defaultBranchName: '分支 {n}',
+  defaultBranchName: '分支 {n}'
 } as const;

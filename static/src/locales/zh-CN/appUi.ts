@@ -198,5 +198,5 @@ export default {
   tabStripWinMinimize: '最小化',
   tabStripWinMaximize: '最大化',
   tabStripWinRestore: '还原',
-  tabStripWinClose: '关闭',
+  tabStripWinClose: '关闭'
 } as const;

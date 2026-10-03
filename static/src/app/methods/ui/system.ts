@@ -2,10 +2,7 @@
 import { debugLog } from '../common';
 import { t } from '@/locales';
 import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
-import {
-  userMDebug,
-  parseSystemNoticeLabel,
-} from './shared';
+import { userMDebug, parseSystemNoticeLabel } from './shared';
 
 export const systemMethods = {
   addSystemMessage(content) {

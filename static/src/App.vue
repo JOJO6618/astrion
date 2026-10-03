@@ -162,9 +162,30 @@
               <div v-if="headerMenuOpen" class="model-mode-dropdown" ref="headerMenu">
                 <div class="dropdown-column" data-tutorial="header-model-options">
                   <div class="dropdown-search">
-                    <svg class="dropdown-search-icon" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                      <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8" />
-                      <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    <svg
+                      class="dropdown-search-icon"
+                      viewBox="0 0 24 24"
+                      width="13"
+                      height="13"
+                      aria-hidden="true"
+                    >
+                      <circle
+                        cx="11"
+                        cy="11"
+                        r="7"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      />
+                      <line
+                        x1="16.5"
+                        y1="16.5"
+                        x2="21"
+                        y2="21"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      />
                     </svg>
                     <input
                       v-model="modelMenuSearchQuery"
@@ -175,7 +196,11 @@
                     />
                   </div>
                   <div class="dropdown-list dropdown-list--models">
-                    <div v-for="group in filteredGroupedModelOptions" :key="group.id" class="model-group">
+                    <div
+                      v-for="group in filteredGroupedModelOptions"
+                      :key="group.id"
+                      class="model-group"
+                    >
                       <button
                         type="button"
                         class="dropdown-group-header"
@@ -185,7 +210,9 @@
                         <span class="group-name">{{ group.name }}</span>
                         <svg
                           class="group-chevron"
-                          :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
+                          :class="{
+                            collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery
+                          }"
                           viewBox="0 0 24 24"
                           aria-hidden="true"
                         >
@@ -201,7 +228,9 @@
                       </button>
                       <div
                         class="model-group-body"
-                        :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
+                        :class="{
+                          collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery
+                        }"
                       >
                         <div class="model-group-body__inner">
                           <button
@@ -209,7 +238,10 @@
                             :key="option.key"
                             type="button"
                             class="dropdown-item"
-                            :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                            :class="{
+                              active: option.key === currentModelKey,
+                              disabled: option.disabled
+                            }"
                             @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
                             :disabled="streamingMessage || !isConnected || option.disabled"
                           >
@@ -239,8 +271,19 @@
                     @click.stop="openManageModels"
                   >
                     <div class="item-label">
-                      <svg class="manage-icon" viewBox="0 0 18 18" width="13" height="13" aria-hidden="true">
-                        <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                      <svg
+                        class="manage-icon"
+                        viewBox="0 0 18 18"
+                        width="13"
+                        height="13"
+                        aria-hidden="true"
+                      >
+                        <g
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                        >
                           <line x1="2" y1="5" x2="16" y2="5" />
                           <circle cx="6.5" cy="5" r="1.8" />
                           <line x1="2" y1="9" x2="16" y2="9" />
@@ -393,7 +436,9 @@
               :host-workspaces="hostWorkspaces"
               :current-host-workspace-id="currentHostWorkspaceId"
               :host-workspace-switching="hostWorkspaceSwitching"
-              :workspace-kind="versioningHostMode ? 'workspace' : (dockerProjectMode ? 'project' : null)"
+              :workspace-kind="
+                versioningHostMode ? 'workspace' : dockerProjectMode ? 'project' : null
+              "
               :main-chat-idle="mainChatIdle"
               :active-sub-agent-count="activeSubAgentCount"
               :avatar-status="showStatusAvatar && messages.length > 0 ? avatarStatus : null"
@@ -452,21 +497,17 @@
             />
           </div>
         </main>
-        <QuickDock
-          v-if="!isMobileViewport"
-          :host-mode="versioningHostMode"
-        />
+        <QuickDock v-if="!isMobileViewport" :host-mode="versioningHostMode" />
         <!-- 快捷窗口展开/收起按钮：零宽锚点始终贴在 QuickDock 右缘，
              按钮绝对定位悬浮在原处，不随面板挤压移动；
              无内容时也常显（不随 qdHasContent 隐藏），避免按钮时隐时现 -->
-        <div
-          v-if="!isMobileViewport"
-          class="qd-toggle-anchor"
-        >
+        <div v-if="!isMobileViewport" class="qd-toggle-anchor">
           <button
             type="button"
             class="qd-toggle"
-            :aria-label="qdExpanded ? $t('appCore.collapseQuickDock') : $t('appCore.expandQuickDock')"
+            :aria-label="
+              qdExpanded ? $t('appCore.collapseQuickDock') : $t('appCore.expandQuickDock')
+            "
             :aria-pressed="qdExpanded"
             @click="qdUserCollapsed = !qdUserCollapsed"
           >
@@ -625,7 +666,9 @@
         @close="goalDialogOpen = false"
       />
       <UserQuestionDialog
-        :visible="userQuestionDialogVisible && !userQuestionMinimized && pendingUserQuestions.length > 0"
+        :visible="
+          userQuestionDialogVisible && !userQuestionMinimized && pendingUserQuestions.length > 0
+        "
         :questions="pendingUserQuestions"
         :active-index="userQuestionActiveIndex"
         :submitting-ids="answeringUserQuestionIds"
@@ -733,9 +776,30 @@
           >
             <div class="dropdown-column" data-tutorial="header-model-options">
               <div class="dropdown-search">
-                <svg class="dropdown-search-icon" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                  <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8" />
-                  <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                <svg
+                  class="dropdown-search-icon"
+                  viewBox="0 0 24 24"
+                  width="13"
+                  height="13"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="11"
+                    cy="11"
+                    r="7"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  />
+                  <line
+                    x1="16.5"
+                    y1="16.5"
+                    x2="21"
+                    y2="21"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  />
                 </svg>
                 <input
                   v-model="modelMenuSearchQuery"
@@ -746,7 +810,11 @@
                 />
               </div>
               <div class="dropdown-list dropdown-list--models">
-                <div v-for="group in filteredGroupedModelOptions" :key="group.id" class="model-group">
+                <div
+                  v-for="group in filteredGroupedModelOptions"
+                  :key="group.id"
+                  class="model-group"
+                >
                   <button
                     type="button"
                     class="dropdown-group-header"
@@ -756,7 +824,9 @@
                     <span class="group-name">{{ group.name }}</span>
                     <svg
                       class="group-chevron"
-                      :class="{ collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery }"
+                      :class="{
+                        collapsed: isModelGroupCollapsed(group.id) && !modelMenuSearchQuery
+                      }"
                       viewBox="0 0 24 24"
                       aria-hidden="true"
                     >
@@ -780,7 +850,10 @@
                         :key="option.key"
                         type="button"
                         class="dropdown-item"
-                        :class="{ active: option.key === currentModelKey, disabled: option.disabled }"
+                        :class="{
+                          active: option.key === currentModelKey,
+                          disabled: option.disabled
+                        }"
                         @click.stop="handleHeaderModelSelect(option.key, option.disabled)"
                         :disabled="streamingMessage || !isConnected || option.disabled"
                       >
@@ -810,7 +883,13 @@
                 @click.stop="openManageModels"
               >
                 <div class="item-label">
-                  <svg class="manage-icon" viewBox="0 0 18 18" width="13" height="13" aria-hidden="true">
+                  <svg
+                    class="manage-icon"
+                    viewBox="0 0 18 18"
+                    width="13"
+                    height="13"
+                    aria-hidden="true"
+                  >
                     <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
                       <line x1="2" y1="5" x2="16" y2="5" />
                       <circle cx="6.5" cy="5" r="1.8" />
@@ -1001,17 +1080,13 @@ const openCommandBlockingDialog = () => commandBlockingStore.openDialog();
 const tutorialStore = useTutorialStore();
 const personalizationStore = usePersonalizationStore();
 
-
-
 const mobilePanelIcon = new URL('../icons/align-left.svg', import.meta.url).href;
 const detectAppShell = () => {
   if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);
   const ua = window.navigator?.userAgent || '';
   return (
-    params.has('app_shell') ||
-    Boolean((window as any)?.AndroidThemeBridge) ||
-    /;\s*wv\)/i.test(ua)
+    params.has('app_shell') || Boolean((window as any)?.AndroidThemeBridge) || /;\s*wv\)/i.test(ua)
   );
 };
 const isAppShell = ref(detectAppShell());

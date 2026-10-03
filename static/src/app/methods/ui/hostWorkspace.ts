@@ -52,7 +52,9 @@ export const hostWorkspaceMethods = {
     }
 
     this.hostWorkspaceSwitching = true;
-    const previousConversationList = Array.isArray(this.conversations) ? [...this.conversations] : [];
+    const previousConversationList = Array.isArray(this.conversations)
+      ? [...this.conversations]
+      : [];
     const previousSearchActive = this.searchActive;
     this.searchActive = false;
     this.searchResults = [];
@@ -72,11 +74,18 @@ export const hostWorkspaceMethods = {
       }).catch(() => {});
 
       const query = encodeURIComponent(targetId);
-      const selectEndpoint = this.versioningHostMode ? '/api/host/workspaces/select' : '/api/projects/select';
+      const selectEndpoint = this.versioningHostMode
+        ? '/api/host/workspaces/select'
+        : '/api/projects/select';
       const resp = await fetch(`${selectEndpoint}?workspace_id=${query}`);
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || (this.versioningHostMode ? t('appUi.switchHostWorkspaceFailed') : t('appUi.switchProjectFailed')));
+        throw new Error(
+          payload?.error ||
+            (this.versioningHostMode
+              ? t('appUi.switchHostWorkspaceFailed')
+              : t('appUi.switchProjectFailed'))
+        );
       }
       const data = payload.data || {};
       this.currentHostWorkspaceId = String(data.current_workspace_id || targetId);
@@ -109,9 +118,13 @@ export const hostWorkspaceMethods = {
         await this.loadConversationsList();
       } else {
         const activeStatuses = new Set(['pending', 'running', 'cancel_requested']);
-        const activeTask = (Array.isArray(this.runningWorkspaceTasks) ? this.runningWorkspaceTasks : [])
+        const activeTask = (
+          Array.isArray(this.runningWorkspaceTasks) ? this.runningWorkspaceTasks : []
+        )
           .filter((task: any) => String(task?.workspace_id || '') === this.currentHostWorkspaceId)
-          .find((task: any) => activeStatuses.has(String(task?.status || '')) && task?.conversation_id);
+          .find(
+            (task: any) => activeStatuses.has(String(task?.status || '')) && task?.conversation_id
+          );
         if (activeTask?.conversation_id) {
           await this.loadConversation(String(activeTask.conversation_id), { force: true });
           this.conversationsOffset = 0;
@@ -122,14 +135,15 @@ export const hostWorkspaceMethods = {
           await this.loadConversationsList();
         }
       }
-      const switchedWorkspace = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : [])
-        .find((item: any) => String(item?.workspace_id || '') === this.currentHostWorkspaceId);
+      const switchedWorkspace = (
+        Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []
+      ).find((item: any) => String(item?.workspace_id || '') === this.currentHostWorkspaceId);
       const switchedLabel = String(switchedWorkspace?.label || '').trim();
       this.uiPushToast({
         title: this.versioningHostMode ? t('appUi.workspaceSwitched') : t('appUi.projectSwitched'),
         message: this.versioningHostMode
-          ? (data.project_path || switchedLabel || targetId)
-          : (switchedLabel || targetId),
+          ? data.project_path || switchedLabel || targetId
+          : switchedLabel || targetId,
         type: 'success'
       });
       this.refreshProjectGitSummary?.();
@@ -137,15 +151,19 @@ export const hostWorkspaceMethods = {
     } catch (error) {
       /* 切换失败仍在旧工作区：恢复旧列表并同步回当前类型缓存，保持引用一致 */
       const conversationStore = useConversationStore();
-      const restoredCache = conversationStore.conversationsCache[conversationStore.sidebarConversationType];
+      const restoredCache =
+        conversationStore.conversationsCache[conversationStore.sidebarConversationType];
       restoredCache.list = previousConversationList;
       restoredCache.loaded = true;
       this.conversations = restoredCache.list;
       this.searchActive = previousSearchActive;
       this.conversationsLoading = false;
-      const message = error instanceof Error ? error.message : String(error || t('appUi.switchFailed'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('appUi.switchFailed'));
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.switchWorkspaceFailed') : t('appUi.switchProjectFailed'),
+        title: this.versioningHostMode
+          ? t('appUi.switchWorkspaceFailed')
+          : t('appUi.switchProjectFailed'),
         message,
         type: 'error'
       });
@@ -174,18 +192,26 @@ export const hostWorkspaceMethods = {
     this.hostWorkspaceCreateSubmitting = true;
     this.hostWorkspaceCreateError = '';
     try {
-      const resp = await fetch(this.versioningHostMode ? '/api/host/workspaces/create' : '/api/projects/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          path: this.versioningHostMode ? workspacePath : undefined,
-          label
-        })
-      });
+      const resp = await fetch(
+        this.versioningHostMode ? '/api/host/workspaces/create' : '/api/projects/create',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            path: this.versioningHostMode ? workspacePath : undefined,
+            label
+          })
+        }
+      );
       const payload = await resp.json().catch(() => ({}));
       if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || (this.versioningHostMode ? t('appUi.createWorkspaceFailed') : t('appUi.createProjectFailed')));
+        throw new Error(
+          payload?.error ||
+            (this.versioningHostMode
+              ? t('appUi.createWorkspaceFailed')
+              : t('appUi.createProjectFailed'))
+        );
       }
       await this.fetchHostWorkspaces();
       const createdLabel = payload?.data?.workspace?.label || label || workspacePath;
@@ -204,10 +230,13 @@ export const hostWorkspaceMethods = {
         await this.loadInitialData();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || t('appUi.createFailed'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('appUi.createFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.createWorkspaceFailed') : t('appUi.createProjectFailed'),
+        title: this.versioningHostMode
+          ? t('appUi.createWorkspaceFailed')
+          : t('appUi.createProjectFailed'),
         message,
         type: 'error'
       });
@@ -227,7 +256,9 @@ export const hostWorkspaceMethods = {
     const workspaceId = String(payload?.workspace_id || '').trim();
     const label = String(payload?.label || '').trim();
     if (!workspaceId || !label) {
-      this.hostWorkspaceCreateError = this.dockerProjectMode ? t('appUi.projectNameCannotBeEmpty') : t('appUi.workspaceNameCannotBeEmpty');
+      this.hostWorkspaceCreateError = this.dockerProjectMode
+        ? t('appUi.projectNameCannotBeEmpty')
+        : t('appUi.workspaceNameCannotBeEmpty');
       return;
     }
     this.hostWorkspaceManageSubmitting = true;
@@ -253,10 +284,13 @@ export const hostWorkspaceMethods = {
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || t('appUi.renameFailed'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('appUi.renameFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.renameWorkspaceFailed') : t('appUi.renameProjectFailed'),
+        title: this.versioningHostMode
+          ? t('appUi.renameWorkspaceFailed')
+          : t('appUi.renameProjectFailed'),
         message,
         type: 'error'
       });
@@ -275,15 +309,19 @@ export const hostWorkspaceMethods = {
     const workspaceId = String(item?.workspace_id || '').trim();
     if (!workspaceId) return;
     const wasCurrent = workspaceId === this.currentHostWorkspaceId;
-    const ok = opts.skipConfirm ? true : await this.confirmAction({
-      title: this.versioningHostMode ? t('appUi.deleteWorkspaceConfirmTitle') : t('appUi.deleteProjectConfirmTitle'),
-      message: this.versioningHostMode
-        ? t('appUi.deleteWorkspaceConfirmMessage', { name: item?.label || workspaceId })
-        : t('appUi.deleteProjectConfirmMessage', { name: item?.label || workspaceId }),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
-      confirmVariant: 'danger'
-    });
+    const ok = opts.skipConfirm
+      ? true
+      : await this.confirmAction({
+          title: this.versioningHostMode
+            ? t('appUi.deleteWorkspaceConfirmTitle')
+            : t('appUi.deleteProjectConfirmTitle'),
+          message: this.versioningHostMode
+            ? t('appUi.deleteWorkspaceConfirmMessage', { name: item?.label || workspaceId })
+            : t('appUi.deleteProjectConfirmMessage', { name: item?.label || workspaceId }),
+          confirmText: t('common.delete'),
+          cancelText: t('common.cancel'),
+          confirmVariant: 'danger'
+        });
     if (!ok) return;
 
     this.hostWorkspaceManageSubmitting = true;
@@ -303,7 +341,9 @@ export const hostWorkspaceMethods = {
         throw new Error(result?.error || t('appUi.deleteFailed'));
       }
       const data = result.data || {};
-      this.currentHostWorkspaceId = String(data.current_workspace_id || this.currentHostWorkspaceId || '');
+      this.currentHostWorkspaceId = String(
+        data.current_workspace_id || this.currentHostWorkspaceId || ''
+      );
       if (data.default_workspace_id) {
         this.defaultHostWorkspaceId = String(data.default_workspace_id);
       }
@@ -329,10 +369,13 @@ export const hostWorkspaceMethods = {
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || t('appUi.deleteFailed'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('appUi.deleteFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.deleteWorkspaceFailed') : t('appUi.deleteProjectFailed'),
+        title: this.versioningHostMode
+          ? t('appUi.deleteWorkspaceFailed')
+          : t('appUi.deleteProjectFailed'),
         message,
         type: 'error'
       });
@@ -340,7 +383,10 @@ export const hostWorkspaceMethods = {
       this.hostWorkspaceManageSubmitting = false;
     }
   },
-  async handleSelectWorkspaceConversation(payload: { conversationId: string; workspaceId: string }) {
+  async handleSelectWorkspaceConversation(payload: {
+    conversationId: string;
+    workspaceId: string;
+  }) {
     const { conversationId, workspaceId } = payload || {};
     if (!conversationId || !workspaceId) return;
     // 桌面端标签条：点击瞬间乐观开标签（标题先用列表里的，进入对话后经
@@ -367,7 +413,10 @@ export const hostWorkspaceMethods = {
     } catch (_tabsErr) {
       // ignore
     }
-    if ((this.versioningHostMode || this.dockerProjectMode) && workspaceId !== this.currentHostWorkspaceId) {
+    if (
+      (this.versioningHostMode || this.dockerProjectMode) &&
+      workspaceId !== this.currentHostWorkspaceId
+    ) {
       await this.handleHostWorkspaceSwitch(workspaceId, { preserveConversationView: true });
     }
     await this.loadConversation(conversationId, { force: true, workspaceId });
@@ -400,9 +449,12 @@ export const hostWorkspaceMethods = {
         throw new Error(result?.error || t('appUi.openFailed'));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || t('appUi.openFailed'));
+      const message =
+        error instanceof Error ? error.message : String(error || t('appUi.openFailed'));
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.openWorkspaceFailed') : t('appUi.openProjectFailed'),
+        title: this.versioningHostMode
+          ? t('appUi.openWorkspaceFailed')
+          : t('appUi.openProjectFailed'),
         message,
         type: 'error'
       });
@@ -414,7 +466,7 @@ export const hostWorkspaceMethods = {
     }
     /* 组件事件契约为 workspaceId 字符串（WorkspaceSwitcher/ConversationSidebar 声明），兼容对象形式 */
     const workspaceId = String(
-      typeof payload === 'string' ? payload : (payload?.workspace_id || '')
+      typeof payload === 'string' ? payload : payload?.workspace_id || ''
     ).trim();
     if (!workspaceId) return;
     if (workspaceId === this.defaultHostWorkspaceId) return;
@@ -434,21 +486,36 @@ export const hostWorkspaceMethods = {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok || !result?.success) {
-        throw new Error(result?.error || (isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed')));
+        throw new Error(
+          result?.error ||
+            (isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed'))
+        );
       }
       const data = result.data || {};
       this.defaultHostWorkspaceId = String(data.default_workspace_id || workspaceId);
       await this.fetchHostWorkspaces();
       this.uiPushToast({
         title: isHostMode ? t('appUi.setAsDefaultWorkspace') : t('appUi.setAsDefaultProject'),
-        message: (this.hostWorkspaces || []).find((w: any) => w.workspace_id === workspaceId)?.label || workspaceId,
+        message:
+          (this.hostWorkspaces || []).find((w: any) => w.workspace_id === workspaceId)?.label ||
+          workspaceId,
         type: 'success'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error || (isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed')));
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(
+              error ||
+                (isHostMode
+                  ? t('appUi.setDefaultWorkspaceFailed')
+                  : t('appUi.setDefaultProjectFailed'))
+            );
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed'),
+        title: isHostMode
+          ? t('appUi.setDefaultWorkspaceFailed')
+          : t('appUi.setDefaultProjectFailed'),
         message,
         type: 'error'
       });

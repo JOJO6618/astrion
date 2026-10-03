@@ -75,5 +75,5 @@ export default {
     'Writes in the workspace pass through; high-risk operations are auto-approved by the background agent',
   permissionUnrestrictedDesc: 'Keep current default behavior with no extra restrictions',
   executionSandboxDesc: 'All commands run in the system sandbox',
-  executionDirectDesc: 'All commands run directly on the host',
+  executionDirectDesc: 'All commands run directly on the host'
 } as const;

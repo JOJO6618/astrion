@@ -38,7 +38,8 @@ export const systemCommandMethods = {
       this.handleSystemCommandResult(result, options);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('appMessages.commandExecutionFailed');
+      const message =
+        error instanceof Error ? error.message : t('appMessages.commandExecutionFailed');
       const result = {
         command: command.replace(/^\//, ''),
         success: false,
@@ -68,7 +69,9 @@ export const systemCommandMethods = {
     }
 
     if (data.command === 'status' && data.success) {
-      this.addSystemMessage(`${t('appMessages.systemStatus')}:\n${JSON.stringify(data.data || {}, null, 2)}`);
+      this.addSystemMessage(
+        `${t('appMessages.systemStatus')}:\n${JSON.stringify(data.data || {}, null, 2)}`
+      );
       if (showToast) {
         this.uiPushToast({
           title: t('appMessages.statusUpdatedTitle'),
@@ -80,7 +83,9 @@ export const systemCommandMethods = {
     }
 
     if (!data.success) {
-      this.addSystemMessage(`${t('appMessages.commandFailedLabel')}: ${data.message || t('common.unknownError')}`);
+      this.addSystemMessage(
+        `${t('appMessages.commandFailedLabel')}: ${data.message || t('common.unknownError')}`
+      );
       if (showToast) {
         this.uiPushToast({
           title: t('appMessages.commandExecutionFailed'),

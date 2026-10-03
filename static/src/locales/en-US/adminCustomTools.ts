@@ -18,12 +18,12 @@ export default {
     passwordPlaceholder: 'Secondary password',
     verifying: 'Verifying...',
     confirmEnter: 'Confirm & enter',
-    defaultDescription: 'Secondary verification is required to view sensitive data.',
+    defaultDescription: 'Secondary verification is required to view sensitive data.'
   },
   // —— CustomToolsGuideApp (developer guide page) ——
   guide: {
     title: 'Developer Guide',
-    subtitle: 'A complete walkthrough for writing, organizing, and debugging custom tools.',
+    subtitle: 'A complete walkthrough for writing, organizing, and debugging custom tools.'
   },
   renderFailed: 'Failed to render guide',
   // —— CustomToolsApp (tool list + editor + modals) ——
@@ -45,14 +45,14 @@ export default {
     params: 'Params: {count}',
     timeout: 'Timeout: {seconds}s',
     noReturnLayer: '(no return layer)',
-    toolNotFound: 'Tool {id} not found',
+    toolNotFound: 'Tool {id} not found'
   },
   editor: {
     noDescription: 'No description',
     hint1Pre: 'Hint: dicts/sets in execution.py must be wrapped in',
     hint1Post: 'to avoid template replacement.',
     hint2: 'No restart needed after saving — custom tools are reloaded automatically.',
-    loadingTool: 'Loading tool...',
+    loadingTool: 'Loading tool...'
   },
   create: {
     title: 'Create New Tool',
@@ -62,16 +62,16 @@ export default {
     create: 'Create',
     idRequired: 'Please enter a tool ID',
     idInvalid: 'Tool ID must start with a letter and may contain letters, digits, _ and -',
-    failed: 'Failed to create tool',
+    failed: 'Failed to create tool'
   },
   delete: {
     title: 'Confirm Delete',
     confirmPre: 'Delete tool',
     confirmPost: '? This action cannot be undone.',
     deleting: 'Deleting...',
-    failed: 'Failed to delete tool',
+    failed: 'Failed to delete tool'
   },
   save: {
-    failed: 'Failed to save {name}',
-  },
+    failed: 'Failed to save {name}'
+  }
 } as const;

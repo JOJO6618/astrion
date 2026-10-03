@@ -120,7 +120,8 @@ export default {
   badgeThinking: '思考',
 
   // ── Codex 订阅 ──
-  codexIntro: '连接你的 ChatGPT 账号，直接使用 Codex 系列模型（消耗 ChatGPT 订阅额度，不占用 API 额度）。',
+  codexIntro:
+    '连接你的 ChatGPT 账号，直接使用 Codex 系列模型（消耗 ChatGPT 订阅额度，不占用 API 额度）。',
   codexStatusTitle: '账号状态',
   codexConnected: '已连接',
   codexNotConnected: '未连接',
@@ -145,7 +146,8 @@ export default {
   codexSourceEmpty: '暂无模型',
   codexProxyTitle: '网络',
   codexProxyRowTitle: '代理地址',
-  codexProxyDesc: '访问 ChatGPT 后端需要代理时填写，例如 http://127.0.0.1:7897；留空则使用系统环境变量。',
+  codexProxyDesc:
+    '访问 ChatGPT 后端需要代理时填写，例如 http://127.0.0.1:7897；留空则使用系统环境变量。',
   codexProxyPlaceholder: 'http://127.0.0.1:7897',
   codexProxySaved: '已保存',
   codexLoadFailed: '加载 Codex 状态失败',
@@ -163,7 +165,8 @@ export default {
   codexResetsNone: '暂无可用重置额度',
   codexResetsUseNow: '立即重置',
   codexResetConfirmTitle: '使用重置额度',
-  codexResetConfirmMessage: '将消耗「{title}」：当前 5 小时与每周窗口的用量立即清零，并开启新的周期。',
+  codexResetConfirmMessage:
+    '将消耗「{title}」：当前 5 小时与每周窗口的用量立即清零，并开启新的周期。',
   codexResetConfirmWarning: '此操作不可逆，消耗后无法恢复。',
   codexResetSuccess: '已重置，用量窗口已清零',
   codexResetFailed: '重置失败：{error}',
@@ -180,7 +183,8 @@ export default {
   groupByWorkspaceTitle: '按项目分组对话',
   groupByWorkspaceDesc: '侧边栏对话记录按工作区/项目折叠展示',
   newChatBlankTitle: '新建对话跳转空白页',
-  newChatBlankDesc: '开启后点击「新建对话」跳转新对话页，发送首条消息时才创建；关闭则立即创建空对话',
+  newChatBlankDesc:
+    '开启后点击「新建对话」跳转新对话页，发送首条消息时才创建；关闭则立即创建空对话',
   useCustomNamesTitle: '使用自定义称呼',
   useCustomNamesDesc: '对话区域使用个性化设置中的自称和称呼',
   enhancedToolDisplayTitle: '增强工具显示',
@@ -194,7 +198,8 @@ export default {
   quickDockAutoExpandTitle: '快捷窗口自动展开',
   quickDockAutoExpandDesc: '有内容时自动展开快捷窗口；关闭后只能通过右侧按钮手动展开',
   previewAutoOpenTitle: '预览面板自动展开',
-  previewAutoOpenDesc: '检测到新的预览目标（本地服务器 / HTML 文件）时自动展开预览面板；关闭后仅在预览窗口亮起计数，手动点击展开',
+  previewAutoOpenDesc:
+    '检测到新的预览目标（本地服务器 / HTML 文件）时自动展开预览面板；关闭后仅在预览窗口亮起计数，手动点击展开',
   editSummaryLiveTitle: '编辑摘要实时显示',
   editSummaryLiveDesc: '工作运行期间实时显示本次编辑过的文件；关闭时仅在每次工作完成后显示',
   filePreviewWrapTitle: '预览窗口自动换行显示',
@@ -248,11 +253,14 @@ export default {
   agentsMdInjectTitle: 'AGENTS.md 自动注入',
   agentsMdInjectDesc: '工作区根目录存在 AGENTS.md 时自动注入系统提示词',
   claudeMdInjectTitle: 'CLAUDE.md 自动注入',
-  claudeMdInjectDesc: '工作区根目录存在 CLAUDE.md 时自动注入系统提示词（默认关闭，与 AGENTS.md 并列注入）',
+  claudeMdInjectDesc:
+    '工作区根目录存在 CLAUDE.md 时自动注入系统提示词（默认关闭，与 AGENTS.md 并列注入）',
   agentsSkillsScanTitle: '扫描 .agents/skills/ 技能目录',
-  agentsSkillsScanDesc: '自动扫描工作区 .agents/skills/ 下的行业通用技能（Agent Skills 开放标准路径），与 .astrion/skills/ 技能一并列出；同名重复时 read_skill 会报错并提示按具体路径读取',
+  agentsSkillsScanDesc:
+    '自动扫描工作区 .agents/skills/ 下的行业通用技能（Agent Skills 开放标准路径），与 .astrion/skills/ 技能一并列出；同名重复时 read_skill 会报错并提示按具体路径读取',
   modifyHistoryTitle: '文件修改留痕',
-  modifyHistoryDesc: '每次任务完成后，把本轮 write/edit 的文件修改以 diff 形式保存到工作区 .astrion/modify_history/，误操作（如被 git checkout 覆盖）后可据此人工恢复',
+  modifyHistoryDesc:
+    '每次任务完成后，把本轮 write/edit 的文件修改以 diff 形式保存到工作区 .astrion/modify_history/，误操作（如被 git checkout 覆盖）后可据此人工恢复',
   versionControlDivider: '版本控制',
   versioningByDefaultTitle: '新对话默认开启版本控制',
   versioningByDefaultDesc: '创建新对话时自动启用，可在输入栏下方手动关闭',
@@ -313,7 +321,8 @@ export default {
   disabledToolCategoriesTitle: '默认禁用工具类别',
   disabledToolCategoriesDesc: '选择后，这些类别在新任务中保持关闭',
   toolLoadingTitle: '按需加载的工具（动态加载）',
-  toolLoadingDesc: '勾选的工具默认不注入上下文，模型需要时经 load_tools 按需获取完整定义，可省 token 并提高工具选择准确率；仅对新对话生效，已有对话以创建时的快照为准',
+  toolLoadingDesc:
+    '勾选的工具默认不注入上下文，模型需要时经 load_tools 按需获取完整定义，可省 token 并提高工具选择准确率；仅对新对话生效，已有对话以创建时的快照为准',
   toolLoadingEnabledTitle: '启用工具动态加载',
   toolLoadingCat: {
     workflow: '工作流',
@@ -351,7 +360,8 @@ export default {
   exaApiKeyDesc: '在 dashboard.exa.ai 注册获取；留空并保存后回退使用服务器环境变量中的密钥',
   exaApiKeyPlaceholder: 'Exa API Key',
   parallelApiKeyTitle: 'Parallel API 密钥',
-  parallelApiKeyDesc: '在 platform.parallel.ai 注册获取；留空并保存后回退使用服务器环境变量中的密钥',
+  parallelApiKeyDesc:
+    '在 platform.parallel.ai 注册获取；留空并保存后回退使用服务器环境变量中的密钥',
   parallelApiKeyPlaceholder: 'Parallel API Key',
   searxngBaseUrlTitle: 'SearXNG 实例地址',
   searxngBaseUrlDesc:
@@ -410,7 +420,8 @@ export default {
   usageFetchFailed: '获取用量统计失败',
 
   // ── 语音模型 ──
-  voiceModelIntro: '端侧语音识别模型（SenseVoice int8），支持中英混说 + 自动标点。 模型约 228MB，仅在手机本地运行，无需网络。',
+  voiceModelIntro:
+    '端侧语音识别模型（SenseVoice int8），支持中英混说 + 自动标点。 模型约 228MB，仅在手机本地运行，无需网络。',
   voiceModelTitle: '语音识别模型',
   voiceModelReady: '已下载 (228MB)',
   voiceModelDownloading: '下载中 {percent}% — {msg}',
@@ -423,13 +434,16 @@ export default {
   voicePreparing: '准备下载...',
 
   // ── 子智能体 ──
-  subAgentsIntro: '管理多智能体模式下的子智能体角色。预设角色可编辑（创建自定义覆盖），自定义角色可创建/编辑/删除。',
+  subAgentsIntro:
+    '管理多智能体模式下的子智能体角色。预设角色可编辑（创建自定义覆盖），自定义角色可创建/编辑/删除。',
   compressThresholdTitle: '上下文压缩阈值',
   compressThresholdDesc: '子智能体上下文 tokens 超过此值时触发深度压缩（默认 250000）',
   subAgentModelTitle: '传统模式子智能体模型',
-  subAgentModelDesc: '传统后台子智能体使用的模型；留空自动选择。多智能体团队成员使用角色上的模型设置，不受此项影响',
+  subAgentModelDesc:
+    '传统后台子智能体使用的模型；留空自动选择。多智能体团队成员使用角色上的模型设置，不受此项影响',
   maxTurnsTitle: '最大执行轮次',
-  maxTurnsDesc: '传统后台子智能体单次任务的最大执行轮次（一轮 = 一次模型调用）。留空默认 50 轮；填 0 表示无上限（慎用，失控任务会持续消耗 API 额度）。多智能体模式的团队成员是长期协作角色，不受此限制',
+  maxTurnsDesc:
+    '传统后台子智能体单次任务的最大执行轮次（一轮 = 一次模型调用）。留空默认 50 轮；填 0 表示无上限（慎用，失控任务会持续消耗 API 额度）。多智能体模式的团队成员是长期协作角色，不受此限制',
   saving: '保存中...',
   roleListTitle: '角色列表',
   newRole: '+ 新建角色',
@@ -462,7 +476,8 @@ export default {
   deleteRoleConfirm: '确认删除角色「{name}」？',
 
   // ── 审核智能体 ──
-  reviewIntro: '统一配置三个审核智能体的模型与运行参数。模型来源与主模型注册表一致（含 Codex），留空则自动选择。',
+  reviewIntro:
+    '统一配置三个审核智能体的模型与运行参数。模型来源与主模型注册表一致（含 Codex），留空则自动选择。',
   reviewAgentAutoApproval: '自动审批智能体',
   reviewAgentAutoApprovalDesc: '自动审批模式下判断工具调用是否越权/危险',
   reviewAgentGoalReview: '目标审核智能体',
@@ -474,7 +489,8 @@ export default {
   titleModelTitle: '标题生成模型',
   titleModelDesc: '选择用于生成对话标题的 AI 模型，留空则自动选择',
   externalSessionHeaderTitle: '外部会话标识',
-  externalSessionHeaderDesc: '向 OpenCode 端点发送每个对话稳定的 x-opencode-session 请求头，用于会话路由与缓存优化；关闭则不发送',
+  externalSessionHeaderDesc:
+    '向 OpenCode 端点发送每个对话稳定的 x-opencode-session 请求头，用于会话路由与缓存优化；关闭则不发送',
   titleDefaultModelDesc: '注册表第一个可用模型；仅 Codex 模型时选 -luna 快速款',
   reviewThinkingDesc: '模型不支持思考时自动回落快速模式',
   timeoutTitle: '审核请求超时',
@@ -517,5 +533,5 @@ export default {
   expModeResearchDesc: '多步骤思考与 20+ 工具完成复杂任务，回复时间可能很长',
   expModeExpertBadge: '专家',
   expModeExpertTitle: '全功能探索',
-  expModeExpertDesc: '自由探索所有配置选项，适合智能体专家与从业者',
+  expModeExpertDesc: '自由探索所有配置选项，适合智能体专家与从业者'
 } as const;

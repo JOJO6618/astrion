@@ -113,8 +113,13 @@ export function resolveUserMessageSource(data: any): string {
   return 'user';
 }
 
-export function resolveUserMessageMetadata(data: any, source: string, message: string): Record<string, any> {
-  const base = data && typeof data.metadata === 'object' && data.metadata ? { ...data.metadata } : {};
+export function resolveUserMessageMetadata(
+  data: any,
+  source: string,
+  message: string
+): Record<string, any> {
+  const base =
+    data && typeof data.metadata === 'object' && data.metadata ? { ...data.metadata } : {};
   const metadata: Record<string, any> = {
     ...base,
     message_source: source
@@ -156,18 +161,28 @@ export function getOptimisticUserEchoTarget(messages: any[]): any | null {
   return null;
 }
 
-export function findRecentMatchingUserMessage(messages: any[], message: string, images: any[] = [], videos: any[] = [], source = ''): any | null {
+export function findRecentMatchingUserMessage(
+  messages: any[],
+  message: string,
+  images: any[] = [],
+  videos: any[] = [],
+  source = ''
+): any | null {
   if (!Array.isArray(messages) || !message) {
     return null;
   }
-  const normalizedSource = String(source || '').trim().toLowerCase();
+  const normalizedSource = String(source || '')
+    .trim()
+    .toLowerCase();
   for (let i = messages.length - 1, seen = 0; i >= 0 && seen < 12; i -= 1) {
     const item = messages[i];
     if (!item || item.role !== 'user') {
       continue;
     }
     seen += 1;
-    const itemSource = String(item?.metadata?.message_source || 'user').trim().toLowerCase();
+    const itemSource = String(item?.metadata?.message_source || 'user')
+      .trim()
+      .toLowerCase();
     if (
       String(item.content || '').trim() === message &&
       JSON.stringify(item.images || []) === JSON.stringify(images || []) &&

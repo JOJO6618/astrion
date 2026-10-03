@@ -39,7 +39,9 @@
             type="text"
           />
         </div>
-        <button type="button" class="ghost-btn" @click="loadScope">{{ $t('adminPolicy.load') }}</button>
+        <button type="button" class="ghost-btn" @click="loadScope">
+          {{ $t('adminPolicy.load') }}
+        </button>
         <button type="button" class="primary" :disabled="saving" @click="savePolicy">
           {{ saving ? $t('common.saving') : $t('common.save') }}
         </button>
@@ -80,7 +82,11 @@
             </button>
             <div class="tool-select-menu" v-if="openToolMenu === cat.id" @click.stop>
               <div class="tool-select-search">
-                <input v-model="toolSearch" type="text" :placeholder="$t('adminPolicy.toolSearchPlaceholder')" />
+                <input
+                  v-model="toolSearch"
+                  type="text"
+                  :placeholder="$t('adminPolicy.toolSearchPlaceholder')"
+                />
               </div>
               <div class="tool-select-options">
                 <label v-for="tool in filteredToolOptions(cat)" :key="tool">
@@ -91,7 +97,9 @@
                   />
                   <span>{{ tool }}</span>
                 </label>
-                <p v-if="!filteredToolOptions.length" class="muted tiny">{{ $t('adminPolicy.noMatchingTool') }}</p>
+                <p v-if="!filteredToolOptions.length" class="muted tiny">
+                  {{ $t('adminPolicy.noMatchingTool') }}
+                </p>
               </div>
               <button
                 v-if="toolSearch.trim() && !toolOptionsSet.has(toolSearch.trim())"
@@ -110,7 +118,9 @@
               @change="setCategoryDefault(cat.id, $event.target.checked)"
             />
             <FancyCheck :checked="getCategoryDefault(cat.id)" accent-checked />
-            <span>{{ cat.default_enabled ? $t('adminPolicy.enabledOn') : $t('adminPolicy.enabledOff') }}</span>
+            <span>{{
+              cat.default_enabled ? $t('adminPolicy.enabledOn') : $t('adminPolicy.enabledOff')
+            }}</span>
           </label>
           <div class="dropdown" :class="{ open: openForceMenu === cat.id }">
             <button type="button" class="ghost-btn" @click="toggleForceMenu(cat.id)">
@@ -118,9 +128,15 @@
               <span class="caret">▾</span>
             </button>
             <div class="dropdown-menu" v-if="openForceMenu === cat.id">
-              <button type="button" @click="setForced(cat.id, null)">{{ $t('adminPolicy.forcedNone') }}</button>
-              <button type="button" @click="setForced(cat.id, true)">{{ $t('adminPolicy.forcedEnable') }}</button>
-              <button type="button" @click="setForced(cat.id, false)">{{ $t('adminPolicy.forcedDisable') }}</button>
+              <button type="button" @click="setForced(cat.id, null)">
+                {{ $t('adminPolicy.forcedNone') }}
+              </button>
+              <button type="button" @click="setForced(cat.id, true)">
+                {{ $t('adminPolicy.forcedEnable') }}
+              </button>
+              <button type="button" @click="setForced(cat.id, false)">
+                {{ $t('adminPolicy.forcedDisable') }}
+              </button>
             </div>
           </div>
           <button type="button" class="link danger" @click="removeCategory(cat.id)">
@@ -202,7 +218,10 @@
             </label>
             <label v-if="server.transport === 'stdio'" class="wide">
               <span>command</span>
-              <input v-model="server.command" :placeholder="$t('adminPolicy.mcpCommandPlaceholder')" />
+              <input
+                v-model="server.command"
+                :placeholder="$t('adminPolicy.mcpCommandPlaceholder')"
+              />
             </label>
             <label v-if="server.transport === 'stdio'" class="wide">
               <span>{{ $t('adminPolicy.mcpArgs') }}</span>
@@ -230,7 +249,11 @@
             </label>
             <label class="wide">
               <span>{{ $t('adminPolicy.mcpEnv') }}</span>
-              <textarea v-model="server.envText" rows="2" :placeholder="$t('adminPolicy.mcpEnvPlaceholder')"></textarea>
+              <textarea
+                v-model="server.envText"
+                rows="2"
+                :placeholder="$t('adminPolicy.mcpEnvPlaceholder')"
+              ></textarea>
             </label>
             <label>
               <span>timeout(s)</span>
@@ -238,28 +261,43 @@
             </label>
             <label class="wide">
               <span>{{ $t('adminPolicy.mcpIncludeTools') }}</span>
-              <input v-model="server.includeToolsText" :placeholder="$t('adminPolicy.mcpIncludeToolsPlaceholder')" />
+              <input
+                v-model="server.includeToolsText"
+                :placeholder="$t('adminPolicy.mcpIncludeToolsPlaceholder')"
+              />
             </label>
             <label class="wide">
               <span>{{ $t('adminPolicy.mcpExcludeTools') }}</span>
-              <input v-model="server.excludeToolsText" :placeholder="$t('adminPolicy.mcpExcludeToolsPlaceholder')" />
+              <input
+                v-model="server.excludeToolsText"
+                :placeholder="$t('adminPolicy.mcpExcludeToolsPlaceholder')"
+              />
             </label>
             <label class="wide">
               <span>{{ $t('adminPolicy.mcpDescription') }}</span>
-              <input v-model="server.description" :placeholder="$t('adminPolicy.mcpDescriptionPlaceholder')" />
+              <input
+                v-model="server.description"
+                :placeholder="$t('adminPolicy.mcpDescriptionPlaceholder')"
+              />
             </label>
           </div>
           <div class="mcp-meta">
             <span>
-              {{ $t('adminPolicy.mcpLastSync', { time: server.tools_cache_updated_at || $t('adminPolicy.mcpNotSynced') }) }}
+              {{
+                $t('adminPolicy.mcpLastSync', {
+                  time: server.tools_cache_updated_at || $t('adminPolicy.mcpNotSynced')
+                })
+              }}
             </span>
-            <span v-if="server.last_error" class="error-text"
-              >{{ $t('adminPolicy.mcpError', { message: server.last_error }) }}</span
-            >
+            <span v-if="server.last_error" class="error-text">{{
+              $t('adminPolicy.mcpError', { message: server.last_error })
+            }}</span>
             <span>{{ $t('adminPolicy.mcpCacheCount', { count: server.tools_cache_count }) }}</span>
           </div>
           <div class="mcp-actions">
-            <button type="button" class="primary" @click="saveMcpServer(server)">{{ $t('common.save') }}</button>
+            <button type="button" class="primary" @click="saveMcpServer(server)">
+              {{ $t('common.save') }}
+            </button>
             <button type="button" class="ghost-btn" @click="syncMcpServer(server.id)">
               {{ $t('adminPolicy.syncTools') }}
             </button>
@@ -276,7 +314,9 @@
         <h2>{{ $t('adminPolicy.removedCategories') }}</h2>
       </div>
       <div class="chips">
-        <span v-if="!form.config.remove_categories.length" class="muted">{{ $t('adminPolicy.none') }}</span>
+        <span v-if="!form.config.remove_categories.length" class="muted">{{
+          $t('adminPolicy.none')
+        }}</span>
         <span v-for="cid in form.config.remove_categories" :key="cid" class="chip">
           {{ cid }}
           <button type="button" @click="undoRemove(cid)">×</button>
@@ -383,16 +423,19 @@ const targetPlaceholder = computed(() => {
   return '';
 });
 
-const targetOptions = () => [
-  { value: 'global', label: t('adminPolicy.scopeGlobal') },
-  { value: 'role', label: t('adminPolicy.scopeRole') },
-  { value: 'user', label: t('adminPolicy.scopeUser') },
-  { value: 'invite', label: t('adminPolicy.scopeInvite') }
-] as const;
+const targetOptions = () =>
+  [
+    { value: 'global', label: t('adminPolicy.scopeGlobal') },
+    { value: 'role', label: t('adminPolicy.scopeRole') },
+    { value: 'user', label: t('adminPolicy.scopeUser') },
+    { value: 'invite', label: t('adminPolicy.scopeInvite') }
+  ] as const;
 
 const targetTypeLabel = computed(() => {
   void currentLocale.value;
-  return targetOptions().find((o) => o.value === form.target_type)?.label || t('adminPolicy.scopeGlobal');
+  return (
+    targetOptions().find((o) => o.value === form.target_type)?.label || t('adminPolicy.scopeGlobal')
+  );
 });
 const targetMenuOpen = ref(false);
 const openForceMenu = ref<string | null>(null);
@@ -676,7 +719,8 @@ function mapMcpServer(raw: any): MCPServerFormItem {
     argsText: args.join('\n'),
     cwd: String(raw?.cwd || ''),
     url: String(raw?.url || ''),
-    headersText: raw?.headers && typeof raw.headers === 'object' ? JSON.stringify(raw.headers, null, 2) : '',
+    headersText:
+      raw?.headers && typeof raw.headers === 'object' ? JSON.stringify(raw.headers, null, 2) : '',
     envText: raw?.env && typeof raw.env === 'object' ? JSON.stringify(raw.env, null, 2) : '',
     timeoutText: String(raw?.timeout_seconds ?? 25),
     includeToolsText: Array.isArray(raw?.include_tools) ? raw.include_tools.join(',') : '',
@@ -808,7 +852,9 @@ async function syncMcpServer(id?: string, silent = false) {
       throw new Error(data.error || t('adminPolicy.syncMcpFailed'));
     }
     if (!silent) {
-      banner.message = target ? t('adminPolicy.mcpSyncedWith', { id: target }) : t('adminPolicy.mcpSyncedAll');
+      banner.message = target
+        ? t('adminPolicy.mcpSyncedWith', { id: target })
+        : t('adminPolicy.mcpSyncedAll');
       banner.type = 'success';
     }
     await fetchMcpServers();
@@ -1461,5 +1507,4 @@ button:disabled {
 .tiny {
   font-size: 12px;
 }
-
 </style>

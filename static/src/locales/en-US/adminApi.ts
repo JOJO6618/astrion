@@ -56,5 +56,5 @@ export default {
   statusRequestFailed: 'Status request failed: {status}',
   cannotVerifySecondaryPass: 'Unable to verify secondary password status',
   secondaryPassVerifyFailed: 'Secondary password verification failed',
-  verifyFailed: 'Verification failed',
+  verifyFailed: 'Verification failed'
 } as const;

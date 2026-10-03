@@ -21,5 +21,5 @@ export const taskPollingMethods = {
   ...lifecycleMethods,
   ...messagingMethods,
   ...syncMethods,
-  ...compressionMethods,
+  ...compressionMethods
 };

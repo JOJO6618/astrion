@@ -5,8 +5,8 @@
       `boundary-node--${data.node.kind}`,
       {
         'boundary-node--selected': selected,
-        'boundary-node--issue': data.hasIssue,
-      },
+        'boundary-node--issue': data.hasIssue
+      }
     ]"
   >
     <!-- 结束节点左侧入桩：每条入线一个桩（含 1 个常驻空桩），上下均布 -->
@@ -26,7 +26,9 @@
       :style="iconSrc(data.node.kind === 'start' ? ICONS.play : ICONS.octagon)"
       aria-hidden="true"
     ></span>
-    <span class="boundary-node__label">{{ data.node.name || (data.node.kind === 'start' ? $t('workflow.start') : $t('workflow.end')) }}</span>
+    <span class="boundary-node__label">{{
+      data.node.name || (data.node.kind === 'start' ? $t('workflow.start') : $t('workflow.end'))
+    }}</span>
     <Handle v-if="data.node.kind === 'start'" id="out-0" type="source" :position="Position.Right" />
   </div>
 </template>

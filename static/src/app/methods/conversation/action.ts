@@ -49,7 +49,9 @@ export const actionMethods = {
       try {
         const { useConversationStore } = await import('../../../stores/conversation');
         this.newConversationType =
-          useConversationStore().sidebarConversationType === 'multi_agent' ? 'multi_agent' : 'agent';
+          useConversationStore().sidebarConversationType === 'multi_agent'
+            ? 'multi_agent'
+            : 'agent';
         persistNewConversationType(this.newConversationType);
       } catch (_e) {
         // ignore
@@ -152,8 +154,17 @@ export const actionMethods = {
       // reasoning_effort 随创建权威写入新对话 meta（此处 this.reasoningEffort 已被上方
       // 重置为个性化默认值，语义与“创建空对话写入默认值一次”一致）
       const createBody = isMultiAgent
-        ? JSON.stringify({ preserve_mode: true, thinking_mode: this.thinkingMode, mode: this.runMode, reasoning_effort: this.reasoningEffort })
-        : JSON.stringify({ thinking_mode: this.thinkingMode, mode: this.runMode, reasoning_effort: this.reasoningEffort });
+        ? JSON.stringify({
+            preserve_mode: true,
+            thinking_mode: this.thinkingMode,
+            mode: this.runMode,
+            reasoning_effort: this.reasoningEffort
+          })
+        : JSON.stringify({
+            thinking_mode: this.thinkingMode,
+            mode: this.runMode,
+            reasoning_effort: this.reasoningEffort
+          });
       const response = await fetch(createUrl, {
         method: 'POST',
         headers: {
@@ -253,7 +264,9 @@ export const actionMethods = {
           const conversationStore = useConversationStore();
           const currentWorkspaceId = this.currentHostWorkspaceId;
           if (currentWorkspaceId) {
-            await conversationStore.loadWorkspaceConversations(currentWorkspaceId, { refresh: true });
+            await conversationStore.loadWorkspaceConversations(currentWorkspaceId, {
+              refresh: true
+            });
           }
         } catch (_err) {
           // ignore
@@ -329,7 +342,9 @@ export const actionMethods = {
           const { useConversationStore } = await import('../../../stores/conversation');
           const conversationStore = useConversationStore();
           conversationStore.ensureWorkspaceGroup(workspaceId);
-          const group = conversationStore.workspaceGroups.find((g: any) => g.workspaceId === workspaceId);
+          const group = conversationStore.workspaceGroups.find(
+            (g: any) => g.workspaceId === workspaceId
+          );
           if (group) {
             group.conversations.splice(
               0,
@@ -342,7 +357,9 @@ export const actionMethods = {
           }
           // 延迟刷新该工作区列表以获取真实数据，用 refresh 模式保留占位避免闪烁
           window.setTimeout(() => {
-            conversationStore.loadWorkspaceConversations(workspaceId, { refresh: true }).catch(() => {});
+            conversationStore
+              .loadWorkspaceConversations(workspaceId, { refresh: true })
+              .catch(() => {});
           }, 300);
         } catch (_err) {
           // ignore
@@ -459,9 +476,10 @@ export const actionMethods = {
             results: (group.results || []).filter((conv: any) => conv.id !== conversationId)
           }))
           .filter((group: any) => group.results.length > 0);
-        this.pendingDeletingConversationIds = (Array.isArray(this.pendingDeletingConversationIds)
-          ? this.pendingDeletingConversationIds
-          : []
+        this.pendingDeletingConversationIds = (
+          Array.isArray(this.pendingDeletingConversationIds)
+            ? this.pendingDeletingConversationIds
+            : []
         ).filter((id) => id !== conversationId);
 
         // 等待“左滑离场 + 0.1s 后集体上移”动画结束，避免刷新列表打断过渡。
@@ -480,9 +498,10 @@ export const actionMethods = {
         });
       }
     } catch (error) {
-      this.pendingDeletingConversationIds = (Array.isArray(this.pendingDeletingConversationIds)
-        ? this.pendingDeletingConversationIds
-        : []
+      this.pendingDeletingConversationIds = (
+        Array.isArray(this.pendingDeletingConversationIds)
+          ? this.pendingDeletingConversationIds
+          : []
       ).filter((id) => id !== conversationId);
       this.conversationListAnimationMode = 'idle';
       console.error('删除对话异常:', error);
@@ -514,7 +533,9 @@ export const actionMethods = {
           );
           const sourceConversation = sourceIndex >= 0 ? this.conversations[sourceIndex] : null;
           const duplicateTitle =
-            result.load_result?.title || sourceConversation?.title || t('appMessages.duplicateConversationTitle');
+            result.load_result?.title ||
+            sourceConversation?.title ||
+            t('appMessages.duplicateConversationTitle');
           const duplicatePlaceholder = {
             id: newId,
             title: duplicateTitle,
@@ -543,7 +564,12 @@ export const actionMethods = {
               ...withoutDuplicate.slice(insertIndex + 1)
             );
           } else {
-            this.conversations.splice(0, this.conversations.length, duplicatePlaceholder, ...withoutDuplicate);
+            this.conversations.splice(
+              0,
+              this.conversations.length,
+              duplicatePlaceholder,
+              ...withoutDuplicate
+            );
           }
 
           window.setTimeout(() => {
@@ -562,7 +588,9 @@ export const actionMethods = {
               g.conversations.some((conv: any) => conv.id === conversationId)
             );
             if (group) {
-              const sourceGroupIndex = group.conversations.findIndex((conv: any) => conv.id === conversationId);
+              const sourceGroupIndex = group.conversations.findIndex(
+                (conv: any) => conv.id === conversationId
+              );
               const withoutDuplicate = group.conversations.filter((conv: any) => conv.id !== newId);
               if (sourceGroupIndex >= 0) {
                 group.conversations.splice(
@@ -573,7 +601,12 @@ export const actionMethods = {
                   ...withoutDuplicate.slice(sourceGroupIndex + 1)
                 );
               } else {
-                group.conversations.splice(0, group.conversations.length, duplicatePlaceholder, ...withoutDuplicate);
+                group.conversations.splice(
+                  0,
+                  group.conversations.length,
+                  duplicatePlaceholder,
+                  ...withoutDuplicate
+                );
               }
               group.expanded = true;
             }

@@ -31,9 +31,21 @@ const contentPreferences = [
     title: 'personalization.moralityTitle',
     description: 'personalization.moralityDesc',
     options: [
-      { value: 'low', label: 'personalization.continuityLow', description: 'personalization.moralityLowDesc' },
-      { value: 'medium', label: 'personalization.continuityMedium', description: 'personalization.moralityMediumDesc' },
-      { value: 'high', label: 'personalization.continuityHigh', description: 'personalization.moralityHighDesc' }
+      {
+        value: 'low',
+        label: 'personalization.continuityLow',
+        description: 'personalization.moralityLowDesc'
+      },
+      {
+        value: 'medium',
+        label: 'personalization.continuityMedium',
+        description: 'personalization.moralityMediumDesc'
+      },
+      {
+        value: 'high',
+        label: 'personalization.continuityHigh',
+        description: 'personalization.moralityHighDesc'
+      }
     ]
   },
   {
@@ -41,10 +53,26 @@ const contentPreferences = [
     title: 'personalization.adultContentTitle',
     description: 'personalization.adultContentDesc',
     options: [
-      { value: 'none', label: 'personalization.adultContentNone', description: 'personalization.adultContentNoneDesc' },
-      { value: 'low', label: 'personalization.continuityLow', description: 'personalization.adultContentLowDesc' },
-      { value: 'medium', label: 'personalization.continuityMedium', description: 'personalization.adultContentMediumDesc' },
-      { value: 'high', label: 'personalization.continuityHigh', description: 'personalization.adultContentHighDesc' }
+      {
+        value: 'none',
+        label: 'personalization.adultContentNone',
+        description: 'personalization.adultContentNoneDesc'
+      },
+      {
+        value: 'low',
+        label: 'personalization.continuityLow',
+        description: 'personalization.adultContentLowDesc'
+      },
+      {
+        value: 'medium',
+        label: 'personalization.continuityMedium',
+        description: 'personalization.adultContentMediumDesc'
+      },
+      {
+        value: 'high',
+        label: 'personalization.continuityHigh',
+        description: 'personalization.adultContentHighDesc'
+      }
     ]
   }
 ] as const;
@@ -59,232 +87,238 @@ const selectContentPreference = (
 </script>
 
 <template>
-  <section
-    class="settings-page"
-    data-tutorial="personal-page-preferences"
-  >
-                      <label class="settings-toggle-row">
-                        <span class="settings-row-copy">
-                          <span class="settings-row-title">{{ $t('personalization.preferencesTitle') }}</span>
-                          <span class="settings-row-desc">{{ $t('personalization.preferencesDesc') }}</span>
-                        </span>
-                        <input
-                          type="checkbox"
-                          :checked="form.enabled"
-                          :disabled="toggleUpdating"
-                          @change="personalization.toggleEnabled()"
-                        />
-                        <FancyCheck :checked="form.enabled" />
-                      </label>
-                      <label class="settings-input-row">
-                        <span class="settings-row-title">{{ $t('personalization.selfIdentifyTitle') }}</span>
-                        <input
-                          type="text"
-                          :value="form.self_identify"
-                          maxlength="20"
-                          :placeholder="$t('personalization.selfIdentifyPlaceholder')"
-                          @input="
-                            personalization.updateField({
-                              key: 'self_identify',
-                              value: $event.target.value
-                            })
-                          "
-                          @focus="personalization.clearFeedback()"
-                        />
-                      </label>
-                      <label class="settings-input-row">
-                        <span class="settings-row-title">{{ $t('personalization.userNameTitle') }}</span>
-                        <input
-                          type="text"
-                          :value="form.user_name"
-                          maxlength="20"
-                          :placeholder="$t('personalization.userNamePlaceholder')"
-                          @input="
-                            personalization.updateField({
-                              key: 'user_name',
-                              value: $event.target.value
-                            })
-                          "
-                          @focus="personalization.clearFeedback()"
-                        />
-                      </label>
-                      <label class="settings-input-row">
-                        <span class="settings-row-title">{{ $t('personalization.professionTitle') }}</span>
-                        <input
-                          type="text"
-                          :value="form.profession"
-                          maxlength="20"
-                          :placeholder="$t('personalization.professionPlaceholder')"
-                          @input="
-                            personalization.updateField({
-                              key: 'profession',
-                              value: $event.target.value
-                            })
-                          "
-                          @focus="personalization.clearFeedback()"
-                        />
-                      </label>
-                      <label class="settings-toggle-row"
-                        ><span class="settings-row-copy"
-                          ><span class="settings-row-title">{{ $t('personalization.useCustomNamesTitle') }}</span
-                          ><span class="settings-row-desc"
-                            >{{ $t('personalization.useCustomNamesDesc') }}</span
-                          ></span
-                        ><input
-                          type="checkbox"
-                          :checked="form.use_custom_names"
-                          @change="
-                            personalization.updateField({
-                              key: 'use_custom_names',
-                              value: $event.target.checked
-                            })
-                          " /><FancyCheck :checked="form.use_custom_names" /></label>
-                      <div class="settings-input-row stackable">
-                        <span class="settings-row-title">{{ $t('personalization.toneTitle') }}</span>
-                        <div class="settings-input-stack">
-                          <input
-                            type="text"
-                            :value="form.tone"
-                            maxlength="20"
-                            :placeholder="$t('personalization.tonePlaceholder')"
-                            @input="
-                              personalization.updateField({
-                                key: 'tone',
-                                value: $event.target.value
-                              })
-                            "
-                            @focus="personalization.clearFeedback()"
-                          />
-                          <div class="settings-chip-row">
-                            <button
-                              v-for="preset in tonePresets"
-                              :key="preset"
-                              type="button"
-                              @click.prevent="personalization.applyTonePreset(preset)"
-                            >
-                              {{ preset }}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="settings-textarea-row">
-                        <div class="settings-row-copy">
-                          <span class="settings-row-title">{{ $t('personalization.considerationsTitle') }}</span>
-                          <span class="settings-row-desc">{{ $t('personalization.considerationsDesc') }}</span>
-                        </div>
-                        <textarea
-                          :value="form.considerations"
-                          rows="6"
-                          maxlength="2000"
-                          :placeholder="$t('personalization.considerationsPlaceholder')"
-                          @input="personalization.updateConsiderations($event.target.value)"
-                          @focus="personalization.clearFeedback()"
-                        ></textarea>
-                      </div>
-                      <div class="settings-select-row">
-                        <span class="settings-row-copy">
-                          <span class="settings-row-title">{{ $t('personalization.communicationStyleTitle') }}</span>
-                          <span class="settings-row-desc">{{ $t('personalization.communicationStyleDesc') }}</span>
-                        </span>
-                        <div
-                          class="settings-select-wrap"
-                          :class="{ open: activeDropdown === 'communication' }"
-                          @click.stop
-                        >
-                          <button
-                            type="button"
-                            class="settings-select-button"
-                            @click="toggleDropdown('communication')"
-                          >
-                            {{ communicationStyleLabel }}
-                            <span class="select-chevron" aria-hidden="true"></span>
-                          </button>
-                          <div
-                            :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-                            :style="activeDropdown ? floatingMenuStyle : undefined"
-                          >
-                            <button
-                              type="button"
-                              class="settings-menu-option"
-                              :class="{ selected: form.communication_style === 'default' }"
-                              @click="selectCommunicationStyle('default')"
-                            >
-                              <strong>{{ $t('personalization.communicationDefault') }}</strong><span>{{ $t('personalization.communicationDefaultDesc') }}</span
-                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              class="settings-menu-option"
-                              :class="{ selected: form.communication_style === 'human_like' }"
-                              @click="selectCommunicationStyle('human_like')"
-                            >
-                              <strong>{{ $t('personalization.communicationHumanLike') }}</strong><span>{{ $t('personalization.communicationHumanLikeDesc') }}</span
-                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              class="settings-menu-option"
-                              :class="{ selected: form.communication_style === 'auto' }"
-                              @click="selectCommunicationStyle('auto')"
-                            >
-                              <strong>{{ $t('personalization.communicationAuto') }}</strong><span>{{ $t('personalization.communicationAutoDesc') }}</span
-                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="settings-select-row">
-                        <span class="settings-row-copy">
-                          <span class="settings-row-title">{{ $t('personalization.conversationContinuityTitle') }}</span>
-                          <span class="settings-row-desc">{{ $t('personalization.conversationContinuityDesc') }}</span>
-                        </span>
-                        <div
-                          class="settings-select-wrap"
-                          :class="{ open: activeDropdown === 'conversation-continuity' }"
-                          @click.stop
-                        >
-                          <button
-                            type="button"
-                            class="settings-select-button"
-                            @click="toggleDropdown('conversation-continuity')"
-                          >
-                            {{ conversationContinuityLabel }}
-                            <span class="select-chevron" aria-hidden="true"></span>
-                          </button>
-                          <div
-                            :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-                            :style="activeDropdown ? floatingMenuStyle : undefined"
-                          >
-                            <button
-                              type="button"
-                              class="settings-menu-option"
-                              :class="{ selected: form.conversation_continuity === 'high' }"
-                              @click="selectConversationContinuity('high')"
-                            >
-                              <strong>{{ $t('personalization.continuityHigh') }}</strong><span>{{ $t('personalization.continuityHighDesc') }}</span
-                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              class="settings-menu-option"
-                              :class="{ selected: form.conversation_continuity === 'medium' }"
-                              @click="selectConversationContinuity('medium')"
-                            >
-                              <strong>{{ $t('personalization.continuityMedium') }}</strong><span>{{ $t('personalization.continuityMediumDesc') }}</span
-                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              class="settings-menu-option"
-                              :class="{ selected: form.conversation_continuity === 'low' }"
-                              @click="selectConversationContinuity('low')"
-                            >
-                              <strong>{{ $t('personalization.continuityLow') }}</strong><span>{{ $t('personalization.continuityLowDesc') }}</span
-                              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+  <section class="settings-page" data-tutorial="personal-page-preferences">
+    <label class="settings-toggle-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.preferencesTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.preferencesDesc') }}</span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="form.enabled"
+        :disabled="toggleUpdating"
+        @change="personalization.toggleEnabled()"
+      />
+      <FancyCheck :checked="form.enabled" />
+    </label>
+    <label class="settings-input-row">
+      <span class="settings-row-title">{{ $t('personalization.selfIdentifyTitle') }}</span>
+      <input
+        type="text"
+        :value="form.self_identify"
+        maxlength="20"
+        :placeholder="$t('personalization.selfIdentifyPlaceholder')"
+        @input="
+          personalization.updateField({
+            key: 'self_identify',
+            value: $event.target.value
+          })
+        "
+        @focus="personalization.clearFeedback()"
+      />
+    </label>
+    <label class="settings-input-row">
+      <span class="settings-row-title">{{ $t('personalization.userNameTitle') }}</span>
+      <input
+        type="text"
+        :value="form.user_name"
+        maxlength="20"
+        :placeholder="$t('personalization.userNamePlaceholder')"
+        @input="
+          personalization.updateField({
+            key: 'user_name',
+            value: $event.target.value
+          })
+        "
+        @focus="personalization.clearFeedback()"
+      />
+    </label>
+    <label class="settings-input-row">
+      <span class="settings-row-title">{{ $t('personalization.professionTitle') }}</span>
+      <input
+        type="text"
+        :value="form.profession"
+        maxlength="20"
+        :placeholder="$t('personalization.professionPlaceholder')"
+        @input="
+          personalization.updateField({
+            key: 'profession',
+            value: $event.target.value
+          })
+        "
+        @focus="personalization.clearFeedback()"
+      />
+    </label>
+    <label class="settings-toggle-row"
+      ><span class="settings-row-copy"
+        ><span class="settings-row-title">{{ $t('personalization.useCustomNamesTitle') }}</span
+        ><span class="settings-row-desc">{{ $t('personalization.useCustomNamesDesc') }}</span></span
+      ><input
+        type="checkbox"
+        :checked="form.use_custom_names"
+        @change="
+          personalization.updateField({
+            key: 'use_custom_names',
+            value: $event.target.checked
+          })
+        " /><FancyCheck :checked="form.use_custom_names"
+    /></label>
+    <div class="settings-input-row stackable">
+      <span class="settings-row-title">{{ $t('personalization.toneTitle') }}</span>
+      <div class="settings-input-stack">
+        <input
+          type="text"
+          :value="form.tone"
+          maxlength="20"
+          :placeholder="$t('personalization.tonePlaceholder')"
+          @input="
+            personalization.updateField({
+              key: 'tone',
+              value: $event.target.value
+            })
+          "
+          @focus="personalization.clearFeedback()"
+        />
+        <div class="settings-chip-row">
+          <button
+            v-for="preset in tonePresets"
+            :key="preset"
+            type="button"
+            @click.prevent="personalization.applyTonePreset(preset)"
+          >
+            {{ preset }}
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-textarea-row">
+      <div class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.considerationsTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.considerationsDesc') }}</span>
+      </div>
+      <textarea
+        :value="form.considerations"
+        rows="6"
+        maxlength="2000"
+        :placeholder="$t('personalization.considerationsPlaceholder')"
+        @input="personalization.updateConsiderations($event.target.value)"
+        @focus="personalization.clearFeedback()"
+      ></textarea>
+    </div>
+    <div class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.communicationStyleTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.communicationStyleDesc') }}</span>
+      </span>
+      <div
+        class="settings-select-wrap"
+        :class="{ open: activeDropdown === 'communication' }"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="settings-select-button"
+          @click="toggleDropdown('communication')"
+        >
+          {{ communicationStyleLabel }}
+          <span class="select-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+          :style="activeDropdown ? floatingMenuStyle : undefined"
+        >
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.communication_style === 'default' }"
+            @click="selectCommunicationStyle('default')"
+          >
+            <strong>{{ $t('personalization.communicationDefault') }}</strong
+            ><span>{{ $t('personalization.communicationDefaultDesc') }}</span
+            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.communication_style === 'human_like' }"
+            @click="selectCommunicationStyle('human_like')"
+          >
+            <strong>{{ $t('personalization.communicationHumanLike') }}</strong
+            ><span>{{ $t('personalization.communicationHumanLikeDesc') }}</span
+            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.communication_style === 'auto' }"
+            @click="selectCommunicationStyle('auto')"
+          >
+            <strong>{{ $t('personalization.communicationAuto') }}</strong
+            ><span>{{ $t('personalization.communicationAutoDesc') }}</span
+            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{
+          $t('personalization.conversationContinuityTitle')
+        }}</span>
+        <span class="settings-row-desc">{{
+          $t('personalization.conversationContinuityDesc')
+        }}</span>
+      </span>
+      <div
+        class="settings-select-wrap"
+        :class="{ open: activeDropdown === 'conversation-continuity' }"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="settings-select-button"
+          @click="toggleDropdown('conversation-continuity')"
+        >
+          {{ conversationContinuityLabel }}
+          <span class="select-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+          :style="activeDropdown ? floatingMenuStyle : undefined"
+        >
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.conversation_continuity === 'high' }"
+            @click="selectConversationContinuity('high')"
+          >
+            <strong>{{ $t('personalization.continuityHigh') }}</strong
+            ><span>{{ $t('personalization.continuityHighDesc') }}</span
+            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.conversation_continuity === 'medium' }"
+            @click="selectConversationContinuity('medium')"
+          >
+            <strong>{{ $t('personalization.continuityMedium') }}</strong
+            ><span>{{ $t('personalization.continuityMediumDesc') }}</span
+            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+          <button
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.conversation_continuity === 'low' }"
+            @click="selectConversationContinuity('low')"
+          >
+            <strong>{{ $t('personalization.continuityLow') }}</strong
+            ><span>{{ $t('personalization.continuityLowDesc') }}</span
+            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
     <div v-for="preference in contentPreferences" :key="preference.key" class="settings-select-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t(preference.title) }}</span>
@@ -295,8 +329,17 @@ const selectContentPreference = (
         :class="{ open: activeDropdown === preference.key }"
         @click.stop
       >
-        <button type="button" class="settings-select-button" @click="toggleDropdown(preference.key)">
-          {{ $t(preference.options.find(option => option.value === form[preference.key])?.label || 'personalization.continuityMedium') }}
+        <button
+          type="button"
+          class="settings-select-button"
+          @click="toggleDropdown(preference.key)"
+        >
+          {{
+            $t(
+              preference.options.find((option) => option.value === form[preference.key])?.label ||
+                'personalization.continuityMedium'
+            )
+          }}
           <span class="select-chevron" aria-hidden="true"></span>
         </button>
         <div
@@ -311,7 +354,8 @@ const selectContentPreference = (
             :class="{ selected: form[preference.key] === option.value }"
             @click="selectContentPreference(preference.key, option.value)"
           >
-            <strong>{{ $t(option.label) }}</strong><span>{{ $t(option.description) }}</span>
+            <strong>{{ $t(option.label) }}</strong
+            ><span>{{ $t(option.description) }}</span>
             <svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
           </button>
         </div>

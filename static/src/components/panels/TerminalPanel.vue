@@ -25,8 +25,21 @@
     <div class="terminal-panel__body" ref="terminalContainer">
       <div v-if="!sessionKeys.length" class="terminal-panel__idle">
         <svg class="terminal-panel__idle-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="2" y="3" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M6 7h12M6 10h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect
+            x="2"
+            y="3"
+            width="20"
+            height="16"
+            rx="2"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
+          <path
+            d="M6 7h12M6 10h8"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
         </svg>
         <span>{{ $t('shell.noOpenTerminals') }}</span>
       </div>
@@ -233,19 +246,25 @@ function resetPanelState() {
   if (term) term.clear();
 }
 
-watch(() => props.workspaceId, (newId, oldId) => {
-  if (newId && oldId && newId !== oldId) {
-    resetPanelState();
-    void fetchTerminalList();
+watch(
+  () => props.workspaceId,
+  (newId, oldId) => {
+    if (newId && oldId && newId !== oldId) {
+      resetPanelState();
+      void fetchTerminalList();
+    }
   }
-});
+);
 
-watch(() => props.conversationId, (newId, oldId) => {
-  if (newId !== oldId) {
-    resetPanelState();
-    void fetchTerminalList();
+watch(
+  () => props.conversationId,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      resetPanelState();
+      void fetchTerminalList();
+    }
   }
-});
+);
 
 // ---- REST 轮询（替代原 WebSocket 订阅与事件推送） ----
 async function fetchTerminalList() {
@@ -397,7 +416,9 @@ onBeforeUnmount(() => {
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
   flex-shrink: 0;
 }
 

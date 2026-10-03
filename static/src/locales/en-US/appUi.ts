@@ -85,7 +85,8 @@ export default {
   setReasoningEffortFailed: 'Failed to set reasoning effort',
   pauseAllSubAgentsTitle: 'Pause all sub-agents?',
   terminateAllSubAgentsTitle: 'Terminate all sub-agents?',
-  pauseAllSubAgentsMessage: 'All running sub-agents will stop and become idle. Cancel to do nothing.',
+  pauseAllSubAgentsMessage:
+    'All running sub-agents will stop and become idle. Cancel to do nothing.',
   terminateAllSubAgentsMessage:
     'All background sub-agents will be forcefully terminated. Cancel to do nothing.',
   pause: 'Pause',
@@ -139,7 +140,8 @@ export default {
   modelDoesNotSupportVideo: 'The current model does not support videos',
   switchToVideoModelMessage: 'Switch to a model that supports video input before sending videos',
   workspaceBootstrapTitle: 'No workspaces yet',
-  workspaceBootstrapMessage: 'Click the "Workspace" button in the sidebar to create your first workspace',
+  workspaceBootstrapMessage:
+    'Click the "Workspace" button in the sidebar to create your first workspace',
   statusApiRequestFailed: 'Status API request failed: {status}',
   hostModeFileTreeUnavailable: 'The file tree is unavailable in host mode',
   dockerModeFilesChanged: 'In Docker mode the files area now shows the project list',
@@ -203,5 +205,5 @@ export default {
   tabStripWinMinimize: 'Minimize',
   tabStripWinMaximize: 'Maximize',
   tabStripWinRestore: 'Restore',
-  tabStripWinClose: 'Close',
+  tabStripWinClose: 'Close'
 } as const;

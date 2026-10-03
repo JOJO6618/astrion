@@ -97,5 +97,5 @@ export default {
   saveFailed: '保存失败',
   savedSuccess: '保存成功',
   loadPolicyFailed: '加载策略失败',
-  toolConflict: '工具 {tool} 已在分类 {category} 中，请先移除后再分配',
+  toolConflict: '工具 {tool} 已在分类 {category} 中，请先移除后再分配'
 } as const;

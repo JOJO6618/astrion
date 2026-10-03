@@ -120,7 +120,8 @@ export default {
   executionLockedSandboxDesc: 'In plan mode, the execution environment is locked to sandbox',
   currentMark: 'Current',
   optionWithCurrent: 'Current · {desc}',
-  conversationTypeLockedDesc: 'The conversation type is fixed after creation; switch only for new chats',
+  conversationTypeLockedDesc:
+    'The conversation type is fixed after creation; switch only for new chats',
 
   // ── Slash menu aria / empty state ──
   slashSkillsAria: 'Available AgentSkills',
@@ -183,5 +184,5 @@ export default {
   executionFullAccess: 'Full Access',
   executionSandbox: 'Sandbox',
   runModeFast: 'Fast',
-  runModeThinking: 'Thinking',
+  runModeThinking: 'Thinking'
 } as const;

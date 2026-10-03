@@ -18,15 +18,15 @@
           <pre class="entry-content">{{ entry.content }}</pre>
         </div>
         <div class="modify-meta" v-if="action.modify">
-          <span v-if="action.modify.total !== null && action.modify.total !== undefined"
-            >{{ $t('chatActions.modifyTotal', { n: action.modify.total }) }}</span
-          >
-          <span v-if="action.modify.completed && action.modify.completed.length"
-            >{{ $t('chatActions.modifyCompleted', { n: action.modify.completed.length }) }}</span
-          >
-          <span v-if="action.modify.failed && action.modify.failed.length"
-            >{{ $t('chatActions.modifyRemaining', { n: action.modify.failed.length }) }}</span
-          >
+          <span v-if="action.modify.total !== null && action.modify.total !== undefined">{{
+            $t('chatActions.modifyTotal', { n: action.modify.total })
+          }}</span>
+          <span v-if="action.modify.completed && action.modify.completed.length">{{
+            $t('chatActions.modifyCompleted', { n: action.modify.completed.length })
+          }}</span>
+          <span v-if="action.modify.failed && action.modify.failed.length">{{
+            $t('chatActions.modifyRemaining', { n: action.modify.failed.length })
+          }}</span>
         </div>
         <div class="modify-warning icon-label" v-if="action.modify?.forced">
           <span class="icon icon-sm" :style="iconStyle('triangleAlert')" aria-hidden="true"></span>

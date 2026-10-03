@@ -4,7 +4,11 @@
       <div class="subagent-activity-modal">
         <div class="subagent-activity-header">
           <div class="subagent-activity-title">
-            {{ $t('overlay.subAgentProgressTitle', { id: activeAgent.agent_id || activeAgent.task_id }) }}
+            {{
+              $t('overlay.subAgentProgressTitle', {
+                id: activeAgent.agent_id || activeAgent.task_id
+              })
+            }}
           </div>
           <CloseButton :label="$t('common.close')" @click="close" />
         </div>
@@ -37,7 +41,10 @@
               v-for="item in timelineItems"
               :key="item.key"
               class="subagent-activity-item"
-              :class="{ 'subagent-output-item': item.kind === 'output', expanded: item.kind === 'output' && expandedOutputs.has(item.key) }"
+              :class="{
+                'subagent-output-item': item.kind === 'output',
+                expanded: item.kind === 'output' && expandedOutputs.has(item.key)
+              }"
               @click="handleItemClick(item)"
             >
               <template v-if="item.kind === 'output'">
@@ -45,7 +52,9 @@
               </template>
               <template v-else>
                 <span class="subagent-activity-text">{{ item.text }}</span>
-                <span class="subagent-activity-state" :class="item.state">{{ item.stateLabel }}</span>
+                <span class="subagent-activity-state" :class="item.state">{{
+                  item.stateLabel
+                }}</span>
               </template>
             </div>
           </div>
@@ -175,7 +184,9 @@ const handleItemClick = (item: any) => {
 const timelineItems = computed(() => {
   void currentLocale.value;
   const entries = activityEntries.value || [];
-  const rawItems: { kind: 'tool'; key: string; entry: ActivityEntry } | { kind: 'output'; key: string; content: string; isFinal: boolean }[] = [];
+  const rawItems:
+    | { kind: 'tool'; key: string; entry: ActivityEntry }
+    | { kind: 'output'; key: string; content: string; isFinal: boolean }[] = [];
   let currentToolGroup: { kind: 'tool'; key: string; entry: ActivityEntry } | null = null;
 
   const flushToolGroup = () => {
@@ -186,7 +197,11 @@ const timelineItems = computed(() => {
   };
 
   entries.forEach((entry: ActivityEntry, index: number) => {
-    if (entry?.type === 'progress' && entry?.subtype === 'output' && typeof entry.content === 'string') {
+    if (
+      entry?.type === 'progress' &&
+      entry?.subtype === 'output' &&
+      typeof entry.content === 'string'
+    ) {
       flushToolGroup();
       // 语义顺序修正：工具「正在调用」事件在流式期间先于文本 output 落盘，
       // 但 assistant 消息里文本永远在 tool_calls 之前——把 output 插入到
@@ -195,7 +210,7 @@ const timelineItems = computed(() => {
         kind: 'output' as const,
         key: `output-${entry.ts || index}`,
         content: entry.content,
-        isFinal: !!entry.is_final,
+        isFinal: !!entry.is_final
       };
       let cut = rawItems.length;
       while (cut > 0) {
@@ -227,9 +242,7 @@ const timelineItems = computed(() => {
     if (entry.id) {
       const prior = rawItems.find(
         (item) =>
-          item.kind === 'tool' &&
-          item.entry.id === entry.id &&
-          !isTerminalStatus(item.entry.status)
+          item.kind === 'tool' && item.entry.id === entry.id && !isTerminalStatus(item.entry.status)
       );
       if (prior && prior.kind === 'tool') {
         prior.entry = { ...prior.entry, ...entry };

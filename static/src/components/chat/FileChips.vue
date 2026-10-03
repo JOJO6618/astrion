@@ -122,9 +122,46 @@ const FILE_KIND_MAP: Record<string, { kind: string; labelKey: string }> = {
 };
 
 const CODE_EXTENSIONS = new Set([
-  'js', 'mjs', 'cjs', 'ts', 'jsx', 'tsx', 'vue', 'py', 'java', 'c', 'h', 'cpp', 'cc', 'hpp',
-  'go', 'rs', 'rb', 'php', 'html', 'htm', 'css', 'scss', 'less', 'json', 'xml', 'yml', 'yaml',
-  'toml', 'ini', 'cfg', 'sh', 'bash', 'zsh', 'sql', 'swift', 'kt', 'kts', 'lua', 'r', 'dart'
+  'js',
+  'mjs',
+  'cjs',
+  'ts',
+  'jsx',
+  'tsx',
+  'vue',
+  'py',
+  'java',
+  'c',
+  'h',
+  'cpp',
+  'cc',
+  'hpp',
+  'go',
+  'rs',
+  'rb',
+  'php',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'less',
+  'json',
+  'xml',
+  'yml',
+  'yaml',
+  'toml',
+  'ini',
+  'cfg',
+  'sh',
+  'bash',
+  'zsh',
+  'sql',
+  'swift',
+  'kt',
+  'kts',
+  'lua',
+  'r',
+  'dart'
 ]);
 
 const props = withDefaults(
@@ -138,7 +175,9 @@ const props = withDefaults(
 defineEmits<{ (e: 'remove', path: string): void }>();
 
 const basename = (path: string): string => {
-  const parts = String(path || '').split(/[/\\]/).filter(Boolean);
+  const parts = String(path || '')
+    .split(/[/\\]/)
+    .filter(Boolean);
   return parts.length ? parts[parts.length - 1] : String(path || '');
 };
 

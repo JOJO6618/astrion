@@ -87,7 +87,8 @@ export default {
   writableMode: '可读可写',
   readableMode: '仅可读',
   writableHint: '可读可写路径在可写沙箱中可写入，在只读沙箱中仅可读。',
-  readableHint: '仅可读路径会加入只读沙箱的读取白名单（只读沙箱默认拒绝所有读取，仅系统目录、工作区与授权路径可读）。',
+  readableHint:
+    '仅可读路径会加入只读沙箱的读取白名单（只读沙箱默认拒绝所有读取，仅系统目录、工作区与授权路径可读）。',
   writablePlaceholder: '每行一个路径，例如：~/Desktop/agents-export',
   readablePlaceholder: '每行一个路径，例如：~/Documents/reference',
 
@@ -169,5 +170,5 @@ export default {
   // ── VideoPicker：视频选择 ──
   videoPickerTitle: '选择视频（一次最多 1 个）',
   noVideos: '未找到视频文件',
-  videoSelectedCount: '已选 {n} / 1',
+  videoSelectedCount: '已选 {n} / 1'
 } as const;

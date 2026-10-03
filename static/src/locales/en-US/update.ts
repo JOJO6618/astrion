@@ -27,5 +27,5 @@ export default {
   updateFailed: 'Update failed',
 
   // Check failure
-  checkFailed: 'Failed to check for updates',
+  checkFailed: 'Failed to check for updates'
 };

@@ -3,7 +3,7 @@
     class="stage-node"
     :class="{
       'stage-node--selected': selected,
-      'stage-node--issue': data.hasIssue,
+      'stage-node--issue': data.hasIssue
     }"
   >
     <!-- 左：前进入桩（白/蓝线） -->
@@ -12,7 +12,12 @@
     <Handle id="out-0" type="source" :position="Position.Right" />
     <!-- 上/下：驳回红线接收入口（语义相同，按相对位置自动选向，只进不出） -->
     <Handle id="in-top" type="target" :position="Position.Top" class="stage-node__reject-in" />
-    <Handle id="in-bottom" type="target" :position="Position.Bottom" class="stage-node__reject-in" />
+    <Handle
+      id="in-bottom"
+      type="target"
+      :position="Position.Bottom"
+      class="stage-node__reject-in"
+    />
     <div class="stage-node__head">
       <span
         v-if="data.isEntry"

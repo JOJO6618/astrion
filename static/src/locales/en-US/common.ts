@@ -39,5 +39,5 @@ export default {
   minutesAgo: '{n}min ago',
   hoursAgo: '{n}h ago',
   daysAgo: '{n}d ago',
-  timeDate: '{month}/{day} {hour}:{minute}',
+  timeDate: '{month}/{day} {hour}:{minute}'
 } as const;

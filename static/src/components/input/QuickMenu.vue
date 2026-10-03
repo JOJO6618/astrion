@@ -2,84 +2,88 @@
   <transition name="quick-menu">
     <div v-if="open" class="quick-menu" @click.stop>
       <div class="quick-menu-list">
-      <button
-        type="button"
-        class="menu-entry"
-        data-tutorial="quick-upload"
-        @click="$emit('quick-upload')"
-        :disabled="!isConnected || uploading"
-      >
-        {{ uploading ? $t('quickdock.uploading') : $t('quickdock.uploadFile') }}
-      </button>
-      <button
-        type="button"
-        class="menu-entry"
-        data-tutorial="quick-review"
-        @click.stop="$emit('open-review')"
-        :disabled="!isConnected || streamingMessage"
-      >
-        {{ $t('quickdock.conversationReview') }}
-      </button>
-      <button
-        v-if="currentModelSupportsImage"
-        type="button"
-        class="menu-entry"
-        data-tutorial="quick-send-image"
-        @click.stop="$emit('pick-images')"
-        :disabled="!isConnected || streamingMessage"
-      >
-        {{ $t('quickdock.sendImage') }}
-      </button>
-      <button
-        v-if="currentModelSupportsVideo"
-        type="button"
-        class="menu-entry"
-        data-tutorial="quick-send-video"
-        @click.stop="$emit('pick-video')"
-        :disabled="!isConnected || streamingMessage"
-      >
-        {{ $t('quickdock.sendVideo') }}
-      </button>
-      <button
-        type="button"
-        class="menu-entry has-submenu"
-        data-tutorial="quick-tool-menu"
-        @click.stop="$emit('toggle-tool-menu')"
-        :disabled="!isConnected"
-      >
-        {{ $t('quickdock.disableTools') }}
-        <span class="entry-arrow">›</span>
-      </button>
-      <button
-        type="button"
-        class="menu-entry"
-        :class="{ 'goal-entry-active': goalModeArmed || goalRunning || goalCompleted }"
-        @click.stop="$emit('toggle-goal-mode')"
-        :disabled="!isConnected"
-      >
-        {{ $t('quickdock.goalMode') }}
-        <span class="entry-arrow">
-          <template v-if="goalRunning">{{ $t('common.running') }}</template>
-          <template v-else-if="goalCompleted">{{ $t('quickdock.goalDone') }}</template>
-          <template v-else>{{ goalModeArmed ? $t('quickdock.goalArmed') : '' }}</template>
-        </span>
-      </button>
-      <button
-        type="button"
-        class="menu-entry has-submenu"
-        data-tutorial="quick-settings-menu"
-        @click.stop="$emit('toggle-settings')"
-        :disabled="!isConnected"
-      >
-        {{ $t('quickdock.settingsMenu') }}
-        <span class="entry-arrow">›</span>
-      </button>
+        <button
+          type="button"
+          class="menu-entry"
+          data-tutorial="quick-upload"
+          @click="$emit('quick-upload')"
+          :disabled="!isConnected || uploading"
+        >
+          {{ uploading ? $t('quickdock.uploading') : $t('quickdock.uploadFile') }}
+        </button>
+        <button
+          type="button"
+          class="menu-entry"
+          data-tutorial="quick-review"
+          @click.stop="$emit('open-review')"
+          :disabled="!isConnected || streamingMessage"
+        >
+          {{ $t('quickdock.conversationReview') }}
+        </button>
+        <button
+          v-if="currentModelSupportsImage"
+          type="button"
+          class="menu-entry"
+          data-tutorial="quick-send-image"
+          @click.stop="$emit('pick-images')"
+          :disabled="!isConnected || streamingMessage"
+        >
+          {{ $t('quickdock.sendImage') }}
+        </button>
+        <button
+          v-if="currentModelSupportsVideo"
+          type="button"
+          class="menu-entry"
+          data-tutorial="quick-send-video"
+          @click.stop="$emit('pick-video')"
+          :disabled="!isConnected || streamingMessage"
+        >
+          {{ $t('quickdock.sendVideo') }}
+        </button>
+        <button
+          type="button"
+          class="menu-entry has-submenu"
+          data-tutorial="quick-tool-menu"
+          @click.stop="$emit('toggle-tool-menu')"
+          :disabled="!isConnected"
+        >
+          {{ $t('quickdock.disableTools') }}
+          <span class="entry-arrow">›</span>
+        </button>
+        <button
+          type="button"
+          class="menu-entry"
+          :class="{ 'goal-entry-active': goalModeArmed || goalRunning || goalCompleted }"
+          @click.stop="$emit('toggle-goal-mode')"
+          :disabled="!isConnected"
+        >
+          {{ $t('quickdock.goalMode') }}
+          <span class="entry-arrow">
+            <template v-if="goalRunning">{{ $t('common.running') }}</template>
+            <template v-else-if="goalCompleted">{{ $t('quickdock.goalDone') }}</template>
+            <template v-else>{{ goalModeArmed ? $t('quickdock.goalArmed') : '' }}</template>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="menu-entry has-submenu"
+          data-tutorial="quick-settings-menu"
+          @click.stop="$emit('toggle-settings')"
+          :disabled="!isConnected"
+        >
+          {{ $t('quickdock.settingsMenu') }}
+          <span class="entry-arrow">›</span>
+        </button>
       </div>
 
       <transition name="submenu-slide">
         <div class="quick-submenu tool-submenu" v-if="toolMenuOpen">
-          <div class="submenu-status" v-if="toolSettingsLoading">{{ $t('quickdock.toolSettingsSyncing') }}</div>
-          <div v-else-if="!toolSettings.length" class="submenu-empty">{{ $t('quickdock.noControllableTools') }}</div>
+          <div class="submenu-status" v-if="toolSettingsLoading">
+            {{ $t('quickdock.toolSettingsSyncing') }}
+          </div>
+          <div v-else-if="!toolSettings.length" class="submenu-empty">
+            {{ $t('quickdock.noControllableTools') }}
+          </div>
           <div v-else class="submenu-list tool-submenu-list">
             <button
               v-for="category in toolSettings"
@@ -124,7 +128,12 @@
               type="button"
               class="menu-entry submenu-entry"
               data-tutorial="settings-token-panel"
-              @click="console.log('[UI_DEBUG] QuickMenu 用量统计按钮 clicked, emitting toggle-token-panel with true'); $emit('toggle-token-panel', true)"
+              @click="
+                console.log(
+                  '[UI_DEBUG] QuickMenu usage statistics button clicked, emitting toggle-token-panel with true'
+                );
+                $emit('toggle-token-panel', true);
+              "
               :disabled="!currentConversationId"
             >
               {{ $t('quickdock.usageStats') }}
@@ -244,7 +253,9 @@ const currentModelSupportsVideo = computed(() => {
   return !!found?.supportsVideo;
 });
 
-const goalCompleted = computed(() => String(props.goalProgress?.status || '').toLowerCase() === 'done');
+const goalCompleted = computed(
+  () => String(props.goalProgress?.status || '').toLowerCase() === 'done'
+);
 </script>
 
 <style scoped>

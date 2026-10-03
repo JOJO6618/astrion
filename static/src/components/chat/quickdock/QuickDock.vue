@@ -24,30 +24,32 @@
          保证菜单按按钮的视口坐标精确落位（2026-09-24 移动端改造） -->
     <Teleport to="body" :disabled="!isMobileViewport">
       <Transition name="qd-menu">
-      <div
-        v-if="menu"
-        class="qd-menu"
-        :class="{ 'qd-menu--above': menuFlipped }"
-        :style="menuStyle"
-        @click.stop
-      >
-        <template v-if="effectiveMenu?.type === 'runner'">
-          <button
-            class="qd-menu__item qd-menu__item--danger"
-            :disabled="!menuTargetRunning"
-            @click="killRunner"
-          >
-            {{ $t('quickdock.menuForceStop') }}
-          </button>
-        </template>
-        <template v-else>
-          <button class="qd-menu__item" @click="downloadFile">{{ $t('common.download') }}</button>
-          <button v-if="hostMode" class="qd-menu__item" @click="revealInManager">
-            {{ $t('quickdock.menuRevealInManager') }}
-          </button>
-          <button class="qd-menu__item" @click="copyPath">{{ $t('quickdock.menuCopyPath') }}</button>
-        </template>
-      </div>
+        <div
+          v-if="menu"
+          class="qd-menu"
+          :class="{ 'qd-menu--above': menuFlipped }"
+          :style="menuStyle"
+          @click.stop
+        >
+          <template v-if="effectiveMenu?.type === 'runner'">
+            <button
+              class="qd-menu__item qd-menu__item--danger"
+              :disabled="!menuTargetRunning"
+              @click="killRunner"
+            >
+              {{ $t('quickdock.menuForceStop') }}
+            </button>
+          </template>
+          <template v-else>
+            <button class="qd-menu__item" @click="downloadFile">{{ $t('common.download') }}</button>
+            <button v-if="hostMode" class="qd-menu__item" @click="revealInManager">
+              {{ $t('quickdock.menuRevealInManager') }}
+            </button>
+            <button class="qd-menu__item" @click="copyPath">
+              {{ $t('quickdock.menuCopyPath') }}
+            </button>
+          </template>
+        </div>
       </Transition>
     </Teleport>
   </aside>
@@ -345,7 +347,10 @@ async function killRunner() {
       ? await subAgentStore.terminateSubAgent(m.key)
       : await bgStore.cancelCommand(m.key);
   if (!result?.success) {
-    uiStore.pushToast({ message: result?.error || t('quickdock.killForceStopFailed'), type: 'error' });
+    uiStore.pushToast({
+      message: result?.error || t('quickdock.killForceStopFailed'),
+      type: 'error'
+    });
   }
 }
 
@@ -395,7 +400,10 @@ async function revealInManager() {
       throw new Error(openPayload?.error || t('quickdock.revealOpenFileFailed'));
     }
   } catch (err: any) {
-    uiStore.pushToast({ message: err?.message || t('quickdock.revealOpenFileFailed'), type: 'error' });
+    uiStore.pushToast({
+      message: err?.message || t('quickdock.revealOpenFileFailed'),
+      type: 'error'
+    });
   }
 }
 

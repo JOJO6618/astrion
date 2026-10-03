@@ -1,6 +1,10 @@
 <template>
   <div class="input-area compact-input-area" ref="inputAreaRoot">
-    <div class="stadium-input-wrapper" :class="{ 'composer-locked': inputLocked }" ref="stadiumShellOuter">
+    <div
+      class="stadium-input-wrapper"
+      :class="{ 'composer-locked': inputLocked }"
+      ref="stadiumShellOuter"
+    >
       <div
         class="runtime-queue-list"
         :class="{ 'runtime-queue-list--empty': !runtimeQueuedMessagesForRender.length }"
@@ -141,7 +145,9 @@
                   <button type="button" @click.stop="openProjectInFileManager">
                     {{ $t('input.openInFileManager') }}
                   </button>
-                  <button type="button" @click.stop="copyProjectPath">{{ $t('input.copyPath') }}</button>
+                  <button type="button" @click.stop="copyProjectPath">
+                    {{ $t('input.copyPath') }}
+                  </button>
                 </div>
               </span>
               <span class="floating-project-status__menu-wrap">
@@ -167,10 +173,12 @@
               </span>
             </span>
             <span class="floating-project-status__right">
-              <span v-if="goalRunning" class="floating-project-status__notice">{{ $t('input.goalModeRunning') }}</span>
-              <span v-else-if="goalModeArmed" class="floating-project-status__notice"
-                >{{ $t('input.goalModeReady') }}</span
-              >
+              <span v-if="goalRunning" class="floating-project-status__notice">{{
+                $t('input.goalModeRunning')
+              }}</span>
+              <span v-else-if="goalModeArmed" class="floating-project-status__notice">{{
+                $t('input.goalModeReady')
+              }}</span>
               <button
                 v-if="pendingUserQuestionCount > 0"
                 type="button"
@@ -239,8 +247,7 @@
         <div class="input-stack">
           <div
             v-if="
-              (selectedImages && selectedImages.length) ||
-              (selectedFiles && selectedFiles.length)
+              (selectedImages && selectedImages.length) || (selectedFiles && selectedFiles.length)
             "
             class="image-inline-row"
           >
@@ -312,82 +319,126 @@
           </div>
           <div class="input-actions">
             <div class="input-actions-left">
-            <button
-              type="button"
-              class="stadium-btn add-btn"
-              data-tutorial="quick-menu-open"
-              @click.stop="$emit('toggle-quick-menu')"
-              :disabled="!isConnected"
-              :aria-label="$t('input.quickMenuAriaLabel')"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M5 12h14" /><path d="M12 5v14" />
-              </svg>
-            </button>
-            <div class="agent-type-switcher" :class="{ 'is-disabled': agentTypeLocked }">
               <button
                 type="button"
-                class="agent-type-switcher__btn"
-                @click.stop="$emit('toggle-agent-type-menu')"
-                :disabled="!isConnected || agentTypeLocked"
-                :aria-expanded="agentTypeMenuOpen"
-                aria-haspopup="true"
+                class="stadium-btn add-btn"
+                data-tutorial="quick-menu-open"
+                @click.stop="$emit('toggle-quick-menu')"
+                :disabled="!isConnected"
+                :aria-label="$t('input.quickMenuAriaLabel')"
               >
-                <span>{{ agentTypeLabel }}</span>
-                <svg class="agent-type-switcher__caret" :class="{ open: agentTypeMenuOpen }" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.75 3.75L5 6.25L7.25 3.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>
-              <div v-if="agentTypeMenuOpen && !agentTypeLocked" class="agent-type-switcher__menu" @click.stop>
-                <button
-                  v-for="option in agentTypeOptions"
-                  :key="option.value"
-                  type="button"
-                  class="agent-type-switcher__menu-item"
-                  :class="{ 'is-active': option.value === newConversationType }"
-                  @click.stop="$emit('select-new-conversation-type', option.value)"
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
                 >
-                  <span class="agent-type-switcher__menu-label">{{ option.label }}</span>
-                  <span class="agent-type-switcher__menu-desc">{{ option.description }}</span>
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+              </button>
+              <div class="agent-type-switcher" :class="{ 'is-disabled': agentTypeLocked }">
+                <button
+                  type="button"
+                  class="agent-type-switcher__btn"
+                  @click.stop="$emit('toggle-agent-type-menu')"
+                  :disabled="!isConnected || agentTypeLocked"
+                  :aria-expanded="agentTypeMenuOpen"
+                  aria-haspopup="true"
+                >
+                  <span>{{ agentTypeLabel }}</span>
+                  <svg
+                    class="agent-type-switcher__caret"
+                    :class="{ open: agentTypeMenuOpen }"
+                    viewBox="0 0 10 10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2.75 3.75L5 6.25L7.25 3.75"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
                 </button>
+                <div
+                  v-if="agentTypeMenuOpen && !agentTypeLocked"
+                  class="agent-type-switcher__menu"
+                  @click.stop
+                >
+                  <button
+                    v-for="option in agentTypeOptions"
+                    :key="option.value"
+                    type="button"
+                    class="agent-type-switcher__menu-item"
+                    :class="{ 'is-active': option.value === newConversationType }"
+                    @click.stop="$emit('select-new-conversation-type', option.value)"
+                  >
+                    <span class="agent-type-switcher__menu-label">{{ option.label }}</span>
+                    <span class="agent-type-switcher__menu-desc">{{ option.description }}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-            <div class="agent-type-switcher work-mode-switcher" :class="{ 'is-disabled': workModeLocked }">
-              <button
-                type="button"
-                class="agent-type-switcher__btn"
-                @click.stop="$emit('toggle-work-mode-menu')"
-                :disabled="!isConnected || workModeLocked"
-                :aria-expanded="workModeMenuOpen"
-                aria-haspopup="true"
-                :title="workModeLocked ? $t('input.workModeLockedTitle') : $t('input.workModeTitle')"
+              <div
+                class="agent-type-switcher work-mode-switcher"
+                :class="{ 'is-disabled': workModeLocked }"
               >
-                <span>{{ workModeLabel }}</span>
-                <svg class="agent-type-switcher__caret" :class="{ open: workModeMenuOpen }" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.75 3.75L5 6.25L7.25 3.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>
-              <div v-if="workModeMenuOpen && !workModeLocked" class="agent-type-switcher__menu" @click.stop>
                 <button
-                  v-for="option in workModeOptions"
-                  :key="option.value"
                   type="button"
-                  class="agent-type-switcher__menu-item"
-                  :class="{ 'is-active': option.value === currentWorkMode }"
-                  @click.stop="$emit('change-work-mode', option.value)"
+                  class="agent-type-switcher__btn"
+                  @click.stop="$emit('toggle-work-mode-menu')"
+                  :disabled="!isConnected || workModeLocked"
+                  :aria-expanded="workModeMenuOpen"
+                  aria-haspopup="true"
+                  :title="
+                    workModeLocked ? $t('input.workModeLockedTitle') : $t('input.workModeTitle')
+                  "
                 >
-                  <span class="agent-type-switcher__menu-label">{{ $t(option.labelKey) }}</span>
-                  <span class="agent-type-switcher__menu-desc">{{ $t(option.descriptionKey) }}</span>
+                  <span>{{ workModeLabel }}</span>
+                  <svg
+                    class="agent-type-switcher__caret"
+                    :class="{ open: workModeMenuOpen }"
+                    viewBox="0 0 10 10"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2.75 3.75L5 6.25L7.25 3.75"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
                 </button>
+                <div
+                  v-if="workModeMenuOpen && !workModeLocked"
+                  class="agent-type-switcher__menu"
+                  @click.stop
+                >
+                  <button
+                    v-for="option in workModeOptions"
+                    :key="option.value"
+                    type="button"
+                    class="agent-type-switcher__menu-item"
+                    :class="{ 'is-active': option.value === currentWorkMode }"
+                    @click.stop="$emit('change-work-mode', option.value)"
+                  >
+                    <span class="agent-type-switcher__menu-label">{{ $t(option.labelKey) }}</span>
+                    <span class="agent-type-switcher__menu-desc">{{
+                      $t(option.descriptionKey)
+                    }}</span>
+                  </button>
+                </div>
               </div>
-            </div>
             </div>
             <div class="input-actions-right">
               <button
@@ -505,7 +556,13 @@
             type="button"
             class="permission-switcher__btn"
             :disabled="!isConnected"
-            :title="permissionLockedByPlan ? $t('input.permissionLockedByPlanTitle') : (executionLockedByRestricted ? $t('input.executionLockedRestrictedTitle') : '')"
+            :title="
+              permissionLockedByPlan
+                ? $t('input.permissionLockedByPlanTitle')
+                : executionLockedByRestricted
+                  ? $t('input.executionLockedRestrictedTitle')
+                  : ''
+            "
             @click="$emit('toggle-permission-menu')"
           >
             <svg
@@ -532,7 +589,21 @@
               :class="{ 'permission-switcher__exec--warn': currentExecutionMode === 'direct' }"
               >{{ currentExecutionShortLabel }}</span
             >
-            <svg class="permission-switcher__caret" :class="{ open: permissionMenuOpen }" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.75 3.75L5 6.25L7.25 3.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg
+              class="permission-switcher__caret"
+              :class="{ open: permissionMenuOpen }"
+              viewBox="0 0 10 10"
+              aria-hidden="true"
+            >
+              <path
+                d="M2.75 3.75L5 6.25L7.25 3.75"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
           </button>
           <div
             v-if="permissionMenuOpen"
@@ -540,16 +611,23 @@
             class="permission-switcher__menu"
             :class="{
               'permission-switcher__menu--split': executionModeEnabled,
-              'permission-switcher__menu--centered': permissionMenuCentered,
+              'permission-switcher__menu--centered': permissionMenuCentered
             }"
-            :style="permissionMenuCentered ? { left: permissionMenuCenteredLeft, right: 'auto' } : undefined"
+            :style="
+              permissionMenuCentered
+                ? { left: permissionMenuCenteredLeft, right: 'auto' }
+                : undefined
+            "
           >
             <div
               class="permission-switcher__group"
               :class="{ 'permission-switcher__group--disabled': permissionLockedByPlan }"
             >
               <div class="permission-switcher__group-title">
-                {{ $t('input.permissionGroup') }}<span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{ $t('input.planModeLocked') }}</span>
+                {{ $t('input.permissionGroup')
+                }}<span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{
+                  $t('input.planModeLocked')
+                }}</span>
               </div>
               <button
                 v-for="option in permissionOptions"
@@ -571,8 +649,14 @@
             >
               <div class="permission-switcher__group-title">
                 {{ $t('input.executionEnv') }}
-                <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{ $t('input.planModeLocked') }}</span>
-                <span v-else-if="executionLockedByRestricted" class="permission-switcher__group-lock">{{ $t('input.restrictedModeLocked') }}</span>
+                <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{
+                  $t('input.planModeLocked')
+                }}</span>
+                <span
+                  v-else-if="executionLockedByRestricted"
+                  class="permission-switcher__group-lock"
+                  >{{ $t('input.restrictedModeLocked') }}</span
+                >
               </div>
               <button
                 v-for="option in executionModeOptions"
@@ -596,7 +680,9 @@
               class="permission-switcher__group"
               :class="{ 'permission-switcher__group--disabled': currentExecutionMode === 'direct' }"
             >
-              <div class="permission-switcher__group-title">{{ $t('input.networkPermission') }}</div>
+              <div class="permission-switcher__group-title">
+                {{ $t('input.networkPermission') }}
+              </div>
               <button
                 v-for="option in networkPermissionOptions"
                 :key="`network-${option.value}`"
@@ -875,7 +961,13 @@ type SlashMenuItem = {
   mode?: SlashMenuMode;
   skill?: SkillItem;
 };
-type WorkflowItem = { name: string; description: string; source: string; updatedAt: string; nodeCount: number };
+type WorkflowItem = {
+  name: string;
+  description: string;
+  source: string;
+  updatedAt: string;
+  nodeCount: number;
+};
 const availableSkills = ref<SkillItem[]>([]);
 const selectedSkillRefs = ref<SkillItem[]>([]);
 const skillsLoaded = ref(false);
@@ -1079,9 +1171,9 @@ const floatingStatusVisible = computed(() => {
     !!projectGitSummaryForRender.value ||
     !!props.goalRunning ||
     !!props.goalModeArmed ||
-    (Number(props.pendingUserQuestionCount || 0) > 0) ||
+    Number(props.pendingUserQuestionCount || 0) > 0 ||
     (!!props.planApprovalMinimized && Number(props.pendingPlanApprovalCount || 0) > 0) ||
-    (Number(props.activeSubAgentCount || 0) > 0);
+    Number(props.activeSubAgentCount || 0) > 0;
   return visible;
 });
 
@@ -1948,7 +2040,9 @@ const slashMenuAriaLabel = computed(() => {
   if (slashMenuMode.value === 'network') return t('input.slashNetworkAria');
   if (slashMenuMode.value === 'work-mode') return t('input.slashWorkModeAria');
   if (slashMenuMode.value === 'workspace')
-    return props.workspaceKind === 'project' ? t('input.slashProjectAria') : t('input.slashWorkspaceAria');
+    return props.workspaceKind === 'project'
+      ? t('input.slashProjectAria')
+      : t('input.slashWorkspaceAria');
   if (slashMenuMode.value === 'conversation-type') return t('input.slashConversationTypeAria');
   return t('input.slashRootAria');
 });
@@ -2130,10 +2224,7 @@ const workflowSlashMenuItems = computed<SlashMenuItem[]>(() => {
   // 激活仅智能体空闲可用（streaming / 审批等待 / 已有激活工作流时禁用）；
   // 空对话允许激活（后端自动创建对话）。
   const activateDisabled =
-    !props.isConnected ||
-    props.streamingMessage ||
-    workflowActionPending.value ||
-    !!activeName;
+    !props.isConnected || props.streamingMessage || workflowActionPending.value || !!activeName;
   for (const wf of availableWorkflows.value) {
     const isCurrent = activeName && wf.name === activeName;
     items.push({
@@ -2167,11 +2258,7 @@ const refreshSkillSlashState = () => {
   }
   skillSlashQuery.value = token.query;
   // 「//」直达 skills 子菜单；仅键入来源跟随斜杠数量变化（菜单点入不受影响）
-  if (
-    token.doubleSlash &&
-    slashMenuMode.value === 'root' &&
-    !slashDoubleSlashSuppressed.value
-  ) {
+  if (token.doubleSlash && slashMenuMode.value === 'root' && !slashDoubleSlashSuppressed.value) {
     slashMenuMode.value = 'skills';
     slashSkillsEntrySource.value = 'typed';
     skillSlashActiveIndex.value = 0;
@@ -2707,26 +2794,19 @@ const initSpeechRecognition = () => {
     stopVoiceRecording();
   };
 
-  recognition.onstart = () => {
-  };
+  recognition.onstart = () => {};
 
-  recognition.onaudiostart = () => {
-  };
+  recognition.onaudiostart = () => {};
 
-  recognition.onsoundstart = () => {
-  };
+  recognition.onsoundstart = () => {};
 
-  recognition.onspeechstart = () => {
-  };
+  recognition.onspeechstart = () => {};
 
-  recognition.onspeechend = () => {
-  };
+  recognition.onspeechend = () => {};
 
-  recognition.onsoundend = () => {
-  };
+  recognition.onsoundend = () => {};
 
-  recognition.onaudioend = () => {
-  };
+  recognition.onaudioend = () => {};
 
   recognition.onend = () => {
     isRecording.value = false;
@@ -2739,7 +2819,6 @@ const initSpeechRecognition = () => {
 };
 
 const toggleVoiceRecording = () => {
-
   // Android Bridge 模式
   const bridge = (window as any).AndroidVoiceBridge;
   if (bridge) {
@@ -3339,9 +3418,13 @@ const agentTypeLocked = computed(() => !!props.currentConversationId);
 const agentTypeLabel = computed(() => {
   void currentLocale.value;
   if (props.currentConversationId) {
-    return props.currentConversationType === 'multi_agent' ? t('input.multiAgentType') : t('input.agentType');
+    return props.currentConversationType === 'multi_agent'
+      ? t('input.multiAgentType')
+      : t('input.agentType');
   }
-  return props.newConversationType === 'multi_agent' ? t('input.multiAgentType') : t('input.agentType');
+  return props.newConversationType === 'multi_agent'
+    ? t('input.multiAgentType')
+    : t('input.agentType');
 });
 
 /** 运行模式：对话运行中不可切换（后端也会 409 拒绝，UI 侧先锁定避免误点） */

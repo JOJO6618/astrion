@@ -76,5 +76,5 @@ export default {
   quotaMessage: 'Your usage quota has been used up',
 
   // ── Download (resources.ts) ──
-  cannotCompleteDownload: 'Could not complete the download',
+  cannotCompleteDownload: 'Could not complete the download'
 } as const;

@@ -5,8 +5,15 @@ import { t } from '@/locales';
 export const goalMethods = {
   handleGoalProgress(data: any) {
     // 安全检查：确保目标事件属于当前对话，防止切换对话后旧任务事件污染
-    if (data?.conversation_id && this.currentConversationId && data.conversation_id !== this.currentConversationId) {
-      debugLog('[Goal] 忽略不匹配对话的目标进度事件', { eventCid: data.conversation_id, currentCid: this.currentConversationId });
+    if (
+      data?.conversation_id &&
+      this.currentConversationId &&
+      data.conversation_id !== this.currentConversationId
+    ) {
+      debugLog('[Goal] 忽略不匹配对话的目标进度事件', {
+        eventCid: data.conversation_id,
+        currentCid: this.currentConversationId
+      });
       return;
     }
     debugLog('[Goal] 目标进度更新', data);
@@ -36,7 +43,9 @@ export const goalMethods = {
       this.autoApprovalFeedLines = [t('appTasks.reviewStarted')];
       this.autoApprovalFinalMessage = '';
     } else if (progress.stage === 'model_call') {
-      this.autoApprovalFeedLines.push(String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim());
+      this.autoApprovalFeedLines.push(
+        String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim()
+      );
     } else if (progress.stage === 'run_command' && progress.command) {
       this.autoApprovalFeedLines.push(String(progress.command));
     } else if (progress.message) {
@@ -58,8 +67,15 @@ export const goalMethods = {
   },
   handleGoalCompleted(data: any) {
     // 安全检查：确保目标事件属于当前对话
-    if (data?.conversation_id && this.currentConversationId && data.conversation_id !== this.currentConversationId) {
-      debugLog('[Goal] 忽略不匹配对话的目标完成事件', { eventCid: data.conversation_id, currentCid: this.currentConversationId });
+    if (
+      data?.conversation_id &&
+      this.currentConversationId &&
+      data.conversation_id !== this.currentConversationId
+    ) {
+      debugLog('[Goal] 忽略不匹配对话的目标完成事件', {
+        eventCid: data.conversation_id,
+        currentCid: this.currentConversationId
+      });
       return;
     }
     debugLog('[Goal] 目标已达成', data);
@@ -71,8 +87,15 @@ export const goalMethods = {
   },
   handleGoalStopped(data: any) {
     // 安全检查：确保目标事件属于当前对话
-    if (data?.conversation_id && this.currentConversationId && data.conversation_id !== this.currentConversationId) {
-      debugLog('[Goal] 忽略不匹配对话的目标停止事件', { eventCid: data.conversation_id, currentCid: this.currentConversationId });
+    if (
+      data?.conversation_id &&
+      this.currentConversationId &&
+      data.conversation_id !== this.currentConversationId
+    ) {
+      debugLog('[Goal] 忽略不匹配对话的目标停止事件', {
+        eventCid: data.conversation_id,
+        currentCid: this.currentConversationId
+      });
       return;
     }
     debugLog('[Goal] 目标已停止', data);

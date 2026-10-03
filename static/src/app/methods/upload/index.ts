@@ -14,5 +14,5 @@ export const uploadMethods = {
   ...confirmMethods,
   ...quickMethods,
   ...dragMethods,
-  ...pasteMethods,
+  ...pasteMethods
 };

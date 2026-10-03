@@ -23,7 +23,8 @@ export const titleMethods = {
     if (Array.isArray(this.conversations)) {
       /* 原地替换保持数组引用：conversations 与双类型缓存中当前类型列表同一引用 */
       const convIndex = this.conversations.findIndex(
-        (conv: any) => conv && conv.id === normalizedConversationId && conv.title !== normalizedTitle
+        (conv: any) =>
+          conv && conv.id === normalizedConversationId && conv.title !== normalizedTitle
       );
       if (convIndex >= 0) {
         this.conversations.splice(convIndex, 1, {
@@ -45,7 +46,9 @@ export const titleMethods = {
     return changed;
   },
   scheduleGeneratedTitleRefresh(reason = 'unknown', options: any = {}) {
-    const conversationId = String(options.conversationId || this.currentConversationId || '').trim();
+    const conversationId = String(
+      options.conversationId || this.currentConversationId || ''
+    ).trim();
     if (!conversationId) {
       return;
     }

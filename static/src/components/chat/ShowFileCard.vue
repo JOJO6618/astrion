@@ -16,7 +16,9 @@
         <button v-if="canCopy" type="button" class="sfc-btn" @click="copyContent">
           {{ copied ? $t('common.copied') : $t('common.copy') }}
         </button>
-        <button type="button" class="sfc-btn sfc-btn-download" @click="handleDownload">{{ $t('common.download') }}</button>
+        <button type="button" class="sfc-btn sfc-btn-download" @click="handleDownload">
+          {{ $t('common.download') }}
+        </button>
       </div>
     </div>
 
@@ -323,9 +325,7 @@ async function openHtmlPreview() {
       srcdoc: buildShowHtmlIframeSrcdoc(content),
       allowScripts: true,
       title: displayName.value,
-      notice: detectExternalResourceRefs(content)
-        ? t('chat.htmlPreviewNotice')
-        : undefined
+      notice: detectExternalResourceRefs(content) ? t('chat.htmlPreviewNotice') : undefined
     });
   } catch (e) {
     error.value = (e as Error).message || t('chat.networkError');

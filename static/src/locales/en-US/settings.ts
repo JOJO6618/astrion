@@ -46,8 +46,10 @@ export default {
   generalTitle: 'General',
   generalDesc: 'Basic behavior for conversations and the app.',
   runDataTitle: 'Runtime data directory',
-  runDataDesc: 'Choose where the desktop app stores conversations, user data, and runtime settings. After restart, data migration runs before the app opens and shows a progress window.',
-  runDataEnvLocked: 'ASTRION_DESKTOP_DATA_ROOT is set, so in-app directory changes are disabled. Change or remove this environment variable to use this setting.',
+  runDataDesc:
+    'Choose where the desktop app stores conversations, user data, and runtime settings. After restart, data migration runs before the app opens and shows a progress window.',
+  runDataEnvLocked:
+    'ASTRION_DESKTOP_DATA_ROOT is set, so in-app directory changes are disabled. Change or remove this environment variable to use this setting.',
   runDataPathLabel: 'Data directory path',
   runDataPathPlaceholder: 'Enter a new data directory path',
   runDataBrowse: 'Choose in Finder',
@@ -58,21 +60,27 @@ export default {
   runDataConfirm: 'Confirm',
   runDataMigrate: 'Migrate current data',
   runDataStartFresh: 'Use target directory data',
-  runDataMigrateDesc: 'Copy all current contents. The target must contain no data; Finder-created .DS_Store files are ignored. Wait for running tasks to finish first. The original directory is kept.',
-  runDataFreshDesc: 'Do not copy old data. Use existing data in the target directory, or start with an empty directory.',
+  runDataMigrateDesc:
+    'Copy all current contents. The target must contain no data; Finder-created .DS_Store files are ignored. Wait for running tasks to finish first. The original directory is kept.',
+  runDataFreshDesc:
+    'Do not copy old data. Use existing data in the target directory, or start with an empty directory.',
   runDataApply: 'Apply directory settings',
   runDataWorking: 'Working…',
   runDataRestartRequired: 'Directory setting saved. Restart to apply it.',
   runDataRestartNow: 'Restart now',
   runDataRestarting: 'Restarting…',
   runDataError: {
-    environment_locked: 'The environment variable controls the data directory. Change or remove ASTRION_DESKTOP_DATA_ROOT first.',
+    environment_locked:
+      'The environment variable controls the data directory. Change or remove ASTRION_DESKTOP_DATA_ROOT first.',
     path_required: 'Enter a data directory path first.',
     same_directory: 'The new directory is the same as the current one.',
-    overlapping_directories: 'The new directory cannot contain or be contained by the current directory.',
+    overlapping_directories:
+      'The new directory cannot contain or be contained by the current directory.',
     target_not_directory: 'The target path is not a usable directory.',
-    target_not_empty: 'The migration target contains existing data. Choose “Use target directory data” to use it, or select an empty directory.',
-    verification_failed: 'The copied data did not pass verification. The setting was not changed and the original directory is kept.',
+    target_not_empty:
+      'The migration target contains existing data. Choose “Use target directory data” to use it, or select an empty directory.',
+    verification_failed:
+      'The copied data did not pass verification. The setting was not changed and the original directory is kept.',
     restart_failed: 'Could not restart the app. Quit and reopen it manually when convenient.',
     request_failed: 'The operation failed. Check directory permissions and try again.',
     unknown: 'The operation failed. Check directory permissions and try again.'

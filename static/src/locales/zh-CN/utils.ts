@@ -39,5 +39,5 @@ export default {
   apiError: 'API 错误',
   apiErrorWithCode: 'API 错误 {code}',
   systemStatus: '系统状态:\n{data}',
-  commandFailed: '命令失败: {message}',
+  commandFailed: '命令失败: {message}'
 } as const;

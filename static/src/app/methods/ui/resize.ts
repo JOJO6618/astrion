@@ -1,5 +1,9 @@
 // @ts-nocheck
-import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
+import {
+  startResize as startPanelResize,
+  handleResize as handlePanelResize,
+  stopResize as stopPanelResize
+} from '../../../composables/usePanelResize';
 
 export const resizeMethods = {
   startResize(panel, event) {

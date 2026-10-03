@@ -43,14 +43,14 @@ export async function saveWorkflow(wf: WorkflowDef): Promise<void> {
   const resp = await fetch(`/api/workflows/${encodeURIComponent(wf.name)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ workflow: wf }),
+    body: JSON.stringify({ workflow: wf })
   });
   if (!resp.ok) throw await parseError(resp, t('workflow.saveFailed'));
 }
 
 export async function deleteWorkflow(name: string): Promise<void> {
   const resp = await fetch(`/api/workflows/${encodeURIComponent(name)}`, {
-    method: 'DELETE',
+    method: 'DELETE'
   });
   if (!resp.ok) throw await parseError(resp, t('workflow.deleteFailed'));
 }

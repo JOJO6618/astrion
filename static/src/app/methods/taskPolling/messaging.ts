@@ -10,7 +10,7 @@ import {
   resolveUserMessageMetadata,
   isEmptyAssistantPlaceholderMessage,
   getOptimisticUserEchoTarget,
-  findRecentMatchingUserMessage,
+  findRecentMatchingUserMessage
 } from './shared';
 
 export const messagingMethods = {
@@ -88,7 +88,9 @@ export const messagingMethods = {
       // 恢复“已发送但尚未收到任何回复”的运行中对话时，前端会先补一个
       // awaitingFirstContent assistant 占位。重放 user_message 不能把这个等待态清掉，
       // 否则输入区会丢失停止按钮。
-      this.streamingMessage = isEmptyAssistantPlaceholderMessage(this.messages?.[this.messages.length - 1])
+      this.streamingMessage = isEmptyAssistantPlaceholderMessage(
+        this.messages?.[this.messages.length - 1]
+      )
         ? true
         : false;
       this.stopRequested = false;

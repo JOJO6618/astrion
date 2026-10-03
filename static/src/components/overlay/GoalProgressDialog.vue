@@ -4,14 +4,22 @@
       <div class="subagent-activity-modal goal-progress-modal">
         <div class="subagent-activity-header">
           <div class="subagent-activity-title">
-            {{ isDone ? $t('overlay.goalDoneTitle') : isStopped ? $t('overlay.goalStoppedTitle') : $t('overlay.goalRunningTitle') }}
+            {{
+              isDone
+                ? $t('overlay.goalDoneTitle')
+                : isStopped
+                  ? $t('overlay.goalStoppedTitle')
+                  : $t('overlay.goalRunningTitle')
+            }}
           </div>
           <CloseButton :label="$t('common.close')" @click="$emit('close')" />
         </div>
 
         <div class="goal-progress-meta">
           <span class="goal-progress-status" :class="statusClass">{{ statusLabel }}</span>
-          <span v-if="goal" class="goal-progress-goal" :title="goal">{{ $t('overlay.goalLabel', { goal }) }}</span>
+          <span v-if="goal" class="goal-progress-goal" :title="goal">{{
+            $t('overlay.goalLabel', { goal })
+          }}</span>
         </div>
 
         <div class="goal-progress-metrics">
@@ -38,7 +46,9 @@
         </div>
 
         <div v-if="summary" class="goal-progress-summary">
-          <div class="goal-progress-summary__title">{{ isDone ? $t('overlay.summaryDone') : $t('overlay.summaryLatest') }}</div>
+          <div class="goal-progress-summary__title">
+            {{ isDone ? $t('overlay.summaryDone') : $t('overlay.summaryLatest') }}
+          </div>
           <div class="goal-progress-summary__body">{{ summary }}</div>
         </div>
       </div>
@@ -79,7 +89,9 @@ const statusClass = computed(() => ({
 const goal = computed(() => (props.progress?.goal || '').toString());
 const turnCount = computed(() => Number(props.progress?.turn_count ?? 0));
 const toolCalls = computed(() => Number(props.progress?.tool_calls ?? 0));
-const summary = computed(() => (props.progress?.summary || props.progress?.final_summary || '').toString());
+const summary = computed(() =>
+  (props.progress?.summary || props.progress?.final_summary || '').toString()
+);
 const durationBaseSeconds = ref(0);
 const durationObservedAtMs = ref(Date.now());
 const nowMs = ref(Date.now());
@@ -129,9 +141,10 @@ const formattedTokens = computed(() => {
 });
 
 const formattedDuration = computed(() => {
-  const liveExtra = !isDone.value && !isStopped.value
-    ? Math.max(0, (nowMs.value - durationObservedAtMs.value) / 1000)
-    : 0;
+  const liveExtra =
+    !isDone.value && !isStopped.value
+      ? Math.max(0, (nowMs.value - durationObservedAtMs.value) / 1000)
+      : 0;
   const s = durationBaseSeconds.value + liveExtra;
   if (!Number.isFinite(s) || s <= 0) return '0s';
   if (s < 60) return `${Math.round(s)}s`;

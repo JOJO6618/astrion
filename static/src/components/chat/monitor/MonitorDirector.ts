@@ -189,7 +189,6 @@ type TerminalLine = {
   role: 'prompt' | 'output' | 'note';
 };
 
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class MonitorDirector implements MonitorDriver {
@@ -1456,7 +1455,8 @@ export class MonitorDirector implements MonitorDriver {
     this.extractionWindows.set(key, instance);
     const displayIndex = this.extractionWindows.size;
     if (instance.titleEl) {
-      const baseTitle = meta?.title && meta.title.trim().length ? meta.title.trim() : t('monitor.extractTitle');
+      const baseTitle =
+        meta?.title && meta.title.trim().length ? meta.title.trim() : t('monitor.extractTitle');
       instance.titleEl.textContent = displayIndex > 1 ? `${baseTitle} #${displayIndex}` : baseTitle;
     }
     if (meta?.url) {
@@ -1527,7 +1527,10 @@ export class MonitorDirector implements MonitorDriver {
     return top === instance.element;
   }
 
-  private resetCommandWindow(title = t('monitor.commandTitle'), options: { clearOutput?: boolean } = {}) {
+  private resetCommandWindow(
+    title = t('monitor.commandTitle'),
+    options: { clearOutput?: boolean } = {}
+  ) {
     if (this.elements.commandTitle) {
       this.elements.commandTitle.textContent = title;
     }
@@ -2548,7 +2551,10 @@ export class MonitorDirector implements MonitorDriver {
         await this.movePointerToElement(searchBar, { offsetX: -40 });
         await this.click();
       }
-      const query = payload?.arguments?.query || payload?.argumentSnapshot?.query || t('monitor.defaultSearchQuery');
+      const query =
+        payload?.arguments?.query ||
+        payload?.argumentSnapshot?.query ||
+        t('monitor.defaultSearchQuery');
       await this.typeSearchQuery(query);
       this.elements.browserStatus.textContent = t('monitor.browserSearching');
       const completion = await runtime.waitForResult(payload.executionId || payload.id);
@@ -2558,7 +2564,9 @@ export class MonitorDirector implements MonitorDriver {
       const results = Array.isArray(completion?.result?.results) ? completion.result.results : [];
       this.renderSearchResults(results);
       this.elements.browserStatus.textContent =
-        completion?.status === 'completed' ? t('monitor.searchCompleted') : t('monitor.searchIncomplete');
+        completion?.status === 'completed'
+          ? t('monitor.searchCompleted')
+          : t('monitor.searchIncomplete');
       await sleep(320);
       await this.simulateResultBrowsing();
       this.pushWindowToStack(this.elements.browserWindow);
@@ -2654,7 +2662,9 @@ export class MonitorDirector implements MonitorDriver {
       this.applySceneStatus(runtime, 'createFolder', t('monitor.statusCreatingFolder'));
       this.lockDesktopRender();
       const rawPath =
-        payload?.arguments?.path || payload?.arguments?.target_path || t('monitor.defaultFolderName');
+        payload?.arguments?.path ||
+        payload?.arguments?.target_path ||
+        t('monitor.defaultFolderName');
       const segments = this.normalizePathSegments(rawPath);
       const folderName = segments.pop() || t('monitor.defaultFolderName');
       const parentKey = this.composePath(segments);
@@ -2704,7 +2714,9 @@ export class MonitorDirector implements MonitorDriver {
           this.hideContextMenus();
         }
         completion = await resultPromise;
-        if (!this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.createFolderFailed'))) {
+        if (
+          !this.ensureSuccessOrErrorBubble(completion, payload, t('monitor.createFolderFailed'))
+        ) {
           return;
         }
         const resolvedPath = this.resolveResultPath(completion, rawPath);
@@ -3177,7 +3189,11 @@ export class MonitorDirector implements MonitorDriver {
 
     this.sceneHandlers.runCommand = async (payload, runtime) => {
       const toolLabel = payload?.name || payload?.tool || 'run_command';
-      this.applySceneStatus(runtime, 'runCommand', t('monitor.statusCallingTool', { tool: toolLabel }));
+      this.applySceneStatus(
+        runtime,
+        'runCommand',
+        t('monitor.statusCallingTool', { tool: toolLabel })
+      );
       const command = payload?.arguments?.command || payload?.result?.command || 'echo "Hello"';
       const reuse = this.isWindowVisible(this.elements.commandWindow);
       if (reuse) {
@@ -3187,7 +3203,10 @@ export class MonitorDirector implements MonitorDriver {
           this.elements.commandOutput.innerHTML = '';
         }
       } else {
-        await this.revealCommandWindow(t('monitor.commandTitle'), { reset: true, focusInput: true });
+        await this.revealCommandWindow(t('monitor.commandTitle'), {
+          reset: true,
+          focusInput: true
+        });
       }
       await this.typeCommandText(command);
       const completion = await runtime.waitForResult(payload.executionId || payload.id);
@@ -3208,7 +3227,8 @@ export class MonitorDirector implements MonitorDriver {
     };
 
     this.sceneHandlers.reader = async (payload, runtime) => {
-      const targetPath = payload?.arguments?.path || payload?.result?.path || t('monitor.defaultDocPath');
+      const targetPath =
+        payload?.arguments?.path || payload?.result?.path || t('monitor.defaultDocPath');
       const readMode = String(
         payload?.arguments?.type || payload?.result?.type || 'read'
       ).toLowerCase();
@@ -3282,7 +3302,8 @@ export class MonitorDirector implements MonitorDriver {
 
     this.sceneHandlers.focus = async (payload, runtime) => {
       this.applySceneStatus(runtime, 'focus', t('monitor.statusFocusingFile'));
-      const targetPath = payload?.arguments?.path || payload?.result?.path || t('monitor.defaultFilePath');
+      const targetPath =
+        payload?.arguments?.path || payload?.result?.path || t('monitor.defaultFilePath');
       const entry = await this.revealFileTarget(targetPath, { spawnDesktopFile: true });
       if (entry?.element) {
         await this.click({ right: true });
@@ -3330,7 +3351,8 @@ export class MonitorDirector implements MonitorDriver {
 
     this.sceneHandlers.unfocus = async (payload, runtime) => {
       this.applySceneStatus(runtime, 'unfocus', t('monitor.statusProcessing'));
-      const targetPath = payload?.arguments?.path || payload?.result?.path || t('monitor.defaultFilePath');
+      const targetPath =
+        payload?.arguments?.path || payload?.result?.path || t('monitor.defaultFilePath');
       const entry = await this.revealFileTarget(targetPath, { spawnDesktopFile: true });
       if (entry?.element) {
         await this.click({ right: true });
@@ -3569,7 +3591,11 @@ export class MonitorDirector implements MonitorDriver {
             ? output.map(String)
             : [String(output || '')]
       );
-      this.appendTerminalOutputs(sessionId, command, lines.length ? lines : [t('monitor.commandSent')]);
+      this.appendTerminalOutputs(
+        sessionId,
+        command,
+        lines.length ? lines : [t('monitor.commandSent')]
+      );
       await sleep(400);
     };
 
@@ -3660,7 +3686,11 @@ export class MonitorDirector implements MonitorDriver {
 
     this.sceneHandlers.genericTool = async (payload, runtime) => {
       const toolLabel = payload?.name || payload?.tool || 'tool';
-      this.applySceneStatus(runtime, 'genericTool', t('monitor.statusCallingTool', { tool: toolLabel }));
+      this.applySceneStatus(
+        runtime,
+        'genericTool',
+        t('monitor.statusCallingTool', { tool: toolLabel })
+      );
       await sleep(600);
     };
   }

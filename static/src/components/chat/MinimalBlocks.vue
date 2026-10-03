@@ -101,7 +101,11 @@
                     :ref="(el) => registerThinking(step.id, el)"
                     @scroll="handleScroll(step.id, $event)"
                   >
-                    <MarkdownRenderer :content="step.content" :is-streaming="step.streaming" thinking />
+                    <MarkdownRenderer
+                      :content="step.content"
+                      :is-streaming="step.streaming"
+                      thinking
+                    />
                   </div>
                 </div>
                 <div v-else-if="step.type === 'tool'" class="step-body">
@@ -129,7 +133,13 @@
         :class="{ 'streaming-text': group.streaming }"
       >
         <div class="text-content" :class="{ 'streaming-text': group.streaming }">
-          <MarkdownRenderer :content="group.content || ''" :is-streaming="group.streaming" :citations="citations" :citations-final="citationsFinal" :enable-citations="enableCitations" />
+          <MarkdownRenderer
+            :content="group.content || ''"
+            :is-streaming="group.streaming"
+            :citations="citations"
+            :citations-final="citationsFinal"
+            :enable-citations="enableCitations"
+          />
         </div>
       </div>
       <div v-else-if="group.type === 'system'" class="summary-group sub-agent-system-group">
@@ -290,7 +300,9 @@ const getToolSummaryText = (action: Action) => {
   if (tool.status === 'completed') {
     return tool.display_name || tool.name || t('chat.toolCompleted');
   }
-  return action.streaming ? t('chat.executingTool') : tool.display_name || tool.name || t('chat.runTool');
+  return action.streaming
+    ? t('chat.executingTool')
+    : tool.display_name || tool.name || t('chat.runTool');
 };
 
 const isActiveToolAction = (action: Action) => {
@@ -846,9 +858,10 @@ const getCompletedSummaryText = (actions: Action[]): string => {
 
   // counts 必须由 CATEGORY_ORDER 生成：手写初始化清单曾在新增分类时漏同步，
   // 导致新分类计数从 undefined 累加成 NaN、被 count > 0 过滤掉，摘要行整行空白
-  const counts = Object.fromEntries(
-    CATEGORY_ORDER.map((category) => [category, 0])
-  ) as Record<ToolCategory, number>;
+  const counts = Object.fromEntries(CATEGORY_ORDER.map((category) => [category, 0])) as Record<
+    ToolCategory,
+    number
+  >;
 
   toolActions.forEach((action) => {
     counts[getToolCategory(action)]++;
@@ -955,10 +968,14 @@ const toggleExpand = (groupId: string) => {
         // 无高度变化时不会发 transitionend；用已有宽限期计时器收尾。
         // 若 CSS 过渡仍在运行，则由真实 transitionend 通知，避免提前结束回锁检查。
         const container = stepsWrapperRefs.get(groupId)?.parentElement;
-        const transitioning = container?.getAnimations().some(
-          (animation) => animation.playState === 'running' &&
-            'transitionProperty' in animation && animation.transitionProperty === 'grid-template-rows'
-        );
+        const transitioning = container
+          ?.getAnimations()
+          .some(
+            (animation) =>
+              animation.playState === 'running' &&
+              'transitionProperty' in animation &&
+              animation.transitionProperty === 'grid-template-rows'
+          );
         if (!transitioning && !expandedGroups.value.has(groupId)) {
           emit('group-collapse-finished', { groupId });
         }

@@ -64,9 +64,9 @@ export const dragMethods = {
     if (!files.length) return;
 
     // 分离图片和非图片文件
-    const imageFiles = files.filter(file => this.isImageFile(file));
-    const videoFiles = files.filter(file => this.isVideoFile(file));
-    const otherFiles = files.filter(file => !this.isImageFile(file) && !this.isVideoFile(file));
+    const imageFiles = files.filter((file) => this.isImageFile(file));
+    const videoFiles = files.filter((file) => this.isVideoFile(file));
+    const otherFiles = files.filter((file) => !this.isImageFile(file) && !this.isVideoFile(file));
 
     // 优先处理图片，其次视频
     if (imageFiles.length > 0) {

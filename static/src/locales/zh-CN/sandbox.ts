@@ -9,15 +9,19 @@ export default {
   setupAriaLabel: '沙箱环境安装向导',
 
   // ── 说明区 ──
-  introWhat: '沙箱是一个隔离的命令执行环境（基于 WSL2）。AI 执行的所有终端命令都在沙箱内运行，与您的系统隔离。',
+  introWhat:
+    '沙箱是一个隔离的命令执行环境（基于 WSL2）。AI 执行的所有终端命令都在沙箱内运行，与您的系统隔离。',
   introEffect: '未安装沙箱时，需要隔离执行的命令将无法运行，工具调用会直接报错。',
   introDisk: '将下载约 3MB 的 Alpine 迷你系统并安装到 {path}（含工具链总占用约 100~300MB）。',
   introUninstall: '可随时通过命令 wsl --unregister {distro} 完全卸载。',
-  introSecure: '安装的是专用沙箱发行版（已关闭 Windows 互操作），不能使用已安装的 Ubuntu 等日常发行版代替。',
+  introSecure:
+    '安装的是专用沙箱发行版（已关闭 Windows 互操作），不能使用已安装的 Ubuntu 等日常发行版代替。',
 
   // ── 状态描述（检测分级） ──
-  stateWslMissing: '检测到系统尚未启用 WSL2。安装过程需要先启用 WSL2（系统将弹出管理员授权，授权后可能需要重启电脑）。',
-  stateVmPlatformMissing: '检测到 WSL 已安装，但 Windows「虚拟机平台」功能未启用，WSL2 无法运行。安装过程将请求管理员授权启用该功能，之后需要重启电脑才能完成安装。',
+  stateWslMissing:
+    '检测到系统尚未启用 WSL2。安装过程需要先启用 WSL2（系统将弹出管理员授权，授权后可能需要重启电脑）。',
+  stateVmPlatformMissing:
+    '检测到 WSL 已安装，但 Windows「虚拟机平台」功能未启用，WSL2 无法运行。安装过程将请求管理员授权启用该功能，之后需要重启电脑才能完成安装。',
   stateDistroMissing: '检测到 WSL2 已就绪，但尚未安装沙箱专用发行版。点击安装即可自动完成。',
   stateBwrapMissing: '检测到沙箱发行版存在，但缺少 bubblewrap 组件。点击安装将自动修复。',
   stateChecking: '正在检测沙箱环境…',
@@ -43,7 +47,8 @@ export default {
   later: '暂不安装',
   neverAgain: '不再提示',
   rebootDone: '我已重启，继续安装',
-  uacCancelledHint: '已取消管理员授权。启用 WSL2 需要管理员权限，请点击重试并在系统弹窗中选择"是"。',
+  uacCancelledHint:
+    '已取消管理员授权。启用 WSL2 需要管理员权限，请点击重试并在系统弹窗中选择"是"。',
 
   // ── 个人空间 → 通用：沙箱环境区块 ──
   sectionTitle: '沙箱环境',
@@ -55,5 +60,5 @@ export default {
   openWizard: '打开安装向导',
   recheck: '重新检测',
   neverAgainSet: '已选择"不再提示"',
-  resetNeverAgain: '恢复提示',
+  resetNeverAgain: '恢复提示'
 };

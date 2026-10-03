@@ -34,7 +34,9 @@
                 @click.stop="openCitationPreview(single)"
               />
             </div>
-            <div v-else-if="displaySnippet(single)" class="pop-snippet">“{{ displaySnippet(single) }}”</div>
+            <div v-else-if="displaySnippet(single)" class="pop-snippet">
+              “{{ displaySnippet(single) }}”
+            </div>
           </div>
         </div>
         <div v-if="hasFooterAction" class="pop-footer">
@@ -44,12 +46,14 @@
             :href="single.url"
             target="_blank"
             rel="noopener"
-          >{{ t('chat.citationOpenSource') }} ↗</a>
+            >{{ t('chat.citationOpenSource') }} ↗</a
+          >
           <span
             v-else-if="isFile(single) && hostMode"
             class="pop-open"
             @click="openOnComputer(single)"
-          >{{ t('quickdock.menuRevealInManager') }}</span>
+            >{{ t('quickdock.menuRevealInManager') }}</span
+          >
         </div>
       </template>
 
@@ -70,9 +74,21 @@
               :aria-label="t('chat.citationPrev')"
               @click.stop="stepPager(-1)"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m15 6-6 6 6 6" />
+              </svg>
             </button>
-            <span class="pop-pager-count">{{ currentIndex + 1 }}/{{ citationPopover.annotations.length }}</span>
+            <span class="pop-pager-count"
+              >{{ currentIndex + 1 }}/{{ citationPopover.annotations.length }}</span
+            >
             <button
               type="button"
               class="pop-pager-btn"
@@ -80,7 +96,17 @@
               :aria-label="t('chat.citationNext')"
               @click.stop="stepPager(1)"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
             </button>
           </span>
         </div>
@@ -88,7 +114,9 @@
           <div class="pop-body">
             <div class="pop-title-row">
               <div class="pop-title">{{ current.title || current.file_name || '' }}</div>
-              <span v-if="locatorText(current)" class="pop-locator">{{ locatorText(current) }}</span>
+              <span v-if="locatorText(current)" class="pop-locator">{{
+                locatorText(current)
+              }}</span>
             </div>
             <div v-if="current.url" class="pop-url">{{ current.url }}</div>
             <div v-if="isImageFile(current)" class="pop-image">
@@ -99,7 +127,9 @@
                 @click.stop="openCitationPreview(current)"
               />
             </div>
-            <div v-else-if="displaySnippet(current)" class="pop-snippet">“{{ displaySnippet(current) }}”</div>
+            <div v-else-if="displaySnippet(current)" class="pop-snippet">
+              “{{ displaySnippet(current) }}”
+            </div>
           </div>
         </div>
         <div v-if="hasFooterAction" class="pop-footer">
@@ -109,12 +139,14 @@
             :href="current.url"
             target="_blank"
             rel="noopener"
-          >{{ t('chat.citationOpenSource') }} ↗</a>
+            >{{ t('chat.citationOpenSource') }} ↗</a
+          >
           <span
             v-else-if="isFile(current) && hostMode"
             class="pop-open"
             @click="openOnComputer(current)"
-          >{{ t('quickdock.menuRevealInManager') }}</span>
+            >{{ t('quickdock.menuRevealInManager') }}</span
+          >
         </div>
       </template>
     </div>
@@ -131,7 +163,7 @@ import {
   keepCitationPopover,
   leaveCitationPopover,
   closeCitationPopover,
-  type CitationAnnotation,
+  type CitationAnnotation
 } from './citationChips';
 import { faviconFallbackHtml, upgradeCitationFavicons } from './citationFavicon';
 
@@ -144,7 +176,7 @@ const quickDock = useQuickDockStore();
 const uiStore = useUiStore();
 
 const single = computed<CitationAnnotation | null>(() =>
-  citationPopover.annotations.length === 1 ? citationPopover.annotations[0] : null,
+  citationPopover.annotations.length === 1 ? citationPopover.annotations[0] : null
 );
 
 /** 多来源分页：当前展示的条目索引（弹层打开时重置为 0，箭头步进） */
@@ -188,7 +220,17 @@ function isFile(ann: CitationAnnotation) {
   return ann.type === 'file_citation';
 }
 
-const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico', '.avif']);
+const IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.bmp',
+  '.ico',
+  '.avif'
+]);
 
 function isImageFile(ann: CitationAnnotation): boolean {
   if (!isFile(ann)) return false;
@@ -226,7 +268,7 @@ function iconHtml(ann: CitationAnnotation): string {
 }
 
 function headerText(ann: CitationAnnotation): string {
-  return isFile(ann) ? (ann.file_path || ann.file_name || '') : shortDomain(ann.domain);
+  return isFile(ann) ? ann.file_path || ann.file_name || '' : shortDomain(ann.domain);
 }
 
 function locatorText(ann: CitationAnnotation): string {
@@ -236,7 +278,7 @@ function locatorText(ann: CitationAnnotation): string {
     bits.push(
       ann.line_end != null && ann.line_end !== ann.line_start
         ? `L${ann.line_start}–${ann.line_end}`
-        : `L${ann.line_start}`,
+        : `L${ann.line_start}`
     );
   }
   return bits.join(' · ');
@@ -262,7 +304,14 @@ function displaySnippet(ann: CitationAnnotation): string {
 }
 
 async function maybeFetchSnippet(ann: CitationAnnotation) {
-  if (!isFile(ann) || isImageFile(ann) || ann.snippet || !ann.file_path || snippetCache.value[ann.id]) return;
+  if (
+    !isFile(ann) ||
+    isImageFile(ann) ||
+    ann.snippet ||
+    !ann.file_path ||
+    snippetCache.value[ann.id]
+  )
+    return;
   if (pendingSnippets.has(ann.id)) return;
   pendingSnippets.add(ann.id);
   const path = ann.file_path;
@@ -308,7 +357,7 @@ watch(
   () => [citationPopover.visible, current.value?.id] as const,
   ([visible]) => {
     if (visible && current.value) maybeFetchSnippet(current.value);
-  },
+  }
 );
 
 /** 文件卡片头部点击 → 复用右侧文件预览面板 */
@@ -333,14 +382,17 @@ async function openOnComputer(ann: CitationAnnotation) {
     const openResp = await fetch('/api/project/open-file-with-app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, app_id: apps[0].id }),
+      body: JSON.stringify({ path, app_id: apps[0].id })
     });
     const openPayload = await openResp.json().catch(() => ({}));
     if (!openResp.ok || !openPayload?.success) {
       throw new Error(openPayload?.error || t('quickdock.revealOpenFileFailed'));
     }
   } catch (err: any) {
-    uiStore.pushToast({ message: err?.message || t('quickdock.revealOpenFileFailed'), type: 'error' });
+    uiStore.pushToast({
+      message: err?.message || t('quickdock.revealOpenFileFailed'),
+      type: 'error'
+    });
     return;
   }
   closeCitationPopover();
@@ -374,7 +426,7 @@ watch(
       // v-html 渲染出的字母占位统一走多源竞速升级
       if (popoverEl.value) upgradeCitationFavicons(popoverEl.value);
     }
-  },
+  }
 );
 
 const onGlobalClick = (e: MouseEvent) => {

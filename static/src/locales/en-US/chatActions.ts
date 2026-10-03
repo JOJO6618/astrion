@@ -27,5 +27,5 @@ export default {
   modifyWarning: 'No closing marker detected; handled automatically.',
 
   // —— Loader pool (loaders/index.ts) ——
-  loaderPoolEmpty: 'loaderPool cannot be empty',
+  loaderPoolEmpty: 'loaderPool cannot be empty'
 } as const;

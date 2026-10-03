@@ -3,9 +3,7 @@ import { debugLog, goalModeDebugLog } from '../common';
 import { t } from '@/locales';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
-import {
-  extractSkillRefsFromMessage,
-} from './shared';
+import { extractSkillRefsFromMessage } from './shared';
 
 export const sendMethods = {
   async handleSendOrStop() {
@@ -35,9 +33,10 @@ export const sendMethods = {
     // 主对话空闲但 composerBusy=true：composerBusy 只因后台子智能体在跑而保持。
     // 传统模式：waitingForSubAgent=true（taskInProgress=true 。多智能体模式：has_running_multi_agent=true。
     // 此时新文本消息应直接发送，触发主智能体下一轮工作，而不是被进队列等任务结束。
-    const mainIdle = typeof this.mainChatIdle === 'function' ? this.mainChatIdle : (
-      !this.streamingUi && !this.stopRequested && !this.compressionActiveForCurrentConversation
-    );
+    const mainIdle =
+      typeof this.mainChatIdle === 'function'
+        ? this.mainChatIdle
+        : !this.streamingUi && !this.stopRequested && !this.compressionActiveForCurrentConversation;
     if (this.composerBusy && mainIdle && hasText) {
       // 如果有 pending 问题（子智能体询问主智能体），仍走问答路径，不走直接发送
       if (Array.isArray(this.pendingUserQuestions) && this.pendingUserQuestions.length > 0) {
@@ -153,7 +152,8 @@ export const sendMethods = {
     let text = ((usePresetText ? presetText : this.inputMessage) || '').trim();
     let preparedSkillRefs = [];
     if (!usePresetText) {
-      const composerRef = typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
+      const composerRef =
+        typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
       const prepared =
         composerRef && typeof composerRef.prepareMessageForSend === 'function'
           ? composerRef.prepareMessageForSend(this.inputMessage)
@@ -277,8 +277,17 @@ export const sendMethods = {
         // reasoning_effort 随创建权威写入新对话 meta：/new 页面用户可能已手动调整档位，
         // 不能依赖后端 terminal 值（会被 status 轮询的 prefs 应用覆盖）
         const createBody = isMultiAgent
-          ? JSON.stringify({ preserve_mode: true, thinking_mode: this.thinkingMode, mode: this.runMode, reasoning_effort: this.reasoningEffort })
-          : JSON.stringify({ thinking_mode: this.thinkingMode, mode: this.runMode, reasoning_effort: this.reasoningEffort });
+          ? JSON.stringify({
+              preserve_mode: true,
+              thinking_mode: this.thinkingMode,
+              mode: this.runMode,
+              reasoning_effort: this.reasoningEffort
+            })
+          : JSON.stringify({
+              thinking_mode: this.thinkingMode,
+              mode: this.runMode,
+              reasoning_effort: this.reasoningEffort
+            });
         const createResp = await fetch(createUrl, {
           method: 'POST',
           headers: {
@@ -288,7 +297,11 @@ export const sendMethods = {
         });
         const createResult = await createResp.json().catch(() => ({}));
         if (!createResp.ok || !createResult?.success || !createResult?.conversation_id) {
-          throw new Error(createResult?.message || createResult?.error || t('appMessages.createConversationFailed'));
+          throw new Error(
+            createResult?.message ||
+              createResult?.error ||
+              t('appMessages.createConversationFailed')
+          );
         }
         targetConversationId = createResult.conversation_id;
         // 创建即定型：落地对话类型（与后端 metadata 保持一致）
@@ -399,7 +412,11 @@ export const sendMethods = {
     if (typeof this.startRunningStateReconcile === 'function') {
       this.startRunningStateReconcile();
     }
-    const localMessageSource = usePresetText ? (options?.source === 'runtime_queue_manual_guide' ? 'guidance' : 'presend') : 'user';
+    const localMessageSource = usePresetText
+      ? options?.source === 'runtime_queue_manual_guide'
+        ? 'guidance'
+        : 'presend'
+      : 'user';
     this.chatAddUserMessage(
       message,
       images,
@@ -533,7 +550,7 @@ export const sendMethods = {
       taskInProgress: this.taskInProgress,
       streamingUi: this.streamingUi,
       canStop,
-      currentTaskId: this.currentTaskId,
+      currentTaskId: this.currentTaskId
     });
     if (!canStop) {
       this._stopTaskRunning = false;
@@ -564,14 +581,15 @@ export const sendMethods = {
       // 等待后端确认；轮询继续，task_stopped 事件到达后会由 taskStore 自动停止轮询
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      const shouldKeepBusy =
-        ['running', 'pending', 'cancel_requested', 'canceled'].includes(String(taskStore.taskStatus));
+      const shouldKeepBusy = ['running', 'pending', 'cancel_requested', 'canceled'].includes(
+        String(taskStore.taskStatus)
+      );
 
       goalModeDebugLog('stopTask:try-end', {
         currentTaskId: taskStore.currentTaskId,
         taskStatus: taskStore.taskStatus,
         shouldKeepBusy,
-        streamingMessage: this.streamingMessage,
+        streamingMessage: this.streamingMessage
       });
 
       // 清理前端状态
@@ -594,14 +612,15 @@ export const sendMethods = {
       console.error('[Message] 取消任务失败:', error);
       const { useTaskStore } = await import('../../../stores/task');
       const taskStore = useTaskStore();
-      const shouldKeepBusy =
-        ['running', 'pending', 'cancel_requested', 'canceled'].includes(String(taskStore.taskStatus));
+      const shouldKeepBusy = ['running', 'pending', 'cancel_requested', 'canceled'].includes(
+        String(taskStore.taskStatus)
+      );
 
       goalModeDebugLog('stopTask:catch', {
         error: String(error),
         currentTaskId: taskStore.currentTaskId,
         taskStatus: taskStore.taskStatus,
-        shouldKeepBusy,
+        shouldKeepBusy
       });
 
       // 即使失败也清理状态

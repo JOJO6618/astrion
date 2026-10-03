@@ -122,9 +122,12 @@ export const useWorkflowStore = defineStore('workflow', {
      */
     async fetchStatus(conversationId: string) {
       try {
-        const resp = await fetch(`/api/workflow/status?conversation_id=${encodeURIComponent(conversationId)}`, {
-          credentials: 'same-origin'
-        });
+        const resp = await fetch(
+          `/api/workflow/status?conversation_id=${encodeURIComponent(conversationId)}`,
+          {
+            credentials: 'same-origin'
+          }
+        );
         const data = await resp.json().catch(() => ({}));
         if (resp.ok && data?.success && data?.snapshot?.active === true) {
           this.setWorkflow(data.snapshot, false);

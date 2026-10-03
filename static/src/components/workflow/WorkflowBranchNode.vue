@@ -3,7 +3,7 @@
     class="branch-node"
     :class="{
       'branch-node--selected': selected,
-      'branch-node--issue': data.hasIssue,
+      'branch-node--issue': data.hasIssue
     }"
     :style="{ minHeight: `${bodyHeight}px` }"
   >
@@ -29,11 +29,22 @@
     />
     <!-- 上/下：驳回红线接收入口（语义相同，按相对位置自动选向，只进不出） -->
     <Handle id="in-top" type="target" :position="Position.Top" class="branch-node__reject-in" />
-    <Handle id="in-bottom" type="target" :position="Position.Bottom" class="branch-node__reject-in" />
+    <Handle
+      id="in-bottom"
+      type="target"
+      :position="Position.Bottom"
+      class="branch-node__reject-in"
+    />
     <div class="branch-node__body">
-      <span class="icon branch-node__icon" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+      <span
+        class="icon branch-node__icon"
+        :style="iconSrc(ICONS.gitBranch)"
+        aria-hidden="true"
+      ></span>
       <span class="branch-node__name">{{ data.node.name || data.node.id }}</span>
-      <span class="branch-node__meta">{{ $t('workflow.branchOutMeta', { n: data.outCount }) }}</span>
+      <span class="branch-node__meta">{{
+        $t('workflow.branchOutMeta', { n: data.outCount })
+      }}</span>
     </div>
   </div>
 </template>

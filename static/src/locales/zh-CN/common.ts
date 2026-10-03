@@ -41,5 +41,5 @@ export default {
   minutesAgo: '{n}分钟前',
   hoursAgo: '{n}小时前',
   daysAgo: '{n}天前',
-  timeDate: '{month}月{day}日 {hour}:{minute}',
+  timeDate: '{month}月{day}日 {hour}:{minute}'
 } as const;

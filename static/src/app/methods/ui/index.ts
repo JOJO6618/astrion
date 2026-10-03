@@ -44,5 +44,5 @@ export const uiMethods = {
   ...routeMethods,
   ...conversationTabsMethods,
   ...systemMethods,
-  ...resizeMethods,
+  ...resizeMethods
 };

@@ -22,12 +22,7 @@
       </div>
 
       <div v-if="workflows.length" class="wf-library__list">
-        <div
-          v-for="wf in workflows"
-          :key="wf.name"
-          class="wf-row"
-          @click="$emit('open', wf.name)"
-        >
+        <div v-for="wf in workflows" :key="wf.name" class="wf-row" @click="$emit('open', wf.name)">
           <div class="wf-row__icon">
             <span class="icon icon-md" :style="iconSrc(ICONS.workflow)" aria-hidden="true"></span>
           </div>
@@ -38,7 +33,9 @@
           <div class="wf-row__meta">
             <span>{{ $t('workflow.nodeCountLabel', { n: wf.nodeCount }) }}</span>
             <span class="wf-row__meta-sep">·</span>
-            <span>{{ wf.source === 'builtin' ? $t('workflow.badgeBuiltin') : $t('workflow.badgeUser') }}</span>
+            <span>{{
+              wf.source === 'builtin' ? $t('workflow.badgeBuiltin') : $t('workflow.badgeUser')
+            }}</span>
             <span class="wf-row__meta-sep">·</span>
             <span>{{ wf.updatedAt }}</span>
           </div>
@@ -289,7 +286,9 @@ function iconSrc(url: string) {
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 
   .icon {
     --icon-size: 14px;
@@ -343,7 +342,9 @@ function iconSrc(url: string) {
   background: transparent;
   color: var(--text-tertiary);
   cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 
   .icon {
     --icon-size: 15px;

@@ -55,7 +55,7 @@ function getRunningStatusTexts(): Record<string, string> {
     terminal_snapshot: t('toolResults.runningStatus.terminalSnapshot'),
     read_skill: t('toolResults.runningStatus.readSkill'),
     create_skill: t('toolResults.runningStatus.createSkill'),
-    ask_user: t('toolResults.runningStatus.askUser'),
+    ask_user: t('toolResults.runningStatus.askUser')
   };
 }
 
@@ -83,7 +83,7 @@ function getCompletedStatusTexts(): Record<string, string> {
     terminal_snapshot: t('toolResults.completedStatus.terminalSnapshot'),
     read_skill: t('toolResults.completedStatus.readSkill'),
     create_skill: t('toolResults.completedStatus.createSkill'),
-    ask_user: t('toolResults.completedStatus.askUser'),
+    ask_user: t('toolResults.completedStatus.askUser')
   };
 }
 
@@ -101,7 +101,7 @@ function getSearchTopicMap(): Record<string, string> {
   return {
     general: t('toolResults.search.topicGeneral'),
     news: t('toolResults.search.topicNews'),
-    finance: t('toolResults.search.topicFinance'),
+    finance: t('toolResults.search.topicFinance')
   };
 }
 
@@ -110,7 +110,7 @@ function getRelativeTimeRangeMap(): Record<string, string> {
     day: t('toolResults.search.timeLast24h'),
     week: t('toolResults.search.timeLast7d'),
     month: t('toolResults.search.timeLast30d'),
-    year: t('toolResults.search.timeLast365d'),
+    year: t('toolResults.search.timeLast365d')
   };
 }
 
@@ -144,7 +144,9 @@ function describeReadFileResult(tool: any): string {
   }
   const readType = String(tool.result.type || 'read').toLowerCase();
   if (readType === 'search') {
-    const query = tool.result.query ? t('toolResults.sentences.searchQuote', { text: tool.result.query }) : '';
+    const query = tool.result.query
+      ? t('toolResults.sentences.searchQuote', { text: tool.result.query })
+      : '';
     const count =
       typeof tool.result.returned_matches === 'number'
         ? tool.result.returned_matches
@@ -235,7 +237,7 @@ export function getToolStatusText(tool: any, opts?: { intentEnabled?: boolean })
       const runningMap: Record<string, string> = {
         read: t('toolResults.runningStatus.readFile'),
         search: t('toolResults.runningStatus.readSearch'),
-        extract: t('toolResults.runningStatus.readExtract'),
+        extract: t('toolResults.runningStatus.readExtract')
       };
       return runningMap[readType] || t('toolResults.runningStatus.readFile');
     }
@@ -347,7 +349,7 @@ export function formatSearchTime(filters: ToolPayload): string {
   if (filters.start_date && filters.end_date) {
     return t('toolResults.search.timeRangeTo', {
       start: filters.start_date,
-      end: filters.end_date,
+      end: filters.end_date
     });
   }
   return t('toolResults.search.timeUnlimited');

@@ -70,7 +70,9 @@ export const useSubAgentStore = defineStore('subAgent', {
         );
         let resp;
         if (conversationStore.multiAgentMode) {
-          resp = await fetch(`/api/multiagent/active_sub_agents?conversation_id=${encodeURIComponent(convId)}`);
+          resp = await fetch(
+            `/api/multiagent/active_sub_agents?conversation_id=${encodeURIComponent(convId)}`
+          );
         } else {
           // 必须携带 conversation_id：后端按 terminal 的当前对话过滤，无参数时落到
           // 工作区级服务 terminal，其 current_conversation_id 与用户查看的对话不一致。
@@ -82,8 +84,12 @@ export const useSubAgentStore = defineStore('subAgent', {
         const data = await resp.json();
         if (data.success) {
           const agents = conversationStore.multiAgentMode
-            ? (Array.isArray(data.agents) ? data.agents : [])
-            : (Array.isArray(data.data) ? data.data : []);
+            ? Array.isArray(data.agents)
+              ? data.agents
+              : []
+            : Array.isArray(data.data)
+              ? data.data
+              : [];
           // 统一按创建时间升序（最新在末尾）：传统模式后端返回倒序，
           // 快捷窗口设计要求最新条目出现在列表底部（与待办/后台指令/文件一致）。
           agents.sort(
@@ -197,9 +203,12 @@ export const useSubAgentStore = defineStore('subAgent', {
         const conversationStore = useConversationStore();
         const convId = conversationStore.currentConversationId;
         const query = convId ? `?conversation_id=${encodeURIComponent(convId)}` : '';
-        const resp = await fetch(`/api/sub_agents/${encodeURIComponent(normalizedId)}/terminate${query}`, {
-          method: 'POST'
-        });
+        const resp = await fetch(
+          `/api/sub_agents/${encodeURIComponent(normalizedId)}/terminate${query}`,
+          {
+            method: 'POST'
+          }
+        );
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || !data?.success) {
           throw new Error(data?.error || `HTTP ${resp.status}`);
@@ -222,7 +231,9 @@ export const useSubAgentStore = defineStore('subAgent', {
         this.stoppingTaskIds = next;
       }
     },
-    async stopAllAgents(mode: 'terminate' | 'soft_stop'): Promise<{ success: boolean; stoppedCount?: number; error?: string }> {
+    async stopAllAgents(
+      mode: 'terminate' | 'soft_stop'
+    ): Promise<{ success: boolean; stoppedCount?: number; error?: string }> {
       try {
         // 同 terminateSubAgent：携带 conversation_id 确保命中对话级 terminal
         const conversationStore = useConversationStore();

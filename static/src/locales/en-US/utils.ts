@@ -21,7 +21,8 @@ export default {
 
   // ── WebSocket events (useLegacySocket.ts) ──
   contextTooLong: 'Conversation context is too long',
-  contextNearLimit: 'The current conversation context is nearing its limit. Consider using compression.',
+  contextNearLimit:
+    'The current conversation context is nearing its limit. Consider using compression.',
   videoReading: 'Reading video',
   videoReadingSlow: 'Reading the video may take a while, please be patient',
   unknownFile: 'Unknown file',
@@ -39,5 +40,5 @@ export default {
   apiError: 'API error',
   apiErrorWithCode: 'API error {code}',
   systemStatus: 'System status:\n{data}',
-  commandFailed: 'Command failed: {message}',
+  commandFailed: 'Command failed: {message}'
 } as const;

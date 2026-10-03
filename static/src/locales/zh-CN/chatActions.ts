@@ -27,5 +27,5 @@ export default {
   modifyWarning: '未检测到结束标记，系统已自动处理。',
 
   // —— 加载动画池（loaders/index.ts） ——
-  loaderPoolEmpty: 'loaderPool 不能为空',
+  loaderPoolEmpty: 'loaderPool 不能为空'
 } as const;

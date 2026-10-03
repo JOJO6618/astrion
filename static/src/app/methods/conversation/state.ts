@@ -5,7 +5,6 @@ import './shared';
 
 export const stateMethods = {
   resetAllStates(reason = 'unspecified', options: { preserveMonitorWindows?: boolean } = {}) {
-
     // 如果正在等待子智能体完成，不重置任务状态
     if (this.waitingForSubAgent) {
       debugLog('跳过状态重置：正在等待子智能体完成', { reason });
@@ -114,7 +113,8 @@ export const stateMethods = {
     this._scrollListenerReady = false;
     this.$nextTick(() => {
       this.ensureScrollListener();
-      const composerRef = typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
+      const composerRef =
+        typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
       if (composerRef && typeof composerRef.emitComposerHeight === 'function') {
         composerRef.emitComposerHeight();
       }

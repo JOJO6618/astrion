@@ -188,5 +188,5 @@ export default {
   progressOcr: 'Extracting...',
   progressMemory: 'Syncing memory...',
   progressTodo: 'Managing todos...',
-  progressGenericTool: 'Calling tool',
+  progressGenericTool: 'Calling tool'
 } as const;

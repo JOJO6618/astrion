@@ -14,10 +14,14 @@
       <div>
         <h1>{{ $t('adminApi.title') }}</h1>
         <p>{{ $t('adminApi.subtitle') }}</p>
-        <small class="muted">{{ $t('adminApi.dataTime', { time: timeAgo(snapshot?.generated_at) }) }}</small>
+        <small class="muted">{{
+          $t('adminApi.dataTime', { time: timeAgo(snapshot?.generated_at) })
+        }}</small>
       </div>
       <div class="header-actions">
-        <label><input type="checkbox" v-model="autoRefresh" /> {{ $t('adminApi.autoRefresh') }}</label>
+        <label
+          ><input type="checkbox" v-model="autoRefresh" /> {{ $t('adminApi.autoRefresh') }}</label
+        >
         <button type="button" :disabled="loading" @click="fetchAll">
           {{ loading ? $t('common.refreshing') : $t('adminApi.manualRefresh') }}
         </button>
@@ -37,23 +41,21 @@
         <div class="metric-card">
           <p>{{ $t('adminApi.metricTotalTokens') }}</p>
           <strong>{{ formatNumber(overview.token_totals?.total_tokens || 0) }}</strong>
-          <span class="muted"
-            >{{
-              $t('adminApi.tokenInOut', {
-                input: formatNumber(overview.token_totals?.input_tokens || 0),
-                output: formatNumber(overview.token_totals?.output_tokens || 0)
-              })
-            }}</span
-          >
+          <span class="muted">{{
+            $t('adminApi.tokenInOut', {
+              input: formatNumber(overview.token_totals?.input_tokens || 0),
+              output: formatNumber(overview.token_totals?.output_tokens || 0)
+            })
+          }}</span>
         </div>
         <div class="metric-card">
           <p>{{ $t('adminApi.metricActiveContainers') }}</p>
           <strong>{{ overview.totals?.containers_active || 0 }}</strong>
-          <span class="muted"
-            >{{
-              $t('adminApi.availableSlots', { slots: overview.totals?.available_container_slots ?? '—' })
-            }}</span
-          >
+          <span class="muted">{{
+            $t('adminApi.availableSlots', {
+              slots: overview.totals?.available_container_slots ?? '—'
+            })
+          }}</span>
         </div>
       </div>
     </section>
@@ -62,8 +64,16 @@
       <div class="section-head">
         <h2>{{ $t('adminApi.accountManagement') }}</h2>
         <div class="create-form">
-          <input v-model="createForm.username" type="text" :placeholder="$t('adminApi.usernamePlaceholder')" />
-          <input v-model="createForm.note" type="text" :placeholder="$t('adminApi.notePlaceholder')" />
+          <input
+            v-model="createForm.username"
+            type="text"
+            :placeholder="$t('adminApi.usernamePlaceholder')"
+          />
+          <input
+            v-model="createForm.note"
+            type="text"
+            :placeholder="$t('adminApi.notePlaceholder')"
+          />
           <button type="button" :disabled="creating" @click="createUser">
             {{ creating ? $t('adminApi.creating') : $t('adminApi.createAccount') }}
           </button>
@@ -100,7 +110,9 @@
               <td>{{ formatNumber(u.tokens?.total_tokens || 0) }}</td>
               <td>{{ formatBytes(u.storage?.total_bytes) }}</td>
               <td>
-                <span v-if="u.container?.running" class="status-badge online">{{ $t('common.running') }}</span>
+                <span v-if="u.container?.running" class="status-badge online">{{
+                  $t('common.running')
+                }}</span>
                 <span v-else class="status-badge offline">{{ $t('common.notRunning') }}</span>
               </td>
               <td class="token-cell">
@@ -196,7 +208,9 @@
           <small class="muted">{{ $t('adminApi.uploadSourceNote') }}</small>
         </div>
         <ul class="upload-feed scrollable">
-          <li v-if="!uploads.recent_events?.length" class="upload-item">{{ $t('adminApi.emptyRecords') }}</li>
+          <li v-if="!uploads.recent_events?.length" class="upload-item">
+            {{ $t('adminApi.emptyRecords') }}
+          </li>
           <li v-for="item in uploads.recent_events || []" :key="item.upload_id" class="upload-item">
             <div>
               <strong>{{ item.original_name || $t('adminApi.unnamedFile') }}</strong>
@@ -220,7 +234,6 @@
         </ul>
       </div>
     </section>
-
   </div>
 </template>
 
@@ -688,5 +701,4 @@ td {
   color: #b5473d;
   margin-top: 8px;
 }
-
 </style>

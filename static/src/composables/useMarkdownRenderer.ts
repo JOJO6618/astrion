@@ -335,7 +335,9 @@ function transformCitationMarkers(raw: string, isStreaming: boolean): string {
       .split(/[,，]/)
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+      .map((s) =>
+        s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      )
       .join(',');
     if (!clean) return '';
     return `<span class="md-citation-chip" data-citation-ids="${clean}"></span>`;
@@ -347,7 +349,10 @@ function transformCitationMarkers(raw: string, isStreaming: boolean): string {
   }
 
   // 还原行内代码
-  text = text.replace(new RegExp(`${INLINE_CODE_PLACEHOLDER}(\\d+)__`, 'g'), (_m, i: string) => inlineCodes[Number(i)]);
+  text = text.replace(
+    new RegExp(`${INLINE_CODE_PLACEHOLDER}(\\d+)__`, 'g'),
+    (_m, i: string) => inlineCodes[Number(i)]
+  );
 
   return text;
 }
@@ -571,18 +576,38 @@ const sanitizedSchema: Record<string, any> = {
   ...defaultSchema,
   tagNames: [
     ...(defaultSchema.tagNames || []),
-    'show_html', 'show_image', 'show_file',
-    'show-html', 'show-image', 'show-file'
+    'show_html',
+    'show_image',
+    'show_file',
+    'show-html',
+    'show-image',
+    'show-file'
   ],
   attributes: {
     ...(defaultSchema.attributes || {}),
     div: [...((defaultSchema.attributes || {}).div || []), 'className', 'data-md-table-scroll'],
-    span: [...((defaultSchema.attributes || {}).span || []), 'className', 'dataLatex', 'dataDisplay', 'dataMathRendered', 'data-latex', 'data-display', 'data-math-rendered', 'data-citation-ids', 'dataCitationIds'],
+    span: [
+      ...((defaultSchema.attributes || {}).span || []),
+      'className',
+      'dataLatex',
+      'dataDisplay',
+      'dataMathRendered',
+      'data-latex',
+      'data-display',
+      'data-math-rendered',
+      'data-citation-ids',
+      'dataCitationIds'
+    ],
     a: [
-      'ariaDescribedBy', 'ariaLabel', 'ariaLabelledBy',
-      'dataFootnoteBackref', 'dataFootnoteRef',
-      'data-path', 'data-download',
-      'href', 'title',
+      'ariaDescribedBy',
+      'ariaLabel',
+      'ariaLabelledBy',
+      'dataFootnoteBackref',
+      'dataFootnoteRef',
+      'data-path',
+      'data-download',
+      'href',
+      'title',
       // className: 合并默认的 data-footnote-backref 和我们的 md-download-link
       ['className', 'data-footnote-backref', 'md-download-link']
     ],
@@ -596,10 +621,7 @@ const sanitizedSchema: Record<string, any> = {
   // 允许 <a href="download://..."> 链接
   protocols: {
     ...(defaultSchema.protocols || {}),
-    href: [
-      ...((defaultSchema.protocols || {}).href || []),
-      'download'
-    ]
+    href: [...((defaultSchema.protocols || {}).href || []), 'download']
   }
 };
 
@@ -704,7 +726,9 @@ function scheduleStreamingCodeHighlight() {
 
     if (typeof Prism === 'undefined') return;
 
-    const codeBlocks = document.querySelectorAll('.code-block-wrapper[data-streaming="1"] pre code');
+    const codeBlocks = document.querySelectorAll(
+      '.code-block-wrapper[data-streaming="1"] pre code'
+    );
     codeBlocks.forEach((block) => {
       try {
         Prism.highlightElement(block as HTMLElement);
@@ -802,21 +826,25 @@ export function parseMarkdownSegments(text: string, isStreaming = false): Markdo
 }
 
 export function renderMarkdownText(
-  text: string, isStreaming = false, enableCitations = false, enableCards = true
+  text: string,
+  isStreaming = false,
+  enableCitations = false,
+  enableCards = true
 ): string {
   if (!text) return '';
   // Thinking supports Markdown but treats special card markup as literal text.
   if (!enableCards) {
-    text = text.replace(/<\/?show[_-](?:html|image|file)\b[^>]*(?:>|$)/gi,
-      (tag, offset: number) => isShowHtmlTagInsideMarkdownCode(text, offset) ? tag : escapeHtml(tag));
+    text = text.replace(/<\/?show[_-](?:html|image|file)\b[^>]*(?:>|$)/gi, (tag, offset: number) =>
+      isShowHtmlTagInsideMarkdownCode(text, offset) ? tag : escapeHtml(tag)
+    );
   }
 
   // isStreaming 必须透传：流式期间未闭合的 show_html 需要编码成 data-partial 占位
   // （js=off 实时渲染 / js=on 显示"渲染中"），否则原始标签文本会直接散落到消息里
   // enableCitations：仅 assistant 正文开启；用户消息/预览等静态文本里的【cite:】原样显示
-  const withCustomBlocks = enableCards ? transformShowFileBlocks(
-    transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming))
-  ) : text;
+  const withCustomBlocks = enableCards
+    ? transformShowFileBlocks(transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming)))
+    : text;
   const safeText = transformMathBlocks(
     enableCitations ? transformCitationMarkers(withCustomBlocks, isStreaming) : withCustomBlocks
   );
@@ -886,9 +914,7 @@ export function renderMarkdown(text: string, isStreaming = false) {
   }
 
   const safeText = transformMathBlocks(
-    transformShowFileBlocks(
-      transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming))
-    )
+    transformShowFileBlocks(transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming)))
   );
   let html = '';
   try {

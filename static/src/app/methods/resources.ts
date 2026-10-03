@@ -233,7 +233,9 @@ export const resourceMethods = {
         this.compressionMode = compression.mode || '';
         this.compressionStage = compression.stage || '';
         this.compressionError = compression.error || '';
-        this.compressionConversationId = this.compressionInProgress ? this.currentConversationId : null;
+        this.compressionConversationId = this.compressionInProgress
+          ? this.currentConversationId
+          : null;
       } else {
         this.compressionInProgress = false;
         this.compressionConversationId = null;

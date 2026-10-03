@@ -13,7 +13,9 @@
       >
         <div class="ws-switcher__header">
           <span class="ws-switcher__title">{{ $t(noun) }}</span>
-          <span class="ws-switcher__count">{{ $t('sidebar.workspaceCount', { n: workspaces.length }) }}</span>
+          <span class="ws-switcher__count">{{
+            $t('sidebar.workspaceCount', { n: workspaces.length })
+          }}</span>
         </div>
 
         <div class="ws-switcher__list" ref="listEl" @scroll="closeMenu">
@@ -33,13 +35,28 @@
             <!-- 删除确认内联 -->
             <div v-if="deletingId === item.workspace_id" class="ws-confirm">
               <div class="ws-confirm-text">
-                {{ $t(isProject ? 'sidebar.deleteProjectConfirm' : 'sidebar.deleteWorkspaceConfirm', { label: item.label }) }}
+                {{
+                  $t(
+                    isProject ? 'sidebar.deleteProjectConfirm' : 'sidebar.deleteWorkspaceConfirm',
+                    { label: item.label }
+                  )
+                }}
               </div>
               <div class="ws-confirm-actions">
-                <button type="button" class="ws-btn ghost" :disabled="busy" @click.stop="deletingId = null">
+                <button
+                  type="button"
+                  class="ws-btn ghost"
+                  :disabled="busy"
+                  @click.stop="deletingId = null"
+                >
                   {{ $t('common.cancel') }}
                 </button>
-                <button type="button" class="ws-btn danger" :disabled="busy" @click.stop="confirmDelete(item)">
+                <button
+                  type="button"
+                  class="ws-btn danger"
+                  :disabled="busy"
+                  @click.stop="confirmDelete(item)"
+                >
                   {{ $t('common.delete') }}
                 </button>
               </div>
@@ -47,8 +64,17 @@
 
             <template v-else>
               <span class="ws-row-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+                  />
                 </svg>
               </span>
               <span class="ws-row-text">
@@ -63,10 +89,14 @@
                   @keydown.esc.prevent="renamingId = null"
                 />
                 <span v-else class="ws-row-name">{{ item.label }}</span>
-                <span v-if="!isProject" class="ws-row-path">{{ item.path || $t('sidebar.unconfiguredPath') }}</span>
+                <span v-if="!isProject" class="ws-row-path">{{
+                  item.path || $t('sidebar.unconfiguredPath')
+                }}</span>
               </span>
               <span class="ws-row-meta">
-                <span v-if="item.workspace_id === defaultWorkspaceId" class="ws-tag">{{ $t('sidebar.default') }}</span>
+                <span v-if="item.workspace_id === defaultWorkspaceId" class="ws-tag">{{
+                  $t('sidebar.default')
+                }}</span>
                 <button
                   type="button"
                   class="ws-more"
@@ -75,7 +105,9 @@
                   @click.stop="toggleMenu(item)"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" />
+                    <circle cx="5" cy="12" r="1.6" />
+                    <circle cx="12" cy="12" r="1.6" />
+                    <circle cx="19" cy="12" r="1.6" />
                   </svg>
                 </button>
               </span>
@@ -89,21 +121,43 @@
         <!-- 底部：新建按钮 ⇄ 新建表单（高度动画容器） -->
         <div class="ws-bottom" ref="bottomEl">
           <div v-if="!createOpen" class="ws-footer" :class="{ fading: bottomFading }">
-            <button type="button" class="ws-create-btn" :disabled="busy" @click.stop="openCreateForm">
+            <button
+              type="button"
+              class="ws-create-btn"
+              :disabled="busy"
+              @click.stop="openCreateForm"
+            >
               <span class="ws-create-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 12h14" /><path d="M12 5v14" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
                 </svg>
               </span>
               <span>{{ $t('sidebar.createNoun', { noun: $t(noun) }) }}</span>
             </button>
           </div>
-          <form v-else class="ws-create-form" :class="{ fading: bottomFading }" @submit.prevent="submitCreate">
+          <form
+            v-else
+            class="ws-create-form"
+            :class="{ fading: bottomFading }"
+            @submit.prevent="submitCreate"
+          >
             <input
               ref="createNameEl"
               v-model="createLabel"
               type="text"
-              :placeholder="isProject ? $t('sidebar.projectNamePlaceholder') : $t('sidebar.workspaceNamePlaceholder')"
+              :placeholder="
+                isProject
+                  ? $t('sidebar.projectNamePlaceholder')
+                  : $t('sidebar.workspaceNamePlaceholder')
+              "
               autocomplete="off"
               :disabled="createSubmitting"
             />
@@ -115,7 +169,9 @@
               autocomplete="off"
               :disabled="createSubmitting"
             />
-            <div v-if="errorMessage || pickFolderError" class="ws-create-error">{{ errorMessage || pickFolderError }}</div>
+            <div v-if="errorMessage || pickFolderError" class="ws-create-error">
+              {{ errorMessage || pickFolderError }}
+            </div>
             <div class="ws-create-actions">
               <button
                 v-if="!isProject"
@@ -126,7 +182,12 @@
               >
                 {{ pickingFolder ? $t('sidebar.pickingFolder') : $t('sidebar.pickFolder') }}
               </button>
-              <button type="button" class="ws-btn ghost" :disabled="createSubmitting" @click.stop="closeCreateForm">
+              <button
+                type="button"
+                class="ws-btn ghost"
+                :disabled="createSubmitting"
+                @click.stop="closeCreateForm"
+              >
                 {{ $t('common.cancel') }}
               </button>
               <button type="submit" class="ws-btn primary" :disabled="createSubmitting">
@@ -140,13 +201,7 @@
 
     <!-- 「…」二级菜单：fixed 浮层，逃逸容器裁切（同个人空间二级菜单方案） -->
     <transition name="ws-menu">
-      <div
-        v-if="menuOpenId"
-        class="ws-menu-floating"
-        :style="menuStyle"
-        role="menu"
-        @click.stop
-      >
+      <div v-if="menuOpenId" class="ws-menu-floating" :style="menuStyle" role="menu" @click.stop>
         <button
           type="button"
           :disabled="menuOpenId === defaultWorkspaceId || busy"
@@ -154,12 +209,16 @@
         >
           {{ $t('sidebar.setDefault') }}
         </button>
-        <button type="button" :disabled="busy" @click="handleMenuAction('rename')">{{ $t('sidebar.rename') }}</button>
+        <button type="button" :disabled="busy" @click="handleMenuAction('rename')">
+          {{ $t('sidebar.rename') }}
+        </button>
         <button type="button" :disabled="isProject || busy" @click="handleMenuAction('reveal')">
           {{ $t('sidebar.revealInFolder') }}
         </button>
         <div class="ws-menu-sep"></div>
-        <button type="button" class="danger" :disabled="busy" @click="handleMenuAction('delete')">{{ $t('common.delete') }}</button>
+        <button type="button" class="danger" :disabled="busy" @click="handleMenuAction('delete')">
+          {{ $t('common.delete') }}
+        </button>
       </div>
     </transition>
   </Teleport>
@@ -426,7 +485,8 @@ const pickFolderViaNativeDialog = async () => {
       createPath.value = picked;
     }
   } catch (error) {
-    pickFolderError.value = error instanceof Error ? error.message : String(error || t('sidebar.pickFolderFailed'));
+    pickFolderError.value =
+      error instanceof Error ? error.message : String(error || t('sidebar.pickFolderFailed'));
   } finally {
     pickingFolder.value = false;
   }
@@ -543,7 +603,9 @@ onBeforeUnmount(() => {
 
 .ws-switcher-enter-active,
 .ws-switcher-leave-active {
-  transition: opacity 120ms ease, transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 120ms ease,
+    transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .ws-switcher-enter-from,
@@ -928,7 +990,9 @@ onBeforeUnmount(() => {
 
 .ws-menu-enter-active,
 .ws-menu-leave-active {
-  transition: opacity 110ms ease, transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 110ms ease,
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .ws-menu-enter-from,

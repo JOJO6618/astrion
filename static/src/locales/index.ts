@@ -37,8 +37,8 @@ export const i18n = createI18n<[MessageSchema], LocaleKey, false>({
   messages: {
     'zh-CN': zhCN,
     // enUS 用 DeepString 宽化过（key 奇偶校验在 en-US.ts 里完成），这里断言回 schema 形态
-    'en-US': enUS as unknown as MessageSchema,
-  },
+    'en-US': enUS as unknown as MessageSchema
+  }
 });
 
 // 当前语言（响应式）。需要在 setup 外/普通 TS 中追踪语言变化时使用。

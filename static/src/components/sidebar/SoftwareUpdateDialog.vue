@@ -1,11 +1,7 @@
 <template>
   <Teleport to="body">
     <transition name="update-dialog-fade">
-      <div
-        v-if="store.dialogOpen"
-        class="update-dialog-overlay"
-        @click.self="store.closeDialog()"
-      >
+      <div v-if="store.dialogOpen" class="update-dialog-overlay" @click.self="store.closeDialog()">
         <div class="update-dialog" role="dialog" :aria-label="$t('update.dialogTitle')">
           <div class="update-dialog-header">
             <span class="update-dialog-title">{{ $t('update.dialogTitle') }}</span>
@@ -16,23 +12,45 @@
               :title="$t('common.close')"
               @click="store.closeDialog()"
             >
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              >
                 <path d="M3 3l10 10M13 3L3 13" />
               </svg>
             </button>
           </div>
 
           <!-- 检查中 -->
-          <div v-if="store.checking && !store.progress" class="update-dialog-body update-dialog-body--center">
+          <div
+            v-if="store.checking && !store.progress"
+            class="update-dialog-body update-dialog-body--center"
+          >
             <span class="update-spinner" aria-hidden="true"></span>
             <span class="update-status-text">{{ $t('update.checking') }}</span>
           </div>
 
           <!-- 安装流程（优先于检查结果展示） -->
-          <div v-else-if="store.progress && store.progress.state !== 'idle'" class="update-dialog-body">
+          <div
+            v-else-if="store.progress && store.progress.state !== 'idle'"
+            class="update-dialog-body"
+          >
             <template v-if="store.progress.state === 'error'">
               <div class="update-result-row update-result-row--error">
-                <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <svg
+                  viewBox="0 0 20 20"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                >
                   <circle cx="10" cy="10" r="8" />
                   <path d="M10 6v5M10 13.8v.2" />
                 </svg>
@@ -40,10 +58,18 @@
               </div>
               <div class="update-error-detail">{{ store.progress.error }}</div>
               <div class="update-dialog-actions">
-                <button type="button" class="update-btn update-btn--ghost" @click="store.closeDialog()">
+                <button
+                  type="button"
+                  class="update-btn update-btn--ghost"
+                  @click="store.closeDialog()"
+                >
                   {{ $t('common.close') }}
                 </button>
-                <button type="button" class="update-btn update-btn--primary" @click="store.startInstall()">
+                <button
+                  type="button"
+                  class="update-btn update-btn--primary"
+                  @click="store.startInstall()"
+                >
                   {{ $t('common.retry') }}
                 </button>
               </div>
@@ -51,7 +77,10 @@
             <template v-else>
               <div class="update-status-line">
                 <span class="update-status-text">{{ progressText }}</span>
-                <span v-if="store.progress.state === 'downloading' && store.progress.total" class="update-progress-num">
+                <span
+                  v-if="store.progress.state === 'downloading' && store.progress.total"
+                  class="update-progress-num"
+                >
                   {{ downloadText }}
                 </span>
               </div>
@@ -69,7 +98,15 @@
           <!-- 检查失败 -->
           <div v-else-if="store.checkError" class="update-dialog-body">
             <div class="update-result-row update-result-row--error">
-              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <svg
+                viewBox="0 0 20 20"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              >
                 <circle cx="10" cy="10" r="8" />
                 <path d="M10 6v5M10 13.8v.2" />
               </svg>
@@ -77,10 +114,18 @@
             </div>
             <div class="update-error-detail">{{ store.checkError }}</div>
             <div class="update-dialog-actions">
-              <button type="button" class="update-btn update-btn--ghost" @click="store.closeDialog()">
+              <button
+                type="button"
+                class="update-btn update-btn--ghost"
+                @click="store.closeDialog()"
+              >
                 {{ $t('common.close') }}
               </button>
-              <button type="button" class="update-btn update-btn--primary" @click="store.checkUpdate({ force: true })">
+              <button
+                type="button"
+                class="update-btn update-btn--primary"
+                @click="store.checkUpdate({ force: true })"
+              >
                 {{ $t('common.retry') }}
               </button>
             </div>
@@ -90,7 +135,16 @@
           <div v-else-if="store.result" class="update-dialog-body">
             <template v-if="store.result.update_available">
               <div class="update-result-row update-result-row--accent">
-                <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 20 20"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M10 3v9M6.5 8.5L10 12l3.5-3.5" />
                   <path d="M4 15.5h12" />
                 </svg>
@@ -104,28 +158,51 @@
                 <span class="update-version-arrow" aria-hidden="true">→</span>
                 <span class="update-version-item">
                   <span class="update-version-label">{{ $t('update.latestVersion') }}</span>
-                  <span class="update-version-value update-version-value--accent">v{{ store.result.latest_version }}</span>
+                  <span class="update-version-value update-version-value--accent"
+                    >v{{ store.result.latest_version }}</span
+                  >
                 </span>
               </div>
               <div class="update-notes-block">
                 <div class="update-notes-title">
                   {{ $t('update.releaseNotes') }}
-                  <span v-if="store.result.pub_date" class="update-notes-date">{{ $t('update.publishedAt', { date: pubDateText }) }}</span>
+                  <span v-if="store.result.pub_date" class="update-notes-date">{{
+                    $t('update.publishedAt', { date: pubDateText })
+                  }}</span>
                 </div>
-                <div class="update-notes-content">{{ store.result.notes || $t('update.noReleaseNotes') }}</div>
+                <div class="update-notes-content">
+                  {{ store.result.notes || $t('update.noReleaseNotes') }}
+                </div>
               </div>
               <div class="update-dialog-actions">
-                <button type="button" class="update-btn update-btn--ghost" @click="store.closeDialog()">
+                <button
+                  type="button"
+                  class="update-btn update-btn--ghost"
+                  @click="store.closeDialog()"
+                >
                   {{ $t('update.later') }}
                 </button>
-                <button type="button" class="update-btn update-btn--primary" @click="store.startInstall()">
+                <button
+                  type="button"
+                  class="update-btn update-btn--primary"
+                  @click="store.startInstall()"
+                >
                   {{ $t('update.updateNow') }}
                 </button>
               </div>
             </template>
             <template v-else>
               <div class="update-result-row update-result-row--success">
-                <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 20 20"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <circle cx="10" cy="10" r="8" />
                   <path d="M6.5 10.2l2.4 2.4 4.6-4.8" />
                 </svg>
@@ -138,10 +215,18 @@
                 </span>
               </div>
               <div class="update-dialog-actions">
-                <button type="button" class="update-btn update-btn--ghost" @click="store.closeDialog()">
+                <button
+                  type="button"
+                  class="update-btn update-btn--ghost"
+                  @click="store.closeDialog()"
+                >
                   {{ $t('common.close') }}
                 </button>
-                <button type="button" class="update-btn update-btn--primary" @click="store.checkUpdate({ force: true })">
+                <button
+                  type="button"
+                  class="update-btn update-btn--primary"
+                  @click="store.checkUpdate({ force: true })"
+                >
                   {{ $t('update.recheck') }}
                 </button>
               </div>
@@ -198,7 +283,7 @@ const pubDateText = computed(() => {
   return at.toLocaleDateString(locale.value === 'zh-CN' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric',
+    day: 'numeric'
   });
 });
 </script>
@@ -254,7 +339,9 @@ const pubDateText = computed(() => {
   background: transparent;
   color: var(--text-tertiary);
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 
 .update-dialog-close:hover {
@@ -463,7 +550,10 @@ const pubDateText = computed(() => {
   border-radius: 8px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
   white-space: nowrap;
 }
 

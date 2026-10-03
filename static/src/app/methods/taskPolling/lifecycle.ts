@@ -4,12 +4,7 @@ import { useTaskStore } from '../../../stores/task';
 import { useQuickDockStore } from '../../../stores/quickDock';
 import { usePreviewStore } from '../../../stores/preview';
 import { useChatStore } from '../../../stores/chat';
-import {
-  debugNotifyLog,
-  keyNotifyLog,
-  jsonDebug,
-  restoreDebugLog,
-} from './shared';
+import { debugNotifyLog, keyNotifyLog, jsonDebug, restoreDebugLog } from './shared';
 import { t } from '@/locales';
 
 export const lifecycleMethods = {
@@ -59,10 +54,7 @@ export const lifecycleMethods = {
 
     // 检查事件的 conversation_id 是否匹配当前对话
     // 如果不匹配，忽略该事件（避免切换对话后旧任务的事件显示到新对话中）
-    const crossConversationAllowed = new Set([
-      'shallow_compression',
-      'compression_finished'
-    ]);
+    const crossConversationAllowed = new Set(['shallow_compression', 'compression_finished']);
     // 显式新建路由（/new、/multiagent/new）与独立全屏路由（工作流编辑器等）上
     // currentConversationId 为空是常态：空 id 不等于“无归属”，此时任何携带
     // conversation_id 的事件都属于其他对话，必须丢弃，否则运行中对话的
@@ -99,7 +91,9 @@ export const lifecycleMethods = {
             currentConversationId: this.currentConversationId
           });
         }
-        debugLog(`[TaskPolling] 忽略不匹配的事件 #${eventIdx}: ${eventType}, 事件对话=${eventData.conversation_id}, 当前对话=${this.currentConversationId}`);
+        debugLog(
+          `[TaskPolling] Ignoring mismatched event #${eventIdx}: ${eventType}, event conversation=${eventData.conversation_id}, current conversation=${this.currentConversationId}`
+        );
         return;
       }
     }
@@ -121,7 +115,9 @@ export const lifecycleMethods = {
         eventConversationId: eventData.conversation_id,
         currentConversationId: this.currentConversationId
       });
-      debugLog(`[TaskPolling] 忽略不匹配的任务事件 #${eventIdx}: ${eventType}, 事件任务=${eventData.task_id}, 当前任务=${taskStore.currentTaskId}`);
+      debugLog(
+        `[TaskPolling] Ignoring mismatched task event #${eventIdx}: ${eventType}, event task=${eventData.task_id}, current task=${taskStore.currentTaskId}`
+      );
       return;
     }
 
@@ -532,7 +528,11 @@ export const lifecycleMethods = {
       }, 500);
     }
     this.scheduleTodoListRefresh(100);
-    if (data?.conversation_id && data.conversation_id === this.currentConversationId && data?.task_id) {
+    if (
+      data?.conversation_id &&
+      data.conversation_id === this.currentConversationId &&
+      data?.task_id
+    ) {
       this.acknowledgeCompletedWorkspaceTask?.(data.task_id);
     }
     setTimeout(() => this.refreshRunningWorkspaceTasks?.(), 0);
@@ -575,7 +575,7 @@ export const lifecycleMethods = {
       streamingMessage: this.streamingMessage,
       hasRunningSubAgents,
       hasRunningBackgroundCommands,
-      data,
+      data
     });
 
     this.cleanupTrailingEmptyAssistantPlaceholder('task_stopped');
@@ -614,7 +614,7 @@ export const lifecycleMethods = {
       taskInProgress: this.taskInProgress,
       waitingForSubAgent: this.waitingForSubAgent,
       waitingForBackgroundCommand: this.waitingForBackgroundCommand,
-      hasRunningBackground,
+      hasRunningBackground
     });
 
     this.scheduleTodoListRefresh(100);
@@ -681,7 +681,10 @@ export const lifecycleMethods = {
     const errorType = data.error_type || 'unknown';
     const isToolArgumentParseError =
       // 双语匹配后端 modules/i18n.py tool.param_parse_failed 的 zh/en 产出（\u 转义仅过审计）
-      errorType === 'parameter_format_error' || /(?:\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25|Failed to parse tool arguments)/.test(String(errorMessage || ''));
+      errorType === 'parameter_format_error' ||
+      /(?:\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25|Failed to parse tool arguments)/.test(
+        String(errorMessage || '')
+      );
 
     // 工具参数解析失败属于“单个工具调用失败”，后端会继续执行主任务。
     // 这里不能停止轮询，否则会出现“后端继续跑、前端不再更新”的假死状态。

@@ -57,14 +57,20 @@
     >
       <header class="tutorial-popover__header">
         <span class="tutorial-popover__step">{{ visibleStepIndex }} / {{ totalVisibleSteps }}</span>
-        <button type="button" class="tutorial-popover__close" @click="handleExit">{{ $t('overlay.tutorialExit') }}</button>
+        <button type="button" class="tutorial-popover__close" @click="handleExit">
+          {{ $t('overlay.tutorialExit') }}
+        </button>
       </header>
-      <h3 class="tutorial-popover__title">{{ step?.title || $t('overlay.tutorialFallbackTitle') }}</h3>
+      <h3 class="tutorial-popover__title">
+        {{ step?.title || $t('overlay.tutorialFallbackTitle') }}
+      </h3>
       <p class="tutorial-popover__desc">{{ step?.description || '' }}</p>
       <p v-if="isWaitingTarget" class="tutorial-popover__warn">
         {{ $t('overlay.tutorialWaitingTarget') }}
       </p>
-      <p v-else-if="isMustClick" class="tutorial-popover__hint">{{ $t('overlay.tutorialMustClickHint') }}</p>
+      <p v-else-if="isMustClick" class="tutorial-popover__hint">
+        {{ $t('overlay.tutorialMustClickHint') }}
+      </p>
       <p v-if="showPersonalScrollHint" class="tutorial-popover__hint">
         {{ $t('overlay.tutorialScrollHint') }}
       </p>

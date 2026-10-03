@@ -2,12 +2,24 @@
   <div class="wf-editor">
     <header class="wf-editor__topbar">
       <div class="wf-editor__topbar-left">
-        <button type="button" class="wf-icon-btn" :aria-label="$t('workflow.backToLibrary')" :title="$t('workflow.backToLibrary')" @click="$emit('back')">
+        <button
+          type="button"
+          class="wf-icon-btn"
+          :aria-label="$t('workflow.backToLibrary')"
+          :title="$t('workflow.backToLibrary')"
+          @click="$emit('back')"
+        >
           <span class="icon" :style="iconSrc(ICONS.arrowLeft)" aria-hidden="true"></span>
         </button>
-        <span class="icon wf-editor__logo" :style="iconSrc(ICONS.workflow)" aria-hidden="true"></span>
+        <span
+          class="icon wf-editor__logo"
+          :style="iconSrc(ICONS.workflow)"
+          aria-hidden="true"
+        ></span>
         <span class="wf-editor__name">{{ workflow.name }}</span>
-        <span class="wf-editor__badge">{{ workflow.source === 'builtin' ? $t('workflow.badgeBuiltin') : $t('workflow.badgeUser') }}</span>
+        <span class="wf-editor__badge">{{
+          workflow.source === 'builtin' ? $t('workflow.badgeBuiltin') : $t('workflow.badgeUser')
+        }}</span>
         <span v-if="dirty" class="wf-editor__dirty">{{ $t('workflow.unsaved') }}</span>
       </div>
       <div class="wf-editor__topbar-right">
@@ -19,26 +31,53 @@
             :title="$t('workflow.checkIssues')"
             @click.stop="issuesOpen = !issuesOpen"
           >
-            <span class="icon" :style="iconSrc(errorCount > 0 ? ICONS.circleAlert : ICONS.check)" aria-hidden="true"></span>
+            <span
+              class="icon"
+              :style="iconSrc(errorCount > 0 ? ICONS.circleAlert : ICONS.check)"
+              aria-hidden="true"
+            ></span>
             <span>{{ issueLabel }}</span>
           </button>
           <!-- 提醒/报错弹层：不占页面布局，固定高度 + 内部滚动，点外部关闭 -->
           <div v-if="issuesOpen && issues.length" class="wf-editor__issues-pop">
-            <div v-for="(issue, i) in issues" :key="i" class="wf-issue" :class="`wf-issue--${issue.level}`">
-              <span class="icon" :style="iconSrc(issue.level === 'error' ? ICONS.circleAlert : ICONS.triangleAlert)" aria-hidden="true"></span>
+            <div
+              v-for="(issue, i) in issues"
+              :key="i"
+              class="wf-issue"
+              :class="`wf-issue--${issue.level}`"
+            >
+              <span
+                class="icon"
+                :style="iconSrc(issue.level === 'error' ? ICONS.circleAlert : ICONS.triangleAlert)"
+                aria-hidden="true"
+              ></span>
               <span>{{ issue.message }}</span>
             </div>
           </div>
         </div>
-        <button type="button" class="wf-btn wf-btn--ghost" :title="$t('workflow.autoLayout')" @click="onAutoLayout">
+        <button
+          type="button"
+          class="wf-btn wf-btn--ghost"
+          :title="$t('workflow.autoLayout')"
+          @click="onAutoLayout"
+        >
           <span class="icon" :style="iconSrc(ICONS.layoutGrid)" aria-hidden="true"></span>
           <span>{{ $t('workflow.autoLayout') }}</span>
         </button>
         <div class="wf-select wf-select--toolbar" ref="addNodeSelectRef">
-          <button type="button" class="wf-btn wf-btn--ghost" :title="$t('workflow.addNodeTitle')" @click.stop="addNodeMenuOpen = !addNodeMenuOpen">
+          <button
+            type="button"
+            class="wf-btn wf-btn--ghost"
+            :title="$t('workflow.addNodeTitle')"
+            @click.stop="addNodeMenuOpen = !addNodeMenuOpen"
+          >
             <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
             <span>{{ $t('workflow.addNode') }}</span>
-            <span class="icon wf-select__caret" :style="iconSrc(ICONS.chevronDown)" aria-hidden="true"></span>
+            <span
+              class="icon wf-select__caret"
+              :style="iconSrc(ICONS.chevronDown)"
+              aria-hidden="true"
+            ></span>
           </button>
           <div v-if="addNodeMenuOpen" class="wf-select__menu">
             <button type="button" class="wf-select__option" @click="onAddNodeAtCenter('stage')">
@@ -128,7 +167,12 @@
             </label>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.descLabel') }}</span>
-              <input v-model="workflow.description" class="wf-input" type="text" :placeholder="$t('workflow.descPlaceholder')" />
+              <input
+                v-model="workflow.description"
+                class="wf-input"
+                type="text"
+                :placeholder="$t('workflow.descPlaceholder')"
+              />
             </label>
             <div class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.reviewCapability') }}</span>
@@ -164,14 +208,24 @@
             </label>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.endMethodLabel') }}</span>
-              <input v-model="workflow.endConditions" class="wf-input" type="text" :placeholder="$t('workflow.endMethodPlaceholder')" />
+              <input
+                v-model="workflow.endConditions"
+                class="wf-input"
+                type="text"
+                :placeholder="$t('workflow.endMethodPlaceholder')"
+              />
             </label>
           </div>
           <div class="wf-panel__section">
             <div class="wf-panel__heading">{{ $t('workflow.globalNotes') }}</div>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.globalNotesLabel') }}</span>
-              <textarea v-model="workflow.body" class="wf-textarea" rows="8" spellcheck="false"></textarea>
+              <textarea
+                v-model="workflow.body"
+                class="wf-textarea"
+                rows="8"
+                spellcheck="false"
+              ></textarea>
             </label>
           </div>
         </template>
@@ -189,11 +243,21 @@
             </label>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.stageGoalLabel') }}</span>
-              <textarea v-model="selectedStage.goal" class="wf-textarea" rows="2" :placeholder="$t('workflow.stageGoalPlaceholder')"></textarea>
+              <textarea
+                v-model="selectedStage.goal"
+                class="wf-textarea"
+                rows="2"
+                :placeholder="$t('workflow.stageGoalPlaceholder')"
+              ></textarea>
             </label>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.stageWorkLabel') }}</span>
-              <textarea v-model="selectedStage.instructions" class="wf-textarea" rows="4" :placeholder="$t('workflow.stageWorkPlaceholder')"></textarea>
+              <textarea
+                v-model="selectedStage.instructions"
+                class="wf-textarea"
+                rows="4"
+                :placeholder="$t('workflow.stageWorkPlaceholder')"
+              ></textarea>
             </label>
           </div>
           <div class="wf-panel__section">
@@ -205,7 +269,9 @@
                 <button
                   type="button"
                   class="wf-icon-btn wf-icon-btn--sm"
-                  :aria-label="$t('workflow.removeRouteAriaLabel', { name: nodeNameOf(selectedStage.next) })"
+                  :aria-label="
+                    $t('workflow.removeRouteAriaLabel', { name: nodeNameOf(selectedStage.next) })
+                  "
                   @click="onRemoveSelectedRoute"
                 >
                   <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
@@ -227,7 +293,9 @@
             </button>
             <div v-else class="wf-confirm-row">
               <span class="wf-confirm-row__text">{{ $t('workflow.deleteNodeWarning') }}</span>
-              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">{{ $t('workflow.confirmDelete') }}</button>
+              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">
+                {{ $t('workflow.confirmDelete') }}
+              </button>
             </div>
           </div>
         </template>
@@ -245,7 +313,12 @@
             </label>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.reviewFocusLabel') }}</span>
-              <textarea v-model="selectedReview.prompt" class="wf-textarea" rows="3" :placeholder="$t('workflow.reviewFocusPlaceholder')"></textarea>
+              <textarea
+                v-model="selectedReview.prompt"
+                class="wf-textarea"
+                rows="3"
+                :placeholder="$t('workflow.reviewFocusPlaceholder')"
+              ></textarea>
             </label>
             <label class="wf-field">
               <span class="wf-field__label">{{ $t('workflow.maxRejectsLabel') }}</span>
@@ -263,12 +336,20 @@
             <div class="wf-panel__heading">{{ $t('workflow.passRoute') }}</div>
             <div v-if="selectedReview.next" class="wf-route-list">
               <div class="wf-route-row">
-                <span class="icon wf-route-row__icon--pass" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+                <span
+                  class="icon wf-route-row__icon--pass"
+                  :style="iconSrc(ICONS.gitBranch)"
+                  aria-hidden="true"
+                ></span>
                 <span class="wf-route-row__name">{{ nodeNameOf(selectedReview.next) }}</span>
                 <button
                   type="button"
                   class="wf-icon-btn wf-icon-btn--sm"
-                  :aria-label="$t('workflow.removePassRouteAriaLabel', { name: nodeNameOf(selectedReview.next) })"
+                  :aria-label="
+                    $t('workflow.removePassRouteAriaLabel', {
+                      name: nodeNameOf(selectedReview.next)
+                    })
+                  "
                   @click="onRemoveSelectedRoute"
                 >
                   <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
@@ -282,19 +363,29 @@
             <div class="wf-panel__heading">{{ $t('workflow.rejectRoute') }}</div>
             <div v-if="selectedReview.rejectTo" class="wf-route-list">
               <div class="wf-route-row">
-                <span class="icon wf-route-row__icon--back" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+                <span
+                  class="icon wf-route-row__icon--back"
+                  :style="iconSrc(ICONS.gitBranch)"
+                  aria-hidden="true"
+                ></span>
                 <span class="wf-route-row__name">{{ nodeNameOf(selectedReview.rejectTo) }}</span>
                 <button
                   type="button"
                   class="wf-icon-btn wf-icon-btn--sm"
-                  :aria-label="$t('workflow.removeRejectRouteAriaLabel', { name: nodeNameOf(selectedReview.rejectTo) })"
+                  :aria-label="
+                    $t('workflow.removeRejectRouteAriaLabel', {
+                      name: nodeNameOf(selectedReview.rejectTo)
+                    })
+                  "
                   @click="onRemoveRejectRoute"
                 >
                   <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
-            <div v-else class="wf-panel__empty wf-panel__empty--error">{{ $t('workflow.rejectRequired') }}</div>
+            <div v-else class="wf-panel__empty wf-panel__empty--error">
+              {{ $t('workflow.rejectRequired') }}
+            </div>
             <div class="wf-panel__hint">{{ $t('workflow.rejectRouteHint') }}</div>
           </div>
           <div class="wf-panel__section">
@@ -309,7 +400,9 @@
             </button>
             <div v-else class="wf-confirm-row">
               <span class="wf-confirm-row__text">{{ $t('workflow.deleteNodeWarning') }}</span>
-              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">{{ $t('workflow.confirmDelete') }}</button>
+              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">
+                {{ $t('workflow.confirmDelete') }}
+              </button>
             </div>
           </div>
         </template>
@@ -327,7 +420,9 @@
             </label>
           </div>
           <div class="wf-panel__section">
-            <div class="wf-panel__heading">{{ $t('workflow.branchOuts', { n: selectedBranch.next.length }) }}</div>
+            <div class="wf-panel__heading">
+              {{ $t('workflow.branchOuts', { n: selectedBranch.next.length }) }}
+            </div>
             <div v-if="selectedBranch.next.length" class="wf-route-list">
               <div v-for="route in selectedBranch.next" :key="route.target" class="wf-route-item">
                 <div class="wf-route-row">
@@ -336,7 +431,9 @@
                   <button
                     type="button"
                     class="wf-icon-btn wf-icon-btn--sm"
-                    :aria-label="$t('workflow.removeOutAriaLabel', { name: nodeNameOf(route.target) })"
+                    :aria-label="
+                      $t('workflow.removeOutAriaLabel', { name: nodeNameOf(route.target) })
+                    "
                     @click="onRemoveRoute(route.target)"
                   >
                     <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
@@ -365,7 +462,9 @@
             </button>
             <div v-else class="wf-confirm-row">
               <span class="wf-confirm-row__text">{{ $t('workflow.deleteNodeWarning') }}</span>
-              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">{{ $t('workflow.confirmDelete') }}</button>
+              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">
+                {{ $t('workflow.confirmDelete') }}
+              </button>
             </div>
           </div>
         </template>
@@ -374,7 +473,11 @@
         <template v-else-if="selectedBoundary">
           <div class="wf-panel__section">
             <div class="wf-panel__heading">
-              <span>{{ selectedBoundary.kind === 'start' ? $t('workflow.startNode') : $t('workflow.endNode') }}</span>
+              <span>{{
+                selectedBoundary.kind === 'start'
+                  ? $t('workflow.startNode')
+                  : $t('workflow.endNode')
+              }}</span>
               <span class="wf-panel__heading-id">{{ selectedBoundary.id }}</span>
             </div>
             <label class="wf-field">
@@ -391,14 +494,20 @@
                 <button
                   type="button"
                   class="wf-icon-btn wf-icon-btn--sm"
-                  :aria-label="$t('workflow.disconnectEntryAriaLabel', { name: nodeNameOf(selectedBoundary.next) })"
+                  :aria-label="
+                    $t('workflow.disconnectEntryAriaLabel', {
+                      name: nodeNameOf(selectedBoundary.next)
+                    })
+                  "
                   @click="onRemoveSelectedRoute"
                 >
                   <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
-            <div v-else class="wf-panel__empty wf-panel__empty--error">{{ $t('workflow.entryNotConnected') }}</div>
+            <div v-else class="wf-panel__empty wf-panel__empty--error">
+              {{ $t('workflow.entryNotConnected') }}
+            </div>
             <div class="wf-panel__hint">{{ $t('workflow.startOnlyHint') }}</div>
           </div>
           <div class="wf-panel__section">
@@ -413,7 +522,9 @@
             </button>
             <div v-else class="wf-confirm-row">
               <span class="wf-confirm-row__text">{{ $t('workflow.deleteNodeWarning') }}</span>
-              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">{{ $t('workflow.confirmDelete') }}</button>
+              <button type="button" class="wf-btn wf-btn--danger-confirm" @click="onDeleteStage">
+                {{ $t('workflow.confirmDelete') }}
+              </button>
             </div>
           </div>
         </template>
@@ -433,7 +544,7 @@ import {
   type Edge,
   type EdgeChange,
   type Node,
-  type NodeChange,
+  type NodeChange
 } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
@@ -463,7 +574,7 @@ import {
   validateWorkflow,
   workflowToFlow,
   type WorkflowDef,
-  type WorkflowNodeDef,
+  type WorkflowNodeDef
 } from './workflowModel';
 import { saveWorkflow } from './api';
 import { t, currentLocale } from '@/locales';
@@ -506,16 +617,28 @@ const issueLabel = computed(() => {
   if (issues.value.length > 0) return t('workflow.issueWarnings', { n: issues.value.length });
   return t('workflow.issueOk');
 });
-const issueStageIds = computed(() => new Set(issues.value.map((i) => i.nodeId).filter(Boolean) as string[]));
+const issueStageIds = computed(
+  () => new Set(issues.value.map((i) => i.nodeId).filter(Boolean) as string[])
+);
 // 拖拽只改 position 也会触发校验重算产出新 Set 引用；用排序字符串 key 做值比较，避免拖拽中断
 const issueStageKey = computed(() => Array.from(issueStageIds.value).sort().join(','));
 
-const selectedNode = computed(() => workflow.value.nodes.find((n) => n.id === selectedStageId.value) ?? null);
-const selectedStage = computed(() => (selectedNode.value?.kind === 'stage' ? selectedNode.value : null));
-const selectedReview = computed(() => (selectedNode.value?.kind === 'review' ? selectedNode.value : null));
-const selectedBranch = computed(() => (selectedNode.value?.kind === 'branch' ? selectedNode.value : null));
+const selectedNode = computed(
+  () => workflow.value.nodes.find((n) => n.id === selectedStageId.value) ?? null
+);
+const selectedStage = computed(() =>
+  selectedNode.value?.kind === 'stage' ? selectedNode.value : null
+);
+const selectedReview = computed(() =>
+  selectedNode.value?.kind === 'review' ? selectedNode.value : null
+);
+const selectedBranch = computed(() =>
+  selectedNode.value?.kind === 'branch' ? selectedNode.value : null
+);
 const selectedBoundary = computed(() =>
-  selectedNode.value?.kind === 'start' || selectedNode.value?.kind === 'end' ? selectedNode.value : null
+  selectedNode.value?.kind === 'start' || selectedNode.value?.kind === 'end'
+    ? selectedNode.value
+    : null
 );
 
 function nodeNameOf(id: string): string {
@@ -569,7 +692,8 @@ function onConnect(connection: Connection) {
     const prev = sourceNode.kind === 'review' ? sourceNode.rejectTo : null;
     const err = connectRejectTo(workflow.value, source, target);
     if (err) flash(err);
-    else if (prev && prev !== target) flash(t('workflow.flashReplaceReject', { name: nodeNameOf(prev) }));
+    else if (prev && prev !== target)
+      flash(t('workflow.flashReplaceReject', { name: nodeNameOf(prev) }));
   } else if (sourceNode.kind === 'branch') {
     // 分支右桩：已占用桩拖线 = 修改该桩流向；空桩拖线 = 新增出线
     const slotMatch = /^out-(\d+)$/.exec(sourceHandle);
@@ -587,7 +711,8 @@ function onConnect(connection: Connection) {
     const prev = sourceNode.next;
     const err = connectNext(workflow.value, source, target);
     if (err) flash(err);
-    else if (prev && prev !== target) flash(t('workflow.flashReplaceRoute', { name: nodeNameOf(prev) }));
+    else if (prev && prev !== target)
+      flash(t('workflow.flashReplaceRoute', { name: nodeNameOf(prev) }));
   }
   rebuild();
 }
@@ -664,7 +789,7 @@ function onAddNodeAtCenter(kind: WorkflowNodeDef['kind']) {
   const cy = (rect?.height ?? 500) / 2;
   const point = {
     x: (cx - viewport.x) / viewport.zoom - 90,
-    y: (cy - viewport.y) / viewport.zoom - 50,
+    y: (cy - viewport.y) / viewport.zoom - 50
   };
   const node =
     kind === 'review'
@@ -769,10 +894,18 @@ async function onSave() {
 }
 
 function onDocumentClick(event: MouseEvent) {
-  if (addNodeMenuOpen.value && addNodeSelectRef.value && !addNodeSelectRef.value.contains(event.target as HTMLElement)) {
+  if (
+    addNodeMenuOpen.value &&
+    addNodeSelectRef.value &&
+    !addNodeSelectRef.value.contains(event.target as HTMLElement)
+  ) {
     addNodeMenuOpen.value = false;
   }
-  if (issuesOpen.value && issuesAnchorRef.value && !issuesAnchorRef.value.contains(event.target as HTMLElement)) {
+  if (
+    issuesOpen.value &&
+    issuesAnchorRef.value &&
+    !issuesAnchorRef.value.contains(event.target as HTMLElement)
+  ) {
     issuesOpen.value = false;
   }
 }
@@ -1098,7 +1231,9 @@ onBeforeUnmount(() => {
     font-size: 12px;
     font-family: inherit;
     cursor: pointer;
-    transition: background-color 0.12s ease, color 0.12s ease;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
 
     &--active {
       background: var(--surface-raised);
@@ -1300,7 +1435,9 @@ onBeforeUnmount(() => {
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 
   .icon {
     --icon-size: 14px;
@@ -1381,7 +1518,9 @@ onBeforeUnmount(() => {
   color: var(--text-tertiary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 
   .icon {
     --icon-size: 15px;

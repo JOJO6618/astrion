@@ -32,7 +32,9 @@
               </div>
               <div class="browser-body">
                 <div class="search-bar"><span ref="browserSearchText"></span></div>
-                <div class="browser-status" ref="browserStatus">{{ $t('chat.vmBrowserReady') }}</div>
+                <div class="browser-status" ref="browserStatus">
+                  {{ $t('chat.vmBrowserReady') }}
+                </div>
                 <div class="results-list results-scroll">
                   <ul ref="browserResults"></ul>
                 </div>
@@ -48,7 +50,9 @@
               </div>
               <div class="extraction-body">
                 <div class="extract-url" ref="extractionUrl"></div>
-                <div class="extract-status" ref="extractionState">{{ $t('chat.vmExtractWait') }}</div>
+                <div class="extract-status" ref="extractionState">
+                  {{ $t('chat.vmExtractWait') }}
+                </div>
                 <div class="extract-summary" ref="extractionSummary"></div>
               </div>
             </div>

@@ -18,11 +18,13 @@ export default {
   workspacePanelSwitchTitle: 'Workspace panel switcher',
   workspacePanelSwitchDesc: 'The next step will open the panel switcher menu.',
   workspacePanelOptionsTitle: 'Quad panel',
-  workspacePanelOptionsDesc: 'Switch between Files, To-dos, Sub-agents, and Background Commands here.',
+  workspacePanelOptionsDesc:
+    'Switch between Files, To-dos, Sub-agents, and Background Commands here.',
   workspaceModeIndicatorTitle: 'Thinking mode',
   workspaceModeIndicatorDesc: 'Click to toggle Quick / Thinking.',
   workspaceConnectionIndicatorTitle: 'Connection indicator',
-  workspaceConnectionIndicatorDesc: 'Green means connected; red means disconnected from the backend.',
+  workspaceConnectionIndicatorDesc:
+    'Green means connected; red means disconnected from the backend.',
   headerModelSelectorTitle: 'Model & mode selector',
   headerModelSelectorDesc: 'The next step will open the model and run mode popup.',
   modelListTitle: 'Model list',
@@ -45,7 +47,8 @@ export default {
   mobileMenuWorkspaceDesc: 'The next step will open the workspace files.',
   mobileWorkspacePanelSwitchDesc: 'The next step will open the switcher popup.',
   mobileWorkspacePanelOptionsTitle: 'Switcher options',
-  mobileWorkspacePanelOptionsDesc: 'Switch between Files, To-dos, Sub-agents, and Background Commands here.',
+  mobileWorkspacePanelOptionsDesc:
+    'Switch between Files, To-dos, Sub-agents, and Background Commands here.',
   mobileWorkspaceCloseTitle: 'Close workspace files',
   mobileWorkspaceCloseDesc: 'The next step will close the workspace files panel.',
   mobileMenuOpenNewchatDesc: 'The next step will open the menu.',
@@ -127,5 +130,5 @@ export default {
 
   // Done
   doneTitle: 'Tour complete!',
-  doneDesc: 'Congratulations! You can revisit this tour anytime from Personal Space.',
+  doneDesc: 'Congratulations! You can revisit this tour anytime from Personal Space.'
 } as const;

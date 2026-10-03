@@ -34,7 +34,7 @@ export default {
     done: 'Done',
     notFound: 'Not found',
     terminated: 'Terminated',
-    waiting: 'Waiting',
+    waiting: 'Waiting'
   },
 
   // —— Field labels in HTML fragments (with colon) ——
@@ -125,7 +125,7 @@ export default {
     backgroundCommandOutput: 'Background command output:',
     reviewContent: 'Review content:',
     rename: 'Renamed:',
-    waitedSubAgents: 'Waited for {n} sub-agents:',
+    waitedSubAgents: 'Waited for {n} sub-agents:'
   },
 
   // —— Search engine names (provider badge in web_search result meta) ——
@@ -134,14 +134,14 @@ export default {
     bocha: 'Bocha',
     exa: 'Exa',
     parallel: 'Parallel',
-    searxng: 'SearXNG (self-hosted)',
+    searxng: 'SearXNG (self-hosted)'
   },
 
   // —— Section titles (no colon) ——
   sectionLabels: {
     executionStats: 'Execution stats',
     finalReply: 'Final reply',
-    replyContent: 'Reply content',
+    replyContent: 'Reply content'
   },
 
   // —— Structural field-name map (renderDefaultResult labelMap etc., nouns without colon) ——
@@ -154,7 +154,7 @@ export default {
     targetDisplayName: 'Target sub-agent',
     question: 'Question',
     roleId: 'Role ID',
-    url: 'URL',
+    url: 'URL'
   },
 
   // —— Personalization fields ——
@@ -168,7 +168,7 @@ export default {
       theme: 'Theme',
       communicationStyle: 'Communication style',
       conversationContinuity: 'Conversation continuity',
-      enabled: 'Personalization toggle',
+      enabled: 'Personalization toggle'
     },
     values: {
       enabled: 'On',
@@ -178,10 +178,10 @@ export default {
       styleAuto: 'auto (automatic)',
       independenceLow: 'Low',
       independenceMedium: 'Medium',
-      independenceHigh: 'High',
+      independenceHigh: 'High'
     },
     actionUpdate: 'Update config',
-    actionRead: 'Read config',
+    actionRead: 'Read config'
   },
 
   // —— Duration formatting ——
@@ -192,7 +192,7 @@ export default {
     minutes: '{minutes}m',
     hours: '{hours}h',
     hoursMinutesSeconds: '{hours}h {minutes}m {seconds}s',
-    runtimeNote: 'Ran for {n}s',
+    runtimeNote: 'Ran for {n}s'
   },
 
   // —— Counts / statistics (full sentence including the label, so English word order is free) ——
@@ -208,7 +208,7 @@ export default {
     statEditFiles: 'Files edited {n}',
     statSearches: 'Searches {n}',
     statWebPages: 'Web pages {n}',
-    statCommands: 'Commands {n}',
+    statCommands: 'Commands {n}'
   },
 
   // —— Full sentences ——
@@ -239,7 +239,7 @@ export default {
     subAgentResultMeta: ' (task {taskId}) · {status} · {outcome}',
     searchQuote: '"{text}"',
     readSearch: 'Search {query}, got {count} results',
-    readExtract: 'Extracted {n} lines',
+    readExtract: 'Extracted {n} lines'
   },
 
   // —— Generic values / fallbacks ——
@@ -264,7 +264,7 @@ export default {
     optionLabel: 'Option {n}',
     line: 'Line {line}',
     reviewContentModeDialogue: 'Clean dialogue',
-    reviewContentModeFull: 'Full record',
+    reviewContentModeFull: 'Full record'
   },
 
   // —— Search topic / time range / domain limits ——
@@ -280,14 +280,14 @@ export default {
     timeRelative: 'Relative range: {range}',
     timeLastDays: 'Last {n} days',
     timeRangeTo: '{start} to {end}',
-    domainsUnlimited: 'No domain limit',
+    domainsUnlimited: 'No domain limit'
   },
 
   // —— Image media attributes ——
   media: {
     ocrImgAlt: 'OCR image',
     viewImgAlt: 'View image',
-    viewImgTitle: 'Open original in new window',
+    viewImgTitle: 'Open original in new window'
   },
 
   // —— MCP tool fallback name ——
@@ -319,7 +319,7 @@ export default {
     readFile: 'Reading file...',
     readSearch: 'Searching...',
     readExtract: 'Extracting content...',
-    fallback: 'Calling tool',
+    fallback: 'Calling tool'
   },
 
   // —— Tool completed status texts (chatDisplay action label map) ——
@@ -347,6 +347,6 @@ export default {
     createSkill: 'Skill archived',
     askUser: 'User answered',
     readFile: 'File read complete',
-    fallback: 'Executed',
-  },
+    fallback: 'Executed'
+  }
 } as const;

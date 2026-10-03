@@ -109,5 +109,5 @@ export default {
 
   // 阅读器兜底
   readerEmptyFallback: '暂无内容',
-  noVisibleContent: '未返回可视内容',
+  noVisibleContent: '未返回可视内容'
 } as const;

@@ -79,5 +79,5 @@ export default {
   permissionAutoApprovalDesc: '工作区内写入直通，高风险操作由后台审核智能体自动审批',
   permissionUnrestrictedDesc: '保持当前默认行为，不额外拦截',
   executionSandboxDesc: '所有指令会在系统沙箱中执行',
-  executionDirectDesc: '所有指令会在宿主机直接执行',
+  executionDirectDesc: '所有指令会在宿主机直接执行'
 } as const;

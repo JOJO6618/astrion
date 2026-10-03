@@ -46,7 +46,8 @@ export default {
   runningTextOnlyTitle: '运行中仅支持文本',
   runningTextOnlyMessage: '图片/视频请等待当前任务结束后发送',
   conversationRunningTitle: '当前对话正在运行',
-  conversationRunningMessage: '请等待当前对话任务完成后再发送新消息；同工作区的其他对话可正常并行。',
+  conversationRunningMessage:
+    '请等待当前对话任务完成后再发送新消息；同工作区的其他对话可正常并行。',
   connectionLostTitle: '连接已断开',
   connectionLostMessage: '当前无法发送消息，请等待连接恢复后重试',
   uploadingTitle: '上传中',
@@ -119,5 +120,5 @@ export default {
   versioningRestoreFailed: '回溯失败',
   versioningRestoreConversationTitle: '版本回溯对话',
   versioningRestoreCopyDone: '已复制并回溯到新对话',
-  versioningRestoreDone: '回溯完成',
+  versioningRestoreDone: '回溯完成'
 } as const;

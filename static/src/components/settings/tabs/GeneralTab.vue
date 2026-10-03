@@ -57,8 +57,15 @@ const defaultExtraOptions = computed(() => [
 ]);
 
 const knownRunDataErrors = new Set([
-  'environment_locked', 'path_required', 'same_directory', 'overlapping_directories',
-  'target_not_directory', 'target_not_empty', 'verification_failed', 'restart_failed', 'request_failed'
+  'environment_locked',
+  'path_required',
+  'same_directory',
+  'overlapping_directories',
+  'target_not_directory',
+  'target_not_empty',
+  'verification_failed',
+  'restart_failed',
+  'request_failed'
 ]);
 
 function setRunDataError(error: any) {
@@ -151,7 +158,10 @@ async function applyRunDataChange() {
     await requestRunData('/api/desktop/rundata/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data_root: runDataPath.value.trim(), migrate: runDataMode.value === 'migrate' })
+      body: JSON.stringify({
+        data_root: runDataPath.value.trim(),
+        migrate: runDataMode.value === 'migrate'
+      })
     });
     runDataDialogOpen.value = false;
     restartPending.value = true;
@@ -224,7 +234,11 @@ onMounted(() => {
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('commandBlocking.settingsTitle') }}</span>
         <span class="settings-row-desc">{{ $t('commandBlocking.settingsDesc') }}</span>
-        <span v-if="commandBlocking.error && !commandBlocking.dialogOpen" class="command-blocking-error" role="alert">
+        <span
+          v-if="commandBlocking.error && !commandBlocking.dialogOpen"
+          class="command-blocking-error"
+          role="alert"
+        >
           {{ $t('commandBlocking.toggleFailed') }}
           <span class="command-blocking-error-detail">{{ commandBlocking.error }}</span>
         </span>
@@ -232,7 +246,13 @@ onMounted(() => {
       <input
         type="checkbox"
         :checked="commandBlocking.enabled"
-        :disabled="commandBlocking.toggling || commandBlocking.saving || commandBlocking.loading || !commandBlocking.loaded || commandBlocking.loadFailed"
+        :disabled="
+          commandBlocking.toggling ||
+          commandBlocking.saving ||
+          commandBlocking.loading ||
+          !commandBlocking.loaded ||
+          commandBlocking.loadFailed
+        "
         @change="commandBlocking.setEnabled(($event.target as HTMLInputElement).checked)"
       />
       <FancyCheck :checked="commandBlocking.enabled" />
@@ -290,7 +310,12 @@ onMounted(() => {
             <button
               type="button"
               class="settings-primary-button"
-              :disabled="runDataBusy || restartPending || !runDataPath.trim() || runDataPath.trim() === runDataInfo?.active_path"
+              :disabled="
+                runDataBusy ||
+                restartPending ||
+                !runDataPath.trim() ||
+                runDataPath.trim() === runDataInfo?.active_path
+              "
               @click="openRunDataDialog"
             >
               {{ $t('settings.runDataApply') }}
@@ -299,20 +324,33 @@ onMounted(() => {
         </template>
 
         <div v-if="restartPending" class="run-data-restart-row">
-          <span class="settings-mini-status warning">{{ $t('settings.runDataRestartRequired') }}</span>
-          <button type="button" class="settings-primary-button" :disabled="restarting" @click="restartDesktop">
+          <span class="settings-mini-status warning">{{
+            $t('settings.runDataRestartRequired')
+          }}</span>
+          <button
+            type="button"
+            class="settings-primary-button"
+            :disabled="restarting"
+            @click="restartDesktop"
+          >
             {{ restarting ? $t('settings.runDataRestarting') : $t('settings.runDataRestartNow') }}
           </button>
         </div>
         <p v-if="runDataError && !runDataDialogOpen" class="run-data-error" role="alert">
           {{ $t(`settings.runDataError.${runDataError}`) }}
-          <span v-if="runDataErrorDetail" class="run-data-error-detail">{{ runDataErrorDetail }}</span>
+          <span v-if="runDataErrorDetail" class="run-data-error-detail">{{
+            runDataErrorDetail
+          }}</span>
         </p>
       </div>
     </div>
 
     <Teleport to="body">
-      <div v-if="runDataDialogOpen" class="run-data-dialog-backdrop" @click.self="closeRunDataDialog">
+      <div
+        v-if="runDataDialogOpen"
+        class="run-data-dialog-backdrop"
+        @click.self="closeRunDataDialog"
+      >
         <div
           ref="runDataDialogElement"
           class="run-data-dialog"
@@ -322,9 +360,17 @@ onMounted(() => {
           tabindex="-1"
           @keydown.esc.stop.prevent="closeRunDataDialog"
         >
-          <h2 id="run-data-dialog-title" class="run-data-dialog-title">{{ $t('settings.runDataConfirmTitle') }}</h2>
-          <p class="run-data-dialog-path"><code>{{ runDataPath }}</code></p>
-          <div class="run-data-choices" role="radiogroup" :aria-label="$t('settings.runDataModeLabel')">
+          <h2 id="run-data-dialog-title" class="run-data-dialog-title">
+            {{ $t('settings.runDataConfirmTitle') }}
+          </h2>
+          <p class="run-data-dialog-path">
+            <code>{{ runDataPath }}</code>
+          </p>
+          <div
+            class="run-data-choices"
+            role="radiogroup"
+            :aria-label="$t('settings.runDataModeLabel')"
+          >
             <button
               type="button"
               role="radio"
@@ -358,7 +404,12 @@ onMounted(() => {
             {{ $t(`settings.runDataError.${runDataError}`) }}
           </p>
           <div class="run-data-dialog-actions">
-            <button type="button" class="settings-secondary-button" :disabled="runDataBusy" @click="closeRunDataDialog">
+            <button
+              type="button"
+              class="settings-secondary-button"
+              :disabled="runDataBusy"
+              @click="closeRunDataDialog"
+            >
               {{ $t('settings.runDataCancel') }}
             </button>
             <button
@@ -385,16 +436,27 @@ onMounted(() => {
         }}</span>
       </span>
       <div class="settings-inline-actions">
-        <span class="settings-mini-status" :class="{ warning: appHasUpdate }">{{ appUpdateStateText }}</span>
+        <span class="settings-mini-status" :class="{ warning: appHasUpdate }">{{
+          appUpdateStateText
+        }}</span>
         <button
           type="button"
           class="settings-secondary-button"
           :disabled="appUpdateChecking"
           @click="checkAppUpdate"
         >
-          {{ appUpdateChecking ? $t('personalization.appChecking') : $t('personalization.appCheckUpdate') }}
+          {{
+            appUpdateChecking
+              ? $t('personalization.appChecking')
+              : $t('personalization.appCheckUpdate')
+          }}
         </button>
-        <button v-if="appHasUpdate" type="button" class="settings-primary-button" @click="downloadLatestApp">
+        <button
+          v-if="appHasUpdate"
+          type="button"
+          class="settings-primary-button"
+          @click="downloadLatestApp"
+        >
           {{ $t('common.download') }}
         </button>
       </div>

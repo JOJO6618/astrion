@@ -118,5 +118,5 @@ export default {
   inProgress: '进行中',
   playbackStatus: '回放{label}',
   toolPlayback: '工具操作回放',
-  toolExecFailed: '工具执行失败',
+  toolExecFailed: '工具执行失败'
 } as const;

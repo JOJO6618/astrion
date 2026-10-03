@@ -6,7 +6,8 @@
 export default {
   // ── Messages: clear/compress conversation (message/chat.ts) ──
   clearChatTitle: 'Clear chat',
-  clearChatConfirmMessage: 'Are you sure you want to clear all conversation records? This cannot be undone.',
+  clearChatConfirmMessage:
+    'Are you sure you want to clear all conversation records? This cannot be undone.',
   clearChatConfirmText: 'Clear',
   cannotCompressTitle: 'Cannot compress',
   cannotCompressMessage: 'No conversation to compress.',
@@ -42,13 +43,16 @@ export default {
   textRequiredTitle: 'Text required',
   textRequiredMessage: 'Attached files must be sent with a text message',
   subAgentRunningTitle: 'Background sub-agent running',
-  subAgentRunningMessage: 'Please wait for the background task to finish before sending images/videos',
+  subAgentRunningMessage:
+    'Please wait for the background task to finish before sending images/videos',
   runningTextOnlyTitle: 'Text only while running',
   runningTextOnlyMessage: 'Send images/videos after the current task finishes',
   conversationRunningTitle: 'Conversation is running',
-  conversationRunningMessage: 'Please wait for the current conversation task to finish before sending a new message; other conversations in the same workspace can run in parallel.',
+  conversationRunningMessage:
+    'Please wait for the current conversation task to finish before sending a new message; other conversations in the same workspace can run in parallel.',
   connectionLostTitle: 'Connection lost',
-  connectionLostMessage: "Messages can't be sent right now; please retry after the connection is restored",
+  connectionLostMessage:
+    "Messages can't be sent right now; please retry after the connection is restored",
   uploadingTitle: 'Uploading',
   uploadingMessage: 'Please wait for the image/video upload to finish before sending',
   modelNoImageTitle: 'Model does not support images',
@@ -56,14 +60,16 @@ export default {
   modelNoVideoTitle: 'Model does not support videos',
   modelNoVideoMessage: 'Switch to a model that supports video input before sending videos',
   noMixedMediaTitle: 'Send media separately',
-  noMixedMediaMessage: 'Videos and images must be sent separately; each message can contain only one media type',
+  noMixedMediaMessage:
+    'Videos and images must be sent separately; each message can contain only one media type',
   videoProcessingTitle: 'Video processing',
   videoProcessingMessage: 'Reading the video can take a while, please be patient',
   initializingBackupTitle: 'Initializing backup',
   initializingBackupMessage: 'Creating a full workspace snapshot, please wait...',
   createConversationFailed: 'Failed to create conversation',
   stopRequestedTitle: 'Stop requested',
-  stopRequestedMessage: 'If the main conversation does not stop, please wait; background tasks can be stopped from the status bar',
+  stopRequestedMessage:
+    'If the main conversation does not stop, please wait; background tasks can be stopped from the status bar',
   autoCompressingBlockStop: 'Compression is in progress; the task cannot be stopped right now',
 
   // ── Messages: system command (message/systemCommand.ts) ──
@@ -86,7 +92,8 @@ export default {
   createConversationErrorTitle: 'Error creating conversation',
   createWorkspaceConversationErrorTitle: 'Error creating workspace conversation',
   deleteConversationTitle: 'Delete conversation',
-  deleteConversationConfirmMessage: 'Are you sure you want to delete this conversation? This cannot be undone.',
+  deleteConversationConfirmMessage:
+    'Are you sure you want to delete this conversation? This cannot be undone.',
   deleteConversationFailedTitle: 'Failed to delete conversation',
   deleteConversationErrorTitle: 'Error deleting conversation',
   duplicateConversationTitle: 'Duplicated conversation',
@@ -114,10 +121,11 @@ export default {
   versioningModeCopy: 'duplicate the conversation',
   versioningModeOverwrite: 'overwrite the current conversation',
   versioningRestoreConfirmTitle: 'Confirm restore',
-  versioningRestoreConfirmMessage: 'Restore {scope} to the state at input #{seq} and {mode}. Continue?',
+  versioningRestoreConfirmMessage:
+    'Restore {scope} to the state at input #{seq} and {mode}. Continue?',
   versioningRestoreConfirmText: 'Restore',
   versioningRestoreFailed: 'Restore failed',
   versioningRestoreConversationTitle: 'Restored conversation',
   versioningRestoreCopyDone: 'Duplicated and restored to a new conversation',
-  versioningRestoreDone: 'Restore complete',
+  versioningRestoreDone: 'Restore complete'
 } as const;

@@ -103,7 +103,9 @@ export const reviewMethods = {
       const count = typeof char_count === 'number' ? char_count : 0;
       this.reviewGeneratedPath = path;
       const suggestion =
-        count && count <= 10000 ? t('appUi.reviewSuggestReadFull') : t('appUi.reviewSuggestReadBySearch');
+        count && count <= 10000
+          ? t('appUi.reviewSuggestReadFull')
+          : t('appUi.reviewSuggestReadBySearch');
       if (this.reviewSendToModel) {
         const message = t('appUi.reviewAutoMessage', {
           path,
@@ -126,7 +128,8 @@ export const reviewMethods = {
         });
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.generateFailed'));
+      const msg =
+        error instanceof Error ? error.message : String(error || t('appUi.generateFailed'));
       this.uiPushToast({
         title: t('appUi.generateReviewFailed'),
         message: msg,
@@ -151,7 +154,8 @@ export const reviewMethods = {
       }
       this.reviewPreviewLines = payload?.data?.preview || [];
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error || t('appUi.fetchPreviewFailed'));
+      const msg =
+        error instanceof Error ? error.message : String(error || t('appUi.fetchPreviewFailed'));
       this.reviewPreviewError = msg;
     } finally {
       this.reviewPreviewLoading = false;

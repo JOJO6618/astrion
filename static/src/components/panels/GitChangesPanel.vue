@@ -14,14 +14,38 @@
     </header>
 
     <div class="git-changes-panel__body">
-      <div v-if="loading && !diff" class="git-changes-panel__empty">{{ $t('shell.loadingGitChanges') }}</div>
-      <div v-else-if="error && !files.length" class="git-changes-panel__empty git-changes-panel__empty--error">{{ error }}</div>
+      <div v-if="loading && !diff" class="git-changes-panel__empty">
+        {{ $t('shell.loadingGitChanges') }}
+      </div>
+      <div
+        v-else-if="error && !files.length"
+        class="git-changes-panel__empty git-changes-panel__empty--error"
+      >
+        {{ error }}
+      </div>
       <div v-else-if="!files.length" class="git-changes-panel__empty">
-        <svg class="git-changes-panel__empty-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="2"/>
-          <path d="M18 19c-2.8 0-5-2.2-5-5v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="20" cy="19" r="2" stroke="currentColor" stroke-width="2"/>
+        <svg
+          class="git-changes-panel__empty-svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="2" />
+          <path
+            d="M18 19c-2.8 0-5-2.2-5-5v8"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="20" cy="19" r="2" stroke="currentColor" stroke-width="2" />
         </svg>
         <span>{{ $t('shell.noUncommittedChanges') }}</span>
       </div>
@@ -37,15 +61,18 @@
                 :title="hostMode ? $t('shell.openFileWithApp') : $t('shell.dockerModeUnavailable')"
                 @click.stop.prevent="toggleOpenMenu(file.path)"
               >
-                <img class="git-change-file__open-icon" :src="filePenIcon" alt="" aria-hidden="true" />
+                <img
+                  class="git-change-file__open-icon"
+                  :src="filePenIcon"
+                  alt=""
+                  aria-hidden="true"
+                />
                 <span class="git-change-file__open-caret" aria-hidden="true"></span>
               </button>
-              <div
-                v-if="openMenuPath === file.path"
-                class="git-change-file__open-menu"
-                @click.stop
-              >
-                <div v-if="openAppsError" class="git-change-file__open-empty">{{ openAppsError }}</div>
+              <div v-if="openMenuPath === file.path" class="git-change-file__open-menu" @click.stop>
+                <div v-if="openAppsError" class="git-change-file__open-empty">
+                  {{ openAppsError }}
+                </div>
                 <button
                   v-for="app in openApps"
                   v-else
@@ -62,7 +89,10 @@
                   />
                   <span>{{ app.label }}</span>
                 </button>
-                <div v-if="!appsLoadingPath && !openAppsError && !openApps.length" class="git-change-file__open-empty">
+                <div
+                  v-if="!appsLoadingPath && !openAppsError && !openApps.length"
+                  class="git-change-file__open-empty"
+                >
                   {{ $t('shell.noAppsDetected') }}
                 </div>
               </div>
@@ -93,7 +123,10 @@
                 @click.stop.prevent="handleExpandContext(file.path, hunk.before_fold_key)"
               >
                 <span class="git-change-file__fold-content">
-                  <span class="git-change-file__fold-icon git-change-file__fold-icon--up" aria-hidden="true"></span>
+                  <span
+                    class="git-change-file__fold-icon git-change-file__fold-icon--up"
+                    aria-hidden="true"
+                  ></span>
                   <span>{{ $t('shell.hiddenLines', { n: hunk.before_hidden }) }}</span>
                 </span>
               </button>
@@ -118,7 +151,10 @@
               @click.stop.prevent="handleExpandContext(file.path, file.after_fold_key || 'after')"
             >
               <span class="git-change-file__fold-content">
-                <span class="git-change-file__fold-icon git-change-file__fold-icon--down" aria-hidden="true"></span>
+                <span
+                  class="git-change-file__fold-icon git-change-file__fold-icon--down"
+                  aria-hidden="true"
+                ></span>
                 <span>{{ $t('shell.hiddenLines', { n: file.after_hidden }) }}</span>
               </span>
             </button>

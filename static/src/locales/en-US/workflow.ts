@@ -7,7 +7,8 @@ export default {
   unsaved: 'Unsaved',
   checkIssues: 'View structure warnings and errors',
   autoLayout: 'Auto layout',
-  addNodeTitle: 'Add a node at the center of the canvas (or double-click empty canvas to add a stage)',
+  addNodeTitle:
+    'Add a node at the center of the canvas (or double-click empty canvas to add a stage)',
   addNode: 'Add node',
 
   // Add node types
@@ -50,7 +51,8 @@ export default {
   forwardRoute: 'Forward route',
   removeRouteAriaLabel: 'Remove route to {name}',
   endStageEmpty: 'End stage (no forward route)',
-  routeHint: 'Drag from the handle on the right of a node to the target; a new line replaces the existing one. Add a branch node to fork.',
+  routeHint:
+    'Drag from the handle on the right of a node to the target; a new line replaces the existing one. Add a branch node to fork.',
 
   // Delete node (shared across panels)
   deleteNode: 'Delete this node',
@@ -68,11 +70,13 @@ export default {
   passRoute: 'Approval route',
   removePassRouteAriaLabel: 'Remove approval route to {name}',
   passEndsWorkflow: 'Approval ends the workflow',
-  passRouteHint: 'Where the workflow goes after approval — drag from the right handle of the diamond (blue line)',
+  passRouteHint:
+    'Where the workflow goes after approval — drag from the right handle of the diamond (blue line)',
   rejectRoute: 'Rejection route',
   removeRejectRouteAriaLabel: 'Remove rejection route to {name}',
   rejectRequired: 'A rejection route is required',
-  rejectRouteHint: 'Where the workflow goes on rejection — drag from the top or bottom handle of the diamond (red line; top and bottom exits are equivalent, direction follows the target position)',
+  rejectRouteHint:
+    'Where the workflow goes on rejection — drag from the top or bottom handle of the diamond (red line; top and bottom exits are equivalent, direction follows the target position)',
 
   // Branch properties
   branchProps: 'Branch properties',
@@ -82,7 +86,8 @@ export default {
   removeOutAriaLabel: 'Remove outgoing line to {name}',
   branchConditionPlaceholder: 'Condition: take this path when...',
   branchNoOuts: 'No outgoing lines (dead end)',
-  branchRouteHint: 'Drag lines one by one from the right handle; 1-in n-out splits, n-in 1-out joins. Give every outgoing line a condition — the AI picks the path based on them.',
+  branchRouteHint:
+    'Drag lines one by one from the right handle; 1-in n-out splits, n-in 1-out joins. Give every outgoing line a condition — the AI picks the path based on them.',
 
   // Start / end nodes
   startNode: 'Start node',
@@ -90,7 +95,8 @@ export default {
   boundaryNameLabel: 'Name',
   entryRoute: 'Entry route',
   disconnectEntryAriaLabel: 'Disconnect entry route to {name}',
-  entryNotConnected: 'Not connected (drag from the right handle of the start node to the first node)',
+  entryNotConnected:
+    'Not connected (drag from the right handle of the start node to the first node)',
   startOnlyHint: 'The workflow starts here; only one start node is allowed',
 
   // Structure validation labels
@@ -116,7 +122,8 @@ export default {
   // Workflow library list page (WorkflowLibraryView)
   backToConversation: 'Back to conversation',
   libraryTitle: 'Workflows',
-  librarySubtitle: 'Save a fixed way of working, verification, and completion as a process, then activate it in your conversation.',
+  librarySubtitle:
+    'Save a fixed way of working, verification, and completion as a process, then activate it in your conversation.',
   newWorkflow: 'New workflow',
   noDescription: '(no description)',
   nodeCountLabel: '{n} nodes',
@@ -178,5 +185,5 @@ export default {
   defaultEndNode: 'End',
   defaultStageName: 'Stage {n}',
   defaultReviewName: 'Review {n}',
-  defaultBranchName: 'Branch {n}',
+  defaultBranchName: 'Branch {n}'
 } as const;

@@ -33,15 +33,19 @@ export const bootstrapMethods = {
     } = options;
 
     const isHostLikeMode = Boolean(this.versioningHostMode || this.dockerProjectMode);
-    const requestUrl = workspaceId && isHostLikeMode
-      ? `/api/conversations/${conversationId}/bootstrap?workspace_id=${encodeURIComponent(workspaceId)}`
-      : `/api/conversations/${conversationId}/bootstrap`;
+    const requestUrl =
+      workspaceId && isHostLikeMode
+        ? `/api/conversations/${conversationId}/bootstrap?workspace_id=${encodeURIComponent(workspaceId)}`
+        : `/api/conversations/${conversationId}/bootstrap`;
 
     traceLog('enterConversation:start', { conversationId, source, urlMode });
     const response = await fetch(requestUrl);
     const result = await response.json();
     if (!result.success) {
-      debugLog('enterConversation:failed', { conversationId, error: result.error || result.message });
+      debugLog('enterConversation:failed', {
+        conversationId,
+        error: result.error || result.message
+      });
       return result;
     }
 
@@ -118,9 +122,7 @@ export const bootstrapMethods = {
     // QuickDock 内清空）全部执行完，否则回填数据会被 watcher 覆盖。
     // setTimeout(0) 走宏任务，比 $nextTick 的 microtask 更保险。
     await new Promise((resolve) => setTimeout(resolve, 0));
-    useQuickDockStore().setEditedFiles(
-      Array.isArray(data.edited_files) ? data.edited_files : []
-    );
+    useQuickDockStore().setEditedFiles(Array.isArray(data.edited_files) ? data.edited_files : []);
     // 预览窗口：回填本对话预览目标（同一时机，避免被 watcher 清空覆盖）
     // + 预览运行时（独立预览服务器 base/token，跨站隔离 iframe 用）
     usePreviewStore().setRuntime(data.preview_base, data.preview_token);
@@ -132,13 +134,18 @@ export const bootstrapMethods = {
     // 4.6 快捷窗口：回填工作流运行状态（静态呈现，不播动画）。
     // 失败不影响对话进入。
     try {
-      const wfResp = await fetch(`/api/workflow/status?conversation_id=${encodeURIComponent(normalizedId)}`);
+      const wfResp = await fetch(
+        `/api/workflow/status?conversation_id=${encodeURIComponent(normalizedId)}`
+      );
       if (wfResp.ok) {
         const wfData = await wfResp.json();
         useWorkflowStore().setWorkflow(wfData?.snapshot, false);
       }
     } catch (wfErr) {
-      debugLog('enterConversation:workflow-status-failed', { conversationId: normalizedId, error: String(wfErr || '') });
+      debugLog('enterConversation:workflow-status-failed', {
+        conversationId: normalizedId,
+        error: String(wfErr || '')
+      });
     }
 
     // 5. 运行中任务快速恢复（任务/事件/判据已由 bootstrap 聚合，

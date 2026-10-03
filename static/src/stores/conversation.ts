@@ -286,10 +286,7 @@ export const useConversationStore = defineStore('conversation', {
         });
       }
     },
-    async loadWorkspaceConversations(
-      workspaceId: string,
-      { reset = false, refresh = false } = {}
-    ) {
+    async loadWorkspaceConversations(workspaceId: string, { reset = false, refresh = false } = {}) {
       if (!workspaceId) return;
       let index = this.workspaceGroups.findIndex((g) => g.workspaceId === workspaceId);
       if (index === -1) {
@@ -364,10 +361,7 @@ export const useConversationStore = defineStore('conversation', {
       }
     },
     /** 后台补载某工作区指定类型的首页缓存：已加载则跳过，不干扰当前显示 */
-    async loadWorkspaceConversationTypeCache(
-      workspaceId: string,
-      type: 'normal' | 'multi_agent'
-    ) {
+    async loadWorkspaceConversationTypeCache(workspaceId: string, type: 'normal' | 'multi_agent') {
       const group = this.workspaceGroups.find((g) => g.workspaceId === workspaceId);
       if (!group || group.pagingByType[type].loaded) return;
       const maParam = type === 'multi_agent' ? '&multi_agent_mode=1' : '&multi_agent_mode=0';
@@ -407,7 +401,8 @@ export const useConversationStore = defineStore('conversation', {
         const listType = this.sidebarConversationType;
         try {
           const fetchOffset = group.conversations.length;
-          const maParam = listType === 'multi_agent' ? '&multi_agent_mode=1' : '&multi_agent_mode=0';
+          const maParam =
+            listType === 'multi_agent' ? '&multi_agent_mode=1' : '&multi_agent_mode=0';
           const response = await fetch(
             `/api/conversations?workspace_id=${encodeURIComponent(workspaceId)}&limit=${group.bufferLimit}&offset=${fetchOffset}${maParam}`
           );

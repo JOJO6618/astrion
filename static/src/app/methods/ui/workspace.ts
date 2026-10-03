@@ -112,7 +112,10 @@ export const workspaceMethods = {
     if (!workspaceId || !conversationId) {
       return;
     }
-    if ((this.versioningHostMode || this.dockerProjectMode) && workspaceId !== this.currentHostWorkspaceId) {
+    if (
+      (this.versioningHostMode || this.dockerProjectMode) &&
+      workspaceId !== this.currentHostWorkspaceId
+    ) {
       await this.handleHostWorkspaceSwitch(workspaceId);
     }
     if (this.currentConversationId === conversationId) {
@@ -120,7 +123,10 @@ export const workspaceMethods = {
     }
     await this.loadConversation(conversationId, { force: true });
     const taskId = String(task?.task_id || '');
-    if (taskId && !['pending', 'running', 'cancel_requested'].includes(String(task?.status || ''))) {
+    if (
+      taskId &&
+      !['pending', 'running', 'cancel_requested'].includes(String(task?.status || ''))
+    ) {
       this.acknowledgeCompletedWorkspaceTask(taskId);
       return;
     }

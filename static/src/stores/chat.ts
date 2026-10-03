@@ -260,7 +260,9 @@ export const useChatStore = defineStore('chat', {
       extraMetadata: Record<string, any> = {}
     ) {
       const startedAt = new Date().toISOString();
-      const normalizedSource = String(source || 'user').trim().toLowerCase();
+      const normalizedSource = String(source || 'user')
+        .trim()
+        .toLowerCase();
       const metadata: Record<string, any> = {
         media_refs: Array.isArray(mediaRefs) ? mediaRefs : [],
         message_source: normalizedSource,
@@ -303,7 +305,10 @@ export const useChatStore = defineStore('chat', {
       // 因此命中流式块只可能来自重复/重放事件（去重集合被清后的最后防线）。
       const existingThinking = this.getActiveThinkingAction(msg);
       if (existingThinking && existingThinking.streaming === true) {
-        return { action: existingThinking, blockId: existingThinking.blockId || existingThinking.id };
+        return {
+          action: existingThinking,
+          blockId: existingThinking.blockId || existingThinking.id
+        };
       }
       msg.streamingThinking = '';
       msg.currentStreamingType = 'thinking';

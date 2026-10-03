@@ -39,7 +39,9 @@
         <div class="footer">
           <div class="count">{{ $t('overlay.imageSelectedCount', { n: selectedSet.size }) }}</div>
           <div class="actions">
-            <button type="button" class="btn secondary" @click="close">{{ $t('common.cancel') }}</button>
+            <button type="button" class="btn secondary" @click="close">
+              {{ $t('common.cancel') }}
+            </button>
             <button
               type="button"
               class="btn primary"

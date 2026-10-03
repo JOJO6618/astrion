@@ -1,7 +1,12 @@
 <template>
   <transition name="plan-approval-fade" appear>
     <div v-if="visible && current" class="plan-approval-overlay">
-      <section class="plan-approval-card" role="dialog" aria-modal="true" :aria-label="$t('overlay.planApprovalAriaLabel')">
+      <section
+        class="plan-approval-card"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="$t('overlay.planApprovalAriaLabel')"
+      >
         <header class="plan-approval-windowbar">
           <div class="plan-approval-window-title">{{ $t('overlay.planApprovalTitle') }}</div>
           <span class="plan-approval-close">
@@ -17,12 +22,24 @@
           <div class="plan-approval-title-block">
             <p v-if="current.summary" class="plan-approval-summary">{{ current.summary }}</p>
             <p class="plan-approval-file" :title="current.plan_file">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <path d="M14 2v6h6" />
               </svg>
               <span>{{ current.plan_file }}</span>
-              <span v-if="current.plan_content_truncated" class="plan-approval-truncated">{{ $t('overlay.planTruncatedNote') }}</span>
+              <span v-if="current.plan_content_truncated" class="plan-approval-truncated">{{
+                $t('overlay.planTruncatedNote')
+              }}</span>
             </p>
           </div>
         </header>

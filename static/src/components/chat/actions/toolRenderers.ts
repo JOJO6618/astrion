@@ -34,7 +34,7 @@ function formatDuration(seconds: number): string {
   return t('toolResults.duration.hoursMinutesSeconds', {
     hours,
     minutes: remainingMinutes,
-    seconds: remainingSeconds,
+    seconds: remainingSeconds
   });
 }
 
@@ -199,7 +199,11 @@ export function renderEnhancedToolResult(
 }
 
 function renderDefaultResult(result: any, args: any, name: string): string {
-  const status = formatToolStatusLabel(result, t('toolResults.status.completed'), t('toolResults.status.failedMark'));
+  const status = formatToolStatusLabel(
+    result,
+    t('toolResults.status.completed'),
+    t('toolResults.status.failedMark')
+  );
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>${escapeHtml(t('toolResults.labels.tool'))}</strong>${escapeHtml(name)}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(status)}</div>`;
@@ -228,15 +232,13 @@ function renderDefaultResult(result: any, args: any, name: string): string {
         target_display_name: 'toolResults.fields.targetDisplayName',
         question: 'toolResults.fields.question',
         role_id: 'toolResults.fields.roleId',
-        url: 'toolResults.fields.url',
+        url: 'toolResults.fields.url'
       };
       const displayValue = typeof value === 'string' ? value : JSON.stringify(value);
       const preview = String(displayValue).slice(0, 200);
       const suffix = String(displayValue).length > 200 ? '…' : '';
       const colon = t('toolResults.values.colon');
-      const label = fieldLabelKeys[key]
-        ? t(fieldLabelKeys[key]) + colon
-        : key + colon;
+      const label = fieldLabelKeys[key] ? t(fieldLabelKeys[key]) + colon : key + colon;
       html += `<div><strong>${escapeHtml(label)}</strong>${escapeHtml(preview + suffix)}</div>`;
     }
   });
@@ -921,13 +923,17 @@ function renderSleep(result: any, args: any): string {
         const itemStatus = item.status ?? 'unknown';
         const success = item.success === true;
         html += '<div class="sub-agent-result-item">';
-        const outcome = success ? t('toolResults.status.successMark') : t('toolResults.status.failedMark');
+        const outcome = success
+          ? t('toolResults.status.successMark')
+          : t('toolResults.status.failedMark');
         html += `<div><strong>${escapeHtml(t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) }))}</strong>${escapeHtml(t('toolResults.sentences.subAgentResultMeta', { taskId: String(taskId), status: String(itemStatus), outcome }))}</div>`;
         const itemMessage = item.message || item.error || '';
         if (itemMessage) {
           const runtime = item.runtime_seconds ?? item.elapsed_seconds ?? null;
           const runtimeNote =
-            runtime !== null ? t('toolResults.duration.runtimeNote', { n: Math.round(Number(runtime)) }) : '';
+            runtime !== null
+              ? t('toolResults.duration.runtimeNote', { n: Math.round(Number(runtime)) })
+              : '';
           const stats = item.stats;
           if (runtimeNote || stats) {
             html += '<div class="sub-agent-meta">';
@@ -936,12 +942,18 @@ function renderSleep(result: any, args: any): string {
             }
             if (stats && typeof stats === 'object') {
               const statParts = [];
-              if (stats.api_calls != null) statParts.push(t('toolResults.counts.statApiCalls', { n: stats.api_calls }));
-              if (stats.files_read != null) statParts.push(t('toolResults.counts.statFilesRead', { n: stats.files_read }));
-              if (stats.edit_files != null) statParts.push(t('toolResults.counts.statEditFiles', { n: stats.edit_files }));
-              if (stats.searches != null) statParts.push(t('toolResults.counts.statSearches', { n: stats.searches }));
-              if (stats.web_pages != null) statParts.push(t('toolResults.counts.statWebPages', { n: stats.web_pages }));
-              if (stats.commands != null) statParts.push(t('toolResults.counts.statCommands', { n: stats.commands }));
+              if (stats.api_calls != null)
+                statParts.push(t('toolResults.counts.statApiCalls', { n: stats.api_calls }));
+              if (stats.files_read != null)
+                statParts.push(t('toolResults.counts.statFilesRead', { n: stats.files_read }));
+              if (stats.edit_files != null)
+                statParts.push(t('toolResults.counts.statEditFiles', { n: stats.edit_files }));
+              if (stats.searches != null)
+                statParts.push(t('toolResults.counts.statSearches', { n: stats.searches }));
+              if (stats.web_pages != null)
+                statParts.push(t('toolResults.counts.statWebPages', { n: stats.web_pages }));
+              if (stats.commands != null)
+                statParts.push(t('toolResults.counts.statCommands', { n: stats.commands }));
               if (statParts.length > 0) {
                 html += `<span>${escapeHtml(statParts.join(' | '))}</span>`;
               }
@@ -1173,9 +1185,10 @@ function renderConversationReview(result: any, args: any): string {
   html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(result?.mode || args?.mode || '')}</div>`;
   const reviewContentMode = result?.content_mode || args?.content_mode || '';
   if (reviewContentMode) {
-    const reviewContentModeLabel = reviewContentMode === 'full'
-      ? t('toolResults.values.reviewContentModeFull')
-      : t('toolResults.values.reviewContentModeDialogue');
+    const reviewContentModeLabel =
+      reviewContentMode === 'full'
+        ? t('toolResults.values.reviewContentModeFull')
+        : t('toolResults.values.reviewContentModeDialogue');
     html += `<div><strong>${escapeHtml(t('toolResults.labels.contentMode'))}</strong>${escapeHtml(reviewContentModeLabel)}</div>`;
   }
   if (result?.title) {
@@ -1253,7 +1266,8 @@ function renderListWorkflows(result: any, args: any): string {
   items.forEach((item: any) => {
     const name = escapeHtml(String(item?.name || t('toolResults.values.unnamed')));
     const desc = escapeHtml(String(item?.description || t('toolResults.values.noDescription')));
-    const source = item?.source === 'builtin' ? t('toolResults.values.builtin') : t('toolResults.values.user');
+    const source =
+      item?.source === 'builtin' ? t('toolResults.values.builtin') : t('toolResults.values.user');
     const nodeCount = Number(item?.nodeCount || 0);
     html += '<div class="search-result-item">';
     html += `<div class="search-result-title">${name}</div>`;
@@ -1306,7 +1320,7 @@ const personalizationFieldLabelKeys: Record<string, string> = {
   theme: 'toolResults.personalization.fieldLabels.theme',
   communication_style: 'toolResults.personalization.fieldLabels.communicationStyle',
   conversation_continuity: 'toolResults.personalization.fieldLabels.conversationContinuity',
-  enabled: 'toolResults.personalization.fieldLabels.enabled',
+  enabled: 'toolResults.personalization.fieldLabels.enabled'
 };
 
 function formatPersonalizationFieldLabel(field: string): string {
@@ -1333,7 +1347,7 @@ function formatPersonalizationFieldValue(field: string, value: any): string {
     const styleMap: Record<string, string> = {
       default: t('toolResults.personalization.values.styleDefault'),
       human_like: t('toolResults.personalization.values.styleHumanLike'),
-      auto: t('toolResults.personalization.values.styleAuto'),
+      auto: t('toolResults.personalization.values.styleAuto')
     };
     return styleMap[String(value)] || String(value);
   }
@@ -1341,7 +1355,7 @@ function formatPersonalizationFieldValue(field: string, value: any): string {
     const independenceMap: Record<string, string> = {
       low: t('toolResults.personalization.values.independenceLow'),
       medium: t('toolResults.personalization.values.independenceMedium'),
-      high: t('toolResults.personalization.values.independenceHigh'),
+      high: t('toolResults.personalization.values.independenceHigh')
     };
     return independenceMap[String(value)] || String(value);
   }
@@ -1371,7 +1385,9 @@ function renderAskUser(result: any, args: any): string {
     html += '<div class="tool-result-meta">';
     html += `<div><strong>${escapeHtml(t('toolResults.labels.providedOptions'))}</strong></div>`;
     options.forEach((option: any, idx: number) => {
-      const label = String(option?.label || option?.id || t('toolResults.values.optionLabel', { n: idx + 1 }));
+      const label = String(
+        option?.label || option?.id || t('toolResults.values.optionLabel', { n: idx + 1 })
+      );
       const desc = String(option?.description || '').trim();
       html += `<div>${idx + 1}. ${escapeHtml(label)}${desc ? ` — ${escapeHtml(desc)}` : ''}</div>`;
     });
@@ -1512,7 +1528,11 @@ function renderEasterEgg(result: any, args: any): string {
 
 // 子智能体类渲染函数
 function renderLoadTools(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, t('toolResults.status.completed'), t('toolResults.status.failedMark'));
+  const status = formatToolStatusLabel(
+    result,
+    t('toolResults.status.completed'),
+    t('toolResults.status.failedMark')
+  );
   const requested: string[] = Array.isArray(args?.tool_names) ? args.tool_names : [];
   const loadedNow: string[] = Array.isArray(result?.loaded_now) ? result.loaded_now : [];
   const already: string[] = Array.isArray(result?.already_loaded) ? result.already_loaded : [];
@@ -1554,7 +1574,11 @@ function renderLoadTools(result: any, args: any): string {
 }
 
 function renderCreateSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, t('toolResults.status.created'), t('toolResults.status.createFailed'));
+  const status = formatToolStatusLabel(
+    result,
+    t('toolResults.status.created'),
+    t('toolResults.status.createFailed')
+  );
   const agentId = result.agent_id ?? args.agent_id ?? '';
   // 多智能体模式：只展示角色内编号显示名，全局 agent_id/task_id 不暴露
   const displayName = result.display_name ?? '';
@@ -1623,7 +1647,11 @@ function renderCreateSubAgent(result: any, args: any): string {
 }
 
 function renderTerminateSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, t('toolResults.status.closed'), t('toolResults.status.closeFailed'));
+  const status = formatToolStatusLabel(
+    result,
+    t('toolResults.status.closed'),
+    t('toolResults.status.closeFailed')
+  );
   const displayName = result.display_name ?? args.display_name ?? '';
   const agentId = result.agent_id ?? args.agent_id ?? '';
   const taskId = result.task_id ?? '';
@@ -1671,7 +1699,9 @@ function renderGetSubAgentStatus(result: any): string {
 
     html += '<div class="sub-agent-status-item">';
     const itemDisplayName = item.display_name || '';
-    const itemHeader = itemDisplayName || t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) });
+    const itemHeader =
+      itemDisplayName ||
+      t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) });
     html += `<div class="sub-agent-status-header">${escapeHtml(String(itemHeader))}</div>`;
 
     if (!found) {
@@ -1711,7 +1741,11 @@ function renderGetSubAgentStatus(result: any): string {
 }
 
 function renderSendMessageToSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, t('toolResults.status.sent'), t('toolResults.status.sendFailed'));
+  const status = formatToolStatusLabel(
+    result,
+    t('toolResults.status.sent'),
+    t('toolResults.status.sendFailed')
+  );
   const displayName = args.display_name ?? result.display_name ?? '';
   const agentId = args.agent_id ?? result.agent_id ?? '';
 
@@ -1731,7 +1765,11 @@ function renderSendMessageToSubAgent(result: any, args: any): string {
 }
 
 function renderAnswerSubAgentQuestion(result: any, args: any): string {
-  const status = formatToolStatusLabel(result, t('toolResults.status.replied'), t('toolResults.status.replyFailed'));
+  const status = formatToolStatusLabel(
+    result,
+    t('toolResults.status.replied'),
+    t('toolResults.status.replyFailed')
+  );
   const questionId = args.question_id ?? result.question_id ?? '';
   const answer = args.answer ?? '';
 

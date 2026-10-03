@@ -316,16 +316,24 @@ onMounted(() => {
       {{ $t('personalization.codexIntro') }}
     </div>
 
-    <div v-if="loading" class="settings-section-desc">{{ $t('personalization.loadingPersonalization') }}</div>
+    <div v-if="loading" class="settings-section-desc">
+      {{ $t('personalization.loadingPersonalization') }}
+    </div>
     <template v-else>
       <!-- 连接状态 -->
       <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{ $t('personalization.codexStatusTitle') }}</span>
+        <span class="settings-section-divider__label">{{
+          $t('personalization.codexStatusTitle')
+        }}</span>
       </div>
       <div class="settings-input-row">
         <span class="settings-row-copy">
           <span class="settings-row-title">
-            {{ connected ? $t('personalization.codexConnected') : $t('personalization.codexNotConnected') }}
+            {{
+              connected
+                ? $t('personalization.codexConnected')
+                : $t('personalization.codexNotConnected')
+            }}
           </span>
           <span class="settings-row-desc">{{ statusLine }}</span>
         </span>
@@ -338,7 +346,9 @@ onMounted(() => {
 
       <!-- 模型列表 -->
       <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{ $t('personalization.codexModelsTitle') }}</span>
+        <span class="settings-section-divider__label">{{
+          $t('personalization.codexModelsTitle')
+        }}</span>
       </div>
       <div class="settings-input-row">
         <span class="settings-row-copy">
@@ -352,11 +362,15 @@ onMounted(() => {
       <!-- 用量（wham/usage；仅已连接时显示） -->
       <template v-if="connected">
         <div class="settings-section-divider">
-          <span class="settings-section-divider__label">{{ $t('personalization.codexUsageTitle') }}</span>
+          <span class="settings-section-divider__label">{{
+            $t('personalization.codexUsageTitle')
+          }}</span>
         </div>
         <div class="settings-input-row">
           <span class="settings-row-copy">
-            <span class="settings-row-title">{{ usagePlanText || $t('personalization.codexUsageTitle') }}</span>
+            <span class="settings-row-title">{{
+              usagePlanText || $t('personalization.codexUsageTitle')
+            }}</span>
             <span class="settings-row-desc">
               <template v-if="usageError">{{ usageError }}</template>
               <template v-else-if="!usage">{{ $t('personalization.usageSyncing') }}</template>
@@ -372,7 +386,10 @@ onMounted(() => {
           <div v-for="w in usageWindows" :key="w.labelKey" class="codex-usage-window">
             <div class="codex-usage-window__head">
               <span>{{ $t(w.labelKey) }}</span>
-              <span>{{ w.percent }}% · {{ $t('personalization.codexUsageResetIn', { time: w.resetText }) }}</span>
+              <span
+                >{{ w.percent }}% ·
+                {{ $t('personalization.codexUsageResetIn', { time: w.resetText }) }}</span
+              >
             </div>
             <div class="codex-usage-bar">
               <div
@@ -386,7 +403,9 @@ onMounted(() => {
 
         <!-- 重置额度（banked resets：可用数 + 兑换 + 历史） -->
         <div class="settings-section-divider">
-          <span class="settings-section-divider__label">{{ $t('personalization.codexResetsTitle') }}</span>
+          <span class="settings-section-divider__label">{{
+            $t('personalization.codexResetsTitle')
+          }}</span>
         </div>
         <div class="settings-input-row">
           <span class="settings-row-copy">
@@ -406,14 +425,30 @@ onMounted(() => {
         <div v-if="creditHistory.length" class="codex-credit-history">
           <div v-for="c in creditHistory" :key="c.id" class="codex-credit-item">
             <div class="codex-credit-item__main">
-              <span class="codex-credit-item__title">{{ c.title || $t('personalization.codexResetsTitle') }}</span>
+              <span class="codex-credit-item__title">{{
+                c.title || $t('personalization.codexResetsTitle')
+              }}</span>
               <span class="codex-credit-item__meta">
-                {{ $t('personalization.codexResetGrantedAt', { time: formatCreditDate(c.granted_at) }) }}
+                {{
+                  $t('personalization.codexResetGrantedAt', {
+                    time: formatCreditDate(c.granted_at)
+                  })
+                }}
                 <template v-if="c.redeemed_at">
-                  · {{ $t('personalization.codexResetRedeemedAt', { time: formatCreditDate(c.redeemed_at) }) }}
+                  ·
+                  {{
+                    $t('personalization.codexResetRedeemedAt', {
+                      time: formatCreditDate(c.redeemed_at)
+                    })
+                  }}
                 </template>
                 <template v-else>
-                  · {{ $t('personalization.codexResetExpiresAt', { time: formatCreditDate(c.expires_at) }) }}
+                  ·
+                  {{
+                    $t('personalization.codexResetExpiresAt', {
+                      time: formatCreditDate(c.expires_at)
+                    })
+                  }}
                 </template>
               </span>
             </div>
@@ -433,7 +468,9 @@ onMounted(() => {
 
       <!-- 代理设置 -->
       <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{ $t('personalization.codexProxyTitle') }}</span>
+        <span class="settings-section-divider__label">{{
+          $t('personalization.codexProxyTitle')
+        }}</span>
       </div>
       <div class="settings-input-row">
         <span class="settings-row-copy">

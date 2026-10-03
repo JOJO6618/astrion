@@ -52,9 +52,13 @@
         />
       </div>
 
-      <button class="auth-button" :disabled="submitting" @click="register">{{ t('auth.register') }}</button>
+      <button class="auth-button" :disabled="submitting" @click="register">
+        {{ t('auth.register') }}
+      </button>
       <div class="auth-error">{{ error }}</div>
-      <div class="auth-link">{{ t('auth.haveAccount') }}<a href="/login">{{ t('auth.backToLogin') }}</a></div>
+      <div class="auth-link">
+        {{ t('auth.haveAccount') }}<a href="/login">{{ t('auth.backToLogin') }}</a>
+      </div>
     </section>
   </main>
 </template>

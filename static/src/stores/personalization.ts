@@ -329,7 +329,10 @@ const persistMinimalExpandHeightLimited = (value: boolean) => {
     return;
   }
   try {
-    window.localStorage.setItem(MINIMAL_EXPAND_HEIGHT_LIMITED_STORAGE_KEY, value ? 'true' : 'false');
+    window.localStorage.setItem(
+      MINIMAL_EXPAND_HEIGHT_LIMITED_STORAGE_KEY,
+      value ? 'true' : 'false'
+    );
   } catch (error) {
     console.warn('写入极简展开高度限制设置失败：', error);
   }
@@ -534,8 +537,7 @@ export const usePersonalizationStore = defineStore('personalization', {
     handleOverlayPressEnd(event: Event) {
       // 按下与松开都发生在遮罩上才关闭；输入框内拖选文字、松开落在遮罩上时
       // target 虽为遮罩，但按压并未起始于遮罩，不会关闭
-      const shouldClose =
-        this.overlayPressActive && event.target === event.currentTarget;
+      const shouldClose = this.overlayPressActive && event.target === event.currentTarget;
       this.overlayPressActive = false;
       if (!shouldClose) {
         return;
@@ -612,15 +614,13 @@ export const usePersonalizationStore = defineStore('personalization', {
               (item: any) => typeof item === 'string' && item.trim()
             )
           : [],
-        tavily_api_key:
-          typeof data.tavily_api_key === 'string' ? data.tavily_api_key.trim() : '',
+        tavily_api_key: typeof data.tavily_api_key === 'string' ? data.tavily_api_key.trim() : '',
         search_provider: ['tavily', 'bocha', 'exa', 'parallel', 'searxng'].includes(
           String(data.search_provider || '')
         )
           ? String(data.search_provider)
           : 'tavily',
-        bocha_api_key:
-          typeof data.bocha_api_key === 'string' ? data.bocha_api_key.trim() : '',
+        bocha_api_key: typeof data.bocha_api_key === 'string' ? data.bocha_api_key.trim() : '',
         exa_api_key: typeof data.exa_api_key === 'string' ? data.exa_api_key.trim() : '',
         parallel_api_key:
           typeof data.parallel_api_key === 'string' ? data.parallel_api_key.trim() : '',
@@ -739,7 +739,8 @@ export const usePersonalizationStore = defineStore('personalization', {
         deep_compress_form: data.deep_compress_form === 'inject' ? 'inject' : 'file',
         agents_md_auto_inject: !!data.agents_md_auto_inject,
         claude_md_auto_inject: !!data.claude_md_auto_inject,
-        agents_skills_scan_enabled: data.agents_skills_scan_enabled === undefined ? true : !!data.agents_skills_scan_enabled,
+        agents_skills_scan_enabled:
+          data.agents_skills_scan_enabled === undefined ? true : !!data.agents_skills_scan_enabled,
         new_chat_button_behavior: data.new_chat_button_behavior === 'blank' ? 'blank' : 'route',
         group_sidebar_by_workspace: !!data.group_sidebar_by_workspace,
         sidebar_pinned_workspaces: Array.isArray(data.sidebar_pinned_workspaces)
@@ -751,7 +752,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         theme: ['classic', 'light', 'dark'].includes(data.theme) ? data.theme : fallbackTheme,
         ui_locale: ['zh-CN', 'en-US'].includes(data.ui_locale)
           ? data.ui_locale
-          : (this.form?.ui_locale || 'zh-CN'),
+          : this.form?.ui_locale || 'zh-CN',
         goal_review_mode: data.goal_review_mode === 'active' ? 'active' : 'readonly',
         goal_end_conditions: Array.isArray(data.goal_end_conditions)
           ? data.goal_end_conditions.filter((x: any) => x === 'max_turns' || x === 'max_tokens')
@@ -1129,7 +1130,10 @@ export const usePersonalizationStore = defineStore('personalization', {
     },
     setDefaultReasoningEffort(effort: ReasoningEffort | null) {
       let target: ReasoningEffort | null = null;
-      if (typeof effort === 'string' && REASONING_EFFORT_OPTIONS.includes(effort as ReasoningEffort)) {
+      if (
+        typeof effort === 'string' &&
+        REASONING_EFFORT_OPTIONS.includes(effort as ReasoningEffort)
+      ) {
         target = effort as ReasoningEffort;
       }
       this.form = {

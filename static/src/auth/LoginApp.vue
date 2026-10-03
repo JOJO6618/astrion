@@ -27,7 +27,9 @@
         />
       </div>
 
-      <button class="auth-button" :disabled="submitting" @click="login">{{ t('auth.login') }}</button>
+      <button class="auth-button" :disabled="submitting" @click="login">
+        {{ t('auth.login') }}
+      </button>
 
       <button
         v-if="hostModeEnabled"
@@ -39,7 +41,9 @@
       </button>
 
       <div class="auth-error">{{ error }}</div>
-      <div class="auth-link">{{ t('auth.noAccount') }}<a href="/register">{{ t('auth.signUp') }}</a></div>
+      <div class="auth-link">
+        {{ t('auth.noAccount') }}<a href="/register">{{ t('auth.signUp') }}</a>
+      </div>
     </section>
   </main>
 </template>
@@ -80,7 +84,7 @@ const doLogin = async (redirectUrl = '/') => {
 
     // 503 = ensure_container 失败（Docker 未启动/镜像缺失等），error 带具体原因，原地显示
     if (resp.status === 503) {
-      const data = await resp.json().catch(() => ({} as any));
+      const data = await resp.json().catch(() => ({}) as any);
       error.value = data.error || t('auth.serviceUnavailable');
       return;
     }
@@ -109,7 +113,7 @@ const doHostLogin = async (redirectUrl = '/') => {
     const resp = await fetch('/host-login', { method: 'POST' });
     // 503 = 容量满或终端创建失败，error 带具体原因，原地显示
     if (resp.status === 503) {
-      const data = await resp.json().catch(() => ({} as any));
+      const data = await resp.json().catch(() => ({}) as any);
       error.value = data.error || t('auth.resourceBusy');
       return;
     }

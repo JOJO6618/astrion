@@ -28,5 +28,5 @@ export default {
   updateFailed: '更新失败',
 
   // 检查失败
-  checkFailed: '检查更新失败',
+  checkFailed: '检查更新失败'
 };

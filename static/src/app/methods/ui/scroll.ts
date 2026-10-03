@@ -1,9 +1,11 @@
 // @ts-nocheck
 import { createHistoryScrollSession } from './historyScrollSession';
-import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
 import {
-  uiBounceTrace,
-} from './shared';
+  scrollToBottom as scrollToBottomHelper,
+  conditionalScrollToBottom as conditionalScrollToBottomHelper,
+  scrollThinkingToBottom as scrollThinkingToBottomHelper
+} from '../../../composables/useScrollControl';
+import { uiBounceTrace } from './shared';
 
 export const scrollMethods = {
   clearLocalTaskUiState(reason = 'safe-navigation') {

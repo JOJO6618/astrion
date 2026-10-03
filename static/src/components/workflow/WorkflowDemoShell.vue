@@ -36,7 +36,7 @@ import {
   listWorkflows,
   loadWorkflow,
   saveWorkflow,
-  type WorkflowListItem,
+  type WorkflowListItem
 } from './api';
 
 /**

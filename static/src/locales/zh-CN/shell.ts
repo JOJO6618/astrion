@@ -58,5 +58,5 @@ export default {
   toolRenameFile: '重命名文件',
   toolWriteFile: '写入文件',
   toolEditFile: '编辑文件',
-  pendingApproval: '待审批操作',
+  pendingApproval: '待审批操作'
 } as const;

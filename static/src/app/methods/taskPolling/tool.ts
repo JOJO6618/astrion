@@ -230,7 +230,14 @@ export const toolMethods = {
 
     if (data.status) {
       targetAction.tool.status = data.status;
-      const terminalStatuses = new Set(['completed', 'failed', 'timeout', 'terminated', 'cancelled', 'canceled']);
+      const terminalStatuses = new Set([
+        'completed',
+        'failed',
+        'timeout',
+        'terminated',
+        'cancelled',
+        'canceled'
+      ]);
       if (terminalStatuses.has(String(data.status))) {
         this.refreshProjectGitSummary?.();
         this.fetchTerminalCount();
@@ -468,11 +475,13 @@ export const toolMethods = {
       if (Notification.permission === 'granted') {
         new Notification(title, { body });
       } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then((permission) => {
-          if (permission === 'granted') {
-            new Notification(title, { body });
-          }
-        }).catch(() => undefined);
+        Notification.requestPermission()
+          .then((permission) => {
+            if (permission === 'granted') {
+              new Notification(title, { body });
+            }
+          })
+          .catch(() => undefined);
       }
     } catch (_error) {
       // ignore notification errors
@@ -501,10 +510,13 @@ export const toolMethods = {
     this.pendingToolApprovals = this.pendingToolApprovals.filter(
       (item: any) => item && item.approval_id !== approvalId
     );
-    const decision = String(data?.decision || '').trim().toLowerCase();
+    const decision = String(data?.decision || '')
+      .trim()
+      .toLowerCase();
     const reason = String(data?.reason || '').trim();
     if (decision === 'approved' || decision === 'rejected') {
-      const decisionText = decision === 'approved' ? t('appTasks.approvalApproved') : t('appTasks.approvalRejected');
+      const decisionText =
+        decision === 'approved' ? t('appTasks.approvalApproved') : t('appTasks.approvalRejected');
       this.autoApprovalFinalMessage = t('appTasks.approvalFinalMessage', {
         decision: decisionText,
         reason: reason || t('appTasks.reasonNotProvided')
