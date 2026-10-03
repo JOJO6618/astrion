@@ -78,6 +78,7 @@
             show: expandedGroups.has(group.id),
             'collapse-animating': collapsingGroups.has(group.id)
           }"
+          @transitionend.self="handleGroupTransitionEnd(group.id, $event)"
         >
           <div
             class="steps-wrapper"
@@ -221,6 +222,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'group-toggle', payload: { groupId: string; expanded: boolean }): void;
+  (event: 'group-collapse-finished', payload: { groupId: string }): void;
 }>();
 
 const expandedGroups = ref(new Set<string>());
@@ -932,6 +934,12 @@ const scrollStepsWrapperToBottom = (groupId: string) => {
   }
 };
 
+const handleGroupTransitionEnd = (groupId: string, event: TransitionEvent) => {
+  if (event.propertyName === 'grid-template-rows' && !expandedGroups.value.has(groupId)) {
+    emit('group-collapse-finished', { groupId });
+  }
+};
+
 const toggleExpand = (groupId: string) => {
   if (expandedGroups.value.has(groupId)) {
     expandedGroups.value.delete(groupId);
@@ -943,6 +951,16 @@ const toggleExpand = (groupId: string) => {
       setTimeout(() => {
         collapsingGroups.value.delete(groupId);
         collapseSkipTimers.delete(groupId);
+        // 无高度变化时不会发 transitionend；用已有宽限期计时器收尾。
+        // 若 CSS 过渡仍在运行，则由真实 transitionend 通知，避免提前结束回锁检查。
+        const container = stepsWrapperRefs.get(groupId)?.parentElement;
+        const transitioning = container?.getAnimations().some(
+          (animation) => animation.playState === 'running' &&
+            'transitionProperty' in animation && animation.transitionProperty === 'grid-template-rows'
+        );
+        if (!transitioning && !expandedGroups.value.has(groupId)) {
+          emit('group-collapse-finished', { groupId });
+        }
       }, COLLAPSE_ANIMATION_MS)
     );
     emit('group-toggle', { groupId, expanded: false });

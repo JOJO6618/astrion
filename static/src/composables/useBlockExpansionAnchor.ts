@@ -19,6 +19,7 @@ interface UseBlockExpansionAnchorOptions {
    * 两个写入者同帧打架会产生抖动/猛拽。tick 每帧自查，一旦活跃立即中止所有动画。
    */
   isFollowEngineActive?: () => boolean;
+  onBeforeScroll?: () => void;
   duration?: number;
   defaultDirection?: BlockExpandDirection;
 }
@@ -30,7 +31,7 @@ interface UseBlockExpansionAnchorOptions {
  * 产生顿挫。该 composable 在 CSS 过渡期间用 rAF 持续覆盖 scrollTop。
  *
  * 注意（2026-09-28）：本 composable 只在「用户脱锁浏览」状态下由调用方启动；
- * 锁定态的块高度变化由跟随引擎逐帧贴底处理，对话最底部块由临时锁定动画处理。
+ * 锁定态的块高度变化由跟随引擎处理；脱锁后不因块靠近底部而自动回锁。
  *
  * 方向策略：
  * - 展开时根据块顶边在视口的位置决定：上半向下展开（顶边不动），下半向上展开（底边不动）。
@@ -41,7 +42,7 @@ export function useBlockExpansionAnchor(
   scrollRef: Ref<HTMLElement | null>,
   options: UseBlockExpansionAnchorOptions
 ) {
-  const { isFollowEngineActive, duration = 300, defaultDirection = 'auto' } = options;
+  const { isFollowEngineActive, onBeforeScroll, duration = 300, defaultDirection = 'auto' } = options;
   const animations = new Map<string, AnchorAnimation>();
   const preferredModes = new Map<string, 'up' | 'down'>();
   let rafId: number | null = null;
@@ -89,7 +90,8 @@ export function useBlockExpansionAnchor(
       if (anim.mode === 'up') {
         delta = currentBottom - anim.initialBottom;
       } else {
-        delta = -(currentTop - anim.initialTop);
+        // scrollTop 增加会使视口内的顶边上移，因此补偿与顶边偏移同号。
+        delta = currentTop - anim.initialTop;
       }
 
       const stillGrowing = Math.abs(delta) > 1;
@@ -110,6 +112,7 @@ export function useBlockExpansionAnchor(
       hasActive = true;
 
       if (Math.abs(delta) > 0.5) {
+        onBeforeScroll?.();
         container.scrollTop += delta;
       }
     }

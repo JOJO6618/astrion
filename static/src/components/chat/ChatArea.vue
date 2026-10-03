@@ -9,6 +9,7 @@
       <!-- 窗口化渲染：virtua 只挂载可视区+buffer 的消息块，未挂载项按实测高度缓存占位 -->
       <Virtualizer
         ref="virtualizerRef"
+        class="chat-message-list"
         v-if="stickScrollElement"
         :data="filteredMessages || []"
         :scroll-ref="stickScrollElement"
@@ -202,6 +203,7 @@
               :register-thinking-ref="registerThinkingRef"
               :handle-thinking-scroll="props.handleThinkingScroll"
               @group-toggle="handleMinimalGroupToggle"
+              @group-collapse-finished="handleMinimalGroupCollapseFinished"
             />
           </template>
           <template v-else-if="stackedBlocksEnabled">
@@ -759,6 +761,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { Virtualizer } from 'virtua/vue';
 import { useBlockExpansionAnchor } from '@/composables/useBlockExpansionAnchor';
+import { useVirtualListLayoutCommit } from '@/composables/useVirtualListLayoutCommit';
 import ToolAction from '@/components/chat/actions/ToolAction.vue';
 import StackedBlocks from './StackedBlocks.vue';
 import MinimalBlocks from './MinimalBlocks.vue';
@@ -1325,33 +1328,67 @@ function syncStickState() {
   isNearBottom.value = remain <= 70;
 }
 
-// 跟随引擎唯一写入口：所有追底都经由此处（RO 回调 / KaTeX / 显式追底）。
-// 单向：只在内容增长导致 remain>1 时向下写；shrink（remain<0）由浏览器 clamp 处理。
-function requestFollowWrite(source: string) {
-  if (followState.value !== 'locked') return;
-  if (quickNavJumpActive) return;
-  // 回锁补间进行中：补间每帧自己写底，引擎此刻瞬时写入会顶掉动画
-  if (relockAnimRaf !== null) return;
+// virtua 在 ResizeObserver 中测量条目，再由 Vue 更新占位并补偿 scrollTop。
+// 同批观测中直接读取 scrollHeight 会读到「条目新高度 + 旧偏移/占位」的混合布局，
+// 先追过头再 clamp 回来。合并请求，在 Vue 本批布局与补偿提交后、绘制前追底。
+let followWriteQueued = false;
+let followWriteSource = '';
+const pendingMinimalCollapses = new Map<string, symbol>();
+
+function tryRelockAfterMinimalCollapse() {
+  if (followState.value !== 'escaped' || quickNavJumpActive || pendingMinimalCollapses.size === 0) return;
   const el = scrollRef.value;
-  if (!el) return;
-  const maxTop = el.scrollHeight - el.clientHeight;
-  const remain = maxTop - el.scrollTop;
-  if (remain > 1) {
-    markProgrammaticHint(`ChatArea.follow:${source}`);
-    el.scrollTop = maxTop;
+  if (!el || !el.isConnected || renderPending.value) return;
+  for (const id of pendingMinimalCollapses.keys()) {
+    if (!el.querySelector(`[data-group-id="${escapeBlockSelector(id)}"]`)) {
+      pendingMinimalCollapses.delete(id);
+    }
+  }
+  // 收缩 clamp 真正触底时恢复锁定；不使用用户下滚的 100px 吸底阈值。
+  const remain = el.scrollHeight - el.scrollTop - el.clientHeight;
+  if (pendingMinimalCollapses.size > 0 && remain <= 2) {
+    relockFollow('minimal-collapse-at-bottom');
   }
 }
 
+function requestFollowWrite(source: string) {
+  if (quickNavJumpActive || relockAnimRaf !== null) return;
+  if (followState.value !== 'locked' && pendingMinimalCollapses.size === 0) return;
+  followWriteSource = source;
+  if (followWriteQueued) return;
+  followWriteQueued = true;
+  // 先退出整批 RO 回调，再等待 Vue flush；即使我们的 RO 先于 virtua 触发，
+  // nextTick 也能等到它随后排入的列表更新，而不是挂到一个已完成的 Promise。
+  queueMicrotask(() => {
+    void nextTick(() => {
+      followWriteQueued = false;
+      tryRelockAfterMinimalCollapse();
+      if (followState.value !== 'locked' || quickNavJumpActive || relockAnimRaf !== null) return;
+      const el = scrollRef.value;
+      if (!el || !el.isConnected) return;
+      const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      // 收缩交给浏览器 clamp，不新增与它相反的逐帧写入者。
+      if (maxTop - el.scrollTop > 1) {
+        markProgrammaticHint(`ChatArea.follow:${followWriteSource}`);
+        el.scrollTop = maxTop;
+      }
+      syncStickState();
+    });
+  });
+}
+
 function escapeFollowLock(reason: string) {
+  // 用户在收起期间再次上滚/跳转，取消本次收起的触底回锁资格。
+  pendingMinimalCollapses.clear();
   if (followState.value === 'escaped') return;
   followState.value = 'escaped';
-  cancelBottomFollowLock();
   cancelRelockAnimation();
   bounceTraceLog('follow:escape', { reason }, 'follow:escape', 0);
 }
 
 function relockFollow(source: string) {
   if (followState.value === 'locked') return;
+  pendingMinimalCollapses.clear();
   followState.value = 'locked';
   // 引擎接管滚动，进行中的锚定动画让位（锚定 tick 内也有同款自查兑底）
   stopBlockExpansionAnchors();
@@ -1383,7 +1420,7 @@ function relockFollow(source: string) {
       };
       relockAnimRaf = requestAnimationFrame(tick);
     } else {
-      // 已在底部（如 bottom-follow 动画落定后回锁）：瞬时写底即可
+      // 已在底部：瞬时写底即可。
       markProgrammaticHint(`ChatArea.relock:${source}`);
       el.scrollTop = el.scrollHeight - el.clientHeight;
     }
@@ -1391,57 +1428,8 @@ function relockFollow(source: string) {
   bounceTraceLog('follow:relock', { source }, 'follow:relock', 0);
 }
 
-// —— 底部块「临时锁定动画」——
-// 脱锁状态下用户手动展开/收起对话最底部的块（如极简模式摘要组）：块下方没有更多
-// 内容，锚定顶边会露出大片空白、锚定底边会把页面拽走。正确语义是视同仍锁定——
-// 过渡期间逐帧钉底，块变矮多少上方内容同步滑下多少，动画结束正好停在底部并回锁。
-const BOTTOM_BLOCK_EDGE_TOLERANCE_PX = 120; // 块底边与对话底部的距离容差
-const BOTTOM_FOLLOW_MAX_REMAIN_PX = 400; // 距底超过该值说明用户在浏览历史，保持位置不拽
-
-let bottomFollowRaf: number | null = null;
-let bottomFollowUntil = 0;
-
-function cancelBottomFollowLock() {
-  if (bottomFollowRaf !== null) {
-    cancelAnimationFrame(bottomFollowRaf);
-    bottomFollowRaf = null;
-  }
-  bottomFollowUntil = 0;
-}
-
-function isConversationBottomBlock(element: HTMLElement): boolean {
-  const container = scrollRef.value;
-  if (!container) return false;
-  const containerRect = container.getBoundingClientRect();
-  const rect = element.getBoundingClientRect();
-  const remain = container.scrollHeight - container.scrollTop - container.clientHeight;
-  // 对话底部在视口坐标系中的位置 = 视口底 + remain；块底与之重合即底部块
-  return Math.abs(containerRect.bottom + remain - rect.bottom) <= BOTTOM_BLOCK_EDGE_TOLERANCE_PX;
-}
-
-function startBottomFollowLock(duration: number) {
-  cancelBottomFollowLock();
-  bottomFollowUntil = performance.now() + duration + 120; // 余量覆盖过渡尾帧
-  const tick = () => {
-    bottomFollowRaf = null;
-    const el = scrollRef.value;
-    if (!el) return;
-    const maxTop = el.scrollHeight - el.clientHeight;
-    if (Math.abs(maxTop - el.scrollTop) > 1) {
-      markProgrammaticHint('ChatArea.bottomFollow');
-      el.scrollTop = maxTop;
-    }
-    if (performance.now() < bottomFollowUntil) {
-      bottomFollowRaf = requestAnimationFrame(tick);
-    } else {
-      // 落定在底部 = 明确回锁（用户中途滚轮会走 escape 路径提前取消本动画）
-      relockFollow('bottom-follow');
-    }
-  };
-  bottomFollowRaf = requestAnimationFrame(tick);
-}
-
 // —— 虚拟列表支撑 ——
+// 展开保持当前锁定意图；脱锁收起保持阅读锚点，仅真正触底时恢复锁定。
 // 消息对象没有后端 id，这里按对象身份（WeakMap）分配稳定 key，
 // 供 virtua 的逐项高度缓存与列表项复用，避免改动 store / 后端消息结构
 const messageKeyCache = new WeakMap<object, string>();
@@ -1488,7 +1476,10 @@ const rootEl = scrollRef;
 // 避免两个写入者同帧打架。
 const { anchorBlockElement, stopAll: stopBlockExpansionAnchors } = useBlockExpansionAnchor(
   scrollRef,
-  { isFollowEngineActive: () => followState.value === 'locked' }
+  {
+    isFollowEngineActive: () => followState.value === 'locked',
+    onBeforeScroll: () => markProgrammaticHint('ChatArea.expansion-anchor')
+  }
 );
 
 const thinkingRefs = new Map<string, HTMLElement | null>();
@@ -1829,10 +1820,11 @@ function attachBounceListener() {
     }
     // 回锁：escaped 期间，用户输入驱动的滚动真正触底才恢复跟随。
     // 惯性滚动期间 scrollHeight 可能随流式增长而变化（证据法失效），故允许
-    // 「近期有用户输入」作为兼容；escaped 期间无任何程序路径会把内容拉到底部
-    // （跟随引擎/KaTeX 兑底均已按 followState 门控，锚定只保持视口相对位置），触底即可信。
+    // 「近期有用户输入」作为兼容，但不能把随后发生的锚定补偿当作用户下滚。
+    // 锚定写入已有程序标记；即使仍在最近一次 wheel 的 600ms 窗口内也不回锁。
     if (
       followState.value === 'escaped' &&
+      !closeToProgrammaticHint &&
       delta > 0 &&
       height - top - target.clientHeight <= RELOCK_BOTTOM_THRESHOLD_PX &&
       (userScrollEvidence || now - lastUserScrollInputTs <= 600)
@@ -1881,6 +1873,8 @@ function attachBounceListener() {
         180
       );
     }
+    // virtua 的尺寸补偿也会写 scrollTop；锁定时在本批更新结束后收敛到真实底部。
+    requestFollowWrite('scroll-settle');
   };
   el.addEventListener('scroll', scrollListener, { passive: true });
   if (!traceAttachLogged && isScrollBounceTraceEnabled()) {
@@ -1921,26 +1915,12 @@ function escapeBlockSelector(value: string) {
 
 const prevExpandedBlocks = ref(new Set<string>());
 
-type ExpansionScrollDecision = 'engine' | 'bottom-follow' | 'anchor';
+type ExpansionScrollDecision = 'engine' | 'anchor';
 
-// 块展开/收起的滚动补偿决策（2026-09-28 重写，替代旧 shouldSkipExpansionAnchor）：
-// - engine：locked 状态下跟随引擎是唯一写入者，锚定不参与（消除 stopScroll/rearm
-//   双写打架——旧架构锚定启动先记录边位置、rearm 紧接着跳底、首帧再猛拽回来，
-//   就是「收起时页面像惯性一样上拉」的来源）。
-// - bottom-follow：escaped + 对话底部块 + 距底较近——临时锁定动画（钉底，
-//   收起时上方内容同步下滑，不露空白；结束停在底部并回锁）。
-// - anchor：escaped 其余情况——锚定顶/底边保持视口稳定。距底较远的底部块
-//   自动收起也走这里：用户在浏览历史，任何方案都不应拽动视口。
-function decideExpansionScroll(element?: HTMLElement | null): ExpansionScrollDecision {
-  // 快捷导航补间进行中不启动新写入，避免覆写 scrollTop 取消跳转
-  if (quickNavJumpActive) return 'engine';
-  if (followState.value === 'locked') return 'engine';
-  const container = scrollRef.value;
-  if (!container || !element) return 'anchor';
-  const remain = container.scrollHeight - container.scrollTop - container.clientHeight;
-  if (remain <= BOTTOM_FOLLOW_MAX_REMAIN_PX && isConversationBottomBlock(element)) {
-    return 'bottom-follow';
-  }
+// 用户已脱锁就保持阅读锚点，不因块靠近底部而临时追底或自动回锁。
+// 锁定态和快捷导航期间，块锚定让位给对应的滚动执行者。
+function decideExpansionScroll(): ExpansionScrollDecision {
+  if (quickNavJumpActive || followState.value === 'locked') return 'engine';
   return 'anchor';
 }
 
@@ -1966,12 +1946,8 @@ watch(
       const el = container.querySelector(
         `[data-block-id="${escapeBlockSelector(id)}"]`
       ) as HTMLElement | null;
-      const decision = decideExpansionScroll(el);
+      const decision = decideExpansionScroll();
       if (decision === 'engine') continue;
-      if (decision === 'bottom-follow') {
-        startBottomFollowLock(260);
-        continue;
-      }
       if (el) {
         anchorBlockElement(el, id, {
           direction: 'auto',
@@ -1989,12 +1965,8 @@ function handleStackedMoreToggle(payload: {
   expanded: boolean;
   stackKey: string;
 }) {
-  const decision = decideExpansionScroll(payload.element);
+  const decision = decideExpansionScroll();
   if (decision === 'engine') return;
-  if (decision === 'bottom-follow') {
-    startBottomFollowLock(260);
-    return;
-  }
 
   anchorBlockElement(payload.element, `more-${payload.stackKey}`, {
     direction: 'auto',
@@ -2005,24 +1977,43 @@ function handleStackedMoreToggle(payload: {
 
 function handleMinimalGroupToggle(payload: { groupId: string; expanded: boolean }) {
   const { groupId, expanded } = payload;
+  if (expanded) {
+    pendingMinimalCollapses.delete(groupId);
+  } else if (followState.value === 'escaped' && !quickNavJumpActive) {
+    pendingMinimalCollapses.set(groupId, Symbol(groupId));
+  }
   const container = scrollRef.value;
   if (!container) return;
   const el = container.querySelector(
     `[data-group-id="${escapeBlockSelector(groupId)}"]`
   ) as HTMLElement | null;
-  const decision = decideExpansionScroll(el);
+  const decision = decideExpansionScroll();
   if (decision === 'engine') return;
-  if (decision === 'bottom-follow') {
-    startBottomFollowLock(300);
-    return;
-  }
   if (el) {
     anchorBlockElement(el, groupId, {
-      direction: 'auto',
+      // 此元素是固定高度的摘要标题；脱锁后保持标题，而非移动整段阅读位置。
+      direction: 'down',
       duration: 300,
       phase: expanded ? 'expand' : 'collapse'
     });
   }
+}
+
+function handleMinimalGroupCollapseFinished(payload: { groupId: string }) {
+  const { groupId } = payload;
+  const token = pendingMinimalCollapses.get(groupId);
+  if (!token) return;
+  // 最后一帧的条目测量/占位更新可能晚于 transitionend；跨过完整布局帧再复核。
+  // 这两帧只检查位置，不创建新的滚动补间或强制追底。
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      void nextTick(() => {
+        if (pendingMinimalCollapses.get(groupId) !== token) return;
+        tryRelockAfterMinimalCollapse();
+        pendingMinimalCollapses.delete(groupId);
+      });
+    });
+  });
 }
 
 const registerCollapseContent = (key: string, el: Element | null) => {
@@ -2547,10 +2538,10 @@ watch(contentRef, () => {
 });
 
 onBeforeUnmount(() => {
+  pendingMinimalCollapses.clear();
   detachBounceListener();
   stopBlockExpansionAnchors();
   cancelQuickNavJump();
-  cancelBottomFollowLock();
   cancelRelockAnimation();
   if (contentResizeObserver) {
     contentResizeObserver.disconnect();
@@ -2648,6 +2639,9 @@ function getGeneratingLetters(message: any) {
 // 与深度压缩 _collect_user_texts（server/deep_compression.py）口径保持一致。
 const shellRef = ref<HTMLElement | null>(null);
 const virtualizerRef = ref<any>(null);
+useVirtualListLayoutCommit(contentRef, virtualizerRef, () => {
+  requestFollowWrite('virtual-layout-commit');
+});
 const quickNavActiveIndex = ref(-1);
 const quickNavLineEls = new Map<number, HTMLElement>();
 

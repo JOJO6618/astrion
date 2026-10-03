@@ -350,6 +350,13 @@
   contain: layout style;
 }
 
+/* 绝对定位条目在高度过渡中可能暂时越过 virtua 尚未提交的列表高度。
+   纵向溢出不能提前扩大外层 scrollHeight，否则追底会先越界再回跳。
+   clip 不建立新的滚动容器；横向仍可见，保留消息侧边装饰。 */
+.chat-message-list {
+  overflow-y: clip;
+}
+
 /* 窗口化后 message-block 外层有 virtua 列表项包装，不再是 messages-flow 直接子元素，改用后代选择器 */
 .messages-flow .message-block--last {
   margin-bottom: 0;
