@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { createHistoryScrollSession } from './historyScrollSession';
 import { debugLog } from '../common';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
@@ -120,49 +121,26 @@ export const scrollMethods = {
     );
   },
   scrollHistoryToBottomInstant() {
-    const chatArea = this.getChatAreaController();
-    if (chatArea && typeof chatArea.stopStickScroll === 'function') {
-      chatArea.stopStickScroll();
-    }
-    const area = this.getMessagesAreaElement();
-    if (!area) {
-      return;
-    }
-    const jump = () => {
-      area.scrollTop = area.scrollHeight;
-    };
-    jump();
+    const session = createHistoryScrollSession(this);
+    if (!session) return;
     requestAnimationFrame(() => {
-      jump();
-      requestAnimationFrame(jump);
+      if (!session.jump()) return;
+      requestAnimationFrame(() => session.jump());
     });
-    // 历史落定 = 明确回锁
-    if (chatArea && typeof chatArea.scrollToBottom === 'function') {
-      chatArea.scrollToBottom({ behavior: 'auto', force: true });
-    }
-    this.chatSetScrollState({ userScrolling: false });
   },
   async settleHistoryRenderAndScroll() {
-    const chatArea = this.getChatAreaController();
-    if (chatArea && typeof chatArea.stopStickScroll === 'function') {
-      chatArea.stopStickScroll();
-    }
+    const session = createHistoryScrollSession(this);
     const area = this.getMessagesAreaElement();
-    if (!area) {
-      return;
-    }
+    if (!session || !area) return;
     const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
     const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
-    const jump = () => {
-      area.scrollTop = area.scrollHeight;
-    };
 
     let lastHeight = -1;
     let stableFrames = 0;
     const startedAt = Date.now();
     while (Date.now() - startedAt < 900 && stableFrames < 4) {
       await nextFrame();
-      jump();
+      if (!session.jump()) return;
       const height = area.scrollHeight;
       if (Math.abs(height - lastHeight) <= 1) {
         stableFrames += 1;
@@ -174,14 +152,9 @@ export const scrollMethods = {
 
     // 给 show_html / 表格滚动壳等异步同步 DOM 一次短暂稳定窗口；仍在 historyLoading 隐藏期内完成。
     await sleep(80);
-    jump();
+    if (!session.jump()) return;
     await nextFrame();
-    jump();
-    // 历史落定 = 明确回锁
-    if (chatArea && typeof chatArea.scrollToBottom === 'function') {
-      chatArea.scrollToBottom({ behavior: 'auto', force: true });
-    }
-    this.chatSetScrollState({ userScrolling: false });
+    session.jump();
   },
   scrollToBottom() {
     uiBounceTrace(

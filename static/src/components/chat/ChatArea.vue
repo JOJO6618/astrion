@@ -1284,6 +1284,8 @@ const contentRef = ref<HTMLElement | null>(null);
 
 type FollowState = 'locked' | 'escaped';
 const followState = ref<FollowState>('locked');
+// 历史追底被脱锁打断后，即使再次回锁也不能恢复旧流程。
+let scrollEscapeVersion = 0;
 // 最近一次可信用户滚动输入时间（wheel / touch / scroll 推断），用于回锁判定
 let lastUserScrollInputTs = 0;
 // 用户输入驱动的滚动进入底部区域（距底 <= 该值）即允许回锁。
@@ -1378,6 +1380,7 @@ function requestFollowWrite(source: string) {
 }
 
 function escapeFollowLock(reason: string) {
+  scrollEscapeVersion += 1;
   // 用户在收起期间再次上滚/跳转，取消本次收起的触底回锁资格。
   pendingMinimalCollapses.clear();
   if (followState.value === 'escaped') return;
@@ -1518,7 +1521,6 @@ let lastObservedHeight = 0;
 let lastUserDownScrollTs = 0;
 let lastProgrammaticHintTs = 0;
 let lastProgrammaticHintSource = '';
-let suppressUserIntentUntil = 0;
 let scrollListener: ((event: Event) => void) | null = null;
 let wheelListener: ((event: WheelEvent) => void) | null = null;
 let touchStartListener: ((event: TouchEvent) => void) | null = null;
@@ -1678,7 +1680,6 @@ function attachBounceListener() {
     const deltaY = event.touches[0].clientY - touchScrollStartY;
     if (deltaY <= 8) return;
     const now = Date.now();
-    if (now <= suppressUserIntentUntil) return;
     if (isNestedScrollableTarget(event.target)) return;
     touchEscapeFired = true;
     escapeFollowLock('touch-drag');
@@ -1713,7 +1714,7 @@ function attachBounceListener() {
     const now = Date.now();
     // 任意方向的真实滚轮都记为用户输入证据（回锁判定用）
     lastUserScrollInputTs = now;
-    if (!(deltaY < -1 && now > suppressUserIntentUntil)) {
+    if (!(deltaY < -1)) {
       return;
     }
     escapeFollowLock('wheel-up');
@@ -1786,12 +1787,11 @@ function attachBounceListener() {
     // 滚一轮 escape→relock 才能恢复（「向上再使劲向下滚一下下次就能锁上」的根因）。
     // virtua 补偿写入保持视口位置（remain 不变），同样被本条件天然排除。
     const remainAfterScroll = height - top - target.clientHeight;
-    const strongManualUp = delta < -18 && now > suppressUserIntentUntil;
+    const strongManualUp = delta < -18;
     if (
       followState.value === 'locked' &&
       delta < -2 &&
       remainAfterScroll > ESCAPE_LEAVE_BOTTOM_PX &&
-      now > suppressUserIntentUntil &&
       (strongManualUp || userScrollEvidence)
     ) {
       escapeFollowLock('scroll-up');
@@ -2067,7 +2067,6 @@ async function stickScrollToBottom(
   // 强制滚动到底 = 明确回锁意图（发送消息 / 点击回底按钮 / 历史加载落定）
   if (options.force) {
     followState.value = 'locked';
-    suppressUserIntentUntil = Date.now() + 900;
   }
   // 瞬时写底前取消可能进行中的回锁补间，避免两个写入者叠写
   cancelRelockAnimation();
@@ -2112,7 +2111,8 @@ function getStickState() {
     isAtBottom: !!isAtBottom.value,
     isNearBottom: !!isNearBottom.value,
     escapedFromLock: !!escapedFromLock.value,
-    followState: followState.value
+    followState: followState.value,
+    scrollEscapeVersion
   };
 }
 

@@ -140,6 +140,7 @@ export const historyMethods = {
           // 如果状态中有对话历史字段
           if (status.conversation_history && Array.isArray(status.conversation_history)) {
             this.renderHistoryMessages(status.conversation_history);
+            await this.settleHistoryRenderAndScroll();
             return;
           }
 
@@ -566,9 +567,8 @@ export const historyMethods = {
     // 强制更新视图
     this.$forceUpdate();
 
-    // 确保滚动到底部
+    // 初始滚动由加载入口统一负责，渲染层不再安排重复的强制回底。
     this.$nextTick(() => {
-      this.scrollHistoryToBottomInstant();
       setTimeout(() => {
         const blockCount =
           this.$el && this.$el.querySelectorAll
