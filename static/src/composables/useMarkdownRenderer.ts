@@ -764,10 +764,6 @@ export interface MarkdownSegment {
   key: string;
 }
 
-function hashCodeBlock(language: string, content: string): string {
-  return stableHash(`${language || ''}|${content}`);
-}
-
 export function parseMarkdownSegments(text: string, isStreaming = false): MarkdownSegment[] {
   if (!text) {
     return [{ type: 'text', content: '', closed: true, key: 'text-0' }];
@@ -790,7 +786,7 @@ export function parseMarkdownSegments(text: string, isStreaming = false): Markdo
 
     const language = match[1].trim();
     const content = match[2];
-    const key = `code-${hashCodeBlock(language, content)}`;
+    const key = `code-${match.index}`;
 
     segments.push({
       type: 'code',
@@ -824,7 +820,7 @@ export function parseMarkdownSegments(text: string, isStreaming = false): Markdo
           content,
           language,
           closed: false,
-          key: 'code-streaming-active'
+          key: `code-${cursor + (openMatch.index || 0)}`
         });
         return segments;
       }
@@ -841,15 +837,22 @@ export function parseMarkdownSegments(text: string, isStreaming = false): Markdo
   return segments;
 }
 
-export function renderMarkdownText(text: string, isStreaming = false, enableCitations = false): string {
+export function renderMarkdownText(
+  text: string, isStreaming = false, enableCitations = false, enableCards = true
+): string {
   if (!text) return '';
+  // Thinking supports Markdown but treats special card markup as literal text.
+  if (!enableCards) {
+    text = text.replace(/<\/?show[_-](?:html|image|file)\b[^>]*(?:>|$)/gi,
+      (tag, offset: number) => isShowHtmlTagInsideMarkdownCode(text, offset) ? tag : escapeHtml(tag));
+  }
 
   // isStreaming 必须透传：流式期间未闭合的 show_html 需要编码成 data-partial 占位
   // （js=off 实时渲染 / js=on 显示"渲染中"），否则原始标签文本会直接散落到消息里
   // enableCitations：仅 assistant 正文开启；用户消息/预览等静态文本里的【cite:】原样显示
-  const withCustomBlocks = transformShowFileBlocks(
+  const withCustomBlocks = enableCards ? transformShowFileBlocks(
     transformShowImageBlocks(transformShowHtmlBlocks(text, isStreaming))
-  );
+  ) : text;
   const safeText = transformMathBlocks(
     enableCitations ? transformCitationMarkers(withCustomBlocks, isStreaming) : withCustomBlocks
   );

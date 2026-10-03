@@ -67,7 +67,11 @@
                 @scroll="handleThinkingScrollInternal(blockKey(action, idx), $event)"
                 style="max-height: 240px; overflow-y: auto"
               >
-                {{ action.content }}
+                <MarkdownRenderer
+                  :content="action.content || ''"
+                  :is-streaming="action.streaming"
+                  thinking
+                />
               </div>
             </div>
           </div>
@@ -115,6 +119,7 @@ import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useModelStore } from '@/stores/model';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
+import MarkdownRenderer from './MarkdownRenderer.vue';
 
 defineOptions({ name: 'StackedBlocks' });
 

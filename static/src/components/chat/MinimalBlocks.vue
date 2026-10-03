@@ -100,8 +100,9 @@
                     class="thinking-content"
                     :ref="(el) => registerThinking(step.id, el)"
                     @scroll="handleScroll(step.id, $event)"
-                    v-html="renderContent(step.content)"
-                  ></div>
+                  >
+                    <MarkdownRenderer :content="step.content" :is-streaming="step.streaming" thinking />
+                  </div>
                 </div>
                 <div v-else-if="step.type === 'tool'" class="step-body">
                   <div class="step-header">{{ getToolName(step.action) }}</div>
@@ -1077,11 +1078,6 @@ const renderToolResult = (action: Action) => {
   return `<div class="result-item"><pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre></div>`;
 };
 
-const renderContent = (content: string) => {
-  if (!content) return '';
-  return escapeHtml(content).replace(/\n/g, '<br>');
-};
-
 const escapeHtml = (text: string) => {
   const div = document.createElement('div');
   div.textContent = text;
@@ -1457,7 +1453,7 @@ body[data-theme='light'] .summary-line-text.running .summary-char {
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.7;
-  white-space: pre-wrap;
+  white-space: normal;
   word-wrap: break-word;
   max-height: calc(1.7em * 6); /* 6行 */
   overflow-y: auto;

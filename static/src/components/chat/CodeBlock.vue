@@ -19,8 +19,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Prism from 'prismjs';
+import { createStreamReveal } from '@/utils/streamReveal';
 
 defineOptions({ name: 'CodeBlock' });
 
@@ -32,6 +33,8 @@ const props = defineProps<{
 
 const codeEl = ref<HTMLElement | null>(null);
 const copied = ref(false);
+const reveal = createStreamReveal();
+onBeforeUnmount(reveal.dispose);
 
 const displayLanguage = computed(() => props.language || 'text');
 
@@ -50,10 +53,11 @@ function highlight() {
     } catch (error) {
       console.warn('代码高亮失败:', error);
     }
+    reveal.update(codeEl.value, !!props.isStreaming);
   });
 }
 
-watch(() => props.content, highlight, { immediate: true });
+watch(() => [props.content, props.isStreaming], highlight, { immediate: true });
 onMounted(highlight);
 
 async function handleCopy(event: MouseEvent) {

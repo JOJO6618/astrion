@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="markdown-renderer">
+  <div ref="containerRef" class="markdown-renderer" :class="{ 'thinking-markdown': thinking }">
     <template v-for="segment in segments" :key="segment.key">
       <!-- 文本段按顶层块分片渲染：流式期间只有末尾块字符串变化，
            已完成的前缀块 v-html 字符串不变、DOM 不被重设，
@@ -16,7 +16,7 @@
         v-else
         :content="segment.content"
         :language="segment.language"
-        :is-streaming="!segment.closed"
+        :is-streaming="!!isStreaming && !segment.closed"
       />
     </template>
   </div>
@@ -32,6 +32,7 @@ import {
   type MarkdownSegment
 } from '@/composables/useMarkdownRenderer';
 import { chunkRenderedHtml, type HtmlChunk } from '@/utils/htmlChunks';
+import { createStreamReveal } from '@/utils/streamReveal';
 import { classifyMarkdownTables, observeMarkdownTables } from '@/utils/tableLayout';
 import { enhanceCitationChips, type CitationAnnotation } from './citationChips';
 
@@ -40,6 +41,7 @@ defineOptions({ name: 'MarkdownRenderer' });
 const props = defineProps<{
   content: string;
   isStreaming?: boolean;
+  thinking?: boolean;
   citations?: CitationAnnotation[];
   /** citations 是否为后端裁决后的权威版本（message.metadata.citations 已到达） */
   citationsFinal?: boolean;
@@ -54,8 +56,18 @@ const segments = computed(() => parseMarkdownSegments(props.content || '', props
 function renderText(text: string) {
   // 透传流式标志：show_html 卡片在流式期间需要 partial 渲染（实时渲染/渲染中占位）
   // enableCitations：仅 assistant 正文开启引用渲染，其他场景【cite:】按原文显示
-  return renderMarkdownText(text, props.isStreaming, props.enableCitations);
+  return renderMarkdownText(text, props.isStreaming, props.enableCitations, !props.thinking);
 }
+
+const reveal = createStreamReveal('[data-md-code-block]');
+function revealText() {
+  nextTick(() => {
+    if (containerRef.value) reveal.update(containerRef.value, !!props.isStreaming);
+  });
+}
+onMounted(revealText);
+onUpdated(revealText);
+onBeforeUnmount(reveal.dispose);
 
 // 分段级分块缓存：segments 每个 token 都是新对象，按 key 缓存避免对
 // 已完成分段重复做 HTML 解析/分块；内容变化时才重新分块。
@@ -136,6 +148,25 @@ onBeforeUnmount(() => {
 
 .markdown-text-segment {
   display: block;
+}
+
+.thinking-markdown .markdown-text-segment {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  white-space: normal;
+}
+
+.thinking-markdown .markdown-text-segment :deep(p) {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.thinking-markdown .markdown-text-segment :deep(p:last-child) {
+  margin-bottom: 0;
 }
 
 /* 分块容器只作 v-html 载体，不产生任何布局盒，

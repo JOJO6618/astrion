@@ -16,7 +16,11 @@
         @scroll="(event) => handleScroll(blockId, event)"
         style="max-height: 240px; overflow-y: auto"
       >
-        {{ action.content }}
+        <MarkdownRenderer
+          :content="action.content || ''"
+          :is-streaming="action.streaming"
+          thinking
+        />
       </div>
     </div>
     <div v-if="action.streaming" class="progress-indicator"></div>
@@ -24,6 +28,8 @@
 </template>
 
 <script setup lang="ts">
+import MarkdownRenderer from '../MarkdownRenderer.vue';
+
 defineOptions({ name: 'ThinkingAction' });
 
 const props = defineProps<{
