@@ -1,21 +1,7 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import { useTaskStore } from '../../../stores/task';
-import { getMessageVisibility, messageStartsWork } from '../../../utils/messageVisibility';
 import {
-  debugNotifyLog,
-  keyNotifyLog,
-  jsonDebug,
-  userMDebug,
-  isRestoreDebugEnabled,
   restoreDebugLog,
-  isSystemAutoUserMessagePayload,
-  isRuntimeModeNoticePayload,
-  resolveUserMessageSource,
-  resolveUserMessageMetadata,
-  isEmptyAssistantPlaceholderMessage,
-  getOptimisticUserEchoTarget,
-  findRecentMatchingUserMessage,
 } from './shared';
 import { t } from '@/locales';
 

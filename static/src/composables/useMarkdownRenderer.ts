@@ -430,42 +430,6 @@ function writeAttr(props: RehypeProps, name: string, value: string | null) {
   props[name] = value;
 }
 
-// show_file 预览类型：text/code/json/csv/markdown/image/pdf/binary
-const SHOW_FILE_PREVIEW_TYPES = new Set([
-  'text', 'code', 'json', 'csv', 'markdown', 'image', 'pdf', 'binary'
-]);
-
-const SHOW_FILE_EXT_TO_TYPE: Record<string, string> = {
-  '.txt': 'text',
-  '.md': 'markdown', '.markdown': 'markdown',
-  '.json': 'json', '.json5': 'json',
-  '.csv': 'csv', '.tsv': 'csv',
-  '.yaml': 'text', '.yml': 'text', '.toml': 'text',
-  '.ini': 'text', '.cfg': 'text', '.conf': 'text', '.log': 'text',
-  '.js': 'code', '.ts': 'code', '.jsx': 'code', '.tsx': 'code',
-  '.vue': 'code', '.py': 'code', '.rb': 'code', '.go': 'code',
-  '.rs': 'code', '.java': 'code', '.c': 'code', '.h': 'code',
-  '.cpp': 'code', '.hpp': 'code', '.cs': 'code', '.php': 'code',
-  '.swift': 'code', '.kt': 'code', '.sh': 'code', '.bash': 'code',
-  '.html': 'code', '.htm': 'code', '.css': 'code', '.scss': 'code',
-  '.less': 'code', '.xml': 'code', '.svg': 'image', '.sql': 'code',
-  '.png': 'image', '.jpg': 'image', '.jpeg': 'image',
-  '.gif': 'image', '.webp': 'image', '.bmp': 'image', '.ico': 'image',
-  '.avif': 'image',
-  '.pdf': 'pdf',
-};
-
-function inferShowFileType(path: string, explicit?: string): string {
-  if (explicit && SHOW_FILE_PREVIEW_TYPES.has(explicit)) return explicit;
-  const lowerPath = path.toLowerCase();
-  const dotIdx = lowerPath.lastIndexOf('.');
-  if (dotIdx >= 0) {
-    const ext = lowerPath.slice(dotIdx);
-    if (SHOW_FILE_EXT_TO_TYPE[ext]) return SHOW_FILE_EXT_TO_TYPE[ext];
-  }
-  return 'binary';
-}
-
 function normalizeShowTagsPlugin() {
   return (tree: any) => {
     visit(tree, 'element', (node: any) => {

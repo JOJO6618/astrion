@@ -1,11 +1,5 @@
 // @ts-nocheck
-import { debugLog } from '../common';
 import { t } from '@/locales';
-import { useTaskStore } from '../../../stores/task';
-import {
-  extractSkillRefsFromMessage,
-  SKILL_MARKDOWN_LINK_RE,
-} from './shared';
 
 export const systemCommandMethods = {
   async executeSystemCommand(rawCommand, options = {}) {

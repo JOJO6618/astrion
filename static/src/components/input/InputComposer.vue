@@ -1032,10 +1032,6 @@ const applyLineMetrics = (lines: number, multiline: boolean) => {
   inputStore.setInputMultiline(multiline);
 };
 
-const composerInputKey = computed(
-  () => `${props.currentConversationId || 'new'}:${props.isConnected ? 'online' : 'offline'}`
-);
-
 const runtimeQueuedMessagesForRender = computed(() => {
   const list = Array.isArray(props.runtimeQueuedMessages) ? props.runtimeQueuedMessages : [];
   return list
@@ -1160,7 +1156,6 @@ const findSlashToken = () => {
   if (!instance) return null;
   const { state } = instance;
   const { $from } = state.selection;
-  const lineStart = $from.start();
   const beforeInLine = $from.parent.textBetween(0, $from.parentOffset, '\n', '\n');
   const match = /(^|[ \n])(\/{1,2})([^\s/]*)$/.exec(beforeInLine);
   if (!match) return null;
@@ -2617,13 +2612,6 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const isWebSpeechSupported = computed(() => {
-  if (typeof window === 'undefined') return false;
-  const hasSR = 'SpeechRecognition' in window;
-  const hasWebkit = 'webkitSpeechRecognition' in window;
-  return hasSR || hasWebkit;
-});
-
 const getSpeechRecognitionConstructor = (): typeof SpeechRecognition | null => {
   if (typeof window === 'undefined') return null;
   const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
@@ -3090,13 +3078,6 @@ const goalBannerCollapsed = computed(
     slashMenuTransitioning.value
 );
 
-const goalBannerTitle = computed(() => {
-  void currentLocale.value;
-  if (props.goalRunning) return t('input.goalModeRunning');
-  if (goalCompleted.value) return t('input.goalModeCompleted');
-  return t('input.goalModeArmed');
-});
-
 const collectComposerVisualHeight = () => {
   const root = inputAreaRoot.value;
   const shell = compactInputShell.value;
@@ -3237,18 +3218,6 @@ const keepEditorSelectionVisible = (
       target.scrollTop = Math.min(maxScrollTop, Math.max(0, options.previousScrollTop));
     }
   });
-};
-
-const onInput = (event: Event) => {
-  const target = event.target as HTMLTextAreaElement;
-  if (!props.isConnected || props.inputLocked) {
-    target.value = props.inputMessage || '';
-    return;
-  }
-  emit('update:input-message', target.value);
-  emit('input-change');
-  adjustTextareaSize();
-  nextTick(refreshSkillSlashState);
 };
 
 const insertFileAtMentionByPath = (path: string, name: string) => {

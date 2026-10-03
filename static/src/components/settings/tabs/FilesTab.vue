@@ -9,7 +9,6 @@ defineOptions({ name: 'FilesTab' });
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  personalization,
   form,
   activeDropdown,
   floatingMenuStyle,

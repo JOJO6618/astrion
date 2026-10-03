@@ -160,7 +160,8 @@ onMounted(async () => {
 
   try {
     const resp = await fetch('/api/session-status', { credentials: 'same-origin' });
-    const data = await resp.json();
+    // 仅需触发会话探测请求以预热会话/CSRF，响应体内容无需使用
+    await resp.json();
   } catch (err) {
     console.warn('[auth-debug] login page session-status failed:', err);
   }

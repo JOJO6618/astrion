@@ -2,9 +2,7 @@
 import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
-import {
-
-} from './shared';
+import './shared';
 
 export const dragMethods = {
   handleDragEnter(event: DragEvent) {

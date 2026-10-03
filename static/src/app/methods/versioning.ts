@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { debugLog } from './common';
 import { t } from '@/locales';
 import { persistWorkspaceMode } from '../state';
 

@@ -1,12 +1,10 @@
 // @ts-nocheck
 import { debugLog, goalModeDebugLog } from '../common';
 import { t } from '@/locales';
-import { useTaskStore } from '../../../stores/task';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import {
   extractSkillRefsFromMessage,
-  SKILL_MARKDOWN_LINK_RE,
 } from './shared';
 
 export const sendMethods = {

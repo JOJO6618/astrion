@@ -7,8 +7,12 @@ const debugNotifyLog = (...args: any[]) => {
   void args;
 };
 const keyNotifyLog = (...args: any[]) => {
+  // 调试桩：默认空实现，排障时在此恢复 console 输出
+  void args;
 };
 const jsonDebug = (...args: any[]) => {
+  // 调试桩：默认空实现，排障时在此恢复 console 输出
+  void args;
 };
 const CONN_DIAG_PREFIX = '[CONN_DIAG]';
 const TASK_POLL_DIAG_MAX = 2000;

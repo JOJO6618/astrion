@@ -1,28 +1,6 @@
 // @ts-nocheck
-import { debugLog } from '../common';
 import { t } from '@/locales';
-import { usePolicyStore } from '../../../stores/policy';
-import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
-import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
-import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
-import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
-import {
-  SUB_AGENT_DONE_PREFIX_RE,
-  BG_RUN_COMMAND_DONE_PREFIX_RE,
-  userMDebug,
-  UI_BOUNCE_TRACE_MAX,
-  uiBounceTraceLastTsByKey,
-  isUiBounceTraceEnabled,
-  uiBounceTrace,
-  isConnectionDiagEnabled,
-  pushConnectionDiagRecord,
-  connectionDiag,
-  parseSubAgentDoneLabel,
-  parseBackgroundRunCommandDoneLabel,
-  parseSystemNoticeLabel,
-} from './shared';
 
 export const terminalMethods = {
   handleRealtimeTerminalClick() {
@@ -74,6 +52,8 @@ export const terminalMethods = {
         }
         this.previousTerminalCount = count;
       }
-    } catch {}
+    } catch {
+      // 容错：终端数量轮询失败时保持现状，由下一轮轮询重试
+    }
   }
 };

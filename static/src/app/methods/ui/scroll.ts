@@ -1,27 +1,8 @@
 // @ts-nocheck
 import { createHistoryScrollSession } from './historyScrollSession';
-import { debugLog } from '../common';
-import { usePolicyStore } from '../../../stores/policy';
-import { useModelStore } from '../../../stores/model';
-import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
-import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
 import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
-import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
 import {
-  SUB_AGENT_DONE_PREFIX_RE,
-  BG_RUN_COMMAND_DONE_PREFIX_RE,
-  userMDebug,
-  UI_BOUNCE_TRACE_MAX,
-  uiBounceTraceLastTsByKey,
-  isUiBounceTraceEnabled,
   uiBounceTrace,
-  isConnectionDiagEnabled,
-  pushConnectionDiagRecord,
-  connectionDiag,
-  parseSubAgentDoneLabel,
-  parseBackgroundRunCommandDoneLabel,
-  parseSystemNoticeLabel,
 } from './shared';
 
 export const scrollMethods = {
@@ -32,7 +13,9 @@ export const scrollMethods = {
       if (typeof this.stopWaitingTaskProbe === 'function') {
         this.stopWaitingTaskProbe();
       }
-    } catch (_) {}
+    } catch (_) {
+      // 容错：停止探针失败不阻断后续本地 UI 状态清理
+    }
     this.streamingMessage = false;
     this.taskInProgress = false;
     this.stopRequested = false;

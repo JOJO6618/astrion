@@ -229,7 +229,7 @@ function releaseNoAnim(force = false) {
 //   用户手动展开后只要内容不完全清空（hasContent 不再变化），dock 保持展开
 watch(
   hasContent,
-  (content) => {
+  () => {
     quickDock.userCollapsed = !autoExpand.value;
   },
   // immediate：挂载时即校正（手动模式下刷新恢复对话，已有内容不应自动展开）

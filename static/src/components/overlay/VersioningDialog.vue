@@ -169,7 +169,8 @@ const props = defineProps<{
   iconStyle?: (key: string) => Record<string, string>;
 }>();
 
-const emit = defineEmits([
+// 模板中统一使用 $emit 触发事件，无需脚本侧 emit 句柄
+defineEmits([
   'close',
   'refresh',
   'toggle-enabled',

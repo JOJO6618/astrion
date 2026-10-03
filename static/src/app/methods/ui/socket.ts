@@ -5,24 +5,9 @@ import { persistWorkspaceMode } from '../../state';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
-import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
-import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
-import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
 import {
-  SUB_AGENT_DONE_PREFIX_RE,
-  BG_RUN_COMMAND_DONE_PREFIX_RE,
-  userMDebug,
-  UI_BOUNCE_TRACE_MAX,
-  uiBounceTraceLastTsByKey,
-  isUiBounceTraceEnabled,
-  uiBounceTrace,
   isConnectionDiagEnabled,
-  pushConnectionDiagRecord,
   connectionDiag,
-  parseSubAgentDoneLabel,
-  parseBackgroundRunCommandDoneLabel,
-  parseSystemNoticeLabel,
 } from './shared';
 
 export const socketMethods = {
@@ -401,7 +386,7 @@ export const socketMethods = {
       this.isConnected = true;
 
       const focusPromise = this.focusFetchFiles();
-      let treePromise: Promise<any> | null = null;
+      const treePromise: Promise<any> | null = null;
       const isHostMode = statusData?.container?.mode === 'host';
       this.versioningHostMode = !!isHostMode;
       this.dockerProjectMode = !isHostMode;
@@ -436,7 +421,7 @@ export const socketMethods = {
         !isMultiAgentNewRoute &&
         !isExplicitNewRoute &&
         !this.isConversationIndependentRoute() &&
-        !Boolean((window as any).__ASTRION_DESKTOP__)
+        !(window as any).__ASTRION_DESKTOP__
       ) {
         this.skipConversationHistoryReload = true;
         // 首次从状态恢复对话时，避免 socket 的 conversation_loaded 再次触发历史加载

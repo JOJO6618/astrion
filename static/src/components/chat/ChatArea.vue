@@ -1043,19 +1043,6 @@ const releaseUserBubbleTransitionAfterLayout = () => {
   });
 };
 
-const isSystemAutoUserMessage = (message: any) => {
-  if (!message || message.role !== 'user') {
-    return false;
-  }
-  const meta = message.metadata || {};
-  return !!(
-    meta.is_auto_generated ||
-    meta.auto_message_type ||
-    meta.sub_agent_notice ||
-    meta.background_command_notice
-  );
-};
-
 // ---------- 多智能体消息渲染 ----------
 
 interface MultiAgentMessageInfo {
@@ -1195,9 +1182,6 @@ const isEmptyAssistantMessage = (message: any) => {
 
 const filteredMessages = computed(() => {
   const source = props.messages || [];
-  const droppedRoleSystem = source.filter((m) => m && m.role === 'system');
-  if (droppedRoleSystem.length > 0) {
-  }
   const result = source.filter((m) => {
     if (m && m.metadata && m.metadata.system_injected_image) {
       return false;
@@ -2581,10 +2565,6 @@ const splitActionGroups = (actions: any[] = [], messageIndex = 0) => {
   > = [];
   let buffer: any[] = [];
 
-  // 调试：记录输入
-  if (CHAT_DEBUG_LOGS && actions.length > 0) {
-  }
-
   const flushBuffer = () => {
     // 单个可堆叠块(thinking/tool)也走 stack 路径，避免 1↔2 块时在 single/stack
     // 两套渲染路径之间整体切换导致 StackedBlocks 重新挂载(表现为外框瞬间塌成最扁再展开)。
@@ -2616,10 +2596,6 @@ const splitActionGroups = (actions: any[] = [], messageIndex = 0) => {
     }
   });
   flushBuffer();
-
-  // 调试：记录输出
-  if (CHAT_DEBUG_LOGS && actions.length > 0) {
-  }
 
   return result;
 };

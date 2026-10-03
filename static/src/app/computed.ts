@@ -19,7 +19,6 @@ import { useSubAgentStore } from '../stores/subAgent';
 import { useBackgroundCommandStore } from '../stores/backgroundCommand';
 import { usePersonalizationStore } from '../stores/personalization';
 import { useQuickDockStore } from '../stores/quickDock';
-import { getToolStatusText, getToolDescription } from '../utils/chatDisplay';
 import { toolFaceKey } from '../utils/avatarFace';
 
 // 取最后一段连续的 tool actions（对应模型一次并行调用的一批工具）

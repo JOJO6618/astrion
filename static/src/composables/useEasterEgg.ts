@@ -119,8 +119,6 @@ export function useEasterEgg() {
       }
     }, durationSeconds * 1000);
     uiStore.setEasterEggState({ cleanupTimer: timer });
-    if (payload?.message) {
-    }
   };
 
   const handlePayload = async (payload: any, app?: any) => {

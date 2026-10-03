@@ -1,23 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import { useTaskStore } from '../../../stores/task';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
-import { getMessageVisibility, messageStartsWork } from '../../../utils/messageVisibility';
-import {
-  debugNotifyLog,
-  keyNotifyLog,
-  jsonDebug,
-  userMDebug,
-  isRestoreDebugEnabled,
-  restoreDebugLog,
-  isSystemAutoUserMessagePayload,
-  isRuntimeModeNoticePayload,
-  resolveUserMessageSource,
-  resolveUserMessageMetadata,
-  isEmptyAssistantPlaceholderMessage,
-  getOptimisticUserEchoTarget,
-  findRecentMatchingUserMessage,
-} from './shared';
 
 export const syncMethods = {
   handleRuntimeQueueSync(data: any) {

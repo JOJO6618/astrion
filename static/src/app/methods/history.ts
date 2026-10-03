@@ -4,6 +4,7 @@ import { t } from '@/locales';
 import { useQuickDockStore } from '../../stores/quickDock';
 import { usePreviewStore } from '../../stores/preview';
 const jsonDebug = (...args: any[]) => {
+  void args;
 };
 const RESTORE_DEBUG_PREFIX = '[RESTORE_DEBUG]';
 const RESTORE_DEBUG_EVENTS = new Set([
@@ -56,18 +57,6 @@ function parseSystemNoticeLabel(rawContent: any): string | null {
   const content = (rawContent || '').toString().trim();
   if (!content) return null;
   return parseSubAgentDoneLabel(content) || parseBackgroundRunCommandDoneLabel(content);
-}
-
-function isSystemAutoUserMessageMeta(meta: any): boolean {
-  if (!meta || typeof meta !== 'object') {
-    return false;
-  }
-  return !!(
-    meta.is_auto_generated ||
-    meta.auto_message_type ||
-    meta.sub_agent_notice ||
-    meta.background_command_notice
-  );
 }
 
 export const historyMethods = {
@@ -515,8 +504,8 @@ export const historyMethods = {
               awaitingFirstContent: false,
               generatingLabel: ''
             });
-          } else {
           }
+          // 未匹配到系统通知标签时不额外插入提示，直接结束本次消息处理
           return;
         }
 

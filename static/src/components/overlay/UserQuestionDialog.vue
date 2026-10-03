@@ -119,10 +119,14 @@ const currentIndex = computed(() => {
 const currentQuestion = computed(() => props.questions[currentIndex.value] || {});
 const currentOptions = computed(() => Array.isArray(currentQuestion.value.options) ? currentQuestion.value.options : []);
 const currentKey = computed(() => questionKey(currentQuestion.value, currentIndex.value));
-const currentDraft = computed(() => {
-  if (!drafts[currentKey.value]) drafts[currentKey.value] = { selected_option_id: '', text: '' };
-  return drafts[currentKey.value];
-});
+watch(
+  currentKey,
+  (key) => {
+    if (!drafts[key]) drafts[key] = { selected_option_id: '', text: '' };
+  },
+  { immediate: true, flush: 'sync' }
+);
+const currentDraft = computed(() => drafts[currentKey.value]);
 const submitting = computed(() => (props.submittingIds || []).length > 0);
 
 const isAnswered = (idx: number) => {

@@ -128,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { computed } from 'vue';
 import { t, currentLocale } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
 
@@ -174,16 +174,6 @@ const handleCloseClick = () => {
 const isMobileViewport = computed(() => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
   return isMobile;
-});
-
-onMounted(() => {
-  
-  // 检查父元素链
-  const aside = document.querySelector('.tool-approval-panel');
-  const sidebarHeader = document.querySelector('.tool-approval-panel .sidebar-header');
-  if (sidebarHeader) {
-    const computedStyle = window.getComputedStyle(sidebarHeader);
-  }
 });
 
 const isEditPreview = (item: any) => item?.tool_name === 'edit_file' && item?.preview?.edit_context;

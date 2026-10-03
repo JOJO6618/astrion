@@ -1063,7 +1063,8 @@ const {
   conversationsLoading,
   hasMoreConversations: hasMore,
   loadingMoreConversations: loadingMore,
-  currentConversationId
+  // 与同名 prop 区分：此处为 store 中的当前对话 id，模板中裸用 currentConversationId 指 prop
+  currentConversationId: storeCurrentConversationId
 } = storeToRefs(conversationStore);
 const { visible: personalPageVisible } = storeToRefs(personalizationStore);
 
@@ -1358,7 +1359,7 @@ const runningTaskItems = computed(() =>
           task &&
           task.task_id &&
           task.conversation_id &&
-          task.conversation_id !== currentConversationId.value &&
+          task.conversation_id !== storeCurrentConversationId.value &&
           String(task.workspace_id || '') !== String(props.currentWorkspaceId || '')
       )
     : []

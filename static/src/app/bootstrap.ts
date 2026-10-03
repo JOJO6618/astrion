@@ -1501,7 +1501,11 @@ function renderShowFileCard(node: Element) {
   // 清理旧实例
   const oldApp = showFileAppMap.get(node);
   if (oldApp) {
-    try { oldApp.unmount(); } catch {}
+    try {
+      oldApp.unmount();
+    } catch {
+      // 容错：旧预览实例卸载失败不阻断重建，节点内容随后会被 replaceChildren 整体替换
+    }
     showFileAppMap.delete(node);
   }
 

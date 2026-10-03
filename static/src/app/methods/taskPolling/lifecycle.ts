@@ -4,21 +4,11 @@ import { useTaskStore } from '../../../stores/task';
 import { useQuickDockStore } from '../../../stores/quickDock';
 import { usePreviewStore } from '../../../stores/preview';
 import { useChatStore } from '../../../stores/chat';
-import { getMessageVisibility, messageStartsWork } from '../../../utils/messageVisibility';
 import {
   debugNotifyLog,
   keyNotifyLog,
   jsonDebug,
-  userMDebug,
-  isRestoreDebugEnabled,
   restoreDebugLog,
-  isSystemAutoUserMessagePayload,
-  isRuntimeModeNoticePayload,
-  resolveUserMessageSource,
-  resolveUserMessageMetadata,
-  isEmptyAssistantPlaceholderMessage,
-  getOptimisticUserEchoTarget,
-  findRecentMatchingUserMessage,
 } from './shared';
 import { t } from '@/locales';
 

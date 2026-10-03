@@ -1,27 +1,12 @@
 // @ts-nocheck
 // @ts-nocheck
 import { t } from '@/locales';
-import { usePolicyStore } from '../../../stores/policy';
-import { useModelStore } from '../../../stores/model';
-import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
-import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
-import {
-  scrollToBottom as scrollToBottomHelper,
-  conditionalScrollToBottom as conditionalScrollToBottomHelper,
-  scrollThinkingToBottom as scrollThinkingToBottomHelper
-} from '../../../composables/useScrollControl';
-import {
-  startResize as startPanelResize,
-  handleResize as handlePanelResize,
-  stopResize as stopPanelResize
-} from '../../../composables/usePanelResize';
-import { debugLog } from '../common';
 
 // 后端子智能体完成消息格式匹配（须与后端 modules/i18n.py 的 zh/en 两种产出一致；\u 转义仅为通过 i18n 审计）
 export const SUB_AGENT_DONE_PREFIX_RE = /^(?:✅\s*)?(?:\u5b50\u667a\u80fd\u4f53|Sub-agent)\s*#?\s*(\d+)\s*(?:\u4efb\u52a1\u6458\u8981|task summary)[:：]/;
 export const BG_RUN_COMMAND_DONE_PREFIX_RE = /^\[(?:\u540e\u53f0\s*run_command\s*\u5b8c\u6210|Background\s*run_command\s*finished)\]/;
 export const userMDebug = (...args: any[]) => {
+  void args;
 };
 export let uiBounceTraceCount = 0;
 export const UI_BOUNCE_TRACE_MAX = 140;

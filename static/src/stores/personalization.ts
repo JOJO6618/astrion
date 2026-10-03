@@ -1160,6 +1160,8 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.scheduleAutoSave();
     },
     setVersioningRestoreMode(_mode: 'overwrite') {
+      // 当前仅支持 overwrite 一种恢复模式，入参保留用于未来扩展，此处显式忽略
+      void _mode;
       const target: 'overwrite' = 'overwrite';
       this.form = {
         ...this.form,

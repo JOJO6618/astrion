@@ -141,9 +141,7 @@ async function deleteWorkflowByName(name: string) {
   }
 }
 
-async function onSaved() {
-  const wf = currentWorkflow.value;
-  if (!wf) return;
+async function onSaved(wf: WorkflowDef) {
   // 改名 = 另存新名 + 删除旧文件（内置示例不可删，降级为保留原件）
   if (wf.name !== editingName.value) {
     const oldName = editingName.value;

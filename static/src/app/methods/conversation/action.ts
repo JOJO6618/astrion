@@ -3,9 +3,7 @@ import { debugLog, traceLog } from '../common';
 import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { persistNewConversationType } from '../../state';
-import {
-
-} from './shared';
+import './shared';
 
 export const actionMethods = {
   promoteConversationToTop(conversationId) {

@@ -1,9 +1,5 @@
 // @ts-nocheck
-import { usePolicyStore } from '../../../stores/policy';
-import { useModelStore } from '../../../stores/model';
-import {
-
-} from './shared';
+import './shared';
 import { t } from '@/locales';
 
 export const processMethods = {

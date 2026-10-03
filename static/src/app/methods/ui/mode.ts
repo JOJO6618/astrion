@@ -1,29 +1,7 @@
 // @ts-nocheck
-import { debugLog } from '../common';
 import { t } from '@/locales';
 import { persistNewConversationType } from '../../state';
-import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
-import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
-import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
-import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
-import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
-import {
-  SUB_AGENT_DONE_PREFIX_RE,
-  BG_RUN_COMMAND_DONE_PREFIX_RE,
-  userMDebug,
-  UI_BOUNCE_TRACE_MAX,
-  uiBounceTraceLastTsByKey,
-  isUiBounceTraceEnabled,
-  uiBounceTrace,
-  isConnectionDiagEnabled,
-  pushConnectionDiagRecord,
-  connectionDiag,
-  parseSubAgentDoneLabel,
-  parseBackgroundRunCommandDoneLabel,
-  parseSystemNoticeLabel,
-} from './shared';
 
 // 推理强度滑块是高频交互（后端限制 20 次/分）：档位变化只乐观更新 UI，
 // 停止操作 600ms 后才把最终值发一次请求；序列开始时的对话 id 随请求带上，

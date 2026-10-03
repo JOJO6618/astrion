@@ -474,8 +474,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'back'): void;
-  (event: 'save'): void;
+  (event: 'save', workflow: WorkflowDef): void;
 }>();
+
+// 编辑器持有独立草稿，保存成功后才将结果交给父组件。
+const cloneWorkflow = (value: WorkflowDef): WorkflowDef => JSON.parse(JSON.stringify(value));
+const workflow = ref(cloneWorkflow(props.workflow));
 
 // ---------------------------------------------------------------- 画布状态
 
@@ -494,7 +498,7 @@ let flashTimer: ReturnType<typeof setTimeout> | null = null;
 
 const { project, fitView, getViewport, updateNodeInternals } = useVueFlow();
 
-const issues = computed(() => validateWorkflow(props.workflow));
+const issues = computed(() => validateWorkflow(workflow.value));
 const errorCount = computed(() => issues.value.filter((i) => i.level === 'error').length);
 const issueLabel = computed(() => {
   void currentLocale.value;
@@ -506,7 +510,7 @@ const issueStageIds = computed(() => new Set(issues.value.map((i) => i.nodeId).f
 // 拖拽只改 position 也会触发校验重算产出新 Set 引用；用排序字符串 key 做值比较，避免拖拽中断
 const issueStageKey = computed(() => Array.from(issueStageIds.value).sort().join(','));
 
-const selectedNode = computed(() => props.workflow.nodes.find((n) => n.id === selectedStageId.value) ?? null);
+const selectedNode = computed(() => workflow.value.nodes.find((n) => n.id === selectedStageId.value) ?? null);
 const selectedStage = computed(() => (selectedNode.value?.kind === 'stage' ? selectedNode.value : null));
 const selectedReview = computed(() => (selectedNode.value?.kind === 'review' ? selectedNode.value : null));
 const selectedBranch = computed(() => (selectedNode.value?.kind === 'branch' ? selectedNode.value : null));
@@ -515,15 +519,15 @@ const selectedBoundary = computed(() =>
 );
 
 function nodeNameOf(id: string): string {
-  return props.workflow.nodes.find((n) => n.id === id)?.name ?? id;
+  return workflow.value.nodes.find((n) => n.id === id)?.name ?? id;
 }
 
 function rebuild() {
   // 有节点缺坐标时（初始加载/新建）先自动布局，保证回边等非线性结构可读
-  if (props.workflow.nodes.length > 0 && props.workflow.nodes.some((n) => !n.position)) {
-    autoLayout(props.workflow);
+  if (workflow.value.nodes.length > 0 && workflow.value.nodes.some((n) => !n.position)) {
+    autoLayout(workflow.value);
   }
-  const flow = workflowToFlow(props.workflow, issueStageIds.value);
+  const flow = workflowToFlow(workflow.value, issueStageIds.value);
   nodes.value = flow.nodes;
   edges.value = flow.edges;
   // 桩位随连线数量动态增减/重排后，必须手动失效 Vue Flow 的 handle 位置缓存，
@@ -535,11 +539,21 @@ function rebuild() {
 watch(issueStageKey, rebuild);
 
 watch(
-  () => props.workflow,
+  workflow,
   () => {
     dirty.value = true;
   },
-  { deep: true }
+  { deep: true, flush: 'sync' }
+);
+
+watch(
+  () => props.workflow,
+  (value) => {
+    workflow.value = cloneWorkflow(value);
+    selectedStageId.value = '';
+    rebuild();
+    dirty.value = false;
+  }
 );
 
 // ---------------------------------------------------------------- 画布事件
@@ -548,12 +562,12 @@ function onConnect(connection: Connection) {
   const { source, target } = connection;
   if (!source || !target || source === target) return;
   const sourceHandle = connection.sourceHandle ?? '';
-  const sourceNode = props.workflow.nodes.find((n) => n.id === source);
+  const sourceNode = workflow.value.nodes.find((n) => n.id === source);
   if (!sourceNode || sourceNode.kind === 'end') return;
   if (sourceHandle.startsWith('reject-')) {
     // 菱形上/下驳回口拉出 = 驳回路由（红线，替换语义）
     const prev = sourceNode.kind === 'review' ? sourceNode.rejectTo : null;
-    const err = connectRejectTo(props.workflow, source, target);
+    const err = connectRejectTo(workflow.value, source, target);
     if (err) flash(err);
     else if (prev && prev !== target) flash(t('workflow.flashReplaceReject', { name: nodeNameOf(prev) }));
   } else if (sourceNode.kind === 'branch') {
@@ -561,17 +575,17 @@ function onConnect(connection: Connection) {
     const slotMatch = /^out-(\d+)$/.exec(sourceHandle);
     const slotIdx = slotMatch ? parseInt(slotMatch[1], 10) : -1;
     if (slotIdx >= 0 && slotIdx < sourceNode.next.length) {
-      const err = replaceBranchTarget(props.workflow, source, slotIdx, target);
+      const err = replaceBranchTarget(workflow.value, source, slotIdx, target);
       if (err) flash(err);
       else flash(t('workflow.flashBranchRetarget', { name: nodeNameOf(target) }));
     } else {
-      const err = connectNext(props.workflow, source, target);
+      const err = connectNext(workflow.value, source, target);
       if (err) flash(err);
     }
   } else {
     // 开始/阶段/审核右桩：单值替换语义
     const prev = sourceNode.next;
-    const err = connectNext(props.workflow, source, target);
+    const err = connectNext(workflow.value, source, target);
     if (err) flash(err);
     else if (prev && prev !== target) flash(t('workflow.flashReplaceRoute', { name: nodeNameOf(prev) }));
   }
@@ -582,11 +596,11 @@ function onNodesChange(changes: NodeChange[]) {
   let needRebuild = false;
   for (const change of changes) {
     if (change.type === 'position' && change.position) {
-      const node = props.workflow.nodes.find((n) => n.id === change.id);
+      const node = workflow.value.nodes.find((n) => n.id === change.id);
       if (node) node.position = { ...change.position };
     }
     if (change.type === 'remove') {
-      removeNode(props.workflow, change.id);
+      removeNode(workflow.value, change.id);
       if (selectedStageId.value === change.id) selectedStageId.value = '';
       needRebuild = true;
     }
@@ -611,9 +625,9 @@ function onEdgesChange(changes: EdgeChange[]) {
       const [source, target] = (isRejectEdge ? change.id.slice(7) : change.id).split('->');
       if (!source || !target) continue;
       if (isRejectEdge) {
-        disconnectRejectTo(props.workflow, source);
+        disconnectRejectTo(workflow.value, source);
       } else {
-        disconnectNext(props.workflow, source, target);
+        disconnectNext(workflow.value, source, target);
       }
       needRebuild = true;
     }
@@ -636,7 +650,7 @@ function onPaneDblclick(event: MouseEvent) {
   const target = event.target as HTMLElement;
   if (!target.classList.contains('vue-flow__pane')) return;
   const point = project({ x: event.clientX, y: event.clientY });
-  const stage = addStage(props.workflow, { x: point.x - 105, y: point.y - 48 });
+  const stage = addStage(workflow.value, { x: point.x - 105, y: point.y - 48 });
   rebuild();
   selectedStageId.value = stage.id;
 }
@@ -654,14 +668,14 @@ function onAddNodeAtCenter(kind: WorkflowNodeDef['kind']) {
   };
   const node =
     kind === 'review'
-      ? addReview(props.workflow, point)
+      ? addReview(workflow.value, point)
       : kind === 'branch'
-        ? addBranch(props.workflow, point)
+        ? addBranch(workflow.value, point)
         : kind === 'start'
-          ? addStart(props.workflow, point)
+          ? addStart(workflow.value, point)
           : kind === 'end'
-            ? addEnd(props.workflow, point)
-            : addStage(props.workflow, point);
+            ? addEnd(workflow.value, point)
+            : addStage(workflow.value, point);
   rebuild();
   selectedStageId.value = node.id;
 }
@@ -673,7 +687,7 @@ function onMaxRoundsInput(event: Event) {
   (event.target as HTMLInputElement).value = raw;
   const value = parseInt(raw, 10);
   if (Number.isFinite(value) && value > 0) {
-    props.workflow.maxStageRounds = value;
+    workflow.value.maxStageRounds = value;
   }
 }
 
@@ -689,7 +703,7 @@ function onMaxRejectsInput(event: Event) {
 /** 分支面板：按目标移除某条出线 */
 function onRemoveRoute(target: string) {
   if (!selectedNode.value) return;
-  disconnectNext(props.workflow, selectedNode.value.id, target);
+  disconnectNext(workflow.value, selectedNode.value.id, target);
   rebuild();
 }
 
@@ -697,7 +711,7 @@ function onRemoveRoute(target: string) {
 function onRemoveSelectedRoute() {
   const n = selectedNode.value;
   if (!n || n.kind === 'branch' || !n.next) return;
-  disconnectNext(props.workflow, n.id, n.next);
+  disconnectNext(workflow.value, n.id, n.next);
   rebuild();
 }
 
@@ -705,13 +719,13 @@ function onRemoveSelectedRoute() {
 function onRemoveRejectRoute() {
   const n = selectedReview.value;
   if (!n?.rejectTo) return;
-  disconnectRejectTo(props.workflow, n.id);
+  disconnectRejectTo(workflow.value, n.id);
   rebuild();
 }
 
 function onDeleteStage() {
   if (!selectedNode.value) return;
-  removeNode(props.workflow, selectedNode.value.id);
+  removeNode(workflow.value, selectedNode.value.id);
   selectedStageId.value = '';
   confirmingStageDelete.value = false;
   rebuild();
@@ -720,7 +734,7 @@ function onDeleteStage() {
 // ---------------------------------------------------------------- 顶栏操作
 
 function onAutoLayout() {
-  autoLayout(props.workflow);
+  autoLayout(workflow.value);
   rebuild();
   nextTick(() => fitView({ padding: 0.2, maxZoom: 1 }));
 }
@@ -741,10 +755,11 @@ async function onSave() {
   }
   if (saving.value) return;
   saving.value = true;
+  const savedWorkflow = cloneWorkflow(workflow.value);
   try {
-    await saveWorkflow(props.workflow);
-    dirty.value = false;
-    emit('save');
+    await saveWorkflow(savedWorkflow);
+    dirty.value = JSON.stringify(workflow.value) !== JSON.stringify(savedWorkflow);
+    emit('save', savedWorkflow);
     flash(t('workflow.flashSaved'));
   } catch (err) {
     flash(err instanceof Error ? err.message : t('workflow.saveFailed'));

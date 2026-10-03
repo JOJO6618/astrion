@@ -1,10 +1,7 @@
 // @ts-nocheck
 import { debugLog, traceLog } from '../common';
 import { t } from '@/locales';
-import { usePersonalizationStore } from '../../../stores/personalization';
-import {
-
-} from './shared';
+import './shared';
 
 export const loadMethods = {
   /**
@@ -20,6 +17,8 @@ export const loadMethods = {
    * 按需补载当前类型的主列表与工作区分组首页。
    */
   async handleSidebarConversationTypeChange(_type?: 'normal' | 'multi_agent') {
+    // _type 为组件事件载荷的签名占位：目标类型以 store 已写入的 sidebarConversationType 为准
+    void _type;
     const { useConversationStore } = await import('../../../stores/conversation');
     const conversationStore = useConversationStore();
     const listType = conversationStore.sidebarConversationType;

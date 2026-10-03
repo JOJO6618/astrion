@@ -1,28 +1,5 @@
 // @ts-nocheck
-import { debugLog } from '../common';
 import { t } from '@/locales';
-import { usePolicyStore } from '../../../stores/policy';
-import { useModelStore } from '../../../stores/model';
-import { usePersonalizationStore } from '../../../stores/personalization';
-import { useTutorialStore } from '../../../stores/tutorial';
-import { renderMarkdown as renderMarkdownHelper } from '../../../composables/useMarkdownRenderer';
-import { scrollToBottom as scrollToBottomHelper, conditionalScrollToBottom as conditionalScrollToBottomHelper, scrollThinkingToBottom as scrollThinkingToBottomHelper } from '../../../composables/useScrollControl';
-import { startResize as startPanelResize, handleResize as handlePanelResize, stopResize as stopPanelResize } from '../../../composables/usePanelResize';
-import {
-  SUB_AGENT_DONE_PREFIX_RE,
-  BG_RUN_COMMAND_DONE_PREFIX_RE,
-  userMDebug,
-  UI_BOUNCE_TRACE_MAX,
-  uiBounceTraceLastTsByKey,
-  isUiBounceTraceEnabled,
-  uiBounceTrace,
-  isConnectionDiagEnabled,
-  pushConnectionDiagRecord,
-  connectionDiag,
-  parseSubAgentDoneLabel,
-  parseBackgroundRunCommandDoneLabel,
-  parseSystemNoticeLabel,
-} from './shared';
 
 export const hostWorkspaceMethods = {
   async fetchHostWorkspaces() {
@@ -120,7 +97,9 @@ export const hostWorkspaceMethods = {
           const { useTaskStore } = await import('../../../stores/task');
           const taskStore = useTaskStore();
           taskStore.clearTask();
-        } catch (_) {}
+        } catch (_) {
+          // 容错：任务 store 动态加载/清理失败不影响工作区切换主流程
+        }
         this.clearLocalTaskUiState?.('switch-host-workspace');
       }
       await this.fetchHostWorkspaces();
@@ -401,6 +380,8 @@ export const hostWorkspaceMethods = {
   },
   async handlePinWorkspaceFromSidebar(_workspaceId: string) {
     // 置顶状态由侧边栏组件本地维护并持久化到 localStorage，此处无需额外操作。
+    // _workspaceId 为组件事件载荷的签名占位，保留以便未来接入服务端置顶。
+    void _workspaceId;
   },
   async revealHostWorkspace(workspaceId: string) {
     if (!(this.versioningHostMode || this.dockerProjectMode)) {

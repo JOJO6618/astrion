@@ -94,6 +94,8 @@ function clearAwaitingFirstContent(message: any) {
   }
 }
 const userMDebug = (...args: any[]) => {
+  // 调试桩：默认空实现，排障时在此恢复 console 输出
+  void args;
 };
 
 export const useChatStore = defineStore('chat', {

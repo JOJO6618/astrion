@@ -48,7 +48,8 @@ const props = defineProps<{
   conversationId?: string;
 }>();
 
-const emit = defineEmits<{
+// 模板中统一使用 $emit 触发事件，无需脚本侧 emit 句柄
+defineEmits<{
   (event: 'close'): void;
 }>();
 
@@ -212,7 +213,7 @@ function switchToSession(name: string) {
 }
 
 // ---- watchers ----
-watch(activeSession, (val) => {
+watch(activeSession, () => {
   if (term) renderSessionLog();
 });
 

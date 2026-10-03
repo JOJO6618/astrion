@@ -10,16 +10,17 @@
     ]"
   >
     <!-- 结束节点左侧入桩：每条入线一个桩（含 1 个常驻空桩），上下均布 -->
-    <Handle
-      v-if="data.node.kind === 'end'"
-      v-for="i in data.inCount + 1"
-      :key="`in-${i - 1}`"
-      :id="`in-${i - 1}`"
-      type="target"
-      :position="Position.Left"
-      :class="{ 'boundary-node__in--empty': i > data.inCount }"
-      :style="{ top: `${(i / (data.inCount + 2)) * 100}%` }"
-    />
+    <template v-if="data.node.kind === 'end'">
+      <Handle
+        v-for="i in data.inCount + 1"
+        :key="`in-${i - 1}`"
+        :id="`in-${i - 1}`"
+        type="target"
+        :position="Position.Left"
+        :class="{ 'boundary-node__in--empty': i > data.inCount }"
+        :style="{ top: `${(i / (data.inCount + 2)) * 100}%` }"
+      />
+    </template>
     <span
       class="icon boundary-node__icon"
       :style="iconSrc(data.node.kind === 'start' ? ICONS.play : ICONS.octagon)"

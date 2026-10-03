@@ -1,10 +1,7 @@
 // @ts-nocheck
-import { debugLog, traceLog } from '../common';
+import { debugLog } from '../common';
 import { t } from '@/locales';
-import { usePersonalizationStore } from '../../../stores/personalization';
-import {
-
-} from './shared';
+import './shared';
 
 export const stateMethods = {
   resetAllStates(reason = 'unspecified', options: { preserveMonitorWindows?: boolean } = {}) {
@@ -41,13 +38,6 @@ export const stateMethods = {
     this.toolResetTracking();
 
     // 新增：将所有未完成的工具标记为已完成，并清理awaitingFirstContent状态
-    const assistantMsgsBefore = this.messages
-      .filter((m) => m.role === 'assistant')
-      .map((m) => ({
-        awaitingFirstContent: m.awaitingFirstContent,
-        generatingLabel: m.generatingLabel
-      }));
-
     this.messages.forEach((msg) => {
       if (msg.role === 'assistant') {
         // 清理等待动画状态
@@ -71,13 +61,6 @@ export const stateMethods = {
         }
       }
     });
-
-    const assistantMsgsAfter = this.messages
-      .filter((m) => m.role === 'assistant')
-      .map((m) => ({
-        awaitingFirstContent: m.awaitingFirstContent,
-        generatingLabel: m.generatingLabel
-      }));
 
     // 清理Markdown缓存
     if (this.markdownCache) {
