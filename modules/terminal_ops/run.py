@@ -14,7 +14,6 @@ from types import SimpleNamespace
 try:
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
@@ -25,7 +24,6 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,

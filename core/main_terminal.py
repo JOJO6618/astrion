@@ -130,7 +130,9 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.memory_manager = MemoryManager(data_dir=str(self.data_dir))
             self.file_manager = FileManager(project_path, container_session=container_session, data_dir=str(self.data_dir))
             self.search_engine = SearchEngine(data_dir=str(self.data_dir))
-            self.terminal_ops = TerminalOperator(project_path, container_session=container_session)
+            self.terminal_ops = TerminalOperator(
+                project_path, container_session=container_session, data_dir=str(self.data_dir)
+            )
             self.ocr_client = OCRClient(project_path, self.file_manager)
             self.pending_image_view = None  # 供 view_image 工具使用，保存一次性图片附加请求
             self.pending_video_view = None  # 供 view_video 工具使用，保存一次性视频附加请求
@@ -145,6 +147,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 container_session=container_session,
                 network_permission_getter=self.get_network_permission,
                 terminal_readonly_getter=self.terminal_readonly_enabled,
+                command_validator=self.terminal_ops._validate_command,
             )
             # 让 run_command 复用终端容器，保持环境一致
             self.terminal_ops.attach_terminal_manager(self.terminal_manager)

@@ -65,7 +65,6 @@ _DEPLOY_CONFIG_FILES = (
     "host_workspaces.json",
     "auto_approval.json",
     "goal_review.json",
-    "forbidden_commands.json",
     "host_sandbox_policy.json",
 )
 

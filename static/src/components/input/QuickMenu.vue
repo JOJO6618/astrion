@@ -153,6 +153,14 @@
             >
               {{ $t('quickdock.pathAuthorization') }}
             </button>
+            <!-- 指令拦截为个人级设置，与执行环境无关：Docker/web 也必须显示（不加 executionModeEnabled 限制） -->
+            <button
+              type="button"
+              class="menu-entry submenu-entry"
+              @click="$emit('open-command-blocking')"
+            >
+              {{ $t('quickdock.commandBlocking') }}
+            </button>
           </div>
         </div>
       </transition>
@@ -220,6 +228,7 @@ defineEmits<{
   (event: 'open-review'): void;
   (event: 'pick-video'): void;
   (event: 'open-path-authorization'): void;
+  (event: 'open-command-blocking'): void;
   (event: 'toggle-goal-mode'): void;
 }>();
 

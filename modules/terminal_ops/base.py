@@ -14,7 +14,6 @@ from types import SimpleNamespace
 try:
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
@@ -25,7 +24,6 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
@@ -46,8 +44,14 @@ if TYPE_CHECKING:
 class TerminalOperatorBase:
     """TerminalOperator 基础类。"""
 
-    def __init__(self, project_path: str, container_session: Optional["ContainerHandle"] = None):
+    def __init__(
+        self,
+        project_path: str,
+        container_session: Optional["ContainerHandle"] = None,
+        data_dir: Optional[str] = None,
+    ):
         self.project_path = Path(project_path).resolve()
+        self.data_dir = Path(data_dir).expanduser() if data_dir is not None else None
         self.process = None
         # 自动检测Python命令，并记录虚拟环境变量（仅宿主机使用）
         self._python_env: Dict[str, str] = {}

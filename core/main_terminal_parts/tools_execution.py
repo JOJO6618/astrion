@@ -1086,6 +1086,15 @@ class MainTerminalToolsExecutionMixin:
                     MAX_RUN_COMMAND_CHARS, MAX_EXTRACT_WEBPAGE_CHARS
                 )
 
+                # 所有命令执行后端共用个人规则，包括持久终端及注入的 ExecutionBackend。
+                if tool_name in {"run_command", "terminal_input"} and isinstance(arguments.get("command"), str):
+                    from modules.command_blocking import validate_command
+                    valid, error = validate_command(arguments["command"], getattr(self, "data_dir", None))
+                    if not valid:
+                        return json.dumps({
+                            "success": False, "error": error, "output": "", "return_code": -1
+                        }, ensure_ascii=False)
+
                 # 检查是否需要确认
                 if tool_name in NEED_CONFIRMATION:
                     if not await self.confirm_action(tool_name, arguments):

@@ -3,9 +3,14 @@ import { computed, inject, nextTick, onMounted, ref } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
 import { t } from '@/locales';
+import { useCommandBlockingStore } from '@/stores/commandBlocking';
 import { desktopPlatform, isDesktopShell } from '@/utils/desktopPlatform';
 
 defineOptions({ name: 'GeneralTab' });
+
+// 个人级指令拦截：独立接口 /api/command-blocking（不走 personalization 字段），
+// 开关立即 POST 单字段 { enabled }；规则编辑走统一窗口（App.vue 挂载的 CommandBlockingDialog）
+const commandBlocking = useCommandBlockingStore();
 
 /**
  * 设置页「通用」分区：标题生成设置、应用更新与桌面运行数据目录。
@@ -177,6 +182,8 @@ async function restartDesktop() {
 
 onMounted(() => {
   if (runDataSupported) void loadRunDataInfo();
+  // 进入通用页签时拉取一次拦截开关状态（失败保留 error，开关仍可重试）
+  if (!commandBlocking.loaded) void commandBlocking.fetchState();
 });
 </script>
 
@@ -211,6 +218,39 @@ onMounted(() => {
         :extra-options="defaultExtraOptions"
         @select="(v) => personalization.updateField({ key: 'title_model', value: v })"
       />
+    </div>
+
+    <label class="settings-toggle-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('commandBlocking.settingsTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('commandBlocking.settingsDesc') }}</span>
+        <span v-if="commandBlocking.error && !commandBlocking.dialogOpen" class="command-blocking-error" role="alert">
+          {{ $t('commandBlocking.toggleFailed') }}
+          <span class="command-blocking-error-detail">{{ commandBlocking.error }}</span>
+        </span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="commandBlocking.enabled"
+        :disabled="commandBlocking.toggling || commandBlocking.saving || commandBlocking.loading || !commandBlocking.loaded || commandBlocking.loadFailed"
+        @change="commandBlocking.setEnabled(($event.target as HTMLInputElement).checked)"
+      />
+      <FancyCheck :checked="commandBlocking.enabled" />
+    </label>
+
+    <div class="settings-action-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('commandBlocking.rulesLabel') }}</span>
+        <span class="settings-row-desc">{{ $t('commandBlocking.sharedHint') }}</span>
+      </span>
+      <button
+        type="button"
+        class="settings-secondary-button"
+        :disabled="commandBlocking.saving || commandBlocking.toggling"
+        @click="commandBlocking.openDialog()"
+      >
+        {{ $t('commandBlocking.manageRules') }}
+      </button>
     </div>
 
     <div v-if="runDataSupported" class="settings-action-row">
@@ -363,6 +403,21 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.command-blocking-error {
+  display: block;
+  margin-top: 6px;
+  color: var(--state-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.command-blocking-error-detail {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  word-break: break-all;
+}
+
 .run-data-settings {
   grid-column: 1 / -1;
   display: flex;

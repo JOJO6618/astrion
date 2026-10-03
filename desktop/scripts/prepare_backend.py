@@ -38,7 +38,6 @@ PRIVATE_CONFIGS = (
     "config/host_workspaces.json",
     "config/auto_approval.json",
     "config/goal_review.json",
-    "config/forbidden_commands.json",
     "config/host_sandbox_policy.json",
     # custom_models.json.example 是开发者写法示例（含 Kimi-K3/deepseek-chat 示例条目），
     # 随包分发会让全新用户经回退链（部署目录→源码树.json→.example）预装示例模型。

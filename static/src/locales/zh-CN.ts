@@ -27,6 +27,7 @@ import auth from './zh-CN/auth';
 import utils from './zh-CN/utils';
 import sandbox from './zh-CN/sandbox';
 import update from './zh-CN/update';
+import commandBlocking from './zh-CN/commandBlocking';
 
 export default {
   common,
@@ -56,4 +57,5 @@ export default {
   utils,
   sandbox,
   update,
+  commandBlocking
 } as const;

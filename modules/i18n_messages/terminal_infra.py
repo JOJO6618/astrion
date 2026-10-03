@@ -155,8 +155,32 @@ MESSAGES = {
         "en-US": "Command execution cancelled by user",
     },
     "terminal.forbidden_command": {
-        "zh-CN": "用户不允许执行包含“{pattern}”的指令",
-        "en-US": "You are not allowed to run commands containing \"{pattern}\"",
+        "zh-CN": "指令已被你的规则“{pattern}”拦截",
+        "en-US": "Command blocked by your rule \"{pattern}\"",
+    },
+    "terminal.command_blocking_rules_invalid": {
+        "zh-CN": "规则必须是数组，最多 {limit} 条",
+        "en-US": "Rules must be an array containing at most {limit} entries",
+    },
+    "terminal.command_blocking_rule_invalid": {
+        "zh-CN": "每条规则必须是字符串，最多 {limit} 个字符",
+        "en-US": "Each rule must be a string of at most {limit} characters",
+    },
+    "terminal.command_blocking_rule_single_line": {
+        "zh-CN": "每条规则只能占一行",
+        "en-US": "Each rule must fit on a single line",
+    },
+    "terminal.command_blocking_payload_invalid": {
+        "zh-CN": "指令拦截配置只接受 enabled 和 rules 字段",
+        "en-US": "Command blocking configuration accepts only enabled and rules fields",
+    },
+    "terminal.command_blocking_enabled_invalid": {
+        "zh-CN": "指令拦截开关必须是布尔值",
+        "en-US": "The command blocking switch must be a boolean",
+    },
+    "terminal.command_blocking_unavailable": {
+        "zh-CN": "无法读取你的指令拦截配置，指令未执行：{error}",
+        "en-US": "Unable to read your command blocking configuration; command was not executed: {error}",
     },
     "terminal.command_failed": {
         "zh-CN": "命令执行失败",

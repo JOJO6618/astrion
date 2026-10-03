@@ -10,3 +10,4 @@ from server.chat.approval import *
 from server.chat.terminal import *
 from server.chat.misc import *
 from server.chat.preview import *
+from server.chat.command_blocking import *

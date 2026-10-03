@@ -27,8 +27,8 @@
 - **开发者配置 / 程序能力**（``docker_risk_markers.json`` / ``skill_hints.json``）：
   是程序行为的一部分，随版本演进，仍锚定源码树。
 - **部署者自定义配置**（``custom_models`` / ``host_workspaces`` /
-  ``auto_approval`` / ``goal_review`` / ``forbidden_commands`` /
-  ``host_sandbox_policy``）：因部署/机器而异、或含密钥，外置到
+  ``auto_approval`` / ``goal_review`` / ``host_sandbox_policy``）：
+  因部署/机器而异、或含密钥，外置到
   ``<data_root>/config/``（即 ``DEPLOY_CONFIG_DIR``）。读取走
   ``resolve_deploy_config``，回退链为：部署目录 -> 源码树 ``.json`` ->
   源码树 ``.json.example``。

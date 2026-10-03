@@ -488,6 +488,7 @@
         @toggle-approval-panel="$emit('toggle-approval-panel')"
         @open-review="$emit('open-review')"
         @open-path-authorization="$emit('open-path-authorization')"
+        @open-command-blocking="$emit('open-command-blocking')"
         @toggle-goal-mode="$emit('toggle-goal-mode')"
       />
       <div class="permission-switcher" @click.stop>
@@ -702,6 +703,7 @@ const emit = defineEmits([
   'remove-file',
   'open-review',
   'open-path-authorization',
+  'open-command-blocking',
   'toggle-permission-menu',
   'change-permission-mode',
   'change-execution-mode',

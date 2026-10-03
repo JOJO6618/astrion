@@ -4,7 +4,7 @@ import json
 import time
 import shlex
 import shutil
-from typing import Dict, List, Optional, Callable, TYPE_CHECKING
+from typing import Dict, List, Optional, Callable, Tuple, TYPE_CHECKING
 from pathlib import Path
 from datetime import datetime
 try:
@@ -78,6 +78,7 @@ class TerminalManager:
         container_session: Optional["ContainerHandle"] = None,
         network_permission_getter: Optional[Callable] = None,
         terminal_readonly_getter: Optional[Callable] = None,
+        command_validator: Optional[Callable[[str], Tuple[bool, str]]] = None,
     ):
         """
         初始化终端管理器
@@ -90,6 +91,7 @@ class TerminalManager:
             broadcast_callback: WebSocket广播回调
         """
         self.project_path = Path(project_path)
+        self.command_validator = command_validator
         self.max_terminals = max_terminals or MAX_TERMINALS
         self.terminal_buffer_size = terminal_buffer_size or TERMINAL_BUFFER_SIZE
         self.terminal_display_size = terminal_display_size or TERMINAL_DISPLAY_SIZE
@@ -577,6 +579,12 @@ class TerminalManager:
                 "output": tr("terminal.output_wait_missing")
             }
         output_wait = min(output_wait, 300)
+
+        validator = getattr(self, "command_validator", None)
+        if validator is not None:
+            valid, error = validator(command)
+            if not valid:
+                return {"success": False, "error": error, "status": "error", "output": ""}
 
         result = terminal.send_command(
             command,

@@ -14,7 +14,6 @@ from types import SimpleNamespace
 try:
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
@@ -25,7 +24,6 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        FORBIDDEN_COMMANDS,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
@@ -48,26 +46,10 @@ class CommandMixin:
     """TerminalOperator command 能力 mixin。"""
 
     def _validate_command(self, command: str) -> Tuple[bool, str]:
-        """验证命令安全性"""
-        # 检查禁止的命令
-        for forbidden in FORBIDDEN_COMMANDS:
-            if forbidden in command.lower():
-                return False, tr("terminal.forbidden_command", pattern=forbidden)
-        
-        # 检查危险的命令模式
-        dangerous_patterns = [
-            "sudo",
-            "chmod 777",
-            "rm -rf",
-            "> /dev/",
-            "fork bomb"
-        ]
-        
-        for pattern in dangerous_patterns:
-            if pattern in command.lower():
-                return False, tr("terminal.forbidden_command", pattern=pattern)
-        
-        return True, ""
+        """读取执行器所属用户的最新规则，不使用部署级或内置词表。"""
+        from modules.command_blocking import validate_command
+
+        return validate_command(command, getattr(self, "data_dir", None))
 
     @staticmethod
     def _clamp_timeout(requested: Optional[int], default: int, max_limit: int) -> int:

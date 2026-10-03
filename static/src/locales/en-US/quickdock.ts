@@ -96,4 +96,5 @@ export default {
   compressConversation: 'Compress conversation',
   approvalPanel: 'Approval panel',
   pathAuthorization: 'Path authorization',
+  commandBlocking: 'Command blocking'
 } as const;

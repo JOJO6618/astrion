@@ -433,6 +433,7 @@
               @change-execution-mode="changeExecutionMode"
               @change-network-permission="changeNetworkPermission"
               @open-path-authorization="openPathAuthorizationDialog"
+              @open-command-blocking="openCommandBlockingDialog"
               @open-versioning-dialog="openVersioningDialog"
               @guide-runtime-message="handleGuideRuntimeMessage"
               @delete-runtime-message="handleDeleteRuntimeMessage"
@@ -560,6 +561,8 @@
         @close="closePathAuthorizationDialog"
         @save="savePathAuthorization"
       />
+      <!-- 指令拦截规则窗口：store 驱动，与设置页共用同一实例（settingsRoute 下也可见） -->
+      <CommandBlockingDialog />
       <transition name="overlay-fade">
         <ImagePicker
           v-if="imagePickerOpen"
@@ -979,6 +982,7 @@ import { useTutorialStore } from './stores/tutorial';
 import { usePersonalizationStore } from './stores/personalization';
 import { usePreviewStore } from './stores/preview';
 import { useDesktopUpdateStore } from './stores/desktopUpdate';
+import { useCommandBlockingStore } from './stores/commandBlocking';
 
 const VirtualMonitorSurface = defineAsyncComponent(
   () => import('./components/chat/VirtualMonitorSurface.vue')
@@ -986,6 +990,13 @@ const VirtualMonitorSurface = defineAsyncComponent(
 const PathAuthorizationDialog = defineAsyncComponent(
   () => import('./components/overlay/PathAuthorizationDialog.vue')
 );
+const CommandBlockingDialog = defineAsyncComponent(
+  () => import('./components/overlay/CommandBlockingDialog.vue')
+);
+
+// 个人级指令拦截：QuickMenu → InputComposer 一路冒泡到此处，统一走 store 打开窗口
+const commandBlockingStore = useCommandBlockingStore();
+const openCommandBlockingDialog = () => commandBlockingStore.openDialog();
 
 const tutorialStore = useTutorialStore();
 const personalizationStore = usePersonalizationStore();

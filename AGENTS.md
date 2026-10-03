@@ -67,8 +67,10 @@
 具体目录变量支持相对路径（相对仓库根目录展开）、绝对路径与 `~`。
 
 > 注意：`config/*.json` 分两类：
-> - **程序能力**（`docker_risk_markers.json`、`skill_hints.json`）：是程序行为的一部分，随版本演进，仍锚定源码树。`prompts/`、`agentskills/` 同理。
-> - **部署级配置**（`custom_models`、`host_workspaces`、`auto_approval`、`goal_review`、`forbidden_commands`、`host_sandbox_policy`）：因部署/机器而异或含密钥，外置到 `~/.astrion/astrion/config/`（即 `DEPLOY_CONFIG_DIR`，可单独用该环境变量覆盖，host/web 共享）。读取走 `config.resolve_deploy_config(name)`，回退链：部署目录 → 源码树 `.json` → 源码树 `.json.example`，因此开发环境不必先跑 setup 也能用源码树种子。含密钥/机器特定的 5 个（除 `forbidden_commands`）不纳入 git，仓库仅留 `.example`。
+> - **程序能力**（`docker_risk_markers.json`、`skill_hints.json`、`command_blocking_recommended.json`）：是程序行为的一部分，随版本演进，仍锚定源码树。`prompts/`、`agentskills/` 同理。指令推荐规则仅供用户主动导入，禁止作为执行时的默认禁令或回退。
+> - **部署级配置**（`custom_models`、`host_workspaces`、`auto_approval`、`goal_review`、`host_sandbox_policy`）：因部署/机器而异或含密钥，外置到 `~/.astrion/astrion/config/`（即 `DEPLOY_CONFIG_DIR`，可单独用该环境变量覆盖，host/web 共享）。读取走 `config.resolve_deploy_config(name)`，回退链：部署目录 → 源码树 `.json` → 源码树 `.json.example`，因此开发环境不必先跑 setup 也能用源码树种子。
+>
+> **个人指令拦截（2026-10）**：唯一权威为 `modules/command_blocking.py`。个人文件 `command_blocking.json` 与解析共享链接后的 `personalization.json` 同目录，格式 `{enabled: true, rules: []}`；用户间隔离、同用户跨工作区共享，host 免登录沿用其 `DATA_DIR`。普通用户可调用 `/api/command-blocking` GET/POST（full/headless 共用），设置→通用的开关与路径授权旁的规则窗口共享状态。保存立即影响后续前台/后台命令和终端输入；部分更新不能覆盖未提交字段。沿用不区分大小写的全文包含匹配，空列表不回退，关闭保留规则。旧部署级 `forbidden_commands.json` 和硬编码词表均不再使用，也不自动迁入个人配置。
 
 ### 1.5.3 Host / Web 双路径机制（2026-06 新增）
 

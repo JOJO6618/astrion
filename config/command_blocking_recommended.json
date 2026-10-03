@@ -1,5 +1,5 @@
 {
-  "forbidden_commands": [
+  "rules": [
     "rm -rf /",
     "rm -rf ~",
     "format",

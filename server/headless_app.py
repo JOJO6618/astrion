@@ -166,11 +166,14 @@ def create_headless_app() -> Flask:
     )
     from server.conversation import list_background_commands, list_sub_agents, list_conversation_versioning_checkpoints
     from server.workflow_page import api_list_workflows
+    from server.chat.command_blocking import get_command_blocking, update_command_blocking
 
     app.add_url_rule('/api/personalization', view_func=get_personalization_settings, methods=['GET'])
     app.add_url_rule('/api/personalization', view_func=update_personalization_settings, methods=['POST'])
     app.add_url_rule('/api/path-authorization', view_func=get_path_authorization, methods=['GET'])
     app.add_url_rule('/api/path-authorization', view_func=update_path_authorization, methods=['POST'])
+    app.add_url_rule('/api/command-blocking', view_func=get_command_blocking, methods=['GET'])
+    app.add_url_rule('/api/command-blocking', view_func=update_command_blocking, methods=['POST'])
     # 子智能体/后台指令列表（/agents /tasks 面板数据源；conversation_id 走 query 显式指定）
     app.add_url_rule('/api/sub_agents', view_func=list_sub_agents, methods=['GET'])
     app.add_url_rule('/api/background_commands', view_func=list_background_commands, methods=['GET'])

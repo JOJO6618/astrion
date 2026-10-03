@@ -103,4 +103,5 @@ export default {
   compressConversation: '压缩对话',
   approvalPanel: '审批面板',
   pathAuthorization: '路径授权',
+  commandBlocking: '指令拦截'
 } as const;
