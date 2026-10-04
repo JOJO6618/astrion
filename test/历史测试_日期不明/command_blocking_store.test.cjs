@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const ts = require('typescript');
 const pinia = require('pinia');
 
-const source = fs.readFileSync(path.join(__dirname, '../static/src/stores/commandBlocking.ts'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../../static/src/stores/commandBlocking.ts'), 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS }
 }).outputText;

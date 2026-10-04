@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createHistoryScrollSession } from '../static/src/app/methods/ui/historyScrollSession.ts';
+import { createHistoryScrollSession } from '../../static/src/app/methods/ui/historyScrollSession.ts';
 
 function fixture() {
   const state = { followState: 'escaped', scrollEscapeVersion: 0 };

@@ -1,7 +1,7 @@
 """兼容 re-export：协议转换层已泛化搬家到 ``utils/api_client/responses/translate.py``
 （2026-09-25 协议泛化，设计文档 docs/provider_protocol_generalization.md）。
 
-本模块仅保持存量导入路径（``codex/mixin.py``、``test/test_codex_translate.py``）
+本模块仅保持存量导入路径（``codex/mixin.py``、``test/历史测试_日期不明/test_codex_translate.py``）
 不变；新代码请直接从 ``utils.api_client.responses.translate`` 导入。
 """
 

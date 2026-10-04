@@ -58,6 +58,7 @@ class TaskParams:
     goal_mode: bool = False
     skill_context_messages: List[Dict[str, str]] = field(default_factory=list)
     message_source: Optional[str] = None
+    queued_message_id: Optional[str] = None
     task_type: str = "chat"
     # 审批/提问等待超时透传（秒）。None = 保持既有默认语义（3600s）不变；
     # 超时后的语义（拒绝当前动作继续 vs 结束任务）属阶段三产品决策，

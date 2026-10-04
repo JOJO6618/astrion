@@ -11,7 +11,7 @@ from pathlib import Path
 
 class ConfigPathsResolutionTest(unittest.TestCase):
     def setUp(self):
-        self.repo_root = Path(__file__).resolve().parents[1]
+        self.repo_root = Path(__file__).resolve().parents[2]
 
     def _load_paths(self, *, cwd: Path, extra_env: dict | None = None) -> dict:
         code = """

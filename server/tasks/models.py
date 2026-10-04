@@ -25,6 +25,9 @@ from modules.goal_state_manager import GoalStateManager, REASON_USER_CANCEL
 from modules.sub_agent.state import TERMINAL_STATUSES as SUB_AGENT_TERMINAL_STATUSES
 from modules.background_command_manager import BackgroundCommandManager, TERMINAL_STATUSES as BG_COMMAND_TERMINAL_STATUSES
 from modules.i18n import tr
+from server.tasks.queue_state import (
+    initialize_queue, load_queue, save_queue, finish_queue, consume_selected_message,
+)
 
 
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
@@ -61,6 +64,8 @@ class TaskRecord:
         "next_event_idx",
         "runtime_pending_queue",
         "runtime_guidance_queue",
+        "queue_manager",
+        "runtime_queue_paused",
         "last_cancel_at",
         "task_type",
     )
@@ -98,7 +103,9 @@ class TaskRecord:
         self.stop_requested: bool = False
         self.next_event_idx: int = 0
         self.runtime_pending_queue: List[Dict[str, Any]] = []
-        self.runtime_guidance_queue: List[str] = []
+        self.runtime_guidance_queue: List[Any] = []
+        self.queue_manager = None
+        self.runtime_queue_paused = False
         self.last_cancel_at: Optional[float] = None
         self.task_type = str(params.task_type or "chat")
 
@@ -163,23 +170,25 @@ class TaskManager:
         # 单对话互斥：普通 chat 任务禁止同一对话并发（防串写对话历史）；
         # 同工作区不同对话允许并行（对话级 terminal 隔离）。
         # notice（通知触发）任务允许与已完成的 chat 任务共存，用于后台通知重入。
-        if normalized_task_type == "chat":
-            def _norm_cid(cid):
-                cid = str(cid or "").strip()
-                return cid[5:] if cid.startswith("conv_") else cid
-            target_cid = _norm_cid(conversation_id)
-            existing = [
-                t for t in self.list_tasks(username, workspace_id)
-                if t.status in {"pending", "running"}
-                and getattr(t, "task_type", "chat") == "chat"
-                and _norm_cid(getattr(t, "conversation_id", None)) == target_cid
-            ]
-            if existing:
-                raise RuntimeError(tr("tasks.task_already_running"))
+        def _norm_cid(cid):
+            return str(cid or "").strip().removeprefix("conv_")
         task_id = str(uuid.uuid4())
         record = TaskRecord(task_id, ctx, conversation_id)
         record.task_type = normalized_task_type
+        if conversation_id:
+            initialize_queue(record)
         with self._lock:
+            existing = [
+                t for t in self._tasks.values()
+                if t.username == username and t.workspace_id == workspace_id
+                and t.status in {"pending", "running", "cancel_requested"}
+                and _norm_cid(t.conversation_id) == _norm_cid(conversation_id)
+            ]
+            if existing:
+                raise RuntimeError(tr("tasks.task_already_running"))
+            if conversation_id:
+                load_queue(record)
+                save_queue(record)
             self._tasks[task_id] = record
         thread = threading.Thread(
             target=self._run_chat_task,
@@ -287,9 +296,8 @@ class TaskManager:
             except Exception as exc:
                 debug_log(f"[Goal] 取消任务时停止目标模式失败: {exc}")
 
-        # 3. 丢弃已经引导的内容（预输入队列保持不变，正常结束后再插入）
+        # 未消费的引导和提前输入必须保留，取消只停止当前执行体。
         with self._lock:
-            rec.runtime_guidance_queue = []
             rec.updated_at = time.time()
 
         # 4. 标记为 cancel_requested。
@@ -336,6 +344,7 @@ class TaskManager:
                 "id": item_id,
                 "text": text,
                 "created_at": created_at_float,
+                "source": raw_item.get("source", "user") if isinstance(raw_item, dict) else "user",
             }
             if isinstance(raw_files, list):
                 files = [
@@ -362,6 +371,7 @@ class TaskManager:
                 "id": item_id,
                 "text": text,
                 "created_at": item.get("created_at"),
+                "source": item.get("source", "user"),
             }
             if isinstance(item.get("files"), list) and item["files"]:
                 entry["files"] = list(item["files"])
@@ -407,6 +417,7 @@ class TaskManager:
             queue.append(item)
             rec.runtime_pending_queue = queue
             rec.updated_at = time.time()
+            save_queue(rec)
             return {
                 "success": True,
                 "task_id": rec.task_id,
@@ -435,6 +446,7 @@ class TaskManager:
             queue.pop(remove_idx)
             rec.runtime_pending_queue = queue
             rec.updated_at = time.time()
+            save_queue(rec)
             return {
                 "success": True,
                 "task_id": rec.task_id,
@@ -480,14 +492,11 @@ class TaskManager:
             selected_text = str(selected.get("text") or "").strip()
             if not selected_text:
                 return {"success": False, "code": "empty_message", "error": tr("tasks.message_content_empty")}
-            selected_files = selected.get("files")
-            if isinstance(selected_files, list) and selected_files:
-                guidance_queue.append({"text": selected_text, "files": list(selected_files)[:9]})
-            else:
-                guidance_queue.append(selected_text)
+            guidance_queue.append({**selected, "source": "guidance"})
             rec.runtime_guidance_queue = guidance_queue
             rec.runtime_pending_queue = remain_queue
             rec.updated_at = time.time()
+            save_queue(rec)
             return {
                 "success": True,
                 "task_id": rec.task_id,
@@ -537,6 +546,7 @@ class TaskManager:
             else:
                 queue.append(text)
             rec.updated_at = time.time()
+            save_queue(rec)
             return {
                 "success": True,
                 "queued_count": len(queue),
@@ -553,6 +563,7 @@ class TaskManager:
                 return None
             item = queue.pop(0)
             rec.updated_at = time.time()
+            save_queue(rec)
             if isinstance(item, dict):
                 text = str(item.get("text") or "").strip()
                 if not text:
@@ -580,6 +591,7 @@ class TaskManager:
                     items.append(text)
             rec.runtime_guidance_queue = []
             rec.updated_at = time.time()
+            save_queue(rec)
             return items
 
     def consume_runtime_guidance_for_injection(self, username: str, task_id: str) -> List[Any]:
@@ -613,6 +625,7 @@ class TaskManager:
                         items.append(text)
             rec.runtime_guidance_queue = []
             rec.updated_at = time.time()
+            save_queue(rec)
             return items
 
     # ---- internal helpers ----
@@ -749,6 +762,7 @@ class TaskManager:
         if isinstance(data, dict):
             data = dict(data)
             data.setdefault("task_id", rec.task_id)
+            data.setdefault("task_type", rec.task_type)
             if rec.conversation_id:
                 data.setdefault("conversation_id", rec.conversation_id)
             if rec.workspace_id:
@@ -899,6 +913,23 @@ class TaskManager:
                 debug_log(f"[Task] 注入 user_message 事件失败: {exc}")
 
             def sender(event_type, data):
+                if event_type == "user_message" and (data or {}).get("message") == rec.message:
+                    with self._lock:
+                        consume_selected_message(rec)
+                if event_type == "error" and not (data or {}).get("retry"):
+                    with self._lock:
+                        rec.runtime_queue_paused = True
+                        save_queue(rec)
+                    data = dict(data or {})
+                    data["preserve_pending_messages"] = True
+                    data["runtime_queued_messages"] = self.get_runtime_pending_messages(username, rec.task_id)
+                if event_type == "task_complete":
+                    with self._lock:
+                        finish_queue(rec, paused=rec.runtime_queue_paused or rec.task_type == "compression" or bool((data or {}).get("error")))
+                    data = dict(data or {})
+                    data["preserve_pending_messages"] = rec.runtime_queue_paused
+                    data["pending_runtime_guidance_messages"] = []
+                    data["runtime_queued_messages"] = self.get_runtime_pending_messages(username, rec.task_id)
                 if isinstance(data, dict):
                     data = dict(data)
                     if event_type == "compression_finished":
@@ -981,19 +1012,22 @@ class TaskManager:
                 # 使本模块可在无 Web 应用初始化的进程中加载（Gateway 独立启动前提）。
                 from server.chat_flow import run_chat_task_sync
 
-                run_chat_task_sync(
-                    terminal=terminal,
-                    message=rec.message,
-                    images=images,
-                    sender=sender,
-                    client_sid=rec.task_id,
-                    workspace=workspace,
-                    username=username,
-                    videos=videos,
-                    files=files or [],
-                    # 通知链任务认领轮询器预占的门闸（其余任务为 None，走竞争获取）
-                    main_task_gate_token=rec.directives.main_task_gate_token,
-                )
+                if rec.task_type == "compression":
+                    from server.tasks.compression import run_compression_task
+                    run_compression_task(self, rec, terminal, workspace, sender)
+                else:
+                    run_chat_task_sync(
+                        terminal=terminal,
+                        message=rec.message,
+                        images=images,
+                        sender=sender,
+                        client_sid=rec.task_id,
+                        workspace=workspace,
+                        username=username,
+                        videos=videos,
+                        files=files or [],
+                        main_task_gate_token=rec.directives.main_task_gate_token,
+                    )
             finally:
                 try:
                     if previous_auto_user_event is not None:
@@ -1027,6 +1061,7 @@ class TaskManager:
                 bg_state = self._has_running_background(rec, terminal)
                 has_bg = bg_state["has_running_sub_agents"] or bg_state["has_running_background_commands"]
                 with self._lock:
+                    finish_queue(rec, paused=True)
                     new_status = "stopped"
                     rec.status = new_status
                     rec.updated_at = time.time()
@@ -1037,6 +1072,8 @@ class TaskManager:
                 # 统一发送 task_stopped，携带后台任务状态
                 try:
                     stopped_payload = {
+                        'preserve_pending_messages': True,
+                        'runtime_queued_messages': self.get_runtime_pending_messages(username, rec.task_id),
                         'message': tr("task_main.task_stopped"),
                         'reason': 'user_requested',
                         'task_id': rec.task_id,
@@ -1076,7 +1113,15 @@ class TaskManager:
                 pass
         except Exception as exc:
             debug_log(f"[Task] 后台任务失败: {exc}")
-            self._append_event(rec, "error", {"message": str(exc)})
+            with self._lock:
+                try:
+                    finish_queue(rec, paused=True)
+                except Exception as queue_error:
+                    debug_log(f"[RuntimeQueue] 保存失败，保留内存队列: {queue_error}")
+            self._append_event(rec, "error", {
+                "message": str(exc), "preserve_pending_messages": True,
+                "runtime_queued_messages": self.get_runtime_pending_messages(username, rec.task_id),
+            })
             with self._lock:
                 rec.status = "failed"
                 rec.error = str(exc)

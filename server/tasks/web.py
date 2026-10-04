@@ -16,4 +16,5 @@ def get_tasks_blueprint():
     from server.tasks import helpers as _helpers  # noqa: F401  （保持历史装配行为等价）
     from server.tasks import media as _media  # noqa: F401  （保持历史装配行为等价）
     from server.tasks import api as _api  # noqa: F401  （@tasks_bp.route 挂载）
+    from server.tasks import queue_api as _queue_api  # noqa: F401
     return tasks_bp

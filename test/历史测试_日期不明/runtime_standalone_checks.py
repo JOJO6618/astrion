@@ -6,7 +6,7 @@ import 时固化的模块级常量；在 unittest discover 全量运行时，排
 落到用户真实运行态目录执行任务（不可接受）。子进程内 import 顺序完全可控，
 隔离 100% 可靠。
 
-用法：python test/runtime_standalone_checks.py <lifecycle|chain>
+用法：python test/历史测试_日期不明/runtime_standalone_checks.py <lifecycle|chain>
 退出码 0 = 通过；断言失败/traceback 走 stderr，返回码非 0。
 """
 import json
@@ -29,7 +29,7 @@ os.environ["TERMINAL_SANDBOX_MODE"] = "host"
 # 测试进程必须显式禁用它，否则隔离目录会被 .env 值穿透（静默落到真实/clone 数据根）。
 os.environ["ASTRION_IGNORE_DOTENV"] = "1"
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 (_SMOKE_ROOT / "config" / "host_workspaces.json").write_text(
     json.dumps(

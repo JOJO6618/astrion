@@ -96,6 +96,7 @@ export function dataState() {
     // 运行期消息堆积（提前发送 / 引导对话）
     runtimeQueuedMessages: [],
     runtimeGuidanceFallbackQueue: [],
+    runtimeQueuePaused: false,
     runtimeQueueSuppressedMessageIds: new Set(),
     runtimeGuidanceSuppressedTextCounts: {},
     runtimeQueueLimit: 5,

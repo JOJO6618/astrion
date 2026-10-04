@@ -1736,58 +1736,28 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
                 terminal = conv_terminal
         except RuntimeError as exc:
             return jsonify({"success": False, "error": str(exc), "code": "resource_busy"}), 503
-        result = asyncio.run(
-            run_deep_compression(
-                web_terminal=terminal,
-                workspace=workspace,
-                conversation_id=normalized_id,
-                mode="manual",
-                sender=None,
-            )
-        )
+        from server.main_task_gate import try_acquire_main_task_gate, release_main_task_gate
+        from server.runtime import RuntimeContext, TaskParams, InternalDirectives, runtime_service
+        from server.tasks.models import task_public_payload
 
-        if not result.get("success"):
-            status_code = 404 if _is_not_found_message(result.get("error", "")) else (409 if result.get("in_progress") else 400)
-            return jsonify(result), status_code
-
-        # in-place 压缩：对话 id 不变。对话内容变化推送已随 WebSocket 移除，
-        # 发起方依据响应（guide_inserted 等字段）刷新历史。
-        load_result = terminal.load_conversation(normalized_id)
-
-        response_payload = {
-            "success": True,
-            "in_place": True,
-            "compressed_conversation_id": normalized_id,
-            "compact_file": result.get("compact_file"),
-            "summary_failed": result.get("summary_failed", False),
-            "guide_message": result.get("guide_message"),
-            "compress_form": result.get("compress_form"),
-            # 手动压缩只有一种行为：生成压缩消息（引导语），不自动续接，等待用户继续发送消息才工作。
-            "compress_behavior": "wait",
-            "load_result": load_result
-        }
-
-        guide_message = (result.get("guide_message") or "").strip()
-        if guide_message:
-            # 只把引导语作为 user 消息追加进历史，不触发请求。
-            try:
-                terminal.context_manager.add_conversation(
-                    role="user",
-                    content=guide_message,
-                    metadata={"message_source": "compression_handoff"},
-                )
-                response_payload["auto_task_started"] = False
-                response_payload["guide_inserted"] = True
-                # 引导语已写入历史，前端依据响应 guide_inserted 刷新历史即可看到。
-            except Exception as exc:
-                debug_log(f"[Compression] 追加引导语消息失败: {exc}")
-                response_payload["auto_task_started"] = False
-                response_payload["guide_inserted"] = False
-                response_payload["guide_insert_error"] = str(exc)
-        else:
-            response_payload["auto_task_started"] = False
-
-        return jsonify(response_payload)
+        if not terminal.context_manager._get_conversation_manager_for_id(normalized_id).load_conversation(normalized_id):
+            return jsonify({"success": False, "error": tr("deep_compression.conversation_not_found", conversation_id=normalized_id)}), 404
+        token = try_acquire_main_task_gate(terminal)
+        if not token:
+            return jsonify({"success": False, "error": tr("tasks.task_already_running")}), 409
+        try:
+            rec = runtime_service.create_task(RuntimeContext.from_terminal(
+                terminal, workspace, username,
+                TaskParams(conversation_id=normalized_id, task_type="compression"),
+                InternalDirectives(main_task_gate_token=token),
+            ))
+        except RuntimeError as exc:
+            release_main_task_gate(terminal, token)
+            return jsonify({"success": False, "error": str(exc)}), 409
+        except Exception:
+            release_main_task_gate(terminal, token)
+            raise
+        return jsonify({"success": True, "data": task_public_payload(rec)}), 202
 
     except Exception as e:
         logger.error(f"[API] 压缩对话错误: {e}")
@@ -1833,19 +1803,15 @@ def get_conversation_compression_status(conversation_id, terminal: WebTerminal, 
 def cancel_conversation_compression(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     try:
         normalized_id = conversation_id if conversation_id.startswith('conv_') else f"conv_{conversation_id}"
-        ok = terminal.context_manager._get_conversation_manager_for_id(
-            normalized_id).update_conversation_metadata(
-            normalized_id, {
-                "compression_in_progress": False,
-                "compression_mode": None,
-                "compression_stage": None,
-                "compression_resume_payload": None,
-                "compression_error": tr("conversation.compression_cancelled_error"),
-            }
-        )
-        if not ok:
+        from server.runtime import runtime_service
+        runs = runtime_service.list_runs(username, workspace.workspace_id,
+                                         conversation_id=normalized_id, status="active")
+        manager = terminal.context_manager._get_conversation_manager_for_id(normalized_id)
+        metadata = (manager.load_conversation(normalized_id) or {}).get("metadata") or {}
+        if not runs or (runs[0].get("task_type") != "compression" and not metadata.get("compression_in_progress")):
             return jsonify({"success": False, "error": tr("conversation.not_found_or_cancel_failed")}), 404
-        return jsonify({"success": True, "conversation_id": normalized_id})
+        ok = runtime_service.cancel_task(username, runs[0]["task_id"])
+        return jsonify({"success": ok, "conversation_id": normalized_id}), (200 if ok else 404)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

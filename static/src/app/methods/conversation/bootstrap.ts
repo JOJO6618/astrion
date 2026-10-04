@@ -122,6 +122,11 @@ export const bootstrapMethods = {
     // QuickDock 内清空）全部执行完，否则回填数据会被 watcher 覆盖。
     // setTimeout(0) 走宏任务，比 $nextTick 的 microtask 更保险。
     await new Promise((resolve) => setTimeout(resolve, 0));
+    this.runtimeQueuePaused = !!data.runtime_queue?.paused;
+    this.applyRuntimeQueuedMessages(data.runtime_queue?.messages || []);
+    this.handleCompressionState(
+      data.compression || { conversation_id: normalizedId, in_progress: false }
+    );
     useQuickDockStore().setEditedFiles(Array.isArray(data.edited_files) ? data.edited_files : []);
     // 预览窗口：回填本对话预览目标（同一时机，避免被 watcher 清空覆盖）
     // + 预览运行时（独立预览服务器 base/token，跨站隔离 iframe 用）

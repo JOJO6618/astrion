@@ -12,8 +12,9 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from server.runtime import (  # noqa: E402
     InternalDirectives,
@@ -117,6 +118,10 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
         self._orig_run = task_manager._run_chat_task
         task_manager._run_chat_task = lambda *a, **k: None  # 线程即刻结束
         self._created = []
+        for name in ("initialize_queue", "load_queue", "save_queue"):
+            mocked = patch(f"server.tasks.models.{name}")
+            mocked.start()
+            self.addCleanup(mocked.stop)
 
     def tearDown(self):
         task_manager._run_chat_task = self._orig_run
@@ -138,16 +143,17 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
         self.assertEqual(rec.principal.username, "tester")
         self.assertEqual(rec.directives.main_task_gate_token, "tok123")
 
-    def test_t02_same_conversation_chat_mutex_and_notice_exempt(self):
+    def test_t02_same_conversation_all_writer_tasks_mutex(self):
         # 第一个任务保持 running（线程 no-op 但 status 已被置 running）
         rec1 = self._create()
         self.assertEqual(rec1.status, "running")
         # 同对话第二个 chat 被拒
         with self.assertRaises(RuntimeError):
             self._create()
-        # notice 类型豁免互斥
-        rec2 = self._create(task_type="notice")
-        self.assertEqual(rec2.task_type, "notice")
+        # 通知和压缩也不能与已有主任务并发写入。
+        for task_type in ("notice", "compression"):
+            with self.assertRaises(RuntimeError):
+                self._create(task_type=task_type)
         # 不同对话不受影响
         rec3 = self._create(conversation_id="conv_other")
         self.assertTrue(rec3.task_id)

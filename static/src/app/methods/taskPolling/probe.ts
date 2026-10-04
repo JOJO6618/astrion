@@ -81,6 +81,13 @@ export const probeMethods = {
         !!status.main_task_id &&
         taskStore.currentTaskId === status.main_task_id &&
         taskStore.isPolling;
+      if (status.is_main_running && status.main_task_type === 'compression') {
+        this.handleCompressionState({
+          conversation_id: conversationId,
+          in_progress: true,
+          mode: 'manual'
+        });
+      }
       if (status.is_main_running && status.main_task_id && !alreadyTrackingMain) {
         debugNotifyLog('[DEBUG_NOTIFY][ui] reconcile:resume-main-task', {
           taskId: status.main_task_id,

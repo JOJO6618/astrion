@@ -152,10 +152,14 @@
 
 ## 3) 测试现状（不要再写过时命令）
 
-- 当前仓库内可见自动化冒烟：`test/test_server_refactor_smoke.py`（`unittest`）
-  - 运行方式：`python -m pytest test/test_server_refactor_smoke.py -q`
+- **测试分类（2026-10-04 用户要求）**：每次新增测试都在 `test/` 下新建 `日期_功能/` 目录，日期用 `YYYY-MM-DD`，例如 `test/2026-10-04_对话压缩/`；禁止把测试文件直接放在 `test/` 根目录或项目根目录。同日同功能的独立测试批次用 `_02`、`_03` 后缀，不能覆盖已有目录。配套辅助文件放在对应测试目录内。
+- **历史测试**：无法确认日期的已有测试集中放在 `test/历史测试_日期不明/`，不按文件修改时间猜测日期。移动时必须修正相对路径、辅助文件引用和运行命令。
+- **执行方式**：pytest 可以按分类目录收集；unittest 使用具体分类目录作为 `discover` 起点，不能依赖 `discover('test')` 自动递归这些非包目录。本次压缩回归：`python3 -m unittest discover -s test/2026-10-04_对话压缩 -p 'test_*.py'`。
+
+- 当前仓库内可见自动化冒烟：`test/历史测试_日期不明/test_server_refactor_smoke.py`（`unittest`）
+  - 运行方式：`python -m pytest test/历史测试_日期不明/test_server_refactor_smoke.py -q`
   - 注意（2026-08-01 实测）：`python -m unittest test.test_server_refactor_smoke` 在标准 Windows Python 上失败——stdlib 自带常规包 `test` 遮蔽本地 `test/` 目录（无 `__init__.py` 的命名空间包优先级更低），报 `No module named 'test.test_server_refactor_smoke'`。无 pytest 时可用：
-    `python -c "import sys; sys.path.insert(0, '.'); import unittest; suite = unittest.TestLoader().discover('test', pattern='test_server_refactor_smoke.py'); r = unittest.TextTestRunner().run(suite); sys.exit(0 if r.wasSuccessful() else 1)"`
+    `python -c "import sys; sys.path.insert(0, '.'); import unittest; suite = unittest.TestLoader().discover('test/历史测试_日期不明', pattern='test_server_refactor_smoke.py'); r = unittest.TextTestRunner().run(suite); sys.exit(0 if r.wasSuccessful() else 1)"`
 - `test_system_message.py` 依赖外部 `MOONSHOT_API_KEY` 与网络，不属于离线稳定 CI 用例。
 - 当前仓库未发现 `pytest.ini`/`pyproject.toml`/`tox.ini`；不要默认要求 `pytest` 作为唯一入口（仅作为冒烟测试的便捷运行器）。
 - CLI 当前最小可复现验证：
@@ -163,7 +167,7 @@
   - 无头冒烟：`testRender` 抓帧脚本（写完即用即删，参考 cli-redesign-demo 的验证模式； gateway 指向 127.0.0.1:9 不碰真实服务）
 - 若改动 `server/chat/`、`server/status/`、`server/tasks/` 等后端接口适配，补充：
   - `python3 -m py_compile server/chat/*.py server/status/*.py server/tasks/*.py`
-  - `python -m pytest test/test_server_refactor_smoke.py -q`
+  - `python -m pytest test/历史测试_日期不明/test_server_refactor_smoke.py -q`
 
 ## 4) 代码修改约定（实用版）
 
@@ -604,7 +608,7 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   1. `write_file`/`edit_file` 的 `.html`/`.htm` 文件（挂钩 `tools_execution._record_edited_file`）
   2. 模型流式输出的 localhost/127.0.0.1/[::1] 链接（`chat_flow_stream_loop` 滚动缓冲 120 字符增量扫描，防 URL 跨 chunk 断裂；每次回复内去重）
   - **run_command/terminal_input/terminal_snapshot 输出检测已删除**（2026-09-29 用户拍板）：实测命令输出是脏数据主来源（浏览器控制台 `@ url:行号` 后缀、代码模板 `f"http://127.0.0.1:{port}/"` 假地址），且放行条件「输出非空」几乎恒真形同虚设；服务器地址改由 prompt（`prompts/preview_panel.txt`）要求模型在回复中主动写出完整 URL
-- **URL 识别规则**（2026-09-29 重写，修复 Markdown/中文粘连）：路径为 ASCII 白名单字符集（`* ' " ( ) [ ] :` 与非 ASCII 一概不粘）；裸主机（无端口无路径）不记录；favicon.ico 等静态资源噪音不记录；尾部 `/` 归一后去重。`_normalize` 对存量条目按新规则自愈清洗（脏 URL 截回干净形态重新去重、无效条目剔除、label 统一重算），所有读取出口（preview.py / conversation.py / conversation_bootstrap.py）均走 `_normalize`，老对话读出自愈无需迁移。测试：`test/test_preview_targets.py`。
+- **URL 识别规则**（2026-09-29 重写，修复 Markdown/中文粘连）：路径为 ASCII 白名单字符集（`* ' " ( ) [ ] :` 与非 ASCII 一概不粘）；裸主机（无端口无路径）不记录；favicon.ico 等静态资源噪音不记录；尾部 `/` 归一后去重。`_normalize` 对存量条目按新规则自愈清洗（脏 URL 截回干净形态重新去重、无效条目剔除、label 统一重算），所有读取出口（preview.py / conversation.py / conversation_bootstrap.py）均走 `_normalize`，老对话读出自愈无需迁移。测试：`test/历史测试_日期不明/test_preview_targets.py`。
 - **聊天消息裸 URL 渲染截断**（2026-09-29）：remark-gfm autolink-literal 按 GFM 规范只修剪尾随 ASCII 标点，中文/全角符号/Markdown 残余会被整段粘进链接；`useMarkdownRenderer.ts` 的 `cleanAutolinkLiteralsPlugin`（rehype 层）把 autolink 生成的 <a> 在第一个「URL 不可能字符」处截断（Markdown 定界符 + 全角/CJK 标点 + 弯引号），显示文字不变只修链接范围；刻意保留 CJK 表意文字（维基百科类合法 URL）。
 - **0.0.0.0 归一化**：`0.0.0.0` 是监听地址不是访问地址（Chrome 已禁访问），扫描时统一映射为 127.0.0.1 再记录。
 - **存储**：对话 `metadata.preview_targets`（按对话隔离，跟随压缩/重启）；服务器按**完整 URL** 去重——同 origin 不同 path 保留多条（用户拍板：根地址与具体页面是独立预览目标），同 URL 重复命中不写不广播（防流式刷屏）；label 格式 `:端口[/路径] · 框架`（同端口多条靠路径区分）。
@@ -655,15 +659,16 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
 - 获取/认领：`acquire_or_claim_main_task_gate(terminal_id, owner_desc)`——门闸空闲或持有者是同一任务时返回 token，否则返回 None。
 - 释放：`release_main_task_gate(terminal_id, token)`，token 不匹配则拒绝（防止错误释放他人门闸）。
 
-### 12.3 唯一入口与 token 移交
+### 12.3 门闸入口与 token 移交
 
-- **唯一入口**：`process_message_task`（`server/chat_flow.py`）是所有主任务的门闸入口——进入即获取/认领门闸，拿不到则向用户发 error 并返回，绝不强行执行；`finally` 中释放。
+- **聊天入口**：`process_message_task`（`server/chat_flow.py`）进入即获取/认领门闸，拿不到则返回，`finally` 中释放。手动压缩由 `server/tasks/compression.py` 获取/认领同一个门闸，复用 TaskRecord 与任务取消。
+- **压缩运行语义（2026-10）**：手动压缩是 `task_type="compression"` 的主任务，自动压缩属于原主任务；两者均算智能体运行，输入保持可用，发送走提前输入/引导，停止精确取消当前任务。`server/compression_commit.py` 仅标记摘要快照中的历史前缀，历史标记/压缩记录/手动引导语/上下文统计一次原子提交；生成失败或提交前取消保留旧历史。`server/tasks/queue_state.py` 把未消费提前输入和引导存入对话 metadata，停止/失败只暂停自动消费，未消费引导连同附件回到可见队列；通知池不清空。
 - **通知链移交**：完成通知轮询器在派发前先预占门闸（`server/chat_flow_task_main.py`），token 经 `session_data["main_task_gate_token"]` 移交 `_run_chat_task` → `run_chat_task_sync` → `process_message_task`（持 token 认领，不重复获取）；派发失败时释放门闸并回滚已打的通知标记（`_rollback_completion_notice_marks`）。
 - **兜底释放**：`_run_chat_task`（`server/tasks/models.py`）外层 `finally` 兜底释放，防止异常路径门闸泄漏。
 
 ### 12.4 改代码注意事项（硬性）
 
-1. **新增任何主任务入口必须走门闸**：不要绕过 `process_message_task` 直接驱动一轮模型对话；多智能体 idle 派发（task_type="notice"）目前依赖 `_multi_agent_main_task_active` 标志，后续应统一纳管。
+1. **新增任何主任务入口必须走门闸**：聊天通过 `process_message_task`，手动压缩通过 `run_compression_task` 获取/认领相同的对话级门闸；chat/notice/compression 的受理检查也统一按对话互斥。
 2. **不要在 return 分支手写 `_tool_loop_active` 恢复**：`execute_tool_calls`（`server/chat_flow_tool_loop.py`）已改为守护包装（try/finally 复位，内层 `_execute_tool_calls_impl`），新增提前返回路径无需也不应手动操作该标志——并发交错「存旧值→置True→恢复旧值」正是此前标志卡死的原因。
 3. **不要依赖 build_messages 防御层掩盖并发问题**：`core/main_terminal_parts/context/messages.py` 的孤儿 tool 消息剥离只是「坏数据不再 400」的止血层，乱序段本身意味着历史已被污染；发现剥离 warning 日志应按事故排查，而不是视为正常。
 
@@ -713,7 +718,7 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 1. `core/tool_loading.py` 的 `DEFERRABLE_REGISTRY` 注册（类目 label + when_to_use 文案 + 工具名）；默认延迟集=注册表全集，无需另配。
 2. 确认后端 formatter（`tool_result_formatter`）与前端 renderer（`toolRenderers.ts`）已覆盖该工具。
 3. 个人空间勾选 UI 自动出现（注册表经 `/api/personalization` 的 `tool_loading_registry` 下发，类目标签 i18n key `personalization.toolLoadingCat.<key>` 需双语补齐）。
-4. 跑 `test/test_tool_loading.py`（注册表完整性断言会校验数量与结构）。
+4. 跑 `test/历史测试_日期不明/test_tool_loading.py`（注册表完整性断言会校验数量与结构）。
 
 ---
 

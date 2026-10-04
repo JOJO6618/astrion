@@ -2744,32 +2744,8 @@ async def handle_task_with_sender(
     except Exception as exc:
         debug_log(f"[RuntimeMode] task 结束时清理 pending runtime mode 失败: {exc}")
 
+    # 未消费引导由 TaskManager 收尾时连同附件返回持久队列，不能取出后丢弃。
     pending_runtime_guidance_messages: List[str] = []
-    try:
-        from .tasks import task_manager
-
-        raw_items = task_manager.consume_runtime_guidance_for_injection(
-            username=username,
-            task_id=client_sid,
-        )
-        # 权限/执行环境/网络权限变更通知在任务完成时不应该触发新一轮工作，
-        # 只保留真正的引导消息（压缩续接等），丢弃变更通知。
-        runtime_skip_sources = {"权限变更", "执行环境变更", "网络权限变更", "notify", "permission_change", "execution_change", "network_change"}
-        for item in (raw_items or []):
-            if isinstance(item, dict):
-                src = str(item.get("source") or "").strip().lower()
-                text = str(item.get("text") or "").strip()
-                if src in runtime_skip_sources:
-                    continue
-                if text:
-                    pending_runtime_guidance_messages.append(text)
-            else:
-                text = str(item or "").strip()
-                if text:
-                    pending_runtime_guidance_messages.append(text)
-    except Exception as exc:
-        debug_log(f"[RuntimeGuidance] 读取剩余引导消息失败: {exc}")
-        pending_runtime_guidance_messages = []
 
     # 发送完成事件（如果有后台完成任务在运行，前端会保持等待状态）
     if not has_running_completion_jobs:

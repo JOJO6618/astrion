@@ -412,6 +412,15 @@ export const lifecycleMethods = {
     // 该标记应该在恢复完所有历史事件后才清除
   },
   handleTaskComplete(data: any) {
+    if (data?.task_type === 'compression' || this.compressionActiveForCurrentConversation) {
+      this.handleCompressionState({
+        conversation_id: this.currentConversationId,
+        in_progress: false
+      });
+    }
+    this.runtimeQueuePaused = !!data?.preserve_pending_messages;
+    if (Array.isArray(data?.runtime_queued_messages))
+      this.applyRuntimeQueuedMessages(data.runtime_queued_messages);
     const pendingToolsBefore =
       typeof this.hasPendingToolActions === 'function' ? this.hasPendingToolActions() : null;
     const pendingRuntimeGuidance = Array.isArray(data?.pending_runtime_guidance_messages)
@@ -556,6 +565,13 @@ export const lifecycleMethods = {
     });
   },
   handleTaskStopped(data: any, eventIdx: number) {
+    this.runtimeQueuePaused = true;
+    if (Array.isArray(data?.runtime_queued_messages))
+      this.applyRuntimeQueuedMessages(data.runtime_queued_messages);
+    this.handleCompressionState({
+      conversation_id: this.currentConversationId,
+      in_progress: false
+    });
     goalModeDebugLog('handleTaskStopped:entered', { eventIdx, data });
     jsonDebug('handleTaskStopped:before', {
       eventIdx,
@@ -639,6 +655,14 @@ export const lifecycleMethods = {
     }
   },
   handleTaskError(data: any) {
+    if (data?.preserve_pending_messages) {
+      this.runtimeQueuePaused = true;
+      this.applyRuntimeQueuedMessages(data.runtime_queued_messages || []);
+      this.handleCompressionState({
+        conversation_id: this.currentConversationId,
+        in_progress: false
+      });
+    }
     jsonDebug('handleTaskError:incoming', {
       data,
       taskInProgress: this.taskInProgress,

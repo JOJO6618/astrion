@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 
 import sys
 # 测试脚本在 test/ 目录下，需要把项目根目录加入路径
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 # 把子智能体运行态数据重定向到临时目录，避免写入受保护的 ~/.agents 路径
 _test_tmp = Path(tempfile.mkdtemp(prefix="sub_agent_cfg_"))

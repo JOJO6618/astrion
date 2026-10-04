@@ -31,24 +31,7 @@ export const runtimeQueueMethods = {
     }
   },
   markRuntimeQueueSuppressedByManualStop() {
-    this.ensureRuntimeQueueSuppressionState();
-    const queueList = Array.isArray(this.runtimeQueuedMessages) ? this.runtimeQueuedMessages : [];
-    queueList.forEach((item) => {
-      const id = String(item?.id || '').trim();
-      if (id) {
-        this.runtimeQueueSuppressedMessageIds.add(id);
-      }
-    });
-
-    const fallbackList = Array.isArray(this.runtimeGuidanceFallbackQueue)
-      ? this.runtimeGuidanceFallbackQueue
-      : [];
-    fallbackList.forEach((item) => {
-      const text = String(item || '').trim();
-      if (!text) return;
-      const counts = this.runtimeGuidanceSuppressedTextCounts;
-      counts[text] = Number(counts[text] || 0) + 1;
-    });
+    this.runtimeQueuePaused = true;
   },
   consumeSuppressedRuntimeGuidanceText(rawText) {
     this.ensureRuntimeQueueSuppressionState();
@@ -111,7 +94,6 @@ export const runtimeQueueMethods = {
       : [];
     const previousById = new Map(previousList.map((item) => [item?.id, item]));
     const previousIndexById = new Map(previousList.map((item, index) => [item?.id, index]));
-    const limit = Math.max(1, Number(this.runtimeQueueLimit || 5));
     const normalizedRaw = (Array.isArray(messages) ? messages : [])
       .map((item) => {
         if (!item) return null;
@@ -129,7 +111,7 @@ export const runtimeQueueMethods = {
           id,
           text,
           createdAt: Number.isFinite(rawCreatedAt) ? rawCreatedAt : Date.now(),
-          source: previous?.source || 'user',
+          source: item.source || previous?.source || 'user',
           files: rawFiles.filter((path) => typeof path === 'string' && path).slice(0, 9)
         };
       })
@@ -143,25 +125,23 @@ export const runtimeQueueMethods = {
       dedupById.set(item.id, item);
     });
 
-    const normalized = Array.from(dedupById.values())
-      .sort((a, b) => {
-        const at = Number(a?.createdAt || 0);
-        const bt = Number(b?.createdAt || 0);
-        if (at !== bt) {
-          return at - bt;
-        }
-        const ai = previousIndexById.has(a?.id)
-          ? Number(previousIndexById.get(a?.id))
-          : Number.MAX_SAFE_INTEGER;
-        const bi = previousIndexById.has(b?.id)
-          ? Number(previousIndexById.get(b?.id))
-          : Number.MAX_SAFE_INTEGER;
-        if (ai !== bi) {
-          return ai - bi;
-        }
-        return String(a?.id || '').localeCompare(String(b?.id || ''));
-      })
-      .slice(0, limit);
+    const normalized = Array.from(dedupById.values()).sort((a, b) => {
+      const at = Number(a?.createdAt || 0);
+      const bt = Number(b?.createdAt || 0);
+      if (at !== bt) {
+        return at - bt;
+      }
+      const ai = previousIndexById.has(a?.id)
+        ? Number(previousIndexById.get(a?.id))
+        : Number.MAX_SAFE_INTEGER;
+      const bi = previousIndexById.has(b?.id)
+        ? Number(previousIndexById.get(b?.id))
+        : Number.MAX_SAFE_INTEGER;
+      if (ai !== bi) {
+        return ai - bi;
+      }
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    });
 
     const unchanged =
       previousList.length === normalized.length &&
@@ -235,20 +215,12 @@ export const runtimeQueueMethods = {
       const { useTaskStore } = await import('../../../stores/task');
       const taskStore = useTaskStore();
       const taskId = taskStore.currentTaskId;
-      if (!taskId) {
-        const nextQueue = (this.runtimeQueuedMessages || []).filter(
-          (item) => item?.id !== targetId
-        );
-        this.runtimeQueuedMessages = nextQueue;
-        this.setRuntimeQueueSyncLock(nextQueue, 1200);
-        return;
-      }
-      const response = await fetch(
-        `/api/tasks/${encodeURIComponent(taskId)}/runtime_queue/${encodeURIComponent(targetId)}`,
-        {
-          method: 'DELETE'
-        }
-      );
+      const deleteUrl = taskId
+        ? `/api/tasks/${encodeURIComponent(taskId)}/runtime_queue/${encodeURIComponent(targetId)}`
+        : `/api/conversations/${encodeURIComponent(this.currentConversationId)}/runtime_queue/${encodeURIComponent(targetId)}`;
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE'
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || t('appMessages.deleteFailed'));
@@ -272,6 +244,7 @@ export const runtimeQueueMethods = {
       const sent = !!(await this.sendMessage({
         presetText: String(item.text || '').trim(),
         source: 'runtime_queue_manual_guide',
+        queuedMessageId: item.id,
         files: Array.isArray(item?.files) ? [...item.files] : []
       }));
       if (!sent) {
@@ -335,7 +308,7 @@ export const runtimeQueueMethods = {
     }
   },
   async tryAutoSendRuntimeQueuedMessages(reason = 'unspecified') {
-    if (this.runtimeQueueAutoSendInProgress) {
+    if (this.runtimeQueueAutoSendInProgress || this.runtimeQueuePaused) {
       return false;
     }
     if (
@@ -405,6 +378,7 @@ export const runtimeQueueMethods = {
       sent = !!(await this.sendMessage({
         presetText: nextText,
         source,
+        queuedMessageId: runtimeQueueMessageId,
         files: nextFiles
       }));
     } catch {

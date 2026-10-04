@@ -18,6 +18,7 @@ from server.auth_helpers import api_login_required, get_current_username
 from server.context import get_user_resources
 from server.tasks import task_manager
 from server.tasks.models import task_public_payload
+from server.tasks.queue_state import queue_snapshot
 from server.utils_common import debug_log
 from modules.i18n import tr
 
@@ -269,6 +270,10 @@ def bootstrap_conversation(conversation_id: str):
         },
         "messages": messages,
         "running": running,
+        "runtime_queue": queue_snapshot(cm, normalized_id, include_guidance=not is_main_running),
+        "compression": {"in_progress": is_main_running and bool(raw_meta.get("compression_in_progress")),
+                        "mode": raw_meta.get("compression_mode"),
+                        "conversation_id": normalized_id},
         "edited_files": edited_files,
         "preview_targets": preview_targets,
         "preview_base": preview_runtime["preview_base"],

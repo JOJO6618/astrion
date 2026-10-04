@@ -7,7 +7,7 @@
 - 事件流按 idx/offset 协议可读；任务可取消；门闸最终释放；
 - 模型调用允许失败（外部依赖非验收对象）——装配与生命周期必须真实。
 
-隔离设计：真实检查体在 test/runtime_standalone_checks.py，由本文件以
+隔离设计：真实检查体在 test/历史测试_日期不明/runtime_standalone_checks.py，由本文件以
 **子进程**方式执行。原因：config/paths.py 的 DATA_DIR / DEPLOY_CONFIG_DIR
 是 import 时固化的模块级常量；unittest discover 全量运行时排在前面的测试
 模块会先 import config 使常量固化，进程内设环境变量已无效，被测代码会落到
@@ -21,7 +21,7 @@ import unittest
 from pathlib import Path
 
 _CHECKS_SCRIPT = Path(__file__).resolve().parent / "runtime_standalone_checks.py"
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _run_check(mode: str) -> str:

@@ -7,14 +7,6 @@ import { extractSkillRefsFromMessage } from './shared';
 
 export const sendMethods = {
   async handleSendOrStop() {
-    if (this.compressionActiveForCurrentConversation) {
-      this.uiPushToast({
-        title: t('appMessages.autoCompressingTitle'),
-        message: t('appMessages.autoCompressingBlockSend'),
-        type: 'warning'
-      });
-      return;
-    }
     const hasText = !!((this.inputMessage || '').trim().length > 0);
     const hasMedia =
       (Array.isArray(this.selectedImages) && this.selectedImages.length > 0) ||
@@ -122,12 +114,10 @@ export const sendMethods = {
     }
 
     if (this.compressionActiveForCurrentConversation) {
-      this.uiPushToast({
-        title: t('appMessages.autoCompressingTitle'),
-        message: t('appMessages.compressionBlocksSend'),
-        type: 'warning'
-      });
-      return false;
+      return this.enqueueRuntimeQueuedMessage(
+        usePresetText ? presetText : this.inputMessage,
+        options?.files || this.selectedFiles || []
+      );
     }
     if (this.streamingUi && !usePresetText) {
       return false;
@@ -462,6 +452,7 @@ export const sendMethods = {
         run_mode: this.runMode,
         thinking_mode: this.thinkingMode,
         message_source: localMessageSource,
+        queued_message_id: options?.queuedMessageId || undefined,
         goal_mode: startingGoalMode,
         skill_refs: skillRefs,
         files,
@@ -530,19 +521,10 @@ export const sendMethods = {
       return;
     }
     this._stopTaskRunning = true;
-    if (this.compressionActiveForCurrentConversation) {
-      this._stopTaskRunning = false;
-      this.uiPushToast({
-        title: t('appMessages.autoCompressingTitle'),
-        message: t('appMessages.autoCompressingBlockStop'),
-        type: 'warning'
-      });
-      return;
-    }
 
-    // 停止按钮现在只停主智能体，与后台任务无关。
-    // canStop 判断只看主智能体是否在 streaming。多次点击被 stopRequested 抖动拦截。
-    const canStop = this.streamingUi && !this.stopRequested;
+    // 压缩属于主智能体活动，停止精确取消当前任务。
+    const canStop =
+      (this.streamingUi || this.compressionActiveForCurrentConversation) && !this.stopRequested;
 
     goalModeDebugLog('stopTask:entry', {
       composerBusy: this.composerBusy,

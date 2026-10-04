@@ -4,6 +4,7 @@ import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
 export const syncMethods = {
   handleRuntimeQueueSync(data: any) {
+    if (data?.paused) this.runtimeQueuePaused = true;
     const messages = Array.isArray(data?.messages) ? data.messages : [];
     const buildSnapshotKey =
       typeof this.buildRuntimeQueueSnapshotKey === 'function'

@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { debugLog } from '../common';
 import { t } from '@/locales';
 
 export const chatMethods = {
@@ -24,10 +23,11 @@ export const chatMethods = {
       return;
     }
 
-    if (this.compressing) {
+    if (this.compressionActiveForCurrentConversation || !this.mainChatIdle) {
       return;
     }
-
+    const conversationId = this.currentConversationId;
+    let accepted = false;
     this.compressing = true;
     this.compressionInProgress = true;
     this.compressionConversationId = this.currentConversationId;
@@ -47,42 +47,25 @@ export const chatMethods = {
     });
 
     try {
-      const response = await fetch(`/api/conversations/${this.currentConversationId}/compress`, {
+      const response = await fetch(`/api/conversations/${conversationId}/compress`, {
         method: 'POST'
       });
 
       const result = await response.json();
 
-      if (response.ok && result.success) {
-        this.compressionStage = 'switching';
-        const newId = result.compressed_conversation_id;
-        const isInPlace = newId && newId === this.currentConversationId;
-        // in-place 压缩：对话 id 不变，不重新加载（避免 resetAllStates
-        // 重置滚动状态 + fetchAndDisplayHistory 清空重渲染导致闪烁和锁死）。
-        if (newId && !isInPlace) {
-          await this.loadConversation(newId, { force: true });
+      if (response.ok && result.success && result.data?.task_id) {
+        accepted = true;
+        const { useTaskStore } = await import('../../../stores/task');
+        if (this.currentConversationId === conversationId) {
+          this.taskInProgress = true;
+          this.stopRequested = false;
+          this.clearProcessedEvents();
+          useTaskStore().resumeTask(result.data.task_id, {
+            status: 'running',
+            eventHandler: (event: any) => this.handleTaskEvent(event)
+          });
         }
-        const guideMessage = (result.guide_message || '').trim();
-        // 手动压缩只有一种行为：后端已把引导语作为 user 消息追加进历史，
-        // 这里刷新展示即可，不触发新一轮请求（等待用户继续发送消息才工作）。
-        if (newId && !isInPlace) {
-          await this.loadConversation(newId, { force: true });
-        } else if (isInPlace) {
-          await this.loadConversation(this.currentConversationId, { force: true });
-        }
-        void guideMessage;
-
-        if (!isInPlace) {
-          await this.loadConversationsList();
-        }
-
-        debugLog('对话压缩完成:', result);
-        this.uiPushToast({
-          title: t('appMessages.compressionCompletedTitle'),
-          message: t('appMessages.compressionCompletedMessage'),
-          type: 'success',
-          duration: 2200
-        });
+        await this.refreshRunningWorkspaceTasks?.();
       } else {
         const message = result.message || result.error || t('appMessages.compressionFailed');
         this.compressionError = message;
@@ -101,15 +84,11 @@ export const chatMethods = {
         type: 'error'
       });
     } finally {
-      if (this.compressionToastId) {
-        this.uiDismissToast(this.compressionToastId);
-        this.compressionToastId = null;
-      }
       this.compressing = false;
-      this.compressionInProgress = false;
-      this.compressionConversationId = null;
-      this.compressionMode = '';
-      this.compressionStage = '';
+      // 受理成功后由任务事件结束压缩状态；切换对话不接管原对话。
+      if (!accepted && this.currentConversationId === conversationId) {
+        this.handleCompressionState({ conversation_id: conversationId, in_progress: false });
+      }
     }
   },
   async sendAutoUserMessage(text) {

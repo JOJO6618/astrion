@@ -1,10 +1,10 @@
 """工具动态加载（core.tool_loading + personalization 字段）单元测试。
 
 设计文档：docs/dynamic_tool_loading_plan.md
-运行：.venv/bin/python -m pytest test/test_tool_loading.py -q
+运行：.venv/bin/python -m pytest test/历史测试_日期不明/test_tool_loading.py -q
 无 pytest 时：
   .venv/bin/python -c "import sys; sys.path.insert(0, '.'); import unittest; \\
-    s = unittest.TestLoader().discover('test', pattern='test_tool_loading.py'); \\
+    s = unittest.TestLoader().discover('test/历史测试_日期不明', pattern='test_tool_loading.py'); \\
     r = unittest.TextTestRunner().run(s); sys.exit(0 if r.wasSuccessful() else 1)"
 """
 
@@ -14,7 +14,7 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core import tool_loading as tl  # noqa: E402
 

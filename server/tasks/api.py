@@ -181,6 +181,7 @@ def create_task_api():
                 run_mode=run_mode,
                 max_iterations=max_iterations,
                 message_source=message_source,
+                queued_message_id=str(payload.get("queued_message_id") or "").strip() or None,
                 goal_mode=goal_mode,
                 skill_context_messages=skill_context_messages,
             ),
@@ -248,11 +249,13 @@ def get_task_api(task_id: str):
             "conversation_id": rec.conversation_id,
             "error": rec.error,
             "message_source": rec.task_params.message_source,
+            "task_type": rec.task_type,
             "goal_mode": bool(rec.task_params.goal_mode),
             "goal_progress": rec.goal_progress,
             "events": events,
             "next_offset": next_offset,
             "window_start": window_start,
+            "runtime_queue_paused": rec.runtime_queue_paused,
             "runtime_queued_messages": runtime_service.get_runtime_pending_messages(
                 username, task_id
             ),

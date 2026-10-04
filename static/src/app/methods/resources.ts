@@ -227,7 +227,11 @@ export const resourceMethods = {
     // 对话的压缩状态。空对话/显式新建路由（/new）上没有打开对话，status 里的
     // 压缩标记属于残留的旧对话上下文，应用会把输入锁错误地带到 /new 页。
     const compression = status?.conversation?.compression;
-    if (hasConversation && !onExplicitNewRoute) {
+    if (
+      hasConversation &&
+      !onExplicitNewRoute &&
+      status?.conversation?.current_id === this.currentConversationId
+    ) {
       if (compression && typeof compression === 'object') {
         this.compressionInProgress = !!compression.in_progress;
         this.compressionMode = compression.mode || '';

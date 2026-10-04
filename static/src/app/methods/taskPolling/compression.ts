@@ -5,15 +5,13 @@ import { t } from '@/locales';
 
 export const compressionMethods = {
   handleCompressionState(data: any) {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || data.conversation_id !== this.currentConversationId) {
       return;
     }
     const wasInProgress = !!this.compressionInProgress;
     this.compressionInProgress = !!data.in_progress;
-    // 记录压缩所属对话：压缩锁只作用于该对话，不影响其他对话与 /new 新建页
-    this.compressionConversationId = this.compressionInProgress
-      ? data.conversation_id || this.currentConversationId || null
-      : null;
+    // 归属必须来自事件，禁止把其他对话的状态绑到当前页面。
+    this.compressionConversationId = this.compressionInProgress ? data.conversation_id : null;
     this.compressionMode = data.mode || '';
     this.compressionStage = data.stage || '';
     if (this.compressionInProgress && !wasInProgress) {
@@ -55,6 +53,7 @@ export const compressionMethods = {
     });
   },
   async handleCompressionFinished(data: any) {
+    if (data?.conversation_id !== this.currentConversationId) return;
     if (this.compressionToastId) {
       this.uiDismissToast(this.compressionToastId);
       this.compressionToastId = null;
@@ -64,21 +63,10 @@ export const compressionMethods = {
     this.compressionMode = '';
     this.compressionStage = '';
     this.compressionError = '';
-    const newId = data?.conversation_id;
-    const isInPlace = newId && newId === this.currentConversationId;
-    if (newId && !isInPlace) {
-      // 旧行为兼容：压缩产生了新对话 id（非 in-place），需要切换并重新加载。
-      await this.loadConversation(newId, { force: true });
-      this.conversationsOffset = 0;
-      if (typeof this.loadConversationsList === 'function') {
-        await this.loadConversationsList();
-      }
-      await this.refreshRunningWorkspaceTasks?.();
-      await this.restoreTaskState?.();
+    // 手动压缩引导语已提交，只刷新消息，不重置任务/草稿、不切换对话。
+    if (data?.mode === 'manual') {
+      void this.fetchAndDisplayHistory({ force: true });
     }
-    // in-place 压缩：对话 id 不变，不重新加载对话，也不触发 restoreTaskState。
-    // loadConversation 会 clearTask 停止轮询才需要 restore；in-place 跳过了
-    // loadConversation，轮询仍在运行，restoreTaskState 的 rebuild 反而会
     this.uiPushToast({
       title: t('appTasks.compressionComplete'),
       message: t('appTasks.compressedEarlierContent'),
@@ -196,6 +184,20 @@ export const compressionMethods = {
         return;
       }
 
+      if (runningTask?.task_type === 'compression') {
+        this.handleCompressionState({
+          conversation_id: this.currentConversationId,
+          in_progress: true,
+          mode: 'manual'
+        });
+        this.taskInProgress = true;
+        taskStore.resumeTask(runningTask.task_id, {
+          status: 'running',
+          resetOffset: false,
+          eventHandler: (event: any) => this.handleTaskEvent(event)
+        });
+        return;
+      }
       debugLog('[TaskPolling] 发现运行中的任务，开始恢复状态', {
         taskId: runningTask?.task_id,
         status: runningTask?.status,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from copy import deepcopy
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from modules.external_session import new_external_session_id
 from modules.i18n import tr
+from server.compression_commit import check_compression_cancelled, commit_compression
 
 def _load_summary_prompt(web_terminal) -> str:
     """从 prompts/deep_compression_summary.txt 加载压缩总结提示词。"""
@@ -62,7 +64,7 @@ def _clear_compression_state_on_error(func):
     async def wrapper(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             try:
                 web_terminal = kwargs.get("web_terminal")
                 conversation_id = kwargs.get("conversation_id")
@@ -86,6 +88,11 @@ def _clear_compression_state_on_error(func):
                         })
             except Exception:
                 pass
+            _emit(kwargs.get("sender"), "compression_state", {
+                "conversation_id": kwargs.get("conversation_id"),
+                "in_progress": False,
+                "mode": kwargs.get("mode"),
+            })
             raise
     return wrapper
 
@@ -372,18 +379,25 @@ async def _generate_summary(web_terminal, prompt: str, retries: int = 5) -> Tupl
     # 模型即便返回 tool_calls 也会被忽略——我们只取 content；prompt 已要求其直接输出总结。
     tools = web_terminal.define_tools()
     for _ in range(max(1, retries)):
+        check_compression_cancelled()
         try:
             # 统一走流式（Codex 通道仅支持流式；常规通道同样适用）
             response_parts: list = []
-            async for chunk in web_terminal.api_client.chat(messages, tools=tools, stream=True):
-                if not isinstance(chunk, dict) or chunk.get("error"):
-                    continue
-                choices = chunk.get("choices") or []
-                if choices:
-                    delta = choices[0].get("delta") or {}
-                    piece = delta.get("content")
-                    if isinstance(piece, str) and piece:
-                        response_parts.append(piece)
+            stream = web_terminal.api_client.chat(messages, tools=tools, stream=True)
+            try:
+                async for chunk in stream:
+                    check_compression_cancelled()
+                    if not isinstance(chunk, dict) or chunk.get("error"):
+                        continue
+                    choices = chunk.get("choices") or []
+                    if choices:
+                        delta = choices[0].get("delta") or {}
+                        piece = delta.get("content")
+                        if isinstance(piece, str) and piece:
+                            response_parts.append(piece)
+            finally:
+                # Python 3.9 没有 contextlib.aclosing；取消或异常也必须关闭请求流。
+                await stream.aclose()
             response_text = "".join(response_parts)
             if response_text.strip():
                 return response_text.strip(), None
@@ -527,8 +541,8 @@ async def run_deep_compression(
 
     # 提前收集用户输入与运行时状态：总结提示词需要嵌入最新输入与压缩轮次，
     # compact 文件 / 注入引导语需要追加运行时状态区块。
-    messages = conv_data.get("messages") or []
-    user_inputs = _collect_user_texts(messages)
+    snapshot = deepcopy(cm.conversation_history or [])
+    user_inputs = _collect_user_texts(snapshot)
     latest_user_input = user_inputs[-1] if user_inputs else ""
     user_inputs_before = len(user_inputs)
     runtime_state_lines = _collect_runtime_state_lines(web_terminal, conversation_id)
@@ -540,7 +554,8 @@ async def run_deep_compression(
     )
     summary_text, summary_fail_reason = await _generate_summary(web_terminal, summary_prompt, retries=5)
     if summary_fail_reason:
-        _emit(sender, "system_message", {"content": tr("deep_compression.summary_failed_notice", reason=summary_fail_reason)})
+        raise RuntimeError(tr("deep_compression.summary_failed_notice", reason=summary_fail_reason))
+    check_compression_cancelled()
 
     cm.set_compression_state(
         in_progress=True,
@@ -574,32 +589,7 @@ async def run_deep_compression(
 
     # === in-place 压缩：不创建/切换新对话，只把当前对话历史前缀打上 deep_compacted 标记 ===
     now_iso = datetime.now().isoformat()
-    marked_count = _mark_history_compacted(
-        cm.conversation_history or [],
-        round_index=target_count,
-        now=now_iso,
-    )
-    # 标记后立即持久化历史（标记写在每条消息的 metadata 中）。
-    try:
-        cm.save_current_conversation()
-    except Exception as exc:
-        _emit(sender, "system_message", {"content": tr("deep_compression.marks_save_failed", error=exc)})
-
-    # 关键：重置 current_context_tokens，避免自动压缩续接后阈值判断仍读到压缩前的大值而陷入死循环。
-    # 真实上下文长度会在下一次 API 响应后被重新写入。
-    # 同时置位 cache_cold_start_pending：压缩重写了上下文前缀，缓存可能已失效；
-    # 下一次真实调用若未命中缓存，其输入会被计入冷启动豁免值（cache_exempt_input_tokens）。
-    try:
-        target_manager.update_token_statistics(
-            conversation_id,
-            input_tokens=0,
-            output_tokens=0,
-            total_tokens=0,
-            current_context_tokens=0,
-            cache_cold_start_pending=True,
-        )
-    except Exception as exc:
-        _emit(sender, "system_message", {"content": tr("deep_compression.stats_reset_failed", error=exc)})
+    # 历史标记、统计及引导语稍后一次提交；此处尚不改变历史。
 
     current_record = {
         "count": target_count,
@@ -673,15 +663,12 @@ async def run_deep_compression(
             meta_updates[_TL_META_KEY] = _tl_reset(_tl_state)
     except Exception:
         pass
-    target_manager.update_conversation_metadata(conversation_id, meta_updates)
-    # 同步内存中的 metadata，清除 frozen 缓存
-    try:
-        if getattr(cm, "current_conversation_id", None) == conversation_id and isinstance(cm.conversation_metadata, dict):
-            for frozen_key in REBUILD_FROZEN_KEYS:
-                cm.conversation_metadata.pop(frozen_key, None)
-            cm.conversation_metadata.update(meta_updates)
-    except Exception:
-        pass
+    meta_updates["compression_pid"] = None
+    marked_count = commit_compression(
+        cm, target_manager, conversation_id, snapshot, meta_updates,
+        round_index=target_count, now=now_iso,
+        guide_message=guide_message if mode == "manual" else "",
+    )
 
     _emit(sender, "compression_finished", {
         "source_conversation_id": conversation_id,
@@ -691,6 +678,8 @@ async def run_deep_compression(
         "marked_count": marked_count,
         "compress_form": compress_form,
         "compress_behavior": compress_behavior,
+        "mode": mode,
+        "guide_inserted": mode == "manual",
         "job_id": job_id,
     })
     return {

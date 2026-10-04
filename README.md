@@ -267,7 +267,7 @@ python3 -c "from werkzeug.security import generate_password_hash; print(generate
 - 提供商与设置页 API 契约：[docs/providers_api.md](docs/providers_api.md)
 
 ```bash
-python -m pytest test/test_server_refactor_smoke.py -q       # 后端冒烟
+python -m pytest test/历史测试_日期不明/test_server_refactor_smoke.py -q       # 后端冒烟
 cd cli && ./node_modules/.bin/tsc --noEmit                   # CLI 类型检查
 ```
 

@@ -88,6 +88,7 @@ export const useTaskStore = defineStore('task', {
         run_mode?: 'fast' | 'thinking' | null;
         thinking_mode?: boolean | null;
         message_source?: string | null;
+        queued_message_id?: string | null;
         goal_mode?: boolean | null;
         skill_refs?: Array<{ name?: string; path: string }> | null;
         files?: string[] | null;
@@ -112,6 +113,7 @@ export const useTaskStore = defineStore('task', {
             thinking_mode:
               typeof options.thinking_mode === 'boolean' ? options.thinking_mode : undefined,
             message_source: options.message_source ?? undefined,
+            queued_message_id: options.queued_message_id ?? undefined,
             goal_mode: options.goal_mode === true ? true : undefined,
             skill_refs: Array.isArray(options.skill_refs) ? options.skill_refs : undefined,
             files: Array.isArray(options.files) && options.files.length ? options.files : undefined
@@ -241,10 +243,9 @@ export const useTaskStore = defineStore('task', {
           ? data.runtime_queued_messages
           : [];
         const runtimeQueueSnapshotKey = JSON.stringify(
-          runtimeQueueMessages.map((item: any) => [
-            String(item?.id || ''),
-            String(item?.text || '')
-          ])
+          runtimeQueueMessages
+            .map((item: any) => [String(item?.id || ''), String(item?.text || '')])
+            .concat([[String(!!data?.runtime_queue_paused)]])
         );
         if (runtimeQueueSnapshotKey !== this.runtimeQueueSnapshotKey) {
           this.runtimeQueueSnapshotKey = runtimeQueueSnapshotKey;
@@ -254,6 +255,7 @@ export const useTaskStore = defineStore('task', {
               data: {
                 task_id: data?.task_id || this.currentTaskId,
                 conversation_id: data?.conversation_id || null,
+                paused: !!data?.runtime_queue_paused,
                 messages: runtimeQueueMessages
               }
             });
@@ -394,6 +396,9 @@ export const useTaskStore = defineStore('task', {
                 task_id: data.task_id || this.currentTaskId,
                 conversation_id: data.conversation_id || null,
                 synthetic: true,
+                task_type: data.task_type,
+                preserve_pending_messages: !!data.runtime_queue_paused,
+                runtime_queued_messages: runtimeQueueMessages,
                 has_running_sub_agents: false,
                 has_running_background_commands: false
               }

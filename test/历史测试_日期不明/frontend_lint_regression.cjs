@@ -1,4 +1,4 @@
-// Run: node test/frontend_lint_regression.cjs
+// Run: node test/历史测试_日期不明/frontend_lint_regression.cjs
 // Exercise actual SFC setup code with Vue reactivity; stub canvas and network boundaries.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,7 +8,7 @@ const ts = require('typescript');
 const vue = require('vue');
 const { parse, compileScript } = require('@vue/compiler-sfc');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '../..');
 const locales = { t: (key) => key, currentLocale: vue.ref('zh-CN') };
 const scopes = [];
 const timers = new Set();

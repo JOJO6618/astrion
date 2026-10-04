@@ -264,24 +264,15 @@ export const computed = {
     return !!this.policyUiBlocks.block_virtual_monitor;
   },
   compressionActiveForCurrentConversation() {
-    // 压缩锁按对话隔离：只有「正在查看的对话就是正在压缩的对话」时才锁；
-    // 其他对话与 /new 新建页（currentConversationId 为空）不受影响。
+    // 压缩活动按对话隔离，未知归属不影响当前页面。
     if (!this.compressionInProgress && !this.compressing) {
       return false;
     }
     const cid = this.compressionConversationId;
-    if (!cid) {
-      // 未记录来源（旧数据/异常路径兑底）：只锁有打开对话的页面，/new 不锁
-      return !!this.currentConversationId;
-    }
-    return cid === this.currentConversationId;
+    return !!cid && cid === this.currentConversationId;
   },
   displayLockEngaged() {
-    // 对话级并行后：运行中的任务不再硬锁输入栏——当前对话需要保持可输入以排队/停止，
-    // 其他对话需要保持可输入以并行运行。仅当前对话压缩期间保持锁定。
-    if (this.compressionActiveForCurrentConversation) {
-      return true;
-    }
+    // 主任务及压缩期间均允许输入、排队和停止。
     // 空态锁定：host 模式下尚未创建/选择工作区时，发送必然失败，输入栏整体锁定
     // （textarea/语音/发送均吃 inputLocked，引导用户先创建工作区）。
     if (this.versioningHostMode && !this.currentHostWorkspaceId) {
@@ -306,7 +297,11 @@ export const computed = {
     });
   },
   streamingUi() {
-    return this.streamingMessage || this.hasPendingToolActions();
+    return (
+      this.streamingMessage ||
+      this.hasPendingToolActions() ||
+      this.compressionActiveForCurrentConversation
+    );
   },
   composerBusy() {
     const monitorLock = this.monitorIsLocked && this.chatDisplayMode === 'monitor';
