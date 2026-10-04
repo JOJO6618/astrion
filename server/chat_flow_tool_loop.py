@@ -1827,6 +1827,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 conversation_id=conversation_id,
                 inline=True,
                 extra_metadata={"files": runtime_guidance_files} if runtime_guidance_files else None,
+                images=raw_item.get("images") if isinstance(raw_item, dict) else None,
+                videos=raw_item.get("videos") if isinstance(raw_item, dict) else None,
             )
             # 携带文件的引导：同步注入一条 hidden 文件路径通知，让模型感知文件位置
             if runtime_guidance_files:

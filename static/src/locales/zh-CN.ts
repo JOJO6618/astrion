@@ -28,8 +28,10 @@ import utils from './zh-CN/utils';
 import sandbox from './zh-CN/sandbox';
 import update from './zh-CN/update';
 import commandBlocking from './zh-CN/commandBlocking';
+import quickEntry from './zh-CN/quickEntry';
 
 export default {
+  quickEntry,
   common,
   personalization,
   settings,

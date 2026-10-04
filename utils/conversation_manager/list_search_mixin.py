@@ -48,7 +48,7 @@ class ConversationMetadata:
 class ListSearchMixin:
     """ConversationManager list search mixin 能力 mixin。"""
 
-    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None) -> Dict:
+    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None, quick_entry: Optional[bool] = None) -> Dict:
         """
         获取对话列表
 
@@ -76,19 +76,25 @@ class ListSearchMixin:
                         result.append((conv_id, meta))
                 return result
 
-            if non_empty:
-                # 过滤模式：全量加载后剔除空对话，再在过滤结果上分页，
-                # 保证 total / has_more 与"有内容对话"的真实数量一致。
-                index = self._ensure_index_covering(limit=10000, offset=0)
+            if non_empty or quick_entry is not None:
+                # 来源筛选必须覆盖全部文件，再在匹配结果上分页。
+                file_count = len(self._iter_conversation_files(sort_by_mtime=False))
+                index = self._ensure_index_covering(limit=file_count, offset=0)
                 sorted_conversations = sorted(
                     index.items(),
                     key=lambda x: x[1].get("updated_at") or "",
                     reverse=True
                 )
-                sorted_conversations = [
-                    item for item in sorted_conversations
-                    if (item[1].get("total_messages", 0) or 0) > 0
-                ]
+                if non_empty:
+                    sorted_conversations = [
+                        item for item in sorted_conversations
+                        if (item[1].get("total_messages", 0) or 0) > 0
+                    ]
+                if quick_entry is not None:
+                    sorted_conversations = [
+                        item for item in sorted_conversations
+                        if (item[1].get("quick_entry") is True) == quick_entry
+                    ]
                 if multi_agent_mode is not None:
                     sorted_conversations = _filter_by_multi_agent(sorted_conversations)
                 total = len(sorted_conversations)
@@ -131,7 +137,8 @@ class ListSearchMixin:
                     "total_messages": metadata.get("total_messages", 0),
                     "total_tools": metadata.get("total_tools", 0),
                     "status": metadata.get("status", "active"),
-                    "multi_agent_mode": bool(metadata.get("multi_agent_mode", False))
+                    "multi_agent_mode": bool(metadata.get("multi_agent_mode", False)),
+                    "quick_entry": metadata.get("quick_entry") is True,
                 })
 
             elapsed_ms = (time.perf_counter() - t0) * 1000

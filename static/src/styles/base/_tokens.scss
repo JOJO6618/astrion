@@ -353,3 +353,31 @@
   --diff-add-bg: rgba(22, 163, 74, 0.12);
   --diff-del-bg: rgba(220, 38, 38, 0.12);
 }
+
+// Quick entry uses its own approved silver palette, independent of app themes.
+:root {
+  --quick-metal-white: #fff;
+  --quick-metal-black: #000;
+  --quick-metal-0: #fdfdfe;
+  --quick-metal-1: #f3f4f6;
+  --quick-metal-2: #eceef1;
+  --quick-metal-3: #e0e3e8;
+  --quick-metal-4: #d9dce2;
+  --quick-metal-5: #c5c9d0;
+  --quick-metal-6: #646972;
+  --quick-metal-7: #292d35;
+  --quick-entry-text: var(--quick-metal-7);
+  --quick-entry-muted: var(--quick-metal-6);
+  --quick-entry-border: var(--quick-metal-5);
+  --quick-entry-surface: var(--quick-metal-2);
+  --quick-entry-soft: var(--quick-metal-1);
+  --quick-entry-hover: var(--quick-metal-3);
+  --quick-entry-avatar: var(--quick-metal-black);
+  --quick-entry-caret: #303743;
+  --quick-entry-button-ink: #303640;
+  --quick-entry-danger: #b53232;
+  --quick-entry-gradient: linear-gradient(172deg, var(--quick-metal-0) 0%, var(--quick-metal-1) 26%, var(--quick-metal-3) 55%, var(--quick-metal-2) 78%, var(--quick-metal-4) 100%);
+  --quick-entry-button: linear-gradient(145deg, #f6f7f9, #c9cdd5);
+  --quick-entry-shadow: 0 12px 26px rgba(38, 49, 75, .08), inset 0 1px 0 rgba(255, 255, 255, .79);
+  --quick-entry-button-shadow: inset 0 1px 0 rgba(255, 255, 255, .61), 0 2px 5px rgba(28, 38, 50, .1);
+}

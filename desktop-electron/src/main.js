@@ -12,23 +12,38 @@
 // virtua 首项不挂载、拖放被吞、上滚估值补偿可见抖动），统一 Chromium 后与
 // Windows（WebView2）/ Chrome web 同一引擎，测试矩阵塌缩。
 
-import { app } from 'electron';
+import { app, protocol } from 'electron';
 import { startBackendAndCreateWindow, shutdownBackend } from './lifecycle.js';
 import { installAppMenu } from './menu.js';
+import { startQuickEntry, quickEnabled, showQuickEntry } from './quick/controller.js';
+
+const quickDebug = process.argv.includes('--quick-debug');
+let desktopReady = false;
+if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
+protocol.registerSchemesAsPrivileged([{ scheme: 'astrion-quick', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 // 单实例锁：第二实例直接退出，焦点交给已运行窗口（Tauri 侧曾是待办项）
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // 已有实例：聚焦主窗口（由 lifecycle 提供）
-    import('./window.js').then((m) => m.focusMainWindow());
+    if (quickDebug) showQuickEntry();
+    else import('./window.js').then((m) => m.focusMainWindow());
+  });
+
+  app.on('activate', () => {
+    if (desktopReady && !quickDebug) void import('./window.js').then(module => module.focusMainWindow());
   });
 
   app.whenReady().then(async () => {
     installAppMenu();
     try {
-      await startBackendAndCreateWindow();
+      if (quickDebug) {
+        await startQuickEntry({ debug: true, port: process.env.ASTRION_API_PORT ? Number(process.env.ASTRION_API_PORT) : undefined, dataRoot: process.env.ASTRION_DATA_ROOT, workspacePath: process.env.ASTRION_QUICK_WORKSPACE || process.cwd() });
+      } else {
+        await startBackendAndCreateWindow();
+      }
+      desktopReady = true;
     } catch (err) {
       // 后端起不来属致命错误：写日志 + 落盘临时文件（GUI 进程无控制台可见性），退出
       console.error('[astrion-desktop] 启动失败:', err);
@@ -47,7 +62,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('window-all-closed', () => {
     // macOS 惯例是关窗不退 app，但本壳单窗口 + 内嵌后端，关窗即退出（对齐 Tauri 行为）
-    app.quit();
+    if (!quickDebug && !quickEnabled()) app.quit();
   });
 
   app.on('will-quit', () => {

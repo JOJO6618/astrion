@@ -19,7 +19,8 @@ import {
 } from './rundata.js';
 import { loadLoginShellPath } from './shell_env.js';
 import { createMigrationWindow } from './migration-window.js';
-import { createMainWindow, focusMainWindow, getMainView } from './window.js';
+import { setMainWindowBackend, focusMainWindow, getMainView } from './window.js';
+import { startQuickEntry, quickEnabled } from './quick/controller.js';
 
 export { shutdownBackend };
 
@@ -97,7 +98,11 @@ export async function startBackendAndCreateWindow() {
   });
 
   await waitBackendReady(port);
-  createMainWindow(port);
+  await startQuickEntry({ port, dataRoot: desktopDataRoot, getMainView, openMain: route => focusMainWindow(route) });
+  setMainWindowBackend(port);
+  // A configured quick-chat launch needs no hidden main WebContents. First
+  // launch (quick chat disabled) still opens the normal setup/main interface.
+  if (!quickEnabled()) focusMainWindow();
   backendReady = true;
 
   const migration = getMigrationProgress();

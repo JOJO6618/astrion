@@ -33,6 +33,7 @@ opencode_key_fix_output/
 .env
 node_modules/
 static/dist/
+desktop-electron/.cache/
 *.tsbuildinfo
 user_upload/
 skills/

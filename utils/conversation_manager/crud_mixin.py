@@ -242,6 +242,7 @@ class CrudMixin:
                     "total_tools": metadata.total_tools,
                     "status": metadata.status,
                     "multi_agent_mode": bool(conversation_data["metadata"].get("multi_agent_mode", False)),
+                    "quick_entry": conversation_data["metadata"].get("quick_entry") is True,
                     "custom_prompt_name": conversation_data["metadata"].get("custom_prompt_name"),
                     "personalization_name": conversation_data["metadata"].get("personalization_name"),
                 }

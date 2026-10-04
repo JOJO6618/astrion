@@ -8,6 +8,8 @@ import ModelsTab from './tabs/ModelsTab.vue';
 import ModelPrefTab from './tabs/ModelPrefTab.vue';
 import CodexTab from './tabs/CodexTab.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
+import QuickEntrySettings from './tabs/QuickEntrySettings.vue';
+import { isMacDesktopShell } from '@/utils/desktopPlatform';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ToolsTab from './tabs/ToolsTab.vue';
 import SearchTab from './tabs/SearchTab.vue';
@@ -76,6 +78,7 @@ const NAV_GROUPS: NavGroup[] = [
     titleKey: 'settings.groupSystem',
     items: [
       { id: 'general', labelKey: 'settings.navGeneral', icon: 'general' },
+      { id: 'quick-chat', labelKey: 'settings.navQuickChat', icon: 'quick-chat' },
       { id: 'workspace', labelKey: 'settings.navWorkspace', icon: 'workspace' },
       { id: 'search', labelKey: 'settings.navSearch', icon: 'search' },
       { id: 'tools', labelKey: 'settings.navTools', icon: 'tools' },
@@ -105,12 +108,16 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const isAdmin = computed(() => settingsStore.isAdmin);
+const quickChatSupported = isMacDesktopShell() && Boolean(window.astrionQuickSettings);
+const canShowSection = (section: SettingsSection) =>
+  (section !== 'quick-chat' || quickChatSupported) &&
+  (!SETTINGS_ADMIN_SECTIONS.has(section) || isAdmin.value);
 
 /** 过滤管理员项后的可见导航（整组为空时隐藏组标题） */
 const visibleNavGroups = computed(() =>
   NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !SETTINGS_ADMIN_SECTIONS.has(item.id) || isAdmin.value)
+    items: group.items.filter((item) => canShowSection(item.id))
   })).filter((group) => group.items.length > 0)
 );
 
@@ -128,6 +135,7 @@ const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string 
   'model-pref': { titleKey: 'settings.modelPrefTitle', descKey: 'settings.modelPrefDesc' },
   codex: { titleKey: 'settings.codexTitle', descKey: 'settings.codexDesc' },
   general: { titleKey: 'settings.generalTitle', descKey: 'settings.generalDesc' },
+  'quick-chat': { titleKey: 'settings.quickChatTitle', descKey: 'settings.quickChatDesc' },
   workspace: { titleKey: 'settings.workspaceTitle', descKey: 'settings.workspaceDesc' },
   search: { titleKey: 'settings.searchTitle', descKey: 'settings.searchDesc' },
   tools: { titleKey: 'settings.toolsTitle', descKey: 'settings.toolsDesc' },
@@ -146,6 +154,7 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   'model-pref': ModelPrefTab,
   codex: CodexTab,
   general: GeneralTab,
+  'quick-chat': QuickEntrySettings,
   workspace: WorkspaceTab,
   search: SearchTab,
   tools: ToolsTab,
@@ -188,7 +197,7 @@ onMounted(() => {
     if (!match) return;
     const target = match[1] as SettingsSection;
     const exists = NAV_GROUPS.some((group) => group.items.some((item) => item.id === target));
-    if (exists && (!SETTINGS_ADMIN_SECTIONS.has(target) || settingsStore.isAdmin)) {
+    if (exists && canShowSection(target)) {
       settingsStore.setActiveSection(target);
     }
   })();

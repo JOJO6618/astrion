@@ -37,6 +37,7 @@ export default defineConfig({
   build: {
     outDir: 'static/dist',
     emptyOutDir: false,
+    manifest: true,
     rollupOptions: {
       input: {
         main: entry,
@@ -47,6 +48,7 @@ export default defineConfig({
         adminApi: adminApiEntry,
         login: loginEntry,
         register: registerEntry,
+        quick: fileURLToPath(new URL('./static/src/quick.ts', import.meta.url)),
         chrome: chromeEntry
       },
       output: {

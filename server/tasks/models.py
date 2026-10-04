@@ -520,8 +520,12 @@ class TaskManager:
         message: str,
         max_queue_size: int = 5,
         source: Optional[str] = None,
+        images: Optional[List[Any]] = None,
+        videos: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
         text = str(message or "").strip()
+        if not text and (images or videos):
+            text = "请结合本次附带的图片或视频继续。"
         if not text:
             return {"success": False, "code": "empty_message", "error": tr("tasks.guidance_content_empty")}
         with self._lock:
@@ -541,8 +545,13 @@ class TaskManager:
                     "error": tr("tasks.guidance_queue_full_max", guidance_limit=int(max(1, max_queue_size))),
                 }
             normalized_source = str(source or "").strip().lower()
-            if normalized_source:
-                queue.append({"text": text, "source": normalized_source})
+            if normalized_source or images or videos:
+                item = {"text": text, "source": normalized_source or "guidance"}
+                if images:
+                    item["images"] = list(images)[:9]
+                if videos:
+                    item["videos"] = list(videos)[:9]
+                queue.append(item)
             else:
                 queue.append(text)
             rec.updated_at = time.time()
@@ -611,6 +620,9 @@ class TaskManager:
                         continue
                     src = str(item.get("source") or "").strip().lower()
                     entry = {"text": text, "source": src} if src else {"text": text}
+                    for media_key in ("images", "videos"):
+                        if isinstance(item.get(media_key), list):
+                            entry[media_key] = list(item[media_key])[:9]
                     raw_files = item.get("files")
                     if isinstance(raw_files, list) and raw_files:
                         entry["files"] = [

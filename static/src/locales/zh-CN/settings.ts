@@ -21,6 +21,7 @@ export default {
   navModelPref: '模型偏好',
   navCodex: 'Codex',
   navGeneral: '通用',
+  navQuickChat: '快捷对话',
   navWorkspace: '工作区',
   navSearch: '网络搜索',
   navTools: '工具',
@@ -43,6 +44,8 @@ export default {
   codexDesc: 'Codex 订阅登录、代理设置与用量额度管理。',
   generalTitle: '通用',
   generalDesc: '对话与应用的基础行为。',
+  quickChatTitle: '快捷对话',
+  quickChatDesc: '用快捷键随时唤起对话和截图。未单独设置的工作区与模型跟随全局默认值。',
   runDataTitle: '运行数据目录',
   runDataDesc:
     '设置桌面端保存对话、用户数据与运行配置的位置。切换后重启时会先迁移数据，并显示进度窗口。',

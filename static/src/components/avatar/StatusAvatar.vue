@@ -103,6 +103,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { eyeTrackingOffset } from '@/utils/avatarTracking';
 
 // mode: 'idle' | 'work' | 'think' | 'tool'
 const props = withDefaults(
@@ -110,6 +111,7 @@ const props = withDefaults(
     mode?: string;
     toolKeys?: string[];
     tracking?: boolean;
+    pointer?: { x: number; y: number };
     size?: number;
     hexBackground?: boolean;
   }>(),
@@ -383,7 +385,12 @@ function onMouseMove(e: MouseEvent) {
 function stopTracking() {
   if (trackRaf) cancelAnimationFrame(trackRaf);
   trackRaf = null;
-  if (faceRef.value) faceRef.value.style.transform = 'translate(0px, 0px)';
+  eyeOffsetX = 0;
+  eyeOffsetY = 0;
+  if (faceRef.value) {
+    faceRef.value.style.removeProperty('transform');
+    faceRef.value.setAttribute('transform', 'translate(0 0)');
+  }
 }
 function trackEyes() {
   const mode = internalMode.value || props.mode;
@@ -391,19 +398,20 @@ function trackEyes() {
     stopTracking();
     return;
   }
-  const rect = svgRef.value.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const dx = mouseX - centerX;
-  const dy = mouseY - centerY;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx);
-  const factor = Math.min(distance / 180, 1);
-  const targetX = Math.cos(angle) * 10 * factor;
-  const targetY = Math.sin(angle) * 10 * factor;
+  const matrix = svgRef.value.getScreenCTM();
+  if (!matrix) {
+    trackRaf = requestAnimationFrame(trackEyes);
+    return;
+  }
+  const center = new DOMPoint(100, 100).matrixTransform(matrix);
+  const point = props.pointer || { x: mouseX, y: mouseY };
+  const { x: targetX, y: targetY } = eyeTrackingOffset(point, center);
   eyeOffsetX += (targetX - eyeOffsetX) * 0.15;
   eyeOffsetY += (targetY - eyeOffsetY) * 0.15;
-  if (faceRef.value) faceRef.value.style.transform = `translate(${eyeOffsetX}px, ${eyeOffsetY}px)`;
+  if (faceRef.value) {
+    faceRef.value.style.removeProperty('transform');
+    faceRef.value.setAttribute('transform', `translate(${eyeOffsetX} ${eyeOffsetY})`);
+  }
   trackRaf = requestAnimationFrame(trackEyes);
 }
 
@@ -566,11 +574,16 @@ function applyState() {
   }
 }
 
-// toolKeys 按内容 join 后再监听：avatarStatus computed 每次重算都产出新数组引用，
-// 若直接监听数组，流式期间（intent 打字、状态刷新）applyState 会被高频触发，
-// face 切换动画反复重启，表现为图标无规律抖动
+// Use separate watch sources so Vue compares each actual value. A getter
+// returning a fresh array treats identical tool keys as a state change and
+// restarts tracking on every parent render (including mouse-position updates).
 watch(
-  () => [props.mode, (props.toolKeys || []).join('\u001f'), props.tracking, internalMode.value],
+  [
+    () => props.mode,
+    () => (props.toolKeys || []).join('\u001f'),
+    () => props.tracking,
+    () => internalMode.value
+  ],
   () => applyState()
 );
 
@@ -620,8 +633,8 @@ onBeforeUnmount(() => {
 
 .sa-face {
   transform-origin: 100px 100px;
-  transition: transform 0.08s linear;
 }
+// Tracking already interpolates once per frame in SVG coordinates.
 .sa-fc {
   transform-origin: 100px 100px;
   pointer-events: none;

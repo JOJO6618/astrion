@@ -17,6 +17,7 @@ const ICON_FILES: Record<string, string> = {
   'model-pref': 'brain-cog',
   codex: 'codex',
   general: 'settings',
+  'quick-chat': 'zap',
   workspace: 'folder-git-2',
   search: 'globe',
   tools: 'wrench',

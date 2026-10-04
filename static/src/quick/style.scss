@@ -1,0 +1,121 @@
+@use '../styles/base/tokens';
+@use './markdown';
+
+html, body { margin: 0; background: transparent; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+button, textarea { font: inherit; color: var(--text-primary); }
+button { border: 0; cursor: pointer; background: transparent; }
+button:focus-visible { outline: 2px solid var(--quick-entry-caret); outline-offset: 2px; }
+.quick-window {
+  --text-primary: var(--quick-entry-text);
+  --text-secondary: var(--quick-entry-muted);
+  --text-tertiary: var(--quick-entry-muted);
+  --surface-base: var(--quick-entry-surface);
+  --surface-soft: var(--quick-entry-soft);
+  --surface-card: var(--quick-entry-soft);
+  --surface-muted: var(--quick-entry-hover);
+  --surface-raised: var(--quick-entry-soft);
+  --border-default: var(--quick-entry-border);
+  --border-strong: var(--quick-entry-border);
+  --hover-bg: var(--quick-entry-hover);
+  --accent: var(--quick-entry-caret);
+  --state-danger: var(--quick-entry-danger);
+  --quick-surface: var(--quick-entry-surface);
+  --quick-menu-surface: var(--quick-entry-soft);
+  --chat-surface-color: var(--quick-surface);
+  --quick-ease: cubic-bezier(.25,.8,.25,1);
+  position: absolute; bottom: 14px; left: 14px; right: 14px;
+  font-size: 13px; line-height: 1.5; color: var(--text-primary);
+  opacity: 0; pointer-events: none; transform: scale(.9); transform-origin: center bottom;
+}
+.quick-window.is-open { opacity: 1; pointer-events: auto; animation: quick-open 360ms cubic-bezier(.25,.8,.25,1) both; }
+.quick-window.is-closing { pointer-events: none; animation: quick-close 160ms ease-in both; }
+@keyframes quick-open { 0% { opacity: 0; transform: scale(.9); } 72% { opacity: 1; transform: scale(1.015); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes quick-close { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.94); } }
+.quick-window button { box-sizing: border-box; height: 28px; border-radius: 7px; white-space: nowrap; }
+.quick-window button:not(.send-button):not(.image-remove):hover { background: var(--hover-bg); }
+.composer { position: relative; z-index: 2; box-sizing: border-box; border: 1px solid var(--border-default); border-radius: 21px; padding: 0 14px 0 7px; min-height: 74px; background: var(--quick-entry-gradient); box-shadow: var(--quick-entry-shadow); }
+.input-row { display: flex; align-items: center; box-sizing: border-box; gap: 10px; min-height: 72px; padding: 12px 0; }
+.quick-window .status-avatar { flex: 0 0 48px; color: var(--quick-entry-avatar); transform: translateX(6px); }
+.quick-window .status-avatar .sa-frame { animation: none; }
+.quick-window .meta-button { display: flex; align-items: center; gap: 7px; padding: 0 10px; min-width: 0; font-size: 12px; }
+.meta-button > span:first-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-button .quick-icon { transition: transform 300ms var(--quick-ease); }
+.meta-button.active { background: var(--hover-bg); }
+.meta-button.active .quick-icon { transform: rotate(180deg); }
+.quick-window .conversation-button { flex: 0 1 110px; max-width: 128px; height: 32px; padding: 0 7px; gap: 5px; font-size: 14px; color: var(--text-secondary); }
+.quick-window .composer.has-draft .conversation-button { color: var(--text-primary); }
+.conversation-button > span:first-child { flex: 1; min-width: 0; text-align: left; }
+.conversation-button > span:first-child, .conversation-list .menu-copy { text-overflow: clip; mask-image: linear-gradient(to right, var(--quick-metal-black) 85%, transparent 100%); -webkit-mask-image: linear-gradient(to right, var(--quick-metal-black) 85%, transparent 100%); }
+.conversation-button .quick-icon { width: 14px; height: 14px; margin-left: auto; }
+.quick-window .send-button { display: grid; place-items: center; flex: 0 0 39px; width: 39px; height: 39px; padding: 0; border-radius: 12px; background: var(--quick-entry-button); color: var(--quick-entry-button-ink); box-shadow: var(--quick-entry-button-shadow); }
+.send-button:disabled { opacity: .45; cursor: default; }
+.send-arrow { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.stop-icon { width: 9px; height: 9px; background: currentColor; border-radius: 2px; }
+// The shell moves the complete, already-sized panel upward. Its bottom is
+// clipped behind the composer until the shell has exposed the new content.
+.run-shell { position: relative; width: 90%; margin: 0 auto; height: 0; overflow: hidden; transition: height 300ms var(--quick-ease); }
+.run-panel { position: absolute; top: 0; left: 0; right: 0; box-sizing: border-box; max-height: 300px; overflow: hidden; background: var(--quick-surface); border: 1px solid var(--border-default); border-bottom: 0; border-radius: 12px 12px 0 0; transition: opacity 300ms var(--quick-ease); }
+.run-shell:not(.visible) .run-panel { opacity: 0; }
+.run-scroll { height: 100%; overflow: hidden; }
+.run-scroll.has-scrollbar { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }
+.primary-row { position: relative; min-height: 34px; }
+.tool-copy { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 12px; height: 34px; box-sizing: border-box; font-size: 13px; line-height: 1.3; }
+.tool-copy > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.parallel-rows .tool-copy { border-top: 1px solid var(--border-default); }
+.reply-copy { padding: 10px; line-height: 24px; overflow-wrap: anywhere; }
+.summary-copy { box-sizing: border-box; height: 34px; padding: 6px 10px; overflow: hidden; }
+.quick-window .reply-summary { display: block; width: 100%; height: 22px; line-height: 22px; text-align: left; padding: 0; border-radius: 0; overflow: hidden; text-overflow: ellipsis; }
+.quick-window .reply-summary:hover { background: transparent; }
+.status-icon { width: 14px; height: 14px; flex: 0 0 14px; display: grid; place-items: center; }
+.status-icon .quick-icon { width: 14px; height: 14px; }
+.status-icon.spinner::before { content: ''; box-sizing: border-box; width: 13px; height: 13px; border: 1.5px solid var(--border-default); border-top-color: var(--text-primary); border-radius: 50%; animation: quick-spin 850ms linear infinite; }
+@keyframes quick-spin { to { transform: rotate(360deg); } }
+.collapse-zone { position: absolute; z-index: 3; right: 0; top: 0; width: 40px; height: 34px; display: grid; place-items: center; }
+.quick-window .collapse-button { position: relative; width: 28px; padding: 0; display: grid; place-items: center; opacity: 0; isolation: isolate; background: transparent; transition: opacity 160ms ease; }
+.collapse-button::before { content: ''; position: absolute; z-index: -1; inset: -4px; border-radius: 9px; background: var(--quick-surface); pointer-events: none; }
+.collapse-button .quick-icon { width: 15px; height: 15px; transition: transform 300ms var(--quick-ease); }
+.collapse-button.expanded .quick-icon { transform: rotate(180deg); }
+.collapse-zone:hover .collapse-button { opacity: 1; }
+.attachments { display: flex; flex: 0 1 auto; align-items: center; gap: 6px; max-width: 140px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.attachment { position: relative; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 8px; overflow: hidden; }
+.attachment img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.quick-window .image-remove { position: absolute; top: 2px; right: 2px; width: 12px; height: 12px; padding: 0; border: 0; border-radius: 50%; opacity: 0; pointer-events: none; background: var(--quick-entry-soft); color: var(--text-primary); display: grid; place-items: center; transition: opacity 150ms ease; }
+.image-remove .quick-icon { width: 7px; height: 7px; }
+.attachment:hover .image-remove, .attachment:focus-within .image-remove { opacity: 1; pointer-events: auto; }
+.setup-panel { position: relative; z-index: 1; margin-top: -24px; padding: 34px 18px 10px; background: var(--surface-soft); border: 1px solid var(--border-default); border-top: 0; border-radius: 0 0 24px 24px; }
+.setup-panel > strong { font-size: 12px; font-weight: 550; }
+.setup-panel > div { display: flex; align-items: center; justify-content: space-between; height: 39px; border-top: 1px solid var(--border-default); font-size: 11px; margin-top: 6px; }
+.popover { position: absolute; z-index: 8; box-sizing: border-box; width: min(285px, 100%); max-height: 280px; padding: 7px; overflow-y: auto; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--quick-menu-surface); box-shadow: var(--quick-entry-shadow); scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; transform-origin: center bottom; }
+.menu-title { display: flex; align-items: center; height: 26px; padding: 0 9px; color: var(--text-tertiary); font-size: 10px; }
+.quick-window .menu-item { display: flex; align-items: center; gap: 9px; text-align: left; width: 100%; height: 36px; padding: 0 9px; border-radius: 5px; font-size: 12px; }
+.popover.conversation-popover { max-height: 243px; overflow: hidden; }
+.conversation-list { max-height: calc(5 * 36px); overflow-y: auto; scrollbar-width: none; scroll-snap-type: y mandatory; }
+.conversation-list .menu-item { scroll-snap-align: start; }
+.quick-window .workspace-item { height: 43px; }
+.menu-item[aria-checked='true'] { background: var(--hover-bg); }
+.menu-copy { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-copy > span, .menu-copy small { display: block; overflow: hidden; text-overflow: ellipsis; }
+.menu-copy small { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+.menu-item .quick-icon { color: var(--text-secondary); }
+.menu-empty { display: block; padding: 8px 9px; font-size: 11px; color: var(--text-secondary); }
+.menu-separator { border-top: 1px solid var(--border-default); margin: 5px 2px; }
+.approval-panel { box-sizing: border-box; padding: 8px 12px; background: var(--quick-surface); max-height: 150px; overflow: auto; border-bottom: 1px solid var(--border-default); scrollbar-width: thin; }
+.approval-panel textarea { box-sizing: border-box; resize: none; width: 100%; height: 40px; background: var(--surface-soft); border: 1px solid var(--border-default); }
+.copy-enter-active, .copy-leave-active, .parallel-enter-active, .parallel-leave-active, .parallel-move { transition: opacity 300ms var(--quick-ease), transform 300ms var(--quick-ease); }
+.copy-leave-active { position: absolute; left: 0; right: 0; top: 0; }
+.copy-enter-from, .copy-leave-to { opacity: 0; }
+.parallel-rows > div { position: relative; }
+.parallel-enter-from, .parallel-leave-to { opacity: 0; }
+.parallel-leave-active { position: absolute; left: 0; width: 100%; }
+.menu-enter-active, .menu-leave-active { transition: opacity 300ms var(--quick-ease); }
+.menu-enter-from, .menu-leave-to { opacity: 0; }
+.menu-leave-active { pointer-events: none; }
+.setup-enter-active, .setup-leave-active { transition: opacity 300ms var(--quick-ease); }
+.setup-enter-from, .setup-leave-to { opacity: 0; }
+@media (max-width: 760px) {
+  .input-row { gap: 6px; }
+  .composer { padding-right: 10px; }
+  .attachments { max-width: 78px; }
+  .quick-window .conversation-button { flex-basis: 80px; font-size: 12px; padding: 0 4px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0ms; transition-duration: 0ms; } }

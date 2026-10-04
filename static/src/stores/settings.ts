@@ -20,6 +20,7 @@ export type SettingsSection =
   | 'codex'
   // 系统
   | 'general'
+  | 'quick-chat'
   | 'workspace'
   | 'search'
   | 'tools'

@@ -419,26 +419,27 @@ class ConversationMixin:
         except Exception as e:
             print(f"⌘ 自动保存异常: {e}")
 
-    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None) -> Dict:
+    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None, quick_entry: Optional[bool] = None) -> Dict:
         """获取对话列表。
 
         多智能体对话存储在独立目录，需要合并普通管理器和多智能体管理器的结果。
         """
+        filters = {} if quick_entry is None else {"quick_entry": quick_entry}
         # 多智能体模式只查多智能体管理器；常规模式只查普通管理器；None 时合并
         if multi_agent_mode is True:
             ma_manager = getattr(self, "multi_agent_conversation_manager", None)
             if ma_manager:
-                return ma_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode)
-            return self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode)
+                return ma_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode, **filters)
+            return self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode, **filters)
         if multi_agent_mode is False:
-            return self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode)
+            return self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode, **filters)
 
         # None：合并两个管理器的结果
-        regular = self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=False)
+        regular = self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=False, **filters)
         ma_manager = getattr(self, "multi_agent_conversation_manager", None)
         if not ma_manager:
             return regular
-        ma = ma_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=True)
+        ma = ma_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=True, **filters)
 
         merged_conversations = list(regular.get("conversations", [])) + list(ma.get("conversations", []))
         merged_conversations.sort(key=lambda x: x.get("updated_at") or "", reverse=True)

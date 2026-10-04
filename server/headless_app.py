@@ -167,7 +167,9 @@ def create_headless_app() -> Flask:
     from server.conversation import list_background_commands, list_sub_agents, list_conversation_versioning_checkpoints
     from server.workflow_page import api_list_workflows
     from server.chat.command_blocking import get_command_blocking, update_command_blocking
+    from server.api_v1 import list_models_api
 
+    app.add_url_rule('/api/v1/models', view_func=list_models_api, methods=['GET'])
     app.add_url_rule('/api/personalization', view_func=get_personalization_settings, methods=['GET'])
     app.add_url_rule('/api/personalization', view_func=update_personalization_settings, methods=['POST'])
     app.add_url_rule('/api/path-authorization', view_func=get_path_authorization, methods=['GET'])

@@ -16,7 +16,10 @@
 import { app, BaseWindow, shell, WebContentsView } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { quickEnabled } from './quick/controller.js';
 
+let appQuitting = false;
+app.on('before-quit', () => { appQuitting = true; });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** 顶部 chrome 标签条高度（CSS px）。前端 _tab-strip.scss 的 46px 与主页面
@@ -29,16 +32,32 @@ let mainWindow = null;
 let mainView = null;
 /** @type {WebContentsView | null} */
 let chromeView = null;
+let backendPort = null;
+let pendingMainRoute = null;
+
+export function setMainWindowBackend(port) {
+  backendPort = port;
+  if (pendingMainRoute !== null) {
+    const route = pendingMainRoute;
+    pendingMainRoute = null;
+    focusMainWindow(route);
+  }
+}
 
 export function getMainView() {
   return mainView;
 }
 
-export function focusMainWindow() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+export function focusMainWindow(route = '') {
+  const target = route === '/settings/quick-chat' ? route : '';
+  if (!backendPort) { pendingMainRoute = target; return; }
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(backendPort, target || '/');
+  else if (target && mainView && !mainView.webContents.isDestroyed()) {
+    void mainView.webContents.loadURL(`http://127.0.0.1:${backendPort}${target}`);
   }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 const isLoopbackHost = (host) => host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
@@ -90,8 +109,9 @@ function layoutViews() {
   });
 }
 
-export function createMainWindow(port) {
-  const url = `http://127.0.0.1:${port}/`;
+export function createMainWindow(port, route = '/') {
+  backendPort = port;
+  const url = `http://127.0.0.1:${port}${route}`;
   const chromeUrl = `http://127.0.0.1:${port}/chrome`;
 
   mainWindow = new BaseWindow({
@@ -150,11 +170,15 @@ export function createMainWindow(port) {
   mainWindow.on('leave-full-screen', layoutViews);
   mainWindow.on('maximize', layoutViews);
   mainWindow.on('unmaximize', layoutViews);
+  mainWindow.on('close', (event) => {
+    if (!appQuitting && quickEnabled()) { event.preventDefault(); mainWindow.hide(); }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
     mainView = null;
     chromeView = null;
+    if (!appQuitting && !quickEnabled()) app.quit();
   });
 
   return mainWindow;

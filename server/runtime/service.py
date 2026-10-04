@@ -118,11 +118,14 @@ class RuntimeService:
         return task_manager.cancel_task(username, task_id)
 
     def enqueue_runtime_guidance(
-        self, username: str, task_id: str, message: str, source: Optional[str] = None
+        self, username: str, task_id: str, message: str, source: Optional[str] = None,
+        images: Optional[List[Any]] = None, videos: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
         from server.tasks import task_manager
 
-        return task_manager.enqueue_runtime_guidance(username, task_id, message, source=source)
+        return task_manager.enqueue_runtime_guidance(
+            username, task_id, message, source=source, images=images, videos=videos
+        )
 
     def enqueue_runtime_pending_message(
         self, username: str, task_id: str, message: str, files: Optional[List[str]] = None
@@ -211,6 +214,7 @@ class RuntimeService:
         limit: int = 50,
         offset: int = 0,
         multi_agent_mode: Optional[bool] = None,
+        quick_entry: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """会话列表查询。principal 省略时按 username/workspace_id 构造最小身份快照。
 
@@ -221,7 +225,8 @@ class RuntimeService:
         cm = getattr(terminal, "context_manager", None)
         if cm is None:
             raise RuntimeError(tr("tasks.system_not_initialized"))
-        return cm.get_conversation_list(limit=limit, offset=offset, multi_agent_mode=multi_agent_mode)
+        filters = {} if quick_entry is None else {"quick_entry": quick_entry}
+        return cm.get_conversation_list(limit=limit, offset=offset, multi_agent_mode=multi_agent_mode, **filters)
 
     def get_session_history(
         self,
@@ -271,6 +276,10 @@ class RuntimeService:
         thinking_mode: Optional[bool] = None,
         model_key: Optional[str] = None,
         multi_agent_mode: bool = False,
+        work_mode: Optional[str] = None,
+        permission_mode: Optional[str] = None,
+        execution_mode: Optional[str] = None,
+        quick_entry: bool = False,
     ) -> Dict[str, Any]:
         """显式创建会话（session.create）。
 
@@ -292,8 +301,15 @@ class RuntimeService:
         resolved_thinking = (
             bool(resolved_thinking) if resolved_thinking is not None else (resolved_run_mode != "fast")
         )
-        # 工具动态加载快照（多智能体对话 v1 不启用；老对话无字段=不启用）
-        _meta_overrides: Dict[str, Any] = {"multi_agent_mode": True} if multi_agent_mode else {}
+        # 会话模式显式覆盖；未传时继承当前工作区 terminal，遵循创建对话的一致语义。
+        from server.runtime.session_modes import session_mode_overrides
+        _meta_overrides = session_mode_overrides(
+            terminal, principal, work_mode, permission_mode, execution_mode
+        )
+        if multi_agent_mode:
+            _meta_overrides["multi_agent_mode"] = True
+        if quick_entry is True:
+            _meta_overrides["quick_entry"] = True
         try:
             from core.tool_loading import snapshot_overrides_from_prefs
             from modules.personalization_manager import load_personalization_config as _load_tl_prefs

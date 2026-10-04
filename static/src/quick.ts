@@ -1,0 +1,10 @@
+import { createApp } from 'vue';
+import QuickEntry from './quick/QuickEntry.vue';
+import { installI18n } from './locales';
+import { installTheme } from './utils/theme';
+import 'katex/dist/katex.min.css';
+import './quick/style.scss';
+const app = createApp(QuickEntry);
+installI18n(app);
+installTheme();
+app.mount('#quick-app');

@@ -289,10 +289,13 @@ def enqueue_runtime_guidance_api(task_id: str):
     username = get_current_username()
     payload = request.get_json() or {}
     message = (payload.get("message") or "").strip()
-    if not message:
+    images, videos = _normalize_media_payload(payload.get("images") or [], payload.get("videos") or [])
+    if not message and not images and not videos:
         return jsonify({"success": False, "error": tr("tasks.guidance_content_empty")}), 400
 
-    result = runtime_service.enqueue_runtime_guidance(username, task_id, message)
+    result = runtime_service.enqueue_runtime_guidance(
+        username, task_id, message, images=images, videos=videos
+    )
     if not result.get("success"):
         code = result.get("code") or "runtime_guidance_failed"
         if code == "task_not_found":

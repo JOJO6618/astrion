@@ -1,0 +1,27 @@
+.quick-window .reply-copy {
+  p { margin: 0 0 10px; }
+  .md-html-chunk > :first-child { margin-top: 0; }
+  .md-html-chunk > :last-child { margin-bottom: 0; }
+  h1, h2, h3, h4 { line-height: 1.45; margin: 14px 0 8px; font-weight: 600; }
+  h1 { font-size: 19px; }
+  h2 { font-size: 17px; }
+  h3, h4 { font-size: 14px; }
+  a { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+  blockquote { margin: 10px 0; padding-left: 12px; border-left: 2px solid var(--border-strong); color: var(--text-secondary); }
+  hr { border: 0; border-top: 1px solid var(--border-default); margin: 12px 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  :not(pre) > code { padding: 1px 4px; background: var(--surface-muted); border-radius: 3px; }
+  img { max-width: 100%; height: auto; }
+  .md-table-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 10px 0; }
+  td, th { padding: 6px 8px; border: 1px solid var(--border-default); text-align: left; }
+  th { background: var(--surface-soft); font-weight: 550; }
+  .code-block-wrapper { border-top: 1px solid var(--border-default); border-bottom: 1px solid var(--border-default); margin: 10px 0; }
+  .code-block-header { display: flex; align-items: center; justify-content: space-between; height: 32px; border-bottom: 1px solid var(--border-default); }
+  .code-language { font-size: 11px; color: var(--text-secondary); }
+  .copy-code-btn { position: relative; width: 28px; padding: 0; color: var(--text-secondary); }
+  .copy-code-btn::before { content: ''; position: absolute; width: 13px; height: 13px; inset: 0; margin: auto; background: currentColor; mask: url('/static/icons/copy.svg') center / contain no-repeat; }
+  .copy-code-btn.copied::before { mask-image: url('/static/icons/check.svg'); }
+  pre { margin: 0; padding: 8px 0; overflow-x: auto; white-space: pre; scrollbar-width: thin; }
+  pre code { padding: 0; background: transparent; }
+}

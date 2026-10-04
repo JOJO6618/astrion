@@ -39,6 +39,8 @@ def list_runtime_sessions():
     offset = request.args.get("offset", 0, type=int)
     ma_param = request.args.get("multi_agent_mode", None)
     multi_agent_mode = None if ma_param is None else ma_param in ("1", "true", "True")
+    quick_param = request.args.get("quick_entry")
+    quick_entry = None if quick_param is None else quick_param in ("1", "true", "True")
     username = str(session.get("username") or "")
     principal = principal_from_session_snapshot(dict(session), workspace_id, username)
     try:
@@ -49,6 +51,7 @@ def list_runtime_sessions():
             limit=limit,
             offset=offset,
             multi_agent_mode=multi_agent_mode,
+            quick_entry=quick_entry,
         )
         return jsonify({"success": True, **(result or {})})
     except PermissionError as exc:
@@ -76,6 +79,10 @@ def create_runtime_session():
             thinking_mode=data.get("thinking_mode"),
             model_key=data.get("model_key"),
             multi_agent_mode=bool(data.get("multi_agent_mode")),
+            work_mode=data.get("work_mode"),
+            permission_mode=data.get("permission_mode"),
+            execution_mode=data.get("execution_mode"),
+            quick_entry=data.get("quick_entry") is True,
         )
         return jsonify({"success": True, **result})
     except PermissionError as exc:

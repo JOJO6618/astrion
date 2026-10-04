@@ -21,6 +21,7 @@ export default {
   navModelPref: 'Model Preferences',
   navCodex: 'Codex',
   navGeneral: 'General',
+  navQuickChat: 'Quick Chat',
   navWorkspace: 'Workspace',
   navSearch: 'Web Search',
   navTools: 'Tools',
@@ -45,6 +46,9 @@ export default {
   codexDesc: 'Codex subscription sign-in, proxy settings, and usage & credits management.',
   generalTitle: 'General',
   generalDesc: 'Basic behavior for conversations and the app.',
+  quickChatTitle: 'Quick Chat',
+  quickChatDesc:
+    'Summon a chat and capture screenshots with a shortcut. Unset workspace and model choices follow your global defaults.',
   runDataTitle: 'Runtime data directory',
   runDataDesc:
     'Choose where the desktop app stores conversations, user data, and runtime settings. After restart, data migration runs before the app opens and shows a progress window.',

@@ -19,6 +19,10 @@ files:
 extraResources:
   - from: ../desktop/src-tauri/runtime
     to: runtime
+  - from: .cache/quick-entry-listener
+    to: quick-entry-listener
+  - from: .cache/quick-entry-capture
+    to: quick-entry-capture
 
 mac:
   category: public.app-category.productivity

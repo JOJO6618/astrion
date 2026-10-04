@@ -78,6 +78,8 @@ def inject_runtime_user_message(
     inline: bool,
     extra_metadata: Optional[Dict[str, Any]] = None,
     persist: bool = True,
+    images: Optional[List[Any]] = None,
+    videos: Optional[List[Any]] = None,
 ) -> Optional[str]:
     """运行期/空闲期统一向对话插入一条 user 消息（带 [系统通知|{source}] 前缀）。
 
@@ -114,13 +116,23 @@ def inject_runtime_user_message(
             "started_at": datetime.now().isoformat(),
         }
 
+    saved_message = None
+    ctx_manager = getattr(web_terminal, "context_manager", None)
     if persist:
         try:
-            ctx_manager = getattr(web_terminal, "context_manager", None)
             if ctx_manager is not None:
-                ctx_manager.add_conversation("user", formatted, metadata=metadata)
+                saved_message = ctx_manager.add_conversation(
+                    "user", formatted, metadata=metadata, images=images, videos=videos
+                )
         except Exception:
-            pass
+            if images or videos:
+                raise
+    content = formatted
+    if ctx_manager is not None and (images or videos):
+        content = ctx_manager._build_content_with_images(
+            formatted, images or [], videos=videos or [],
+            media_refs=(saved_message or {}).get("media_refs") or [],
+        )
 
     if messages is not None:
         insert_index = len(messages)
@@ -136,7 +148,7 @@ def inject_runtime_user_message(
                     break
         messages.insert(insert_index, {
             "role": "user",
-            "content": formatted,
+            "content": content,
         })
 
     if callable(sender):
@@ -152,6 +164,8 @@ def inject_runtime_user_message(
             "metadata": metadata,
             "runtime_guidance": True,
             "runtime_guidance_original": raw,
+            "images": (saved_message or {}).get("images") or images or [],
+            "videos": (saved_message or {}).get("videos") or videos or [],
         }
         # 关键：不能把子智能体任务 id 透传为顶层 task_id——本事件由主任务 sender
         # 发出、走主任务事件流，若顶层 task_id 是子任务 id，sender 的 setdefault

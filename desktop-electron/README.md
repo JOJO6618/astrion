@@ -57,10 +57,16 @@ bash scripts/release_mac.sh [版本]   # 半一键发布（见脚本头注释）
 
 - 产物：`dist/Astrion-<ver>-arm64.dmg`（安装）+ `Astrion-<ver>-arm64-mac.zip`（自动更新包）
   + `latest-mac.yml`（electron-updater 清单）。
-- 签名：`electron-builder.yml` mac.identity = "Astrion Local Sign"（与 Tauri 壳同一本地证书；
-  electron-updater mac 要求应用签名且更新包身份匹配，minisign 私钥体系随之退役）。
+- 签名：`electron-builder.yml` 使用钥匙串中的 Apple Development 证书；
+  electron-updater mac 要求应用签名且更新包身份匹配，minisign 私钥体系随之退役。
 - 更新清单与安装包托管 `https://astrion.cyjai.com/downloads/`（与 Tauri 的
   latest-darwin-aarch64.json 并存，latest-mac.yml 文件名不冲突）。
+
+## 快捷对话
+
+在「设置 → 快捷对话」启用，并选择双击修饰键、默认工作区及图片模型。留空时跟随全局默认工作区和模型，每次唤起刷新配置。首次使用按系统提示授权输入监控和屏幕录制。
+
+启用后，启动应用保留后台服务和菜单栏，主窗口通过程序坞或菜单栏按需打开；关闭主窗口不退出。快捷页复用同一后端。当前必须先启动应用，不包含登录自启动。详情见 [QUICK_ENTRY.md](QUICK_ENTRY.md)。
 
 ## 与 Tauri 壳的差异备忘
 
