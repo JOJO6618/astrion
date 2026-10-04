@@ -102,8 +102,10 @@ interface PersonalForm {
   auto_generate_title: boolean;
   /** 标题生成模型（注册表模型 key）；留空 = 自动规则 */
   title_model: string;
-  /** 传统模式子智能体模型（注册表模型 key）；留空 = 自动规则；多智能体成员走角色设置 */
-  sub_agent_model: string;
+  /** 传统子智能体分档模型；空值表示未配置。 */
+  sub_agent_model_high: string;
+  sub_agent_model_medium: string;
+  sub_agent_model_low: string;
   recent_conversations_prompt_enabled: boolean;
   recent_conversations_prompt_limit: number | string;
   project_memory_inject_limit: number | string | null;
@@ -346,7 +348,9 @@ const defaultForm = (): PersonalForm => ({
   adult_content_restriction: 'medium',
   auto_generate_title: true,
   title_model: '',
-  sub_agent_model: '',
+  sub_agent_model_high: '',
+  sub_agent_model_medium: '',
+  sub_agent_model_low: '',
   recent_conversations_prompt_enabled: false,
   recent_conversations_prompt_limit: DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT,
   project_memory_inject_limit: DEFAULT_PROJECT_MEMORY_INJECT_LIMIT,
@@ -595,7 +599,12 @@ export const usePersonalizationStore = defineStore('personalization', {
             : 'medium',
         auto_generate_title: data.auto_generate_title !== false,
         title_model: typeof data.title_model === 'string' ? data.title_model : '',
-        sub_agent_model: typeof data.sub_agent_model === 'string' ? data.sub_agent_model : '',
+        sub_agent_model_high:
+          typeof data.sub_agent_model_high === 'string' ? data.sub_agent_model_high : '',
+        sub_agent_model_medium:
+          typeof data.sub_agent_model_medium === 'string' ? data.sub_agent_model_medium : '',
+        sub_agent_model_low:
+          typeof data.sub_agent_model_low === 'string' ? data.sub_agent_model_low : '',
         recent_conversations_prompt_enabled: !!data.recent_conversations_prompt_enabled,
         recent_conversations_prompt_limit: this.normalizeRecentConversationsPromptLimit(
           data.recent_conversations_prompt_limit

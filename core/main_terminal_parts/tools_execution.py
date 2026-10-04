@@ -2298,6 +2298,7 @@ class MainTerminalToolsExecutionMixin:
                         else:
                             # 读取子智能体最大轮次配置（None=默认50、0=无上限、N=N轮）
                             _max_turns = None
+                            _prefs = {}
                             try:
                                 from modules.personalization_manager import load_personalization_config
                                 _prefs = load_personalization_config(str(getattr(self, "data_dir", ""))) or {}
@@ -2306,26 +2307,29 @@ class MainTerminalToolsExecutionMixin:
                                     _max_turns = int(_raw_max_turns)
                             except Exception:
                                 pass
-                            # 传统模式子智能体模型：个人空间设置（留空 = None 走自动规则）；
-                            # 多智能体分支不走这里（角色自带 model_key）
-                            _sub_agent_model = None
+                            from modules.sub_agent.intelligence import resolve_intelligence_model
+                            _intelligence = arguments.get("intelligence")
                             try:
-                                _raw_model = str((_prefs or {}).get("sub_agent_model") or "").strip()
-                                _sub_agent_model = _raw_model or None
-                            except Exception:
-                                pass
-                            result = self.sub_agent_manager.create_sub_agent(
-                                agent_id=arguments.get("agent_id"),
-                                summary=arguments.get("summary", ""),
-                                task=arguments.get("task", ""),
-                                deliverables_dir=arguments.get("deliverables_dir", ""),
-                                run_in_background=arguments.get("run_in_background", False),
-                                timeout_seconds=arguments.get("timeout_seconds"),
-                                thinking_mode=arguments.get("thinking_mode"),
-                                conversation_id=self.context_manager.current_conversation_id,
-                                model_key=_sub_agent_model,
-                                max_turns=_max_turns,
-                            )
+                                _sub_agent_model = resolve_intelligence_model(
+                                    _intelligence, _prefs or {}, getattr(self.api_client, "model_key", None)
+                                )
+                            except (ValueError, RuntimeError) as exc:
+                                result = {"success": False, "error": str(exc)}
+                            else:
+                                result = self.sub_agent_manager.create_sub_agent(
+                                    agent_id=arguments.get("agent_id"),
+                                    summary=arguments.get("summary", ""),
+                                    task=arguments.get("task", ""),
+                                    deliverables_dir=arguments.get("deliverables_dir", ""),
+                                    run_in_background=arguments.get("run_in_background", False),
+                                    timeout_seconds=arguments.get("timeout_seconds"),
+                                    thinking_mode="thinking",
+                                    conversation_id=self.context_manager.current_conversation_id,
+                                    model_key=_sub_agent_model,
+                                    intelligence=_intelligence,
+                                    reasoning_effort=getattr(self.api_client, "reasoning_effort", None),
+                                    max_turns=_max_turns,
+                                )
 
                             # 如果不是后台运行，阻塞等待完成
                             if not arguments.get("run_in_background", False) and result.get("success"):

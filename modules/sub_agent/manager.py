@@ -233,6 +233,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         run_in_background: bool = False,
         model_key: Optional[str] = None,
         thinking_mode: Optional[str] = None,
+        intelligence: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
         multi_agent_mode: bool = False,
         role_id: Optional[str] = None,
         display_name: Optional[str] = None,
@@ -251,6 +253,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         if validation_error:
             return {"success": False, "error": validation_error}
 
+        if not multi_agent_mode:
+            thinking_mode = "thinking"
         if not thinking_mode:
             return {"success": False, "error": tr("sub_agent_mgr.missing_thinking_mode")}
         if thinking_mode not in {"fast", "thinking"}:
@@ -331,6 +335,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "deliverables_dir": str(deliverables_path),
             "timeout_seconds": timeout_seconds,
             "thinking_mode": thinking_mode,
+            **({"intelligence": intelligence, "reasoning_effort": reasoning_effort}
+               if not multi_agent_mode else {}),
             "created_at": time.time(),
             "updated_at": time.time(),
             "conversation_id": conversation_id,

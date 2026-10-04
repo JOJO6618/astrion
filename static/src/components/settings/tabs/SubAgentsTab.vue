@@ -42,8 +42,9 @@ const auxModelOptions = computed(() =>
   (subAgentModels.value || []).map((m: any) => ({ key: m.key, label: m.name || m.key }))
 );
 const defaultExtraOptions = computed(() => [
-  { key: '', label: t('personalization.defaultModelOption') }
+  { key: '', label: t('personalization.subAgentModelUnconfigured') }
 ]);
+const intelligenceLevels = ['high', 'medium', 'low'] as const;
 </script>
 
 <template>
@@ -55,17 +56,29 @@ const defaultExtraOptions = computed(() => [
       {{ $t('personalization.subAgentsIntro') }}
     </div>
 
-    <!-- 传统模式子智能体模型（多智能体成员走角色设置，不受此影响） -->
-    <div class="settings-select-row" style="margin-bottom: 16px">
+    <div class="settings-section-header">
+      <span class="settings-section-title">{{ $t('personalization.subAgentModelTitle') }}</span>
+    </div>
+    <p class="settings-section-desc">{{ $t('personalization.subAgentModelDesc') }}</p>
+    <div
+      v-for="level in intelligenceLevels"
+      :key="level"
+      class="settings-select-row"
+      style="margin-bottom: 16px; height: 64px"
+    >
       <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.subAgentModelTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.subAgentModelDesc') }}</span>
+        <span class="settings-row-title">{{
+          $t(`personalization.subAgentIntelligence.${level}`)
+        }}</span>
+        <span class="settings-row-desc">{{
+          $t(`personalization.subAgentIntelligenceDesc.${level}`)
+        }}</span>
       </span>
       <ModelSelectDropdown
-        :model-value="form.sub_agent_model"
+        :model-value="form[`sub_agent_model_${level}`]"
         :options="auxModelOptions"
         :extra-options="defaultExtraOptions"
-        @select="(v) => personalization.updateField({ key: 'sub_agent_model', value: v })"
+        @select="(v) => personalization.updateField({ key: `sub_agent_model_${level}`, value: v })"
       />
     </div>
 

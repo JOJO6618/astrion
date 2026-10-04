@@ -88,7 +88,7 @@ class SubAgentTask:
         self.task_message = task_message
         self.system_prompt = system_prompt
         self.model_key = model_key
-        self.thinking_mode = thinking_mode or "fast"
+        self.thinking_mode = (thinking_mode or "fast") if multi_agent_mode else "thinking"
         self.task_id = task_record["task_id"]
         self.agent_id = task_record["agent_id"]
         raw_timeout = task_record.get("timeout_seconds")
@@ -751,6 +751,8 @@ class SubAgentTask:
         client.model_key = chosen_key
         client.project_path = str(self.manager.project_path)
         client.apply_profile(profile)
+        if not self.multi_agent_mode:
+            client.reasoning_effort = self.task_record.get("reasoning_effort")
         # 外部会话标识（x-opencode-session）：随子对话生命周期稳定，压缩后重置
         client.extra_headers_resolver = self._resolve_external_session_headers
         return client, chosen_key

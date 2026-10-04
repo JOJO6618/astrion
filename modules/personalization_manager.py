@@ -116,7 +116,9 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "default_work_mode": "plan",  # 默认运行模式：plan / ask / execute
     "auto_generate_title": True,
     "title_model": "",  # 对话标题生成使用的注册表模型 key（空=自动规则）
-    "sub_agent_model": "",  # 传统模式子智能体使用的注册表模型 key（空=自动规则；多智能体成员走角色 model_key，不受此影响）
+    "sub_agent_model_high": "",
+    "sub_agent_model_medium": "",
+    "sub_agent_model_low": "",
     "external_session_header": True,  # 向 opencode.ai 端点发送 x-opencode-session 头（默认开启，opt-out）
     "recent_conversations_prompt_enabled": False,
     "recent_conversations_prompt_limit": RECENT_CONVERSATIONS_PROMPT_LIMIT_DEFAULT,
@@ -450,7 +452,12 @@ def sanitize_personalization_payload(
         base[key] = value if value in allowed else "medium"
     base["auto_generate_title"] = bool(data.get("auto_generate_title", base["auto_generate_title"]))
     base["title_model"] = str(data.get("title_model", base.get("title_model", "")) or "").strip()
-    base["sub_agent_model"] = str(data.get("sub_agent_model", base.get("sub_agent_model", "")) or "").strip()
+    for level in ("high", "medium", "low"):
+        key = f"sub_agent_model_{level}"
+        # 仅缺少新低档字段时迁移；显式清空低档不会复活旧值。
+        legacy = data.get("sub_agent_model", "") if level == "low" else ""
+        base[key] = str(data.get(key, base.get(key) or legacy) or "").strip()
+    base.pop("sub_agent_model", None)
     base["external_session_header"] = bool(
         data.get("external_session_header", base.get("external_session_header", True))
     )

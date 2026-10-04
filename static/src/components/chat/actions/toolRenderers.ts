@@ -1607,6 +1607,10 @@ function renderCreateSubAgent(result: any, args: any): string {
   } else if (agentId !== '') {
     html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
   }
+  const intelligence = args.intelligence;
+  if (!displayName && ['same', 'high', 'medium', 'low'].includes(intelligence)) {
+    html += `<div><strong>${escapeHtml(t('personalization.subAgentModelTitle'))}</strong>${escapeHtml(t(`personalization.subAgentIntelligence.${intelligence}`))}</div>`;
+  }
   if (taskId !== '' && !displayName) {
     html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
   }

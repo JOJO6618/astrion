@@ -462,9 +462,22 @@ export default {
   compressThresholdTitle: 'Context compression threshold',
   compressThresholdDesc:
     "Deep compression triggers when a sub-agent's context tokens exceed this value (default 250000)",
-  subAgentModelTitle: 'Traditional sub-agent model',
+  subAgentModelTitle: 'Traditional sub-agent intelligence',
   subAgentModelDesc:
-    'Model used by traditional background sub-agents; leave empty for automatic selection. Multi-agent team members use the model set on their role and are not affected by this setting',
+    'Configure tiers based on actual model capability; tiers may use the same model. Same as current agent needs no configuration and suits collaborative coding. Unconfigured tiers return an error; use same as current agent instead. All tiers use thinking mode and inherit the main agent’s reasoning effort at creation; unsupported effort follows existing protocol handling. Multi-agent roles are unaffected.',
+  subAgentModelUnconfigured: 'Not configured',
+  subAgentIntelligence: {
+    same: 'Same as current agent',
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low'
+  },
+  subAgentIntelligenceDesc: {
+    high: 'Choose a strong reasoning model for core architecture, complex diagnosis and technical trade-offs.',
+    medium:
+      'Balance capability and cost for module analysis, routine reviews and information synthesis.',
+    low: 'Choose a fast, inexpensive model for broad searches, batch reading and organizing sources.'
+  },
   maxTurnsTitle: 'Max execution turns',
   maxTurnsDesc:
     'Max execution turns for a single traditional background sub-agent task (one turn = one model call). Leave empty for the default of 50; 0 means unlimited (use with care — runaway tasks keep consuming API quota). Multi-agent team members are long-term collaborators and are not limited by this',
