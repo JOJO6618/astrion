@@ -4,6 +4,7 @@ pub mod config;
 mod diagnostics;
 pub mod gateway;
 pub mod keyboard;
+mod input;
 mod tray;
 mod window;
 
@@ -62,6 +63,7 @@ pub fn start(app:&AppHandle,port:u16,root:PathBuf)->Result<(),String> {
     app.manage(QuickState {config:Mutex::new(config),port,root,static_root:assets::static_root(app)?,
         ready:AtomicBool::new(false),visible:AtomicBool::new(false),quitting:AtomicBool::new(false),generation:AtomicU64::new(0),capturing:AtomicBool::new(false),
         regions:Mutex::new(Vec::new()),presentation:Mutex::new(json!({})),listener:Mutex::new(None),input_error:Mutex::new(String::new()),config_lock:Mutex::new(()),windows:Mutex::new(Vec::new())});
+    input::install(app)?;
     window::create(app)?;
     tray::create(app)?;
     restart_listener(app);
@@ -72,6 +74,7 @@ pub fn enabled(app:&AppHandle)->bool {
     app.try_state::<QuickState>().is_some_and(|s| s.config.lock().unwrap().enabled && !s.quitting.load(Ordering::Acquire))
 }
 pub fn stop(app:&AppHandle) {
+    input::set_alt_enabled(false);
     if let Some(state)=app.try_state::<QuickState>() {
         state.quitting.store(true,Ordering::Release);state.generation.fetch_add(1,Ordering::AcqRel);
         state.listener.lock().unwrap().take();
@@ -85,7 +88,11 @@ pub fn show(app:&AppHandle)->Result<(),String> {
     if !enabled(app){return Err("Quick Chat is disabled".into());}
     if !state.ready.load(Ordering::Acquire){return Err("Quick Chat page is still loading".into());}
     let handle=app.clone();app.run_on_main_thread(move || {
-        if let Err(error)=window::show(&handle){emit(&handle,"quick","capture-error",json!(error));}
+        if let Err(error)=window::show(&handle){
+            diagnostics::record("show-error",json!({"error":error}));
+            let _=std::fs::write(std::env::temp_dir().join("astrion-quick-show-error.log"),&error);
+            emit(&handle,"quick","capture-error",json!(error));
+        }
     }).map_err(|e|e.to_string())
 }
 pub fn hide(app:&AppHandle) {
@@ -93,7 +100,7 @@ pub fn hide(app:&AppHandle) {
     diagnostics::record("hide",json!({"visible":state.visible.load(Ordering::Acquire)}));
     if !state.visible.swap(false,Ordering::AcqRel){return;}
     let ticket=state.generation.fetch_add(1,Ordering::AcqRel)+1;
-    capture::close(app);emit(app,"quick","will-hide",Value::Null);
+    capture::dismiss(app,ticket);emit(app,"quick","will-hide",Value::Null);
     let handle=app.clone();std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(300));
         if let Some(s)=handle.try_state::<QuickState>(){if s.generation.load(Ordering::Acquire)==ticket && !s.visible.load(Ordering::Acquire){if let Some(w)=handle.get_webview_window("quick"){let _=w.hide();}}}
@@ -102,14 +109,22 @@ pub fn hide(app:&AppHandle) {
 fn restart_listener(app:&AppHandle) {
     let state=app.state::<QuickState>();state.listener.lock().unwrap().take();
     state.input_error.lock().unwrap().clear();
-    let config=state.config.lock().unwrap().clone();if !config.enabled{return;}
+    let config=state.config.lock().unwrap().clone();
+    input::set_alt_enabled(config.enabled && config.modifier=="alt");
+    if !config.enabled{return;}
     let (tx,rx)=std::sync::mpsc::channel();
     match keyboard::install(keyboard::Modifier::parse(&config.modifier).unwrap(),tx){
         Ok(listener)=>{*state.listener.lock().unwrap()=Some(listener);let handle=app.clone();std::thread::spawn(move ||{
             while let Ok(event)=rx.recv() {
                 let visible=handle.state::<QuickState>().visible.load(Ordering::Acquire);
                 match event {
-                    keyboard::KeyEvent::Toggle=>{if visible{hide(&handle);}else{let _=show(&handle);}},
+                    keyboard::KeyEvent::Toggle=>{
+                        diagnostics::record("toggle",json!({"visible":visible}));
+                        if visible{hide(&handle);}else if let Err(error)=show(&handle){
+                            diagnostics::record("show-request-error",json!({"error":error}));
+                            let _=std::fs::write(std::env::temp_dir().join("astrion-quick-show-error.log"),&error);
+                        }
+                    },
                     keyboard::KeyEvent::Escape=>{
                         diagnostics::record("native-escape",json!({"visible":visible}));
                         // A focused HWND does not imply keyboard focus inside WebView2.
@@ -119,7 +134,7 @@ fn restart_listener(app:&AppHandle) {
                 }
             }
         });},
-        Err(error)=>*state.input_error.lock().unwrap()=error,
+        Err(error)=>{input::set_alt_enabled(false);*state.input_error.lock().unwrap()=error;},
     }
 }
 pub fn settings(app:&AppHandle,op:&str,patch:Option<&Value>)->Result<Value,String> {
@@ -147,6 +162,7 @@ fn dispatch(app:&AppHandle,label:&str,args:&Value)->Result<Value,String> {
     let state=app.state::<QuickState>();
     if label!="quick" {
         return match op {
+            "dismissed"=>{capture::finish_dismiss(app,label,args["ticket"].as_u64().ok_or("Invalid dismissal ticket")?);Ok(Value::Null)},
             "hide"=>{hide(app);Ok(Value::Null)},
             "selection"|"window-selection"=>{capture::submit(app,label,op,args)?;Ok(Value::Null)},
             _=>Err("Overlay operation is not allowed".into()),

@@ -84,7 +84,7 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
   quickWindow.webContents.on('will-navigate', (event, url) => { if (url !== assets.url) event.preventDefault(); });
   quickWindow.on('close', (event) => { if (!quitting) { event.preventDefault(); hideQuickEntry(); } });
   capture = new CaptureController(quickWindow, hideQuickEntry);
-  visibility = new QuickVisibility(quickWindow, () => capture.close());
+  visibility = new QuickVisibility(quickWindow, () => capture.dismissOverlays());
   const trusted = (event) => event.senderFrame === event.sender.mainFrame && (
     event.sender === quickWindow.webContents ||
     (event.sender === getMainView?.()?.webContents && event.sender.getURL().startsWith(gateway.base + '/'))

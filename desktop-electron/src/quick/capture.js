@@ -15,18 +15,25 @@ export class CaptureController {
     this.presentation = {};
     this.generation = 0;
     this.capturing = false;
+    this.dismissing = false;
     this.nativeReady = prepareNativeCapture();
     this.nativeReady.catch(error => console.warn('[astrion-quick] 截图初始化失败:', error.message));
     ipcMain.on('quick:selection', (event, rect) => this.finish(event, rect));
     ipcMain.on('quick:window-selection', (event, id) => this.finishWindow(event, id));
     ipcMain.on('quick:selection-cancel', event => { if (this.senderOverlay(event)) this.dismiss(); });
     ipcMain.on('quick:outside-click', event => { if (this.senderOverlay(event)) this.dismiss(); });
+    ipcMain.on('quick:overlay-dismissed', (event, ticket) => {
+      const item = this.overlays.find(item => !item.window.isDestroyed()
+        && item.window.webContents === event.sender && event.senderFrame === event.sender.mainFrame);
+      if (item) this.finishDismiss(item, ticket);
+    });
   }
   async permission(request = false) {
     return capturePermission(await this.nativeReady, request);
   }
   senderOverlay(event) {
-    return this.overlays.find(item => item.window.webContents === event.sender
+    if (this.dismissing) return;
+    return this.overlays.find(item => !item.window.isDestroyed() && item.window.webContents === event.sender
       && event.senderFrame === event.sender.mainFrame);
   }
   async prepare() {
@@ -49,7 +56,12 @@ export class CaptureController {
       }
       this.updateExclusion();
       void this.refreshWindows(ticket);
-    } catch (error) { console.warn('[astrion-quick] 截图准备失败:', error.message); this.close(); }
+    } catch (error) {
+      if (ticket === this.generation) {
+        console.warn('[astrion-quick] 截图准备失败:', error.message);
+        this.close();
+      }
+    }
   }
   setPresentation(presentation) {
     if (!presentation || typeof presentation !== 'object') return;
@@ -62,7 +74,8 @@ export class CaptureController {
     this.updateExclusion();
   }
   updateExclusion() {
-    if (!this.quick || this.quick.isDestroyed()) return;
+    // Keep button geometry and clipping fixed during the prompt's scale exit.
+    if (this.dismissing || !this.quick || this.quick.isDestroyed()) return;
     const bounds = this.quick.getBounds();
     for (const item of this.overlays) {
       if (!item.ready || item.window.isDestroyed()) continue;
@@ -141,13 +154,38 @@ export class CaptureController {
       }
     }
   }
-  close() {
-    this.generation += 1;
+  dismissOverlays() {
+    if (this.dismissing) return;
+    this.dismissing = true;
+    const ticket = ++this.generation;
     this.capturing = false;
     clearTimeout(this.windowTimer);
     this.windowTimer = null;
+    for (const item of [...this.overlays]) {
+      if (item.window.isDestroyed() || !item.ready) { this.finishDismiss(item, ticket); continue; }
+      item.window.setIgnoreMouseEvents(true);
+      item.window.webContents.send('quick:overlay-dismiss', ticket);
+      // Renderer normally acknowledges the last button; clean up stalled layers.
+      item.dismissTimer = setTimeout(() => this.finishDismiss(item, ticket), 5000);
+    }
+  }
+  finishDismiss(item, ticket) {
+    if (!this.dismissing || ticket !== this.generation || !this.overlays.includes(item)) return;
+    clearTimeout(item.dismissTimer);
+    if (!item.window.isDestroyed()) item.window.destroy();
+    this.overlays = this.overlays.filter(overlay => overlay !== item);
+  }
+  close() {
+    this.generation += 1;
+    this.capturing = false;
+    this.dismissing = false;
+    clearTimeout(this.windowTimer);
+    this.windowTimer = null;
     this.windows = [];
-    for (const item of this.overlays) if (!item.window.isDestroyed()) item.window.destroy();
+    for (const item of this.overlays) {
+      clearTimeout(item.dismissTimer);
+      if (!item.window.isDestroyed()) item.window.destroy();
+    }
     this.overlays = [];
   }
 }

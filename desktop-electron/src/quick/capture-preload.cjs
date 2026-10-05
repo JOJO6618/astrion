@@ -5,5 +5,7 @@ contextBridge.exposeInMainWorld('capture', {
   dismiss: () => ipcRenderer.send('quick:outside-click'),
   selectWindow: (id) => ipcRenderer.send('quick:window-selection', id),
   windows: (callback) => ipcRenderer.on('quick:windows', (_, snapshot) => callback(snapshot)),
-  exclude: (callback) => ipcRenderer.on('quick:exclude', (_, bounds) => callback(bounds))
+  exclude: (callback) => ipcRenderer.on('quick:exclude', (_, bounds) => callback(bounds)),
+  onHide: (callback) => ipcRenderer.on('quick:overlay-dismiss', (_, ticket) => callback(ticket)),
+  dismissed: (ticket) => ipcRenderer.send('quick:overlay-dismissed', ticket)
 });

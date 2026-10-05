@@ -32,7 +32,9 @@
       cancel: () => notify('hide'),
       dismiss: () => notify('hide'),
       windows: (callback) => on('windows', callback),
-      exclude: (callback) => on('exclude', callback)
+      exclude: (callback) => on('exclude', callback),
+      onHide: (callback) => on('dismiss', callback),
+      dismissed: (ticket) => notify('dismissed', { ticket })
     };
   } else {
     let lastDomEscape = -Infinity;

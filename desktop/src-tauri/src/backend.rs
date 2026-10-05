@@ -587,6 +587,8 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         tauri::LogicalSize::new(1280.0, CHROME_STRIP_HEIGHT),
     )?;
     layout_webviews(&host_window);
+    #[cfg(windows)]
+    crate::single_instance::main_window_ready(app);
     #[cfg(target_os = "macos")]
     position_traffic_lights(&host_window);
     #[cfg(target_os = "macos")]
@@ -712,6 +714,11 @@ pub fn position_traffic_lights(window: &tauri::Window) {
 /// 双 webview 布局：chrome 条钉顶部（全宽 × 固定 46px），主 webview 占剩余区域。
 /// 窗口创建后与每次 Resized 时调用（main.rs 的 on_window_event）。
 pub fn layout_webviews(window: &tauri::Window) {
+    // Manager::get_webview is application-wide: never size main/chrome from a
+    // quick-chat or screenshot-overlay window's resize event.
+    if window.label() != "main" {
+        return;
+    }
     let Ok(size) = window.inner_size() else {
         return;
     };

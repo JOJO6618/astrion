@@ -31,15 +31,18 @@ class WindowCaptureButtons {
     this.capturing = false;
     this.snapshot = null;
     this.scheduled = 0;
+    this.entryCount = 0;
+    this.dismissing = false;
   }
   update(snapshot) {
+    if (this.dismissing) return;
     this.snapshot = snapshot;
     this.capturing = Boolean(snapshot.capturing);
     document.body.classList.toggle('capturing', this.capturing);
     if (!this.locked) this.render();
   }
   select(id) {
-    if (this.capturing) return;
+    if (this.capturing || this.dismissing) return;
     this.capturing = true;
     document.body.classList.add('capturing');
     window.capture.selectWindow(id);
@@ -85,8 +88,42 @@ class WindowCaptureButtons {
     this.buttons.set(id, button);
     return button;
   }
+  dismiss(ticket) {
+    if (this.dismissing) return;
+    this.dismissing = true;
+    this.locked = true;
+    cancelAnimationFrame(this.scheduled);
+    document.body.classList.add('dismissing');
+    const buttons = [...this.buttons.values()]
+      .filter(button => !button.hidden && button.dataset.entered)
+      .sort((left, right) => Number(left.dataset.entryOrder) - Number(right.dataset.entryOrder));
+    let pending = buttons.length;
+    let finished = false;
+    let timer;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      window.capture.dismissed(ticket);
+    };
+    if (!pending) { finish(); return; }
+    buttons.forEach((button, rank) => {
+      // Freeze each button's current opacity and geometry; the prompt's scale
+      // animation must not move or shrink screenshot buttons toward its center.
+      button.style.setProperty('--exit-opacity', getComputedStyle(button).opacity);
+      button.style.setProperty('--exit-delay', `${rank * 50}ms`);
+      button.disabled = true;
+      button.tabIndex = -1;
+      button.addEventListener('animationend', event => {
+        if (event.animationName === 'window-button-dismiss' && --pending === 0) finish();
+      });
+      button.classList.remove('revealing');
+      button.classList.add('dismissing');
+    });
+    timer = setTimeout(finish, (buttons.length - 1) * 50 + 210);
+  }
   render() {
-    if (!this.snapshot || this.locked) return;
+    if (!this.snapshot || this.locked || this.dismissing) return;
     const { windows = [], display, exclude = [], label = '', colors = {} } = this.snapshot;
     if (!validRect(display)) return;
     for (const [key, value] of Object.entries(colors)) document.documentElement.style.setProperty(key, value);
@@ -115,6 +152,7 @@ class WindowCaptureButtons {
         if (fragments.length) {
           if (!button.dataset.entered) {
             button.dataset.entered = 'true';
+            button.dataset.entryOrder = String(this.entryCount++);
             button.style.setProperty('--entry-delay', `${50 + visibleRank * 50}ms`);
             button.classList.add('revealing');
           }
@@ -136,3 +174,4 @@ class WindowCaptureButtons {
 }
 window.captureButtons = new WindowCaptureButtons();
 window.capture.windows(snapshot => window.captureButtons.update(snapshot));
+window.capture.onHide(ticket => window.captureButtons.dismiss(ticket));

@@ -1,10 +1,20 @@
 //! Modifier double-tap recognition. The hook never consumes or records keystrokes.
 use std::collections::HashSet;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{Arc, OnceLock, atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering}};
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
+
+static ALT_RELEASE_UNTIL: AtomicU64 = AtomicU64::new(0);
+static ALT_RELEASE_WINDOW: AtomicIsize = AtomicIsize::new(0);
+static INPUT_CLOCK: OnceLock<Instant> = OnceLock::new();
+fn input_time_ms() -> u64 { INPUT_CLOCK.get_or_init(Instant::now).elapsed().as_millis() as u64 + 1 }
+pub(super) fn take_bare_alt_menu(hwnd:isize) -> bool {
+    let until=ALT_RELEASE_UNTIL.load(Ordering::Acquire);
+    until!=0 && input_time_ms()<=until && ALT_RELEASE_WINDOW.load(Ordering::Relaxed)==hwnd
+        && ALT_RELEASE_UNTIL.compare_exchange(until,0,Ordering::AcqRel,Ordering::Relaxed).is_ok()
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Modifier { LeftControl, RightControl, Shift, Alt }
@@ -84,6 +94,15 @@ unsafe extern "system" fn keyboard_hook(code:i32,w:WPARAM,l:LPARAM)->LRESULT {
             if down || up {
                 HOOK.with(|slot| {
                     if let Some(state)=slot.borrow_mut().as_mut() {
+                        let recognizer=&state.recognizer;
+                        let bare_alt=up && recognizer.modifier==Modifier::Alt
+                            && recognizer.modifier.matches(info.vkCode) && recognizer.pressed
+                            && recognizer.clean && recognizer.keys.len()==1;
+                        ALT_RELEASE_UNTIL.store(0,Ordering::Release);
+                        if bare_alt {
+                            ALT_RELEASE_WINDOW.store(GetForegroundWindow().0 as isize,Ordering::Relaxed);
+                            ALT_RELEASE_UNTIL.store(input_time_ms()+150,Ordering::Release);
+                        }
                         if down && info.vkCode == 0x1b { let _=state.notify.send(KeyEvent::Escape); }
                         if state.recognizer.key(info.vkCode,down,state.start.elapsed()) { let _=state.notify.send(KeyEvent::Toggle); }
                     }
@@ -95,6 +114,7 @@ unsafe extern "system" fn keyboard_hook(code:i32,w:WPARAM,l:LPARAM)->LRESULT {
 }
 unsafe extern "system" fn mouse_hook(code:i32,w:WPARAM,l:LPARAM)->LRESULT {
     if code>=0 && [WM_LBUTTONDOWN,WM_RBUTTONDOWN,WM_MBUTTONDOWN].contains(&(w.0 as u32)) {
+        ALT_RELEASE_UNTIL.store(0,Ordering::Release);
         HOOK.with(|slot| { if let Some(state)=slot.borrow_mut().as_mut() { state.recognizer.cancel(); } });
     }
     CallNextHookEx(None,code,w,l)

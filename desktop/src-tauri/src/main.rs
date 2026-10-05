@@ -15,11 +15,15 @@ mod rundata;
 mod shell_env;
 #[cfg(windows)]
 mod quick;
+#[cfg(windows)]
+mod single_instance;
 
 use tauri::Manager;
 
 fn main() {
     let builder = tauri::Builder::default();
+    #[cfg(windows)]
+    let builder = single_instance::register(builder);
     #[cfg(windows)]
     let builder = quick::register(builder);
     builder
@@ -41,7 +45,7 @@ fn main() {
         .on_window_event(|window, event| {
             match event {
                 // 双 webview 手动布局：chrome 条钉顶部固定 46px，主 webview 占剩余
-                tauri::WindowEvent::Resized(_) => {
+                tauri::WindowEvent::Resized(_) if window.label() == "main" => {
                     backend::layout_webviews(window);
                     // AppKit 在缩放/全屏切换时会重排红绿灯，需重新定位（tauri #14072 绕行）
                     #[cfg(target_os = "macos")]

@@ -29,14 +29,27 @@ pub fn show(app:&AppHandle)->Result<(),String> {
         let height=(area.size.height as i32-2*inset).max(100) as u32;
         window.set_position(PhysicalPosition::new(area.position.x+(area.size.width-width) as i32/2,area.position.y+inset)).map_err(|e|e.to_string())?;
         window.set_size(PhysicalSize::new(width,height)).map_err(|e|e.to_string())?;
-        state.generation.fetch_add(1,Ordering::AcqRel);
+        let ticket=state.generation.fetch_add(1,Ordering::AcqRel)+1;
         state.visible.store(true,Ordering::Release);
-        super::capture::prepare(app)?;
+        if let Err(error)=super::capture::prepare(app){
+            rollback_show(app,ticket);
+            return Err(format!("Prepare capture overlays: {error}"));
+        }
     }
-    window.show().map_err(|e|e.to_string())?;
-    focus(app)?;
+    let ticket=state.generation.load(Ordering::Acquire);
+    if !state.visible.load(Ordering::Acquire){return Ok(());}
+    let result=window.show().map_err(|e|format!("Show quick window: {e}"))
+        .and_then(|_|focus(app).map_err(|e|format!("Focus quick window: {e}")));
+    if let Err(error)=result{rollback_show(app,ticket);return Err(error);}
     emit(app,"quick","show",serde_json::Value::Null);
     Ok(())
+}
+fn rollback_show(app:&AppHandle,ticket:u64){
+    let state=app.state::<QuickState>();
+    if state.generation.compare_exchange(ticket,ticket+1,Ordering::AcqRel,Ordering::Acquire).is_err(){return;}
+    state.visible.store(false,Ordering::Release);
+    super::capture::close(app);
+    if let Some(window)=app.get_webview_window("quick"){let _=window.hide();}
 }
 pub(super) fn focus(app:&AppHandle)->Result<(),String> {
     app.get_webview_window("quick").ok_or("Quick window missing")?.set_focus().map_err(|e|e.to_string())?;

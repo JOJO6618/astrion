@@ -13,6 +13,33 @@ pub fn close(app:&AppHandle){
     for (label,window) in app.webview_windows(){if label.starts_with("quick-overlay-"){let _=window.destroy();}}
     if let Some(state)=app.try_state::<QuickState>(){state.capturing.store(false,Ordering::Release);state.windows.lock().unwrap().clear();}
 }
+pub fn dismiss(app:&AppHandle,ticket:u64){
+    if let Some(state)=app.try_state::<QuickState>(){
+        state.capturing.store(false,Ordering::Release);
+    }
+    for (label,window) in app.webview_windows(){
+        if label.starts_with("quick-overlay-"){
+            let _=window.set_ignore_cursor_events(true);
+            emit(app,&label,"dismiss",json!(ticket));
+        }
+    }
+    // Normally the renderer acknowledges its final button's animation. Recover
+    // if a renderer is not ready or crashes, without touching a newer opening.
+    let handle=app.clone();
+    std::thread::spawn(move ||{
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        let ui_handle=handle.clone();
+        let _=handle.run_on_main_thread(move ||{
+            let Some(state)=ui_handle.try_state::<QuickState>() else{return};
+            if state.generation.load(Ordering::Acquire)==ticket && !state.visible.load(Ordering::Acquire){close(&ui_handle);}
+        });
+    });
+}
+pub fn finish_dismiss(app:&AppHandle,label:&str,ticket:u64){
+    let Some(state)=app.try_state::<QuickState>() else{return};
+    if state.generation.load(Ordering::Acquire)!=ticket || state.visible.load(Ordering::Acquire){return;}
+    if let Some(window)=app.get_webview_window(label){let _=window.destroy();}
+}
 pub fn prepare(app:&AppHandle)->Result<(),String>{
     close(app);
     let quick=app.get_webview_window("quick").ok_or("Quick window missing")?;
@@ -44,6 +71,8 @@ pub fn prepare(app:&AppHandle)->Result<(),String>{
 }
 pub fn update(app:&AppHandle){
     let Some(state)=app.try_state::<QuickState>() else{return};
+    // Preserve button clipping/positions while the prompt shrinks away.
+    if !state.visible.load(Ordering::Acquire){return;}
     let Some(quick)=app.get_webview_window("quick") else{return};
     let (Ok(q_origin),Ok(q_scale))=(quick.inner_position(),quick.scale_factor())else{return};
     let regions=state.regions.lock().unwrap().clone();let windows=state.windows.lock().unwrap().clone();

@@ -34,6 +34,12 @@ body { margin: 0; background: transparent; cursor: crosshair; user-select: none;
   from { opacity: 0; visibility: hidden; }
   to { opacity: 1; visibility: visible; }
 }
+.window-capture.dismissing { animation: window-button-dismiss 160ms ease-in var(--exit-delay, 0ms) both; }
+@keyframes window-button-dismiss {
+  from { opacity: var(--exit-opacity, 1); }
+  to { opacity: 0; }
+}
+.dismissing .window-capture { pointer-events: none; }
 .capturing .window-capture { cursor: progress; }
 .selecting #window-buttons { visibility: hidden; opacity: 0; }
 .selecting .window-capture { visibility: hidden; }

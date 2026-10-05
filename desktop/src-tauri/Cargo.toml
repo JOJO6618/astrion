@@ -17,6 +17,7 @@ serde_json = "1"
 # Job Object（后端孤儿收尸）：仅 Windows 需要
 # Win32_System_Registry：读注册表 PATH（桌面命令环境对齐用户真实环境）
 [target.'cfg(windows)'.dependencies]
+tauri-plugin-single-instance = "2"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json"] }
 png = "0.17"
 base64 = "0.22"
@@ -34,6 +35,7 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_JobObjects",
   "Win32_System_Registry",
   "Win32_System_Threading",
+  "Win32_UI_Shell",
 ] }
 
 # 红绿灯手动定位（tauri #14072：unstable 下 traffic_light_position 失效钉在 (0,0)，
