@@ -1,6 +1,6 @@
 [package]
 name = "astrion-desktop"
-version = "0.4.3"
+version = "0.5.1"
 description = "Astrion desktop shell (system WebView + embedded Python backend)"
 edition = "2021"
 rust-version = "1.77.2"
@@ -9,7 +9,7 @@ rust-version = "1.77.2"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["unstable"] }  # unstable: 多 webview（add_child/WebviewBuilder）
+tauri = { version = "2", features = ["unstable", "tray-icon"] }  # 多 webview + Windows 快捷模式托盘
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -17,6 +17,17 @@ serde_json = "1"
 # Job Object（后端孤儿收尸）：仅 Windows 需要
 # Win32_System_Registry：读注册表 PATH（桌面命令环境对齐用户真实环境）
 [target.'cfg(windows)'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json"] }
+png = "0.17"
+base64 = "0.22"
+windows = { version = "0.61.3", features = [
+  "Foundation", "Graphics_Capture", "Graphics_DirectX_Direct3D11",
+  "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm",
+  "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture",
+  "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_HiDpi", "Win32_System_Threading", "Win32_Storage_FileSystem",
+] }
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Security",

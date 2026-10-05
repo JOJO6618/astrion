@@ -5,6 +5,16 @@ import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdow
 import { useModelStore } from '@/stores/model';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { t } from '@/locales';
+import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
+
+const windowsShell = isWindowsDesktopShell();
+const modifiers = windowsShell
+  ? ['alt', 'left-control', 'right-control', 'shift']
+  : ['option', 'command', 'control'];
+const modifierLabel = (key: string) =>
+  t(
+    `quickEntry.${key === 'left-control' ? 'leftControl' : key === 'right-control' ? 'rightControl' : key}`
+  );
 
 interface QuickSettings {
   enabled: boolean;
@@ -31,7 +41,12 @@ declare global {
   }
 }
 const bridge = window.astrionQuickSettings;
-const config = ref<QuickSettings>({ enabled: false, modifier: 'option', model: '', workspace: '' });
+const config = ref<QuickSettings>({
+  enabled: false,
+  modifier: windowsShell ? 'alt' : 'option',
+  model: '',
+  workspace: ''
+});
 const workspaces = ref<{ workspace_id: string; label: string }[]>([]);
 const defaultWorkspace = ref('');
 const permissions = ref({
@@ -68,6 +83,15 @@ const workspaceLabel = computed(() =>
 );
 const extraModels = computed(() => [{ key: '', label: t('quickEntry.followGlobal') }]);
 function permissionLabel(status: PermissionStatus) {
+  if (windowsShell && !checkingPermissions.value) {
+    return t(
+      status === 'granted'
+        ? 'quickEntry.capabilityReady'
+        : status === 'denied'
+          ? 'quickEntry.capabilityUnavailable'
+          : 'quickEntry.permissionUnknown'
+    );
+  }
   return t(
     checkingPermissions.value
       ? 'quickEntry.permissionChecking'
@@ -216,14 +240,14 @@ onBeforeUnmount(() => {
         >
         <div class="quick-settings-modifiers">
           <button
-            v-for="key in ['option', 'command', 'control']"
+            v-for="key in modifiers"
             :key="key"
             type="button"
             :disabled="!loaded || saving"
             :aria-pressed="config.modifier === key"
             @click="update({ modifier: key })"
           >
-            {{ t(`quickEntry.${key}`) }}
+            {{ modifierLabel(key) }}
           </button>
         </div>
       </div>
@@ -305,14 +329,19 @@ onBeforeUnmount(() => {
         <span class="settings-row-copy">
           <span class="settings-row-title">{{
             t(
-              kind === 'screenPermission'
-                ? 'quickEntry.screenPermissionTitle'
-                : 'quickEntry.inputPermissionTitle'
+              windowsShell
+                ? kind === 'screenPermission'
+                  ? 'quickEntry.screenCapability'
+                  : 'quickEntry.inputCapability'
+                : kind === 'screenPermission'
+                  ? 'quickEntry.screenPermissionTitle'
+                  : 'quickEntry.inputPermissionTitle'
             )
           }}</span>
           <span class="settings-row-desc">{{ permissionLabel(permissions[kind]) }}</span>
         </span>
         <button
+          v-if="!windowsShell"
           type="button"
           class="settings-select-button"
           :disabled="checkingPermissions || authorizing || permissions[kind] === 'granted'"
@@ -327,7 +356,9 @@ onBeforeUnmount(() => {
           }}
         </button>
       </div>
-      <p class="quick-settings-note">{{ t('quickEntry.permissionHint') }}</p>
+      <p class="quick-settings-note">
+        {{ t(windowsShell ? 'quickEntry.windowsCapabilityHint' : 'quickEntry.permissionHint') }}
+      </p>
       <p v-if="permissionError" class="quick-settings-error" role="status">{{ permissionError }}</p>
       <div class="quick-settings-actions">
         <button

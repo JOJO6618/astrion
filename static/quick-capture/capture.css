@@ -1,0 +1,39 @@
+:root {
+  --selection-border: Highlight;
+  --selection-tint: color-mix(in srgb, Highlight 12%, transparent);
+  --quick-entry-text: ButtonText;
+  --quick-entry-border: GrayText;
+  --quick-entry-surface: ButtonFace;
+  --quick-entry-hover: ButtonFace;
+}
+body { margin: 0; background: transparent; cursor: crosshair; user-select: none; }
+#selection { position: absolute; border: 1px solid var(--selection-border); background: var(--selection-tint); box-sizing: border-box; pointer-events: none; }
+#window-buttons { position: absolute; inset: 0; pointer-events: none; }
+.window-capture {
+  position: absolute;
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--quick-entry-border);
+  border-radius: 7px;
+  background: var(--quick-entry-gradient, var(--quick-entry-surface));
+  color: var(--quick-entry-text);
+  font: 500 12px/28px -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: .1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.window-capture:hover { background: var(--quick-entry-hover); }
+.window-capture:active { background: var(--quick-entry-border); }
+.window-capture:focus-visible { outline: 2px solid var(--quick-entry-text); outline-offset: -3px; }
+.window-capture.revealing { animation: window-button-reveal 160ms ease-out var(--entry-delay, 50ms) both; }
+@keyframes window-button-reveal {
+  from { opacity: 0; visibility: hidden; }
+  to { opacity: 1; visibility: visible; }
+}
+.capturing .window-capture { cursor: progress; }
+.selecting #window-buttons { visibility: hidden; opacity: 0; }
+.selecting .window-capture { visibility: hidden; }

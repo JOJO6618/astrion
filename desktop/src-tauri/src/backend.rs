@@ -497,6 +497,10 @@ const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'windows';";
 const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'macos';";
 #[cfg(all(unix, not(target_os = "macos")))]
 const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'linux';";
+#[cfg(windows)]
+const QUICK_SETTINGS_SCRIPT: &str = include_str!("../../../static/quick-capture/windows-settings.js");
+#[cfg(not(windows))]
+const QUICK_SETTINGS_SCRIPT: &str = "";
 
 fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     let url = format!("http://127.0.0.1:{port}/");
@@ -528,7 +532,7 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         // 不用 withGlobalTauri——它对 External URL 页面不注入，且语义过重。
         // 平台标记供 chrome 标签条做平台差异化 UI（Windows 左侧设置按钮）。
         .initialization_script(&format!(
-            "window.__ASTRION_DESKTOP__ = true; {PLATFORM_MARKER}"
+            "window.__ASTRION_DESKTOP__ = true; {PLATFORM_MARKER} {QUICK_SETTINGS_SCRIPT}"
         ))
         // 恢复 HTML5 文件拖放：Tauri 2 默认 dragDropEnabled=true，壳会拦截系统拖放
         // 改发 tauri://drag-drop 事件、吃掉页面自身的 drop 事件；而 External URL
@@ -587,6 +591,10 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     position_traffic_lights(&host_window);
     #[cfg(target_os = "macos")]
     install_ctrl_return_send_interceptor(app);
+    #[cfg(windows)]
+    if let Err(error) = crate::quick::start(app, port, crate::rundata::resolve_data_root()) {
+        let _ = std::fs::write(std::env::temp_dir().join("astrion-quick-startup.log"), error);
+    }
     Ok(())
 }
 

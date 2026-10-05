@@ -39,6 +39,29 @@ def _desktop_context() -> dict | None:
     return {"version": version, "bridge_port": bridge_port or None}
 
 
+@status_bp.route('/api/desktop/quick/<operation>', methods=['GET', 'POST'])
+@api_login_required
+def desktop_quick_settings(operation: str):
+    """Windows 快捷模式设置代理；业务 Gateway 请求不经过此端点。"""
+    allowed = {
+        'GET': {'info', 'permissions'},
+        'POST': {'configure', 'open', 'capture-permission', 'input-permission'},
+    }
+    if operation not in allowed.get(request.method, set()):
+        return jsonify({'ok': False, 'error': 'unsupported_quick_operation'}), 404
+    ctx = _desktop_context()
+    if not ctx:
+        return _not_desktop()
+    payload = request.get_json(silent=True) if request.method == 'POST' else None
+    body, err = _bridge_request(
+        ctx, request.method, f'/quick/{operation}', timeout=10.0,
+        json_body=payload if isinstance(payload, dict) else None,
+    )
+    if err:
+        return err
+    return jsonify(body)
+
+
 @status_bp.route('/api/desktop/rundata/info')
 @api_login_required
 def desktop_rundata_info():

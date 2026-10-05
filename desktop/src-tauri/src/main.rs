@@ -13,11 +13,16 @@ mod backend;
 mod bridge;
 mod rundata;
 mod shell_env;
+#[cfg(windows)]
+mod quick;
 
 use tauri::Manager;
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(windows)]
+    let builder = quick::register(builder);
+    builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(backend::BackendState::default())
         .setup(|app| {
@@ -44,8 +49,20 @@ fn main() {
                 }
                 _ => {}
             }
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                #[cfg(windows)]
+                if window.label() == "quick" {
+                    api.prevent_close();
+                    quick::hide(window.app_handle());
+                    return;
+                }
                 if window.label() == "main" {
+                    #[cfg(windows)]
+                    if quick::enabled(window.app_handle()) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                        return;
+                    }
                     window.app_handle().exit(0);
                 }
             }
@@ -54,6 +71,8 @@ fn main() {
         .expect("error while building Astrion desktop")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                #[cfg(windows)]
+                quick::stop(app);
                 backend::shutdown_backend(app);
             }
         });

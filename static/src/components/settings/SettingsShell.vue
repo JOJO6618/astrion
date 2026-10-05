@@ -9,7 +9,7 @@ import ModelPrefTab from './tabs/ModelPrefTab.vue';
 import CodexTab from './tabs/CodexTab.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
 import QuickEntrySettings from './tabs/QuickEntrySettings.vue';
-import { isMacDesktopShell } from '@/utils/desktopPlatform';
+import { isDesktopShell } from '@/utils/desktopPlatform';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ToolsTab from './tabs/ToolsTab.vue';
 import SearchTab from './tabs/SearchTab.vue';
@@ -108,7 +108,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const isAdmin = computed(() => settingsStore.isAdmin);
-const quickChatSupported = isMacDesktopShell() && Boolean(window.astrionQuickSettings);
+const quickChatSupported = isDesktopShell() && Boolean(window.astrionQuickSettings);
 const canShowSection = (section: SettingsSection) =>
   (section !== 'quick-chat' || quickChatSupported) &&
   (!SETTINGS_ADMIN_SECTIONS.has(section) || isAdmin.value);

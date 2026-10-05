@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import StatusAvatar from '@/components/avatar/StatusAvatar.vue';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer.vue';
 import { toolFaceKey } from '@/utils/avatarFace';
+import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import { t } from '@/locales';
 import QuickIcon from './QuickIcon.vue';
 import QuickPrompt from './QuickPrompt.vue';
@@ -73,7 +74,7 @@ watch(
   { deep: true }
 );
 const activeTools = computed(() => tools.value.filter((tool) => !tool.done));
-const setupVisible = computed(() => !workspace.value);
+const setupVisible = computed(() => !isWindowsDesktopShell() && !workspace.value);
 const chatTitle = computed(
   () =>
     sessions.value.find((item) => item.conversation_id === conversation.value)?.title ||

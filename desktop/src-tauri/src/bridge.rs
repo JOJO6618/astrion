@@ -294,7 +294,7 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
     // POST 的 body：chrome/dispatch、window/control、rundata/apply 需要内容（JSON，独立上限
     // 64KB）；其余端点不需要 body，读完只为让 TCP 正常收尾（不读完就关连接可能触发 RST）
     let want_body = method == "POST"
-        && (path == "/chrome/dispatch" || path == "/window/control" || path == "/rundata/apply");
+        && (path == "/chrome/dispatch" || path == "/window/control" || path == "/rundata/apply" || path == "/quick/configure");
     let content_length: usize = lines
         .filter_map(|l| l.split_once(':'))
         .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
@@ -318,6 +318,21 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
         body_have += n;
     }
 
+    #[cfg(windows)]
+    if let Some(op) = path.strip_prefix("/quick/") {
+        let allowed = match method {
+            "GET" => ["info", "permissions"].contains(&op),
+            "POST" => ["configure", "open", "capture-permission", "input-permission"].contains(&op),
+            _ => false,
+        };
+        if !allowed { return respond(&mut stream, 404, "{\"error\":\"unsupported_quick_route\"}"); }
+        let patch = serde_json::from_slice::<serde_json::Value>(&body).ok();
+        let payload = match crate::quick::settings(&app, op, patch.as_ref()) {
+            Ok(data) => serde_json::json!({"ok": true, "data": data}),
+            Err(error) => serde_json::json!({"ok": false, "error": error}),
+        };
+        return respond(&mut stream, 200, &payload.to_string());
+    }
     match (method, path) {
         ("GET", "/version") => {
             let body = serde_json::json!({ "version": APP_VERSION }).to_string();
