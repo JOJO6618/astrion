@@ -260,7 +260,12 @@ onMounted(() => {
         <div class="settings-shell-content-inner" v-if="loaded">
           <div class="settings-shell-page-title">{{ $t(activeMeta.titleKey) }}</div>
           <div class="settings-shell-page-desc">{{ $t(activeMeta.descKey) }}</div>
-          <component :is="activeComponent" :key="activeSection" />
+          <QuickEntrySettings v-if="quickChatSupported" v-show="activeSection === 'quick-chat'" />
+          <component
+            v-if="activeSection !== 'quick-chat'"
+            :is="activeComponent"
+            :key="activeSection"
+          />
         </div>
         <div class="settings-shell-content-inner settings-shell-placeholder" v-else-if="error">
           <span class="settings-shell-loaderror">{{ error }}</span>

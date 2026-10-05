@@ -99,12 +99,10 @@ struct QuickCapture {
             // windows so they occlude lower applications and can be captured too.
             if pid == clientPID && layer > 0 { continue }
             let application = NSRunningApplication(processIdentifier: pid)
-            // Dock owns screen-sized desktop/input surfaces whose CGWindowAlpha
-            // is 1 even though the content is transparent. They precede app
-            // windows and must not wipe out every application's button. Keep
-            // ordinary Dock/menu rectangles in the occlusion list.
-            if application?.bundleIdentifier == "com.apple.dock",
-               displayBounds.contains(where: { rect.contains($0) }) { continue }
+            // Transparent system carriers must not occlude every app button.
+            // Ordinary windows, Dock/menu panels and screenshot toolbars remain.
+            if isSystemScreenCarrier(bundleIdentifier: application?.bundleIdentifier,
+                                     bounds: rect, displays: displayBounds) { continue }
             let name = application?.localizedName ?? (info[kCGWindowOwnerName as String] as? String) ?? ""
             let candidate = layer == 0 && rect.width >= 140 && rect.height >= 80
                 && application?.activationPolicy == .regular && !name.isEmpty

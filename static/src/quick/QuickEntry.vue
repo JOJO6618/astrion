@@ -73,9 +73,7 @@ watch(
   { deep: true }
 );
 const activeTools = computed(() => tools.value.filter((tool) => !tool.done));
-const setupVisible = computed(
-  () => !workspace.value || config.value.screenPermission !== 'granted'
-);
+const setupVisible = computed(() => !workspace.value);
 const chatTitle = computed(
   () =>
     sessions.value.find((item) => item.conversation_id === conversation.value)?.title ||
@@ -274,9 +272,6 @@ async function chooseConversation(id = '') {
     error.value = String(exception);
   }
 }
-async function askPermission() {
-  config.value.screenPermission = await state.bridge.capturePermission();
-}
 watch([draft, images], state.save, { deep: true });
 watch(error, (value) => {
   if (value) collapsed.value = false;
@@ -342,6 +337,7 @@ onMounted(async () => {
   });
   for (const element of [root.value, primaryRow.value, parallelRows.value])
     if (element) observer.observe(element);
+  state.bridge.ready();
   await state.initialize();
   await nextTick();
   measureOutput();
@@ -524,10 +520,6 @@ onBeforeUnmount(() => {
             <span>{{ workspaceLabel }}</span
             ><QuickIcon name="chevronDown" />
           </button>
-        </div>
-        <div v-if="config.screenPermission !== 'granted'">
-          <span>{{ t('quickEntry.permission') }}</span
-          ><button @click="askPermission">{{ t('quickEntry.permission') }}</button>
         </div>
       </section>
     </Transition>

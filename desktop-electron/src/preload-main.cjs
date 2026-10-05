@@ -6,7 +6,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('astrionQuickSettings', {
   info: () => ipcRenderer.invoke('quick:info'),
   configure: (patch) => ipcRenderer.invoke('quick:configure', patch),
-  open: () => ipcRenderer.send('quick:open')
+  permissions: () => ipcRenderer.invoke('quick:permissions'),
+  capturePermission: () => ipcRenderer.invoke('quick:capture-permission'),
+  inputPermission: () => ipcRenderer.invoke('quick:input-permission'),
+  open: () => ipcRenderer.invoke('quick:open')
 });
 contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);

@@ -6,6 +6,7 @@ export interface QuickBridge {
   request(route: string, method?: string, body?: any, workspace?: string): Promise<any>;
   info(): Promise<any>;
   configure(patch: any): Promise<any>;
+  ready(): void;
   hide(): void;
   hidden(): void;
   layout(

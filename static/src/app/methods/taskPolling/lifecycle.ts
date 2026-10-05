@@ -6,9 +6,21 @@ import { usePreviewStore } from '../../../stores/preview';
 import { useChatStore } from '../../../stores/chat';
 import { debugNotifyLog, keyNotifyLog, jsonDebug, restoreDebugLog } from './shared';
 import { t } from '@/locales';
+import { isHistoricalTaskEvent, withoutReplayNotifications } from '@/utils/taskReplay';
 
 export const lifecycleMethods = {
   handleTaskEvent(event: any) {
+    const historical = isHistoricalTaskEvent(
+      this._taskReplayBoundary,
+      event || {},
+      useTaskStore().currentTaskId,
+      this.currentConversationId
+    );
+    this._rebuildingFromScratch = historical;
+    if (historical) return withoutReplayNotifications(() => this.dispatchTaskEvent(event));
+    return this.dispatchTaskEvent(event);
+  },
+  dispatchTaskEvent(event: any) {
     if (!event || !event.type) {
       return;
     }
@@ -323,7 +335,7 @@ export const lifecycleMethods = {
         // 任务期广播的待办快照（创建/勾选/清空都会触发）。live=true 让窗口播动画。
         // 快照直接可用；缺失时退化为 REST 拉取（fetchTodoList 带 conversation_id）。
         if (eventData && 'todo_list' in eventData) {
-          this.fileSetTodoList(eventData.todo_list || null, true);
+          this.fileSetTodoList(eventData.todo_list || null, !this._rebuildingFromScratch);
         } else if (typeof this.scheduleTodoListRefresh === 'function') {
           this.scheduleTodoListRefresh(0);
         }
@@ -333,7 +345,7 @@ export const lifecycleMethods = {
         // 快捷窗口文件记录：edit/write/delete/rename 后广播，payload 携带最新列表
         useQuickDockStore().setEditedFiles(
           Array.isArray(eventData?.edited_files) ? eventData.edited_files : [],
-          true
+          !this._rebuildingFromScratch
         );
         break;
 
@@ -342,7 +354,7 @@ export const lifecycleMethods = {
         // live=true 供自动展开判定（设置项 preview_auto_open）
         usePreviewStore().setTargets(
           Array.isArray(eventData?.preview_targets) ? eventData.preview_targets : [],
-          true
+          !this._rebuildingFromScratch
         );
         break;
 

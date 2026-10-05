@@ -301,6 +301,14 @@ export const compressionMethods = {
 
         allEvents = detailResult.data.events;
       }
+      this._taskReplayBoundary = {
+        taskId: runningTask.task_id,
+        conversationId: this.currentConversationId,
+        lastEventIndex: allEvents.reduce(
+          (last, event) => (typeof event.idx === 'number' ? Math.max(last, event.idx) : last),
+          -1
+        )
+      };
       debugLog(`[TaskPolling] 获取到 ${allEvents.length} 个事件`);
       restoreDebugLog('restore:task-detail-events', {
         total: allEvents.length,
@@ -540,7 +548,6 @@ export const compressionMethods = {
 
         // 标记正在从头重建，用于后续处理
         this._rebuildingFromScratch = true;
-        this._rebuildingEventCount = allEvents.length; // 记录当前事件总数
 
         (window as any).__taskEventHandler = (event: any) => {
           this.handleTaskEvent(event);
@@ -554,13 +561,8 @@ export const compressionMethods = {
           currentConversationId: this.currentConversationId
         });
 
-        // 延迟清除重建标记，确保所有历史事件都处理完毕
-        setTimeout(() => {
-          debugLog('[TaskPolling] 历史事件处理完毕，清除重建标记');
-          this._rebuildingFromScratch = false;
-          this._rebuildingEventCount = 0;
-        }, 2000);
-
+        // handleTaskEvent 按快照最后一个 idx 逐事件判断历史/实时，
+        // 不依赖批次数量或网络耗时，也不屏蔽同批到达的新事件。
         return;
       }
 

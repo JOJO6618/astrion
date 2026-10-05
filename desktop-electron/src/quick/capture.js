@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { capturePermission, captureRegion, captureWindow, listCaptureWindows, prepareNativeCapture } from './screenshot.js';
+import { configureWorkspaceVisibility } from './workspace-visibility.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 export class CaptureController {
@@ -35,9 +36,9 @@ export class CaptureController {
       // Discovery does not gate the transparent input layers on recording permission.
       for (const display of screen.getAllDisplays()) {
         const overlay = new BrowserWindow({ ...display.bounds, frame: false, transparent: true, show: false,
-          hasShadow: false, resizable: false, alwaysOnTop: true, skipTaskbar: true,
+          hasShadow: false, resizable: false, alwaysOnTop: true, skipTaskbar: process.platform !== 'darwin',
           webPreferences: { preload: path.join(here, 'capture-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
-        overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        configureWorkspaceVisibility(overlay);
         overlay.setAlwaysOnTop(true, 'floating');
         this.overlays.push({ window: overlay, display, ready: false });
         await overlay.loadFile(path.join(here, 'capture.html'));

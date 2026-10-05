@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
+import { replayNotificationsSuppressed } from '@/utils/taskReplay';
 
 type ResizingPanel = 'left' | 'right' | null;
 type MobileOverlayTarget = 'conversation' | 'focus' | 'approval' | 'quickdock' | null;
@@ -191,6 +192,7 @@ export const useUiStore = defineStore('ui', {
       this.quotaToast = null;
     },
     pushToast(options: ToastOptions = {}) {
+      if (replayNotificationsSuppressed()) return 0;
       const title = options.title || '';
       const message = options.message || '';
       if (!title && !message) {

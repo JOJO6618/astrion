@@ -22,8 +22,8 @@ ASTRION_API_PORT=8092 npm --prefix desktop-electron run dev:quick
 
 ## 首次权限
 
-- 输入监控：双击修饰键由原生只读监听辅助程序识别，系统可能要求为 Terminal、Electron 或监听程序授权，以系统实际列出的进程为准。授权后重新运行调试命令。
-- 屏幕录制：快捷窗初始设置区域有截图权限入口。权限检查与申请统一调用实际执行截图的原生辅助程序，使用 CGPreflightScreenCaptureAccess / CGRequestScreenCaptureAccess，不用 Electron 自身权限代表辅助程序。授权后重新唤起窗口；如系统提示重启，则退出并重新运行调试命令。
+- 输入监控：双击修饰键由原生只读监听辅助程序识别。正式桌面版在设置 → 快捷对话内授权，返回设置页后重新检查并恢复监听。调试版的授权主体可能为 Terminal、Electron 或监听程序，以系统实际列出的进程为准。
+- 屏幕录制：权限状态与授权入口在正式桌面版设置 → 快捷对话内，快捷浮窗不显示授权按钮。权限检查与申请统一调用实际执行截图的原生辅助程序，使用 CGPreflightScreenCaptureAccess / CGRequestScreenCaptureAccess，不用 Electron 自身权限代表辅助程序。如系统提示重启，退出并重新打开应用；调试版可在系统设置中授权后重新运行调试命令。
 - 不申请辅助功能权限来模拟键盘输入，不把消息转交完整桌面窗口。
 
 ## 已接入的行为
@@ -54,7 +54,9 @@ ASTRION_API_PORT=8092 npm --prefix desktop-electron run dev:quick
 
 正式桌面端「设置 → 快捷对话」可启用快捷模式、选择双击按键、默认工作区与默认图片模型。留空分别继承 `/api/host/workspaces` 的 `default_workspace_id` 与个性化 `default_model`，每次唤起刷新；不可用的默认模型会提示选择，不自动替换。
 
-启用后启动应用保留同一个 `server.app` 后端及菜单栏，主窗口由程序坞、菜单栏或设置入口按需创建。关闭主窗口保留后台客户端，退出应用则停止自有后端。当前仍需先启动应用，登录后台自启动留待后续实现。
+启用后显式启动应用会打开主窗口，保留同一个 `server.app` 后端及菜单栏。程序坞激活在后端尚未就绪时会保留打开意图，无需第二次点击。主应用保持 macOS regular 身份，快捷窗及截图覆盖层不设置 macOS 的 skipTaskbar，避免把整个应用变成 UIElement。关闭主窗口保留后台客户端，退出应用则停止自有后端。当前仍需先启动应用，登录后台自启动留待后续实现。
+
+快捷窗与截图覆盖层通过 `workspace-visibility.js` 统一设置跨桌面/全屏可见性，必须启用 `skipTransformProcessType: true`。Electron 默认会为全屏兼容切换应用的进程类型；只去掉 skipTaskbar 仍可能让程序坞运行点消失。该策略保留全屏可见配置，同时让应用持续保持 Foreground 身份。
 
 ## 验证
 

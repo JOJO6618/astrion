@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('astrionQuick', {
   request: (route, method = 'GET', body, workspace = '') => ipcRenderer.invoke('quick:request', { route, method, body, workspace }),
   info: () => ipcRenderer.invoke('quick:info'),
   configure: (patch) => ipcRenderer.invoke('quick:configure', patch),
+  ready: () => ipcRenderer.send('quick:ready'),
   hide: () => ipcRenderer.send('quick:hide'),
   hidden: () => ipcRenderer.send('quick:hidden'),
   layout: (regions, presentation) => ipcRenderer.send('quick:layout', regions, presentation),

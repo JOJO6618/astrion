@@ -4,6 +4,12 @@ import CoreGraphics
 // Listen only: no keystrokes are intercepted or recorded. Native modifier taps
 // are unavailable through Electron's accelerator API.
 let requestedKey = CommandLine.arguments.dropFirst().first ?? "option"
+if requestedKey == "permission" {
+    let granted = CommandLine.arguments.last == "request" ? CGRequestListenEventAccess() : CGPreflightListenEventAccess()
+    print("{\"granted\":\(granted ? "true" : "false")}")
+    fflush(stdout)
+    exit(0)
+}
 let target: CGEventFlags = requestedKey == "control" ? .maskControl : requestedKey == "command" ? .maskCommand : .maskAlternate
 var pressed = false
 var lastRelease: TimeInterval = 0
@@ -31,7 +37,7 @@ let callback: CGEventTapCallBack = { _, type, event, _ in
     }
     return Unmanaged.passUnretained(event)
 }
-if !CGPreflightListenEventAccess() && !CGRequestListenEventAccess() {
+if !CGPreflightListenEventAccess() {
     emit("permission-required")
     exit(2)
 }

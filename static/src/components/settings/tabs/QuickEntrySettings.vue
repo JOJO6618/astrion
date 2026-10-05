@@ -15,8 +15,16 @@ interface QuickSettings {
 interface SettingsBridge {
   info(): Promise<QuickSettings>;
   configure(patch: Partial<QuickSettings>): Promise<QuickSettings>;
-  open(): void;
+  permissions(): Promise<{
+    screenPermission: PermissionStatus;
+    inputPermission: PermissionStatus;
+    error?: string;
+  }>;
+  capturePermission(): Promise<PermissionStatus>;
+  inputPermission(): Promise<PermissionStatus>;
+  open(): Promise<void>;
 }
+type PermissionStatus = 'granted' | 'denied' | 'unknown';
 declare global {
   interface Window {
     astrionQuickSettings?: SettingsBridge;
@@ -26,6 +34,13 @@ const bridge = window.astrionQuickSettings;
 const config = ref<QuickSettings>({ enabled: false, modifier: 'option', model: '', workspace: '' });
 const workspaces = ref<{ workspace_id: string; label: string }[]>([]);
 const defaultWorkspace = ref('');
+const permissions = ref({
+  screenPermission: 'unknown' as PermissionStatus,
+  inputPermission: 'unknown' as PermissionStatus
+});
+const checkingPermissions = ref(false),
+  authorizing = ref(false),
+  permissionError = ref('');
 const workspaceOpen = ref(false),
   error = ref(''),
   saving = ref(false),
@@ -52,6 +67,54 @@ const workspaceLabel = computed(() =>
     : t('quickEntry.followGlobal')
 );
 const extraModels = computed(() => [{ key: '', label: t('quickEntry.followGlobal') }]);
+function permissionLabel(status: PermissionStatus) {
+  return t(
+    checkingPermissions.value
+      ? 'quickEntry.permissionChecking'
+      : status === 'granted'
+        ? 'quickEntry.permissionGranted'
+        : status === 'denied'
+          ? 'quickEntry.permissionDenied'
+          : 'quickEntry.permissionUnknown'
+  );
+}
+async function refreshPermissions() {
+  if (!bridge || checkingPermissions.value || authorizing.value) return;
+  checkingPermissions.value = true;
+  try {
+    const result = await bridge.permissions();
+    permissions.value = result;
+    permissionError.value = result.error || '';
+  } catch (exception) {
+    permissionError.value = String(exception);
+  } finally {
+    checkingPermissions.value = false;
+  }
+}
+async function authorize(kind: 'screenPermission' | 'inputPermission') {
+  if (!bridge || authorizing.value || checkingPermissions.value) return;
+  authorizing.value = true;
+  try {
+    permissions.value[kind] = await (kind === 'screenPermission'
+      ? bridge.capturePermission()
+      : bridge.inputPermission());
+    permissionError.value = '';
+  } catch (exception) {
+    permissionError.value = String(exception);
+  } finally {
+    authorizing.value = false;
+    void refreshPermissions();
+  }
+}
+async function openQuickChat() {
+  if (!bridge) return;
+  try {
+    await bridge.open();
+    error.value = '';
+  } catch (exception) {
+    error.value = String(exception);
+  }
+}
 
 async function update(patch: Partial<QuickSettings>) {
   if (!bridge || saving.value || !loaded.value) return;
@@ -101,7 +164,9 @@ onMounted(async () => {
   document.addEventListener('pointerdown', outside);
   document.addEventListener('keydown', keydown);
   window.addEventListener('resize', closeWorkspace);
+  window.addEventListener('focus', refreshPermissions);
   if (!bridge) return;
+  void refreshPermissions();
   try {
     const [settings, response] = await Promise.all([
       bridge.info(),
@@ -121,122 +186,160 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', outside);
   document.removeEventListener('keydown', keydown);
   window.removeEventListener('resize', closeWorkspace);
+  window.removeEventListener('focus', refreshPermissions);
 });
 </script>
 
 <template>
-  <section v-if="bridge" class="settings-page quick-settings">
-    <button
-      type="button"
-      class="settings-toggle-row"
-      role="switch"
-      :aria-checked="config.enabled"
-      :disabled="!loaded || saving"
-      @click="update({ enabled: !config.enabled })"
-    >
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ t('quickEntry.enabled') }}</span
-        ><span class="settings-row-desc">{{ t('quickEntry.desktopHint') }}</span></span
+  <section v-if="bridge" class="settings-page quick-settings" :aria-busy="!loaded && !error">
+    <p v-if="!loaded && !error" class="quick-settings-note" role="status">
+      {{ t('common.loading') }}
+    </p>
+    <template v-if="loaded">
+      <button
+        type="button"
+        class="settings-toggle-row"
+        role="switch"
+        :aria-checked="config.enabled"
+        :disabled="!loaded || saving"
+        @click="update({ enabled: !config.enabled })"
       >
-      <FancyCheck :checked="config.enabled" />
-    </button>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ t('quickEntry.shortcut') }}</span></span
-      >
-      <div class="quick-settings-modifiers">
-        <button
-          v-for="key in ['option', 'command', 'control']"
-          :key="key"
-          type="button"
-          :disabled="!loaded || saving"
-          :aria-pressed="config.modifier === key"
-          @click="update({ modifier: key })"
+        <span class="settings-row-copy"
+          ><span class="settings-row-title">{{ t('quickEntry.enabled') }}</span
+          ><span class="settings-row-desc">{{ t('quickEntry.desktopHint') }}</span></span
         >
-          {{ t(`quickEntry.${key}`) }}
-        </button>
-      </div>
-    </div>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ t('quickEntry.defaultWorkspace') }}</span
-        ><span class="settings-row-desc">{{
-          t('quickEntry.globalWorkspaceValue', { value: inheritedWorkspace })
-        }}</span></span
-      >
-      <div ref="workspaceRoot" class="settings-select-wrap" :class="{ open: workspaceOpen }">
-        <button
-          type="button"
-          class="settings-select-button"
-          :disabled="!loaded || saving"
-          :aria-expanded="workspaceOpen"
-          @click="toggleWorkspace"
+        <FancyCheck :checked="config.enabled" />
+      </button>
+      <div class="settings-select-row">
+        <span class="settings-row-copy"
+          ><span class="settings-row-title">{{ t('quickEntry.shortcut') }}</span></span
         >
-          <span class="quick-setting-value">{{ workspaceLabel }}</span
-          ><span class="select-chevron" aria-hidden="true" />
-        </button>
-        <div
-          v-if="workspaceOpen"
-          class="settings-floating-menu quick-workspace-menu"
-          :style="menuStyle"
-          role="menu"
-        >
+        <div class="quick-settings-modifiers">
           <button
+            v-for="key in ['option', 'command', 'control']"
+            :key="key"
             type="button"
-            class="settings-menu-option"
-            role="menuitemradio"
-            :aria-checked="!config.workspace"
-            @click="selectWorkspace('')"
+            :disabled="!loaded || saving"
+            :aria-pressed="config.modifier === key"
+            @click="update({ modifier: key })"
           >
-            <span>{{ t('quickEntry.followGlobal') }}</span
-            ><FancyCheck :checked="!config.workspace" :size="16" />
-          </button>
-          <button
-            v-for="item in workspaces"
-            :key="item.workspace_id"
-            type="button"
-            class="settings-menu-option"
-            role="menuitemradio"
-            :aria-checked="config.workspace === item.workspace_id"
-            @click="selectWorkspace(item.workspace_id)"
-          >
-            <span>{{ item.label }}</span
-            ><FancyCheck :checked="config.workspace === item.workspace_id" :size="16" />
+            {{ t(`quickEntry.${key}`) }}
           </button>
         </div>
       </div>
-    </div>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ t('quickEntry.defaultModel') }}</span
-        ><span class="settings-row-desc">{{
-          t('quickEntry.globalModelValue', { value: inheritedModel })
-        }}</span></span
-      >
-      <div
-        class="quick-model-control"
-        :class="{ inactive: !loaded || saving }"
-        :inert="!loaded || saving"
-      >
-        <ModelSelectDropdown
-          :model-value="config.model"
-          :options="options"
-          :extra-options="extraModels"
-          @select="(value) => update({ model: value })"
-        />
+      <div class="settings-select-row">
+        <span class="settings-row-copy"
+          ><span class="settings-row-title">{{ t('quickEntry.defaultWorkspace') }}</span
+          ><span class="settings-row-desc">{{
+            t('quickEntry.globalWorkspaceValue', { value: inheritedWorkspace })
+          }}</span></span
+        >
+        <div ref="workspaceRoot" class="settings-select-wrap" :class="{ open: workspaceOpen }">
+          <button
+            type="button"
+            class="settings-select-button"
+            :disabled="!loaded || saving"
+            :aria-expanded="workspaceOpen"
+            @click="toggleWorkspace"
+          >
+            <span class="quick-setting-value">{{ workspaceLabel }}</span
+            ><span class="select-chevron" aria-hidden="true" />
+          </button>
+          <div
+            v-if="workspaceOpen"
+            class="settings-floating-menu quick-workspace-menu"
+            :style="menuStyle"
+            role="menu"
+          >
+            <button
+              type="button"
+              class="settings-menu-option"
+              role="menuitemradio"
+              :aria-checked="!config.workspace"
+              @click="selectWorkspace('')"
+            >
+              <span>{{ t('quickEntry.followGlobal') }}</span
+              ><FancyCheck :checked="!config.workspace" :size="16" />
+            </button>
+            <button
+              v-for="item in workspaces"
+              :key="item.workspace_id"
+              type="button"
+              class="settings-menu-option"
+              role="menuitemradio"
+              :aria-checked="config.workspace === item.workspace_id"
+              @click="selectWorkspace(item.workspace_id)"
+            >
+              <span>{{ item.label }}</span
+              ><FancyCheck :checked="config.workspace === item.workspace_id" :size="16" />
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
-    <p class="quick-settings-note">{{ t('quickEntry.visionModelHint') }}</p>
-    <div class="quick-settings-actions">
-      <button
-        type="button"
-        class="settings-select-button"
-        :disabled="!loaded || !config.enabled"
-        @click="bridge.open()"
+      <div class="settings-select-row">
+        <span class="settings-row-copy"
+          ><span class="settings-row-title">{{ t('quickEntry.defaultModel') }}</span
+          ><span class="settings-row-desc">{{
+            t('quickEntry.globalModelValue', { value: inheritedModel })
+          }}</span></span
+        >
+        <div
+          class="quick-model-control"
+          :class="{ inactive: !loaded || saving }"
+          :inert="!loaded || saving"
+        >
+          <ModelSelectDropdown
+            :model-value="config.model"
+            :options="options"
+            :extra-options="extraModels"
+            @select="(value) => update({ model: value })"
+          />
+        </div>
+      </div>
+      <p class="quick-settings-note">{{ t('quickEntry.visionModelHint') }}</p>
+      <div
+        v-for="kind in ['screenPermission', 'inputPermission'] as const"
+        :key="kind"
+        class="settings-select-row"
       >
-        {{ t('quickEntry.openQuickChat') }}
-      </button>
-    </div>
+        <span class="settings-row-copy">
+          <span class="settings-row-title">{{
+            t(
+              kind === 'screenPermission'
+                ? 'quickEntry.screenPermissionTitle'
+                : 'quickEntry.inputPermissionTitle'
+            )
+          }}</span>
+          <span class="settings-row-desc">{{ permissionLabel(permissions[kind]) }}</span>
+        </span>
+        <button
+          type="button"
+          class="settings-select-button"
+          :disabled="checkingPermissions || authorizing || permissions[kind] === 'granted'"
+          @click="authorize(kind)"
+        >
+          {{
+            t(
+              kind === 'screenPermission'
+                ? 'quickEntry.permission'
+                : 'quickEntry.inputPermissionAction'
+            )
+          }}
+        </button>
+      </div>
+      <p class="quick-settings-note">{{ t('quickEntry.permissionHint') }}</p>
+      <p v-if="permissionError" class="quick-settings-error" role="status">{{ permissionError }}</p>
+      <div class="quick-settings-actions">
+        <button
+          type="button"
+          class="settings-select-button"
+          :disabled="!loaded || !config.enabled"
+          @click="openQuickChat"
+        >
+          {{ t('quickEntry.openQuickChat') }}
+        </button>
+      </div>
+    </template>
     <p v-if="error" class="quick-settings-error" role="status">{{ error }}</p>
   </section>
 </template>

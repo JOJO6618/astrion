@@ -10,11 +10,12 @@ const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.
 export async function prepareNativeCapture() {
   const binary = app.isPackaged ? path.join(process.resourcesPath, 'quick-entry-capture') : path.join(desktop, '.cache/quick-entry-capture');
   if (!app.isPackaged) {
-    const source = path.join(desktop, 'native/quick-capture.swift');
+    const sources = ['quick-capture.swift', 'window-discovery-policy.swift'].map(name => path.join(desktop, 'native', name));
     const compiled = await stat(binary).catch(() => null);
-    if (!compiled || (await stat(source)).mtimeMs > compiled.mtimeMs) {
+    const sourceStats = await Promise.all(sources.map(source => stat(source)));
+    if (!compiled || sourceStats.some(source => source.mtimeMs > compiled.mtimeMs)) {
       await mkdir(path.dirname(binary), { recursive: true });
-      await execute('/usr/bin/swiftc', ['-parse-as-library', source, '-o', binary]);
+      await execute('/usr/bin/swiftc', ['-parse-as-library', ...sources, '-o', binary]);
     }
   }
   return binary;

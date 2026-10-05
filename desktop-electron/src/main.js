@@ -16,9 +16,9 @@ import { app, protocol } from 'electron';
 import { startBackendAndCreateWindow, shutdownBackend } from './lifecycle.js';
 import { installAppMenu } from './menu.js';
 import { startQuickEntry, quickEnabled, showQuickEntry } from './quick/controller.js';
+import { focusMainWindow } from './window.js';
 
 const quickDebug = process.argv.includes('--quick-debug');
-let desktopReady = false;
 if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
 protocol.registerSchemesAsPrivileged([{ scheme: 'astrion-quick', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
@@ -28,14 +28,16 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => {
     if (quickDebug) showQuickEntry();
-    else import('./window.js').then((m) => m.focusMainWindow());
+    else focusMainWindow();
   });
 
   app.on('activate', () => {
-    if (desktopReady && !quickDebug) void import('./window.js').then(module => module.focusMainWindow());
+    // focusMainWindow queues the intent until the backend is ready.
+    if (!quickDebug) focusMainWindow();
   });
 
   app.whenReady().then(async () => {
+    if (process.platform === 'darwin' && !quickDebug) app.setActivationPolicy('regular');
     installAppMenu();
     try {
       if (quickDebug) {
@@ -43,7 +45,6 @@ if (!app.requestSingleInstanceLock()) {
       } else {
         await startBackendAndCreateWindow();
       }
-      desktopReady = true;
     } catch (err) {
       // 后端起不来属致命错误：写日志 + 落盘临时文件（GUI 进程无控制台可见性），退出
       console.error('[astrion-desktop] 启动失败:', err);
