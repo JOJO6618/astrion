@@ -41,6 +41,9 @@ skills/
 # 本地实验残留与历史文档归档（不进仓库）
 _experiments/
 
+# 本地代码索引（codegraph：机器特定索引库，不入仓库）
+.codegraph/
+
 # 本地打包产物（dmg/App 构建输出）
 _packaging/
 
