@@ -107,6 +107,8 @@
   --text-secondary: #3d3d3a;
   --text-tertiary: #6c6a64;
   --text-muted: rgba(108, 106, 100, 0.55);
+  --summary-text: #827b71;
+  --summary-sweep: #303030;
   /* Border 边框 —— hairline */
   --border-default: #e6dfd8;
   --border-strong: #d8cfc4;
@@ -180,6 +182,8 @@
   --border-card-strong: rgba(13, 13, 13, 0.1);
   --chip-border: rgba(13, 13, 13, 0.05);
   /* Accent 强调 —— ChatGPT primary（近黑，克制 CTA-only） */
+  --summary-text: #858585;
+  --summary-sweep: #303030;
   --accent: #181818;
   --accent-strong: #181818;
   --accent-hover: #303030;
@@ -242,6 +246,8 @@
   --text-secondary: #a0a0a0;
   --text-tertiary: #707070;
   --text-muted: rgba(255, 255, 255, 0.3);
+  --summary-text: #93938f;
+  --summary-sweep: #f6f3ed;
   /* Border 边框 */
   --border-default: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.12);
@@ -309,6 +315,8 @@
   --text-secondary: #3d3d3a;
   --text-tertiary: #6c6a64;
   --text-muted: rgba(108, 106, 100, 0.55);
+  --summary-text: #827b71;
+  --summary-sweep: #303030;
   /* Border 边框 */
   --border-default: #e6dfd8;
   --border-strong: #d8cfc4;

@@ -11,6 +11,7 @@ from utils.token_usage import extract_usage_payload
 
 from .utils_common import debug_log, log_backend_chunk
 from .chat_flow_runner_helpers import extract_intent_from_partial
+from .tool_intent_stream import extract_complete_intent
 from .chat_flow_task_support import wait_retry_delay, cancel_pending_tools
 from .state import get_stop_flag, clear_stop_flag
 
@@ -20,6 +21,7 @@ from modules.i18n import tr
 async def run_streaming_attempts(*, web_terminal, messages, tools, sender, client_sid: str, username: str, conversation_id: Optional[str], current_iteration: int, max_api_retries: int, retry_delay_seconds: int, detected_tool_intent: Dict[str, str], full_response: str, tool_calls: list, current_thinking: str, detected_tools: Dict[str, str], last_usage_payload, in_thinking: bool, thinking_started: bool, thinking_ended: bool, text_started: bool, text_has_content: bool, text_streaming: bool, text_chunk_index: int, last_text_chunk_time, chunk_count: int, reasoning_chunks: int, content_chunks: int, tool_chunks: int, last_finish_reason: Optional[str], accumulated_response: str) -> Dict[str, Any]:
     api_error = None
     tool_call_stream_active = False
+    completed_intents: set[str] = set()
     # 预览面板：流式文本的本地 URL 增量检测状态（滚动缓冲 + 本次回复已报告集合）
     preview_scan_tail = ""
     preview_seen_urls: set = set()
@@ -45,6 +47,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             tool_chunks = 0
             last_finish_reason = None
             tool_call_stream_active = False
+            completed_intents.clear()
 
         # 通知前端：API 请求已发出、尚未收到首个响应（每次重试前都会重新触发）。
         # 前端据此驱动状态形象的「等待 API 响应…」文案；响应开始（thinking_start/
@@ -164,18 +167,24 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                                     existing_fn.get("name")
                                     or tc.get("function", {}).get("name", "")
                                 )
-                                intent_value = extract_intent_from_partial(combined_args)
+                                complete_intent = extract_complete_intent(combined_args)
+                                intent_value = complete_intent if complete_intent is not None else extract_intent_from_partial(combined_args)
+                                intent_complete = complete_intent is not None
                                 if (
-                                    intent_value
+                                    intent_value is not None
                                     and tool_id
-                                    and detected_tool_intent.get(tool_id) != intent_value
+                                    and (detected_tool_intent.get(tool_id) != intent_value
+                                         or (intent_complete and tool_id not in completed_intents))
                                 ):
                                     detected_tool_intent[tool_id] = intent_value
+                                    if intent_complete:
+                                        completed_intents.add(tool_id)
                                     debug_log(f"[intent] 增量提取 {tool_name}: {intent_value}")
                                     sender('tool_intent', {
                                         'id': tool_id,
                                         'name': tool_name,
                                         'intent': intent_value,
+                                        'intent_complete': intent_complete,
                                         'conversation_id': conversation_id
                                     })
                                     debug_log(f"    发送工具意图: {tool_name} -> {intent_value}")
@@ -193,11 +202,13 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                             detected_tools[tool_id] = tool_name
 
                             # 尝试提前提取 intent
-                            intent_value = None
-                            if arguments_str:
-                                intent_value = extract_intent_from_partial(arguments_str)
-                                if intent_value:
-                                    detected_tool_intent[tool_id] = intent_value
+                            complete_intent = extract_complete_intent(arguments_str)
+                            intent_complete = complete_intent is not None
+                            intent_value = complete_intent if intent_complete else extract_intent_from_partial(arguments_str)
+                            if intent_value is not None:
+                                detected_tool_intent[tool_id] = intent_value
+                                if intent_complete:
+                                    completed_intents.add(tool_id)
                                     debug_log(f"[intent] 预提取 {tool_name}: {intent_value}")
 
                             # 立即发送工具准备中事件
@@ -207,6 +218,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                                 'name': tool_name,
                                 'message': tr("stream_loop.preparing_tool", tool=tool_name),
                                 'intent': intent_value,
+                                'intent_complete': intent_complete,
                                 'conversation_id': conversation_id
                             })
                             debug_log(f"    发送工具准备事件: {tool_name}")
@@ -223,13 +235,21 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                         })
                         # 尝试从增量参数中抽取 intent，并单独推送
                         if tool_id and arguments_str:
-                            intent_value = extract_intent_from_partial(arguments_str)
-                            if intent_value and detected_tool_intent.get(tool_id) != intent_value:
+                            complete_intent = extract_complete_intent(arguments_str)
+                            intent_complete = complete_intent is not None
+                            intent_value = complete_intent if intent_complete else extract_intent_from_partial(arguments_str)
+                            if intent_value is not None and (
+                                detected_tool_intent.get(tool_id) != intent_value
+                                or (intent_complete and tool_id not in completed_intents)
+                            ):
                                 detected_tool_intent[tool_id] = intent_value
+                                if intent_complete:
+                                    completed_intents.add(tool_id)
                                 sender('tool_intent', {
                                     'id': tool_id,
                                     'name': tool_name,
                                     'intent': intent_value,
+                                    'intent_complete': intent_complete,
                                     'conversation_id': conversation_id
                                 })
                                 debug_log(f"    发送工具意图: {tool_name} -> {intent_value}")

@@ -13,41 +13,11 @@
         >
           <div class="summary-content-wrapper">
             <span class="summary-preview">
-              <template v-if="shouldAnimateSummary(group.actions, group.id)">
-                <span
-                  v-if="shouldShowToolReel(group.actions, group.id)"
-                  class="summary-tool-reel-window"
-                >
-                  <span
-                    class="summary-tool-reel-track"
-                    :class="getToolReelPhase(group.id)"
-                    :style="getToolReelTrackStyle(group.id)"
-                  >
-                    <span
-                      v-for="(item, idx) in getToolReelDisplayItems(group.actions, group.id)"
-                      :key="`${group.id}-tool-reel-${idx}-${item}`"
-                      class="summary-tool-reel-item"
-                    >
-                      {{ item }}
-                    </span>
-                  </span>
-                </span>
-                <template v-else>
-                  <span
-                    v-for="(char, idx) in getAnimatedSummaryChars(
-                      getSummaryLineText(group.actions, group.id)
-                    )"
-                    :key="`${group.id}-${idx}`"
-                    class="summary-char"
-                    :style="{ animationDelay: `${(idx + 1) * 0.12}s` }"
-                  >
-                    {{ char === ' ' ? '\u00A0' : char }}
-                  </span>
-                </template>
-              </template>
-              <template v-else>
-                {{ getSummaryLineText(group.actions, group.id) }}
-              </template>
+              <SummarySweepText
+                v-bind="getSummarySweepInput(group.actions, group.id)"
+                :reel-view="summaryToolReel.shouldShow(group.id) ? summaryToolReel.getView(group.id) : undefined"
+                @settled="onSummarySettled(group.id, $event)"
+              />
             </span>
           </div>
           <!-- 加载动画或完成图标 -->
@@ -168,9 +138,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick, onBeforeUnmount, Component } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount, Component } from 'vue';
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
+import { useSummaryToolReel } from '@/composables/useSummaryToolReel';
+import SummarySweepText from './SummarySweepText.vue';
+import type { SummarySweepInput } from './summarySweepController';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
 import { getLatestToolBatch as getLatestToolSegment } from './toolSummaryBatch';
 
@@ -192,6 +165,7 @@ interface Action {
     intent?: string;
     intent_rendered?: string;
     intent_full?: string;
+    intent_complete?: boolean;
     status?: string;
     display_name?: string;
     arguments?: any;
@@ -252,34 +226,11 @@ const stepsWrapperRefs = new Map<string, HTMLElement>();
 const stepsWrapperScrollLocks = new Map<string, boolean>();
 const summaryLoaders = new Map<string, Component>();
 const STEPS_WRAPPER_BOTTOM_THRESHOLD = 20;
-const TOOL_REEL_ITEM_HEIGHT = 26;
-const TOOL_REEL_INTERVAL_MS = 1450;
-const TOOL_REEL_ROLL_MS = 520;
-const TOOL_REEL_SETTLE_MS = 170;
-const TOOL_REEL_OVERSHOOT_PX = 2;
-
-type ToolReelPhase = 'idle' | 'rolling' | 'settle';
-
-interface ToolReelState {
-  index: number;
-  offsetPx: number;
-  phase: ToolReelPhase;
-  signature: string;
-  batchKey: string;
-  items: string[];
-  completing?: boolean;
-}
-
-const toolReelStates = reactive<Record<string, ToolReelState>>({});
-const toolReelIntervals = new Map<string, number>();
-const toolReelTimeouts = new Map<string, number[]>();
-
-const getAnimatedSummaryChars = (text: string) => Array.from(text || '');
 
 const getFirstLine = (raw: string) => {
   const text = typeof raw === 'string' ? raw : '';
   const firstLineEnd = text.indexOf('\n');
-  return firstLineEnd > 0 ? text.substring(0, firstLineEnd) : text;
+  return firstLineEnd >= 0 ? text.substring(0, firstLineEnd) : text;
 };
 
 const getToolSummaryText = (action: Action) => {
@@ -288,8 +239,9 @@ const getToolSummaryText = (action: Action) => {
   if (!tool) return '';
 
   const intentEnabled = personalizationStore.form.tool_intent_enabled;
-  const intentText = tool.intent_rendered || tool.intent_full || '';
+  const intentText = tool.intent_full || tool.intent_rendered || tool.arguments?.intent || '';
 
+  if (intentEnabled && !isSummaryIntentReady(action)) return '';
   if (intentEnabled && intentText) {
     return getFirstLine(intentText);
   }
@@ -329,198 +281,20 @@ const getToolBatchKey = (actions: Action[]) => {
   return first?.toolBatchId || first?.id || '';
 };
 
-const getLatestActiveToolSegment = (actions: Action[]) => {
-  const segment = getLatestToolSegment(actions);
-  return segment.some(isActiveToolAction) ? segment : [];
+const isSummaryIntentReady = (action: Action): boolean => {
+  if (!personalizationStore.form.tool_intent_enabled) return true;
+  const tool = action.tool;
+  return tool?.intent_complete === true ||
+    (tool?.intent_complete === undefined && tool?.status !== 'preparing' && tool?.status !== 'hinted');
 };
 
-const getToolReelItems = (actions: Action[]) =>
-  getLatestActiveToolSegment(actions)
-    .map(getToolSummaryText)
-    .filter((item) => item.trim().length > 0);
-
-const getToolReelDisplayItems = (actions: Action[], groupId: string) => {
-  const completingItems = toolReelStates[groupId]?.completing
-    ? toolReelStates[groupId].items
-    : null;
-  if (completingItems?.length) {
-    return completingItems;
-  }
-
-  const items = getToolReelItems(actions);
-  return items.length > 0 ? [...items, items[0]] : [];
-};
-
-const shouldShowToolReel = (actions: Action[], groupId: string) =>
-  !!toolReelStates[groupId]?.completing ||
-  (isSummaryRunning(actions, groupId) && getToolReelItems(actions).length > 1);
-
-const shouldAnimateSummary = (actions: Action[], groupId: string) =>
-  isSummaryRunning(actions, groupId) || !!toolReelStates[groupId]?.completing;
-
-const getToolReelPhase = (groupId: string) => toolReelStates[groupId]?.phase || 'idle';
-
-const getToolReelTrackStyle = (groupId: string) => ({
-  transform: `translateY(${toolReelStates[groupId]?.offsetPx || 0}px)`
-});
-
-const clearToolReelTimers = (groupId: string) => {
-  const interval = toolReelIntervals.get(groupId);
-  if (interval) {
-    window.clearInterval(interval);
-    toolReelIntervals.delete(groupId);
-  }
-
-  const timeouts = toolReelTimeouts.get(groupId) || [];
-  timeouts.forEach((timeout) => window.clearTimeout(timeout));
-  toolReelTimeouts.delete(groupId);
-};
-
-const pushToolReelTimeout = (groupId: string, timeout: number) => {
-  const timeouts = toolReelTimeouts.get(groupId) || [];
-  timeouts.push(timeout);
-  toolReelTimeouts.set(groupId, timeouts);
-};
-
-const spinToolReel = (groupId: string, itemCount: number) => {
-  const state = toolReelStates[groupId];
-  if (!state || state.completing || itemCount < 2) return;
-
-  const nextIndex = (state.index + 1) % itemCount;
-  const visualIndex = nextIndex === 0 ? itemCount : nextIndex;
-  const targetOffset = -visualIndex * TOOL_REEL_ITEM_HEIGHT;
-
-  state.phase = 'rolling';
-  state.offsetPx = targetOffset - TOOL_REEL_OVERSHOOT_PX;
-
-  const settleTimeout = window.setTimeout(() => {
-    state.phase = 'settle';
-    state.offsetPx = targetOffset;
-    state.index = nextIndex;
-
-    if (nextIndex === 0) {
-      const resetTimeout = window.setTimeout(() => {
-        state.phase = 'idle';
-        state.offsetPx = 0;
-      }, TOOL_REEL_SETTLE_MS);
-      pushToolReelTimeout(groupId, resetTimeout);
-    }
-  }, TOOL_REEL_ROLL_MS);
-  pushToolReelTimeout(groupId, settleTimeout);
-};
-
-const finishToolReel = (groupId: string, actions: Action[]) => {
-  const state = toolReelStates[groupId];
-  if (!state || state.completing) return;
-
-  const items =
-    state.items.length > 1
-      ? state.items
-      : getLatestToolSegment(actions)
-          .map(getToolSummaryText)
-          .filter((item) => item.trim().length > 0);
-
-  if (items.length < 2) {
-    clearToolReelTimers(groupId);
-    delete toolReelStates[groupId];
-    return;
-  }
-
-  clearToolReelTimers(groupId);
-  state.items = items;
-  state.signature = items.join('\u0001');
-  state.completing = true;
-
-  const finalIndex = items.length - 1;
-  const normalizedOffset = -state.index * TOOL_REEL_ITEM_HEIGHT;
-  const targetOffset = -finalIndex * TOOL_REEL_ITEM_HEIGHT;
-
-  state.phase = 'idle';
-  state.offsetPx = normalizedOffset;
-
-  window.requestAnimationFrame(() => {
-    if (toolReelStates[groupId] !== state) return;
-    state.phase = 'rolling';
-    state.offsetPx = targetOffset - TOOL_REEL_OVERSHOOT_PX;
-
-    const settleTimeout = window.setTimeout(() => {
-      state.phase = 'settle';
-      state.offsetPx = targetOffset;
-      state.index = finalIndex;
-    }, TOOL_REEL_ROLL_MS);
-    pushToolReelTimeout(groupId, settleTimeout);
-
-    const cleanupTimeout = window.setTimeout(
-      () => {
-        clearToolReelTimers(groupId);
-        delete toolReelStates[groupId];
-      },
-      TOOL_REEL_ROLL_MS + TOOL_REEL_SETTLE_MS + 260
-    );
-    pushToolReelTimeout(groupId, cleanupTimeout);
-  });
-};
-
-const syncToolReels = () => {
-  const activeGroups = new Set<string>();
-
-  blockGroups.value.forEach((group) => {
-    if (group.type !== 'summary' || !group.actions) return;
-
-    const batchKey = getToolBatchKey(group.actions);
-    const previous = toolReelStates[group.id];
-    if (previous && previous.batchKey !== batchKey) {
-      clearToolReelTimers(group.id);
-      delete toolReelStates[group.id];
-    }
-    if (toolReelStates[group.id]?.completing) {
-      activeGroups.add(group.id);
-      return;
-    }
-    if (!shouldShowToolReel(group.actions, group.id)) return;
-
-    const items = getToolReelItems(group.actions);
-    const signature = items.join('\u0001');
-    activeGroups.add(group.id);
-
-    if (!toolReelStates[group.id] || toolReelStates[group.id].signature !== signature) {
-      clearToolReelTimers(group.id);
-      toolReelStates[group.id] = {
-        index: 0,
-        offsetPx: 0,
-        phase: 'idle',
-        signature,
-        batchKey,
-        items
-      };
-    } else {
-      toolReelStates[group.id].items = items;
-    }
-
-    if (!toolReelIntervals.has(group.id)) {
-      const interval = window.setInterval(
-        () => spinToolReel(group.id, items.length),
-        TOOL_REEL_INTERVAL_MS
-      );
-      toolReelIntervals.set(group.id, interval);
-    }
-  });
-
-  Object.keys(toolReelStates).forEach((groupId) => {
-    if (!activeGroups.has(groupId)) {
-      const group = blockGroups.value.find((item) => item.id === groupId);
-      if (group?.type === 'summary' && group.actions && !toolReelStates[groupId].completing) {
-        activeGroups.add(groupId);
-        finishToolReel(groupId, group.actions);
-        return;
-      }
-
-      if (!toolReelStates[groupId].completing) {
-        clearToolReelTimers(groupId);
-        delete toolReelStates[groupId];
-      }
-    }
-  });
+const getSummaryToolItems = (actions: Action[]) => {
+  const batchKey = getToolBatchKey(actions);
+  return getLatestToolSegment(actions).map((action, index) => ({
+    identity: `${batchKey}:${action.id || action.blockId || index}`,
+    text: getToolSummaryText(action),
+    ready: isSummaryIntentReady(action)
+  }));
 };
 
 // 获取摘要组的加载动画组件（每次action类型切换时随机一次）
@@ -780,58 +554,6 @@ const getToolCategory = (action: Action): ToolCategory => {
   return TOOL_CATEGORY_MAP[name] || 'other';
 };
 
-// 运行中：显示当前最新步骤的意图或状态（单行，由 CSS 截断）
-const getRunningSummaryText = (actions: Action[]): string => {
-  void currentLocale.value;
-  const streamingActions = actions.filter((a) => a.streaming);
-
-  let currentStep;
-  if (streamingActions.length > 0) {
-    currentStep = streamingActions[streamingActions.length - 1];
-  } else {
-    const toolActions = actions.filter((a) => a.type === 'tool');
-    if (toolActions.length > 0) {
-      currentStep = toolActions[toolActions.length - 1];
-    } else {
-      currentStep = actions[actions.length - 1];
-    }
-  }
-
-  if (!currentStep) return '';
-
-  if (currentStep.type === 'thinking') {
-    const content = currentStep.content || '';
-    return getFirstLine(content);
-  }
-
-  if (currentStep.type === 'tool') {
-    const tool = currentStep.tool;
-    if (!tool) return '';
-
-    const intentEnabled = personalizationStore.form.tool_intent_enabled;
-    const intentText = tool.intent_rendered || tool.intent_full || '';
-
-    if (intentEnabled && intentText) {
-      return getFirstLine(intentText);
-    }
-
-    if (tool.status === 'preparing') {
-      return t('toolResults.sentences.preparing', { name: tool.name || t('common.tool') });
-    }
-    if (tool.status === 'running') {
-      return t('chat.callingTool', { name: tool.name || t('common.tool') });
-    }
-    if (tool.status === 'completed') {
-      return tool.display_name || tool.name || t('chat.toolCompleted');
-    }
-    return currentStep.streaming
-      ? t('chat.executingTool')
-      : tool.display_name || tool.name || t('chat.runTool');
-  }
-
-  return '';
-};
-
 // 完成后：汇总本组所有工具的执行次数
 const getCompletedSummaryText = (actions: Action[]): string => {
   void currentLocale.value;
@@ -873,14 +595,6 @@ const getCompletedSummaryText = (actions: Action[]): string => {
   return parts.join('，');
 };
 
-// 摘要行统一入口：运行中显示实时进度，完成后显示统计总结
-const getSummaryLineText = (actions: Action[], groupId: string): string => {
-  if (isSummaryRunning(actions, groupId)) {
-    return getRunningSummaryText(actions);
-  }
-  return getCompletedSummaryText(actions);
-};
-
 // 判断摘要组是否正在运行（显示加载动画还是对勾）
 const isSummaryRunning = (actions: Action[], groupId: string) => {
   if (!props.conversationRunning || !props.isLatestMessage) {
@@ -891,12 +605,95 @@ const isSummaryRunning = (actions: Action[], groupId: string) => {
   const currentIndex = blockGroups.value.findIndex((g) => g.id === groupId);
   if (currentIndex === -1) return false;
 
-  // 检查后面是否有文本输出
-  const hasTextAfter = blockGroups.value.slice(currentIndex + 1).some((g) => g.type === 'text');
+  // text_start creates an empty action before its first nonempty chunk.
+  const lastActionIndex = props.actions.indexOf(actions[actions.length - 1]);
+  const hasTextAfter = lastActionIndex >= 0 &&
+    props.actions.slice(lastActionIndex + 1).some((action) => action.type === 'text');
 
   // 只有当后面有文本输出时，才显示对勾（说明这个摘要组已经完成并开始输出了）
   // 否则一直显示加载动画（即使工具执行完了，也要等下一个步骤或文本输出）
   return !hasTextAfter;
+};
+
+const summaryEntries = ref<Record<string, string>>({});
+const summaryEntryTexts = ref<Record<string, string>>({});
+const summaryThinkingEntries = ref<Record<string, string>>({});
+const onSummarySettled = (groupId: string, input: SummarySweepInput) => {
+  summaryEntries.value[groupId] = input.identity;
+  summaryEntryTexts.value[groupId] = input.text;
+  // Keep thinking entry completion separate: the final summary's settled
+  // event must not make the completed thought look unentered again.
+  if (input.kind === 'thinking' && input.text) {
+    summaryThinkingEntries.value[groupId] = input.identity;
+  }
+};
+
+const summaryToolReel = useSummaryToolReel(() =>
+  blockGroups.value.flatMap((group) => {
+    if (group.type !== 'summary' || !group.actions) return [];
+    const tools = getLatestToolSegment(group.actions);
+    const batchKey = getToolBatchKey(group.actions);
+    return [{
+      id: group.id,
+      batchKey,
+      items: getSummaryToolItems(group.actions).filter((item) => item.ready).map((item) => item.text),
+      ready: summaryEntries.value[group.id] === `${batchKey}:tools`,
+      running: isSummaryRunning(group.actions, group.id),
+      active: tools.some(isActiveToolAction)
+    }];
+  })
+);
+
+const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepInput => {
+  const running = isSummaryRunning(actions, groupId);
+  const lastAction = actions[actions.length - 1];
+  const thinkingIdentity = lastAction?.id || lastAction?.blockId || `${groupId}:thinking`;
+  const thinkingComplete = lastAction?.type === 'thinking' && lastAction.streaming === false &&
+    summaryThinkingEntries.value[groupId] === thinkingIdentity;
+  const latestSummary = blockGroups.value.filter((group) => group.type === 'summary').pop();
+  // Only keep a finished thought until its entry has appeared. Body streaming
+  // must not postpone the final summary until the whole API call completes.
+  const thinkingDuringOutput = lastAction?.type === 'thinking' && !thinkingComplete &&
+    latestSummary?.id === groupId && props.conversationRunning && props.isLatestMessage;
+  if (thinkingComplete || (!running && !thinkingDuringOutput)) {
+    return {
+      text: getCompletedSummaryText(actions),
+      identity: `${groupId}:complete`,
+      kind: 'static',
+      animate: false,
+      sweeping: false
+    };
+  }
+  const tools = getLatestToolSegment(actions);
+  const items = getSummaryToolItems(actions);
+  if (items.length) {
+    const running = tools.some(isActiveToolAction);
+    const item = items[0];
+    const identity = `${getToolBatchKey(actions)}:tools`;
+    const entryText = items.length > 1 && summaryEntries.value[groupId] === identity
+      ? summaryEntryTexts.value[groupId] : undefined;
+    return {
+      // The reel owns subsequent row updates. Status changes must not replay
+      // this batch's first entry or rebuild the outer summary animation.
+      text: entryText ?? item.text,
+      identity,
+      kind: 'tool',
+      animate: true,
+      sweeping: items.length === 1 && running,
+      parallel: items.length > 1,
+      // Same-batch parallel members keep the first entry intact; the reel
+      // waits for its settled event even when later members arrive early.
+      ready: item.ready
+    };
+  }
+  const thinking = actions.filter((action) => action.type === 'thinking').pop();
+  return {
+    text: getFirstLine(thinking?.content || ''),
+    identity: thinking?.id || thinking?.blockId || `${groupId}:thinking`,
+    kind: 'thinking',
+    animate: true,
+    sweeping: running && thinking?.streaming !== false
+  };
 };
 
 // 获取摘要组的所有步骤（用于展开显示）
@@ -1127,7 +924,6 @@ const handleScroll = (blockId: string, event: Event) => {
 watch(
   () => props.actions,
   () => {
-    syncToolReels();
     // 对展开的 running 摘要组，若用户未主动向上滚动，自动将展开区滚动到底部
     nextTick(() => {
       blockGroups.value.forEach((group) => {
@@ -1145,15 +941,7 @@ watch(
   { deep: true, immediate: true }
 );
 
-watch(
-  () => [props.conversationRunning, props.isLatestMessage],
-  () => {
-    syncToolReels();
-  }
-);
-
 onBeforeUnmount(() => {
-  Object.keys(toolReelStates).forEach(clearToolReelTimers);
   collapseSkipTimers.forEach((timer) => clearTimeout(timer));
   collapseSkipTimers.clear();
   stepsWrapperRefs.forEach((el) => {
@@ -1209,8 +997,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   font-size: 15px;
   color: var(--text-secondary);
-  /* 固定 26px 与工具轮播窗口（summary-tool-reel-window）严格同高：
-     轮播态与纯文本态高度不一致会导致贴底锁定时内容随轮播切换上下晃动 */
+  /* 摘要、打印和文字切换统一保持 26px，避免虚拟列表高度随动画变化。 */
   line-height: 26px;
   padding: 0;
   position: relative;
@@ -1224,63 +1011,6 @@ onBeforeUnmount(() => {
   color: inherit;
   mask-image: linear-gradient(to right, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
-}
-
-.summary-tool-reel-window {
-  position: relative;
-  display: inline-block;
-  width: min(100%, 36em);
-  height: 26px;
-  overflow: hidden;
-  vertical-align: top;
-}
-
-.summary-tool-reel-window::before,
-.summary-tool-reel-window::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 1;
-  height: 6px;
-  pointer-events: none;
-}
-
-.summary-tool-reel-window::before {
-  top: 0;
-  background: linear-gradient(180deg, var(--surface-base), transparent);
-}
-
-.summary-tool-reel-window::after {
-  bottom: 0;
-  background: linear-gradient(0deg, var(--surface-base), transparent);
-}
-
-.summary-tool-reel-track {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: block;
-  will-change: transform;
-}
-
-.summary-tool-reel-track.rolling {
-  transition: transform 520ms cubic-bezier(0.22, 0.9, 0.25, 1);
-}
-
-.summary-tool-reel-track.settle {
-  transition: transform 170ms cubic-bezier(0.2, 0.72, 0.26, 1);
-}
-
-.summary-tool-reel-item {
-  display: block;
-  height: 26px;
-  line-height: 26px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .summary-status-icon {
@@ -1312,44 +1042,9 @@ onBeforeUnmount(() => {
   height: 18px;
 }
 
-/* 运行中文本：按字符依次闪烁 */
-.summary-line-text.running .summary-char {
-  display: inline-block;
-  color: var(--text-secondary);
-  animation: summaryPass 2s ease-in-out infinite;
-}
-
-@keyframes summaryPass {
-  0%,
-  100% {
-    color: var(--text-secondary);
-  }
-  50% {
-    color: var(--accent);
-  }
-}
-
-/* ===== 明亮主题：摘要行降为三级文字色，与正文（text-primary）拉开层级 ===== */
-/* hover 反馈不做特化：与经典/深色保持一致（基础 hover 底色在三主题下均等于底色，均无可见反馈） */
-
-body[data-theme='light'] .summary-content-wrapper,
-body[data-theme='light'] .summary-tool-reel-item {
+/* 明亮主题的静态摘要维持三级文字色；运行扫光由独立组件与语义 token 控制。 */
+body[data-theme='light'] .summary-content-wrapper {
   color: var(--text-tertiary);
-}
-
-body[data-theme='light'] .summary-line-text.running .summary-char {
-  color: var(--text-tertiary);
-  animation-name: summaryPassLight;
-}
-
-@keyframes summaryPassLight {
-  0%,
-  100% {
-    color: var(--text-tertiary);
-  }
-  50% {
-    color: var(--accent);
-  }
 }
 
 /* 步骤容器 */

@@ -32,6 +32,7 @@ export const toolMethods = {
     if (existingAction) {
       if (String(existingAction.tool?.status || '').toLowerCase() === 'preparing') {
         existingAction.tool.message = data.message || existingAction.tool.message;
+        existingAction.tool.intent_complete ||= data.intent_complete === true;
         if (data.intent) {
           existingAction.tool.intent_full = data.intent;
           existingAction.tool.intent_rendered = data.intent;
@@ -55,7 +56,8 @@ export const toolMethods = {
         result: null,
         message: data.message || t('appTasks.preparingTool', { name: data.name }),
         intent_full: data.intent || '',
-        intent_rendered: data.intent || ''
+        intent_rendered: data.intent || '',
+        intent_complete: data.intent_complete === true
       },
       timestamp: Date.now()
     };
@@ -120,6 +122,10 @@ export const toolMethods = {
 
     action.tool.status = 'running';
     action.tool.arguments = data.arguments;
+    action.tool.intent_complete = true;
+    if (typeof data.arguments?.intent === 'string') {
+      action.tool.intent_full = data.arguments.intent;
+    }
     action.tool.argumentSnapshot = this.cloneToolArguments(data.arguments);
     action.tool.argumentLabel = this.buildToolLabel(action.tool.argumentSnapshot);
     action.tool.message = null;
@@ -147,9 +153,13 @@ export const toolMethods = {
 
     if (action && action.tool) {
       const newIntent = data.intent || '';
+      const wasComplete = action.tool.intent_complete === true;
+      action.tool.intent_complete = wasComplete || data.intent_complete === true;
 
-      // 如果 intent 没有变化，跳过
+      // The closing quote may arrive without changing the text. Its completion
+      // signal still needs to release the minimal summary entry gate.
       if (action.tool.intent_full === newIntent) {
+        if (!wasComplete && action.tool.intent_complete) this.$forceUpdate();
         return;
       }
 
