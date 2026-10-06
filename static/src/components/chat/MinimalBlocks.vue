@@ -172,6 +172,7 @@ import { ref, reactive, computed, watch, nextTick, onBeforeUnmount, Component } 
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
+import { getLatestToolBatch as getLatestToolSegment } from './toolSummaryBatch';
 
 const personalizationStore = usePersonalizationStore();
 const heightLimited = computed(() => personalizationStore.form.minimal_expand_height_limited);
@@ -185,6 +186,7 @@ interface Action {
   content: string;
   streaming?: boolean;
   blockId?: string;
+  toolBatchId?: string;
   tool?: {
     name?: string;
     intent?: string;
@@ -263,6 +265,7 @@ interface ToolReelState {
   offsetPx: number;
   phase: ToolReelPhase;
   signature: string;
+  batchKey: string;
   items: string[];
   completing?: boolean;
 }
@@ -321,25 +324,9 @@ const isActiveToolAction = (action: Action) => {
   ].includes(status);
 };
 
-const getLatestToolSegment = (actions: Action[]) => {
-  let lastToolIndex = -1;
-  for (let i = actions.length - 1; i >= 0; i--) {
-    if (actions[i].type === 'tool') {
-      lastToolIndex = i;
-      break;
-    }
-    if (actions[i].type === 'thinking') {
-      break;
-    }
-  }
-  if (lastToolIndex < 0) return [];
-
-  let startIndex = lastToolIndex;
-  while (startIndex > 0 && actions[startIndex - 1].type === 'tool') {
-    startIndex--;
-  }
-
-  return actions.slice(startIndex, lastToolIndex + 1);
+const getToolBatchKey = (actions: Action[]) => {
+  const first = getLatestToolSegment(actions)[0];
+  return first?.toolBatchId || first?.id || '';
 };
 
 const getLatestActiveToolSegment = (actions: Action[]) => {
@@ -452,6 +439,7 @@ const finishToolReel = (groupId: string, actions: Action[]) => {
   state.offsetPx = normalizedOffset;
 
   window.requestAnimationFrame(() => {
+    if (toolReelStates[groupId] !== state) return;
     state.phase = 'rolling';
     state.offsetPx = targetOffset - TOOL_REEL_OVERSHOOT_PX;
 
@@ -477,13 +465,19 @@ const syncToolReels = () => {
   const activeGroups = new Set<string>();
 
   blockGroups.value.forEach((group) => {
-    if (
-      group.type !== 'summary' ||
-      !group.actions ||
-      !shouldShowToolReel(group.actions, group.id)
-    ) {
+    if (group.type !== 'summary' || !group.actions) return;
+
+    const batchKey = getToolBatchKey(group.actions);
+    const previous = toolReelStates[group.id];
+    if (previous && previous.batchKey !== batchKey) {
+      clearToolReelTimers(group.id);
+      delete toolReelStates[group.id];
+    }
+    if (toolReelStates[group.id]?.completing) {
+      activeGroups.add(group.id);
       return;
     }
+    if (!shouldShowToolReel(group.actions, group.id)) return;
 
     const items = getToolReelItems(group.actions);
     const signature = items.join('\u0001');
@@ -496,6 +490,7 @@ const syncToolReels = () => {
         offsetPx: 0,
         phase: 'idle',
         signature,
+        batchKey,
         items
       };
     } else {

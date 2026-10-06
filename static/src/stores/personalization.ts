@@ -15,7 +15,7 @@ const TONE_PRESET_KEYS = [
 ] as const;
 
 export type BlockDisplayMode = 'traditional' | 'stacked' | 'minimal';
-export type CompactMessageDisplay = 'full' | 'brief';
+export type CompactMessageDisplay = 'full' | 'brief' | 'hidden';
 /** 个人空间抽屉标签页（精简后只剩「个性化 / 账户」两个，其余迁入全屏设置页） */
 export type PersonalDrawerTab = 'preferences' | 'account';
 /** 个人空间默认落地标签页 */
@@ -464,7 +464,7 @@ const loadExperimentState = (): ExperimentState => {
       defaultExperimentState().compactMessageDisplay;
     if (
       typeof parsed?.compactMessageDisplay === 'string' &&
-      ['full', 'brief'].includes(parsed.compactMessageDisplay)
+      ['full', 'brief', 'hidden'].includes(parsed.compactMessageDisplay)
     ) {
       compactMessageDisplay = parsed.compactMessageDisplay;
     }
@@ -651,7 +651,10 @@ export const usePersonalizationStore = defineStore('personalization', {
         silent_tool_disable: !!data.silent_tool_disable,
         hide_tool_approval_panel: data.hide_tool_approval_panel !== false,
         enhanced_tool_display: data.enhanced_tool_display !== false,
-        compact_message_display: data.compact_message_display === 'brief' ? 'brief' : 'full',
+        compact_message_display:
+          data.compact_message_display === 'brief' || data.compact_message_display === 'hidden'
+            ? data.compact_message_display
+            : 'full',
         block_display_mode:
           data.block_display_mode === 'traditional' ||
           data.block_display_mode === 'stacked' ||
@@ -1294,7 +1297,8 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.scheduleAutoSave();
     },
     setCompactMessageDisplay(mode: CompactMessageDisplay) {
-      const target: CompactMessageDisplay = mode === 'brief' ? 'brief' : 'full';
+      const target: CompactMessageDisplay =
+        mode === 'brief' || mode === 'hidden' ? mode : 'full';
       this.form = {
         ...this.form,
         compact_message_display: target

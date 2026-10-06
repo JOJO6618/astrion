@@ -165,7 +165,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "silent_tool_disable": True,  # 禁用工具时不向模型插入提示（默认开启）
     "hide_tool_approval_panel": True,  # 自动审核模式下不自动打开工具审核面板（默认开启）
     "enhanced_tool_display": True,  # 增强工具显示
-    "compact_message_display": "full",  # 简略消息显示：full-完整原始内容 / brief-一行概要
+    "compact_message_display": "full",  # 简略消息显示：full-完整 / brief-概要 / hidden-不显示
     "block_display_mode": "minimal",  # 堆叠块显示模式：traditional-传统列表 / stacked-堆叠动画 / minimal-极简模式
     "show_status_avatar": True,  # 是否显示助手状态形象
     "stacked_hide_borders": False,  # 堆叠块隐藏边线
@@ -702,9 +702,9 @@ def sanitize_personalization_payload(
     else:
         base["enhanced_tool_display"] = bool(base.get("enhanced_tool_display", True))
 
-    # 简略消息显示：full（完整原始内容）/ brief（一行概要）
+    # 简略消息显示：full（完整）/ brief（概要）/ hidden（不显示）
     compact_msg = data.get("compact_message_display", base.get("compact_message_display"))
-    if isinstance(compact_msg, str) and compact_msg.strip().lower() in ("full", "brief"):
+    if isinstance(compact_msg, str) and compact_msg.strip().lower() in ("full", "brief", "hidden"):
         base["compact_message_display"] = compact_msg.strip().lower()
     else:
         base["compact_message_display"] = "full"

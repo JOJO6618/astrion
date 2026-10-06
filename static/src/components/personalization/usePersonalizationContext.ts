@@ -1241,10 +1241,16 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
       labelKey: 'personalization.compactMessageBrief',
       descKey: 'personalization.compactMessageBriefDesc',
       value: 'brief' as const
+    },
+    {
+      id: 'hidden',
+      labelKey: 'personalization.compactMessageHidden',
+      descKey: 'personalization.compactMessageHiddenDesc',
+      value: 'hidden' as const
     }
   ];
 
-  const selectCompactMessageDisplay = (mode: 'full' | 'brief') => {
+  const selectCompactMessageDisplay = (mode: 'full' | 'brief' | 'hidden') => {
     personalization.setCompactMessageDisplay(mode);
     closeDropdown();
   };

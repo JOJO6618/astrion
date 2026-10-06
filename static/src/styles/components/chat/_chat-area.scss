@@ -1241,7 +1241,8 @@
 }
 
 .user-message .message-text {
-  background: var(--chip-bg);
+  --user-bubble-bg: var(--chip-bg);
+  background: var(--user-bubble-bg);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1251,14 +1252,15 @@
 }
 
 .user-message.user-message--compact .message-text {
+  --user-bubble-bg: var(--surface-card);
   max-width: min(760px, 88%);
   align-self: center;
   padding: 10px 14px;
   border-radius: 14px;
   font-size: 13px;
   color: var(--text-secondary);
-  background: var(--theme-surface-card);
-  border: 1px solid var(--theme-control-border);
+  background: var(--user-bubble-bg);
+  border: 1px solid var(--border-default);
 }
 
 /* 简略信息：以横跨显示区域的横线包裹一行概要文字（类似 markdown 的 --- 分隔线）。 */
@@ -1332,7 +1334,7 @@
   right: 0;
   bottom: 0;
   height: 1.6em;
-  background: linear-gradient(to bottom, transparent, var(--chip-bg));
+  background: linear-gradient(to bottom, transparent, var(--user-bubble-bg));
   pointer-events: none;
   opacity: 1;
   transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -1364,7 +1366,7 @@
   margin-top: -1.6em;
   min-height: 1.6em;
   align-items: flex-end;
-  background: linear-gradient(to right, transparent 0%, transparent 50%, var(--chip-bg) 100%);
+  background: linear-gradient(to right, transparent 0%, transparent 50%, var(--user-bubble-bg) 100%);
   border-bottom-right-radius: 18px;
 }
 

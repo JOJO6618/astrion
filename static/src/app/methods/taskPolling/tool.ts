@@ -44,6 +44,7 @@ export const toolMethods = {
     const action = {
       id: data.id,
       type: 'tool',
+      toolBatchId: this._summaryToolBatchId || `tool-${data.id}`,
       tool: {
         id: data.id,
         name: data.name,
@@ -102,6 +103,7 @@ export const toolMethods = {
       action = {
         id: data.id,
         type: 'tool',
+        toolBatchId: this._summaryToolBatchId || `tool-${data.id}`,
         tool: {
           id: data.id,
           name: data.name,

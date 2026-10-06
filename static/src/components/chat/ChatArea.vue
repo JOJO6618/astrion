@@ -796,6 +796,7 @@ import ToolAction from '@/components/chat/actions/ToolAction.vue';
 import StackedBlocks from './StackedBlocks.vue';
 import MinimalBlocks from './MinimalBlocks.vue';
 import MarkdownRenderer from './MarkdownRenderer.vue';
+import { mergeAssistantDisplayRuns } from './assistantDisplayRuns';
 import { collectConversationCitations, type CitationAnnotation } from './citationChips';
 import EditSummaryCard from './EditSummaryCard.vue';
 import { usePersonalizationStore } from '@/stores/personalization';
@@ -850,12 +851,24 @@ const collectedCitations = computed<CitationAnnotation[]>(() =>
 );
 /** 该消息可用的引用来源：权威（metadata.citations，后端裁决富化）优先，否则用收集表 */
 function citationsForMessage(msg: any): CitationAnnotation[] | undefined {
+  if (Array.isArray(msg?.displaySourceMessages)) {
+    const citations = new Map<string, CitationAnnotation>();
+    msg.displaySourceMessages.forEach((source: any) => {
+      (citationsForMessage(source) || []).forEach((citation) => {
+        citations.set(`${citation.type}:${citation.id}`, citation);
+      });
+    });
+    return [...citations.values()];
+  }
   const meta = msg?.metadata?.citations;
   if (Array.isArray(meta)) return meta;
   return collectedCitations.value.length ? collectedCitations.value : undefined;
 }
 /** metadata.citations 到达即为权威裁决（含空数组=全部无效），触发无效 chip 移除与富化 */
 function citationsFinalForMessage(msg: any): boolean {
+  if (Array.isArray(msg?.displaySourceMessages)) {
+    return msg.displaySourceMessages.every(citationsFinalForMessage);
+  }
   return Array.isArray(msg?.metadata?.citations);
 }
 const blockDisplayMode = computed(() => {
@@ -1195,7 +1208,17 @@ const isHiddenUserMessage = (message: any) => {
   if (!message || message.role !== 'user') {
     return false;
   }
-  return getMessageVisibility(message) === 'hidden';
+  if (getMessageVisibility(message) === 'hidden') {
+    return true;
+  }
+  if (compactMessageDisplay.value !== 'hidden' || isMultiAgentMessage(message)) {
+    return false;
+  }
+  const meta = message.metadata || {};
+  const source = String(
+    meta.message_source || meta.source || message.message_source || message.source || 'user'
+  ).trim().toLowerCase();
+  return getMessageVisibility(message) === 'compact' || !['user', 'presend'].includes(source);
 };
 const isEmptyAssistantMessage = (message: any) => {
   if (!message || message.role !== 'assistant') {
@@ -1247,7 +1270,7 @@ const filteredMessages = computed(() => {
       dropped: source.length - result.length
     });
   }
-  return result;
+  return compactMessageDisplay.value === 'hidden' ? mergeAssistantDisplayRuns(result) : result;
 });
 const getFilteredMessagesSafe = () =>
   Array.isArray(filteredMessages.value) ? filteredMessages.value : [];
@@ -1462,6 +1485,8 @@ function relockFollow(source: string) {
 const messageKeyCache = new WeakMap<object, string>();
 let messageKeySeq = 0;
 const getMessageKey = (msg: any, index: number): string => {
+  // A merged display run keeps the first source's identity across stream updates.
+  msg = msg?.displaySourceMessages?.[0] || msg;
   if (msg && typeof msg === 'object') {
     let key = messageKeyCache.get(msg as object);
     if (!key) {

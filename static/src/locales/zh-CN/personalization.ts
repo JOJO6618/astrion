@@ -220,6 +220,8 @@ export default {
   compactMessageFullDesc: '审核、子智能体等系统消息显示完整原始内容',
   compactMessageBrief: '简略信息',
   compactMessageBriefDesc: '用一行横线概要替代系统消息',
+  compactMessageHidden: '不显示',
+  compactMessageHiddenDesc: '隐藏通知、引导和压缩等消息，保留正常用户消息和多智能体通信',
   themeClassic: '经典',
   themeClassicDesc: '米色质感，柔和高对比',
   themeLight: '明亮',

@@ -228,6 +228,9 @@ export default {
     'Show full original content for review, sub-agent and other system messages',
   compactMessageBrief: 'Brief',
   compactMessageBriefDesc: 'Replace system messages with a one-line summary',
+  compactMessageHidden: 'Hide',
+  compactMessageHiddenDesc:
+    'Hide notices, guidance and compression messages; keep regular user messages and multi-agent communication',
   themeClassic: 'Classic',
   themeClassicDesc: 'Beige tones, soft and high-contrast',
   themeLight: 'Light',

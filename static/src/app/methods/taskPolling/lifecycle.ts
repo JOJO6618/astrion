@@ -184,6 +184,9 @@ export const lifecycleMethods = {
     // 历史事件重放时按序经过此处，最终状态自然收敛正确。
     if (eventType === 'api_request_start') {
       this.apiRequestPending = true;
+      // Every request starts a distinct tool batch, even without reasoning output.
+      this._summaryToolBatchSequence = (this._summaryToolBatchSequence || 0) + 1;
+      this._summaryToolBatchId = `request-${this._summaryToolBatchSequence}`;
     } else if (
       eventType === 'thinking_start' ||
       eventType === 'text_start' ||

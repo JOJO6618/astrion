@@ -398,6 +398,7 @@ export const historyMethods = {
             const action = {
               id: `history-tool-${toolCall.id || Date.now()}-${tcIndex}`,
               type: 'tool',
+              toolBatchId: `history-${message.tool_calls[0]?.id || currentAssistantMessage.actions.length - tcIndex}`,
               tool: {
                 id: toolCall.id,
                 name: toolCall.function.name,
