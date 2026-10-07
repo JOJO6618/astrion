@@ -71,11 +71,11 @@ export default {
 
   // —— 工具执行摘要（极简模式 MinimalBlocks） ——
   executing: '执行中...',
-  callingTool: '正在调用 {name}...',
-  toolCompleted: '工具执行完成',
   executingTool: '正在执行工具...',
   runTool: '执行工具',
   summaryRead: '读取了 {n} 个文件',
+  summarySkillRead: '读取了 {n} 个技能',
+  summaryVision: '查看了 {n} 个图片/视频',
   summaryCommand: '运行了 {n} 个指令',
   summaryEdit: '编辑了 {n} 次文件',
   summarySearch: '搜索了 {n} 次',

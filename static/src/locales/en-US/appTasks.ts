@@ -50,7 +50,6 @@ export default {
   reasonNotProvided: 'Not provided',
 
   // ── Tool blocks & tool settings (tool.ts / tooling.ts) ──
-  preparingTool: 'Preparing to call {name}...',
   interruptedByNewResponse: 'Interrupted by a new response',
   cannotModify: 'Cannot modify',
   categoryEnforcedByAdmin: 'This tool category is enforced by the administrator',

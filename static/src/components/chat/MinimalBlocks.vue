@@ -146,6 +146,7 @@ import SummarySweepText from './SummarySweepText.vue';
 import type { SummarySweepInput } from './summarySweepController';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
 import { getLatestToolBatch as getLatestToolSegment } from './toolSummaryBatch';
+import { getToolStateText } from '@/utils/chatDisplay';
 
 const personalizationStore = usePersonalizationStore();
 const heightLimited = computed(() => personalizationStore.form.minimal_expand_height_limited);
@@ -242,22 +243,17 @@ const getToolSummaryText = (action: Action) => {
   const intentText = tool.intent_full || tool.intent_rendered || tool.arguments?.intent || '';
 
   // 只对 intent 片段设门闸：完整 intent 到达前不展示半截解码文字，但下方的
-  // 稳定状态兜底文案（准备调用/正在调用…）是安全的，必须照常显示，避免摘要行
+  // 稳定状态兜底文案（准备/正在/完成/失败四态）是安全的，必须照常显示，避免摘要行
   // 在完整 intent 到达前整行空白。完整 intent 到达后由上方分支同步替换。
   if (intentEnabled && isSummaryIntentReady(action) && intentText) {
     const firstLine = getFirstLine(intentText);
     if (firstLine) return firstLine;
   }
 
-  if (tool.status === 'preparing') {
-    return t('toolResults.sentences.preparing', { name: tool.name || t('common.tool') });
-  }
-  if (tool.status === 'running') {
-    return t('chat.callingTool', { name: tool.name || t('common.tool') });
-  }
-  if (tool.status === 'completed') {
-    return tool.display_name || tool.name || t('chat.toolCompleted');
-  }
+  // 无 intent 或 intent 未就绪：按工具名出四态文案（与完整视图同一来源）
+  const stateText = getToolStateText(tool);
+  if (stateText) return stateText;
+
   return action.streaming
     ? t('chat.executingTool')
     : tool.display_name || tool.name || t('chat.runTool');
@@ -407,6 +403,8 @@ const blockGroups = computed(() => {
 
 type ToolCategory =
   | 'read'
+  | 'skill_read'
+  | 'vision'
   | 'command'
   | 'edit'
   | 'search'
@@ -431,12 +429,12 @@ type ToolCategory =
   | 'other';
 
 const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
-  // 读取文件 / 视觉内容
+  // 读取文件 / 技能 / 视觉内容（分档统计：看图与读技能不再计入“读文件”）
   read_file: 'read',
-  read_skill: 'read',
-  vlm_analyze: 'read',
-  view_image: 'read',
-  view_video: 'read',
+  read_skill: 'skill_read',
+  vlm_analyze: 'vision',
+  view_image: 'vision',
+  view_video: 'vision',
 
   // 运行指令
   run_command: 'command',
@@ -445,12 +443,8 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   terminal_snapshot: 'command',
 
   // 编辑文件
-  create_file: 'edit',
   write_file: 'edit',
   edit_file: 'edit',
-  delete_file: 'edit',
-  rename_file: 'edit',
-  create_folder: 'edit',
 
   // 搜索
   web_search: 'search',
@@ -505,6 +499,8 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
 // TODO(common): 候选公共词（若跨域复用于摘要统计可归并 common）
 const CATEGORY_LABEL_KEYS: Record<ToolCategory, string> = {
   read: 'chat.summaryRead',
+  skill_read: 'chat.summarySkillRead',
+  vision: 'chat.summaryVision',
   command: 'chat.summaryCommand',
   edit: 'chat.summaryEdit',
   search: 'chat.summarySearch',
@@ -531,6 +527,8 @@ const CATEGORY_LABEL_KEYS: Record<ToolCategory, string> = {
 
 const CATEGORY_ORDER: ToolCategory[] = [
   'read',
+  'skill_read',
+  'vision',
   'command',
   'edit',
   'search',
@@ -867,17 +865,8 @@ const getToolName = (action: Action) => {
     return intentText;
   }
 
-  // 没有intent或未开启intent模式时显示状态
-  if (tool.status === 'preparing') {
-    return t('toolResults.sentences.preparing', { name: tool.name || t('common.tool') });
-  }
-  if (tool.status === 'running') {
-    return t('chat.callingTool', { name: tool.name || t('common.tool') });
-  }
-  if (tool.status === 'completed') {
-    return t('chat.toolCompleted');
-  }
-  return tool.name || t('chat.runTool');
+  // 没有intent或未开启intent模式时，按工具名出四态文案
+  return getToolStateText(tool) || tool.name || t('chat.runTool');
 };
 
 const getToolIntent = (action: Action) => {

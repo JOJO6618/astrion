@@ -51,7 +51,6 @@ export default {
   reasonNotProvided: '未提供',
 
   // ── 工具块与工具设置（tool.ts / tooling.ts） ──
-  preparingTool: '准备调用 {name}...',
   interruptedByNewResponse: '已被新的响应中断',
   cannotModify: '无法修改',
   categoryEnforcedByAdmin: '该工具类别被管理员强制设置',

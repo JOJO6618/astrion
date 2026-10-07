@@ -62,10 +62,7 @@ MESSAGES = {
     },
 
     # ── server/chat_flow_stream_loop.py ──
-    "stream_loop.preparing_tool": {
-        "zh-CN": "准备调用 {tool}...",
-        "en-US": "Preparing to call {tool}...",
-    },
+    # 工具准备态文案已改由前端按工具名统一生成（四态），后端不再下发 message
 
     # ── core/web_terminal.py（工具执行状态广播 message） ──
     # 注意：本组 key 与 modules/i18n_messages/web_terminal.py 的 key 不重叠。

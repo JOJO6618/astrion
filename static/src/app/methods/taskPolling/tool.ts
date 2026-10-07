@@ -61,7 +61,9 @@ export const toolMethods = {
         argumentLabel: '',
         status: 'preparing',
         result: null,
-        message: data.message || t('appTasks.preparingTool', { name: data.name }),
+        // 准备态文案由前端按工具名统一出（chatDisplay），不再使用后端下发的 message，
+        // 避免服务端语言与界面语言不一致、极简/完整视图两套文案。
+        message: '',
         intent_full: data.intent || '',
         intent_rendered: data.intent || '',
         intent_complete: data.intent_complete === true

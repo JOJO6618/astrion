@@ -212,11 +212,12 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                                     debug_log(f"[intent] 预提取 {tool_name}: {intent_value}")
 
                             # 立即发送工具准备中事件
+                            # 准备态文案由前端按工具名统一生成（四态文案表），
+                            # 后端不再下发 message，避免服务端语言与界面语言不一致。
                             debug_log(f"[tool] 准备调用 {tool_name} (id={tool_id}) intent={intent_value or '-'}")
                             sender('tool_preparing', {
                                 'id': tool_id,
                                 'name': tool_name,
-                                'message': tr("stream_loop.preparing_tool", tool=tool_name),
                                 'intent': intent_value,
                                 'intent_complete': intent_complete,
                                 'conversation_id': conversation_id

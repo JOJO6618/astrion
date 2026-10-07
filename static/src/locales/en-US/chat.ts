@@ -61,11 +61,11 @@ export default {
 
   // —— Tool execution summary (minimal mode) ——
   executing: 'Executing...',
-  callingTool: 'Calling {name}...',
-  toolCompleted: 'Tool complete',
   executingTool: 'Executing tool...',
   runTool: 'Run tool',
   summaryRead: 'Read {n} files',
+  summarySkillRead: 'Read {n} skills',
+  summaryVision: 'Viewed {n} images/videos',
   summaryCommand: 'Ran {n} commands',
   summaryEdit: 'Edited files {n} times',
   summarySearch: 'Searched {n} times',
