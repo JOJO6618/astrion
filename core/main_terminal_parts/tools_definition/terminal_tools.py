@@ -170,7 +170,7 @@ class ToolsDefinitionTerminalToolsMixin:
                         "type": "function",
 	                "function": {
 	                    "name": "run_command",
-	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。遇到沙箱限制后，可显式申请 request_full_access 并说明原因：仅本次命令经人工批准后在宿主机执行，不改变全局权限。开启自动审核时必须同时得到自动审核通过与人工批准。计划/只读不可申请。Windows 沙箱使用 Linux bash，完全访问实际使用 Windows cmd.exe，申请时需重新编写适用于 cmd.exe 的命令和 Windows 路径，不会把失败的 bash 命令自动重试到宿主机。",
+	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。完成用户已授权的任务确实需要超出沙箱权限或使用宿主机原生工具链时，可设置 request_full_access=true，并填写非空 full_access_reason，申请本次命令的完全访问权限。申请前简短说明原因，然后直接发起工具申请，由审批面板获取授权，无需先在聊天中重复询问是否申请。仅本次命令经人工批准后在宿主机执行，不改变全局权限或执行环境，也不扩大其他工具或持久终端的权限。开启自动审核时必须同时获得自动审核通过与人工批准，人工允许不能中止或替代自动审核。计划模式、只读模式及子智能体不可申请，Docker 不支持；当前已处于宿主机直接执行环境时无需申请。Windows 沙箱使用 Linux bash，单次完全访问使用 Windows cmd.exe，申请时必须重新编写适用于 cmd 的命令和 Windows 路径。申请被拒绝后不得通过换命令、换工具或重复申请规避该决定。",
 	                    "parameters": {
 	                        "type": "object",
 	                        "properties": self._inject_intent({
@@ -184,7 +184,7 @@ class ToolsDefinitionTerminalToolsMixin:
                                     },
                                     "full_access_reason": {
                                         "type": "string",
-                                        "description": "申请本次完全访问的具体原因，request_full_access=true 时必填非空。"
+                                        "description": "申请本次完全访问的具体原因，说明执行目的、沙箱限制或宿主机执行需求，以及所需访问范围；request_full_access=true 时必填非空。"
                                     },
                                     "timeout": {
                                         "type": "number",
