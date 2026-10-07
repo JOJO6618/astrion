@@ -9,6 +9,8 @@
 
 import http from 'node:http';
 import { app, dialog } from 'electron';
+import { shutdownBackend } from './backend.js';
+import { setUpdaterInstalling } from './updater-state.js';
 import { migrationPageHtml } from './migration-window.js';
 import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
 
@@ -42,6 +44,35 @@ function setProgress(state, error = null) {
   }
 }
 
+/**
+ * 安装期兜底退出阶梯：quitAndInstall() 正常路径不返回；万一仍有路径把退出挡回来，
+ * 先重试 app.quit()，再关掉内嵌 Python 后端强制退出——绝不停在「窗口没了、Dock 图标
+ * 还在」的状态（该状态既让用户以为卡死，又会让 ShipIt 放弃本次安装）。
+ * 注意 app.exit() 不触发 will-quit，后端必须显式收掉，否则会留下孤儿 Python 进程。
+ */
+const UPDATER_QUIT_RETRY_MS = 8000;
+const UPDATER_FORCE_EXIT_MS = 11000;
+let updaterExitFallbackArmed = false;
+
+function armUpdaterExitFallback() {
+  if (updaterExitFallbackArmed) return;
+  updaterExitFallbackArmed = true;
+  setTimeout(() => {
+    console.warn('[astrion-desktop] quitAndInstall() 后仍未退出，改用 app.quit() 重试');
+    setUpdaterInstalling(true);
+    app.quit();
+  }, UPDATER_QUIT_RETRY_MS);
+  setTimeout(() => {
+    console.warn('[astrion-desktop] quitAndInstall() 后仍未退出，兜底强制退出');
+    try {
+      shutdownBackend();
+    } catch (err) {
+      console.error('[astrion-desktop] 兜底退出时后端清理失败:', err);
+    }
+    app.exit(0);
+  }, UPDATER_FORCE_EXIT_MS);
+}
+
 /** 惰性加载 electron-updater（仅打包环境可用；dev 下更新不可用）。 */
 async function getAutoUpdater() {
   if (autoUpdater) return autoUpdater;
@@ -69,15 +100,22 @@ async function getAutoUpdater() {
   });
   autoUpdater.on('update-downloaded', () => {
     setProgress(UpdateState.Installing);
-    // 重启进入新版本（quitAndInstall 不返回）
+    // 先开闸再安装：quitAndInstall() 是「先关闭所有窗口、之后才发 before-quit」，
+    // 主窗口/快捷窗的 close 拦截若照旧生效，应用就退不出去（历史故障：窗口消失、
+    // Dock 图标还在、点一下又弹回来，ShipIt 始终看到「有实例在运行」而放弃安装）。
+    setUpdaterInstalling(true);
+    // 重启进入新版本（quitAndInstall 正常路径不返回）
     setTimeout(() => {
       setProgress(UpdateState.Restarting);
       autoUpdater.quitAndInstall();
+      armUpdaterExitFallback();
     }, 300);
   });
   autoUpdater.on('error', (err) => {
     setProgress(UpdateState.Error, String(err?.message || err));
     installRunning = false;
+    // 安装没开始（检查/下载/校验失败）：撤销开闸，恢复正常关窗行为
+    setUpdaterInstalling(false);
   });
   return autoUpdater;
 }

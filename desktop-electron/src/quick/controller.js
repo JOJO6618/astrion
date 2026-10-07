@@ -13,6 +13,7 @@ import { InputRegions } from './input-regions.js';
 import { QuickVisibility } from './visibility.js';
 import { inputPermission, resolveListenerBinary } from './listener.js';
 import { configureWorkspaceVisibility } from './workspace-visibility.js';
+import { isUpdaterInstalling } from '../updater-state.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let quickWindow, tray, listener, capture;
@@ -82,7 +83,10 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
   });
   quickWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   quickWindow.webContents.on('will-navigate', (event, url) => { if (url !== assets.url) event.preventDefault(); });
-  quickWindow.on('close', (event) => { if (!quitting) { event.preventDefault(); hideQuickEntry(); } });
+  // 同主窗口：安装更新时必须放行关闭。quitting 只在 before-quit 里置位，而
+  // quitAndInstall() 是先关窗口、后发 before-quit，只靠 quitting 会拦出一个退不掉的
+  // 快捷窗，导致 ShipIt 判定“仍有实例在运行”而放弃安装。
+  quickWindow.on('close', (event) => { if (!quitting && !isUpdaterInstalling()) { event.preventDefault(); hideQuickEntry(); } });
   capture = new CaptureController(quickWindow, hideQuickEntry);
   visibility = new QuickVisibility(quickWindow, () => capture.dismissOverlays());
   const trusted = (event) => event.senderFrame === event.sender.mainFrame && (
@@ -204,10 +208,11 @@ function installListener() {
 }
 
 export async function showQuickEntry() {
-  if (!config.enabled || !quickWindow || quickWindow.isDestroyed() || quitting) return;
+  // 安装更新期间不再唤起：应用正在退出，界面出现只会干扰 ShipIt 的“无运行实例”判定。
+  if (!config.enabled || !quickWindow || quickWindow.isDestroyed() || quitting || isUpdaterInstalling()) return;
   try { await quickRendererReady; }
   catch (error) { console.error('[astrion-quick] 无法唤起快捷对话:', error.message); return; }
-  if (!config.enabled || quickWindow.isDestroyed() || quitting) return;
+  if (!config.enabled || quickWindow.isDestroyed() || quitting || isUpdaterInstalling()) return;
   if (!visibility.requested) {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     anchorDisplayId = display.id;

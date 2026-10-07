@@ -17,6 +17,7 @@ import { startBackendAndCreateWindow, shutdownBackend } from './lifecycle.js';
 import { installAppMenu } from './menu.js';
 import { startQuickEntry, quickEnabled, showQuickEntry } from './quick/controller.js';
 import { focusMainWindow } from './window.js';
+import { isUpdaterInstalling } from './updater-state.js';
 
 const quickDebug = process.argv.includes('--quick-debug');
 if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
@@ -27,12 +28,16 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
+    // 安装更新期间忽略二次启动/激活意图：应用正在退出，任何建窗都会让 ShipIt
+    // 判定“仍有实例在运行”并放弃本次安装。
+    if (isUpdaterInstalling()) return;
     if (quickDebug) showQuickEntry();
     else focusMainWindow();
   });
 
   app.on('activate', () => {
     // focusMainWindow queues the intent until the backend is ready.
+    if (isUpdaterInstalling()) return;
     if (!quickDebug) focusMainWindow();
   });
 

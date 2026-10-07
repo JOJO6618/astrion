@@ -17,6 +17,7 @@ import { app, BaseWindow, shell, WebContentsView } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quickEnabled } from './quick/controller.js';
+import { isUpdaterInstalling } from './updater-state.js';
 
 let appQuitting = false;
 app.on('before-quit', () => { appQuitting = true; });
@@ -49,6 +50,10 @@ export function getMainView() {
 }
 
 export function focusMainWindow(route = '') {
+  // 安装更新期间不再建窗、不再显示：此刻应用正在退出，窗口期要让给 ShipIt；
+  // Dock 点击（activate）/ 快捷对话的「打开桌面端」如果在这里把窗口拉回来，
+  // ShipIt 就会判定仍有实例在运行并放弃本次安装。
+  if (isUpdaterInstalling()) return;
   const target = route === '/settings/quick-chat' ? route : '';
   if (!backendPort) { pendingMainRoute = target; return; }
   if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(backendPort, target || '/');
@@ -171,7 +176,10 @@ export function createMainWindow(port, route = '/') {
   mainWindow.on('maximize', layoutViews);
   mainWindow.on('unmaximize', layoutViews);
   mainWindow.on('close', (event) => {
-    if (!appQuitting && quickEnabled()) { event.preventDefault(); mainWindow.hide(); }
+    // 安装更新时必须放行关闭：quitAndInstall() 先关窗口、之后才发 before-quit，
+    // 此刻 appQuitting 仍为 false；若这里 preventDefault，应用永远退不出去，
+    // ShipIt 等不到「无运行实例」而放弃安装。
+    if (!appQuitting && !isUpdaterInstalling() && quickEnabled()) { event.preventDefault(); mainWindow.hide(); }
   });
 
   mainWindow.on('closed', () => {
