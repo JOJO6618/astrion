@@ -1,5 +1,12 @@
 // Locale namespace: toolResults (en-US mirror, keys must match zh-CN/toolResults.ts exactly).
 export default {
+  access: {
+    workspace_write: 'Sandbox · workspace writes only',
+    sandbox_write: 'Sandbox · authorized paths',
+    full_access: 'Full access',
+    onceGranted: 'Full access approved for this command',
+    alreadyActive: 'Full access is already active'
+  },
   // —— Status labels (symbol-prefixed, semantically different from bare common.* words) ——
   status: {
     successMark: '✓ Success',
@@ -100,6 +107,7 @@ export default {
     userAnswer: 'User answer:',
     subAgent: 'Sub-agent:',
     subAgentId: 'Sub-agent ID:',
+    accessLevel: 'Fixed access:',
     requestedTools: 'Requested:',
     loadedNow: 'Newly loaded:',
     alreadyLoaded: 'Already loaded:',

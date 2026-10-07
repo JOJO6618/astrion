@@ -185,12 +185,17 @@ def _format_sleep(result_data: Dict[str, Any]) -> str:
     return "；".join(parts)
 
 def _format_run_command(result_data: Dict[str, Any]) -> str:
+    authority_note = ""
+    if result_data.get("full_access_granted"):
+        authority_note = "[本次命令已获完全访问授权；对话全局权限及执行环境未改变]\n"
+    elif result_data.get("full_access_already_active"):
+        authority_note = "[沿用当前完全访问执行环境]\n"
     status = str(result_data.get("status") or "").lower()
     if result_data.get("background_task_created") is False:
         body = _plain_command_output(result_data)
         if not body:
             body = "[no_output]"
-        return "[命令在5秒内完成，未创建后台任务]\n" + body
+        return authority_note + "[命令在5秒内完成，未创建后台任务]\n" + body
 
     if status == "running_background":
         command_id = result_data.get("command_id") or "-"
@@ -201,13 +206,13 @@ def _format_run_command(result_data: Dict[str, Any]) -> str:
             lines.append(output)
         else:
             lines.append("[no_output]")
-        return "\n".join(lines)
+        return authority_note + "\n".join(lines)
 
     text = _plain_command_output(result_data)
     if status == "timeout":
         suggestion = "建议：在持久终端中直接运行该命令（terminal_session + terminal_input），或缩短命令执行时间。"
         text = f"{text}\n{suggestion}" if text else suggestion
-    return text
+    return authority_note + text
 
 def _format_terminal_snapshot(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):

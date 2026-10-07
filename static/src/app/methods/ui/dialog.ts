@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { t } from '@/locales';
+import { normalizeApproval } from '@/components/input/approvalModel';
 
 export const dialogMethods = {
   openPersonalPage(tab) {
@@ -279,9 +280,8 @@ export const dialogMethods = {
     if (!Array.isArray(this.decidingApprovalIds)) {
       this.decidingApprovalIds = [];
     }
-    if (!this.decidingApprovalIds.includes(id)) {
-      this.decidingApprovalIds.push(id);
-    }
+    if (this.decidingApprovalIds.includes(id)) return;
+    this.decidingApprovalIds.push(id);
     try {
       const response = await fetch(`/api/tool-approvals/${encodeURIComponent(id)}/decision`, {
         method: 'POST',
@@ -294,15 +294,22 @@ export const dialogMethods = {
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || payload?.error || t('appUi.submitApprovalFailed'));
       }
-      this.pendingToolApprovals = (this.pendingToolApprovals || []).filter(
-        (item) => item && item.approval_id !== id
+      // Keep the request until tool_approval_resolved: full access may still
+      // need the independent automatic review after a human approval.
+      this.approvalSnapshotVersion += 1;
+      this.pendingToolApprovals = (this.pendingToolApprovals || []).map((item) =>
+        item?.approval_id === id
+          ? normalizeApproval(
+              {
+                ...item,
+                ...(payload.item || payload.approval || {}),
+                human_decision: (payload.item || payload.approval)?.human_decision || decision
+              },
+              item,
+              this.currentPermissionMode === 'auto_approval'
+            )
+          : item
       );
-      if (!this.pendingToolApprovals.length) {
-        this.rightCollapsed = true;
-        if (this.isMobileViewport && this.activeMobileOverlay === 'approval') {
-          this.closeMobileOverlay();
-        }
-      }
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : String(error || t('appUi.approvalFailed'));

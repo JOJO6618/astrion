@@ -172,13 +172,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         target = "direct" if normalized == "direct" else "sandbox"
         changed = target != self.host_execution_mode
         self.host_execution_mode = target
-        if changed:
-            # 存活子智能体的工具调用走主终端工具链，脚下环境已实时切换；
-            # 注入纯上下文通知告知「语言」变化（Windows 下 bash↔cmd），不触发新一轮工作。
-            try:
-                self.notify_execution_mode_changed(target)
-            except Exception:
-                logger.exception("[SubAgent] 执行环境变更通知失败")
+        # 该值仅保留主终端当前环境信息。已有子实例按创建时的固定档位执行，
+        # 不随主终端环境切换，也不接收会误导其命令风格的切换通知。
 
     def notify_execution_mode_changed(self, mode: str) -> int:
         """执行环境切换后，向存活的多智能体子智能体注入上下文通知。
@@ -242,6 +237,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         task_message: Optional[str] = None,
         compress_threshold_tokens: Optional[int] = None,
         max_turns: Optional[int] = None,
+        access_level: Optional[str] = None,
     ) -> Dict:
         """创建子智能体任务并启动协程。
         
@@ -249,6 +245,13 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         参数 role_id: 多智能体模式下的角色标诶。
         参数 display_name: 多智能体模式下的显示名（如 UI Operator_1）。
         """
+        from modules.execution_scope import validate_child_access
+        try:
+            if self.terminal is None:
+                raise ValueError("子智能体创建缺少可信主终端。")
+            access_level = validate_child_access(self.terminal, access_level)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
         validation_error = self._validate_create_params(agent_id, summary, task, deliverables_dir, multi_agent_mode=multi_agent_mode)
         if validation_error:
             return {"success": False, "error": validation_error}
@@ -312,8 +315,10 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         if system_prompt:
             final_system_prompt = system_prompt
         else:
-            # 快照当前执行环境写入提示词；后续切换由 notify_execution_mode_changed 补充告知
-            final_system_prompt = build_system_prompt(prompt_workspace, execution_mode=self.host_execution_mode)
+            fixed_mode = "direct" if access_level == "full_access" else "sandbox"
+            final_system_prompt = build_system_prompt(prompt_workspace, execution_mode=fixed_mode)
+        from modules.execution_scope import child_access_prompt
+        final_system_prompt += child_access_prompt(access_level)
         system_prompt_file.write_text(final_system_prompt, encoding="utf-8")
 
         # timeout_seconds 为 None 表示永久子智能体（不会被时间终结）
@@ -329,6 +334,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         task_record = {
             "task_id": task_id,
             "agent_id": agent_id,
+            "access_level": access_level,
+            "workspace_root": str(self.project_path.resolve()),
             "summary": summary,
             "task": task,
             "status": "running",
@@ -474,6 +481,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "deliverables_dir": str(deliverables_path),
             "run_in_background": run_in_background,
             "display_name": display_name,
+            "access_level": access_level,
         }
 
     def wait_for_completion(
@@ -1016,8 +1024,10 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             return {"success": True, "todo_list": todo_manager.get_snapshot()}
         return {"success": False, "error": tr("sub_agent_mgr.unknown_todo_tool", tool_name=tool_name)}
 
-    async def execute_tool_for_sub_agent(self, tool_name: str, arguments: Dict[str, Any], agent_id: Optional[int] = None) -> Dict[str, Any]:
-        """代表子智能体在主进程中执行工具。"""
+    async def execute_tool_for_sub_agent(self, tool_name: str, arguments: Dict[str, Any], agent_id: Optional[int] = None, executor: Optional[SubAgentTask] = None) -> Dict[str, Any]:
+        """代表可信子实例在主进程中执行工具。"""
+        if executor is None or executor.manager is not self or executor.agent_id != agent_id:
+            return {"success": False, "error": "子工具调用缺少可信执行实例。"}
         if not self.terminal:
             return {"success": False, "error": tr("sub_agent_mgr.no_terminal")}
 
@@ -1028,11 +1038,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         try:
             # 多智能体模式常见问答工具已在 SubAgentTask._execute_multi_agent_tool 中处理
             # 这里只处理实际通过主进程执行的工具
-            if tool_name == "read_mediafile":
-                return await handle_read_mediafile(self.project_path, arguments)
-
-            # 其余工具直接走主进程 handle_tool_call，自然经过沙箱/容器/权限链路
-            result_text = await self.terminal.handle_tool_call(tool_name, arguments)
+            from modules.sub_agent.execution import execute_child_tool
+            result_text = await execute_child_tool(self, tool_name, arguments, executor)
             try:
                 return json.loads(result_text)
             except Exception:
@@ -1069,6 +1076,9 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 continue
             # 已在内存中运行，无需恢复
             if task_id in self._running_tasks:
+                continue
+            if not self._has_fixed_access(task):
+                logger.warning("[restore] 任务 %s 缺少固定权限，跳过恢复", task_id)
                 continue
 
             task_root = Path(task.get("task_root", ""))
@@ -1175,7 +1185,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
 
                 sub_agent.inject_notification(
                     "[系统通知|执行环境]\n" + build_sub_agent_restore_notice(
-                        self._get_runtime_path(self.project_path), self.host_execution_mode
+                        self._get_runtime_path(Path(task["workspace_root"])),
+                        "direct" if task["access_level"] == "full_access" else "sandbox"
                     )
                 )
             except Exception:
@@ -1374,6 +1385,21 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         revived = self._revive_sub_agent(agent_id)
         return revived
 
+    @staticmethod
+    def _has_fixed_access(task: Dict[str, Any]) -> bool:
+        from modules.execution_scope import ACCESS_LEVELS
+        root = task.get("workspace_root")
+        level = task.get("access_level")
+        try:
+            return (
+                isinstance(level, str) and level in ACCESS_LEVELS
+                and isinstance(root, str) and bool(root)
+                and Path(root).is_absolute() and Path(root).is_dir()
+                and Path(root).resolve() == Path(root)
+            )
+        except (OSError, RuntimeError):
+            return False
+
     def _revive_sub_agent(self, agent_id: int) -> Optional[Any]:
         """从 conversation.json 重建一个多智能体子智能体实例（保留原 agent_id/role_id）。
 
@@ -1393,6 +1419,9 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
         task = candidates[0]
         task_id = task.get("task_id")
         if not task_id:
+            return None
+        if not self._has_fixed_access(task):
+            logger.warning("[revive] 任务 %s 缺少固定权限，拒绝恢复", task_id)
             return None
         # 已在运行中则不重复重建
         if task_id in self._running_tasks:

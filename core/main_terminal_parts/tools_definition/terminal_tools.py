@@ -170,11 +170,22 @@ class ToolsDefinitionTerminalToolsMixin:
                         "type": "function",
 	                "function": {
 	                    "name": "run_command",
-	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。",
+	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。遇到沙箱限制后，可显式申请 request_full_access 并说明原因：仅本次命令经人工批准后在宿主机执行，不改变全局权限。开启自动审核时必须同时得到自动审核通过与人工批准。计划/只读不可申请。Windows 沙箱使用 Linux bash，完全访问实际使用 Windows cmd.exe，申请时需重新编写适用于 cmd.exe 的命令和 Windows 路径，不会把失败的 bash 命令自动重试到宿主机。",
 	                    "parameters": {
 	                        "type": "object",
 	                        "properties": self._inject_intent({
 	                            "command": {"type": "string", "description": "终端命令"},
+                                    "working_dir": {
+                                        "type": "string", "description": "命令工作目录，须位于绑定工作区内；省略时使用工作区根目录。"
+                                    },
+                                    "request_full_access": {
+                                        "type": "boolean", "default": False,
+                                        "description": "是否申请本次命令完全访问，必须经人工批准；自动审核开启时两项均通过才执行。"
+                                    },
+                                    "full_access_reason": {
+                                        "type": "string",
+                                        "description": "申请本次完全访问的具体原因，request_full_access=true 时必填非空。"
+                                    },
                                     "timeout": {
                                         "type": "number",
                                         "description": "超时时长（秒），必填。前台最大120；后台最大3600。"

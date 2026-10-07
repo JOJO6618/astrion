@@ -1439,62 +1439,6 @@ body[data-theme='light'] {
   transform: translateY(6px);
 }
 
-/* 手机端审批面板样式 - 与电脑端保持一致 */
-.mobile-approval-overlay {
-  pointer-events: auto;
-  justify-content: center !important;
-}
-
-.mobile-approval-overlay .mobile-panel-sheet--approval {
-  pointer-events: auto;
-  background: var(--surface-panel);
-}
-
-/* 手机端审批面板按钮样式 - 与电脑端一致 */
-@media (max-width: 768px) {
-  .mobile-panel-sheet--approval .approval-btn {
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 13px;
-  }
-
-  .mobile-panel-sheet--approval .approval-btn--approve {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-color: var(--accent);
-  }
-
-  .mobile-panel-sheet--approval .approval-btn--reject {
-    background: transparent;
-    border-color: var(--theme-control-border-strong);
-  }
-
-  .mobile-panel-sheet--approval .approval-btn--switch {
-    background: transparent;
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  /* 审批卡片样式保持一致 */
-  .mobile-panel-sheet--approval .approval-card {
-    border-color: var(--theme-control-border);
-    background: var(--theme-surface-soft);
-  }
-
-  /* 审批面板样式 - 移除背景色让内容顶头 */
-  .mobile-panel-sheet--approval .sidebar.right-sidebar {
-    background: transparent !important;
-  }
-
-  .mobile-panel-sheet--approval .sidebar-header,
-  .mobile-panel-sheet--approval .sidebar .sidebar-header {
-    background: transparent !important;
-    border-color: var(--border-default);
-    padding: 0 16px !important;
-  }
-
-}
-
 .user-question-mini-dot {
   position: absolute;
   right: 22px;

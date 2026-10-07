@@ -1,5 +1,11 @@
 <template>
-  <transition name="file-at-menu-motion">
+  <transition
+    name="file-at-menu-motion"
+    @before-enter="$emit('transitioning', true)"
+    @after-enter="$emit('transitioning', false)"
+    @before-leave="$emit('transitioning', true)"
+    @after-leave="$emit('transitioning', false)"
+  >
     <div
       v-if="visible"
       class="file-at-menu-wrapper"
@@ -65,6 +71,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{
+  (e: 'transitioning', active: boolean): void;
   (e: 'select', index: number): void;
   (e: 'hover', index: number): void;
 }>();

@@ -1,5 +1,10 @@
 // @ts-nocheck
 import { t, currentLocale } from '@/locales';
+import {
+  isFullAccessApproval,
+  needsHumanDecision,
+  normalizeApproval
+} from '@/components/input/approvalModel';
 import { usePolicyStore } from '../../../stores/policy';
 import { usePersonalizationStore } from '../../../stores/personalization';
 
@@ -135,12 +140,6 @@ export const permissionMethods = {
         message: msg,
         type: 'error'
       });
-    }
-  },
-  async handleSwitchPermissionToUnrestricted(approvalId) {
-    await this.changePermissionMode('unrestricted');
-    if (approvalId) {
-      await this.approveToolApproval(approvalId);
     }
   },
   async changeNetworkPermission(mode) {
@@ -407,26 +406,47 @@ export const permissionMethods = {
       this.pendingToolApprovals = [];
       return;
     }
+    const conversationId = this.currentConversationId;
+    const snapshotVersion = this.approvalSnapshotVersion;
     try {
       const response = await fetch(
-        `/api/tool-approvals/pending?conversation_id=${encodeURIComponent(this.currentConversationId)}`
+        `/api/tool-approvals/pending?conversation_id=${encodeURIComponent(conversationId)}`
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.success) {
         return;
       }
-      const items = Array.isArray(payload.items) ? payload.items : [];
-      this.pendingToolApprovals = items;
-      // 自动审核模式 + 个人空间开启「隐藏工具审核面板」时，不自动展开审核面板
+      if (
+        conversationId !== this.currentConversationId ||
+        snapshotVersion !== this.approvalSnapshotVersion
+      )
+        return;
+      const resolvedIds = this.resolvedToolApprovalIds || [];
+      const items = (Array.isArray(payload.items) ? payload.items : []).filter(
+        (item) => !resolvedIds.includes(item.approval_id)
+      );
+      const previous = this.pendingToolApprovals || [];
+      this.pendingToolApprovals = items.map((item) =>
+        normalizeApproval(
+          item,
+          previous.find((entry) => entry.approval_id === item.approval_id),
+          this.currentPermissionMode === 'auto_approval'
+        )
+      );
       const hideApprovalPanel =
         this.currentPermissionMode === 'auto_approval' &&
         usePersonalizationStore().form.hide_tool_approval_panel !== false;
-      // 电脑端：有审批时自动展开面板
-      if (items.length > 0 && !this.isMobileViewport && !hideApprovalPanel) {
-        this.rightCollapsed = false;
-        if (this.rightWidth < this.minPanelWidth) {
-          this.rightWidth = this.minPanelWidth;
-        }
+      const mandatory = this.pendingToolApprovals.some(
+        (item) => isFullAccessApproval(item) && needsHumanDecision(item)
+      );
+      const isNewRequest = items.some(
+        (item) => !previous.some((entry) => entry.approval_id === item.approval_id)
+      );
+      const newlyMandatory =
+        mandatory &&
+        !previous.some((item) => isFullAccessApproval(item) && needsHumanDecision(item));
+      if (items.length && (isNewRequest || newlyMandatory) && (!hideApprovalPanel || mandatory)) {
+        this.restoreToolApprovalPanel();
       }
     } catch (_error) {
       // ignore

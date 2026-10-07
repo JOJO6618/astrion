@@ -24,6 +24,8 @@ from utils.context_manager import AUTO_SHALLOW_PLACEHOLDER
 from config import TOOL_CALL_COOLDOWN
 from modules.personalization_manager import load_personalization_config, resolve_context_compression_settings
 from modules.auto_approval_service import run_auto_approval
+from modules.execution_scope import command_fingerprint
+from .tool_execution_authority import resolve_approval_authority, execute_with_authority, DeniedExecution
 from modules.user_question_manager import format_user_question_answer
 from .deep_compression import run_deep_compression
 from .chat_flow_task_support import inject_runtime_user_message, process_multi_agent_master_messages, process_workflow_updates
@@ -68,7 +70,7 @@ def _build_tool_approval_preview(web_terminal, function_name: str, arguments: Di
             if not full_path.exists() or not full_path.is_file():
                 preview["summary"] = tr("tool_loop.preview_file_not_found")
                 return preview
-            content = full_path.read_text(encoding="utf-8", errors="ignore")
+            content = web_terminal.file_manager.read_binary(full_path).decode("utf-8", errors="ignore")
             first = replacements[0] if isinstance(replacements[0], dict) else {}
             old_text = str(first.get("old_string") or "")
             new_text = str(first.get("new_string") or "")
@@ -937,7 +939,10 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         recent_tool_actions = recent_tool_actions[-3:]
         setattr(web_terminal, "_recent_tool_actions", list(recent_tool_actions))
 
+        execution_scope = None
+        approval_root = Path(web_terminal.context_manager.project_path).resolve()
         permission_eval = web_terminal.evaluate_tool_permission(function_name, arguments)
+        approval_fingerprint = command_fingerprint(arguments) if permission_eval.get("approval_type") == "full_access" else None
         if not permission_eval.get("allowed", True):
             denied_message = permission_eval.get("message") or tr("tool_loop.permission_denied_default")
             denied_payload = {
@@ -977,9 +982,13 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 conversation_id=conversation_id,
                 task_id=client_sid,
                 tool_call_id=tool_call_id,
+                executor_id=id(web_terminal),
+                workspace_root=str(approval_root),
                 tool_name=function_name,
                 arguments=arguments,
                 preview=approval_preview,
+                approval_type=permission_eval.get("approval_type", "sandbox_write"),
+                auto_review_required=permission_eval.get("mode") == "auto_approval",
             )
             sender('tool_approval_required', {
                 'approval': approval_item,
@@ -1013,11 +1022,18 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     arguments=arguments,
                     risk_markers=permission_eval.get("risk_markers") if isinstance(permission_eval, dict) else None,
                     sender=sender,
+                    stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
                 )
             else:
                 wait_result = await _wait_for_tool_approval(
                     approval_id=approval_item.get("approval_id"),
                     username=username,
+                    timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+                    stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
+                )
+            if wait_result.get("decision") == "pending":
+                wait_result = await _wait_for_tool_approval(
+                    approval_id=approval_item["approval_id"], username=username,
                     timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
                     stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
                 )
@@ -1071,6 +1087,12 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                         "last_tool_call_time": last_tool_call_time
                     }
                 continue
+            execution_scope = resolve_approval_authority(
+                web_terminal, arguments, wait_result.get("item") or {},
+                task_id=client_sid, tool_call_id=tool_call_id,
+                expected_root=approval_root, fingerprint=approval_fingerprint,
+                manager=tool_approval_manager, tool_name=function_name,
+            )
 
         # 发送工具开始事件
         tool_display_id = f"tool_{iteration}_{function_name}_{time.time()}"
@@ -1147,7 +1169,10 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 conversation_id=conversation_id,
             )
         else:
-            tool_task = asyncio.create_task(web_terminal.handle_tool_call(function_name, arguments))
+            tool_task = asyncio.create_task(execute_with_authority(
+                web_terminal, function_name, arguments, execution_scope,
+                stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
+            ))
 
             # 在工具执行期间持续检查停止标志
             while not tool_task.done():
@@ -1243,7 +1268,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         if (
             function_name == "run_command"
             and permission_eval.get("mode") in {"approval", "auto_approval"}
-            and not bool(arguments.get("_approval_write_granted", False))
+            and not bool(execution_scope and execution_scope.write_granted)
             and _is_permission_denied_result(result_data)
         ):
             approval_preview = _build_tool_approval_preview(web_terminal, function_name, arguments)
@@ -1252,9 +1277,12 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 conversation_id=conversation_id,
                 task_id=client_sid,
                 tool_call_id=tool_call_id,
+                executor_id=id(web_terminal),
+                workspace_root=str(approval_root),
                 tool_name=function_name,
                 arguments=arguments,
                 preview=approval_preview,
+                auto_review_required=permission_eval.get("mode") == "auto_approval",
             )
             sender('tool_approval_required', {
                 'approval': approval_item,
@@ -1286,6 +1314,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     arguments=arguments,
                     risk_markers=permission_eval.get("risk_markers") if isinstance(permission_eval, dict) else None,
                     sender=sender,
+                    stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
                 )
             else:
                 wait_result = await _wait_for_tool_approval(
@@ -1346,9 +1375,19 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 continue
 
             retry_arguments = dict(arguments or {})
-            retry_arguments["_approval_write_granted"] = True
-            retry_arguments["_approval_network_granted"] = True
-            retry_tool_result = await web_terminal.handle_tool_call(function_name, retry_arguments)
+            retry_scope = resolve_approval_authority(
+                web_terminal, retry_arguments, wait_result.get("item") or {},
+                task_id=client_sid, tool_call_id=tool_call_id,
+                expected_root=approval_root,
+                manager=tool_approval_manager, tool_name=function_name,
+            )
+            from dataclasses import replace
+            if not isinstance(retry_scope, DeniedExecution):
+                retry_scope = replace(retry_scope, network_granted=True)
+            retry_tool_result = await execute_with_authority(
+                web_terminal, function_name, retry_arguments, retry_scope,
+                stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
+            )
             try:
                 result_data = json.loads(retry_tool_result)
                 tool_result = retry_tool_result

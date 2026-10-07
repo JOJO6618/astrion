@@ -45,10 +45,42 @@ export default {
   renameLabel: '重命名：',
   toolLabel: '工具：',
   summaryLabel: '说明：',
-  switchToUnrestricted: '切换到无限制',
+  approvalTitle: '工具审批',
+  collapseApprovalPanel: '收起审批面板',
+  restoreApprovalPanel: '展开审批面板',
+  requestReason: '申请原因',
+  parameters: '参数',
+  singleFullAccess: '单次完全访问',
+  allow: '允许',
+  allowFullAccessExecution: '允许本次完全访问权限执行',
+  reviewRecords: '审核记录',
+  noApprovalRecords: '无记录',
+  reviewStages: {
+    start: '审核开始',
+    modelCall: '调用审核模型',
+    runCommand: '执行审核命令',
+    complete: '审核结束',
+    decision: '审核结论'
+  },
+  autoReviewStatus: {
+    pending: '等待自动审核',
+    reviewing: '自动审核中',
+    approved: '自动审核通过',
+    rejected: '自动审核拒绝'
+  },
+  finalDecision: {
+    approved: '已允许执行',
+    rejected: '已拒绝执行',
+    expired: '已过期',
+    cancelled: '已取消',
+    timeout: '已超时'
+  },
+  humanDecision: {
+    approved: '人工已允许',
+    rejected: '已拒绝'
+  },
   run: '运行',
   reject: '拒绝',
-  toolApprovalTitle: '工具审批 ({n})',
   // 工具名标签映射（映射表存 key，使用处 t() 解析）
   toolRunCommand: '执行命令',
   toolTerminalInput: '终端输入',

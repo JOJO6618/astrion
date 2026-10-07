@@ -179,6 +179,17 @@ export interface PendingApprovalMock {
   previewTitle: string;
   /** 完整参数预览（多行原样显示，不截断） */
   previewLines: string[];
+  approvalType: string;
+  status: string;
+  autoReviewRequired: boolean;
+  autoReviewStatus: 'pending' | 'reviewing' | 'approved' | 'rejected' | null;
+  humanDecision: 'approved' | 'rejected' | null;
+  autoReviewReason: string;
+  reason: string;
+  /** 最近一条后端自动审核进度；不生成演示阶段或百分比。 */
+  autoReviewProgress: import('./approval').AutoReviewProgress | null;
+  /** 本端提交裁决期间禁用重复操作，失败后恢复。 */
+  decisionPending: boolean;
 }
 
 // ── 工作流（/workflow 面板；后续接工作流库 API） ──

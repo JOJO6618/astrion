@@ -170,17 +170,7 @@ export function App({ boot }: { boot: BootResult }) {
     width,
     elapsed,
     onApprovalAction: (action, approval) => {
-      if (action === 'reject') {
-        void runtimeRef.current?.decideApproval(approval.id, 'rejected');
-        apiRef.current?.addSystem(`${t('approval.rejected')}${approval.toolLabel}`);
-      } else {
-        void runtimeRef.current?.decideApproval(approval.id, 'approved');
-        apiRef.current?.addSystem(
-          action === 'unrestricted'
-            ? `${t('approval.switched')}${approval.toolLabel}`
-            : `${t('approval.approved')}${approval.toolLabel}`,
-        );
-      }
+      void runtimeRef.current?.decideApproval(approval.id, action === 'reject' ? 'rejected' : 'approved');
     },
     onSessionLoad: (s) => {
       void runtimeRef.current?.loadSession(s.id);
@@ -289,6 +279,7 @@ export function App({ boot }: { boot: BootResult }) {
       api: apiRef.current,
       onRunningChange: setRunning,
       onApprovalRequired: (a) => menuRef.current.openApproval(a),
+      onApprovalResolved: (id) => menuRef.current.resolveApproval(id),
       onSystemMessage: (text) => apiRef.current?.addSystem(text),
       onTokenUpdate: (stats) => menuRef.current.setContextStats(stats),
       onConversationCreated: (id) => {

@@ -998,15 +998,23 @@ function renderRunCommand(result: any, args: any): string {
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>${escapeHtml(t('toolResults.labels.command'))}</strong>${escapeHtml(command)}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.timeout'))}</strong>${escapeHtml(t('toolResults.duration.seconds', { seconds: timeout }))}</div>`;
-  if (exitCode !== undefined) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.exitCode'))}</strong>${exitCode}</div>`;
-  }
   html += '</div>';
 
-  if (output) {
+  const authorityKey = result.full_access_granted
+    ? 'toolResults.access.onceGranted'
+    : result.full_access_already_active
+      ? 'toolResults.access.alreadyActive'
+      : '';
+  if (output || exitCode !== undefined || authorityKey) {
     html += '<div class="tool-result-content scrollable">';
-    html += `<div class="content-label">${escapeHtml(t('toolResults.labels.output'))}</div>`;
-    html += `<pre>${escapeHtml(output)}</pre>`;
+    if (authorityKey) html += `<div>${escapeHtml(t(authorityKey))}</div>`;
+    if (exitCode !== undefined) {
+      html += `<div><strong>${escapeHtml(t('toolResults.labels.exitCode'))}</strong>${escapeHtml(String(exitCode))}</div>`;
+    }
+    if (output) {
+      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.output'))}</div>`;
+      html += `<pre>${escapeHtml(output)}</pre>`;
+    }
     html += '</div>';
   }
 
@@ -1606,6 +1614,10 @@ function renderCreateSubAgent(result: any, args: any): string {
     html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
   } else if (agentId !== '') {
     html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
+  }
+  const accessLevel = result.access_level ?? args.access_level;
+  if (['workspace_write', 'sandbox_write', 'full_access'].includes(accessLevel)) {
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.accessLevel'))}</strong>${escapeHtml(t(`toolResults.access.${accessLevel}`))}</div>`;
   }
   const intelligence = args.intelligence;
   if (!displayName && ['same', 'high', 'medium', 'low'].includes(intelligence)) {

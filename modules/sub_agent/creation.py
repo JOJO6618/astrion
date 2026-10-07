@@ -120,21 +120,37 @@ class SubAgentCreationMixin:
             #（撞名自动加后缀，保证总能建成），实际路径由 create_sub_agent 结果返回
             return self._auto_deliverables_dir(agent_id)
         deliverables_path = (self.project_path / relative_dir).resolve()
-        if not str(deliverables_path).startswith(str(self.project_path)):
-            raise ValueError(tr("sub_agent_creation.deliverables_dir_outside"))
-        if deliverables_path.exists():
-            raise ValueError(tr("sub_agent_creation.deliverables_dir_not_new"))
-        deliverables_path.mkdir(parents=True, exist_ok=True)
+        try:
+            self._create_deliverables_dir(deliverables_path)
+        except FileExistsError as exc:
+            raise ValueError(tr("sub_agent_creation.deliverables_dir_not_new")) from exc
         return deliverables_path
 
     def _auto_deliverables_dir(self, agent_id: int) -> Path:
         """未指定交付目录时自动创建：.astrion/sub_agent_results/agent_{id}（撞名追加后缀）。"""
         base = (self.project_path / ".astrion" / "sub_agent_results").resolve()
-        base.mkdir(parents=True, exist_ok=True)
         candidate = base / f"agent_{agent_id}"
         suffix = 2
-        while candidate.exists():
-            candidate = base / f"agent_{agent_id}_{suffix}"
-            suffix += 1
-        candidate.mkdir(parents=True, exist_ok=True)
-        return candidate
+        while True:
+            try:
+                self._create_deliverables_dir(candidate)
+                return candidate
+            except FileExistsError:
+                candidate = base / f"agent_{agent_id}_{suffix}"
+                suffix += 1
+
+    def _create_deliverables_dir(self, path: Path) -> None:
+        from modules.file_manager.scoped_io import mkdir_checked
+        root = self.project_path
+        try:
+            if root.resolve() != root or not root.is_dir():
+                raise ValueError("工作区根目录已改变。")
+            path.relative_to(root)
+        except (ValueError, OSError, RuntimeError) as exc:
+            raise ValueError(tr("sub_agent_creation.deliverables_dir_outside")) from exc
+        try:
+            mkdir_checked(path, create_roots=[root], exist_ok=False)
+        except FileExistsError:
+            raise
+        except OSError as exc:
+            raise ValueError(str(exc)) from exc

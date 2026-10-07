@@ -9,6 +9,7 @@ import { existsSync, openSync, mkdirSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
+import type { ToolApprovalItem } from './approval';
 
 const DEFAULT_PORT = 8091;
 const TOKEN_PATH = `${homedir()}/.astrion/astrion/host/data/host_api_token`;
@@ -290,11 +291,14 @@ export class GatewayClient {
   }
 
   // ── 审批 ──
-  async decideApproval(approvalId: string, decision: 'approved' | 'rejected'): Promise<void> {
-    await this.request(`/api/tool-approvals/${encodeURIComponent(approvalId)}/decision`, {
-      method: 'POST',
-      body: { decision },
-    });
+  async decideApproval(approvalId: string, decision: 'approved' | 'rejected'): Promise<ToolApprovalItem> {
+    const response = await this.request<{ success: boolean; item: ToolApprovalItem }>(
+      `/api/tool-approvals/${encodeURIComponent(approvalId)}/decision`, {
+        method: 'POST',
+        body: { decision },
+      },
+    );
+    return response.item;
   }
 
   private async request<T = any>(path: string, options: { method: string; body?: any; _retried?: boolean }): Promise<T> {

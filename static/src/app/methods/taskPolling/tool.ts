@@ -2,6 +2,13 @@
 import { debugLog } from '../common';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { t } from '@/locales';
+import {
+  isFullAccessApproval,
+  needsHumanDecision,
+  normalizeApproval,
+  statusFromProgress,
+  updateReviewRecords
+} from '@/components/input/approvalModel';
 
 export const toolMethods = {
   handleToolPreparing(data: any) {
@@ -318,39 +325,45 @@ export const toolMethods = {
   },
   handleToolApprovalRequired(data: any) {
     const approval = data?.approval;
-    if (!approval || !approval.approval_id) {
-      return;
-    }
-    if (!Array.isArray(this.pendingToolApprovals)) {
-      this.pendingToolApprovals = [];
-    }
+    if (!approval?.approval_id) return;
+    if (data.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    if ((this.resolvedToolApprovalIds || []).includes(approval.approval_id)) return;
+    this.approvalSnapshotVersion += 1;
+    if (!Array.isArray(this.pendingToolApprovals)) this.pendingToolApprovals = [];
     const idx = this.pendingToolApprovals.findIndex(
-      (item: any) => item && item.approval_id === approval.approval_id
+      (item) => item?.approval_id === approval.approval_id
     );
-    if (idx >= 0) {
-      this.pendingToolApprovals.splice(idx, 1, approval);
-    } else {
-      this.pendingToolApprovals.push(approval);
+    const previous = idx >= 0 ? this.pendingToolApprovals[idx] : undefined;
+    const normalized = normalizeApproval(
+      approval,
+      previous,
+      this.currentPermissionMode === 'auto_approval'
+    );
+    const record = (this.approvalReviewRecords || []).find(
+      (entry) => entry.approval_id === approval.approval_id
+    );
+    if (!normalized.auto_review_progress?.length && record?.progress?.length) {
+      normalized.auto_review_progress = record.progress;
+      normalized.auto_review_status =
+        approval.auto_review_status ||
+        statusFromProgress(record.progress[record.progress.length - 1]);
     }
+    if (idx >= 0) this.pendingToolApprovals.splice(idx, 1, normalized);
+    else this.pendingToolApprovals.push(normalized);
     if (this.approvalAutoCloseTimer) {
       clearTimeout(this.approvalAutoCloseTimer);
       this.approvalAutoCloseTimer = null;
     }
-    if ((this.autoApprovalFeedLines || []).length === 0) {
-      this.autoApprovalFinalMessage = '';
-    }
-    // 自动审核模式 + 个人空间开启「隐藏工具审核面板」时，不自动展开审核面板
     const hideApprovalPanel =
       this.currentPermissionMode === 'auto_approval' &&
       usePersonalizationStore().form.hide_tool_approval_panel !== false;
-    if (!hideApprovalPanel) {
-      this.rightCollapsed = false;
-      if (this.rightWidth < this.minPanelWidth) {
-        this.rightWidth = this.minPanelWidth;
-      }
-      if (this.isMobileViewport && this.activeMobileOverlay !== 'approval') {
-        this.openMobileOverlay('approval');
-      }
+    const mandatory = isFullAccessApproval(normalized) && needsHumanDecision(normalized);
+    // Updates to the current id preserve an intentional manual collapse.
+    if (
+      (idx < 0 || (mandatory && !isFullAccessApproval(previous))) &&
+      (!hideApprovalPanel || mandatory)
+    ) {
+      this.restoreToolApprovalPanel();
     }
     this.$forceUpdate();
   },
@@ -516,51 +529,75 @@ export const toolMethods = {
   },
   handleToolApprovalResolved(data: any) {
     const approvalId = data?.approval_id;
-    if (!approvalId || !Array.isArray(this.pendingToolApprovals)) {
+    if (!approvalId || !Array.isArray(this.pendingToolApprovals)) return;
+    if (data.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    if (
+      !['approved', 'rejected', 'expired', 'cancelled', 'timeout'].includes(String(data.decision))
+    )
       return;
+    if ((this.resolvedToolApprovalIds || []).includes(approvalId)) return;
+    this.approvalSnapshotVersion += 1;
+    this.resolvedToolApprovalIds = [...(this.resolvedToolApprovalIds || []), approvalId].slice(
+      -256
+    );
+    // A resolved event is terminal. Keep its display snapshot for manual reopening,
+    // without turning a completed record into a pending request.
+    const approval = this.pendingToolApprovals.find((item) => item?.approval_id === approvalId);
+    const records = this.approvalReviewRecords || [];
+    const previous = records.find((record) => record.approval_id === approvalId);
+    if (approval) {
+      const record = {
+        ...previous,
+        id: previous?.id || `auto-${approvalId}`,
+        kind: 'auto',
+        approval_id: approvalId,
+        progress: previous?.progress || approval.auto_review_progress || [],
+        final_decision: ['approved', 'rejected'].includes(data.decision)
+          ? data.decision
+          : undefined,
+        reason: String(data.reason || approval.reason || ''),
+        tool_name: approval.tool_name,
+        approval: { ...approval, status: String(data.decision) }
+      };
+      this.approvalReviewRecords = [
+        ...records.filter((entry) => entry.approval_id !== approvalId),
+        record
+      ].slice(-30);
     }
     this.pendingToolApprovals = this.pendingToolApprovals.filter(
-      (item: any) => item && item.approval_id !== approvalId
+      (item) => item?.approval_id !== approvalId
     );
-    const decision = String(data?.decision || '')
-      .trim()
-      .toLowerCase();
-    const reason = String(data?.reason || '').trim();
-    if (decision === 'approved' || decision === 'rejected') {
-      const decisionText =
-        decision === 'approved' ? t('appTasks.approvalApproved') : t('appTasks.approvalRejected');
-      this.autoApprovalFinalMessage = t('appTasks.approvalFinalMessage', {
-        decision: decisionText,
-        reason: reason || t('appTasks.reasonNotProvided')
-      });
-    }
-    // 电脑端：审批完成后延迟折叠面板（给用户留出查看结果时间）
-    if (!this.pendingToolApprovals.length && !this.isMobileViewport) {
-      if (this.approvalAutoCloseTimer) {
-        clearTimeout(this.approvalAutoCloseTimer);
-      }
-      this.approvalAutoCloseTimer = setTimeout(() => {
-        this.rightCollapsed = true;
-      }, 3000);
+    if (!this.pendingToolApprovals.length) {
+      if (this.approvalAutoCloseTimer) clearTimeout(this.approvalAutoCloseTimer);
+      this.approvalAutoCloseTimer = null;
+      this.approvalPanelCollapsed = true;
     }
     this.$forceUpdate();
   },
   handleAutoApprovalProgress(data: any) {
     const progress = data?.progress;
-    if (!progress || typeof progress !== 'object') {
-      return;
+    if (!progress || typeof progress !== 'object') return;
+    if (data.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    const approvalId = data.approval_id || this.pendingToolApprovals?.[0]?.approval_id;
+    if (approvalId && (this.resolvedToolApprovalIds || []).includes(approvalId)) return;
+    this.approvalReviewRecords = updateReviewRecords(this.approvalReviewRecords || [], 'auto', {
+      ...data,
+      approval_id: approvalId
+    });
+    if (approvalId) {
+      this.pendingToolApprovals = (this.pendingToolApprovals || []).map((item) =>
+        item.approval_id === approvalId
+          ? {
+              ...item,
+              auto_review_required: true,
+              auto_review_status: statusFromProgress(progress, item.auto_review_status),
+              auto_review_progress: [...(item.auto_review_progress || []), { ...progress }].slice(
+                -100
+              )
+            }
+          : item
+      );
     }
-    if (!Array.isArray(this.autoApprovalFeedLines)) {
-      this.autoApprovalFeedLines = [];
-    }
-    this.autoApprovalTitle = t('appTasks.autoApprovalRecordTitle');
-    if (progress.stage === 'start') {
-      this.autoApprovalFeedLines = [t('appTasks.autoApprovalStarted')];
-      this.autoApprovalFinalMessage = '';
-    } else if (progress.stage === 'run_command' && progress.command) {
-      this.autoApprovalFeedLines.push(String(progress.command));
-    }
-    this.autoApprovalFeedLines = this.autoApprovalFeedLines.slice(-20);
     this.$forceUpdate();
   },
   handleAppendPayload(data: any) {

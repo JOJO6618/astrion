@@ -424,6 +424,10 @@
               :pending-user-question-count="pendingUserQuestions.length"
               :plan-approval-minimized="planApprovalMinimized"
               :pending-plan-approval-count="pendingPlanApprovals.length"
+              :tool-approvals="pendingToolApprovals"
+              :deciding-approval-ids="decidingApprovalIds"
+              :approval-panel-collapsed="approvalPanelCollapsed"
+              :approval-review-records="approvalReviewRecords"
               :goal-mode-armed="goalModeArmed"
               :goal-running="goalRunning"
               :goal-progress="goalProgress"
@@ -465,6 +469,10 @@
               @toggle-token-panel="(val) => handleTokenPanelToggleClick(val)"
               @compress-conversation="handleCompressConversationClick"
               @toggle-approval-panel="handleApprovalPanelToggleClick"
+              @restore-tool-approval="restoreToolApprovalPanel"
+              @collapse-tool-approval="collapseToolApprovalPanel"
+              @approve-tool-approval="approveToolApproval"
+              @reject-tool-approval="rejectToolApproval"
               @file-selected="handleFileSelected"
               @paste-files="handlePastedFiles"
               @pick-images="openImagePicker"
@@ -565,29 +573,6 @@
           </div>
         </transition>
       </div>
-      <transition name="desktop-approval-fade">
-        <div v-if="!isMobileViewport && !rightCollapsed" class="desktop-approval-overlay">
-          <div
-            class="desktop-approval-sheet"
-            :style="{ width: Math.min(rightWidth || 420, 520) + 'px' }"
-          >
-            <ToolApprovalPanel
-              :collapsed="false"
-              :width="Math.min(rightWidth || 420, 520)"
-              :approvals="pendingToolApprovals"
-              :deciding-approval-ids="decidingApprovalIds"
-              :auto-approval-feed-lines="autoApprovalFeedLines"
-              :auto-approval-final-message="autoApprovalFinalMessage"
-              :auto-approval-title="autoApprovalTitle"
-              @switch-unrestricted="handleSwitchPermissionToUnrestricted"
-              @approve="approveToolApproval"
-              @reject="rejectToolApproval"
-              @close="rightCollapsed = true"
-            />
-          </div>
-        </div>
-      </transition>
-
       <PersonalizationDrawer />
       <PathAuthorizationDialog
         :open="pathAuthorizationDialogOpen"
@@ -978,30 +963,6 @@
               @rename-workspace="handleRenameWorkspaceFromSidebar"
               @pin-workspace="handlePinWorkspaceFromSidebar"
               @conversation-type-change="handleSidebarConversationTypeChange"
-            />
-          </div>
-        </div>
-      </transition>
-
-      <transition name="mobile-panel-overlay">
-        <div
-          v-if="isMobileViewport && activeMobileOverlay === 'approval'"
-          class="mobile-panel-overlay mobile-panel-overlay--right mobile-approval-overlay"
-          @click.self="closeMobileOverlay('backdrop-click')"
-        >
-          <div class="mobile-panel-sheet mobile-panel-sheet--approval">
-            <ToolApprovalPanel
-              class="mobile-overlay-content"
-              :collapsed="false"
-              :width="Math.min(rightWidth || 420, 460)"
-              :approvals="pendingToolApprovals"
-              :deciding-approval-ids="decidingApprovalIds"
-              :auto-approval-feed-lines="autoApprovalFeedLines"
-              :auto-approval-final-message="autoApprovalFinalMessage"
-              @switch-unrestricted="handleSwitchPermissionToUnrestricted"
-              @approve="approveToolApproval"
-              @reject="rejectToolApproval"
-              @close="closeMobileOverlay('approval-panel-close-btn')"
             />
           </div>
         </div>

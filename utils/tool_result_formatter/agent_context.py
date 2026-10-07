@@ -153,8 +153,11 @@ def _format_create_sub_agent(result_data: Dict[str, Any]) -> str:
     # 多智能体模式：对模型只暴露角色内编号显示名，全局 agent_id/task_id 为内部细节
     display_name = result_data.get("display_name")
     status = result_data.get("status")
+    access_level = result_data.get("access_level")
+    access_note = f"固定权限：{access_level}" if access_level else ""
     if display_name:
-        return tr("fmt_agent2.created_with_status", name=display_name, status=status or "running")
+        header = tr("fmt_agent2.created_with_status", name=display_name, status=status or "running")
+        return f"{header}\n{access_note}" if access_note else header
     agent_id = result_data.get("agent_id")
     task_id = result_data.get("task_id")
     refs = result_data.get("copied_references") or []
@@ -177,6 +180,8 @@ def _format_create_sub_agent(result_data: Dict[str, Any]) -> str:
     if elapsed_seconds is None:
         elapsed_seconds = result_data.get("elapsed_seconds")
     lines = [header]
+    if access_note:
+        lines.append(access_note)
     if stats_text:
         lines.append(stats_text)
     if status == "completed" and isinstance(elapsed_seconds, (int, float)):

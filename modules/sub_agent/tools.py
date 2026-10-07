@@ -1,42 +1,47 @@
-"""子智能体特有工具实现（read_mediafile）。
-
-read_mediafile 直接读取项目内媒体文件并返回 base64。
-（原 search_workspace 工具已移除：子智能体需要搜索时改用 run_command
-执行 rg / grep / find，走主进程沙箱链路，避免进程内遍历大目录导致内存失控。）
-"""
-
+"""Sub-agent media reading through its trusted file access policy."""
 from __future__ import annotations
 
 import base64
 import mimetypes
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from modules.i18n import tr
 
 
-async def handle_read_mediafile(project_path: Path, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    """read_mediafile 实现：直接读取项目内媒体文件并返回 base64。"""
+async def handle_read_mediafile(
+    project_path: Path, arguments: Dict[str, Any], file_manager: Optional[Any] = None,
+) -> Dict[str, Any]:
     path = arguments.get("path")
     if not path:
         return {"success": False, "error": tr("sub_agent_tools.path_required")}
     try:
-        abs_path = (project_path / path).resolve()
-        abs_path.relative_to(project_path)
+        if file_manager is None:
+            abs_path = (project_path / path).resolve()
+            abs_path.relative_to(project_path.resolve())
+        else:
+            valid, error, abs_path = file_manager._validate_path(str(path))
+            if not valid:
+                return {"success": False, "error": error}
+            allowed, error = file_manager._ensure_host_access(abs_path, "read")
+            if not allowed:
+                return {"success": False, "error": error}
     except Exception:
         return {"success": False, "error": tr("sub_agent_tools.invalid_path")}
 
-    if not abs_path.exists() or not abs_path.is_file():
+    if not (file_manager and file_manager._use_container()) and (not abs_path.exists() or not abs_path.is_file()):
         return {"success": False, "error": tr("sub_agent_tools.file_not_found", path=path)}
-
     mime, _ = mimetypes.guess_type(str(abs_path))
-    if not mime or (not mime.startswith("image/") and not mime.startswith("video/")):
+    if not mime or not mime.startswith(("image/", "video/")):
         return {"success": False, "error": tr("sub_agent_tools.forbidden_file_type")}
-
     try:
-        data = abs_path.read_bytes()
-        b64 = base64.b64encode(data).decode("utf-8")
-        file_type = "image" if mime.startswith("image/") else "video"
-        return {"success": True, "path": path, "mime": mime, "type": file_type, "b64": b64}
+        if file_manager is None:
+            raise PermissionError("媒体读取需要可信文件管理器。")
+        data = file_manager.read_binary(abs_path)
+        return {
+            "success": True, "path": path, "mime": mime,
+            "type": "image" if mime.startswith("image/") else "video",
+            "b64": base64.b64encode(data).decode("utf-8"),
+        }
     except Exception as exc:
         return {"success": False, "error": str(exc)}

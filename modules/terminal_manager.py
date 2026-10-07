@@ -59,6 +59,10 @@ except ImportError:
 from modules.persistent_terminal import PersistentTerminal
 from utils.terminal_factory import TerminalFactory
 from modules.i18n import tr
+from modules.execution_scope import current_execution_scope
+from modules.scoped_execution_policy import (
+    scoped_work_path, same_scope_authority, require_scoped_docker_support,
+)
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -79,6 +83,7 @@ class TerminalManager:
         network_permission_getter: Optional[Callable] = None,
         terminal_readonly_getter: Optional[Callable] = None,
         command_validator: Optional[Callable[[str], Tuple[bool, str]]] = None,
+        execution_scope=None,
     ):
         """
         初始化终端管理器
@@ -90,6 +95,8 @@ class TerminalManager:
             terminal_display_size: 显示大小限制
             broadcast_callback: WebSocket广播回调
         """
+        scope = execution_scope if execution_scope is not None else current_execution_scope()
+        self.execution_scope = execution_scope if execution_scope is not None else (scope if scope and scope.is_sub_agent else None)
         self.project_path = Path(project_path)
         self.command_validator = command_validator
         self.max_terminals = max_terminals or MAX_TERMINALS
@@ -163,12 +170,25 @@ class TerminalManager:
         else:
             self.sandbox_mode = self.default_sandbox_mode
 
-    def _build_sandbox_options(self) -> Dict:
+    def _resolve_execution_scope(self):
+        current = current_execution_scope()
+        captured = self.execution_scope
+        if captured and current and not same_scope_authority(captured, current):
+            raise ValueError("Terminal manager belongs to another fixed execution scope")
+        scope = captured or current
+        if scope and scope.is_sub_agent and captured is None:
+            self.execution_scope = scope
+        return scope
+
+    def _build_sandbox_options(self, execution_scope=None) -> Dict:
         """构造当前终端应使用的沙箱参数。"""
         options = dict(self.sandbox_options)
-        options["allow_direct_host_execution"] = self.sandbox_mode == "host" and self.host_execution_mode == "direct"
+        scope = execution_scope if execution_scope is not None else self._resolve_execution_scope()
+        mode = scope.execution_mode if scope else self.host_execution_mode
+        options["execution_scope"] = scope
+        options["allow_direct_host_execution"] = self.sandbox_mode == "host" and mode == "direct"
         readonly_getter = getattr(self, "terminal_readonly_getter", None)
-        readonly_terminal = bool(readonly_getter and readonly_getter())
+        readonly_terminal = False if scope and scope.is_sub_agent else bool(readonly_getter and readonly_getter())
         options["docker_readonly_exec"] = readonly_terminal
         # 宿主机沙箱持久终端同身份：受限档（非 unrestricted）以只读 profile 创建
         options["host_terminal_readonly"] = readonly_terminal
@@ -185,7 +205,7 @@ class TerminalManager:
         if self.host_execution_mode == target:
             return
         self.host_execution_mode = target
-        if self.sandbox_mode == "host" and self.terminals:
+        if self.execution_scope is None and self.sandbox_mode == "host" and self.terminals:
             print(f"{OUTPUT_FORMATS['warning']} 执行环境已切换为 {target}，正在关闭现有终端会话。")
             self.close_all()
 
@@ -245,19 +265,31 @@ class TerminalManager:
                 "suggestion": tr("terminal.close_extra_session_hint")
             }
         
-        # 确定工作目录
-        if working_dir:
-            work_path = self.project_path / working_dir
-            if not work_path.exists():
-                work_path.mkdir(parents=True, exist_ok=True)
-        else:
-            work_path = self.project_path
+        # Validate child cwd before any directory creation or process launch.
+        try:
+            scope = self._resolve_execution_scope()
+            if self.sandbox_mode == "docker":
+                require_scoped_docker_support(scope)
+            if scope:
+                work_path = scoped_work_path(self.project_path, working_dir, scope)
+                if not work_path.is_dir():
+                    # A missing cwd must first be created with the scoped file tool;
+                    # mkdir here would run with the server's unsandboxed authority.
+                    raise ValueError("Scoped terminal working directory must already exist")
+            elif working_dir:
+                work_path = self.project_path / working_dir
+                if not work_path.exists():
+                    work_path.mkdir(parents=True, exist_ok=True)
+            else:
+                work_path = self.project_path
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
         
         # 获取合适的shell命令（用于宿主机或回退模式）
         shell_command = self.factory.get_shell_command()
         
         # 创建终端实例
-        sandbox_options = self._build_sandbox_options()
+        sandbox_options = self._build_sandbox_options(scope)
         terminal = PersistentTerminal(
             session_name=session_name,
             working_dir=str(work_path),
@@ -265,10 +297,11 @@ class TerminalManager:
             broadcast_callback=self.broadcast,
             max_buffer_size=self.terminal_buffer_size,
             display_size=self.terminal_display_size,
-            project_path=str(self.project_path),
+            project_path=str(scope.workspace_root if scope else self.project_path),
             sandbox_mode=self.sandbox_mode,
             sandbox_options=sandbox_options,
-            network_permission_getter=self.network_permission_getter
+            network_permission_getter=self.network_permission_getter,
+            execution_scope=scope,
         )
         
         # 启动终端
@@ -296,12 +329,13 @@ class TerminalManager:
             })
         
         # 对外返回容器视角/相对路径，避免暴露宿主绝对路径
+        display_root = Path(scope.workspace_root) if scope else self.project_path
         try:
             if terminal.using_container:
                 mount_path = (self.sandbox_options.get("mount_path") or "/workspace").rstrip("/")
                 mount_path = mount_path or "/workspace"
                 try:
-                    rel = work_path.relative_to(self.project_path)
+                    rel = work_path.relative_to(display_root)
                     if str(rel) == ".":
                         display_work_dir = mount_path
                     else:
@@ -310,8 +344,8 @@ class TerminalManager:
                     display_work_dir = mount_path
             else:
                 display_work_dir = "."
-                if work_path != self.project_path:
-                    display_work_dir = work_path.relative_to(self.project_path).as_posix()
+                if work_path != display_root:
+                    display_work_dir = work_path.relative_to(display_root).as_posix()
         except Exception:
             display_work_dir = str(work_path)
 
@@ -404,6 +438,15 @@ class TerminalManager:
             }
         
         terminal = self.terminals[target_session]
+        scope = getattr(terminal, "execution_scope", None)
+        current = current_execution_scope()
+        if current and not same_scope_authority(current, scope):
+            return {"success": False, "error": "Terminal belongs to another execution scope"}
+        try:
+            if scope:
+                scoped_work_path(self.project_path, str(terminal.working_dir), scope)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
         working_dir = str(terminal.working_dir)
         shell_command = self.factory.get_shell_command()
         
@@ -411,7 +454,7 @@ class TerminalManager:
         del self.terminals[target_session]
         self._terminal_input_timeout_streaks.pop(target_session, None)
         
-        sandbox_options = self._build_sandbox_options()
+        sandbox_options = self._build_sandbox_options(scope)
         new_terminal = PersistentTerminal(
             session_name=target_session,
             working_dir=working_dir,
@@ -419,9 +462,11 @@ class TerminalManager:
             broadcast_callback=self.broadcast,
             max_buffer_size=self.terminal_buffer_size,
             display_size=self.terminal_display_size,
-            project_path=str(self.project_path),
+            project_path=str(scope.workspace_root if scope else self.project_path),
             sandbox_mode=self.sandbox_mode,
-            sandbox_options=sandbox_options
+            sandbox_options=sandbox_options,
+            network_permission_getter=self.network_permission_getter,
+            execution_scope=scope,
         )
         
         if not new_terminal.start():
@@ -558,8 +603,11 @@ class TerminalManager:
                 "output": tr("terminal.session_not_found", session_name=target_session)
             }
         
-        # 发送命令
+        # A scoped caller cannot inject input into a session with different authority.
         terminal = self.terminals[target_session]
+        scope = current_execution_scope() or self.execution_scope
+        if scope and not same_scope_authority(scope, getattr(terminal, "execution_scope", None)):
+            return {"success": False, "status": "error", "error": "Terminal belongs to another execution scope", "output": ""}
         if isinstance(output_wait, str):
             try:
                 output_wait = float(output_wait)

@@ -8,7 +8,8 @@ import type { TextareaRenderable } from '@opentui/core';
 import { filterCommands, type CommandDef, type PanelKind } from './commands';
 import { panelItemCount, type BoundaryKind, type SlashMenuProps } from './menu';
 import type { ModelStep } from './panels/model';
-import { APPROVAL_ACTIONS } from './panels/approvals';
+import { approvalActions, type ApprovalAction } from './approval';
+import { t } from './i18n';
 import {
   BOOT_STATE,
   BOUNDARY_PANELS,
@@ -77,8 +78,8 @@ export function useSlashMenu({
   destroy: () => void;
   width: number;
   elapsed: number;
-  /** 审批裁决回调（正式版由 runtime 注入，调 Gateway decision 端点）；缺省只上屏系统消息 */
-  onApprovalAction?: (action: 'run' | 'reject' | 'unrestricted', approval: PendingApprovalMock) => void;
+  /** 审批裁决回调；审批由服务端终态回执清除。 */
+  onApprovalAction?: (action: ApprovalAction, approval: PendingApprovalMock) => void;
   /** /session Enter：加载选中对话（runtime.loadSession；缺省只上屏系统消息） */
   onSessionLoad?: (session: SessionMock) => void;
   /** /context 打开：触发一次 token 统计查询（gw.getTokenStats；结果经 setContextStats 回流） */
@@ -203,6 +204,8 @@ export function useSlashMenu({
 
   // 命令层进度记忆：进入级联面板时保存（query+sel），Esc 返回命令层时恢复（继承进入时的位置）
   const commandLayerRef = useRef<{ query: string; sel: number } | null>(null);
+  // 自动审批覆盖层只保存菜单位置；输入内容和光标不改动。
+  const approvalOverlayRef = useRef<{ id: string; stack: PanelKind[] | null; query: string; sel: number } | null>(null);
 
   // 程序性 setText 会同步触发 onContentChange（实测），而此时 stateRef 尚未同步新 stack，
   // 会被 / token 检测误判为「用户删光了 /」把刚打开的级联面板关掉。
@@ -216,9 +219,13 @@ export function useSlashMenu({
   // clearText=true 时才清空输入框：backspace 删光文本触发的 closeMenu 绝不能 setText
   // （onContentChange 回调里同步 setText 会与正在进行的删除操作重入，导致 buffer 状态错乱）
   const closeMenu = (opts?: { clearText?: boolean }) => {
+    stateRef.current.menuStack = null;
+    stateRef.current.query = '';
+    stateRef.current.sel = 0;
     setMenuStack(null);
     setQuery('');
     setSel(0);
+    approvalOverlayRef.current = null;
     commandLayerRef.current = null;
     if (opts?.clearText) setInputText('');
   };
@@ -279,7 +286,7 @@ export function useSlashMenu({
         setSel(0);
         break;
       case 'approvals':
-        // 单条待审批：光标落在第一个操作「运行」上
+        // 单条待审批：光标落在第一个可用操作上。
         setSel(0);
         break;
       case 'mode':
@@ -364,26 +371,16 @@ export function useSlashMenu({
     }
 
     if (top === 'approvals') {
-      // 对齐 web 端：同一时刻最多一条待审批；←→ 选操作，Enter 执行后关闭
-      // 关闭时是否清空输入框：手动 /approvals 进入要清掉命令文本；审批事件自动弹出要保留用户草稿
       const a = st.pendingApproval;
       if (!a) {
         closeAfterApproval();
         return;
       }
-      const action = st.sel === 0 ? 'run' : st.sel === 1 ? 'reject' : 'unrestricted';
-      if (onApprovalAction) {
-        onApprovalAction(action, a);
-      } else if (action === 'run') {
-        sys(`已批准并运行：${a.toolLabel}`);
-      } else if (action === 'reject') {
-        sys(`已拒绝：${a.toolLabel}`);
-      } else {
-        setPermMode('unrestricted');
-        sys(`已切换到无限制模式并运行：${a.toolLabel}`);
-      }
-      setPendingApproval(null);
-      closeAfterApproval();
+      const action = approvalActions(a)[st.sel];
+      if (!action) return;
+      if (onApprovalAction) onApprovalAction(action, a);
+      else sys(t('approval.unavailable'));
+      // 人工批准只是提交一个裁决项；同 ID 状态更新继续显示，最终回执才清除。
       return;
     }
 
@@ -500,27 +497,62 @@ export function useSlashMenu({
     }
   };
 
-  /** Esc / Ctrl+C：逐级返回（model 第二级 → 第一级 → 命令层 → 关闭） */
-  /** 审批面板关闭：手动 /approvals 进入（栈含 commands 层）清掉命令文本；审批事件自动弹出（栈仅 approvals）保留用户草稿 */
+  /** 恢复自动弹出前的菜单位置；不写输入框，也不移动光标。 */
+  const restoreApprovalOverlay = () => {
+    const saved = approvalOverlayRef.current;
+    if (!saved) return false;
+    approvalOverlayRef.current = null;
+    Object.assign(stateRef.current, { menuStack: saved.stack, query: saved.query, sel: saved.sel });
+    setMenuStack(saved.stack);
+    setQuery(saved.query);
+    setSel(saved.sel);
+    return true;
+  };
+
   const closeAfterApproval = () => {
+    if (restoreApprovalOverlay()) return;
     const hasCommandLayer = (stateRef.current.menuStack ?? []).includes('commands');
     closeMenu({ clearText: hasCommandLayer });
   };
 
-  /** 审批事件自动弹出（runtime 注入）：有待审批时把面板压栈（保留用户菜单/输入现场），已打开则只更新内容 */
+  /** 创建时自动弹出；同 ID 更新保留选择和用户关闭决定，包括同轮询批次事件。 */
   const openApproval = (a: PendingApprovalMock) => {
-    setPendingApproval(a);
     const st = stateRef.current;
-    if (!(st.menuStack ?? []).includes('approvals')) {
-      setMenuStack([...(st.menuStack ?? []), 'approvals']);
+    const sameId = st.pendingApproval?.id === a.id;
+    st.pendingApproval = a;
+    setPendingApproval(a);
+    if (sameId) {
+      const actions = approvalActions(a);
+      if (actions.length && st.sel >= actions.length && st.menuStack?.includes('approvals')) {
+        st.sel = actions.length - 1;
+        setSel(st.sel);
+      }
+      return;
     }
+    if (!(st.menuStack ?? []).includes('approvals')) {
+      approvalOverlayRef.current = { id: a.id, stack: st.menuStack, query: st.query, sel: st.sel };
+      st.menuStack = [...(st.menuStack ?? []), 'approvals'];
+      setMenuStack(st.menuStack);
+    }
+    st.sel = 0;
     setSel(0);
+  };
+
+  /** 其他客户端裁决也经同一终态路径清除；迟到旧 ID 不影响当前请求。 */
+  const resolveApproval = (id: string) => {
+    const st = stateRef.current;
+    if (st.pendingApproval?.id !== id) return;
+    st.pendingApproval = null;
+    setPendingApproval(null);
+    if (!st.menuStack?.includes('approvals')) return;
+    if (!restoreApprovalOverlay()) closeMenu();
   };
 
   const escapeLevel = () => {
     const st = stateRef.current;
     if (!st.menuStack) return;
     const top = st.menuStack[st.menuStack.length - 1];
+    if (top === 'approvals' && restoreApprovalOverlay()) return;
     if (top === 'model' && st.modelStep === 'mode') {
       setModelStep('model');
       setSel(Math.max(0, MODEL_OPTIONS.findIndex((m) => m.name === st.pendingModel)));
@@ -575,10 +607,11 @@ export function useSlashMenu({
         setSel(0);
         return true;
       }
-      // /approvals：有待审批时 ←→ 在 运行/拒绝/切换到无限制 间移动
+      // /approvals：仅在当前可用的本次批准/拒绝操作间移动。
       if (top === 'approvals' && st.pendingApproval) {
         key.preventDefault();
-        setSel((s) => (s + (key.name === 'right' ? 1 : -1) + APPROVAL_ACTIONS.length) % APPROVAL_ACTIONS.length);
+        const actions = approvalActions(st.pendingApproval);
+        if (actions.length) setSel((s) => (s + (key.name === 'right' ? 1 : -1) + actions.length) % actions.length);
         return true;
       }
     }
@@ -649,7 +682,7 @@ export function useSlashMenu({
     setTasks(INITIAL_TASKS.map((t) => ({ ...t })));
     setPathAuths(INITIAL_PATH_AUTHS.map((p) => ({ ...p })));
     setSessions(SESSIONS.map((s) => ({ ...s })));
-    setPendingApproval(null);
+    // 运行态审批不属于演示数据；仅 resolveApproval 的终态回执可清除。
     setActiveWorkflow(null);
   };
 
@@ -682,6 +715,7 @@ export function useSlashMenu({
     handleKey,
     closeMenu,
     openApproval,
+    resolveApproval,
     resetMenu,
     setContextStats,
     setAgents,

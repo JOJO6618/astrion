@@ -21,6 +21,10 @@ from modules.host_sandbox_runner import (
 )
 from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
+from modules.execution_scope import current_execution_scope, bind_execution_scope
+from modules.scoped_execution_policy import (
+    require_scoped_docker_support, scoped_work_path, scoped_write_access,
+)
 
 
 TERMINAL_STATUSES = {"completed", "failed", "timeout", "cancelled"}
@@ -46,6 +50,9 @@ class BackgroundCommandManager:
         wait_seconds: float = 5.0,
         network_permission: Optional[str] = None,
         sandbox_write_access: bool = True,
+        working_dir: Optional[str] = None,
+        _cancel_event=None,
+        _on_created=None,
     ) -> Dict[str, Any]:
         """启动后台命令；先等待一小段时间返回已有输出。"""
         if timeout is None or float(timeout) <= 0:
@@ -57,6 +64,7 @@ class BackgroundCommandManager:
                 "return_code": -1,
             }
 
+        scope = current_execution_scope()
         timeout_value = min(int(timeout), 3600)
         if timeout_value <= 0:
             timeout_value = 1
@@ -78,7 +86,7 @@ class BackgroundCommandManager:
             }
 
         try:
-            work_path = terminal_ops._resolve_work_path(None)
+            work_path = scoped_work_path(terminal_ops.project_path, working_dir, scope)
         except ValueError:
             return {
                 "success": False,
@@ -109,22 +117,26 @@ class BackgroundCommandManager:
                 "pid": None,
             }
 
+        if _on_created is not None:
+            _on_created(command_id)
         thread = threading.Thread(
             target=self._run_command_thread,
             kwargs={
+                "cancel_event": _cancel_event,
                 "command_id": command_id,
                 "command": final_command,
                 "work_path": work_path,
                 "timeout": timeout_value,
                 "session": session_override or getattr(terminal_ops, "container_session", None),
                 "python_env": getattr(terminal_ops, "_python_env", None) or {},
-                "host_execution_mode": getattr(terminal_ops, "host_execution_mode", "sandbox"),
+                "host_execution_mode": scope.execution_mode if scope else getattr(terminal_ops, "host_execution_mode", "sandbox"),
+                "execution_scope": scope,
                 # 网络权限必须按调用方（对话级 terminal）快照传入，不能读进程级
                 # 环境变量——env 会被其他 terminal 实例覆盖，导致权限不生效或跨工作区串扰。
                 "network_permission": network_permission,
                 # 写权限同理：只读模式下后台命令必须使用只读沙箱计划，
                 # 否则宿主机只读会被后台路径绕过（此前固定用可写计划）。
-                "sandbox_write_access": bool(sandbox_write_access),
+                "sandbox_write_access": scoped_write_access(sandbox_write_access, scope),
             },
             name=f"bg-run-command-{command_id}",
             daemon=True,
@@ -182,7 +194,12 @@ class BackgroundCommandManager:
                 "background_task_created": True,
             }
 
-    def _run_command_thread(
+    def _run_command_thread(self, *, execution_scope=None, **kwargs) -> None:
+        scope = execution_scope if execution_scope is not None else current_execution_scope()
+        with bind_execution_scope(scope):
+            self._run_command_thread_bound(**kwargs)
+
+    def _run_command_thread_bound(
         self,
         *,
         command_id: str,
@@ -194,6 +211,7 @@ class BackgroundCommandManager:
         host_execution_mode: str = "sandbox",
         network_permission: Optional[str] = None,
         sandbox_write_access: bool = True,
+        cancel_event=None,
     ) -> None:
         start_ts = time.time()
         process: Optional[subprocess.Popen] = None
@@ -204,6 +222,11 @@ class BackgroundCommandManager:
         message: Optional[str] = None
 
         try:
+            scope = current_execution_scope()
+            work_path = scoped_work_path(self.project_path, str(work_path), scope)
+            if scope:
+                host_execution_mode = scope.execution_mode
+                sandbox_write_access = scoped_write_access(sandbox_write_access, scope)
             exec_cmd: Optional[List[str]] = None
             use_shell = True
             env = os.environ.copy()
@@ -212,6 +235,7 @@ class BackgroundCommandManager:
                 env.update(python_env)
 
             if session and getattr(session, "mode", None) == "docker":
+                require_scoped_docker_support(scope)
                 container_name = getattr(session, "container_name", None)
                 mount_path = getattr(session, "mount_path", "/workspace") or "/workspace"
                 docker_bin = shutil.which("docker") or "docker"
@@ -226,6 +250,9 @@ class BackgroundCommandManager:
                     container_workdir = f"{container_workdir}/{relative}"
                 exec_cmd = [docker_bin, "exec"]
                 inner_cmd = ["/bin/bash", "-lc", command]
+                if scope and scope.workspace_only:
+                    from modules.docker_scoped_exec import wrap_scoped_docker_command
+                    inner_cmd = wrap_scoped_docker_command(mount_path, inner_cmd, scope)
                 if not sandbox_write_access:
                     # 只读执行：非特权 uid（内核 DAC 强制只读，见 modules/docker_readonly_exec.py）
                     exec_cmd += docker_readonly_exec_args()
@@ -264,8 +291,8 @@ class BackgroundCommandManager:
                         cmd_args = [str(seccomp_fd) if token == "__SECCOMP_FD__" else token for token in cmd_args]
                         pass_fds = (seccomp_fd,)
                     try:
-                        process = subprocess.Popen(
-                            cmd_args,
+                        process = self._spawn_and_register(
+                            command_id, cancel_event, cmd_args,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             cwd=plan.cwd,
@@ -283,9 +310,11 @@ class BackgroundCommandManager:
                                 os.close(seccomp_fd)
                             except OSError:
                                 pass
+                elif use_host_sandbox:
+                    raise HostSandboxError(tr("terminal.host_sandbox_disabled"))
                 else:
-                    process = subprocess.Popen(
-                        command,
+                    process = self._spawn_and_register(
+                        command_id, cancel_event, command,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         cwd=str(work_path),
@@ -298,8 +327,8 @@ class BackgroundCommandManager:
                         bufsize=1,
                     )
             else:
-                process = subprocess.Popen(
-                    exec_cmd,
+                process = self._spawn_and_register(
+                    command_id, cancel_event, exec_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     env=env,
@@ -309,13 +338,6 @@ class BackgroundCommandManager:
                     errors="replace",
                     bufsize=1,
                 )
-
-            with self._lock:
-                rec = self._records.get(command_id)
-                if rec is not None:
-                    rec["pid"] = process.pid
-                    rec["updated_at"] = time.time()
-                    self._processes[command_id] = process
 
             def _reader(stream, collector, rec_key: str):
                 try:
@@ -397,7 +419,10 @@ class BackgroundCommandManager:
                 if rec is not None:
                     existing_status = rec.get("status")
                     existing_result = rec.get("result")
-                    if existing_status == "cancelled" and isinstance(existing_result, dict):
+                    if existing_status == "cancelled":
+                        if not isinstance(existing_result, dict):
+                            existing_result = {**result, "success": False, "status": "cancelled", "return_code": None}
+                            existing_result["message"] = tr("terminal.background_cancel_requested")
                         existing_output = str(existing_result.get("output") or "")
                         if not existing_output and combined_output:
                             existing_result["output"] = combined_output
@@ -412,6 +437,19 @@ class BackgroundCommandManager:
                         rec["finished_at"] = time.time()
                 self._processes.pop(command_id, None)
                 self._cv.notify_all()
+
+    def _spawn_and_register(self, command_id, cancel_event, *args, **kwargs):
+        # Cancellation and spawn share a lock. There is never a live but
+        # unregistered process that cancellation can incorrectly miss.
+        with self._lock:
+            rec = self._records.get(command_id)
+            if not rec or rec.get("status") != "running" or (cancel_event and cancel_event.is_set()):
+                raise RuntimeError("后台命令已取消，未启动进程。")
+            process = subprocess.Popen(*args, **kwargs)
+            rec["pid"] = process.pid
+            rec["updated_at"] = time.time()
+            self._processes[command_id] = process
+            return process
 
     @staticmethod
     def _coerce_pid(value: Any) -> Optional[int]:
@@ -577,6 +615,7 @@ class BackgroundCommandManager:
                 }
             process = self._processes.get(command_id)
             pid = rec.get("pid")
+            rec["status"] = "cancelled"
 
         stopped = False
         if process and process.poll() is None:

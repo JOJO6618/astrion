@@ -37,6 +37,10 @@ from modules.host_sandbox_runner import (
 )
 from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
+from modules.execution_scope import current_execution_scope
+from modules.scoped_execution_policy import (
+    require_scoped_docker_support, scoped_work_path, scoped_write_access,
+)
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -167,10 +171,14 @@ class RunMixin:
             exec_cmd = None
             use_shell = True
             stderr_ignore_regexes: list = []
+            scope = current_execution_scope()
+            work_path = scoped_work_path(self.project_path, str(work_path), scope)
+            sandbox_write_access = scoped_write_access(sandbox_write_access, scope)
             session = session_override or self.container_session
 
             # 如果存在容器会话且模式为docker，则在容器内执行
             if session and getattr(session, "mode", None) == "docker":
+                require_scoped_docker_support(scope)
                 container_name = getattr(session, "container_name", None)
                 mount_path = getattr(session, "mount_path", "/workspace") or "/workspace"
                 docker_bin = shutil.which("docker") or "docker"
@@ -183,6 +191,9 @@ class RunMixin:
                     container_workdir = f"{container_workdir}/{relative}"
                 exec_cmd = [docker_bin, "exec"]
                 inner_cmd = ["/bin/bash", "-lc", command]
+                if scope and scope.workspace_only:
+                    from modules.docker_scoped_exec import wrap_scoped_docker_command
+                    inner_cmd = wrap_scoped_docker_command(mount_path, inner_cmd, scope)
                 if not sandbox_write_access:
                     # 只读执行：非特权 uid（内核 DAC 强制只读，见 modules/docker_readonly_exec.py）
                     exec_cmd += docker_readonly_exec_args()
@@ -210,7 +221,7 @@ class RunMixin:
                 env.update(self._python_env)
 
             if use_shell:
-                use_host_sandbox = self.host_execution_mode != "direct"
+                use_host_sandbox = (scope.execution_mode if scope else self.host_execution_mode) != "direct"
                 if use_host_sandbox and host_sandbox_enabled():
                     if sandbox_write_access:
                         plan = build_host_sandbox_plan(

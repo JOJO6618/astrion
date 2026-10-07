@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import platform
 import re
 import shutil
@@ -15,6 +16,8 @@ from modules.host_sandbox_policy import (
     get_macos_deny_read_regexes,
 )
 from modules.i18n import tr
+from modules.execution_scope import current_execution_scope
+from modules.scoped_execution_policy import scoped_work_path, fixed_workspace_root
 
 
 @dataclass
@@ -62,11 +65,30 @@ MACOS_MINIMAL_READABLE_PATHS = [
     "/opt/homebrew",
 ]
 
+# Scoped Linux uses a minimal read namespace; no host /, /home, or /var bind.
+LINUX_MINIMAL_READABLE_PATHS = ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt/agent-venv"]
+
 # 两个 macOS profile 共用的基础 mach 规则。dirhelper 是 libSystem 解析
 # DARWIN_USER_TEMP_DIR（confstr）所必需的服务，缺省被拒后垫片会打印
 # "confstr() failed with code 5" 警告并把 TMPDIR 回退到 /tmp；
 # 它只解析/创建当前用户自己的临时目录，不放行任何文件写权限。
 MACOS_BASE_MACH_RULES = '(allow mach-lookup (global-name "com.apple.bsd.dirhelper"))\n'
+
+
+def _sandbox_workspace(work_path: Path) -> Path:
+    scope = current_execution_scope()
+    if scope is None:
+        return work_path
+    try:
+        scoped_work_path(scope.workspace_root, str(work_path), scope)
+    except ValueError as exc:
+        raise HostSandboxError("Working directory is outside the fixed workspace root") from exc
+    return fixed_workspace_root(scope)
+
+
+def _sb_quote(value: str) -> str:
+    # Paths may contain quotes/backslashes; never interpolate them as SBPL code.
+    return json.dumps(str(value), ensure_ascii=False)
 
 
 def _expand_path(raw: str) -> Optional[str]:
@@ -88,7 +110,7 @@ def _build_macos_read_rules(paths: List[str]) -> str:
         expanded = _expand_path(raw)
         if expanded and expanded not in seen:
             seen.add(expanded)
-            rules.append(f'(allow file-read* (subpath "{expanded}"))')
+            rules.append(f'(allow file-read* (subpath {_sb_quote(expanded)}))')
     return "\n".join(rules)
 
 
@@ -100,7 +122,7 @@ def _build_macos_deny_rules(paths: List[str]) -> str:
         expanded = _expand_path(raw)
         if expanded and expanded not in seen:
             seen.add(expanded)
-            rules.append(f'(deny file-read* (subpath "{expanded}"))')
+            rules.append(f'(deny file-read* (subpath {_sb_quote(expanded)}))')
     return "\n".join(rules)
 
 
@@ -150,9 +172,9 @@ def _build_macos_whitelist_read_rules(paths: List[str]) -> str:
 
     rules: List[str] = []
     for literal in sorted(literals):
-        rules.append(f'(allow file-read* (literal "{literal}"))')
+        rules.append(f'(allow file-read* (literal {_sb_quote(literal)}))')
     for subpath in subpaths:
-        rules.append(f'(allow file-read* (subpath "{subpath}"))')
+        rules.append(f'(allow file-read* (subpath {_sb_quote(subpath)}))')
     return "\n".join(rules)
 
 
@@ -200,6 +222,7 @@ def build_host_sandbox_plan(
     env: Dict[str, str],
     network_permission: Optional[str] = None,
 ) -> SandboxPlan:
+    _sandbox_workspace(work_path)
     system = platform.system()
     if system == "Darwin":
         return _build_macos_plan(command, work_path, env, network_permission)
@@ -216,6 +239,7 @@ def build_host_sandbox_readonly_plan(
     env: Dict[str, str],
     network_permission: Optional[str] = None,
 ) -> SandboxPlan:
+    _sandbox_workspace(work_path)
     system = platform.system()
     if system == "Darwin":
         return _build_macos_readonly_plan(command, work_path, env, network_permission)
@@ -238,6 +262,7 @@ def build_host_sandbox_shell_plan(
     Windows WSL 只读挂载）：受限权限档（只读/批准/自动审核）的终端以此创建，
     写入由系统直接拒绝（EPERM）；unrestricted 档传 False 保持可写。
     """
+    _sandbox_workspace(work_path)
     system = platform.system()
     if system == "Darwin":
         return _build_macos_shell_plan(work_path, env, network_permission, readonly=readonly)
@@ -259,7 +284,7 @@ def _build_macos_plan(
         raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec"))
     profile = _macos_profile_for_workspace(work_path, network_permission)
     # 白名单读模型下 ~/.gitconfig 不可读会使 git fatal（PoC 实测），指向 /dev/null 跳过
-    plan_env = dict(env)
+    plan_env = _scoped_macos_env(env)
     plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
     return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
@@ -276,7 +301,7 @@ def _build_macos_readonly_plan(
         raise HostSandboxError(tr("sandbox.macos_no_sandbox_exec"))
     profile = _macos_readonly_profile_for_workspace(work_path, network_permission)
     # git 在 ~/.gitconfig 不可读时会 fatal（PoC 实测），指向 /dev/null 跳过全局配置
-    plan_env = dict(env)
+    plan_env = _scoped_macos_env(env)
     plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-lc", command]
     return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
@@ -295,6 +320,7 @@ def _macos_readonly_profile_for_workspace(
     只读 run_command 与受限档持久终端（shell plan readonly=True）共用本函数。
     """
     network_policy = _build_macos_network_policy(network_permission)
+    work_path = _sandbox_workspace(work_path)
     workspace = str(work_path.resolve())
 
     readable_paths = list(MACOS_MINIMAL_READABLE_PATHS)
@@ -337,18 +363,34 @@ def _build_macos_shell_plan(
     else:
         profile = _macos_profile_for_workspace(work_path, network_permission)
     # 同 _build_macos_plan：白名单读下 git 需要 GIT_CONFIG_GLOBAL 兜底
-    plan_env = dict(env)
+    plan_env = _scoped_macos_env(env)
     plan_env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
     cmd = [sandbox_exec, "-p", profile, "/bin/bash", "-i"]
     return SandboxPlan(command=cmd, env=plan_env, cwd=str(work_path))
+
+
+def _scoped_macos_env(env: Dict[str, str]) -> Dict[str, str]:
+    plan_env = dict(env)
+    scope = current_execution_scope()
+    if scope and scope.workspace_only:
+        import hashlib
+        from modules.file_manager.scoped_io import mkdir_checked
+        root = _sandbox_workspace(scope.workspace_root)
+        actor = hashlib.sha256(scope.actor_id.encode("utf-8")).hexdigest()[:24]
+        temporary = root / ".astrion" / "sub_agent_runtime" / actor / "tmp"
+        mkdir_checked(temporary, create_roots=[root])
+        plan_env.update({"TMPDIR": str(temporary) + "/", "TMP": str(temporary), "TEMP": str(temporary)})
+    return plan_env
 
 
 def _macos_profile_for_workspace(
     work_path: Path,
     network_permission: Optional[str] = None,
 ) -> str:
+    work_path = _sandbox_workspace(work_path)
     workspace = str(work_path.resolve())
-    writable_paths = [workspace, "/tmp", "/private/tmp", "/dev/null"]
+    scope = current_execution_scope()
+    writable_paths = [workspace, "/dev/null"] if scope and scope.workspace_only else [workspace, "/tmp", "/private/tmp", "/dev/null"]
     # dirhelper 放行后 TMPDIR 解析为真实 per-user 临时目录（/var/folders/.../T/）：
     # xcselect 垫片会向其中写 xcrun_db 缓存，只读/可写 profile 语义不同——
     # 可写 profile 放行其父目录（含同级 C/ 缓存目录，与放行 /tmp 的语义对齐，
@@ -358,11 +400,16 @@ def _macos_profile_for_workspace(
     if tmpdir:
         try:
             user_tmp_parent = str(Path(tmpdir).resolve().parent)
-            if user_tmp_parent not in writable_paths:
+            scope = current_execution_scope()
+            temp_parts = Path(tmpdir).resolve().parts
+            system_temp = (len(temp_parts) == 7 and temp_parts[:4] == ("/", "private", "var", "folders") and temp_parts[-1] == "T")
+            if not (scope and scope.workspace_only) and (scope is None or system_temp) and user_tmp_parent not in writable_paths:
                 writable_paths.append(user_tmp_parent)
         except Exception:
             pass
-    for raw in get_macos_writable_paths(str(work_path)):
+    scope = current_execution_scope()
+    extra_writable = [] if scope and scope.workspace_only else get_macos_writable_paths(str(work_path))
+    for raw in extra_writable:
         try:
             expanded = str(Path(raw).expanduser().resolve())
         except Exception:
@@ -374,7 +421,7 @@ def _macos_profile_for_workspace(
         if entry == "/dev/null":
             write_rules.append('(literal "/dev/null")')
         else:
-            write_rules.append(f'(subpath "{entry}")')
+            write_rules.append(f'(subpath {_sb_quote(entry)})')
     write_expr = " ".join(write_rules)
     network_policy = _build_macos_network_policy(network_permission)
     # 可写沙箱（2026-08-30 起）与只读沙箱共用同一白名单读模型：
@@ -475,7 +522,10 @@ def _build_linux_common_plan(
     bwrap = shutil.which("bwrap")
     if not bwrap:
         raise HostSandboxError(tr("sandbox.linux_no_bwrap_brief"))
-    sandbox_root = str(work_path.resolve())
+    sandbox_root = str(_sandbox_workspace(work_path).resolve())
+    scope = current_execution_scope()
+    if scope and scope.is_sub_agent:
+        return _build_linux_scoped_plan(work_path, env, shell_cmd, seccomp_path, readonly)
     cmd: List[str] = [
         bwrap,
         "--die-with-parent",
@@ -492,7 +542,7 @@ def _build_linux_common_plan(
         cmd.extend(["--bind", sandbox_root, sandbox_root])
     cmd.extend([
         "--chdir",
-        sandbox_root,
+        str(work_path.resolve()),
         "--proc",
         "/proc",
         "--dev",
@@ -503,7 +553,46 @@ def _build_linux_common_plan(
         "__SECCOMP_FD__",
         *shell_cmd,
     ])
-    return SandboxPlan(command=cmd, env=env, cwd=sandbox_root, seccomp_bpf_path=str(seccomp_path))
+    return SandboxPlan(command=cmd, env=env, cwd=str(work_path.resolve()), seccomp_bpf_path=str(seccomp_path))
+
+
+def _build_linux_scoped_plan(work_path, env, shell_cmd, seccomp_path, readonly=False):
+    scope = current_execution_scope()
+    root = _sandbox_workspace(work_path)
+    bwrap = shutil.which("bwrap")
+    if not bwrap:
+        raise HostSandboxError(tr("sandbox.linux_no_bwrap_brief"))
+    cmd = [bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--share-net"]
+    # bwrap starts with an empty tmpfs root. Mount system tools and authorized
+    # reads only, then overlay anonymous runtime tmp before workspace mounts so
+    # a workspace under /tmp remains visible at its fixed path.
+    seen = set()
+    for raw in LINUX_MINIMAL_READABLE_PATHS:
+        path = Path(raw).expanduser()
+        canonical = path.resolve()
+        if str(path) in seen:
+            continue
+        if not canonical.exists():
+            if raw in LINUX_MINIMAL_READABLE_PATHS:
+                continue
+            raise HostSandboxError(f"Authorized readable path does not exist: {path}")
+        seen.add(str(path))
+        cmd.extend(["--ro-bind", str(canonical), str(path)])
+    cmd.extend(["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--tmpfs", "/var/tmp"])
+    for raw in get_macos_readable_paths(str(root)):
+        path = Path(raw).expanduser().resolve()
+        if not path.exists():
+            raise HostSandboxError(f"Authorized readable path does not exist: {path}")
+        cmd.extend(["--ro-bind", str(path), str(path)])
+    cmd.extend(["--ro-bind" if readonly else "--bind", str(root), str(root)])
+    if not scope.workspace_only and not readonly:
+        for raw in get_macos_writable_paths(str(root)):
+            path = Path(raw).expanduser().resolve()
+            if not path.exists():
+                raise HostSandboxError(f"Authorized writable path does not exist: {path}")
+            cmd.extend(["--bind", str(path), str(path)])
+    cmd.extend(["--remount-ro", "/", "--cap-drop", "ALL", "--chdir", str(work_path), "--seccomp", "__SECCOMP_FD__", *shell_cmd])
+    return SandboxPlan(command=cmd, env=env, cwd=str(work_path), seccomp_bpf_path=str(seccomp_path))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -587,6 +676,10 @@ def _build_windows_bwrap_argv(
     shell_cmd: List[str],
     readonly: bool,
     network_permission: Optional[str],
+    cwd_wsl: Optional[str] = None,
+    readable_paths: Optional[List[str]] = None,
+    writable_paths: Optional[List[str]] = None,
+    fixed_scope: bool = False,
 ) -> List[str]:
     permission = _normalize_network_permission(network_permission)
     argv: List[str] = [
@@ -603,14 +696,22 @@ def _build_windows_bwrap_argv(
     # 注意：若日后改用 glibc 发行版（如 Ubuntu），需补 --ro-bind /lib64 /lib64。
     for sysdir in ("/bin", "/sbin", "/usr", "/lib", "/etc"):
         argv += ["--ro-bind", sysdir, sysdir]
+    for entry in readable_paths or []:
+        argv += ["--ro-bind", entry, entry]
     argv += (["--ro-bind"] if readonly else ["--bind"]) + [ws_wsl, ws_wsl]
+    for entry in writable_paths or []:
+        argv += ["--bind", entry, entry]
     argv += [
-        "--chdir", ws_wsl,
+        "--chdir", cwd_wsl or ws_wsl,
         "--proc", "/proc",
         "--dev", "/dev",
         "--tmpfs", "/tmp",
         "--tmpfs", "/var/tmp",
         "--dir", "/root",
+    ]
+    if fixed_scope:
+        argv += ["--remount-ro", "/", "--cap-drop", "ALL"]
+    argv += [
         "--",
         # bwrap 为挂载点自动创建的中间父目录（如 /mnt/e）是会话内可写 tmpfs
         # （写入不落盘、退出即消失，无安全问题），但写入不报错、与 mac 的审批
@@ -634,8 +735,32 @@ def _build_windows_wsl_plan(
     if not wsl:
         raise HostSandboxError(tr("sandbox.windows_no_wsl"))
     distro = _ensure_wsl_sandbox_distro()
-    ws_wsl = _win_path_to_wsl(work_path.resolve())
-    argv = _build_windows_bwrap_argv(ws_wsl, shell_cmd, readonly, network_permission)
+    root = _sandbox_workspace(work_path).resolve()
+    ws_wsl = _win_path_to_wsl(root)
+    scope = current_execution_scope()
+    fixed_child = scope is not None and scope.is_sub_agent
+    if fixed_child:
+        probe = subprocess.run(
+            [wsl, "-d", distro, "-e", "sh", "-c",
+             'test ! -e /proc/sys/fs/binfmt_misc/WSLInterop || grep -qx disabled /proc/sys/fs/binfmt_misc/WSLInterop'],
+            capture_output=True, timeout=10,
+        )
+        if probe.returncode != 0:
+            raise HostSandboxError("WSL interop must be disabled for fixed execution scope; operation refused")
+    readable_paths = []
+    writable_paths = []
+    if fixed_child:
+        for raw in get_macos_readable_paths(str(root)):
+            readable_paths.append(_win_path_to_wsl(Path(raw).expanduser().resolve()))
+        if not scope.workspace_only and not readonly:
+            for raw in get_macos_writable_paths(str(root)):
+                writable_paths.append(_win_path_to_wsl(Path(raw).expanduser().resolve()))
+    argv = _build_windows_bwrap_argv(
+        ws_wsl, shell_cmd, readonly, network_permission,
+        cwd_wsl=_win_path_to_wsl(work_path.resolve()),
+        readable_paths=readable_paths, writable_paths=writable_paths,
+        fixed_scope=fixed_child,
+    )
     plan_env = dict(env or {})
     plan_env["WSL_UTF8"] = "1"
     # 必须用 -e（exec，不经默认 shell）而非 --：-- 形式会把尾部交给 /bin/sh 重新解析，

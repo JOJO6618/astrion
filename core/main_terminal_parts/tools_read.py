@@ -223,6 +223,9 @@ class MainTerminalToolsReadMixin:
 
                 max_results = self._clamp_int(max_results, 5, 1, 10)
                 memory_dir = Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME
+                readable, access_error = self.file_manager._ensure_host_access(memory_dir.resolve(), "read")
+                if not readable:
+                    return {"success": False, "error": access_error}
                 if not memory_dir.exists() or not memory_dir.is_dir():
                     empty_text = tr("tools_read.memory_dir_not_exists")
                     return {
@@ -238,7 +241,10 @@ class MainTerminalToolsReadMixin:
                 scored: List[Dict[str, Any]] = []
                 for md_file in sorted(memory_dir.glob("*.md")):
                     try:
-                        text = md_file.read_text(encoding="utf-8")
+                        read_result = self.file_manager.read_file(str(md_file))
+                        if not read_result.get("success"):
+                            continue
+                        text = str(read_result.get("content") or "")
                     except Exception:
                         continue
 

@@ -208,6 +208,10 @@ class PatchMixin:
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
+        ok, msg = self._ensure_host_access(full_path, "write")
+        if not ok:
+            return {"success": False, "error": msg}
+
 
         parse_result = self._parse_diff_patch(patch_text)
         if not parse_result.get("success"):
@@ -282,7 +286,18 @@ class PatchMixin:
 
         if append_only_blocks:
             try:
-                with open(full_path, 'a', encoding='utf-8') as f:
+                if self._use_container():
+                    append_payload = "".join(block.get("new", "") for block in append_only_blocks)
+                    append_response = self.write_file(path, append_payload, mode="a")
+                    if not append_response.get("success"):
+                        raise PermissionError(append_response.get("error") or "Append refused")
+                    # Container write has already happened; StringIO only shares
+                    # metadata accounting with the native append path below.
+                    from io import StringIO
+                    append_stream = StringIO()
+                else:
+                    append_stream = self._native_open(full_path, 'a', encoding='utf-8')
+                with append_stream as f:
                     for block in append_only_blocks:
                         chunk = block.get("new", "")
                         if not chunk:
@@ -374,6 +389,13 @@ class PatchMixin:
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
+        ok, msg = self._ensure_host_access(full_path, "read")
+        if not ok:
+            return {"success": False, "error": msg}
+        ok, msg = self._ensure_host_access(full_path, "write")
+        if not ok:
+            return {"success": False, "error": msg}
+
         
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
@@ -389,7 +411,7 @@ class PatchMixin:
                     "blocks": blocks
                 })
 
-            with open(full_path, 'r', encoding='utf-8') as f:
+            with self._native_open(full_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
         except Exception as e:
             return {"success": False, "error": tr("file_manager.read_failed", error=e)}
@@ -467,14 +489,14 @@ class PatchMixin:
         write_performed = False
         if completed_indices:
             try:
-                with open(full_path, 'w', encoding='utf-8') as f:
+                with self._native_open(full_path, 'w', encoding='utf-8') as f:
                     f.write(current_content)
                 write_performed = True
             except Exception as e:
                 write_error = tr("file_manager.write_failed", error=e)
                 # 写入失败时恢复原始内容
                 try:
-                    with open(full_path, 'w', encoding='utf-8') as f:
+                    with self._native_open(full_path, 'w', encoding='utf-8') as f:
                         f.write(original_content)
                 except Exception:
                     pass

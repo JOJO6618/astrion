@@ -91,6 +91,18 @@ class SubAgentTask:
         self.thinking_mode = (thinking_mode or "fast") if multi_agent_mode else "thinking"
         self.task_id = task_record["task_id"]
         self.agent_id = task_record["agent_id"]
+        from modules.execution_scope import ACCESS_LEVELS, ExecutionScope
+        access_level = task_record.get("access_level")
+        if not isinstance(access_level, str) or access_level not in ACCESS_LEVELS or not task_record.get("workspace_root"):
+            raise ValueError("子智能体缺少固定权限，请重新创建实例。")
+        self.execution_scope = ExecutionScope(
+            executor_kind="sub_agent", actor_id=self.task_id,
+            workspace_root=Path(task_record["workspace_root"]),
+            access_level=access_level, conversation_id=task_record.get("conversation_id"),
+            task_id=self.task_id,
+        )
+        from modules.scoped_execution_policy import fixed_workspace_root
+        fixed_workspace_root(self.execution_scope)
         raw_timeout = task_record.get("timeout_seconds")
         self.timeout_seconds = int(raw_timeout) if raw_timeout is not None else None
         self.deliverables_dir = Path(task_record["deliverables_dir"])
@@ -220,6 +232,11 @@ class SubAgentTask:
             logger.exception(f"[SubAgent] task={self.task_id} 执行异常")
             ma_debug("sub_agent_run_exception", task_id=self.task_id, agent_id=self.agent_id, display_name=self.display_name, error=str(exc))
             await self._write_failure(tr("sub_agent_task.execution_error", error=exc))
+        finally:
+            resources = getattr(self, "_execution_terminal", None)
+            if resources is not None:
+                resources.terminal_manager.close_all()
+                self._execution_terminal = None
 
     async def _run_loop(self) -> None:
         client, model_key = self._build_client()
@@ -902,7 +919,7 @@ class SubAgentTask:
             result = await self._execute_multi_agent_tool(name, args)
             if result is not None:
                 return result
-        return await self.manager.execute_tool_for_sub_agent(name, args, agent_id=self.agent_id)
+        return await self.manager.execute_tool_for_sub_agent(name, args, agent_id=self.agent_id, executor=self)
 
     async def _execute_multi_agent_tool(self, name: str, args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """处理多智能体模式专属的通信工具。返回 None 表示不 属于多智能体工具。"""

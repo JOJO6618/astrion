@@ -41,10 +41,42 @@ export default {
   renameLabel: 'Rename: ',
   toolLabel: 'Tool: ',
   summaryLabel: 'Summary: ',
-  switchToUnrestricted: 'Switch to unrestricted',
+  approvalTitle: 'Tool approval',
+  collapseApprovalPanel: 'Collapse approval panel',
+  restoreApprovalPanel: 'Expand approval panel',
+  requestReason: 'Request reason',
+  parameters: 'Parameters',
+  singleFullAccess: 'One-time full access',
+  allow: 'Allow',
+  allowFullAccessExecution: 'Allow this execution with full access',
+  reviewRecords: 'Review records',
+  noApprovalRecords: 'No records',
+  reviewStages: {
+    start: 'Review started',
+    modelCall: 'Calling review model',
+    runCommand: 'Running review command',
+    complete: 'Review finished',
+    decision: 'Review decision'
+  },
+  autoReviewStatus: {
+    pending: 'Waiting for automatic review',
+    reviewing: 'Automatic review in progress',
+    approved: 'Automatic review approved',
+    rejected: 'Automatic review rejected'
+  },
+  finalDecision: {
+    approved: 'Execution allowed',
+    rejected: 'Execution rejected',
+    expired: 'Expired',
+    cancelled: 'Cancelled',
+    timeout: 'Timed out'
+  },
+  humanDecision: {
+    approved: 'Approved by you',
+    rejected: 'Rejected'
+  },
   run: 'Run',
   reject: 'Reject',
-  toolApprovalTitle: 'Tool approval ({n})',
   // Tool-name label mapping (map stores keys, resolved with t() at use site)
   toolRunCommand: 'Run command',
   toolTerminalInput: 'Terminal input',

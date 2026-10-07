@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import { t } from '@/locales';
+import { updateReviewRecords } from '@/components/input/approvalModel';
 
 export const goalMethods = {
   handleGoalProgress(data: any) {
@@ -31,38 +31,24 @@ export const goalMethods = {
     };
   },
   handleGoalReviewProgress(data: any) {
-    const progress = data?.progress || data || {};
-    if (!progress || typeof progress !== 'object') {
-      return;
-    }
-    if (!Array.isArray(this.autoApprovalFeedLines)) {
-      this.autoApprovalFeedLines = [];
-    }
-    this.autoApprovalTitle = t('appTasks.goalReviewTitle');
-    if (progress.stage === 'start') {
-      this.autoApprovalFeedLines = [t('appTasks.reviewStarted')];
-      this.autoApprovalFinalMessage = '';
-    } else if (progress.stage === 'model_call') {
-      this.autoApprovalFeedLines.push(
-        String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim()
-      );
-    } else if (progress.stage === 'run_command' && progress.command) {
-      this.autoApprovalFeedLines.push(String(progress.command));
-    } else if (progress.message) {
-      this.autoApprovalFeedLines.push(String(progress.message));
-    }
-    this.autoApprovalFeedLines = this.autoApprovalFeedLines.slice(-20);
+    if (data?.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    const progress = data?.progress || data;
+    if (!progress || typeof progress !== 'object') return;
+    this.approvalReviewRecords = updateReviewRecords(this.approvalReviewRecords || [], 'goal', {
+      ...data,
+      progress
+    });
     this.$forceUpdate();
   },
   scheduleGoalApprovalPanelAutoClose() {
-    if (this.isMobileViewport || this.autoApprovalTitle !== t('appTasks.goalReviewTitle')) {
-      return;
-    }
-    if (this.approvalAutoCloseTimer) {
-      clearTimeout(this.approvalAutoCloseTimer);
-    }
+    if (this.pendingToolApprovals?.length) return;
+    if (this.approvalAutoCloseTimer) clearTimeout(this.approvalAutoCloseTimer);
+    const conversationId = this.currentConversationId;
     this.approvalAutoCloseTimer = setTimeout(() => {
-      this.rightCollapsed = true;
+      this.approvalAutoCloseTimer = null;
+      if (this.currentConversationId === conversationId && !this.pendingToolApprovals?.length) {
+        this.approvalPanelCollapsed = true;
+      }
     }, 3000);
   },
   handleGoalCompleted(data: any) {

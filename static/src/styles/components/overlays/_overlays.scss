@@ -823,11 +823,7 @@
   border-radius: 32px;
   min-height: 220px;
   overflow: hidden;
-  background: radial-gradient(
-      circle at 20% 20%,
-      var(--surface-soft),
-      var(--glass-tint-blue)
-    )
+  background: radial-gradient(circle at 20% 20%, var(--surface-soft), var(--glass-tint-blue))
     var(--glass-base-deep);
   box-shadow:
     0 25px 60px var(--glass-shadow-deep),
@@ -838,7 +834,11 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(140deg, color-mix(in srgb, var(--on-accent) 16%, transparent), transparent);
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--on-accent) 16%, transparent),
+    transparent
+  );
   mix-blend-mode: screen;
 }
 
@@ -846,7 +846,11 @@
   position: absolute;
   width: 140%;
   height: 140%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--on-accent) 30%, transparent), transparent 60%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--on-accent) 30%, transparent),
+    transparent 60%
+  );
   filter: blur(50px);
   transform: translate(-15%, -20%);
   opacity: 0.8;
@@ -869,7 +873,11 @@
   height: 120px;
   border-radius: 50%;
   filter: blur(1px);
-  background: radial-gradient(circle, color-mix(in srgb, var(--state-info) 80%, transparent), transparent);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--state-info) 80%, transparent),
+    transparent
+  );
   animation: experimentDrift 10s ease-in-out infinite alternate;
 }
 
@@ -881,7 +889,11 @@
 .experiment-orb.orb-two {
   bottom: 10%;
   right: 8%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 85%, transparent), transparent);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 85%, transparent),
+    transparent
+  );
 }
 
 .experiment-copy h3 {
@@ -980,7 +992,11 @@
   position: absolute;
   inset: -15%;
   background:
-    radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--on-accent) 35%, transparent), transparent 55%),
+    radial-gradient(
+      circle at 30% 25%,
+      color-mix(in srgb, var(--on-accent) 35%, transparent),
+      transparent 55%
+    ),
     radial-gradient(circle at 80% 5%, var(--glass-tint-blue-soft), transparent 60%);
   opacity: 0.6;
   pointer-events: none;
@@ -1019,7 +1035,11 @@
   border-radius: inherit;
   pointer-events: none;
   background:
-    radial-gradient(circle at 32% 18%, color-mix(in srgb, var(--on-accent) 40%, transparent), transparent 58%),
+    radial-gradient(
+      circle at 32% 18%,
+      color-mix(in srgb, var(--on-accent) 40%, transparent),
+      transparent 58%
+    ),
     radial-gradient(circle at 70% 8%, var(--glass-tint-amber), transparent 55%),
     radial-gradient(circle at 45% 120%, var(--glass-tint-blue-mid), transparent 45%);
   mix-blend-mode: screen;
@@ -1056,7 +1076,11 @@
   padding: 9px 18px;
   font-size: 13px;
   color: white;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--on-accent) 30%, transparent), var(--border-strong));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--on-accent) 30%, transparent),
+    var(--border-strong)
+  );
   backdrop-filter: blur(18px);
   cursor: pointer;
   transition:
@@ -1066,7 +1090,11 @@
 
 .liquid-glass-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--on-accent) 40%, transparent), color-mix(in srgb, var(--on-accent) 20%, transparent));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--on-accent) 40%, transparent),
+    color-mix(in srgb, var(--on-accent) 20%, transparent)
+  );
 }
 
 .liquid-glass-btn:disabled {
@@ -1832,59 +1860,6 @@
 .mobile-panel-overlay .mobile-panel-sheet {
   transform: translateX(0);
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* 桌面端审批：覆盖弹窗，不挤压主布局 */
-.desktop-approval-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2100;
-  background: var(--theme-overlay-scrim);
-  backdrop-filter: blur(6px);
-  display: flex;
-  justify-content: flex-end;
-  align-items: stretch;
-}
-
-.desktop-approval-sheet {
-  height: 100%;
-  max-width: 92vw;
-  background: var(--surface-panel);
-  box-shadow: var(--shadow-strong);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.desktop-approval-sheet .sidebar.right-sidebar {
-  width: 100% !important;
-  min-width: 0;
-  height: 100%;
-  transition: none !important;
-  transform: none !important;
-}
-
-.desktop-approval-fade-enter-active,
-.desktop-approval-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.desktop-approval-fade-enter-from,
-.desktop-approval-fade-leave-to {
-  opacity: 0;
-}
-
-.desktop-approval-fade-enter-active .desktop-approval-sheet,
-.desktop-approval-fade-leave-active .desktop-approval-sheet {
-  transition:
-    transform 0.22s ease,
-    opacity 0.22s ease;
-}
-
-.desktop-approval-fade-enter-from .desktop-approval-sheet,
-.desktop-approval-fade-leave-to .desktop-approval-sheet {
-  transform: translateX(14px);
-  opacity: 0.96;
 }
 
 .mobile-panel-overlay--left.mobile-panel-overlay-enter-from .mobile-panel-sheet,
@@ -3179,7 +3154,11 @@ body[data-theme='dark'] {
 
 .tutorial-status-badge.success {
   color: var(--text-primary);
-  background: linear-gradient(135deg, var(--state-success), color-mix(in srgb, var(--state-success) 70%, black));
+  background: linear-gradient(
+    135deg,
+    var(--state-success),
+    color-mix(in srgb, var(--state-success) 70%, black)
+  );
 }
 
 .tutorial-intro-actions {

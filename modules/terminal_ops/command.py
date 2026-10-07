@@ -36,6 +36,7 @@ from modules.host_sandbox_runner import (
     host_sandbox_enabled,
 )
 from modules.i18n import tr
+from modules.scoped_execution_policy import scoped_work_path
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -59,8 +60,4 @@ class CommandMixin:
         return min(int(requested), max_limit)
 
     def _resolve_work_path(self, working_dir: Optional[str]) -> Path:
-        if working_dir:
-            work_path = (self.project_path / working_dir).resolve()
-            work_path.relative_to(self.project_path)
-            return work_path
-        return self.project_path
+        return scoped_work_path(self.project_path, working_dir)

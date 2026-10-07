@@ -64,6 +64,13 @@ class ListMixin:
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
+        ok, msg = self._ensure_host_access(full_path, "read")
+        if not ok:
+            return {"success": False, "error": msg}
+        ok, msg = self._ensure_host_access(full_path, "write")
+        if not ok:
+            return {"success": False, "error": msg}
+
         
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
@@ -90,7 +97,7 @@ class ListMixin:
                 })
 
             # 读取文件内容
-            with open(full_path, 'r', encoding='utf-8') as f:
+            with self._native_open(full_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
             total_lines = len(lines)
@@ -140,7 +147,7 @@ class ListMixin:
                     return {"success": False, "error": tr("file_manager.unknown_operation", operation=operation)}
             
             # 写回文件
-            with open(full_path, 'w', encoding='utf-8') as f:
+            with self._native_open(full_path, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
             
             relative_path = self._relative_path(full_path)
@@ -171,12 +178,12 @@ class ListMixin:
 
     def list_files(self, path: str = "") -> Dict:
         """列出目录内容"""
-        if path:
-            valid, error, full_path = self._validate_path(path)
-            if not valid:
-                return {"success": False, "error": error}
-        else:
-            full_path = self.project_path
+        valid, error, full_path = self._validate_path(path)
+        if not valid:
+            return {"success": False, "error": error}
+        ok, msg = self._ensure_host_access(full_path, "read")
+        if not ok:
+            return {"success": False, "error": msg}
         
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.dir_not_found")}
@@ -192,6 +199,9 @@ class ListMixin:
                 if item.name.startswith('.'):
                     continue
                 
+                readable, _ = self._ensure_host_access(item, "read")
+                if not readable:
+                    continue
                 relative_path = self._relative_path(item)
                 
                 if item.is_file():
@@ -225,6 +235,9 @@ class ListMixin:
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
+        ok, msg = self._ensure_host_access(full_path, "read")
+        if not ok:
+            return {"success": False, "error": msg}
         try:
             stat = full_path.stat()
             relative_path = self._relative_path(full_path)

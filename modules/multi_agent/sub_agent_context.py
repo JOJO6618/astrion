@@ -42,6 +42,24 @@ except ImportError:
     from config.paths import IS_HOST_MODE
 
 
+def _context_read_text(path: Path) -> str:
+    from modules.execution_scope import current_execution_scope
+    scope = current_execution_scope()
+    if scope is None or not scope.is_sub_agent:
+        return path.read_text(encoding="utf-8")
+    if not IS_HOST_MODE:
+        # Context injection reads the backend's bind-mounted workspace only;
+        # a container path must never select an unrelated host file.
+        path.resolve().relative_to(scope.workspace_root)
+    from modules.file_manager import FileManager
+    manager = FileManager(str(scope.workspace_root))
+    manager.set_host_execution_mode(scope.execution_mode)
+    result = manager.read_file(str(path))
+    if not result.get("success"):
+        raise PermissionError(result.get("error") or "上下文文件不可读。")
+    return str(result.get("content") or "")
+
+
 def _load_agents_md(workspace_path: str) -> Optional[str]:
     """加载工作区根目录的 AGENTS.md 文件内容。"""
     try:
@@ -52,7 +70,7 @@ def _load_agents_md(workspace_path: str) -> Optional[str]:
         if not agents_md_files:
             return None
         latest_file = max(agents_md_files, key=lambda p: p.stat().st_mtime)
-        content = latest_file.read_text(encoding="utf-8")
+        content = _context_read_text(latest_file)
         return content.strip() if content else None
     except Exception:
         return None
@@ -150,7 +168,7 @@ def _build_claude_md_section(workspace_path: str, data_dir: str = "") -> str:
         claude_file = Path(workspace_path) / "CLAUDE.md"
         if not claude_file.is_file():
             return ""
-        content = claude_file.read_text(encoding="utf-8").strip()
+        content = _context_read_text(claude_file).strip()
         if not content:
             return ""
         return (
@@ -214,7 +232,7 @@ def _build_project_memory_section(workspace_path: str) -> str:
         entries: List[str] = []
         for md_file in sorted(memory_dir.glob("*.md")):
             try:
-                text = md_file.read_text(encoding="utf-8")
+                text = _context_read_text(md_file)
                 name = None
                 description = None
                 if text.startswith("---"):

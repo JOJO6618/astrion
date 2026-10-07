@@ -42,9 +42,11 @@ from modules.host_sandbox_policy import (
     get_macos_deny_read_paths,
     get_macos_deny_read_regexes,
 )
-from modules.host_sandbox_runner import MACOS_MINIMAL_READABLE_PATHS
+from modules.host_sandbox_runner import MACOS_MINIMAL_READABLE_PATHS, LINUX_MINIMAL_READABLE_PATHS
 from utils.logger import setup_logger
 from modules.i18n import tr
+from modules.execution_scope import current_execution_scope
+from modules.scoped_execution_policy import fixed_workspace_root, require_scoped_docker_support
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -88,11 +90,15 @@ class PathMixin:
             (是否有效, 错误信息, 完整路径)
         """
         original_path = path
-        project_root = Path(self.project_path).resolve()
-        if project_root != self.project_path:
+        scope = current_execution_scope()
+        try:
+            project_root = fixed_workspace_root(scope) if scope else Path(self.project_path).resolve()
+        except (ValueError, OSError, RuntimeError) as exc:
+            return False, str(exc), None
+        if scope is None and project_root != self.project_path:
             self.project_path = project_root
 
-        if self._is_host_mode():
+        if (scope is not None and scope.is_sub_agent) or self._is_host_mode():
             normalized = (path or "").strip()
             if normalized == "/workspace":
                 normalized = ""
@@ -100,10 +106,13 @@ class PathMixin:
                 normalized = normalized.split("/workspace/", 1)[1]
             if not normalized:
                 return True, "", project_root
-            if Path(normalized).is_absolute() or (len(normalized) > 1 and normalized[1] == ":"):
-                full_path = Path(normalized).expanduser().resolve()
-            else:
-                full_path = (project_root / normalized).resolve()
+            try:
+                if Path(normalized).is_absolute() or (len(normalized) > 1 and normalized[1] == ":"):
+                    full_path = Path(normalized).expanduser().resolve()
+                else:
+                    full_path = (project_root / normalized).resolve()
+            except (OSError, RuntimeError) as exc:
+                return False, str(exc), None
             return True, "", full_path
         
         # 不允许绝对路径（除非是在项目内的绝对路径）
@@ -146,8 +155,10 @@ class PathMixin:
         return True, "", full_path
 
     def _relative_path(self, full_path: Path) -> str:
+        scope = current_execution_scope()
+        root = fixed_workspace_root(scope) if scope else self.project_path
         try:
-            return str(full_path.relative_to(self.project_path))
+            return str(full_path.relative_to(root))
         except ValueError:
             return str(full_path)
 
@@ -169,16 +180,23 @@ class PathMixin:
             temp_roots = [Path(tempfile.gettempdir()).resolve()]
         else:
             temp_roots = [Path("/tmp").resolve(), Path("/private/tmp").resolve()]
-        roots: List[Path] = [self.project_path.resolve(), *temp_roots]
+        scope = current_execution_scope()
+        workspace = fixed_workspace_root(scope) if scope else self.project_path.resolve()
+        if scope and scope.workspace_only and access == "write":
+            # Temporary dirs are shell runtime allowances, never native write grants.
+            return [workspace]
+        roots: List[Path] = [workspace, *temp_roots]
         # 2026-09-27 起传入工作区路径：并入该工作区的工作区级路径授权（只增不减）
         if access == "write":
-            raw_items = get_macos_writable_paths(str(self.project_path))
+            raw_items = get_macos_writable_paths(str(workspace))
         else:
-            raw_items = get_macos_readable_paths(str(self.project_path))
+            raw_items = get_macos_readable_paths(str(workspace))
             if platform.system() == "Darwin":
                 # 读 roots 与只读沙箱白名单同源：系统路径（/usr、/System 等）
                 # 在只读沙箱里可读，原生读工具应对齐（2026-08-30 白名单化）
                 raw_items = list(MACOS_MINIMAL_READABLE_PATHS) + list(raw_items)
+            elif scope and platform.system() == "Linux":
+                raw_items = list(LINUX_MINIMAL_READABLE_PATHS) + list(raw_items)
         for raw in raw_items:
             try:
                 p = Path(raw).expanduser().resolve()
@@ -214,18 +232,32 @@ class PathMixin:
         return False
 
     def _ensure_host_access(self, full_path: Path, access: str) -> Tuple[bool, str]:
-        if not self._is_host_mode():
+        scope = current_execution_scope()
+        if scope and self._is_docker_mode():
+            try:
+                require_scoped_docker_support(scope)
+            except ValueError as exc:
+                return False, str(exc)
+        if not self._is_host_mode() and (scope is None or not scope.is_sub_agent):
             return True, ""
         # 执行环境为 direct（完全访问权限）时，run_command 不套沙箱、可读写任意路径；
         # read_file/write_file/edit_file 为进程内文件操作，本就不走 OS 沙箱，此处与
         # run_command 语义对齐，直接放行。sandbox 模式下保持授权范围检查不变。
-        if getattr(self, "host_execution_mode", "sandbox") == "direct":
+        if (scope.execution_mode if scope else getattr(self, "host_execution_mode", "sandbox")) == "direct":
             return True, ""
-        check_target = full_path
-        if access == "write" and not full_path.exists():
-            check_target = full_path.parent.resolve()
-        allowed_roots = self._host_allowed_roots(access)
-        resolved_target = check_target.resolve()
+        try:
+            allowed_roots = self._host_allowed_roots(access)
+            check_target = full_path
+            if scope is None and access == "write" and not full_path.exists():
+                check_target = full_path.parent
+            resolved_target = check_target.resolve()
+            # Path.resolve checks existing symlink ancestors, including dangling
+            # links for targets not yet created. Check the target itself: using
+            # only its parent would erroneously authorize a new root sibling.
+            if scope and os.name not in {"posix", "nt"}:
+                return False, "Scoped native IO unavailable on this platform; operation refused"
+        except (ValueError, OSError, RuntimeError) as exc:
+            return False, str(exc)
         if self._path_in_allowed_roots(resolved_target, allowed_roots):
             # 读访问还需过 macOS 禁读清单（工作区内 .env 等，与沙箱 deny 同源）
             if access == "read" and platform.system() == "Darwin" and self._host_read_denied(resolved_target):

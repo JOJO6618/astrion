@@ -16,13 +16,19 @@ export const panelMethods = {
     }
   },
   toggleApprovalPanel() {
-    this.rightCollapsed = !this.rightCollapsed;
-    if (!this.rightCollapsed && this.rightWidth < this.minPanelWidth) {
-      this.rightWidth = this.minPanelWidth;
+    this.approvalPanelCollapsed = !this.approvalPanelCollapsed;
+    if (!this.approvalPanelCollapsed) this.fetchPendingToolApprovals();
+  },
+  restoreToolApprovalPanel() {
+    this.approvalPanelCollapsed = false;
+    if (this.approvalAutoCloseTimer) {
+      clearTimeout(this.approvalAutoCloseTimer);
+      this.approvalAutoCloseTimer = null;
     }
-    if (!this.rightCollapsed) {
-      this.fetchPendingToolApprovals();
-    }
+  },
+  collapseToolApprovalPanel() {
+    // Presentation only: never submits a decision or changes editor focus.
+    this.approvalPanelCollapsed = true;
   },
   toggleTerminalPanel() {
     this.terminalPanelOpen = !this.terminalPanelOpen;
@@ -40,15 +46,6 @@ export const panelMethods = {
     this.toggleFocusPanel();
   },
   handleApprovalPanelToggleClick() {
-    if (!this.currentConversationId) {
-      return;
-    }
-    if (this.isMobileViewport) {
-      // 手机端：获取审批列表（不自动关闭），然后切换遮罩
-      this.fetchPendingToolApprovals();
-      this.openMobileOverlay('approval');
-      return;
-    }
     this.toggleApprovalPanel();
   },
   handleTokenPanelToggleClick(fromSettingsMenu = false) {

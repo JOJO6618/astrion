@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from modules.approval_agent import ApprovalAgent
+from modules.full_access_review import run_full_access_review
 from server.state import tool_approval_manager
 from modules.i18n import tr
 
@@ -64,13 +65,41 @@ async def run_auto_approval(
     arguments: Dict[str, Any],
     risk_markers: Optional[List[str]],
     sender,
+    stop_check=None,
 ) -> Dict[str, Any]:
+    item = tool_approval_manager.get(approval_id)
+    if (item or {}).get("approval_type") == "full_access":
+        async def _review_full_access(*, progress_cb, cancel_check) -> Dict[str, Any]:
+            payload = build_auto_approval_payload(
+                web_terminal=web_terminal,
+                recent_tool_actions=recent_tool_actions,
+                function_name=function_name,
+                arguments=arguments,
+                risk_markers=risk_markers,
+            )
+            payload += "\n本次申请仅针对当前工具调用的单次完全访问权限，请审核该权限提升的危险性和越权风险。"
+            agent = ApprovalAgent(web_terminal=web_terminal)
+            return await agent.review(payload_text=payload, progress_cb=progress_cb, cancel_check=cancel_check)
+
+        return await run_full_access_review(
+            manager=tool_approval_manager,
+            approval_id=approval_id,
+            username=username,
+            reviewer=_review_full_access,
+            sender=sender,
+            stop_check=stop_check,
+        )
+
     def _progress(evt: Dict[str, Any]) -> None:
         sender("auto_approval_progress", {"approval_id": approval_id, "progress": evt, "conversation_id": conversation_id})
 
     def _manual_takeover() -> Optional[Dict[str, Any]]:
         row = tool_approval_manager.get(approval_id)
+        if stop_check is not None and stop_check():
+            row = tool_approval_manager.mark_expired(approval_id)
         status = (row or {}).get("status")
+        if status == "expired":
+            return {"decision": "rejected", "item": row, "source": "system", "code": "approval_expired"}
         if status in {"approved", "rejected"}:
             return {"decision": status, "item": row, "source": "manual"}
         return None
@@ -96,5 +125,11 @@ async def run_auto_approval(
         out = {"decision": decided.get("status"), "item": decided, "source": "approval_agent"}
     else:
         out = _manual_takeover() or {"decision": "rejected", "reason": tr("auto_approval.takeover_failed")}
-    _progress({"stage": "done", "message": tr("auto_approval.done"), "decision": (out or {}).get("decision")})
+    source = (out or {}).get("source")
+    _progress({
+        "stage": "done",
+        "message": tr("auto_approval.done"),
+        "source": source,
+        "decision": (out or {}).get("decision") if source == "approval_agent" else None,
+    })
     return out

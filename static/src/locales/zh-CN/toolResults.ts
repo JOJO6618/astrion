@@ -7,6 +7,13 @@
 //   - enabled「开启」/ disabled「关闭」/ unnamed「未命名」/ unnamedConversation「未命名对话」
 //   - queryFailed「查询失败」/ title「标题」/ description「描述」/ mode「模式」
 export default {
+  access: {
+    workspace_write: '沙箱 · 仅工作区可写',
+    sandbox_write: '沙箱 · 按路径授权读写',
+    full_access: '完全访问',
+    onceGranted: '本次完全访问已批准',
+    alreadyActive: '当前为完全访问'
+  },
   // —— 状态标签（带符号前缀，与 common 的裸词不同义）——
   status: {
     successMark: '✓ 成功',
@@ -107,6 +114,7 @@ export default {
     userAnswer: '用户回答：',
     subAgent: '子智能体：',
     subAgentId: '子智能体 ID：',
+    accessLevel: '固定权限：',
     requestedTools: '请求加载：',
     loadedNow: '新加载：',
     alreadyLoaded: '此前已加载：',

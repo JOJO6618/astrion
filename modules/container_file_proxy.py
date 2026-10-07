@@ -405,7 +405,29 @@ def _edit_lines(root, payload):
         "affected_lines": affected
     }
 
+def _read_binary(root, payload):
+    import os
+    import stat
+    import base64
+    target = _resolve(root, payload.get("path"))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    parent = os.open("/", flags)
+    try:
+        for part in target.parts[1:-1]:
+            child = os.open(part, flags, dir_fd=parent)
+            os.close(parent)
+            parent = child
+        fd = os.open(target.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        with os.fdopen(fd, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise PermissionError("媒体读取仅允许普通文件且不能有硬链接")
+            return {"success": True, "b64": base64.b64encode(stream.read()).decode("ascii")}
+    finally:
+        os.close(parent)
+
 HANDLERS = {
+    "read_binary": _read_binary,
     "create_file": _create_file,
     "delete_file": _delete_file,
     "rename_file": _rename_file,
@@ -480,7 +502,8 @@ class ContainerFileProxy:
         if session.mount_path:
             cmd.extend(["-w", session.mount_path])
         cmd.append(session.container_name)
-        cmd.extend(["python3", "-c", CONTAINER_FILE_SCRIPT])
+        from modules.docker_scoped_exec import wrap_scoped_docker_command
+        cmd.extend(wrap_scoped_docker_command(session.mount_path or "/workspace", ["python3", "-I", "-S", "-c", CONTAINER_FILE_SCRIPT]))
 
         try:
             completed = subprocess.run(

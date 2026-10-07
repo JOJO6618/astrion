@@ -110,6 +110,11 @@ class ToolsDefinitionAgentToolsMixin:
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
+                                    "access_level": {
+                                        "type": "string",
+                                        "enum": ["workspace_write", "sandbox_write", "full_access"],
+                                        "description": "必选且创建后固定。workspace_write：沙箱仅创建时工作区可写（计划/只读也可选）；sandbox_write：沙箱按当前路径授权读写；full_access：宿主机完全访问，仅主智能体当前已处于完全访问时可创建。不冻结路径授权列表。"
+                                    },
                                     "agent_id": {
                                         "type": "integer",
                                         "description": "子智能体编号（1-99），用于标识和管理。同一对话中每个编号只能使用一次。建议按顺序分配：1、2、3..."
@@ -140,7 +145,7 @@ class ToolsDefinitionAgentToolsMixin:
                                         "description": "智能程度（必选），决定子智能体使用的模型。\nsame（和当前智能体一致）：推荐用于与主智能体协作的代码编写、修改和重构，使用创建时主智能体的模型，帮助保持代码质量和风格一致。\nhigh（高）：推荐用于核心架构设计、复杂问题诊断、重大技术方案权衡，或当前模型难以解决的问题，可请其提供指导。\nmedium（中）：推荐用于边界明确但需要分析和判断的任务，如模块代码分析、常规代码审查、测试方案设计、多来源信息比较与综合。\nlow（低）：推荐用于步骤明确、以收集和整理为主的任务，如大范围搜索、批量读取、资料摘要、信息提取和基础调查；复杂判断应选择中或高。\n高、中、低模型由用户在设置中配置，未配置时创建会报错，请改用 same 或请用户配置。"
                                     }
                                 }),
-                                "required": ["agent_id", "summary", "task", "intelligence"]
+                                "required": ["agent_id", "summary", "task", "intelligence", "access_level"]
                             }
                         }
                     },

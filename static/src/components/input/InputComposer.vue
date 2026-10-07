@@ -7,6 +7,7 @@
     >
       <div
         class="runtime-queue-list"
+        v-show="!approvalExpanded"
         :class="{ 'runtime-queue-list--empty': !runtimeQueuedMessagesForRender.length }"
         ref="runtimeQueueList"
       >
@@ -37,6 +38,21 @@
           </button>
         </div>
       </div>
+      <ComposerApprovalDock
+        :visible="approvalDockVisible"
+        :collapsed="!!approvalPanelCollapsed"
+        :status-visible="floatingStatusVisible"
+        :queue-height="runtimeQueueHeight"
+        :approvals="toolApprovals || []"
+        :deciding-approval-ids="decidingApprovalIds"
+        :review-records="approvalReviewRecords"
+        @layout-change="emitComposerHeight"
+        @transitioning="approvalPanelTransitioning = $event"
+        @restore="$emit('restore-tool-approval')"
+        @collapse="$emit('collapse-tool-approval')"
+        @approve="$emit('approve-tool-approval', $event)"
+        @reject="$emit('reject-tool-approval', $event)"
+      />
       <transition
         name="skill-slash-menu-motion"
         @before-enter="handleSlashMenuTransitionStart"
@@ -84,6 +100,7 @@
         :loading="fileAtLoading"
         :host-mode="!!props.hostMode"
         :menu-style="fileAtMenuStyle"
+        @transitioning="fileAtTransitioning = $event"
         @select="selectFileAtItemByIndex"
         @hover="fileAtActiveIndex = $event"
       />
@@ -747,6 +764,8 @@ import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { TextSelection } from 'prosemirror-state';
 import QuickMenu from '@/components/input/QuickMenu.vue';
+import ComposerApprovalDock from '@/components/input/ComposerApprovalDock.vue';
+import type { ToolApproval, ApprovalReviewRecord } from '@/components/input/approvalModel';
 import FileAtMenu, { type FileAtItem } from '@/components/input/FileAtMenu.vue';
 import FileChips from '@/components/chat/FileChips.vue';
 import RollingNumber from '@/components/input/RollingNumber.vue';
@@ -782,6 +801,10 @@ const emit = defineEmits([
   'toggle-token-panel',
   'compress-conversation',
   'toggle-approval-panel',
+  'restore-tool-approval',
+  'collapse-tool-approval',
+  'approve-tool-approval',
+  'reject-tool-approval',
   'file-selected',
   'paste-files',
   'remove-image',
@@ -880,6 +903,10 @@ const props = defineProps<{
   pendingUserQuestionCount?: number;
   planApprovalMinimized?: boolean;
   pendingPlanApprovalCount?: number;
+  toolApprovals?: ToolApproval[];
+  decidingApprovalIds?: string[];
+  approvalPanelCollapsed?: boolean;
+  approvalReviewRecords?: ApprovalReviewRecord[];
   goalModeArmed?: boolean;
   goalRunning?: boolean;
   goalProgress?: Record<string, any> | null;
@@ -1000,6 +1027,7 @@ let lastSlashAnimationEndTime = 0;
 
 const fileAtMenuRef = ref<InstanceType<typeof FileAtMenu> | null>(null);
 const fileAtOpen = ref(false);
+const fileAtTransitioning = ref(false);
 const fileAtQuery = ref<string | null>(null);
 const fileAtActiveIndex = ref(0);
 const fileAtItems = ref<FileAtItem[]>([]);
@@ -1159,8 +1187,24 @@ const projectGitSummaryForRender = computed(() => {
   return result;
 });
 
+// Typed / and @ menus temporarily own the composer slot. Requests remain pending.
+const approvalPanelTransitioning = ref(false);
+const approvalDockVisible = computed(
+  () =>
+    !skillSlashMenuOpen.value &&
+    !fileAtOpen.value &&
+    !props.quickMenuOpen &&
+    (!props.approvalPanelCollapsed || !!props.toolApprovals?.length)
+);
+const approvalExpanded = computed(() => approvalDockVisible.value && !props.approvalPanelCollapsed);
+
 const floatingStatusVisible = computed(() => {
-  if (skillSlashMenuOpen.value || fileAtOpen.value || props.quickMenuOpen) {
+  if (
+    skillSlashMenuOpen.value ||
+    fileAtOpen.value ||
+    props.quickMenuOpen ||
+    approvalExpanded.value
+  ) {
     return false;
   }
   // 消息队列（预输入/引导消息）存在时隐藏git状态栏，与 / 菜单出现时逻辑相同
@@ -1178,7 +1222,8 @@ const floatingStatusVisible = computed(() => {
 });
 
 const showComposerAvatar = computed(() => {
-  if (skillSlashMenuOpen.value || fileAtOpen.value || props.quickMenuOpen) return false;
+  if (skillSlashMenuOpen.value || fileAtOpen.value || props.quickMenuOpen || approvalExpanded.value)
+    return false;
   if (runtimeQueuedMessagesForRender.value.length > 0 || props.hasPendingRuntimeGuidance)
     return false;
   return !!props.avatarStatus;
@@ -2861,6 +2906,7 @@ const toggleVoiceRecording = () => {
 const RUNTIME_QUEUE_ANIM_DURATION = 300;
 const RUNTIME_QUEUE_ANIM_EASING = 'cubic-bezier(0.25, 0.8, 0.25, 1)';
 const runtimeQueueList = ref<HTMLElement | null>(null);
+const runtimeQueueHeight = ref(0);
 const runtimeQueueItemRefs = new Map<string, HTMLElement>();
 const runtimeQueuePrevIds: string[] = [];
 const runtimeQueuePrevRects = new Map<string, DOMRect>();
@@ -2981,14 +3027,14 @@ onUpdated(() => {
     return;
   }
 
-  keepRuntimeQueueTransitionCollapsed();
-
   const previousIdSet = new Set(runtimeQueuePrevIds);
   const currentIdSet = new Set(currentIds);
   const enteringIds = currentIds.filter((id) => !previousIdSet.has(id));
   const leavingIds = runtimeQueuePrevIds.filter((id) => !currentIdSet.has(id));
 
   if (!enteringIds.length && !leavingIds.length) return;
+
+  keepRuntimeQueueTransitionCollapsed();
 
   // ── Leave: create ghost clones at old positions ──
   leavingIds.forEach((id) => {
@@ -3117,10 +3163,14 @@ const hasRuntimeLayoutExpansion = computed(() => {
   const hasFiles = Array.isArray(props.selectedFiles) && props.selectedFiles.length > 0;
   return (
     hasQueue ||
+    approvalDockVisible.value ||
+    approvalPanelTransitioning.value ||
     floatingStatusVisible.value ||
     showComposerAvatar.value ||
     skillSlashOpen.value ||
+    slashMenuTransitioning.value ||
     fileAtOpen.value ||
+    fileAtTransitioning.value ||
     hasImages ||
     hasVideos ||
     hasFiles ||
@@ -3156,6 +3206,9 @@ const goalBannerCollapsed = computed(
     runtimeQueuedMessagesForRender.value.length > 0 ||
     runtimeQueueTransitioning.value ||
     skillSlashMenuOpen.value ||
+    fileAtOpen.value ||
+    fileAtTransitioning.value ||
+    approvalExpanded.value ||
     slashMenuTransitioning.value
 );
 
@@ -3173,8 +3226,12 @@ const collectComposerVisualHeight = () => {
   // 其 offsetParent 一致，offsetTop 可直接比较。
   let top = shell.offsetTop;
   let bottom = shell.offsetTop + shell.offsetHeight;
-  const slashMenu = root.querySelector('.skill-slash-menu');
-  if (slashMenu instanceof HTMLElement) {
+  const approvalDock = root.querySelector('.composer-approval-dock');
+  if (approvalDock instanceof HTMLElement && approvalExpanded.value) {
+    return Math.max(0, bottom - Math.min(top, approvalDock.offsetTop));
+  }
+  const slashMenu = root.querySelector('.skill-slash-menu-wrapper');
+  if (slashMenu instanceof HTMLElement && skillSlashMenuOpen.value) {
     const sTop = slashMenu.offsetTop;
     const sBottom = slashMenu.offsetTop + slashMenu.offsetHeight;
     return Math.max(0, Math.max(bottom, sBottom) - Math.min(top, sTop));
@@ -3182,7 +3239,7 @@ const collectComposerVisualHeight = () => {
   // 收起态横幅是脱离流、浮在角上的小圆点，不应计入为聊天区预留的高度，
   // 否则会把消息区可滚动范围顶高。故排除 .goal-mode-banner--collapsed。
   const nodes = root.querySelectorAll(
-    '.runtime-queue-list:not(.runtime-queue-list--empty), .floating-status-row, .composer-avatar'
+    '.runtime-queue-list:not(.runtime-queue-list--empty), .floating-status-row, .composer-avatar, .composer-approval-restore-dock'
   );
   nodes.forEach((node) => {
     if (!(node instanceof HTMLElement)) return;
@@ -3190,6 +3247,11 @@ const collectComposerVisualHeight = () => {
     // 此时不再计入它的高度，让输入栏立即回升、与浮层的退场动画同步。
     if (node.classList.contains('floating-status-row') && !floatingStatusVisible.value) return;
     if (node.classList.contains('composer-avatar') && !showComposerAvatar.value) return;
+    if (
+      node.classList.contains('composer-approval-restore-dock') &&
+      (!approvalDockVisible.value || !props.approvalPanelCollapsed)
+    )
+      return;
     top = Math.min(top, node.offsetTop);
     bottom = Math.max(bottom, node.offsetTop + node.offsetHeight);
   });
@@ -3636,6 +3698,11 @@ watch(
   { deep: true }
 );
 
+watch([approvalDockVisible, approvalExpanded, fileAtOpen, runtimeQueueHeight], async () => {
+  await nextTick();
+  emitComposerHeight();
+});
+
 watch(floatingStatusVisible, async () => {
   await nextTick();
   emitComposerHeight();
@@ -3692,8 +3759,12 @@ onMounted(() => {
     emitComposerHeight();
     if (typeof ResizeObserver !== 'undefined') {
       composerResizeObserver = new ResizeObserver(() => {
+        runtimeQueueHeight.value = runtimeQueueList.value?.offsetHeight || 0;
         emitComposerHeight();
       });
+      if (runtimeQueueList.value) {
+        composerResizeObserver.observe(runtimeQueueList.value);
+      }
       if (inputAreaRoot.value) {
         composerResizeObserver.observe(inputAreaRoot.value);
       }

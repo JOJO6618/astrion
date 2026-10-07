@@ -3,7 +3,8 @@
 // 事件窗口缺口（offset < window_start）按 §5.2 提示并对齐续读（CLI 不做快照对账）。
 import type { GatewayClient, TaskPollResult } from './gateway';
 import type { ContextStats, PendingApprovalMock } from './data';
-import { CPS_INSTANT, type TimelineApi } from './timeline';
+import type { TimelineApi } from './timeline';
+import { approvalActions, approvalArguments, mergeApprovalState, type ToolApprovalItem, type AutoReviewProgress } from './approval';
 
 const POLL_INTERVAL_MS = 500;
 /** 事件轮询空闲退避上限（连续空响应时） */
@@ -21,8 +22,10 @@ export interface RuntimeCallbacks {
   api: TimelineApi;
   /** 运行态变化（状态栏「运行中/空闲」、Enter 排队语义） */
   onRunningChange(running: boolean): void;
-  /** 审批事件：自动弹出审批面板 */
+  /** 审批创建或同 ID 状态更新；更新不重新打开用户已关闭的面板。 */
   onApprovalRequired(approval: PendingApprovalMock): void;
+  /** 仅服务端终态回执清除审批（包括其他客户端裁决）。 */
+  onApprovalResolved(approvalId: string): void;
   /** 系统消息（审批回执/错误/窗口缺口提示等），经 menuState 的 sys 通道上屏 */
   onSystemMessage(text: string): void;
   /** token 统计更新（token_update 事件流）：刷新状态栏与 /context 面板 */
@@ -40,6 +43,9 @@ export class ChatRuntime {
   private offset = 0;
   private polling = false;
   private destroyed = false;
+  // 同一对话串行审批，仅保存当前请求和最近终结 ID。
+  private pendingApproval: PendingApprovalMock | null = null;
+  private resolvedApprovalId = '';
 
   constructor(
     private readonly gw: GatewayClient,
@@ -56,6 +62,9 @@ export class ChatRuntime {
     this.conversationId = '';
     this.taskId = '';
     this.offset = 0;
+    if (this.pendingApproval) this.cb.onApprovalResolved(this.pendingApproval.id);
+    this.pendingApproval = null;
+    this.resolvedApprovalId = '';
     this.cb.api.reset();
   }
 
@@ -86,11 +95,25 @@ export class ChatRuntime {
     void this.pollLoop();
   }
 
-  /** 审批裁决（审批面板 Enter 后调用） */
+  /** 提交人工项；接口成功仍等待 tool_approval_resolved，不宣称工具已执行。 */
   async decideApproval(approvalId: string, decision: 'approved' | 'rejected'): Promise<void> {
+    const pending = this.pendingApproval;
+    if (!pending || pending.id !== approvalId
+      || !approvalActions(pending).includes(decision === 'approved' ? 'run' : 'reject')) return;
+    this.pendingApproval = { ...pending, decisionPending: true };
+    this.cb.onApprovalRequired(this.pendingApproval);
     try {
-      await this.gw.decideApproval(approvalId, decision);
+      const item = await this.gw.decideApproval(approvalId, decision);
+      // 终态回执或下一条请求可能先于 HTTP 响应到达，不能重新创建旧审批。
+      if (this.pendingApproval?.id !== approvalId) return;
+      this.pendingApproval = { ...this.pendingApproval, decisionPending: false };
+      if (item?.approval_id === approvalId) this.updateApproval(item);
+      else this.cb.onApprovalRequired(this.pendingApproval);
     } catch (err) {
+      if (this.pendingApproval?.id === approvalId) {
+        this.pendingApproval = { ...this.pendingApproval, decisionPending: false };
+        this.cb.onApprovalRequired(this.pendingApproval);
+      }
       this.cb.onSystemMessage(`${this.cb.tr('runtime.decideFailed')}${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -101,6 +124,9 @@ export class ChatRuntime {
     this.conversationId = conversationId;
     this.taskId = '';
     this.offset = 0;
+    if (this.pendingApproval) this.cb.onApprovalResolved(this.pendingApproval.id);
+    this.pendingApproval = null;
+    this.resolvedApprovalId = '';
     this.cb.api.reset();
     try {
       const res = await this.gw.getSessionHistory(conversationId);
@@ -215,20 +241,41 @@ export class ChatRuntime {
         }
         break;
       }
-      case 'tool_approval_required': {
-        const a = data.approval ?? data;
-        this.cb.onApprovalRequired({
-          id: String(a.approval_id ?? ''),
-          toolName: String(a.tool_name ?? ''),
-          toolLabel: this.toolLabel(String(a.tool_name ?? '')),
-          previewTitle: this.cb.tr('approval.params'),
-          previewLines: toolParamLines(String(a.tool_name ?? ''), a.arguments),
-        });
+      case 'tool_approval_required':
+        this.updateApproval(data.approval ?? data);
+        break;
+      case 'auto_approval_progress': {
+        const pending = this.pendingApproval;
+        if (!pending || pending.id !== String(data.approval_id ?? '') || !data.progress) break;
+        const progress = data.progress as AutoReviewProgress;
+        // 普通自动审核保留人工接管语义；双重审批的自动项只能来自条目字段。
+        let autoReviewStatus = pending.autoReviewStatus;
+        if (pending.approvalType !== 'full_access' && progress.stage !== 'done'
+          && autoReviewStatus !== 'approved' && autoReviewStatus !== 'rejected') {
+          autoReviewStatus = 'reviewing';
+        }
+        // 普通审核的 done.decision 也可能来自人工接管，不能冒充自动审核结论。
+        this.pendingApproval = { ...pending, autoReviewProgress: progress, autoReviewStatus };
+        this.cb.onApprovalRequired(this.pendingApproval);
         break;
       }
-      case 'tool_approval_resolved':
-        // 本端/他端裁决回执：面板由 onSystemMessage 链路收尾（其他端裁决时也需关闭面板，后续接 approval.list 对账）
+      case 'tool_approval_resolved': {
+        const item = data.approval ?? data.item ?? data;
+        const id = String(item.approval_id ?? data.approval_id ?? '');
+        const decision = String(item.decision ?? data.decision ?? item.status ?? '');
+        // pending 回执不是最终授权，不清除面板。
+        if (!id || !['approved', 'rejected', 'expired', 'cancelled', 'canceled', 'stopped', 'timeout'].includes(decision)) break;
+        if (this.pendingApproval?.id !== id) break;
+        const pending = this.pendingApproval;
+        const reason = String(item.reason ?? data.reason ?? pending.reason ?? '').trim();
+        const key = decision === 'approved' ? 'approval.approved'
+          : decision === 'rejected' ? 'approval.rejected' : 'approval.expired';
+        this.pendingApproval = null;
+        this.resolvedApprovalId = id;
+        this.cb.onApprovalResolved(id);
+        this.cb.onSystemMessage(`${this.cb.tr(key)}${pending.toolLabel}${reason ? `\n${reason}` : ''}`);
         break;
+      }
       case 'task_stopped':
         api.addSystem(this.cb.tr('runtime.stopped'));
         break;
@@ -251,6 +298,24 @@ export class ChatRuntime {
       default:
         break;
     }
+  }
+
+  private updateApproval(item: ToolApprovalItem): void {
+    const id = String(item.approval_id ?? '');
+    if (!id || id === this.resolvedApprovalId) return;
+    const previous = this.pendingApproval?.id === id ? this.pendingApproval : null;
+    const state = mergeApprovalState(item, previous);
+    const toolName = item.tool_name ?? previous?.toolName ?? '';
+    this.pendingApproval = {
+      id,
+      toolName,
+      toolLabel: this.toolLabel(toolName),
+      previewTitle: this.cb.tr('approval.params'),
+      previewLines: item.arguments === undefined ? previous?.previewLines ?? []
+        : toolParamLines(toolName, approvalArguments(item.arguments, state.approvalType)),
+      ...state,
+    };
+    this.cb.onApprovalRequired(this.pendingApproval);
   }
 
   private toolLabel(toolName: string): string {

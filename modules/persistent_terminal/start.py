@@ -40,17 +40,27 @@ except ImportError:
 
 from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
+from modules.execution_scope import bind_execution_scope
+from modules.scoped_execution_policy import require_scoped_docker_support, scoped_work_path
 
 
 class StartMixin:
     """PersistentTerminal start 能力 mixin。"""
 
     def start(self) -> bool:
+        # Background launch threads have no ContextVar inheritance. Bind the
+        # instance's creation-time authority for all sandbox builders.
+        with bind_execution_scope(self.execution_scope):
+            return self._start_bound()
+
+    def _start_bound(self) -> bool:
         """启动终端进程（支持容器沙箱）"""
         if self.is_running:
             return False
 
         try:
+            if self.execution_scope:
+                scoped_work_path(self.project_path, str(self.working_dir), self.execution_scope)
             process = None
             selected_mode = self.sandbox_mode
             if selected_mode == "docker":
@@ -61,6 +71,8 @@ class StartMixin:
                     print(f"{OUTPUT_FORMATS['error']} {message}")
                     return False
             if process is None:
+                if self.execution_scope and selected_mode == "docker":
+                    raise RuntimeError("Scoped Docker terminal unavailable; host fallback refused")
                 process = self._start_host_terminal()
                 selected_mode = "host"
 
@@ -113,8 +125,13 @@ class StartMixin:
             return False
 
     def _start_host_terminal(self):
+        with bind_execution_scope(self.execution_scope):
+            return self._start_host_terminal_bound()
+
+    def _start_host_terminal_bound(self):
         """启动宿主机终端"""
-        if self.allow_direct_host_execution:
+        direct = self.execution_scope.execution_mode == "direct" if self.execution_scope else self.allow_direct_host_execution
+        if direct:
             return self._start_plain_host_terminal()
         if not host_sandbox_enabled():
             raise RuntimeError(tr("terminal_start.host_sandbox_disabled"))
@@ -212,6 +229,7 @@ class StartMixin:
 
     def _start_docker_terminal(self):
         """连接容器化终端（docker exec 进入已有用户容器）。"""
+        require_scoped_docker_support(self.execution_scope)
         docker_bin = self.sandbox_options.get("bin") or "docker"
         docker_path = shutil.which(docker_bin)
         if not docker_path:
@@ -236,6 +254,7 @@ class StartMixin:
 
     def _start_existing_container_terminal(self, docker_path: str, container_name: str):
         """通过 docker exec 连接到已有容器。"""
+        require_scoped_docker_support(self.execution_scope)
         if not self._ensure_container_alive(docker_path, container_name):
             raise RuntimeError(tr("terminal_start.container_not_running", container_name=container_name))
 
@@ -267,6 +286,9 @@ class StartMixin:
         inner_cmd = [shell_path]
         if shell_path.endswith("sh"):
             inner_cmd.append("-i")
+        if self.execution_scope and self.execution_scope.workspace_only:
+            from modules.docker_scoped_exec import wrap_scoped_docker_command
+            inner_cmd = wrap_scoped_docker_command(mount_path, inner_cmd, self.execution_scope)
         if readonly_exec:
             # Landlock 加固：可用时 shell 及其子进程全程处于工作区只读域；失败自动降级纯 DAC。
             inner_cmd = docker_readonly_wrap_inner(container_name, mount_path, inner_cmd, docker_path)

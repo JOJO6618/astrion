@@ -75,9 +75,9 @@ class CrudMixin:
                 return result
 
             # 创建父目录
-            full_path.parent.mkdir(parents=True, exist_ok=True)
+            self._native_mkdir(full_path.parent)
             
-            with open(full_path, 'w', encoding='utf-8') as f:
+            with self._native_open(full_path, 'w', encoding='utf-8') as f:
                 f.write("")
             
             print(f"{OUTPUT_FORMATS['file']} 创建文件: {relative_path}")
@@ -115,7 +115,7 @@ class CrudMixin:
                     print(f"{OUTPUT_FORMATS['file']} 删除文件: {relative_path}")
                 return result
 
-            full_path.unlink()
+            self._native_unlink(full_path)
             print(f"{OUTPUT_FORMATS['file']} 删除文件: {relative_path}")
             
             # 删除文件备注（如果存在）
@@ -164,7 +164,7 @@ class CrudMixin:
                     print(f"{OUTPUT_FORMATS['file']} 重命名: {old_relative} -> {new_relative}")
                 return result
 
-            full_old_path.rename(full_new_path)
+            self._native_rename(full_old_path, full_new_path)
             
             print(f"{OUTPUT_FORMATS['file']} 重命名: {old_relative} -> {new_relative}")
             
@@ -197,7 +197,7 @@ class CrudMixin:
                     print(f"{OUTPUT_FORMATS['file']} 创建文件夹: {relative_path}")
                 return result
 
-            full_path.mkdir(parents=True, exist_ok=True)
+            self._native_mkdir(full_path)
             print(f"{OUTPUT_FORMATS['file']} 创建文件夹: {relative_path}")
             
             return {"success": True, "path": relative_path}
@@ -209,6 +209,10 @@ class CrudMixin:
         valid, error, full_path = self._validate_path(path)
         if not valid:
             return {"success": False, "error": error}
+        ok, msg = self._ensure_host_access(full_path, "write")
+        if not ok:
+            return {"success": False, "error": msg}
+
 
         # 安全：禁止删除工作区根目录本身（空路径/点路径会解析为根；
         # docker 模式下该目录是宿主 bind mount，rmtree 会真实删除宿主文件）
@@ -232,7 +236,7 @@ class CrudMixin:
                     print(f"{OUTPUT_FORMATS['file']} 删除文件夹: {relative_path}")
                 return result
 
-            shutil.rmtree(full_path)
+            self._native_rmtree(full_path)
             print(f"{OUTPUT_FORMATS['file']} 删除文件夹: {relative_path}")
             
             return {"success": True, "path": relative_path}
@@ -294,7 +298,7 @@ class CrudMixin:
             original_file: Optional[str] = None
             try:
                 if full_path.exists():
-                    original_file = full_path.read_text(encoding='utf-8')
+                    original_file = self._native_read_text(full_path)
             except Exception:
                 original_file = None
 
@@ -311,9 +315,9 @@ class CrudMixin:
                 return result
 
             # 创建父目录
-            full_path.parent.mkdir(parents=True, exist_ok=True)
+            self._native_mkdir(full_path.parent)
             
-            with open(full_path, mode, encoding='utf-8') as f:
+            with self._native_open(full_path, mode, encoding='utf-8') as f:
                 f.write(content)
             
             action = "覆盖" if mode == "w" else "追加"
@@ -321,7 +325,7 @@ class CrudMixin:
             
             # 读取写入后的实际内容（追加模式需要从文件读取）
             try:
-                new_file = full_path.read_text(encoding='utf-8')
+                new_file = self._native_read_text(full_path)
             except Exception:
                 new_file = content
             

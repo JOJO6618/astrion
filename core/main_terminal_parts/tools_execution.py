@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from modules.shallow_versioning import ShallowVersioningManager
+from modules.execution_scope import current_execution_scope, validate_full_access_request
 from modules.edit_summary import (
     remove_edit_summary_entry,
     rename_edit_summary_entry,
@@ -400,6 +401,18 @@ class MainTerminalToolsExecutionMixin:
                 except Exception:
                     mode = str(getattr(self, "current_permission_mode", "unrestricted") or "unrestricted")
                 args = arguments or {}
+                if any(key.startswith(("_approval_", "_execution_")) for key in args):
+                    return {"allowed": False, "mode": mode, "code": "untrusted_authority", "message": "工具参数不能携带内部执行授权。"}
+                if tool_name == "run_command":
+                    try:
+                        full_access_required = validate_full_access_request(self, args)
+                    except ValueError as exc:
+                        return {"allowed": False, "mode": mode, "code": "full_access_denied", "message": str(exc)}
+                    if full_access_required:
+                        return {"allowed": True, "mode": mode, "requires_approval": True, "approval_type": "full_access"}
+                scope = current_execution_scope()
+                if scope is not None and scope.is_sub_agent:
+                    return {"allowed": True, "mode": "unrestricted"}
 
                 if mode == "readonly":
                     if tool_name == "run_command":
@@ -955,12 +968,19 @@ class MainTerminalToolsExecutionMixin:
             perf_log("_track_shallow_versioning skipped", extra={"reason": "missing_required"})
             return
         try:
+            valid, _, checked_path = self.file_manager._validate_path(str(file_path))
+            if not valid:
+                return
+            can_read, _ = self.file_manager._ensure_host_access(checked_path, "read")
+            can_write, _ = self.file_manager._ensure_host_access(checked_path, "write")
+            if not can_read or not can_write:
+                return
             manager = ShallowVersioningManager(
                 project_path=self.project_path,
                 data_dir=self.data_dir,
                 conversation_id=conversation_id,
             )
-            manager.track_edit(file_path, message_id)
+            manager.track_edit(str(checked_path), message_id)
             perf_log("_track_shallow_versioning done", extra={
                 "conversation_id": conversation_id,
                 "message_id": message_id,
@@ -1074,8 +1094,28 @@ class MainTerminalToolsExecutionMixin:
     async def handle_tool_call(self, tool_name: str, arguments: Dict) -> str:
                 """处理工具调用（添加参数预检查和改进错误处理）"""
                 logger.debug("[handle_tool_call] 工具调用开始: tool_name=%s, arguments=%s", tool_name, arguments)
+                scope = current_execution_scope()
+                if any(key.startswith(("_approval_", "_execution_")) for key in arguments):
+                    return json.dumps({"success": False, "code": "untrusted_authority", "error": "工具参数不能携带内部执行授权。"}, ensure_ascii=False)
+                if scope is not None and scope.is_sub_agent and (
+                    "request_full_access" in arguments or "full_access_reason" in arguments
+                ):
+                    return json.dumps({"success": False, "error": "子智能体不能申请权限升级。"}, ensure_ascii=False)
+                if scope and scope.full_access_grant and tool_name != "run_command":
+                    return json.dumps({"success": False, "code": "full_access_denied", "error": "单次授权仅适用于 run_command。"}, ensure_ascii=False)
+                if tool_name == "run_command":
+                    try:
+                        needs_full_access = validate_full_access_request(self, arguments)
+                        if scope is not None and not scope.is_sub_agent and scope.access_level == "full_access":
+                            grant = scope.full_access_grant
+                            if grant is None or not grant.consume(self, arguments):
+                                raise ValueError("本次完全访问授权无效、已使用或执行参数已改变。")
+                        elif needs_full_access:
+                            raise ValueError("单次完全访问申请尚未获批，不能执行。")
+                    except ValueError as exc:
+                        return json.dumps({"success": False, "code": "full_access_denied", "error": str(exc)}, ensure_ascii=False)
                 try:
-                    if hasattr(self, "_apply_execution_mode_to_runtime"):
+                    if scope is None and hasattr(self, "_apply_execution_mode_to_runtime"):
                         self._apply_execution_mode_to_runtime()
                 except Exception:
                     pass
@@ -1106,7 +1146,7 @@ class MainTerminalToolsExecutionMixin:
                     from core.tool_loading import get_tool_loading_state, is_deferred_not_loaded
                     _tl_cm_guard = getattr(self, "context_manager", None)
                     _tl_meta_guard = getattr(_tl_cm_guard, "conversation_metadata", None) if _tl_cm_guard else None
-                    if is_deferred_not_loaded(get_tool_loading_state(_tl_meta_guard), tool_name):
+                    if not (scope and scope.is_sub_agent) and is_deferred_not_loaded(get_tool_loading_state(_tl_meta_guard), tool_name):
                         return json.dumps({
                             "success": False,
                             "tool_not_loaded": True,
@@ -1147,7 +1187,8 @@ class MainTerminalToolsExecutionMixin:
 
                 # 自定义工具预解析（仅管理员）
                 custom_tool = None
-                if self.custom_tools_enabled and getattr(self, "user_role", "user") == "admin":
+                from modules.custom_tool_registry import is_reserved_tool_name
+                if self.custom_tools_enabled and getattr(self, "user_role", "user") == "admin" and not is_reserved_tool_name(tool_name):
                     try:
                         self.custom_tool_registry.reload()
                     except Exception:
@@ -1909,12 +1950,14 @@ class MainTerminalToolsExecutionMixin:
                             permission_mode = self.get_permission_mode()
                         except Exception:
                             permission_mode = str(getattr(self, "current_permission_mode", "unrestricted") or "unrestricted")
-                        write_granted_once = bool(arguments.get("_approval_write_granted", False))
+                        write_granted_once = bool(scope and scope.write_granted)
+                        if scope and scope.is_sub_agent:
+                            permission_mode = "unrestricted"
                         sandbox_write_access = not (
                             permission_mode == "readonly"
                             or (permission_mode in {"approval", "auto_approval"} and not write_granted_once)
                         )
-                        network_granted_once = bool(arguments.get("_approval_network_granted", False))
+                        network_granted_once = bool(scope and scope.network_granted)
                         if network_granted_once:
                             network_permission = "full"
                         else:
@@ -1950,9 +1993,11 @@ class MainTerminalToolsExecutionMixin:
                                 elif not bg_manager:
                                     result = {"success": False, "error": tr("tools_exec.background_manager_unavailable")}
                                 else:
-                                    result = bg_manager.create_background_command(
-                                        terminal_ops=self.terminal_ops,
+                                    from modules.background_command_start import start_background_command
+                                    result = await start_background_command(
+                                        bg_manager, terminal_ops=self.terminal_ops,
                                         command=arguments["command"],
+                                        working_dir=arguments.get("working_dir"),
                                         timeout=timeout_value,
                                         conversation_id=getattr(self.context_manager, "current_conversation_id", None),
                                         wait_seconds=5.0,
@@ -1983,6 +2028,7 @@ class MainTerminalToolsExecutionMixin:
                                 else:
                                     result = await self.terminal_ops.run_command(
                                         arguments["command"],
+                                        working_dir=arguments.get("working_dir"),
                                         timeout=timeout_value,
                                         sandbox_write_access=sandbox_write_access,
                                         network_permission=network_permission,
@@ -2206,6 +2252,9 @@ class MainTerminalToolsExecutionMixin:
                         )
 
                     elif tool_name == "create_sub_agent":
+                        from modules.execution_scope import validate_child_access
+                        arguments = dict(arguments)
+                        arguments["access_level"] = validate_child_access(self, arguments.get("access_level"))
                         # 多智能体模式：create_sub_agent 走新签名，需要 role_id/display_name/multi_agent_mode
                         if getattr(self, "multi_agent_mode", False):
                             role_id = arguments.get("role_id")
@@ -2243,19 +2292,20 @@ class MainTerminalToolsExecutionMixin:
                                         # 构造多智能体版系统提示词（含动态上下文注入）
                                         workspace_path = str(getattr(self, "project_path", ""))
                                         data_dir = str(getattr(self, "data_dir", ""))
-                                        # 获取当前沙箱模式
-                                        sandbox_mode = ""
-                                        try:
-                                            if hasattr(self, "get_execution_mode_state"):
-                                                state = self.get_execution_mode_state() or {}
-                                                sandbox_mode = str(state.get("mode") or "")
-                                        except Exception:
-                                            pass
-                                        system_prompt = build_multi_agent_sub_agent_prompt(
-                                            role.body_prompt, display_name, workspace_path,
-                                            data_dir=data_dir,
-                                            sandbox_mode=sandbox_mode,
+                                        # 提示词跟随子实例固定档位，不复制主智能体当前环境。
+                                        sandbox_mode = "direct" if arguments["access_level"] == "full_access" else "sandbox"
+                                        from modules.execution_scope import ExecutionScope, bind_execution_scope
+                                        prompt_scope = ExecutionScope(
+                                            executor_kind="sub_agent", actor_id=display_name,
+                                            workspace_root=Path(workspace_path).resolve(),
+                                            access_level=arguments["access_level"], conversation_id=conv_id,
                                         )
+                                        with bind_execution_scope(prompt_scope):
+                                            system_prompt = build_multi_agent_sub_agent_prompt(
+                                                role.body_prompt, display_name, workspace_path,
+                                                data_dir=data_dir,
+                                                sandbox_mode=sandbox_mode,
+                                            )
                                         # 构造 task_message（作为 Team Leader 的任务发布）
                                         from modules.multi_agent.state import build_master_dispatch_text
                                         task_message = build_master_dispatch_text(arguments.get("task", ""))
@@ -2273,6 +2323,7 @@ class MainTerminalToolsExecutionMixin:
                                         # 走原行 发事件创建（避免后期重建提供重复工能重费，直接使用 multi_agent_mode=True 调用）
                                         result = self.sub_agent_manager.create_sub_agent(
                                             agent_id=agent_id,
+                                            access_level=arguments.get("access_level"),
                                             summary=summary_text,
                                             task=arguments.get("task", ""),
                                             run_in_background=False,
@@ -2318,6 +2369,7 @@ class MainTerminalToolsExecutionMixin:
                             else:
                                 result = self.sub_agent_manager.create_sub_agent(
                                     agent_id=arguments.get("agent_id"),
+                                    access_level=arguments.get("access_level"),
                                     summary=arguments.get("summary", ""),
                                     task=arguments.get("task", ""),
                                     deliverables_dir=arguments.get("deliverables_dir", ""),
@@ -2345,6 +2397,7 @@ class MainTerminalToolsExecutionMixin:
                                     "agent_id": result.get("agent_id"),
                                     "task_id": result.get("task_id"),
                                     "deliverables_dir": result.get("deliverables_dir"),
+                                    "access_level": result.get("access_level"),
                                     "run_in_background": False,
                                 }
                                 execution_message = (
@@ -2676,6 +2729,9 @@ class MainTerminalToolsExecutionMixin:
                     logger.exception("[handle_tool_call] 工具执行异常详情")
                     result = {"success": False, "error": tr("tools_exec.tool_exec_exception", error=str(e))}
 
+                if tool_name == "run_command" and arguments.get("request_full_access") and isinstance(result, dict):
+                    result["full_access_granted"] = bool(scope and scope.full_access_grant)
+                    result["full_access_already_active"] = not bool(scope and scope.full_access_grant)
                 logger.debug("[handle_tool_call] 工具调用结束: tool_name=%s, result=%s", tool_name, result)
                 return json.dumps(result, ensure_ascii=False)
 

@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { debugLog } from '../common';
-import { t } from '@/locales';
 import './shared';
 
 export const stateMethods = {
@@ -101,7 +100,14 @@ export const stateMethods = {
     this.toolSetSettings([]);
     this.pendingToolApprovals = [];
     this.decidingApprovalIds = [];
-    this.autoApprovalTitle = t('appTasks.autoApprovalRecordTitle');
+    this.approvalPanelCollapsed = true;
+    this.approvalReviewRecords = [];
+    this.resolvedToolApprovalIds = [];
+    this.approvalSnapshotVersion += 1;
+    if (this.approvalAutoCloseTimer) {
+      clearTimeout(this.approvalAutoCloseTimer);
+      this.approvalAutoCloseTimer = null;
+    }
     // 切换对话/工作区/新建视图时，清理上一轮目标模式的本地完成提示。
     // 如果目标任务仍在运行，后续 restoreTaskState 会重新恢复运行态。
     this.goalModeArmed = false;

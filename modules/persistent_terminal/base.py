@@ -15,6 +15,8 @@ from collections import deque
 import shutil
 import uuid
 import codecs
+from modules.execution_scope import current_execution_scope
+from modules.scoped_execution_policy import scoped_work_path
 from modules.host_sandbox_runner import (
     HostSandboxError,
     build_host_sandbox_shell_plan,
@@ -78,6 +80,7 @@ class PersistentTerminalBase:
         sandbox_mode: Optional[str] = None,
         sandbox_options: Optional[Dict] = None,
         network_permission_getter: Optional[Callable] = None,
+        execution_scope=None,
     ):
         """
         初始化持久化终端
@@ -93,6 +96,9 @@ class PersistentTerminalBase:
         self.session_name = session_name
         self.working_dir = Path(working_dir).resolve() if working_dir else Path.cwd()
         self.project_path = Path(project_path).resolve() if project_path else self.working_dir
+        self.execution_scope = execution_scope or (sandbox_options or {}).get("execution_scope") or current_execution_scope()
+        if self.execution_scope:
+            self.working_dir = scoped_work_path(self.project_path, str(self.working_dir), self.execution_scope)
         self.host_shell_command = shell_command
         self.shell_command = shell_command
         self.broadcast = broadcast_callback
@@ -101,6 +107,9 @@ class PersistentTerminalBase:
         # 网络权限来源：优先由所属 WebTerminal 注入 getter 实时取值；
         # 不可用时才回落进程级环境变量。
         self.network_permission_getter = network_permission_getter
+        self._network_permission_snapshot = None
+        if self.execution_scope:
+            self._network_permission_snapshot = self._resolve_network_permission()
         
         # 进程相关
         self.process = None
@@ -160,13 +169,22 @@ class PersistentTerminalBase:
         self.sandbox_mode = (sandbox_mode or TERMINAL_SANDBOX_MODE or "host").lower()
         self.sandbox_options = sandbox_defaults
         self.sandbox_required = bool(self.sandbox_options.get("require"))
-        self.allow_direct_host_execution = bool(self.sandbox_options.get("allow_direct_host_execution", False))
+        self.allow_direct_host_execution = (
+            self.execution_scope.execution_mode == "direct" if self.execution_scope
+            else bool(self.sandbox_options.get("allow_direct_host_execution", False))
+        )
+        if self.execution_scope and self.execution_scope.is_sub_agent:
+            self.sandbox_options["host_terminal_readonly"] = False
+            self.sandbox_options["docker_readonly_exec"] = False
         self.sandbox_container_name = None
         self.execution_mode = "host"
         self.using_container = False
 
     def _resolve_network_permission(self) -> str:
         """取当前网络权限设置：getter 实时值优先，环境变量兼容回落。"""
+        snapshot = getattr(self, "_network_permission_snapshot", None)
+        if snapshot is not None:
+            return snapshot
         getter = getattr(self, "network_permission_getter", None)
         if callable(getter):
             try:

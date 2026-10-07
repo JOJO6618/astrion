@@ -1,7 +1,6 @@
 import { defineAsyncComponent } from 'vue';
 import ChatArea from '../components/chat/ChatArea.vue';
 import ConversationSidebar from '../components/sidebar/ConversationSidebar.vue';
-import ToolApprovalPanel from '../components/panels/ToolApprovalPanel.vue';
 import GitChangesPanel from '../components/panels/GitChangesPanel.vue';
 import TerminalPanel from '../components/panels/TerminalPanel.vue';
 import TokenDrawer from '../components/token/TokenDrawer.vue';
@@ -55,7 +54,6 @@ const SettingsShell = defineAsyncComponent(
 export const appComponents = {
   ChatArea,
   ConversationSidebar,
-  ToolApprovalPanel,
   GitChangesPanel,
   TerminalPanel,
   TokenDrawer,

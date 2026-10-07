@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useWorkflowStore } from '../../../stores/workflow';
-import { t } from '@/locales';
+import { updateReviewRecords } from '@/components/input/approvalModel';
 
 /**
  * 工作流运行时事件处理（任务轮询链路）。
@@ -22,34 +22,13 @@ export const workflowMethods = {
   },
 
   handleWorkflowReviewProgress(data: any) {
-    if (
-      data?.conversation_id &&
-      this.currentConversationId &&
-      data.conversation_id !== this.currentConversationId
-    ) {
-      return;
-    }
-    const progress = data?.progress || data || {};
-    if (!progress || typeof progress !== 'object') {
-      return;
-    }
-    if (!Array.isArray(this.autoApprovalFeedLines)) {
-      this.autoApprovalFeedLines = [];
-    }
-    this.autoApprovalTitle = t('appTasks.workflowReviewTitle');
-    if (progress.stage === 'start') {
-      this.autoApprovalFeedLines = [t('appTasks.reviewStarted')];
-      this.autoApprovalFinalMessage = '';
-    } else if (progress.stage === 'model_call') {
-      this.autoApprovalFeedLines.push(
-        String(progress.message || t('appTasks.reviewRound', { n: progress.round || '' })).trim()
-      );
-    } else if (progress.stage === 'run_command' && progress.command) {
-      this.autoApprovalFeedLines.push(String(progress.command));
-    } else if (progress.message) {
-      this.autoApprovalFeedLines.push(String(progress.message));
-    }
-    this.autoApprovalFeedLines = this.autoApprovalFeedLines.slice(-20);
+    if (data?.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    const progress = data?.progress || data;
+    if (!progress || typeof progress !== 'object') return;
+    this.approvalReviewRecords = updateReviewRecords(this.approvalReviewRecords || [], 'workflow', {
+      ...data,
+      progress
+    });
     this.$forceUpdate();
   }
 };

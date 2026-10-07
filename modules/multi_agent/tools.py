@@ -41,6 +41,11 @@ def _master_tool_create_sub_agent() -> Dict[str, Any]:
             "parameters": {
                 "type": "object",
                 "properties": _inject_intent({
+                    "access_level": {
+                        "type": "string",
+                        "enum": ["workspace_write", "sandbox_write", "full_access"],
+                        "description": "必选固定权限：workspace_write仅工作区可写；sandbox_write按现行路径授权读写；full_access宿主机完全访问，仅主智能体当前完全访问时可选。创建后不随主权限变化。",
+                    },
                     "role_id": {
                         "type": "string",
                         "description": "角色标识，例如 'ui-operator'/'full-stack-engineer'/'code-reviewer'/'researcher'。先用 list_agents 查看可用角色。",
@@ -55,7 +60,7 @@ def _master_tool_create_sub_agent() -> Dict[str, Any]:
                         "description": "（可选）覆盖角色默认思考模式。不填使用角色配置。",
                     },
                 }),
-                "required": ["role_id", "task"],
+                "required": ["role_id", "task", "access_level"],
             },
         },
     }

@@ -42,7 +42,9 @@ export const mobileMethods = {
       return;
     }
     if (target === 'approval') {
+      this.restoreToolApprovalPanel();
       this.fetchPendingToolApprovals();
+      return;
     }
     if (this.activeMobileOverlay === target) {
       this.closeMobileOverlay('same-target-click');

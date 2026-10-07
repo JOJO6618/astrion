@@ -24,6 +24,24 @@ from config import (
 )
 
 from modules.i18n import tr
+from core.tool_config import TOOL_CATEGORIES
+
+
+_RESERVED_TOOLS = frozenset(
+    name for category in TOOL_CATEGORIES.values() for name in category.tools
+) | frozenset({
+    "load_tools", "ask_user", "submit_plan", "view_video", "read_mediafile",
+    "recall_project_memory", "search_project_memory", "update_project_memory",
+    "stop_sub_agent", "send_message_to_sub_agent", "answer_sub_agent_question",
+    "create_custom_agent", "list_agents", "list_active_sub_agents", "ask_master",
+    "ask_other_agent", "answer_other_agent", "activate_workflow", "report_workflow_stage",
+    "choose_workflow_branch", "get_workflow_status", "deactivate_workflow",
+    "list_workflows", "save_workflow", "ocr_image", "manage_personalization",
+})
+
+
+def is_reserved_tool_name(name: str) -> bool:
+    return name in _RESERVED_TOOLS or name.startswith("mcp__")
 
 
 class CustomToolRegistry:
@@ -59,6 +77,8 @@ class CustomToolRegistry:
             if not isinstance(definition, dict):
                 return None
             tool_id = definition.get("id") or tool_dir.name
+            if not isinstance(tool_id, str) or is_reserved_tool_name(tool_id):
+                return None
 
             execution_code = exec_path.read_text(encoding="utf-8")
             timeout = definition.get("timeout")
@@ -137,6 +157,8 @@ class CustomToolRegistry:
             raise ValueError(tr("custom_tool_reg.id_required"))
         if not self._is_valid_tool_id(tool_id):
             raise ValueError(tr("custom_tool_reg.id_invalid"))
+        if is_reserved_tool_name(tool_id):
+            raise ValueError("自定义工具不能覆盖内置工具名称。")
         tool_dir = self.root / tool_id
         tool_dir.mkdir(parents=True, exist_ok=True)
 
