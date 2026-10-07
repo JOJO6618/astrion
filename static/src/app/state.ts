@@ -87,10 +87,8 @@ export function dataState() {
     // （由后端 api_request_start 事件置位，thinking_start/text_start/tool_preparing/
     // error/任务终结时清除），用于状态头像显示「等待 API 响应…」
     apiRequestPending: false,
-    // 对话运行状态对账定时器（事件为主、2.5s 对账纠偏，冲突以对账为准）
+    // 对话运行状态查询定时器（缺订阅时统一刷新显示快照）
     runningStateReconcileTimer: null,
-    // 对账清理方向的连续空闲确认计数（防 notice/idle dispatch 间隙误清）
-    _runningStateIdleStreak: 0,
     // 宿主机多工作区任务列表后台刷新定时器（用于当前未查看运行对话时同步完成态）
     runningWorkspaceTasksRefreshTimer: null,
     // 运行期消息堆积（提前发送 / 引导对话）
@@ -127,8 +125,6 @@ export function dataState() {
     rightSplitRatio: 0.5,
     // 输入区动态保留高度（用于同步扩大消息区可滚动范围）
     composerReservedHeight: 80,
-    // 记录上一次成功加载历史的对话ID，防止初始化阶段重复加载导致动画播放两次
-    lastHistoryLoadedConversationId: null,
 
     // ==========================================
     // 对话管理相关状态
@@ -152,12 +148,9 @@ export function dataState() {
     compressionStage: '',
     compressionError: '',
     compressionToastId: null,
-    skipConversationLoadedEvent: false,
-    skipConversationHistoryReload: false,
     _scrollListenerReady: false,
     historyLoading: false,
     historyLoadingFor: null,
-    historyLoadSeq: 0,
     blankHeroActive: false,
     blankHeroExiting: false,
     blankWelcomeText: '',

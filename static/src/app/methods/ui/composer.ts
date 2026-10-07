@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { debugLog } from '../common';
 import { t } from '@/locales';
+import { beginAuxiliaryRequest, invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
 
 export const composerMethods = {
   normalizeComposerDraftContent(rawValue) {
@@ -34,6 +35,7 @@ export const composerMethods = {
     }, 1000);
   },
   async persistComposerDraftNow(options = {}) {
+    const owns = beginAuxiliaryRequest(this, 'draft-save');
     const reason = String(options?.reason || 'manual');
     const force = !!options?.force;
     const useBeacon = !!options?.useBeacon;
@@ -93,6 +95,7 @@ export const composerMethods = {
       keepalive: !!options?.keepalive
     });
     const data = await response.json().catch(() => ({}));
+    if (!owns()) return { success: true, superseded: true };
     // 无工作区空态（200 + code）：草稿无处存储属预期，静默丢弃
     if (data?.code === 'no_workspace') {
       return { success: true, skipped: true, reason };
@@ -101,10 +104,11 @@ export const composerMethods = {
       throw new Error(data?.error || t('appUi.saveInputDraftFailed'));
     }
     this.composerDraftLastSyncedContent = content;
-    this.composerDraftDirty = false;
+    this.composerDraftDirty = this.normalizeComposerDraftContent(this.inputMessage) !== content;
     return { success: true, saved: true, reason };
   },
   async restoreComposerDraftState(reason = 'manual') {
+    const owns = beginAuxiliaryRequest(this, 'draft-read');
     const fetchSeq = Number(this.composerDraftFetchSeq || 0) + 1;
     this.composerDraftFetchSeq = fetchSeq;
     try {
@@ -113,6 +117,7 @@ export const composerMethods = {
         credentials: 'same-origin'
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       // 无工作区空态（200 + code）：草稿无处存储属预期，静默跳过
       if (payload?.code === 'no_workspace') {
         return;
@@ -141,6 +146,7 @@ export const composerMethods = {
       this.composerDraftDirty = false;
       this.inputSetMessage(content);
       this.$nextTick(() => {
+        if (!owns()) return;
         const composerRef =
           typeof this.getInputComposerRef === 'function' ? this.getInputComposerRef() : null;
         if (composerRef && typeof composerRef.restoreComposerDraftMeta === 'function') {
@@ -152,6 +158,7 @@ export const composerMethods = {
       });
       debugLog('[UI] 输入草稿已恢复', { reason, length: content.length });
     } catch (error) {
+      if (!owns()) return;
       console.warn('[UI] 恢复输入草稿失败:', error);
     }
   },
@@ -163,6 +170,8 @@ export const composerMethods = {
     }).catch(() => {});
   },
   clearComposerDraftState(reason = 'manual') {
+    invalidateAuxiliaryRequest(this, 'draft-read');
+    invalidateAuxiliaryRequest(this, 'draft-save');
     debugLog('[UI] 清理输入草稿状态', { reason });
     this.inputClearMessage();
     this.composerDraftLastSyncedContent = '';

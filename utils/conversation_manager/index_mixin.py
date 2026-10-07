@@ -1,6 +1,7 @@
 # utils/conversation_manager.py - 对话持久化管理器（集成Token统计）
 
 import json
+from utils.conversation_manager.locking import locked_write
 import os
 import time
 import tempfile
@@ -51,6 +52,7 @@ class ConversationMetadata:
 class IndexMixin:
     """ConversationManager index mixin 能力 mixin。"""
 
+    @locked_write
     def _migrate_legacy_conversation_files(self):
         """把 data/conversations/conv_*.json 按 metadata.project_path 移入对应 workspace 子目录。"""
         try:
@@ -210,6 +212,7 @@ class IndexMixin:
             perf_log("_index_missing_conversations", elapsed_ms=elapsed_ms, extra={"file_count": len(files), "index_size": len(index), "missing": missing})
         return missing
 
+    @locked_write
     def _load_index(self, ensure_integrity: bool = False, max_rebuild: Optional[int] = None) -> Dict:
         """加载对话索引，可选地在缺失时自动重建（可限制重建条数）"""
         try:
@@ -282,7 +285,9 @@ class IndexMixin:
                     "error": str(e),  # str 含 [WinError N] 与源/目标路径，repr 会丢失
                 }, ensure_ascii=False),
             )
+            raise
 
+    @locked_write
     def _ensure_index_covering(self, limit: int, offset: int) -> Dict:
         """
         确保索引涵盖到 offset+limit 条记录，不足时按需扩展重建（仍按 mtime 倒序，增量加载批量）。

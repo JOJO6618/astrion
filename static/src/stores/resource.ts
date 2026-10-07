@@ -1,3 +1,7 @@
+import {
+  beginAuxiliaryStoreRequest,
+  invalidateAuxiliaryRequest
+} from '../app/methods/auxiliaryOwnership';
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
 
@@ -97,6 +101,8 @@ export const useResourceStore = defineStore('resource', {
   }),
   actions: {
     resetTokenStatistics() {
+      invalidateAuxiliaryRequest(this, 'token-statistics');
+      invalidateAuxiliaryRequest(this, 'context-tokens');
       this.currentContextTokens = 0;
       this.currentConversationTokens = {
         cumulative_input_tokens: 0,
@@ -107,6 +113,7 @@ export const useResourceStore = defineStore('resource', {
       };
     },
     setCurrentContextTokens(value: number) {
+      invalidateAuxiliaryRequest(this, 'context-tokens');
       this.currentContextTokens = value || 0;
     },
     toggleTokenPanel() {
@@ -118,6 +125,7 @@ export const useResourceStore = defineStore('resource', {
       }
     },
     async updateCurrentContextTokens(conversationId: string | null) {
+      const owns = beginAuxiliaryStoreRequest(this, 'context-tokens', conversationId);
       if (!conversationId) {
         this.currentContextTokens = 0;
         return;
@@ -125,17 +133,20 @@ export const useResourceStore = defineStore('resource', {
       try {
         const response = await fetch(`/api/conversations/${conversationId}/tokens`);
         const data = await response.json();
+        if (!owns()) return;
         if (data.success && data.data) {
           this.currentContextTokens = data.data.total_tokens || 0;
         } else {
           this.currentContextTokens = 0;
         }
       } catch (error) {
+        if (!owns()) return;
         console.warn('获取当前上下文Token异常:', error);
         this.currentContextTokens = 0;
       }
     },
     async fetchConversationTokenStatistics(conversationId: string | null) {
+      const owns = beginAuxiliaryStoreRequest(this, 'token-statistics', conversationId);
       if (!conversationId) {
         this.resetTokenStatistics();
         return;
@@ -143,6 +154,7 @@ export const useResourceStore = defineStore('resource', {
       try {
         const response = await fetch(`/api/conversations/${conversationId}/token-statistics`);
         const data = await response.json();
+        if (!owns()) return;
         if (data.success && data.data) {
           this.currentConversationTokens.cumulative_input_tokens =
             data.data.total_input_tokens || 0;
@@ -158,6 +170,7 @@ export const useResourceStore = defineStore('resource', {
           }
         }
       } catch (error) {
+        if (!owns()) return;
         console.warn('获取Token统计异常:', error);
       }
     },

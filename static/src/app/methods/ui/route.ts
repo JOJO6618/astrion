@@ -1,25 +1,10 @@
 // @ts-nocheck
 import { t } from '@/locales';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
+import { conversationViewEpoch, ownsConversationSession } from '../conversation/session';
 
 export const routeMethods = {
   async bootstrapRoute() {
-    // 桌面端标签条：先于路由解析恢复标签列表（后续 enterConversation 挂钩与
-    // 启动恢复都依赖它；await 保证 hydrate 与标签登记不竞争）
-    try {
-      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
-      const tabsStore = useConversationTabsStore();
-      if (tabsStore.enabled) {
-        await tabsStore.hydrate();
-      }
-    } catch (_tabsErr) {
-      // 恢复失败不阻断路由
-    }
-    // 在路由解析期间抑制标题动画，避免预置"新对话"闪烁
-    this.suppressTitleTyping = true;
-    this.titleReady = false;
-    this.currentConversationTitle = '';
-    this.titleTypingText = '';
     let path = window.location.pathname.replace(/^\/+|\/+$/g, '');
     // 兼容重定向：旧多智能体路由统一收敛到裸路径。
     // 对话类型是 metadata 属性（创建时确定），不再是路由概念。
@@ -32,6 +17,33 @@ export const routeMethods = {
       history.replaceState({}, '', `/${bareId}`);
       path = bareId;
     }
+    const blankRoute =
+      !path || this.isExplicitNewConversationRoute() || this.isConversationIndependentRoute();
+    if (blankRoute) this.leaveConversationView();
+    const convId = blankRoute ? null : path.startsWith('conv_') ? path : `conv_${path}`;
+    const session = convId
+      ? this.beginConversationView(convId, this.currentHostWorkspaceId || '')
+      : undefined;
+    const epoch = conversationViewEpoch(this);
+    const owns = () =>
+      session ? ownsConversationSession(this, session) : conversationViewEpoch(this) === epoch;
+    // 桌面端标签条：先于路由解析恢复标签列表（后续 enterConversation 挂钩与
+    // 启动恢复都依赖它；await 保证 hydrate 与标签登记不竞争）
+    try {
+      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      const tabsStore = useConversationTabsStore();
+      if (tabsStore.enabled) {
+        await tabsStore.hydrate();
+      }
+    } catch (_tabsErr) {
+      // 恢复失败不阻断路由
+    }
+    if (!owns()) return { success: false, superseded: true };
+    // 在路由解析期间抑制标题动画，避免预置"新对话"闪烁
+    this.suppressTitleTyping = true;
+    this.titleReady = false;
+    this.currentConversationTitle = '';
+    this.titleTypingText = '';
     // 工作流编辑器：独立于对话体系的全屏路由，直接交给前端组件
     if (this.isConversationIndependentRoute()) {
       if (path === 'workflow') {
@@ -73,28 +85,32 @@ export const routeMethods = {
           // 重建失败不阻断主流程
         }
       }
+      if (!owns()) return { success: false, superseded: true };
       await this.restoreComposerDraftState('bootstrap-route:new');
       return;
     }
 
-    const convId = path.startsWith('conv_') ? path : `conv_${path}`;
     try {
       // 统一加载协议：一次 bootstrap 拿元数据+历史+运行状态（纯只读，不切换后端上下文）
       const result = await this.enterConversation(convId, {
         source: 'refresh',
+        session,
+        workspaceId: this.currentHostWorkspaceId || '',
         urlMode: 'replace'
       });
+      if (!owns() || result.superseded) return { success: false, superseded: true };
       if (result.success) {
         this.currentConversationTitle = result.title || '';
         this.titleReady = true;
         this.suppressTitleTyping = false;
         this.startTitleTyping(this.currentConversationTitle, { animate: false });
-        // 刷新路径不经 loadConversation，需在此补拉 token 统计，
-        // 否则输入栏右下角上下文用量圆环保持 0（enterConversation 内
-        // skipConversationHistoryReload 会让 watcher 也跳过拉取）
+        // 刷新路径补拉当前快照的 token 统计。
         this.fetchConversationTokenStatistics();
         this.updateCurrentContextTokens();
       } else {
+        this.initialRouteResolved = true;
+        this.leaveConversationView();
+        this.clearLocalTaskUiState?.('bootstrap-route:failed');
         history.replaceState({}, '', '/new');
         this.currentConversationId = null;
         this.currentConversationTitle = t('common.newConversation');
@@ -103,6 +119,10 @@ export const routeMethods = {
         this.startTitleTyping(t('common.newConversation'), { animate: false });
       }
     } catch (error) {
+      if (!owns()) return { success: false, superseded: true };
+      this.initialRouteResolved = true;
+      this.leaveConversationView();
+      this.clearLocalTaskUiState?.('bootstrap-route:failed');
       console.warn('初始化路由失败:', error);
       history.replaceState({}, '', '/new');
       this.currentConversationId = null;
@@ -111,7 +131,7 @@ export const routeMethods = {
       this.suppressTitleTyping = false;
       this.startTitleTyping(t('common.newConversation'), { animate: false });
     } finally {
-      this.initialRouteResolved = true;
+      if (owns()) this.initialRouteResolved = true;
     }
     await this.restoreComposerDraftState('bootstrap-route:conversation');
     if (this.currentConversationId) {
@@ -122,6 +142,8 @@ export const routeMethods = {
     const state = event.state || {};
     const convId = state.conversationId;
     if (!convId) {
+      this.leaveConversationView();
+      this.clearLocalTaskUiState?.('popstate:new');
       this.currentConversationId = null;
       this.currentConversationTitle = t('common.newConversation');
       this.logMessageState('handlePopState:clear-messages-no-conversation');
@@ -174,11 +196,13 @@ export const routeMethods = {
     // 工作流编辑器是 bootstrap 级全屏路由，与退出方向（/new）对称使用整页跳转，保证状态干净
     // 跳转前暂存当前激活标签（返回时恢复）并立刻清空激活态（chrome 选中效果即时消失）
     this.stashAndClearActiveTab?.();
+    this.leaveConversationView();
     window.location.assign('/workflows');
   },
   openSettingsPage() {
     // 设置页同样是 bootstrap 级全屏路由，整页跳转保证状态干净
     this.stashAndClearActiveTab?.();
+    this.leaveConversationView();
     window.location.assign('/settings');
   },
   closeSettingsPage() {

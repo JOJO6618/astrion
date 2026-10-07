@@ -70,13 +70,6 @@ export async function mounted() {
       .catch(() => {});
   }
 
-  // 注册全局事件处理器（用于任务轮询）
-  (window as any).__taskEventHandler = (event: any) => {
-    if (typeof this.handleTaskEvent === 'function') {
-      this.handleTaskEvent(event);
-    }
-  };
-
   // 桌面壳双 webview：接收 chrome 标签条意图（activate/new/close）。
   // 壳控制桥 eval 调用 window.__astrionChromeDispatch；未就绪期间的消息在
   // __astrionChromeQueue 排队，这里注册后一并 drain（shim 见 static/index.html）。
@@ -96,10 +89,7 @@ export async function mounted() {
     }
   }
 
-  // 立即尝试恢复运行中的任务（不延迟）
-  if (typeof this.restoreTaskState === 'function') {
-    this.restoreTaskState();
-  }
+  // bootstrapRoute owns the complete snapshot and its live subscription.
 
   document.addEventListener('click', this.handleClickOutsideQuickMenu);
   document.addEventListener('click', this.handleClickOutsideHeaderMenu);
@@ -131,14 +121,7 @@ export function beforeUnmount() {
     this._todoRefreshTimer = null;
   }
 
-  // 停止任务轮询
-  try {
-    const { useTaskStore } = require('../stores/task');
-    const taskStore = useTaskStore();
-    taskStore.stopPolling();
-  } catch (error) {
-    // ignore
-  }
+  this.leaveConversationView();
 
   document.removeEventListener('click', this.handleClickOutsideQuickMenu);
   document.removeEventListener('click', this.handleClickOutsideHeaderMenu);

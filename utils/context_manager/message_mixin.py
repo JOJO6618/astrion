@@ -136,10 +136,11 @@ class MessageMixin:
         images: Optional[List[Any]] = None,
         videos: Optional[List[Any]] = None,
         media_refs: Optional[List[Dict[str, Any]]] = None,
+        message_id: Optional[str] = None,
     ):
-        """添加对话记录（改进版：集成自动保存 + 智能token统计）"""
+        """添加对话记录；生产端可为事件和持久化消息指定同一个身份。"""
         timestamp = datetime.now().isoformat()
-        message_id = self._generate_message_id()
+        message_id = message_id or self._generate_message_id()
         if role == "assistant":
             message = {
                 "role": role,

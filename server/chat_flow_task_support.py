@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
@@ -117,12 +118,14 @@ def inject_runtime_user_message(
         }
 
     saved_message = None
+    message_id = str(uuid.uuid4())
     ctx_manager = getattr(web_terminal, "context_manager", None)
     if persist:
         try:
             if ctx_manager is not None:
                 saved_message = ctx_manager.add_conversation(
-                    "user", formatted, metadata=metadata, images=images, videos=videos
+                    "user", formatted, metadata=metadata, images=images, videos=videos,
+                    message_id=message_id,
                 )
         except Exception:
             if images or videos:
@@ -155,6 +158,7 @@ def inject_runtime_user_message(
         payload: Dict[str, Any] = {
             "message": formatted,
             "content": formatted,
+            "message_id": (saved_message or {}).get("message_id") or message_id,
             "conversation_id": conversation_id,
             "inline": inline,
             "source": src,
@@ -427,8 +431,8 @@ def inject_multi_agent_master_message(
     conversation_id: Optional[str] = None,
     inline: bool = True,
     after_tool_call_id: Optional[str] = None,
-) -> Optional[str]:
-    """把多智能体子智能体输出/消息以原生格式注入主对话，不添加 [系统通知|xxx] 前缀。"""
+) -> Optional[Dict[str, Any]]:
+    """返回本生产者分配的消息身份；把多智能体子智能体输出/消息以原生格式注入主对话，不添加 [系统通知|xxx] 前缀。"""
     raw = "" if text is None else str(text).strip()
     if not raw:
         return None
@@ -463,10 +467,14 @@ def inject_multi_agent_master_message(
         "starts_work": False,
     }
 
+    saved_message = None
+    message_id = str(uuid.uuid4())
     try:
         ctx_manager = getattr(web_terminal, "context_manager", None)
         if ctx_manager is not None:
-            ctx_manager.add_conversation("user", raw, metadata=metadata)
+            saved_message = ctx_manager.add_conversation(
+                "user", raw, metadata=metadata, message_id=message_id
+            )
             ma_debug(
                 "inject_ma_message_saved",
                 conversation_id=conversation_id,
@@ -498,6 +506,7 @@ def inject_multi_agent_master_message(
         payload = {
             "message": raw,
             "content": raw,
+            "message_id": (saved_message or {}).get("message_id") or message_id,
             "conversation_id": conversation_id,
             "inline": inline,
             "source": "sub_agent",
@@ -516,7 +525,8 @@ def inject_multi_agent_master_message(
         except Exception:
             pass
 
-    return raw
+    return {"message_id": (saved_message or {}).get("message_id") or message_id,
+            "content": raw, "metadata": metadata, "persisted": saved_message is not None}
 
 
 async def process_multi_agent_master_messages(

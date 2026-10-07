@@ -2,6 +2,7 @@
 import { debugLog, traceLog } from '../common';
 import { t } from '@/locales';
 import './shared';
+import { ownsConversationSession } from './session';
 
 export const loadMethods = {
   /**
@@ -170,12 +171,8 @@ export const loadMethods = {
       force
     });
     this.logMessageState('loadConversation:start', { conversationId, force });
-    this.suppressTitleTyping = true;
-    this.titleReady = false;
-    this.currentConversationTitle = '';
-    this.titleTypingText = '';
 
-    if (!force && conversationId === this.currentConversationId) {
+    if (!force && conversationId === this.currentConversationId && !this.historyLoading) {
       debugLog('已是当前对话，跳过加载');
       traceLog('loadConversation:skip-same', { conversationId });
       this.suppressTitleTyping = false;
@@ -183,11 +180,16 @@ export const loadMethods = {
       return;
     }
 
+    const session = this.beginConversationView(conversationId, workspaceId);
+    const owns = () => ownsConversationSession(this, session);
+    this.suppressTitleTyping = true;
+    this.titleReady = false;
     // 桌面端标签条：进入对话的公共漏斗（侧边栏普通列表直接绑本方法）。
     // 新对话：点击瞬间乐观开标签；已有标签：立即激活——两者都 persistNow，
     // 不等对话加载完（原来要等 bootstrap 登记 + 防抖，chrome 选中滞后几秒）
     try {
       const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      if (!owns()) return;
       const tabsStore = useConversationTabsStore();
       if (tabsStore.enabled) {
         const bareId = String(conversationId).replace(/^conv_/, '');
@@ -230,38 +232,27 @@ export const loadMethods = {
 
     // 注意：加载已有对话时必须保留该对话自身的模型/模式，不能套用用户默认值。
 
-    // 多工作区并行后，切换对话只切换视图，不再取消后台任务；停止当前轮询避免事件写入新对话界面。
-    try {
-      const { useTaskStore } = await import('../../../stores/task');
-      const taskStore = useTaskStore();
-      if (taskStore.hasActiveTask || this.taskInProgress) {
-        taskStore.clearTask();
-        if (typeof this.clearProcessedEvents === 'function') {
-          this.clearProcessedEvents();
-        }
-      }
-      this.clearLocalTaskUiState?.(`switch-conversation:${conversationId}`);
-    } catch (error) {
-      console.error('[切换对话] 停止本地轮询失败:', error);
-    }
-
-    await this.persistComposerDraftNow({
+    // 保存已经捕获的原工作区草稿，不阻塞显示快照请求。
+    void this.persistComposerDraftNow({
       reason: `switch-conversation:${conversationId}`,
       force: true,
       keepalive: true
     }).catch(() => {});
+    if (!owns()) return;
 
     try {
       // 统一加载协议：一次 bootstrap 替代「PUT load + GET messages + GET tasks」串行链。
       // 模式/模型应用、历史渲染、运行中任务恢复均在 enterConversation 内完成。
       const result = await this.enterConversation(conversationId, {
         source: 'sidebar',
+        session,
         workspaceId,
         urlMode: 'push',
         preserveListPosition,
         resetUI: true
       });
 
+      if (!owns() || result.superseded) return;
       if (result.success) {
         debugLog('对话 bootstrap 成功:', result);
         traceLog('loadConversation:api-success', { conversationId, title: result.title });
@@ -274,6 +265,7 @@ export const loadMethods = {
         this.fetchTodoList();
 
         await this.refreshRunningWorkspaceTasks?.();
+        if (!owns()) return;
         const visibleTask =
           typeof this.getVisibleWorkspaceTaskForConversation === 'function'
             ? this.getVisibleWorkspaceTaskForConversation(conversationId)
@@ -289,9 +281,7 @@ export const loadMethods = {
         this.fetchExecutionMode();
         this.fetchNetworkPermission();
         await this.fetchVersioningStatus(conversationId, { silent: true });
-        this.fetchPendingToolApprovals();
-        this.fetchPendingUserQuestions();
-        this.fetchPendingPlanApprovals();
+        if (!owns()) return;
         this.refreshProjectGitSummary();
         this.fetchConversationTokenStatistics();
         this.updateCurrentContextTokens();
@@ -310,6 +300,7 @@ export const loadMethods = {
         });
       }
     } catch (error) {
+      if (!owns()) return;
       console.error('加载对话异常:', error);
       traceLog('loadConversation:error', {
         conversationId,

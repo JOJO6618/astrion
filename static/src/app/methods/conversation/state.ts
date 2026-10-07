@@ -4,12 +4,6 @@ import './shared';
 
 export const stateMethods = {
   resetAllStates(reason = 'unspecified', options: { preserveMonitorWindows?: boolean } = {}) {
-    // 如果正在等待子智能体完成，不重置任务状态
-    if (this.waitingForSubAgent) {
-      debugLog('跳过状态重置：正在等待子智能体完成', { reason });
-      return;
-    }
-
     debugLog('重置所有前端状态', { reason, conversationId: this.currentConversationId });
     this.logMessageState('resetAllStates:before-cleanup', { reason });
     this.fileHideContextMenu();
@@ -30,6 +24,8 @@ export const stateMethods = {
     this.currentMessageIndex = -1;
     this.stopRequested = false;
     this.taskInProgress = false;
+    this.waitingForSubAgent = false;
+    this.waitingForBackgroundCommand = false;
     this.dropToolEvents = false;
 
     // 清理工具状态
@@ -109,7 +105,7 @@ export const stateMethods = {
       this.approvalAutoCloseTimer = null;
     }
     // 切换对话/工作区/新建视图时，清理上一轮目标模式的本地完成提示。
-    // 如果目标任务仍在运行，后续 restoreTaskState 会重新恢复运行态。
+    // 目标任务运行态由下一次统一快照恢复。
     this.goalModeArmed = false;
     this.goalRunning = false;
     this.goalProgress = null;
@@ -127,7 +123,6 @@ export const stateMethods = {
     });
 
     // 重置已加载对话标记，便于后续重新加载新对话历史
-    this.lastHistoryLoadedConversationId = null;
 
     this.logMessageState('resetAllStates:after-cleanup', { reason });
   },

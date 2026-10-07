@@ -1,8 +1,10 @@
 // @ts-nocheck
 import { t } from '@/locales';
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 
 export const workspaceMethods = {
   async refreshRunningWorkspaceTasks() {
+    const owns = beginAuxiliaryRequest(this, 'workspace-tasks');
     if (!(this.versioningHostMode || this.dockerProjectMode)) {
       this.runningWorkspaceTasks = [];
       if (this.runningWorkspaceTasksRefreshTimer) {
@@ -14,6 +16,7 @@ export const workspaceMethods = {
     try {
       const resp = await fetch('/api/tasks');
       const payload = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !payload?.success) {
         throw new Error(payload?.error || t('appUi.fetchRunningTasksFailed'));
       }
@@ -98,6 +101,7 @@ export const workspaceMethods = {
         }));
       }
     } catch (error) {
+      if (!owns()) return;
       console.warn('刷新运行中任务失败:', error);
       this.runningWorkspaceTasks = [];
       if (this.runningWorkspaceTasksRefreshTimer) {
@@ -112,16 +116,8 @@ export const workspaceMethods = {
     if (!workspaceId || !conversationId) {
       return;
     }
-    if (
-      (this.versioningHostMode || this.dockerProjectMode) &&
-      workspaceId !== this.currentHostWorkspaceId
-    ) {
-      await this.handleHostWorkspaceSwitch(workspaceId);
-    }
-    if (this.currentConversationId === conversationId) {
-      return;
-    }
-    await this.loadConversation(conversationId, { force: true });
+    await this.handleSelectWorkspaceConversation({ conversationId, workspaceId });
+    if (this.currentConversationId !== conversationId) return;
     const taskId = String(task?.task_id || '');
     if (
       taskId &&
@@ -130,8 +126,7 @@ export const workspaceMethods = {
       this.acknowledgeCompletedWorkspaceTask(taskId);
       return;
     }
-    // 复用刷新页面时的运行任务恢复逻辑：它会等待历史加载、按事件重建未完成的 assistant
-    // 消息，并重新注册思考/工具块，避免重复加载和块分裂。
-    await this.restoreTaskState();
+    // loadConversation already atomically hydrated the snapshot and attached its cursor.
+    return;
   }
 };

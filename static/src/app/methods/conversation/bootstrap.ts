@@ -1,201 +1,275 @@
 // @ts-nocheck
-import { debugLog, traceLog } from '../common';
+import { debugLog } from '../common';
+import { parseSystemNoticeLabel } from '../ui/shared';
+import { displayMessageTime } from './display';
+import { useTaskStore } from '../../../stores/task';
 import { useQuickDockStore } from '../../../stores/quickDock';
 import { usePreviewStore } from '../../../stores/preview';
 import { useConversationStore } from '../../../stores/conversation';
 import { useWorkflowStore } from '../../../stores/workflow';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
+import { usePersonalizationStore } from '../../../stores/personalization';
+import {
+  isFullAccessApproval,
+  needsHumanDecision,
+  normalizeApproval
+} from '@/components/input/approvalModel';
+import { bindAuxiliaryConversationHost } from '../auxiliaryOwnership';
+import {
+  beginConversationSession,
+  currentConversationSession,
+  leaveConversationSession,
+  ownsConversationSession
+} from './session';
 
-/**
- * 统一加载协议（方案 B）：进入对话的单一入口。
- *
- * 一次 GET bootstrap 拿「元数据 + 文件态历史 + 运行状态 + 任务重放决策」，
- * 替代旧的「PUT load + GET messages + GET tasks + 历史死等重试」串行链。
- * 后端接口纯只读，不切换任何 terminal 上下文，天然规避 safe_nav 双轨问题。
- *
- * 设计文档：docs/conversation_load_unification_plan.md
- */
 export const bootstrapMethods = {
-  /**
-   * @param conversationId 对话 ID（可带或不带 conv_ 前缀）
-   * @param options.source 'refresh' | 'sidebar'（仅用于日志追踪）
-   * @param options.workspaceId 目标工作区（host/docker 多工作区场景）
-   * @param options.urlMode 'push' | 'replace' | 'none'（缺省 push）
-   * @param options.preserveListPosition 保持侧边栏列表位置不置顶
-   * @param options.resetUI 渲染前 resetAllStates（sidebar 切换保留「清空→填入」语义）
-   */
+  beginConversationView(conversationId, workspaceId = '') {
+    const session = beginConversationSession(
+      this,
+      conversationId,
+      workspaceId || this.currentHostWorkspaceId || ''
+    );
+    bindAuxiliaryConversationHost(this);
+    useTaskStore().clearTask();
+    this.historyLoading = true;
+    this.historyLoadingFor = conversationId;
+    return session;
+  },
+  leaveConversationView() {
+    leaveConversationSession(this);
+    useTaskStore().clearTask();
+    this.historyLoading = false;
+    this.historyLoadingFor = null;
+    this.stopRunningStateReconcile?.();
+  },
+  async refreshConversationSnapshot() {
+    const session = currentConversationSession(this);
+    if (session && ownsConversationSession(this, session) && this.historyLoading) return;
+    const id = this.currentConversationId;
+    if (!id) return;
+    return this.enterConversation(id, {
+      workspaceId: this.currentHostWorkspaceId || '',
+      urlMode: 'none',
+      source: 'sync'
+    });
+  },
   async enterConversation(conversationId, options = {}) {
-    const {
-      source = 'sidebar',
-      workspaceId = '',
-      urlMode = 'push',
-      preserveListPosition = false,
-      resetUI = false
-    } = options;
-
-    const isHostLikeMode = Boolean(this.versioningHostMode || this.dockerProjectMode);
-    const requestUrl =
-      workspaceId && isHostLikeMode
-        ? `/api/conversations/${conversationId}/bootstrap?workspace_id=${encodeURIComponent(workspaceId)}`
-        : `/api/conversations/${conversationId}/bootstrap`;
-
-    traceLog('enterConversation:start', { conversationId, source, urlMode });
-    const response = await fetch(requestUrl);
-    const result = await response.json();
-    if (!result.success) {
-      debugLog('enterConversation:failed', {
-        conversationId,
-        error: result.error || result.message
-      });
-      return result;
-    }
-
-    const data = result.data || {};
-    const meta = data.meta || {};
-    const normalizedId = data.conversation_id || conversationId;
-
-    // 1. 应用模式/模型（与旧 PUT load 响应处理对齐）
-    if (typeof meta.run_mode === 'string') {
-      // 历史值 deep 映射为 thinking
-      this.runMode = (meta.run_mode === 'deep' ? 'thinking' : meta.run_mode) as 'fast' | 'thinking';
-      this.thinkingMode =
-        typeof meta.thinking_mode === 'boolean' ? meta.thinking_mode : meta.run_mode !== 'fast';
-    } else if (typeof meta.thinking_mode === 'boolean') {
-      this.thinkingMode = meta.thinking_mode;
-      this.runMode = meta.thinking_mode ? 'thinking' : 'fast';
-    }
-    if (typeof meta.model_key === 'string' && meta.model_key) {
-      this.modelSet(meta.model_key);
-    }
-    // 恢复会话级推理强度档位（null = 默认，不传参）
-    this.reasoningEffort = typeof meta.reasoning_effort === 'string' ? meta.reasoning_effort : null;
-    // 对话类型从 metadata 落地（创建时确定、不可变）
-    this.currentConversationType = meta.multi_agent_mode === true ? 'multi_agent' : 'normal';
-    // conversationStore.multiAgentMode 语义 = 「当前对话是否多智能体」（subAgent store 读取）
-    useConversationStore().$patch({ multiAgentMode: meta.multi_agent_mode === true });
-
-    // 2. 当前对话状态（skip 标记阻止 currentConversationId watch 重复拉历史）
-    this.skipConversationHistoryReload = true;
-    this.currentConversationId = normalizedId;
-    this.refreshProjectGitSummary?.();
-    this.fetchTerminalCount();
-    if (!preserveListPosition) {
-      this.promoteConversationToTop(normalizedId);
-    }
-    if (urlMode !== 'none') {
-      // 对话类型不再是路由概念，统一裸路径 /<id>
-      const stateMethod = urlMode === 'replace' ? 'replaceState' : 'pushState';
-      history[stateMethod](
-        { conversationId: normalizedId },
-        '',
-        `/${this.stripConversationPrefix(normalizedId)}`
-      );
-    }
-    this.skipConversationLoadedEvent = true;
-
-    // 3. 重置 UI（sidebar 切换保留「清空→填入」语义；刷新路径不传以避免闪烁）
-    if (resetUI) {
-      this.resetAllStates(`enterConversation:${normalizedId}`);
-    }
-
-    // 4. 渲染文件态历史（复用现有渲染器；设置防重标记避免 loadInitialData 二次拉取）
-    const messages = Array.isArray(data.messages) ? data.messages : [];
-    this.logMessageState?.('enterConversation:before-render', {
-      conversationId: normalizedId,
-      count: messages.length
-    });
-    this.messages = [];
-    if (messages.length > 0) {
-      this.renderHistoryMessages(messages);
-      // 与 fetchAndDisplayHistory 一致：隐藏期内等待动态高度稳定再滚到底
-      if (typeof this.settleHistoryRenderAndScroll === 'function') {
-        await this.settleHistoryRenderAndScroll();
-      } else {
-        await this.$nextTick();
-        this.scrollHistoryToBottomInstant();
-      }
-    }
-    this.lastHistoryLoadedConversationId = normalizedId;
-    this.refreshBlankHeroState();
-
-    // 4.5 快捷窗口：回填本次对话编辑/创建文件记录。
-    // 必须先等 currentConversationId 的级联 watcher（app watcher 清空 → store 同步 →
-    // QuickDock 内清空）全部执行完，否则回填数据会被 watcher 覆盖。
-    // setTimeout(0) 走宏任务，比 $nextTick 的 microtask 更保险。
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    this.runtimeQueuePaused = !!data.runtime_queue?.paused;
-    this.applyRuntimeQueuedMessages(data.runtime_queue?.messages || []);
-    this.handleCompressionState(
-      data.compression || { conversation_id: normalizedId, in_progress: false }
-    );
-    useQuickDockStore().setEditedFiles(Array.isArray(data.edited_files) ? data.edited_files : []);
-    // 预览窗口：回填本对话预览目标（同一时机，避免被 watcher 清空覆盖）
-    // + 预览运行时（独立预览服务器 base/token，跨站隔离 iframe 用）
-    usePreviewStore().setRuntime(data.preview_base, data.preview_token);
-    usePreviewStore().setTargets(
-      Array.isArray(data.preview_targets) ? data.preview_targets : [],
-      false
-    );
-
-    // 4.6 快捷窗口：回填工作流运行状态（静态呈现，不播动画）。
-    // 失败不影响对话进入。
+    const { workspaceId = '', urlMode = 'push', preserveListPosition = false } = options;
+    const session = options.session || this.beginConversationView(conversationId, workspaceId);
+    const owns = () => ownsConversationSession(this, session);
+    if (!owns()) return { success: false, superseded: true };
+    const wsQuery = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
     try {
-      const wfResp = await fetch(
-        `/api/workflow/status?conversation_id=${encodeURIComponent(normalizedId)}`
-      );
-      if (wfResp.ok) {
-        const wfData = await wfResp.json();
-        useWorkflowStore().setWorkflow(wfData?.snapshot, false);
-      }
-    } catch (wfErr) {
-      debugLog('enterConversation:workflow-status-failed', {
-        conversationId: normalizedId,
-        error: String(wfErr || '')
+      const response = await fetch(`/api/conversations/${conversationId}/bootstrap${wsQuery}`, {
+        signal: session.controller.signal
       });
-    }
-
-    // 5. 运行中任务快速恢复（任务/事件/判据已由 bootstrap 聚合，
-    //    免去 GET /api/tasks + 历史死等 + GET /api/tasks/{id} 三次请求）
-    const running = data.running || {};
-    if (running.is_main_running && data.task_replay) {
-      await this.restoreTaskState({ bootstrapReplay: data.task_replay });
-    }
-
-    traceLog('enterConversation:done', {
-      conversationId: normalizedId,
-      messagesCount: messages.length,
-      isTrulyActive: !!running.is_truly_active,
-      needsRebuild: data.task_replay?.needs_rebuild
-    });
-
-    // 桌面端标签条：成功进入对话后登记/激活对应标签（跨工作区混排）。
-    // 动态引入避免非桌面环境加载；失败不影响对话进入。
-    try {
-      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+      const result = await response.json();
+      if (!owns()) return { success: false, superseded: true };
+      if (!response.ok || !result.success) return result;
+      const data = result.data || {};
+      const meta = data.meta || {};
+      const normalizedId = data.conversation_id || conversationId;
+      const display = data.display || {};
+      const historyState = this.buildHistoryState(
+        Array.isArray(data.messages) ? data.messages : [],
+        normalizedId
+      );
+      const live = Array.isArray(display.messages) ? display.messages : [];
+      for (const message of live) {
+        if (message.role === 'user') {
+          message.created_at = displayMessageTime(message.created_at ?? message.timestamp);
+        }
+        for (const action of message.actions || []) {
+          if (action.type === 'system') action.content = parseSystemNoticeLabel(action.content);
+        }
+      }
+      const messages = [...historyState.messages, ...live];
+      const preserveInteraction =
+        options.source === 'sync' && this.currentConversationId === normalizedId;
+      this.clearLocalTaskUiState?.(`snapshot:${normalizedId}`);
+      session.conversationId = normalizedId;
+      if (meta.run_mode) {
+        this.runMode = meta.run_mode === 'deep' ? 'thinking' : meta.run_mode;
+        this.thinkingMode =
+          typeof meta.thinking_mode === 'boolean' ? meta.thinking_mode : this.runMode !== 'fast';
+      }
+      if (meta.model_key) this.modelSet(meta.model_key);
+      if (meta.work_mode) this.currentWorkMode = meta.work_mode;
+      if (meta.permission_mode) this.currentPermissionMode = meta.permission_mode;
+      if (meta.execution_mode) this.currentExecutionMode = meta.execution_mode;
+      if (meta.network_permission) this.currentNetworkPermission = meta.network_permission;
+      this.reasoningEffort =
+        typeof meta.reasoning_effort === 'string' ? meta.reasoning_effort : null;
+      this.currentConversationType = meta.multi_agent_mode ? 'multi_agent' : 'normal';
+      useConversationStore().$patch({ multiAgentMode: !!meta.multi_agent_mode });
+      this.currentConversationId = normalizedId;
+      this.messages = messages;
+      this.conversationHasImages = historyState.hasImages || live.some((m) => m.images?.length);
+      this.conversationHasVideos = historyState.hasVideos || live.some((m) => m.videos?.length);
+      this.currentMessageIndex =
+        messages.length && messages[messages.length - 1].role === 'assistant'
+          ? messages.length - 1
+          : -1;
+      this.currentConversationTitle = meta.title || '';
+      this.titleReady = true;
+      this.suppressTitleTyping = false;
+      this.startTitleTyping?.(this.currentConversationTitle, { animate: false });
+      this.hydrateRuntimeDisplay(display, data.running || {}, preserveInteraction);
+      useWorkflowStore().setWorkflow(null, false);
+      this.runtimeQueuePaused = !!data.runtime_queue?.paused;
+      this.applyRuntimeQueuedMessages(data.runtime_queue?.messages || []);
+      this.handleCompressionState(
+        data.compression || { conversation_id: normalizedId, in_progress: false }
+      );
+      useQuickDockStore().setEditedFiles(data.edited_files || []);
+      usePreviewStore().setRuntime(data.preview_base, data.preview_token);
+      usePreviewStore().setTargets(data.preview_targets || [], false);
+      if (!preserveListPosition) this.promoteConversationToTop(normalizedId);
+      if (urlMode !== 'none') {
+        history[urlMode === 'replace' ? 'replaceState' : 'pushState'](
+          { conversationId: normalizedId },
+          '',
+          `/${this.stripConversationPrefix(normalizedId)}`
+        );
+      }
+      this.historyLoading = false;
+      this.historyLoadingFor = null;
+      this.refreshBlankHeroState();
+      const task = display.task;
+      if (task && ['pending', 'running', 'cancel_requested'].includes(task.status)) {
+        useTaskStore().attachSnapshot(task, display.next_event_idx || 0, (event) => {
+          if (owns()) this.handleTaskEvent(event);
+        });
+      }
+      this.startRunningStateReconcile();
+      // Scroll and auxiliary panels never hold up the snapshot or live subscription.
+      this.$nextTick(() => {
+        if (!owns()) return;
+        if (preserveInteraction) this.conditionalScrollToBottom?.();
+        else this.scrollHistoryToBottomInstant();
+      });
+      void this.fetchConversationWorkflow(normalizedId, session);
       const tabsStore = useConversationTabsStore();
       if (tabsStore.enabled) {
-        const wsId = String(workspaceId || this.currentHostWorkspaceId || '');
-        const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
-          (item: any) => String(item?.workspace_id || '') === wsId
-        );
+        const wsId = workspaceId || this.currentHostWorkspaceId || '';
+        const ws = (this.hostWorkspaces || []).find((item) => item.workspace_id === wsId);
         tabsStore.openConversationTab({
           conversationId: normalizedId,
           workspaceId: wsId,
-          workspaceLabel: String(ws?.label || ''),
+          workspaceLabel: ws?.label || '',
           title: meta.title || ''
         });
       }
-    } catch (_tabsErr) {
-      // ignore
+      return { success: true, title: meta.title || '', conversation_id: normalizedId };
+    } catch (error) {
+      if (!owns() || error?.name === 'AbortError') return { success: false, superseded: true };
+      throw error;
+    } finally {
+      if (owns()) {
+        this.historyLoading = false;
+        this.historyLoadingFor = null;
+      }
     }
-
-    return {
-      success: true,
-      title: meta.title || '',
-      run_mode: meta.run_mode,
-      thinking_mode: meta.thinking_mode,
-      model_key: meta.model_key,
-      multi_agent_mode: meta.multi_agent_mode,
-      conversation_id: normalizedId
-    };
+  },
+  hydrateRuntimeDisplay(display, running, preserveInteraction = false) {
+    const state = display.state || {};
+    const previousApprovalIds = new Set(
+      (this.pendingToolApprovals || []).map((item) => item.approval_id)
+    );
+    this.approvalSnapshotVersion += 1;
+    this.resolvedToolApprovalIds = state.resolved_tool_approval_ids || [];
+    this.pendingToolApprovals = (state.pending_tool_approvals || []).map((approval) =>
+      normalizeApproval(approval, undefined, this.currentPermissionMode === 'auto_approval')
+    );
+    this.approvalReviewRecords = state.approval_review_records || [];
+    this.pendingUserQuestions = state.pending_user_questions || [];
+    this.pendingPlanApprovals = state.pending_plan_approvals || [];
+    this.decidingApprovalIds = [];
+    this.answeringUserQuestionIds = [];
+    this.answeringPlanApprovalIds = [];
+    if (this.approvalAutoCloseTimer) clearTimeout(this.approvalAutoCloseTimer);
+    this.approvalAutoCloseTimer = null;
+    this.restoreUserQuestionTitle?.();
+    if (!preserveInteraction) {
+      const hideAutomatic =
+        this.currentPermissionMode === 'auto_approval' &&
+        usePersonalizationStore().form.hide_tool_approval_panel !== false;
+      this.approvalPanelCollapsed = !this.pendingToolApprovals.some(
+        (approval) =>
+          !hideAutomatic || (isFullAccessApproval(approval) && needsHumanDecision(approval))
+      );
+      this.userQuestionActiveIndex = 0;
+      this.userQuestionMinimized = false;
+      this.planApprovalMinimized = false;
+    }
+    if (
+      preserveInteraction &&
+      this.pendingToolApprovals.some(
+        (approval) =>
+          !previousApprovalIds.has(approval.approval_id) &&
+          (this.currentPermissionMode !== 'auto_approval' ||
+            usePersonalizationStore().form.hide_tool_approval_panel === false ||
+            (isFullAccessApproval(approval) && needsHumanDecision(approval)))
+      )
+    )
+      this.approvalPanelCollapsed = false;
+    if (!this.pendingToolApprovals.length && (!preserveInteraction || previousApprovalIds.size)) {
+      this.approvalPanelCollapsed = true;
+    }
+    this.userQuestionDialogVisible = this.pendingUserQuestions.length > 0;
+    this.taskInProgress = !!running.is_truly_active;
+    this.streamingMessage = !!state.streaming && !!running.is_main_running;
+    this.waitingForSubAgent = !!running.has_running_sub_agents;
+    this.waitingForBackgroundCommand = !!running.has_running_background_commands;
+    this.apiRequestPending = !!state.api_request_pending;
+    this.goalProgress = state.goal_progress || display.task?.goal_progress || null;
+    this.goalRunning = !!state.goal_running && !!running.is_main_running;
+    this._summaryToolBatchId = state.summary_tool_batch_id || '';
+    this._summaryToolBatchSequence = state.summary_tool_batch_sequence || 0;
+    for (const message of display.messages || []) {
+      if (message.role !== 'assistant') continue;
+      for (const action of message.actions || []) {
+        if (action.type === 'thinking') {
+          action.collapsed = true;
+          if (action.streaming) this.chatSetThinkingLock?.(action.blockId || action.id, true);
+        }
+        if (action.type === 'tool' && action.tool) {
+          action.tool.argumentSnapshot = this.cloneToolArguments(action.tool.arguments || {});
+          action.tool.argumentLabel = this.buildToolLabel(action.tool.argumentSnapshot);
+          for (const alias of [
+            action.id,
+            action.tool.id,
+            action.tool.executionId,
+            action.tool.execution_id,
+            action.tool.preparingId,
+            action.tool.preparing_id,
+            action.tool.tool_call_id
+          ]) {
+            if (alias != null && alias !== '') this.toolRegisterAction(action, String(alias));
+          }
+          if (action.tool.preparingId) this.preparingTools.set(action.tool.preparingId, action);
+          if (action.tool.status === 'preparing') this.preparingTools.set(action.tool.id, action);
+          this.toolTrackAction(action.tool.name, action);
+        }
+      }
+    }
+  },
+  async fetchConversationWorkflow(conversationId, session) {
+    try {
+      const response = await fetch(
+        `/api/workflow/status?conversation_id=${encodeURIComponent(conversationId)}`,
+        {
+          signal: session.controller.signal
+        }
+      );
+      const data = await response.json();
+      if (response.ok && ownsConversationSession(this, session)) {
+        useWorkflowStore().setWorkflow(data?.snapshot, false);
+      }
+    } catch (error) {
+      if (ownsConversationSession(this, session) && error?.name !== 'AbortError') {
+        debugLog('conversation workflow unavailable', String(error));
+      }
+    }
   }
 };

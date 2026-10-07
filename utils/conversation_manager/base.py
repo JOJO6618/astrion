@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from utils.conversation_manager.locking import directory_lock
 try:
     from config import DATA_DIR, HOST_WORKSPACES_FILE
 except ImportError:
@@ -44,7 +45,7 @@ class ConversationManagerBase:
     def __init__(self, base_dir: Optional[str] = None, project_path: Optional[str] = None):
         self.base_dir = Path(base_dir).expanduser().resolve() if base_dir else Path(DATA_DIR).resolve()
         self.conversations_root = self.base_dir / "conversations"
-        self._io_lock = threading.RLock()
+        self._io_lock = directory_lock(self.conversations_root)
         self.current_conversation_id: Optional[str] = None
         self.workspace_root = Path(__file__).resolve().parents[1]
         self.host_workspaces = self._load_host_workspaces()
@@ -53,10 +54,11 @@ class ConversationManagerBase:
         # 当前管理器只暴露“当前工作区”的对话目录；未匹配到工作区时保留根目录作为兜底写入位置。
         self.conversations_dir = self._conversation_dir_for_workspace(self.current_workspace_id)
         self.index_file = self.conversations_dir / "index.json"
-        self._ensure_directories()
-        self._index_verified = False
-        # 首次加载索引仅重建最近 20 条，降低启动开销；后续按需扩展
-        self._load_index(ensure_integrity=True, max_rebuild=20)
+        with self._io_lock:
+            self._ensure_directories()
+            self._index_verified = False
+            # 首次加载索引仅重建最近 20 条；初始化与迁移也使用目录锁。
+            self._load_index(ensure_integrity=True, max_rebuild=20)
 
     def _normalize_path(self, value: Optional[str]) -> Optional[Path]:
         if not value:

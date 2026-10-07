@@ -71,6 +71,8 @@ function createAssistantMessage() {
     streamingText: '',
     currentStreamingType: null,
     activeThinkingId: null,
+    streamAttemptStart: 0,
+    streamAttemptBatchId: '',
     awaitingFirstContent: false,
     generatingLabel: randomGeneratingLabel()
   };
@@ -243,7 +245,14 @@ export const useChatStore = defineStore('chat', {
       return true;
     },
     ensureAssistantMessage() {
-      if (this.currentMessageIndex >= 0) {
+      if (
+        this.currentMessageIndex >= 0 &&
+        this.messages[this.currentMessageIndex]?.role === 'assistant'
+      ) {
+        return this.messages[this.currentMessageIndex];
+      }
+      if (this.messages[this.messages.length - 1]?.role === 'assistant') {
+        this.currentMessageIndex = this.messages.length - 1;
         return this.messages[this.currentMessageIndex];
       }
       const message = createAssistantMessage();
@@ -287,6 +296,7 @@ export const useChatStore = defineStore('chat', {
         created_at: startedAt
       });
       this.currentMessageIndex = -1;
+      return this.messages[this.messages.length - 1];
     },
     startAssistantMessage() {
       const message = createAssistantMessage();
@@ -300,11 +310,12 @@ export const useChatStore = defineStore('chat', {
     startThinkingAction() {
       const msg = this.ensureAssistantMessage();
       clearAwaitingFirstContent(msg);
-      // 幂等兜底：已有「流式中」的思考块时复用而非新建。正常流程
-      // thinking_start/thinking_end 成对出现，end 会把 streaming 置 false，
-      // 因此命中流式块只可能来自重复/重放事件（去重集合被清后的最后防线）。
+      // Snapshot hydration may already have installed the active thinking action.
       const existingThinking = this.getActiveThinkingAction(msg);
       if (existingThinking && existingThinking.streaming === true) {
+        msg.streamingThinking = existingThinking.content || '';
+        msg.currentStreamingType = 'thinking';
+        msg.activeThinkingId = existingThinking.id;
         return {
           action: existingThinking,
           blockId: existingThinking.blockId || existingThinking.id
@@ -329,21 +340,24 @@ export const useChatStore = defineStore('chat', {
     appendThinkingChunk(content: string) {
       if (this.currentMessageIndex < 0) return null;
       const msg = this.messages[this.currentMessageIndex];
-      msg.streamingThinking += content;
       const thinkingAction = this.getActiveThinkingAction(msg);
       if (thinkingAction) {
-        thinkingAction.content += content;
+        clearAwaitingFirstContent(msg);
+        thinkingAction.content = (thinkingAction.content || '') + content;
+        msg.streamingThinking = thinkingAction.content;
+        msg.currentStreamingType = 'thinking';
+        msg.activeThinkingId = thinkingAction.id;
         return thinkingAction;
       }
       return null;
     },
-    completeThinking(fullContent: string) {
-      if (this.currentMessageIndex < 0) return null;
-      const msg = this.messages[this.currentMessageIndex];
-      const thinkingAction = this.getActiveThinkingAction(msg);
+    completeThinking(fullContent?: string) {
+      const msg = this.ensureAssistantMessage();
+      let thinkingAction = this.getActiveThinkingAction(msg);
+      if (!thinkingAction && fullContent) thinkingAction = this.startThinkingAction().action;
       if (thinkingAction) {
         thinkingAction.streaming = false;
-        thinkingAction.content = fullContent;
+        if (typeof fullContent === 'string') thinkingAction.content = fullContent;
         msg.streamingThinking = '';
         msg.currentStreamingType = null;
         msg.activeThinkingId = null;
@@ -357,11 +371,10 @@ export const useChatStore = defineStore('chat', {
         return null;
       }
       clearAwaitingFirstContent(msg);
-      // 幂等兜底：末尾已有「流式中」的文本块时复用而非新建。正常流程
-      // text_start/text_end 成对出现，end 会把 streaming 置 false，
-      // 因此命中流式块只可能来自重复/重放事件（去重集合被清后的最后防线）。
+      // Continue the active text action installed by the snapshot.
       const lastAction = msg.actions[msg.actions.length - 1];
       if (lastAction && lastAction.type === 'text' && lastAction.streaming === true) {
+        msg.currentStreamingType = 'text';
         return lastAction;
       }
       msg.streamingText = '';
@@ -386,6 +399,8 @@ export const useChatStore = defineStore('chat', {
       if (typeof msg.streamingText !== 'string') {
         msg.streamingText = '';
       }
+      clearAwaitingFirstContent(msg);
+      msg.currentStreamingType = 'text';
       msg.streamingText += content;
       let lastAction = msg.actions[msg.actions.length - 1];
       if (!(lastAction && lastAction.type === 'text' && lastAction.streaming)) {
@@ -399,7 +414,7 @@ export const useChatStore = defineStore('chat', {
         };
         msg.actions.push(lastAction);
       }
-      lastAction.content += content;
+      lastAction.content = (lastAction.content || '') + content;
 
       // show_html 一旦闭合，当前卡片应“定格”，后续 chunk 进入新的 text action，
       // 避免 streaming 阶段每个新 chunk 都重建同一 show_html 卡片。
@@ -411,10 +426,16 @@ export const useChatStore = defineStore('chat', {
 
       return lastAction;
     },
-    completeText(fullContent: string) {
-      if (this.currentMessageIndex < 0) return;
-      const msg = this.messages[this.currentMessageIndex];
-      const splitByShowHtml = !!(msg as any).__splitByShowHtml;
+    completeText(fullContent?: string) {
+      const msg = this.ensureAssistantMessage();
+      // A snapshot does not need the old private split flag: frozen cards in
+      // the current contiguous text run also carry the split identity.
+      let splitByShowHtml = !!(msg as any).__splitByShowHtml;
+      if (msg.currentStreamingType === 'text') {
+        for (let i = msg.actions.length - 1; i >= 0 && msg.actions[i].type === 'text'; i--) {
+          if (msg.actions[i].frozenByShowHtml) splitByShowHtml = true;
+        }
+      }
       let completedStreamingAction = false;
       for (let i = msg.actions.length - 1; i >= 0; i--) {
         const action = msg.actions[i];
@@ -428,12 +449,19 @@ export const useChatStore = defineStore('chat', {
         }
       }
       if (!completedStreamingAction && !splitByShowHtml && typeof fullContent === 'string') {
+        let found = false;
         for (let i = msg.actions.length - 1; i >= 0; i--) {
           const action = msg.actions[i];
           if (action.type === 'text') {
             action.content = fullContent;
+            found = true;
             break;
           }
+        }
+        if (!found && fullContent) {
+          const action = this.startTextAction();
+          action.content = fullContent;
+          action.streaming = false;
         }
       }
       msg.streamingText = '';
@@ -454,6 +482,7 @@ export const useChatStore = defineStore('chat', {
         msg.activeThinkingId = null;
         msg.streamingThinking = '';
         msg.streamingText = '';
+        delete msg.__splitByShowHtml;
         msg.awaitingFirstContent = false;
         msg.generatingLabel = '';
         if (Array.isArray(msg.actions)) {
@@ -469,10 +498,8 @@ export const useChatStore = defineStore('chat', {
         }
       }
     },
-    // 断流重试「清除重来」：移除当前 assistant 消息中本轮 API 尝试已渲染的
-    // 半截内容——从 actions 末尾往前删除思考（含已闭合）/文本/preparing 工具条目，
-    // 遇到上一轮迭代的已完成工具结果等非本轮内容即停。复位流式标志；若消息
-    // 因此被清空则恢复「生成中」占位（label 通常为重试提示文案）。
+    // 清理当前请求的明确动作区间；边界由 api_request_start 或显示快照提供。
+    // 复位流式标志；消息清空后恢复当前任务的等待占位。
     // 返回被移除的 action 对象列表，供调用方清理 preparingTools / 工具注册表。
     resetStreamingAttemptActions(label: string = ''): any[] {
       const removed: any[] = [];
@@ -491,16 +518,17 @@ export const useChatStore = defineStore('chat', {
         }
       }
       if (!msg || !Array.isArray(msg.actions)) return removed;
-      while (msg.actions.length) {
-        const last = msg.actions[msg.actions.length - 1];
-        const isThinking = last?.type === 'thinking';
-        const isText = last?.type === 'text';
-        const isPreparingTool =
-          last?.type === 'tool' && String(last?.tool?.status || '').toLowerCase() === 'preparing';
-        if (!isThinking && !isText && !isPreparingTool) break;
-        removed.push(last);
-        msg.actions.pop();
+      const attemptStart = msg.streamAttemptStart;
+      if (
+        !Number.isInteger(attemptStart) ||
+        attemptStart < 0 ||
+        attemptStart > msg.actions.length
+      ) {
+        throw new Error('Runtime request action boundary is missing');
       }
+      removed.push(...msg.actions.splice(attemptStart));
+      msg.streamAttemptStart = msg.actions.length;
+      delete msg.__splitByShowHtml;
       msg.currentStreamingType = null;
       msg.activeThinkingId = null;
       msg.streamingThinking = '';

@@ -28,6 +28,8 @@ from modules.i18n import tr
 from server.tasks.queue_state import (
     initialize_queue, load_queue, save_queue, finish_queue, consume_selected_message,
 )
+from server.conversation_view.snapshots import TaskViewMixin, VIEW_LOCK, view_transaction
+from server.conversation_view.projector import RuntimeProjection
 
 
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
@@ -37,6 +39,8 @@ SKILL_FIELD_RE = re.compile(r"^(?P<key>name|description)\s*:\s*(?P<value>.*)$")
 
 class TaskRecord:
     __slots__ = (
+        "display_base", "display_context", "display_projection", "display_revision",
+        "display_valid", "trigger_message_id",
         "task_id",
         "username",
         "workspace_id",
@@ -87,8 +91,7 @@ class TaskRecord:
         self.message = params.message
         # conversation_id 经受理层补建兜底后显式传入（可能与 params.conversation_id 不同）
         self.conversation_id = conversation_id
-        # 刷新恢复时前端会从事件流重建进行中的输出，1000 在长流式回复下会过早截断，
-        # 导致“只恢复最后几个字符”。这里提高缓冲上限，优先保证重建完整性。
+        # 有限事件窗口只用于快照游标之后的增量续传；显示快照不依赖窗口完整性。
         self.events: deque[Dict[str, Any]] = deque(maxlen=20000)
         self.thread: Optional[threading.Thread] = None
         self.error: Optional[str] = None
@@ -108,8 +111,14 @@ class TaskRecord:
         self.runtime_queue_paused = False
         self.last_cancel_at: Optional[float] = None
         self.task_type = str(params.task_type or "chat")
+        self.display_base = None
+        self.display_context = None
+        self.display_projection = RuntimeProjection(task_id, conversation_id, self.model_key)
+        self.display_revision = str(uuid.uuid4())
+        self.display_valid = True
+        self.trigger_message_id = str(uuid.uuid4())
 
-class TaskManager:
+class TaskManager(TaskViewMixin):
     """线程内存版任务管理器，后续可替换为 Redis/DB。"""
 
     def __init__(self):
@@ -140,6 +149,7 @@ class TaskManager:
             return len(to_remove)
 
     # ---- public APIs ----
+    @view_transaction
     def create_chat_task(
         self,
         ctx: RuntimeContext,
@@ -770,15 +780,18 @@ class TaskManager:
         result["has_running_background_commands"] = status["has_running_background_commands"]
         return result
 
+    @view_transaction
     def _append_event(self, rec: TaskRecord, event_type: str, data: Dict[str, Any]):
+        if event_type == "compression_finished":
+            self.rebase_display(rec)
         if isinstance(data, dict):
             data = dict(data)
-            data.setdefault("task_id", rec.task_id)
-            data.setdefault("task_type", rec.task_type)
+            data["task_id"] = rec.task_id
+            data["task_type"] = rec.task_type
             if rec.conversation_id:
-                data.setdefault("conversation_id", rec.conversation_id)
+                data["conversation_id"] = rec.conversation_id
             if rec.workspace_id:
-                data.setdefault("workspace_id", rec.workspace_id)
+                data["workspace_id"] = rec.workspace_id
         with self._lock:
             if event_type in {"goal_progress", "goal_completed", "goal_stopped"} and isinstance(data, dict):
                 rec.goal_progress = dict(data)
@@ -786,12 +799,9 @@ class TaskManager:
             if idx is None:
                 idx = rec.events[-1]["idx"] + 1 if rec.events else 0
             rec.next_event_idx = idx + 1
-            rec.events.append({
-                "idx": idx,
-                "type": event_type,
-                "data": data,
-                "ts": time.time(),
-            })
+            event = {"idx": idx, "type": event_type, "data": data, "ts": time.time()}
+            self.publish_display(rec, event)
+            rec.events.append(event)
             rec.updated_at = time.time()
 
     def _run_chat_task(self, rec: TaskRecord, images: List[Any], videos: List[Any], files: Optional[List[str]] = None):
@@ -888,8 +898,11 @@ class TaskManager:
             except Exception:
                 pass
 
-            # 仅对“后台通知触发的新任务”补发 user_message 事件到任务事件流。
-            # 这样前端轮询能即时看到这条 user 消息，而不是刷新后才从历史中看到。
+            rec.display_projection.conversation_id = rec.conversation_id
+            self.bind_display(rec, terminal.context_manager)
+            terminal._display_trigger_message_id = rec.trigger_message_id
+
+            # 通知输入与落盘消息共享身份；前置通知从持久化前缀明确移入本任务。
             try:
                 if rec.directives.auto_user_message_event:
                     # 先回放本批「通知池」里的前置完成通知（除触发消息外的 N-1 条），
@@ -920,12 +933,14 @@ class TaskManager:
                         "task_id": rec.task_id,
                     }
                     payload.update(extra_payload)
+                    payload["message_id"] = rec.trigger_message_id
+                    payload["is_task_input"] = True
                     self._append_event(rec, "user_message", payload)
             except Exception as exc:
                 debug_log(f"[Task] 注入 user_message 事件失败: {exc}")
 
             def sender(event_type, data):
-                if event_type == "user_message" and (data or {}).get("message") == rec.message:
+                if event_type == "user_message" and (data or {}).get("message_id") == rec.trigger_message_id:
                     with self._lock:
                         consume_selected_message(rec)
                 if event_type == "error" and not (data or {}).get("retry"):
@@ -1074,9 +1089,7 @@ class TaskManager:
                 has_bg = bg_state["has_running_sub_agents"] or bg_state["has_running_background_commands"]
                 with self._lock:
                     finish_queue(rec, paused=True)
-                    new_status = "stopped"
-                    rec.status = new_status
-                    rec.updated_at = time.time()
+                new_status = "stopped"
                 debug_log(
                     f"[TaskRun] 任务线程结束: task_id={rec.task_id}, canceled_flag={canceled_flag}, "
                     f"new_status={new_status}, bg_state={bg_state}"
@@ -1093,8 +1106,8 @@ class TaskManager:
                         'has_running_sub_agents': bg_state["has_running_sub_agents"],
                         'has_running_background_commands': bg_state["has_running_background_commands"],
                     }
-                    # 事件流（轮询通道）为唯一权威出口，不再做 WebSocket 实时推送。
-                    self._append_event(rec, "task_stopped", stopped_payload)
+                    # 状态与最后一条显示事件同时发布，快照不会停在半个终态。
+                    self.finish_display_task(rec, "stopped", "task_stopped", stopped_payload)
                     debug_log(
                         f"[TaskRun] 已发送 task_stopped: task_id={rec.task_id}, "
                         f"has_bg={has_bg}, room=user_{rec.username}"
@@ -1102,9 +1115,7 @@ class TaskManager:
                 except Exception as exc:
                     debug_log(f"[TaskRun] 发送 task_stopped 失败: {exc}")
             else:
-                with self._lock:
-                    rec.status = "succeeded"
-                    rec.updated_at = time.time()
+                self.finish_display_task(rec, "succeeded")
 
             # 任务线程结束：仅当对话真正空闲（无其它前台/后台任务）时才把 work_timer 标记为完成，
             # 避免智能体已停、但后台子智能体/后台命令/压缩仍在进行时提前停止计时。
@@ -1130,14 +1141,10 @@ class TaskManager:
                     finish_queue(rec, paused=True)
                 except Exception as queue_error:
                     debug_log(f"[RuntimeQueue] 保存失败，保留内存队列: {queue_error}")
-            self._append_event(rec, "error", {
+            self.finish_display_task(rec, "failed", "error", {
                 "message": str(exc), "preserve_pending_messages": True,
                 "runtime_queued_messages": self.get_runtime_pending_messages(username, rec.task_id),
-            })
-            with self._lock:
-                rec.status = "failed"
-                rec.error = str(exc)
-                rec.updated_at = time.time()
+            }, error=str(exc))
         finally:
             # 清理 stop_flags
             stop_flags.pop(rec.task_id, None)

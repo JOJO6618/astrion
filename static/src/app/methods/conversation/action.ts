@@ -4,6 +4,9 @@ import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { persistNewConversationType } from '../../state';
 import './shared';
+import { conversationViewEpoch, currentConversationSession } from './session';
+import { useConversationStore } from '../../../stores/conversation';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
 export const actionMethods = {
   promoteConversationToTop(conversationId) {
@@ -17,6 +20,11 @@ export const actionMethods = {
     }
   },
   async createNewConversation() {
+    this.leaveConversationView();
+    const workspaceId = this.currentHostWorkspaceId;
+    const epoch = conversationViewEpoch(this);
+    const owns = () =>
+      conversationViewEpoch(this) === epoch && this.currentHostWorkspaceId === workspaceId;
     // 已移除「压缩中需确认并取消压缩」拦截：多对话独立运行后，某对话压缩中
     // 不影响新建/切换其他对话（压缩锁已按对话隔离）。
     debugLog('创建新对话...');
@@ -35,6 +43,7 @@ export const actionMethods = {
       keepalive: true
     }).catch(() => {});
 
+    if (!owns()) return;
     // 按个性化设置分流：route-跳转空白新对话页（发送首条消息时才真正创建）；
     // blank-保持现有行为，立即创建空对话
     let newChatBehavior = 'route';
@@ -47,7 +56,6 @@ export const actionMethods = {
       // 跳转 /new 前把侧边栏过滤器类型同步给输入栏选择器：
       // 看着哪类对话列表点新建，默认就创建哪类（选择器仍可手动改）。
       try {
-        const { useConversationStore } = await import('../../../stores/conversation');
         this.newConversationType =
           useConversationStore().sidebarConversationType === 'multi_agent'
             ? 'multi_agent'
@@ -58,7 +66,6 @@ export const actionMethods = {
       }
       // 桌面端标签条：点「新建」= 新增一个 /new 标签（发首条消息才落地为对话）
       try {
-        const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
         const tabsStore = useConversationTabsStore();
         if (tabsStore.enabled) {
           const wsId = String(this.currentHostWorkspaceId || '');
@@ -114,20 +121,7 @@ export const actionMethods = {
       console.warn('应用个性化默认设置失败:', error);
     }
 
-    // 创建新对话只切换视图，不再取消后台任务；停止当前轮询避免事件串写。
-    try {
-      const { useTaskStore } = await import('../../../stores/task');
-      const taskStore = useTaskStore();
-      if (taskStore.hasActiveTask || this.taskInProgress) {
-        taskStore.clearTask();
-        if (typeof this.clearProcessedEvents === 'function') {
-          this.clearProcessedEvents();
-        }
-      }
-      this.clearLocalTaskUiState?.('create-new-conversation');
-    } catch (error) {
-      console.error('[创建新对话] 停止本地轮询失败:', error);
-    }
+    this.clearLocalTaskUiState?.('create-new-conversation');
 
     let backupToastId = null;
     try {
@@ -148,7 +142,6 @@ export const actionMethods = {
       }
 
       // 侧边栏新建：类型跟随侧边栏过滤器（看着哪类列表就建哪类对话）
-      const { useConversationStore } = await import('../../../stores/conversation');
       const isMultiAgent = useConversationStore().sidebarConversationType === 'multi_agent';
       const createUrl = isMultiAgent ? '/api/multiagent/conversations' : '/api/conversations';
       // reasoning_effort 随创建权威写入新对话 meta（此处 this.reasoningEffort 已被上方
@@ -174,6 +167,7 @@ export const actionMethods = {
       });
 
       const result = await response.json();
+      if (!owns()) return;
 
       if (result.success) {
         const newConversationId = result.conversation_id;
@@ -241,9 +235,9 @@ export const actionMethods = {
         // 工作区旁新建不切换对话，所以不会触发此处的状态风暴；顶部新建需要切对话，
         // 但把 loadConversation 放到入场动画基本结束后再执行，动画就和工作区旁一致。
         await waitForAnimation(540);
+        if (!owns()) return;
 
         // 直接加载新对话，确保状态一致
-        // 如果 socket 事件已把 currentConversationId 设置为新ID，则强制加载一次以同步状态
         await this.loadConversation(newConversationId, { force: true });
         traceLog('createNewConversation:after-load', {
           newConversationId,
@@ -282,6 +276,7 @@ export const actionMethods = {
         });
       }
     } catch (error) {
+      if (!owns()) return;
       console.error('创建对话异常:', error);
       this.uiPushToast({
         title: t('appMessages.createConversationErrorTitle'),
@@ -289,7 +284,7 @@ export const actionMethods = {
         type: 'error'
       });
     } finally {
-      if (backupToastId) {
+      if (owns() && backupToastId) {
         this.uiDismissToast(backupToastId);
         this.versioningInitializingBackupToastId = null;
       }
@@ -420,7 +415,12 @@ export const actionMethods = {
         debugLog('对话删除成功');
 
         // 如果删除的是当前对话，清空界面
-        if (conversationId === this.currentConversationId) {
+        if (
+          conversationId === this.currentConversationId ||
+          currentConversationSession(this)?.conversationId === conversationId
+        ) {
+          this.leaveConversationView();
+          this.clearLocalTaskUiState?.(`delete-conversation:${conversationId}`);
           this.logMessageState('deleteConversation:before-clear', { conversationId });
           this.messages = [];
           this.logMessageState('deleteConversation:after-clear', { conversationId });

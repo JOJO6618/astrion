@@ -1,6 +1,7 @@
 # utils/conversation_manager.py - 对话持久化管理器（集成Token统计）
 
 import json
+from utils.conversation_manager.locking import locked_write
 import os
 import time
 import tempfile
@@ -41,6 +42,7 @@ class ConversationMetadata:
 class TokenMixin:
     """ConversationManager token mixin 能力 mixin。"""
 
+    @locked_write
     def update_token_statistics(
         self,
         conversation_id: str,

@@ -1,3 +1,7 @@
+import {
+  beginAuxiliaryStoreRequest,
+  invalidateAuxiliaryRequest
+} from '../app/methods/auxiliaryOwnership';
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
 import { useConversationStore } from './conversation';
@@ -52,6 +56,7 @@ export const useSubAgentStore = defineStore('subAgent', {
   }),
   actions: {
     async fetchSubAgents() {
+      const owns = beginAuxiliaryStoreRequest(this, 'sub-agents');
       try {
         const conversationStore = useConversationStore();
         const convId = conversationStore.currentConversationId;
@@ -82,6 +87,7 @@ export const useSubAgentStore = defineStore('subAgent', {
           throw new Error(await resp.text());
         }
         const data = await resp.json();
+        if (!owns()) return;
         if (data.success) {
           const agents = conversationStore.multiAgentMode
             ? Array.isArray(data.agents)
@@ -106,6 +112,7 @@ export const useSubAgentStore = defineStore('subAgent', {
           }
         }
       } catch (error) {
+        if (!owns()) return;
         console.error('获取子智能体列表失败:', error);
       }
     },
@@ -144,12 +151,15 @@ export const useSubAgentStore = defineStore('subAgent', {
       }, 2000);
     },
     stopActivityPolling() {
+      invalidateAuxiliaryRequest(this, 'sub-activity');
+      this.activityLoading = false;
       if (this.activityTimer) {
         clearInterval(this.activityTimer);
         this.activityTimer = null;
       }
     },
     async fetchSubAgentActivity(taskId: string) {
+      const owns = beginAuxiliaryStoreRequest(this, 'sub-activity');
       if (!taskId) return;
       this.activityLoading = true;
       try {
@@ -162,6 +172,7 @@ export const useSubAgentStore = defineStore('subAgent', {
           throw new Error(await resp.text());
         }
         const data = await resp.json();
+        if (!owns()) return;
         if (data && data.success && data.data) {
           const entries = Array.isArray(data.data.entries) ? data.data.entries : [];
           this.activityEntries = entries;
@@ -182,10 +193,11 @@ export const useSubAgentStore = defineStore('subAgent', {
           }
         }
       } catch (error: any) {
+        if (!owns()) return;
         this.activityError = error?.message || String(error);
         console.error('获取子智能体活动失败:', error);
       } finally {
-        this.activityLoading = false;
+        if (owns()) this.activityLoading = false;
       }
     },
     async terminateSubAgent(taskId: string) {

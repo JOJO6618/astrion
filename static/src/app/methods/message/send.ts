@@ -4,6 +4,76 @@ import { t } from '@/locales';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { extractSkillRefsFromMessage } from './shared';
+import { useTaskStore } from '../../../stores/task';
+import { usePreviewStore } from '../../../stores/preview';
+import { createTaskPayload } from '../../../stores/taskPolling';
+import { currentConversationSession, ownsConversationSession } from '../conversation/session';
+
+export function ensureMessageSession(host: any) {
+  const conversationId = host.currentConversationId || '';
+  const workspaceId = host.currentHostWorkspaceId || '';
+  const current = currentConversationSession(host);
+  if (
+    current &&
+    ownsConversationSession(host, current) &&
+    current.conversationId === conversationId &&
+    current.workspaceId === workspaceId
+  ) {
+    return current;
+  }
+  const session = host.beginConversationView(conversationId, workspaceId);
+  host.historyLoading = false;
+  host.historyLoadingFor = null;
+  return session;
+}
+
+// Creation has the same session owner as its optimistic input. A late POST must
+// never attach its task to a view that has already navigated elsewhere.
+export async function createOwnedMessageTask(
+  host: any,
+  session: any,
+  optimisticUser: any,
+  message: string,
+  images: any[],
+  videos: any[],
+  conversationId: string,
+  options = {},
+  optimisticAssistant = host.messages[host.currentMessageIndex]
+) {
+  const owns = () => ownsConversationSession(host, session);
+  if (!owns()) return null;
+  const response = await fetch('/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: session.controller.signal,
+    body: JSON.stringify(createTaskPayload(message, images, videos, conversationId, options))
+  });
+  const result = await response.json();
+  if (!owns()) return null;
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || result.message || t('appMessages.createTaskFailedMessage'));
+  }
+  if (optimisticAssistant?.role === 'assistant') optimisticAssistant.taskId = result.data.task_id;
+  let inputBound = false;
+  useTaskStore().attachSnapshot(result.data, 0, (event: any) => {
+    if (!owns()) return;
+    const data = event.data || {};
+    const messageId = data.message_id ?? data.metadata?.message_id;
+    if (
+      !inputBound &&
+      optimisticUser &&
+      event.type === 'user_message' &&
+      data.is_task_input === true &&
+      messageId != null
+    ) {
+      optimisticUser.id = messageId;
+      optimisticUser.message_id = messageId;
+      inputBound = true;
+    }
+    host.handleTaskEvent(event);
+  });
+  return result.data;
+}
 
 export const sendMethods = {
   async handleSendOrStop() {
@@ -105,13 +175,9 @@ export const sendMethods = {
     const presetText = typeof options?.presetText === 'string' ? options.presetText : null;
     const usePresetText = presetText !== null;
 
-    // 新任务开始：重置预览面板的自动展开抑制（用户上轮手动关过面板，本轮恢复自动展开资格）
-    try {
-      const { usePreviewStore } = await import('../../../stores/preview');
-      usePreviewStore().resetAutoOpen();
-    } catch (_e) {
-      // ignore
-    }
+    const session = ensureMessageSession(this);
+    const owns = () => ownsConversationSession(this, session);
+    usePreviewStore().resetAutoOpen();
 
     if (this.compressionActiveForCurrentConversation) {
       return this.enqueueRuntimeQueuedMessage(
@@ -236,6 +302,7 @@ export const sendMethods = {
       this.blankHeroExiting = true;
       this.blankHeroActive = true;
       setTimeout(() => {
+        if (!owns()) return;
         this.blankHeroExiting = false;
         this.blankHeroActive = false;
       }, 320);
@@ -283,9 +350,11 @@ export const sendMethods = {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: createBody
+          body: createBody,
+          signal: session.controller.signal
         });
         const createResult = await createResp.json().catch(() => ({}));
+        if (!owns()) return false;
         if (!createResp.ok || !createResult?.success || !createResult?.conversation_id) {
           throw new Error(
             createResult?.message ||
@@ -296,7 +365,7 @@ export const sendMethods = {
         targetConversationId = createResult.conversation_id;
         // 创建即定型：落地对话类型（与后端 metadata 保持一致）
         this.currentConversationType = isMultiAgent ? 'multi_agent' : 'normal';
-        this.skipConversationHistoryReload = true;
+        session.conversationId = targetConversationId;
         this.currentConversationId = targetConversationId;
         this.currentConversationTitle = t('common.newConversation');
         const newPlaceholder = {
@@ -310,6 +379,7 @@ export const sendMethods = {
         const targetType = isMultiAgent ? 'multi_agent' : 'normal';
         try {
           const { useConversationStore } = await import('../../../stores/conversation');
+          if (!owns()) return false;
           const conversationStore = useConversationStore();
           conversationStore.$patch({ multiAgentMode: isMultiAgent });
 
@@ -371,6 +441,7 @@ export const sendMethods = {
         // 桌面端标签条：首条消息落地为真实对话，把当前激活的 new 标签转换为 conv 标签
         try {
           const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+          if (!owns()) return false;
           const tabsStore = useConversationTabsStore();
           if (tabsStore.enabled) {
             tabsStore.convertActiveNewTab({
@@ -382,6 +453,7 @@ export const sendMethods = {
           // ignore
         }
       } catch (error) {
+        if (!owns()) return false;
         this.uiPushToast({
           title: t('appMessages.sendFailedTitle'),
           message: error?.message || t('appMessages.createNewConversationFailedMessage'),
@@ -389,12 +461,14 @@ export const sendMethods = {
         });
         return false;
       } finally {
-        if (backupToastId) {
+        if (owns() && backupToastId) {
           this.uiDismissToast(backupToastId);
           this.versioningInitializingBackupToastId = null;
         }
       }
     }
+
+    if (!owns()) return false;
 
     // 标记任务进行中，直到任务完成或用户手动停止
     this.taskInProgress = true;
@@ -407,7 +481,7 @@ export const sendMethods = {
         ? 'guidance'
         : 'presend'
       : 'user';
-    this.chatAddUserMessage(
+    const optimisticUser = this.chatAddUserMessage(
       message,
       images,
       videos,
@@ -418,6 +492,7 @@ export const sendMethods = {
     // 关键体验修复：用户发送后立刻显示 assistant 头部 + 工作中计时 + 等待提示，
     // 不等待 createTask / 轮询首事件返回。
     this.chatStartAssistantMessage();
+    const optimisticAssistant = this.messages[this.currentMessageIndex];
     this.stopRequested = false;
     if (typeof this.monitorShowPendingReply === 'function') {
       this.monitorShowPendingReply();
@@ -428,11 +503,6 @@ export const sendMethods = {
 
     // 使用 REST API 创建任务（轮询模式）
     try {
-      const { useTaskStore } = await import('../../../stores/task');
-      const taskStore = useTaskStore();
-      if (typeof this.clearProcessedEvents === 'function') {
-        this.clearProcessedEvents();
-      }
       const startingGoalMode = this.goalModeArmed === true;
       if (startingGoalMode) {
         this.goalModeArmed = false;
@@ -447,21 +517,33 @@ export const sendMethods = {
         };
       }
 
-      await taskStore.createTask(message, images, videos, targetConversationId, {
-        model_key: this.currentModelKey,
-        run_mode: this.runMode,
-        thinking_mode: this.thinkingMode,
-        message_source: localMessageSource,
-        queued_message_id: options?.queuedMessageId || undefined,
-        goal_mode: startingGoalMode,
-        skill_refs: skillRefs,
-        files,
-        eventHandler: (event: any) => this.handleTaskEvent(event)
-      });
+      const created = await createOwnedMessageTask(
+        this,
+        session,
+        optimisticUser,
+        message,
+        images,
+        videos,
+        targetConversationId,
+        {
+          model_key: this.currentModelKey,
+          run_mode: this.runMode,
+          thinking_mode: this.thinkingMode,
+          message_source: localMessageSource,
+          queued_message_id: options?.queuedMessageId || undefined,
+          goal_mode: startingGoalMode,
+          skill_refs: skillRefs,
+          files
+        },
+        optimisticAssistant
+      );
 
+      if (!created || !owns()) return false;
       debugLog('[Message] 任务已创建，开始轮询');
       await this.refreshRunningWorkspaceTasks?.();
+      if (!owns()) return false;
     } catch (error) {
+      if (!owns()) return false;
       console.error('[Message] 创建任务失败:', error);
       this.uiPushToast({
         title: t('appMessages.sendFailedTitle'),
@@ -509,7 +591,7 @@ export const sendMethods = {
 
     // 发送消息后延迟更新当前上下文Token（关键修复：恢复原逻辑）
     setTimeout(() => {
-      if (this.currentConversationId) {
+      if (owns()) {
         this.updateCurrentContextTokens();
       }
     }, 1000);
@@ -521,6 +603,8 @@ export const sendMethods = {
       return;
     }
     this._stopTaskRunning = true;
+    const session = ensureMessageSession(this);
+    const owns = () => ownsConversationSession(this, session);
 
     // 压缩属于主智能体活动，停止精确取消当前任务。
     const canStop =
@@ -553,7 +637,6 @@ export const sendMethods = {
     }
 
     try {
-      const { useTaskStore } = await import('../../../stores/task');
       const taskStore = useTaskStore();
 
       if (taskStore.currentTaskId) {
@@ -562,6 +645,7 @@ export const sendMethods = {
 
       // 等待后端确认；轮询继续，task_stopped 事件到达后会由 taskStore 自动停止轮询
       await new Promise((resolve) => setTimeout(resolve, 300));
+      if (!owns()) return;
 
       const shouldKeepBusy = ['running', 'pending', 'cancel_requested', 'canceled'].includes(
         String(taskStore.taskStatus)
@@ -580,9 +664,6 @@ export const sendMethods = {
       // 若后台已回传停止事件，不要再次把输入区锁回“停止中”
       this.taskInProgress = shouldKeepBusy;
       this.forceUnlockMonitor('user_stop');
-      if (typeof this.clearProcessedEvents === 'function') {
-        this.clearProcessedEvents();
-      }
 
       // 清理assistant消息的等待动画状态
       const lastMessage = this.messages[this.messages.length - 1];
@@ -591,8 +672,8 @@ export const sendMethods = {
         lastMessage.generatingLabel = '';
       }
     } catch (error) {
+      if (!owns()) return;
       console.error('[Message] 取消任务失败:', error);
-      const { useTaskStore } = await import('../../../stores/task');
       const taskStore = useTaskStore();
       const shouldKeepBusy = ['running', 'pending', 'cancel_requested', 'canceled'].includes(
         String(taskStore.taskStatus)
@@ -611,9 +692,6 @@ export const sendMethods = {
       // 如果任务其实已结束，允许按钮恢复发送态
       this.taskInProgress = shouldKeepBusy;
       this.forceUnlockMonitor('user_stop');
-      if (typeof this.clearProcessedEvents === 'function') {
-        this.clearProcessedEvents();
-      }
 
       // 清理assistant消息的等待动画状态
       const lastMessage = this.messages[this.messages.length - 1];
@@ -629,8 +707,10 @@ export const sendMethods = {
       });
     } finally {
       // 确保清除 dropToolEvents 和 stopRequested 标志
-      this.dropToolEvents = false;
-      this.stopRequested = false;
+      if (owns()) {
+        this.dropToolEvents = false;
+        this.stopRequested = false;
+      }
       this._stopTaskRunning = false;
     }
   }

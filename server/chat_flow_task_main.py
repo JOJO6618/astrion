@@ -496,14 +496,19 @@ def _persist_and_echo_preceding_notice(
         "auto_message_type": "completion_notice",
         **ui_defaults,
     }
+    import uuid
+    payload["message_id"] = str(uuid.uuid4())
     try:
         cm = getattr(web_terminal, "context_manager", None)
         if cm is not None:
-            cm.add_conversation("user", message, metadata=metadata)
+            saved = cm.add_conversation(
+                "user", message, metadata=metadata, message_id=payload["message_id"]
+            )
+            payload["message_id"] = saved["message_id"]
     except Exception as exc:
         debug_log(f"[CompletionNotice] 前置通知写入历史失败: {exc}")
     # 回显经 sender 通道（任务内=任务事件流；poll 轮询器=no-op）；
-    # 轮询客户端统一由后续任务事件流回放，前端按消息内容 dedup 不会双显。
+    # 轮询客户端统一由后续任务事件流回放，前端按 message_id 更新同一消息。
     try:
         echo_payload = {
             "message": message,
@@ -560,7 +565,7 @@ async def _dispatch_completion_user_notice(
             sender=sender,
             conversation_id=conversation_id,
             message=str(item.get("message") or ""),
-            payload=dict(item.get("payload") or {}),
+            payload=item.setdefault("payload", {}),
         )
 
     try:
@@ -1285,7 +1290,7 @@ async def _dispatch_multi_agent_idle_messages(
         preceding_count=max(0, len(parsed_messages) - 1),
     )
     for item in parsed_messages[:-1]:
-        inject_multi_agent_master_message(
+        produced = inject_multi_agent_master_message(
             web_terminal=web_terminal,
             messages=None,
             text=item["text"],
@@ -1293,6 +1298,7 @@ async def _dispatch_multi_agent_idle_messages(
             conversation_id=conversation_id,
             inline=False,
         )
+        item["message_id"] = produced["message_id"] if produced else None
 
     # 1.5) 最后一条只 emit 给在线客户端，不在这里持久化（后续 task handle_task_with_sender
     #      会以这条文本作为 message 创建任务，并写入历史，从而避免重复写入。）
@@ -1382,6 +1388,7 @@ async def _dispatch_multi_agent_idle_messages(
             {
                 "message": item["text"],
                 "payload": {
+                    "message_id": item.get("message_id"),
                     "message_source": "sub_agent",
                     "sub_agent_notice": True,
                     "multi_agent_message": True,
@@ -1603,8 +1610,10 @@ async def handle_task_with_sender(
         message,
         images=images,
         videos=videos,
-        metadata=user_message_metadata
+        metadata=user_message_metadata,
+        message_id=getattr(web_terminal, "_display_trigger_message_id", None),
     )
+    web_terminal._display_trigger_message_id = None
     # 为浅备份 track_edit 提供当前用户消息 ID，避免文件修改被归到上一个输入。
     try:
         web_terminal.context_manager.current_shallow_message_id = (
@@ -1673,6 +1682,8 @@ async def handle_task_with_sender(
                 'user_message',
                 {
                     "message": message,
+                    "message_id": (saved_user_message or {}).get("message_id"),
+                    "is_task_input": True,
                     "images": (saved_user_message or {}).get("images") or images or [],
                     "videos": (saved_user_message or {}).get("videos") or videos or [],
                     "media_refs": (saved_user_message or {}).get("media_refs") or [],

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { beginAuxiliaryRequest } from './auxiliaryOwnership';
 import { t } from '@/locales';
 import { persistWorkspaceMode } from '../state';
 
@@ -10,12 +11,14 @@ const normalizeTrackingMode = (value: any): 'workspace_and_conversation' | 'conv
 
 export const versioningMethods = {
   async fetchVersioningStatus(conversationId = null, options = {}) {
+    const owns = beginAuxiliaryRequest(this, 'version-status');
     const targetId = conversationId || this.currentConversationId;
     const { silent = false } = options as { silent?: boolean };
     if (!targetId) return null;
     try {
       const resp = await fetch(`/api/conversations/${targetId}/versioning`);
       const data = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !data?.success) {
         if (!silent) {
           throw new Error(data?.error || t('appMessages.versioningFetchStatusFailed'));
@@ -30,6 +33,7 @@ export const versioningMethods = {
       this.versioningRestoreMode = 'overwrite';
       return payload;
     } catch (error) {
+      if (!owns()) return;
       if (!silent) {
         this.uiPushToast({
           title: t('common.versioning'),
@@ -42,12 +46,14 @@ export const versioningMethods = {
   },
 
   async fetchVersioningCheckpoints(conversationId = null) {
+    const owns = beginAuxiliaryRequest(this, 'version-list');
     const targetId = conversationId || this.currentConversationId;
     if (!targetId) return [];
     this.versioningLoading = true;
     try {
       const resp = await fetch(`/api/conversations/${targetId}/versioning/checkpoints`);
       const data = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !data?.success) {
         throw new Error(data?.error || t('appMessages.versioningLoadCheckpointsFailed'));
       }
@@ -59,6 +65,7 @@ export const versioningMethods = {
       }
       return items;
     } catch (error) {
+      if (!owns()) return;
       this.uiPushToast({
         title: t('common.versioning'),
         message: error?.message || t('appMessages.versioningLoadCheckpointsFailed'),
@@ -66,7 +73,7 @@ export const versioningMethods = {
       });
       return [];
     } finally {
-      this.versioningLoading = false;
+      if (owns()) this.versioningLoading = false;
     }
   },
 

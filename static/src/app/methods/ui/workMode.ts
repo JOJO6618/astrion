@@ -6,6 +6,7 @@
 // submit_plan 批准后后端自动切到 execute，前端经 plan_approval_resolved 刷新。
 import { t, currentLocale } from '@/locales';
 
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 export const workModeMethods = {
   getWorkModeLabel(mode) {
     void currentLocale.value;
@@ -14,12 +15,14 @@ export const workModeMethods = {
     return hit ? t(hit.labelKey) : mode || t('appUi.unknown');
   },
   async fetchWorkMode() {
+    const owns = beginAuxiliaryRequest(this, 'work-mode');
     try {
       const query = this.currentConversationId
         ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}`
         : '';
       const response = await fetch(`/api/work-mode${query}`);
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
@@ -34,10 +37,12 @@ export const workModeMethods = {
         this.currentExecutionMode = payload.execution_mode;
       }
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
   async changeWorkMode(mode) {
+    const owns = beginAuxiliaryRequest(this, 'work-mode');
     const target = String(mode || '')
       .trim()
       .toLowerCase();
@@ -59,6 +64,7 @@ export const workModeMethods = {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (response.status === 409) {
         throw new Error(payload?.message || t('appUi.workModeRunningMessage'));
       }
@@ -95,6 +101,7 @@ export const workModeMethods = {
         duration: 1800
       });
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error ? error.message : String(error || t('appUi.switchRunModeFailed'));
       this.uiPushToast({
@@ -103,7 +110,7 @@ export const workModeMethods = {
         type: 'error'
       });
     } finally {
-      this.closeWorkModeMenu();
+      if (owns()) this.closeWorkModeMenu();
     }
   },
   toggleWorkModeMenu() {

@@ -8,6 +8,7 @@ import {
 import { usePolicyStore } from '../../../stores/policy';
 import { usePersonalizationStore } from '../../../stores/personalization';
 
+import { beginAuxiliaryRequest, invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
 export const permissionMethods = {
   applyPolicyUiLocks() {
     const policyStore = usePolicyStore();
@@ -44,6 +45,7 @@ export const permissionMethods = {
     return hit ? t(hit.labelKey) : mode || t('appUi.unknown');
   },
   async changePermissionMode(mode) {
+    const owns = beginAuxiliaryRequest(this, 'permission-mode');
     const target = String(mode || '')
       .trim()
       .toLowerCase();
@@ -66,6 +68,7 @@ export const permissionMethods = {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || payload?.error || t('appUi.switchPermissionFailed'));
       }
@@ -85,6 +88,7 @@ export const permissionMethods = {
         duration: 1800
       });
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error ? error.message : String(error || t('appUi.switchPermissionFailed'));
       this.uiPushToast({
@@ -93,10 +97,11 @@ export const permissionMethods = {
         type: 'error'
       });
     } finally {
-      this.closePermissionMenu();
+      if (owns()) this.closePermissionMenu();
     }
   },
   async changeExecutionMode(mode) {
+    const owns = beginAuxiliaryRequest(this, 'execution-mode');
     const target = String(mode || '')
       .trim()
       .toLowerCase();
@@ -116,6 +121,7 @@ export const permissionMethods = {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || payload?.error || t('appUi.switchExecutionModeFailed'));
       }
@@ -131,6 +137,7 @@ export const permissionMethods = {
         duration: 1800
       });
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error
           ? error.message
@@ -143,6 +150,7 @@ export const permissionMethods = {
     }
   },
   async changeNetworkPermission(mode) {
+    const owns = beginAuxiliaryRequest(this, 'network-permission');
     const target = String(mode || '')
       .trim()
       .toLowerCase();
@@ -162,6 +170,7 @@ export const permissionMethods = {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         throw new Error(
           payload?.message || payload?.error || t('appUi.switchNetworkPermissionFailed')
@@ -187,6 +196,7 @@ export const permissionMethods = {
         duration: 1800
       });
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error
           ? error.message
@@ -199,12 +209,14 @@ export const permissionMethods = {
     }
   },
   async fetchNetworkPermission() {
+    const owns = beginAuxiliaryRequest(this, 'network-permission');
     try {
       const query = this.currentConversationId
         ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}`
         : '';
       const response = await fetch(`/api/network-permission${query}`);
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
@@ -215,16 +227,19 @@ export const permissionMethods = {
       this.pendingNetworkPermission =
         typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
   async fetchPermissionMode() {
+    const owns = beginAuxiliaryRequest(this, 'permission-mode');
     try {
       const query = this.currentConversationId
         ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}`
         : '';
       const response = await fetch(`/api/permission-mode${query}`);
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
@@ -234,16 +249,19 @@ export const permissionMethods = {
       this.pendingPermissionMode =
         typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
   async fetchExecutionMode() {
+    const owns = beginAuxiliaryRequest(this, 'execution-mode');
     try {
       const query = this.currentConversationId
         ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}`
         : '';
       const response = await fetch(`/api/execution-mode${query}`);
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
@@ -255,15 +273,18 @@ export const permissionMethods = {
       this.pendingExecutionMode =
         typeof payload.pending_mode === 'string' ? payload.pending_mode : '';
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
   async openPathAuthorizationDialog() {
+    const owns = beginAuxiliaryRequest(this, 'path-authorization');
     if (!this.executionModeEnabled) return;
     this.pathAuthorizationDialogOpen = true;
     try {
       const response = await fetch('/api/path-authorization');
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (response.ok && payload?.success) {
         const writablePaths = Array.isArray(payload.writable_paths) ? payload.writable_paths : [];
         const readableExtraPaths = Array.isArray(payload.readable_extra_paths)
@@ -287,6 +308,7 @@ export const permissionMethods = {
         this.pathAuthorizationDraft = this.pathAuthorizationWorkspaceWritableDraft;
       }
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
@@ -326,9 +348,11 @@ export const permissionMethods = {
     this.pathAuthorizationDraft = this._currentPathAuthorizationDraft();
   },
   closePathAuthorizationDialog() {
+    invalidateAuxiliaryRequest(this, 'path-authorization');
     this.pathAuthorizationDialogOpen = false;
   },
   async savePathAuthorization() {
+    const owns = beginAuxiliaryRequest(this, 'path-authorization');
     this._stashPathAuthorizationDraft();
     const isWorkspace = this.pathAuthorizationScope === 'workspace';
     const toLines = (text) =>
@@ -365,6 +389,7 @@ export const permissionMethods = {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || t('appUi.saveFailed'));
       }
@@ -391,6 +416,7 @@ export const permissionMethods = {
       });
       this.pathAuthorizationDialogOpen = false;
     } catch (error) {
+      if (!owns()) return;
       const msg = error instanceof Error ? error.message : String(error || t('appUi.saveFailed'));
       this.uiPushToast({
         title: t('appUi.savePathAuthorizationFailed'),
@@ -398,10 +424,11 @@ export const permissionMethods = {
         type: 'error'
       });
     } finally {
-      this.pathAuthorizationSaving = false;
+      if (owns()) this.pathAuthorizationSaving = false;
     }
   },
   async fetchPendingToolApprovals() {
+    const owns = beginAuxiliaryRequest(this, 'pending-tool-approvals');
     if (!this.currentConversationId) {
       this.pendingToolApprovals = [];
       return;
@@ -413,6 +440,7 @@ export const permissionMethods = {
         `/api/tool-approvals/pending?conversation_id=${encodeURIComponent(conversationId)}`
       );
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
@@ -449,6 +477,7 @@ export const permissionMethods = {
         this.restoreToolApprovalPanel();
       }
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },

@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { useResourceStore } from '../../../stores/resource';
+import { invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
 export const syncMethods = {
@@ -54,6 +56,7 @@ export const syncMethods = {
   },
   handleTokenUpdate(data: any) {
     if (data.conversation_id === this.currentConversationId) {
+      invalidateAuxiliaryRequest(useResourceStore(), 'token-statistics');
       this.currentConversationTokens.cumulative_input_tokens = data.cumulative_input_tokens || 0;
       this.currentConversationTokens.cumulative_output_tokens = data.cumulative_output_tokens || 0;
       this.currentConversationTokens.cumulative_total_tokens = data.cumulative_total_tokens || 0;

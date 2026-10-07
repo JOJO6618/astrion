@@ -41,15 +41,16 @@ class RuntimeService:
             # 对话级 terminal 上运行。补建对话文件是装配职责，收在服务层单点，
             # Web/CLI/定时触发器等调用方无需各自实现「先建会话再发任务」。
             conversation_id = self._ensure_conversation_for_chat(ctx)
+        if not conversation_id:
+            raise RuntimeError(tr("tasks.conversation_load_failed", error="Missing conversation_id"))
         return task_manager.create_chat_task(ctx, conversation_id=conversation_id)
 
     @staticmethod
     def _ensure_conversation_for_chat(ctx: RuntimeContext) -> Optional[str]:
         """chat 任务未携带 conversation_id 时补建对话文件。
 
-        失败时返回 None（容错语义与原适配层兜底一致：任务线程内
-        ensure_conversation_loaded 仍有最终兜底，但会失去对话级隔离，
-        仅作为极端降级路径存在）。
+        失败时返回 None，由受理层拒绝启动；每个任务必须先确定对话身份，
+        才能取得对话级资源并发布唯一显示快照。
         """
         try:
             from server.context import RuntimeIdentity, get_user_resources
@@ -104,7 +105,7 @@ class RuntimeService:
             try:
                 from server.utils_common import debug_log
 
-                debug_log(f"[RuntimeService] 补建对话失败（继续按无 cid 处理）: {exc}")
+                debug_log(f"[RuntimeService] 补建对话失败（拒绝创建无对话身份的任务）: {exc}")
             except Exception:
                 pass
             return None
@@ -421,10 +422,9 @@ class RuntimeService:
         if not rec:
             return None, None, tr("tasks.task_not_found"), None
         offset = max(0, int(offset or 0))
-        events = task_manager.get_events_since(rec, offset)
-        next_offset = events[-1]["idx"] + 1 if events else offset
-        meta = {"window_start": task_manager.get_event_window_start(rec)}
-        return events, next_offset, None, meta
+        window = task_manager.capture_event_window(rec, offset)
+        meta = {key: window[key] for key in ("window_start", "status", "updated_at")}
+        return window["events"], window["next_offset"], None, meta
 
 
 # 进程级单例（无状态，可安全共享）

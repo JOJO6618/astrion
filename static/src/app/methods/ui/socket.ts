@@ -1,11 +1,13 @@
 // @ts-nocheck
 import { debugLog } from '../common';
 import { t } from '@/locales';
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 import { persistWorkspaceMode } from '../../state';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { isConnectionDiagEnabled, connectionDiag } from './shared';
+import { conversationViewEpoch, currentConversationSession } from '../conversation/session';
 
 export const socketMethods = {
   async initSocket() {
@@ -16,10 +18,13 @@ export const socketMethods = {
   // 任务运行期跳过（运行期状态由任务事件流驱动），空闲期每 5s 一次。
   // 配额轮询已由 resource store 的 UsageQuotaPolling 独立承担，这里不重复。
   async fetchStatusSnapshot() {
+    const session = currentConversationSession(this);
+    const owns = beginAuxiliaryRequest(this, 'status');
     try {
       const res = await fetch('/api/status', { cache: 'no-store' });
       if (!res.ok) return;
       const status = await res.json();
+      if (!owns()) return;
       // 无工作区空态（200 + code）：不是故障，不应用快照、静默跳过
       if (status?.code === 'no_workspace') return;
       this.applyStatusSnapshot(status);
@@ -41,10 +46,17 @@ export const socketMethods = {
           !onIndependentRoute &&
           !desktopTabsEnabled
         ) {
-          this.currentConversationId = status.conversation.current_id;
+          if (!session && !this.historyLoading) {
+            await this.enterConversation(status.conversation.current_id, {
+              workspaceId: this.currentHostWorkspaceId || '',
+              source: 'status',
+              urlMode: 'replace'
+            });
+            return;
+          }
         }
       }
-      if (!onExplicitNewRoute) {
+      if (!onExplicitNewRoute && !this.currentConversationId && !session) {
         if (typeof status.run_mode === 'string') {
           this.runMode = status.run_mode;
         } else if (typeof status.thinking_mode !== 'undefined') {
@@ -278,6 +290,9 @@ export const socketMethods = {
     });
   },
   async loadInitialData() {
+    const startupSession = currentConversationSession(this);
+    const epoch = conversationViewEpoch(this);
+    const owns = () => conversationViewEpoch(this) === epoch;
     try {
       debugLog('加载初始数据...');
 
@@ -290,6 +305,7 @@ export const socketMethods = {
 
       const statusResponse = await fetch('/api/status');
       const statusBody = await statusResponse.json().catch(() => ({}));
+      if (!owns()) return;
       // 零工作区的新部署：/api/status 返回 code=no_workspace（现以 200 表达，
       // 历史上曾用 503，此处按业务码判定与状态码无关，两种形态都兼容）。
       // 此时不能按普通失败中断初始化——host/docker 模式标志只在 status 成功后
@@ -316,13 +332,19 @@ export const socketMethods = {
       this.fetchPendingToolApprovals();
       // 立即更新配额和运行模式，避免等待其他慢接口
       this.fetchUsageQuota();
-      if (statusData && typeof statusData.model_key === 'string') {
+      if (
+        statusData &&
+        typeof statusData.model_key === 'string' &&
+        !currentConversationSession(this) &&
+        !this.currentConversationId
+      ) {
         modelStore.setModel(statusData.model_key);
         this.currentModelKey = modelStore.currentModelKey;
       }
       // 拉取管理员策略
       const policyStore = usePolicyStore();
       await policyStore.fetchPolicy();
+      if (!owns()) return;
       this.applyPolicyUiLocks();
 
       // 加载个性化设置
@@ -338,6 +360,7 @@ export const socketMethods = {
       // 注意：显式新建路由（/new、/multiagent/new）上，后端的“当前对话”
       // 只是上一个对话的残留上下文，不等于本页要创建新对话的意图，
       // 因此此时也必须应用个性化默认值（与“新建空对话”按钮行为一致）。
+      if (!owns()) return;
       const statusConversationIdForDefaults = statusData?.conversation?.current_id;
       const hasActiveConversation =
         typeof statusConversationIdForDefaults === 'string' &&
@@ -349,6 +372,7 @@ export const socketMethods = {
       if (
         personalizationStore.loaded &&
         !this.currentConversationId &&
+        !currentConversationSession(this) &&
         (!hasActiveConversation || isExplicitNewRouteForDefaults)
       ) {
         const defaultRunMode = personalizationStore.form.default_run_mode;
@@ -398,10 +422,13 @@ export const socketMethods = {
         this.hostWorkspaceCreateSubmitting = false;
       }
 
+      if (!owns()) return;
       // 获取当前对话信息
       const isExplicitNewRoute = this.isExplicitNewConversationRoute();
-      const runningConversationId = await this.getRunningTaskConversationId();
       const statusConversationId = statusData.conversation && statusData.conversation.current_id;
+      const runningConversationId = statusConversationId
+        ? null
+        : await this.getRunningTaskConversationId();
       const resumeConversationId = statusConversationId || runningConversationId;
       const currentPath = window.location.pathname.replace(/^\/+/, '');
       const isMultiAgentNewRoute = currentPath === 'multiagent/new' || currentPath === 'multiagent';
@@ -412,61 +439,21 @@ export const socketMethods = {
       // 桌面端标签条模式同样禁用：恢复权威是持久化标签列表而非后端单槽位状态。
       if (
         resumeConversationId &&
+        !startupSession &&
+        owns() &&
+        currentConversationSession(this) === startupSession &&
+        !this.historyLoading &&
         !this.currentConversationId &&
         !isMultiAgentNewRoute &&
         !isExplicitNewRoute &&
         !this.isConversationIndependentRoute() &&
         !(window as any).__ASTRION_DESKTOP__
       ) {
-        this.skipConversationHistoryReload = true;
-        // 首次从状态恢复对话时，避免 socket 的 conversation_loaded 再次触发历史加载
-        this.skipConversationLoadedEvent = true;
-        this.suppressTitleTyping = true;
-        this.titleReady = false;
-        this.currentConversationTitle = '';
-        this.titleTypingText = '';
-        this.currentConversationId = resumeConversationId;
-        const pathFragment = this.stripConversationPrefix(resumeConversationId);
-        const currentPath = window.location.pathname.replace(/^\/+/, '');
-        if (currentPath !== pathFragment) {
-          history.replaceState({ conversationId: resumeConversationId }, '', `/${pathFragment}`);
-        }
-
-        // 如果有当前对话，尝试获取标题和历史
-        try {
-          const convResponse = await fetch(`/api/conversations/current`);
-          const convData = await convResponse.json();
-          if (convData.success && convData.data) {
-            this.currentConversationTitle = convData.data.title;
-            this.titleReady = true;
-            this.suppressTitleTyping = false;
-            this.startTitleTyping(this.currentConversationTitle, { animate: false });
-          } else {
-            this.titleReady = true;
-            this.suppressTitleTyping = false;
-            const fallbackTitle = this.currentConversationTitle || t('common.newConversation');
-            this.currentConversationTitle = fallbackTitle;
-            this.startTitleTyping(fallbackTitle, { animate: false });
-          }
-          // 初始化时调用一次，因为 skipConversationHistoryReload 会阻止 watch 触发
-          if (
-            this.lastHistoryLoadedConversationId !== this.currentConversationId ||
-            !Array.isArray(this.messages) ||
-            this.messages.length === 0
-          ) {
-            await this.fetchAndDisplayHistory();
-          }
-          // 获取当前对话的Token统计
-          this.fetchConversationTokenStatistics();
-          this.updateCurrentContextTokens();
-          await this.fetchVersioningStatus(this.currentConversationId, { silent: true });
-          this.fetchPendingUserQuestions();
-        } catch (e) {
-          console.warn('获取当前对话标题失败:', e);
-          this.titleReady = true;
-          this.suppressTitleTyping = false;
-          this.startTitleTyping(this.currentConversationTitle || t('common.newConversation'), '');
-        }
+        await this.enterConversation(resumeConversationId, {
+          workspaceId: this.currentHostWorkspaceId || '',
+          source: 'startup',
+          urlMode: 'replace'
+        });
       }
 
       // 待办数据依赖当前会话上下文，放在会话恢复/切换之后拉取，避免初始化早期拿到空快照
@@ -486,6 +473,7 @@ export const socketMethods = {
 
       debugLog('初始数据加载完成');
     } catch (error) {
+      if (!owns()) return;
       console.error('加载初始数据失败:', error);
       this.isConnected = false;
     }

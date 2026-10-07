@@ -1,4 +1,9 @@
 // @ts-nocheck
+import {
+  beginAuxiliaryRequest,
+  captureConversationView,
+  invalidateAuxiliaryRequest
+} from '../auxiliaryOwnership';
 import { t } from '@/locales';
 import { normalizeApproval } from '@/components/input/approvalModel';
 
@@ -25,6 +30,7 @@ export const dialogMethods = {
     this.userQuestionMinimized = false;
   },
   async fetchPendingUserQuestions() {
+    const owns = beginAuxiliaryRequest(this, 'user-questions');
     if (!this.currentConversationId) {
       this.pendingUserQuestions = [];
       return;
@@ -34,6 +40,7 @@ export const dialogMethods = {
         `/api/user-questions/pending?conversation_id=${encodeURIComponent(this.currentConversationId)}`
       );
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
@@ -50,6 +57,7 @@ export const dialogMethods = {
         this.userQuestionActiveIndex = 0;
       }
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
@@ -57,6 +65,7 @@ export const dialogMethods = {
     return this.decideToolApproval(approvalId, 'approved');
   },
   async fetchPendingPlanApprovals() {
+    const owns = beginAuxiliaryRequest(this, 'plan-approvals');
     if (!this.currentConversationId) {
       this.pendingPlanApprovals = [];
       return;
@@ -66,11 +75,13 @@ export const dialogMethods = {
         `/api/plan-approvals/pending?conversation_id=${encodeURIComponent(this.currentConversationId)}`
       );
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         return;
       }
       this.pendingPlanApprovals = Array.isArray(payload.items) ? payload.items : [];
     } catch (_error) {
+      if (!owns()) return;
       // ignore
     }
   },
@@ -87,6 +98,7 @@ export const dialogMethods = {
     this.planApprovalMinimized = false;
   },
   async submitPlanApproval(payload) {
+    const owns = beginAuxiliaryRequest(this, 'plan-answer');
     const approvalId = String(payload?.approval_id || '').trim();
     if (!approvalId) {
       return;
@@ -102,9 +114,11 @@ export const dialogMethods = {
         })
       });
       const result = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !result?.success) {
         throw new Error(result?.message || result?.error || t('appUi.submitPlanDecisionFailed'));
       }
+      invalidateAuxiliaryRequest(this, 'plan-approvals');
       this.pendingPlanApprovals = (this.pendingPlanApprovals || []).filter(
         (item) => item && String(item.approval_id || '') !== approvalId
       );
@@ -128,13 +142,14 @@ export const dialogMethods = {
         });
       }
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error
           ? error.message
           : String(error || t('appUi.submitPlanDecisionFailed'));
       this.uiPushToast({ title: t('appUi.submitPlanDecisionFailed'), message: msg, type: 'error' });
     } finally {
-      this.answeringPlanApprovalIds = [];
+      if (owns()) this.answeringPlanApprovalIds = [];
     }
   },
   rejectToolApproval(approvalId) {
@@ -190,6 +205,7 @@ export const dialogMethods = {
     return this.uiRequestConfirm(options);
   },
   async submitUserQuestionAnswers(answers) {
+    const owns = beginAuxiliaryRequest(this, 'question-answer');
     const list = Array.isArray(answers) ? answers : [];
     if (!list.length) {
       return;
@@ -215,10 +231,12 @@ export const dialogMethods = {
           }
         );
         const payload = await response.json().catch(() => ({}));
+        if (!owns()) return;
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.message || payload?.error || t('appUi.submitAnswerFailed'));
         }
       }
+      invalidateAuxiliaryRequest(this, 'user-questions');
       this.pendingUserQuestions = (this.pendingUserQuestions || []).filter(
         (item) => item && !ids.includes(String(item.question_id || ''))
       );
@@ -236,11 +254,12 @@ export const dialogMethods = {
         );
       }
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error ? error.message : String(error || t('appUi.submitAnswerFailed'));
       this.uiPushToast({ title: t('appUi.submitAnswerFailed'), message: msg, type: 'error' });
     } finally {
-      this.answeringUserQuestionIds = [];
+      if (owns()) this.answeringUserQuestionIds = [];
     }
   },
   // 用户点击「不回答」：只将当前查看的这个问题标记为 dismissed，其余问题保持待回答。
@@ -253,6 +272,7 @@ export const dialogMethods = {
     await this.submitUserQuestionAnswers([{ question_id: id, dismissed: true }]);
   },
   async answerUserQuestionFromComposer(text) {
+    const owns = captureConversationView(this);
     const clean = String(text || '').trim();
     if (!clean || !Array.isArray(this.pendingUserQuestions) || !this.pendingUserQuestions.length) {
       return false;
@@ -266,6 +286,7 @@ export const dialogMethods = {
       return false;
     }
     await this.submitUserQuestionAnswers([{ question_id: question.question_id, text: clean }]);
+    if (!owns()) return false;
     if (this.pendingUserQuestions.length > 0) {
       this.userQuestionDialogVisible = true;
       this.userQuestionMinimized = false;
@@ -273,6 +294,7 @@ export const dialogMethods = {
     return true;
   },
   async decideToolApproval(approvalId, decision) {
+    const owns = beginAuxiliaryRequest(this, 'tool-decision');
     const id = String(approvalId || '').trim();
     if (!id) {
       return;
@@ -291,6 +313,7 @@ export const dialogMethods = {
         body: JSON.stringify({ decision })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns()) return;
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || payload?.error || t('appUi.submitApprovalFailed'));
       }
@@ -311,6 +334,7 @@ export const dialogMethods = {
           : item
       );
     } catch (error) {
+      if (!owns()) return;
       const msg =
         error instanceof Error ? error.message : String(error || t('appUi.approvalFailed'));
       this.uiPushToast({
@@ -319,7 +343,8 @@ export const dialogMethods = {
         type: 'error'
       });
     } finally {
-      this.decidingApprovalIds = (this.decidingApprovalIds || []).filter((item) => item !== id);
+      if (owns())
+        this.decidingApprovalIds = (this.decidingApprovalIds || []).filter((item) => item !== id);
     }
   }
 };

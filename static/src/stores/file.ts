@@ -1,3 +1,7 @@
+import {
+  beginAuxiliaryStoreRequest,
+  invalidateAuxiliaryRequest
+} from '../app/methods/auxiliaryOwnership';
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
 import { useConversationStore } from './conversation';
@@ -171,6 +175,7 @@ export const useFileStore = defineStore('file', {
       };
     },
     async fetchTodoList() {
+      const owns = beginAuxiliaryStoreRequest(this, 'todo');
       // /new 等无对话场景：待办是对话级数据，直接清空不发请求。
       // 不带 id 时后端返回工作区级服务 terminal——它可能被 /new 首条消息的
       // 任务污染而持有最近对话的待办，会导致 /new 页面残留老待办。
@@ -183,6 +188,7 @@ export const useFileStore = defineStore('file', {
         const url = `/api/todo-list?conversation_id=${encodeURIComponent(convId)}`;
         const response = await fetch(url);
         const data = await response.json();
+        if (!owns()) return;
         if (data && data.success) {
           // 顺序同 setTodoList：先写 live 标记（REST 拉取一律静态），再写数据
           this.todoListLive = false;
@@ -190,10 +196,12 @@ export const useFileStore = defineStore('file', {
           this.todoSyncSeq += 1;
         }
       } catch (error) {
+        if (!owns()) return;
         console.error('获取待办列表失败:', error);
       }
     },
     setTodoList(payload: TodoList | null, live = false) {
+      invalidateAuxiliaryRequest(this, 'todo');
       // 必须先写 live 标记再写数据：TodoWindow 的 watch 是 flush:'sync'，
       // todoList 一赋值就同步触发并读取 todoListLive；顺序颠倒会让 watch
       // 读到上一次调用残留的旧值，动画路径（划线/圆点弹跳）永远走不到。

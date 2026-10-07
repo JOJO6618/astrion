@@ -20,6 +20,7 @@ def _is_not_found_message(text) -> bool:
 
 
 from modules.i18n import tr
+from server.conversation_view.snapshots import view_transaction
 from pathlib import Path
 from collections import defaultdict, Counter, deque
 from io import BytesIO
@@ -226,7 +227,9 @@ def _normalize_conv_id(conversation_id: str) -> str:
     return conv if conv.startswith("conv_") else f"conv_{conv}"
 
 
-def _sync_restored_conversation_memory(conversation_id: str) -> None:
+def _sync_restored_conversation_memory(
+    conversation_id: str, *, username: str, workspace_id: str, manager
+) -> None:
     """版本回溯后同步内存实例：把绑定该对话的对话级 terminal 内存替换为磁盘最新。
 
     回溯用 allow_shrink 覆写裁短磁盘；若持有旧（更长）历史的对话级实例之后保存，
@@ -238,6 +241,8 @@ def _sync_restored_conversation_memory(conversation_id: str) -> None:
     from server import state as server_state
 
     normalized = _normalize_conv_id(conversation_id)
+    from server.tasks import task_manager
+    task_manager.invalidate_display(normalized, username=username, workspace_id=workspace_id)
     user_terminals = getattr(server_state, "user_terminals", None) or {}
     for term_key, term in list(user_terminals.items()):
         try:
@@ -248,6 +253,8 @@ def _sync_restored_conversation_memory(conversation_id: str) -> None:
             if ctx is None:
                 continue
             target_manager = ctx._get_conversation_manager_for_id(normalized)
+            if target_manager.conversations_dir.resolve() != manager.conversations_dir.resolve():
+                continue
             data = target_manager.load_conversation(normalized) or {}
             ctx.conversation_history = list(data.get("messages") or [])
             ctx.conversation_metadata = deepcopy(data.get("metadata") or {})
@@ -1626,6 +1633,7 @@ def _restore_checkpoint_to_conversation(
 @conversation_bp.route('/api/conversations/<conversation_id>/versioning/restore', methods=['POST'])
 @api_login_required
 @with_terminal
+@view_transaction
 def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     try:
         normalized_id = _normalize_conv_id(conversation_id)
@@ -1685,7 +1693,10 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
         # terminal 常驻 24h），否则旧内存后续保存经 merge 会把被裁消息「救回」，回溯被撤销。
         # copy 场景目标是新对话，无缓存实例，无需处理。
         if restore_mode == "overwrite":
-            _sync_restored_conversation_memory(target_conversation_id)
+            _sync_restored_conversation_memory(
+                target_conversation_id, username=username, workspace_id=workspace.workspace_id,
+                manager=terminal.context_manager._get_conversation_manager_for_id(target_conversation_id),
+            )
 
         # 恢复模式与焦点到当前（工作区级）terminal；服务实例不挂载历史，仅读磁盘元数据
         terminal.load_conversation(target_conversation_id)

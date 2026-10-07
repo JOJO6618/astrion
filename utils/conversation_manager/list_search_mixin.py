@@ -1,6 +1,7 @@
 # utils/conversation_manager.py - 对话持久化管理器（集成Token统计）
 
 import json
+from utils.conversation_manager.locking import locked_write
 import os
 import re
 import time
@@ -265,6 +266,7 @@ class ListSearchMixin:
             print(f"⌘ 搜索对话摘要失败: {e}")
             return []
 
+    @locked_write
     def delete_conversation(self, conversation_id: str) -> bool:
         """
         删除对话
@@ -297,6 +299,7 @@ class ListSearchMixin:
             print(f"⌘ 删除对话失败 {conversation_id}: {e}")
             return False
 
+    @locked_write
     def archive_conversation(self, conversation_id: str) -> bool:
         """
         归档对话（标记为已归档，不删除）

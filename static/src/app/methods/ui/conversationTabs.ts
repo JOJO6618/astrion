@@ -197,6 +197,8 @@ export const conversationTabsMethods = {
   /** SPA 方式进入 /new 空态：chrome 标签条常驻顶部，主页面切换不整页刷新，
    *  避免旧方案 location.href 跳转的全屏闪白与标签条重建。 */
   enterNewConversationPage() {
+    this.leaveConversationView();
+    this.clearLocalTaskUiState?.('chrome-tabs:enter-new');
     // 独立全屏路由（设置/工作流）没有对话体系状态，只能整跳回 /new
     if (this.isConversationIndependentRoute?.()) {
       useConversationTabsStore().persistNow();

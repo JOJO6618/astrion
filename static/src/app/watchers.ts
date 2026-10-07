@@ -4,6 +4,7 @@ import { useConversationStore } from '../stores/conversation';
 import { useQuickDockStore } from '../stores/quickDock';
 import { usePreviewStore } from '../stores/preview';
 import { useFileStore } from '../stores/file';
+import { currentConversationSession } from './methods/conversation/session';
 
 export const watchers = {
   inputMessage() {
@@ -75,6 +76,8 @@ export const watchers = {
         // 同步到 conversationStore（QuickDock 等组件监听 store 侧的 id）
         useConversationStore().setCurrentConversationId(newValue || null);
         if (!newValue) {
+          const session = currentConversationSession(this);
+          if (session?.conversationId && !this.historyLoading) this.leaveConversationView();
           // 空对话态：对话类型复位（进入对话时由 enterConversation 从 metadata 落地）
           this.currentConversationType = null;
           useConversationStore().$patch({ multiAgentMode: false });
@@ -94,22 +97,18 @@ export const watchers = {
       }
       debugLog('currentConversationId 变化', {
         oldValue,
-        newValue,
-        skipConversationHistoryReload: this.skipConversationHistoryReload
+        newValue
       });
       traceLog('watch:currentConversationId', {
         oldValue,
         newValue,
-        skipConversationHistoryReload: this.skipConversationHistoryReload,
         historyLoading: this.historyLoading,
-        historyLoadingFor: this.historyLoadingFor,
-        historyLoadSeq: this.historyLoadSeq
+        historyLoadingFor: this.historyLoadingFor
       });
       this.refreshBlankHeroState();
       this.logMessageState('watch:currentConversationId', {
         oldValue,
-        newValue,
-        skipConversationHistoryReload: this.skipConversationHistoryReload
+        newValue
       });
       if (
         oldValue !== newValue &&
@@ -127,14 +126,7 @@ export const watchers = {
         return;
       }
       this.fetchVersioningStatus(newValue, { silent: true });
-      if (this.skipConversationHistoryReload) {
-        this.skipConversationHistoryReload = false;
-        return;
-      }
-      if (oldValue && newValue === oldValue) {
-        return;
-      }
-      this.fetchAndDisplayHistory();
+      // Navigation owns snapshot loading; changing the selected id never starts a second loader.
       this.fetchConversationTokenStatistics();
       this.updateCurrentContextTokens();
     }

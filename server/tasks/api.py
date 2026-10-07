@@ -242,9 +242,9 @@ def get_task_api(task_id: str):
         "data": {
             "task_id": rec.task_id,
             "workspace_id": rec.workspace_id,
-            "status": rec.status,
+            "status": (ev_meta or {}).get("status", rec.status),
             "created_at": rec.created_at,
-            "updated_at": rec.updated_at,
+            "updated_at": (ev_meta or {}).get("updated_at", rec.updated_at),
             "message": rec.message,
             "conversation_id": rec.conversation_id,
             "error": rec.error,

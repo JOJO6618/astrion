@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from utils.conversation_manager.locking import locked_write
 try:
     from config import DATA_DIR, HOST_WORKSPACES_FILE
 except ImportError:
@@ -49,6 +50,7 @@ class ConversationMetadata:
 class CrudMixin:
     """ConversationManager crud mixin 能力 mixin。"""
 
+    @locked_write
     def create_conversation(
         self,
         project_path: str,
@@ -150,6 +152,7 @@ class CrudMixin:
 
         return conversation_id
 
+    @locked_write
     def update_conversation_metadata(self, conversation_id: str, updates: Dict[str, Any]) -> bool:
         """合并更新对话 metadata。"""
         if not conversation_id or not isinstance(updates, dict):
@@ -169,6 +172,7 @@ class CrudMixin:
             print(f"⚠️ 更新对话 metadata 失败 {conversation_id}: {exc}")
             return False
 
+    @locked_write
     def update_conversation_title(self, conversation_id: str, title: str) -> bool:
         """更新对话标题并刷新索引。"""
         if not conversation_id or not title:
@@ -201,6 +205,7 @@ class CrudMixin:
                 self._atomic_write_json(file_path, data)
         except Exception as e:
             print(f"⌘ 保存对话文件失败 {conversation_id}: {e}")
+            raise
 
     def _update_index(self, conversation_id: str, conversation_data: Dict):
         """更新对话索引"""
@@ -250,6 +255,7 @@ class CrudMixin:
                 self._save_index(index)
         except Exception as e:
             print(f"⌘ 更新对话索引失败: {e}")
+            raise
 
     @staticmethod
     def _merge_messages_by_id(disk_messages: List[Dict], new_messages: List[Dict]):
@@ -298,6 +304,7 @@ class CrudMixin:
                 appended += 1
         return merged, appended, healed
 
+    @locked_write
     def save_conversation(
         self, 
         conversation_id: str, 
@@ -458,6 +465,7 @@ class CrudMixin:
             print(f"⌘ 保存对话失败 {conversation_id}: {e}")
             return False
 
+    @locked_write
     def mark_latest_user_work_completed(
         self,
         conversation_id: str,
@@ -562,6 +570,7 @@ class CrudMixin:
 
         return False
 
+    @locked_write
     def update_project_snapshot(
         self,
         conversation_id: str,
@@ -589,90 +598,34 @@ class CrudMixin:
             print(f"⌘ 更新项目快照失败 {conversation_id}: {exc}")
             return False
 
-    def load_conversation(self, conversation_id: str) -> Optional[Dict]:
-        """
-        加载对话数据
-        
-        Args:
-            conversation_id: 对话ID
-        
-        Returns:
-            Dict: 对话数据，如果不存在返回None
-        """
+    def read_conversation(self, conversation_id: str) -> Optional[Dict]:
+        """Read a detached snapshot. Reading never rewrites the conversation or index."""
         try:
             file_path = self._get_conversation_file_path(conversation_id)
-            if not file_path.exists():
-                return None
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if not content:
+            with self._io_lock:
+                if not file_path.exists():
                     return None
-                
-                data = json.loads(content)
-
-                metadata = data.get("metadata", {})
-                if "project_relative_path" not in metadata:
-                    metadata["project_relative_path"] = None
-                    self._save_conversation_file(conversation_id, data)
-                    print(f"🔧 为对话 {conversation_id} 添加相对路径字段")
-
-                # 向后兼容：确保Token统计结构存在
-                if "token_statistics" not in data:
-                    data["token_statistics"] = self._initialize_token_statistics()
-                    # 自动保存修复后的数据
-                    self._save_conversation_file(conversation_id, data)
-                    print(f"🔧 为对话 {conversation_id} 添加Token统计结构")
-                else:
-                    # 验证现有Token统计数据
-                    data = self._validate_token_statistics(data)
-                
-                if "run_mode" not in metadata:
-                    metadata["run_mode"] = "thinking" if metadata.get("thinking_mode") else "fast"
-                    self._save_conversation_file(conversation_id, data)
-                    print(f"🔧 为对话 {conversation_id} 添加运行模式字段")
-                
-                # 确保项目快照字段存在（向后兼容）
-                changed = False
-                if "project_file_tree" not in metadata:
-                    metadata["project_file_tree"] = None
-                    changed = True
-                if "project_statistics" not in metadata:
-                    metadata["project_statistics"] = None
-                    changed = True
-                if "project_snapshot_at" not in metadata:
-                    metadata["project_snapshot_at"] = None
-                    changed = True
-                if changed:
-                    data["metadata"] = metadata
-                    self._save_conversation_file(conversation_id, data)
-                    print(f"🔧 为对话 {conversation_id} 补齐项目快照字段")
-
-                # 兼容历史口径：旧版本 total_tools 可能把 role=tool 也计入，导致翻倍。
-                expected_total_tools = self._count_tools_in_messages(data.get("messages") or [])
-                if int(metadata.get("total_tools", 0) or 0) != expected_total_tools:
-                    metadata["total_tools"] = expected_total_tools
-                    data["metadata"] = metadata
-                    self._save_conversation_file(conversation_id, data)
-                    self._update_index(conversation_id, data)
-                    print(f"🔧 修正对话 {conversation_id} 的 total_tools 统计为 {expected_total_tools}")
-                
-                # 回填缺失的模型字段：从最近的助手消息元数据推断
-                if metadata.get("model_key") is None:
-                    inferred_model = None
-                    for msg in reversed(data.get("messages") or []):
-                        if msg.get("role") != "assistant":
-                            continue
-                        mk = (msg.get("metadata") or {}).get("model_key")
-                        if mk:
-                            inferred_model = mk
-                            break
-                    if inferred_model is not None:
-                        metadata["model_key"] = inferred_model
-                        self._save_conversation_file(conversation_id, data)
-                        print(f"🔧 为对话 {conversation_id} 回填模型字段: {inferred_model}")
-                
-                return data
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"⌘ 加载对话失败 {conversation_id}: {e}")
+                with open(file_path, 'r', encoding='utf-8') as stream:
+                    data = json.load(stream)
+            if not isinstance(data, dict):
+                return None
+            metadata = data.setdefault("metadata", {})
+            metadata.setdefault("project_relative_path", None)
+            metadata.setdefault("run_mode", "thinking" if metadata.get("thinking_mode") else "fast")
+            for key in ("project_file_tree", "project_statistics", "project_snapshot_at"):
+                metadata.setdefault(key, None)
+            metadata["total_tools"] = self._count_tools_in_messages(data.get("messages") or [])
+            if metadata.get("model_key") is None:
+                for message in reversed(data.get("messages") or []):
+                    model = (message.get("metadata") or {}).get("model_key")
+                    if message.get("role") == "assistant" and model:
+                        metadata["model_key"] = model
+                        break
+            data.setdefault("token_statistics", self._initialize_token_statistics())
+            return self._validate_token_statistics(data)
+        except (OSError, ValueError, TypeError):
             return None
+
+    def load_conversation(self, conversation_id: str) -> Optional[Dict]:
+        """Compatibility name for the read-only conversation snapshot."""
+        return self.read_conversation(conversation_id)

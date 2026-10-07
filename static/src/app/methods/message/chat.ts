@@ -1,15 +1,19 @@
 // @ts-nocheck
 import { t } from '@/locales';
+import { useTaskStore } from '../../../stores/task';
+import { ownsConversationSession } from '../conversation/session';
+import { ensureMessageSession, createOwnedMessageTask } from './send';
 
 export const chatMethods = {
   async clearChat() {
+    const session = ensureMessageSession(this);
     const confirmed = await this.confirmAction({
       title: t('appMessages.clearChatTitle'),
       message: t('appMessages.clearChatConfirmMessage'),
       confirmText: t('appMessages.clearChatConfirmText'),
       cancelText: t('common.cancel')
     });
-    if (confirmed) {
+    if (confirmed && ownsConversationSession(this, session)) {
       await this.executeSystemCommand('/clear', { showToast: false });
     }
   },
@@ -27,6 +31,8 @@ export const chatMethods = {
       return;
     }
     const conversationId = this.currentConversationId;
+    const session = ensureMessageSession(this);
+    const owns = () => ownsConversationSession(this, session);
     let accepted = false;
     this.compressing = true;
     this.compressionInProgress = true;
@@ -48,23 +54,20 @@ export const chatMethods = {
 
     try {
       const response = await fetch(`/api/conversations/${conversationId}/compress`, {
-        method: 'POST'
+        method: 'POST',
+        signal: session.controller.signal
       });
 
       const result = await response.json();
+      if (!owns()) return;
 
       if (response.ok && result.success && result.data?.task_id) {
         accepted = true;
-        const { useTaskStore } = await import('../../../stores/task');
-        if (this.currentConversationId === conversationId) {
-          this.taskInProgress = true;
-          this.stopRequested = false;
-          this.clearProcessedEvents();
-          useTaskStore().resumeTask(result.data.task_id, {
-            status: 'running',
-            eventHandler: (event: any) => this.handleTaskEvent(event)
-          });
-        }
+        this.taskInProgress = true;
+        this.stopRequested = false;
+        useTaskStore().attachSnapshot(result.data, 0, (event: any) => {
+          if (owns()) this.handleTaskEvent(event);
+        });
         await this.refreshRunningWorkspaceTasks?.();
       } else {
         const message = result.message || result.error || t('appMessages.compressionFailed');
@@ -76,6 +79,7 @@ export const chatMethods = {
         });
       }
     } catch (error) {
+      if (!owns()) return;
       console.error('压缩对话异常:', error);
       this.compressionError = error.message || t('common.retryLater');
       this.uiPushToast({
@@ -84,9 +88,9 @@ export const chatMethods = {
         type: 'error'
       });
     } finally {
-      this.compressing = false;
+      if (owns()) this.compressing = false;
       // 受理成功后由任务事件结束压缩状态；切换对话不接管原对话。
-      if (!accepted && this.currentConversationId === conversationId) {
+      if (!accepted && owns()) {
         this.handleCompressionState({ conversation_id: conversationId, in_progress: false });
       }
     }
@@ -101,23 +105,28 @@ export const chatMethods = {
       this.showQuotaToast({ type: quotaType });
       return false;
     }
+    const session = ensureMessageSession(this);
+    const owns = () => ownsConversationSession(this, session);
     this.taskInProgress = true;
-    this.chatAddUserMessage(message, [], [], [], 'user');
+    const optimisticUser = this.chatAddUserMessage(message, [], [], [], 'user');
     this.chatStartAssistantMessage();
     this.stopRequested = false;
     if (typeof this.monitorShowPendingReply === 'function') {
       this.monitorShowPendingReply();
     }
     try {
-      const { useTaskStore } = await import('../../../stores/task');
-      const taskStore = useTaskStore();
-      if (typeof this.clearProcessedEvents === 'function') {
-        this.clearProcessedEvents();
-      }
-      await taskStore.createTask(message, [], [], this.currentConversationId, {
-        eventHandler: (event: any) => this.handleTaskEvent(event)
-      });
+      const created = await createOwnedMessageTask(
+        this,
+        session,
+        optimisticUser,
+        message,
+        [],
+        [],
+        this.currentConversationId
+      );
+      if (!created || !owns()) return false;
     } catch (error) {
+      if (!owns()) return false;
       console.error('[Message] 自动消息创建任务失败:', error);
       this.uiPushToast({
         title: t('appMessages.sendFailedTitle'),
@@ -139,7 +148,7 @@ export const chatMethods = {
     }
     this.autoResizeInput();
     setTimeout(() => {
-      if (this.currentConversationId) {
+      if (owns()) {
         this.updateCurrentContextTokens();
       }
     }, 1000);

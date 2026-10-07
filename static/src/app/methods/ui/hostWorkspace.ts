@@ -1,8 +1,17 @@
 // @ts-nocheck
 import { t } from '@/locales';
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
+import { useConversationStore } from '../../../stores/conversation';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
+import {
+  conversationViewEpoch,
+  currentConversationSession,
+  ownsConversationSession
+} from '../conversation/session';
 
 export const hostWorkspaceMethods = {
   async fetchHostWorkspaces() {
+    const owns = beginAuxiliaryRequest(this, 'host-workspaces');
     if (!(this.versioningHostMode || this.dockerProjectMode)) {
       this.hostWorkspaces = [];
       this.currentHostWorkspaceId = '';
@@ -12,6 +21,7 @@ export const hostWorkspaceMethods = {
     try {
       const resp = await fetch(this.versioningHostMode ? '/api/host/workspaces' : '/api/projects');
       const payload = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !payload?.success) {
         throw new Error(payload?.error || t('appUi.fetchProjectsFailed'));
       }
@@ -28,6 +38,7 @@ export const hostWorkspaceMethods = {
       this.defaultHostWorkspaceId = String(data.default_workspace_id || '');
       await this.refreshRunningWorkspaceTasks();
     } catch (error) {
+      if (!owns()) return;
       console.warn('加载工作区/项目失败:', error);
       this.hostWorkspaces = [];
       this.currentHostWorkspaceId = '';
@@ -51,6 +62,12 @@ export const hostWorkspaceMethods = {
       return;
     }
 
+    if (!options.session) this.leaveConversationView();
+    const session = options.session;
+    const epoch = conversationViewEpoch(this);
+    const owns = () =>
+      session ? ownsConversationSession(this, session) : conversationViewEpoch(this) === epoch;
+    if (!owns()) return;
     this.hostWorkspaceSwitching = true;
     const previousConversationList = Array.isArray(this.conversations)
       ? [...this.conversations]
@@ -59,7 +76,6 @@ export const hostWorkspaceMethods = {
     this.searchActive = false;
     this.searchResults = [];
     /* 主列表是当前工作区作用域：切换前使双类型缓存整体失效（conversations 重指空缓存） */
-    const { useConversationStore } = await import('../../../stores/conversation');
     useConversationStore().resetConversationsTypeCache();
     this.conversationsOffset = 0;
     this.hasMoreConversations = false;
@@ -73,12 +89,14 @@ export const hostWorkspaceMethods = {
         keepalive: true
       }).catch(() => {});
 
+      if (!owns()) return;
       const query = encodeURIComponent(targetId);
       const selectEndpoint = this.versioningHostMode
         ? '/api/host/workspaces/select'
         : '/api/projects/select';
       const resp = await fetch(`${selectEndpoint}?workspace_id=${query}`);
       const payload = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !payload?.success) {
         throw new Error(
           payload?.error ||
@@ -102,16 +120,10 @@ export const hostWorkspaceMethods = {
         this.currentConversationTitle = t('common.newConversation');
         this.titleReady = true;
         this.suppressTitleTyping = false;
-        try {
-          const { useTaskStore } = await import('../../../stores/task');
-          const taskStore = useTaskStore();
-          taskStore.clearTask();
-        } catch (_) {
-          // 容错：任务 store 动态加载/清理失败不影响工作区切换主流程
-        }
         this.clearLocalTaskUiState?.('switch-host-workspace');
       }
       await this.fetchHostWorkspaces();
+      if (!owns()) return;
       if (preserveConversationView) {
         // 不做视图跳转（/new 或自动进入运行中任务对话），仅刷新侧边栏列表
         this.conversationsOffset = 0;
@@ -149,6 +161,7 @@ export const hostWorkspaceMethods = {
       this.refreshProjectGitSummary?.();
       this.fetchTerminalCount();
     } catch (error) {
+      if (!owns()) return;
       /* 切换失败仍在旧工作区：恢复旧列表并同步回当前类型缓存，保持引用一致 */
       const conversationStore = useConversationStore();
       const restoredCache =
@@ -205,6 +218,7 @@ export const hostWorkspaceMethods = {
         }
       );
       const payload = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !payload?.success) {
         throw new Error(
           payload?.error ||
@@ -341,28 +355,33 @@ export const hostWorkspaceMethods = {
         throw new Error(result?.error || t('appUi.deleteFailed'));
       }
       const data = result.data || {};
+      const leavingCurrent = wasCurrent && workspaceId === this.currentHostWorkspaceId;
+      if (leavingCurrent) {
+        this.leaveConversationView();
+        this.clearLocalTaskUiState?.('delete-host-workspace');
+      }
+      if (!leavingCurrent && wasCurrent) return;
       this.currentHostWorkspaceId = String(
         data.current_workspace_id || this.currentHostWorkspaceId || ''
       );
       if (data.default_workspace_id) {
         this.defaultHostWorkspaceId = String(data.default_workspace_id);
       }
-      await this.fetchHostWorkspaces();
-      if (wasCurrent) {
+      if (leavingCurrent) {
         this.messages = [];
         this.currentConversationId = null;
         this.currentConversationTitle = t('common.newConversation');
         this.searchActive = false;
         this.searchResults = [];
         /* 当前工作区已删除：双类型缓存整体失效后重新加载 */
-        const { useConversationStore } = await import('../../../stores/conversation');
         useConversationStore().resetConversationsTypeCache();
         this.conversationsOffset = 0;
         this.hasMoreConversations = false;
         this.conversationsLoading = true;
         history.replaceState({}, '', '/new');
-        await this.loadConversationsList();
       }
+      await this.fetchHostWorkspaces();
+      if (leavingCurrent && !currentConversationSession(this)) await this.loadConversationsList();
       this.uiPushToast({
         title: this.versioningHostMode ? t('appUi.workspaceDeleted') : t('appUi.projectDeleted'),
         message: item?.label || workspaceId,
@@ -389,11 +408,18 @@ export const hostWorkspaceMethods = {
   }) {
     const { conversationId, workspaceId } = payload || {};
     if (!conversationId || !workspaceId) return;
+    this.flushReasoningEffortSave?.();
+    const draft = this.persistComposerDraftNow({
+      reason: `workspace-conversation:${conversationId}`,
+      force: true,
+      keepalive: true
+    }).catch(() => {});
+    const session = this.beginConversationView(conversationId, workspaceId);
+    const owns = () => ownsConversationSession(this, session);
     // 桌面端标签条：点击瞬间乐观开标签（标题先用列表里的，进入对话后经
     // bootstrap 的 openConversationTab 用真实标题更新）；persistNow 让 chrome
     // 轮询尽快拿到——原来要等对话完全加载完才登记，标签出现滞后 1s+
     try {
-      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
       const tabsStore = useConversationTabsStore();
       if (tabsStore.enabled && !tabsStore.hasConversationTab(conversationId)) {
         const conv = (Array.isArray(this.conversations) ? this.conversations : []).find(
@@ -417,9 +443,32 @@ export const hostWorkspaceMethods = {
       (this.versioningHostMode || this.dockerProjectMode) &&
       workspaceId !== this.currentHostWorkspaceId
     ) {
-      await this.handleHostWorkspaceSwitch(workspaceId, { preserveConversationView: true });
+      await this.handleHostWorkspaceSwitch(workspaceId, {
+        preserveConversationView: true,
+        session
+      });
     }
-    await this.loadConversation(conversationId, { force: true, workspaceId });
+    await draft;
+    if (
+      !owns() ||
+      ((this.versioningHostMode || this.dockerProjectMode) &&
+        this.currentHostWorkspaceId !== workspaceId)
+    )
+      return;
+    try {
+      const result = await this.enterConversation(conversationId, {
+        session,
+        workspaceId,
+        source: 'workspace',
+        urlMode: 'push'
+      });
+      if (!owns() || result?.superseded) return result;
+      if (result?.success) await this.restoreComposerDraftState('workspace-conversation');
+      return result;
+    } catch (error) {
+      if (!owns()) return { success: false, superseded: true };
+      throw error;
+    }
   },
   async handleRenameWorkspaceFromSidebar(payload: { workspaceId: string; label: string }) {
     const workspaceId = String(payload?.workspace_id || payload?.workspaceId || '').trim();
