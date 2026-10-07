@@ -2890,7 +2890,11 @@ a.md-download-link {
 body[data-theme='dark'] {
   /* 用户消息块 - 使用浅灰色 */
   .user-message .message-text {
-    background: var(--badge-bg);
+    /* 只覆写唯一背景变量：气泡本体、底部竖向渐隐与展开行水平渐变都引用
+       --user-bubble-bg，同步该变量即可消除深色下背景与渐变来源分叉。
+       compact 气泡原本取 --surface-card，此处随之统一为 --badge-bg。 */
+    --user-bubble-bg: var(--badge-bg);
+    background: var(--user-bubble-bg);
     box-shadow: none;
   }
 

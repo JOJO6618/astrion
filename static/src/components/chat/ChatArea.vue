@@ -74,6 +74,7 @@
                       v-if="msg.content"
                       class="bubble-text"
                       :class="{ 'is-expanded': isUserBubbleExpanded(msg, index) }"
+                      :style="getUserBubbleStyle(msg, index)"
                       :ref="(el) => registerUserBubbleRef(msg, index, el)"
                     >
                       <template v-if="isMultiAgentMessage(msg)">
@@ -915,23 +916,56 @@ const userBubbleTransitionSuppressed = ref(false);
 let userBubbleResizeObserver: ResizeObserver | null = null;
 let copiedBubbleTimeouts = new Map<string, number>();
 let userBubbleTransitionSeq = 0;
+const userBubbleMountFrames = new Map<HTMLElement, number>();
 
 const getUserBubbleKey = (msg: any, index: number) => msg?.id || `user-bubble-${index}`;
 
+const getUserBubbleStyle = (msg: any, index: number): Record<string, string> => {
+  const state = userBubbleFoldStates.value[getUserBubbleKey(msg, index)];
+  return {
+    // Restore cached dimensions during render, before virtua observes a new DOM node.
+    // An unmeasured expanded bubble must never fall back to the 9999px cap.
+    '--bubble-full-height': state?.fullHeight ? `${state.fullHeight}px` : 'none',
+    '--bubble-fold-height': state?.foldHeight
+      ? `${state.foldHeight}px`
+      : `${USER_BUBBLE_FOLD_LINES}lh`
+  };
+};
+
+const releaseUserBubbleMount = (key: string, el: HTMLElement) => {
+  const release = () => {
+    userBubbleMountFrames.delete(el);
+    if (userBubbleRefs.get(key) === el && el.isConnected) {
+      el.style.removeProperty('transition');
+    }
+  };
+  // Keep initialization static through Vue's class/style update and virtua's first RO.
+  userBubbleMountFrames.set(
+    el,
+    requestAnimationFrame(() => {
+      userBubbleMountFrames.set(el, requestAnimationFrame(release));
+    })
+  );
+};
+
 const registerUserBubbleRef = (msg: any, index: number, el: Element | null) => {
   const key = getUserBubbleKey(msg, index);
+  const previous = userBubbleRefs.get(key);
+  if (el === previous) return;
+  if (previous) {
+    userBubbleResizeObserver?.unobserve(previous);
+    const frame = userBubbleMountFrames.get(previous);
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    userBubbleMountFrames.delete(previous);
+  }
   if (el instanceof HTMLElement) {
     userBubbleRefs.set(key, el);
-    // 虚拟列表下气泡随滚动挂载/卸载：挂载时补做观察与高度测量，保证折叠状态正确恢复
-    if (userBubbleResizeObserver) {
-      userBubbleResizeObserver.observe(el);
-    }
-    const state = userBubbleFoldStates.value[key];
-    if (state && state.foldHeight === 0) {
-      requestAnimationFrame(() => {
-        if (el.isConnected) measureUserBubbles();
-      });
-    }
+    // A remount is not a user expansion. Measure synchronously, without replaying
+    // max-height animation or letting virtua cache an intermediate item height.
+    el.style.transition = 'none';
+    measureUserBubble(el, key);
+    userBubbleResizeObserver?.observe(el);
+    releaseUserBubbleMount(key, el);
   } else {
     userBubbleRefs.delete(key);
   }
@@ -966,27 +1000,38 @@ const preMeasureUserBubbles = () => {
   });
 };
 
-const measureUserBubbles = () => {
-  userBubbleRefs.forEach((el, key) => {
-    if (!el.isConnected) {
-      userBubbleRefs.delete(key);
-      return;
-    }
-    const computed = window.getComputedStyle(el);
-    const rawLineHeight = parseFloat(computed.lineHeight);
-    const lineHeight = Number.isFinite(rawLineHeight) ? rawLineHeight : 24;
-    const foldHeight = Math.round(lineHeight * USER_BUBBLE_FOLD_LINES);
-    const fullHeight = Math.ceil(el.scrollHeight);
-    const needsFold = fullHeight > foldHeight + 1;
-    const existing = userBubbleFoldStates.value[key];
+const measureUserBubble = (el: HTMLElement, key: string) => {
+  if (!el.isConnected) return;
+  const computed = window.getComputedStyle(el);
+  const rawLineHeight = parseFloat(computed.lineHeight);
+  const lineHeight = Number.isFinite(rawLineHeight) ? rawLineHeight : 24;
+  const foldHeight = Math.round(lineHeight * USER_BUBBLE_FOLD_LINES);
+  const fullHeight = Math.ceil(el.scrollHeight);
+  const needsFold = fullHeight > foldHeight + 1;
+  const existing = userBubbleFoldStates.value[key];
+  if (
+    existing?.needsFold !== needsFold ||
+    existing?.foldHeight !== foldHeight ||
+    existing?.fullHeight !== fullHeight
+  ) {
     userBubbleFoldStates.value[key] = {
       needsFold,
       expanded: existing?.expanded ?? false,
       foldHeight,
       fullHeight
     };
-    el.style.setProperty('--bubble-fold-height', `${foldHeight}px`);
-    el.style.setProperty('--bubble-full-height', `${fullHeight}px`);
+  }
+  el.style.setProperty('--bubble-fold-height', `${foldHeight}px`);
+  el.style.setProperty('--bubble-full-height', `${fullHeight}px`);
+};
+
+const measureUserBubbles = () => {
+  userBubbleRefs.forEach((el, key) => {
+    if (!el.isConnected) {
+      userBubbleRefs.delete(key);
+      return;
+    }
+    measureUserBubble(el, key);
   });
 };
 
@@ -2608,6 +2653,8 @@ onBeforeUnmount(() => {
     userBubbleResizeObserver.disconnect();
     userBubbleResizeObserver = null;
   }
+  userBubbleMountFrames.forEach((frame) => cancelAnimationFrame(frame));
+  userBubbleMountFrames.clear();
   userBubbleRefs.clear();
   copiedBubbleTimeouts.forEach((t) => window.clearTimeout(t));
   copiedBubbleTimeouts.clear();

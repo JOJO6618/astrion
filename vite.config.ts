@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
@@ -23,7 +24,21 @@ const chromeEntry = fileURLToPath(new URL('./static/src/chrome.ts', import.meta.
 export default defineConfig({
   // 统一静态资源基路径，避免动态 import 走到 /assets/* 导致 404
   base: '/static/dist/',
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    {
+      name: 'astrion-entry-styles',
+      apply: 'build',
+      // Runs after the manifest/CSS are written, including each build --watch update.
+      writeBundle() {
+        const script = fileURLToPath(
+          new URL('./scripts/generate_entry_styles.mjs', import.meta.url)
+        );
+        const output = execFileSync(process.execPath, [script], { encoding: 'utf8' });
+        process.stdout.write(output);
+      }
+    }
+  ],
   css: {
     preprocessorOptions: {
       scss: {

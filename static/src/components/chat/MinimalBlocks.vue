@@ -241,9 +241,12 @@ const getToolSummaryText = (action: Action) => {
   const intentEnabled = personalizationStore.form.tool_intent_enabled;
   const intentText = tool.intent_full || tool.intent_rendered || tool.arguments?.intent || '';
 
-  if (intentEnabled && !isSummaryIntentReady(action)) return '';
-  if (intentEnabled && intentText) {
-    return getFirstLine(intentText);
+  // 只对 intent 片段设门闸：完整 intent 到达前不展示半截解码文字，但下方的
+  // 稳定状态兜底文案（准备调用/正在调用…）是安全的，必须照常显示，避免摘要行
+  // 在完整 intent 到达前整行空白。完整 intent 到达后由上方分支同步替换。
+  if (intentEnabled && isSummaryIntentReady(action) && intentText) {
+    const firstLine = getFirstLine(intentText);
+    if (firstLine) return firstLine;
   }
 
   if (tool.status === 'preparing') {
@@ -290,11 +293,17 @@ const isSummaryIntentReady = (action: Action): boolean => {
 
 const getSummaryToolItems = (actions: Action[]) => {
   const batchKey = getToolBatchKey(actions);
-  return getLatestToolSegment(actions).map((action, index) => ({
-    identity: `${batchKey}:${action.id || action.blockId || index}`,
-    text: getToolSummaryText(action),
-    ready: isSummaryIntentReady(action)
-  }));
+  return getLatestToolSegment(actions).map((action, index) => {
+    const text = getToolSummaryText(action);
+    return {
+      identity: `${batchKey}:${action.id || action.blockId || index}`,
+      text,
+      // ready 表示“这一行是否有可稳定展示的文案”，而非“intent 是否完整”。
+      // intent 片段本身仍在 getToolSummaryText 内被门闸拦住，未就绪时回落到
+      // 状态兜底文案；因此有文案即可渲染，控制器与滚筒不再整行空白。
+      ready: !!text
+    };
+  });
 };
 
 // 获取摘要组的加载动画组件（每次action类型切换时随机一次）
@@ -670,8 +679,16 @@ const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepI
     const running = tools.some(isActiveToolAction);
     const item = items[0];
     const identity = `${getToolBatchKey(actions)}:tools`;
-    const entryText = items.length > 1 && summaryEntries.value[groupId] === identity
-      ? summaryEntryTexts.value[groupId] : undefined;
+    // 并行滚筒接管后续行。仅当首项仍是“状态占位文案”时才复用缓存的已入场
+    // 首项文字，避免状态变化重播外层入场；一旦首项拿到完整 intent，就回落到
+    // 实时文案，使“准备调用…”兜底能被真实 intent 替换，而不会被永久锁住。
+    const firstTool = tools[0];
+    const firstHasIntent = personalizationStore.form.tool_intent_enabled &&
+      isSummaryIntentReady(firstTool) &&
+      !!(firstTool?.tool?.intent_full || firstTool?.tool?.intent_rendered ||
+        firstTool?.tool?.arguments?.intent);
+    const entryText = items.length > 1 && summaryEntries.value[groupId] === identity &&
+      !firstHasIntent ? summaryEntryTexts.value[groupId] : undefined;
     return {
       // The reel owns subsequent row updates. Status changes must not replay
       // this batch's first entry or rebuild the outer summary animation.

@@ -312,9 +312,15 @@ function morphShape(
   easing = easeOut
 ) {
   if (!eye) return;
-  eye.setAttribute('d', EYE_SHAPES[fromShape]);
-  const fromNums = parsePathNumbers(EYE_SHAPES[fromShape]);
   const toNums = parsePathNumbers(EYE_SHAPES[toShape]);
+  // 从元素当前实际的 SVG d 作为起点，平滑接续中断中的变形；不再先写回名义
+  // 预设形状（旧实现先 setAttribute(fromShape) 再取消原 RAF，blink 预设全为 0，
+  // 因此会出现从点状形状突跳）。无法解析时才回落到名义起点。
+  const currentNums = parsePathNumbers(eye.getAttribute('d') || '');
+  const fromNums =
+    currentNums.length === toNums.length
+      ? currentNums
+      : parsePathNumbers(EYE_SHAPES[fromShape]);
   const startTime = performance.now();
   const prev = morphRaf.get(eye);
   if (prev) cancelAnimationFrame(prev);
@@ -420,6 +426,10 @@ let faceSwitchTimer: number | null = null;
 let blinkTimer: number | null = null;
 let nervousTimer: number | null = null;
 let isBlinking = false;
+// 递增令牌：任何使当前眨眼失效的操作（状态变化、停止定时、卸载）都会使正在
+// await 的旧 blinkEyes 在下一个检查点退出，避免旧眨眼覆盖新的 work/think/tool。
+let blinkEpoch = 0;
+let disposed = false;
 const internalMode = ref<string | null>(null);
 function stopFaceSwitchTimer() {
   if (faceSwitchTimer) clearTimeout(faceSwitchTimer);
@@ -428,6 +438,7 @@ function stopFaceSwitchTimer() {
 function stopAutoBlink() {
   if (blinkTimer) clearTimeout(blinkTimer);
   blinkTimer = null;
+  blinkEpoch++;
 }
 function stopNervousTimer() {
   if (nervousTimer) clearTimeout(nervousTimer);
@@ -438,29 +449,45 @@ function wait(ms: number) {
 }
 function scheduleAutoBlink() {
   stopAutoBlink();
-  if (props.mode !== 'idle' || internalMode.value) return;
+  if (disposed || props.mode !== 'idle' || internalMode.value) return;
   const delay = 2800 + Math.random() * 3600;
+  const epoch = blinkEpoch;
   blinkTimer = window.setTimeout(async () => {
+    blinkTimer = null;
     await blinkEyes();
+    if (disposed || epoch !== blinkEpoch) return;
     scheduleAutoBlink();
   }, delay);
 }
 async function blinkEyes() {
-  if (props.mode !== 'idle' || internalMode.value || isBlinking) return;
+  if (disposed || props.mode !== 'idle' || internalMode.value || isBlinking) return;
   isBlinking = true;
+  // 捕获当前令牌；每个 await 之后都重新校验，任何状态变化/卸载都会让这次
+  // 眨眼整体失效，不再继续写入 DOM。
+  const epoch = blinkEpoch;
+  const invalid = () =>
+    disposed || epoch !== blinkEpoch || props.mode !== 'idle' || !!internalMode.value;
   const blinkCount = Math.random() < 0.5 ? 1 : 2;
   for (let i = 0; i < blinkCount; i++) {
     morphShape(eyeLeftRef.value, 'idle', 'blink', 150, easeInOut);
     morphShape(eyeRightRef.value, 'idle', 'blink', 150, easeInOut);
     await wait(120);
-    if (props.mode !== 'idle' || internalMode.value) {
+    if (invalid()) {
       isBlinking = false;
       return;
     }
     await wait(45);
+    if (invalid()) {
+      isBlinking = false;
+      return;
+    }
     morphShape(eyeLeftRef.value, 'blink', 'idle', 210, easeInOut);
     morphShape(eyeRightRef.value, 'blink', 'idle', 210, easeInOut);
     await wait(i === blinkCount - 1 ? 200 : 250);
+    if (invalid()) {
+      isBlinking = false;
+      return;
+    }
   }
   isBlinking = false;
 }
@@ -594,6 +621,7 @@ onMounted(() => {
   applyState();
 });
 onBeforeUnmount(() => {
+  disposed = true;
   document.removeEventListener('mousemove', onMouseMove);
   stopTracking();
   stopFaceSwitchTimer();

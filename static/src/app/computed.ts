@@ -20,6 +20,7 @@ import { useBackgroundCommandStore } from '../stores/backgroundCommand';
 import { usePersonalizationStore } from '../stores/personalization';
 import { useQuickDockStore } from '../stores/quickDock';
 import { toolFaceKey } from '../utils/avatarFace';
+import { messageStartsWork } from '../utils/messageVisibility';
 
 // 取最后一段连续的 tool actions（对应模型一次并行调用的一批工具）
 function getLatestToolSegment(actions) {
@@ -36,6 +37,24 @@ function getLatestToolSegment(actions) {
   let start = last;
   while (start > 0 && actions[start - 1]?.type === 'tool') start--;
   return actions.slice(start, last + 1);
+}
+
+// 从本轮（最近一条 assistant 消息）actions 里，向后查找上一条“已经完整
+// 展示过”的工具 intent（打字效果已完成：rendered === full）。纯函数，无副作用。
+// 用于工具间间隙在头像上方保留上一条文案；只取最近一条 assistant 消息，
+// 因此不会跨 assistant 轮次泄漏。
+function getLastCompleteToolIntent(actions) {
+  if (!Array.isArray(actions)) return '';
+  for (let i = actions.length - 1; i >= 0; i--) {
+    const action = actions[i];
+    if (action?.type !== 'tool') continue;
+    const tool = action.tool;
+    if (!tool) continue;
+    const full = tool.intent_full || '';
+    const rendered = tool.intent_rendered || '';
+    if (tool.intent_complete !== false && full && rendered === full) return full;
+  }
+  return '';
 }
 
 const AVATAR_RUNNING_TOOL_STATUS = new Set([
@@ -382,7 +401,9 @@ export const computed = {
     const messages = Array.isArray(this.messages) ? this.messages : [];
     const lastAssistant = (() => {
       for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i]?.role === 'assistant') return messages[i];
+        const message = messages[i];
+        if (message?.role === 'assistant') return message;
+        if (message?.role === 'user' && messageStartsWork(message)) break;
       }
       return null;
     })();
@@ -408,6 +429,12 @@ export const computed = {
     })();
 
     const intentEnabled = !!usePersonalizationStore().form?.tool_intent_enabled;
+    // 上一条可展示的完整工具 intent：当前任务内工具间隙保留；任务停止时不再
+    // 保留（任务结束走 idle 分支自然清空；切对话后 lastAssistant 变化自然失效）。
+    const retainedIntent =
+      intentEnabled && !this.stopRequested && (this.taskInProgress || this.streamingMessage)
+        ? getLastCompleteToolIntent(lastAssistant?.actions || [])
+        : '';
 
     // 1) 思考中（防御：仅在任务仍运行时采信流式字段——异常中断后字段可能残留，
     //    虽有各终结路径的统一清理兑底，这里再加一层保险避免永久卡「思考中」）
@@ -472,20 +499,27 @@ export const computed = {
         const full = tool.intent_full || '';
         const rendered = tool.intent_rendered || '';
         // 只在 intent 打字效果完成后才显示完整文案，避免头像上出现逐字动画
-        return full && rendered === full ? full : '';
+        return tool.intent_complete !== false && full && rendered === full ? full : '';
       };
       const toolTexts = runningTools.map((a) => {
-        return intentEnabled ? getFinalIntentText(a?.tool) : '';
+        return intentEnabled && !this.stopRequested ? getFinalIntentText(a?.tool) : '';
       });
-      let text = toolTexts[0] || '';
-      if (runningTools.length > 1) {
-        text = toolTexts[0] || '';
-      } else if (!text) {
-        text = intentEnabled ? getFinalIntentText(runningTools[0]?.tool) : '';
-      }
+      // 文案跟随当前第一个工具；其 intent 未就绪时保留上一条文案。
+      const text = toolTexts[0] || retainedIntent;
       return { mode: 'tool', toolKeys: keys, toolTexts, text, tracking: false };
     }
     if (running) {
+      // 工具间等待仍显示上一次 intent，直到下一条 intent 就绪。
+      if (retainedIntent) {
+        return {
+          mode: 'work',
+          toolKeys: [],
+          toolTexts: [],
+          text: retainedIntent,
+          tracking: false,
+          intentRetained: true
+        };
+      }
       // 工作态：等 API / 后台运行 / 流式输出正文
       let text = bgText;
       // 「等待 API 响应…」优先于随机等待文案：后端已发出请求、尚未开始回复

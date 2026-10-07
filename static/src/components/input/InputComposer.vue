@@ -952,8 +952,10 @@ const props = defineProps<{
     toolTexts?: string[];
     text: string;
     tracking?: boolean;
-    /** true 时表示当前文案是「等待 API 响应…」（work 模式下仅此类文案显示在头像旁） */
+    /** true 时表示当前文案是「等待 API 响应…」。 */
     apiWaiting?: boolean;
+    /** 工具间等待时继续展示上一条已完整显示的 intent。 */
+    intentRetained?: boolean;
   } | null;
 }>();
 
@@ -1235,23 +1237,19 @@ const composerAvatarText = computed(() => {
   if (props.avatarStatus.mode === 'tool' || props.avatarStatus.mode === 'think') {
     return props.avatarStatus.text || '';
   }
-  // work 模式仅显示「等待 API 响应…」（apiWaiting 标记）；
-  // 后台计数/随机等待文案不在头像旁重复显示（后者已在消息区等待动画中体现）
-  if (props.avatarStatus.mode === 'work' && props.avatarStatus.apiWaiting) {
+  // work 模式展示工具间保留的 intent 或首次 API 等待提示。
+  // 后台计数/随机等待文案仍由消息区展示。
+  if (
+    props.avatarStatus.mode === 'work' &&
+    (props.avatarStatus.intentRetained || props.avatarStatus.apiWaiting)
+  ) {
     return props.avatarStatus.text || '';
   }
   return '';
 });
 
-// key 跟随当前显示的工具（第一个 running tool）变化，
-// 工具1完成切到工具2时文字有 out-in 过渡，与 SVG 切换动画同步
-const composerAvatarTextKey = computed(() => {
-  const s = props.avatarStatus;
-  if (!s) return 'avatar-none';
-  if (s.mode === 'tool') return `avatar-tool-${s.toolKeys?.[0] || ''}`;
-  if (s.mode === 'work' && s.apiWaiting) return 'avatar-work-api-waiting';
-  return `avatar-${s.mode}`;
-});
+// 工具/工作态切换时，同一条保留文案不重新退场；真正换文字才播放过渡。
+const composerAvatarTextKey = computed(() => `avatar-text-${composerAvatarText.value}`);
 
 const projectGitMenuOpen = ref<null | 'project' | 'branch'>(null);
 
