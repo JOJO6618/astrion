@@ -1,6 +1,6 @@
 /* 由 scripts/generate_entry_styles.mjs 依据 Vite manifest 自动生成，请勿手改。
    正式构建与监听构建均由 Vite writeBundle 自动更新。
    顺序为共享 chunk CSS 在前、入口 CSS 在后，保证入口局部样式最后生效。 */
-@import url('/static/dist/assets/katex.css?v=6d0c134896');
-@import url('/static/dist/assets/CloseButton.css?v=6d0c134896');
-@import url('/static/dist/assets/main.css?v=6d0c134896');
+@import url('/static/dist/assets/katex.css?v=ffe1f10c5b');
+@import url('/static/dist/assets/CloseButton.css?v=ffe1f10c5b');
+@import url('/static/dist/assets/main.css?v=ffe1f10c5b');
