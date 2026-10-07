@@ -3853,7 +3853,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 4px 10px 4px 4px;
+  padding: 4px;
   border: 1px solid var(--border-default);
   border-radius: 14px;
   background: var(--theme-surface-soft);

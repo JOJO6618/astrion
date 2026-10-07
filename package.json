@@ -36,6 +36,8 @@
     "html2canvas": "^1.4.1",
     "katex": "^0.16.9",
     "marked": "^11.1.0",
+    "micromark-core-commonmark": "^2.0.3",
+    "micromark-util-types": "^2.0.0",
     "pdfjs-dist": "^6.0.227",
     "pinia": "^3.0.4",
     "prismjs": "^1.29.0",

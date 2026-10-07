@@ -10,6 +10,7 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import rehypeStringify from 'rehype-stringify';
 import { visit } from 'unist-util-visit';
 import { t } from '@/locales';
+import remarkCjkStrong from '@/utils/remarkCjkStrong';
 
 let latexRenderTimer: number | null = null;
 let streamingCodeHighlightTimer: number | null = null;
@@ -668,6 +669,7 @@ function cleanAutolinkLiteralsPlugin() {
 const markdownProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  .use(remarkCjkStrong)
   .use(remarkBreaks)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRaw)
