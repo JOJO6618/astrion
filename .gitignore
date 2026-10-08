@@ -47,9 +47,10 @@ _experiments/
 # 本地打包产物（dmg/App 构建输出）
 _packaging/
 
-# Ignore docs（doc/ 与 docs/ 均为本地文档，不纳入版本控制）
+# 文档目录
+# 注意：docs/ 自 2026-10-08 起转为**追踪**（放 AGENTS.md 拆出的细节文档与开发文档，约定见 docs/README.md）
+# doc/ 是已废弃的旧目录名，继续忽略以防误建；旧物料已归档到 _experiments/docs_archive/
 doc/
-docs/
 workflow_research/
 
 # 部署级配置（含密钥引用 / 机器特定，本地保留，仓库仅留 .example 种子）
