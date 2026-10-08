@@ -8,8 +8,10 @@ SQRLInstallerErrorDomain -9 "App Still Running Error" 放弃安装。
 
 本用例守住两条不变量：
   1. updater-state.js 的开关语义正确（默认关闭，可开可关）；
-  2. 所有会拦住退出的 close 闸门都带上了安装期放行条件，且 bridge 在调用
-     quitAndInstall() 之前先开闸、并挂了兜底退出。
+  2. 所有会拦住退出的 close 闸门都带上了安装期放行条件；原生就绪后先开闸
+     再 quitAndInstall，原生安装退出事件之后才挂退出兜底。
+
+慢准备与失败时序的行为测试见 test/2026-10-08_桌面更新原生准备/。
 
 运行：python3 -m unittest discover -s test/2026-10-07_桌面端更新安装退出闸门 -p 'test_*.py'
 """
@@ -104,35 +106,39 @@ class CloseGateTest(unittest.TestCase):
 
 
 class BridgeInstallFlowTest(unittest.TestCase):
-    """控制桥：先开闸 → quitAndInstall → 兜底退出阶梯。"""
+    """控制桥只请求准备；安装控制器在原生就绪后放行退出。"""
 
     def setUp(self):
         self.src = read("bridge.js")
+        self.installer = read("updater-install.js")
 
     def test_gate_opened_before_quit_and_install(self):
-        handler = re.search(r"autoUpdater\.on\('update-downloaded'.*?\n  \}\);", self.src, re.S)
-        self.assertIsNotNone(handler, "未找到 update-downloaded 处理器")
+        handler = re.search(r"function onNativeReady\(\).*?\n  \}", self.installer, re.S)
+        self.assertIsNotNone(handler, "未找到原生准备完成处理器")
         body = handler.group(0)
-        self.assertIn("setUpdaterInstalling(true)", body)
-        self.assertIn("autoUpdater.quitAndInstall()", body)
         self.assertLess(
             body.index("setUpdaterInstalling(true)"),
-            body.index("autoUpdater.quitAndInstall()"),
+            body.index("updater.quitAndInstall()"),
             "必须先开闸再调用 quitAndInstall()",
         )
-        self.assertIn("armUpdaterExitFallback()", body)
+        downloaded = re.search(r"autoUpdater\.on\('update-downloaded'.*?\n  \}\);", self.src, re.S)
+        self.assertIsNotNone(downloaded)
+        self.assertIn("updateInstaller.prepare()", downloaded.group(0))
+        self.assertNotIn("quitAndInstall", downloaded.group(0))
 
     def test_error_event_closes_gate_again(self):
-        handler = re.search(r"autoUpdater\.on\('error'.*?\n  \}\);", self.src, re.S)
-        self.assertIsNotNone(handler, "未找到 error 处理器")
+        handler = re.search(r"function fail\(error\).*?\n  \}", self.installer, re.S)
+        self.assertIsNotNone(handler)
         self.assertIn("setUpdaterInstalling(false)", handler.group(0))
+        self.assertIn("clearTimers()", handler.group(0))
 
     def test_fallback_exit_ladder_exists(self):
-        self.assertIn("function armUpdaterExitFallback()", self.src)
-        self.assertIn("app.quit()", self.src)
-        self.assertIn("app.exit(0)", self.src)
+        self.assertIn("nativeUpdater.on('before-quit-for-update', onNativeQuit)", self.installer)
+        self.assertIn("app.quit()", self.installer)
+        self.assertIn("app.exit(0)", self.installer)
         # app.exit() 不触发 will-quit，必须显式收后端，否则会留下孤儿 Python 进程
-        self.assertIn("shutdownBackend()", self.src)
+        self.assertIn("stopBackend()", self.installer)
+        self.assertIn("stopBackend: shutdownBackend", self.src)
 
     def test_no_circular_import_of_lifecycle(self):
         """桥只依赖 backend.js（无反向依赖），不要 import lifecycle.js 造成环。"""

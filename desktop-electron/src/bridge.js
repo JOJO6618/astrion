@@ -8,9 +8,10 @@
 // 仅绑定 loopback，不鉴权：同机进程本就在同一威胁域内。
 
 import http from 'node:http';
-import { app, dialog } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, dialog } from 'electron';
 import { shutdownBackend } from './backend.js';
-import { setUpdaterInstalling } from './updater-state.js';
+import { createUpdateInstaller } from './updater-install.js';
+import { createUpdaterLogger } from './updater-log.js';
 import { migrationPageHtml } from './migration-window.js';
 import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
 
@@ -34,6 +35,8 @@ const progress = {
 
 let installRunning = false;
 let autoUpdater = null;
+let updateInstaller = null;
+const logUpdate = createUpdaterLogger(app);
 
 function setProgress(state, error = null) {
   progress.state = state;
@@ -44,33 +47,9 @@ function setProgress(state, error = null) {
   }
 }
 
-/**
- * 安装期兜底退出阶梯：quitAndInstall() 正常路径不返回；万一仍有路径把退出挡回来，
- * 先重试 app.quit()，再关掉内嵌 Python 后端强制退出——绝不停在「窗口没了、Dock 图标
- * 还在」的状态（该状态既让用户以为卡死，又会让 ShipIt 放弃本次安装）。
- * 注意 app.exit() 不触发 will-quit，后端必须显式收掉，否则会留下孤儿 Python 进程。
- */
-const UPDATER_QUIT_RETRY_MS = 8000;
-const UPDATER_FORCE_EXIT_MS = 11000;
-let updaterExitFallbackArmed = false;
-
-function armUpdaterExitFallback() {
-  if (updaterExitFallbackArmed) return;
-  updaterExitFallbackArmed = true;
-  setTimeout(() => {
-    console.warn('[astrion-desktop] quitAndInstall() 后仍未退出，改用 app.quit() 重试');
-    setUpdaterInstalling(true);
-    app.quit();
-  }, UPDATER_QUIT_RETRY_MS);
-  setTimeout(() => {
-    console.warn('[astrion-desktop] quitAndInstall() 后仍未退出，兜底强制退出');
-    try {
-      shutdownBackend();
-    } catch (err) {
-      console.error('[astrion-desktop] 兜底退出时后端清理失败:', err);
-    }
-    app.exit(0);
-  }, UPDATER_FORCE_EXIT_MS);
+function setInstallError(error) {
+  setProgress(UpdateState.Error, String(error?.message || error));
+  installRunning = false;
 }
 
 /** 惰性加载 electron-updater（仅打包环境可用；dev 下更新不可用）。 */
@@ -89,7 +68,18 @@ async function getAutoUpdater() {
   autoUpdater = resolved;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoRunAppAfterInstall = true;
+  updateInstaller = createUpdateInstaller({
+    updater: autoUpdater,
+    nativeUpdater: nativeAutoUpdater,
+    app,
+    stopBackend: shutdownBackend,
+    onState: setProgress,
+    onError: setInstallError,
+    log: logUpdate
+  });
   autoUpdater.on('update-not-available', () => {
+    logUpdate('update-not-available');
     setProgress(UpdateState.NoUpdate);
     installRunning = false;
   });
@@ -98,25 +88,11 @@ async function getAutoUpdater() {
     progress.downloaded = p.transferred ?? 0;
     progress.total = p.total ?? null;
   });
-  autoUpdater.on('update-downloaded', () => {
-    setProgress(UpdateState.Installing);
-    // 先开闸再安装：quitAndInstall() 是「先关闭所有窗口、之后才发 before-quit」，
-    // 主窗口/快捷窗的 close 拦截若照旧生效，应用就退不出去（历史故障：窗口消失、
-    // Dock 图标还在、点一下又弹回来，ShipIt 始终看到「有实例在运行」而放弃安装）。
-    setUpdaterInstalling(true);
-    // 重启进入新版本（quitAndInstall 正常路径不返回）
-    setTimeout(() => {
-      setProgress(UpdateState.Restarting);
-      autoUpdater.quitAndInstall();
-      armUpdaterExitFallback();
-    }, 300);
+  autoUpdater.on('update-downloaded', (event) => {
+    logUpdate('zip-downloaded', { targetVersion: event?.version });
+    updateInstaller.prepare();
   });
-  autoUpdater.on('error', (err) => {
-    setProgress(UpdateState.Error, String(err?.message || err));
-    installRunning = false;
-    // 安装没开始（检查/下载/校验失败）：撤销开闸，恢复正常关窗行为
-    setUpdaterInstalling(false);
-  });
+  autoUpdater.on('error', (err) => updateInstaller.fail(err));
   return autoUpdater;
 }
 
@@ -133,14 +109,18 @@ async function tryStartInstall(isPackaged) {
   }
   installRunning = true;
   setProgress(UpdateState.Checking);
-  const updater = await getAutoUpdater();
-  // 后台跑检查（HTTP 立即返回 202，与 Tauri 版语义一致——后端代理超时只有 5s，
-  // 同步等检查完成会误报失败）；后续状态由事件链接管：
-  // download-progress → update-downloaded → quitAndInstall
-  updater.checkForUpdates().catch((err) => {
-    setProgress(UpdateState.Error, String(err?.message || err));
-    installRunning = false;
-  });
+  let updater;
+  try {
+    updater = await getAutoUpdater();
+    updateInstaller.assertCanStart();
+    logUpdate('update-check-start');
+    // HTTP 立即返回 202；后续状态由 ZIP 下载、原生准备与安装退出事件接管。
+    updater.checkForUpdates().catch((err) => updateInstaller.fail(err));
+  } catch (err) {
+    logUpdate('update-check-failed', { error: String(err?.message || err) });
+    setInstallError(err);
+    throw err;
+  }
 }
 
 /**
