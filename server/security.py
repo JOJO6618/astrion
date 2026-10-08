@@ -5,7 +5,7 @@ import os
 import secrets
 import time
 from typing import Dict, Any, Optional, Tuple
-from flask import request, session, jsonify
+from flask import current_app, g, request, session, jsonify
 from functools import wraps
 
 from . import state
@@ -163,10 +163,12 @@ def get_csrf_token(force_new: bool = False) -> str:
 
 
 def requires_csrf_protection(path: str) -> bool:
-    # Bearer Token 请求走无状态认证，跳过 CSRF
-    auth_header = (request.headers.get("Authorization") or "").lower()
-    if auth_header.startswith("bearer "):
-        return False
+    # Only an authenticated Host Bearer on a compatible endpoint bypasses CSRF.
+    view = current_app.view_functions.get(request.endpoint)
+    if getattr(view, "host_bearer_auth", False):
+        from server.gateway_auth import _extract_bearer_token, _verify_host_bearer
+        if _verify_host_bearer(_extract_bearer_token()):
+            return False
     # API v1 统一跳过 CSRF；若未携带 Authorization，将由鉴权层返回 401
     if path.startswith("/api/v1/"):
         return False
@@ -256,6 +258,11 @@ def attach_security_hooks(app):
 
     @app.after_request
     def _apply_security_headers(response):
+        if getattr(g, "host_bearer_authenticated", False):
+            # Flask saves sessions after after_request hooks. Clear transient
+            # identity and suppress saving, including changes made by a view.
+            session.clear()
+            session.modified = False
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")

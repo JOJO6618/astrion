@@ -33,7 +33,7 @@
 |---|---|---|
 | **定位** | 本地个人智能体 | 线上多人 AI 服务 |
 | **终端执行** | 宿主机 OS 级沙箱（macOS `sandbox-exec` / Windows WSL2 / Linux 受限助手；Linux 首批 Ubuntu 24.04 隔离实测） | 每个用户独立的 Docker 容器 |
-| **可登录账号** | host 与 web 两个数据源的账号**均可登录** | **仅 web 数据源账号**（host 账号无法登录，即被封堵） |
+| **可登录账号** | 未开启 Host 密码时可登录 host/web 账号；开启后只使用 Host 密码登录 | **仅 web 数据源账号**（host 账号无法登录，即被封堵） |
 | **数据目录** | `<数据根>/host/`（同时可读 web 数据） | `<数据根>/web/` |
 | **默认监听** | 当前配置默认 `0.0.0.0`；host 请显式设 `WEB_SERVER_HOST=127.0.0.1` | `0.0.0.0`（对外服务） |
 | **用户注册** | 单人使用，无需注册 | 邀请码注册制 |
@@ -79,6 +79,18 @@ bun cli/src/main.tsx   # 或 npm --prefix cli run dev；当前目录即工作区
 ```
 
 CLI 通过 host Bearer 通道连接本地服务（探测到无服务时自动启动后端）；命令入口为 `cli/bin/astrion`，加入 PATH 后可直接使用 `astrion` 命令。
+
+### Host 网页密码（可选）
+
+默认沿用本机免登录。需要密码保护时，在源码目录运行：
+
+```bash
+python3 scripts/host_password.py --password 'YOUR_PASSWORD'
+```
+
+将 `YOUR_PASSWORD` 替换为 8 至 1024 个字符的密码。每次执行都会设置密码并开启保护，旧网页登录会话随即失效，无需重启服务。脚本默认使用服务同一套 `DATA_DIR` 配置；也可通过 `--data-dir /absolute/path/to/data` 显式指定目标实例的数据目录。
+
+启用后，Host 登录页只显示密码登录。设置 → 通用可验证当前密码后关闭保护；再次开启或重设密码仍运行上述脚本。配置保存为 `<DATA_DIR>/host_auth.json`（scrypt 哈希、0600、原子写），不保存明文。桌面端免密码，本机 CLI/headless Bearer 通道独立保留。
 
 ## Docker 沙箱镜像（web 模式必需）
 

@@ -1,49 +1,58 @@
 <template>
   <main class="auth-page">
-    <section class="auth-card">
-      <h1 class="auth-title">{{ t('auth.loginTitle') }}</h1>
-      <p class="auth-subtitle">{{ t('auth.loginSubtitle') }}</p>
+    <section class="auth-card" :aria-busy="!ready || submitting">
+      <h1 class="auth-title">
+        {{ t(hostPasswordRequired ? 'auth.hostLoginTitle' : 'auth.loginTitle') }}
+      </h1>
+      <p v-if="ready" class="auth-subtitle">
+        {{ t(hostPasswordRequired ? 'auth.hostLoginSubtitle' : 'auth.loginSubtitle') }}
+      </p>
 
-      <div class="auth-form-group">
-        <label class="auth-label" for="email">{{ t('auth.email') }}</label>
-        <input
-          id="email"
-          v-model.trim="email"
-          type="email"
-          class="auth-input"
-          autocomplete="email"
-        />
-      </div>
+      <form v-if="ready" @submit.prevent="login">
+        <div v-if="!hostPasswordRequired" class="auth-form-group">
+          <label class="auth-label" for="email">{{ t('auth.email') }}</label>
+          <input
+            id="email"
+            v-model.trim="email"
+            type="email"
+            class="auth-input"
+            autocomplete="email"
+          />
+        </div>
 
-      <div class="auth-form-group">
-        <label class="auth-label" for="password">{{ t('auth.password') }}</label>
-        <input
-          id="password"
-          v-model="password"
-          type="password"
-          class="auth-input"
-          autocomplete="current-password"
-          @keydown.enter="login"
-        />
-      </div>
+        <div class="auth-form-group">
+          <label class="auth-label" for="password">{{ t('auth.password') }}</label>
+          <input
+            id="password"
+            v-model="password"
+            type="password"
+            class="auth-input"
+            autocomplete="current-password"
+            :disabled="!configValid || submitting"
+          />
+        </div>
 
-      <button class="auth-button" :disabled="submitting" @click="login">
-        {{ t('auth.login') }}
-      </button>
+        <button type="submit" class="auth-button" :disabled="submitting || !configValid">
+          {{ t(hostPasswordRequired ? 'auth.hostLogin' : 'auth.login') }}
+        </button>
+        <button
+          v-if="hostModeEnabled && !hostPasswordRequired"
+          type="button"
+          class="auth-secondary-button"
+          :disabled="submitting || !configValid"
+          @click="hostLogin"
+        >
+          {{ t('auth.hostModeNoLogin') }}
+        </button>
+      </form>
 
-      <button
-        v-if="hostModeEnabled"
-        class="auth-secondary-button"
-        :disabled="hostSubmitting"
-        @click="hostLogin"
-      >
-        {{ t('auth.hostModeNoLogin') }}
-      </button>
-
-      <div class="auth-error">{{ error }}</div>
-      <div class="auth-link">
+      <div class="auth-error" role="alert">{{ error }}</div>
+      <div v-if="ready && !hostPasswordRequired" class="auth-link">
         {{ t('auth.noAccount') }}<a href="/register">{{ t('auth.signUp') }}</a>
       </div>
+      <button v-if="!ready && error" class="auth-secondary-button" @click="loadStatus">
+        {{ t('common.retry') }}
+      </button>
     </section>
   </main>
 </template>
@@ -63,111 +72,80 @@ const email = ref('');
 const password = ref('');
 const error = ref('');
 const submitting = ref(false);
-const hostSubmitting = ref(false);
+const ready = ref(false);
 const hostModeEnabled = ref(false);
+const hostPasswordRequired = ref(false);
+const configValid = ref(true);
 
-const doLogin = async (redirectUrl = '/') => {
-  if (!email.value || !password.value) {
-    error.value = t('auth.emailAndPasswordRequired');
+async function loadStatus() {
+  error.value = '';
+  try {
+    const response = await fetch('/api/host-mode-enabled', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok || data.success !== true) throw new Error('status');
+    hostModeEnabled.value = data.enabled === true;
+    hostPasswordRequired.value = hostModeEnabled.value && data.password_required === true;
+    configValid.value = data.config_valid !== false;
+    if (!configValid.value) error.value = data.error || t('auth.serviceUnavailable');
+    ready.value = true;
+  } catch {
+    ready.value = false;
+    error.value = t('auth.networkErrorRetry');
+  }
+}
+
+async function sendLogin(host: boolean) {
+  if (!ready.value || !configValid.value || submitting.value) return;
+  if (
+    (!host && (!email.value || !password.value)) ||
+    (host && hostPasswordRequired.value && !password.value)
+  ) {
+    error.value = t(host ? 'auth.hostPasswordRequired' : 'auth.emailAndPasswordRequired');
     return;
   }
-
   submitting.value = true;
   error.value = '';
-
   try {
-    const resp = await fetch('/login', {
+    if (window.ensureCsrfToken) await window.ensureCsrfToken();
+    const response = await fetch(host ? '/host-login' : '/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value, password: password.value })
+      body: JSON.stringify(
+        host ? { password: password.value } : { email: email.value, password: password.value }
+      )
     });
-
-    // 503 = ensure_container 失败（Docker 未启动/镜像缺失等），error 带具体原因，原地显示
-    if (resp.status === 503) {
-      const data = await resp.json().catch(() => ({}) as any);
-      error.value = data.error || t('auth.serviceUnavailable');
+    const data = await response.json();
+    if (response.ok && data.success) {
+      password.value = '';
+      window.location.href = '/';
       return;
     }
-
-    const data = await resp.json();
-    if (data.success) {
-      window.location.href = redirectUrl;
-      return;
-    }
-
-    error.value = data.error || t('auth.loginFailed');
-  } catch (_err) {
+    // The script can enable/reset protection while this page is already open.
+    const message = data.error || t(host ? 'auth.hostModeUnavailable' : 'auth.loginFailed');
+    await loadStatus();
+    error.value = message;
+  } catch {
     error.value = t('auth.networkErrorRetry');
   } finally {
     submitting.value = false;
   }
-};
+}
 
-const login = () => doLogin('/');
-
-const doHostLogin = async (redirectUrl = '/') => {
-  hostSubmitting.value = true;
-  error.value = '';
-
-  try {
-    const resp = await fetch('/host-login', { method: 'POST' });
-    // 503 = 容量满或终端创建失败，error 带具体原因，原地显示
-    if (resp.status === 503) {
-      const data = await resp.json().catch(() => ({}) as any);
-      error.value = data.error || t('auth.resourceBusy');
-      return;
-    }
-
-    const data = await resp.json();
-    if (data.success) {
-      window.location.href = redirectUrl;
-      return;
-    }
-
-    error.value = data.error || t('auth.hostModeUnavailable');
-  } catch (_err) {
-    error.value = t('auth.networkErrorRetry');
-  } finally {
-    hostSubmitting.value = false;
-  }
-};
-
-const hostLogin = () => doHostLogin('/');
+const login = () => sendLogin(hostPasswordRequired.value);
+const hostLogin = () => sendLogin(true);
 
 onMounted(async () => {
   applyTheme(loadTheme());
-
-  if (window.ensureCsrfToken) {
-    try {
-      await window.ensureCsrfToken();
-    } catch (_err) {
-      // ignore
-    }
-  }
-
-  try {
-    const resp = await fetch('/api/host-mode-enabled');
-    const data = await resp.json();
-    hostModeEnabled.value = !!(data && data.success && data.enabled);
-  } catch (_err) {
-    hostModeEnabled.value = false;
-  }
-
-  // 桌面壳（Tauri WebView）+ 宿主机模式：登录页对本机用户纯属多余，
-  // 直接自动完成免登录跳转，实现「打开 App 即进主界面」。
-  // window.__ASTRION_DESKTOP__ 由壳的 initialization_script 在页面脚本前注入，
-  // Web 浏览器环境不存在不受影响。
-  if (hostModeEnabled.value && (window as any).__ASTRION_DESKTOP__) {
-    await doHostLogin('/');
-    return;
-  }
-
-  try {
-    const resp = await fetch('/api/session-status', { credentials: 'same-origin' });
-    // 仅需触发会话探测请求以预热会话/CSRF，响应体内容无需使用
-    await resp.json();
-  } catch (err) {
-    console.warn('[auth-debug] login page session-status failed:', err);
+  await loadStatus();
+  // The shell flag only triggers the UX; exemption is decided by the backend.
+  if (
+    ready.value &&
+    configValid.value &&
+    hostModeEnabled.value &&
+    !hostPasswordRequired.value &&
+    (window as any).__ASTRION_DESKTOP__
+  ) {
+    await hostLogin();
   }
 });
 </script>

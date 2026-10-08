@@ -46,6 +46,12 @@ export default {
   codexDesc: 'Codex subscription sign-in, proxy settings, and usage & credits management.',
   generalTitle: 'General',
   generalDesc: 'Basic behavior for conversations and the app.',
+  hostPasswordTitle: 'Host web password protection',
+  hostPasswordEnabled: 'Enabled',
+  hostPasswordDisabled: 'Disabled, password-free entry',
+  hostPasswordDisable: 'Disable protection',
+  hostPasswordConfirmHint: 'Enter the current Host password to restore password-free entry.',
+  hostPasswordScriptHint: 'Enable or reset the password using the source script:',
   quickChatTitle: 'Quick Chat',
   quickChatDesc:
     'Summon a chat and capture screenshots with a shortcut. Unset workspace and model choices follow your global defaults.',

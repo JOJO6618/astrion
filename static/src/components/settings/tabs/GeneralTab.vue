@@ -2,6 +2,7 @@
 import { computed, inject, nextTick, onMounted, ref } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import HostPasswordSettings from './HostPasswordSettings.vue';
 import { t } from '@/locales';
 import { useCommandBlockingStore } from '@/stores/commandBlocking';
 import { desktopPlatform, isDesktopShell } from '@/utils/desktopPlatform';
@@ -199,6 +200,7 @@ onMounted(() => {
 
 <template>
   <section class="settings-page">
+    <HostPasswordSettings />
     <label class="settings-toggle-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('personalization.autoTitleTitle') }}</span>

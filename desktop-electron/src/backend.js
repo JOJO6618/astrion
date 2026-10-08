@@ -151,6 +151,9 @@ export function spawnBackend({ python, backendDir, port, bridgePort, version, sh
   // 不禁用会读穿到共享数据根 ~/.astrion/astrion（桌面数据隔离被破坏）。
   // 生产形态后端在 .app 内无 .env，此变量无害；桌面配置一律走自己的 settings.json。
   env.ASTRION_IGNORE_DOTENV = '1';
+  // Desktop Host is password-exempt and must remain loopback-only.
+  env.TERMINAL_SANDBOX_MODE = 'host';
+  env.WEB_SERVER_HOST = '127.0.0.1';
   // 桌面版数据根由壳在启动前从固定运行数据设置文件解析，绝不与 server 实例共享
   env.ASTRION_DATA_ROOT = desktopDataRoot || path.join(os.homedir(), '.astrion', 'astrion-desktop');
   // 桌面应用身份与控制桥地址：后端据此判定「自己是桌面壳内嵌实例」并代理更新接口

@@ -28,6 +28,7 @@ from .security import (
 from . import state
 from .utils_common import debug_log
 from modules.i18n import tr
+from .host_password import authorize_host_login, ordinary_login_allowed, public_host_status
 
 auth_bp = Blueprint("auth", __name__)
 AUTH_DEBUG_FILE = Path(LOGS_DIR).expanduser().resolve() / "auth_debug.log"
@@ -116,12 +117,13 @@ def issue_csrf_token():
 
 @auth_bp.route('/api/host-mode-enabled', methods=['GET'])
 def host_mode_enabled():
-    enabled = (TERMINAL_SANDBOX_MODE or "").lower() == "host" and not LINUX_SAFETY
-    return jsonify({"success": True, "enabled": enabled})
+    return jsonify(public_host_status())
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'POST' and not ordinary_login_allowed():
+        return jsonify(success=False, error=tr("auth.host_password_required")), 403
     if request.method == 'GET':
         auth_debug_log(f"[auth_debug] GET /login session={_session_debug_snapshot()} cookie={_cookie_debug_snapshot()}")
         if is_logged_in():
@@ -222,22 +224,20 @@ def login():
 
 @auth_bp.route('/host-login', methods=['POST'])
 def host_login():
-    """宿主机模式一键进入（仅当 TERMINAL_SANDBOX_MODE=host 时可用）。
-
-    该入口无任何凭证，因此只允许本机回环地址直连调用（host 模式定位为本机单人使用）；
-    经反向代理/远程访问时一律拒绝，防止公网部署下任何人一键获得 admin 会话。
-    """
+    """Optional password login; without protection keep the existing loopback entry."""
     if (TERMINAL_SANDBOX_MODE or "").lower() != "host" or LINUX_SAFETY:
         return jsonify({"success": False, "error": tr("auth.host_mode_disabled")}), 403
-    remote_addr = (request.remote_addr or "").strip()
-    if remote_addr not in {"127.0.0.1", "::1", "localhost"}:
-        return jsonify({"success": False, "error": tr("auth.host_mode_disabled")}), 403
+    credential_state, error = authorize_host_login()
+    if error is not None:
+        return error
     if not state.container_manager.has_capacity("host"):
         return jsonify({"success": False, "error": tr("auth.resource_busy")}), 503
 
     _, host_workspace = resolve_host_workspace()
-    # 初始化 session，跳过账号体系
+    # 初始化 session，跳过账号体系；绑定校验过的密码版本以撤销旧会话。
+    _revoke_login_nonce(session.get('username'), session.get('login_nonce'))
     session.clear()
+    session['host_auth_generation'] = credential_state.generation
     session['logged_in'] = True
     session['username'] = 'host'
     session['role'] = 'admin'
@@ -290,6 +290,10 @@ def host_login():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    if not ordinary_login_allowed():
+        if request.method == 'GET':
+            return redirect('/login')
+        return jsonify(success=False, error=tr("auth.host_password_required")), 403
     if request.method == 'GET':
         auth_debug_log(f"[auth_debug] GET /register session={_session_debug_snapshot()} cookie={_cookie_debug_snapshot()}")
         if is_logged_in():
@@ -367,6 +371,7 @@ def logout():
 def session_status():
     """前端调试用：查看当前会话是否已清理。"""
     snapshot = _session_debug_snapshot()
+    snapshot['logged_in'] = is_logged_in()
     auth_debug_log(f"[auth_debug] GET /api/session-status session={snapshot} cookie={_cookie_debug_snapshot()}")
     return jsonify({"success": True, "session": snapshot})
 

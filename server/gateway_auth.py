@@ -20,7 +20,7 @@ import secrets
 from pathlib import Path
 from typing import Optional
 
-from flask import current_app, jsonify, request, session
+from flask import current_app, g, jsonify, request, session
 
 from config import DATA_DIR, TERMINAL_SANDBOX_MODE
 from config.terminal import LINUX_SAFETY
@@ -91,16 +91,16 @@ def _verify_host_bearer(token: str) -> bool:
 def _inject_host_identity() -> None:
     """注入与 /host-login 等价的 host 会话身份（复用现有上下文装配逻辑）。
 
-    session 字段与 server/auth.py 的 host_login 保持一致（含 login_nonce），
-    保证路由内及下游 is_logged_in()/principal 构造等既有逻辑无差异。
+    身份只在本请求内装配，不发行浏览器登录 nonce 或 Cookie。
+    is_logged_in()/principal 仍使用相同身份字段。
 
     工作区绑定：CLI 等本机客户端以启动目录为工作区，经
     `X-Astrion-Workspace-Id` 头声明；未声明或 id 不存在时 resolve 回退默认
     工作区（与 web host-login 语义一致）。host 本机单人模型下客户端声明
     不构成越权（工作区均属同一 host 用户）。
     """
-    from server.auth import _issue_login_nonce
-
+    g.host_bearer_authenticated = True
+    session.clear()
     requested_workspace_id = (request.headers.get("X-Astrion-Workspace-Id") or "").strip() or None
     _, host_workspace = resolve_host_workspace(requested_workspace_id)
     session["logged_in"] = True
@@ -116,28 +116,31 @@ def _inject_host_identity() -> None:
     session["run_mode"] = current_app.config.get(
         "DEFAULT_RUN_MODE", "deep" if default_thinking else "fast"
     )
-    session.permanent = True
-    _issue_login_nonce("host")
+    # Never turn a local API credential into a reusable browser login.
+    session.modified = False
 
 
 def api_login_or_host_token_required(view_func):
     """双通道认证装饰器：host Bearer token 或 Web session 登录。
 
     - 携带 Bearer token 且匹配 host 通道 → 注入 host 身份并放行
-    - 否则回退 Web session 检查（is_logged_in）
-    Bearer 请求天然跳过 CSRF（server/security.py 已放行 Authorization 头）。
+    - 未携带 Bearer 时检查 Web session；无效 Bearer 不回退 Cookie
+    只有支持此通道的端点且凭证有效时才豁免 CSRF。
     """
 
     @functools.wraps(view_func)
     def wrapped(*args, **kwargs):
         token = _extract_bearer_token()
-        if token and _verify_host_bearer(token):
+        if (request.headers.get("Authorization") or "").lower().startswith("bearer "):
+            if not token or not _verify_host_bearer(token):
+                return jsonify({"success": False, "error": tr("auth.invalid_token")}), 401
             _inject_host_identity()
             return view_func(*args, **kwargs)
         if not is_logged_in():
             return jsonify({"success": False, "error": tr("auth.session_expired")}), 401
         return view_func(*args, **kwargs)
 
+    wrapped.host_bearer_auth = True
     return wrapped
 
 

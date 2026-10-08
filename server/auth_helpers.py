@@ -2,7 +2,7 @@
 from __future__ import annotations
 from functools import wraps
 from typing import Optional, Any, Dict
-from flask import session, redirect, jsonify
+from flask import g, session, redirect, jsonify
 
 from modules import admin_policy_manager
 from .utils_common import debug_log
@@ -11,6 +11,11 @@ from modules.i18n import tr
 
 
 def is_logged_in() -> bool:
+    if getattr(g, "host_bearer_authenticated", False):
+        return True
+    from .host_password import browser_session_valid
+    if not browser_session_valid():
+        return False
     username = (session.get('username') or '').strip().lower()
     if not username:
         return False

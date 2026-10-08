@@ -881,6 +881,18 @@ codegraph init --yes .
 - **调用与身份**：普通客户端通过固定 SEQPACKET socket 传严格 JSON 和三个 stdio FD；SO_PEERCRED/SO_PEERSEC/pidfd 核验身份，拒绝 UID0 和已在沙箱标签下的递归调用。UID、groups、助手路径和 unit 属性不能来自模型参数。特权阶段仅挂载，任意用户命令只能在 C 入口降到真实普通 UID/GID、清能力和开启 NNP 后执行。
 - **文件根**：系统目录和精确配置清单唯一来源为 `modules/linux_sandbox/constants.py`，主/子/只读/后台/持久终端统一走 `plans.py`。源在普通用户 fork 中逐组件 no-follow 打开并固定 FD；cwd 在降权后再次验证固定 inode。`/proc`、`/dev`、`/sys` 和内部 runtime 禁止作为宿主挂载授权。匿名 shell `/tmp`、HOME 不授权原生文件工具访问对应宿主路径；额外授权每次读取现行工作区政策，最低子档不得额外持久写入。
 - **网络与回收**：共享 host 网络；每任务独立 transient unit，restricted=deny any+allow localhost，none=deny any。runner 检查 enforcing 标签和实际 ingress/egress BPF，缺失则拒绝。受限档拒绝抽象 Unix socket；none 通过独立 seccomp 禁止新 Unix socket 和 datagram socketpair，保留匿名 stream/seqpacket IPC。客户端断开/pidfd 退出、助手停止和取消均回收本任务 unit；启动前二次握手与可撤销 lease 防迟到执行。安装后 unit 绑定 broker 服务生命周期。
-- **网页/headless**：沿用现有沙箱向导及三条 `/api/sandbox/*` 路由，Linux manager 与独立脚本共用安装实现；无系统授权方式时给终端命令。网页不收 sudo 密码。三端点共享现有 host Cookie/Bearer 装饰器，不在本轮改变认证逻辑。
+- **网页/headless**：沿用现有沙箱向导及三条 `/api/sandbox/*` 路由，Linux manager 与独立脚本共用安装实现；无系统授权方式时给终端命令。网页不收 sudo 密码。三端点共享现有 host Cookie/Bearer 装饰器，沙箱适配阶段未改变认证逻辑。
 - **证据与限制**：`test/2026-10-08_Linux_host沙箱实验/`（248 项网络/文件断言和双向 localhost）；`test/2026-10-08_Linux_host沙箱助手/`（真实 UID、完整 broker、嵌套拒绝、终端管道、SIGKILL 孙进程清理）；`test/2026-10-08_Linux_host沙箱适配/`（契约、安装回滚、Linux 专属回归和 dry-run）。这些是有限验证，不等同跨发行版安全认证或生产全局安装验收。
-- **密码功能本轮不实施**：具体方案在 `.astrion/plan/host_password_login.md`，下轮讨论后再改认证。安装脚本不设置或存储网页登录密码。安装说明见 `docs/linux_host_sandbox_setup.md`。
+- **安装与网页登录密码分离**：沙箱安装脚本不设置或存储网页登录密码。安装说明见 `docs/linux_host_sandbox_setup.md`；Host 可选密码见 §21。
+
+## 21) Host 网页可选密码保护（2026-10-08）
+
+- **默认免登录**：未运行密码脚本、缺少配置时沿用现有回环免登录。禁止按监听地址或推测公网状态强制初始化；存在但损坏的密码配置必须报错，不能静默降为免登录。
+- **唯一开启/重设入口**：`python3 scripts/host_password.py --password 'YOUR_PASSWORD'`，密码通过参数直接指定（8–1024 字符，保留空白）。脚本使用服务同一配置解析的 `DATA_DIR`，可加 `--data-dir` 显式指定。每次执行开启保护并撤销旧网页登录会话；不依赖 Astrion CLI，不打印密码。
+- **存储唯一权威**：`modules/host_auth.py`，`<DATA_DIR>/host_auth.json`（版本、enabled、scrypt 哈希、generation），0600、原子写；脚本重设与网页关闭共用跨进程文件锁。缺文件只读不创建；脚本可以修复损坏的常规配置，不写穿符号链接。
+- **scrypt 实现兼容**：`modules/host_auth_hash.py` 使用项目已有 `cryptography` 的 Scrypt，固定 n=32768/r=8/p=1/64 字节，保留 Werkzeug 哈希格式与随机盐，恒定时间比较。生成和校验都不依赖 `hashlib.scrypt`（本机 Apple Python 3.9 缺失该属性，pip 不能补齐解释器内置能力），不能只修脚本而漏掉登录校验。与原 Werkzeug 哈希双向互通；回归 `test/2026-10-08_Host密码保护_02/`，实测 3.9/3.11 脚本与校验互通，不代表项目整体支持 Python 3.9。
+- **网页认证**：`server/host_password.py` 管策略；`server/auth.py` 的 `/host-login` 接收密码，启用后允许远程密码认证；关闭时保留现有回环限制。登录 nonce 与 generation 共同校验，开启/重设/关闭令旧浏览器 session 失效。启用时隐藏并拒绝普通账户登录/注册，旧账户会话也不能绕过。设置→通用只提供验证当前密码后关闭；没有网页开启/重设接口。
+- **桌面豁免**：以壳启动后端时注入的 `ASTRION_DESKTOP_VERSION` 判断，不能相信网页 JS、HTTP 头或 query 标记。Electron/Tauri 明确设置 `TERMINAL_SANDBOX_MODE=host`、`WEB_SERVER_HOST=127.0.0.1`、`ASTRION_IGNORE_DOTENV=1`；桌面不读取或应用 Host 密码配置，不显示密码管理。
+- **本机 Bearer 独立**：`gateway_auth` 只注入请求内身份，不发行浏览器 nonce/Cookie。有效凭证只能在支持该装饰器的路由豁免 CSRF；无效 Bearer 不回退 Cookie。`security` after_request 清理临时 session 并阻止持久化，full/headless 共用；API v1 保留自己的认证。
+- **运行任务保持**：密码变更不走 logout、不清理终端/任务，不取消正在运行的工作。新网页请求需按当前密码版本认证。
+- **隔离回归**：`python3 -B test/2026-10-08_Host密码保护/run_regressions.py`，临时数据目录与合成凭证，禁读真实 `.env` 和密码/token；不启动服务。前端视觉、真实桌面启动及 Windows 文件锁行为仍需对应环境验收。

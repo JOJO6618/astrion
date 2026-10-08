@@ -27,10 +27,11 @@ body {
   width: min(100%, 390px);
   padding: 30px;
   border-radius: 18px;
-  background: var(--theme-surface-soft);
-  border: 1px solid var(--theme-control-border);
-  box-shadow: var(--theme-shadow-mid);
-  backdrop-filter: blur(8px);
+  background: var(--surface-soft);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-mid);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
 }
 
 .auth-title {
@@ -58,11 +59,11 @@ body {
 
 .auth-input {
   width: 100%;
-  min-height: 46px;
+  height: 46px;
   box-sizing: border-box;
-  border-radius: 12px;
-  border: 1px solid var(--theme-control-border);
-  background: var(--theme-surface-strong);
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-base);
   color: var(--text-primary);
   padding: 11px 12px;
   font-size: 0.95rem;
@@ -82,10 +83,10 @@ body {
   margin-top: 18px;
   border: none;
   border-radius: 999px;
-  min-height: 44px;
+  height: 44px;
   font-size: 0.95rem;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  background: var(--accent);
   color: var(--on-accent);
   transition:
     transform 0.15s ease,
@@ -107,9 +108,9 @@ body {
   width: 100%;
   margin-top: 10px;
   border-radius: 999px;
-  min-height: 42px;
-  border: 1px solid var(--accent-strong);
-  background: var(--theme-surface-strong);
+  height: 42px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-base);
   color: var(--accent-strong);
   cursor: pointer;
 }

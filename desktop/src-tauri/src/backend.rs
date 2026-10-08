@@ -388,6 +388,10 @@ fn spawn_backend(
     // 固定独立目录，绝不与任何 server 实例（8091/8092 等）共享。
     // 显式设置在清洗之后（否则会被上面的 env_remove 抹掉）。
     cmd.env("ASTRION_DATA_ROOT", data_root);
+    // Desktop Host is password-exempt and must remain loopback-only.
+    cmd.env("ASTRION_IGNORE_DOTENV", "1");
+    cmd.env("TERMINAL_SANDBOX_MODE", "host");
+    cmd.env("WEB_SERVER_HOST", "127.0.0.1");
 
     // 命令环境：Windows 上没有「登录 shell」概念，环境变量的权威来源是注册表。
     // 从资源管理器/开始菜单启动的 GUI 进程只拿到系统变量，用户自己装的

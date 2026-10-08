@@ -29,6 +29,22 @@ MESSAGES = {
         "zh-CN": "宿主机模式未启用",
         "en-US": "Host mode is not enabled",
     },
+    "auth.host_password_required": {
+        "zh-CN": "请使用 Host 密码登录",
+        "en-US": "Please sign in with the Host password",
+    },
+    "auth.host_password_incorrect": {
+        "zh-CN": "Host 密码错误",
+        "en-US": "Incorrect Host password",
+    },
+    "auth.host_password_unavailable": {
+        "zh-CN": "Host 密码配置不可用，请通过密码脚本重新设置",
+        "en-US": "Host password configuration is unavailable. Reset it using the password script.",
+    },
+    "auth.host_password_not_enabled": {
+        "zh-CN": "Host 密码保护未开启",
+        "en-US": "Host password protection is not enabled",
+    },
     "auth.resource_busy": {
         "zh-CN": "资源繁忙，请稍后再试",
         "en-US": "Resources are busy. Please try again later",
