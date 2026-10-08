@@ -280,9 +280,9 @@ class BackgroundCommandManager:
                         else os.environ.get("HOST_SANDBOX_NETWORK_PERMISSION", "restricted")
                     )
                     if sandbox_write_access:
-                        plan = build_host_sandbox_plan(command, work_path, env, network_permission=effective_network_permission)
+                        plan = build_host_sandbox_plan(command, work_path, env, network_permission=effective_network_permission, workspace_root=self.project_path)
                     else:
-                        plan = build_host_sandbox_readonly_plan(command, work_path, env, network_permission=effective_network_permission)
+                        plan = build_host_sandbox_readonly_plan(command, work_path, env, network_permission=effective_network_permission, workspace_root=self.project_path)
                     cmd_args = plan.command
                     pass_fds = ()
                     seccomp_fd = None

@@ -14,17 +14,22 @@ from .constants import SAFE_ENVIRONMENT
 from .schema import validate_request
 
 
-def build_plan(work_path, environment, argv, network_permission=None, readonly=False):
+def build_plan(work_path, environment, argv, network_permission=None, readonly=False,
+               workspace_root=None):
     # Lazy import preserves the existing SandboxPlan/HostSandboxError API.
     from modules.host_sandbox_runner import SandboxPlan, HostSandboxError
     scope = current_execution_scope()
-    root = fixed_workspace_root(scope) if scope else Path(work_path).resolve()
     cwd = Path(work_path).resolve()
     if scope:
         try:
             scoped_work_path(scope.workspace_root, str(work_path), scope)
         except ValueError as error:
             raise HostSandboxError(str(error)) from error
+        root = fixed_workspace_root(scope)
+    else:
+        # 主智能体：cwd 可以是工作区内的子目录，边界锚点由调用方显式给定。
+        # 缺省才回落 cwd——那会让沙箱把「当前目录」当工作区，等于没有边界。
+        root = Path(workspace_root).resolve() if workspace_root else cwd
     workspace_only = bool(scope and scope.workspace_only)
     reads = get_macos_readable_paths(str(root))
     writes = [] if readonly or workspace_only else get_macos_writable_paths(str(root))
@@ -47,13 +52,16 @@ def build_plan(work_path, environment, argv, network_permission=None, readonly=F
     return SandboxPlan(command=[sys.executable, client, "--request", encoded], env=environment, cwd=str(cwd))
 
 
-def build_command_plan(command, work_path, env, network_permission=None):
-    return build_plan(work_path, env, ["/bin/bash", "-c", command], network_permission)
+def build_command_plan(command, work_path, env, network_permission=None, workspace_root=None):
+    return build_plan(work_path, env, ["/bin/bash", "-c", command], network_permission,
+                      workspace_root=workspace_root)
 
 
-def build_readonly_plan(command, work_path, env, network_permission=None):
-    return build_plan(work_path, env, ["/bin/bash", "-c", command], network_permission, readonly=True)
+def build_readonly_plan(command, work_path, env, network_permission=None, workspace_root=None):
+    return build_plan(work_path, env, ["/bin/bash", "-c", command], network_permission,
+                      readonly=True, workspace_root=workspace_root)
 
 
-def build_shell_plan(work_path, env, network_permission=None, readonly=False):
-    return build_plan(work_path, env, ["/bin/bash", "-i"], network_permission, readonly)
+def build_shell_plan(work_path, env, network_permission=None, readonly=False, workspace_root=None):
+    return build_plan(work_path, env, ["/bin/bash", "-i"], network_permission,
+                      readonly=readonly, workspace_root=workspace_root)

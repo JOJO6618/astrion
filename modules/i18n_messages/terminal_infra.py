@@ -26,6 +26,10 @@ MESSAGES = {
         "zh-CN": "终端启动失败",
         "en-US": "Failed to start terminal",
     },
+    "terminal.working_dir_must_stay_in_workspace": {
+        "zh-CN": "终端工作目录必须是工作区内的相对路径（沙箱模式下不允许绝对路径或 .. 逃逸）",
+        "en-US": "Terminal working directory must be a relative path inside the workspace (absolute paths and .. escapes are not allowed in sandbox mode)",
+    },
     "terminal.session_not_found": {
         "zh-CN": "终端会话 '{session_name}' 不存在",
         "en-US": "Terminal session '{session_name}' does not exist",

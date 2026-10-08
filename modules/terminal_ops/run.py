@@ -225,11 +225,13 @@ class RunMixin:
                 if use_host_sandbox and host_sandbox_enabled():
                     if sandbox_write_access:
                         plan = build_host_sandbox_plan(
-                            command, work_path, env, network_permission=network_permission
+                            command, work_path, env, network_permission=network_permission,
+                            workspace_root=self.project_path,
                         )
                     else:
                         plan = build_host_sandbox_readonly_plan(
-                            command, work_path, env, network_permission=network_permission
+                            command, work_path, env, network_permission=network_permission,
+                            workspace_root=self.project_path,
                         )
                     cmd_args, pass_fds, seccomp_fd = self._materialize_seccomp_fd(
                         plan.command,

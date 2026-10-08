@@ -153,7 +153,7 @@ class StartMixin:
             readonly = bool(self.sandbox_options.get("host_terminal_readonly"))
             plan = build_host_sandbox_shell_plan(
                 self.working_dir, env, network_permission=network_permission,
-                readonly=readonly,
+                readonly=readonly, workspace_root=self.project_path,
             )
             cmd_args = plan.command
             pass_fds = ()

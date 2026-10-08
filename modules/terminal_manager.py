@@ -231,6 +231,56 @@ class TerminalManager:
             print(f"{OUTPUT_FORMATS['warning']} 容器已切换，正在关闭现有终端会话。")
             self.close_all()
     
+    def _main_terminal_is_direct(self) -> bool:
+        """主智能体终端是否跑在宿主机直接执行（完全访问）下。"""
+        return self.sandbox_mode == "host" and self.host_execution_mode == "direct"
+
+    def _resolve_main_work_path(self, working_dir: str) -> Path:
+        """解析主智能体终端的起始目录（无固定子作用域时的唯一守门点）。
+
+        沙箱下必须是工作区内的相对路径：绝对路径会被 pathlib 的 `/` 运算直接
+        顶掉 self.project_path，`..` 虽不 resolve 但内核照样解析出去。两者都会
+        让沙箱把工作区外的目录当成工作区挂载（astrion 可写的 /tmp、/var/log
+        会被整体挂进来），边界只剩 OS 账户权限兜底。direct（完全访问）沿用
+        旧行为，允许工作区外路径。
+        """
+        root = Path(self.project_path).resolve()
+        if self._main_terminal_is_direct():
+            target = root / str(working_dir)
+            if not target.exists():
+                target.mkdir(parents=True, exist_ok=True)
+            return target
+        candidate = Path(str(working_dir))
+        if candidate.is_absolute():
+            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
+        target = (root / candidate).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace")) from exc
+        if target.exists() and not target.is_dir():
+            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
+        if not target.exists():
+            target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def _guard_existing_work_path(self, work_path) -> Path:
+        """已有终端重建（reset）前的守门：cwd 必须落在工作区内。
+
+        与 _resolve_main_work_path 同一策略，区别是这里拿到的是终端记录里
+        已解析过的绝对路径（不是模型传的相对路径），所以只做边界校验，
+        不代建目录。direct（完全访问）沿用旧行为。
+        """
+        root = Path(self.project_path).resolve()
+        if self._main_terminal_is_direct():
+            return Path(work_path)
+        target = (root / str(work_path)).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace")) from exc
+        return target
+
     def open_terminal(
         self,
         session_name: str,
@@ -277,9 +327,7 @@ class TerminalManager:
                     # mkdir here would run with the server's unsandboxed authority.
                     raise ValueError("Scoped terminal working directory must already exist")
             elif working_dir:
-                work_path = self.project_path / working_dir
-                if not work_path.exists():
-                    work_path.mkdir(parents=True, exist_ok=True)
+                work_path = self._resolve_main_work_path(working_dir)
             else:
                 work_path = self.project_path
         except ValueError as exc:
@@ -445,9 +493,14 @@ class TerminalManager:
         try:
             if scope:
                 scoped_work_path(self.project_path, str(terminal.working_dir), scope)
+                working_dir = str(terminal.working_dir)
+            else:
+                # reset 不走 open_terminal，拿的是终端记录里的绝对路径 cwd，
+                # 必须在这里补同一条工作区边界校验；否则越过边界时只能落到
+                # 沙箱 schema 层的拒绝，报成「Linux 沙箱未就绪」误导用户。
+                working_dir = str(self._guard_existing_work_path(terminal.working_dir))
         except ValueError as exc:
             return {"success": False, "error": str(exc)}
-        working_dir = str(terminal.working_dir)
         shell_command = self.factory.get_shell_command()
         
         terminal.close()
