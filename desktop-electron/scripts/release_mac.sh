@@ -66,6 +66,9 @@ ls -lh "$DMG" "$ZIP" "$YML" | awk '{print "    " $5 "  " $9}'
 
 # ── 4) 提取本版本更新说明（首个 ## 小节，到第二个 ## 为止） ──
 NOTES_FILE="$(mktemp -t astrion-release-notes)"
+# mktemp 默认 0600，scp 会把权限带到服务器，导致 release-notes-macos.txt 被 nginx 403
+# （2026-10-07 实测；补 644 后与 Windows 的 txt 一致）
+chmod 644 "$NOTES_FILE"
 awk -v ver="$VERSION" '
   BEGIN { n = 0; found = 0 }
   /^## / {
