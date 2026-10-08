@@ -3,6 +3,8 @@ export interface ConversationSession {
   workspaceId: string;
   controller: AbortController;
   generation: number;
+  submission: object | null;
+  submissionVersion: number;
 }
 
 const sessions = new WeakMap<object, ConversationSession>();
@@ -23,7 +25,9 @@ export function beginConversationSession(
     conversationId,
     workspaceId,
     controller: new AbortController(),
-    generation: ++generation
+    generation: ++generation,
+    submission: null as object | null,
+    submissionVersion: 0
   };
   sessions.set(host, session);
   epochs.set(host, session.generation);
@@ -36,6 +40,24 @@ export function currentConversationSession(host: object) {
 
 export function ownsConversationSession(host: object, session: ConversationSession) {
   return sessions.get(host) === session && !session.controller.signal.aborted;
+}
+
+export function isConversationSubmitting(host: object) {
+  return !!currentConversationSession(host)?.submission;
+}
+
+export function beginConversationSubmission(session: ConversationSession) {
+  if (session.submission) return null;
+  const submission = {};
+  session.submission = submission;
+  session.submissionVersion++;
+  return submission;
+}
+
+export function endConversationSubmission(session: ConversationSession, submission: object) {
+  if (session.submission !== submission) return;
+  session.submission = null;
+  session.submissionVersion++;
 }
 
 export function leaveConversationSession(host: object) {

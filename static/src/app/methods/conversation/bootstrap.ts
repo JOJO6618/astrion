@@ -22,6 +22,8 @@ import {
   ownsConversationSession
 } from './session';
 
+const snapshotRequests = new WeakMap<object, object>();
+
 export const bootstrapMethods = {
   beginConversationView(conversationId, workspaceId = '') {
     const session = beginConversationSession(
@@ -44,10 +46,12 @@ export const bootstrapMethods = {
   },
   async refreshConversationSnapshot() {
     const session = currentConversationSession(this);
-    if (session && ownsConversationSession(this, session) && this.historyLoading) return;
+    if (!session || !ownsConversationSession(this, session)) return;
+    if (this.historyLoading || session.submission) return;
     const id = this.currentConversationId;
-    if (!id) return;
+    if (!id || session.conversationId !== id) return;
     return this.enterConversation(id, {
+      session,
       workspaceId: this.currentHostWorkspaceId || '',
       urlMode: 'none',
       source: 'sync'
@@ -56,8 +60,20 @@ export const bootstrapMethods = {
   async enterConversation(conversationId, options = {}) {
     const { workspaceId = '', urlMode = 'push', preserveListPosition = false } = options;
     const session = options.session || this.beginConversationView(conversationId, workspaceId);
-    const owns = () => ownsConversationSession(this, session);
-    if (!owns()) return { success: false, superseded: true };
+    const syncing = options.source === 'sync';
+    if (!ownsConversationSession(this, session) || (syncing && session.submission)) {
+      return { success: false, superseded: true };
+    }
+    const request = {};
+    const submissionVersion = session.submissionVersion;
+    snapshotRequests.set(this, request);
+    const ownsRequest = () =>
+      ownsConversationSession(this, session) && snapshotRequests.get(this) === request;
+    const owns = () =>
+      ownsRequest() &&
+      (!syncing || (!session.submission && session.submissionVersion === submissionVersion));
+    this.historyLoading = true;
+    this.historyLoadingFor = conversationId;
     const wsQuery = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
     try {
       const response = await fetch(`/api/conversations/${conversationId}/bootstrap${wsQuery}`, {
@@ -84,8 +100,9 @@ export const bootstrapMethods = {
         }
       }
       const messages = [...historyState.messages, ...live];
-      const preserveInteraction =
-        options.source === 'sync' && this.currentConversationId === normalizedId;
+      const preserveInteraction = syncing && this.currentConversationId === normalizedId;
+      // Keep the existing subscription while fetching; replace it only at commit.
+      useTaskStore().clearTask();
       this.clearLocalTaskUiState?.(`snapshot:${normalizedId}`);
       session.conversationId = normalizedId;
       if (meta.run_mode) {
@@ -138,13 +155,13 @@ export const bootstrapMethods = {
       const task = display.task;
       if (task && ['pending', 'running', 'cancel_requested'].includes(task.status)) {
         useTaskStore().attachSnapshot(task, display.next_event_idx || 0, (event) => {
-          if (owns()) this.handleTaskEvent(event);
+          if (ownsConversationSession(this, session)) this.handleTaskEvent(event);
         });
       }
       this.startRunningStateReconcile();
       // Scroll and auxiliary panels never hold up the snapshot or live subscription.
       this.$nextTick(() => {
-        if (!owns()) return;
+        if (!ownsConversationSession(this, session)) return;
         if (preserveInteraction) this.conditionalScrollToBottom?.();
         else this.scrollHistoryToBottomInstant();
       });
@@ -165,7 +182,8 @@ export const bootstrapMethods = {
       if (!owns() || error?.name === 'AbortError') return { success: false, superseded: true };
       throw error;
     } finally {
-      if (owns()) {
+      if (ownsRequest()) {
+        snapshotRequests.delete(this);
         this.historyLoading = false;
         this.historyLoadingFor = null;
       }
@@ -247,9 +265,22 @@ export const bootstrapMethods = {
           ]) {
             if (alias != null && alias !== '') this.toolRegisterAction(action, String(alias));
           }
-          if (action.tool.preparingId) this.preparingTools.set(action.tool.preparingId, action);
-          if (action.tool.status === 'preparing') this.preparingTools.set(action.tool.id, action);
-          this.toolTrackAction(action.tool.name, action);
+          const status = String(action.tool.status || '').toLowerCase();
+          if (running.is_main_running && status === 'preparing') {
+            for (const alias of [
+              action.tool.preparingId,
+              action.tool.preparing_id,
+              action.tool.id
+            ]) {
+              if (alias != null && alias !== '') this.preparingTools.set(String(alias), action);
+            }
+          }
+          if (
+            running.is_main_running &&
+            ['preparing', 'running', 'pending', 'queued', 'awaiting_user_answer'].includes(status)
+          ) {
+            this.toolTrackAction(action.tool.name, action);
+          }
         }
       }
     }

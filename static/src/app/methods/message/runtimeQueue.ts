@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { debugLog } from '../common';
 import { t } from '@/locales';
+import { currentConversationSession, ownsConversationSession } from '../conversation/session';
 
 export const runtimeQueueMethods = {
   buildRuntimeQueueSnapshotKey(messages = []) {
@@ -161,6 +162,14 @@ export const runtimeQueueMethods = {
     return normalized;
   },
   async enqueueRuntimeQueuedMessage(rawMessage, rawFiles = []) {
+    const session = currentConversationSession(this);
+    const conversationId = this.currentConversationId;
+    const owns = () =>
+      !!session &&
+      !!conversationId &&
+      ownsConversationSession(this, session) &&
+      this.currentConversationId === conversationId;
+    if (!owns()) return false;
     const text = (rawMessage || '').toString().trim();
     if (!text) {
       return false;
@@ -170,8 +179,10 @@ export const runtimeQueueMethods = {
       .slice(0, 9);
     try {
       const { useTaskStore } = await import('../../../stores/task');
+      if (!owns()) return false;
       const taskStore = useTaskStore();
       const taskId = taskStore.currentTaskId;
+      const taskGeneration = taskStore.pollGeneration;
       if (!taskId) {
         this.uiPushToast({
           title: t('appMessages.cannotQueueTitle'),
@@ -191,6 +202,7 @@ export const runtimeQueueMethods = {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (!owns() || taskStore.pollGeneration !== taskGeneration) return false;
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || t('appMessages.queueMessageFailed'));
       }
@@ -198,6 +210,7 @@ export const runtimeQueueMethods = {
       this.setRuntimeQueueSyncLock(nextQueue, 2200);
       return true;
     } catch (error) {
+      if (!owns()) return false;
       this.uiPushToast({
         title: t('appMessages.queueFailedTitle'),
         message: error?.message || t('common.retryLater'),

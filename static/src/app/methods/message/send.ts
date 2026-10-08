@@ -1,181 +1,38 @@
 // @ts-nocheck
-import { debugLog, goalModeDebugLog } from '../common';
+import { debugLog } from '../common';
 import { t } from '@/locales';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { extractSkillRefsFromMessage } from './shared';
-import { useTaskStore } from '../../../stores/task';
 import { usePreviewStore } from '../../../stores/preview';
-import { createTaskPayload } from '../../../stores/taskPolling';
-import { currentConversationSession, ownsConversationSession } from '../conversation/session';
+import { createOwnedMessageTask, ensureMessageSession } from './ownership';
+import { messageControlMethods } from './controls';
+import {
+  beginConversationSubmission,
+  endConversationSubmission,
+  ownsConversationSession
+} from '../conversation/session';
 
-export function ensureMessageSession(host: any) {
-  const conversationId = host.currentConversationId || '';
-  const workspaceId = host.currentHostWorkspaceId || '';
-  const current = currentConversationSession(host);
-  if (
-    current &&
-    ownsConversationSession(host, current) &&
-    current.conversationId === conversationId &&
-    current.workspaceId === workspaceId
-  ) {
-    return current;
-  }
-  const session = host.beginConversationView(conversationId, workspaceId);
-  host.historyLoading = false;
-  host.historyLoadingFor = null;
-  return session;
-}
-
-// Creation has the same session owner as its optimistic input. A late POST must
-// never attach its task to a view that has already navigated elsewhere.
-export async function createOwnedMessageTask(
-  host: any,
-  session: any,
-  optimisticUser: any,
-  message: string,
-  images: any[],
-  videos: any[],
-  conversationId: string,
-  options = {},
-  optimisticAssistant = host.messages[host.currentMessageIndex]
-) {
-  const owns = () => ownsConversationSession(host, session);
-  if (!owns()) return null;
-  const response = await fetch('/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: session.controller.signal,
-    body: JSON.stringify(createTaskPayload(message, images, videos, conversationId, options))
-  });
-  const result = await response.json();
-  if (!owns()) return null;
-  if (!response.ok || !result.success) {
-    throw new Error(result.error || result.message || t('appMessages.createTaskFailedMessage'));
-  }
-  if (optimisticAssistant?.role === 'assistant') optimisticAssistant.taskId = result.data.task_id;
-  let inputBound = false;
-  useTaskStore().attachSnapshot(result.data, 0, (event: any) => {
-    if (!owns()) return;
-    const data = event.data || {};
-    const messageId = data.message_id ?? data.metadata?.message_id;
-    if (
-      !inputBound &&
-      optimisticUser &&
-      event.type === 'user_message' &&
-      data.is_task_input === true &&
-      messageId != null
-    ) {
-      optimisticUser.id = messageId;
-      optimisticUser.message_id = messageId;
-      inputBound = true;
-    }
-    host.handleTaskEvent(event);
-  });
-  return result.data;
-}
+export { createOwnedMessageTask, ensureMessageSession } from './ownership';
 
 export const sendMethods = {
-  async handleSendOrStop() {
-    const hasText = !!((this.inputMessage || '').trim().length > 0);
-    const hasMedia =
-      (Array.isArray(this.selectedImages) && this.selectedImages.length > 0) ||
-      (Array.isArray(this.selectedVideos) && this.selectedVideos.length > 0);
-    const hasFiles = Array.isArray(this.selectedFiles) && this.selectedFiles.length > 0;
-    // 文件只是路径引用，不能单独构成一条消息，必须随文字/媒体一起发送。
-    // 注意：仅在主对话空闲时拦截；运行中该按钮是「停止」语义，不能影响停止功能。
-    if (hasFiles && !hasText && !hasMedia && !this.composerBusy) {
-      this.uiPushToast({
-        title: t('appMessages.textRequiredTitle'),
-        message: t('appMessages.textRequiredMessage'),
-        type: 'warning'
-      });
-      return;
-    }
-    // 主对话空闲但 composerBusy=true：composerBusy 只因后台子智能体在跑而保持。
-    // 传统模式：waitingForSubAgent=true（taskInProgress=true 。多智能体模式：has_running_multi_agent=true。
-    // 此时新文本消息应直接发送，触发主智能体下一轮工作，而不是被进队列等任务结束。
-    const mainIdle =
-      typeof this.mainChatIdle === 'function'
-        ? this.mainChatIdle
-        : !this.streamingUi && !this.stopRequested && !this.compressionActiveForCurrentConversation;
-    if (this.composerBusy && mainIdle && hasText) {
-      // 如果有 pending 问题（子智能体询问主智能体），仍走问答路径，不走直接发送
-      if (Array.isArray(this.pendingUserQuestions) && this.pendingUserQuestions.length > 0) {
-        const answered = await this.answerUserQuestionFromComposer(this.inputMessage);
-        if (answered) {
-          this.inputClearMessage();
-          this.inputSetLineCount(1);
-          this.inputSetMultiline(false);
-          this.autoResizeInput();
-        }
-        return;
+  ...messageControlMethods,
+  async sendMessage(options = {}) {
+    const session = ensureMessageSession(this);
+    const submission = beginConversationSubmission(session);
+    if (!submission) return false;
+    try {
+      return await this.sendMessageInSession(options, session);
+    } finally {
+      endConversationSubmission(session, submission);
+      if (ownsConversationSession(this, session) && this.currentConversationId) {
+        this.startRunningStateReconcile?.();
       }
-      // 主对话空闲但后台任务在跑：直接发送新消息触发主智能体下一轮
-      this.sendMessage();
-      return;
-    }
-    if (this.composerBusy && mainIdle && hasMedia) {
-      this.uiPushToast({
-        title: t('appMessages.subAgentRunningTitle'),
-        message: t('appMessages.subAgentRunningMessage'),
-        type: 'warning'
-      });
-      return;
-    }
-    if (this.composerBusy) {
-      if (hasText) {
-        if (Array.isArray(this.pendingUserQuestions) && this.pendingUserQuestions.length > 0) {
-          const answered = await this.answerUserQuestionFromComposer(this.inputMessage);
-          if (answered) {
-            this.inputClearMessage();
-            this.inputSetLineCount(1);
-            this.inputSetMultiline(false);
-            this.autoResizeInput();
-          }
-          return;
-        }
-        const queued = await this.enqueueRuntimeQueuedMessage(
-          this.inputMessage,
-          Array.isArray(this.selectedFiles) ? [...this.selectedFiles] : []
-        );
-        if (queued) {
-          this.inputClearMessage();
-          this.inputClearSelectedFiles();
-          this.inputSetLineCount(1);
-          this.inputSetMultiline(false);
-          this.autoResizeInput();
-        }
-        return;
-      }
-      if (hasMedia) {
-        this.uiPushToast({
-          title: t('appMessages.runningTextOnlyTitle'),
-          message: t('appMessages.runningTextOnlyMessage'),
-          type: 'warning'
-        });
-        return;
-      }
-      this.stopTask();
-    } else {
-      // 对账安全网：REST 对账显示当前对话仍在运行、但本地流式状态尚未恢复（如刚刷新页面）时，
-      // 阻止直接发起新任务（后端同对话互斥会 409）。排队/停止走上方 composerBusy 分支，不受此守卫影响。
-      if (this.currentWorkspaceHasRunningTask) {
-        this.uiPushToast({
-          title: t('appMessages.conversationRunningTitle'),
-          message: t('appMessages.conversationRunningMessage'),
-          type: 'warning'
-        });
-        return;
-      }
-      this.sendMessage();
     }
   },
-  async sendMessage(options = {}) {
+  async sendMessageInSession(options, session) {
     const presetText = typeof options?.presetText === 'string' ? options.presetText : null;
     const usePresetText = presetText !== null;
-
-    const session = ensureMessageSession(this);
     const owns = () => ownsConversationSession(this, session);
     usePreviewStore().resetAutoOpen();
 
@@ -470,12 +327,8 @@ export const sendMethods = {
 
     if (!owns()) return false;
 
-    // 标记任务进行中，直到任务完成或用户手动停止
+    // 对账在发送受理结束后恢复，不能用受理前的空快照覆盖乐观消息。
     this.taskInProgress = true;
-    // 启动运行状态对账循环（幂等）：发送消息后确保对账兜底在运行
-    if (typeof this.startRunningStateReconcile === 'function') {
-      this.startRunningStateReconcile();
-    }
     const localMessageSource = usePresetText
       ? options?.source === 'runtime_queue_manual_guide'
         ? 'guidance'
@@ -596,122 +449,5 @@ export const sendMethods = {
       }
     }, 1000);
     return true;
-  },
-  async stopTask() {
-    if (this._stopTaskRunning) {
-      goalModeDebugLog('stopTask:debounce-rejected', { stopRequested: this.stopRequested });
-      return;
-    }
-    this._stopTaskRunning = true;
-    const session = ensureMessageSession(this);
-    const owns = () => ownsConversationSession(this, session);
-
-    // 压缩属于主智能体活动，停止精确取消当前任务。
-    const canStop =
-      (this.streamingUi || this.compressionActiveForCurrentConversation) && !this.stopRequested;
-
-    goalModeDebugLog('stopTask:entry', {
-      composerBusy: this.composerBusy,
-      stopRequested: this.stopRequested,
-      taskInProgress: this.taskInProgress,
-      streamingUi: this.streamingUi,
-      canStop,
-      currentTaskId: this.currentTaskId
-    });
-    if (!canStop) {
-      this._stopTaskRunning = false;
-      return;
-    }
-
-    const shouldDropToolEvents = this.streamingUi;
-    if (typeof this.markRuntimeQueueSuppressedByManualStop === 'function') {
-      this.markRuntimeQueueSuppressedByManualStop();
-    }
-    this.stopRequested = true;
-    this.dropToolEvents = shouldDropToolEvents;
-    if (this.goalRunning || this.goalModeArmed) {
-      this.goalRunning = false;
-      this.goalModeArmed = false;
-      this.goalProgress = null;
-      this.goalDialogOpen = false;
-    }
-
-    try {
-      const taskStore = useTaskStore();
-
-      if (taskStore.currentTaskId) {
-        await taskStore.cancelTask();
-      }
-
-      // 等待后端确认；轮询继续，task_stopped 事件到达后会由 taskStore 自动停止轮询
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      if (!owns()) return;
-
-      const shouldKeepBusy = ['running', 'pending', 'cancel_requested', 'canceled'].includes(
-        String(taskStore.taskStatus)
-      );
-
-      goalModeDebugLog('stopTask:try-end', {
-        currentTaskId: taskStore.currentTaskId,
-        taskStatus: taskStore.taskStatus,
-        shouldKeepBusy,
-        streamingMessage: this.streamingMessage
-      });
-
-      // 清理前端状态
-      this.clearPendingTools('user_stop');
-      this.streamingMessage = false;
-      // 若后台已回传停止事件，不要再次把输入区锁回“停止中”
-      this.taskInProgress = shouldKeepBusy;
-      this.forceUnlockMonitor('user_stop');
-
-      // 清理assistant消息的等待动画状态
-      const lastMessage = this.messages[this.messages.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant') {
-        lastMessage.awaitingFirstContent = false;
-        lastMessage.generatingLabel = '';
-      }
-    } catch (error) {
-      if (!owns()) return;
-      console.error('[Message] 取消任务失败:', error);
-      const taskStore = useTaskStore();
-      const shouldKeepBusy = ['running', 'pending', 'cancel_requested', 'canceled'].includes(
-        String(taskStore.taskStatus)
-      );
-
-      goalModeDebugLog('stopTask:catch', {
-        error: String(error),
-        currentTaskId: taskStore.currentTaskId,
-        taskStatus: taskStore.taskStatus,
-        shouldKeepBusy
-      });
-
-      // 即使失败也清理状态
-      this.clearPendingTools('user_stop');
-      this.streamingMessage = false;
-      // 如果任务其实已结束，允许按钮恢复发送态
-      this.taskInProgress = shouldKeepBusy;
-      this.forceUnlockMonitor('user_stop');
-
-      // 清理assistant消息的等待动画状态
-      const lastMessage = this.messages[this.messages.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant') {
-        lastMessage.awaitingFirstContent = false;
-        lastMessage.generatingLabel = '';
-      }
-
-      this.uiPushToast({
-        title: t('appMessages.stopRequestedTitle'),
-        message: t('appMessages.stopRequestedMessage'),
-        type: 'info'
-      });
-    } finally {
-      // 确保清除 dropToolEvents 和 stopRequested 标志
-      if (owns()) {
-        this.dropToolEvents = false;
-        this.stopRequested = false;
-      }
-      this._stopTaskRunning = false;
-    }
   }
 };

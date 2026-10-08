@@ -33,12 +33,22 @@ export const probeMethods = {
   async reconcileRunningStateOnce() {
     const session = currentConversationSession(this);
     const id = this.currentConversationId;
-    if (!session || !ownsConversationSession(this, session) || !id || this.historyLoading) return;
+    if (
+      !session ||
+      !ownsConversationSession(this, session) ||
+      !id ||
+      this.historyLoading ||
+      session.submission
+    )
+      return;
     if (requests.get(this) === session) return;
+    const submissionVersion = session.submissionVersion;
     requests.set(this, session);
     const owns = () =>
       ownsConversationSession(this, session) &&
       requests.get(this) === session &&
+      !session.submission &&
+      session.submissionVersion === submissionVersion &&
       this.currentConversationId === id;
     try {
       const query = session.workspaceId

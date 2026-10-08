@@ -52,7 +52,7 @@ function fixture() {
   for (const [alias, key] of Object.entries(methods)) host[alias] = chat[key].bind(chat);
   const requests = [], attachments = [];
   const payload = compile('static/src/stores/taskPolling.ts');
-  const send = compile(`${base}message/send.ts`, {
+  const send = compile(`${base}message/ownership.ts`, {
     '../common': { debugLog: noop, goalModeDebugLog: noop }, '@/locales': locale,
     '../../../stores/model': {}, '../../../stores/personalization': {}, './shared': {},
     '../../../stores/task': { useTaskStore: () => ({ attachSnapshot: (...args) => attachments.push(args) }) },
