@@ -51,7 +51,11 @@ export const aiStreamMethods = {
     msg.streamAttemptStart = msg.actions.length;
     msg.streamAttemptBatchId = this._summaryToolBatchId || '';
     msg.awaitingFirstContent = !msg.actions.length;
-    msg.generatingLabel = msg.awaitingFirstContent ? t('appTasks.thinkingLabel') : '';
+    // 保底语义：已有占位标签（发送时生成的随机趣味文案）时保留，仅缺失时兜底「思考中...」，
+    // 避免首事件到达后把随机标签覆盖成固定文案。
+    msg.generatingLabel = msg.awaitingFirstContent
+      ? msg.generatingLabel || t('appTasks.thinkingLabel')
+      : '';
     this.waitingForSubAgent = false;
     this.taskInProgress = true;
     this.stopRequested = false;
