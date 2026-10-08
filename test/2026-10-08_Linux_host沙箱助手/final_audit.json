@@ -1,0 +1,13 @@
+{
+  "remaining_units": "",
+  "unit_query_code": 0,
+  "remaining_profiles": [],
+  "remaining_job_dirs": [],
+  "remaining_control_sockets": [],
+  "remaining_experiment_bpf": [],
+  "system_bwrap": null,
+  "root_mode": "0o700",
+  "production_install_performed": false,
+  "existing_business_services_changed": false,
+  "clean": true
+}

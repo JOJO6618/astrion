@@ -1,0 +1,653 @@
+{
+  "policy": {
+    "library": "libseccomp.so.2",
+    "bytes": 656,
+    "rule_count": 52
+  },
+  "variants": [
+    {
+      "name": "ordinary_full",
+      "readonly": false,
+      "restricted": false,
+      "profile": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "ok": true,
+          "value": "authorized"
+        },
+        "authorized_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "ok": true,
+          "value": "connected-no-data-sent"
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "host_nonloopback_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      },
+      "identity": {
+        "apparmor": {
+          "ok": true,
+          "value": "unconfined"
+        },
+        "created_file_owner": 65534,
+        "euid": 65534,
+        "gid": 65534,
+        "git_init": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "git_status": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "groups": [
+          65534
+        ],
+        "home_owner": 65534,
+        "home_write": {
+          "ok": true,
+          "value": 12
+        },
+        "node": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "v20.19.5\n"
+        },
+        "node_worker": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "worker-ok\n"
+        },
+        "npm": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "10.8.2\n"
+        },
+        "profile_escape": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "root_private_chmod": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "root_private_read": {
+          "errno": 13,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "status": {
+          "CapBnd": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapPrm": "0000000000000000",
+          "Gid": "65534\t65534\t65534\t65534",
+          "NoNewPrivs": "1",
+          "Seccomp": "2",
+          "Uid": "65534\t65534\t65534\t65534"
+        },
+        "uid": 65534,
+        "venv_create": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "venv_python": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "venv-ok\n"
+        }
+      }
+    },
+    {
+      "name": "ordinary_restricted",
+      "readonly": false,
+      "restricted": true,
+      "profile": true,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "errno": 13,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "ok": true,
+          "value": "authorized"
+        },
+        "authorized_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "host_nonloopback_udp": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      },
+      "identity": {
+        "apparmor": {
+          "ok": true,
+          "value": "astrion-exp-linux-20261008-b03 (enforce)"
+        },
+        "created_file_owner": 65534,
+        "euid": 65534,
+        "gid": 65534,
+        "git_init": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "git_status": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "groups": [
+          65534
+        ],
+        "home_owner": 65534,
+        "home_write": {
+          "ok": true,
+          "value": 12
+        },
+        "node": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "v20.19.5\n"
+        },
+        "node_worker": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "worker-ok\n"
+        },
+        "npm": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "10.8.2\n"
+        },
+        "profile_escape": {
+          "returncode": 1,
+          "stderr": "[26] aa-exec: ERROR: insufficient permissions to change to the profile 'unconfined'\n",
+          "stdout": ""
+        },
+        "root_private_chmod": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "root_private_read": {
+          "errno": 13,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "status": {
+          "CapBnd": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapPrm": "0000000000000000",
+          "Gid": "65534\t65534\t65534\t65534",
+          "NoNewPrivs": "1",
+          "Seccomp": "2",
+          "Uid": "65534\t65534\t65534\t65534"
+        },
+        "uid": 65534,
+        "venv_create": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "venv_python": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "venv-ok\n"
+        }
+      }
+    },
+    {
+      "name": "ordinary_readonly",
+      "readonly": true,
+      "restricted": true,
+      "profile": true,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "errno": 13,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "ok": true,
+          "value": "authorized"
+        },
+        "authorized_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "host_nonloopback_udp": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "workspace_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        }
+      },
+      "identity": {
+        "apparmor": {
+          "ok": true,
+          "value": "astrion-exp-linux-20261008-b03 (enforce)"
+        },
+        "euid": 65534,
+        "gid": 65534,
+        "groups": [
+          65534
+        ],
+        "home_owner": 65534,
+        "home_write": {
+          "ok": true,
+          "value": 12
+        },
+        "node": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "v20.19.5\n"
+        },
+        "node_worker": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "worker-ok\n"
+        },
+        "npm": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "10.8.2\n"
+        },
+        "profile_escape": {
+          "returncode": 1,
+          "stderr": "[26] aa-exec: ERROR: insufficient permissions to change to the profile 'unconfined'\n",
+          "stdout": ""
+        },
+        "root_private_chmod": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_private_read": {
+          "errno": 13,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "status": {
+          "CapBnd": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapPrm": "0000000000000000",
+          "Gid": "65534\t65534\t65534\t65534",
+          "NoNewPrivs": "1",
+          "Seccomp": "2",
+          "Uid": "65534\t65534\t65534\t65534"
+        },
+        "uid": 65534
+      }
+    }
+  ],
+  "units": [
+    "astrion-sandbox-b03-0",
+    "astrion-sandbox-b03-1",
+    "astrion-sandbox-b03-2"
+  ],
+  "profile_unload_returncode": 0
+}

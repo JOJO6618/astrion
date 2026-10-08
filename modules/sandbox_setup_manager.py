@@ -483,4 +483,8 @@ class SandboxSetupManager:
             return None
 
 
-sandbox_setup_manager = SandboxSetupManager()
+if sys.platform.startswith("linux"):
+    from modules.linux_sandbox.setup_manager import LinuxSandboxSetupManager
+    sandbox_setup_manager = LinuxSandboxSetupManager()
+else:
+    sandbox_setup_manager = SandboxSetupManager()

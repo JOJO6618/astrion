@@ -59,7 +59,26 @@ export default {
   sectionMissing: 'Not installed',
   sectionChecking: 'Checking...',
   sectionUnavailable: 'Not applicable in this environment',
-  sectionDesc: 'In Windows host mode, commands run isolated inside a WSL2-based sandbox.',
+  sectionDesc:
+    'Windows uses WSL2; Linux isolates commands through an administrator-installed helper.',
+  linuxIntro:
+    'Install system dependencies and a restricted helper. Astrion and commands still run as an ordinary OS user.',
+  linuxNetwork:
+    'Restricted networking supports host localhost in both directions and Unix sockets within authorized paths.',
+  linuxLocation:
+    'The helper is installed at {path}; its configuration and service are maintained by the administrator.',
+  linuxMissing:
+    'The Linux helper is not ready. Initial support covers Ubuntu 24.04 with systemd, cgroup v2 and AppArmor.',
+  linuxTerminal: 'Run this command in a terminal on the Astrion server, then check again.',
+  linuxAdmin:
+    'Setup requests OS administrator authorization and installs dependencies, the helper and its system service.',
+  linuxCommand: 'Administrator install command',
+  linuxCheckSystem: 'Check system and permissions',
+  linuxDependencies: 'Install system dependencies',
+  linuxBuildHelper: 'Compile restricted helper',
+  linuxPolicies: 'Install isolation policies',
+  linuxService: 'Start helper service',
+  linuxVerify: 'Verify ordinary user and isolation',
   openWizard: 'Open Setup Wizard',
   recheck: 'Re-check',
   neverAgainSet: '"Don\'t ask again" is on',

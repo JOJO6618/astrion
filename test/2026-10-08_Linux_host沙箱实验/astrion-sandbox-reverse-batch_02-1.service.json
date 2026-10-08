@@ -1,0 +1,6 @@
+{
+  "cgroup": "/system.slice/astrion-sandbox-reverse-batch_02-1.service",
+  "bpf_returncode": 0,
+  "attached_programs": "ID       AttachType      AttachFlags     Name           \n189      cgroup_inet_ingress multi           sd_fw_ingress                  \n188      cgroup_inet_egress multi           sd_fw_egress                   \n",
+  "stderr": ""
+}

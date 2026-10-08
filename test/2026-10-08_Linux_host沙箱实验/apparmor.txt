@@ -1,0 +1,4 @@
+audit: type=1400 audit(1791395129.774:125): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=75179 comm="unshare" requested="userns_create" target="unprivileged_userns"
+audit: type=1400 audit(1791395129.779:126): apparmor="AUDIT" operation="userns_create" class="namespace" info="Userns create - transitioning profile" profile="unconfined" pid=75180 comm="bwrap" requested="userns_create" target="unprivileged_userns"
+audit: type=1400 audit(1791395129.780:127): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=75181 comm="bwrap" capability=8  capname="setpcap"
+audit: type=1400 audit(1791395129.781:128): apparmor="DENIED" operation="capable" class="cap" profile="unprivileged_userns" pid=75181 comm="bwrap" capability=12  capname="net_admin"

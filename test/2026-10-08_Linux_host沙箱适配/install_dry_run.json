@@ -1,0 +1,14 @@
+{
+  "supported": true,
+  "user": "nobody",
+  "uid": 65534,
+  "install_root": "/usr/local/libexec/astrion-sandbox",
+  "socket": "/run/astrion-sandbox/control.sock",
+  "config": "/etc/astrion-sandbox/helper.json",
+  "service": "/etc/systemd/system/astrion-sandbox.service",
+  "profile": "/etc/apparmor.d/astrion-linux-sandbox",
+  "missing": [
+    "bwrap"
+  ],
+  "install_dependencies": true
+}

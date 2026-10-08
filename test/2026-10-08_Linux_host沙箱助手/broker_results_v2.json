@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "network": "full",
+      "readonly": false,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"uid\": 65534, \"gid\": 65534, \"cwd\": \"/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace\", \"label\": \"astrion-linux-sandbox-full (enforce)\", \"outside\": 2, \"escape\": 2, \"private\": 13, \"authorized\": \"authorized\", \"write\": true, \"owner\": 65534, \"localhost\": true, \"path\": true, \"abstract\": true, \"socketpair\": true, \"node\": 0, \"npm\": 0, \"git\": 0, \"status\": {\"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"NoNewPrivs\": \"1\", \"Seccomp\": \"2\"}}\n",
+      "probe": {
+        "uid": 65534,
+        "gid": 65534,
+        "cwd": "/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace",
+        "label": "astrion-linux-sandbox-full (enforce)",
+        "outside": 2,
+        "escape": 2,
+        "private": 13,
+        "authorized": "authorized",
+        "write": true,
+        "owner": 65534,
+        "localhost": true,
+        "path": true,
+        "abstract": true,
+        "socketpair": true,
+        "node": 0,
+        "npm": 0,
+        "git": 0,
+        "status": {
+          "CapPrm": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapBnd": "0000000000000000",
+          "NoNewPrivs": "1",
+          "Seccomp": "2"
+        }
+      }
+    },
+    {
+      "network": "restricted",
+      "readonly": false,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"uid\": 65534, \"gid\": 65534, \"cwd\": \"/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace\", \"label\": \"astrion-linux-sandbox-restricted (enforce)\", \"outside\": 2, \"escape\": 2, \"private\": 13, \"authorized\": \"authorized\", \"write\": true, \"owner\": 65534, \"localhost\": true, \"path\": true, \"abstract\": false, \"abstract_errno\": 13, \"socketpair\": true, \"node\": 0, \"npm\": 0, \"git\": 0, \"status\": {\"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"NoNewPrivs\": \"1\", \"Seccomp\": \"2\"}}\n",
+      "probe": {
+        "uid": 65534,
+        "gid": 65534,
+        "cwd": "/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace",
+        "label": "astrion-linux-sandbox-restricted (enforce)",
+        "outside": 2,
+        "escape": 2,
+        "private": 13,
+        "authorized": "authorized",
+        "write": true,
+        "owner": 65534,
+        "localhost": true,
+        "path": true,
+        "abstract": false,
+        "abstract_errno": 13,
+        "socketpair": true,
+        "node": 0,
+        "npm": 0,
+        "git": 0,
+        "status": {
+          "CapPrm": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapBnd": "0000000000000000",
+          "NoNewPrivs": "1",
+          "Seccomp": "2"
+        }
+      }
+    },
+    {
+      "network": "restricted",
+      "readonly": true,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"uid\": 65534, \"gid\": 65534, \"cwd\": \"/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace\", \"label\": \"astrion-linux-sandbox-restricted (enforce)\", \"outside\": 2, \"escape\": 2, \"private\": 13, \"authorized\": \"authorized\", \"write\": false, \"write_errno\": 30, \"localhost\": true, \"path\": true, \"abstract\": false, \"abstract_errno\": 13, \"socketpair\": true, \"node\": 0, \"npm\": 0, \"git\": 0, \"status\": {\"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"NoNewPrivs\": \"1\", \"Seccomp\": \"2\"}}\n",
+      "probe": {
+        "uid": 65534,
+        "gid": 65534,
+        "cwd": "/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace",
+        "label": "astrion-linux-sandbox-restricted (enforce)",
+        "outside": 2,
+        "escape": 2,
+        "private": 13,
+        "authorized": "authorized",
+        "write": false,
+        "write_errno": 30,
+        "localhost": true,
+        "path": true,
+        "abstract": false,
+        "abstract_errno": 13,
+        "socketpair": true,
+        "node": 0,
+        "npm": 0,
+        "git": 0,
+        "status": {
+          "CapPrm": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapBnd": "0000000000000000",
+          "NoNewPrivs": "1",
+          "Seccomp": "2"
+        }
+      }
+    },
+    {
+      "network": "none",
+      "readonly": false,
+      "code": 0,
+      "stderr": "",
+      "stdout": "{\"uid\": 65534, \"gid\": 65534, \"cwd\": \"/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace\", \"label\": \"astrion-linux-sandbox-none (enforce)\", \"outside\": 2, \"escape\": 2, \"private\": 13, \"authorized\": \"authorized\", \"write\": true, \"owner\": 65534, \"localhost\": false, \"localhost_errno\": null, \"path\": false, \"path_errno\": 1, \"abstract\": false, \"abstract_errno\": 1, \"socketpair\": true, \"node\": 0, \"npm\": 0, \"git\": 0, \"status\": {\"CapPrm\": \"0000000000000000\", \"CapEff\": \"0000000000000000\", \"CapBnd\": \"0000000000000000\", \"NoNewPrivs\": \"1\", \"Seccomp\": \"2\"}}\n",
+      "probe": {
+        "uid": 65534,
+        "gid": 65534,
+        "cwd": "/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_12/workspace",
+        "label": "astrion-linux-sandbox-none (enforce)",
+        "outside": 2,
+        "escape": 2,
+        "private": 13,
+        "authorized": "authorized",
+        "write": true,
+        "owner": 65534,
+        "localhost": false,
+        "localhost_errno": null,
+        "path": false,
+        "path_errno": 1,
+        "abstract": false,
+        "abstract_errno": 1,
+        "socketpair": true,
+        "node": 0,
+        "npm": 0,
+        "git": 0,
+        "status": {
+          "CapPrm": "0000000000000000",
+          "CapEff": "0000000000000000",
+          "CapBnd": "0000000000000000",
+          "NoNewPrivs": "1",
+          "Seccomp": "2"
+        }
+      }
+    }
+  ],
+  "nested_request": {
+    "code": 0,
+    "stdout": "{\"nested_refused\": true}\n",
+    "stderr": ""
+  },
+  "terminal_pipe": {
+    "code": 0,
+    "stdout": "terminal-check\n",
+    "stderr": "bash: cannot set terminal process group (1): Inappropriate ioctl for device\nbash: no job control in this shell\nbash-5.2$ echo terminal-check; exit\nexit\n"
+  },
+  "source_checks": {
+    "private_parent": 125,
+    "symlink": 125
+  },
+  "cancel_grandchild_gone": true,
+  "profile_unload": 0,
+  "jobs_remaining": []
+}

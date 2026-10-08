@@ -1,0 +1,14 @@
+{
+  "apparmor_restrict_unprivileged_userns": "1",
+  "unprivileged_userns_clone": "1",
+  "ordinary_user_unshare": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "unshare: write failed /proc/self/uid_map: Operation not permitted\n"
+  },
+  "ordinary_user_bwrap": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted\n"
+  }
+}

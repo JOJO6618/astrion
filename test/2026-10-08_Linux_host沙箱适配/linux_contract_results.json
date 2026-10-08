@@ -1,0 +1,11 @@
+{
+  "tests": 16,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "omitted_app_import_tests": [
+    "test_installation.InstallationTests.test_non_linux_import_does_not_require_unix_transport",
+    "test_linux_sandbox.ConstructionTests.test_application_plans_encode_trusted_scope_and_fail_closed"
+  ],
+  "ok": true
+}

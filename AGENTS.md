@@ -469,7 +469,8 @@ AI 执行以下流程时，每一步都要向用户说明在做什么：
   - 可写 profile 已于 2026-08-30 白名单化（此前为全局可读，导致 unrestricted/审批批准后能读授权范围外文件）；白名单固有代价：祖先目录顶层文件名可列出（读文件内容仍被拒）
   - 持久终端 shell plan 支持 readonly 参数（`_build_macos_shell_plan` 复用 `_macos_readonly_profile_for_workspace`）：受限档终端以只读 profile 创建，unrestricted 保持可写 profile
   - 原生文件工具对齐（`file_manager/path_mixin.py`）：读 roots 与沙箱白名单同源（系统路径 + 工作区 + 授权）+ 叠加同一禁读清单——至此 host+sandbox 下全部读通道（只读/可写沙箱命令、原生 read_file）共享同一边界
-- **Linux 宿主机 = bwrap**：只读为 `--ro-bind / /`（全局只读）；可写为 `--ro-bind / /` + 工作区可写 bind——**读侧仍是全局可读，尚未对齐白名单**；**2026-09-04 起官方口径：Linux 宿主机沙箱未测试、未适配、不可用**（README 与官网文档已同步声明；待有 Linux 测试环境再适配）；**Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合
+- **Linux 宿主机（2026-10）= 管理员安装的受限助手**：bwrap 最小文件系统 + seccomp + AppArmor + systemd/cgroup IP 过滤；不再挂载宿主 `/`。共享 host 网络保证双向 localhost；restricted 允许回环和授权路径 Unix socket、阻断抽象 Unix socket；none 保留匿名 stream/seqpacket socketpair。最后降到真实普通 UID 并清能力。首批 Ubuntu 24.04/kernel 6.8 隔离实验通过，系统全局安装和其它发行版仍待验收。原生 IO 与精确系统白名单同源，不给实际宿主 `/tmp` 隐式授权。具体约束见 §20。
+- **Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合。
 
 ## 11) 多智能体对话类型（multi-agent conversation type）
 
@@ -855,7 +856,7 @@ codegraph init --yes .
 - `create_sub_agent`（普通/多智能体）必填 `access_level`：`workspace_write`、`sandbox_write`、`full_access`。创建时校验主权限上限；plan/readonly 仍可创建最低档并交付工作区文件。每个新实例保存创建时规范化的 `workspace_root` 与固定档位，恢复时核对原路径身份，不重新 resolve 后扩大授权。旧记录缺少档位不迁移、不恢复。
 - 可信权限唯一入口为 `modules/execution_scope.py` 的 ContextVar；子工具通过 `modules/sub_agent/execution.py` 使用独立 FileManager/TerminalOperator/TerminalManager，不修改父对象再恢复。路径授权每次读取现行配置；父权限和执行环境切换不改变已有子档位，也不发送误导环境通知。子工具只开放自身白名单，不继承父自定义分派，不开放后台命令或单次升级参数。
 - `workspace_write` 的写根始终为创建时工作区，命令 cwd 只能在其内。macOS 临时文件放 `.astrion/sub_agent_runtime/<actor哈希>/tmp`，不附带宿主 `/tmp` 或额外路径写授权。原生 IO 使用 POSIX no-follow 描述符或 Windows 句柄，拒绝替换链接、特殊文件和多硬链接写入；媒体读取复用安全二进制接口。交付目录按路径组件检查并安全新建，不使用字符串 startswith。
-- Docker 不支持 `full_access`。最低档通过 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，不使用 DAC 降级或宿主机回退。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`），临时文件也在工作区。Landlock 不覆盖的权限/归属/扩展属性等元数据系统调用由 seccomp 拒绝。`sandbox_write` 沿用现有容器边界。Docker/Windows 的真实运行行为仍需对应平台验收；Linux 宿主机维持原未适配口径。
+- Docker 不支持 `full_access`。最低档通过 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，不使用 DAC 降级或宿主机回退。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`），临时文件也在工作区。Landlock 不覆盖的权限/归属/扩展属性等元数据系统调用由 seccomp 拒绝。`sandbox_write` 沿用现有容器边界。Docker/Windows 的真实运行行为仍需对应平台验收；Linux 首批适配与验证范围见 §20。
 - 主 `run_command` 的 `request_full_access=true` 必须提供非空原因；plan/readonly 拒绝，Docker/远端替身后端不伪装支持宿主机直接执行。已处于 direct 时无需额外申请。Windows direct 使用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。
 - 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。开启自动审核时自动与人工独立裁决，任一拒绝即终结，两项通过才执行；人工先允许不能取消自动审核。可信记录保存执行者/根/对话/任务/工具调用/完整参数，`claim_execution` 原子领取一次；`FullAccessGrant.consume` 在原生命令入口再次核对并消费。授权失效返回正常工具失败结果，不中断历史消息配对。内置工具名禁止被自定义注册或分派覆盖。
 - 前台、后台均绑定该次权限，不改变主对话全局状态。后台创建经 `asyncio.to_thread`；Popen 与取消在相同锁内握手，取消发生在 ID 分配前时通过 Event 与回调处理迟到创建。正常后台完成不等于取消全部后台任务。
@@ -871,3 +872,15 @@ codegraph init --yes .
 - **身份与生命周期**：事件和持久化共享用户 `message_id`；动作使用 task/event 身份，工具 preparing/execution/call 别名在 hydrate 一次登记。重试只重置明确动作区间。压缩提交后 rebase 显示前缀并接管新快照；检查点按用户/工作区/对话退役旧显示。前台结束但后台仍活动时保持活动状态；新任务绑定释放旧完整显示副本。
 - **存储边界**：`read_conversation`（兼容名 `load_conversation`）不做迁移回写；同持久化目录共享锁保护完整读合并写。锁顺序为显示锁→任务锁，不在任务锁内反向获取显示锁；持久化提交释放目录锁后再发布显示事件。仍维持单后端进程约束。
 - **回归**：`test/2026-10-07_运行对话快照/`，统一入口 `python -B test/2026-10-07_运行对话快照/run_regressions.py`（需已安装项目依赖及 Node；本机验证解释器为 `/opt/homebrew/bin/python3.11`）。测试隔离运行态、不启动服务、不读真实对话。视觉由用户验收，首次历史仍全量读取，不将离线回归等同于所有卡顿消失。
+
+## 20) Linux host 沙箱（2026-10-08 首批适配）
+
+- **独立安装入口**：`sudo bash scripts/setup-linux-sandbox.sh`，默认授权 `SUDO_USER`；root 直接安装必须加 `--user <普通账户>`。支持 `--dry-run`、`--status`、`--no-install-dependencies`。不依赖 Astrion CLI，也不启动后端。底层 `modules/linux_sandbox/setup.py` 可独立调用。
+- **首批环境**：Ubuntu 24.04、kernel 6.8、systemd 255、cgroup v2、AppArmor、libseccomp；其它发行版不自动放行。安装器可装系统依赖，但不得通过关闭 AppArmor/userns 限制或降级 direct 来绕过失败。安装器全局安装与网页 sudo/polkit 仍需实机验收。
+- **可信助手**：`/usr/local/libexec/astrion-sandbox` + `/etc/astrion-sandbox/helper.json` + `astrion-sandbox.service`。代码、配置、C 身份入口和 BPF 必须 root-owned、不可由普通用户修改。运行时不从用户源码树导入 root Python 模块。成功升级保留旧助手备份，验收失败回滚旧文件及服务状态。
+- **调用与身份**：普通客户端通过固定 SEQPACKET socket 传严格 JSON 和三个 stdio FD；SO_PEERCRED/SO_PEERSEC/pidfd 核验身份，拒绝 UID0 和已在沙箱标签下的递归调用。UID、groups、助手路径和 unit 属性不能来自模型参数。特权阶段仅挂载，任意用户命令只能在 C 入口降到真实普通 UID/GID、清能力和开启 NNP 后执行。
+- **文件根**：系统目录和精确配置清单唯一来源为 `modules/linux_sandbox/constants.py`，主/子/只读/后台/持久终端统一走 `plans.py`。源在普通用户 fork 中逐组件 no-follow 打开并固定 FD；cwd 在降权后再次验证固定 inode。`/proc`、`/dev`、`/sys` 和内部 runtime 禁止作为宿主挂载授权。匿名 shell `/tmp`、HOME 不授权原生文件工具访问对应宿主路径；额外授权每次读取现行工作区政策，最低子档不得额外持久写入。
+- **网络与回收**：共享 host 网络；每任务独立 transient unit，restricted=deny any+allow localhost，none=deny any。runner 检查 enforcing 标签和实际 ingress/egress BPF，缺失则拒绝。受限档拒绝抽象 Unix socket；none 通过独立 seccomp 禁止新 Unix socket 和 datagram socketpair，保留匿名 stream/seqpacket IPC。客户端断开/pidfd 退出、助手停止和取消均回收本任务 unit；启动前二次握手与可撤销 lease 防迟到执行。安装后 unit 绑定 broker 服务生命周期。
+- **网页/headless**：沿用现有沙箱向导及三条 `/api/sandbox/*` 路由，Linux manager 与独立脚本共用安装实现；无系统授权方式时给终端命令。网页不收 sudo 密码。三端点共享现有 host Cookie/Bearer 装饰器，不在本轮改变认证逻辑。
+- **证据与限制**：`test/2026-10-08_Linux_host沙箱实验/`（248 项网络/文件断言和双向 localhost）；`test/2026-10-08_Linux_host沙箱助手/`（真实 UID、完整 broker、嵌套拒绝、终端管道、SIGKILL 孙进程清理）；`test/2026-10-08_Linux_host沙箱适配/`（契约、安装回滚、Linux 专属回归和 dry-run）。这些是有限验证，不等同跨发行版安全认证或生产全局安装验收。
+- **密码功能本轮不实施**：具体方案在 `.astrion/plan/host_password_login.md`，下轮讨论后再改认证。安装脚本不设置或存储网页登录密码。安装说明见 `docs/linux_host_sandbox_setup.md`。

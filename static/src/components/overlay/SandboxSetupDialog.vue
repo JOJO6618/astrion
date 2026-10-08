@@ -35,7 +35,8 @@
             </div>
             <p v-if="stateDescription" class="sandbox-setup-state-desc">{{ stateDescription }}</p>
             <p v-else class="sandbox-setup-state-desc">{{ $t('sandbox.stateChecking') }}</p>
-            <ul class="sandbox-setup-facts">
+            <LinuxSandboxInstallInfo v-if="isLinux" :status="store.status" />
+            <ul v-else class="sandbox-setup-facts">
               <li>{{ $t('sandbox.introWhat') }}</li>
               <li>{{ $t('sandbox.introEffect') }}</li>
               <li>{{ $t('sandbox.introDisk', { path: installPathHint }) }}</li>
@@ -142,12 +143,22 @@
               <span>{{ $t('sandbox.neverAgain') }}</span>
             </label>
             <div class="sandbox-setup-spacer"></div>
+            <button
+              v-if="isLinux"
+              type="button"
+              class="sandbox-setup-btn ghost"
+              :disabled="store.checking"
+              @click="store.recheck()"
+            >
+              {{ $t('sandbox.recheck') }}
+            </button>
             <button type="button" class="sandbox-setup-btn ghost" @click="onClose">
               {{ $t('sandbox.later') }}
             </button>
             <button
               type="button"
               class="sandbox-setup-btn primary"
+              v-if="!isLinux || store.status?.can_install"
               :disabled="store.starting || store.checking || !store.status"
               @click="store.startSetup()"
             >
@@ -183,6 +194,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import CloseButton from '@/components/common/CloseButton.vue';
+import LinuxSandboxInstallInfo from './LinuxSandboxInstallInfo.vue';
 import { useSandboxSetupStore } from '@/stores/sandboxSetup';
 
 defineOptions({ name: 'SandboxSetupDialog' });
@@ -203,6 +215,7 @@ watch(
 );
 
 const progress = computed(() => store.progress);
+const isLinux = computed(() => store.status?.platform === 'linux');
 const distroName = computed(() => store.status?.distro_name || 'astrion-sandbox');
 // 安装目录与 scripts/setup-wsl-sandbox.ps1 的默认 InstallDir 保持一致
 const installPathHint = computed(() => '%USERPROFILE%\\.astrion\\wsl-sandbox');
@@ -210,6 +223,8 @@ const installPathHint = computed(() => '%USERPROFILE%\\.astrion\\wsl-sandbox');
 const stateDescription = computed(() => {
   const s = store.status;
   if (!s || !s.applicable) return '';
+  if (isLinux.value)
+    return s.state === 'ready' ? t('sandbox.sectionReady') : s.detail || t('sandbox.linuxMissing');
   if (s.state === 'wsl_missing') return t('sandbox.stateWslMissing');
   if (s.state === 'vm_platform_missing') return t('sandbox.stateVmPlatformMissing');
   if (s.state === 'distro_missing') return t('sandbox.stateDistroMissing');
@@ -217,14 +232,25 @@ const stateDescription = computed(() => {
   return '';
 });
 
-const steps = computed(() => [
-  t('sandbox.stepCheckWsl'),
-  t('sandbox.stepCheckDistro'),
-  t('sandbox.stepDownloadRootfs'),
-  t('sandbox.stepImportDistro'),
-  t('sandbox.stepWriteConfig'),
-  t('sandbox.stepInstallTools')
-]);
+const steps = computed(() =>
+  isLinux.value
+    ? [
+        t('sandbox.linuxCheckSystem'),
+        t('sandbox.linuxDependencies'),
+        t('sandbox.linuxBuildHelper'),
+        t('sandbox.linuxPolicies'),
+        t('sandbox.linuxService'),
+        t('sandbox.linuxVerify')
+      ]
+    : [
+        t('sandbox.stepCheckWsl'),
+        t('sandbox.stepCheckDistro'),
+        t('sandbox.stepDownloadRootfs'),
+        t('sandbox.stepImportDistro'),
+        t('sandbox.stepWriteConfig'),
+        t('sandbox.stepInstallTools')
+      ]
+);
 
 function stepStatus(step1Based: number): 'pending' | 'active' | 'done' | 'error' {
   const p = progress.value;
@@ -304,336 +330,4 @@ function onClose() {
 }
 </script>
 
-<style scoped>
-.sandbox-setup-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: var(--overlay-scrim);
-}
-
-.sandbox-setup-card {
-  position: relative;
-  width: min(560px, calc(100vw - 36px));
-  max-height: min(720px, calc(100vh - 36px));
-  max-height: min(720px, calc(100dvh - 36px));
-  display: flex;
-  flex-direction: column;
-  color: var(--text-primary);
-  background: var(--surface-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.sandbox-setup-windowbar {
-  position: relative;
-  height: 40px;
-  flex: 0 0 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid var(--border-default);
-}
-
-.sandbox-setup-window-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  user-select: none;
-}
-
-.sandbox-setup-close {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sandbox-setup-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 20px 24px 8px;
-  scrollbar-width: thin;
-}
-
-.sandbox-setup-hero {
-  display: flex;
-  justify-content: center;
-  color: var(--accent);
-  margin-bottom: 12px;
-}
-
-.sandbox-setup-state-desc {
-  margin: 0 0 12px;
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.6;
-  color: var(--text-primary);
-}
-
-.sandbox-setup-facts {
-  margin: 0;
-  padding: 0 0 0 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sandbox-setup-facts li {
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-.sandbox-setup-phase-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  margin-bottom: 10px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.sandbox-setup-steps {
-  list-style: none;
-  margin: 0 0 14px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sandbox-setup-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 30px;
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
-.sandbox-setup-step.active {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.sandbox-setup-step.done {
-  color: var(--text-secondary);
-}
-
-.sandbox-setup-step.error {
-  color: var(--state-danger);
-  font-weight: 600;
-}
-
-.sandbox-setup-step-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sandbox-setup-step.done .sandbox-setup-step-icon {
-  color: var(--state-success);
-}
-
-.sandbox-setup-step-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--border-strong);
-}
-
-.sandbox-setup-step-extra {
-  margin-left: auto;
-  font-size: 11.5px;
-  font-weight: 400;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.sandbox-setup-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--border-default);
-  border-top-color: var(--accent);
-  animation: sandbox-setup-spin 0.9s linear infinite;
-}
-
-.sandbox-setup-spinner.small {
-  width: 11px;
-  height: 11px;
-  border-width: 1.6px;
-}
-
-@keyframes sandbox-setup-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.sandbox-setup-progress {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--surface-muted);
-  overflow: hidden;
-  margin-bottom: 14px;
-}
-
-.sandbox-setup-progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--accent);
-  transition: width 0.4s ease;
-}
-
-.sandbox-setup-result {
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  margin-bottom: 12px;
-}
-
-.sandbox-setup-result.ok {
-  background: color-mix(in srgb, var(--state-success) 12%, transparent);
-  color: var(--text-primary);
-}
-
-.sandbox-setup-result.warn {
-  background: color-mix(in srgb, var(--state-warning) 14%, transparent);
-  color: var(--text-primary);
-}
-
-.sandbox-setup-result.error {
-  background: color-mix(in srgb, var(--state-danger) 12%, transparent);
-  color: var(--text-primary);
-}
-
-.sandbox-setup-error-line {
-  margin: 0;
-  font-weight: 600;
-}
-
-.sandbox-setup-error-hint {
-  margin: 6px 0 0;
-  color: var(--text-secondary);
-}
-
-.sandbox-setup-log-block {
-  margin-bottom: 12px;
-}
-
-.sandbox-setup-log-label {
-  height: 22px;
-  line-height: 22px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  user-select: none;
-}
-
-.sandbox-setup-log {
-  margin: 2px 0 0;
-  max-height: 160px;
-  overflow-y: auto;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--surface-muted);
-  font-size: 11.5px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-all;
-  scrollbar-width: thin;
-}
-
-.sandbox-setup-footer {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 24px 16px;
-  border-top: 1px solid var(--border-default);
-}
-
-.sandbox-setup-never {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-}
-
-.sandbox-setup-never input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.sandbox-setup-spacer {
-  flex: 1 1 auto;
-}
-
-.sandbox-setup-btn {
-  height: 32px;
-  padding: 0 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-
-.sandbox-setup-btn:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.sandbox-setup-btn.ghost {
-  background: transparent;
-  border-color: var(--border-default);
-  color: var(--text-secondary);
-}
-
-.sandbox-setup-btn.ghost:hover:not(:disabled) {
-  background: var(--hover-bg);
-  color: var(--text-primary);
-}
-
-.sandbox-setup-btn.primary {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.sandbox-setup-btn.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.sandbox-setup-fade-enter-active,
-.sandbox-setup-fade-leave-active {
-  transition: opacity 0.18s ease;
-}
-
-.sandbox-setup-fade-enter-from,
-.sandbox-setup-fade-leave-to {
-  opacity: 0;
-}
-</style>
+<style scoped src="./SandboxSetupDialog.scss"></style>

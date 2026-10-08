@@ -14,7 +14,7 @@ from __future__ import annotations
 from flask import jsonify, request, session
 
 from server.status import status_bp
-from server.auth_helpers import api_login_required
+from server.gateway_auth import api_login_or_host_token_required
 from modules.sandbox_setup_manager import sandbox_setup_manager
 from modules.i18n import tr
 
@@ -28,9 +28,9 @@ def _is_host_mode_request() -> bool:
 
 
 @status_bp.route('/api/sandbox/status')
-@api_login_required
+@api_login_or_host_token_required
 def get_sandbox_status():
-    """分级检测沙箱状态。force=1 时绕过短缓存实测。"""
+    """Windows/Linux host 状态；full/headless 共享 Cookie/Bearer 通道。"""
     if not _is_host_mode_request():
         return jsonify({"success": True, "data": {"applicable": False, "state": "not_applicable"}})
     force = request.args.get("force") == "1"
@@ -39,9 +39,9 @@ def get_sandbox_status():
 
 
 @status_bp.route('/api/sandbox/setup', methods=['POST'])
-@api_login_required
+@api_login_or_host_token_required
 def start_sandbox_setup():
-    """启动一键安装。body: {"enable_wsl_if_needed": bool}"""
+    """显式启动管理员安装；Linux 也可完全独立运行安装 CLI。"""
     if not _is_host_mode_request():
         return jsonify({"success": False, "error": tr("sandbox.setup_not_host_mode")}), 400
     payload = request.get_json(silent=True) or {}
@@ -52,7 +52,9 @@ def start_sandbox_setup():
 
 
 @status_bp.route('/api/sandbox/setup/status')
-@api_login_required
+@api_login_or_host_token_required
 def get_sandbox_setup_status():
     """轮询安装进度。"""
+    if not _is_host_mode_request():
+        return jsonify({"success": False, "error": tr("sandbox.setup_not_host_mode")}), 400
     return jsonify({"success": True, "data": sandbox_setup_manager.get_setup_progress()})

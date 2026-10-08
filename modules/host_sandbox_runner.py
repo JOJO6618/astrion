@@ -65,8 +65,9 @@ MACOS_MINIMAL_READABLE_PATHS = [
     "/opt/homebrew",
 ]
 
-# Scoped Linux uses a minimal read namespace; no host /, /home, or /var bind.
-LINUX_MINIMAL_READABLE_PATHS = ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt/agent-venv"]
+# Native IO and the Linux broker share the same precise readable roots.
+from modules.linux_sandbox.constants import MINIMAL_READABLE_PATHS
+LINUX_MINIMAL_READABLE_PATHS = list(MINIMAL_READABLE_PATHS)
 
 # 两个 macOS profile 共用的基础 mach 规则。dirhelper 是 libSystem 解析
 # DARWIN_USER_TEMP_DIR（confstr）所必需的服务，缺省被拒后垫片会打印
@@ -453,146 +454,20 @@ def _macos_profile_for_workspace(
     )
 
 
-def _build_linux_plan(
-    command: str,
-    work_path: Path,
-    env: Dict[str, str],
-    network_permission: Optional[str] = None,
-) -> SandboxPlan:
-    bwrap = shutil.which("bwrap")
-    if not bwrap:
-        raise HostSandboxError(tr("sandbox.linux_no_bwrap_exec"))
-
-    seccomp_bpf = os.environ.get("HOST_SANDBOX_LINUX_SECCOMP_BPF", "").strip()
-    if not seccomp_bpf:
-        raise HostSandboxError(tr("sandbox.linux_no_seccomp_exec"))
-    seccomp_path = Path(seccomp_bpf).expanduser().resolve()
-    if not seccomp_path.exists():
-        raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
-    shell_cmd = ["/bin/bash", "-lc", command]
-    # network_permission 暂不参与 Linux 构建，保持现有 --share-net 行为
-    return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path)
+# Lazy imports keep Linux-only fcntl/Unix transports out of Windows imports.
+def _build_linux_plan(command, work_path, env, network_permission=None):
+    from modules.linux_sandbox.plans import build_command_plan
+    return build_command_plan(command, work_path, env, network_permission)
 
 
-def _build_linux_readonly_plan(
-    command: str,
-    work_path: Path,
-    env: Dict[str, str],
-    network_permission: Optional[str] = None,
-) -> SandboxPlan:
-    bwrap = shutil.which("bwrap")
-    if not bwrap:
-        raise HostSandboxError(tr("sandbox.linux_no_bwrap_exec"))
-    seccomp_bpf = os.environ.get("HOST_SANDBOX_LINUX_SECCOMP_BPF", "").strip()
-    if not seccomp_bpf:
-        raise HostSandboxError(tr("sandbox.linux_no_seccomp_exec"))
-    seccomp_path = Path(seccomp_bpf).expanduser().resolve()
-    if not seccomp_path.exists():
-        raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
-    shell_cmd = ["/bin/bash", "-lc", command]
-    return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path, readonly=True)
+def _build_linux_readonly_plan(command, work_path, env, network_permission=None):
+    from modules.linux_sandbox.plans import build_readonly_plan
+    return build_readonly_plan(command, work_path, env, network_permission)
 
 
-def _build_linux_shell_plan(
-    work_path: Path,
-    env: Dict[str, str],
-    network_permission: Optional[str] = None,
-    readonly: bool = False,
-) -> SandboxPlan:
-    bwrap = shutil.which("bwrap")
-    if not bwrap:
-        raise HostSandboxError(tr("sandbox.linux_no_bwrap_shell"))
-    seccomp_bpf = os.environ.get("HOST_SANDBOX_LINUX_SECCOMP_BPF", "").strip()
-    if not seccomp_bpf:
-        raise HostSandboxError(tr("sandbox.linux_no_seccomp_shell"))
-    seccomp_path = Path(seccomp_bpf).expanduser().resolve()
-    if not seccomp_path.exists():
-        raise HostSandboxError(tr("sandbox.seccomp_bpf_not_found", path=seccomp_path))
-    shell_cmd = ["/bin/bash", "-i"]
-    return _build_linux_common_plan(work_path, env, shell_cmd, seccomp_path, readonly=readonly)
-
-
-def _build_linux_common_plan(
-    work_path: Path,
-    env: Dict[str, str],
-    shell_cmd: List[str],
-    seccomp_path: Path,
-    readonly: bool = False,
-) -> SandboxPlan:
-    bwrap = shutil.which("bwrap")
-    if not bwrap:
-        raise HostSandboxError(tr("sandbox.linux_no_bwrap_brief"))
-    sandbox_root = str(_sandbox_workspace(work_path).resolve())
-    scope = current_execution_scope()
-    if scope and scope.is_sub_agent:
-        return _build_linux_scoped_plan(work_path, env, shell_cmd, seccomp_path, readonly)
-    cmd: List[str] = [
-        bwrap,
-        "--die-with-parent",
-        "--new-session",
-        "--unshare-all",
-        "--share-net",
-        "--ro-bind",
-        "/",
-        "/",
-    ]
-    if readonly:
-        cmd.extend(["--ro-bind", sandbox_root, sandbox_root])
-    else:
-        cmd.extend(["--bind", sandbox_root, sandbox_root])
-    cmd.extend([
-        "--chdir",
-        str(work_path.resolve()),
-        "--proc",
-        "/proc",
-        "--dev",
-        "/dev",
-        "--tmpfs",
-        "/tmp",
-        "--seccomp",
-        "__SECCOMP_FD__",
-        *shell_cmd,
-    ])
-    return SandboxPlan(command=cmd, env=env, cwd=str(work_path.resolve()), seccomp_bpf_path=str(seccomp_path))
-
-
-def _build_linux_scoped_plan(work_path, env, shell_cmd, seccomp_path, readonly=False):
-    scope = current_execution_scope()
-    root = _sandbox_workspace(work_path)
-    bwrap = shutil.which("bwrap")
-    if not bwrap:
-        raise HostSandboxError(tr("sandbox.linux_no_bwrap_brief"))
-    cmd = [bwrap, "--die-with-parent", "--new-session", "--unshare-all", "--share-net"]
-    # bwrap starts with an empty tmpfs root. Mount system tools and authorized
-    # reads only, then overlay anonymous runtime tmp before workspace mounts so
-    # a workspace under /tmp remains visible at its fixed path.
-    seen = set()
-    for raw in LINUX_MINIMAL_READABLE_PATHS:
-        path = Path(raw).expanduser()
-        canonical = path.resolve()
-        if str(path) in seen:
-            continue
-        if not canonical.exists():
-            if raw in LINUX_MINIMAL_READABLE_PATHS:
-                continue
-            raise HostSandboxError(f"Authorized readable path does not exist: {path}")
-        seen.add(str(path))
-        cmd.extend(["--ro-bind", str(canonical), str(path)])
-    cmd.extend(["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--tmpfs", "/var/tmp"])
-    for raw in get_macos_readable_paths(str(root)):
-        path = Path(raw).expanduser().resolve()
-        if not path.exists():
-            raise HostSandboxError(f"Authorized readable path does not exist: {path}")
-        cmd.extend(["--ro-bind", str(path), str(path)])
-    cmd.extend(["--ro-bind" if readonly else "--bind", str(root), str(root)])
-    if not scope.workspace_only and not readonly:
-        for raw in get_macos_writable_paths(str(root)):
-            path = Path(raw).expanduser().resolve()
-            if not path.exists():
-                raise HostSandboxError(f"Authorized writable path does not exist: {path}")
-            cmd.extend(["--bind", str(path), str(path)])
-    cmd.extend(["--remount-ro", "/", "--cap-drop", "ALL", "--chdir", str(work_path), "--seccomp", "__SECCOMP_FD__", *shell_cmd])
-    return SandboxPlan(command=cmd, env=env, cwd=str(work_path), seccomp_bpf_path=str(seccomp_path))
+def _build_linux_shell_plan(work_path, env, network_permission=None, readonly=False):
+    from modules.linux_sandbox.plans import build_shell_plan
+    return build_shell_plan(work_path, env, network_permission, readonly)
 
 
 # ──────────────────────────────────────────────────────────────

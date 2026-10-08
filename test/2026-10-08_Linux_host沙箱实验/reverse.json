@@ -1,0 +1,61 @@
+{
+  "tests": [
+    {
+      "variant": "full",
+      "host_connection_expected": true,
+      "ready": {
+        "listening_port": 39705
+      },
+      "reply": "sandbox-listener",
+      "host_connection_ok": true,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "variant": "restricted",
+      "host_connection_expected": true,
+      "ready": {
+        "listening_port": 55533
+      },
+      "reply": "sandbox-listener",
+      "host_connection_ok": true,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "unit_final_state": "inactive",
+      "passed": true
+    },
+    {
+      "variant": "restricted_unix_blocked",
+      "host_connection_expected": true,
+      "ready": {
+        "listening_port": 58451
+      },
+      "reply": "sandbox-listener",
+      "host_connection_ok": true,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "unit_final_state": "inactive",
+      "passed": true
+    },
+    {
+      "variant": "separate_namespace",
+      "host_connection_expected": false,
+      "ready": {
+        "listening_port": 37235
+      },
+      "host_connection_ok": false,
+      "host_connection_error": "ConnectionRefusedError",
+      "host_connection_errno": 111,
+      "returncode": 0,
+      "stdout": "no-host-connection\n",
+      "stderr": "",
+      "passed": true
+    }
+  ],
+  "passed": 4,
+  "total": 4
+}

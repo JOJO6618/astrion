@@ -1,0 +1,15 @@
+# Loaded only for the named disposable experimental processes, then removed.
+profile astrion-exp-linux-20261008-b03 flags=(attach_disconnected,mediate_deleted) {
+  / r,
+  /** mrwklix,
+  capability,
+  network,
+  unix,
+  signal,
+  ptrace,
+  mount,
+  umount,
+  pivot_root,
+  deny unix (connect, send, receive) peer=(addr="@**"),
+  deny unix (bind) addr="@**",
+}

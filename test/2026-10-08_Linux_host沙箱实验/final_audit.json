@@ -1,0 +1,20 @@
+{
+  "sandbox_status": {
+    "Uid": "0\t0\t0\t0",
+    "Gid": "0\t0\t0\t0",
+    "CapPrm": "0000000000000000",
+    "CapEff": "0000000000000000",
+    "CapBnd": "0000000000000000",
+    "NoNewPrivs": "1",
+    "Seccomp": "2"
+  },
+  "sandbox_returncode": 0,
+  "remaining_experiment_units": "",
+  "remaining_experiment_processes": [],
+  "bubblewrap_system_package": {
+    "returncode": 1,
+    "status": ""
+  },
+  "remaining_experiment_bpf_programs": [],
+  "unprivileged_bpf_disabled": "2"
+}

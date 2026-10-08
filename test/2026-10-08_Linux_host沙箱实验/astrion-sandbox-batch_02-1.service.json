@@ -1,0 +1,6 @@
+{
+  "cgroup": "/system.slice/astrion-sandbox-batch_02-1.service",
+  "bpf_returncode": 0,
+  "attached_programs": "ID       AttachType      AttachFlags     Name           \n185      cgroup_inet_ingress multi           sd_fw_ingress                  \n184      cgroup_inet_egress multi           sd_fw_egress                   \n186      cgroup_unix_connect multi           astrion_unix                   \n187      cgroup_unix_sendmsg multi           astrion_unix                   \n",
+  "stderr": ""
+}

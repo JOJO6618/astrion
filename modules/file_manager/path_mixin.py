@@ -178,6 +178,9 @@ class PathMixin:
         if os.name == "nt":
             import tempfile
             temp_roots = [Path(tempfile.gettempdir()).resolve()]
+        elif platform.system() == "Linux":
+            # Shell /tmp is private tmpfs; it is never the host's native /tmp.
+            temp_roots = []
         else:
             temp_roots = [Path("/tmp").resolve(), Path("/private/tmp").resolve()]
         scope = current_execution_scope()
@@ -195,7 +198,7 @@ class PathMixin:
                 # 读 roots 与只读沙箱白名单同源：系统路径（/usr、/System 等）
                 # 在只读沙箱里可读，原生读工具应对齐（2026-08-30 白名单化）
                 raw_items = list(MACOS_MINIMAL_READABLE_PATHS) + list(raw_items)
-            elif scope and platform.system() == "Linux":
+            elif platform.system() == "Linux":
                 raw_items = list(LINUX_MINIMAL_READABLE_PATHS) + list(raw_items)
         for raw in raw_items:
             try:

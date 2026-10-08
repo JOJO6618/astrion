@@ -40,6 +40,9 @@ export type SandboxState =
   | 'vm_platform_missing'
   | 'distro_missing'
   | 'bwrap_missing'
+  | 'helper_missing'
+  | 'unsupported'
+  | 'ordinary_user_required'
   | 'not_applicable'
   | 'error';
 
@@ -50,6 +53,9 @@ export interface SandboxStatus {
   distro_name: string;
   detail: string;
   setup_running: boolean;
+  can_install?: boolean;
+  install_command?: string;
+  install_path?: string;
 }
 
 export type SetupPhase =
@@ -113,7 +119,8 @@ export const useSandboxSetupStore = defineStore('sandboxSetup', {
         s.state === 'wsl_missing' ||
         s.state === 'vm_platform_missing' ||
         s.state === 'distro_missing' ||
-        s.state === 'bwrap_missing'
+        s.state === 'bwrap_missing' ||
+        s.state === 'helper_missing'
       );
     },
     /** 进页面是否应自动弹出向导 */

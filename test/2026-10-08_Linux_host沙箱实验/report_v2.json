@@ -1,0 +1,2182 @@
+{
+  "root": "/tmp/astrion-linux-sandbox-20261008-2Bjdqo/batch_02",
+  "kernel": "6.8.0-40-generic",
+  "uid": 0,
+  "seccomp": {
+    "library": "libseccomp.so.2",
+    "bytes": 656,
+    "rule_count": 52
+  },
+  "variants": [
+    {
+      "name": "writable_full",
+      "readonly": false,
+      "authorization": "none",
+      "shared_net": true,
+      "restricted": false,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "authorized_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "ok": true,
+          "value": "connected-no-data-sent"
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "host_nonloopback_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      }
+    },
+    {
+      "name": "readonly_full",
+      "readonly": true,
+      "authorization": "none",
+      "shared_net": true,
+      "restricted": false,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "authorized_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "ok": true,
+          "value": "connected-no-data-sent"
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "host_nonloopback_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "workspace_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        }
+      }
+    },
+    {
+      "name": "authorized_ro_full",
+      "readonly": false,
+      "authorization": "ro",
+      "shared_net": true,
+      "restricted": false,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "ok": true,
+          "value": "authorized"
+        },
+        "authorized_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "ok": true,
+          "value": "connected-no-data-sent"
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "host_nonloopback_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      }
+    },
+    {
+      "name": "authorized_rw_full",
+      "readonly": false,
+      "authorization": "rw",
+      "shared_net": true,
+      "restricted": false,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "ok": true,
+          "value": "authorized"
+        },
+        "authorized_write": {
+          "ok": true,
+          "value": 16
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "ok": true,
+          "value": "connected-no-data-sent"
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "host_nonloopback_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      }
+    },
+    {
+      "name": "readonly_authorized_rw",
+      "readonly": true,
+      "authorization": "rw",
+      "shared_net": true,
+      "restricted": false,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "ok": true,
+          "value": "authorized"
+        },
+        "authorized_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "ok": true,
+          "value": "connected-no-data-sent"
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "host_nonloopback_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "workspace_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        }
+      }
+    },
+    {
+      "name": "restricted_host_localhost",
+      "readonly": false,
+      "authorization": "none",
+      "shared_net": true,
+      "restricted": true,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "authorized_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "host_nonloopback_udp": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      }
+    },
+    {
+      "name": "restricted_unix_blocked",
+      "readonly": false,
+      "authorization": "none",
+      "shared_net": true,
+      "restricted": true,
+      "gate_unix": true,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "authorized_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "filesystem_unix_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "host_nonloopback_udp": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "ipv4_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv4_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_tcp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "ipv6_localhost_udp": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      }
+    },
+    {
+      "name": "separate_network_namespace",
+      "readonly": false,
+      "authorization": "none",
+      "shared_net": false,
+      "restricted": false,
+      "gate_unix": false,
+      "returncode": 0,
+      "stderr": "",
+      "probe": {
+        "abstract_unix_socket": {
+          "errno": 111,
+          "error": "ConnectionRefusedError",
+          "ok": false
+        },
+        "anonymous_tmp_write": {
+          "ok": true,
+          "value": 9
+        },
+        "authorized_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "authorized_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "cgroup_filesystem_visible": false,
+        "external_tcp": {
+          "errno": 101,
+          "error": "OSError",
+          "ok": false
+        },
+        "filesystem_unix_socket": {
+          "ok": true,
+          "value": "fixture-ok"
+        },
+        "git": {
+          "ok": true,
+          "value": "git version 2.43.0"
+        },
+        "host_data_visible": false,
+        "host_home_visible": false,
+        "host_nonloopback_tcp": {
+          "errno": 101,
+          "error": "OSError",
+          "ok": false
+        },
+        "host_nonloopback_udp": {
+          "errno": 101,
+          "error": "OSError",
+          "ok": false
+        },
+        "ipv4_localhost_tcp": {
+          "errno": 111,
+          "error": "ConnectionRefusedError",
+          "ok": false
+        },
+        "ipv4_localhost_udp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "ipv6_localhost_tcp": {
+          "errno": 111,
+          "error": "ConnectionRefusedError",
+          "ok": false
+        },
+        "ipv6_localhost_udp": {
+          "errno": null,
+          "error": "TimeoutError",
+          "ok": false
+        },
+        "nested_network_namespace": {
+          "errno": 1,
+          "returncode": -1
+        },
+        "netlink_socket": {
+          "errno": 1,
+          "error": "PermissionError",
+          "ok": false
+        },
+        "outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_unix_socket": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "outside_write": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "proc_processes": [
+          "1",
+          "2"
+        ],
+        "python_child": {
+          "ok": true,
+          "value": "child-ok"
+        },
+        "python_thread": {
+          "ok": true,
+          "value": [
+            "thread-ok"
+          ]
+        },
+        "readonly_mount_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "root_write": {
+          "errno": 30,
+          "error": "OSError",
+          "ok": false
+        },
+        "symlink_outside_read": {
+          "errno": 2,
+          "error": "FileNotFoundError",
+          "ok": false
+        },
+        "unix_socketpair": {
+          "ok": true,
+          "value": "pair-ok"
+        },
+        "workspace_chmod": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_read": {
+          "ok": true,
+          "value": "workspace"
+        },
+        "workspace_unlink": {
+          "ok": true,
+          "value": null
+        },
+        "workspace_write": {
+          "ok": true,
+          "value": 11
+        }
+      }
+    }
+  ],
+  "external_baseline_endpoint": {
+    "hostname": "example.com",
+    "address": "104.20.23.154",
+    "port": 80,
+    "application_data_sent": false
+  },
+  "outside_fixture_unchanged": true,
+  "checks": [
+    {
+      "name": "writable_full:process_success",
+      "passed": true
+    },
+    {
+      "name": "writable_full:outside_read",
+      "passed": true
+    },
+    {
+      "name": "writable_full:outside_write",
+      "passed": true
+    },
+    {
+      "name": "writable_full:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "writable_full:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "writable_full:root_write",
+      "passed": true
+    },
+    {
+      "name": "writable_full:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "writable_full:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "writable_full:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "writable_full:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "writable_full:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "writable_full:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "writable_full:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "writable_full:git",
+      "passed": true
+    },
+    {
+      "name": "writable_full:python_child",
+      "passed": true
+    },
+    {
+      "name": "writable_full:python_thread",
+      "passed": true
+    },
+    {
+      "name": "writable_full:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "writable_full:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "writable_full:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "writable_full:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "writable_full:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "writable_full:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "writable_full:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "writable_full:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "writable_full:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:process_success",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:outside_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:outside_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:root_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:git",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:python_child",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:python_thread",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "readonly_full:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:process_success",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:outside_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:outside_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:root_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:git",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:python_child",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:python_thread",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "authorized_ro_full:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:process_success",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:outside_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:outside_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:root_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:git",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:python_child",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:python_thread",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "authorized_rw_full:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:process_success",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:outside_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:outside_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:root_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:git",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:python_child",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:python_thread",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "readonly_authorized_rw:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:process_success",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:outside_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:outside_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:root_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:git",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:python_child",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:python_thread",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "restricted_host_localhost:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:process_success",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:outside_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:outside_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:root_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:git",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:python_child",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:python_thread",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "restricted_unix_blocked:unix_socketpair",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:process_success",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:outside_read",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:outside_write",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:symlink_outside_read",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:outside_unix_socket",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:root_write",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:readonly_mount_write",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:netlink_socket",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:host_data_visible",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:host_home_visible",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:cgroup_filesystem_visible",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:workspace_read",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:anonymous_tmp_write",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:git",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:python_child",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:python_thread",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:workspace_write",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:workspace_chmod",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:workspace_unlink",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:authorized_read",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:authorized_write",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:ipv4_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:ipv4_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:ipv6_localhost_tcp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:ipv6_localhost_udp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:host_nonloopback_tcp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:host_nonloopback_udp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:external_tcp",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:filesystem_unix",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:abstract_unix",
+      "passed": true
+    },
+    {
+      "name": "separate_network_namespace:unix_socketpair",
+      "passed": true
+    }
+  ],
+  "passed_checks": 248,
+  "total_checks": 248,
+  "transient_unit_cleanup": [
+    {
+      "unit": "astrion-sandbox-batch_02-0",
+      "stop_returncode": 5,
+      "active_state": "inactive"
+    },
+    {
+      "unit": "astrion-sandbox-batch_02-1",
+      "stop_returncode": 5,
+      "active_state": "inactive"
+    }
+  ],
+  "fixture_threads_alive": []
+}

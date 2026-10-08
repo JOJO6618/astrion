@@ -11,7 +11,7 @@
 ## ⚠️ 重要声明
 
 - **本项目处于开发中，不要用于正式生产环境。**
-- 诸多设计在 **macOS** 环境下开发与验证；宿主机沙箱已在 **macOS（sandbox-exec）** 与 **Windows（WSL2）** 完成测试；**Linux 宿主机沙箱（bwrap）未测试、未适配、暂不可用**（Linux 服务器上部署多用户服务请使用 Docker 模式，容器隔离在 Linux 宿主上已实测生效）。
+- 宿主机沙箱已在 **macOS（sandbox-exec）** 与 **Windows（WSL2）** 完成测试；**Linux 首批适配 Ubuntu 24.04**（bwrap + seccomp + AppArmor + systemd/cgroup IP 过滤），已完成隔离环境实测，须由管理员安装受限助手，Astrion 本体以普通用户运行。其它 Linux 发行版和全局安装流程尚需实机验收，详见 [Linux 安装说明](docs/linux_host_sandbox_setup.md)。Linux 多用户服务仍使用 Docker 模式。
 - 本项目的大量设计借鉴了 **Codex、Claude Code、OpenCode、OpenClaw** 等智能体产品的优秀实践，特此致谢。
 
 ## 核心特性
@@ -32,12 +32,12 @@
 | | `host` 模式（默认） | `web` 模式（值 `web` 或 `docker`） |
 |---|---|---|
 | **定位** | 本地个人智能体 | 线上多人 AI 服务 |
-| **终端执行** | 宿主机 OS 级沙箱（macOS `sandbox-exec` / Windows WSL2，均已实测；Linux 未适配、暂不可用） | 每个用户独立的 Docker 容器 |
+| **终端执行** | 宿主机 OS 级沙箱（macOS `sandbox-exec` / Windows WSL2 / Linux 受限助手；Linux 首批 Ubuntu 24.04 隔离实测） | 每个用户独立的 Docker 容器 |
 | **可登录账号** | host 与 web 两个数据源的账号**均可登录** | **仅 web 数据源账号**（host 账号无法登录，即被封堵） |
 | **数据目录** | `<数据根>/host/`（同时可读 web 数据） | `<数据根>/web/` |
-| **默认监听** | `127.0.0.1`（仅本机） | `0.0.0.0`（对外服务） |
+| **默认监听** | 当前配置默认 `0.0.0.0`；host 请显式设 `WEB_SERVER_HOST=127.0.0.1` | `0.0.0.0`（对外服务） |
 | **用户注册** | 单人使用，无需注册 | 邀请码注册制 |
-| **前置要求** | 无 | **必须先构建 Docker 沙箱镜像**（见下） |
+| **前置要求** | Windows 安装 WSL2 沙箱；Linux 管理员安装受限助手（见安装说明） | **必须先构建 Docker 沙箱镜像**（见下） |
 
 > 两种模式下 Web 界面都可启动；host 模式只是把服务开在本机给自己用。
 > 依据：用户加载逻辑 `modules/user_manager.py:_load_users`（host 模式合并加载 `host/data/users.json` + `web/data/users.json`，web 模式仅加载后者）。
