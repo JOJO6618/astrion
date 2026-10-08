@@ -178,7 +178,8 @@ async function snapshotHydratesApprovalsAndToolAliases() {
   assert.equal(f.host.pendingPlanApprovals[0].approval_id, 'plan');
   assert.deepEqual(plain(f.host.resolvedToolApprovalIds), ['old']);
   assert.deepEqual(registered, ['tool-action', 'call', 'execute', 'prepare']);
-  assert.equal(f.host.preparingTools.get('prepare').id, 'tool-action');
+  // A historical preparing alias identifies a running tool; it is not an active preparation.
+  assert.equal(f.host.preparingTools.has('prepare'), false);
   assert.deepEqual(locks, ['think']);
 }
 async function reconcileCannotStealLoadingSession() {

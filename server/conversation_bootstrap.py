@@ -30,6 +30,34 @@ def _existing_file(file_manager, path: str) -> bool:
         return False
 
 
+@conversation_bootstrap_bp.route("/api/conversations/<conversation_id>/metadata", methods=["GET"])
+@api_login_required
+def conversation_metadata(conversation_id: str):
+    """Read title metadata without selecting a conversation or rebuilding display."""
+    normalized_id = _normalize_conv_id(conversation_id)
+    workspace_id = str(request.args.get("workspace_id") or "").strip() or None
+    try:
+        terminal, _workspace = get_user_resources(
+            get_current_username(), workspace_id=workspace_id, update_session=False
+        )
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+    context = getattr(terminal, "context_manager", None)
+    if context is None:
+        return jsonify({"success": False, "error": tr("bootstrap.terminal_unavailable")}), 503
+    manager = context._get_conversation_manager_for_id(normalized_id)
+    data = manager.read_conversation(normalized_id) if manager else None
+    if data is None:
+        return jsonify({"success": False, "error": tr(
+            "bootstrap.conversation_not_found", id=normalized_id
+        )}), 404
+    return jsonify({"success": True, "data": {
+        "id": normalized_id,
+        "title": data.get("title") or "",
+        "title_locked": bool((data.get("metadata") or {}).get("title_locked")),
+    }})
+
+
 @conversation_bootstrap_bp.route("/api/conversations/<conversation_id>/bootstrap", methods=["GET"])
 @api_login_required
 def bootstrap_conversation(conversation_id: str):

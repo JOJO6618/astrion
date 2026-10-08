@@ -122,6 +122,7 @@ export function beforeUnmount() {
   }
 
   this.leaveConversationView();
+  this.stopWorkspaceTasksRefresh();
 
   document.removeEventListener('click', this.handleClickOutsideQuickMenu);
   document.removeEventListener('click', this.handleClickOutsideHeaderMenu);

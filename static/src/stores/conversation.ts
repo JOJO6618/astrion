@@ -145,6 +145,39 @@ export const useConversationStore = defineStore('conversation', {
     setCurrentConversationId(id: string | null) {
       this.currentConversationId = id;
     },
+    updateConversationTitle(conversationId: string, title: string) {
+      const id = String(conversationId || '').trim();
+      const value = String(title || '').trim();
+      if (!id || !value) return false;
+      let changed = false;
+      const lists = new Set<ConversationSummary[]>([
+        this.conversations,
+        this.conversationsCache.normal.list,
+        this.conversationsCache.multi_agent.list,
+        this.searchResults,
+        ...this.searchGroups.map((group) => group.results),
+        ...this.workspaceGroups.flatMap((group) => [
+          group.conversations,
+          group.conversationsByType.normal,
+          group.conversationsByType.multi_agent
+        ])
+      ]);
+      for (const list of lists) {
+        for (const item of list) {
+          if (item.id === id && item.title !== value) {
+            item.title = value;
+            changed = true;
+          }
+        }
+      }
+      for (const task of this.runningWorkspaceTasks) {
+        if (task.conversation_id === id && task.conversation_title !== value) {
+          task.conversation_title = value;
+          changed = true;
+        }
+      }
+      return changed;
+    },
     /**
      * 侧边栏对话类型过滤器切换（左右切换控件写入）。
      * 纯本地引用交换：当前分页状态存回缓存 → conversations 指向目标类型缓存数组

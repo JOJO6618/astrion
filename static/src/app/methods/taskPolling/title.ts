@@ -1,5 +1,9 @@
 // @ts-nocheck
 import { debugLog } from '../common';
+import { useConversationStore } from '../../../stores/conversation';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
+import { currentConversationSession, ownsConversationSession } from '../conversation/session';
 
 export const titleMethods = {
   applyConversationTitleUpdate(conversationId: string, title: string, source = 'unknown') {
@@ -20,20 +24,10 @@ export const titleMethods = {
       }
     }
 
-    if (Array.isArray(this.conversations)) {
-      /* 原地替换保持数组引用：conversations 与双类型缓存中当前类型列表同一引用 */
-      const convIndex = this.conversations.findIndex(
-        (conv: any) =>
-          conv && conv.id === normalizedConversationId && conv.title !== normalizedTitle
-      );
-      if (convIndex >= 0) {
-        this.conversations.splice(convIndex, 1, {
-          ...this.conversations[convIndex],
-          title: normalizedTitle
-        });
-        changed = true;
-      }
-    }
+    changed =
+      useConversationStore().updateConversationTitle(normalizedConversationId, normalizedTitle) ||
+      changed;
+    useConversationTabsStore().updateTitle(normalizedConversationId, normalizedTitle);
 
     if (changed) {
       debugLog('[TaskPolling] 已同步生成后的对话标题:', {
@@ -49,9 +43,12 @@ export const titleMethods = {
     const conversationId = String(
       options.conversationId || this.currentConversationId || ''
     ).trim();
-    if (!conversationId) {
-      return;
-    }
+    const session = currentConversationSession(this);
+    if (!conversationId || !session) return;
+    const owns = () =>
+      ownsConversationSession(this, session) &&
+      this.currentConversationId === conversationId &&
+      this.generatedTitleRefreshSeq === seq;
 
     // 标题模型是后台独立请求，慢时可能在主任务完成后几十秒才落盘。
     // 这里用“总等待窗口”而不是少量固定次数，避免刚好错过最终 title_locked=true 的标题。
@@ -69,17 +66,13 @@ export const titleMethods = {
     }
 
     const run = async (attempt: number) => {
-      if (this.generatedTitleRefreshSeq !== seq || this.currentConversationId !== conversationId) {
-        return;
-      }
+      if (!owns()) return;
       this.generatedTitleRefreshTimer = null;
       const updated = await this.fetchGeneratedConversationTitle(
         conversationId,
         `${reason}:attempt-${attempt}`
       );
-      if (updated) {
-        return;
-      }
+      if (!owns() || updated) return;
       const elapsedMs = Date.now() - startedAt;
       if (attempt >= maxAttempts || elapsedMs >= deadlineMs) {
         debugLog('[TaskPolling] 停止等待生成标题', {
@@ -105,12 +98,22 @@ export const titleMethods = {
     if (!normalizedConversationId || normalizedConversationId !== this.currentConversationId) {
       return false;
     }
+    const session = currentConversationSession(this);
+    if (!session || !ownsConversationSession(this, session)) return false;
+    const owns = beginAuxiliaryRequest(this, 'generated-title');
+    const workspaceId = session.workspaceId || this.currentHostWorkspaceId || '';
+    const query = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
     try {
-      const response = await fetch('/api/conversations/current', { cache: 'no-store' });
+      const response = await fetch(
+        `/api/conversations/${encodeURIComponent(normalizedConversationId)}/metadata${query}`,
+        { cache: 'no-store', signal: session.controller.signal }
+      );
+      if (!owns()) return false;
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       const result = await response.json();
+      if (!owns()) return false;
       const data = result?.data || {};
       if (!result?.success || data.id !== normalizedConversationId) {
         return false;
@@ -124,7 +127,9 @@ export const titleMethods = {
       this.applyConversationTitleUpdate(normalizedConversationId, normalizedTitle, source);
       return true;
     } catch (error) {
-      console.warn('[TaskPolling] 同步生成后的对话标题失败:', error);
+      if (owns() && error?.name !== 'AbortError') {
+        console.warn('[TaskPolling] 同步生成后的对话标题失败:', error);
+      }
       return false;
     }
   }

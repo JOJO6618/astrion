@@ -93,12 +93,27 @@ export const messageControlMethods = {
       return this.stopTask();
     }
     if (this.currentWorkspaceHasRunningTask) {
-      this.uiPushToast({
-        title: t('appMessages.conversationRunningTitle'),
-        message: t('appMessages.conversationRunningMessage'),
-        type: 'warning'
-      });
-      return;
+      // Sidebar state may predate a navigation or task completion. Verify it
+      // before rejecting an otherwise idle composer, without rebuilding history.
+      const refreshed = await this.refreshRunningWorkspaceTasks();
+      if (!owns() || isConversationSubmitting(this)) return;
+      if (!refreshed) {
+        this.uiPushToast({
+          title: t('appMessages.sendFailedTitle'),
+          message: t('appUi.fetchRunningTasksFailed'),
+          type: 'error'
+        });
+        return;
+      }
+      if (this.composerBusy) return this.handleSendOrStop();
+      if (this.currentWorkspaceHasRunningTask) {
+        this.uiPushToast({
+          title: t('appMessages.conversationRunningTitle'),
+          message: t('appMessages.conversationRunningMessage'),
+          type: 'warning'
+        });
+        return;
+      }
     }
     return this.sendMessage();
   },

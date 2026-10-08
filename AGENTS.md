@@ -602,6 +602,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **显示加载唯一入口**：`server/conversation_bootstrap.py` + `static/src/app/methods/conversation/bootstrap.ts`；契约见 `docs/运行对话显示快照契约.md`。服务端 `conversation_view/` 冻结已提交历史前缀并增量维护当前任务显示投影，同一显示事务捕获投影、主任务摘要与绝对 `next_event_idx`；前端离线构造后一次提交，再用 `attachSnapshot` 从该游标续接。**有限事件 deque 只用于增量，不用于重建全部显示。**
 - **禁止恢复旁路**：不要恢复 `restoreTaskState`、从事件 0 重放、末条角色/工具猜边界、文本匹配去重、全历史扫描补工具注册、mounted/watcher 第二次恢复、对账独立写消息/归零游标或全局 task handler。
 - **所有权**：导航使用 `conversation/session.ts` 的 session 身份与 epoch（空页面也推进 epoch）；轮询独立使用 generation/request owner。**所有异步响应、catch/finally、timer 在写状态前检查归属，不能只比较 conversation/task 字符串 ID。**
+- **跨对话索引**：`ui/workspace.ts` 的 `/api/tasks` 列表使用独立请求身份，**不绑定导航 session**；切换对话不停止刷新，失败保留缓存并重试，页面卸载才退役。输入空闲但任务缓存运行时，发送前重新核实；标题统一经 `conversation` store 更新各类型/工作区/搜索缓存，补查走显式对话与工作区的 `/metadata`，不读 `/current`。
 - **身份与生命周期**：事件和持久化共享用户 `message_id`；工具 preparing/execution/call 别名在 hydrate 一次登记。压缩提交后 rebase 显示前缀并接管新快照；检查点按用户/工作区/对话退役旧显示。前台结束但后台仍活动时保持活动状态。
 - **存储边界**：`read_conversation`（兼容名 `load_conversation`）**不做迁移回写**；同持久化目录共享锁。**锁顺序 = 显示锁 → 任务锁**，不在任务锁内反向获取显示锁。仍维持单后端进程约束。
 - 回归：`python -B test/2026-10-07_运行对话快照/run_regressions.py`（需已安装依赖与 Node）。视觉由用户验收；**不将离线回归等同于所有卡顿消失**。

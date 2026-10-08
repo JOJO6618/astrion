@@ -131,6 +131,7 @@ export const bootstrapMethods = {
       this.titleReady = true;
       this.suppressTitleTyping = false;
       this.startTitleTyping?.(this.currentConversationTitle, { animate: false });
+      this.applyConversationTitleUpdate?.(normalizedId, meta.title || '', 'snapshot');
       this.hydrateRuntimeDisplay(display, data.running || {}, preserveInteraction);
       useWorkflowStore().setWorkflow(null, false);
       this.runtimeQueuePaused = !!data.runtime_queue?.paused;
@@ -159,6 +160,9 @@ export const bootstrapMethods = {
         });
       }
       this.startRunningStateReconcile();
+      if (this.isPlaceholderConversationTitle?.(meta.title || '')) {
+        this.scheduleGeneratedTitleRefresh?.('snapshot', { conversationId: normalizedId });
+      }
       // Scroll and auxiliary panels never hold up the snapshot or live subscription.
       this.$nextTick(() => {
         if (!ownsConversationSession(this, session)) return;

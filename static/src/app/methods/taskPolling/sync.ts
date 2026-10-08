@@ -2,7 +2,6 @@
 import { debugLog } from '../common';
 import { useResourceStore } from '../../../stores/resource';
 import { invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
-import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
 export const syncMethods = {
   handleRuntimeQueueSync(data: any) {
@@ -78,33 +77,8 @@ export const syncMethods = {
   handleConversationChanged(data: any, eventIdx: number) {
     debugLog('[TaskPolling] 对话标题已更新, idx:', eventIdx, data);
 
-    // 桌面端标签条：任何对话的标题更新都同步标签（chrome 轮询收敛前
-    // 主页面快照先落地，保证「标题有了就瞬间变」）
-    if (data && data.title && data.conversation_id) {
-      try {
-        useConversationTabsStore().updateTitle(data.conversation_id, data.title);
-      } catch (_tabsErr) {
-        // 标签 store 不可用时忽略
-      }
-    }
-
-    if (data && data.conversation_id === this.currentConversationId) {
-      // 更新当前对话标题
-      if (data.title) {
-        this.currentConversationTitle = data.title;
-        debugLog('[TaskPolling] 更新当前对话标题:', data.title);
-      }
-
-      // 更新对话列表中的标题
-      if (data.title && Array.isArray(this.conversations)) {
-        const conv = this.conversations.find((c) => c && c.id === data.conversation_id);
-        if (conv) {
-          conv.title = data.title;
-          debugLog('[TaskPolling] 更新对话列表中的标题:', data.title);
-        }
-      }
-
-      this.$forceUpdate();
+    if (data?.conversation_id && data?.title) {
+      this.applyConversationTitleUpdate(data.conversation_id, data.title, 'task-event');
     }
   },
   handleConversationResolved(data: any) {

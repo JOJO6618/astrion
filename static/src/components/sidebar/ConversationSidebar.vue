@@ -1504,7 +1504,7 @@ const runningTaskItems = computed(() =>
     : []
 );
 const activeStatuses = new Set(['pending', 'running', 'cancel_requested']);
-const terminalStatuses = new Set(['succeeded', 'failed', 'canceled']);
+const terminalStatuses = new Set(['succeeded', 'failed', 'canceled', 'stopped']);
 const isTaskActive = (task: any) => activeStatuses.has(String(task?.status || ''));
 const isTaskCompleted = (task: any) => terminalStatuses.has(String(task?.status || ''));
 const activeConversationIds = computed(
