@@ -232,6 +232,10 @@ export default {
   localeChineseDesc: 'Chinese (Simplified)',
   localeEnglish: 'English',
   localeEnglishDesc: 'English (US)',
+  currencyTitle: '显示币种',
+  currencyDesc: '花费显示使用的币种，人民币按每日参考汇率换算',
+  currencyUSD: '美元 USD',
+  currencyCNY: '人民币 CNY',
 
   // ── 工作区与权限 ──
   defaultPermissionTitle: '默认权限',

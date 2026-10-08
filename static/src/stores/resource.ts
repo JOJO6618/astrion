@@ -4,8 +4,10 @@ import {
 } from '../app/methods/auxiliaryOwnership';
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
+import type { ConversationCosts } from '@/components/token/costTypes';
 
 interface ConversationTokens {
+  costs?: ConversationCosts | null;
   cumulative_input_tokens: number;
   cumulative_output_tokens: number;
   cumulative_total_tokens: number;
@@ -165,6 +167,7 @@ export const useResourceStore = defineStore('resource', {
             data.data.total_cached_input_tokens || 0;
           this.currentConversationTokens.cache_exempt_input_tokens =
             data.data.cache_exempt_input_tokens || 0;
+          this.currentConversationTokens.costs = data.data.costs || null;
           if (typeof data.data.current_context_tokens === 'number') {
             this.currentContextTokens = data.data.current_context_tokens;
           }

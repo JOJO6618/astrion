@@ -149,7 +149,7 @@ class SubAgentTask:
             "web_pages": 0,
             "commands": 0,
             "api_calls": 0,
-            "token_usage": {"prompt": 0, "completion": 0, "total": 0},
+            "token_usage": {"prompt": 0, "completion": 0, "total": 0, "cached_input": 0},
             "current_context_tokens": 0,
             "compress_round": 0,
         }
@@ -369,6 +369,10 @@ class SubAgentTask:
                 if self._cancelled:
                     raise asyncio.CancelledError()
                 try:
+                    from modules.api_pricing import capture_price
+                    from uuid import uuid4
+                    self._request_price = await asyncio.to_thread(capture_price, model_key)
+                    self._cost_request_id = str(uuid4())
                     assistant_message, reasoning, tool_calls, usage, responses_reasoning_items = await self._call_model(client, model_key, tools)
                     call_error = None
                     break
@@ -443,8 +447,8 @@ class SubAgentTask:
                     )
                 raise call_error
 
-            if usage:
-                self._apply_usage(usage)
+            # A successful response without usage is explicitly unpriced.
+            self._apply_usage(usage)
 
             # 上下文压缩检查：超过阈值时触发深度压缩
             if self.current_context_tokens > 0 and self.current_context_tokens >= self.compress_threshold_tokens:
@@ -878,8 +882,10 @@ class SubAgentTask:
                             "ts": int(time.time() * 1000),
                         })
 
-                if chunk.get("usage"):
-                    usage = chunk["usage"]
+                from utils.token_usage import extract_usage_payload
+                normalized_usage = extract_usage_payload(chunk)
+                if normalized_usage:
+                    usage = normalized_usage
         except (asyncio.CancelledError, SubAgentModelCallError):
             raise
         except Exception as exc:
@@ -1032,19 +1038,11 @@ class SubAgentTask:
             pass
 
     def _apply_usage(self, usage: Any) -> None:
+        from modules.sub_agent.usage import apply_usage
         try:
-            if isinstance(usage, dict):
-                prompt = usage.get("prompt_tokens") or usage.get("prompt") or 0
-                completion = usage.get("completion_tokens") or usage.get("completion") or 0
-                total = usage.get("total_tokens") or usage.get("total") or (prompt + completion)
-                self.stats["token_usage"]["prompt"] += int(prompt)
-                self.stats["token_usage"]["completion"] += int(completion)
-                self.stats["token_usage"]["total"] += int(total)
-                # prompt_tokens 即为当前上下文占用的 tokens
-                self.current_context_tokens = int(prompt)
-                self.stats["current_context_tokens"] = int(prompt)
+            apply_usage(self, usage)
         except Exception:
-            pass
+            logger.exception('Sub-agent usage/cost commit failed: %s', self.task_id)
 
     def _rebuild_system_prompt(self) -> str:
         """从冻结的 system_prompt.txt 重新读取 system prompt（压缩后重建用）。"""

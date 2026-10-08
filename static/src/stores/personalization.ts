@@ -192,6 +192,7 @@ interface PersonalForm {
   sidebar_workspace_order: string[];
   theme: 'classic' | 'light' | 'dark';
   ui_locale: 'zh-CN' | 'en-US';
+  display_currency: 'USD' | 'CNY';
   goal_review_mode: 'readonly' | 'active';
   goal_end_conditions: string[];
   goal_max_turns: number;
@@ -425,6 +426,7 @@ const defaultForm = (): PersonalForm => ({
   sidebar_workspace_order: [],
   theme: loadCachedTheme(),
   ui_locale: 'zh-CN' as 'zh-CN' | 'en-US',
+  display_currency: 'USD' as 'USD' | 'CNY',
   goal_review_mode: 'readonly',
   goal_end_conditions: ['max_turns'],
   goal_max_turns: 5,
@@ -765,6 +767,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         ui_locale: ['zh-CN', 'en-US'].includes(data.ui_locale)
           ? data.ui_locale
           : this.form?.ui_locale || 'zh-CN',
+        display_currency: data.display_currency === 'CNY' ? 'CNY' : 'USD',
         goal_review_mode: data.goal_review_mode === 'active' ? 'active' : 'readonly',
         goal_end_conditions: Array.isArray(data.goal_end_conditions)
           ? data.goal_end_conditions.filter((x: any) => x === 'max_turns' || x === 'max_tokens')
@@ -1297,8 +1300,7 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.scheduleAutoSave();
     },
     setCompactMessageDisplay(mode: CompactMessageDisplay) {
-      const target: CompactMessageDisplay =
-        mode === 'brief' || mode === 'hidden' ? mode : 'full';
+      const target: CompactMessageDisplay = mode === 'brief' || mode === 'hidden' ? mode : 'full';
       this.form = {
         ...this.form,
         compact_message_display: target

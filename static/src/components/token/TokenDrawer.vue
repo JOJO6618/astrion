@@ -42,6 +42,11 @@
                 <div class="stat-label">{{ $t('sidebar.cacheHitRate') }}</div>
                 <div class="stat-value">{{ cacheHitRateText }}</div>
               </div>
+              <CostSummary
+                :costs="currentConversationTokens.costs"
+                :conversation-id="conversationId"
+                :active="visible && !collapsed"
+              />
             </div>
           </div>
           <div class="usage-cell usage-cell--right usage-cell--performance panel-card">
@@ -129,6 +134,8 @@ defineOptions({ name: 'TokenDrawer' });
 import { computed } from 'vue';
 import { t, currentLocale } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
+import CostSummary from './CostSummary.vue';
+import type { ConversationCosts } from './costTypes';
 
 const emit = defineEmits<{
   (e: 'toggle'): void;
@@ -137,7 +144,9 @@ const emit = defineEmits<{
 const props = defineProps<{
   visible: boolean;
   collapsed: boolean;
+  conversationId: string | null;
   currentConversationTokens: {
+    costs?: ConversationCosts | null;
     cumulative_input_tokens?: number;
     cumulative_output_tokens?: number;
     cumulative_cached_input_tokens?: number;

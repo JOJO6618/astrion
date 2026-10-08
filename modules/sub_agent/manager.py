@@ -355,6 +355,7 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             "progress_file": str(progress_file),
             "conversation_file": str(conversation_file),
             "model_key": model_key,
+            "cost_tracking_version": 1,
             "provider_type": provider_type,
             "api_protocol": api_protocol,
             "role_id": role_id,
@@ -1157,6 +1158,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
                 display_name=display_name,
             )
             sub_agent.messages = messages
+            from modules.sub_agent.usage import restore_statistics
+            restore_statistics(sub_agent)
             # 重启后统一置为 idle，等待主智能体再次发消息才继续
             if multi_agent_mode:
                 sub_agent._idle = True
@@ -1496,6 +1499,8 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             display_name=task.get("display_name"),
         )
         sub_agent.messages = messages
+        from modules.sub_agent.usage import restore_statistics
+        restore_statistics(sub_agent)
         sub_agent._idle = True
         task["status"] = "idle"
         task["updated_at"] = time.time()

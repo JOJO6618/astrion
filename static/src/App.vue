@@ -111,6 +111,7 @@
         >
           <TokenDrawer
             :visible="Boolean(currentConversationId)"
+            :conversation-id="currentConversationId"
             :collapsed="tokenPanelCollapsed"
             @toggle="handleTokenPanelToggleClick"
             :current-conversation-tokens="currentConversationTokens"

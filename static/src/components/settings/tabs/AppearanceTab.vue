@@ -34,8 +34,17 @@ const {
   stackedHideBorders,
   themeLabel,
   themeOptions,
-  toggleDropdown
+  toggleDropdown,
+  closeDropdown
 } = ctx;
+const currencyOptions = [
+  { id: 'USD', label: 'personalization.currencyUSD' },
+  { id: 'CNY', label: 'personalization.currencyCNY' }
+] as const;
+const selectCurrency = (value: 'USD' | 'CNY') => {
+  personalization.updateField({ key: 'display_currency', value });
+  closeDropdown();
+};
 </script>
 
 <template>
@@ -97,6 +106,44 @@ const {
             <strong>{{ $t(option.labelKey) }}</strong
             ><span>{{ $t(option.descKey) }}</span
             ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.currencyTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.currencyDesc') }}</span>
+      </span>
+      <div
+        class="settings-select-wrap"
+        :class="{ open: activeDropdown === 'currency' }"
+        @click.stop
+      >
+        <button type="button" class="settings-select-button" @click="toggleDropdown('currency')">
+          {{
+            $t(
+              form.display_currency === 'CNY'
+                ? 'personalization.currencyCNY'
+                : 'personalization.currencyUSD'
+            )
+          }}
+          <span class="select-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
+          :style="activeDropdown ? floatingMenuStyle : undefined"
+        >
+          <button
+            v-for="option in currencyOptions"
+            :key="option.id"
+            type="button"
+            class="settings-menu-option"
+            :class="{ selected: form.display_currency === option.id }"
+            @click="selectCurrency(option.id)"
+          >
+            <strong>{{ $t(option.label) }}</strong>
+            <svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
           </button>
         </div>
       </div>

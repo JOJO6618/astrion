@@ -129,10 +129,29 @@ class TokenMixin:
         snapshot["updated_at"] = datetime.now().isoformat()
         self._save_token_totals(snapshot)
 
-    def apply_usage_statistics(self, usage: Dict[str, Any]) -> bool:
-        """
-        根据模型返回的 usage 字段更新token统计
-        """
+    def apply_usage_statistics(self, usage: Dict[str, Any], *, price=None,
+                               request_id=None, conversation_id=None) -> bool:
+        """Apply actual usage and optionally commit the main request's USD cost."""
+        target_id = conversation_id or self.current_conversation_id
+        actor = None
+        previous = {}
+        if price is not None and request_id and target_id:
+            from modules.api_pricing import calculate_cost
+            from modules.conversation_costs import actor_statistics, record_request
+            manager = getattr(self, '_get_conversation_manager_for_id', lambda _: self.conversation_manager)(target_id)
+            previous = manager.get_token_statistics(target_id) or {}
+            committed = record_request(
+                self.data_dir, target_id, request_id, 'main', '', 'main', calculate_cost(usage, price),
+                historical_unpriced=bool(previous.get('total_input_tokens')),
+                baseline={'input_tokens': previous.get('total_input_tokens', 0),
+                          'output_tokens': previous.get('total_output_tokens', 0),
+                          'total_tokens': previous.get('total_tokens', 0),
+                          'cached_input_tokens': previous.get('total_cached_input_tokens', 0)},
+            )
+            actor = actor_statistics(self.data_dir, target_id, 'main')
+            if not committed and actor['total_tokens'] == previous.get('total_tokens', 0):
+                return True
+
         normalized_usage = normalize_usage_payload(usage) or {}
         prompt_tokens = int(normalized_usage.get("prompt_tokens") or 0)
         completion_tokens = int(normalized_usage.get("completion_tokens") or 0)
@@ -141,13 +160,20 @@ class TokenMixin:
         current_context_tokens = int(normalized_usage.get("current_context_tokens") or prompt_tokens)
         # 本次请求命中缓存的输入 token（全厂商字段已在 normalize 中归一化）
         cached_input_tokens = int(normalized_usage.get("cached_input_tokens") or 0)
+        if actor:
+            # Repair a previous ledger-only commit after interruption without
+            # counting a repeated request twice in the conversation token totals.
+            prompt_tokens = max(0, actor['input_tokens'] - previous.get('total_input_tokens', 0))
+            completion_tokens = max(0, actor['output_tokens'] - previous.get('total_output_tokens', 0))
+            total_tokens = max(0, actor['total_tokens'] - previous.get('total_tokens', 0))
+            cached_input_tokens = max(0, actor['cached_input_tokens'] - previous.get('total_cached_input_tokens', 0))
 
         try:
             self._increment_workspace_token_totals(prompt_tokens, completion_tokens, total_tokens, cached_input_tokens)
         except Exception as exc:
             print(f"[TokenStats] 无法写入累计Token: {exc}")
 
-        if not self.current_conversation_id:
+        if not target_id:
             print("⚠️ 没有当前对话ID，跳过usage统计更新")
             return False
         
@@ -157,9 +183,9 @@ class TokenMixin:
             # 直接使用 self.conversation_manager 会找不到对话导致统计写入失败
             target_manager = getattr(
                 self, "_get_conversation_manager_for_id", lambda _: self.conversation_manager
-            )(self.current_conversation_id)
+            )(target_id)
             success = target_manager.update_token_statistics(
-                self.current_conversation_id,
+                target_id,
                 prompt_tokens,
                 completion_tokens,
                 total_tokens,
@@ -174,6 +200,25 @@ class TokenMixin:
         except Exception as e:
             print(f"更新usage统计失败: {e}")
             return False
+
+    def record_unavailable_usage(self, *, price, request_id, conversation_id=None):
+        """Keep successful calls lacking usage explicit without resetting context."""
+        from modules.api_pricing import calculate_cost
+        from modules.conversation_costs import record_request
+        target_id = conversation_id or self.current_conversation_id
+        if not target_id:
+            return
+        manager = getattr(self, '_get_conversation_manager_for_id', lambda _: self.conversation_manager)(target_id)
+        previous = manager.get_token_statistics(target_id) or {}
+        record_request(
+            self.data_dir, target_id, request_id, 'main', '', 'main', calculate_cost(None, price),
+            historical_unpriced=bool(previous.get('total_input_tokens')),
+            baseline={'input_tokens': previous.get('total_input_tokens', 0),
+                      'output_tokens': previous.get('total_output_tokens', 0),
+                      'total_tokens': previous.get('total_tokens', 0),
+                      'cached_input_tokens': previous.get('total_cached_input_tokens', 0)},
+        )
+        self.safe_broadcast_token_update()
 
     def get_conversation_token_statistics(self, conversation_id: str = None) -> Optional[Dict]:
         """
@@ -193,7 +238,19 @@ class TokenMixin:
         target_manager = getattr(
             self, "_get_conversation_manager_for_id", lambda _: self.conversation_manager
         )(target_id)
-        return target_manager.get_token_statistics(target_id)
+        stats = target_manager.get_token_statistics(target_id)
+        if stats is not None:
+            from modules.conversation_costs import summarize
+            from modules.exchange_rates import get_rate
+            terminal = getattr(self, 'main_terminal', None)
+            sub_manager = getattr(terminal, 'sub_agent_manager', None)
+            tasks = getattr(sub_manager, 'tasks', {}).copy().values()
+            children = [task for task in tasks if task.get('conversation_id') == target_id]
+            stats['costs'] = summarize(self.data_dir, target_id,
+                                      main_input=stats.get('total_input_tokens', 0),
+                                      sub_agents=children)
+            stats['costs']['exchange_rate'] = get_rate()
+        return stats
 
     def get_current_context_tokens(self, conversation_id: str = None) -> int:
         """
@@ -229,6 +286,7 @@ class TokenMixin:
                 'cumulative_cached_input_tokens': cumulative_stats.get("total_cached_input_tokens", 0) if cumulative_stats else 0,
                 'cache_exempt_input_tokens': cumulative_stats.get("cache_exempt_input_tokens", 0) if cumulative_stats else 0,
                 'current_context_tokens': cumulative_stats.get("current_context_tokens", 0) if cumulative_stats else 0,
+                'costs': cumulative_stats.get('costs') if cumulative_stats else None,
                 'updated_at': datetime.now().isoformat()
             }
             

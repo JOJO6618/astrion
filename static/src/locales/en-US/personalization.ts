@@ -241,6 +241,10 @@ export default {
   localeChineseDesc: 'Chinese (Simplified)',
   localeEnglish: 'English',
   localeEnglishDesc: 'English (US)',
+  currencyTitle: 'Display currency',
+  currencyDesc: 'Currency for costs; CNY uses a daily reference exchange rate',
+  currencyUSD: 'US dollar USD',
+  currencyCNY: 'Renminbi CNY',
 
   // ── Workspace & Permissions ──
   defaultPermissionTitle: 'Default permission',

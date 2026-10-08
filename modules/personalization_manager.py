@@ -190,6 +190,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "sidebar_workspace_order": [],  # 分组侧边栏中非置顶工作区的显示顺序
     "theme": "classic",  # 主题配色: classic-经典/light-明亮/dark-暗黑
     "ui_locale": "zh-CN",  # 界面语言: zh-CN / en-US（同时驱动后端用户可见消息语言）
+    "display_currency": "USD",
     # 目标模式（Goal Mode）
     "goal_review_mode": "readonly",  # readonly-仅读对话判断 / active-允许审核智能体跑只读命令取证
     "goal_end_conditions": ["max_turns"],  # 结束方式，可多选：max_turns / max_tokens
@@ -865,6 +866,9 @@ def sanitize_personalization_payload(
         base["ui_locale"] = ui_locale_value
     elif base.get("ui_locale") not in ALLOWED_UI_LOCALES:
         base["ui_locale"] = "zh-CN"
+
+    currency = data.get('display_currency', base.get('display_currency', 'USD'))
+    base['display_currency'] = currency if currency in ('USD', 'CNY') else 'USD'
 
     # 目标模式：审核模式
     goal_review_mode = data.get("goal_review_mode", base.get("goal_review_mode"))

@@ -47,6 +47,8 @@ function getLastCompleteToolIntent(actions) {
   if (!Array.isArray(actions)) return '';
   for (let i = actions.length - 1; i >= 0; i--) {
     const action = actions[i];
+    // Body output ends the previous tool-intent run; do not revive it after text_end.
+    if (action?.type === 'text') return '';
     if (action?.type !== 'tool') continue;
     const tool = action.tool;
     if (!tool) continue;
@@ -482,6 +484,22 @@ export const computed = {
       agentCount > 0 ||
       cmdCount > 0;
 
+    // An explicit new API request supersedes the previous request's retained
+    // intent and any stale streaming/tool fields. Response-start events clear it.
+    if (
+      this.apiRequestPending &&
+      !this.stopRequested &&
+      (this.taskInProgress || this.streamingMessage)
+    ) {
+      return {
+        mode: 'work',
+        toolKeys: [],
+        toolTexts: [],
+        text: t('appCore.waitingApiResponse'),
+        tracking: false,
+        apiWaiting: true
+      };
+    }
     // ---- 决策 ----
     if (isThinking) {
       return {
@@ -509,6 +527,9 @@ export const computed = {
       return { mode: 'tool', toolKeys: keys, toolTexts, text, tracking: false };
     }
     if (running) {
+      if (lastAssistant?.currentStreamingType === 'text') {
+        return { mode: 'work', toolKeys: [], toolTexts: [], text: '', tracking: false };
+      }
       // 工具间等待仍显示上一次 intent，直到下一条 intent 就绪。
       if (retainedIntent) {
         return {
@@ -524,7 +545,7 @@ export const computed = {
       let text = bgText;
       // 「等待 API 响应…」优先于随机等待文案：后端已发出请求、尚未开始回复
       // （api_request_start 事件驱动，覆盖首轮与工具轮次间的每一次等待）
-      if (!text && this.apiRequestPending) {
+      if (!text && this.apiRequestPending && !this.stopRequested) {
         return {
           mode: 'work',
           toolKeys: [],

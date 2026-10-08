@@ -550,6 +550,12 @@ class ProviderManager:
                     },
                     "supports_thinking": supports_thinking,
                     "fast_only": not supports_thinking,
+                    "pricing": meta.get("pricing"),
+                    "billing": (
+                        "local" if (catalog_entry or {}).get("auth") == "none"
+                        else "subscription" if "编程订阅" in str((catalog_entry or {}).get("badge", ""))
+                        else "metered"
+                    ),
                 }
                 if headers:
                     profile["headers"] = dict(headers)

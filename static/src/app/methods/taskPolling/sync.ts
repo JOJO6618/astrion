@@ -64,6 +64,7 @@ export const syncMethods = {
         data.cumulative_cached_input_tokens || 0;
       this.currentConversationTokens.cache_exempt_input_tokens =
         data.cache_exempt_input_tokens || 0;
+      this.currentConversationTokens.costs = data.costs || null;
 
       if (typeof data.current_context_tokens === 'number') {
         this.resourceSetCurrentContextTokens(data.current_context_tokens);

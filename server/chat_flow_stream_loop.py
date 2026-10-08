@@ -56,6 +56,11 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             'attempt': api_attempt + 1,
             'max_attempts': max_api_retries + 1,
         })
+        from modules.api_pricing import capture_price
+        from uuid import uuid4
+        request_model_key = str(getattr(web_terminal, 'model_key', '') or '')
+        request_price = await asyncio.to_thread(capture_price, request_model_key)
+        cost_request_id = str(uuid4())
 
         # 收集流式响应
         async for chunk in web_terminal.api_client.chat(messages, tools, stream=True):
@@ -404,7 +409,10 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
         # 若在 error 分支判断之前 apply 会导致同一回答重复计数。
         if last_usage_payload and not api_error:
             try:
-                web_terminal.context_manager.apply_usage_statistics(last_usage_payload)
+                web_terminal.context_manager.apply_usage_statistics(
+                    last_usage_payload, price=request_price, request_id=cost_request_id,
+                    conversation_id=conversation_id,
+                )
                 debug_log(
                     f"Usage统计: prompt={last_usage_payload.get('prompt_tokens', 0)}, "
                     f"completion={last_usage_payload.get('completion_tokens', 0)}, "
@@ -414,6 +422,14 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                 debug_log(f"Usage统计更新失败: {e}")
         else:
             debug_log("未获取到usage字段，跳过token统计更新")
+            if not api_error:
+                try:
+                    web_terminal.context_manager.record_unavailable_usage(
+                        price=request_price, request_id=cost_request_id,
+                        conversation_id=conversation_id,
+                    )
+                except Exception as exc:
+                    debug_log(f"未计价请求登记失败: {exc}")
 
 
         if api_error:

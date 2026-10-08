@@ -149,6 +149,14 @@ def get_model_meta(catalog_entry: Dict[str, Any], model_id: str) -> Optional[Dic
         meta["context"] = model["context"]
     if model.get("max_output"):
         meta["max_output"] = model["max_output"]
+    if isinstance(model.get("cost"), dict):
+        from modules.api_pricing import clean_rates
+        data = _current_data()
+        meta["pricing"] = {
+            "rates": clean_rates(model["cost"]),
+            "source": data.get("source", _API_URL),
+            "fetched_at": data.get("fetched_at"),
+        }
     return meta or None
 
 
@@ -180,12 +188,15 @@ def slim_full_dump(full: Dict[str, Any], md_keys: set[str]) -> Dict[str, Any]:
                     entry["context"] = limit["context"]
                 if limit.get("output"):
                     entry["max_output"] = limit["output"]
+            if isinstance(m.get("cost"), dict):
+                from modules.api_pricing import clean_rates
+                entry["cost"] = clean_rates(m["cost"])
             models[model_id] = entry
         providers[key] = {"npm": pdata.get("npm"), "models": models}
     from datetime import datetime, timezone
 
     return {
-        "version": 1,
+        "version": 2,
         "source": _API_URL,
         "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "providers": providers,
@@ -227,11 +238,9 @@ def refresh_cache(
         return False, f"request_error: {exc}"
     slim = slim_full_dump(full, md_keys)
     try:
+        from utils.atomic_io import atomic_write_json
         path = _store_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(slim, ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp.replace(path)
+        atomic_write_json(path, slim)
     except Exception as exc:
         return False, f"write_error: {exc}"
     with _lock:
