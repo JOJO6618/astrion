@@ -185,6 +185,7 @@ export const hostWorkspaceMethods = {
     }
   },
   async submitHostWorkspaceCreate() {
+    const owns = beginAuxiliaryRequest(this, 'host-workspace-create');
     if (!(this.versioningHostMode || this.dockerProjectMode)) {
       return;
     }

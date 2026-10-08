@@ -9,6 +9,7 @@ import uuid
 import platform
 import shutil
 import subprocess
+import sys
 from copy import deepcopy
 from typing import Dict, List, Optional, Any
 from pathlib import Path
