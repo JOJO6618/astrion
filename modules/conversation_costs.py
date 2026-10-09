@@ -47,6 +47,7 @@ def record_request(data_dir: str | Path, conversation_id: str, request_id: str,
             'cached_input_tokens': (baseline or {}).get('cached_input_tokens', 0),
             'total_tokens': (baseline or {}).get('total_tokens', 0),
             'requests': 0, 'priced_requests': 0, 'unpriced_requests': 0,
+            # 保留旧账本键位（历史订阅/本地请求不计价）；新增请求只有 priced/unpriced
             'subscription_requests': 0, 'local_requests': 0,
             'historical_unpriced': historical_unpriced,
         })
@@ -73,6 +74,7 @@ def actor_statistics(data_dir: str | Path, conversation_id: str, actor_id: str) 
 
 def summarize(data_dir: str | Path, conversation_id: str, *, main_input: int = 0,
               sub_agents: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Total = every actor's API-priced amount; unpriced requests stay explicit."""
     path = _path(data_dir, conversation_id)
     with directory_lock(path.parent):
         actors = list(_read(path)['actors'].values())
@@ -92,6 +94,5 @@ def summarize(data_dir: str | Path, conversation_id: str, *, main_input: int = 0
     total = sum((Decimal(a['cost_usd']) for a in actors), Decimal(0))
     partial = any(a.get('unpriced_requests') or a.get('historical_unpriced') for a in actors)
     has_priced = any(a.get('priced_requests') for a in actors)
-    non_metered = any(a.get('subscription_requests') or a.get('local_requests') for a in actors)
     return {'currency': 'USD', 'total_usd': str(total), 'partial': partial,
-            'has_priced': has_priced, 'non_metered': non_metered, 'actors': actors}
+            'has_priced': has_priced, 'actors': actors}

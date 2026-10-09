@@ -25,7 +25,7 @@ from modules import exchange_rates, modelsdev_registry
 from modules.sub_agent.usage import apply_usage, restore_statistics
 from utils.context_manager.token_mixin import TokenMixin
 
-PRICE = {'model_key': 'synthetic/a', 'billing': 'metered',
+PRICE = {'model_key': 'synthetic/a',
          'rates': {'input': 2, 'cache_read': 0.2, 'output': 8}}
 USAGE = {'prompt_tokens': 1000, 'completion_tokens': 100,
          'prompt_tokens_details': {'cached_tokens': 400}}
@@ -71,12 +71,46 @@ class PricingTests(unittest.TestCase):
             self.assertEqual(load_personalization_config(path)['display_currency'], 'CNY')
             self.assertEqual(save_personalization_config(path, {'display_currency': 'invalid'})['display_currency'], 'USD')
 
-    def test_subscription_has_no_fabricated_api_charge(self):
-        profiles = {'synthetic/sub': {'responses_auth': 'codex_oauth'}}
+    def test_oauth_subscription_model_priced_from_api_rates(self):
+        profiles = {'synthetic/sub': {'responses_auth': 'codex_oauth', 'provider_id': 'openai-codex',
+                                      'pricing': {'rates': PRICE['rates'], 'source': 'synthetic'}}}
         with patch('config.model_profiles.get_registered_model_profiles', return_value=profiles):
             price = capture_price('synthetic/sub', refresh=False)
-        self.assertEqual(calculate_cost(USAGE, price)['status'], 'subscription')
-        self.assertIsNone(calculate_cost(USAGE, price)['cost_usd'])
+        self.assertEqual(price['rates'], PRICE['rates'])
+        result = calculate_cost(USAGE, price)
+        self.assertEqual(result['status'], 'priced')
+        self.assertEqual(Decimal(result['cost_usd']), Decimal('0.00208'))
+
+    def test_model_without_rates_is_unpriced_whatever_the_billing_shape(self):
+        for profile in ({'responses_auth': 'codex_oauth'}, {'billing': 'local'}, {}):
+            profiles = {'synthetic/sub': profile}
+            with patch('config.model_profiles.get_registered_model_profiles', return_value=profiles):
+                price = capture_price('synthetic/sub', refresh=False)
+            result = calculate_cost(USAGE, price)
+            self.assertEqual(result['status'], 'unpriced', profile)
+            self.assertIsNone(result['cost_usd'], profile)
+
+    def test_codex_profiles_carry_modelsdev_openai_rates(self):
+        from utils.api_client.codex.models import _profile_from_model_info
+        pricing = {'rates': PRICE['rates'], 'source': 'synthetic', 'fetched_at': 'synthetic'}
+        with patch('modules.modelsdev_registry.get_model_meta', return_value={'pricing': pricing}) as meta:
+            profile = _profile_from_model_info('gpt-6.1-sol', {'display_name': 'Synthetic Codex'})
+        meta.assert_called_once_with({'modelsdev_key': 'openai'}, 'gpt-6.1-sol')
+        self.assertEqual(profile['responses_auth'], 'codex_oauth')
+        with patch('config.model_profiles.get_registered_model_profiles',
+                   return_value={'openai-codex/gpt-6.1-sol': profile}):
+            price = capture_price('openai-codex/gpt-6.1-sol', refresh=False)
+        self.assertEqual(calculate_cost(USAGE, price)['status'], 'priced')
+
+    def test_codex_profile_without_modelsdev_entry_stays_unpriced(self):
+        from utils.api_client.codex.models import _profile_from_model_info
+        with patch('modules.modelsdev_registry.get_model_meta', return_value=None):
+            profile = _profile_from_model_info('gpt-reserve', {'display_name': 'Reserve'})
+        self.assertIsNone(profile['pricing'])
+        with patch('config.model_profiles.get_registered_model_profiles',
+                   return_value={'openai-codex/gpt-reserve': profile}):
+            price = capture_price('openai-codex/gpt-reserve', refresh=False)
+        self.assertEqual(calculate_cost(USAGE, price)['status'], 'unpriced')
 
     def test_price_is_provider_specific(self):
         profiles = {'synthetic/a': {'pricing': {'rates': PRICE['rates']}}}
@@ -125,6 +159,17 @@ class LedgerTests(unittest.TestCase):
         ledger = json.loads((self.data / 'api_costs/conv_1.json').read_text())
         self.assertEqual(ledger['requests']['a']['price']['rates']['input'], 2)
         self.assertEqual(Decimal(summarize(self.data, 'conv_1')['total_usd']), Decimal('0.00624'))
+
+    def test_oauth_subscription_request_counts_into_total(self):
+        subscription = {'model_key': 'openai-codex/gpt-6.1-sol', 'provider_id': 'openai-codex',
+                        'rates': dict(input=2, cache_read=0.1, output=10)}
+        self.record('a')
+        self.record('b', price=subscription)
+        summary = summarize(self.data, 'conv_1')
+        self.assertEqual(summary['actors'][0]['priced_requests'], 2)
+        self.assertFalse(summary['partial'])
+        # 600×2 + 400×0.1 + 100×10 = 0.00224，与第一笔 0.00208 合计
+        self.assertEqual(Decimal(summary['total_usd']), Decimal('0.00432'))
 
     def test_old_history_and_unpriced_requests_are_partial(self):
         self.record('a', historical=True)

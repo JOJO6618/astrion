@@ -37,6 +37,20 @@ from utils.api_client.codex.settings import (
 )
 
 
+def _api_pricing(slug: str) -> Optional[Dict[str, Any]]:
+    """models.dev 的 OpenAI API 单价。
+
+    ChatGPT 订阅（OAuth）只是凭证来源不同，对话花费同样按 API 单价折算；
+    查不到单价的模型交由计费层标记未计价，不在这里虚构价格。
+    """
+    try:
+        from modules import modelsdev_registry
+    except Exception:
+        return None
+    meta = modelsdev_registry.get_model_meta({"modelsdev_key": "openai"}, slug)
+    return (meta or {}).get("pricing")
+
+
 def _profile_from_model_info(slug: str, info: Dict[str, Any]) -> Dict[str, Any]:
     """把端点 ModelInfo 转换为 astrion 模型 profile 形态。"""
     input_modalities = info.get("input_modalities") or []
@@ -90,6 +104,7 @@ def _profile_from_model_info(slug: str, info: Dict[str, Any]) -> Dict[str, Any]:
         "default_reasoning_level": info.get("default_reasoning_level"),
         "base_instructions": info.get("base_instructions"),  # CLI 缓存来源时为 None
         "codex_visibility": info.get("visibility"),
+        "pricing": _api_pricing(slug),
     }
 
 

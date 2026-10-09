@@ -550,12 +550,8 @@ class ProviderManager:
                     },
                     "supports_thinking": supports_thinking,
                     "fast_only": not supports_thinking,
+                    # 单价统一来自 models.dev；对话花费不看订阅/本地身份
                     "pricing": meta.get("pricing"),
-                    "billing": (
-                        "local" if (catalog_entry or {}).get("auth") == "none"
-                        else "subscription" if "编程订阅" in str((catalog_entry or {}).get("badge", ""))
-                        else "metered"
-                    ),
                 }
                 if headers:
                     profile["headers"] = dict(headers)

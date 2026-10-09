@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。modelsdev_key=该提供商在 models.dev 的 provider key（协议裁决与能力 enrich 数据源；本地/特殊发现链路条目不配）。protocol_note=multi_protocol_partial 表示多协议网关：Chat Completions 与 Responses 模型可用，Anthropic/Google 协议模型正常注册但暂不支持调用（前端提示）。protocol_map=静态协议裁决表（最高优先级，覆盖 models.dev 标注）。protocol_source=models.dev 表示启用 models.dev 在线裁决/enrich。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。static_models=可选静态模型清单：仅当 GET /models 失败或为空时回退使用（部分编程订阅套餐端点官方不提供模型列表），/models 可用时以在线发现为准，清单需随官网更新人工维护。badge 含「编程订阅」的条目为套餐计费（非按量），套餐 Key 与按量 API Key 不通用。",
+  "_comment": "提供商目录（程序能力配置，随版本演进）。一个 base_url = 一个提供商条目。auth: api_key=密钥连接 / none=本地无密钥 / codex_oauth=ChatGPT 订阅 OAuth（走现有 Codex 链路，不在 providers.json 存储）。icon 文件位于前端 provider-icons 目录。modelsdev_key=该提供商在 models.dev 的 provider key（协议裁决、能力 enrich 与模型单价数据源；本地/特殊发现链路条目不配）。protocol_note=multi_protocol_partial 表示多协议网关：Chat Completions 与 Responses 模型可用，Anthropic/Google 协议模型正常注册但暂不支持调用（前端提示）。protocol_map=静态协议裁决表（最高优先级，覆盖 models.dev 标注）。protocol_source=models.dev 表示启用 models.dev 在线裁决/enrich。key_url 为官方控制台获取密钥页面（尽力核实，变更以官网为准）。static_models=可选静态模型清单：仅当 GET /models 失败或为空时回退使用（部分编程订阅套餐端点官方不提供模型列表），/models 可用时以在线发现为准，清单需随官网更新人工维护。badge 含「编程订阅」的条目为套餐计费（非按量），套餐 Key 与按量 API Key 不通用；对话花费一律按 models.dev 单价折算，与计费方式无关。",
   "providers": [
     {
       "id": "deepseek",
@@ -170,6 +170,7 @@
     {
       "id": "openai-codex",
       "name": "OpenAI",
+      "modelsdev_key": "openai",
       "base_url": "https://chatgpt.com/backend-api/codex",
       "icon": "openai.svg",
       "icon_mono": true,

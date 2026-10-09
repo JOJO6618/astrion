@@ -35,18 +35,20 @@ function money(value: string) {
 }
 function actorAmount(actor: CostActor) {
   if (actor.priced_requests) return money(actor.cost_usd);
-  if (actor.historical_unpriced || actor.unpriced_requests) return '—';
-  if (actor.subscription_requests) return t('sidebar.costSubscription');
-  if (actor.local_requests) return t('sidebar.costLocal');
+  if (
+    actor.historical_unpriced ||
+    actor.unpriced_requests ||
+    actor.subscription_requests ||
+    actor.local_requests
+  )
+    return t('sidebar.costUnpriced');
   return money('0');
 }
 const totalText = computed(() => {
   const costs = props.costs;
   if (!costs) return '—';
   if (costs.has_priced) return money(costs.total_usd);
-  if (costs.partial) return '—';
-  if (costs.actors.some((a) => a.subscription_requests)) return t('sidebar.costSubscription');
-  if (costs.actors.some((a) => a.local_requests)) return t('sidebar.costLocal');
+  if (costs.partial) return t('sidebar.costUnpriced');
   return money('0');
 });
 const rateText = computed(() => {
