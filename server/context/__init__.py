@@ -37,6 +37,9 @@ _SYMBOL_MODULE = {
     "reset_system_state": "server.context.reaper",
     "reap_idle_conversation_terminals": "server.context.reaper",
     "start_conversation_terminal_reaper": "server.context.reaper",
+    # 对话是否仍有运行中的工作（主任务/子智能体/后台命令/多智能体）——
+    # 桌面标签条蓝点与对话记录侧边栏运行态的共用判据。
+    "_conversation_terminal_has_running_work": "server.context.reaper",
 }
 
 __all__ = [

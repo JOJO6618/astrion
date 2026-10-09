@@ -2,6 +2,9 @@
 
 存 `{DATA_DIR}/conversation_tabs.json`（按用户名分键），供桌面壳（host 模式）
 重开应用后恢复上次打开的对话标签。非 host 模式返回空数据（标签功能仅桌面壳启用）。
+
+下发给标签条的 `running` 是**对话级运行态**（主任务 + 后台子智能体/后台命令/
+多智能体），与对话记录侧边栏的运行中图标同一口径；不是"主智能体还在不在工作"。
 """
 from __future__ import annotations
 
@@ -45,30 +48,105 @@ def _load_index_titles(workspace_id: str) -> Dict[str, str]:
     return titles
 
 
-def _running_conversation_ids(username: str, workspace_ids: List[str]) -> set:
-    """各工作区当前有活动任务（pending/running/cancel_requested）的对话 id 集合。"""
-    running: set = set()
+def _normalized_conversation_ids(raw: Any) -> List[str]:
+    """对话 id 的合法写法（带/不带 conv_ 前缀），用于与任务记录、terminal 键对齐。"""
+    value = str(raw or "").strip()
+    if not value:
+        return []
+    return [value] if value.startswith("conv_") else [value, f"conv_{value}"]
+
+
+def _active_run_conversation_ids(username: str, workspace_ids: List[str]) -> set:
+    """各工作区当前有活动主任务（pending/running/cancel_requested）的对话 id 集合。
+
+    只覆盖主任务（任务注册表）。子智能体/后台命令/多智能体不是 TaskRecord，
+    由 `_conversation_is_running` 的对话级 terminal 聚合补齐。
+    """
+    active: set = set()
     try:
         from server.runtime import runtime_service
     except Exception:
-        return running
+        return active
     for ws_id in workspace_ids:
         try:
             runs = runtime_service.list_runs(username, ws_id, status="active")
         except Exception:
             continue
         for run in runs:
-            conv_id = str(run.get("conversation_id") or "").strip()
-            if conv_id:
-                running.add(conv_id)
-    return running
+            active.update(_normalized_conversation_ids(run.get("conversation_id")))
+    return active
+
+
+def _peek_conversation_terminal(username: str, workspace_id: str, conversation_ids: List[str]):
+    """读取**已存在**的对话级 terminal（不创建）。
+
+    标签条 600ms 轮询，不能走 get_user_resources 按需建终端（每个对话级终端各自持有
+    对话历史，代价不可接受）；而没有对话级 terminal 时该对话不可能有运行中的
+    子智能体/后台命令/多智能体，跳过判定语义正确。
+    """
+    if not conversation_ids:
+        return None
+    try:
+        from server import state
+        from server.context import _make_terminal_key
+    except Exception:
+        return None
+    for conv_id in conversation_ids:
+        terminal = state.user_terminals.get(_make_terminal_key(username, workspace_id, conv_id))
+        if terminal is not None and not getattr(terminal, "_reaper_closing", False):
+            return terminal
+    # 工作区标识不一致时的兜底：按 用户名 + 对话 id 扫描终端键（三段键 username::ws::conv）
+    wanted = set(conversation_ids)
+    for term_key, terminal in list(state.user_terminals.items()):
+        parts = str(term_key).split("::")
+        if len(parts) < 3 or parts[0] != username:
+            continue
+        if "::".join(parts[2:]) not in wanted:
+            continue
+        if getattr(terminal, "_reaper_closing", False):
+            continue
+        return terminal
+    return None
+
+
+def _conversation_is_running(
+    username: str,
+    workspace_id: str,
+    conversation_id: str,
+    active_run_ids: set,
+) -> bool:
+    """对话级运行中判定：主任务活动 或 后台仍有运行中的工作。
+
+    后台口径复用 `server/context/reaper.py::_conversation_terminal_has_running_work`
+    （= `/api/conversations/<id>/running-status` 的 `is_truly_active` 同源口径），
+    保证标签条蓝点与对话记录侧边栏一致：包含后台指令、子智能体、多智能体。
+    """
+    variants = _normalized_conversation_ids(conversation_id)
+    if not variants:
+        return False
+    if any(conv_id in active_run_ids for conv_id in variants):
+        return True
+    terminal = _peek_conversation_terminal(username, workspace_id or "", variants)
+    if terminal is None:
+        return False
+    try:
+        from server.context import _conversation_terminal_has_running_work
+
+        return any(
+            _conversation_terminal_has_running_work(
+                username, workspace_id or "", conv_id, terminal
+            )
+            for conv_id in variants
+        )
+    except Exception:
+        return False
 
 
 def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
-    """GET 时富化：最新标题（对话索引）+ running 标记（活动任务）。"""
+    """GET 时富化：最新标题（对话索引）+ running 标记（对话级运行态）。"""
     ws_ids = sorted({t["workspace_id"] for t in tabs if t.get("kind") == "conv" and t.get("workspace_id")})
     title_maps = {ws: _load_index_titles(ws) for ws in ws_ids}
-    running = _running_conversation_ids(username, ws_ids)
+    active_runs = _active_run_conversation_ids(username, ws_ids)
     for tab in tabs:
         if tab.get("kind") != "conv":
             tab["running"] = False
@@ -77,8 +155,8 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
         fresh = title_maps.get(tab.get("workspace_id") or "", {}).get(conv_id)
         if fresh:
             tab["title"] = fresh[:200]
-        tab["running"] = conv_id in running or (
-            bool(conv_id) and not conv_id.startswith("conv_") and f"conv_{conv_id}" in running
+        tab["running"] = _conversation_is_running(
+            username, str(tab.get("workspace_id") or ""), conv_id, active_runs
         )
 
 
@@ -125,7 +203,8 @@ def get_conversation_tabs():
     data = _load_all().get(username) or {}
     tabs = _sanitize_tabs(data.get("tabs"))
     # chrome 标签条独立 webview 以轮询本端点刷新，标题取索引最新值、
-    # running 取运行时活动任务——标签持久化文件只是主页面写入的快照。
+    # running 取对话级运行态（主任务 + 后台子智能体/后台命令/多智能体，
+    # 与对话记录侧边栏一致）——标签持久化文件只是主页面写入的快照。
     _enrich_tabs(username, tabs)
     return jsonify({
         "success": True,
