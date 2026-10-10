@@ -37,6 +37,8 @@ export default {
   guideFailedTitle: 'Guide failed',
 
   // ── Messages: send/stop (message/send.ts) ──
+  conversationOpeningTitle: 'Opening conversation',
+  conversationOpeningMessage: 'The conversation is still opening. Please try again in a moment.',
   autoCompressingTitle: 'Conversation is auto-compressing',
   autoCompressingBlockSend: 'Sending/stopping is unavailable while compression is in progress',
   compressionBlocksSend: 'You can continue sending after compression completes',

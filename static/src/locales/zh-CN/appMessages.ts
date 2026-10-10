@@ -36,6 +36,8 @@ export default {
   guideFailedTitle: '引导失败',
 
   // ── 消息：发送/停止（message/send.ts） ──
+  conversationOpeningTitle: '对话打开中',
+  conversationOpeningMessage: '对话正在打开，请稍候再发送',
   autoCompressingTitle: '对话自动压缩中',
   autoCompressingBlockSend: '当前不可发送/停止，请等待压缩完成',
   compressionBlocksSend: '压缩完成后才能继续发送消息',

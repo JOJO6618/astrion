@@ -665,7 +665,7 @@
                   }"
                   @click="
                     openActionMenuId = null;
-                    $emit('select', conv.id);
+                    handleWorkspaceConversationClick(conv.id, String(currentWorkspaceId || ''));
                   "
                 >
                   <div class="conversation-title">{{ conv.title }}</div>
@@ -1055,7 +1055,6 @@ const emit = defineEmits<{
   (event: 'refresh'): void;
   (event: 'search', value: string): void;
   (event: 'search-submit', value: string): void;
-  (event: 'select', id: string): void;
   (event: 'select-running-task', task: any): void;
   (event: 'load-more'): void;
   (event: 'search-more'): void;
@@ -1601,6 +1600,7 @@ watch(
 
 const handleWorkspaceConversationClick = (conversationId: string, workspaceId: string) => {
   openWorkspaceMenuId.value = null;
+  openActionMenuId.value = null;
   emit('select-workspace-conversation', { conversationId, workspaceId });
 };
 

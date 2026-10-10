@@ -1,8 +1,6 @@
 // @ts-nocheck
-import { debugLog, traceLog } from '../common';
-import { t } from '@/locales';
+import { debugLog } from '../common';
 import './shared';
-import { ownsConversationSession } from './session';
 
 export const loadMethods = {
   /**
@@ -103,7 +101,10 @@ export const loadMethods = {
             if (this.initialRouteResolved) {
               const latestConversation = cache.list[0];
               if (latestConversation && latestConversation.id) {
-                await this.loadConversation(latestConversation.id);
+                await this.handleSelectWorkspaceConversation({
+                  conversationId: String(latestConversation.id || ''),
+                  workspaceId: String(this.currentHostWorkspaceId || '')
+                });
               }
             }
           }
@@ -159,162 +160,10 @@ export const loadMethods = {
     this.conversationsOffset += this.conversationsLimit;
     await this.loadConversationsList();
     this.loadingMoreConversations = false;
-  },
-  async loadConversation(conversationId, options = {}) {
-    const force = Boolean(options.force);
-    const preserveListPosition = Boolean(options.preserveListPosition);
-    const workspaceId = options.workspaceId ? String(options.workspaceId) : '';
-    debugLog('加载对话:', conversationId);
-    traceLog('loadConversation:start', {
-      conversationId,
-      currentConversationId: this.currentConversationId,
-      force
-    });
-    this.logMessageState('loadConversation:start', { conversationId, force });
-
-    if (!force && conversationId === this.currentConversationId && !this.historyLoading) {
-      debugLog('已是当前对话，跳过加载');
-      traceLog('loadConversation:skip-same', { conversationId });
-      this.suppressTitleTyping = false;
-      this.titleReady = true;
-      return;
-    }
-
-    const session = this.beginConversationView(conversationId, workspaceId);
-    const owns = () => ownsConversationSession(this, session);
-    this.suppressTitleTyping = true;
-    this.titleReady = false;
-    // 桌面端标签条：进入对话的公共漏斗（侧边栏普通列表直接绑本方法）。
-    // 新对话：点击瞬间乐观开标签；已有标签：立即激活——两者都 persistNow，
-    // 不等对话加载完（原来要等 bootstrap 登记 + 防抖，chrome 选中滞后几秒）
-    try {
-      const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
-      if (!owns()) return;
-      const tabsStore = useConversationTabsStore();
-      if (tabsStore.enabled) {
-        const bareId = String(conversationId).replace(/^conv_/, '');
-        const existing = tabsStore.tabs.find(
-          (item: any) =>
-            item.kind === 'conv' &&
-            [String(conversationId), bareId, `conv_${bareId}`].includes(item.conversationId)
-        );
-        if (existing) {
-          tabsStore.setActive(existing.key);
-          tabsStore.persistNow();
-        } else {
-          const conv = (Array.isArray(this.conversations) ? this.conversations : []).find(
-            (item: any) => String(item?.id || '') === String(conversationId)
-          );
-          const wsId = workspaceId || String(this.currentHostWorkspaceId || '');
-          const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
-            (item: any) => String(item?.workspace_id || '') === wsId
-          );
-          tabsStore.openConversationTab({
-            conversationId,
-            workspaceId: wsId,
-            workspaceLabel: String(ws?.label || ''),
-            title: String(conv?.title || '')
-          });
-          tabsStore.persistNow();
-        }
-      }
-    } catch (_tabsErr) {
-      // ignore
-    }
-
-    // 切换对话前把 debounce 中的推理强度保存立即落盘（随请求带原对话 id，
-    // 不会串到新对话）；fire-and-forget，不阻塞加载
-    this.flushReasoningEffortSave?.();
-
-    // 已移除「压缩中切换对话需确认/取消压缩」拦截：多对话独立运行后，压缩在
-    // 后端随对话任务进行，切换视图不影响压缩本身；压缩锁也按对话隔离
-    // （compressionActiveForCurrentConversation），不再存在对话级全局锁。
-
-    // 注意：加载已有对话时必须保留该对话自身的模型/模式，不能套用用户默认值。
-
-    // 保存已经捕获的原工作区草稿，不阻塞显示快照请求。
-    void this.persistComposerDraftNow({
-      reason: `switch-conversation:${conversationId}`,
-      force: true,
-      keepalive: true
-    }).catch(() => {});
-    if (!owns()) return;
-
-    try {
-      // 统一加载协议：一次 bootstrap 替代「PUT load + GET messages + GET tasks」串行链。
-      // 模式/模型应用、历史渲染、运行中任务恢复均在 enterConversation 内完成。
-      const result = await this.enterConversation(conversationId, {
-        source: 'sidebar',
-        session,
-        workspaceId,
-        urlMode: 'push',
-        preserveListPosition,
-        resetUI: true
-      });
-
-      if (!owns() || result.superseded) return;
-      if (result.success) {
-        debugLog('对话 bootstrap 成功:', result);
-        traceLog('loadConversation:api-success', { conversationId, title: result.title });
-        this.currentConversationTitle = result.title;
-        this.titleReady = true;
-        this.suppressTitleTyping = false;
-        this.startTitleTyping(this.currentConversationTitle, { animate: false });
-
-        this.subAgentFetch();
-        this.fetchTodoList();
-
-        await this.refreshRunningWorkspaceTasks?.();
-        if (!owns()) return;
-        const visibleTask =
-          typeof this.getVisibleWorkspaceTaskForConversation === 'function'
-            ? this.getVisibleWorkspaceTaskForConversation(conversationId)
-            : null;
-        const visibleTaskStatus = String(visibleTask?.status || '');
-        const terminalStatuses = new Set(['succeeded', 'failed', 'canceled']);
-        if (visibleTask && terminalStatuses.has(visibleTaskStatus)) {
-          // 用户已点进完成后的“待查看”对话，清除列表里的完成标记。
-          this.acknowledgeCompletedWorkspaceTask?.(visibleTask.task_id);
-        }
-        this.fetchWorkMode();
-        this.fetchPermissionMode();
-        this.fetchExecutionMode();
-        this.fetchNetworkPermission();
-        await this.fetchVersioningStatus(conversationId, { silent: true });
-        if (!owns()) return;
-        this.refreshProjectGitSummary();
-        this.fetchConversationTokenStatistics();
-        this.updateCurrentContextTokens();
-        traceLog('loadConversation:after-history', {
-          conversationId,
-          messagesLen: Array.isArray(this.messages) ? this.messages.length : 'n/a'
-        });
-      } else {
-        console.error('对话加载失败:', result.message);
-        this.suppressTitleTyping = false;
-        this.titleReady = true;
-        this.uiPushToast({
-          title: t('appMessages.loadConversationFailedTitle'),
-          message: result.message || t('appMessages.serverNotSuccessMessage'),
-          type: 'error'
-        });
-      }
-    } catch (error) {
-      if (!owns()) return;
-      console.error('加载对话异常:', error);
-      traceLog('loadConversation:error', {
-        conversationId,
-        error: error?.message || String(error)
-      });
-      this.suppressTitleTyping = false;
-      this.titleReady = true;
-      this.uiPushToast({
-        title: t('appMessages.loadConversationErrorTitle'),
-        message: error.message || String(error),
-        type: 'error'
-      });
-    }
   }
+  /* loadConversation 已删除（2026-10-10）：全部并入统一入口
+     handleSelectWorkspaceConversation（app/methods/ui/hostWorkspace.ts）。
+     平铺/分组/移动版/标签条/路由恢复/创建/复制/还原/运行任务跳转统一走该入口。 */
 };
 
 /* 工作区分组加载统一走 store 版（stores/conversation.ts 的 loadWorkspaceConversations/

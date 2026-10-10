@@ -98,8 +98,14 @@ export const mobileMethods = {
       this.closeMobileOverlay('escape');
     }
   },
-  handleMobileOverlaySelect(conversationId) {
-    this.loadConversation(conversationId);
+  handleMobileOverlaySelect(payload) {
+    /* 统一入口：侧边栏所有点击都 emit select-workspace-conversation，移动版在启动
+       加载的同时收起悬浮层（加载完成与否不影响收起，与旧行为一致）。 */
+    const record = payload && typeof payload === 'object' ? payload : { conversationId: payload };
+    const conversationId = String(record?.conversationId || '').trim();
+    const workspaceId = String(record?.workspaceId || '').trim();
+    if (!conversationId) return;
+    void this.handleSelectWorkspaceConversation({ conversationId, workspaceId });
     this.closeMobileOverlay();
   }
 };

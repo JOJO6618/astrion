@@ -154,7 +154,10 @@ export const routeMethods = {
       this.restoreComposerDraftState('popstate:new').catch(() => {});
       return;
     }
-    this.loadConversation(convId);
+    this.handleSelectWorkspaceConversation({
+      conversationId: String(convId || ''),
+      workspaceId: String(this.currentHostWorkspaceId || '')
+    });
   },
   refreshCurrentPage() {
     if (typeof window === 'undefined') {

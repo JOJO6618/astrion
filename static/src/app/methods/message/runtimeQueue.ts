@@ -168,6 +168,9 @@ export const runtimeQueueMethods = {
       !!session &&
       !!conversationId &&
       ownsConversationSession(this, session) &&
+      // session 必须与当前视图对话一致：切换加载窗口内 session 已指向新对话而
+      // 视图仍是旧对话，不一致说明发送目标未就绪，直接放弃入队（2026-10-10）。
+      String(session.conversationId) === String(conversationId) &&
       this.currentConversationId === conversationId;
     if (!owns()) return false;
     const text = (rawMessage || '').toString().trim();

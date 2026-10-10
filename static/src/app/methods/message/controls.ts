@@ -14,6 +14,21 @@ export const messageControlMethods = {
     if (isConversationSubmitting(this)) return;
     const session = currentConversationSession(this);
     const owns = () => !!session && ownsConversationSession(this, session);
+    // 对话切换加载窗口守卫（2026-10-10）：点击对话后到快照提交前，session 已指向
+    // 新对话而显示/任务索引仍是旧对话（或空）。此时发送会落入旧流式残留分支并命中
+    // 空任务索引，抛出「暂不可堆积」等错乱提示；统一拦下提示稍候再发。
+    if (
+      this.historyLoading &&
+      !!session?.conversationId &&
+      String(session.conversationId) !== String(this.currentConversationId || '')
+    ) {
+      this.uiPushToast({
+        title: t('appMessages.conversationOpeningTitle'),
+        message: t('appMessages.conversationOpeningMessage'),
+        type: 'info'
+      });
+      return;
+    }
     const hasText = !!((this.inputMessage || '').trim().length > 0);
     const hasMedia =
       (Array.isArray(this.selectedImages) && this.selectedImages.length > 0) ||

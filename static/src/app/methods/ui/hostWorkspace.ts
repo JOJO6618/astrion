@@ -138,7 +138,13 @@ export const hostWorkspaceMethods = {
             (task: any) => activeStatuses.has(String(task?.status || '')) && task?.conversation_id
           );
         if (activeTask?.conversation_id) {
-          await this.loadConversation(String(activeTask.conversation_id), { force: true });
+          await this.handleSelectWorkspaceConversation(
+            {
+              conversationId: String(activeTask.conversation_id),
+              workspaceId: String(this.currentHostWorkspaceId || '')
+            },
+            { force: true }
+          );
           this.conversationsOffset = 0;
           await this.loadConversationsList();
         } else {
@@ -403,47 +409,99 @@ export const hostWorkspaceMethods = {
       this.hostWorkspaceManageSubmitting = false;
     }
   },
-  async handleSelectWorkspaceConversation(payload: {
-    conversationId: string;
-    workspaceId: string;
-  }) {
-    const { conversationId, workspaceId } = payload || {};
-    if (!conversationId || !workspaceId) return;
+  /**
+   * 侧边栏对话点击统一入口（2026-10-10）：平铺列表、工作区分组、移动版、运行中
+   * 任务、标签条、路由恢复、创建/复制/还原等所有导航场景都汇聚到这里；跨工作区
+   * 先切工作区再加载，加载完成后统一执行任务索引/完成标记/模式/版本化等收尾。
+   * options.force 跳过「点击当前对话」短路（创建/复制/还原/切工作区场景）。
+   */
+  async handleSelectWorkspaceConversation(
+    payload: {
+      conversationId: string;
+      workspaceId: string;
+    },
+    options: { force?: boolean; preserveListPosition?: boolean } = {}
+  ) {
+    const normalizedId = String(payload?.conversationId || '').trim();
+    if (!normalizedId) return { success: false };
+    const force = Boolean(options?.force);
+    const preserveListPosition = Boolean(options?.preserveListPosition);
+    const hostScoped = !!(this.versioningHostMode || this.dockerProjectMode);
+    const workspaceId =
+      String(payload?.workspaceId || '').trim() ||
+      (hostScoped ? String(this.currentHostWorkspaceId || '') : '');
+    // 侧边栏标签/任务条目的标题兜底：覆盖普通缓存与工作区分组缓存。
+    const findSidebarSummary = (id: string) => {
+      const store = useConversationStore();
+      const lists: any[] = [];
+      for (const group of Array.isArray(store.workspaceGroups) ? store.workspaceGroups : []) {
+        if (!group?.conversationsByType) continue;
+        lists.push(group.conversationsByType.normal, group.conversationsByType.multi_agent);
+      }
+      lists.push(
+        store.conversationsCache?.normal?.list,
+        store.conversationsCache?.multi_agent?.list,
+        this.conversations
+      );
+      for (const list of lists) {
+        const found = (Array.isArray(list) ? list : []).find(
+          (item: any) => String(item?.id || '') === id
+        );
+        if (found) return found;
+      }
+      return null;
+    };
+
+    // 点击当前对话：不重新加载（与旧平铺入口 loadConversation 行为一致）。
+    if (!force && normalizedId === this.currentConversationId && !this.historyLoading) {
+      this.suppressTitleTyping = false;
+      this.titleReady = true;
+      return { success: true, skipped: true };
+    }
+
     this.flushReasoningEffortSave?.();
     const draft = this.persistComposerDraftNow({
-      reason: `workspace-conversation:${conversationId}`,
+      reason: `workspace-conversation:${normalizedId}`,
       force: true,
       keepalive: true
     }).catch(() => {});
-    const session = this.beginConversationView(conversationId, workspaceId);
+    const session = this.beginConversationView(normalizedId, workspaceId);
     const owns = () => ownsConversationSession(this, session);
-    // 桌面端标签条：点击瞬间乐观开标签（标题先用列表里的，进入对话后经
-    // bootstrap 的 openConversationTab 用真实标题更新）；persistNow 让 chrome
+    this.suppressTitleTyping = true;
+    this.titleReady = false;
+    // 桌面端标签条：点击瞬间乐观开标签/激活已有标签（标题先用列表里的，进入对话后
+    // 经 bootstrap 的 openConversationTab 用真实标题更新）；persistNow 让 chrome
     // 轮询尽快拿到——原来要等对话完全加载完才登记，标签出现滞后 1s+
     try {
       const tabsStore = useConversationTabsStore();
-      if (tabsStore.enabled && !tabsStore.hasConversationTab(conversationId)) {
-        const conv = (Array.isArray(this.conversations) ? this.conversations : []).find(
-          (item: any) => String(item?.id || '') === String(conversationId)
+      if (tabsStore.enabled) {
+        const bareId = String(normalizedId).replace(/^conv_/, '');
+        const existing = tabsStore.tabs.find(
+          (item: any) =>
+            item.kind === 'conv' &&
+            [String(normalizedId), bareId, `conv_${bareId}`].includes(item.conversationId)
         );
-        const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
-          (item: any) => String(item?.workspace_id || '') === String(workspaceId)
-        );
-        tabsStore.openConversationTab({
-          conversationId,
-          workspaceId,
-          workspaceLabel: String(ws?.label || ''),
-          title: String(conv?.title || '')
-        });
-        tabsStore.persistNow();
+        if (existing) {
+          tabsStore.setActive(existing.key);
+          tabsStore.persistNow();
+        } else {
+          const summary = findSidebarSummary(normalizedId);
+          const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
+            (item: any) => String(item?.workspace_id || '') === String(workspaceId)
+          );
+          tabsStore.openConversationTab({
+            conversationId: normalizedId,
+            workspaceId,
+            workspaceLabel: String(ws?.label || ''),
+            title: String(summary?.title || '')
+          });
+          tabsStore.persistNow();
+        }
       }
     } catch (_tabsErr) {
       // ignore
     }
-    if (
-      (this.versioningHostMode || this.dockerProjectMode) &&
-      workspaceId !== this.currentHostWorkspaceId
-    ) {
+    if (hostScoped && workspaceId && workspaceId !== String(this.currentHostWorkspaceId || '')) {
       await this.handleHostWorkspaceSwitch(workspaceId, {
         preserveConversationView: true,
         session
@@ -452,23 +510,72 @@ export const hostWorkspaceMethods = {
     await draft;
     if (
       !owns() ||
-      ((this.versioningHostMode || this.dockerProjectMode) &&
-        this.currentHostWorkspaceId !== workspaceId)
-    )
-      return;
+      (hostScoped && workspaceId && String(this.currentHostWorkspaceId || '') !== workspaceId)
+    ) {
+      return { success: false, superseded: true };
+    }
     try {
-      const result = await this.enterConversation(conversationId, {
+      const result = await this.enterConversation(normalizedId, {
         session,
         workspaceId,
         source: 'workspace',
-        urlMode: 'push'
+        urlMode: 'push',
+        preserveListPosition
       });
-      if (!owns() || result?.superseded) return result;
-      if (result?.success) await this.restoreComposerDraftState('workspace-conversation');
+      if (!owns() || result?.superseded) return result || { success: false, superseded: true };
+      if (result?.success) {
+        // 标题收尾（enterConversation 已写首帧；此处与旧平铺入口保持一致再同步一次）。
+        this.currentConversationTitle = result.title || '';
+        this.titleReady = true;
+        this.suppressTitleTyping = false;
+        this.startTitleTyping(this.currentConversationTitle, { animate: false });
+        await this.restoreComposerDraftState('workspace-conversation');
+        if (!owns()) return result;
+        // 以下为吸收自旧平铺入口 loadConversation 的完整收尾：任务索引、完成标记、
+        // 模式/版本化/git/token 等状态刷新，保证开启与不开启分组的刷新行为一致。
+        this.subAgentFetch();
+        this.fetchTodoList();
+        await this.refreshRunningWorkspaceTasks?.();
+        if (!owns()) return result;
+        const visibleTask =
+          typeof this.getVisibleWorkspaceTaskForConversation === 'function'
+            ? this.getVisibleWorkspaceTaskForConversation(normalizedId)
+            : null;
+        const terminalStatuses = new Set(['succeeded', 'failed', 'canceled', 'stopped']);
+        if (visibleTask && terminalStatuses.has(String(visibleTask?.status || ''))) {
+          // 用户已点进完成后的“待查看”对话，清除列表里的完成标记。
+          this.acknowledgeCompletedWorkspaceTask?.(visibleTask.task_id);
+        }
+        this.fetchWorkMode();
+        this.fetchPermissionMode();
+        this.fetchExecutionMode();
+        this.fetchNetworkPermission();
+        await this.fetchVersioningStatus(normalizedId, { silent: true });
+        if (!owns()) return result;
+        this.refreshProjectGitSummary();
+        this.fetchConversationTokenStatistics();
+        this.updateCurrentContextTokens();
+      } else {
+        this.suppressTitleTyping = false;
+        this.titleReady = true;
+        this.uiPushToast({
+          title: t('appMessages.loadConversationFailedTitle'),
+          message: result?.message || t('appMessages.serverNotSuccessMessage'),
+          type: 'error'
+        });
+      }
       return result;
     } catch (error) {
       if (!owns()) return { success: false, superseded: true };
-      throw error;
+      console.error('加载对话异常:', error);
+      this.suppressTitleTyping = false;
+      this.titleReady = true;
+      this.uiPushToast({
+        title: t('appMessages.loadConversationErrorTitle'),
+        message: error?.message || String(error || ''),
+        type: 'error'
+      });
+      return { success: false, error: String(error?.message || error || '') };
     }
   },
   async handleRenameWorkspaceFromSidebar(payload: { workspaceId: string; label: string }) {

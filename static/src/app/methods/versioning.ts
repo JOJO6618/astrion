@@ -255,7 +255,13 @@ export const versioningMethods = {
       }
       const targetConversationId = data?.data?.conversation_id || this.currentConversationId;
       this.versioningDialogOpen = false;
-      await this.loadConversation(targetConversationId, { force: true });
+      await this.handleSelectWorkspaceConversation(
+        {
+          conversationId: String(targetConversationId || ''),
+          workspaceId: String(this.currentHostWorkspaceId || '')
+        },
+        { force: true }
+      );
       // 立即刷新侧边栏对话列表，避免依赖 socket 事件延迟或丢失
       this.conversationsOffset = 0;
       await this.loadConversationsList();

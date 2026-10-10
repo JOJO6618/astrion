@@ -233,12 +233,18 @@ export const actionMethods = {
 
         // 等待插入动画先完成一帧，避免立即加载对话导致列表闪烁/卡顿。
         // 工作区旁新建不切换对话，所以不会触发此处的状态风暴；顶部新建需要切对话，
-        // 但把 loadConversation 放到入场动画基本结束后再执行，动画就和工作区旁一致。
+        // 但把对话加载放到入场动画基本结束后再执行，动画就和工作区旁一致。
         await waitForAnimation(540);
         if (!owns()) return;
 
-        // 直接加载新对话，确保状态一致
-        await this.loadConversation(newConversationId, { force: true });
+        // 直接加载新对话，确保状态一致（统一入口，2026-10-10）
+        await this.handleSelectWorkspaceConversation(
+          {
+            conversationId: String(newConversationId || ''),
+            workspaceId: String(this.currentHostWorkspaceId || '')
+          },
+          { force: true }
+        );
         traceLog('createNewConversation:after-load', {
           newConversationId,
           currentConversationId: this.currentConversationId
@@ -616,7 +622,13 @@ export const actionMethods = {
 
           // 先让“目标下方钻出 + 下方整体下移”动画播完，再加载复制出的对话。
           await waitForAnimation(860);
-          await this.loadConversation(newId, { force: true, preserveListPosition: true });
+          await this.handleSelectWorkspaceConversation(
+            {
+              conversationId: String(newId || ''),
+              workspaceId: String(this.currentHostWorkspaceId || '')
+            },
+            { force: true, preserveListPosition: true }
+          );
         }
       } else {
         const message = result.message || result.error || t('common.copyFailed');
