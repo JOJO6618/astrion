@@ -39,9 +39,12 @@ export async function createOwnedMessageTask(
   if (!owns()) return null;
   const response = await fetch('/api/tasks', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Astrion-Workspace-Id': session.workspaceId },
     signal: session.controller.signal,
-    body: JSON.stringify(createTaskPayload(message, images, videos, conversationId, options))
+    body: JSON.stringify({
+      ...createTaskPayload(message, images, videos, conversationId, options),
+      workspace_id: session.workspaceId
+    })
   });
   const result = await response.json();
   if (!owns()) return null;

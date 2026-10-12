@@ -14,6 +14,8 @@ from flask import Blueprint, jsonify, request, send_file, session
 
 from server.auth_helpers import api_login_required, resolve_admin_policy
 from server.context import with_terminal
+from server.context.data_decorators import with_workspace_data
+from server.context.status_view import workspace_status
 from server.state import (
     PROJECT_STORAGE_CACHE,
     PROJECT_STORAGE_CACHE_TTL_SECONDS,
@@ -89,8 +91,8 @@ def get_health():
 
 @status_bp.route('/api/status')
 @api_login_required
-@with_terminal
-def get_status(terminal, workspace, username):
+@with_workspace_data
+def get_status(data_context, workspace, username):
     """获取系统状态（包含对话、容器、版本等信息）"""
     started_at = time.perf_counter()
     heartbeat_id = request.headers.get("X-Connection-Heartbeat", "").strip()
@@ -104,7 +106,7 @@ def get_status(terminal, workspace, username):
     }
     phase_started_at = time.perf_counter()
     try:
-        status = terminal.get_status()
+        status, terminal = workspace_status(data_context, request.args.get('conversation_id'))
     except Exception as exc:
         timings["terminal_ms"] = (time.perf_counter() - phase_started_at) * 1000
         total_ms = (time.perf_counter() - started_at) * 1000
@@ -115,14 +117,15 @@ def get_status(terminal, workspace, username):
         raise
     timings["terminal_ms"] = (time.perf_counter() - phase_started_at) * 1000
     phase_started_at = time.perf_counter()
-    if terminal.terminal_manager:
+    if terminal is not None and terminal.terminal_manager:
         status['terminals'] = terminal.terminal_manager.list_terminals()
     timings["terminals_ms"] = (time.perf_counter() - phase_started_at) * 1000
     phase_started_at = time.perf_counter()
     try:
-        current_conv = terminal.context_manager.current_conversation_id
-        status.setdefault('conversation', {})['current_id'] = current_conv
-        if current_conv and not current_conv.startswith('temp_'):
+        current_conv = terminal.context_manager.current_conversation_id if terminal else None
+        if terminal:
+            status.setdefault('conversation', {})['current_id'] = current_conv
+        if terminal and current_conv and not current_conv.startswith('temp_'):
             current_conv_data = terminal.context_manager._get_conversation_manager_for_id(current_conv).load_conversation(current_conv)
             if current_conv_data:
                 status['conversation']['title'] = current_conv_data.get('title', '未知对话')
@@ -166,6 +169,8 @@ def get_status(terminal, workspace, username):
             else f"{username}::{workspace_id}"
         )
         status['container'] = container_manager.get_container_status(container_key, include_stats=False)
+        status['container'].setdefault('mode', 'host' if data_context.identity.host_mode else 'docker')
+        status['workspace_id'] = data_context.workspace_id
     except Exception as exc:
         status['container'] = {"success": False, "error": str(exc)}
         log_conn_diag(f"status container-status-failed user={username} error={exc}")
@@ -200,8 +205,8 @@ def get_status(terminal, workspace, username):
 
 @status_bp.route('/api/container-status')
 @api_login_required
-@with_terminal
-def get_container_status_api(terminal, workspace, username):
+@with_workspace_data
+def get_container_status_api(data_context, workspace, username):
     try:
         container_key = (
             f"host::{getattr(workspace, 'workspace_id', None) or session.get('workspace_id') or 'default'}"
@@ -215,8 +220,8 @@ def get_container_status_api(terminal, workspace, username):
 
 @status_bp.route('/api/project-storage')
 @api_login_required
-@with_terminal
-def get_project_storage(terminal, workspace, username):
+@with_workspace_data
+def get_project_storage(data_context, workspace, username):
     now = time.time()
     workspace_id = getattr(workspace, "workspace_id", None) or session.get("workspace_id") or "default"
     cache_key = f"{username}::{workspace_id}"
@@ -224,9 +229,12 @@ def get_project_storage(terminal, workspace, username):
     if cache_entry and (now - cache_entry.get("ts", 0)) < PROJECT_STORAGE_CACHE_TTL_SECONDS:
         return jsonify({"success": True, "data": cache_entry["data"]})
     try:
-        file_manager = getattr(terminal, 'file_manager', None)
-        if not file_manager:
-            return jsonify({"success": False, "error": tr("status_base.file_manager_not_initialized")}), 500
+        from modules.file_manager import FileManager
+        from server.context.resources import find_runtime
+        terminal = find_runtime(username, workspace)
+        file_manager = getattr(terminal, 'file_manager', None) if terminal else None
+        if file_manager is None:
+            file_manager = FileManager(str(workspace.project_path), data_dir=str(workspace.data_dir))
         used_bytes = file_manager._get_project_size()
         limit_bytes = PROJECT_MAX_STORAGE_MB * 1024 * 1024 if PROJECT_MAX_STORAGE_MB else None
         usage_percent = (used_bytes / limit_bytes * 100) if limit_bytes else None

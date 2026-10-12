@@ -23,6 +23,8 @@ SKILL_FILE_NAME = "SKILL.md"
 SKILL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _SYNC_LOCK_GUARD = threading.Lock()
 _SYNC_LOCKS: Dict[str, threading.Lock] = {}
+_CATALOG_CACHE: Dict[str, tuple] = {}
+_CATALOG_LOCK = threading.RLock()
 
 
 def _get_sync_lock(skills_dir: Path) -> threading.Lock:
@@ -255,6 +257,13 @@ def _is_valid_skill_id(name: str) -> bool:
 
 def _scan_skills_catalog(root: Path) -> List[Dict[str, str]]:
     """Scan one skills root."""
+    from modules.skills_revision import catalog_revision
+    revision = catalog_revision(root)
+    key = str(root.resolve())
+    with _CATALOG_LOCK:
+        cached = _CATALOG_CACHE.get(key)
+        if cached is not None and cached[0] == revision:
+            return [dict(item) for item in cached[1]]
     if not root.exists() or not root.is_dir():
         return []
     catalog: List[Dict[str, str]] = []
@@ -278,6 +287,9 @@ def _scan_skills_catalog(root: Path) -> List[Dict[str, str]]:
             "label": label,
             "description": description,
         })
+    with _CATALOG_LOCK:
+        if catalog_revision(root) == revision:
+            _CATALOG_CACHE[key] = (revision, [dict(item) for item in catalog])
     return catalog
 
 
@@ -470,39 +482,6 @@ def sync_workspace_skills(
     base_dir: Optional[str] = None,
     private_dir: Optional[str | Path] = None,
 ) -> Dict[str, object]:
-    """Sync global skills into workspace / 将全局 skills 同步到工作区。"""
-    root = Path(project_path).expanduser().resolve()
-    skills_dir = (root / WORKSPACE_SKILLS_DIRNAME).resolve()
-    try:
-        skills_dir.relative_to(root)
-    except Exception:
-        return {"success": False, "error": tr("skills.skills_dir_not_in_project")}
-
-    ensure_agent_skills_dir(base_dir)
-    catalog = get_skills_catalog(base_dir, private_dir=private_dir)
-    resolved = resolve_enabled_skills(enabled_skills, catalog)
-    sources = _get_skill_source_map(base_dir, private_dir=private_dir)
-
-    lock = _get_sync_lock(skills_dir)
-    try:
-        with lock:
-            if skills_dir.exists():
-                shutil.rmtree(skills_dir, ignore_errors=True)
-            skills_dir.mkdir(parents=True, exist_ok=True)
-            for skill_id in resolved:
-                src = sources.get(skill_id)
-                if src is None or not src.exists() or not src.is_dir():
-                    continue
-                dst = skills_dir / skill_id
-                if dst.exists() and not dst.is_dir():
-                    dst.unlink(missing_ok=True)
-                shutil.copytree(src, dst, dirs_exist_ok=True)
-            return {
-                "success": True,
-                "copied": list(resolved),
-                "available": [item.get("id") for item in catalog],
-                "target": str(skills_dir),
-            }
-    except Exception as exc:
-        logger.error("同步 skills 失败: %s", exc, exc_info=True)
-        return {"success": False, "error": str(exc), "target": str(skills_dir)}
+    """Prepare skills only at execution/activation or explicit configuration changes."""
+    from modules.skills_sync import sync_workspace_skills as prepare_skills
+    return prepare_skills(project_path, enabled_skills, base_dir, private_dir)

@@ -1,4 +1,7 @@
 import { defineStore } from 'pinia';
+import { workspaceScopedFetch as fetch } from '../app/methods/workspaceRequestScope';
+import { emptyWorkspaceCache, workspaceCacheActions } from './workspaceConversationCache';
+import type { WorkspaceListCache } from './workspaceConversationCache';
 
 /* 侧边栏对话类型过滤器缓存（普通/多智能体）：记住用户上次查看的列表类型。 */
 const SIDEBAR_CONVERSATION_TYPE_STORAGE_KEY = 'agents_sidebar_conversation_type';
@@ -102,10 +105,9 @@ interface ConversationState {
       的同一数组引用——原地增删（push/splice/unshift）天然同步；重新赋值 conversations 后
       必须同步刷新缓存引用。切换过滤器为纯本地引用交换，零请求零加载态。
       loaded 区分「未加载过」与「加载过但为空」。 */
-  conversationsCache: {
-    normal: { list: ConversationSummary[]; offset: number; hasMore: boolean; loaded: boolean };
-    multi_agent: { list: ConversationSummary[]; offset: number; hasMore: boolean; loaded: boolean };
-  };
+  conversationCacheWorkspaceId: string;
+  conversationsByWorkspace: Record<string, WorkspaceListCache>;
+  conversationsCache: WorkspaceListCache;
 }
 
 export const useConversationStore = defineStore('conversation', {
@@ -135,12 +137,12 @@ export const useConversationStore = defineStore('conversation', {
     workspaceGroups: [],
     multiAgentMode: false,
     sidebarConversationType: loadSidebarConversationType(),
-    conversationsCache: {
-      normal: { list: [], offset: 0, hasMore: false, loaded: false },
-      multi_agent: { list: [], offset: 0, hasMore: false, loaded: false }
-    }
+    conversationCacheWorkspaceId: '',
+    conversationsByWorkspace: {},
+    conversationsCache: emptyWorkspaceCache()
   }),
   actions: {
+    ...workspaceCacheActions,
     /** 当前对话 id 同步（由 app watcher 在 this.currentConversationId 变化时写入） */
     setCurrentConversationId(id: string | null) {
       this.currentConversationId = id;
@@ -154,6 +156,10 @@ export const useConversationStore = defineStore('conversation', {
         this.conversations,
         this.conversationsCache.normal.list,
         this.conversationsCache.multi_agent.list,
+        ...Object.values(this.conversationsByWorkspace).flatMap((pair) => [
+          pair.normal.list,
+          pair.multi_agent.list
+        ]),
         this.searchResults,
         ...this.searchGroups.map((group) => group.results),
         ...this.workspaceGroups.flatMap((group) => [
@@ -209,8 +215,13 @@ export const useConversationStore = defineStore('conversation', {
       }
     },
     resetConversations() {
-      /* 重置双类型缓存并对齐 conversations 引用（核心不变量） */
-      this.resetConversationsCacheOnly();
+      /* Full reset retires all workspace caches, including pending requests. */
+      for (const key of Object.keys(this.conversationsByWorkspace)) {
+        this.invalidateWorkspaceCache(JSON.parse(key)[0]);
+      }
+      this.conversationsByWorkspace = {};
+      this.conversationCacheWorkspaceId = '';
+      this.activateWorkspaceCache('default');
       this.searchResults = [];
       this.searchGroups = [];
       this.conversationInsertAnimations = {};
@@ -234,11 +245,7 @@ export const useConversationStore = defineStore('conversation', {
     },
     /** 内部共用：仅重置双类型缓存并对齐 conversations 引用 */
     resetConversationsCacheOnly() {
-      this.conversationsCache = {
-        normal: { list: [], offset: 0, hasMore: false, loaded: false },
-        multi_agent: { list: [], offset: 0, hasMore: false, loaded: false }
-      };
-      this.conversations = this.conversationsCache[this.sidebarConversationType].list;
+      this.invalidateWorkspaceCache(this.conversationCacheWorkspaceId || 'default');
     },
     cancelSearchTimer() {
       if (this.searchTimer) {
@@ -342,7 +349,7 @@ export const useConversationStore = defineStore('conversation', {
           group.hasMore = false;
         }
       }
-      if (group.loading || group.loadingMore) return;
+      if (group.loading || group.loadingMore || (paging.loaded && !refresh && !reset)) return;
       const fetchOffset = refresh ? 0 : paging.offset;
       group.loading = true;
       try {

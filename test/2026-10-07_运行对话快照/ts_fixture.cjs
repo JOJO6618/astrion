@@ -20,6 +20,12 @@ function compile(file, imports = {}, globals = {}) {
     Date, console: { log: noop, warn: noop, error: noop },
     require: (key) => {
       if (Object.hasOwn(imports, key)) return imports[key];
+      if (key.endsWith('/workspaceRequestScope')) return {
+        bindWorkspaceRequestHost: noop, workspaceScopedFetch: (...args) => globals.fetch(...args)
+      };
+      if (key.endsWith('/workspaceConversationCache') || key === './workspaceConversationCache') {
+        return compile('static/src/stores/workspaceConversationCache.ts', {}, globals);
+      }
       throw new Error(`Unmocked dependency ${file}: ${key}`);
     }, ...globals
   }, { filename: file });

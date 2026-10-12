@@ -42,7 +42,9 @@ class ConversationMetadata:
 class ConversationManagerBase:
     """ConversationManager 基础类，包含初始化与目录管理。"""
 
-    def __init__(self, base_dir: Optional[str] = None, project_path: Optional[str] = None):
+    def __init__(self, base_dir: Optional[str] = None, project_path: Optional[str] = None,
+                 *, read_only: bool = False):
+        self.read_only = read_only
         self.base_dir = Path(base_dir).expanduser().resolve() if base_dir else Path(DATA_DIR).resolve()
         self.conversations_root = self.base_dir / "conversations"
         self._io_lock = directory_lock(self.conversations_root)
@@ -54,11 +56,10 @@ class ConversationManagerBase:
         # 当前管理器只暴露“当前工作区”的对话目录；未匹配到工作区时保留根目录作为兜底写入位置。
         self.conversations_dir = self._conversation_dir_for_workspace(self.current_workspace_id)
         self.index_file = self.conversations_dir / "index.json"
-        with self._io_lock:
-            self._ensure_directories()
-            self._index_verified = False
-            # 首次加载索引仅重建最近 20 条；初始化与迁移也使用目录锁。
-            self._load_index(ensure_integrity=True, max_rebuild=20)
+        self._index_verified = False
+        if not read_only:
+            from utils.conversation_manager.preparation import prepare_storage
+            prepare_storage(self)
 
     def _normalize_path(self, value: Optional[str]) -> Optional[Path]:
         if not value:

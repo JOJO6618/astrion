@@ -16,6 +16,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 
 from server.auth_helpers import api_login_required, login_required, get_current_username
 from server.context import get_user_resources
+from server.context.data_decorators import with_workspace_data
 from modules.multi_agent.role_store import (
     RoleConfig,
     list_roles,
@@ -49,28 +50,14 @@ def multi_agent_conversation_page(conversation_id: str):
 
 @multi_agent_bp.route("/api/multiagent/rebuild-index", methods=["POST"])
 @api_login_required
-def rebuild_conversation_index_api():
-    """强制从磁盘重建对话索引，补全 multi_agent_mode 等新字段。"""
+@with_workspace_data
+def rebuild_conversation_index_api(data_context, workspace, username):
+    """显式修复所属工作区的多智能体索引，不装配执行资源。"""
     try:
-        username = get_current_username()
-        if not username:
-            return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
-        from server.context.identity import NoWorkspaceError
-        try:
-            terminal, _ = get_user_resources(username)
-        except NoWorkspaceError:
-            # 与 with_terminal 装饰器一致：无工作区是正常空态，返回 200 + 业务码
-            return jsonify({"success": False, "code": "no_workspace", "error": tr("multi_agent_api.workspace_not_ready")}), 200
-        if not terminal:
-            return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
-        ctx_manager = getattr(terminal, "context_manager", None)
-        if not ctx_manager:
-            return jsonify({"success": False, "error": tr("multi_agent_api.context_manager_not_initialized")}), 503
-        ma_manager = getattr(ctx_manager, "multi_agent_conversation_manager", None)
-        if not ma_manager:
-            return jsonify({"success": False, "error": tr("multi_agent_api.ma_conversation_manager_not_initialized")}), 503
-        rebuilt = ma_manager._rebuild_index_from_files()
-        ma_manager._save_index(rebuilt)
+        manager = data_context.manager(True)
+        with manager._io_lock:
+            rebuilt = manager._rebuild_index_from_files()
+            manager._save_index(rebuilt)
         return jsonify({"success": True, "index_size": len(rebuilt)})
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500

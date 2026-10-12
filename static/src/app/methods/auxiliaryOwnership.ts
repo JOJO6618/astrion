@@ -1,4 +1,5 @@
 import { useConversationStore } from '../../stores/conversation';
+import { bindWorkspaceRequestHost } from './workspaceRequestScope';
 import {
   conversationViewEpoch,
   currentConversationSession,
@@ -14,6 +15,7 @@ const viewHosts = new WeakMap<object, Host>();
 
 export function bindAuxiliaryConversationHost(host: Host) {
   viewHosts.set(useConversationStore(), host);
+  bindWorkspaceRequestHost(host);
 }
 
 export function captureConversationView(host: Host) {

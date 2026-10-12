@@ -49,6 +49,8 @@ from config.model_profiles import get_model_context_window
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.gateway_auth import api_login_or_host_token_required
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker, get_user_resources
+from server.context.data_decorators import with_workspace_data
+from server.context.modes import mode_view
 from server.security import rate_limited
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB
@@ -139,14 +141,14 @@ def _path_conflicts_with_deny_list(path: str) -> Optional[str]:
     return None
 @chat_bp.route('/api/permission-mode', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取当前权限模式。"""
-    current_conversation_id = getattr(terminal.context_manager, "current_conversation_id", None)
+@with_workspace_data
+def get_permission_mode(data_context, workspace: UserWorkspace, username: str):
+    """Read effective modes without activating an execution runtime."""
+    modes, pending, current_conversation_id = mode_view(data_context, request.args.get('conversation_id'))
     return jsonify({
         "success": True,
-        "mode": terminal.get_permission_mode() if hasattr(terminal, "get_permission_mode") else "unrestricted",
-        "pending_mode": (terminal.get_pending_runtime_modes().get("permission_mode") if hasattr(terminal, "get_pending_runtime_modes") else None),
+        "mode": modes['permission_mode'],
+        "pending_mode": pending.get('permission_mode'),
         "options": PERMISSION_MODE_OPTIONS,
         "conversation_id": current_conversation_id,
     })
@@ -233,16 +235,17 @@ def update_permission_mode(terminal: WebTerminal, workspace: UserWorkspace, user
 
 @chat_bp.route('/api/execution-mode', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
-    can_manage = is_host and getattr(terminal, "user_role", "user") == "admin"
-    state = terminal.get_execution_mode_state() if hasattr(terminal, "get_execution_mode_state") else {"mode": "sandbox"}
+@with_workspace_data
+def get_execution_mode(data_context, workspace: UserWorkspace, username: str):
+    modes, pending, _ = mode_view(data_context, request.args.get('conversation_id'))
+    can_manage = data_context.identity.host_mode and data_context.identity.role == 'admin'
+    from config import HOST_EXECUTION_MODE_DEFAULT
+    state = {'mode': modes['execution_mode'], 'default_mode': HOST_EXECUTION_MODE_DEFAULT}
     return jsonify({
         "success": True,
         "enabled": can_manage,
         "state": state,
-        "pending_mode": (terminal.get_pending_runtime_modes().get("execution_mode") if hasattr(terminal, "get_pending_runtime_modes") else None),
+        "pending_mode": pending.get('execution_mode'),
         "options": EXECUTION_MODE_OPTIONS,
     })
 
@@ -316,16 +319,16 @@ def update_execution_mode(terminal: WebTerminal, workspace: UserWorkspace, usern
 
 @chat_bp.route('/api/network-permission', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_network_permission(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    is_host = bool(getattr(terminal, "_is_host_mode", lambda: False)())
-    can_manage = is_host and getattr(terminal, "user_role", "user") == "admin"
-    current = terminal.get_network_permission() if hasattr(terminal, "get_network_permission") else "restricted"
+@with_workspace_data
+def get_network_permission(data_context, workspace: UserWorkspace, username: str):
+    modes, pending, _ = mode_view(data_context, request.args.get('conversation_id'))
+    can_manage = data_context.identity.host_mode and data_context.identity.role == 'admin'
+    current = modes['network_permission']
     return jsonify({
         "success": True,
         "enabled": can_manage,
         "mode": current,
-        "pending_mode": (terminal.get_pending_runtime_modes().get("network_permission") if hasattr(terminal, "get_pending_runtime_modes") else None),
+        "pending_mode": pending.get('network_permission'),
         "options": NETWORK_PERMISSION_OPTIONS,
     })
 
@@ -393,16 +396,15 @@ def update_network_permission(terminal: WebTerminal, workspace: UserWorkspace, u
 
 @chat_bp.route('/api/work-mode', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_work_mode(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取当前运行模式（plan/ask/execute）。"""
-    current_conversation_id = getattr(terminal.context_manager, "current_conversation_id", None)
+@with_workspace_data
+def get_work_mode(data_context, workspace: UserWorkspace, username: str):
+    """Read the same mode normalization used by conversation activation."""
+    modes, _, current_conversation_id = mode_view(data_context, request.args.get('conversation_id'))
     return jsonify({
         "success": True,
-        "mode": terminal.get_work_mode() if hasattr(terminal, "get_work_mode") else "plan",
-        # plan 档下权限被联动锁定为只读、执行环境被联动锁定为沙箱，前端需要同步显示
-        "permission_mode": terminal.get_permission_mode() if hasattr(terminal, "get_permission_mode") else None,
-        "execution_mode": terminal.get_execution_mode() if hasattr(terminal, "get_execution_mode") else None,
+        "mode": modes['work_mode'],
+        "permission_mode": modes['permission_mode'],
+        "execution_mode": modes['execution_mode'],
         "options": WORK_MODE_OPTIONS,
         "conversation_id": current_conversation_id,
     })

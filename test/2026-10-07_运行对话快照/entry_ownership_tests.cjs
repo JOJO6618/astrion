@@ -18,6 +18,10 @@ function fixture() {
     '../../../stores/policy': {}, '../../../stores/model': {}, '../../../stores/personalization': {},
     './shared': {} };
   const globals = { fetch, window, history: { replaceState: noop } };
+  imports['./workspaceNavigation'] = { workspaceNavigationMethods: {} };
+  imports['./workspaceStartup'] = compile(`${base}ui/workspaceStartup.ts`, imports, globals);
+  imports['./composerDrafts'] = compile(`${base}ui/composerDrafts.ts`, imports, globals);
+  conversation.activateWorkspaceCache = noop;
   const host = {
     currentConversationId: 'A', currentHostWorkspaceId: 'ws', versioningHostMode: true,
     dockerProjectMode: false, runningWorkspaceTasks: [], hostWorkspaces: [],
@@ -66,12 +70,16 @@ test('idle status preserves the opened conversation mode', async () => {
   const pending = f.host.fetchStatusSnapshot(); respond(f.requests[0], { run_mode: 'fast' }); await pending;
   assert.equal(f.host.runMode, 'thinking');
 });
-test('out-of-order workspace snapshots keep the latest selected workspace', async () => {
+test('out-of-order workspace directories preserve the committed view and latest catalog', async () => {
   const f = fixture(); f.host.refreshRunningWorkspaceTasks = noop;
   const old = f.host.fetchHostWorkspaces(); const latest = f.host.fetchHostWorkspaces();
-  respond(f.requests[1], { success: true, data: { workspaces: [], current_workspace_id: 'latest' } }); await latest;
-  respond(f.requests[0], { success: true, data: { workspaces: [], current_workspace_id: 'old' } }); await old;
-  assert.equal(f.host.currentHostWorkspaceId, 'latest');
+  respond(f.requests[1], { success: true, data: { workspaces: [{ workspace_id: 'latest' }],
+    current_workspace_id: 'latest', default_workspace_id: 'latest' } }); await latest;
+  respond(f.requests[0], { success: true, data: { workspaces: [{ workspace_id: 'old' }],
+    current_workspace_id: 'old', default_workspace_id: 'old' } }); await old;
+  assert.equal(f.host.currentHostWorkspaceId, 'ws');
+  assert.equal(f.host.hostWorkspaces[0].workspace_id, 'latest');
+  assert.equal(f.host.defaultHostWorkspaceId, 'latest');
 });
 test('old workspace task failure cannot clear the replacement list', async () => {
   const f = fixture(); const old = f.host.refreshRunningWorkspaceTasks();
@@ -84,7 +92,8 @@ test('old workspace task failure cannot clear the replacement list', async () =>
 });
 test('late draft GET cannot write the new view or its scheduled editor metadata', async () => {
   const f = fixture(); let text = '', metadataWrites = 0;
-  f.host.inputSetMessage = (value) => { text = value; };
+  f.host.inputMessage = '';
+  f.host.inputSetMessage = (value) => { text = value; f.host.inputMessage = value; };
   f.host.getInputComposerRef = () => ({ restoreComposerDraftMeta: () => metadataWrites++ });
   const old = f.host.restoreComposerDraftState();
   f.host.beginConversationView('B', 'ws'); f.host.currentConversationId = 'B';
@@ -98,8 +107,9 @@ test('late draft GET cannot write the new view or its scheduled editor metadata'
 });
 test('older draft POST cannot clear newer unsaved input', async () => {
   const f = fixture(); const old = f.host.persistComposerDraftNow({ force: true });
+  await flush();
   f.host.inputMessage = 'new typing';
-  respond(f.requests[0], { success: true }); await old;
+  respond(f.requests[0], { success: true, data: { saved: true } }); await old;
   assert.equal(f.host.composerDraftDirty, true); assert.equal(f.host.composerDraftLastSyncedContent, 'draft');
 });
 test('foreground completion preserves activity when only a background command remains', () => {

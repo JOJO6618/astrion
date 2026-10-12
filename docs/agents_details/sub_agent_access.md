@@ -8,6 +8,7 @@
 
 ## 18) 固定子权限与单次命令完全访问（2026-10-07）
 
+- **对话激活恢复（2026-10-12）**：SubAgentManager 构造不恢复任务；执行资源入口调用 `restore_for_activation()`，仅恢复所属对话并合并并发。没有运行实例时，显示查询读取持久化任务与真实全局多智能体状态，必要恢复由 `server/context/background.py` 按用户／工作区／对话异步激活，不能阻塞完整历史显示。恢复仍校验创建时固定档位与原工作区路径，旧记录缺档位不恢复；多智能体实例沿用 idle 恢复，不在启动时无条件重跑历史任务。回归见 `test/2026-10-12_工作区切换重构/`。
 - `create_sub_agent`（普通/多智能体）必填 `access_level`：`workspace_write`、`sandbox_write`、`full_access`。创建时校验主权限上限；plan/readonly 仍可创建最低档并交付工作区文件。每个新实例保存创建时规范化的 `workspace_root` 与固定档位，恢复时核对原路径身份，不重新 resolve 后扩大授权。旧记录缺少档位不迁移、不恢复。
 - 可信权限唯一入口为 `modules/execution_scope.py` 的 ContextVar；子工具通过 `modules/sub_agent/execution.py` 使用独立 FileManager/TerminalOperator/TerminalManager，不修改父对象再恢复。路径授权每次读取现行配置；父权限和执行环境切换不改变已有子档位，也不发送误导环境通知。子工具只开放自身白名单，不继承父自定义分派，不开放后台命令或单次升级参数。
 - `workspace_write` 的写根始终为创建时工作区，命令 cwd 只能在其内。macOS 临时文件放 `.astrion/sub_agent_runtime/<actor哈希>/tmp`，不附带宿主 `/tmp` 或额外路径写授权。原生 IO 使用 POSIX no-follow 描述符或 Windows 句柄，拒绝替换链接、特殊文件和多硬链接写入；媒体读取复用安全二进制接口。交付目录按路径组件检查并安全新建，不使用字符串 startswith。

@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 
 from server.auth_helpers import api_login_required
 from server.context import make_terminal_callback, with_terminal
+from server.context.data_decorators import with_workspace_data
 from server.runtime import InternalDirectives, RuntimeContext, TaskParams, runtime_service
 from modules.i18n import tr
 
@@ -297,14 +298,16 @@ def api_deactivate_workflow(terminal, workspace, username):
 
 @workflow_runtime_bp.route("/api/workflow/status", methods=["GET"])
 @api_login_required
-@with_terminal
-def api_workflow_status(terminal, workspace, username):
+@with_workspace_data
+def api_workflow_status(data_context, workspace, username):
     conversation_id = str(request.args.get("conversation_id") or "").strip()
     if not conversation_id:
         return jsonify({"error": tr("workflow_api.missing_conversation_id")}), 400
     try:
         from modules.workflow_state_manager import WorkflowStateManager
 
+        if data_context.manager_for(conversation_id).read_conversation(conversation_id) is None:
+            return jsonify({'success': False, 'error': 'Conversation not found'}), 404
         wsm = WorkflowStateManager(workspace.data_dir, conversation_id)
         return jsonify({"success": True, "snapshot": wsm.progress_snapshot()})
     except Exception as exc:  # noqa: BLE001

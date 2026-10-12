@@ -207,77 +207,25 @@ test('runtimeQueue：一致且有任务时正常发起入队请求', async () =>
 /* ────────────────────── Part 4: 统一入口收尾链 ────────────────────── */
 
 function hostWorkspaceFixture() {
-  const session = compile(base + 'conversation/session.ts');
-  const calls = { enter: [], switch: [], ack: [], order: [] };
-  const toasts = [];
-  const openedTabs = [];
-  const store = { workspaceGroups: [], conversationsCache: {} };
-  const tabs = {
-    enabled: true,
-    tabs: [],
-    setActive: noop,
-    persistNow: noop,
-    openConversationTab: (payload) => { openedTabs.push(payload); calls.order.push('openTab'); }
+  const { fixture } = require('../2026-10-12_工作区切换重构/navigation_fixture.cjs');
+  const f = fixture({ realSnapshot: false, automaticSelection: true });
+  const calls = { enter: [], ack: [], order: f.calls };
+  const host = f.host;
+  host.persistComposerDraftNow = () => Promise.resolve();
+  host.prepareComposerDraftState = async () => ({ payload: { content: '' } });
+  host.applyComposerDraftState = noop;
+  host.getVisibleWorkspaceTaskForConversation = () => ({ task_id: 'T1', status: 'succeeded' });
+  host.acknowledgeCompletedWorkspaceTask = (id) => calls.ack.push(id);
+  host.enterConversation = async (id, options) => {
+    calls.enter.push({ id, options }); calls.order.push('enter');
+    const [selected] = await options.navigationReady;
+    if (!f.session.ownsConversationSession(host, options.session)) return { superseded: true };
+    f.navigation.commitWorkspaceIdentity(host, options.workspaceId, selected);
+    host.currentConversationId = id; host.currentConversationTitle = `T:${id}`;
+    host.titleReady = true; host.historyLoading = false;
+    return { success: true, title: `T:${id}` };
   };
-  const host = {
-    ...compile(base + 'ui/hostWorkspace.ts', {
-      '@/locales': locale,
-      '../auxiliaryOwnership': { beginAuxiliaryRequest: () => () => true },
-      '../../../stores/conversation': { useConversationStore: () => store },
-      '../../../stores/conversationTabs': { useConversationTabsStore: () => tabs },
-      '../conversation/session': session
-    }).hostWorkspaceMethods,
-    versioningHostMode: true,
-    dockerProjectMode: false,
-    currentHostWorkspaceId: 'ws1',
-    hostWorkspaces: [
-      { workspace_id: 'ws1', label: 'W1' },
-      { workspace_id: 'ws2', label: 'W2' }
-    ],
-    currentConversationId: 'A',
-    historyLoading: false,
-    titleReady: false,
-    suppressTitleTyping: false,
-    conversations: [],
-    conversationsOffset: 0,
-    uiPushToast: (value) => toasts.push(value),
-    persistComposerDraftNow: () => Promise.resolve(),
-    flushReasoningEffortSave: noop,
-    startTitleTyping: noop,
-    restoreComposerDraftState: async () => { calls.order.push('draft-restore'); },
-    subAgentFetch: () => calls.order.push('subAgent'),
-    fetchTodoList: () => calls.order.push('todo'),
-    refreshRunningWorkspaceTasks: async () => { calls.order.push('refreshTasks'); },
-    getVisibleWorkspaceTaskForConversation: () => ({ task_id: 'T1', status: 'succeeded' }),
-    acknowledgeCompletedWorkspaceTask: (id) => { calls.ack.push(id); },
-    fetchWorkMode: () => calls.order.push('workMode'),
-    fetchPermissionMode: noop,
-    fetchExecutionMode: noop,
-    fetchNetworkPermission: noop,
-    fetchVersioningStatus: async (id) => { calls.order.push(`versioning:${id}`); },
-    refreshProjectGitSummary: noop,
-    fetchConversationTokenStatistics: noop,
-    updateCurrentContextTokens: noop,
-    enterConversation: async (id, options) => {
-      calls.enter.push({ id, options });
-      calls.order.push('enter');
-      host.currentConversationId = id;
-      host.historyLoading = false;
-      return { success: true, title: `T:${id}` };
-    },
-    handleHostWorkspaceSwitch: async (workspaceId, options) => {
-      calls.switch.push({ workspaceId, options });
-      calls.order.push('switch');
-      host.currentHostWorkspaceId = workspaceId;
-    },
-    beginConversationView: (conversationId, workspaceId) =>
-      session.beginConversationSession(
-        host,
-        conversationId,
-        workspaceId || host.currentHostWorkspaceId || ''
-      )
-  };
-  return { host, session, calls, toasts, openedTabs };
+  return { ...f, calls };
 }
 
 test('入口：点击当前对话短路跳过', async () => {
@@ -312,9 +260,10 @@ test('入口：加载成功后执行完整收尾链', async () => {
   assert.equal(f.calls.enter[0].options.urlMode, 'push');
   assert.equal(f.calls.enter[0].options.workspaceId, 'ws1');
   assert.ok(f.calls.enter[0].options.session, 'enterConversation 应携带统一 session');
-  for (const step of ['draft-restore', 'subAgent', 'todo', 'refreshTasks', 'workMode', 'versioning:B']) {
-    assert.ok(f.calls.order.includes(step), `缺少收尾步骤 ${step}`);
+  for (const step of ['subAgent', 'tasks', 'tokens', 'terminals', 'versioning:B']) {
+    assert.equal(f.calls.order.filter((value) => value === step).length, 1, `收尾只能刷新一次 ${step}`);
   }
+  for (const step of ['draft-restore', 'todo', 'workMode']) assert.ok(!f.calls.order.includes(step));
   assert.deepEqual(f.calls.ack, ['T1']);
   assert.equal(f.host.currentConversationTitle, 'T:B');
   assert.equal(f.host.titleReady, true);
@@ -324,15 +273,16 @@ test('入口：加载成功后执行完整收尾链', async () => {
   assert.equal(f.toasts.length, 0);
 });
 
-test('入口：跨工作区先切工作区再加载', async () => {
+test('入口：跨工作区准备并行，身份在快照提交时切换', async () => {
   const f = hostWorkspaceFixture();
-  const result = await f.host.handleSelectWorkspaceConversation({ conversationId: 'C', workspaceId: 'ws2' });
+  const pending = f.host.handleSelectWorkspaceConversation({ conversationId: 'C', workspaceId: 'ws2' });
+  assert.equal(f.host.currentHostWorkspaceId, 'ws1');
+  assert.equal(f.host.currentConversationId, 'A');
+  const result = await pending;
   assert.equal(result.success, true);
-  assert.equal(f.calls.switch.length, 1);
-  assert.equal(f.calls.switch[0].workspaceId, 'ws2');
-  assert.equal(f.calls.switch[0].options.preserveConversationView, true);
-  assert.ok(f.calls.switch[0].options.session, '切换工作区应携带预创建的 session');
-  assert.ok(f.calls.order.indexOf('switch') < f.calls.order.indexOf('enter'));
+  assert.equal(f.requests.filter((r) => r.url.includes('/select?')).length, 1);
+  assert.equal(f.host.currentHostWorkspaceId, 'ws2');
+  assert.ok(f.calls.enter[0].options.navigationReady);
   assert.equal(f.calls.enter[0].id, 'C');
   assert.equal(f.calls.enter[0].options.workspaceId, 'ws2');
 });
@@ -342,7 +292,7 @@ test('入口：加载失败与异常均以 toast 上报', async () => {
   failed.host.enterConversation = async () => ({ success: false, message: 'boom' });
   const failedResult = await failed.host.handleSelectWorkspaceConversation({ conversationId: 'D', workspaceId: 'ws1' });
   assert.equal(failedResult.success, false);
-  assert.equal(failed.toasts.at(-1).title, 'appMessages.loadConversationFailedTitle');
+  assert.equal(failed.toasts[0].title, 'appMessages.loadConversationFailedTitle');
   assert.equal(failed.host.titleReady, true);
 
   const threw = hostWorkspaceFixture();

@@ -95,8 +95,7 @@ def list_docker_projects():
         return jsonify({"success": False, "error": tr("status_docker.docker_web_only")}), 403
     username = session.get("username")
     current_id = (session.get("workspace_id") or "default").strip() or "default"
-    # 默认项目用于向后兼容旧 Docker Web 文件/对话。
-    user_manager.ensure_user_workspace(username, current_id)
+    # 列表负责旧布局发现；执行/创建入口才准备项目与共享配置。
     projects = _build_docker_projects_payload(username, current_id)
     default_workspace_id = user_manager._get_user_default_workspace_id(username)
     return jsonify({
@@ -127,20 +126,10 @@ def select_docker_project():
     if workspace_id not in known_projects:
         return jsonify({"success": False, "error": tr("status_docker.project_not_found")}), 404
     try:
-        workspace = user_manager.ensure_user_workspace(username, workspace_id)
+        workspace = user_manager.get_user_workspace(username, workspace_id)
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     session["workspace_id"] = getattr(workspace, "workspace_id", workspace_id)
-    try:
-        container_manager.ensure_container(
-            username,
-            str(workspace.project_path),
-            container_key=f"{username}::{session['workspace_id']}",
-            preferred_mode="docker",
-        )
-    except RuntimeError as exc:
-        session["workspace_id"] = previous_workspace_id
-        return jsonify({"success": False, "error": str(exc)}), 503
     default_workspace_id = user_manager._get_user_default_workspace_id(username)
     return jsonify({
         "success": True,

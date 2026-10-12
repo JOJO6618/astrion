@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { t } from '@/locales';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 
 export const gitMethods = {
   startProjectGitSummaryIdleRefresh() {

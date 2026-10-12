@@ -36,6 +36,8 @@ from config.model_profiles import get_model_context_window
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
 from server.security import rate_limited
+from server.context.data_decorators import with_workspace_data
+from server.context.resources import find_runtime
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB
 from server.state import tool_approval_manager, user_question_manager
@@ -46,13 +48,14 @@ from modules.i18n import tr
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 @chat_bp.route('/api/terminals')
 @api_login_required
-@with_terminal
-def get_terminals(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取终端会话列表"""
+@with_workspace_data
+def get_terminals(data_context, workspace: UserWorkspace, username: str):
+    """获取已有终端会话；列表查询不启动执行环境。"""
+    terminal = find_runtime(username, workspace, request.args.get("conversation_id") or None)
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
         return jsonify({"success": False, "error": tr("chat_terminal.realtime_terminal_admin_disabled")}), 403
-    if terminal.terminal_manager:
+    if terminal is not None and terminal.terminal_manager:
         result = terminal.terminal_manager.list_terminals()
         return jsonify(result)
     else:

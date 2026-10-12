@@ -272,6 +272,12 @@ class UserManager:
         default_logs = default_root / "logs"
         marker = default_root / ".migrated_from_legacy"
 
+        # 已完成的布局只做固定数量路径检查；有残留或新出现的旧数据仍走迁移。
+        if marker.is_file() and not any(
+            (root / name).exists() for name in ("project", "data", "logs", "agentskills")
+        ):
+            return
+
         # 兼容上一轮临时结构 users/<user>/project/<id> 与 users/<user>/project/shared。
         if legacy_project_root.exists() and legacy_project_root.is_dir():
             projects_root.mkdir(parents=True, exist_ok=True)
@@ -368,27 +374,41 @@ class UserManager:
         workspace_root = self._project_container_root(username) / workspace_id
         return self._build_workspace(username, workspace_id, workspace_root)
 
-    def _build_workspace(self, username: str, workspace_id: str, workspace_root: Path) -> UserWorkspace:
-        """根据 workspace_root 构建 UserWorkspace 并创建必要目录。"""
+    def get_user_workspace(self, username: str, workspace_id: str = "default") -> UserWorkspace:
+        """定位已有工作区；不迁移旧目录、不创建目录或共享配置。"""
+        username = self._normalize_username(username)
+        workspace_id = self.normalize_workspace_id(workspace_id)
+        workspace_root = self._project_container_root(username) / workspace_id
+        if IS_HOST_MODE and self._web_workspace_root:
+            web_root = self._web_workspace_root / username / "projects" / workspace_id
+            if web_root.exists():
+                workspace_root = web_root
+        if workspace_id != "default" and not workspace_root.is_dir():
+            raise ValueError(tr("user_mgr.workspace_not_found"))
+        return self._build_workspace(username, workspace_id, workspace_root, prepare=False)
+
+    def _build_workspace(self, username: str, workspace_id: str, workspace_root: Path,
+                         *, prepare: bool = True) -> UserWorkspace:
+        """构建路径描述；执行/创建入口才准备目录与共享配置。"""
         project_path = workspace_root / "project"
         data_dir = workspace_root / "data"
         logs_dir = workspace_root / "logs"
         uploads_dir = project_path / ".astrion" / "user_upload"
         skills_dir = project_path / ".astrion" / "skills"
 
-        for path in [project_path, data_dir, logs_dir, uploads_dir, skills_dir]:
-            path.mkdir(parents=True, exist_ok=True)
-
-        # 初始化数据子目录
-        (data_dir / "conversations").mkdir(parents=True, exist_ok=True)
-        (data_dir / "backups").mkdir(parents=True, exist_ok=True)
-        self._ensure_shared_user_state_links(username, data_dir)
+        if prepare:
+            for path in [project_path, data_dir, logs_dir, uploads_dir, skills_dir]:
+                path.mkdir(parents=True, exist_ok=True)
+            (data_dir / "conversations").mkdir(parents=True, exist_ok=True)
+            (data_dir / "backups").mkdir(parents=True, exist_ok=True)
+            self._ensure_shared_user_state_links(username, data_dir)
 
         quarantine_root = Path(UPLOAD_QUARANTINE_SUBDIR).expanduser()
         if not quarantine_root.is_absolute():
             quarantine_root = (self.workspace_root.parent / UPLOAD_QUARANTINE_SUBDIR).resolve()
         quarantine_dir = (quarantine_root / username / workspace_id).resolve()
-        quarantine_dir.mkdir(parents=True, exist_ok=True)
+        if prepare:
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
 
         workspace = UserWorkspace(
             username=username,
@@ -410,9 +430,10 @@ class UserManager:
             return "default"
         return default_id
 
-    def list_user_workspaces(self, username: str) -> Dict[str, Dict]:
+    def list_user_workspaces(self, username: str, *, prepare: bool = True) -> Dict[str, Dict]:
         username = self._normalize_username(username)
-        self._migrate_legacy_docker_workspace_layout(username)
+        if prepare:
+            self._migrate_legacy_docker_workspace_layout(username)
         result: Dict[str, Dict] = {}
 
         # 收集主路径的工作区

@@ -97,11 +97,19 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
             self.reconcile_task_states()
         except Exception:
             pass
-        try:
-            self.restore_running_tasks()
-        except Exception:
-            logger.exception("[SubAgentManager] 恢复运行中子智能体任务失败")
-            pass
+        self._activation_lock = threading.Lock()
+        self._activation_restored = False
+
+    def restore_for_activation(self) -> int:
+        """Only the owning conversation's activation may restore persisted agents."""
+        if not self.owner_conversation_id:
+            return 0
+        with self._activation_lock:
+            if self._activation_restored:
+                return 0
+            restored = self.restore_running_tasks()
+            self._activation_restored = True
+            return restored
 
     # ------------------------------------------------------------------
     # 生命周期与事件循环

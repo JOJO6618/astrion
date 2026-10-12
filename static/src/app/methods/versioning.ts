@@ -2,6 +2,7 @@
 import { beginAuxiliaryRequest } from './auxiliaryOwnership';
 import { t } from '@/locales';
 import { persistWorkspaceMode } from '../state';
+import { workspaceScopedFetch as fetch } from './workspaceRequestScope';
 
 const normalizeTrackingMode = (value: any): 'workspace_and_conversation' | 'conversation_only' => {
   return String(value || '').toLowerCase() === 'conversation_only'

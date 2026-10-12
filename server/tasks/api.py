@@ -17,6 +17,9 @@ from flask import current_app, session
 from server.auth_helpers import get_current_username
 from server.gateway_auth import api_login_or_host_token_required
 from server.context import get_user_resources, ensure_conversation_loaded
+from server.context.data_decorators import with_workspace_data, requested_workspace_id
+from server.context.data import get_workspace_data
+from server.context.background import background_status
 from server.security import rate_limited
 from server.state import stop_flags
 from server.utils_common import debug_log, log_conn_diag
@@ -45,7 +48,8 @@ def list_tasks_api():
 
 @tasks_bp.route("/api/conversations/<conversation_id>/running-status", methods=["GET"])
 @api_login_or_host_token_required
-def get_conversation_running_status_api(conversation_id: str):
+@with_workspace_data
+def get_conversation_running_status_api(conversation_id: str, data_context, workspace, username):
     """REST 对账接口：聚合某对话的完整运行状态。
 
     前端架构：事件流（250ms 任务轮询 + socket）负责即时性，本接口周期对账负责
@@ -58,27 +62,14 @@ def get_conversation_running_status_api(conversation_id: str):
         return jsonify({"success": False, "error": tr("tasks.missing_conversation_id")}), 400
 
     # ① 主 task：内存中该对话是否有活动任务（list_runs 已按会话筛选 + created_at 倒序）
-    active_runs = runtime_service.list_runs(username, conversation_id=conversation_id, status="active")
+    if not conversation_id.startswith("conv_"):
+        conversation_id = f"conv_{conversation_id}"
+    active_runs = runtime_service.list_runs(
+        username, data_context.workspace_id, conversation_id=conversation_id, status="active")
     main_rec = active_runs[0] if active_runs else None
-
-    # ②③④ 需要 terminal（sub_agent_manager / background_command_manager 挂在 terminal 上）
-    workspace_id = (
-        (request.args.get("workspace_id") or "").strip()
-        or (main_rec["workspace_id"] if main_rec else "")
-        or (session.get("workspace_id") or "")
-    ) or None
-    bg_status = {
-        "has_running_sub_agents": False,
-        "has_running_background_commands": False,
-        "has_running_multi_agent": False,
-    }
-    try:
-        terminal, _workspace = get_user_resources(username, workspace_id=workspace_id, conversation_id=conversation_id)
-    except Exception as exc:
-        debug_log(f"[TaskAPI] running-status 获取终端失败: {exc}")
-        terminal = None
-    if terminal:
-        bg_status = task_manager.get_conversation_running_status(terminal, conversation_id)
+    if data_context.manager_for(conversation_id).read_conversation(conversation_id) is None:
+        return jsonify(success=False, error="Conversation not found"), 404
+    bg_status = background_status(data_context, conversation_id, activate=True)
 
     is_main_running = main_rec is not None
     return jsonify({
@@ -98,8 +89,12 @@ def get_conversation_running_status_api(conversation_id: str):
 @rate_limited("chat_task_create", 30, 60, scope="user")
 def create_task_api():
     username = get_current_username()
-    workspace_id = session.get("workspace_id") or "default"
     payload = request.get_json() or {}
+    try:
+        data_context = get_workspace_data(username, requested_workspace_id())
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 404
+    workspace_id = data_context.workspace_id
     message = (payload.get("message") or "").strip()
     from config import MAX_MESSAGE_CHARS
     if len(message) > MAX_MESSAGE_CHARS:
@@ -107,6 +102,8 @@ def create_task_api():
     images, videos = _normalize_media_payload(payload.get("images") or [], payload.get("videos") or [])
     files = _normalize_files_payload(payload.get("files"))
     conversation_id = payload.get("conversation_id")
+    if conversation_id and data_context.manager_for(conversation_id).read_conversation(conversation_id) is None:
+        return jsonify({'success': False, 'error': 'Conversation not found in workspace'}), 404
     if not message and not images and not videos:
         return jsonify({"success": False, "error": tr("tasks.message_empty")}), 400
     model_key = payload.get("model_key")
@@ -119,7 +116,7 @@ def create_task_api():
     # 避免本对话错误延续旧目标。目标状态是对话级的，不影响其他对话。
     if not goal_mode and conversation_id:
         try:
-            _terminal, workspace = get_user_resources(username, workspace_id, conversation_id=conversation_id)
+            workspace = data_context.workspace
             if workspace:
                 gsm = GoalStateManager(workspace.data_dir, conversation_id)
                 if gsm.is_active():
@@ -136,7 +133,8 @@ def create_task_api():
                 f"count={len(raw_skill_refs) if isinstance(raw_skill_refs, list) else 'N/A'} "
                 f"refs={raw_skill_refs!r}"
             )
-            _terminal, workspace = get_user_resources(username, workspace_id, conversation_id=conversation_id)
+            _terminal, workspace = get_user_resources(username, workspace_id, conversation_id=conversation_id,
+                                                       update_session=False, identity=data_context.identity)
             if not workspace:
                 debug_log(f"[SkillsAPI] create_task workspace unavailable user={username} ws={workspace_id}")
                 return jsonify({"success": False, "error": tr("tasks.workspace_unavailable")}), 400

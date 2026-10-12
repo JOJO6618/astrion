@@ -5,6 +5,7 @@ import {
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
 import { useConversationStore } from './conversation';
+import { workspaceScopedFetch as fetch } from '../app/methods/workspaceRequestScope';
 
 interface SubAgent {
   task_id: string;

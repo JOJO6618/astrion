@@ -191,7 +191,7 @@ class IndexMixin:
         elapsed_ms = (time.perf_counter() - t0) * 1000
         if perf_log:
             perf_log("_rebuild_index_from_files done", elapsed_ms=elapsed_ms, extra={"rebuilt_size": len(rebuilt_index), "max_count": max_count})
-        if rebuilt_index:
+        if rebuilt_index and not getattr(self, "read_only", False):
             print(f"🔄 已从对话文件重建索引，共 {len(rebuilt_index)} 条记录")
         return rebuilt_index
 
@@ -214,7 +214,15 @@ class IndexMixin:
 
     @locked_write
     def _load_index(self, ensure_integrity: bool = False, max_rebuild: Optional[int] = None) -> Dict:
-        """加载对话索引，可选地在缺失时自动重建（可限制重建条数）"""
+        """加载对话索引；显示查询可在内存重建，不能迁移/回写。"""
+        if getattr(self, "read_only", False):
+            try:
+                raw = json.loads(self.index_file.read_text(encoding="utf-8"))
+                if isinstance(raw, dict) and raw:
+                    return raw
+            except (OSError, ValueError):
+                pass
+            return self._rebuild_index_from_files(max_count=max_rebuild)
         try:
             index: Dict = {}
             if self.index_file.exists():
@@ -296,6 +304,10 @@ class IndexMixin:
         t0 = time.perf_counter()
         needed = max(0, int(offset) + int(limit))
         index = self._load_index()
+        if getattr(self, "read_only", False):
+            if self._index_missing_conversations(index) or len(index) < needed:
+                return {**index, **self._rebuild_index_from_files(max_count=max(needed, len(index)))}
+            return index
         load_ms = (time.perf_counter() - t0) * 1000
         if perf_log:
             perf_log("_ensure_index_covering load_index", elapsed_ms=load_ms, extra={"index_size": len(index), "needed": needed})

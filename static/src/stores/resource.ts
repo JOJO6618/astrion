@@ -5,6 +5,7 @@ import {
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
 import type { ConversationCosts } from '@/components/token/costTypes';
+import { workspaceScopedFetch as fetch } from '../app/methods/workspaceRequestScope';
 
 interface ConversationTokens {
   costs?: ConversationCosts | null;

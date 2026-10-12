@@ -79,8 +79,9 @@ def finish_queue(rec, *, paused=False):
     save_queue(rec)
 
 
-def queue_snapshot(manager, conversation_id, *, include_guidance=True):
-    data = manager.load_conversation(conversation_id) or {}
+def queue_snapshot(manager, conversation_id, *, include_guidance=True, data=None):
+    if data is None:
+        data = manager.load_conversation(conversation_id) or {}
     state = (data.get("metadata") or {}).get(QUEUE_KEY) or {}
     return {
         "messages": deepcopy(state.get("pending") or []) + (guidance_to_pending(state.get("guidance")) if include_guidance else []),

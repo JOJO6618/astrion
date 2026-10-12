@@ -2,14 +2,12 @@
 import { t } from '@/locales';
 import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 import { useConversationStore } from '../../../stores/conversation';
-import { useConversationTabsStore } from '../../../stores/conversationTabs';
-import {
-  conversationViewEpoch,
-  currentConversationSession,
-  ownsConversationSession
-} from '../conversation/session';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
+import { currentConversationSession } from '../conversation/session';
+import { workspaceNavigationMethods } from './workspaceNavigation';
 
 export const hostWorkspaceMethods = {
+  ...workspaceNavigationMethods,
   async fetchHostWorkspaces() {
     const owns = beginAuxiliaryRequest(this, 'host-workspaces');
     if (!(this.versioningHostMode || this.dockerProjectMode)) {
@@ -34,160 +32,24 @@ export const hostWorkspaceMethods = {
         is_current: !!item.is_current,
         running_task_count: Number(item.running_task_count || 0)
       }));
-      this.currentHostWorkspaceId = String(data.current_workspace_id || '');
+      // Directory refreshes describe workspaces; the navigation commit owns visible identity.
+      if (!this.currentHostWorkspaceId && !currentConversationSession(this)) {
+        this.currentHostWorkspaceId = String(data.current_workspace_id || '');
+        if (this.currentHostWorkspaceId)
+          useConversationStore().activateWorkspaceCache(this.currentHostWorkspaceId);
+      }
+      for (const workspace of this.hostWorkspaces)
+        workspace.is_current = workspace.workspace_id === this.currentHostWorkspaceId;
       this.defaultHostWorkspaceId = String(data.default_workspace_id || '');
-      await this.refreshRunningWorkspaceTasks();
+      void this.refreshRunningWorkspaceTasks();
     } catch (error) {
       if (!owns()) return;
       console.warn('加载工作区/项目失败:', error);
-      this.hostWorkspaces = [];
-      this.currentHostWorkspaceId = '';
-      this.defaultHostWorkspaceId = '';
-      this.runningWorkspaceTasks = [];
-    }
-  },
-  async handleHostWorkspaceSwitch(workspaceId, options = {}) {
-    // preserveConversationView：跨工作区点选具体对话时使用——保持当前对话视图冻结，
-    // 不做 /new 跳转与状态清空（否则空对话态会让居中输入栏「先往上再往下」），
-    // 目标对话由调用方随后立即加载
-    const preserveConversationView = Boolean(options && options.preserveConversationView);
-    const targetId = String(workspaceId || '').trim();
-    if (!targetId || this.hostWorkspaceSwitching) {
-      return;
-    }
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      return;
-    }
-    if (targetId === this.currentHostWorkspaceId) {
-      return;
-    }
-
-    if (!options.session) this.leaveConversationView();
-    const session = options.session;
-    const epoch = conversationViewEpoch(this);
-    const owns = () =>
-      session ? ownsConversationSession(this, session) : conversationViewEpoch(this) === epoch;
-    if (!owns()) return;
-    this.hostWorkspaceSwitching = true;
-    const previousConversationList = Array.isArray(this.conversations)
-      ? [...this.conversations]
-      : [];
-    const previousSearchActive = this.searchActive;
-    this.searchActive = false;
-    this.searchResults = [];
-    /* 主列表是当前工作区作用域：切换前使双类型缓存整体失效（conversations 重指空缓存） */
-    useConversationStore().resetConversationsTypeCache();
-    this.conversationsOffset = 0;
-    this.hasMoreConversations = false;
-    this.conversationsLoading = true;
-    try {
-      // 先在“当前工作区作用域”落盘草稿，再切换工作区。
-      // 否则会把旧工作区草稿误写到目标工作区作用域里。
-      await this.persistComposerDraftNow({
-        reason: 'switch-host-workspace:before-select',
-        force: true,
-        keepalive: true
-      }).catch(() => {});
-
-      if (!owns()) return;
-      const query = encodeURIComponent(targetId);
-      const selectEndpoint = this.versioningHostMode
-        ? '/api/host/workspaces/select'
-        : '/api/projects/select';
-      const resp = await fetch(`${selectEndpoint}?workspace_id=${query}`);
-      const payload = await resp.json().catch(() => ({}));
-      if (!owns()) return;
-      if (!resp.ok || !payload?.success) {
-        throw new Error(
-          payload?.error ||
-            (this.versioningHostMode
-              ? t('appUi.switchHostWorkspaceFailed')
-              : t('appUi.switchProjectFailed'))
-        );
-      }
-      const data = payload.data || {};
-      this.currentHostWorkspaceId = String(data.current_workspace_id || targetId);
-      if (data.project_path) {
-        this.projectPath = String(data.project_path);
-      }
-      if (data.default_workspace_id) {
-        this.defaultHostWorkspaceId = String(data.default_workspace_id);
-      }
-      if (!preserveConversationView) {
-        this.messages = [];
-        this.currentConversationId = null;
-        this.resetTokenStatistics?.();
-        this.currentConversationTitle = t('common.newConversation');
-        this.titleReady = true;
-        this.suppressTitleTyping = false;
-        this.clearLocalTaskUiState?.('switch-host-workspace');
-      }
-      await this.fetchHostWorkspaces();
-      if (!owns()) return;
-      if (preserveConversationView) {
-        // 不做视图跳转（/new 或自动进入运行中任务对话），仅刷新侧边栏列表
-        this.conversationsOffset = 0;
-        await this.loadConversationsList();
-      } else {
-        const activeStatuses = new Set(['pending', 'running', 'cancel_requested']);
-        const activeTask = (
-          Array.isArray(this.runningWorkspaceTasks) ? this.runningWorkspaceTasks : []
-        )
-          .filter((task: any) => String(task?.workspace_id || '') === this.currentHostWorkspaceId)
-          .find(
-            (task: any) => activeStatuses.has(String(task?.status || '')) && task?.conversation_id
-          );
-        if (activeTask?.conversation_id) {
-          await this.handleSelectWorkspaceConversation(
-            {
-              conversationId: String(activeTask.conversation_id),
-              workspaceId: String(this.currentHostWorkspaceId || '')
-            },
-            { force: true }
-          );
-          this.conversationsOffset = 0;
-          await this.loadConversationsList();
-        } else {
-          this.startTitleTyping(t('common.newConversation'), { animate: false });
-          history.replaceState({}, '', '/new');
-          await this.loadConversationsList();
-        }
-      }
-      const switchedWorkspace = (
-        Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []
-      ).find((item: any) => String(item?.workspace_id || '') === this.currentHostWorkspaceId);
-      const switchedLabel = String(switchedWorkspace?.label || '').trim();
-      this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.workspaceSwitched') : t('appUi.projectSwitched'),
-        message: this.versioningHostMode
-          ? data.project_path || switchedLabel || targetId
-          : switchedLabel || targetId,
-        type: 'success'
-      });
-      this.refreshProjectGitSummary?.();
-      this.fetchTerminalCount();
-    } catch (error) {
-      if (!owns()) return;
-      /* 切换失败仍在旧工作区：恢复旧列表并同步回当前类型缓存，保持引用一致 */
-      const conversationStore = useConversationStore();
-      const restoredCache =
-        conversationStore.conversationsCache[conversationStore.sidebarConversationType];
-      restoredCache.list = previousConversationList;
-      restoredCache.loaded = true;
-      this.conversations = restoredCache.list;
-      this.searchActive = previousSearchActive;
-      this.conversationsLoading = false;
-      const message =
-        error instanceof Error ? error.message : String(error || t('appUi.switchFailed'));
-      this.uiPushToast({
-        title: this.versioningHostMode
-          ? t('appUi.switchWorkspaceFailed')
-          : t('appUi.switchProjectFailed'),
-        message,
+      this.uiPushToast?.({
+        title: t('appUi.fetchProjectsFailed'),
+        message: String(error?.message || error),
         type: 'error'
       });
-    } finally {
-      this.hostWorkspaceSwitching = false;
     }
   },
   async submitHostWorkspaceCreate() {
@@ -362,6 +224,7 @@ export const hostWorkspaceMethods = {
         throw new Error(result?.error || t('appUi.deleteFailed'));
       }
       const data = result.data || {};
+      useConversationStore().invalidateWorkspaceCache(workspaceId);
       const leavingCurrent = wasCurrent && workspaceId === this.currentHostWorkspaceId;
       if (leavingCurrent) {
         this.leaveConversationView();
@@ -380,8 +243,8 @@ export const hostWorkspaceMethods = {
         this.currentConversationTitle = t('common.newConversation');
         this.searchActive = false;
         this.searchResults = [];
-        /* 当前工作区已删除：双类型缓存整体失效后重新加载 */
-        useConversationStore().resetConversationsTypeCache();
+        /* Deleted workspace only: keep other workspace caches intact. */
+        useConversationStore().activateWorkspaceCache(this.currentHostWorkspaceId || 'default');
         this.conversationsOffset = 0;
         this.hasMoreConversations = false;
         this.conversationsLoading = true;
@@ -407,175 +270,6 @@ export const hostWorkspaceMethods = {
       });
     } finally {
       this.hostWorkspaceManageSubmitting = false;
-    }
-  },
-  /**
-   * 侧边栏对话点击统一入口（2026-10-10）：平铺列表、工作区分组、移动版、运行中
-   * 任务、标签条、路由恢复、创建/复制/还原等所有导航场景都汇聚到这里；跨工作区
-   * 先切工作区再加载，加载完成后统一执行任务索引/完成标记/模式/版本化等收尾。
-   * options.force 跳过「点击当前对话」短路（创建/复制/还原/切工作区场景）。
-   */
-  async handleSelectWorkspaceConversation(
-    payload: {
-      conversationId: string;
-      workspaceId: string;
-    },
-    options: { force?: boolean; preserveListPosition?: boolean } = {}
-  ) {
-    const normalizedId = String(payload?.conversationId || '').trim();
-    if (!normalizedId) return { success: false };
-    const force = Boolean(options?.force);
-    const preserveListPosition = Boolean(options?.preserveListPosition);
-    const hostScoped = !!(this.versioningHostMode || this.dockerProjectMode);
-    const workspaceId =
-      String(payload?.workspaceId || '').trim() ||
-      (hostScoped ? String(this.currentHostWorkspaceId || '') : '');
-    // 侧边栏标签/任务条目的标题兜底：覆盖普通缓存与工作区分组缓存。
-    const findSidebarSummary = (id: string) => {
-      const store = useConversationStore();
-      const lists: any[] = [];
-      for (const group of Array.isArray(store.workspaceGroups) ? store.workspaceGroups : []) {
-        if (!group?.conversationsByType) continue;
-        lists.push(group.conversationsByType.normal, group.conversationsByType.multi_agent);
-      }
-      lists.push(
-        store.conversationsCache?.normal?.list,
-        store.conversationsCache?.multi_agent?.list,
-        this.conversations
-      );
-      for (const list of lists) {
-        const found = (Array.isArray(list) ? list : []).find(
-          (item: any) => String(item?.id || '') === id
-        );
-        if (found) return found;
-      }
-      return null;
-    };
-
-    // 点击当前对话：不重新加载（与旧平铺入口 loadConversation 行为一致）。
-    if (!force && normalizedId === this.currentConversationId && !this.historyLoading) {
-      this.suppressTitleTyping = false;
-      this.titleReady = true;
-      return { success: true, skipped: true };
-    }
-
-    this.flushReasoningEffortSave?.();
-    const draft = this.persistComposerDraftNow({
-      reason: `workspace-conversation:${normalizedId}`,
-      force: true,
-      keepalive: true
-    }).catch(() => {});
-    const session = this.beginConversationView(normalizedId, workspaceId);
-    const owns = () => ownsConversationSession(this, session);
-    this.suppressTitleTyping = true;
-    this.titleReady = false;
-    // 桌面端标签条：点击瞬间乐观开标签/激活已有标签（标题先用列表里的，进入对话后
-    // 经 bootstrap 的 openConversationTab 用真实标题更新）；persistNow 让 chrome
-    // 轮询尽快拿到——原来要等对话完全加载完才登记，标签出现滞后 1s+
-    try {
-      const tabsStore = useConversationTabsStore();
-      if (tabsStore.enabled) {
-        const bareId = String(normalizedId).replace(/^conv_/, '');
-        const existing = tabsStore.tabs.find(
-          (item: any) =>
-            item.kind === 'conv' &&
-            [String(normalizedId), bareId, `conv_${bareId}`].includes(item.conversationId)
-        );
-        if (existing) {
-          tabsStore.setActive(existing.key);
-          tabsStore.persistNow();
-        } else {
-          const summary = findSidebarSummary(normalizedId);
-          const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
-            (item: any) => String(item?.workspace_id || '') === String(workspaceId)
-          );
-          tabsStore.openConversationTab({
-            conversationId: normalizedId,
-            workspaceId,
-            workspaceLabel: String(ws?.label || ''),
-            title: String(summary?.title || '')
-          });
-          tabsStore.persistNow();
-        }
-      }
-    } catch (_tabsErr) {
-      // ignore
-    }
-    if (hostScoped && workspaceId && workspaceId !== String(this.currentHostWorkspaceId || '')) {
-      await this.handleHostWorkspaceSwitch(workspaceId, {
-        preserveConversationView: true,
-        session
-      });
-    }
-    await draft;
-    if (
-      !owns() ||
-      (hostScoped && workspaceId && String(this.currentHostWorkspaceId || '') !== workspaceId)
-    ) {
-      return { success: false, superseded: true };
-    }
-    try {
-      const result = await this.enterConversation(normalizedId, {
-        session,
-        workspaceId,
-        source: 'workspace',
-        urlMode: 'push',
-        preserveListPosition
-      });
-      if (!owns() || result?.superseded) return result || { success: false, superseded: true };
-      if (result?.success) {
-        // 标题收尾（enterConversation 已写首帧；此处与旧平铺入口保持一致再同步一次）。
-        this.currentConversationTitle = result.title || '';
-        this.titleReady = true;
-        this.suppressTitleTyping = false;
-        this.startTitleTyping(this.currentConversationTitle, { animate: false });
-        await this.restoreComposerDraftState('workspace-conversation');
-        if (!owns()) return result;
-        // 以下为吸收自旧平铺入口 loadConversation 的完整收尾：任务索引、完成标记、
-        // 模式/版本化/git/token 等状态刷新，保证开启与不开启分组的刷新行为一致。
-        this.subAgentFetch();
-        this.fetchTodoList();
-        await this.refreshRunningWorkspaceTasks?.();
-        if (!owns()) return result;
-        const visibleTask =
-          typeof this.getVisibleWorkspaceTaskForConversation === 'function'
-            ? this.getVisibleWorkspaceTaskForConversation(normalizedId)
-            : null;
-        const terminalStatuses = new Set(['succeeded', 'failed', 'canceled', 'stopped']);
-        if (visibleTask && terminalStatuses.has(String(visibleTask?.status || ''))) {
-          // 用户已点进完成后的“待查看”对话，清除列表里的完成标记。
-          this.acknowledgeCompletedWorkspaceTask?.(visibleTask.task_id);
-        }
-        this.fetchWorkMode();
-        this.fetchPermissionMode();
-        this.fetchExecutionMode();
-        this.fetchNetworkPermission();
-        await this.fetchVersioningStatus(normalizedId, { silent: true });
-        if (!owns()) return result;
-        this.refreshProjectGitSummary();
-        this.fetchConversationTokenStatistics();
-        this.updateCurrentContextTokens();
-      } else {
-        this.suppressTitleTyping = false;
-        this.titleReady = true;
-        this.uiPushToast({
-          title: t('appMessages.loadConversationFailedTitle'),
-          message: result?.message || t('appMessages.serverNotSuccessMessage'),
-          type: 'error'
-        });
-      }
-      return result;
-    } catch (error) {
-      if (!owns()) return { success: false, superseded: true };
-      console.error('加载对话异常:', error);
-      this.suppressTitleTyping = false;
-      this.titleReady = true;
-      this.uiPushToast({
-        title: t('appMessages.loadConversationErrorTitle'),
-        message: error?.message || String(error || ''),
-        type: 'error'
-      });
-      return { success: false, error: String(error?.message || error || '') };
     }
   },
   async handleRenameWorkspaceFromSidebar(payload: { workspaceId: string; label: string }) {

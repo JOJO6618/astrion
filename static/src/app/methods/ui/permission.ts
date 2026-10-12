@@ -9,6 +9,7 @@ import { usePolicyStore } from '../../../stores/policy';
 import { usePersonalizationStore } from '../../../stores/personalization';
 
 import { beginAuxiliaryRequest, invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 export const permissionMethods = {
   applyPolicyUiLocks() {
     const policyStore = usePolicyStore();

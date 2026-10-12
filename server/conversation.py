@@ -73,6 +73,9 @@ from utils.api_client import APIClient
 
 from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from .gateway_auth import api_login_or_host_token_required
+from .context.data_decorators import with_workspace_data
+from .context.data import get_workspace_data
+from .context.resources import find_runtime
 from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
 from .utils_common import (
     build_review_lines,
@@ -304,8 +307,8 @@ def _sanitize_scope_component(value: Any, default: str = "default") -> str:
 
 def _resolve_input_draft_path(workspace: UserWorkspace, username: str) -> Tuple[Path, str]:
     base_dir = Path(workspace.data_dir).expanduser().resolve() / "composer_drafts"
-    if _is_host_mode_request(username):
-        workspace_id = session.get("host_workspace_id") or session.get("workspace_id") or "default"
+    if workspace.username == "host":
+        workspace_id = getattr(workspace, "workspace_id", None) or "default"
         scope = f"host_workspace:{workspace_id}"
         filename = f"{_sanitize_scope_component(workspace_id)}.json"
         return (base_dir / "host" / filename).resolve(), scope
@@ -317,20 +320,13 @@ def _resolve_input_draft_path(workspace: UserWorkspace, username: str) -> Tuple[
 
 
 def _read_input_draft_payload(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8")) or {}
-        return raw if isinstance(raw, dict) else {}
-    except Exception:
-        return {}
+    from modules.composer_drafts import read_draft
+    return read_draft(path)
 
 
 def _atomic_write_input_draft(path: Path, payload: Dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    from modules.composer_drafts import save_draft
+    save_draft(path, payload)
 
 
 def _get_conversation_versioning_meta(terminal: WebTerminal, conversation_id: str) -> Dict[str, Any]:
@@ -437,9 +433,9 @@ def _update_conversation_versioning_meta(
 
 @conversation_bp.route('/api/input-draft', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    del terminal
+@with_workspace_data
+def get_input_draft(data_context, workspace: UserWorkspace, username: str):
+    del data_context
     try:
         path, scope = _resolve_input_draft_path(workspace, username)
         payload = _read_input_draft_payload(path)
@@ -463,9 +459,9 @@ def get_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username: s
 
 @conversation_bp.route('/api/input-draft', methods=['POST', 'PUT'])
 @api_login_required
-@with_terminal
-def upsert_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    del terminal
+@with_workspace_data
+def upsert_input_draft(data_context, workspace: UserWorkspace, username: str):
+    del data_context
     try:
         body = request.get_json(silent=True) or {}
         content = body.get("content") if isinstance(body, dict) else ""
@@ -495,22 +491,6 @@ def upsert_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username
             editor_json = None
 
         path, scope = _resolve_input_draft_path(workspace, username)
-        if content == "":
-            if path.exists():
-                try:
-                    path.unlink()
-                except Exception:
-                    pass
-            return jsonify({
-                "success": True,
-                "data": {
-                    "saved": True,
-                    "cleared": True,
-                    "scope": scope,
-                    "updated_at": datetime.now().isoformat(),
-                }
-            })
-
         payload = {
             "content": content,
             "skill_refs": skill_refs,
@@ -518,12 +498,16 @@ def upsert_input_draft(terminal: WebTerminal, workspace: UserWorkspace, username
             "updated_at": datetime.now().isoformat(),
             "scope": scope,
         }
-        _atomic_write_input_draft(path, payload)
+        from modules.composer_drafts import save_draft
+        client_id = str(body.get("client_id") or "")[:120]
+        sequence = max(0, int(body.get("sequence") or 0))
+        saved = save_draft(path, payload, client_id=client_id, sequence=sequence)
         return jsonify({
             "success": True,
             "data": {
-                "saved": True,
-                "cleared": False,
+                "saved": saved,
+                "superseded": not saved,
+                "cleared": content == "",
                 "scope": scope,
                 "updated_at": payload["updated_at"],
             }
@@ -577,9 +561,9 @@ def _resolve_target_terminal_for_workspace(
 # === 背景生成对话标题（从 app_legacy 拆分） ===
 @conversation_bp.route('/api/conversations', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_conversations(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取对话列表，支持通过 workspace_id 查询指定工作区/项目。"""
+@with_workspace_data
+def get_conversations(data_context, workspace: UserWorkspace, username: str):
+    """Read this workspace's lists without mounting an execution environment."""
     try:
         # 获取查询参数
         limit = request.args.get('limit', 20, type=int)
@@ -599,24 +583,16 @@ def get_conversations(terminal: WebTerminal, workspace: UserWorkspace, username:
         limit = max(1, min(limit, 10000))  # 限制在1-10000之间
         offset = max(0, offset)
 
-        if target_workspace_id:
-            try:
-                terminal, workspace = _resolve_target_terminal_for_workspace(
-                    username, target_workspace_id, terminal, workspace
-                )
-            except ValueError as exc:
-                return jsonify({"success": False, "error": str(exc)}), 404
-            except RuntimeError as exc:
-                return jsonify({"success": False, "error": str(exc)}), 503
-
-        result = terminal.get_conversations_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_filter)
-        cm = getattr(getattr(terminal, "context_manager", None), "conversation_manager", None)
+        rows = data_context.list_conversations(limit=limit, offset=offset, non_empty=non_empty,
+                                               multi_agent_mode=multi_agent_filter)
+        result = {"success": True, "data": rows}
+        cm = data_context.manager()
         write_host_workspace_debug(
             "sidebar-debug-api",
             api="GET /api/conversations",
             workspace_id=target_workspace_id or None,
             session_workspace_id=session.get("workspace_id"),
-            terminal_project_path=str(getattr(terminal, "project_path", None)),
+            terminal_project_path=str(workspace.project_path),
             cm_workspace_id=getattr(cm, "current_workspace_id", None),
             cm_conversations_dir=str(getattr(cm, "conversations_dir", None)),
             result_success=bool(result.get("success")),
@@ -1008,8 +984,8 @@ def delete_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
 
 @conversation_bp.route('/api/conversations/search', methods=['GET'])
 @api_login_required
-@with_terminal
-def search_conversations(terminal: WebTerminal, workspace: UserWorkspace, username: str):
+@with_workspace_data
+def search_conversations(data_context, workspace: UserWorkspace, username: str):
     """搜索对话。
 
     默认仅搜索当前工作区，返回扁平结果；
@@ -1039,7 +1015,8 @@ def search_conversations(terminal: WebTerminal, workspace: UserWorkspace, userna
         limit = max(1, min(limit, 50))
 
         if not search_all:
-            result = terminal.search_conversations(query, limit, multi_agent_mode=multi_agent_filter)
+            rows = data_context.search(query, limit, multi_agent_mode=multi_agent_filter)
+            result = {"results": rows, "count": len(rows)}
             return jsonify({
                 "success": True,
                 "data": {
@@ -1071,14 +1048,13 @@ def search_conversations(terminal: WebTerminal, workspace: UserWorkspace, userna
                 continue
             seen_ids.add(ws_id)
             try:
-                target_terminal, _target_workspace = _resolve_target_terminal_for_workspace(
-                    username, ws_id, terminal, workspace
-                )
+                target_data = get_workspace_data(username, ws_id)
             except (ValueError, RuntimeError) as resolve_err:
                 logger.error(f"[API] 搜索跳过工作区 {ws_id}: {resolve_err}")
                 continue
             try:
-                result = target_terminal.search_conversations(query, limit, multi_agent_mode=multi_agent_filter)
+                rows = target_data.search(query, limit, multi_agent_mode=multi_agent_filter)
+                result = {"results": rows, "count": len(rows)}
             except Exception as search_err:
                 logger.error(f"[API] 搜索工作区对话失败 {ws_id}: {search_err}")
                 continue
@@ -1245,12 +1221,15 @@ def download_conversation_media(media_id, terminal: WebTerminal, workspace: User
 
 @conversation_bp.route('/api/conversations/<conversation_id>/versioning', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_conversation_versioning_status(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
+@with_workspace_data
+def get_conversation_versioning_status(conversation_id, data_context, workspace: UserWorkspace, username: str):
     try:
         normalized_id = _normalize_conv_id(conversation_id)
         host_mode = _is_host_mode_request(username)
-        versioning_meta = _get_conversation_versioning_meta(terminal, normalized_id)
+        conversation = data_context.manager_for(normalized_id).read_conversation(normalized_id)
+        if conversation is None:
+            return jsonify(success=False, error="Conversation not found"), 404
+        versioning_meta = (conversation.get("metadata") or {}).get("versioning") or {}
         tracking_mode = _normalize_versioning_tracking_mode(versioning_meta.get("tracking_mode"))
         enabled = bool(versioning_meta.get("enabled")) and _can_use_versioning_scope(username, tracking_mode)
         manager = _get_conv_versioning_manager(workspace, normalized_id)
@@ -1829,12 +1808,15 @@ def cancel_conversation_compression(conversation_id, terminal: WebTerminal, work
 
 @conversation_bp.route('/api/sub_agents', methods=['GET'])
 @api_login_or_host_token_required
-@with_terminal
-def list_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """返回当前对话的子智能体任务列表。"""
+@with_workspace_data
+def list_sub_agents(data_context, workspace: UserWorkspace, username: str):
+    """Read live or stored sub-agent views without creating execution resources."""
+    conversation_id = (request.args.get("conversation_id") or "").strip() or None
+    terminal = find_runtime(username, workspace, conversation_id)
     manager = getattr(terminal, "sub_agent_manager", None)
     if not manager:
-        return jsonify({"success": True, "data": []})
+        from server.context.sub_agent_views import stored_overview
+        return jsonify(success=True, data=stored_overview(data_context, conversation_id))
     try:
         try:
             # 防止不同进程创建的子智能体未被当前进程感知
@@ -2077,9 +2059,11 @@ def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWork
 
 @conversation_bp.route('/api/background_commands', methods=['GET'])
 @api_login_or_host_token_required
-@with_terminal
-def list_background_commands(terminal: WebTerminal, workspace: UserWorkspace, username: str):
+@with_workspace_data
+def list_background_commands(data_context, workspace: UserWorkspace, username: str):
     """返回当前对话的后台 run_command 列表。"""
+    conversation_id = (request.args.get("conversation_id") or "").strip() or None
+    terminal = find_runtime(username, workspace, conversation_id)
     manager = getattr(terminal, "background_command_manager", None)
     if not manager:
         return jsonify({"success": True, "data": []})
@@ -2470,11 +2454,21 @@ def execute_command_api(terminal: WebTerminal, workspace: UserWorkspace, usernam
 
 @conversation_bp.route('/api/conversations/<conversation_id>/token-statistics', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_conversation_token_statistics(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
+@with_workspace_data
+def get_conversation_token_statistics(conversation_id, data_context, workspace: UserWorkspace, username: str):
     """获取特定对话的token统计"""
     try:
-        stats = terminal.context_manager.get_conversation_token_statistics(conversation_id)
+        conversation_id = _normalize_conv_id(conversation_id)
+        stats = data_context.manager_for(conversation_id).get_token_statistics(conversation_id)
+        if stats is not None:
+            from modules.conversation_costs import summarize
+            from modules.exchange_rates import get_rate
+            from server.context.background import persisted_sub_agents
+            children = [task for task in (persisted_sub_agents(data_context).get("tasks") or {}).values()
+                        if task.get("conversation_id") == conversation_id]
+            stats["costs"] = summarize(workspace.data_dir, conversation_id,
+                                       main_input=stats.get("total_input_tokens", 0), sub_agents=children)
+            stats["costs"]["exchange_rate"] = get_rate()
         
         if stats:
             return jsonify({
@@ -2499,11 +2493,12 @@ def get_conversation_token_statistics(conversation_id, terminal: WebTerminal, wo
 
 @conversation_bp.route('/api/conversations/<conversation_id>/tokens', methods=['GET'])
 @api_login_required
-@with_terminal
-def get_conversation_tokens(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取对话的当前完整上下文token数（包含所有动态内容）"""
+@with_workspace_data
+def get_conversation_tokens(conversation_id, data_context, workspace: UserWorkspace, username: str):
+    """获取最近一次请求的完整上下文token数。"""
     try:
-        current_tokens = terminal.context_manager.get_current_context_tokens(conversation_id)
+        conversation_id = _normalize_conv_id(conversation_id)
+        current_tokens = data_context.manager_for(conversation_id).get_current_context_tokens(conversation_id)
         return jsonify({
             "success": True,
             "data": {

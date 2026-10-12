@@ -193,11 +193,13 @@ export const sendMethods = {
         const createBody = isMultiAgent
           ? JSON.stringify({
               preserve_mode: true,
+              workspace_id: session.workspaceId,
               thinking_mode: this.thinkingMode,
               mode: this.runMode,
               reasoning_effort: this.reasoningEffort
             })
           : JSON.stringify({
+              workspace_id: session.workspaceId,
               thinking_mode: this.thinkingMode,
               mode: this.runMode,
               reasoning_effort: this.reasoningEffort
@@ -205,7 +207,8 @@ export const sendMethods = {
         const createResp = await fetch(createUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Astrion-Workspace-Id': session.workspaceId
           },
           body: createBody,
           signal: session.controller.signal

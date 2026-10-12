@@ -110,25 +110,13 @@ export const watchers = {
         oldValue,
         newValue
       });
-      if (
-        oldValue !== newValue &&
-        !this.taskInProgress &&
-        !this.composerBusy &&
-        typeof this.restoreComposerDraftState === 'function'
-      ) {
-        this.restoreComposerDraftState(
-          `watch-conversation-id:${oldValue || 'none'}->${newValue || 'none'}`
-        );
-      }
+      // Navigation commits scoped input and owns auxiliary HTTP refreshes.
       if (!newValue || typeof newValue !== 'string' || newValue.startsWith('temp_')) {
         this.versioningEnabled = false;
         this.versioningTrackingMode = 'conversation_only';
         return;
       }
-      this.fetchVersioningStatus(newValue, { silent: true });
-      // Navigation owns snapshot loading; changing the selected id never starts a second loader.
-      this.fetchConversationTokenStatistics();
-      this.updateCurrentContextTokens();
+      // Keep this watcher local: no second draft, mode, version or token request.
     }
   },
   fileTree: {

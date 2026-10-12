@@ -285,7 +285,6 @@ def select_host_workspace():
         current_workspace_id=current_id,
     )
 
-    previous_workspace_id = session.get("workspace_id")
     with state.HOST_ACTIVE_WORKSPACE_LOCK:
         state.HOST_ACTIVE_WORKSPACE_ID = workspace_id
         state.HOST_ACTIVE_WORKSPACE_PATH = target_path
@@ -293,54 +292,7 @@ def select_host_workspace():
     session['host_workspace_id'] = workspace_id
     session['workspace_id'] = workspace_id
 
-    try:
-        container_handle = state.container_manager.ensure_container(
-            "host",
-            target_path,
-            container_key=f"host::{workspace_id}",
-            preferred_mode="host",
-        )
-    except RuntimeError as exc:
-        if current_id:
-            session['host_workspace_id'] = current_id
-        if previous_workspace_id is not None:
-            session['workspace_id'] = previous_workspace_id
-        elif current_id:
-            session['workspace_id'] = current_id
-        write_host_workspace_debug(
-            "status.select_host_workspace.ensure_container_failed",
-            workspace_id=workspace_id,
-            target_path=target_path,
-            error=str(exc),
-        )
-        return jsonify({"success": False, "error": str(exc)}), 503
-
-    host_terminal = state.user_terminals.get(f"host::{workspace_id}")
-    if host_terminal:
-        try:
-            host_terminal.update_container_session(container_handle)
-            host_terminal.username = "host"
-            host_terminal.user_role = "admin"
-            write_host_workspace_debug(
-                "status.select_host_workspace.updated_terminal",
-                terminal_id=id(host_terminal),
-                workspace_id=workspace_id,
-                project_path=str(getattr(host_terminal, "project_path", "")),
-                context_project_path=str(getattr(getattr(host_terminal, "context_manager", None), "project_path", "")),
-                current_conversation_id=getattr(getattr(host_terminal, "context_manager", None), "current_conversation_id", None),
-            )
-        except Exception:
-            try:
-                if getattr(host_terminal, "terminal_manager", None):
-                    host_terminal.terminal_manager.close_all()
-            except Exception:
-                pass
-            state.user_terminals.pop(f"host::{workspace_id}", None)
-            write_host_workspace_debug(
-                "status.select_host_workspace.drop_terminal_after_error",
-                workspace_id=workspace_id,
-            )
-
+    # Selection updates identity only. Execution resources are acquired when needed.
     write_host_workspace_debug(
         "status.select_host_workspace.success",
         workspace_id=workspace_id,

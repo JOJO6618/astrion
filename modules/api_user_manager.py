@@ -95,8 +95,9 @@ class ApiUserManager:
                     return user
         return None
 
-    def ensure_workspace(self, username: str, workspace_id: str = "default") -> ApiUserWorkspace:
-        """为 API 用户创建/获取指定工作区。
+    def ensure_workspace(self, username: str, workspace_id: str = "default",
+                         *, prepare: bool = True) -> ApiUserWorkspace:
+        """为 API 用户定位工作区；prepare=False 不准备存储。
 
         目录布局（每个用户）：
         <root>/<username>/
@@ -131,6 +132,19 @@ class ApiUserManager:
         logs_dir = work_root / "logs"
         uploads_dir = project_path / ".astrion" / "user_upload"
         skills_dir = project_path / ".astrion" / "skills"
+
+        from config import UPLOAD_QUARANTINE_SUBDIR
+        if not prepare:
+            quarantine_root = Path(UPLOAD_QUARANTINE_SUBDIR).expanduser()
+            if not quarantine_root.is_absolute():
+                quarantine_root = (self.workspace_root.parent / UPLOAD_QUARANTINE_SUBDIR).resolve()
+            return ApiUserWorkspace(
+                username=username, workspace_id=ws_id, root=work_root,
+                project_path=project_path, data_dir=data_dir, logs_dir=logs_dir,
+                uploads_dir=uploads_dir, quarantine_dir=quarantine_root / username / ws_id,
+                shared_dir=shared_dir, prompts_dir=prompts_dir,
+                personalization_dir=personalization_dir,
+            )
 
         for path in (project_path, data_dir, logs_dir, uploads_dir, skills_dir, shared_dir, prompts_dir, personalization_dir):
             path.mkdir(parents=True, exist_ok=True)

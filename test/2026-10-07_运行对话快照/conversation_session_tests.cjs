@@ -23,6 +23,10 @@ function compile(file, globals, imports = {}) {
     setTimeout, clearTimeout, Date, console: { log: noop, warn: noop, error: noop },
     require: (key) => {
       if (Object.hasOwn(imports, key)) return imports[key];
+      if (key.endsWith('/workspaceRequestScope')) return {
+        bindWorkspaceRequestHost: noop,
+        workspaceScopedFetch: (...args) => globals.fetch(...args)
+      };
       throw new Error(`Unmocked dependency ${file}: ${key}`);
     }, ...globals
   }, { filename: file });
@@ -50,7 +54,10 @@ function fixture() {
     '../../../stores/task': { useTaskStore: () => task },
     '../../../stores/quickDock': { useQuickDockStore: () => ({ setEditedFiles: noop }) },
     '../../../stores/preview': { usePreviewStore: () => ({ setRuntime: noop, setTargets: noop }) },
-    '../../../stores/conversation': { useConversationStore: () => ({ $patch: noop }) },
+    '../../../stores/conversation': { useConversationStore: () => ({ $patch: noop, setCurrentConversationId: noop }) },
+    '../../../stores/file': { useFileStore: () => ({ setTodoList: noop }) },
+    '../../../stores/resource': { useResourceStore: () => ({ setCurrentContextTokens: noop }) },
+    '../ui/workspaceNavigation': { commitWorkspaceIdentity: noop },
     '../../../stores/workflow': { useWorkflowStore: () => ({ setWorkflow: (...args) => workflowWrites.push(args) }) },
     '../../../stores/conversationTabs': { useConversationTabsStore: () => ({ enabled: false }) },
     '../../../stores/personalization': { usePersonalizationStore: () => ({ form: { hide_tool_approval_panel: true } }) },

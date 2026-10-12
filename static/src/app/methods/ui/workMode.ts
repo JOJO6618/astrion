@@ -7,6 +7,7 @@
 import { t, currentLocale } from '@/locales';
 
 import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 export const workModeMethods = {
   getWorkModeLabel(mode) {
     void currentLocale.value;

@@ -1,16 +1,20 @@
-"""Conversation entry: committed prefix, live display state and an exact cursor."""
+"""Conversation entry: storage/display transaction, without execution preparation."""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request
 
+from modules.file_manager import FileManager
+from server.context.modes import effective_modes, pending_modes
 from modules.i18n import tr
+from modules.personalization_manager import load_personalization_config
 from modules.preview_targets import _normalize as normalize_preview, is_preview_enabled
-from server.auth_helpers import api_login_required, get_current_username
-from server.context import get_user_resources
+from server.auth_helpers import api_login_required
+from server.context.background import background_status
+from server.context.data_decorators import with_workspace_data
+from server.context.resources import find_runtime
 from server.tasks import task_manager
 from server.tasks.queue_state import queue_snapshot
 from server.conversation_view.snapshots import ACTIVE
-from server.utils_common import debug_log
 
 conversation_bootstrap_bp = Blueprint("conversation_bootstrap", __name__)
 
@@ -21,8 +25,6 @@ def _normalize_conv_id(conversation_id: str) -> str:
 
 
 def _existing_file(file_manager, path: str) -> bool:
-    if file_manager is None:
-        return False
     try:
         valid, _error, full_path = file_manager._validate_path(path)
         return bool(valid and full_path is not None and full_path.is_file())
@@ -32,123 +34,112 @@ def _existing_file(file_manager, path: str) -> bool:
 
 @conversation_bootstrap_bp.route("/api/conversations/<conversation_id>/metadata", methods=["GET"])
 @api_login_required
-def conversation_metadata(conversation_id: str):
-    """Read title metadata without selecting a conversation or rebuilding display."""
+@with_workspace_data
+def conversation_metadata(conversation_id: str, data_context, workspace, username):
     normalized_id = _normalize_conv_id(conversation_id)
-    workspace_id = str(request.args.get("workspace_id") or "").strip() or None
     try:
-        terminal, _workspace = get_user_resources(
-            get_current_username(), workspace_id=workspace_id, update_session=False
-        )
-    except RuntimeError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 503
-    context = getattr(terminal, "context_manager", None)
-    if context is None:
-        return jsonify({"success": False, "error": tr("bootstrap.terminal_unavailable")}), 503
-    manager = context._get_conversation_manager_for_id(normalized_id)
-    data = manager.read_conversation(normalized_id) if manager else None
+        data = data_context.manager_for(normalized_id).read_conversation(normalized_id)
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
     if data is None:
-        return jsonify({"success": False, "error": tr(
-            "bootstrap.conversation_not_found", id=normalized_id
-        )}), 404
-    return jsonify({"success": True, "data": {
-        "id": normalized_id,
+        return jsonify(success=False, error=tr("bootstrap.conversation_not_found", id=normalized_id)), 404
+    return jsonify(success=True, data={
+        "id": normalized_id, "workspace_id": data_context.workspace_id,
         "title": data.get("title") or "",
         "title_locked": bool((data.get("metadata") or {}).get("title_locked")),
-    }})
+    })
 
 
 @conversation_bootstrap_bp.route("/api/conversations/<conversation_id>/bootstrap", methods=["GET"])
 @api_login_required
-def bootstrap_conversation(conversation_id: str):
-    username = get_current_username()
+@with_workspace_data
+def bootstrap_conversation(conversation_id: str, data_context, workspace, username):
     normalized_id = _normalize_conv_id(conversation_id)
     if not normalized_id:
-        return jsonify({"success": False, "error": tr("bootstrap.missing_conversation_id")}), 400
-    workspace_id = str(request.args.get("workspace_id") or "").strip() or None
+        return jsonify(success=False, error=tr("bootstrap.missing_conversation_id")), 400
     try:
-        terminal, workspace = get_user_resources(username, workspace_id=workspace_id)
-    except RuntimeError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 503
-    context = getattr(terminal, "context_manager", None)
-    if context is None:
-        return jsonify({"success": False, "error": tr("bootstrap.terminal_unavailable")}), 503
-    manager = context._get_conversation_manager_for_id(normalized_id)
-    effective_workspace = str(getattr(workspace, "workspace_id", None) or workspace_id
-                              or session.get("workspace_id") or "default")
-    snapshot = task_manager.capture_display(
-        username, normalized_id, manager, workspace_id=effective_workspace
-    ) if manager else None
+        manager = data_context.manager_for(normalized_id)
+        snapshot = task_manager.capture_display(username, normalized_id, manager,
+                                                workspace_id=data_context.workspace_id)
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
     if snapshot is None:
-        return jsonify({"success": False, "error": tr("bootstrap.conversation_not_found", id=normalized_id)}), 404
+        return jsonify(success=False, error=tr("bootstrap.conversation_not_found", id=normalized_id)), 404
     conversation = snapshot["data"]
     meta = conversation.get("metadata") or {}
     display = snapshot["display"]
+    modes = effective_modes(data_context, meta, normalized_id)
     task = display["task"]
     is_main_running = bool(task and task["status"] in ACTIVE)
-    background = {
-        "has_running_sub_agents": False,
-        "has_running_background_commands": False,
-        "has_running_multi_agent": False,
-    }
-    try:
-        conv_terminal, _ = get_user_resources(
-            username, workspace_id=effective_workspace, conversation_id=normalized_id
-        )
-        if conv_terminal:
-            background = task_manager.get_conversation_running_status(conv_terminal, normalized_id)
-    except Exception as exc:
-        debug_log(f"[Bootstrap] background status unavailable: {exc}")
+    background = background_status(
+                            data_context, normalized_id, activate=True)
     running = {
         "is_main_running": is_main_running,
         "main_task_id": task["task_id"] if is_main_running else None,
         "main_task_type": task["task_type"] if is_main_running else None,
-        **background,
-        "is_truly_active": is_main_running or any(background.values()),
+        **background, "is_truly_active": is_main_running or any(background.values()),
     }
-    file_manager = getattr(terminal, "file_manager", None)
+    files = FileManager(str(workspace.project_path), data_dir=str(workspace.data_dir))
+    files.set_host_execution_mode(modes["execution_mode"])
     edited_files = [
         {"path": item["path"], "op": item.get("op") or "edit", "ts": item.get("ts") or ""}
         for item in meta.get("edited_files", [])
-        if isinstance(item, dict) and item.get("path") and _existing_file(file_manager, item["path"])
+        if isinstance(item, dict) and item.get("path") and _existing_file(files, item["path"])
     ]
     preview_targets = []
     if is_preview_enabled():
-        preview_targets = [
-            item for item in normalize_preview(meta.get("preview_targets"))
-            if item.get("type") != "file" or _existing_file(file_manager, str(item.get("path") or ""))
-        ]
-    try:
-        from server.chat.preview import build_preview_runtime
-        preview_runtime = build_preview_runtime(terminal, username, workspace, normalized_id)
-    except Exception:
-        preview_runtime = {"preview_base": None, "preview_token": None}
+        preview_targets = [item for item in normalize_preview(meta.get("preview_targets"))
+                           if item.get("type") != "file" or _existing_file(files, str(item.get("path") or ""))]
+    from server.chat.preview import build_preview_data_runtime
+    preview_runtime = build_preview_data_runtime(manager, username, workspace, normalized_id, conversation)
     run_mode = meta.get("run_mode") or ("thinking" if meta.get("thinking_mode") else "fast")
     run_mode = "thinking" if run_mode == "deep" else run_mode
-    return jsonify({"success": True, "data": {
+    return jsonify( {"success": True, "data": {
         "conversation_id": normalized_id,
+        "workspace_id": data_context.workspace_id,
+        "workspace": {"workspace_id": data_context.workspace_id,
+                      "project_path": str(workspace.project_path) if workspace.username == "host" else ""},
         "meta": {
             "title": conversation.get("title", tr("bootstrap.unknown_conversation")),
-            "run_mode": run_mode,
-            "thinking_mode": bool(meta.get("thinking_mode", run_mode != "fast")),
-            "reasoning_effort": meta.get("reasoning_effort"),
-            "model_key": meta.get("model_key"),
-            "multi_agent_mode": bool(meta.get("multi_agent_mode")),
-            "work_mode": meta.get("work_mode") or "",
-            "permission_mode": meta.get("permission_mode") or "",
-            "execution_mode": meta.get("execution_mode") or "",
-            "network_permission": meta.get("network_permission") or "",
+            "run_mode": run_mode, "thinking_mode": bool(meta.get("thinking_mode", run_mode != "fast")),
+            "reasoning_effort": meta.get("reasoning_effort"), "model_key": meta.get("model_key"),
+            "multi_agent_mode": bool(meta.get("multi_agent_mode")), **modes,
+            "pending_runtime_modes": pending_modes(data_context, meta, normalized_id),
+            "execution_mode_enabled": data_context.identity.host_mode and data_context.identity.role == 'admin',
+            "network_permission_enabled": data_context.identity.host_mode and data_context.identity.role == 'admin',
             "messages_count": len(conversation.get("messages") or []),
         },
-        "messages": snapshot["messages"],
-        "display": display,
-        "running": running,
-        "runtime_queue": queue_snapshot(manager, normalized_id, include_guidance=not is_main_running),
-        "compression": {
-            "in_progress": is_main_running and bool(meta.get("compression_in_progress")),
-            "mode": meta.get("compression_mode"), "conversation_id": normalized_id,
-        },
-        "edited_files": edited_files,
-        "preview_targets": preview_targets,
-        **preview_runtime,
+        "messages": snapshot["messages"], "display": display, "running": running,
+        "todo_list": conversation.get("todo_list"),
+        "current_context_tokens": (conversation.get("token_statistics") or {}).get("current_context_tokens", 0),
+        "runtime_queue": queue_snapshot(manager, normalized_id, include_guidance=not is_main_running,
+                                        data=conversation),
+        "compression": {"in_progress": is_main_running and bool(meta.get("compression_in_progress")),
+                        "mode": meta.get("compression_mode"), "conversation_id": normalized_id},
+        "edited_files": edited_files, "preview_targets": preview_targets, **preview_runtime,
     }})
+
+
+@conversation_bootstrap_bp.route("/api/workspace-view", methods=["GET"])
+@api_login_required
+@with_workspace_data
+def workspace_view(data_context, workspace, username):
+    """Prepare blank-view settings without a workspace terminal or conversation."""
+    prefs = load_personalization_config(workspace.data_dir)
+    terminal = find_runtime(username, workspace)
+    run_mode = getattr(terminal, "run_mode", None) or prefs.get("default_run_mode") or "fast"
+    from server.runtime import runtime_service
+    active = runtime_service.list_runs(username, data_context.workspace_id, status='active')
+    return jsonify(success=True, data={
+        'host_mode': data_context.identity.host_mode,
+        'active_conversation_id': active[0].get('conversation_id') if active else None,
+        'pending_runtime_modes': pending_modes(data_context, {}, None),
+        'execution_mode_enabled': data_context.identity.host_mode and data_context.identity.role == 'admin',
+        'network_permission_enabled': data_context.identity.host_mode and data_context.identity.role == 'admin',
+        "workspace": {"workspace_id": data_context.workspace_id,
+                      "project_path": str(workspace.project_path) if workspace.username == "host" else ""},
+        "modes": effective_modes(data_context, {}, None),
+        "model_key": getattr(terminal, "model_key", None) or prefs.get("default_model"),
+        "run_mode": "thinking" if run_mode == "deep" else run_mode,
+        "reasoning_effort": getattr(terminal, "reasoning_effort", None) or prefs.get("default_reasoning_effort"),
+    })

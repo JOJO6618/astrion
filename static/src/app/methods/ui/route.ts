@@ -2,6 +2,22 @@
 import { t } from '@/locales';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { conversationViewEpoch, ownsConversationSession } from '../conversation/session';
+import { prepareInitialWorkspaceIdentity } from './workspaceStartup';
+
+async function restoreRouteDraft(host, reason) {
+  const epoch = conversationViewEpoch(host);
+  try {
+    return await host.restoreComposerDraftState(reason);
+  } catch (error) {
+    if (conversationViewEpoch(host) !== epoch) return { superseded: true };
+    host.uiPushToast?.({
+      title: t('appUi.fetchInputDraftFailed'),
+      message: String(error?.message || error),
+      type: 'error'
+    });
+    return { success: false, error: String(error?.message || error) };
+  }
+}
 
 export const routeMethods = {
   async bootstrapRoute() {
@@ -39,6 +55,28 @@ export const routeMethods = {
       // 恢复失败不阻断路由
     }
     if (!owns()) return { success: false, superseded: true };
+    if (!this.isConversationIndependentRoute()) {
+      try {
+        const ready = await prepareInitialWorkspaceIdentity(this, owns);
+        if (!owns() || ready.superseded) return { success: false, superseded: true };
+        if (ready.code === 'no_workspace') {
+          this.initialRouteResolved = true;
+          this.leaveConversationView();
+          return ready;
+        }
+        if (session) session.workspaceId = this.currentHostWorkspaceId;
+      } catch (error) {
+        if (!owns()) return { success: false, superseded: true };
+        this.initialRouteResolved = true;
+        this.leaveConversationView();
+        this.uiPushToast?.({
+          title: t('appMessages.loadConversationErrorTitle'),
+          message: String(error?.message || error),
+          type: 'error'
+        });
+        return { success: false, error: String(error?.message || error) };
+      }
+    }
     // 在路由解析期间抑制标题动画，避免预置"新对话"闪烁
     this.suppressTitleTyping = true;
     this.titleReady = false;
@@ -86,7 +124,7 @@ export const routeMethods = {
         }
       }
       if (!owns()) return { success: false, superseded: true };
-      await this.restoreComposerDraftState('bootstrap-route:new');
+      await restoreRouteDraft(this, 'bootstrap-route:new');
       return;
     }
 
@@ -133,7 +171,7 @@ export const routeMethods = {
     } finally {
       if (owns()) this.initialRouteResolved = true;
     }
-    await this.restoreComposerDraftState('bootstrap-route:conversation');
+    await restoreRouteDraft(this, 'bootstrap-route:conversation');
     if (this.currentConversationId) {
       this.fetchPendingUserQuestions?.();
     }

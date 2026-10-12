@@ -20,7 +20,7 @@ from modules.i18n import tr
 
 
 class MemoryManager:
-    def __init__(self, data_dir: Optional[str] = None):
+    def __init__(self, data_dir: Optional[str] = None, *, read_only: bool = False):
         self.data_dir = Path(data_dir).expanduser().resolve() if data_dir else Path(DATA_DIR).resolve()
         default_main = Path(MAIN_MEMORY_FILE).name
         default_task = Path(TASK_MEMORY_FILE).name
@@ -32,7 +32,8 @@ class MemoryManager:
             self.main_memory_path = Path(MAIN_MEMORY_FILE)
             self.task_memory_path = Path(TASK_MEMORY_FILE)
 
-        self.ensure_files_exist()
+        if not read_only:
+            self.ensure_files_exist()
     
     def ensure_files_exist(self):
         """确保记忆文件存在"""

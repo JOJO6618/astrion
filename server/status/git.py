@@ -13,7 +13,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file, session
 
 from server.auth_helpers import api_login_required, resolve_admin_policy
-from server.context import with_terminal
+from server.context.data_decorators import with_workspace_data
 from server.state import (
     PROJECT_STORAGE_CACHE,
     PROJECT_STORAGE_CACHE_TTL_SECONDS,
@@ -281,8 +281,8 @@ def _parse_git_diff(repo_root: Path, diff_text: str, fold_context_map: dict[str,
 
 @status_bp.route('/api/project/git-summary')
 @api_login_required
-@with_terminal
-def get_project_git_summary(terminal, workspace, username):
+@with_workspace_data
+def get_project_git_summary(data_context, workspace, username):
     """返回当前项目自身 git 仓库概览（不使用隐藏版本管理 git）。"""
     project_path = Path(getattr(workspace, "project_path", "") or "").expanduser().resolve()
     if not project_path.exists():
@@ -317,8 +317,8 @@ def get_project_git_summary(terminal, workspace, username):
 
 @status_bp.route('/api/project/git-diff')
 @api_login_required
-@with_terminal
-def get_project_git_diff(terminal, workspace, username):
+@with_workspace_data
+def get_project_git_diff(data_context, workspace, username):
     """返回当前项目自身 git 工作区 diff，用于前端侧边栏展示。"""
     project_path = Path(getattr(workspace, "project_path", "") or "").expanduser().resolve()
     if not project_path.exists():

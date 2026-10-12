@@ -19,8 +19,9 @@ export const messageControlMethods = {
     // 空任务索引，抛出「暂不可堆积」等错乱提示；统一拦下提示稍候再发。
     if (
       this.historyLoading &&
-      !!session?.conversationId &&
-      String(session.conversationId) !== String(this.currentConversationId || '')
+      !!session &&
+      (String(session.conversationId) !== String(this.currentConversationId || '') ||
+        String(session.workspaceId || '') !== String(this.currentHostWorkspaceId || ''))
     ) {
       this.uiPushToast({
         title: t('appMessages.conversationOpeningTitle'),

@@ -35,6 +35,8 @@ from config.model_profiles import get_model_context_window
 
 from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
 from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
+from server.context.data_decorators import with_workspace_data
+from server.context.resources import find_runtime
 from server.security import rate_limited
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB
@@ -91,10 +93,18 @@ def get_focused_files(terminal: WebTerminal, workspace: UserWorkspace, username:
 
 @chat_bp.route('/api/todo-list')
 @api_login_required
-@with_terminal
-def get_todo_list(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """获取当前待办列表"""
-    todo_snapshot = terminal.context_manager.get_todo_snapshot()
+@with_workspace_data
+def get_todo_list(data_context, workspace: UserWorkspace, username: str):
+    """Read live todo when present, otherwise the owning conversation's storage."""
+    cid = request.args.get('conversation_id')
+    terminal = find_runtime(username, workspace, cid)
+    if terminal:
+        todo_snapshot = terminal.context_manager.get_todo_snapshot()
+    else:
+        data = data_context.manager_for(cid).read_conversation(cid) if cid else None
+        if cid and data is None:
+            return jsonify(success=False, error='Conversation not found'), 404
+        todo_snapshot = data.get('todo_list') if data else None
     return jsonify({
         "success": True,
         "data": todo_snapshot

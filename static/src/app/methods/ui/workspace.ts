@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { t } from '@/locales';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 
 // The task index covers every workspace; navigation does not retire its requests.
 const requests = new WeakMap<object, AbortController>();

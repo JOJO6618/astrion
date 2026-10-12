@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 
 export const terminalMethods = {
   handleRealtimeTerminalClick() {

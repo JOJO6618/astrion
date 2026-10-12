@@ -27,6 +27,7 @@ def _base_patches():
         patch("server.context.resources._apply_workspace_personalization_preferences"),
         patch("server.context.resources.get_or_create_usage_tracker", return_value=None),
         patch("server.context.resources.WebTerminal"),
+        patch("server.context.workspace.Path.mkdir"),
     ]
 
 
@@ -42,7 +43,8 @@ class GetUserResourcesIdentityTest(unittest.TestCase):
             fake_terminal = MagicMock()
             fake_terminal._reaper_closing = False
             term_key = f"host::{workspace_id}::conv_t10" if identity.host_mode else f"{username}::{workspace_id}::conv_t10"
-            with patch.dict(resources.state.user_terminals, {term_key: fake_terminal}, clear=False):
+            with patch.dict(resources.state.user_terminals, {term_key: fake_terminal}, clear=False), \
+                 patch('server.context.resources.find_runtime', return_value=fake_terminal):
                 terminal, workspace = get_user_resources(
                     username,
                     workspace_id=workspace_id,
@@ -58,7 +60,7 @@ class GetUserResourcesIdentityTest(unittest.TestCase):
     def test_host_mode_routes_to_host_workspace(self):
         """host 身份 → resolve_host_workspace 路径，且不需要请求上下文。"""
         host_ws = {"workspace_id": "default", "path": "/tmp/host_ws_t10", "label": "默认"}
-        with patch("server.context.resources.resolve_host_workspace", return_value=(None, host_ws)):
+        with patch("server.context.workspace.resolve_host_workspace", return_value=(None, host_ws)):
             terminal, workspace, _ = self._run_with_mocks(
                 RuntimeIdentity(host_mode=True, host_workspace_id="default", role="admin")
             )
@@ -86,7 +88,7 @@ class GetUserResourcesIdentityTest(unittest.TestCase):
                 username="api_tester",
                 workspace_id="ws_api",
             )
-            api_mgr.ensure_workspace.assert_called_once_with("api_tester", "ws_api")
+            api_mgr.ensure_workspace.assert_called_once_with("api_tester", "ws_api", prepare=True)
             user_mgr.ensure_user_workspace.assert_not_called()
         self.assertIsNotNone(terminal)
 
@@ -151,10 +153,10 @@ class GetUserResourcesHostPolicyTest(unittest.TestCase):
         for p in base:
             p.start()
         try:
-            with patch("server.context.resources.TERMINAL_SANDBOX_MODE", "host"), \
-                 patch("server.context.resources.resolve_host_workspace", return_value=(None, host_ws)), \
-                 patch("server.context.resources._get_current_user_record", return_value=record), \
-                 patch("server.context.resources._get_current_user_role", return_value="admin") as get_role, \
+            with patch("server.context.workspace.TERMINAL_SANDBOX_MODE", "host"), \
+                 patch("server.context.workspace.resolve_host_workspace", return_value=(None, host_ws)), \
+                 patch.object(resources.state.user_manager, 'get_user', return_value=record), \
+                 patch("server.auth_helpers.get_current_user_role", return_value="admin") as get_role, \
                  patch("modules.admin_policy_manager.get_effective_policy", return_value=policy) as get_policy:
                 from flask import Flask
                 app = Flask("host_policy_test")
@@ -185,8 +187,8 @@ class GetUserResourcesHostPolicyTest(unittest.TestCase):
                 finally:
                     ctx.pop()
             # 修复后直接证据：role 解析与策略应用都被真正执行
-            get_role.assert_called_once_with(record)
-            get_policy.assert_called_once()
+            get_role.assert_called_once_with()
+            get_policy.assert_called_once_with('host', 'admin', None)
             fake_terminal.set_admin_policy.assert_called_once()
             self.assertIsNotNone(terminal)
         finally:

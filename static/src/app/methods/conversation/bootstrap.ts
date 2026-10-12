@@ -9,12 +9,16 @@ import { useConversationStore } from '../../../stores/conversation';
 import { useWorkflowStore } from '../../../stores/workflow';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { usePersonalizationStore } from '../../../stores/personalization';
+import { useFileStore } from '../../../stores/file';
+import { useResourceStore } from '../../../stores/resource';
+import { commitWorkspaceIdentity } from '../ui/workspaceNavigation';
 import {
   isFullAccessApproval,
   needsHumanDecision,
   normalizeApproval
 } from '@/components/input/approvalModel';
 import { bindAuxiliaryConversationHost } from '../auxiliaryOwnership';
+import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import {
   beginConversationSession,
   currentConversationSession,
@@ -32,7 +36,7 @@ export const bootstrapMethods = {
       workspaceId || this.currentHostWorkspaceId || ''
     );
     bindAuxiliaryConversationHost(this);
-    useTaskStore().clearTask();
+    // Retire the subscription at commit, while the previous view stays frozen.
     this.historyLoading = true;
     this.historyLoadingFor = conversationId;
     return session;
@@ -76,9 +80,12 @@ export const bootstrapMethods = {
     this.historyLoadingFor = conversationId;
     const wsQuery = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
     try {
-      const response = await fetch(`/api/conversations/${conversationId}/bootstrap${wsQuery}`, {
-        signal: session.controller.signal
-      });
+      const [response, prepared] = await Promise.all([
+        fetch(`/api/conversations/${conversationId}/bootstrap${wsQuery}`, {
+          signal: session.controller.signal
+        }),
+        options.navigationReady || Promise.resolve([])
+      ]);
       const result = await response.json();
       if (!owns()) return { success: false, superseded: true };
       if (!response.ok || !result.success) return result;
@@ -105,6 +112,21 @@ export const bootstrapMethods = {
       useTaskStore().clearTask();
       this.clearLocalTaskUiState?.(`snapshot:${normalizedId}`);
       session.conversationId = normalizedId;
+      if (options.navigationReady) {
+        if (
+          String(this.currentHostWorkspaceId || '') !== String(workspaceId || '') &&
+          this.composerDraftDirty
+        ) {
+          void this.persistComposerDraftNow({ reason: 'navigation-edits', keepalive: true }).catch(
+            () => {}
+          );
+        }
+        commitWorkspaceIdentity(this, data.workspace_id || workspaceId, {
+          ...prepared[0],
+          ...data.workspace
+        });
+        this.applyComposerDraftState(prepared[1], data.workspace_id || workspaceId, session);
+      }
       if (meta.run_mode) {
         this.runMode = meta.run_mode === 'deep' ? 'thinking' : meta.run_mode;
         this.thinkingMode =
@@ -115,11 +137,20 @@ export const bootstrapMethods = {
       if (meta.permission_mode) this.currentPermissionMode = meta.permission_mode;
       if (meta.execution_mode) this.currentExecutionMode = meta.execution_mode;
       if (meta.network_permission) this.currentNetworkPermission = meta.network_permission;
+      const pendingModes = meta.pending_runtime_modes || {};
+      this.pendingPermissionMode = pendingModes.permission_mode || '';
+      this.pendingExecutionMode = pendingModes.execution_mode || '';
+      this.pendingNetworkPermission = pendingModes.network_permission || '';
+      if (typeof meta.execution_mode_enabled === 'boolean')
+        this.executionModeEnabled = meta.execution_mode_enabled;
+      if (typeof meta.network_permission_enabled === 'boolean')
+        this.networkPermissionEnabled = meta.network_permission_enabled;
       this.reasoningEffort =
         typeof meta.reasoning_effort === 'string' ? meta.reasoning_effort : null;
       this.currentConversationType = meta.multi_agent_mode ? 'multi_agent' : 'normal';
       useConversationStore().$patch({ multiAgentMode: !!meta.multi_agent_mode });
       this.currentConversationId = normalizedId;
+      useConversationStore().setCurrentConversationId(normalizedId);
       this.messages = messages;
       this.conversationHasImages = historyState.hasImages || live.some((m) => m.images?.length);
       this.conversationHasVideos = historyState.hasVideos || live.some((m) => m.videos?.length);
@@ -140,6 +171,8 @@ export const bootstrapMethods = {
         data.compression || { conversation_id: normalizedId, in_progress: false }
       );
       useQuickDockStore().setEditedFiles(data.edited_files || []);
+      useFileStore().setTodoList(data.todo_list || null);
+      useResourceStore().setCurrentContextTokens(Number(data.current_context_tokens || 0));
       usePreviewStore().setRuntime(data.preview_base, data.preview_token);
       usePreviewStore().setTargets(data.preview_targets || [], false);
       if (!preserveListPosition) this.promoteConversationToTop(normalizedId);
@@ -292,7 +325,7 @@ export const bootstrapMethods = {
   async fetchConversationWorkflow(conversationId, session) {
     try {
       const response = await fetch(
-        `/api/workflow/status?conversation_id=${encodeURIComponent(conversationId)}`,
+        `/api/workflow/status?conversation_id=${encodeURIComponent(conversationId)}&workspace_id=${encodeURIComponent(session.workspaceId || '')}`,
         {
           signal: session.controller.signal
         }

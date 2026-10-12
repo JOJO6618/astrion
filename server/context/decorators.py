@@ -10,6 +10,8 @@ from server import state
 from server.auth_helpers import get_current_username
 from server.context.identity import NoWorkspaceError
 from server.context.resources import get_user_resources
+from server.context.data import get_workspace_data
+from server.context.data_decorators import requested_workspace_id
 
 
 def with_terminal(func=None, *, allow_no_workspace: bool = False):
@@ -27,9 +29,10 @@ def with_terminal(func=None, *, allow_no_workspace: bool = False):
         @wraps(view_func)
         def wrapper(*args, **kwargs):
             username = get_current_username()
-            conversation_id = None
+            conversation_id = str(kwargs.get("conversation_id") or "").strip() or None
+            workspace_id = requested_workspace_id()
             try:
-                conversation_id = (request.args.get("conversation_id") or "").strip() or None
+                conversation_id = conversation_id or (request.args.get("conversation_id") or "").strip() or None
                 if not conversation_id and request.is_json:
                     body = request.get_json(silent=True) or {}
                     if isinstance(body, dict):
@@ -37,7 +40,18 @@ def with_terminal(func=None, *, allow_no_workspace: bool = False):
             except Exception:
                 conversation_id = None
             try:
-                terminal, workspace = get_user_resources(username, conversation_id=conversation_id)
+                if conversation_id:
+                    conversation_id = conversation_id if conversation_id.startswith("conv_") else f"conv_{conversation_id}"
+                    data = get_workspace_data(username, workspace_id)
+                    if not data.manager_for(conversation_id)._get_conversation_file_path(conversation_id).is_file():
+                        return jsonify(success=False, error="Conversation not found"), 404
+                    workspace_id = data.workspace_id
+                terminal, workspace = get_user_resources(
+                    username, workspace_id=workspace_id, conversation_id=conversation_id,
+                    update_session=False,
+                )
+            except ValueError as exc:
+                return jsonify(success=False, error=str(exc)), 404
             except NoWorkspaceError as exc:
                 if allow_no_workspace:
                     kwargs.update({

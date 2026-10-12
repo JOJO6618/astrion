@@ -166,17 +166,23 @@ def _get_or_create_preview_token(terminal: WebTerminal, conversation_id: str) ->
         manager = getattr(cm, "conversation_manager", None)
     if manager is None:
         return None
-    try:
-        data = manager.load_conversation(conversation_id) or {}
-        metadata = data.get("metadata") or {}
-        token = metadata.get("preview_token")
+    return _preview_token_for_manager(manager, conversation_id)
+
+
+def _preview_token_for_manager(manager, conversation_id, conversation=None):
+    token = ((conversation or {}).get("metadata") or {}).get("preview_token")
+    if isinstance(token, str) and len(token) >= 16:
+        return token
+    with manager._io_lock:
+        data = manager.read_conversation(conversation_id)
+        if not data:
+            return None
+        token = (data.get("metadata") or {}).get("preview_token")
         if isinstance(token, str) and len(token) >= 16:
             return token
         token = secrets.token_urlsafe(24)
         if manager.update_conversation_metadata(conversation_id, {"preview_token": token}):
             return token
-    except Exception:
-        pass
     return None
 
 
@@ -192,6 +198,15 @@ def build_preview_runtime(
     同源端点，preview_base=None）；每次调用都重建 token→terminal 注册表项，
     保证预览服务器能反查到 terminal（容器会话 / 文件读边界都挂在它上面）。
     """
+    context = getattr(terminal, "context_manager", None)
+    if context is None or not conversation_id:
+        return {"preview_base": None, "preview_token": None}
+    manager = context._get_conversation_manager_for_id(conversation_id)
+    return build_preview_data_runtime(manager, username, workspace, conversation_id)
+
+
+def build_preview_data_runtime(manager, username, workspace, conversation_id, conversation=None):
+    """Register a workspace identity using storage, without preparing execution."""
     empty: Dict[str, Optional[str]] = {"preview_base": None, "preview_token": None}
     try:
         if not is_preview_enabled():
@@ -201,7 +216,7 @@ def build_preview_runtime(
             return empty
         if not conversation_id:
             return empty
-        token = _get_or_create_preview_token(terminal, conversation_id)
+        token = _preview_token_for_manager(manager, conversation_id, conversation)
         if not token:
             return empty
         from server.preview_server import ensure_preview_server, register_token

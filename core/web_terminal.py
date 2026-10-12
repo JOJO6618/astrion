@@ -448,57 +448,9 @@ class WebTerminal(MainTerminal):
                         self.set_reasoning_effort(meta.get("reasoning_effort"))
                     except ValueError:
                         self.set_reasoning_effort(None)
-                    # 运行模式必须先于权限恢复：set_permission_mode 带 plan 锁
-                    # （plan 下禁止非只读），若 permission 先恢复，上一对话残留的
-                    # work_mode=plan 会让本对话的非只读权限恢复被误拦截。
-                    work_mode = str(meta.get("work_mode") or "").strip().lower()
-                    if work_mode in {"plan", "ask", "execute"}:
-                        try:
-                            self.set_work_mode(work_mode, persist=False)
-                        except Exception:
-                            pass
-                    permission_mode = str(meta.get("permission_mode") or "").strip().lower()
-                    if permission_mode:
-                        try:
-                            self.set_permission_mode(permission_mode, persist=False)
-                        except Exception:
-                            pass
-                    # 自愈：plan 模式但权限不是只读的异常数据，强制回只读
-                    if self.get_work_mode() == "plan" and self.get_permission_mode() != "readonly":
-                        try:
-                            self.set_permission_mode("readonly", persist=False)
-                        except Exception:
-                            pass
-                    execution_mode = str(meta.get("execution_mode") or "").strip().lower()
-                    if execution_mode in {"sandbox", "direct"}:
-                        try:
-                            self.set_execution_mode(execution_mode)
-                        except Exception:
-                            pass
-                    # 自愈：plan 模式但执行环境是 direct 的异常数据，强制回沙箱
-                    # （只读权限依赖沙箱硬限制，direct 下只读无牙齿）
-                    if self.get_work_mode() == "plan" and hasattr(self, "get_execution_mode"):
-                        try:
-                            if self.get_execution_mode() != "sandbox":
-                                self.set_execution_mode("sandbox")
-                        except Exception:
-                            pass
-                    # 自愈：受限权限档（只读/批准/自动审核）但执行环境是 direct 的
-                    # 存量/异常数据，强制回沙箱（批准后重试依赖沙箱可写+白名单读兜底，
-                    # direct 下审批承诺被架空；与 set_execution_mode 的受限档锁互补，
-                    # 上面 restore direct 被锁拦下后这里再保一层）
-                    if self.get_permission_mode() in {"readonly", "approval", "auto_approval"} and hasattr(self, "get_execution_mode"):
-                        try:
-                            if self.get_execution_mode() != "sandbox":
-                                self.set_execution_mode("sandbox")
-                        except Exception:
-                            pass
-                    network_permission = str(meta.get("network_permission") or "").strip().lower()
-                    if network_permission in {"restricted", "full", "none"}:
-                        try:
-                            self.set_network_permission(network_permission)
-                        except Exception:
-                            pass
+                    # Display and execution share the same plan/restricted sandbox rules.
+                    from modules.conversation_modes import restore_conversation_modes
+                    restore_conversation_modes(self, meta)
                     if restore_model:
                         saved_model_key = meta.get("model_key")
                         if saved_model_key:
