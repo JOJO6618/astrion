@@ -85,6 +85,7 @@ import { openShowHtmlFullscreen } from '@/utils/showHtmlFullscreen';
 import PdfPreview from './PdfPreview.vue';
 import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
+import { downloadWorkspaceFile } from '@/utils/downloadFile';
 
 // 文本类文件内容缓存，避免父组件反复重建卡片时重复 fetch 导致闪烁
 const SHOW_FILE_CONTENT_CACHE = new Map<string, { content: string; ts: number }>();
@@ -376,44 +377,9 @@ async function loadContent() {
 }
 
 async function handleDownload() {
-  const url = `/api/download/file?path=${encodeURIComponent(props.path)}`;
-  const name = props.path.split('/').pop() || 'file';
-
-  // Android App 内通过原生桥接下载，WebView 的 a.download 通常无法触发系统下载器
-  const androidBridge = (window as any).AndroidDownloadBridge;
-  if (androidBridge && typeof androidBridge.downloadFile === 'function') {
-    try {
-      androidBridge.downloadFile(url, name);
-      return;
-    } catch (e) {
-      console.warn('[ShowFileCard] Android 桥接下载失败，回退:', e);
-    }
-  }
-
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      let msg = resp.statusText;
-      try {
-        const j = await resp.json();
-        msg = j.error || msg;
-      } catch {
-        // 响应体非 JSON 时沿用 statusText
-      }
-      throw new Error(msg || t('common.downloadFailed'));
-    }
-    const blob = await resp.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-  } catch (e) {
-    console.warn('[ShowFileCard] 下载失败:', e);
-    window.open(url, '_blank');
+  const outcome = await downloadWorkspaceFile({ path: props.path });
+  if (outcome.status === 'failed') {
+    console.warn('[ShowFileCard] 下载失败:', outcome.error);
   }
 }
 

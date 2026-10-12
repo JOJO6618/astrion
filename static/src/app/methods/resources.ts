@@ -12,6 +12,7 @@ import {
   buildQuotaToastMessage
 } from '../../utils/formatters';
 import { t, currentLocale } from '@/locales';
+import { downloadWorkspaceFile } from '@/utils/downloadFile';
 
 export const resourceMethods = {
   hasContainerStats() {
@@ -295,9 +296,7 @@ export const resourceMethods = {
       this.fileHideContextMenu();
       return;
     }
-    const url = `/api/download/file?path=${encodeURIComponent(path)}`;
-    const name = path.split('/').pop() || 'file';
-    await this.downloadResource(url, name);
+    await this.downloadWorkspacePath(path, 'file');
   },
 
   async downloadFolder(path) {
@@ -305,63 +304,34 @@ export const resourceMethods = {
       this.fileHideContextMenu();
       return;
     }
-    const url = `/api/download/folder?path=${encodeURIComponent(path)}`;
     const segments = path.split('/').filter(Boolean);
     const folderName = segments.length ? segments.pop() : 'folder';
-    await this.downloadResource(url, `${folderName}.zip`);
+    await this.downloadWorkspacePath(path, 'folder', `${folderName}.zip`);
   },
 
-  async downloadResource(url, filename) {
-    // Android App 内优先走原生下载桥接，解决 WebView 中 a.download / blob URL 无法触发系统下载的问题
-    const androidBridge = (window as any).AndroidDownloadBridge;
-    if (androidBridge && typeof androidBridge.downloadFile === 'function') {
-      try {
-        const absoluteUrl = new URL(url, window.location.href).href;
-        androidBridge.downloadFile(absoluteUrl, filename || 'download');
-        return;
-      } catch (error) {
-        console.warn('Android 桥接下载失败，回退:', error);
-      }
-    }
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        let message = response.statusText;
-        try {
-          const errorData = await response.json();
-          message = errorData.error || errorData.message || message;
-        } catch (err) {
-          message = await response.text();
-        }
-        this.uiPushToast({
-          title: t('common.downloadFailed'),
-          message: message || t('appTasks.cannotCompleteDownload'),
-          type: 'error'
-        });
-        return;
-      }
-
-      const blob = await response.blob();
-      const downloadName = filename || 'download';
-      const link = document.createElement('a');
-      const href = URL.createObjectURL(blob);
-      link.href = href;
-      link.download = downloadName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(href);
-    } catch (error) {
-      console.error('下载失败:', error);
+  // 统一入口：桌面壳走宿主原生保存对话框，Android 走原生桥，浏览器走 blob 下载
+  async downloadWorkspacePath(path, kind = 'file', filename = '') {
+    const outcome = await downloadWorkspaceFile({
+      path,
+      kind,
+      filename: filename || undefined
+    });
+    if (outcome.status === 'failed') {
       this.uiPushToast({
         title: t('common.downloadFailed'),
-        message: error.message || String(error),
+        message: outcome.error || t('appTasks.cannotCompleteDownload'),
         type: 'error'
       });
-    } finally {
-      this.fileHideContextMenu();
     }
+    this.fileHideContextMenu();
+  },
+
+  // 兼容旧调用：从 /api/download/xxx?path=... 解析出工作区路径后走统一入口
+  async downloadResource(url, filename) {
+    const match = /[?&]path=([^&]+)/.exec(url || '');
+    const path = match ? decodeURIComponent(match[1]) : '';
+    const kind = (url || '').includes('/api/download/folder') ? 'folder' : 'file';
+    await this.downloadWorkspacePath(path, kind, filename);
   },
 
   formatTokenCount,

@@ -593,6 +593,157 @@ namespace AstrionFolderPicker
     return True, out
 
 
+def _pick_save_file_macos(prompt: str, default_name: str) -> tuple[bool, str]:
+    """macOS：osascript choose file name。返回 (ok, path)；用户取消 → (True, '')。"""
+    safe_prompt = (prompt or "").replace("\\", " ").replace('"', "'")[:120]
+    safe_name = (default_name or "").replace("\\", " ").replace('"', "'")[:120]
+    script = (
+        'POSIX path of (choose file name with prompt "'
+        + safe_prompt
+        + '" default name "'
+        + safe_name
+        + '")'
+    )
+    try:
+        proc = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+    except Exception:
+        return False, ""
+    if proc.returncode == 0:
+        return True, (proc.stdout or "").strip()
+    # error number -128 = User canceled（用户主动取消，不算失败）
+    if "-128" in (proc.stderr or ""):
+        return True, ""
+    return False, ""
+
+
+def _pick_save_file_windows(prompt: str, default_name: str) -> tuple[bool, str]:
+    """Windows：IFileSaveDialog（现代另存为窗口，预填建议文件名）。
+
+    返回 (ok, path)；用户取消 → (True, '')。
+    prompt / default_name 经环境变量传递，避免 PowerShell 内嵌引号转义问题。
+    与 _pick_folder_windows 同一套 COM 互操作模式：接口方法顺序严格匹配
+    IFileDialog vtbl（只声明到 SetFilter，后续方法不调用）。
+    """
+    cs_source = r"""
+using System;
+using System.Runtime.InteropServices;
+
+namespace AstrionFileSaver
+{
+    public static class Saver
+    {
+        private const uint FOS_OVERWRITEPROMPT = 0x2;
+        private const uint FOS_FORCEFILESYSTEM = 0x40;
+        private const uint FOS_PATHMUSTEXIST = 0x800;
+        private const uint SIGDN_FILESYSPATH = 0x80058000;
+        private const int ERROR_CANCELLED = unchecked((int)0x800704C7);
+
+        [ComImport, Guid("C0B4E2F3-BA21-4773-8DBA-335EC946EB8B")]
+        private class FileSaveDialog { }
+
+        [ComImport, Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IFileSaveDialog
+        {
+            [PreserveSig] int Show(IntPtr parent);
+            void SetFileTypes(uint cFileTypes, IntPtr rgFilterSpec);
+            void SetFileTypeIndex(uint iFileType);
+            void GetFileTypeIndex(out uint piFileType);
+            void Advise(IntPtr pfde, out uint pdwCookie);
+            void Unadvise(uint dwCookie);
+            void SetOptions(uint fos);
+            void GetOptions(out uint pfos);
+            void SetDefaultFolder(IntPtr psi);
+            void SetFolder(IntPtr psi);
+            void GetFolder(out IntPtr ppsi);
+            void GetCurrentSelection(out IntPtr ppsi);
+            void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+            void GetFileName(out IntPtr pszName);
+            void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+            void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string pszText);
+            void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+            void GetResult(out IShellItem ppsi);
+            void AddPlace(IntPtr psi, int fdap);
+            void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+            void ClearClientData();
+            void SetFilter(IntPtr pFilter);
+        }
+
+        [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IShellItem
+        {
+            void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+            void GetParent(out IShellItem ppsi);
+            void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+            void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+            void Compare(IShellItem psi, uint hint, out int piOrder);
+        }
+
+        public static string Pick(string title, string defaultName)
+        {
+            IFileSaveDialog dlg = (IFileSaveDialog)new FileSaveDialog();
+            try
+            {
+                uint opts;
+                dlg.GetOptions(out opts);
+                dlg.SetOptions(opts | FOS_OVERWRITEPROMPT | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+                if (!string.IsNullOrEmpty(title)) dlg.SetTitle(title);
+                if (!string.IsNullOrEmpty(defaultName)) dlg.SetFileName(defaultName);
+                int hr = dlg.Show(IntPtr.Zero);
+                if (hr == ERROR_CANCELLED) return null;
+                if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+                IShellItem item;
+                dlg.GetResult(out item);
+                string path;
+                item.GetDisplayName(SIGDN_FILESYSPATH, out path);
+                return path;
+            }
+            finally
+            {
+                Marshal.FinalReleaseComObject(dlg);
+            }
+        }
+    }
+}
+"""
+    ps_script = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+        "$prompt = $env:ASTRION_SAVE_FILE_PROMPT; "
+        "$name = $env:ASTRION_SAVE_FILE_NAME; "
+        "$cs = @'" + cs_source + "'@; "
+        "try { "
+        "  Add-Type -TypeDefinition $cs; "
+        "  $path = [AstrionFileSaver.Saver]::Pick($prompt, $name); "
+        "  if ($path) { [Console]::Out.Write($path) } "
+        "} catch {} "
+    )
+    env = dict(os.environ)
+    env["ASTRION_SAVE_FILE_PROMPT"] = (prompt or "")[:120]
+    env["ASTRION_SAVE_FILE_NAME"] = (default_name or "")[:120]
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Sta", "-Command", ps_script],
+            capture_output=True,
+            timeout=600,
+            check=False,
+            env=env,
+        )
+    except Exception:
+        return False, ""
+    if proc.returncode != 0:
+        return False, ""
+    try:
+        out = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+    except Exception:
+        out = ""
+    return True, out
+
+
 @status_bp.route('/api/project/pick-folder', methods=['POST'])
 @api_login_required
 def pick_folder_via_native_dialog():
@@ -643,3 +794,66 @@ def open_external_url():
     except Exception:
         return jsonify({"success": False, "error": tr("status_file_open.open_external_failed")}), 500
     return jsonify({"success": True})
+
+
+@status_bp.route('/api/system/save-file', methods=['POST'])
+@api_login_required
+@with_terminal
+def save_workspace_file(terminal, workspace, username):
+    """把工作区内的文件另存到用户选择的本地路径（弹宿主原生保存对话框）。
+
+    背景：Windows 桌面壳（Tauri/WebView2）没有下载 UI，浏览器式的 blob 下载点了
+    没反应（macOS Electron 壳靠 WebKit/Chromium 默认行为弹保存框，故正常）。
+    这里让桌面壳统一改走宿主对话框，两个平台行为一致。
+
+    安全语义与 /api/system/open-external、/api/project/pick-folder 相同：仅 host 模式
+    （docker/web 多用户部署下会在服务器桌面弹窗）；源路径必须通过工作区路径校验；
+    目标路径完全由用户在系统对话框中选定，服务端不代为拼路径。
+    """
+    if not _is_host_mode_request():
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
+    data = request.get_json(silent=True) or {}
+    path = str(data.get("path") or "").strip()
+    kind = str(data.get("kind") or "file").strip().lower()
+    default_name = str(data.get("default_name") or "").strip()
+    if not path:
+        return jsonify({"success": False, "error": tr("status_file_open.invalid_path")}), 400
+    if kind != "file":
+        return jsonify({
+            "success": False,
+            "error": tr("status_file_open.save_file_folder_unsupported"),
+        }), 400
+
+    valid, error, full_path = terminal.file_manager._validate_path(path)
+    if not valid or full_path is None:
+        return jsonify({"success": False, "error": error or tr("status_file_open.invalid_path")}), 400
+    if not full_path.exists() or not full_path.is_file():
+        return jsonify({"success": False, "error": tr("status_file_open.file_not_found")}), 404
+
+    if not default_name:
+        default_name = full_path.name
+    prompt = tr("status_file_open.save_file_prompt")
+    if sys.platform == "darwin":
+        ok, target = _pick_save_file_macos(prompt, default_name)
+    elif os.name == "nt":
+        ok, target = _pick_save_file_windows(prompt, default_name)
+    else:
+        return jsonify({
+            "success": False,
+            "error": tr("status_file_open.save_file_unsupported"),
+        }), 400
+    if not ok:
+        return jsonify({"success": False, "error": tr("status_file_open.save_file_failed")}), 500
+    if not target:
+        return jsonify({"success": True, "data": {"saved": False, "cancelled": True}})
+
+    try:
+        # 用户在对话框里选了源文件自身：不复制，直接当作已保存
+        if os.path.abspath(str(full_path)) != os.path.abspath(target):
+            shutil.copy2(full_path, target)
+    except Exception as exc:
+        return jsonify({
+            "success": False,
+            "error": tr("status_file_open.save_file_copy_failed", error=exc),
+        }), 500
+    return jsonify({"success": True, "data": {"saved": True, "path": target}})

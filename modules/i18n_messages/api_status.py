@@ -47,6 +47,26 @@ MESSAGES = {
         "zh-CN": "无法打开系统文件夹选择窗口",
         "en-US": "Failed to open the native folder picker",
     },
+    "status_file_open.save_file_prompt": {
+        "zh-CN": "保存文件到…",
+        "en-US": "Save file as…",
+    },
+    "status_file_open.save_file_unsupported": {
+        "zh-CN": "当前平台不支持系统保存窗口",
+        "en-US": "Native save dialog is not supported on this platform",
+    },
+    "status_file_open.save_file_failed": {
+        "zh-CN": "无法打开系统保存窗口",
+        "en-US": "Failed to open the native save dialog",
+    },
+    "status_file_open.save_file_folder_unsupported": {
+        "zh-CN": "暂不支持另存文件夹",
+        "en-US": "Saving a folder is not supported yet",
+    },
+    "status_file_open.save_file_copy_failed": {
+        "zh-CN": "保存失败：{error}",
+        "en-US": "Failed to save file: {error}",
+    },
     "status_file_open.invalid_external_url": {
         "zh-CN": "无效的外部链接",
         "en-US": "Invalid external URL",

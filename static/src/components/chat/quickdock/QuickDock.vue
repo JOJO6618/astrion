@@ -59,6 +59,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
+import { downloadWorkspaceFile } from '@/utils/downloadFile';
 import {
   useQuickDockStore,
   persistQuickDockHadContent,
@@ -358,18 +359,17 @@ function basename(p: string): string {
   return p.split('/').pop() || p;
 }
 
-function downloadFile() {
+async function downloadFile() {
   const m = menu.value;
   if (!m || m.type !== 'file') {
     return;
   }
   quickDock.closeMenu();
-  const a = document.createElement('a');
-  a.href = `/api/download/file?path=${encodeURIComponent(m.key)}`;
-  a.download = basename(m.key);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  // 统一入口：桌面壳走宿主原生保存对话框（Windows WebView2 无下载 UI）
+  const outcome = await downloadWorkspaceFile({ path: m.key, filename: basename(m.key) });
+  if (outcome.status === 'failed') {
+    console.warn('[QuickDock] 下载失败:', outcome.error);
+  }
 }
 
 /** 用系统默认应用打开（候选列表第一个即系统默认 handler） */

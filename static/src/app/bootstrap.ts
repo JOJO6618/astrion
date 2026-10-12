@@ -11,6 +11,7 @@ import {
   closeShowHtmlFullscreen,
   type ShowHtmlFullscreenPayload
 } from '../utils/showHtmlFullscreen';
+import { downloadWorkspaceFile } from '../utils/downloadFile';
 
 let showImageRenderSeq = 0;
 let showImageDebugLogCount = 0;
@@ -1447,54 +1448,18 @@ function updateViewportHeightVar() {
 // ===== show_file 预览卡片渲染 =====
 
 function dispatchShowFileDownload(path: string) {
-  // 直接 fetch 下载接口，不走 Vue 组件链
-  const url = `/api/download/file?path=${encodeURIComponent(path)}`;
-  const name = path.split('/').pop() || 'file';
-
-  // Android App 内通过原生桥接下载，避免 WebView 对 a.download / blob URL 支持不佳导致失败
-  const androidBridge = (window as any).AndroidDownloadBridge;
-  if (androidBridge && typeof androidBridge.downloadFile === 'function') {
-    try {
-      const absoluteUrl = new URL(url, window.location.href).href;
-      androidBridge.downloadFile(absoluteUrl, name);
-      return;
-    } catch (e) {
-      console.warn('[show_file] Android 桥接下载失败，回退:', e);
-    }
-  }
-
-  fetch(url)
-    .then((resp) => {
-      if (!resp.ok) {
-        return resp
-          .json()
-          .then((j) => {
-            throw new Error(j.error || j.message || resp.statusText);
-          })
-          .catch(() => {
-            throw new Error(resp.statusText || t('common.downloadFailed'));
-          });
-      }
-      return resp.blob();
-    })
-    .then((blob) => {
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    })
-    .catch((err) => {
-      console.warn('[show_file] 下载失败:', err);
-      // 失败不再兜底跳转（window.open 会把后端 JSON 错误整页展示），改为错误弹窗提示
+  // 统一入口：桌面壳（Windows WebView2 无下载 UI）走宿主原生保存对话框，
+  // Android 走原生桥，浏览器走 blob 下载
+  void downloadWorkspaceFile({ path }).then((outcome) => {
+    if (outcome.status === 'failed') {
+      console.warn('[show_file] 下载失败:', outcome.error);
+      // 失败不兜底跳转（window.open 会把后端 JSON 错误整页展示），改为错误弹窗提示
       useUiStore().pushToast({
-        message: err?.message || t('common.downloadFailed'),
+        message: outcome.error || t('common.downloadFailed'),
         type: 'error'
       });
-    });
+    }
+  });
 }
 
 // 跟踪已挂载的 show_file Vue 应用，便于卸载

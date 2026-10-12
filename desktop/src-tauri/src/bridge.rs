@@ -222,15 +222,100 @@ fn install_running() -> &'static Mutex<bool> {
     INSTALL_RUNNING.get_or_init(|| Mutex::new(false))
 }
 
+/// 更新事件日志：Windows 壳是 GUI 子系统（无控制台），更新失败/卡住时只有内存态
+/// 进度可看，用户报障后无从回溯。macOS Electron 壳已补同类落盘日志
+/// （desktop-electron/src/updater-log.js）；这里补一份等价的轻量实现：每次状态切换
+/// 追加一行 JSON 到 <数据根>/logs/desktop-update.log，超 1MB 轮转、保留 3 份。
+/// 写日志失败一律静默——日志本身绝不能影响更新链路。
+const UPDATE_LOG_MAX_BYTES: u64 = 1024 * 1024;
+const UPDATE_LOG_BACKUPS: usize = 3;
+
+fn update_log_path() -> std::path::PathBuf {
+    crate::rundata::resolve_data_root()
+        .join("logs")
+        .join("desktop-update.log")
+}
+
+/// UTC 时间戳（ISO-8601，秒级）。不引时间库，用民用日历换算。
+fn iso_utc_now() -> String {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let days = seconds.div_euclid(86_400);
+    let rem = seconds.rem_euclid(86_400);
+    let (hour, minute, second) = (rem / 3600, (rem % 3600) / 60, rem % 60);
+    // Howard Hinnant 的 civil_from_days
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { year + 1 } else { year };
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
+}
+
+fn rotate_update_log(path: &std::path::Path) {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return;
+    };
+    if meta.len() < UPDATE_LOG_MAX_BYTES {
+        return;
+    }
+    let base = path.to_string_lossy().to_string();
+    let _ = std::fs::remove_file(format!("{base}.{UPDATE_LOG_BACKUPS}"));
+    for index in (1..UPDATE_LOG_BACKUPS).rev() {
+        let from = format!("{base}.{index}");
+        let to = format!("{base}.{}", index + 1);
+        if std::path::Path::new(&from).exists() {
+            let _ = std::fs::rename(&from, &to);
+        }
+    }
+    let _ = std::fs::rename(path, format!("{base}.1"));
+}
+
+fn log_update_event(state: UpdateState, error: Option<&str>, downloaded: u64, total: Option<u64>) {
+    let path = update_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    rotate_update_log(&path);
+    let line = serde_json::json!({
+        "ts": iso_utc_now(),
+        "version": APP_VERSION,
+        "state": state.as_str(),
+        "downloaded": downloaded,
+        "total": total,
+        "error": error,
+    });
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
 fn set_progress(state: UpdateState, error: Option<String>) {
+    let mut downloaded = 0u64;
+    let mut total: Option<u64> = None;
     if let Ok(mut p) = progress().lock() {
         p.state = state;
-        p.error = error;
+        p.error = error.clone();
         if state == UpdateState::Checking {
             p.downloaded = 0;
             p.total = None;
         }
+        downloaded = p.downloaded;
+        total = p.total;
     }
+    // 下载中的海量分片不落盘，只在状态切换点记一条（带累计进度）
+    log_update_event(state, error.as_deref(), downloaded, total);
 }
 
 fn add_downloaded(chunk: u64, total: Option<u64>) {
