@@ -11,6 +11,7 @@
 > 适用范围：所有前端 UI（以 `static/src` Web 为主；`cli/src` 在视觉可类比处同样适用；以及未来新增的任何界面）。
 > 约束级别：写新 UI 或改动 UI 时**必须遵守**；遇到存量违规应在最小改动允许范围内顺手修正。
 > 配色基础设施：两层 token（原始层 + 语义层）定义在 `static/src/styles/base/_tokens.scss`（`:root[data-theme='classic'|'light'|'dark']` + 首屏回退 `:root:not([data-theme])`），切换逻辑见 `static/src/utils/theme.ts`；`.stylelintrc.cjs` 三条规则做防回退栏杆，`build` 含 `stylelint` 步骤。
+> **配色作用域**：颜色 Token 与字面量限制用于应用本体源码。回复内 `show_ui`／`show_html` 可视化内容遵循 `prompts/show_ui.txt`／`prompts/show_html.txt`：基础界面适配主题，状态、分类、数据系列与事物固有颜色允许使用有意义的自定义配色；不要将源码配色限制扩展为内容只能使用几种主题色。
 
 1. **禁止边缘光晕**：不使用任何 glow / 外发光 / 彩色光晕效果（大范围彩色 `box-shadow` 扩散、`filter: drop-shadow` 光圈、`::before/::after` 模糊光晕等）。已有的要移除。允许的只是中性、克制的投影——沿用 `--shadow-*` 既有 token，不自造发光阴影。**仅在用户明确允许或要求时才可使用光晕效果。**
 2. **禁止原生浏览器组件**：不直接使用浏览器默认外观的 `<select>`、`<input type=checkbox/radio/range/date/color>`、`alert/confirm/prompt`、原生右键菜单、原生 tooltip 等，一律换成与项目风格统一的自定义组件（下拉 / 开关 / 单选 / 滑块 / 模态 / Toast）。

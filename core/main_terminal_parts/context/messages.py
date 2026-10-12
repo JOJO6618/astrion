@@ -437,6 +437,15 @@ class MessagesMixin:
             if preview_panel_prompt:
                 messages.append({"role": "system", "content": preview_panel_prompt})
 
+            # show_ui/show_html 两份独立文件共享此冻结段；已有快照不追溯改写。
+            from modules.inline_ui_prompt import load_inline_ui_prompt
+            inline_ui_prompt = self._get_or_init_frozen_prompt(
+                "frozen_inline_ui_prompt",
+                load_inline_ui_prompt,
+            )
+            if inline_ui_prompt:
+                messages.append({"role": "system", "content": inline_ui_prompt})
+
             # 工作流（Workflow）上下文：不冻结，每次按当前状态现生成。
             # 阶段推进时由 workflow_flow.refresh_workflow_system_segment 同步刷新，
             # 压缩不影响（system 段不在压缩范围），天然免疫压缩丢失。

@@ -12,6 +12,13 @@
           v-html="chunk.html"
         ></div>
       </div>
+      <InlineUiRenderer
+        v-else-if="segment.type === 'ui'"
+        :source="segment.content"
+        :js="segment.js || 'off'"
+        :closed="segment.closed"
+        :streaming="!!isStreaming"
+      />
       <CodeBlock
         v-else
         :content="segment.content"
@@ -25,6 +32,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue';
 import CodeBlock from './CodeBlock.vue';
+import InlineUiRenderer from './InlineUiRenderer.vue';
 import {
   parseMarkdownSegments,
   renderMarkdownText,
@@ -38,7 +46,7 @@ import { enhanceCitationChips, type CitationAnnotation } from './citationChips';
 
 defineOptions({ name: 'MarkdownRenderer' });
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   content: string;
   isStreaming?: boolean;
   thinking?: boolean;
@@ -46,12 +54,15 @@ const props = defineProps<{
   /** citations 是否为后端裁决后的权威版本（message.metadata.citations 已到达） */
   citationsFinal?: boolean;
   enableCitations?: boolean;
-}>();
+  enableUi?: boolean;
+}>(), { enableUi: true });
 
 const containerRef = ref<HTMLElement | null>(null);
 const onMathRendered = inject<() => void>('mathRenderedCallback', () => {});
 
-const segments = computed(() => parseMarkdownSegments(props.content || '', props.isStreaming));
+const segments = computed(() =>
+  parseMarkdownSegments(props.content || '', props.isStreaming, !props.thinking && props.enableUi !== false)
+);
 
 function renderText(text: string) {
   // 透传流式标志：show_html 卡片在流式期间需要 partial 渲染（实时渲染/渲染中占位）

@@ -11,6 +11,7 @@ import rehypeStringify from 'rehype-stringify';
 import { visit } from 'unist-util-visit';
 import { t } from '@/locales';
 import remarkCjkStrong from '@/utils/remarkCjkStrong';
+import { splitInlineUi } from '@/utils/inlineUi/parser';
 
 let latexRenderTimer: number | null = null;
 let streamingCodeHighlightTimer: number | null = null;
@@ -747,14 +748,30 @@ function renderMarkdownToHtml(text: string): string {
 }
 
 export interface MarkdownSegment {
-  type: 'text' | 'code';
+  type: 'text' | 'code' | 'ui';
   content: string;
   language?: string;
+  js?: 'off' | 'on';
   closed: boolean;
   key: string;
 }
 
-export function parseMarkdownSegments(text: string, isStreaming = false): MarkdownSegment[] {
+export function parseMarkdownSegments(
+  text: string,
+  isStreaming = false,
+  enableUi = true
+): MarkdownSegment[] {
+  if (enableUi && /<show_ui\b/i.test(text)) {
+    return splitInlineUi(text).flatMap((part): MarkdownSegment[] => {
+      if (part.type === 'ui') {
+        return [{ type: 'ui', content: part.content, closed: part.closed, js: part.js, key: `ui-${part.start}` }];
+      }
+      return parseMarkdownSegments(part.content, isStreaming, false).map((segment) => ({
+        ...segment,
+        key: `part-${part.start}-${segment.key}`
+      }));
+    });
+  }
   if (!text) {
     return [{ type: 'text', content: '', closed: true, key: 'text-0' }];
   }
@@ -836,7 +853,7 @@ export function renderMarkdownText(
   if (!text) return '';
   // Thinking supports Markdown but treats special card markup as literal text.
   if (!enableCards) {
-    text = text.replace(/<\/?show[_-](?:html|image|file)\b[^>]*(?:>|$)/gi, (tag, offset: number) =>
+    text = text.replace(/<\/?show[_-](?:html|image|file|ui)\b[^>]*(?:>|$)/gi, (tag, offset: number) =>
       isShowHtmlTagInsideMarkdownCode(text, offset) ? tag : escapeHtml(tag)
     );
   }

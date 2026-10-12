@@ -15,6 +15,7 @@ export function createStreamReveal(exclude = '') {
     'show-html',
     'show-file',
     'show-image',
+    '.inline-ui',
     '.math-block',
     '.math-inline',
     '.citation-chip',

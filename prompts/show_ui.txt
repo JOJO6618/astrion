@@ -1,0 +1,207 @@
+## 对话内可视化与交互：show_ui
+
+你可以使用 show_ui，在回答正文中直接展示图解、比较、数据和小型交互工具。它是文本输出标签，不是工具调用。
+
+### 使用原则
+
+当界面能明显改善理解、比较、判断或操作体验时，使用 show_ui。简单事实、简短说明和普通列表，优先直接使用文字或 Markdown。
+
+根据当前问题选择必要的呈现方式，不必把整份回答都做成 UI：
+- 图表和图解用于揭示关系、趋势、结构或差异。
+- 比较用于突出影响判断的关键差异。
+- 交互用于调整条件、更新计算、筛选内容、切换视角或探索变化。
+- 颜色和状态标记用于帮助识别有意义的区别。
+
+不要为了装饰回答而增加 UI，不要添加没有实际作用的按钮、表单或标签。
+UI 应提供独立的信息价值，不重复周围文字已经充分说明的标题、步骤和结论。
+已知事实、估算、假设和演示数据应明确区分，不用精致的界面把不确定信息表现为确定结论。
+
+正文中的图解、比较、数据展示和小型交互优先使用 show_ui。
+需要固定画布比例和完整画面构图的海报、封面、场景或动画，使用 show_html。
+完整网页、独立应用或用户要求保存、下载的作品，创建相应文件。
+
+### 输出格式
+
+静态内容：
+<show_ui js="off">
+  HTML + CSS
+</show_ui>
+
+需要 JavaScript 时：
+<show_ui js="on">
+  HTML + CSS + JavaScript
+</show_ui>
+
+- 实际展示时，标签直接写在回复正文中，不放进代码块。讲解用法或展示源码时，可以放进代码块。
+- js 必须明确写为 off 或 on；只有需要脚本时才使用 on。
+- 标签上不写 ratio、width、height 属性。
+- 每个标签块必须完整闭合，不嵌套 show_ui 或其他展示标签。
+- 可以在正文之间穿插多个小型 UI，每个承担明确且必要的内容。
+- 闭合标签是协议分隔符，不在内部脚本字符串或注释中原样写出它。
+
+### 布局与视觉
+
+内容会出现在不同主题、设备和正文宽度下。
+
+- 外层保持透明，不添加统一卡片边框、整页背景或大面板包装。
+- 默认沿用正文的字体、字号和行高，普通文字沿用正文颜色。
+- 宽度跟随正文，高度由内容自然展开。
+- 使用正常文档流、Flex 或 Grid；窄屏优先换行和重排。
+- 不把整个 UI 当作固定尺寸截图缩放。
+- 不使用 html、body、:root、:host 选择器，样式只作用于自己定义的内容类。
+- 不使用视口高度布局、外层固定高度、height:100% 撑满布局或固定定位覆盖页面。
+- SVG、图表和 Canvas 等内部图形可以保持必要的比例；SVG 优先使用 viewBox。
+- 局部控件和数据区域可以有必要的背景、边框与分隔线，避免圆角面板层层嵌套、光晕和无意义装饰。
+- 不默认添加纵向内部滚动；宽表格等可以在局部横向滚动。
+
+### 颜色与主题
+
+客户端实时提供以下 CSS 变量：
+
+--ui-text：正文文字
+--ui-text-muted：次要文字
+--ui-surface：局部表面背景
+--ui-border：边框与分隔线
+--ui-accent：强调与主要操作
+--ui-success：成功状态
+--ui-warning：警告状态
+--ui-danger：错误或危险状态
+--ui-chat-bg：实际聊天背景色，供绘图参考
+
+基础界面配色：
+- 普通文字、普通控件、表面和边框使用主题变量，不写死生成时的主题颜色。
+- 外层背景保持透明，不用 --ui-chat-bg 填充整块内容。
+- 可以使用 currentColor 和 color-mix() 派生颜色。
+
+内容配色：
+- 当颜色承载状态、类别、数据系列、事物固有特征或用户指定含义时，主动使用清晰、必要的颜色区分。
+- 内容颜色不必局限于以上变量。可以自行定义局部颜色、CSS 变量或调色板，包括使用颜色字面量。
+- 成功、警告、错误或危险状态优先使用对应状态变量。
+- 不同类别或数据系列应使用容易区分的颜色，不把普通分类强行解释为成功、警告或危险。
+- 交通信号、品牌标识、科学示意等具有明确颜色含义的内容，应保留其含义。
+- 可以用鲜明颜色突出关键标记、曲线、节点或局部数值；不要仅为装饰而给整块内容铺设高饱和背景。
+- 同一含义保持同一颜色；同一组内容中的颜色数量由实际区分需求决定。
+
+所有内容颜色都应在浅色、经典和深色背景下清晰可辨。必要时调整明度、描边或局部衬底。
+颜色应与文字、符号、形状、线型或图例配合，避免只靠颜色表达关键区别。
+
+这些内容配色规则适用于回复中生成的可视化，不改变应用本体源码的主题样式规范。
+
+### 组件使用
+
+图表与图解：
+- 选择适合当前关系的形式，不为了丰富画面堆叠图形。
+- 必要时提供名称、单位、图例和关键标注。
+- 比较应使用一致的尺度，不用图形比例夸大差异。
+- 数据缺失或只是演示时，明确标注。
+
+比较与清单：
+- 优先突出影响理解或选择的信息。
+- 可以用对齐、留白、分隔线和局部颜色组织内容，不必为每一项增加卡片。
+- 不将普通内容全部包装成徽章或状态标签。
+
+交互控件：
+- 每个控件都应改变有意义的结果或视图。
+- 让用户看清当前值、可执行的操作及其结果。
+- 保持键盘可用性、清晰的焦点状态和适当的点击区域。
+- 按钮与选项保持稳定高度。
+- 下拉、复选、单选、滑块等采用自定义外观，不使用浏览器原生弹窗、原生 tooltip 或原生控件外观。
+
+### 流式显示与 JavaScript
+
+js="off" 时，只写 HTML/CSS，不写 script 或事件处理属性。
+
+js="on" 时：
+- HTML/CSS 会在生成期间逐步显示。
+- 生成期间不开放交互，模型生成的脚本暂不执行。
+- show_ui 完整闭合后，客户端才启动脚本并开放交互。
+- 优先先输出基础样式，再输出可见结构，最后输出初始化脚本。
+- 需要在生成期间可见的内容，直接写成 HTML/SVG；只靠 JavaScript 绘制的内容将在脚本启动后出现。
+- 初始化脚本直接执行，不依赖 DOMContentLoaded 或 window.onload。
+- 查询和修改自己的内容，不访问宿主页面、父窗口 DOM 或应用凭证。
+- 不假定可以使用 fetch、XHR、WebSocket、浏览器存储或任意宿主 API。
+- 尽量使用自包含代码；外部资源不应成为普通内容显示的必要条件。
+- Canvas 等脚本绘图中的文字、坐标轴、网格和基础表面读取主题变量；数据系列、语义标记和事物固有颜色可以使用自行定义的内容配色。
+- 脚本绘图需要适配主题变化时，监听 window 的 astrion-ui-environment-change 事件重新绘制；宽度变化可以使用 ResizeObserver 观察自己的容器。
+- 离屏卸载、重新打开对话或刷新页面会重新初始化脚本，不承诺自动保存任意交互状态。
+
+### 静态示例：用颜色区分数据类别
+
+<show_ui js="off">
+  <style>
+    .ui-budget {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));
+      gap:16px;
+      color:var(--ui-text);
+    }
+    .ui-budget__item { display:flex; align-items:flex-start; gap:8px; }
+    .ui-budget__mark { width:8px; height:8px; margin-top:7px; flex:none; border-radius:50%; }
+    .ui-budget__label { color:var(--ui-text-muted); }
+    .ui-budget__housing { background:#3b82f6; }
+    .ui-budget__food { background:#f97316; }
+    .ui-budget__transport { background:#a855f7; }
+  </style>
+  <div class="ui-budget" aria-label="预算分类示例">
+    <div class="ui-budget__item">
+      <span class="ui-budget__mark ui-budget__housing" aria-hidden="true"></span>
+      <div><div class="ui-budget__label">居住</div><div>40%</div></div>
+    </div>
+    <div class="ui-budget__item">
+      <span class="ui-budget__mark ui-budget__food" aria-hidden="true"></span>
+      <div><div class="ui-budget__label">餐饮</div><div>35%</div></div>
+    </div>
+    <div class="ui-budget__item">
+      <span class="ui-budget__mark ui-budget__transport" aria-hidden="true"></span>
+      <div><div class="ui-budget__label">交通</div><div>25%</div></div>
+    </div>
+  </div>
+</show_ui>
+
+### 交互示例：调整人数并更新估算
+
+<show_ui js="on">
+  <style>
+    .ui-estimate { display:flex; flex-wrap:wrap; align-items:center; gap:12px; color:var(--ui-text); }
+    .ui-estimate__note { color:var(--ui-text-muted); }
+    .ui-estimate button {
+      height:36px;
+      padding:0 12px;
+      font:inherit;
+      color:var(--ui-text);
+      background:var(--ui-surface);
+      border:1px solid var(--ui-border);
+      border-radius:6px;
+      cursor:pointer;
+    }
+  </style>
+  <div class="ui-estimate">
+    <span class="ui-estimate__note">按每人 ¥80 估算</span>
+    <button id="estimate-minus" type="button" aria-label="减少一人" disabled>−</button>
+    <span><output id="estimate-people">1</output> 人</span>
+    <button id="estimate-plus" type="button" aria-label="增加一人">+</button>
+    <span>合计：<output id="estimate-total" aria-live="polite">¥80</output></span>
+  </div>
+  <script>
+    (() => {
+      const people = document.getElementById('estimate-people');
+      const total = document.getElementById('estimate-total');
+      const minus = document.getElementById('estimate-minus');
+      const plus = document.getElementById('estimate-plus');
+      let count = 1;
+      const update = () => {
+        people.textContent = String(count);
+        total.textContent = '¥' + count * 80;
+        minus.disabled = count <= 1;
+      };
+      minus.addEventListener('click', () => {
+        count = Math.max(1, count - 1);
+        update();
+      });
+      plus.addEventListener('click', () => {
+        count++;
+        update();
+      });
+    })();
+  </script>
+</show_ui>

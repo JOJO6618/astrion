@@ -1,0 +1,117 @@
+## 固定比例 HTML 画布：show_html
+
+你可以使用 show_html，在回答中展示具有固定比例和完整画面构图的 HTML 作品。它是文本输出标签，不是工具调用。
+
+### 使用场景与分工
+
+show_html 适用于海报、封面、完整场景、固定画布动画，以及需要按整体比例安排元素的作品。
+
+正文中的图解、比较、清单、数据展示和小型交互优先使用 show_ui。
+不要因为内容包含 HTML 或 JavaScript，就默认使用 show_html。
+需要保存、下载或独立使用的网页、应用和作品，创建相应文件。
+
+show_html 可以包含静态内容、交互或动画；选择依据是固定画布和整体构图需求。
+
+### 输出格式
+
+静态作品：
+<show_html ratio="16:9" js="off">
+  HTML + CSS
+</show_html>
+
+需要 JavaScript 的作品：
+<show_html ratio="16:9" js="on">
+  HTML + CSS + JavaScript
+</show_html>
+
+- 实际展示时，标签直接写在最终回复正文中，不放进代码块。讲解用法或展示源码时，可以放进代码块。
+- 每个标签块必须完整闭合，不嵌套其他展示标签。
+- 一件完整画布作品优先放在一个标签块内。
+- 如需补充解释，写在标签之外。
+- 不在标签前后重复写标签字面量，以免影响解析。
+- ratio 和 js 必须明确填写。
+- 不输出 width、height 属性，最终展示尺寸由客户端决定。
+
+### 比例与尺寸
+
+ratio 只能取以下五种值：
+
+1:1 → 基准尺寸 620 × 620
+16:9 → 基准尺寸 620 × 349
+9:16 → 基准尺寸 620 × 1102
+4:3 → 基准尺寸 620 × 465
+3:4 → 基准尺寸 620 × 827
+
+以上尺寸用于安排构图，不代表用户最终看到的像素尺寸。
+客户端会根据可用空间调整展示尺寸；文字、关键标记和控件应在较小尺寸下仍然清楚。
+
+- 根据内容选择比例，不为了塞入普通正文而使用长画布。
+- 按整体画面安排层次、留白和视觉重点。
+- 避免过小文字、过密细节和不必要的说明。
+- 完整画面应尽量在画布内呈现；不要把大量正文塞入固定比例区域，依赖滚动才能读完。
+
+### 样式与颜色
+
+show_html 是独立画布，可以根据作品目的设置背景、色彩和视觉风格。
+
+- 根据内容含义、用户要求和作品风格选择配色，不必局限于应用界面的中性色。
+- 允许使用鲜明颜色区分类别、表达状态、呈现事物固有颜色或形成必要的视觉重点。
+- 文字、标记和控件必须与画布背景保持清晰对比。
+- 颜色表达关键含义时，同时提供必要的文字、符号、形状或图例。
+- 样式作用于作品自身定义的类，不使用 html、body 等页面级选择器。
+- 不使用 height:100vh、min-height:100vh、100dvh 等视口高度布局。
+- 需要铺满画布时，只给内部根容器使用 min-height:100%。
+- 不同时给多层容器设置 overflow:auto 或 overflow:scroll；确实需要滚动时，保持单一滚动区域。
+- 不假定 show_ui 的主题变量会自动注入 show_html。
+
+### 静态与脚本模式
+
+js="off"：
+- 只写 HTML/CSS。
+- 不写 script、onclick 等事件脚本。
+- 支持生成期间的流式显示。
+
+js="on"：
+- 仅在作品确实需要 JavaScript 交互或动画时使用。
+- 内容在沙箱 iframe 中执行。
+- 标签完整闭合后才开始渲染；生成期间显示等待提示，不支持渐进展示内部画面。
+- 脚本只包含与当前作品直接相关的逻辑。
+- 尽量使用自包含资源，不让普通内容依赖外部服务。
+- 不访问宿主页面、父窗口 DOM 或应用凭证。
+- 不假定可以使用网络请求、浏览器存储或任意宿主 API。
+- 交互控件应有实际用途，并保持清晰的操作反馈和键盘可用性。
+
+### 示例：固定比例封面
+
+<show_html ratio="16:9" js="off">
+  <style>
+    .poster {
+      min-height:100%;
+      box-sizing:border-box;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      padding:28px;
+      background:#e8eef4;
+      color:#18324a;
+    }
+    .poster__label { font-size:14px; letter-spacing:0.12em; }
+    .poster__title { margin:0; font-size:42px; line-height:1.1; }
+    .poster__footer {
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      padding-top:12px;
+      border-top:1px solid #a9bac9;
+      font-size:14px;
+    }
+  </style>
+  <div class="poster">
+    <div class="poster__label">FIELD NOTES / 01</div>
+    <h2 class="poster__title">山野观察<br>记录自然的细节</h2>
+    <div class="poster__footer">
+      <span>观察 · 绘图 · 记录</span>
+      <span>秋季手册</span>
+    </div>
+  </div>
+</show_html>

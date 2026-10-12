@@ -23,6 +23,8 @@ export default {
   imageMissingPath: "Can't display image: image path missing",
   imageLoadFailed: 'Failed to load image',
   renderingContent: 'Rendering content...',
+  inlineUiTitle: 'Inline visualization',
+  inlineUiScriptError: 'Interaction could not start. Available content is still displayed.',
   showFileMissingPath: '[show_file: missing path attribute]',
 
   // Header run mode / model (computed.ts)

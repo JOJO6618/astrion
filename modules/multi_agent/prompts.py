@@ -60,7 +60,9 @@ def build_multi_agent_master_prompt(workspace_path: str, base: str = "") -> str:
     `base` 一般为现有 MainTerminal 的 base 提示词（环境/工具概览等），
     我们在末尾追加多智能体模式专属正文。
     """
-    body = _load_template("master")
+    from modules.inline_ui_prompt import load_inline_ui_prompt
+
+    body = f"{_load_template('master').rstrip()}\n\n{load_inline_ui_prompt()}"
     if base and base.strip():
         return f"{base.rstrip()}\n\n{body}\n"
     return f"{body}\n"
@@ -84,8 +86,11 @@ def build_multi_agent_sub_agent_prompt(
 
     所有动态信息在子智能体创建那一刻快照写入，后续冻结不更新。
     """
-    # 角色专属 prompt（模板正文）
+    # 角色专属 prompt（模板正文），共享 UI 契约在格式化后追加。
+    from modules.inline_ui_prompt import load_inline_ui_prompt
+
     role_prompt = _format_template("sub_agent", display_name=display_name, role_body=role_body.strip())
+    role_prompt = f"{role_prompt.rstrip()}\n\n{load_inline_ui_prompt()}"
 
     # 动态上下文（AGENTS.md / 执行环境 / 工作区信息 / skills / 项目记忆等）
     try:

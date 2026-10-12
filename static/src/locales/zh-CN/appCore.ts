@@ -27,6 +27,8 @@ export default {
   imageMissingPath: '无法显示图片：缺少图片路径',
   imageLoadFailed: '图片加载失败',
   renderingContent: '正在渲染内容...',
+  inlineUiTitle: '对话内可视化',
+  inlineUiScriptError: '交互未能启动，已保留可显示的内容。',
   showFileMissingPath: '[show_file: 缺少 path 属性]',
 
   // ── 头部运行模式 / 模型（computed.ts） ──

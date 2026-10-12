@@ -147,6 +147,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 > 适用所有前端 UI（`static/src` 为主，`cli/src` 视觉可类比处同样适用）；写/改 UI 必须遵守，遇到存量违规在最小改动内顺手修正。
 > 配色基建：两层 token 定义在 `static/src/styles/base/_tokens.scss`，切换见 `utils/theme.ts`；`.stylelintrc.cjs` 三条防回退栏杆，`build` 含 stylelint。
+> **配色作用域**：颜色 Token 与字面量限制用于应用本体源码。回复内 `show_ui`／`show_html` 可视化内容遵循 `prompts/show_ui.txt`／`prompts/show_html.txt`：基础界面适配主题，状态、分类、数据系列与事物固有颜色允许使用有意义的自定义配色；不要将源码配色限制扩展为内容只能使用几种主题色。
 
 1. **禁止边缘光晕**：不用任何 glow／外发光／彩色光晕（大范围彩色 `box-shadow`、`filter: drop-shadow` 光晕、模糊伪元素）。只允许中性克制的投影（沿用 `--shadow-*` token），仅在用户明确允许时才可用光晕。
 2. **禁止原生浏览器组件**：`<select>`、`<input type=checkbox/radio/range/date/color>`、`alert/confirm/prompt`、原生右键菜单、原生 tooltip 一律换成项目统一的自定义组件。
