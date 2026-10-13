@@ -55,7 +55,7 @@ export const routeMethods = {
       // 恢复失败不阻断路由
     }
     if (!owns()) return { success: false, superseded: true };
-    if (!this.isConversationIndependentRoute()) {
+    if (!this.isConversationIndependentRoute() || path === 'git') {
       try {
         const ready = await prepareInitialWorkspaceIdentity(this, owns);
         if (!owns() || ready.superseded) return { success: false, superseded: true };
@@ -90,6 +90,8 @@ export const routeMethods = {
       }
       if (path === 'settings' || path.startsWith('settings/')) {
         this.settingsRoute = path;
+      } else if (path === 'git') {
+        this.gitRoute = path;
       } else {
         this.workflowDemoRoute = path;
       }
@@ -226,6 +228,7 @@ export const routeMethods = {
   isConversationIndependentRoute() {
     const normalizedPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
     return (
+      normalizedPath === 'git' ||
       normalizedPath === 'workflows' ||
       normalizedPath === 'workflow' ||
       normalizedPath.startsWith('workflow/') ||
@@ -240,13 +243,27 @@ export const routeMethods = {
     this.leaveConversationView();
     window.location.assign('/workflows');
   },
+  openGitPage() {
+    const workspaceId = this.currentHostWorkspaceId;
+    if (!workspaceId) {
+      this.uiPushToast?.({ message: t('git.workspaceRequired'), type: 'warning' });
+      return;
+    }
+    this.stashAndClearActiveTab?.();
+    this.leaveConversationView();
+    window.location.assign(`/git?workspace_id=${encodeURIComponent(workspaceId)}`);
+  },
+  closeGitPage() {
+    const workspaceId = this.currentHostWorkspaceId;
+    this.closeSettingsPage(workspaceId ? `/new?workspace_id=${encodeURIComponent(workspaceId)}` : '/new');
+  },
   openSettingsPage() {
     // 设置页同样是 bootstrap 级全屏路由，整页跳转保证状态干净
     this.stashAndClearActiveTab?.();
     this.leaveConversationView();
     window.location.assign('/settings');
   },
-  closeSettingsPage() {
+  closeSettingsPage(fallback = '/new') {
     // 设置页返回出口：直接回到进入时的对话（暂存标签），避免先闪一个空 /new
     // 再加载对话记录；暂存标签已不存在才落 /new（restore 会补一个新对话标签）
     try {
@@ -262,7 +279,7 @@ export const routeMethods = {
     } catch (_tabsErr) {
       // ignore
     }
-    window.location.assign('/new');
+    window.location.assign(typeof fallback === 'string' ? fallback : '/new');
   },
   stripConversationPrefix(conversationId) {
     if (!conversationId) return '';

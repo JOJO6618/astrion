@@ -132,6 +132,11 @@
           <span class="sidebar-nav-label">{{ $t('sidebar.workflows') }}</span>
         </button>
 
+        <button type="button" class="sidebar-nav-row" @click="$emit('open-git')">
+          <span class="sidebar-nav-icon git-brand-icon" aria-hidden="true"></span>
+          <span class="sidebar-nav-label">{{ $t('sidebar.git') }}</span>
+        </button>
+
         <!-- 刷新页面：仅移动端 App 壳内由父级开启（浏览器有自带刷新，不显示） -->
         <button
           v-if="showRefreshButton"
@@ -1075,6 +1080,7 @@ const emit = defineEmits<{
   (event: 'pin-workspace', workspaceId: string): void;
   (event: 'conversation-type-change', type: 'normal' | 'multi_agent'): void;
   (event: 'open-workflows'): void;
+  (event: 'open-git'): void;
 }>();
 
 const uiStore = useUiStore();

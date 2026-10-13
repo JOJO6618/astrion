@@ -29,8 +29,10 @@ import sandbox from './zh-CN/sandbox';
 import update from './zh-CN/update';
 import commandBlocking from './zh-CN/commandBlocking';
 import quickEntry from './zh-CN/quickEntry';
+import git from './zh-CN/git';
 
 export default {
+  git,
   quickEntry,
   common,
   personalization,

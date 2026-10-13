@@ -1,0 +1,197 @@
+.git-shell__history-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+}
+.git-shell__history-dismiss {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--overlay-scrim);
+  cursor: default;
+}
+.git-shell__history {
+  position: relative;
+  width: 340px;
+  max-width: calc(100% - 24px);
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-base);
+  box-shadow: var(--shadow-mid);
+}
+.git-shell__history-heading {
+  height: 54px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 0 16px;
+}
+.git-shell__tabs {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.git-shell__tabs button {
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.git-shell__tabs button[aria-pressed='true'] {
+  border-bottom-color: var(--text-primary);
+  color: var(--text-primary);
+}
+.git-shell__filters {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+.git-shell__search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 34px;
+  padding-left: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+.git-shell__search input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.git-shell__search input::placeholder {
+  color: var(--text-muted);
+}
+.git-shell__search input::-webkit-search-cancel-button {
+  display: none;
+}
+.git-shell__commit-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  padding: 8px 0;
+}
+.git-shell__commit {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 84px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.git-shell__commit:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+.git-shell__commit[aria-pressed='true'] {
+  background: var(--surface-muted);
+}
+.git-shell__subject {
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-shell__commit-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.git-shell__commit-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-shell__commit-meta code {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+}
+.git-shell__commit-date {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.git-shell__more {
+  margin: 12px 18px;
+}
+.git-shell__branch-form {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  padding: 18px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.git-shell__branch-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.git-shell__branch-form label > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.git-history-enter-active,
+.git-history-leave-active {
+  transition: opacity 220ms ease;
+}
+.git-history-enter-active .git-shell__history,
+.git-history-leave-active .git-shell__history {
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.git-history-enter-from,
+.git-history-leave-to {
+  opacity: 0;
+}
+.git-history-enter-from .git-shell__history,
+.git-history-leave-to .git-shell__history {
+  transform: translateX(-100%);
+}
+.git-history-leave-active {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .git-history-enter-active,
+  .git-history-leave-active,
+  .git-history-enter-active .git-shell__history,
+  .git-history-leave-active .git-shell__history {
+    transition-duration: 1ms;
+  }
+}

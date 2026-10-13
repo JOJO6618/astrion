@@ -57,6 +57,7 @@ export function dataState() {
     workflowDemoRoute: '',
     // 设置页路由（'settings' | 'settings/<section>'，空串 = 不在设置视图）
     settingsRoute: '',
+    gitRoute: '',
     // 当前打开对话的类型（'normal' | 'multi_agent'，创建时确定、不可变）；
     // 空对话态为 null。权威来源是对话 metadata.multi_agent_mode。
     currentConversationType: null,

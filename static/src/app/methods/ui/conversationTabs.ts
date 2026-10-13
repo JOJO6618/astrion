@@ -29,7 +29,8 @@ export const conversationTabsMethods = {
       // 整跳前把激活态落地——跳转后新页面 hydrate 才能恢复正确的选中标签
       tabsStore.setActive(tab.key);
       tabsStore.persistNow();
-      window.location.assign(target);
+      const scope = tab.workspaceId ? `?workspace_id=${encodeURIComponent(tab.workspaceId)}` : '';
+      window.location.assign(`${target}${scope}`);
       return;
     }
     if (tab.kind === 'conv' && tab.conversationId) {

@@ -184,6 +184,14 @@
   height: 18px;
 }
 
+.git-brand-icon::before {
+  content: '';
+  width: 17px;
+  height: 17px;
+  background: currentColor;
+  mask: url('/static/icons/git.svg') center / contain no-repeat;
+}
+
 .monitor-mode-btn.blocked {
   color: var(--text-tertiary);
   opacity: 0.6;

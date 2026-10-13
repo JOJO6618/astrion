@@ -13,6 +13,7 @@ export default {
   project: '项目',
   workspace: '工作区',
   workflows: '工作流',
+  git: '项目 Git',
   searchConversationPlaceholder: '搜索对话',
   normalConversations: '普通对话',
   multiAgent: '多智能体',

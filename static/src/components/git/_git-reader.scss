@@ -1,0 +1,206 @@
+.git-shell__selection {
+  height: 80px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  padding: 11px 22px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.git-shell__selection-content {
+  flex: 1;
+  min-width: 0;
+}
+.git-shell__byline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 28px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.git-shell__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+.git-shell__author {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.git-shell__byline time {
+  white-space: nowrap;
+}
+.git-shell__sha {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+.git-shell__sha:hover {
+  background: var(--hover-bg);
+}
+.git-shell__sha .git-icon {
+  width: 12px;
+  height: 12px;
+}
+.git-shell__sha code,
+.git-shell__base code {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+.git-shell__base {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.git-shell__byline .git-select .git-button {
+  height: 24px;
+  font-size: 10px;
+}
+.git-shell__review-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.git-shell__changes-toolbar {
+  position: relative;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px 0 17px;
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+}
+// Shared geometry: avatar center = 22 + 20/2; files button center = 17 + 30/2.
+.git-shell__file-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.git-shell__files-toggle[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+.git-shell__modes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 2px;
+  margin-left: auto;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+.git-shell__modes button {
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.git-shell__modes button:hover,
+.git-shell__modes button[aria-pressed='true'] {
+  color: var(--text-primary);
+  background: var(--surface-muted);
+}
+.git-shell__reader {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.git-shell__files {
+  width: 216px;
+  flex: 0 0 216px;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: auto;
+  background: var(--surface-base);
+  border-right: 1px solid var(--border-default);
+  scrollbar-width: thin;
+}
+.git-shell__diff {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+@media (width <= 1100px) {
+  .git-shell__base,
+  .git-shell__byline time {
+    display: none;
+  }
+}
+@media (width <= 760px) {
+  .git-shell__selection {
+    height: 112px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 7px;
+  }
+  .git-shell__selection-content {
+    flex: 0 0 auto;
+  }
+  .git-shell__review-actions {
+    align-self: flex-end;
+    gap: 6px;
+  }
+  .git-shell__files {
+    width: 168px;
+    flex-basis: 168px;
+  }
+  .git-shell__changes-toolbar {
+    gap: 8px;
+  }
+  .git-shell__file-summary {
+    gap: 7px;
+    font-size: 11px;
+  }
+  .git-shell__modes button {
+    padding: 0 7px;
+  }
+}
+@media (width <= 480px) {
+  .git-shell__files {
+    position: absolute;
+    top: 154px;
+    bottom: 0;
+    left: 0;
+    z-index: 15;
+    width: min(240px, calc(100% - 44px));
+    box-shadow: var(--shadow-mid);
+  }
+}

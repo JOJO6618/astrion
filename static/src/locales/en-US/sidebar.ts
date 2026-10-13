@@ -9,6 +9,7 @@ export default {
   project: 'Project',
   workspace: 'Workspace',
   workflows: 'Workflows',
+  git: 'Project Git',
   searchConversationPlaceholder: 'Search conversations',
   normalConversations: 'Normal chat',
   multiAgent: 'Multi-agent',

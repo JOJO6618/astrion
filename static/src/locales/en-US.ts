@@ -30,10 +30,12 @@ import sandbox from './en-US/sandbox';
 import update from './en-US/update';
 import commandBlocking from './en-US/commandBlocking';
 import quickEntry from './en-US/quickEntry';
+import git from './en-US/git';
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
 const enUS: DeepString<typeof zhCN> = {
+  git,
   quickEntry,
   common,
   personalization,

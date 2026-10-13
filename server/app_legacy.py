@@ -45,6 +45,7 @@ from server.conversation_tabs import conversation_tabs_bp
 from server.gateway_api import gateway_bp
 from server.codex_auth import codex_auth_bp
 from server.providers import providers_bp
+from server.project_git import project_git_bp
 from server.security import attach_security_hooks
 from werkzeug.utils import secure_filename
 from werkzeug.routing import BaseConverter
@@ -313,6 +314,7 @@ app.register_blueprint(conversation_tabs_bp)
 app.register_blueprint(gateway_bp)
 app.register_blueprint(codex_auth_bp)
 app.register_blueprint(providers_bp)
+app.register_blueprint(project_git_bp)
 
 # 安全钩子（CSRF 校验 + 响应头）
 attach_security_hooks(app)

@@ -321,10 +321,11 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       if (!resumeKey) return null;
       const tab = this.tabs.find((t) => t.key === resumeKey);
       if (!tab) return null;
+      const scope = tab.workspaceId ? `?workspace_id=${encodeURIComponent(tab.workspaceId)}` : '';
       if (tab.kind === 'conv' && tab.conversationId) {
-        return { url: `/${tab.conversationId.replace(/^conv_/, '')}`, key: tab.key };
+        return { url: `/${tab.conversationId.replace(/^conv_/, '')}${scope}`, key: tab.key };
       }
-      return { url: '/new', key: tab.key };
+      return { url: `/new${scope}`, key: tab.key };
     },
 
     /** 对话标题更新（重命名等）时同步标签标题。 */

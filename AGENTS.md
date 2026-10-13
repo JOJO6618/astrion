@@ -35,6 +35,7 @@
 | Host 网页密码 | `docs/agents_details/host_password.md` | 认证/密码 |
 | 主／子 API 花费 | `docs/agents_details/api_costs.md` | 费用统计、定价 |
 | CLI 交互与分层 | `docs/agents_details/cli_workflow.md` | 改 CLI 交互/分层 |
+| 项目 Git 记录与评审 | `docs/project_git.md` | 仓库扫描、历史 diff、评审启动及工作区深链 |
 
 ## 0) 项目名称
 
@@ -641,3 +642,13 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **币种**：外观 `display_currency` = USD/CNY，默认 USD。**人民币只转换显示，不改账本**；`modules/exchange_rates.py` 每 UTC 日后台更新 Frankfurter 参考汇率，失败保留缓存，**无首次缓存不虚构汇率**。
 - **等待态**：头像 `api_request_start` 的明确等待态优先于上次工具意图与残留流式状态；响应开始或任务终结清除，停止后不重显。
 - 契约 `docs/conversation_api_costs.md`；回归 `/opt/homebrew/bin/python3.11 -B test/2026-10-08_主子费用/run_regressions.py`。网络刷新、真实账单与前端视觉需实际运行验收。
+
+## 23) 项目 Git 记录与自动评审（2026-10-13）
+
+- **入口与范围**：侧边栏「工作流」下面的「项目 Git」进入 `/git?workspace_id=<当前工作区>`，只扫描进入时已确认工作区内的 Git 工作树；发现与详情都按该单一工作区解析，跳过依赖/运行态目录、不跟随符号链接。入口图标使用本地官方 Git SVG，视觉尺寸 17px、热区沿用侧栏规范。
+- **阅读布局**：Git 为无应用侧栏的独立全屏页；仓库下拉与带进出动画的提交选择面板互斥，文件导航默认展开，diff 占主要空间。文件开关放在文件数左侧并对齐提交作者头像中心；没有专注按钮。提交说明保持单行，左侧无 hover 的符号打开完整 message 浮层；评审记录不带数字，通过浮层菜单选择真实对话。
+- **查询唯一权威**：`modules/project_git/`；Web 蓝图 `server/project_git.py`，任务启动 `server/project_git_review.py`。历史 diff 来自固定 Git 对象，提交默认第一父版本，分支使用 merge base；不能用当前工作树代替目标版本。
+- **评审**：新建目标工作区的普通对话，初始 `execute + readonly + sandbox`，自动发送固定目录和完整 SHA 的请求，沿用正常 RuntimeService/门闸/显示快照。点击时工作区有活动主任务就提示忙，不新建、不排队；不改变其他入口并发规则。
+- **身份与数据**：查询不创建执行实例；评审会话独立创建、不切换现有 terminal。跳转携带显式 `workspace_id`，首次初始化必须验证后等待串行选择完成再加载对话。关联记录原子写入工作区运行态 data，每仓库最近 200 条；未知任务状态不视为成功。
+- **首批边界**：只读本地 Git 浏览与评审，不包含远端 fetch、GitHub/Gitea PR 接入。视觉和真实模型执行由用户验收。
+- 完整契约、API 实现位置与验证命令见 `docs/project_git.md`；回归目录 `test/2026-10-13_项目Git/`。

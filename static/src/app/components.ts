@@ -50,6 +50,7 @@ const WorkflowDemoShell = defineAsyncComponent(
 const SettingsShell = defineAsyncComponent(
   () => import('../components/settings/SettingsShell.vue')
 );
+const GitShell = defineAsyncComponent(() => import('../components/git/GitShell.vue'));
 
 export const appComponents = {
   ChatArea,
@@ -75,5 +76,6 @@ export const appComponents = {
   NewUserTutorialPrompt,
   GoalProgressDialog,
   WorkflowDemoShell,
-  SettingsShell
+  SettingsShell,
+  GitShell
 };

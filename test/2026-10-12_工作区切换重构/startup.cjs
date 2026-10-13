@@ -5,8 +5,9 @@ const base = 'static/src/app/methods/ui/';
 function startupFixture() {
   const f = fixture();
   const globals = { fetch: f.fetch, window: { location: { pathname: '/new' } },
-    history: { replaceState() {} } };
+    URLSearchParams, history: { replaceState() {} } };
   const imports = { '@/locales': locale,
+    './workspaceSelection': compile(base + 'workspaceSelection.ts', {}, globals),
     '../conversation/session': f.session,
     './workspaceNavigation': f.navigation,
     '../../../stores/conversationTabs': { useConversationTabsStore: () => ({ enabled: false }) } };

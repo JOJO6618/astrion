@@ -96,6 +96,7 @@
           @pin-workspace="handlePinWorkspaceFromSidebar"
           @conversation-type-change="handleSidebarConversationTypeChange"
           @open-workflows="openWorkflowsPage"
+          @open-git="openGitPage"
         />
 
         <main
@@ -962,6 +963,8 @@
               @rename-workspace="handleRenameWorkspaceFromSidebar"
               @pin-workspace="handlePinWorkspaceFromSidebar"
               @conversation-type-change="handleSidebarConversationTypeChange"
+              @open-workflows="openWorkflowsPage"
+              @open-git="openGitPage"
             />
           </div>
         </div>
@@ -1002,6 +1005,7 @@
 
       <!-- 设置页：/settings 与 /settings/<section> 全屏覆盖层 -->
       <SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />
+      <GitShell v-else-if="gitRoute" :workspace-id="currentHostWorkspaceId" @close="closeGitPage" />
       <!-- 工作流编辑器 demo：/workflows 与 /workflow/<name> 全屏覆盖层 -->
       <WorkflowDemoShell v-else-if="workflowDemoRoute" :route-path="workflowDemoRoute" />
     </template>
