@@ -47,6 +47,7 @@ from server.status import status_bp
 from server.chat.approval import approval_bp
 from server.usage import usage_bp
 from server.providers import providers_bp
+from server.crosspet_settings import crosspet_settings_bp
 from server.security import attach_security_hooks
 
 HEADLESS_BLUEPRINTS = (
@@ -56,6 +57,7 @@ HEADLESS_BLUEPRINTS = (
     ("approval", approval_bp),
     ("usage", usage_bp),
     ("providers", providers_bp),
+    ("crosspet_settings", crosspet_settings_bp),
 )
 
 _HEADLESS_LANDING_HTML = """<!DOCTYPE html>

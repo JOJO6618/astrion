@@ -310,6 +310,11 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                 }), 409
 
         terminal.set_model(model_key)
+        try:
+            from server.crosspet import focus_model
+            focus_model(username, str(workspace.workspace_id), requested_cid, str(terminal.model_key))
+        except Exception:
+            pass
         # fast-only 时 run_mode 可能被强制为 fast
         session["model_key"] = terminal.model_key
         session["run_mode"] = terminal.run_mode

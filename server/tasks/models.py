@@ -208,6 +208,11 @@ class TaskManager(TaskViewMixin):
         record.thread = thread
         record.status = "running"
         record.updated_at = time.time()
+        try:
+            from server.crosspet import bind_task
+            bind_task(self, record)
+        except Exception:
+            pass  # Optional desktop observer must never prevent task acceptance.
         thread.start()
         return record
 
@@ -803,6 +808,11 @@ class TaskManager(TaskViewMixin):
             self.publish_display(rec, event)
             rec.events.append(event)
             rec.updated_at = time.time()
+        try:
+            from server.crosspet import task_event
+            task_event(rec, event_type, data)
+        except Exception:
+            pass  # Enqueues metadata only; no observer IO under display/task locks.
 
     def _run_chat_task(self, rec: TaskRecord, images: List[Any], videos: List[Any], files: Optional[List[str]] = None):
         username = rec.username
@@ -887,6 +897,11 @@ class TaskManager(TaskViewMixin):
 
             # 对话加载会按会话元数据恢复历史模型/模式，这里再覆盖一次用户本次请求参数
             _apply_requested_model_mode()
+            try:
+                from server.crosspet import bind_task
+                bind_task(self, rec, terminal)
+            except Exception:
+                pass
             try:
                 debug_log(
                     "[Task] post-conversation effective state "
@@ -1146,6 +1161,11 @@ class TaskManager(TaskViewMixin):
                 "runtime_queued_messages": self.get_runtime_pending_messages(username, rec.task_id),
             }, error=str(exc))
         finally:
+            try:
+                from server.crosspet import finish_task
+                finish_task(rec)
+            except Exception:
+                pass
             # 清理 stop_flags
             stop_flags.pop(rec.task_id, None)
             # 主任务门闸兜底释放：若任务线程在 process_message_task 认领前异常退出，

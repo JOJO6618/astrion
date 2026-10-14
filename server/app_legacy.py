@@ -28,6 +28,7 @@ from modules.custom_tool_registry import CustomToolRegistry
 import server.state as state  # 共享单例
 from server.auth import auth_bp
 from server.host_password import host_password_bp
+from server.crosspet_settings import crosspet_settings_bp
 from server.files import files_bp
 from server.admin import admin_bp
 from server.conversation import conversation_bp
@@ -297,6 +298,7 @@ app.url_map.converters['conv'] = ConversationIdConverter
 # 注册各功能模块的蓝图（在自定义 converter 之后）
 app.register_blueprint(auth_bp)
 app.register_blueprint(host_password_bp)
+app.register_blueprint(crosspet_settings_bp)
 app.register_blueprint(files_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(conversation_bp)

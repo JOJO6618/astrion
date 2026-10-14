@@ -36,6 +36,7 @@
 | 主／子 API 花费 | `docs/agents_details/api_costs.md` | 费用统计、定价 |
 | CLI 交互与分层 | `docs/agents_details/cli_workflow.md` | 改 CLI 交互/分层 |
 | 项目 Git 记录与评审 | `docs/project_git.md` | 仓库扫描、历史 diff、评审启动及工作区深链 |
+| CrossPet 本机接入 | `docs/crosspet_integration.md` | 桌宠状态输出、任务观察、模型角色及接入协议 |
 
 ## 0) 项目名称
 
@@ -652,3 +653,13 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **身份与数据**：查询不创建执行实例；评审会话独立创建、不切换现有 terminal。跳转携带显式 `workspace_id`，首次初始化必须验证后等待串行选择完成再加载对话。关联记录原子写入工作区运行态 data，每仓库最近 200 条；未知任务状态不视为成功。
 - **首批边界**：只读本地 Git 浏览与评审，不包含远端 fetch、GitHub/Gitea PR 接入。视觉和真实模型执行由用户验收。
 - 完整契约、API 实现位置与验证命令见 `docs/project_git.md`；回归目录 `test/2026-10-13_项目Git/`。
+
+## 24) CrossPet 本机桌宠接入（2026-10-14）
+
+- **可选 host 输出**：默认关闭，由 Astrion 设置 → 通用的「CrossPet 联动」单一开关控制；所有工作区共用，存 `DEPLOY_CONFIG_DIR/crosspet.json`。不要求 CrossPet 侧启用；其可选 `astrion.json` 只提供目录。默认输出 macOS `/tmp/crosspet`、Windows `%LOCALAPPDATA%\CrossPet\state`；Docker/web 不输出。关闭后停止三个文件所有写入，保留旧文件由读取端过期；保存与输出共用锁。协议见 `docs/crosspet_integration.md`。
+- **观察入口**：`server/crosspet.py` → `modules/crosspet/`；任务线程只派发白名单元数据，配置、模型解析、后台活动探测和文件 IO 都在观察器线程。关闭时不探测后台活动或读取前台对话模型，不创建执行实例。设置端点 `server/crosspet_settings.py` 同时挂在 Web/headless，host 管理员可改，开启时启动或唤醒观察器。
+- **状态与隐私**：独立 `astrion-state.json`，身份哈希，不包含消息、思考、工具参数、命令、结果或凭据；心跳不增加动作修订号。`task_complete` 不是最终结束，真实终态和后台活动共同决定动作；业务失败不得庆祝。最多输出 256 个会话，保留前台、活动及等待会话优先。
+- **配套 CrossPet**：开发副本在 `_experiments/crosspet/`，原始 ZIP 基线在 `_experiments/crosspet-upstream/`，均不纳入 Astrion Git。独立来源合并，不覆盖现有 AI 钩子；45 秒过期清理自身状态。素材授权不变，不复制素材进 Astrion。
+- **订阅额度（2026-10-15）**：`modules/crosspet/quota.py` 以 Astrion 独立 OAuth 和已有代理后台查询用量，只有联动开启且订阅已连接才查询；不在任务或开关锁内做网络 IO。额度仅以白名单数值附加到 `quota.gpt`，不输出账号/凭据/原始响应。CrossPet 保留原有「显示 GPT 额度」（仍只读本机 Codex），新增与其互斥的「显示 Astrion 的 GPT 额度」；打开 Astrion 选项时读取快照额度并标注来源，失败保留旧数据、不混入其他账号也不自动切回 Codex，重置到期显示待更新而非推算 100%，15 分钟旧数不显示，来源/登录代次变化不误庆祝。API 余额与费用不包含在此功能。
+- **接入方式与上游 PR**：CrossPet 侧不需要安装钩子，默认两边目录一致即可工作；仅在使用自定义目录时通过 CrossPet 设置 →「接入 AI」里的 Astrion 项登记（等价命令行 `install astrion`，只写 CrossPet 自己的 `astrion.json`，保留已登记目录与其他字段，未登记时撤销不建文件）。安装/卸载脚本不新增 Astrion 自动目标，`refresh` 不改写登记；macOS 的 `CROSSPET_STATE_DIR` 只作用于 Astrion 文件与 `seen-astrion`，其他来源与 `pet.pid` 保持 `/tmp/crosspet`。PR 材料在 `_experiments/crosspet-pr/`（中文描述与验证记录，未 commit/push）。
+- **回归**：`test/2026-10-14_CrossPet接入/` 的 unittest 和 `runtime_check.py`；独立开关回归 `test/2026-10-15_CrossPet开关/` 的 unittest 和 `settings_api_check.py`。设置 UI 构建/lint 通过后由用户验收；Windows 原生运行仍需实机验证。新增订阅额度与收窄改动按用户要求只改文件，运行测试与原生构建留给用户，不将前轮通过记录当作额度接入已验证。

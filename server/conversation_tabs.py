@@ -227,6 +227,13 @@ def save_conversation_tabs():
         active_key = ""
     with _LOCK:
         data = _load_all()
+        previous_key = str((data.get(username) or {}).get("active_key") or "")
         data[username] = {"tabs": tabs, "active_key": active_key}
         atomic_write_json(_TABS_PATH, data)
+    if active_key != previous_key:
+        try:
+            from server.crosspet import focus_tab
+            focus_tab(username, next((tab for tab in tabs if tab["key"] == active_key), None))
+        except Exception:
+            pass  # Pet state cannot interfere with committed desktop navigation.
     return jsonify({"success": True})

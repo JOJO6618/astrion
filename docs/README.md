@@ -60,6 +60,7 @@
 | `dynamic_tool_loading_plan.md` | 工具动态加载设计文档 | `AGENTS.md` §13 |
 | `运行对话显示快照契约.md` | 运行中对话显示快照契约 | `AGENTS.md` §19 |
 | `conversation_api_costs.md` | 主子智能体费用账本契约 | `AGENTS.md` §22 |
+| `crosspet_integration.md` | 可选本机桌宠状态协议及生命周期 | `AGENTS.md` §24 |
 
 ### 其他开发文档
 
