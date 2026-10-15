@@ -29,6 +29,7 @@ import server.state as state  # 共享单例
 from server.auth import auth_bp
 from server.host_password import host_password_bp
 from server.crosspet_settings import crosspet_settings_bp
+from server.entry_assets import serve_entry_html
 from server.files import files_bp
 from server.admin import admin_bp
 from server.conversation import conversation_bp
@@ -1124,7 +1125,7 @@ def parse_arguments():
 
 @app.route('/resource_busy')
 def resource_busy_page():
-    return app.send_static_file('resource_busy.html'), 503
+    return serve_entry_html('resource_busy.html'), 503
 
 
 @app.route('/api/client_debug_log', methods=['POST'])

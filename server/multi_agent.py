@@ -17,6 +17,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 from server.auth_helpers import api_login_required, login_required, get_current_username
 from server.context import get_user_resources
 from server.context.data_decorators import with_workspace_data
+from server.entry_assets import serve_entry_html
 from modules.multi_agent.role_store import (
     RoleConfig,
     list_roles,
@@ -38,14 +39,14 @@ multi_agent_bp = Blueprint("multi_agent", __name__)
 @login_required
 def multi_agent_new_page():
     """多智能体模式入口，返回与 /new 相同的 SPA index.html。"""
-    return current_app.send_static_file("index.html")
+    return serve_entry_html("index.html")
 
 
 @multi_agent_bp.route("/multiagent/<path:conversation_id>")
 @login_required
 def multi_agent_conversation_page(conversation_id: str):
     """多智能体模式 指定会话 URL，返回 SPA index.html 让前端路由处理。"""
-    return current_app.send_static_file("index.html")
+    return serve_entry_html("index.html")
 
 
 @multi_agent_bp.route("/api/multiagent/rebuild-index", methods=["POST"])

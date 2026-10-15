@@ -67,9 +67,16 @@ export default defineConfig({
         chrome: chromeEntry
       },
       output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name][extname]'
+        // 产物名带内容哈希：URL 本身即版本，避免 CDN/浏览器各自独立缓存与
+        // 过期导致「旧 main.js + 新 theme.js」的模块导出不匹配报错
+        // （Uncaught SyntaxError: The requested module './theme.js' does not
+        // provide an export named 'e'）。
+        // 手写 HTML 里的固定名引用由 server/entry_assets.py 在响应时按
+        // manifest 替换，源码不感知哈希。
+        // 哈希固定 8 位：服务端按该长度识别“固定名”（见 _HASH_RE）。
+        entryFileNames: 'assets/[name]-[hash:8].js',
+        chunkFileNames: 'assets/[name]-[hash:8].js',
+        assetFileNames: 'assets/[name]-[hash:8][extname]'
       }
     }
   },

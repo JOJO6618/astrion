@@ -17,6 +17,7 @@ from config import (
 )
 
 from .auth_helpers import login_required, api_login_required, get_current_user_record, get_current_username, is_logged_in
+from .entry_assets import serve_entry_html
 from .security import (
     get_csrf_token,
     check_rate_limit,
@@ -134,11 +135,11 @@ def login():
             stale_nonce = session.get('login_nonce')
             _revoke_login_nonce(stale_username, stale_nonce)
             session.clear()
-            resp = make_response(current_app.send_static_file('login.html'))
+            resp = serve_entry_html('login.html')
             return _expire_session_cookie(resp)
         if not state.container_manager.has_capacity():
-            return current_app.send_static_file('resource_busy.html'), 503
-        return current_app.send_static_file('login.html')
+            return serve_entry_html('resource_busy.html'), 503
+        return serve_entry_html('login.html')
 
     data = request.get_json() or {}
     email = (data.get('email') or '').strip()
@@ -304,9 +305,9 @@ def register():
             stale_nonce = session.get('login_nonce')
             _revoke_login_nonce(stale_username, stale_nonce)
             session.clear()
-            resp = make_response(current_app.send_static_file('register.html'))
+            resp = serve_entry_html('register.html')
             return _expire_session_cookie(resp)
-        return current_app.send_static_file('register.html')
+        return serve_entry_html('register.html')
 
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
@@ -450,7 +451,7 @@ def index():
 @auth_bp.route('/new')
 @login_required
 def new_page():
-    return current_app.send_static_file('index.html')
+    return serve_entry_html('index.html')
 
 
 @auth_bp.route('/chrome')
@@ -460,7 +461,7 @@ def chrome_page():
     # 刻意不加 login_required：页面本身无数据（数据接口仍受保护），
     # 未登录时标签条空白轮询，主页面自动登录完成后下轮轮询自愈；
     # 若加登录重定向，chrome webview 会被导到登录页再跳进主应用
-    return current_app.send_static_file('chrome.html')
+    return serve_entry_html('chrome.html')
 
 
 @auth_bp.route('/settings')
@@ -469,13 +470,13 @@ def chrome_page():
 def settings_page(section=None):
     # 设置页与 /new 同为 SPA 入口：前端 bootstrapRoute 识别 settings/settings/* 路径
     # （参考 server/workflow_page.py 的 /workflows 同模式）
-    return current_app.send_static_file('index.html')
+    return serve_entry_html('index.html')
 
 
 @auth_bp.route('/<conv:conversation_id>')
 @login_required
 def conversation_page(conversation_id):
-    return current_app.send_static_file('index.html')
+    return serve_entry_html('index.html')
 
 
 @auth_bp.route('/terminal')
@@ -485,7 +486,7 @@ def terminal_page():
     policy = resolve_admin_policy(get_current_user_record())
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
         return tr("auth.terminal_blocked_by_admin"), 403
-    return current_app.send_static_file('terminal.html')
+    return serve_entry_html('terminal.html')
 
 
 def _resolve_serving_workspace_roots(user):

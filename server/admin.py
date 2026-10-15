@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash
 
 from .auth_helpers import login_required, admin_required, admin_api_required, api_login_required, get_current_user_record, resolve_admin_policy
 from .context import with_terminal
+from .entry_assets import serve_entry_html
 from .security import rate_limited
 from .utils_common import debug_log
 from . import state  # 使用动态 state，确保与入口实例保持一致
@@ -66,7 +67,7 @@ def _secondary_required():
 @admin_required
 def admin_monitor_page():
     """管理员监控页面入口"""
-    return send_from_directory(str(Path(current_app.static_folder)/"admin_dashboard"), 'index.html')
+    return serve_entry_html('admin_dashboard/index.html')
 
 
 @admin_bp.route('/monitor')
@@ -81,14 +82,14 @@ def admin_monitor_page_alias():
 @admin_required
 def admin_policy_page():
     """管理员策略配置页面"""
-    return send_from_directory(Path(current_app.static_folder) / 'admin_policy', 'index.html')
+    return serve_entry_html('admin_policy/index.html')
 
 @admin_bp.route('/admin/custom-tools')
 @login_required
 @admin_required
 def admin_custom_tools_page():
     """自定义工具管理页面"""
-    return send_from_directory(str(Path(current_app.static_folder)/"custom_tools"), 'index.html')
+    return serve_entry_html('custom_tools/index.html')
 
 
 @admin_bp.route('/admin/api')
@@ -96,7 +97,7 @@ def admin_custom_tools_page():
 @admin_required
 def admin_api_page():
     """API 管理页面入口。"""
-    return send_from_directory(str(Path(current_app.static_folder)/"admin_api"), 'index.html')
+    return serve_entry_html('admin_api/index.html')
 
 
 @admin_bp.route('/api/admin/secondary/status', methods=['GET'])

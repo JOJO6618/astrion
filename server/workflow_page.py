@@ -17,6 +17,7 @@ from modules.workflow_manager import (
 from server.auth_helpers import api_login_required, login_required
 from server.gateway_auth import api_login_or_host_token_required
 from server.context import with_terminal
+from server.entry_assets import serve_entry_html
 from modules.i18n import tr
 
 workflow_page_bp = Blueprint("workflow_page", __name__)
@@ -26,14 +27,14 @@ workflow_page_bp = Blueprint("workflow_page", __name__)
 @login_required
 def workflow_library_page():
     """工作流库入口，返回与 /new 相同的 SPA index.html。"""
-    return current_app.send_static_file("index.html")
+    return serve_entry_html("index.html")
 
 
 @workflow_page_bp.route("/workflow/<path:name>")
 @login_required
 def workflow_editor_page(name: str):
     """工作流编辑器入口，返回 SPA index.html 让前端路由处理。"""
-    return current_app.send_static_file("index.html")
+    return serve_entry_html("index.html")
 
 
 # ---------------------------------------------------------------- REST API

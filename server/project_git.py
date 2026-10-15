@@ -10,6 +10,7 @@ from modules.project_git.history import branches, changed_files, comparison, fil
 from modules.project_git.runner import GitQueryError
 from server.auth_helpers import api_login_required, get_current_username, login_required
 from server.context.workspace import request_identity, resolve_workspace
+from server.entry_assets import serve_entry_html
 from server.project_git_review import launch_review, list_reviews
 from server.security import rate_limited
 
@@ -19,7 +20,7 @@ project_git_bp = Blueprint("project_git", __name__)
 @project_git_bp.route("/git")
 @login_required
 def git_page():
-    return current_app.send_static_file("index.html")
+    return serve_entry_html("index.html")
 
 
 def _scoped_workspace(username: str, workspace_id: str, identity) -> dict:

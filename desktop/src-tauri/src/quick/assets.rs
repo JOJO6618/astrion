@@ -40,7 +40,14 @@ pub fn serve(root:&Path,path:&str)->Result<(&'static str,Vec<u8>),String>{
         let manifest:serde_json::Value=serde_json::from_slice(&std::fs::read(root.join("dist/.vite/manifest.json")).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
         let mut css=Vec::new();styles(&manifest,"static/src/quick.ts",&mut BTreeSet::new(),&mut css)?;
         let links=css.iter().map(|s|format!("<link rel=\"stylesheet\" href=\"/static/dist/{s}\"> ")).collect::<String>();
-        bytes=String::from_utf8(bytes).map_err(|e|e.to_string())?.replace("<link rel=\"stylesheet\" href=\"/static/dist/assets/quick.css\">",&links).into_bytes();
+        // 产物名带内容哈希后，入口脚本也必须按 manifest 替换；只换 CSS 会让
+        // 快捷窗口 404 白屏。见 vite.config.ts 的 entryFileNames。
+        let entry=manifest.get("static/src/quick.ts").and_then(|chunk|chunk["file"].as_str()).ok_or("Missing quick entry chunk in build manifest")?;
+        let document=String::from_utf8(bytes).map_err(|e|e.to_string())?
+            .replace("<link rel=\"stylesheet\" href=\"/static/dist/assets/quick.css\">",&links)
+            .replace("src=\"/static/dist/assets/quick.js\"",&format!("src=\"/static/dist/{entry}\""));
+        if document.contains("/static/dist/assets/quick.js"){return Err("quick.html 未命中入口脚本引用，注入失败".into());}
+        bytes=document.into_bytes();
     }
     Ok((mime,bytes))
 }
