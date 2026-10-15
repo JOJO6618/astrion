@@ -42,6 +42,8 @@ export default {
   // —— Astrion 头部工作计时状态 ——
   workInProgress: '工作中 {duration}',
   workCompleted: '工作完成 {duration}',
+  // —— 主智能体 tokens/s 行 ——
+  tokenSpeedValue: '{value} tokens/s',
 
   // —— 思考块状态 ——
   thinking: '思考过程',

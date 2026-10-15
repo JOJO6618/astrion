@@ -1420,6 +1420,23 @@
   user-select: none;
 }
 
+/* 主智能体 tokens/s：常驻在工作段最后一条模型文字下方（左侧复制按钮、右侧速度值） */
+.assistant-token-speed {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  height: 20px;
+  margin-top: 6px;
+}
+
+.assistant-token-speed-value {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
 .user-message:not(.user-message--compact):not(.user-message--brief):hover .user-bubble-actions,
 .user-message:not(.user-message--compact):not(.user-message--brief):focus-within .user-bubble-actions {
   opacity: 1;

@@ -129,8 +129,47 @@ class TokenMixin:
         snapshot["updated_at"] = datetime.now().isoformat()
         self._save_token_totals(snapshot)
 
+    def reset_work_segment_speed_samples(self) -> None:
+        """新工作段开始：清空本段 tokens/s 样本。压缩续接沿用同一段，不调用本方法。"""
+        self._work_segment_speed_samples = []
+
+    def record_work_segment_speed_sample(self, output_tokens: int, duration_ms: int) -> None:
+        """记录单次主智能体 API 请求的「输出 token + 耗时」，供段结束时算加权平均。"""
+        try:
+            output_value = max(0, int(output_tokens))
+            duration_value = int(duration_ms)
+        except (TypeError, ValueError):
+            return
+        if output_value <= 0 or duration_value <= 0:
+            return
+        samples = getattr(self, "_work_segment_speed_samples", None)
+        if not isinstance(samples, list):
+            samples = []
+            self._work_segment_speed_samples = samples
+        samples.append({"output_tokens": output_value, "duration_ms": duration_value})
+
+    def consume_work_segment_speed_summary(self) -> Optional[Dict[str, Any]]:
+        """取出本段速度汇总并清空样本；样本为空或全无有效数据时返回 None。"""
+        samples = getattr(self, "_work_segment_speed_samples", None)
+        self._work_segment_speed_samples = []
+        if not isinstance(samples, list) or not samples:
+            return None
+        total_output = sum(int(item.get("output_tokens") or 0) for item in samples)
+        total_ms = sum(int(item.get("duration_ms") or 0) for item in samples)
+        if total_output <= 0 or total_ms <= 0:
+            return None
+        return {
+            "avg_tps": round(total_output / (total_ms / 1000.0), 1),
+            "output_tokens": total_output,
+            "duration_ms": total_ms,
+            "requests": len(samples),
+            "updated_at": datetime.now().isoformat(),
+        }
+
     def apply_usage_statistics(self, usage: Dict[str, Any], *, price=None,
-                               request_id=None, conversation_id=None) -> bool:
+                               request_id=None, conversation_id=None,
+                               duration_ms: Optional[int] = None,
+                               ttft_ms: Optional[int] = None) -> bool:
         """Apply actual usage and optionally commit the main request's USD cost."""
         target_id = conversation_id or self.current_conversation_id
         actor = None
@@ -140,8 +179,18 @@ class TokenMixin:
             from modules.conversation_costs import actor_statistics, record_request
             manager = getattr(self, '_get_conversation_manager_for_id', lambda _: self.conversation_manager)(target_id)
             previous = manager.get_token_statistics(target_id) or {}
+            cost_entry = calculate_cost(usage, price)
+            # 生成耗时与首包等待随账本复用存储（tokens/s 的明细来源，
+            # 历史请求缺这些字段按未记录处理）
+            for _key, _value in (('duration_ms', duration_ms), ('ttft_ms', ttft_ms)):
+                if _value is None:
+                    continue
+                try:
+                    cost_entry[_key] = max(0, int(_value))
+                except (TypeError, ValueError):
+                    pass
             committed = record_request(
-                self.data_dir, target_id, request_id, 'main', '', 'main', calculate_cost(usage, price),
+                self.data_dir, target_id, request_id, 'main', '', 'main', cost_entry,
                 historical_unpriced=bool(previous.get('total_input_tokens')),
                 baseline={'input_tokens': previous.get('total_input_tokens', 0),
                           'output_tokens': previous.get('total_output_tokens', 0),
@@ -172,6 +221,13 @@ class TokenMixin:
             self._increment_workspace_token_totals(prompt_tokens, completion_tokens, total_tokens, cached_input_tokens)
         except Exception as exc:
             print(f"[TokenStats] 无法写入累计Token: {exc}")
+
+        # tokens/s 样本：段内每轮成功调用记一条，工作段真正结束时汇总加权平均
+        if duration_ms:
+            try:
+                self.record_work_segment_speed_sample(completion_tokens, duration_ms)
+            except Exception as exc:
+                logger.warning(f"[TokenStats] 记录速度样本失败: {exc}")
 
         if not target_id:
             print("⚠️ 没有当前对话ID，跳过usage统计更新")
@@ -261,8 +317,11 @@ class TokenMixin:
             return 0
         return stats.get("current_context_tokens", 0)
 
-    def safe_broadcast_token_update(self):
-        """安全的token更新广播（只广播累计统计，不重新计算）"""
+    def safe_broadcast_token_update(self, extra: Optional[Dict[str, Any]] = None):
+        """安全的token更新广播（只广播累计统计，不重新计算）
+
+        extra：附加字段（如工作段 tokens/s）合并进同一事件，不新增事件类型。
+        """
         try:
             # 检查是否有回调函数
             if not hasattr(self, '_web_terminal_callback'):
@@ -289,9 +348,27 @@ class TokenMixin:
                 'costs': cumulative_stats.get('costs') if cumulative_stats else None,
                 'updated_at': datetime.now().isoformat()
             }
-            
-            # 广播到前端
+
+            # 广播到前端（extra 携带的附加字段并入同一事件）
+            if isinstance(extra, dict):
+                broadcast_data.update(extra)
             self._web_terminal_callback('token_update', broadcast_data)
 
         except Exception as e:
             logger.warning(f"[TokenStats] 广播token更新失败: {e}")
+
+    def broadcast_work_segment_speed(self, message_id: Optional[str],
+                                     summary: Optional[Dict[str, Any]]) -> None:
+        """工作段结束：把本段 tokens/s 汇总随 token 更新事件下发，供前端即时渲染。
+
+        任务完成时前端不会重载历史（只本地标记 work_timer），因此速度行必须靠事件送达；
+        消息 id 指向铺点 user 消息，前端据此把 token_speed 写回本地消息 metadata。
+        """
+        if not summary or not message_id:
+            return
+        try:
+            self.safe_broadcast_token_update(extra={
+                'token_speed': {'message_id': message_id, **summary},
+            })
+        except Exception as exc:
+            logger.warning(f"[TokenStats] 广播段速度失败: {exc}")

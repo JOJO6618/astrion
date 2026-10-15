@@ -492,6 +492,7 @@ class CrudMixin:
             messages = data.get("messages") or []
             completed = False
             now_iso = finished_at or datetime.now().isoformat()
+            speed_summary: Optional[Dict[str, Any]] = None
             for msg in reversed(messages):
                 if not isinstance(msg, dict) or msg.get("role") != "user":
                     continue
@@ -512,6 +513,22 @@ class CrudMixin:
                 timer["started_at"] = started_at
                 timer["finished_at"] = now_iso
                 timer["duration_ms"] = duration_ms
+                # 与主链路同样在段结束时汇总 tokens/s（本段样本存在 ContextManager 内存里，
+                # 只有真正空闲收尾时才消费，因此不会误停中途的段）
+                if context_manager is not None:
+                    try:
+                        speed_summary = context_manager.consume_work_segment_speed_summary()
+                    except Exception:
+                        speed_summary = None
+                if speed_summary:
+                    metadata["token_speed"] = speed_summary
+                    if context_manager is not None:
+                        try:
+                            context_manager.broadcast_work_segment_speed(
+                                msg.get("message_id"), speed_summary
+                            )
+                        except Exception:
+                            pass
                 msg["metadata"] = metadata
                 completed = True
                 break
@@ -527,7 +544,7 @@ class CrudMixin:
                 and getattr(context_manager, "current_conversation_id", None) == conversation_id
             ):
                 try:
-                    self._sync_work_timer_in_memory(context_manager, now_iso)
+                    self._sync_work_timer_in_memory(context_manager, now_iso, speed_summary)
                 except Exception:
                     pass
             return True
@@ -535,7 +552,8 @@ class CrudMixin:
             print(f"⌘ 标记用户工作完成失败 {conversation_id}: {exc}")
             return False
 
-    def _sync_work_timer_in_memory(self, context_manager: Any, finished_at: str) -> bool:
+    def _sync_work_timer_in_memory(self, context_manager: Any, finished_at: str,
+                                   speed_summary: Optional[Dict[str, Any]] = None) -> bool:
         """将当前 ContextManager 内存中最后一条 working 的 work_timer 标记为完成。"""
         history = getattr(context_manager, "conversation_history", None) or []
         if not history:
@@ -565,6 +583,8 @@ class CrudMixin:
                 "finished_at": finished_at,
                 "duration_ms": duration_ms,
             })
+            if speed_summary:
+                metadata["token_speed"] = speed_summary
             msg["metadata"] = metadata
             return True
 

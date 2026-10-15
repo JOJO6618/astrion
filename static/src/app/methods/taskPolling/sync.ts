@@ -71,8 +71,46 @@ export const syncMethods = {
         this.updateCurrentContextTokens();
       }
 
+      // 工作段结束：本段 tokens/s 汇总挂到铺点 user 消息，就地渲染速度行
+      if (data?.token_speed && Number(data.token_speed.avg_tps) > 0) {
+        this.applyWorkTokenSpeed(data.token_speed);
+      }
+
       this.$forceUpdate();
     }
+  },
+  /**
+   * 把后端下发的本段 tokens/s 汇总写回本地消息 metadata。
+   * 优先按 message_id 定位，旧消息无 id 时回退到「最后一条开启工作的 user 消息」
+   * （与 markLatestUserWorkCompleted 同一铺点规则）。
+   */
+  applyWorkTokenSpeed(speed: any) {
+    if (!Array.isArray(this.messages) || this.messages.length === 0) return;
+    const messageId = String(speed?.message_id || '').trim();
+    const summary: Record<string, any> = { ...speed };
+    delete summary.message_id;
+    let target: any = null;
+    if (messageId) {
+      for (let i = this.messages.length - 1; i >= 0; i -= 1) {
+        const msg = this.messages[i];
+        if (msg?.role === 'user' && String(msg.message_id || '') === messageId) {
+          target = msg;
+          break;
+        }
+      }
+    }
+    if (!target) {
+      for (let i = this.messages.length - 1; i >= 0; i -= 1) {
+        const msg = this.messages[i];
+        if (msg?.role === 'user' && msg.metadata?.work_timer) {
+          target = msg;
+          break;
+        }
+      }
+    }
+    if (!target) return;
+    target.metadata = { ...(target.metadata || {}), token_speed: summary };
+    this.$forceUpdate();
   },
   handleConversationChanged(data: any, eventIdx: number) {
     debugLog('[TaskPolling] 对话标题已更新, idx:', eventIdx, data);

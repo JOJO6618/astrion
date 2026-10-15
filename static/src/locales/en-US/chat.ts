@@ -32,6 +32,8 @@ export default {
   // —— Astrion header work timer status ——
   workInProgress: 'Working {duration}',
   workCompleted: 'Work complete {duration}',
+  // —— Main-agent tokens/s row ——
+  tokenSpeedValue: '{value} tokens/s',
 
   // —— Thinking block status ——
   thinking: 'Thinking',

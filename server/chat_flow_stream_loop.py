@@ -61,6 +61,10 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
         request_model_key = str(getattr(web_terminal, 'model_key', '') or '')
         request_price = await asyncio.to_thread(capture_price, request_model_key)
         cost_request_id = str(uuid4())
+        # tokens/s 计时：请求发出时刻只用于 TTFT；计入速度的时长从「首个内容增量」开始。
+        # 重试时每轮重新开始计时；失败轮不会走到 usage 应用处，因此不计入。
+        request_started_at = time.monotonic()
+        first_delta_at = None
 
         # 收集流式响应
         async for chunk in web_terminal.api_client.chat(messages, tools, stream=True):
@@ -121,6 +125,17 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             finish_reason = choice.get("finish_reason")
             if finish_reason:
                 last_finish_reason = finish_reason
+
+            # 计时起点：第一个「有内容」的流式增量（思考 / 正文 / 工具参数），
+            # 排除只声明 role 的 chunk 与 usage-only chunk。加密思考的 Responses 摘要
+            # 整段到达，起点自然落在该段到达时刻（provider 侧限制，无更好口径）。
+            if first_delta_at is None and (
+                delta.get("content")
+                or delta.get("reasoning_content")
+                or delta.get("reasoning_details")
+                or delta.get("tool_calls")
+            ):
+                first_delta_at = time.monotonic()
 
             # 处理思考内容（兼容 reasoning_content / reasoning_details）
             reasoning_content = ""
@@ -409,9 +424,18 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
         # 若在 error 分支判断之前 apply 会导致同一回答重复计数。
         if last_usage_payload and not api_error:
             try:
+                request_end_at = time.monotonic()
+                # 生成时长：首个内容增量 → 流结束；全程无内容增量时回退到请求全程
+                generate_start_at = first_delta_at or request_started_at
+                request_duration_ms = int(max(0.0, (request_end_at - generate_start_at) * 1000.0))
+                request_ttft_ms = (
+                    int(max(0.0, (first_delta_at - request_started_at) * 1000.0))
+                    if first_delta_at else None
+                )
                 web_terminal.context_manager.apply_usage_statistics(
                     last_usage_payload, price=request_price, request_id=cost_request_id,
-                    conversation_id=conversation_id,
+                    conversation_id=conversation_id, duration_ms=request_duration_ms,
+                    ttft_ms=request_ttft_ms,
                 )
                 debug_log(
                     f"Usage统计: prompt={last_usage_payload.get('prompt_tokens', 0)}, "

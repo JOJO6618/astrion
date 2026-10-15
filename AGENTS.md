@@ -644,6 +644,8 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **币种**：外观 `display_currency` = USD/CNY，默认 USD。**人民币只转换显示，不改账本**；`modules/exchange_rates.py` 每 UTC 日后台更新 Frankfurter 参考汇率，失败保留缓存，**无首次缓存不虚构汇率**。
 - **等待态**：头像 `api_request_start` 的明确等待态优先于上次工具意图与残留流式状态；响应开始或任务终结清除，停止后不重显。
 - 契约 `docs/conversation_api_costs.md`；回归 `/opt/homebrew/bin/python3.11 -B test/2026-10-08_主子费用/run_regressions.py`。网络刷新、真实账单与前端视觉需实际运行验收。
+- **工作段 tokens/s（2026-10-16）**：耗时口径 = **首个「有内容」的流式增量 → 流结束**（思考 delta / 正文 delta / 工具参数 delta 首个到达者；排除仅声明 role 与 usage-only chunk，不含工具执行与抓价）；**TTFT（请求发出 → 首个增量）单独记入账本 `ttft_ms`，不进速度分母**。单轮速度 = output tokens / 该轮生成耗时，段级取加权平均 `Σoutput / Σ耗时`（**不做输入差分，思考 token 也计入 output，不得扣减**）。加密思考的 Responses（summary 整段下发）起点自然落在该段到达时刻，属 provider 限制。`duration_ms`/`ttft_ms` 随请求写进费用账本，样本在 ContextManager 内存按工作段累积，段真正结束时写入锚点 user 消息 `metadata.token_speed` 并随 `token_update` 事件下发（任务完成时前端只本地标记 work_timer、**不重载历史**）。前端在该段最后一条有文字输出的 assistant 下方渲染「左侧复制按钮 + 右侧 x.x tokens/s」常驻行，段末不是模型文字则不显示。
+- **压缩续接即同一工作段（2026-10-16）**：深压缩续接**不得**提前 `finalize_user_work_timer()`，续接递归必须传 `work_anchor_message_id` 继承原锚点（编辑摘要、work_timer、tokens/s 共用同一锚点消息）；否则前端编辑摘要卡片会在任务仍在续接时提前显示，且段真正结束时无人收尾。实现细节与踩坑见项目记忆 `work_segment_anchor_and_tokens_speed`。
 
 ## 23) 项目 Git 记录与自动评审（2026-10-13）
 

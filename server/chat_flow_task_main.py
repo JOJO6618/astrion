@@ -1484,6 +1484,7 @@ async def handle_task_with_sender(
     videos=None,
     auto_user_message_event: bool = False,
     files=None,
+    work_anchor_message_id: Optional[str] = None,
 ):
     """处理任务并发送消息 - 集成token统计版本"""
 
@@ -1614,18 +1615,42 @@ async def handle_task_with_sender(
         message_id=getattr(web_terminal, "_display_trigger_message_id", None),
     )
     web_terminal._display_trigger_message_id = None
-    # 为浅备份 track_edit 提供当前用户消息 ID，避免文件修改被归到上一个输入。
-    try:
-        web_terminal.context_manager.current_shallow_message_id = (
-            saved_user_message.get("message_id") if isinstance(saved_user_message, dict) else None
-        )
-    except Exception:
-        web_terminal.context_manager.current_shallow_message_id = None
     try:
         user_message_index = len(getattr(web_terminal.context_manager, "conversation_history", []) or []) - 1
     except Exception:
         user_message_index = -1
     current_work_user_message_index = user_message_index
+
+    # 本段工作的锚点消息：编辑摘要、工作计时与 tokens/s 都归属这一条。
+    current_work_anchor_message_id = (
+        saved_user_message.get("message_id") if isinstance(saved_user_message, dict) else None
+    )
+    # 压缩续接：压缩前 + 压缩后是同一工作段，锚点沿用上一段（不回落到引导语消息）。
+    # 否则编辑摘要会挂到 starts_work=false 的引导语上，段真正结束时也无人给原消息收尾。
+    inherited_anchor_id = str(work_anchor_message_id or "").strip()
+    inherited_anchor_index = -1
+    if inherited_anchor_id:
+        history_now = getattr(web_terminal.context_manager, "conversation_history", None) or []
+        for idx in range(len(history_now) - 1, -1, -1):
+            item = history_now[idx] or {}
+            if item.get("role") == "user" and item.get("message_id") == inherited_anchor_id:
+                inherited_anchor_index = idx
+                break
+        if inherited_anchor_index >= 0:
+            current_work_anchor_message_id = inherited_anchor_id
+            current_work_user_message_index = inherited_anchor_index
+    # 为浅备份 track_edit 提供当前用户消息 ID，避免文件修改被归到上一个输入。
+    try:
+        web_terminal.context_manager.current_shallow_message_id = current_work_anchor_message_id
+    except Exception:
+        web_terminal.context_manager.current_shallow_message_id = None
+    # tokens/s 样本按工作段累积：只有真正开启工作的新消息才清空（通知类任务不清），
+    # 压缩续接沿用同段样本。
+    if inherited_anchor_index < 0 and user_message_metadata.get("starts_work") is True:
+        try:
+            web_terminal.context_manager.reset_work_segment_speed_samples()
+        except Exception:
+            pass
 
     skill_context_messages = getattr(web_terminal, "_skill_context_messages", None)
     if not auto_user_message_event and isinstance(skill_context_messages, list):
@@ -1764,6 +1789,23 @@ async def handle_task_with_sender(
             start_ts = None
         now_ts = time.time()
         duration_ms = int(max(0.0, (now_ts - start_ts) * 1000.0)) if start_ts is not None else 0
+        # 本段 tokens/s 加权平均：工作段真正结束时写入锚点消息（与 work_timer 同一条）。
+        # 压缩续接不在此收尾，因此压缩前 + 压缩后归为同一段统计。
+        try:
+            speed_summary = web_terminal.context_manager.consume_work_segment_speed_summary()
+        except Exception as exc:
+            speed_summary = None
+            debug_log(f"[TokenSpeed] 段速度汇总失败: {exc}")
+        if speed_summary:
+            metadata["token_speed"] = speed_summary
+            # 同一事件即时下发：前端任务完成时只本地标记 work_timer、不重载历史，
+            # 速度行必须靠该字段就地渲染（刷新后则由消息 metadata 恢复）。
+            try:
+                web_terminal.context_manager.broadcast_work_segment_speed(
+                    target_msg.get("message_id"), speed_summary
+                )
+            except Exception:
+                pass
         timer.update({
             "status": "completed",
             "started_at": started_at,
@@ -1895,7 +1937,8 @@ async def handle_task_with_sender(
         else:
             guide_message = (deep_result.get("guide_message") or "").strip()
             if guide_message:
-                finalize_user_work_timer()
+                # 压缩续接视为同一工作段：不在压缩处收尾 work_timer，
+                # 锚点（编辑摘要/计时/tokens）由续接任务继承。
                 finalize_run_versioning_checkpoint("auto_deep_compress_handoff")
                 # 压缩后的续接引导语单独标记来源，使其以 compact 形式展示，
                 # 而不是混入普通用户消息流。
@@ -1909,7 +1952,8 @@ async def handle_task_with_sender(
                         sender,
                         client_sid,
                         username,
-                        []
+                        [],
+                        work_anchor_message_id=current_work_anchor_message_id,
                     )
                 finally:
                     setattr(web_terminal, "_current_user_message_source", "user")
@@ -2527,7 +2571,8 @@ async def handle_task_with_sender(
             deep_result = tool_loop_result.get("deep_result") or {}
             guide_message = (deep_result.get("guide_message") or "").strip()
             if deep_result.get("success") and guide_message:
-                finalize_user_work_timer()
+                # 压缩续接视为同一工作段：不在压缩处收尾 work_timer，
+                # 锚点（编辑摘要/计时/tokens）由续接任务继承。
                 finalize_run_versioning_checkpoint("deep_compress_handoff")
                 # 压缩后的续接引导语单独标记来源，使其以 compact 形式展示，
                 # 而不是混入普通用户消息流。
@@ -2541,7 +2586,8 @@ async def handle_task_with_sender(
                         sender,
                         client_sid,
                         username,
-                        []
+                        [],
+                        work_anchor_message_id=current_work_anchor_message_id,
                     )
                 finally:
                     setattr(web_terminal, "_current_user_message_source", "user")

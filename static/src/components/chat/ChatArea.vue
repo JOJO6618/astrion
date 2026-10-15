@@ -716,6 +716,26 @@
                   :summary="editSummarySegmentEnds.get(index)"
                   :icon-style="iconStyleSafe"
                 />
+
+                <!-- 本段主智能体 tokens/s：段真正结束后常驻，左侧复制、右侧速度值 -->
+                <div v-if="assistantTokenSpeedEnds.has(index)" class="assistant-token-speed">
+                  <button
+                    class="user-bubble-action-btn copy"
+                    :class="{ copied: isTokenSpeedCopied(msg, index) }"
+                    :title="
+                      isTokenSpeedCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                    "
+                    :aria-label="
+                      isTokenSpeedCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                    "
+                    @click="copyAssistantPlainText(msg, index)"
+                  ></button>
+                  <span class="assistant-token-speed-value">{{
+                    $t('chat.tokenSpeedValue', {
+                      value: formatTokenSpeed(assistantTokenSpeedEnds.get(index))
+                    })
+                  }}</span>
+                </div>
               </div>
               <div v-else class="system-message">
                 <div
@@ -912,9 +932,12 @@ const USER_BUBBLE_FOLD_LINES = 10;
 const userBubbleRefs = new Map<string, HTMLElement>();
 const userBubbleFoldStates = ref<Record<string, UserBubbleFoldState>>({});
 const copiedBubbleKeys = ref<Set<string>>(new Set());
+// tokens/s 行的复制状态（与用户气泡分开，避免 key 空间互相影响）
+const copiedTokenSpeedKeys = ref<Set<string>>(new Set());
 const userBubbleTransitionSuppressed = ref(false);
 let userBubbleResizeObserver: ResizeObserver | null = null;
 let copiedBubbleTimeouts = new Map<string, number>();
+let copiedTokenSpeedTimeouts = new Map<string, number>();
 let userBubbleTransitionSeq = 0;
 const userBubbleMountFrames = new Map<HTMLElement, number>();
 
@@ -1104,6 +1127,31 @@ const copyUserMessage = async (msg: any, index: number) => {
     copiedBubbleTimeouts.set(key, timeout);
   } catch (err) {
     console.warn('复制用户消息失败:', err);
+  }
+};
+
+const getTokenSpeedKey = (msg: any, index: number) => msg?.id || `assistant-speed-${index}`;
+
+const isTokenSpeedCopied = (msg: any, index: number) =>
+  copiedTokenSpeedKeys.value.has(getTokenSpeedKey(msg, index));
+
+/** 复制该条回答的模型文字输出：拼接全部 text action，不含思考与工具块。 */
+const copyAssistantPlainText = async (msg: any, index: number) => {
+  const key = getTokenSpeedKey(msg, index);
+  const text = extractAssistantPlainText(msg);
+  if (!text || copiedTokenSpeedKeys.value.has(key)) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedTokenSpeedKeys.value.add(key);
+    const existing = copiedTokenSpeedTimeouts.get(key);
+    if (existing) window.clearTimeout(existing);
+    const timeout = window.setTimeout(() => {
+      copiedTokenSpeedKeys.value.delete(key);
+      copiedTokenSpeedTimeouts.delete(key);
+    }, 5000);
+    copiedTokenSpeedTimeouts.set(key, timeout);
+  } catch (err) {
+    console.warn('复制模型输出失败:', err);
   }
 };
 
@@ -1346,6 +1394,28 @@ const editSummarySegmentEnds = computed<Map<number, any>>(() => {
     }
     if (lastAssistant >= 0) {
       map.set(lastAssistant, summary);
+    }
+  }
+  return map;
+});
+// tokens/s 行：数据由后端在工作段真正结束时汇总写入锚 user 消息 metadata.token_speed，
+// 渲染在该段最后一条「有模型文字输出」的 assistant 消息末尾；段内最后不是模型文字则整行不显示。
+const assistantTokenSpeedEnds = computed<Map<number, any>>(() => {
+  const map = new Map<number, any>();
+  const messages = getFilteredMessagesSafe();
+  for (let i = 0; i < messages.length; i += 1) {
+    const msg = messages[i];
+    if (!msg || msg.role !== 'user' || !messageStartsWork(msg)) continue;
+    const speed = msg.metadata?.token_speed;
+    if (!speed || !(Number(speed.avg_tps) > 0)) continue;
+    let lastTextAssistant = -1;
+    for (let j = i + 1; j < messages.length; j += 1) {
+      const next = messages[j];
+      if (next?.role === 'user' && messageStartsWork(next)) break;
+      if (next?.role === 'assistant' && extractAssistantPlainText(next)) lastTextAssistant = j;
+    }
+    if (lastTextAssistant >= 0) {
+      map.set(lastTextAssistant, speed);
     }
   }
   return map;
@@ -2658,6 +2728,8 @@ onBeforeUnmount(() => {
   userBubbleRefs.clear();
   copiedBubbleTimeouts.forEach((t) => window.clearTimeout(t));
   copiedBubbleTimeouts.clear();
+  copiedTokenSpeedTimeouts.forEach((t) => window.clearTimeout(t));
+  copiedTokenSpeedTimeouts.clear();
   if (timerHandle !== null) {
     clearInterval(timerHandle);
     timerHandle = null;
@@ -2779,6 +2851,28 @@ function extractAssistantLastText(msg: any): string {
   }
   const content = msg?.content;
   return typeof content === 'string' ? content.trim() : '';
+}
+
+function extractAssistantPlainText(msg: any): string {
+  const actions = Array.isArray(msg?.actions) ? msg.actions : [];
+  const parts = actions
+    .filter((action: any) => action?.type === 'text' && typeof action?.content === 'string')
+    .map((action: any) => {
+      const text = action.content.trim();
+      return text;
+    })
+    .filter((text: string) => !!text);
+  if (parts.length) {
+    return parts.join('\n\n');
+  }
+  const content = msg?.content;
+  return typeof content === 'string' ? content.trim() : '';
+}
+
+/** tokens/s 展示值：保留一位小数，非法值返回空串（整行由 v-if 兜底）。 */
+function formatTokenSpeed(speed: any): string {
+  const value = Number(speed?.avg_tps);
+  return Number.isFinite(value) && value > 0 ? value.toFixed(1) : '';
 }
 
 const quickNavItems = computed(() => {
