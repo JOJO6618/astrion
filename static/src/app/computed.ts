@@ -181,17 +181,24 @@ export const computed = {
       { value: 'thinking', label: t('input.thinkingMode'), desc: t('appCore.thinkingModeDesc') }
     ];
   },
-  headerRunModeLabel() {
-    void currentLocale.value;
-    const current = this.headerRunModeOptions.find((o) => o.value === this.resolvedRunMode);
-    return current ? current.label : t('appCore.fastMode');
-  },
-  // 推理强度滑块：仅思考模式 + 当前模型支持推理强度参数时显示
+  // 推理强度滑块 + 顶部栏强度标签：仅思考模式 + 当前模型支持推理强度参数时显示
   showEffortSlider() {
     const modelStore = useModelStore();
     return (
       this.resolvedRunMode === 'thinking' && !!modelStore.currentModel?.supportsReasoningEffort
     );
+  },
+  // 顶部栏强度标签：与滑块同条件（思考模式 + 模型支持）；档位沿用滑块原文
+  // low/medium/high/xhigh/max，未设置（null）显示 default；
+  // 不满足条件返回空串，顶部栏只显示模型名
+  headerEffortLabel() {
+    if (!this.showEffortSlider) {
+      return '';
+    }
+    const effort = String(this.reasoningEffort ?? '')
+      .trim()
+      .toLowerCase();
+    return effort || 'default';
   },
   currentModelLabel() {
     const modelStore = useModelStore();

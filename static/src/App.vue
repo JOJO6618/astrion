@@ -140,8 +140,7 @@
             >
               <span class="selector-label">
                 <span class="selector-model">{{ currentModelLabel }}</span>
-                <span class="selector-sep">·</span>
-                <span class="selector-mode">{{ headerRunModeLabel }}</span>
+                <span v-if="headerEffortLabel" class="selector-mode">{{ headerEffortLabel }}</span>
               </span>
               <svg viewBox="0 0 24 24" aria-hidden="true" class="selector-caret">
                 <path
@@ -729,8 +728,9 @@
           >
             <span class="mobile-selector-label">
               <span class="mobile-selector-model">{{ currentModelLabel }}</span>
-              <span class="mobile-selector-sep">·</span>
-              <span class="mobile-selector-mode">{{ headerRunModeLabel }}</span>
+              <span v-if="headerEffortLabel" class="mobile-selector-mode">{{
+                headerEffortLabel
+              }}</span>
             </span>
           </button>
           <div
