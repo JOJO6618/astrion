@@ -1120,9 +1120,8 @@ class MainTerminalToolsExecutionMixin:
                 except Exception:
                     pass
                 
-                # 导入字符限制配置
+                # 导入字符限制配置（MAX_READ_FILE_CHARS 已在模块级导入，此处只补模块级没有的）
                 from config import (
-                    MAX_READ_FILE_CHARS, 
                     MAX_RUN_COMMAND_CHARS, MAX_EXTRACT_WEBPAGE_CHARS
                 )
 
@@ -2315,7 +2314,9 @@ class MainTerminalToolsExecutionMixin:
                                         # sub_agent_max_turns 仅对传统后台子智能体生效，这里不读取）
                                         _compress_threshold = 250_000
                                         try:
-                                            from modules.personalization_manager import load_personalization_config
+                                            # 禁止在此重复 import load_personalization_config：函数内 import 会把
+                                            # 该名字变成局部变量，使同一函数内更早位置（extract_webpage /
+                                            # save_webpage 读提取商配置）抛 UnboundLocalError 并被静默吞掉。
                                             _prefs = load_personalization_config(data_dir) or {}
                                             _compress_threshold = int(_prefs.get("sub_agent_compress_threshold_tokens", 250_000))
                                         except Exception:
@@ -2351,7 +2352,7 @@ class MainTerminalToolsExecutionMixin:
                             _max_turns = None
                             _prefs = {}
                             try:
-                                from modules.personalization_manager import load_personalization_config
+                                # 同上：不要在此重复 import（会毒化整个函数作用域）
                                 _prefs = load_personalization_config(str(getattr(self, "data_dir", ""))) or {}
                                 _raw_max_turns = _prefs.get("sub_agent_max_turns")
                                 if _raw_max_turns is not None:

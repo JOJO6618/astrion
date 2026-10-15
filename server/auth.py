@@ -315,7 +315,6 @@ def register():
     password = data.get('password') or ''
     invite_code = (data.get('invite_code') or '').strip()
 
-    from .security import get_client_ip
     client_ip = get_client_ip()
     limited, retry_after = check_rate_limit("register", 5, 300, client_ip)
     if limited:

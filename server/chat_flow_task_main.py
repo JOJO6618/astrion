@@ -2704,7 +2704,6 @@ async def handle_task_with_sender(
             has_running_background_commands=has_running_background_commands,
         )
         def run_completion_poll():
-            import asyncio
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -2740,7 +2739,6 @@ async def handle_task_with_sender(
             has_pending_ma_messages=has_pending_ma_messages,
         )
         def run_ma_poll():
-            import asyncio
             import threading as _t
             ma_debug(
                 "ma_poll_thread_enter",

@@ -355,7 +355,6 @@ class WebTerminal(MainTerminal):
         t0 = time.perf_counter()
         perf_log("_ensure_conversation_versioning_enabled enter", extra={"conv_id": normalized_id})
         is_host = bool(getattr(self, "_is_host_mode", lambda: False)())
-        from modules.personalization_manager import load_personalization_config
         personal_config = load_personalization_config(self.data_dir)
         backup_mode = str(personal_config.get("versioning_backup_mode") or "shallow").strip().lower()
         backup_mode = "full" if backup_mode == "full" else "shallow"

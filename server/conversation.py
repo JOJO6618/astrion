@@ -2007,7 +2007,6 @@ def stop_all_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, usernam
             debug_log(f"[StopAllSubAgents] soft_stop 会话={conversation_id}, 计数={stopped_count}")
         else:
             # terminate: 遍历所有非终态子智能体逐个终结
-            from modules.sub_agent.state import TERMINAL_STATUSES
             for task_info in list(manager.tasks.values()):
                 if task_info.get('conversation_id') != conversation_id:
                     continue

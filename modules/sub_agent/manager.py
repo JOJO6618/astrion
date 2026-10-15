@@ -1065,8 +1065,6 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
 
         返回成功恢复的任务数。
         """
-        from modules.sub_agent.task import SubAgentTask
-
         restored = 0
         terminal_statuses = TERMINAL_STATUSES.union({"terminated"})
         # 对话级隔离：仅恢复本 manager 绑定对话的任务；未绑定（工作区级
@@ -1416,8 +1414,6 @@ class SubAgentManager(SubAgentStateMixin, SubAgentStatsMixin, SubAgentCreationMi
 
         用于 failed/idle 等可复活状态被 send_message_to_sub_agent 重新激活的场景。
         """
-        from modules.sub_agent.task import SubAgentTask
-
         candidates = [
             t for t in self.tasks.values()
             if isinstance(t, dict) and t.get("agent_id") == agent_id and t.get("multi_agent_mode")

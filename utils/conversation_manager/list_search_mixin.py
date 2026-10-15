@@ -455,7 +455,7 @@ class ListSearchMixin:
             int: 清理的对话数量
         """
         try:
-            from datetime import datetime, timedelta
+            from datetime import timedelta
             cutoff_date = datetime.now() - timedelta(days=days)
             cutoff_iso = cutoff_date.isoformat()
             
