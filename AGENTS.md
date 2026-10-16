@@ -310,7 +310,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 **实现要点（改代码必须知道）**：
 
 - 后端核心 `core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁、`RESTRICTED_PERMISSION_MODES` 与受限档⇄沙箱联动）；执行环境锁在 `core/main_terminal.py::set_execution_mode`（只拦 direct）。
-- **创建对话的模式继承**：三条创建路径（prefer_defaults／显式模式／safe_navigation）**一律沿用 terminal 当前值，不用个性化默认值覆盖**——/new 页面切什么新对话就是什么；个性化 `default_work_mode`/`default_permission_mode` 仅在 terminal 首次构造时生效。多智能体与工作流创建路径同样遵守。**任何创建路径不得在 plan 锁之前调用非只读 set**（曾因此 500）。
+- **Web 新对话初始化（2026-10-16）**：所有新建按钮只进入 `/new`，删除立即创建空文件的个人选项；首条消息才创建。工作区 terminal 独立缓存个人默认模型、思考模式、推理强度、工作模式、权限模式；进入 `/new` 经 `POST /api/new-conversation/settings` 装配。执行环境/网络只继承**刚离开的同工作区正在查看的对话**；跨工作区、直接打开或来源缺失固定 `sandbox + restricted`，禁止扫描最近对话。推理强度 `null` 是有效默认。空页切换只改前端，首消息提交完整 `settings`，普通/多智能体共用 `server/context/new_conversation.py` 校验创建；创建时不再覆盖个人默认。状态轮询不得覆盖空页选择。CLI/Gateway 与工作流创建尚保留各自入口，不据此宣称已统一。**任何创建路径不得在 plan 锁之前调用非只读 set**（曾因此 500）。
 - 提示词：`prompts/work_mode.txt` + `mode.py::_build_work_mode_rules`（三档规则唯一来源）；冻结注入在 `messages.py`；切换走 drift 机制（`_RUNTIME_MODE_KINDS` 第四种）。
 - API：`GET/POST /api/work-mode`；**仅空闲可切换，运行中 409**。
 - 前端：输入栏 `work-mode-switcher`（streaming 时锁定）；plan 下权限/执行环境两组选项禁用+锁定标记（**网络权限组保持可调**，不整体锁死菜单）。

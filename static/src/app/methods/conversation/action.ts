@@ -1,10 +1,9 @@
 // @ts-nocheck
-import { debugLog, traceLog } from '../common';
+import { debugLog } from '../common';
 import { t } from '@/locales';
-import { usePersonalizationStore } from '../../../stores/personalization';
 import { persistNewConversationType } from '../../state';
 import './shared';
-import { conversationViewEpoch, currentConversationSession } from './session';
+import { currentConversationSession } from './session';
 import { useConversationStore } from '../../../stores/conversation';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
@@ -20,367 +19,32 @@ export const actionMethods = {
     }
   },
   async createNewConversation() {
-    this.leaveConversationView();
-    const workspaceId = this.currentHostWorkspaceId;
-    const epoch = conversationViewEpoch(this);
-    const owns = () =>
-      conversationViewEpoch(this) === epoch && this.currentHostWorkspaceId === workspaceId;
-    // 已移除「压缩中需确认并取消压缩」拦截：多对话独立运行后，某对话压缩中
-    // 不影响新建/切换其他对话（压缩锁已按对话隔离）。
-    debugLog('创建新对话...');
-    traceLog('createNewConversation:start', {
-      currentConversationId: this.currentConversationId,
-      convCount: Array.isArray(this.conversations) ? this.conversations.length : 'n/a'
-    });
-    this.logMessageState('createNewConversation:start');
-
-    // 新建对话前把 debounce 中的推理强度保存立即落盘（存到原对话）
-    this.flushReasoningEffortSave?.();
-
-    await this.persistComposerDraftNow({
-      reason: 'create-new-conversation',
-      force: true,
-      keepalive: true
-    }).catch(() => {});
-
-    if (!owns()) return;
-    // 按个性化设置分流：route-跳转空白新对话页（发送首条消息时才真正创建）；
-    // blank-保持现有行为，立即创建空对话
-    let newChatBehavior = 'route';
-    try {
-      newChatBehavior = usePersonalizationStore()?.form?.new_chat_button_behavior || 'route';
-    } catch (error) {
-      console.warn('读取新建对话按钮行为设置失败，按默认跳转处理:', error);
+    this.newConversationType =
+      useConversationStore().sidebarConversationType === 'multi_agent' ? 'multi_agent' : 'agent';
+    persistNewConversationType(this.newConversationType);
+    const workspaceId = String(this.currentHostWorkspaceId || '');
+    const tabs = useConversationTabsStore();
+    if (tabs.enabled) {
+      const workspace = (this.hostWorkspaces || []).find(
+        (item) => item.workspace_id === workspaceId
+      );
+      tabs.addNewTab({ workspaceId, workspaceLabel: workspace?.label || '' });
     }
-    if (newChatBehavior !== 'blank') {
-      // 跳转 /new 前把侧边栏过滤器类型同步给输入栏选择器：
-      // 看着哪类对话列表点新建，默认就创建哪类（选择器仍可手动改）。
-      try {
-        this.newConversationType =
-          useConversationStore().sidebarConversationType === 'multi_agent'
-            ? 'multi_agent'
-            : 'agent';
-        persistNewConversationType(this.newConversationType);
-      } catch (_e) {
-        // ignore
-      }
-      // 桌面端标签条：点「新建」= 新增一个 /new 标签（发首条消息才落地为对话）
-      try {
-        const tabsStore = useConversationTabsStore();
-        if (tabsStore.enabled) {
-          const wsId = String(this.currentHostWorkspaceId || '');
-          const ws = (Array.isArray(this.hostWorkspaces) ? this.hostWorkspaces : []).find(
-            (item: any) => String(item?.workspace_id || '') === wsId
-          );
-          tabsStore.addNewTab({ workspaceId: wsId, workspaceLabel: String(ws?.label || '') });
-          // 双 webview：主页面 SPA 进入 /new（chrome 标签条常驻顶部，
-          // 不再整页跳转——旧方案 location.href 会全屏闪白并重建标签条）
-          this.enterNewConversationPage?.();
-          return;
-        }
-      } catch (_tabsErr) {
-        // ignore
-      }
-      const target = '/new';
-      const normalize = (p) => String(p || '/').replace(/^\/+|\/+$/g, '');
-      if (normalize(window.location.pathname) !== normalize(target)) {
-        window.location.href = target;
-      }
-      return;
-    }
-
-    // 应用个性化设置中的默认模型和思考模式
-    try {
-      const personalizationStore = usePersonalizationStore();
-
-      if (personalizationStore.loaded) {
-        const defaultRunMode = personalizationStore.form.default_run_mode;
-        const defaultModel = personalizationStore.form.default_model;
-        const defaultReasoningEffort = personalizationStore.form.default_reasoning_effort;
-
-        if (defaultRunMode) {
-          this.runMode = defaultRunMode;
-          debugLog('应用默认运行模式:', defaultRunMode);
-        }
-
-        this.reasoningEffort = defaultReasoningEffort;
-
-        if (defaultModel) {
-          this.currentModelKey = defaultModel;
-          debugLog('应用默认模型:', defaultModel);
-        }
-
-        // 根据默认运行模式设置思考模式
-        if (defaultRunMode === 'thinking') {
-          this.thinkingMode = true;
-        } else if (defaultRunMode === 'fast') {
-          this.thinkingMode = false;
-        }
-      }
-    } catch (error) {
-      console.warn('应用个性化默认设置失败:', error);
-    }
-
-    this.clearLocalTaskUiState?.('create-new-conversation');
-
-    let backupToastId = null;
-    try {
-      const personalizationStore = usePersonalizationStore();
-      const shouldShowBackupToast =
-        this.versioningHostMode &&
-        personalizationStore.form.versioning_enabled_by_default &&
-        personalizationStore.form.versioning_backup_mode === 'full';
-      if (shouldShowBackupToast) {
-        backupToastId = this.uiPushToast({
-          title: t('appMessages.initializingBackupTitle'),
-          message: t('appMessages.initializingBackupMessage'),
-          type: 'info',
-          duration: null,
-          closable: false
-        });
-        this.versioningInitializingBackupToastId = backupToastId;
-      }
-
-      // 侧边栏新建：类型跟随侧边栏过滤器（看着哪类列表就建哪类对话）
-      const isMultiAgent = useConversationStore().sidebarConversationType === 'multi_agent';
-      const createUrl = isMultiAgent ? '/api/multiagent/conversations' : '/api/conversations';
-      // reasoning_effort 随创建权威写入新对话 meta（此处 this.reasoningEffort 已被上方
-      // 重置为个性化默认值，语义与“创建空对话写入默认值一次”一致）
-      const createBody = isMultiAgent
-        ? JSON.stringify({
-            preserve_mode: true,
-            thinking_mode: this.thinkingMode,
-            mode: this.runMode,
-            reasoning_effort: this.reasoningEffort
-          })
-        : JSON.stringify({
-            thinking_mode: this.thinkingMode,
-            mode: this.runMode,
-            reasoning_effort: this.reasoningEffort
-          });
-      const response = await fetch(createUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: createBody
-      });
-
-      const result = await response.json();
-      if (!owns()) return;
-
-      if (result.success) {
-        const newConversationId = result.conversation_id;
-        const waitForAnimation = (durationMs) =>
-          new Promise((resolve) => {
-            window.setTimeout(resolve, durationMs);
-          });
-        debugLog('新对话创建成功:', newConversationId);
-        traceLog('createNewConversation:created', { newConversationId });
-
-        // 在本地列表插入占位，避免等待刷新
-        const placeholder = {
-          id: newConversationId,
-          title: t('common.newConversation'),
-          updated_at: new Date().toISOString(),
-          total_messages: 0,
-          total_tools: 0
-        };
-        this.conversationInsertAnimations = {
-          ...this.conversationInsertAnimations,
-          [newConversationId]: 'create'
-        };
-        this.conversationListAnimationMode = 'create';
-        /* 原地 splice 保持数组引用：conversations 与双类型缓存中当前类型列表同一引用 */
-        this.conversations.splice(
-          0,
-          this.conversations.length,
-          placeholder,
-          ...this.conversations.filter((conv) => conv && conv.id !== newConversationId)
-        );
-
-        // 分组视图下同步在当前工作区分组顶部插入占位
-        try {
-          const { useConversationStore } = await import('../../../stores/conversation');
-          const conversationStore = useConversationStore();
-          const currentWorkspaceId = this.currentHostWorkspaceId;
-          if (currentWorkspaceId) {
-            conversationStore.ensureWorkspaceGroup(currentWorkspaceId);
-            const group = conversationStore.workspaceGroups.find(
-              (g: any) => g.workspaceId === currentWorkspaceId
-            );
-            if (group) {
-              group.conversations.splice(
-                0,
-                group.conversations.length,
-                placeholder,
-                ...group.conversations.filter((conv: any) => conv.id !== newConversationId)
-              );
-              group.expanded = true;
-              group.visibleOffset = 0;
-            }
-          }
-        } catch (_err) {
-          // ignore
-        }
-
-        window.setTimeout(() => {
-          const rest = { ...this.conversationInsertAnimations };
-          delete rest[newConversationId];
-          this.conversationInsertAnimations = rest;
-          this.conversationListAnimationMode = 'idle';
-        }, 700);
-
-        // 等待插入动画先完成一帧，避免立即加载对话导致列表闪烁/卡顿。
-        // 工作区旁新建不切换对话，所以不会触发此处的状态风暴；顶部新建需要切对话，
-        // 但把对话加载放到入场动画基本结束后再执行，动画就和工作区旁一致。
-        await waitForAnimation(540);
-        if (!owns()) return;
-
-        // 直接加载新对话，确保状态一致（统一入口，2026-10-10）
-        await this.handleSelectWorkspaceConversation(
-          {
-            conversationId: String(newConversationId || ''),
-            workspaceId: String(this.currentHostWorkspaceId || '')
-          },
-          { force: true }
-        );
-        traceLog('createNewConversation:after-load', {
-          newConversationId,
-          currentConversationId: this.currentConversationId
-        });
-
-        // 刷新对话列表获取最新统计
-        this.conversationsOffset = 0;
-        await this.loadConversationsList();
-        traceLog('createNewConversation:after-refresh', {
-          newConversationId,
-          conversationsLen: Array.isArray(this.conversations) ? this.conversations.length : 'n/a'
-        });
-
-        // 分组视图下刷新当前工作区数据，用 refresh 模式避免清空已加载内容导致闪烁
-        try {
-          const { useConversationStore } = await import('../../../stores/conversation');
-          const conversationStore = useConversationStore();
-          const currentWorkspaceId = this.currentHostWorkspaceId;
-          if (currentWorkspaceId) {
-            await conversationStore.loadWorkspaceConversations(currentWorkspaceId, {
-              refresh: true
-            });
-          }
-        } catch (_err) {
-          // ignore
-        }
-
-        await this.refreshRunningWorkspaceTasks?.();
-      } else {
-        console.error('创建对话失败:', result.message);
-        this.uiPushToast({
-          title: t('appMessages.createConversationFailed'),
-          message: result.message || t('appMessages.serverNotSuccessMessage'),
-          type: 'error'
-        });
-      }
-    } catch (error) {
-      if (!owns()) return;
-      console.error('创建对话异常:', error);
-      this.uiPushToast({
-        title: t('appMessages.createConversationErrorTitle'),
-        message: error.message || String(error),
-        type: 'error'
-      });
-    } finally {
-      if (owns() && backupToastId) {
-        this.uiDismissToast(backupToastId);
-        this.versioningInitializingBackupToastId = null;
-      }
-    }
+    return this.enterNewConversationPage({ workspaceId });
   },
   async createWorkspaceConversation(workspaceId: string) {
     if (!workspaceId) return;
-    debugLog('在指定工作区创建新对话:', workspaceId);
-    try {
-      const { useConversationStore } = await import('../../../stores/conversation');
-      const conversationStore = useConversationStore();
-      // 项目旁新建：类型跟随侧边栏过滤器（看着哪类列表就建哪类对话）
-      const isMultiAgent = conversationStore.sidebarConversationType === 'multi_agent';
-      const createUrl = isMultiAgent ? '/api/multiagent/conversations' : '/api/conversations';
-      const createPayload = isMultiAgent
-        ? { workspace_id: workspaceId, preserve_mode: true }
-        : { workspace_id: workspaceId };
-      const response = await fetch(createUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createPayload)
-      });
-      const result = await response.json();
-      if (result.success) {
-        const newConversationId = result.conversation_id;
-        debugLog('工作区新对话创建成功:', newConversationId);
-        const placeholder = {
-          id: newConversationId,
-          title: t('common.newConversation'),
-          updated_at: new Date().toISOString(),
-          total_messages: 0,
-          total_tools: 0
-        };
-
-        // 统一播放“整体下移 + 新项从左侧滑入”的动画
-        this.conversationInsertAnimations = {
-          ...this.conversationInsertAnimations,
-          [newConversationId]: 'create'
-        };
-        this.conversationListAnimationMode = 'create';
-        window.setTimeout(() => {
-          const rest = { ...this.conversationInsertAnimations };
-          delete rest[newConversationId];
-          this.conversationInsertAnimations = rest;
-          this.conversationListAnimationMode = 'idle';
-        }, 700);
-
-        // 立即在分组侧边栏插入占位，保证用户能立刻看到
-        try {
-          const { useConversationStore } = await import('../../../stores/conversation');
-          const conversationStore = useConversationStore();
-          conversationStore.ensureWorkspaceGroup(workspaceId);
-          const group = conversationStore.workspaceGroups.find(
-            (g: any) => g.workspaceId === workspaceId
-          );
-          if (group) {
-            group.conversations.splice(
-              0,
-              group.conversations.length,
-              placeholder,
-              ...group.conversations.filter((conv: any) => conv.id !== newConversationId)
-            );
-            group.expanded = true;
-            group.visibleOffset = 0;
-          }
-          // 延迟刷新该工作区列表以获取真实数据，用 refresh 模式保留占位避免闪烁
-          window.setTimeout(() => {
-            conversationStore
-              .loadWorkspaceConversations(workspaceId, { refresh: true })
-              .catch(() => {});
-          }, 300);
-        } catch (_err) {
-          // ignore
-        }
-      } else {
-        console.error('创建对话失败:', result.message);
-        this.uiPushToast({
-          title: t('appMessages.createConversationFailed'),
-          message: result.message || t('appMessages.serverNotSuccessMessage'),
-          type: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('创建工作区对话异常:', error);
-      this.uiPushToast({
-        title: t('appMessages.createWorkspaceConversationErrorTitle'),
-        message: error.message || String(error),
-        type: 'error'
-      });
+    this.newConversationType =
+      useConversationStore().sidebarConversationType === 'multi_agent' ? 'multi_agent' : 'agent';
+    persistNewConversationType(this.newConversationType);
+    const tabs = useConversationTabsStore();
+    if (tabs.enabled) {
+      const workspace = (this.hostWorkspaces || []).find(
+        (item) => item.workspace_id === workspaceId
+      );
+      tabs.addNewTab({ workspaceId, workspaceLabel: workspace?.label || '' });
     }
+    return this.enterNewConversationPage({ workspaceId });
   },
   async deleteConversation(payload) {
     const conversationId = typeof payload === 'string' ? payload : payload?.id;
@@ -435,6 +99,7 @@ export const actionMethods = {
           this.resetAllStates(`deleteConversation:${conversationId}`);
           this.resetTokenStatistics();
           history.replaceState({}, '', '/new');
+          await this.enterNewConversationPage();
         }
 
         // 先给目标项加 deleting 类执行左滑动画，再从本地列表移除。

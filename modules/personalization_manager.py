@@ -177,7 +177,6 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "agents_md_auto_inject": False,  # AGENTS.md 自动注入开关
     "claude_md_auto_inject": False,  # CLAUDE.md 自动注入开关（默认关闭）
     "agents_skills_scan_enabled": True,  # 自动扫描工作区 .agents/skills/ 行业通用技能目录（默认开启）
-    "new_chat_button_behavior": "route",  # 新建对话按钮行为：route-跳转空白新对话页 / blank-立即创建空对话
     "default_hide_workspace": False,  # 默认隐藏工作区
     "hide_quick_dock": False,  # 隐藏快捷窗口（对话区右侧的待办/子智能体/后台指令/文件窗口列）
     "quick_dock_auto_expand": True,  # 快捷窗口自动展开：True-有内容时自动展开 / False-只能手动点击按钮展开
@@ -778,12 +777,8 @@ def sanitize_personalization_payload(
     else:
         base["agents_skills_scan_enabled"] = bool(base.get("agents_skills_scan_enabled", True))
 
-    # 新建对话按钮行为：route-跳转空白新对话页 / blank-立即创建空对话
-    new_chat_behavior = data.get("new_chat_button_behavior", base.get("new_chat_button_behavior"))
-    if isinstance(new_chat_behavior, str) and new_chat_behavior.strip().lower() in ("route", "blank"):
-        base["new_chat_button_behavior"] = new_chat_behavior.strip().lower()
-    else:
-        base["new_chat_button_behavior"] = "route"
+    # 移除旧配置；新建对话统一进入 /new，旧文件或旧客户端不能恢复分流。
+    base.pop("new_chat_button_behavior", None)
 
     # 默认隐藏工作区
     if "default_hide_workspace" in data:

@@ -182,9 +182,6 @@ export default {
   themeDesc: '在经典、明亮和夜间之间切换',
   groupByWorkspaceTitle: '按项目分组对话',
   groupByWorkspaceDesc: '侧边栏对话记录按工作区/项目折叠展示',
-  newChatBlankTitle: '新建对话跳转空白页',
-  newChatBlankDesc:
-    '开启后点击「新建对话」跳转新对话页，发送首条消息时才创建；关闭则立即创建空对话',
   useCustomNamesTitle: '使用自定义称呼',
   useCustomNamesDesc: '对话区域使用个性化设置中的自称和称呼',
   enhancedToolDisplayTitle: '增强工具显示',

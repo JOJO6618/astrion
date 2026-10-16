@@ -2,6 +2,7 @@
 import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 
 export const modelMethods = {
   // 模型菜单：提供商组折叠/展开（opencode 式分组，2026-09-25 改造后不再有 Codex 子页）
@@ -73,6 +74,7 @@ export const modelMethods = {
       return;
     }
     const prev = this.currentModelKey;
+    const owns = beginAuxiliaryRequest(this, 'model');
     try {
       let data: any = {};
       if (this.versioningHostMode && !this.currentHostWorkspaceId) {
@@ -88,6 +90,9 @@ export const modelMethods = {
         if (!resp.ok || !payload.success) {
           throw new Error(payload.error || payload.message || t('appUi.switchFailed'));
         }
+      } else if (!this.currentConversationId) {
+        // /new 的当前选择随首条消息完整提交，不修改工作区默认配置。
+        data = { model_key: key };
       } else {
         // 携带当前对话 id：对话级隔离后，后端需要把模型设置到该对话专属的
         // 对话级 terminal 并保存到正确的对话文件，避免写到工作区级 terminal
@@ -106,6 +111,7 @@ export const modelMethods = {
         }
         data = payload.data || {};
       }
+      if (!owns()) return;
       modelStore.setModel(data.model_key || key);
       if (data.run_mode) {
         this.runMode = data.run_mode;
@@ -129,6 +135,7 @@ export const modelMethods = {
         type: 'success'
       });
     } catch (error) {
+      if (!owns()) return;
       modelStore.setModel(prev);
       const msg = error instanceof Error ? error.message : String(error || t('appUi.switchFailed'));
       this.uiPushToast({
@@ -137,9 +144,11 @@ export const modelMethods = {
         type: 'error'
       });
     } finally {
-      this.modelMenuOpen = false;
-      this.inputCloseMenus();
-      this.inputSetQuickMenuOpen(false);
+      if (owns()) {
+        this.modelMenuOpen = false;
+        this.inputCloseMenus();
+        this.inputSetQuickMenuOpen(false);
+      }
     }
   },
   async handleHeaderModelSelect(key, disabled) {

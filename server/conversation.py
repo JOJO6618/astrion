@@ -623,188 +623,21 @@ def get_conversations(data_context, workspace: UserWorkspace, username: str):
 @api_login_required
 @with_terminal
 def create_conversation(terminal: WebTerminal, workspace: UserWorkspace, username: str):
-    """创建新对话，支持通过 workspace_id 在指定工作区/项目中创建。"""
-    perf_log("create_conversation route enter", extra={"username": username})
-    t0 = time.perf_counter()
+    """Create from the complete /new client snapshot, without selecting a focus."""
+    from server.context.new_conversation import create_from_settings
     try:
-        data = request.get_json() or {}
-        # 前端现在期望"新建对话"回到用户配置的默认模型/模式，
-        # 只有当客户端显式要求保留当前模式时才使用传入值。
-        preserve_mode = bool(data.get('preserve_mode'))
-        thinking_mode = data.get('thinking_mode') if preserve_mode and 'thinking_mode' in data else None
-        run_mode = data.get('mode') if preserve_mode and 'mode' in data else None
-        target_workspace_id = (data.get('workspace_id') or '').strip()
-        multi_agent_mode = bool(data.get('multi_agent_mode'))
-        # /new 页发消息/新建对话时前端随 body 传入当前生效的推理强度，
-        # 权威写入新对话 meta；未提供时回落 terminal 当前档位 / 个性化默认值
-        body_effort_provided = 'reasoning_effort' in data
-        body_effort = None
-        if body_effort_provided:
-            raw_effort = data.get('reasoning_effort')
-            if raw_effort is None:
-                body_effort = None  # 显式默认档（不传参）
-            elif isinstance(raw_effort, str):
-                candidate_effort = raw_effort.strip().lower()
-                if candidate_effort in REASONING_EFFORT_LEVELS:
-                    body_effort = candidate_effort
-                else:
-                    body_effort_provided = False  # 非法值视为未提供
-            else:
-                body_effort_provided = False
-
-        if target_workspace_id:
-            try:
-                terminal, workspace = _resolve_target_terminal_for_workspace(
-                    username, target_workspace_id, terminal, workspace
-                )
-            except ValueError as exc:
-                return jsonify({"success": False, "error": str(exc)}), 404
-            except RuntimeError as exc:
-                return jsonify({"success": False, "error": str(exc)}), 503
-
-        # 多工作区并行后，新建/切换对话只是前端视图导航，不应停止同工作区正在运行的主任务。
-        # 同工作区单任务互斥由 /api/tasks 创建任务时兜底限制；输入框禁用由前端根据任务状态处理。
-        effective_workspace_id = target_workspace_id or session.get("workspace_id") or "default"
-        active_task = _get_active_workspace_task(username=username, workspace_id=effective_workspace_id)
-        if active_task:
-            # 运行中时只能创建“视图用”的新对话文件，不能调用 terminal.create_new_conversation。
-            # 后者会切换 context_manager.current_conversation_id，导致运行任务后续内容串写到新对话。
-            cm = getattr(getattr(terminal, "context_manager", None), "conversation_manager", None)
-            if not cm:
-                return jsonify({"success": False, "error": tr("conversation.manager_not_initialized")}), 500
-            try:
-                prefs = load_personalization_config(workspace.data_dir)
-            except Exception:
-                prefs = {}
-            safe_run_mode = str(run_mode or "").strip().lower()
-            if safe_run_mode == "deep":  # 旧版标识符映射
-                safe_run_mode = "thinking"
-            if safe_run_mode not in {"fast", "thinking"}:
-                candidate = str((prefs or {}).get("default_run_mode") or "").strip().lower()
-                if candidate == "deep":
-                    candidate = "thinking"
-                safe_run_mode = candidate if candidate in {"fast", "thinking"} else "fast"
-            safe_thinking = bool(thinking_mode) if thinking_mode is not None else safe_run_mode != "fast"
-            previous_cm_current = getattr(cm, "current_conversation_id", None)
-            # 运行模式（work_mode）：沿用 terminal 当前值（与正常创建路径一致）；
-            # plan 档不变量 ⇒ 权限必须只读，同时记录进入前权限供离开 plan 恢复
-            safe_work_mode = getattr(terminal, "get_work_mode", lambda: "plan")()
-            if safe_work_mode not in ("plan", "ask", "execute"):
-                safe_work_mode = "plan"
-            # 权限模式同样沿用 terminal 当前值（/new 切换已同步到 terminal，见
-            # _sync_workspace_terminal_mode）；个性化 default_permission_mode 仅在
-            # terminal 首次构造时生效，不能在此覆盖用户切换结果
-            safe_permission_mode = getattr(terminal, "get_permission_mode", lambda: "unrestricted")()
-            if safe_permission_mode not in ("readonly", "approval", "auto_approval", "unrestricted"):
-                safe_permission_mode = "unrestricted"
-            safe_pre_plan_permission = None
-            if safe_work_mode == "plan":
-                if safe_permission_mode != "readonly":
-                    safe_pre_plan_permission = safe_permission_mode
-                safe_permission_mode = "readonly"
-            # 推理强度优先级：body 显式值 > terminal 当前档位 > 个性化默认值
-            if body_effort_provided:
-                default_effort = body_effort
-            else:
-                terminal_effort = getattr(terminal, "reasoning_effort", None)
-                if isinstance(terminal_effort, str) and terminal_effort.strip().lower() in REASONING_EFFORT_LEVELS:
-                    default_effort = terminal_effort.strip().lower()
-                else:
-                    default_effort = (prefs or {}).get("default_reasoning_effort")
-                    if isinstance(default_effort, str):
-                        default_effort = default_effort.strip().lower() or None
-                        if default_effort not in REASONING_EFFORT_LEVELS:
-                            default_effort = None
-                    else:
-                        default_effort = None
-            # 工具动态加载快照（多智能体对话不启用；老对话无字段=不启用）
-            try:
-                from core.tool_loading import snapshot_overrides_from_prefs
-                _tl_overrides = snapshot_overrides_from_prefs(prefs, multi_agent_mode=bool(multi_agent_mode))
-            except Exception:
-                _tl_overrides = {}
-            conversation_id = cm.create_conversation(
-                project_path=str(workspace.project_path),
-                thinking_mode=safe_thinking,
-                run_mode=safe_run_mode,
-                initial_messages=[],
-                model_key=(prefs or {}).get("default_model") or getattr(terminal, "model_key", None),
-                metadata_overrides={
-                    "permission_mode": safe_permission_mode,
-                    "execution_mode": getattr(terminal, "get_execution_mode", lambda: "sandbox")(),
-                    "work_mode": safe_work_mode,
-                    "pre_plan_permission_mode": safe_pre_plan_permission,
-                    "multi_agent_mode": bool(multi_agent_mode),
-                    "reasoning_effort": default_effort,
-                    **_tl_overrides,
-                },
-            )
-            try:
-                cm.current_conversation_id = previous_cm_current
-            except Exception:
-                pass
-            # 同步 terminal 级别的多智能体开关，避免新对话继承旧状态
-            terminal.multi_agent_mode = bool(multi_agent_mode)
-            try:
-                if hasattr(terminal, "sub_agent_manager"):
-                    terminal.sub_agent_manager.multi_agent_mode = bool(multi_agent_mode)
-            except Exception:
-                pass
-            result = {
-                "success": True,
-                "conversation_id": conversation_id,
-                "message": tr("conversation.created_detail", conversation_id=conversation_id),
-                "safe_navigation": True,
-            }
-        else:
-            # body 显式携带档位时权威覆盖（prefer_defaults 路径内部会应用 prefs 默认值，
-            # 必须以用户实际选择为准）
-            create_meta_overrides = {"multi_agent_mode": bool(multi_agent_mode)}
-            if body_effort_provided:
-                create_meta_overrides["reasoning_effort"] = body_effort
-            result = terminal.create_new_conversation(
-                thinking_mode=thinking_mode,
-                run_mode=run_mode,
-                metadata_overrides=create_meta_overrides,
-            )
-            # 同步 terminal 级别的多智能体开关，避免新对话继承旧状态
-            terminal.multi_agent_mode = bool(multi_agent_mode)
-            try:
-                if hasattr(terminal, "sub_agent_manager"):
-                    terminal.sub_agent_manager.multi_agent_mode = bool(multi_agent_mode)
-            except Exception:
-                pass
-
-        if result["success"]:
-            # 仅在当前工作区创建时更新 session 模式；指定其他工作区时由前端切换后自动同步。
-            if not target_workspace_id:
-                session['run_mode'] = terminal.run_mode
-                session['thinking_mode'] = terminal.thinking_mode
-            perf_log("create_conversation before default versioning", elapsed_ms=(time.perf_counter() - t0) * 1000, extra={"conv_id": result.get("conversation_id")})
-            # 根据个性化设置，为新对话默认开启版本控制（安全导航路径也需要）。
-            # create_new_conversation 内部已完成初始化时跳过，避免每个新对话初始化两遍。
-            try:
-                prefs = load_personalization_config(workspace.data_dir)
-                if bool(prefs.get("versioning_enabled_by_default", True)) and not result.get("versioning_initialized"):
-                    _ensure_conversation_versioning_enabled(terminal, workspace, result["conversation_id"])
-            except Exception as exc:
-                debug_log(f"[Versioning] create_conversation apply default failed: {exc}")
-            perf_log("create_conversation after default versioning", elapsed_ms=(time.perf_counter() - t0) * 1000, extra={"conv_id": result.get("conversation_id")})
-            # 对话列表/切换推送已随 WebSocket 移除：发起方依据响应刷新，其他标签页由轮询同步。
-
-            perf_log("create_conversation route done", elapsed_ms=(time.perf_counter() - t0) * 1000, extra={"conv_id": result.get("conversation_id")})
-            return jsonify(result), 201
-        else:
-            perf_log("create_conversation route failed", elapsed_ms=(time.perf_counter() - t0) * 1000)
-            return jsonify(result), 500
-            
-    except Exception as e:
-        logger.error(f"[API] 创建对话错误: {e}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "message": tr("conversation.create_exception")
-        }), 500
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            raise ValueError("Expected an object")
+        result = create_from_settings(terminal, workspace, payload.get("settings"))
+        return jsonify(result), 201
+    except PermissionError as exc:
+        return jsonify(success=False, error=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except Exception as exc:
+        logger.exception("[API] New conversation creation failed")
+        return jsonify(success=False, error=str(exc)), 500
 
 @conversation_bp.route('/api/conversations/<conversation_id>', methods=['GET'])
 @api_login_required

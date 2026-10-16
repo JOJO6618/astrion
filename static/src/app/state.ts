@@ -152,6 +152,8 @@ export function dataState() {
     _scrollListenerReady: false,
     historyLoading: false,
     historyLoadingFor: null,
+    newConversationSettingsReady: false,
+    newConversationRestoreModes: {},
     blankHeroActive: false,
     blankHeroExiting: false,
     blankWelcomeText: '',

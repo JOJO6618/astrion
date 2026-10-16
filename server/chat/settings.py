@@ -458,6 +458,8 @@ def update_personalization_settings(terminal: Optional[WebTerminal], workspace: 
                     config,
                     apply_default_modes=not bool(getattr(terminal, '_bound_conversation_id', None)),
                 )
+                from server.context.new_conversation import remember_workspace_defaults
+                remember_workspace_defaults(terminal, config)
                 session['run_mode'] = terminal.run_mode
                 session['thinking_mode'] = terminal.thinking_mode
                 ctx = getattr(terminal, 'context_manager', None)

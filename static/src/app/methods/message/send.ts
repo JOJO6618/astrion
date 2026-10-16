@@ -7,6 +7,7 @@ import { extractSkillRefsFromMessage } from './shared';
 import { usePreviewStore } from '../../../stores/preview';
 import { createOwnedMessageTask, ensureMessageSession } from './ownership';
 import { messageControlMethods } from './controls';
+import { captureNewConversationSettings } from '../ui/newConversation';
 import {
   beginConversationSubmission,
   endConversationSubmission,
@@ -18,6 +19,12 @@ export { createOwnedMessageTask, ensureMessageSession } from './ownership';
 export const sendMethods = {
   ...messageControlMethods,
   async sendMessage(options = {}) {
+    if (
+      this.hostWorkspaceSwitching ||
+      this.historyLoading ||
+      (!this.currentConversationId && !this.newConversationSettingsReady)
+    )
+      return false;
     const session = ensureMessageSession(this);
     const submission = beginConversationSubmission(session);
     if (!submission) return false;
@@ -34,6 +41,7 @@ export const sendMethods = {
     const presetText = typeof options?.presetText === 'string' ? options.presetText : null;
     const usePresetText = presetText !== null;
     const owns = () => ownsConversationSession(this, session);
+    const newSettings = !this.currentConversationId ? captureNewConversationSettings(this) : null;
     usePreviewStore().resetAutoOpen();
 
     if (this.compressionActiveForCurrentConversation) {
@@ -188,22 +196,10 @@ export const sendMethods = {
         // 首条消息创建：类型来自输入栏「智能体/多智能体」选择器（newConversationType）
         const isMultiAgent = this.newConversationType === 'multi_agent';
         const createUrl = isMultiAgent ? '/api/multiagent/conversations' : '/api/conversations';
-        // reasoning_effort 随创建权威写入新对话 meta：/new 页面用户可能已手动调整档位，
-        // 不能依赖后端 terminal 值（会被 status 轮询的 prefs 应用覆盖）
-        const createBody = isMultiAgent
-          ? JSON.stringify({
-              preserve_mode: true,
-              workspace_id: session.workspaceId,
-              thinking_mode: this.thinkingMode,
-              mode: this.runMode,
-              reasoning_effort: this.reasoningEffort
-            })
-          : JSON.stringify({
-              workspace_id: session.workspaceId,
-              thinking_mode: this.thinkingMode,
-              mode: this.runMode,
-              reasoning_effort: this.reasoningEffort
-            });
+        const createBody = JSON.stringify({
+          workspace_id: session.workspaceId,
+          settings: newSettings
+        });
         const createResp = await fetch(createUrl, {
           method: 'POST',
           headers: {
@@ -382,9 +378,9 @@ export const sendMethods = {
         videos,
         targetConversationId,
         {
-          model_key: this.currentModelKey,
-          run_mode: this.runMode,
-          thinking_mode: this.thinkingMode,
+          model_key: newSettings?.model_key ?? this.currentModelKey,
+          run_mode: newSettings?.run_mode ?? this.runMode,
+          thinking_mode: newSettings?.thinking_mode ?? this.thinkingMode,
           message_source: localMessageSource,
           queued_message_id: options?.queuedMessageId || undefined,
           goal_mode: startingGoalMode,

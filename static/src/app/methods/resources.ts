@@ -132,45 +132,18 @@ export const resourceMethods = {
 
   applyStatusSnapshot(status) {
     this.resourceApplyStatusSnapshot(status);
-    // 模型/思考模式/推理强度的权威来源规则：
-    // - 非空对话：以对话 meta 为准（enterConversation bootstrap 恢复），
-    //   status 快照不得覆盖（terminal 状态可能滞后于对话加载）
-    // - 空对话/首页：terminal 状态即权威，从 status 同步
-    // - 例外：显式新建路由（/new、/multiagent/new）上 terminal 状态属于上一个
-    //   对话的残留上下文，不同步（个性化默认值是这里的权威，见 loadInitialData）
+    // Existing conversations restore model settings from bootstrap; /new owns its
+    // prepared settings locally. Status polling must not replace either source.
     const convId = this.currentConversationId;
     const hasConversation =
       typeof convId === 'string' && convId.length > 0 && !convId.startsWith('temp_');
     const onExplicitNewRoute =
       typeof this.isExplicitNewConversationRoute === 'function' &&
       this.isExplicitNewConversationRoute();
-    if (!hasConversation && !onExplicitNewRoute) {
-      if (status && typeof status.thinking_mode !== 'undefined') {
-        this.thinkingMode = !!status.thinking_mode;
-      }
-      if (status && typeof status.run_mode === 'string') {
-        // 历史值 deep 映射为 thinking
-        this.runMode = status.run_mode === 'deep' ? 'thinking' : status.run_mode;
-      } else if (status && typeof status.thinking_mode !== 'undefined') {
-        this.runMode = status.thinking_mode ? 'thinking' : 'fast';
-      }
-      if (status && Object.prototype.hasOwnProperty.call(status, 'reasoning_effort')) {
-        this.reasoningEffort =
-          typeof status.reasoning_effort === 'string' ? status.reasoning_effort : null;
-      }
-      if (status && typeof status.model_key === 'string') {
-        this.modelSet(status.model_key);
-      }
-    }
-    // 运行模式四件套（work_mode/permission_mode/execution_mode/network_permission）
-    // 来源隔离：status_update 是用户级房间广播，工作区级 / 其他对话 / 其他标签页
-    // 的 terminal 触发时都会携带它自己的模式值；不做隔离时别的 terminal 的快照会
-    // 覆盖当前对话的显示（plan 锁对话的 UI 会被误解锁，点击切换又被后端 500 拒绝）。
-    // 仅当快照对应当前查看的对话（含双空：/new 页面 ↔ 工作区级 terminal）才应用；
-    // 对话权威值由 load.ts 进入对话时的对话级 fetch（fetchWorkMode 等）保证。
+    // Runtime mode updates apply only to the explicitly displayed conversation.
     const statusConvIdRaw = status?.conversation?.current_id;
     const statusConvId = typeof statusConvIdRaw === 'string' ? statusConvIdRaw : '';
-    const modeSourceMatches = hasConversation ? statusConvId === convId : !statusConvId;
+    const modeSourceMatches = hasConversation && statusConvId === convId;
     if (modeSourceMatches) {
       if (status && typeof status.permission_mode === 'string') {
         this.currentPermissionMode = status.permission_mode;

@@ -16,6 +16,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 
 from server.auth_helpers import api_login_required, login_required, get_current_username
 from server.context import get_user_resources
+from server.context.decorators import with_terminal
 from server.context.data_decorators import with_workspace_data
 from server.entry_assets import serve_entry_html
 from modules.multi_agent.role_store import (
@@ -29,7 +30,6 @@ from modules.multi_agent.role_store import (
     validate_role_id,
 )
 from config.paths import CUSTOM_ROLES_DIR, WEB_PRESET_ROLES_DIR
-from config.limits import REASONING_EFFORT_LEVELS
 from modules.i18n import tr
 
 multi_agent_bp = Blueprint("multi_agent", __name__)
@@ -280,155 +280,22 @@ def update_multi_agent_settings_api():
 
 @multi_agent_bp.route("/api/multiagent/conversations", methods=["POST"])
 @api_login_required
-def create_multi_agent_conversation():
-    """创建多智能体模式对话。在 metadata 中写入 multi_agent_mode=true。
-
-    body: { workspace_id?, thinking_mode?, run_mode?, preserve_mode? }
-    """
-    import time as _time
-    from server.conversation import _get_active_workspace_task, _resolve_target_terminal_for_workspace
-    from modules.personalization_manager import load_personalization_config
+@with_terminal
+def create_multi_agent_conversation(terminal, workspace, username):
+    """Use the same /new snapshot contract for multi-agent conversations."""
+    from server.context.new_conversation import create_from_settings
     try:
-        from server.user_workspace import UserWorkspace  # noqa
-    except Exception:
-        UserWorkspace = None  # type: ignore
-
-    username = get_current_username()
-    if not username:
-        return jsonify({"success": False, "error": tr("multi_agent_api.not_logged_in")}), 401
-
-    data = request.get_json() or {}
-    target_workspace_id = (data.get("workspace_id") or "").strip()
-
-    terminal, workspace = get_user_resources(username)
-    if not terminal or not workspace:
-        return jsonify({"success": False, "error": tr("multi_agent_api.workspace_not_ready")}), 503
-
-    if target_workspace_id:
-        try:
-            terminal, workspace = _resolve_target_terminal_for_workspace(
-                username, target_workspace_id, terminal, workspace
-            )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 404
-        except RuntimeError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 503
-
-    preserve_mode = bool(data.get("preserve_mode"))
-    thinking_mode = data.get("thinking_mode") if preserve_mode and "thinking_mode" in data else None
-    run_mode = data.get("mode") if preserve_mode and "mode" in data else None
-    # 前端随 body 传入当前生效的推理强度，权威写入新对话 meta
-    body_effort_provided = "reasoning_effort" in data
-    body_effort = None
-    if body_effort_provided:
-        raw_effort = data.get("reasoning_effort")
-        if raw_effort is None:
-            body_effort = None
-        elif isinstance(raw_effort, str):
-            candidate_effort = raw_effort.strip().lower()
-            if candidate_effort in REASONING_EFFORT_LEVELS:
-                body_effort = candidate_effort
-            else:
-                body_effort_provided = False
-        else:
-            body_effort_provided = False
-
-    effective_workspace_id = target_workspace_id or session.get("workspace_id") or "default"
-    active_task = _get_active_workspace_task(username=username, workspace_id=effective_workspace_id)
-
-    try:
-        prefs = load_personalization_config(workspace.data_dir)
-    except Exception:
-        prefs = {}
-
-    ctx_manager = getattr(terminal, "context_manager", None)
-    if not ctx_manager:
-        return jsonify({"success": False, "error": tr("multi_agent_api.context_manager_not_initialized")}), 500
-    cm = getattr(ctx_manager, "multi_agent_conversation_manager", None) or getattr(ctx_manager, "conversation_manager", None)
-    if not cm:
-        return jsonify({"success": False, "error": tr("multi_agent_api.conversation_manager_not_initialized")}), 500
-
-    safe_run_mode = str(run_mode or "").strip().lower()
-    if safe_run_mode == "deep":  # 旧版标识符映射
-        safe_run_mode = "thinking"
-    if safe_run_mode not in {"fast", "thinking"}:
-        candidate = str((prefs or {}).get("default_run_mode") or "").strip().lower()
-        if candidate == "deep":
-            candidate = "thinking"
-        safe_run_mode = candidate if candidate in {"fast", "thinking"} else "fast"
-    safe_thinking = bool(thinking_mode) if thinking_mode is not None else safe_run_mode != "fast"
-    # 运行模式（work_mode）：沿用 terminal 当前值（与正常创建路径一致，
-    # /new 页面切换后新对话继承）；plan 档不变量 ⇒ 权限必须只读，
-    # 同时记录进入前权限供离开 plan 恢复
-    safe_work_mode = getattr(terminal, "get_work_mode", lambda: "plan")()
-    if safe_work_mode not in ("plan", "ask", "execute"):
-        safe_work_mode = "plan"
-    # 权限模式同样沿用 terminal 当前值（/new 切换已同步到 terminal，见
-    # _sync_workspace_terminal_mode）；个性化 default_permission_mode 仅在
-    # terminal 首次构造时生效，不能在此覆盖用户切换结果
-    safe_permission_mode = getattr(terminal, "get_permission_mode", lambda: "unrestricted")()
-    if safe_permission_mode not in ("readonly", "approval", "auto_approval", "unrestricted"):
-        safe_permission_mode = "unrestricted"
-    safe_pre_plan_permission = None
-    if safe_work_mode == "plan":
-        if safe_permission_mode != "readonly":
-            safe_pre_plan_permission = safe_permission_mode
-        safe_permission_mode = "readonly"
-
-    previous_cm_current = getattr(ctx_manager, "current_conversation_id", None)
-
-    # 推理强度优先级：body 显式值 > terminal 当前档位 > 个性化默认值
-    if body_effort_provided:
-        ma_effort = body_effort
-    else:
-        terminal_effort = getattr(terminal, "reasoning_effort", None)
-        if isinstance(terminal_effort, str) and terminal_effort.strip().lower() in REASONING_EFFORT_LEVELS:
-            ma_effort = terminal_effort.strip().lower()
-        else:
-            ma_effort = (prefs or {}).get("default_reasoning_effort")
-            if isinstance(ma_effort, str):
-                ma_effort = ma_effort.strip().lower() or None
-                if ma_effort not in REASONING_EFFORT_LEVELS:
-                    ma_effort = None
-            else:
-                ma_effort = None
-
-    conversation_id = cm.create_conversation(
-        project_path=str(workspace.project_path),
-        thinking_mode=safe_thinking,
-        run_mode=safe_run_mode,
-        initial_messages=[],
-        model_key=(prefs or {}).get("default_model") or getattr(terminal, "model_key", None),
-        metadata_overrides={
-            "permission_mode": safe_permission_mode,
-            "execution_mode": getattr(terminal, "get_execution_mode", lambda: "sandbox")(),
-            "work_mode": safe_work_mode,
-            "pre_plan_permission_mode": safe_pre_plan_permission,
-            "multi_agent_mode": True,
-            "reasoning_effort": ma_effort,
-        },
-    )
-    # 恢复 context_manager 的当前对话（不要影响普通对话的 current_conversation_id）
-    try:
-        ctx_manager.current_conversation_id = previous_cm_current
-    except Exception:
-        pass
-    # 同步 terminal 级别的多智能体开关
-    terminal.multi_agent_mode = True
-    try:
-        if hasattr(terminal, "sub_agent_manager"):
-            terminal.sub_agent_manager.multi_agent_mode = True
-    except Exception:
-        pass
-
-    # 对话列表更新不再经 WebSocket 广播：发起方依据本响应刷新列表，
-    # 其他标签页由对话列表轮询同步。
-
-    return jsonify({
-        "success": True,
-        "conversation_id": conversation_id,
-        "multi_agent_mode": True,
-    }), 201
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            raise ValueError("Expected an object")
+        result = create_from_settings(
+            terminal, workspace, payload.get("settings"), multi_agent=True,
+        )
+        return jsonify(result), 201
+    except PermissionError as exc:
+        return jsonify(success=False, error=str(exc)), 403
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
 
 
 @multi_agent_bp.route("/api/multiagent/models", methods=["GET"])

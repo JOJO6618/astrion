@@ -6,13 +6,13 @@ from flask import Blueprint, jsonify, request
 from modules.file_manager import FileManager
 from server.context.modes import effective_modes, pending_modes
 from modules.i18n import tr
-from modules.personalization_manager import load_personalization_config
 from modules.preview_targets import _normalize as normalize_preview, is_preview_enabled
 from server.auth_helpers import api_login_required
+
 from server.context.background import background_status
 from server.context.data_decorators import with_workspace_data
-from server.context.resources import find_runtime
 from server.tasks import task_manager
+
 from server.tasks.queue_state import queue_snapshot
 from server.conversation_view.snapshots import ACTIVE
 
@@ -124,22 +124,50 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
 @api_login_required
 @with_workspace_data
 def workspace_view(data_context, workspace, username):
-    """Prepare blank-view settings without a workspace terminal or conversation."""
-    prefs = load_personalization_config(workspace.data_dir)
-    terminal = find_runtime(username, workspace)
-    run_mode = getattr(terminal, "run_mode", None) or prefs.get("default_run_mode") or "fast"
+    """Read workspace identity and activity without preparing /new settings."""
     from server.runtime import runtime_service
+
     active = runtime_service.list_runs(username, data_context.workspace_id, status='active')
     return jsonify(success=True, data={
         'host_mode': data_context.identity.host_mode,
         'active_conversation_id': active[0].get('conversation_id') if active else None,
-        'pending_runtime_modes': pending_modes(data_context, {}, None),
-        'execution_mode_enabled': data_context.identity.host_mode and data_context.identity.role == 'admin',
-        'network_permission_enabled': data_context.identity.host_mode and data_context.identity.role == 'admin',
         "workspace": {"workspace_id": data_context.workspace_id,
                       "project_path": str(workspace.project_path) if workspace.username == "host" else ""},
-        "modes": effective_modes(data_context, {}, None),
-        "model_key": getattr(terminal, "model_key", None) or prefs.get("default_model"),
-        "run_mode": "thinking" if run_mode == "deep" else run_mode,
-        "reasoning_effort": getattr(terminal, "reasoning_effort", None) or prefs.get("default_reasoning_effort"),
+
     })
+
+
+@conversation_bootstrap_bp.route("/api/new-conversation/settings", methods=["POST"])
+@api_login_required
+@with_workspace_data
+def prepare_new_conversation_settings(data_context, workspace, username):
+    """Explicit /new preparation may acquire a workspace runtime, never a file."""
+    from server.context.new_conversation import prepare_draft_settings
+    from server.context.resources import get_user_resources, _resource_lock, _make_terminal_key
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            raise ValueError("Expected an object")
+        previous_id = payload.get("previous_conversation_id")
+
+        if previous_id is not None and not isinstance(previous_id, str):
+            raise ValueError("Invalid previous_conversation_id")
+        # An explicit source is resolved only inside the target workspace storage.
+        owner = "host" if workspace.username == "host" else username
+        with _resource_lock(_make_terminal_key(owner, workspace.workspace_id)):
+            terminal, workspace = get_user_resources(
+                username, workspace_id=data_context.workspace_id, update_session=False,
+            )
+            settings = prepare_draft_settings(terminal, workspace, previous_id)
+        manageable = data_context.identity.host_mode and data_context.identity.role == "admin"
+        return jsonify(success=True, data={
+            "workspace": {"workspace_id": data_context.workspace_id,
+                          "project_path": str(workspace.project_path) if data_context.identity.host_mode else ""},
+            "settings": settings,
+            "execution_mode_enabled": manageable,
+            "network_permission_enabled": manageable,
+        })
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except RuntimeError as exc:
+        return jsonify(success=False, error=str(exc)), 503

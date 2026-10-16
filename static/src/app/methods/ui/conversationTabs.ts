@@ -2,7 +2,6 @@
 // 桌面端顶部对话标签条：激活/新建/关闭后的视图导航动作。
 // store 数据操作在 ConversationTabStrip.vue 组件内完成，这里只负责导航，
 // 全部复用现有对话切换路径（跨工作区打开 / SPA 进入 /new），不发明新链路。
-import { t } from '@/locales';
 import { useConversationTabsStore, CHROME_RESUME_TAB_KEY } from '../../../stores/conversationTabs';
 
 export const conversationTabsMethods = {
@@ -44,7 +43,7 @@ export const conversationTabsMethods = {
     // 此前这里只导航不 setActive，主 store 的 activeKey 停在旧对话标签，
     // chrome 乐观窗口（2.5s）过期后轮询快照把选中态收敛回旧标签（点击回弹）。
     tabsStore.setActive(tab.key);
-    this.navigateToTabNewPage();
+    await this.navigateToTabNewPage(tab.workspaceId);
   },
 
   /** chrome 标签条（独立 webview）派发来的意图：activate/new/close。
@@ -157,7 +156,9 @@ export const conversationTabsMethods = {
       return;
     }
     if (active && active.kind === 'new') {
-      return; // 恢复的是 new 标签：已在 /new，选中态已由 setActive 落地
+      if (active.workspaceId && active.workspaceId !== this.currentHostWorkspaceId)
+        await this.navigateToTabNewPage(active.workspaceId);
+      return;
     }
     if (!tabsStore.activeTab) {
       // 暂存标签已不存在（对话被删/标签被关）或无任何可恢复的：
@@ -167,8 +168,8 @@ export const conversationTabsMethods = {
   },
 
   /** 跳到 /new 页（双 webview 后主页面 SPA 进入，不再整页跳转）。 */
-  navigateToTabNewPage() {
-    this.enterNewConversationPage();
+  navigateToTabNewPage(workspaceId) {
+    return this.enterNewConversationPage({ workspaceId });
   },
 
   /** 主页面窗口级快捷键：⌘T 新建标签 / ⌘W 关闭当前标签。
@@ -197,27 +198,16 @@ export const conversationTabsMethods = {
 
   /** SPA 方式进入 /new 空态：chrome 标签条常驻顶部，主页面切换不整页刷新，
    *  避免旧方案 location.href 跳转的全屏闪白与标签条重建。 */
-  enterNewConversationPage() {
-    this.leaveConversationView();
-    this.clearLocalTaskUiState?.('chrome-tabs:enter-new');
-    // 独立全屏路由（设置/工作流）没有对话体系状态，只能整跳回 /new
+  async enterNewConversationPage(options = {}) {
+    const workspaceId = String(options.workspaceId || this.currentHostWorkspaceId || '');
     if (this.isConversationIndependentRoute?.()) {
       useConversationTabsStore().persistNow();
-      window.location.assign('/new');
+      window.location.assign(
+        `/new${workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : ''}`
+      );
       return;
     }
-    const path = String(window.location.pathname || '/').replace(/^\/+|\/+$/g, '');
-    if ((path === '' || path === 'new') && !this.currentConversationId) return;
-    history.pushState({}, '', '/new');
-    this.currentConversationId = null;
-    this.currentConversationTitle = t('common.newConversation');
-    this.messages = [];
-    this.titleReady = true;
-    this.suppressTitleTyping = false;
-    this.startTitleTyping(t('common.newConversation'), { animate: false });
-    this.resetAllStates('chrome-tabs:enter-new');
-    this.resetTokenStatistics();
-    this.refreshBlankHeroState();
-    this.restoreComposerDraftState('chrome-tabs:new').catch(() => {});
+    this.flushReasoningEffortSave?.();
+    return this.handleHostWorkspaceSwitch(workspaceId, { newConversation: true });
   }
 };

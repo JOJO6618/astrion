@@ -73,6 +73,8 @@ def _apply_workspace_personalization_preferences(
             apply_default_model=apply_default_model,
             apply_default_modes=apply_default_modes,
         )
+        from server.context.new_conversation import remember_workspace_defaults
+        remember_workspace_defaults(terminal, config)
         if apply_default_model:
             try:
                 terminal._workspace_default_model_applied = True

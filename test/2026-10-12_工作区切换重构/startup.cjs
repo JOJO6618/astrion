@@ -27,8 +27,11 @@ async function run() {
     host_mode: true, workspace: { workspace_id: 'agents', project_path: '/synthetic/agents' } } });
   await flush();
   assert.equal(f.requests.length, 2);
-  assert.equal(f.requests[1].url, '/api/input-draft?workspace_id=agents');
-  respond(f.requests[1], { success: true, data: { content: 'the correct workspace draft' } });
+  assert.equal(f.requests[1].url, '/api/new-conversation/settings');
+  respond(f.requests[1], { success: true, data: { settings: { work_mode: 'ask', reasoning_effort: null } } });
+  await flush();
+  assert.equal(f.requests[2].url, '/api/input-draft?workspace_id=agents');
+  respond(f.requests[2], { success: true, data: { content: 'the correct workspace draft' } });
   await pending;
   assert.equal(f.host.currentHostWorkspaceId, 'agents');
   assert.equal(f.host.inputMessage, 'the correct workspace draft');
@@ -69,7 +72,9 @@ async function run() {
   const starting = failure.host.bootstrapRoute(); await flush();
   respond(failure.requests[0], { success: true, data: {
     host_mode: true, workspace: { workspace_id: 'agents' } } }); await flush();
-  respond(failure.requests[1], { success: false, error: 'synthetic draft failure' }, false);
+  respond(failure.requests[1], { success: true, data: { settings: { work_mode: 'ask' } } });
+  await flush();
+  respond(failure.requests[2], { success: false, error: 'synthetic draft failure' }, false);
   await starting;
   assert.equal(failure.host.initialRouteResolved, true);
   assert.equal(failure.host.currentHostWorkspaceId, 'agents');

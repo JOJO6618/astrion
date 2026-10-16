@@ -50,7 +50,12 @@ export const permissionMethods = {
     const target = String(mode || '')
       .trim()
       .toLowerCase();
-    if (!target) {
+    if (!['readonly', 'approval', 'auto_approval', 'unrestricted'].includes(target)) {
+      this.closePermissionMenu();
+      return;
+    }
+    if (!this.currentConversationId) {
+      this.setNewConversationMode('permission', target);
       this.closePermissionMenu();
       return;
     }
@@ -62,10 +67,8 @@ export const permissionMethods = {
         },
         body: JSON.stringify({
           mode: target,
-          // 对话级隔离：携带当前对话 ID，让后端把模式设置到对话级 terminal
-          // （任务实际运行的实例），并持久化到当前对话 metadata；
-          // /new 页面无对话时回退到工作区级 terminal（新对话创建时继承）。
-          ...(this.currentConversationId ? { conversation_id: this.currentConversationId } : {})
+          // Existing conversations persist changes to their bound runtime.
+          conversation_id: this.currentConversationId
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -106,7 +109,11 @@ export const permissionMethods = {
     const target = String(mode || '')
       .trim()
       .toLowerCase();
-    if (!this.executionModeEnabled || !target) {
+    if (!this.executionModeEnabled || !['sandbox', 'direct'].includes(target)) {
+      return;
+    }
+    if (!this.currentConversationId) {
+      this.setNewConversationMode('execution', target);
       return;
     }
     try {
@@ -115,10 +122,8 @@ export const permissionMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: target,
-          // 对话级隔离：携带当前对话 ID，让后端把模式设置到对话级 terminal
-          // （任务实际运行的实例），并持久化到当前对话 metadata；
-          // /new 页面无对话时回退到工作区级 terminal（新对话创建时继承）。
-          ...(this.currentConversationId ? { conversation_id: this.currentConversationId } : {})
+          // Existing conversations persist changes to their bound runtime.
+          conversation_id: this.currentConversationId
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -155,7 +160,11 @@ export const permissionMethods = {
     const target = String(mode || '')
       .trim()
       .toLowerCase();
-    if (!this.networkPermissionEnabled || !target) {
+    if (!this.networkPermissionEnabled || !['restricted', 'full'].includes(target)) {
+      return;
+    }
+    if (!this.currentConversationId) {
+      this.setNewConversationMode('network', target);
       return;
     }
     try {
@@ -164,10 +173,8 @@ export const permissionMethods = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: target,
-          // 对话级隔离：携带当前对话 ID，让后端把模式设置到对话级 terminal
-          // （任务实际运行的实例），并持久化到当前对话 metadata；
-          // /new 页面无对话时回退到工作区级 terminal（新对话创建时继承）。
-          ...(this.currentConversationId ? { conversation_id: this.currentConversationId } : {})
+          // Existing conversations persist changes to their bound runtime.
+          conversation_id: this.currentConversationId
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -210,6 +217,7 @@ export const permissionMethods = {
     }
   },
   async fetchNetworkPermission() {
+    if (!this.currentConversationId) return;
     const owns = beginAuxiliaryRequest(this, 'network-permission');
     try {
       const query = this.currentConversationId
@@ -233,6 +241,7 @@ export const permissionMethods = {
     }
   },
   async fetchPermissionMode() {
+    if (!this.currentConversationId) return;
     const owns = beginAuxiliaryRequest(this, 'permission-mode');
     try {
       const query = this.currentConversationId
@@ -255,6 +264,7 @@ export const permissionMethods = {
     }
   },
   async fetchExecutionMode() {
+    if (!this.currentConversationId) return;
     const owns = beginAuxiliaryRequest(this, 'execution-mode');
     try {
       const query = this.currentConversationId

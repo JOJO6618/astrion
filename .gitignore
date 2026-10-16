@@ -112,6 +112,8 @@ test/deepseek_ocr_tutorial.md
 
 # 运行态缓存
 cache/
+# 对话工作区产物（演示页、截图、导出 zip 等，属本地材料不进仓库）
+output/
 website-design/exp/static/dist/
 
 # 官网已独立为单独仓库（astrion-website），本仓库不再追踪

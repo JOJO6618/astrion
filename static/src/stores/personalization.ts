@@ -186,7 +186,6 @@ interface PersonalForm {
   agents_md_auto_inject: boolean;
   claude_md_auto_inject: boolean;
   agents_skills_scan_enabled: boolean;
-  new_chat_button_behavior: 'route' | 'blank';
   group_sidebar_by_workspace: boolean;
   sidebar_pinned_workspaces: string[];
   sidebar_workspace_order: string[];
@@ -420,7 +419,6 @@ const defaultForm = (): PersonalForm => ({
   agents_md_auto_inject: false,
   claude_md_auto_inject: false,
   agents_skills_scan_enabled: true,
-  new_chat_button_behavior: 'route',
   group_sidebar_by_workspace: false,
   sidebar_pinned_workspaces: [],
   sidebar_workspace_order: [],
@@ -755,7 +753,6 @@ export const usePersonalizationStore = defineStore('personalization', {
         claude_md_auto_inject: !!data.claude_md_auto_inject,
         agents_skills_scan_enabled:
           data.agents_skills_scan_enabled === undefined ? true : !!data.agents_skills_scan_enabled,
-        new_chat_button_behavior: data.new_chat_button_behavior === 'blank' ? 'blank' : 'route',
         group_sidebar_by_workspace: !!data.group_sidebar_by_workspace,
         sidebar_pinned_workspaces: Array.isArray(data.sidebar_pinned_workspaces)
           ? data.sidebar_pinned_workspaces.filter((item: unknown) => typeof item === 'string')

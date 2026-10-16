@@ -19,8 +19,12 @@
 ### 实现要点（改代码必须知道）
 
 - **后端核心**：`core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁；`RESTRICTED_PERMISSION_MODES` 受限档集合 + `set_permission_mode` 内 `_apply_restricted_execution_mode_link` 处理受限档⇄沙箱联动，`pre_readonly_execution_mode` 存对话 metadata——键名保留，语义已泛化为受限档共用）；`switch_work_mode` 处理 plan⇄只读+沙箱联动，`pre_plan_permission_mode`/`pre_plan_execution_mode` 存对话 metadata；执行环境 plan 锁与受限档锁同在 `core/main_terminal.py::set_execution_mode`（只拦 direct）
-- **创建对话的模式继承（work_mode + permission_mode 同一原则）**：三条创建路径（prefer_defaults / 显式模式 / safe_navigation）一律沿用 terminal 当前值，**不用个性化默认值覆盖**——/new 页面切换器显示什么新对话就是什么（切换经 `_sync_workspace_terminal_mode` 同步到工作区级 terminal）；个性化 `default_work_mode` / `default_permission_mode` 仅在 terminal 首次构造时生效（tools_policy 加载）。多智能体创建路径（`server/multi_agent.py`）与工作流创建路径（`workflow_runtime_api.py`）同样遵守。plan 锁存在于 `set_permission_mode`，任何创建路径不得在其之前调用非只读 set（曾因此 500）
-  - 历史教训：permission_mode 曾长期例外（`a2a04b95` 引入「个性化默认优先」，彼时还没有 /new 切换器同步机制），导致 /new 切只读后新建对话回落无限制（2026-08-30 修复，与 work_mode 对齐）
+- **Web 新对话初始化（2026-10-16）**：新建按钮（顶部、工作区分组、桌面新标签）统一进入 `/new`，不创建文件；旧 `new_chat_button_behavior` 已移除。`WebTerminal._ensure_conversation()` 仅恢复绑定对话，工作区级 terminal 不自动加载最近对话、不自动建文件。
+  - **默认与当前选择分开**：`server/context/new_conversation.py::remember_workspace_defaults` 缓存工作区个人默认模型、run_mode、reasoning_effort、work_mode、permission_mode；首次装配及个人设置保存/重新加载时更新。`POST /api/new-conversation/settings` 每次进入空页按这份默认配置准备，不用上次临时选择覆盖默认。推理强度 `null` 明确表示 default，不得用 `or` 回退旧值。
+  - **继承边界**：无个人默认的执行环境与网络，只能从导航刚离开的、同工作区正在查看的显式 `previous_conversation_id` 读取。切换到另一个工作区的 `/new`、直接打开、未找到来源均为 `sandbox + restricted`；不得读目标工作区最近历史。plan 强制 readonly+sandbox，受限权限强制 sandbox，并保留恢复记录。
+  - **前端拥有本次选择**：`ui/newConversation.ts` 一次应用初始配置；空页上的模型/思考/强度/工作/权限/执行/网络选择仅更新前端；轮询与旧对话迟到响应不可覆盖。导航准备完成前不受理发送。
+  - **首消息创建**：普通与多智能体 POST 同交完整 `settings`（model_key/run_mode/thinking_mode/reasoning_effort/work_mode/permission_mode/execution_mode/network_permission/restore_modes），`create_from_settings` 共同校验并落盘，不再读取个人默认覆盖快照。无效/缺失快照拒绝，不做旧请求格式兼容。模型能力、管理员模型禁用、direct 身份及模式联动均校验。
+  - **范围**：本轮统一 Web 普通/多智能体首消息创建；CLI/Gateway 与工作流激活仍有各自入口。任何创建路径不得在 plan 锁之前调用非只读 set（曾因此 500）。回归见 `test/2026-10-16_新对话初始化/README.md`。
 - **提示词**：`prompts/work_mode.txt` 模板 + `mode.py::_build_work_mode_rules`（三档规则唯一来源，冻结注入与切换通知共用）；冻结注入在 `messages.py`（执行环境之后）；切换走现有 drift 机制（`_RUNTIME_MODE_KINDS` 第四种），通知携带完整新规则文本
 - **API**：`GET/POST /api/work-mode`（`server/chat/permission.py`）；**仅空闲可切换，运行中 409**（无 pending 队列）；`plan-approvals` pending/answer 端点在 `server/chat/approval.py`
 - **submit_plan 链路**：工具全模式注入（沟通类工具不过滤，非 plan 调用由 handler 运行时兜延返回引导）；`PlanApprovalManager`（`modules/plan_approval_manager.py`）+ `chat_flow_tool_loop.py::_handle_submit_plan` 阻塞等待 → 前端 `PlanApprovalDialog.vue` 弹窗 → 批准则工具循环内切 execute 并静默更新 baseline（避免误发 drift 通知）

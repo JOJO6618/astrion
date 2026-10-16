@@ -183,9 +183,6 @@ export default {
   themeDesc: 'Switch between Classic, Light and Dark',
   groupByWorkspaceTitle: 'Group chats by project',
   groupByWorkspaceDesc: 'Fold conversation history by workspace or project in the sidebar',
-  newChatBlankTitle: 'New Chat opens a blank page',
-  newChatBlankDesc:
-    'When on, "New Chat" routes to the new-chat page and the conversation is created on the first message; when off, an empty conversation is created immediately',
   useCustomNamesTitle: 'Use custom names',
   useCustomNamesDesc:
     'Use the self-name and user name from personalization in the conversation area',

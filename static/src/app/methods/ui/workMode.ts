@@ -16,6 +16,7 @@ export const workModeMethods = {
     return hit ? t(hit.labelKey) : mode || t('appUi.unknown');
   },
   async fetchWorkMode() {
+    if (!this.currentConversationId) return;
     const owns = beginAuxiliaryRequest(this, 'work-mode');
     try {
       const query = this.currentConversationId
@@ -47,7 +48,12 @@ export const workModeMethods = {
     const target = String(mode || '')
       .trim()
       .toLowerCase();
-    if (!target) {
+    if (!['plan', 'ask', 'execute'].includes(target)) {
+      this.closeWorkModeMenu();
+      return;
+    }
+    if (!this.currentConversationId) {
+      this.setNewConversationMode('work', target);
       this.closeWorkModeMenu();
       return;
     }
@@ -59,9 +65,8 @@ export const workModeMethods = {
         },
         body: JSON.stringify({
           mode: target,
-          // 对话级隔离：与权限模式一致，携带当前对话 ID；
-          // /new 页面无对话时回退到工作区级 terminal（新对话创建时继承）。
-          ...(this.currentConversationId ? { conversation_id: this.currentConversationId } : {})
+          // Existing conversations persist changes to their bound runtime.
+          conversation_id: this.currentConversationId
         })
       });
       const payload = await response.json().catch(() => ({}));

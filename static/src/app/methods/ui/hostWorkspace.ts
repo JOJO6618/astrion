@@ -251,7 +251,10 @@ export const hostWorkspaceMethods = {
         history.replaceState({}, '', '/new');
       }
       await this.fetchHostWorkspaces();
-      if (leavingCurrent && !currentConversationSession(this)) await this.loadConversationsList();
+      if (leavingCurrent && !currentConversationSession(this)) {
+        this.newConversationSettingsReady = false;
+        await this.enterNewConversationPage();
+      }
       this.uiPushToast({
         title: this.versioningHostMode ? t('appUi.workspaceDeleted') : t('appUi.projectDeleted'),
         message: item?.label || workspaceId,

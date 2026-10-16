@@ -21,8 +21,10 @@ import { routeMethods } from './route';
 import { conversationTabsMethods } from './conversationTabs';
 import { systemMethods } from './system';
 import { resizeMethods } from './resize';
+import { newConversationMethods } from './newConversation';
 
 export const uiMethods = {
+  ...newConversationMethods,
   ...gitMethods,
   ...scrollMethods,
   ...mobileMethods,

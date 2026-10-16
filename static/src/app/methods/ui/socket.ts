@@ -332,15 +332,7 @@ export const socketMethods = {
       this.fetchPendingToolApprovals();
       // 立即更新配额和运行模式，避免等待其他慢接口
       this.fetchUsageQuota();
-      if (
-        statusData &&
-        typeof statusData.model_key === 'string' &&
-        !currentConversationSession(this) &&
-        !this.currentConversationId
-      ) {
-        modelStore.setModel(statusData.model_key);
-        this.currentModelKey = modelStore.currentModelKey;
-      }
+      // /new model settings come from the workspace preparation endpoint.
       // 拉取管理员策略
       const policyStore = usePolicyStore();
       await policyStore.fetchPolicy();
@@ -355,53 +347,8 @@ export const socketMethods = {
         });
       }
 
-      // 仅在“无当前对话”的新会话入口应用默认模型/模式；
-      // 对于已存在对话（含刷新恢复/URL指定对话），必须保留对话自身设置。
-      // 注意：显式新建路由（/new、/multiagent/new）上，后端的“当前对话”
-      // 只是上一个对话的残留上下文，不等于本页要创建新对话的意图，
-      // 因此此时也必须应用个性化默认值（与“新建空对话”按钮行为一致）。
+      // Default modes are assembled once by /api/new-conversation/settings.
       if (!owns()) return;
-      const statusConversationIdForDefaults = statusData?.conversation?.current_id;
-      const hasActiveConversation =
-        typeof statusConversationIdForDefaults === 'string' &&
-        statusConversationIdForDefaults.length > 0 &&
-        !statusConversationIdForDefaults.startsWith('temp_');
-      const isExplicitNewRouteForDefaults =
-        typeof this.isExplicitNewConversationRoute === 'function' &&
-        this.isExplicitNewConversationRoute();
-      if (
-        personalizationStore.loaded &&
-        !this.currentConversationId &&
-        !currentConversationSession(this) &&
-        (!hasActiveConversation || isExplicitNewRouteForDefaults)
-      ) {
-        const defaultRunMode = personalizationStore.form.default_run_mode;
-        const defaultModel = personalizationStore.form.default_model;
-        const defaultReasoningEffort = personalizationStore.form.default_reasoning_effort;
-
-        if (defaultRunMode) {
-          this.runMode = defaultRunMode;
-          debugLog('应用默认运行模式:', defaultRunMode);
-        }
-
-        this.reasoningEffort = defaultReasoningEffort;
-        if (defaultReasoningEffort) {
-          debugLog('应用默认推理强度:', defaultReasoningEffort);
-        }
-
-        if (defaultModel) {
-          modelStore.setModel(defaultModel);
-          this.currentModelKey = modelStore.currentModelKey;
-          debugLog('应用默认模型:', defaultModel);
-        }
-
-        // 根据默认运行模式设置思考模式
-        if (defaultRunMode === 'thinking') {
-          this.thinkingMode = true;
-        } else if (defaultRunMode === 'fast') {
-          this.thinkingMode = false;
-        }
-      }
       this.isConnected = true;
 
       const focusPromise = this.focusFetchFiles();

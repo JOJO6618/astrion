@@ -166,20 +166,6 @@ const selectCurrency = (value: 'USD' | 'CNY') => {
     /></label>
     <label class="settings-toggle-row"
       ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.newChatBlankTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.newChatBlankDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.new_chat_button_behavior === 'route'"
-        @change="
-          personalization.updateField({
-            key: 'new_chat_button_behavior',
-            value: $event.target.checked ? 'route' : 'blank'
-          })
-        " /><FancyCheck :checked="form.new_chat_button_behavior === 'route'"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.enhancedToolDisplayTitle') }}</span
         ><span class="settings-row-desc">{{
           $t('personalization.enhancedToolDisplayDesc')

@@ -41,10 +41,9 @@ class WebTerminal(MainTerminal):
         对话级 terminal 只服务绑定对话，必须恢复该对话保存的模型
         （restore_model=True），否则重启后新建的对话级 terminal 会用默认
         模型跑任务/回写 metadata，把用户切换的模型覆盖掉。
-        工作区级 terminal（未绑定）：保持原有“最近对话”行为（恢复焦点与模式），
-        且刻意不恢复模型（restore_model=False），避免 /new 页面显示旧对话的模型。
-        经由 load_conversation 的 attach_history 分流，工作区级不挂载消息历史——
-        历史权威在磁盘 + 对话级实例（防 merge-on-save 旧内存写回污染源）。
+        工作区级 terminal（未绑定）：只提供新对话初始配置，不自动加载最近对话
+        或创建文件。/new 的配置准备入口显式装配个性化默认值与历史继承值。
+        历史权威在磁盘 + 对话级实例。
         """
         if self.context_manager.current_conversation_id:
             return
@@ -60,23 +59,9 @@ class WebTerminal(MainTerminal):
                 logger.warning("[WebTerminal] 绑定对话 %s 加载失败: %s", bound_id, result.get('message') or result.get('error'))
             return
 
-        latest_list = self.context_manager.get_conversation_list(limit=1, offset=0)
-        conversations = latest_list.get("conversations", []) if latest_list else []
-
-        if conversations:
-            latest = conversations[0]
-            conv_id = latest.get("id")
-            if conv_id:
-                result = self.load_conversation(conv_id, restore_model=False)
-                if result.get("success"):
-                    debug_log(f"[WebTerminal] 已加载最近对话: {conv_id}")
-                    return
-
-        conversation_id = self.context_manager.start_new_conversation(
-            project_path=self.project_path,
-            thinking_mode=self.thinking_mode
-        )
-        debug_log(f"[WebTerminal] 自动创建新对话: {conversation_id}")
+        # 工作区级 terminal 只保存 /new 的初始配置，不绑定最近对话，
+        # 也不创建空文件。继承历史由 prepare_draft_settings 显式读取。
+        return
     
     def __init__(
         self,

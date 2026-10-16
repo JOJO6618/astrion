@@ -27,7 +27,11 @@ function fixture({ realSnapshot = true, automaticSelection = false } = {}) {
   const refresh = compile(base + 'ui/navigationRefresh.ts', {
     '../conversation/session': session,
   }, globals);
+  const newConversation = compile(base + 'ui/newConversation.ts', {
+    '@/locales': locale, '../conversation/session': session,
+  }, globals);
   const imports = {
+    './newConversation': newConversation,
     '@/locales': locale, '../../../stores/conversation': { useConversationStore: () => store },
     '../../../stores/conversationTabs': { useConversationTabsStore: () => tabs },
     '../../../stores/task': { useTaskStore: () => task }, '../conversation/session': session,
@@ -39,6 +43,7 @@ function fixture({ realSnapshot = true, automaticSelection = false } = {}) {
   }, globals);
   const host = {
     ...navigation.workspaceNavigationMethods, ...drafts.composerDraftMethods,
+    ...newConversation.newConversationMethods,
     versioningHostMode: true, currentHostWorkspaceId: 'ws1', currentConversationId: 'A',
     hostWorkspaces: [{ workspace_id: 'ws1', label: 'one' }, { workspace_id: 'ws2', label: 'two' },
       { workspace_id: 'ws3', label: 'three' }], runningWorkspaceTasks: [], conversations: [], inputMessage: '',
@@ -118,6 +123,10 @@ async function drain(f, target = {}) {
         respond(request, target[id] || bootstrap(id, url.searchParams.get('workspace_id')));
       } else if (url.pathname === '/api/workspace-view') respond(request, { success: true,
         data: target.workspaceView || { modes: { work_mode: 'execute' }, reasoning_effort: 'high' } });
+      else if (url.pathname === '/api/new-conversation/settings') respond(request, { success: true,
+        data: { settings: { model_key: 'synthetic', run_mode: 'thinking', thinking_mode: true,
+          reasoning_effort: 'high', work_mode: 'execute', permission_mode: 'unrestricted',
+          execution_mode: 'sandbox', network_permission: 'restricted', restore_modes: {} } } });
       else respond(request, { success: true, data: {}, snapshot: null });
     }
   }

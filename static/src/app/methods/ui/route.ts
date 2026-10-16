@@ -126,6 +126,17 @@ export const routeMethods = {
         }
       }
       if (!owns()) return { success: false, superseded: true };
+      try {
+        await this.loadNewConversationSettings();
+      } catch (error) {
+        if (!owns()) return { success: false, superseded: true };
+        this.uiPushToast?.({
+          title: t('appMessages.loadConversationErrorTitle'),
+          message: String(error?.message || error),
+          type: 'error'
+        });
+      }
+      if (!owns()) return { success: false, superseded: true };
       await restoreRouteDraft(this, 'bootstrap-route:new');
       return;
     }
@@ -149,27 +160,13 @@ export const routeMethods = {
         this.updateCurrentContextTokens();
       } else {
         this.initialRouteResolved = true;
-        this.leaveConversationView();
-        this.clearLocalTaskUiState?.('bootstrap-route:failed');
-        history.replaceState({}, '', '/new');
-        this.currentConversationId = null;
-        this.currentConversationTitle = t('common.newConversation');
-        this.titleReady = true;
-        this.suppressTitleTyping = false;
-        this.startTitleTyping(t('common.newConversation'), { animate: false });
+        return this.enterNewConversationPage();
       }
     } catch (error) {
       if (!owns()) return { success: false, superseded: true };
       this.initialRouteResolved = true;
-      this.leaveConversationView();
-      this.clearLocalTaskUiState?.('bootstrap-route:failed');
       console.warn('初始化路由失败:', error);
-      history.replaceState({}, '', '/new');
-      this.currentConversationId = null;
-      this.currentConversationTitle = t('common.newConversation');
-      this.titleReady = true;
-      this.suppressTitleTyping = false;
-      this.startTitleTyping(t('common.newConversation'), { animate: false });
+      return this.enterNewConversationPage();
     } finally {
       if (owns()) this.initialRouteResolved = true;
     }
@@ -182,17 +179,10 @@ export const routeMethods = {
     const state = event.state || {};
     const convId = state.conversationId;
     if (!convId) {
-      this.leaveConversationView();
-      this.clearLocalTaskUiState?.('popstate:new');
-      this.currentConversationId = null;
-      this.currentConversationTitle = t('common.newConversation');
-      this.logMessageState('handlePopState:clear-messages-no-conversation');
-      this.messages = [];
-      this.logMessageState('handlePopState:after-clear-no-conversation');
-      this.resetAllStates('handlePopState:no-conversation');
-      this.resetTokenStatistics();
-      this.restoreComposerDraftState('popstate:new').catch(() => {});
-      return;
+      const workspaceId =
+        new URLSearchParams(window.location.search).get('workspace_id') ||
+        this.currentHostWorkspaceId;
+      return this.enterNewConversationPage({ workspaceId });
     }
     this.handleSelectWorkspaceConversation({
       conversationId: String(convId || ''),
@@ -255,7 +245,9 @@ export const routeMethods = {
   },
   closeGitPage() {
     const workspaceId = this.currentHostWorkspaceId;
-    this.closeSettingsPage(workspaceId ? `/new?workspace_id=${encodeURIComponent(workspaceId)}` : '/new');
+    this.closeSettingsPage(
+      workspaceId ? `/new?workspace_id=${encodeURIComponent(workspaceId)}` : '/new'
+    );
   },
   openSettingsPage() {
     // 设置页同样是 bootstrap 级全屏路由，整页跳转保证状态干净

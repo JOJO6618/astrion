@@ -7,6 +7,7 @@ import { ownsConversationSession } from '../conversation/session';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import { selectWorkspaceIdentity } from './workspaceSelection';
 import { refreshNavigationAuxiliary } from './navigationRefresh';
+import { requestNewConversationView } from './newConversation';
 
 export function commitWorkspaceIdentity(host, workspaceId, data = {}) {
   const id = String(workspaceId || host.currentHostWorkspaceId || '');
@@ -169,11 +170,14 @@ export const workspaceNavigationMethods = {
       if (owns()) this.hostWorkspaceSwitching = false;
     }
   },
-  async handleHostWorkspaceSwitch(workspaceId) {
+  async handleHostWorkspaceSwitch(workspaceId, options = {}) {
     const id = String(workspaceId || '').trim();
-    if (!id || !(this.versioningHostMode || this.dockerProjectMode)) return;
-    if (id === String(this.currentHostWorkspaceId || '') && !this.historyLoading) return;
-    // workspace-view supplies the current active task; cached task rows may be stale.
+    if (!id) return;
+    const sameWorkspace = id === String(this.currentHostWorkspaceId || '');
+    if (!options.newConversation && sameWorkspace && !this.historyLoading) return;
+    const previousId =
+      options.newConversation && sameWorkspace ? this.currentConversationId || null : null;
+    // Capture the departed view before navigation; other workspaces never inherit it.
     const save = saveSourceDraft(this);
     const session = this.beginConversationView('', id);
     const owns = () => ownsConversationSession(this, session);
@@ -182,21 +186,34 @@ export const workspaceNavigationMethods = {
       const [selection, draft, response] = await Promise.all([
         selectWorkspaceIdentity(this, id, owns),
         this.prepareComposerDraftState(id),
-        fetch(`/api/workspace-view?workspace_id=${encodeURIComponent(id)}`, {
-          signal: session.controller.signal
-        }),
+        options.newConversation
+          ? requestNewConversationView(id, previousId, session.controller.signal)
+          : fetch(`/api/workspace-view?workspace_id=${encodeURIComponent(id)}`, {
+              signal: session.controller.signal
+            }),
         save
       ]);
-      const result = await response.json();
       if (!owns()) return;
-      if (!response.ok || !result.success) throw new Error(result.error || t('appUi.switchFailed'));
-      const view = result.data || {};
-      if (view.active_conversation_id) {
+      let view;
+      if (options.newConversation) {
+        view = response;
+      } else {
+        const result = await response.json();
+        if (!owns()) return;
+        if (!response.ok || !result.success)
+          throw new Error(result.error || t('appUi.switchFailed'));
+        view = result.data || {};
+      }
+      if (!options.newConversation && view.active_conversation_id) {
         const entered = await this.handleSelectWorkspaceConversation(
           { workspaceId: id, conversationId: view.active_conversation_id },
           { force: true, prepared: Promise.resolve([selection, draft]) }
         );
         return entered;
+      }
+      if (!options.newConversation) {
+        view = await requestNewConversationView(id, null, session.controller.signal);
+        if (!owns()) return;
       }
       if (this.composerDraftDirty) {
         void this.persistComposerDraftNow({ reason: 'navigation-edits', keepalive: true }).catch(
@@ -212,32 +229,13 @@ export const workspaceNavigationMethods = {
       this.titleReady = true;
       this.suppressTitleTyping = false;
       this.startTitleTyping(this.currentConversationTitle, { animate: false });
-      for (const [key, value] of Object.entries(view.modes || {})) {
-        const fields = {
-          work_mode: 'currentWorkMode',
-          permission_mode: 'currentPermissionMode',
-          execution_mode: 'currentExecutionMode',
-          network_permission: 'currentNetworkPermission'
-        };
-        if (fields[key]) this[fields[key]] = value;
-      }
-      const pendingModes = view.pending_runtime_modes || {};
-      this.pendingPermissionMode = pendingModes.permission_mode || '';
-      this.pendingExecutionMode = pendingModes.execution_mode || '';
-      this.pendingNetworkPermission = pendingModes.network_permission || '';
-      if (typeof view.execution_mode_enabled === 'boolean')
-        this.executionModeEnabled = view.execution_mode_enabled;
-      if (typeof view.network_permission_enabled === 'boolean')
-        this.networkPermissionEnabled = view.network_permission_enabled;
-      if (view.model_key) this.modelSet(view.model_key);
-      if (view.run_mode) {
-        this.runMode = view.run_mode;
-        this.thinkingMode = view.run_mode !== 'fast';
-      }
-      this.reasoningEffort = view.reasoning_effort ?? null;
+      this.applyNewConversationView(view);
+      this.conversationHasImages = false;
+      this.conversationHasVideos = false;
       useConversationStore().setCurrentConversationId(null);
       this.resetTokenStatistics?.();
-      this.leaveConversationView();
+      this.historyLoading = false;
+      this.historyLoadingFor = null;
       this.applyComposerDraftState(draft, id, null);
       this.refreshBlankHeroState();
       history.replaceState({}, '', '/new');

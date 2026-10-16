@@ -2,6 +2,7 @@
 import { t } from '@/locales';
 import { persistNewConversationType } from '../../state';
 import { useModelStore } from '../../../stores/model';
+import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 
 // 推理强度滑块是高频交互（后端限制 20 次/分）：档位变化只乐观更新 UI，
 // 停止操作 600ms 后才把最终值发一次请求；序列开始时的对话 id 随请求带上，
@@ -211,15 +212,24 @@ export const modeMethods = {
       this.closeQuickMenu();
       return;
     }
+    if (!this.currentConversationId) {
+      this.runMode = mode;
+      this.thinkingMode = mode === 'thinking';
+      this.modeMenuOpen = false;
+      this.inputCloseMenus();
+      return;
+    }
+    const owns = beginAuxiliaryRequest(this, 'thinking-mode');
     try {
       const response = await fetch('/api/thinking-mode', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ mode })
+        body: JSON.stringify({ mode, conversation_id: this.currentConversationId })
       });
       const payload = await response.json();
+      if (!owns()) return;
       if (!response.ok || !payload.success) {
         throw new Error(payload.message || payload.error || t('appUi.switchFailed'));
       }
@@ -228,6 +238,7 @@ export const modeMethods = {
         typeof data.thinking_mode === 'boolean' ? data.thinking_mode : mode !== 'fast';
       this.runMode = data.mode || mode;
     } catch (error) {
+      if (!owns()) return;
       console.error('切换运行模式失败:', error);
       const message =
         error instanceof Error ? error.message : String(error || t('common.unknownError'));
@@ -237,14 +248,20 @@ export const modeMethods = {
         type: 'error'
       });
     } finally {
-      this.modeMenuOpen = false;
-      this.inputCloseMenus();
+      if (owns()) {
+        this.modeMenuOpen = false;
+        this.inputCloseMenus();
+      }
     }
   },
   async toggleThinkingMode() {
     await this.handleCycleRunMode();
   },
   async setReasoningEffort(effort) {
+    if (!this.currentConversationId) {
+      this.reasoningEffort = effort;
+      return;
+    }
     if (effortSave.rollback === undefined) {
       // 序列开始：记录回滚目标与所属对话
       effortSave.rollback = this.reasoningEffort;
@@ -272,6 +289,7 @@ export const modeMethods = {
     effortSave.rollback = undefined;
     effortSave.latest = undefined;
     effortSave.conversationId = null;
+    const owns = beginAuxiliaryRequest(this, 'reasoning-effort');
     try {
       const response = await fetch('/api/reasoning-effort', {
         method: 'POST',
@@ -281,6 +299,7 @@ export const modeMethods = {
         body: JSON.stringify({ effort, conversation_id: targetConversationId })
       });
       const payload = await response.json();
+      if (!owns()) return;
       if (!response.ok || !payload.success) {
         throw new Error(payload.message || payload.error || t('appUi.settingFailed'));
       }
@@ -295,6 +314,7 @@ export const modeMethods = {
           typeof data.reasoning_effort === 'string' ? data.reasoning_effort : null;
       }
     } catch (error) {
+      if (!owns()) return;
       // 仅当 UI 仍停留在该序列的值时才回滚
       if (this.reasoningEffort === effort) {
         this.reasoningEffort = rollback;

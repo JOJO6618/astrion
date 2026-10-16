@@ -18,7 +18,8 @@ function fixture() {
     '../../../stores/policy': {}, '../../../stores/model': {}, '../../../stores/personalization': {},
     './shared': {} };
   const globals = { fetch, window, history: { replaceState: noop } };
-  imports['./workspaceNavigation'] = { workspaceNavigationMethods: {} };
+  imports['./workspaceSelection'] = compile(`${base}ui/workspaceSelection.ts`, imports, globals);
+  imports['./workspaceNavigation'] = { workspaceNavigationMethods: {}, commitWorkspaceIdentity: noop };
   imports['./workspaceStartup'] = compile(`${base}ui/workspaceStartup.ts`, imports, globals);
   imports['./composerDrafts'] = compile(`${base}ui/composerDrafts.ts`, imports, globals);
   conversation.activateWorkspaceCache = noop;
