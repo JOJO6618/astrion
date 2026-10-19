@@ -25,6 +25,8 @@ from __future__ import annotations
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
+from .speed import ResponsesOutputTimer
+
 
 class ResponsesAPIError(Exception):
     """Responses 后端返回的业务错误（response.failed / error 事件）。"""
@@ -437,6 +439,7 @@ async def responses_sse_to_chat_chunks(
     arg_buffers: Dict[int, List[str]] = {}
     summary_buffers: Dict[Tuple[str, int], List[str]] = {}
     summary_emitted = False
+    output_timer = ResponsesOutputTimer()
 
     async for line in lines:
         if not line:
@@ -455,6 +458,7 @@ async def responses_sse_to_chat_chunks(
         if not isinstance(data, dict):
             continue
         event = data.get("type")
+        output_timer.observe(data)
 
         if event == "response.created":
             yield {"choices": [{"index": 0, "delta": {"role": "assistant"}}]}
@@ -627,6 +631,8 @@ async def responses_sse_to_chat_chunks(
             usage = _map_usage(response.get("usage"))
             if usage:
                 chunk["usage"] = usage
+            # 独立元数据：不改变摘要／工具参数的缓冲和展示语义。
+            chunk["_response_output_timing"] = output_timer.summary()
             yield chunk
 
         elif event == "response.failed":

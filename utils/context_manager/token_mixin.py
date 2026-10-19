@@ -169,8 +169,9 @@ class TokenMixin:
     def apply_usage_statistics(self, usage: Dict[str, Any], *, price=None,
                                request_id=None, conversation_id=None,
                                duration_ms: Optional[int] = None,
-                               ttft_ms: Optional[int] = None) -> bool:
-        """Apply actual usage and optionally commit the main request's USD cost."""
+                               ttft_ms: Optional[int] = None,
+                               speed_sample: Optional[Dict[str, int]] = None) -> bool:
+        """Apply full usage/cost; an explicit speed sample overrides only tokens/s."""
         target_id = conversation_id or self.current_conversation_id
         actor = None
         previous = {}
@@ -189,6 +190,9 @@ class TokenMixin:
                     cost_entry[_key] = max(0, int(_value))
                 except (TypeError, ValueError):
                     pass
+            if speed_sample is not None:
+                # Responses 使用独立非思考样本；空字典明确表示无法准确采样。
+                cost_entry['speed_sample'] = dict(speed_sample)
             committed = record_request(
                 self.data_dir, target_id, request_id, 'main', '', 'main', cost_entry,
                 historical_unpriced=bool(previous.get('total_input_tokens')),
@@ -222,10 +226,16 @@ class TokenMixin:
         except Exception as exc:
             print(f"[TokenStats] 无法写入累计Token: {exc}")
 
-        # tokens/s 样本：段内每轮成功调用记一条，工作段真正结束时汇总加权平均
-        if duration_ms:
+        # None 沿用 Chat 全输出口径；显式样本仅影响速度，不扣减计费用量。
+        # Responses 空样本跳过，不能回退到包含思考的 output／通用耗时。
+        sample = speed_sample if speed_sample is not None else {
+            'output_tokens': completion_tokens, 'duration_ms': duration_ms,
+        }
+        if sample.get('duration_ms'):
             try:
-                self.record_work_segment_speed_sample(completion_tokens, duration_ms)
+                self.record_work_segment_speed_sample(
+                    sample.get('output_tokens', 0), sample['duration_ms'],
+                )
             except Exception as exc:
                 logger.warning(f"[TokenStats] 记录速度样本失败: {exc}")
 

@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 from config.model_profiles import get_model_profile
 
 from utils.token_usage import extract_usage_payload
+from utils.api_client.responses.speed import build_responses_speed_sample
 
 from .utils_common import debug_log, log_backend_chunk
 from .chat_flow_runner_helpers import extract_intent_from_partial
@@ -65,6 +66,10 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
         # 重试时每轮重新开始计时；失败轮不会走到 usage 应用处，因此不计入。
         request_started_at = time.monotonic()
         first_delta_at = None
+        # None 表示 Chat 旧口径；空字典表示 Responses 缺少有效采样，禁止回退。
+        response_output_timing = (
+            {} if getattr(web_terminal.api_client, 'api_protocol', None) == 'responses' else None
+        )
 
         # 收集流式响应
         async for chunk in web_terminal.api_client.chat(messages, tools, stream=True):
@@ -113,6 +118,8 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             usage_info = extract_usage_payload(chunk)
             if usage_info:
                 last_usage_payload = usage_info
+            if isinstance(chunk.get('_response_output_timing'), dict):
+                response_output_timing = chunk['_response_output_timing']
 
             if "choices" not in chunk:
                 debug_log(f"Chunk {chunk_count}: 无choices字段")
@@ -126,9 +133,8 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             if finish_reason:
                 last_finish_reason = finish_reason
 
-            # 计时起点：第一个「有内容」的流式增量（思考 / 正文 / 工具参数），
-            # 排除只声明 role 的 chunk 与 usage-only chunk。加密思考的 Responses 摘要
-            # 整段到达，起点自然落在该段到达时刻（provider 侧限制，无更好口径）。
+            # 通用生成耗时／TTFT 继续记录首个有内容的转换后增量。
+            # Responses 的速度另用原始事件计时，不用摘要或参数缓冲后的到达时间。
             if first_delta_at is None and (
                 delta.get("content")
                 or delta.get("reasoning_content")
@@ -432,10 +438,14 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                     int(max(0.0, (first_delta_at - request_started_at) * 1000.0))
                     if first_delta_at else None
                 )
+                speed_sample = (
+                    build_responses_speed_sample(last_usage_payload, response_output_timing)
+                    if response_output_timing is not None else None
+                )
                 web_terminal.context_manager.apply_usage_statistics(
                     last_usage_payload, price=request_price, request_id=cost_request_id,
                     conversation_id=conversation_id, duration_ms=request_duration_ms,
-                    ttft_ms=request_ttft_ms,
+                    ttft_ms=request_ttft_ms, speed_sample=speed_sample,
                 )
                 debug_log(
                     f"Usage统计: prompt={last_usage_payload.get('prompt_tokens', 0)}, "

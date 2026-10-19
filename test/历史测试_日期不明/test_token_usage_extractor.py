@@ -13,6 +13,7 @@ class TokenUsageExtractorTest(unittest.TestCase):
             "completion_tokens": 5,
             "total_tokens": 15,
             "current_context_tokens": 10,
+            "cached_input_tokens": 0,
         })
 
     def test_extracts_top_level_usage(self):

@@ -26,6 +26,18 @@ USD = ((输入 - 缓存命中输入) × cost.input
 - 子智能体 `stats.token_usage` 新增 `cached_input` 累计字段；每次响应即时保存统计。两个恢复入口均继承统计，并用已提交账本修复统计文件写入前中断的记录。压缩后上下文清零，不清零历史用量和费用。
 - 旧对话、旧子统计没有当时价格／缓存明细，不补算。保留已有 token 基线，新增请求开始计价；无法计价的历史或请求标记「部分统计」。成功响应若不返回 `usage`，登记未计价，不伪装为零费用。
 
+## 工作段输出速度（2026-10-19）
+
+速度只汇总主智能体的有效请求样本，段级取 `Σ样本输出 token / Σ样本生成秒数`，不对各轮速度做算术平均。压缩续接保留同一工作段样本，真正结束时才消费、写入锚点 user 消息 `metadata.token_speed` 并通过 `token_update` 下发；前端显示位置与完成逻辑不变。已有历史速度不回算。
+
+- **Chat Completions**：沿用完整输出 token（包含思考），计时从首个有内容增量至流结束，排除请求前置等待及工具执行。
+- **所有 Responses（含 Codex OAuth 与普通 API Key）**：样本输出为 API 的 `output_tokens − output_tokens_details.reasoning_tokens`，只衡量正文与工具调用生成。思考 token 明细在 usage 归一化中可选保留，明确的 `0` 有效，缺失不能视作 `0`；缺失、非法、超过总输出或没有非思考输出均跳过样本。
+- **Responses 原始事件计时**：`utils/api_client/responses/speed.py` 在协议转换缓冲／yield 前观察 SSE。正文从首个非空 text delta 至对应 text/item done，函数调用从含工具名的 item added（或首个参数 delta）至 arguments/item done。多个区间取并集，避免并行工具重复计时；区间之间的思考与等待不计入。未单独发送 done 的网关在 completed 收尾已观测的区间；无有效正时长则跳过。
+- **采样与计费分离**：`apply_usage_statistics(..., speed_sample=None)` 沿用 Chat 旧口径；显式字典使用指定样本，空字典跳过、禁止回退。费用和累计 token 始终使用完整 usage。账本保留通用 `duration_ms`／`ttft_ms`，Responses 另存 `speed_sample={output_tokens,duration_ms}`，空对象表示没有有效速度样本；它不是费用的输出 token 字段。
+- **失败／重试**：失败轮不入样本，重试重新创建计时器并清空本轮 timing。原有请求 ID 防重继续生效。统计是客户端接收事件的速率，不代表提供商内部逐 token 计算速度。
+
+回归：`/opt/homebrew/bin/python3.11 -B -m unittest discover -s test/2026-10-19_Responses输出速度 -p 'test_*.py'`。用合成 SSE、虚拟时钟和临时账本验证，不调用真实模型或读取真实凭据。
+
 ## 币种和汇率
 
 外观设置的 `display_currency` 可选 USD、CNY，默认 USD；保存到用户共享的 `personalization.json`。后端白名单与前端类型、默认、读取均注册。

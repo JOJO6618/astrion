@@ -144,9 +144,12 @@ def normalize_usage_payload(raw: Any) -> Optional[Dict[str, int]]:
     if prompt_key in ANTHROPIC_STYLE_INPUT_KEYS and (anthropic_read or anthropic_write):
         prompt_tokens = (prompt_tokens or 0) + (anthropic_read or 0) + (anthropic_write or 0)
 
+    # 保留可选推理明细，缺字段与明确为零必须区分；二次归一化保持幂等。
+    reasoning = _first_int(raw, ("reasoning_tokens", "reasoningTokens"))
     completion_details = raw.get("completion_tokens_details") or raw.get("output_tokens_details")
     if isinstance(completion_details, dict):
-        reasoning = _first_int(completion_details, ("reasoning_tokens", "reasoningTokens"))
+        if reasoning is None:
+            reasoning = _first_int(completion_details, ("reasoning_tokens", "reasoningTokens"))
         if completion_tokens is None and reasoning is not None:
             completion_tokens = reasoning
 
@@ -162,13 +165,16 @@ def normalize_usage_payload(raw: Any) -> Optional[Dict[str, int]]:
     if current_context_tokens is None:
         current_context_tokens = prompt_tokens
 
-    return {
+    normalized = {
         "prompt_tokens": int(prompt_tokens),
         "completion_tokens": int(completion_tokens),
         "total_tokens": int(total_tokens),
         "current_context_tokens": int(current_context_tokens),
         "cached_input_tokens": int(cached_input_tokens or 0),
     }
+    if reasoning is not None:
+        normalized["reasoning_tokens"] = reasoning
+    return normalized
 
 
 def _usage_score(payload: Dict[str, int]) -> int:
