@@ -32,9 +32,12 @@ import commandBlocking from './en-US/commandBlocking';
 import quickEntry from './en-US/quickEntry';
 import git from './en-US/git';
 
+import goal from './en-US/goal';
+
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
 const enUS: DeepString<typeof zhCN> = {
+  goal,
   git,
   quickEntry,
   common,

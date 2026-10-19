@@ -1,100 +1,109 @@
 // @ts-nocheck
-import { debugLog } from '../common';
+import { t } from '@/locales';
 import { updateReviewRecords } from '@/components/input/approvalModel';
+import { ensureMessageSession } from '../message/ownership';
+import { ownsConversationSession } from '../conversation/session';
+
+const operations = new WeakMap<object, object>();
 
 export const goalMethods = {
   handleGoalProgress(data: any) {
-    // 安全检查：确保目标事件属于当前对话，防止切换对话后旧任务事件污染
-    if (
-      data?.conversation_id &&
-      this.currentConversationId &&
-      data.conversation_id !== this.currentConversationId
-    ) {
-      debugLog('[Goal] 忽略不匹配对话的目标进度事件', {
-        eventCid: data.conversation_id,
-        currentCid: this.currentConversationId
-      });
-      return;
-    }
-    debugLog('[Goal] 目标进度更新', data);
-    const status = String(data?.status || 'running').toLowerCase();
-    this.goalRunning = status === 'running';
+    if (!data || data.conversation_id !== this.currentConversationId) return;
+    if (data.workspace_id && data.workspace_id !== this.currentHostWorkspaceId) return;
+    if (Number(data.revision || 0) < Number(this.goalProgress?.revision || 0)) return;
+    this.goalProgress = { ...data };
+    this.goalRunning = ['running', 'reviewing', 'retrying'].includes(data.status);
     this.goalModeArmed = false;
-    this.goalProgress = {
-      ...(data || {}),
-      goal: data?.goal || this.goalProgress?.goal || '',
-      status,
-      turn_count: Number(data?.turn_count ?? 0),
-      tokens_used: Number(data?.tokens_used ?? 0),
-      tool_calls: Number(data?.tool_calls ?? 0),
-      duration_seconds: Number(data?.duration_seconds ?? 0)
-    };
   },
   handleGoalReviewProgress(data: any) {
-    if (data?.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    if (data?.conversation_id !== this.currentConversationId) return;
+    if (!this.goalRunning) return;
     const progress = data?.progress || data;
-    if (!progress || typeof progress !== 'object') return;
     this.approvalReviewRecords = updateReviewRecords(this.approvalReviewRecords || [], 'goal', {
       ...data,
       progress
     });
-    this.$forceUpdate();
-  },
-  scheduleGoalApprovalPanelAutoClose() {
-    if (this.pendingToolApprovals?.length) return;
-    if (this.approvalAutoCloseTimer) clearTimeout(this.approvalAutoCloseTimer);
-    const conversationId = this.currentConversationId;
-    this.approvalAutoCloseTimer = setTimeout(() => {
-      this.approvalAutoCloseTimer = null;
-      if (this.currentConversationId === conversationId && !this.pendingToolApprovals?.length) {
-        this.approvalPanelCollapsed = true;
-      }
-    }, 3000);
   },
   handleGoalCompleted(data: any) {
-    // 安全检查：确保目标事件属于当前对话
-    if (
-      data?.conversation_id &&
-      this.currentConversationId &&
-      data.conversation_id !== this.currentConversationId
-    ) {
-      debugLog('[Goal] 忽略不匹配对话的目标完成事件', {
-        eventCid: data.conversation_id,
-        currentCid: this.currentConversationId
-      });
-      return;
-    }
-    debugLog('[Goal] 目标已达成', data);
-    this.goalRunning = false;
-    this.goalModeArmed = false;
-    this.goalProgress = { ...(data || {}), status: 'done' };
-    this.goalDialogOpen = true;
-    this.scheduleGoalApprovalPanelAutoClose?.();
+    this.handleGoalProgress({ ...data, status: 'done' });
   },
   handleGoalStopped(data: any) {
-    // 安全检查：确保目标事件属于当前对话
-    if (
-      data?.conversation_id &&
-      this.currentConversationId &&
-      data.conversation_id !== this.currentConversationId
-    ) {
-      debugLog('[Goal] 忽略不匹配对话的目标停止事件', {
-        eventCid: data.conversation_id,
-        currentCid: this.currentConversationId
+    this.handleGoalProgress({ ...data, status: data?.status || 'paused' });
+  },
+  async handleStartGoal(config: any) {
+    return this.submitGoalAction('start', config);
+  },
+  async handleContinueGoal(limits?: any) {
+    if (!['paused', 'blocked'].includes(this.goalProgress?.status)) return false;
+    return this.submitGoalAction('continue', limits);
+  },
+  async submitGoalAction(action: 'start' | 'continue', config?: any) {
+    if (operations.has(this) || this.taskInProgress || this.streamingMessage) return false;
+    const session = ensureMessageSession(this);
+    const operation = {};
+    operations.set(this, operation);
+    const owns = () => ownsConversationSession(this, session) && operations.get(this) === operation;
+    const text =
+      action === 'start'
+        ? String(config?.goal || '').trim()
+        : t('goal.resumeMessage', { goal: this.goalProgress?.goal || '' });
+    try {
+      const sent = await this.sendMessage({
+        presetText: text,
+        goalAction: action,
+        goalOptions: config
+          ? { max_turns: config.max_turns ?? null, max_tokens: config.max_tokens ?? null }
+          : undefined
       });
-      return;
+      if (!owns()) return false;
+      if (sent) {
+        this.goalDialogOpen = false;
+        this.currentWorkMode = 'execute';
+        if (!['auto_approval', 'unrestricted'].includes(this.currentPermissionMode))
+          this.currentPermissionMode = 'auto_approval';
+      }
+      return sent;
+    } finally {
+      if (operations.get(this) === operation) operations.delete(this);
     }
-    debugLog('[Goal] 目标已停止', data);
-    this.goalRunning = false;
-    this.goalModeArmed = false;
-    if (String(data?.stopped_reason || '').toLowerCase() === 'user_cancel') {
-      this.goalProgress = null;
-      this.goalDialogOpen = false;
-      return;
+  },
+  async handleCloseGoal() {
+    return this.controlGoal('close');
+  },
+  async handlePauseGoal() {
+    return this.controlGoal('pause');
+  },
+  async controlGoal(action: 'close' | 'pause') {
+    const session = ensureMessageSession(this);
+    const progress = this.goalProgress;
+    if (!session.conversationId || !progress?.run_id || operations.has(this)) return false;
+    const operation = {};
+    operations.set(this, operation);
+    const owns = () => ownsConversationSession(this, session) && operations.get(this) === operation;
+    try {
+      const response = await fetch(
+        `/api/conversations/${encodeURIComponent(session.conversationId)}/goal`,
+        {
+          method: 'POST',
+          signal: session.controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Astrion-Workspace-Id': session.workspaceId
+          },
+          body: JSON.stringify({ action, run_id: progress.run_id })
+        }
+      );
+      const result = await response.json();
+      if (!owns()) return false;
+      if (!response.ok || !result.success) throw new Error(result.error || t('goal.actionFailed'));
+      this.handleGoalProgress(result.data);
+      return true;
+    } catch (error) {
+      if (owns() && error?.name !== 'AbortError')
+        this.uiPushToast({ title: t('goal.title'), message: error.message, type: 'error' });
+      return false;
+    } finally {
+      if (operations.get(this) === operation) operations.delete(this);
     }
-    this.goalProgress = { ...(data || {}), status: 'stopped' };
-    // 停止也弹一次窗，告知用户原因与进度
-    this.goalDialogOpen = true;
-    this.scheduleGoalApprovalPanelAutoClose?.();
   }
 };

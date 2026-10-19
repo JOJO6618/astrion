@@ -22,6 +22,7 @@
 | Android 发布联动 | `docs/agents_details/android_release.md` | 发 Android 版本 |
 | 权限模式 / 路径授权 / 平台沙箱 | `docs/agents_details/permission_and_sandbox.md` | 权限、沙箱、平台隔离 |
 | 运行模式（work_mode） | `docs/agents_details/work_mode.md` | plan/ask/execute 链路 |
+| 对话级目标模式 | `docs/agents_details/goal_mode.md` | 目标开始／继续／关闭、暂停、审核及重试 |
 | 多智能体对话类型 | `docs/agents_details/multi_agent.md` | 多智能体派发/渲染 |
 | 主任务门闸与单写者不变量 | `docs/agents_details/main_task_gate.md` | 新增主任务入口 |
 | 工具动态加载 | `docs/agents_details/tool_loading.md` | 动 tool_loading |
@@ -666,3 +667,12 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **订阅额度（2026-10-15）**：`modules/crosspet/quota.py` 以 Astrion 独立 OAuth 和已有代理后台查询用量，只有联动开启且订阅已连接才查询；不在任务或开关锁内做网络 IO。额度仅以白名单数值附加到 `quota.gpt`，不输出账号/凭据/原始响应。CrossPet 保留原有「显示 GPT 额度」（仍只读本机 Codex），新增与其互斥的「显示 Astrion 的 GPT 额度」；打开 Astrion 选项时读取快照额度并标注来源，失败保留旧数据、不混入其他账号也不自动切回 Codex，重置到期显示待更新而非推算 100%，15 分钟旧数不显示，来源/登录代次变化不误庆祝。API 余额与费用不包含在此功能。
 - **接入方式与上游 PR**：CrossPet 侧不需要安装钩子，默认两边目录一致即可工作；仅在使用自定义目录时通过 CrossPet 设置 →「接入 AI」里的 Astrion 项登记（等价命令行 `install astrion`，只写 CrossPet 自己的 `astrion.json`，保留已登记目录与其他字段，未登记时撤销不建文件）。安装/卸载脚本不新增 Astrion 自动目标，`refresh` 不改写登记；macOS 的 `CROSSPET_STATE_DIR` 只作用于 Astrion 文件与 `seen-astrion`，其他来源与 `pet.pid` 保持 `/tmp/crosspet`。**上游 PR 已开：**https://github.com/lokicorvus/crosspet/pull/21（fork `JOJO6618/crosspet` 的分支 `feat/astrion-integration`，提交 `3a53433`，32 个文件、+799/−35）。提交时上游 `main` 已前进到 1.3.5，因此用 `_experiments/merge_crosspet_135.py` 做三方合并（base 1.3.4、ours 1.3.5、theirs 改动），**不要直接把 1.3.4 补丁 `git apply` 到新基线**；唯一冲突在 `app/web/index.html`（脚本引入顺序与 `applyCharState` 的来源合并 + `standsIn` 代演融合）。材料在 `_experiments/crosspet-pr/`。
 - **回归**：`test/2026-10-14_CrossPet接入/` 的 unittest 和 `runtime_check.py`；独立开关回归 `test/2026-10-15_CrossPet开关/` 的 unittest 和 `settings_api_check.py`。设置 UI 构建/lint 通过后由用户验收；Windows 原生运行仍需实机验证。新增订阅额度与收窄改动按用户要求只改文件，运行测试与原生构建留给用户，不将前轮通过记录当作额度接入已验证。
+
+## 25) 对话级目标模式（2026-10-17）
+
+- **文件唯一权威**：`<工作区 data_dir>/goal_states/<conversation_id>.json`，全部续接保留对话 ID。入口弹窗填写后显式开始；禁止恢复输入栏 armed／下一条消息自动变目标的旧行为。
+- **生命周期**：关闭目标不取消当前任务；停止主任务持久暂停目标。paused / blocked 均能手动继续，进程重启只恢复暂停显示，不自动续跑。自动后台通知不得解除暂停／阻塞。
+- **执行与交互**：开始／继续设 execute；权限已有 auto_approval / unrestricted 则保留，其余变 auto_approval。活动目标禁止 ask_user、submit_plan、人工确认工具和单次完全访问申请；正常自动审核与智能体内部通信保留。
+- **重试与并发**：网络耗尽后通过 RuntimeService 在同一对话派发新 user 输入；额度／认证／配置错误阻塞。Timer 绑定 run_id + task_id + next_retry_at，不能因用量更新 revision 而丢失重试。显示发布锁序固定 VIEW_LOCK → 目标状态锁，禁止反向获取。
+- **审核与限制**：以原目标和真实执行证据判断，不用“没有工具调用”代替审核；审核取证强制只读沙箱，不继承主对话 direct。轮数／Token 限制在目标弹窗可选，继续保留累计统计并重置本次限制基线，Token 来自同对话主／子新请求。
+- 详细契约：`docs/agents_details/goal_mode.md`；回归目录：`test/2026-10-17_目标模式重构/`。视觉和真实模型／网络恢复由用户运行验收。

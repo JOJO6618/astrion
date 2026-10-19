@@ -80,6 +80,7 @@ def get_conversation_running_status_api(conversation_id: str, data_context, work
             "main_task_id": main_rec["task_id"] if main_rec else None,
             "main_task_type": (main_rec.get("task_type") or "chat") if main_rec else None,
             **bg_status,
+            "goal_progress": GoalStateManager(workspace.data_dir, conversation_id).progress_snapshot(),
             "is_truly_active": is_main_running or any(bg_status.values()),
         }
     })
@@ -111,19 +112,9 @@ def create_task_api():
     run_mode = payload.get("run_mode")
     message_source = payload.get("message_source")
     max_iterations = payload.get("max_iterations")
-    goal_mode = bool(payload.get("goal_mode"))
-    # 用户显式发送非目标模式消息时，若本对话仍有残留的活动目标，先停止它，
-    # 避免本对话错误延续旧目标。目标状态是对话级的，不影响其他对话。
-    if not goal_mode and conversation_id:
-        try:
-            workspace = data_context.workspace
-            if workspace:
-                gsm = GoalStateManager(workspace.data_dir, conversation_id)
-                if gsm.is_active():
-                    gsm.mark_stopped("new_message_without_goal")
-                    debug_log(f"[Goal] 新消息未开启目标模式，停止本对话残留目标状态")
-        except Exception as exc:
-            debug_log(f"[Goal] 新任务清理残留目标状态失败: {exc}")
+    goal_action = payload.get("goal_action")
+    if payload.get("goal_mode") and not goal_action:
+        return jsonify(success=False, error="请通过目标弹窗开始目标模式"), 400
     skill_context_messages: List[Dict[str, str]] = []
     raw_skill_refs = payload.get("skill_refs")
     if raw_skill_refs:
@@ -180,7 +171,8 @@ def create_task_api():
                 max_iterations=max_iterations,
                 message_source=message_source,
                 queued_message_id=str(payload.get("queued_message_id") or "").strip() or None,
-                goal_mode=goal_mode,
+                goal_action=goal_action,
+                goal_options=payload.get("goal_options"),
                 skill_context_messages=skill_context_messages,
             ),
         )
@@ -267,18 +259,7 @@ def cancel_task_api(task_id: str):
     rec = runtime_service.get_task(username, task_id)
     if not rec:
         return jsonify({"success": False, "error": tr("tasks.task_not_found")}), 404
-    ok = runtime_service.cancel_task(username, task_id)
-    # 用户取消任务时，一并停止该工作区的目标模式，避免后续新对话继承旧目标。
-    try:
-        if ok and rec.workspace_id:
-            _, workspace = get_user_resources(username, rec.workspace_id, conversation_id=rec.conversation_id)
-            if workspace and rec.conversation_id:
-                gsm = GoalStateManager(workspace.data_dir, rec.conversation_id)
-                if gsm.is_active():
-                    gsm.mark_stopped(REASON_USER_CANCEL)
-                    debug_log(f"[Goal] 用户取消任务 {task_id}，同步停止本对话目标模式")
-    except Exception as exc:
-        debug_log(f"[Goal] 取消任务时停止目标模式失败: {exc}")
+    runtime_service.cancel_task(username, task_id)
     return jsonify({"success": True})
 
 @tasks_bp.route("/api/tasks/<task_id>/runtime_guidance", methods=["POST"])
@@ -386,3 +367,32 @@ def guide_runtime_queue_message_api(task_id: str, message_id: str):
             },
         }
     )
+
+
+@tasks_bp.route("/api/conversations/<conversation_id>/goal", methods=["POST"])
+@api_login_or_host_token_required
+@with_workspace_data
+def control_goal_api(conversation_id, data_context, workspace, username):
+    """Explicit lifecycle control. Closing never cancels the current task."""
+    from server.goal_runtime import cancel_retry
+    from server.conversation_view.snapshots import VIEW_LOCK
+    if data_context.manager_for(conversation_id).read_conversation(conversation_id) is None:
+        return jsonify(success=False, error="Conversation not found"), 404
+    payload = request.get_json() or {}
+    action = payload.get("action")
+    if action not in {"close", "pause"}:
+        return jsonify(success=False, error="Invalid goal action"), 400
+    with VIEW_LOCK:
+        gsm = GoalStateManager(workspace.data_dir, conversation_id)
+        if not payload.get("run_id") or payload["run_id"] != gsm.state.get("run_id"):
+            return jsonify(success=False, error="目标已改变，请刷新状态后重试"), 409
+        if action == "pause":
+            gsm.pause("user_cancel", run_id=payload["run_id"])
+        else:
+            gsm.mark_stopped("user_closed")
+        cancel_retry(username, data_context.workspace_id, conversation_id)
+        snapshot = gsm.progress_snapshot()
+        for rec in task_manager.list_tasks(username, data_context.workspace_id):
+            if rec.conversation_id == conversation_id and rec.status in {"pending", "running", "cancel_requested"}:
+                task_manager._append_event(rec, "goal_progress", snapshot)
+    return jsonify(success=True, data=snapshot)

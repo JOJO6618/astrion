@@ -94,6 +94,10 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
     preview_runtime = build_preview_data_runtime(manager, username, workspace, normalized_id, conversation)
     run_mode = meta.get("run_mode") or ("thinking" if meta.get("thinking_mode") else "fast")
     run_mode = "thinking" if run_mode == "deep" else run_mode
+    from modules.goal_state_manager import GoalStateManager
+    goal = GoalStateManager(workspace.data_dir, normalized_id).progress_snapshot()
+    display.setdefault("state", {})["goal_progress"] = goal or None
+    display["state"]["goal_running"] = goal.get("status") in {"running", "reviewing", "retrying"}
     return jsonify( {"success": True, "data": {
         "conversation_id": normalized_id,
         "workspace_id": data_context.workspace_id,

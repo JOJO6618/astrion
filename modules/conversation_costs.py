@@ -63,7 +63,17 @@ def record_request(data_dir: str | Path, conversation_id: str, request_id: str,
             'actor_id': actor_id, 'recorded_at': datetime.now(timezone.utc).isoformat(), **entry,
         }
         atomic_write_json(path, data)
-        return True
+    # Goal limits use only this conversation's newly committed requests. Keep the
+    # ledger lock released before taking the independent goal lifecycle lock.
+    try:
+        from modules.goal_state_manager import GoalStateManager
+        gsm = GoalStateManager(data_dir, conversation_id)
+        if gsm.is_active():
+            gsm.record_usage(request_id, entry['total_tokens'], run_id=gsm.state['run_id'])
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Goal usage update failed for %s", conversation_id)
+    return True
 
 
 def actor_statistics(data_dir: str | Path, conversation_id: str, actor_id: str) -> dict[str, Any] | None:

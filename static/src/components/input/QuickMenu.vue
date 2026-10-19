@@ -53,15 +53,17 @@
         <button
           type="button"
           class="menu-entry"
-          :class="{ 'goal-entry-active': goalModeArmed || goalRunning || goalCompleted }"
+          :class="{
+            'goal-entry-active': !!goalProgress?.goal && goalProgress?.status !== 'stopped'
+          }"
           @click.stop="$emit('toggle-goal-mode')"
-          :disabled="!isConnected"
+          :disabled="!isConnected || (goalResumable && streamingMessage)"
         >
           {{ $t('quickdock.goalMode') }}
           <span class="entry-arrow">
-            <template v-if="goalRunning">{{ $t('common.running') }}</template>
+            <template v-if="goalResumable">{{ $t('goal.resume') }}</template>
+            <template v-else-if="goalRunning">{{ $t('common.running') }}</template>
             <template v-else-if="goalCompleted">{{ $t('quickdock.goalDone') }}</template>
-            <template v-else>{{ goalModeArmed ? $t('quickdock.goalArmed') : '' }}</template>
           </span>
         </button>
         <button
@@ -256,6 +258,7 @@ const currentModelSupportsVideo = computed(() => {
 const goalCompleted = computed(
   () => String(props.goalProgress?.status || '').toLowerCase() === 'done'
 );
+const goalResumable = computed(() => ['paused', 'blocked'].includes(props.goalProgress?.status));
 </script>
 
 <style scoped>

@@ -665,6 +665,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         function = (pending_tool_call or {}).get("function") or {}
         if function.get("name") != "ask_user":
             continue
+        from modules.goal_policy import interaction_denied
+        if interaction_denied(web_terminal, "ask_user"):
+            continue
         arguments = _safe_parse_tool_arguments_for_question(web_terminal, pending_tool_call)
         if not isinstance(arguments, dict):
             continue
@@ -1032,11 +1035,16 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
                 )
             if wait_result.get("decision") == "pending":
-                wait_result = await _wait_for_tool_approval(
-                    approval_id=approval_item["approval_id"], username=username,
-                    timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
-                    stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
-                )
+                from modules.goal_policy import goal_for_terminal, DENIED_MESSAGE
+                if goal_for_terminal(web_terminal):
+                    tool_approval_manager.mark_expired(approval_item["approval_id"])
+                    wait_result = {"decision": "rejected", "reason": DENIED_MESSAGE}
+                else:
+                    wait_result = await _wait_for_tool_approval(
+                        approval_id=approval_item["approval_id"], username=username,
+                        timeout_seconds=_approval_timeout_for(web_terminal) or 3600.0,
+                        stop_check=_make_interaction_stop_check(get_stop_flag, client_sid, username),
+                    )
             sender('tool_approval_resolved', {
                 'approval_id': approval_item.get("approval_id"),
                 'decision': wait_result.get("decision"),

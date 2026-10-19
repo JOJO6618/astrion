@@ -497,6 +497,12 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             has_partial_output = bool(full_response or tool_calls or current_thinking)
             is_network_error = error_status is None
             can_retry = api_attempt < max_api_retries and (is_network_error or not has_partial_output)
+            from modules.goal_policy import goal_for_terminal
+            if goal_for_terminal(web_terminal):
+                from server.goal_runtime import classify_error
+                category = classify_error({"status_code": error_status, "error_code": error_code,
+                                           "error_type": error_type, "message": error_message})
+                can_retry = can_retry and category == "retryable"
             sender('error', {
                 'message': error_message,
                 'status_code': error_status,
@@ -507,6 +513,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                 'base_url': error_base_url,
                 'model_id': error_model_id,
                 'retry': bool(can_retry),
+                'fatal': not can_retry,
                 'retry_in': retry_delay_seconds if can_retry else None,
                 'attempt': api_attempt + 1,
                 'max_attempts': max_api_retries + 1

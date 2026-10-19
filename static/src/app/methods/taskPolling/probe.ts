@@ -73,7 +73,15 @@ export const probeMethods = {
         !!status.has_running_sub_agents !== !!this.waitingForSubAgent ||
         !!status.has_running_background_commands !== !!this.waitingForBackgroundCommand;
       const activityChanged = !!status.is_truly_active !== !!this.taskInProgress;
-      if (needsSubscription || backgroundChanged || activityChanged || this.streamingMessage) {
+      const goalChanged =
+        Number(status.goal_progress?.revision || 0) !== Number(this.goalProgress?.revision || 0);
+      if (
+        needsSubscription ||
+        backgroundChanged ||
+        activityChanged ||
+        goalChanged ||
+        this.streamingMessage
+      ) {
         await this.refreshConversationSnapshot();
       }
     } catch (error) {

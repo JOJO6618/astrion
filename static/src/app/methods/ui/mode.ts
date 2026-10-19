@@ -42,18 +42,13 @@ export const modeMethods = {
     if (!this.isConnected) {
       return;
     }
-    if (this.goalRunning) {
-      // 运行中点击 → 打开进度弹窗，而非切换
-      this.goalDialogOpen = true;
+    if (['paused', 'blocked'].includes(this.goalProgress?.status)) {
       this.inputCloseMenus();
+      void this.handleContinueGoal();
       return;
     }
-    const goalStatus = String(this.goalProgress?.status || '').toLowerCase();
-    if (goalStatus === 'done' || goalStatus === 'stopped') {
-      this.goalProgress = null;
-      this.goalDialogOpen = false;
-    }
-    this.inputToggleGoalArmed();
+    this.goalDialogOpen = true;
+    this.goalModeArmed = false;
     this.inputCloseMenus();
     this.modeMenuOpen = false;
     this.modelMenuOpen = false;

@@ -1,290 +1,397 @@
 <template>
-  <transition name="overlay-fade">
-    <div v-if="open" class="subagent-activity-overlay" @click.self="$emit('close')">
-      <div class="subagent-activity-modal goal-progress-modal">
-        <div class="subagent-activity-header">
-          <div class="subagent-activity-title">
-            {{
-              isDone
-                ? $t('overlay.goalDoneTitle')
-                : isStopped
-                  ? $t('overlay.goalStoppedTitle')
-                  : $t('overlay.goalRunningTitle')
-            }}
-          </div>
+  <Transition name="overlay-fade">
+    <div
+      v-if="open"
+      class="goal-overlay"
+      @click.self="$emit('close')"
+      @keydown.esc="$emit('close')"
+    >
+      <section class="goal-dialog" role="dialog" aria-modal="true" :aria-label="$t('goal.title')">
+        <header class="goal-dialog__header">
+          <span>{{ $t('goal.title') }}</span>
           <CloseButton :label="$t('common.close')" @click="$emit('close')" />
-        </div>
-
-        <div class="goal-progress-meta">
-          <span class="goal-progress-status" :class="statusClass">{{ statusLabel }}</span>
-          <span v-if="goal" class="goal-progress-goal" :title="goal">{{
-            $t('overlay.goalLabel', { goal })
-          }}</span>
-        </div>
-
-        <div class="goal-progress-metrics">
-          <div class="goal-metric">
-            <div class="goal-metric__value">{{ turnCount }}</div>
-            <div class="goal-metric__label">{{ $t('overlay.metricTurns') }}</div>
-          </div>
-          <div class="goal-metric">
-            <div class="goal-metric__value">{{ formattedTokens }}</div>
-            <div class="goal-metric__label">{{ $t('overlay.metricTokens') }}</div>
-          </div>
-          <div class="goal-metric">
-            <div class="goal-metric__value">{{ toolCalls }}</div>
-            <div class="goal-metric__label">{{ $t('overlay.metricToolCalls') }}</div>
-          </div>
-          <div class="goal-metric">
-            <div class="goal-metric__value">{{ formattedDuration }}</div>
-            <div class="goal-metric__label">{{ $t('overlay.metricDuration') }}</div>
-          </div>
-        </div>
-
-        <div v-if="isStopped && stoppedReasonLabel" class="goal-progress-reason">
-          {{ $t('overlay.stopReason', { reason: stoppedReasonLabel }) }}
-        </div>
-
-        <div v-if="summary" class="goal-progress-summary">
-          <div class="goal-progress-summary__title">
-            {{ isDone ? $t('overlay.summaryDone') : $t('overlay.summaryLatest') }}
-          </div>
-          <div class="goal-progress-summary__body">{{ summary }}</div>
-        </div>
-      </div>
+        </header>
+        <form class="goal-dialog__body" @submit.prevent="submit">
+          <template v-if="isNew">
+            <label class="goal-label" for="goal-target">{{ $t('goal.target') }}</label>
+            <textarea
+              id="goal-target"
+              ref="targetInput"
+              v-model="target"
+              class="goal-target"
+              :placeholder="$t('goal.placeholder')"
+              maxlength="100000"
+            />
+          </template>
+          <template v-else>
+            <div class="goal-dialog__state">{{ stateLabel }}</div>
+            <div class="goal-dialog__target">{{ progress?.goal }}</div>
+            <div class="goal-dialog__metrics">
+              <span
+                >{{ $t('goal.turns') }} <strong>{{ progress?.turn_count || 0 }}</strong></span
+              >
+              <span
+                >{{ $t('goal.tokens') }}
+                <strong>{{ Number(progress?.tokens_used || 0).toLocaleString() }}</strong></span
+              >
+            </div>
+            <p v-if="reason" class="goal-dialog__reason">{{ reason }}</p>
+            <p
+              v-if="progress?.last_message || progress?.final_summary"
+              class="goal-dialog__message"
+            >
+              {{ progress?.final_summary || progress?.last_message }}
+            </p>
+            <p v-if="retryTime" class="goal-dialog__reason">
+              {{ $t('goal.retryAt', { time: retryTime }) }}
+            </p>
+          </template>
+          <details v-if="isNew || resumable" class="goal-limits">
+            <summary>{{ $t('goal.advanced') }}</summary>
+            <div class="goal-limit">
+              <button
+                type="button"
+                class="goal-limit__toggle"
+                :aria-pressed="turnsEnabled"
+                @click="turnsEnabled = !turnsEnabled"
+              >
+                <FancyCheck :checked="turnsEnabled" /><span>{{ $t('goal.maxTurns') }}</span>
+              </button>
+              <input
+                v-model.number="maxTurns"
+                type="number"
+                min="1"
+                max="10000"
+                :disabled="!turnsEnabled"
+                :aria-label="$t('goal.maxTurns')"
+              />
+            </div>
+            <div class="goal-limit">
+              <button
+                type="button"
+                class="goal-limit__toggle"
+                :aria-pressed="tokensEnabled"
+                @click="tokensEnabled = !tokensEnabled"
+              >
+                <FancyCheck :checked="tokensEnabled" /><span>{{ $t('goal.maxTokens') }}</span>
+              </button>
+              <input
+                v-model.number="maxTokens"
+                type="number"
+                min="1"
+                max="1000000000"
+                :disabled="!tokensEnabled"
+                :aria-label="$t('goal.maxTokens')"
+              />
+            </div>
+          </details>
+          <p v-if="validation" class="goal-dialog__error">{{ validation }}</p>
+          <footer class="goal-dialog__footer">
+            <button
+              v-if="!isNew && !terminal"
+              type="button"
+              class="goal-button"
+              @click="$emit('close-goal')"
+            >
+              {{ $t('goal.closeGoal') }}
+            </button>
+            <button
+              v-if="terminal && !isNew"
+              type="button"
+              class="goal-button goal-button--primary"
+              :disabled="taskBusy"
+              @click="creating = true"
+            >
+              {{ $t('goal.newGoal') }}
+            </button>
+            <button
+              v-if="isNew || resumable"
+              type="submit"
+              class="goal-button goal-button--primary"
+              :disabled="taskBusy || (isNew && !target.trim())"
+            >
+              {{ isNew ? $t('goal.start') : $t('goal.resume') }}
+            </button>
+            <button
+              v-if="progress?.status === 'retrying'"
+              type="button"
+              class="goal-button"
+              @click="$emit('pause')"
+            >
+              {{ $t('goal.pause') }}
+            </button>
+          </footer>
+        </form>
+      </section>
     </div>
-  </transition>
+  </Transition>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { t, currentLocale } from '@/locales';
+import { computed, nextTick, ref, watch } from 'vue';
+import { t } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
-
-defineOptions({ name: 'GoalProgressDialog' });
+import FancyCheck from '@/components/common/FancyCheck.vue';
+import { goalReason, goalStatusLabel } from '@/utils/goal';
 
 const props = defineProps<{
   open: boolean;
   progress: Record<string, any> | null;
+  taskBusy?: boolean;
 }>();
-
-defineEmits<{ (event: 'close'): void }>();
-
-const status = computed(() => (props.progress?.status || 'running') as string);
-const isDone = computed(() => status.value === 'done');
-const isStopped = computed(() => status.value === 'stopped');
-
-const statusLabel = computed(() => {
-  void currentLocale.value;
-  if (isDone.value) return t('overlay.statusDone');
-  if (isStopped.value) return t('overlay.statusStopped');
-  return t('common.running');
-});
-const statusClass = computed(() => ({
-  'is-done': isDone.value,
-  'is-stopped': isStopped.value,
-  'is-running': !isDone.value && !isStopped.value
-}));
-
-const goal = computed(() => (props.progress?.goal || '').toString());
-const turnCount = computed(() => Number(props.progress?.turn_count ?? 0));
-const toolCalls = computed(() => Number(props.progress?.tool_calls ?? 0));
-const summary = computed(() =>
-  (props.progress?.summary || props.progress?.final_summary || '').toString()
+const emit = defineEmits<{
+  (event: 'close'): void;
+  (
+    event: 'start',
+    value: { goal: string; max_turns: number | null; max_tokens: number | null }
+  ): void;
+  (event: 'continue', value: { max_turns: number | null; max_tokens: number | null }): void;
+  (event: 'close-goal'): void;
+  (event: 'pause'): void;
+}>();
+const target = ref('');
+const targetInput = ref<HTMLTextAreaElement | null>(null);
+const maxTurns = ref(5);
+const maxTokens = ref(100000);
+const turnsEnabled = ref(false);
+const tokensEnabled = ref(false);
+const creating = ref(false);
+const validation = ref('');
+const terminal = computed(() => ['done', 'stopped'].includes(props.progress?.status));
+const isNew = computed(() => creating.value || !props.progress?.goal);
+const resumable = computed(() => ['paused', 'blocked'].includes(props.progress?.status));
+const stateLabel = computed(() => goalStatusLabel(props.progress?.status));
+const reason = computed(() => goalReason(props.progress?.stopped_reason));
+const retryTime = computed(() =>
+  props.progress?.status === 'retrying' && props.progress?.next_retry_at
+    ? new Date(props.progress.next_retry_at * 1000).toLocaleTimeString()
+    : ''
 );
-const durationBaseSeconds = ref(0);
-const durationObservedAtMs = ref(Date.now());
-const nowMs = ref(Date.now());
-let durationTimer: ReturnType<typeof window.setInterval> | null = null;
-
-const syncDurationBase = () => {
-  const raw = Number(props.progress?.duration_seconds ?? 0);
-  durationBaseSeconds.value = Number.isFinite(raw) && raw > 0 ? raw : 0;
-  durationObservedAtMs.value = Date.now();
-  nowMs.value = durationObservedAtMs.value;
-};
-
-const ensureDurationTimer = () => {
-  if (durationTimer || !props.open || isDone.value || isStopped.value) return;
-  durationTimer = window.setInterval(() => {
-    nowMs.value = Date.now();
-  }, 1000);
-};
-
-const clearDurationTimer = () => {
-  if (durationTimer) {
-    window.clearInterval(durationTimer);
-    durationTimer = null;
-  }
-};
-
 watch(
-  () => [props.progress?.duration_seconds, props.progress?.status, props.open],
-  () => {
-    syncDurationBase();
-    if (props.open && !isDone.value && !isStopped.value) {
-      ensureDurationTimer();
-    } else {
-      clearDurationTimer();
+  () => [props.open, props.progress?.run_id],
+  async () => {
+    validation.value = '';
+    creating.value = false;
+    turnsEnabled.value = props.progress?.max_turns != null;
+    tokensEnabled.value = props.progress?.max_tokens != null;
+    maxTurns.value = props.progress?.max_turns || 5;
+    maxTokens.value = props.progress?.max_tokens || 100000;
+    if (props.open && isNew.value) {
+      await nextTick();
+      targetInput.value?.focus();
     }
-  },
-  { immediate: true }
+  }
 );
-
-onBeforeUnmount(clearDurationTimer);
-
-const formattedTokens = computed(() => {
-  const n = Number(props.progress?.tokens_used ?? 0);
-  if (!Number.isFinite(n)) return '0';
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return `${n}`;
-});
-
-const formattedDuration = computed(() => {
-  const liveExtra =
-    !isDone.value && !isStopped.value
-      ? Math.max(0, (nowMs.value - durationObservedAtMs.value) / 1000)
-      : 0;
-  const s = durationBaseSeconds.value + liveExtra;
-  if (!Number.isFinite(s) || s <= 0) return '0s';
-  if (s < 60) return `${Math.round(s)}s`;
-  const m = Math.floor(s / 60);
-  const rem = Math.round(s % 60);
-  if (m < 60) return `${m}m${rem}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h${m % 60}m`;
-});
-
-const stoppedReasonLabel = computed(() => {
-  void currentLocale.value;
-  const map: Record<string, string> = {
-    idle_no_tool: 'overlay.reasonIdleNoTool',
-    max_turns: 'overlay.reasonMaxTurns',
-    max_tokens: 'overlay.reasonMaxTokens',
-    user_cancel: 'overlay.reasonUserCancel'
-  };
-  const reason = (props.progress?.stopped_reason || '').toString();
-  const key = map[reason];
-  return key ? t(key) : reason;
-});
+// The task-owned parent rejects duplicate submissions; failed sends stay editable.
+function submit() {
+  if (props.taskBusy) return;
+  const turns = turnsEnabled.value ? Number(maxTurns.value) : null;
+  const tokens = tokensEnabled.value ? Number(maxTokens.value) : null;
+  if (
+    (turns != null && (!Number.isSafeInteger(turns) || turns < 1 || turns > 10000)) ||
+    (tokens != null && (!Number.isSafeInteger(tokens) || tokens < 1 || tokens > 1000000000))
+  ) {
+    validation.value = t('goal.invalidLimit');
+    return;
+  }
+  validation.value = '';
+  const limits = { max_turns: turns, max_tokens: tokens };
+  if (isNew.value) emit('start', { goal: target.value.trim(), ...limits });
+  else emit('continue', limits);
+}
 </script>
 
 <style scoped>
-.goal-progress-modal {
-  min-width: 360px;
-  max-width: 520px;
-}
-.goal-progress-meta {
+.goal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 4px 0 12px;
+  justify-content: center;
+  padding: 20px;
+  background: var(--overlay-scrim);
 }
-.goal-progress-status {
-  font-size: 12px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--theme-chip-border);
-  background: color-mix(in srgb, var(--theme-surface-soft) 92%, var(--text-tertiary) 8%);
-  color: var(--text-secondary);
-}
-.goal-progress-status.is-running {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--theme-surface-soft) 82%, var(--accent) 18%);
-}
-.goal-progress-status.is-done {
-  color: var(--state-success);
-  border-color: var(--state-success);
-  background: color-mix(in srgb, var(--theme-surface-soft) 82%, var(--state-success) 18%);
-}
-.goal-progress-status.is-stopped {
-  color: var(--state-warning);
-  border-color: var(--state-warning);
-  background: color-mix(in srgb, var(--theme-surface-soft) 82%, var(--state-warning) 18%);
-}
-:global(:root[data-theme='dark']) .goal-progress-status,
-:global(body[data-theme='dark']) .goal-progress-status {
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--theme-surface-muted) 82%, var(--text-tertiary) 18%);
-  border-color: var(--theme-control-border-strong);
-}
-:global(:root[data-theme='dark']) .goal-progress-status.is-running,
-:global(body[data-theme='dark']) .goal-progress-status.is-running {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--theme-surface-muted) 72%, var(--accent) 28%);
-  border-color: color-mix(in srgb, var(--accent) 70%, white 30%);
-}
-:global(:root[data-theme='dark']) .goal-progress-status.is-done,
-:global(body[data-theme='dark']) .goal-progress-status.is-done {
-  color: color-mix(in srgb, var(--state-success) 30%, white);
-  background: color-mix(in srgb, var(--theme-surface-muted) 72%, var(--state-success) 28%);
-  border-color: color-mix(in srgb, var(--state-success) 70%, white 30%);
-}
-:global(:root[data-theme='dark']) .goal-progress-status.is-stopped,
-:global(body[data-theme='dark']) .goal-progress-status.is-stopped {
-  color: color-mix(in srgb, var(--state-warning) 30%, white);
-  background: color-mix(in srgb, var(--theme-surface-muted) 72%, var(--state-warning) 28%);
-  border-color: color-mix(in srgb, var(--state-warning) 70%, white 30%);
-}
-.goal-progress-goal {
-  font-size: 13px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.goal-dialog {
+  width: 520px;
   max-width: 100%;
-}
-.goal-progress-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.goal-metric {
-  text-align: center;
-  padding: 10px 6px;
-  border-radius: 10px;
-  background: var(--theme-surface-muted);
-  border: 1px solid var(--theme-control-border);
-}
-.goal-metric__value {
-  font-size: 18px;
-  font-weight: 600;
+  max-height: min(760px, 90dvh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-base);
   color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  box-shadow: var(--shadow-mid);
 }
-.goal-metric__label {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-tertiary);
+.goal-dialog__header {
+  height: 58px;
+  min-height: 58px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-default);
 }
-.goal-progress-reason {
+.goal-dialog__body {
+  padding: 20px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.goal-label {
+  display: block;
+  height: 30px;
   font-size: 13px;
-  color: var(--state-warning);
-  margin-bottom: 10px;
+  color: var(--text-secondary);
 }
-.goal-progress-summary {
-  border-top: 1px solid var(--theme-control-border);
-  padding-top: 10px;
+.goal-target {
+  width: 100%;
+  height: 170px;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 100px;
+  max-height: 300px;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.6;
 }
-.goal-progress-summary__title {
+.goal-target:focus-visible,
+.goal-button:focus-visible,
+.goal-limit__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.goal-dialog__state {
+  height: 28px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.goal-dialog__target {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow: auto;
+  line-height: 1.6;
+}
+.goal-dialog__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 16px 0;
   font-size: 12px;
-  color: var(--text-tertiary);
-  margin-bottom: 6px;
+  color: var(--text-secondary);
 }
-.goal-progress-summary__body {
+.goal-dialog__metrics strong {
+  margin-left: 6px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.goal-dialog__reason {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.goal-dialog__message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 240px;
-  overflow-y: auto;
 }
-@media (max-width: 520px) {
-  .goal-progress-metrics {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.goal-limits {
+  margin-top: 18px;
+  border-top: 1px solid var(--border-default);
+}
+.goal-limits summary {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  list-style: none;
+}
+.goal-limits summary::-webkit-details-marker {
+  display: none;
+}
+.goal-limit {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.goal-limit__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.goal-limit input {
+  width: 112px;
+  height: 32px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+.goal-limit input:disabled {
+  opacity: 0.4;
+}
+.goal-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.goal-button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 7px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.goal-button:hover {
+  background: var(--hover-bg);
+}
+.goal-button--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+.goal-button--primary:hover {
+  background: var(--accent-hover);
+}
+.goal-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.goal-dialog__error {
+  color: var(--state-danger);
+  font-size: 12px;
 }
 </style>

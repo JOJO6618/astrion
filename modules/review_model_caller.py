@@ -26,7 +26,23 @@ __all__ = ["ReviewModelCallError", "call_review_model"]
 
 
 class ReviewModelCallError(RuntimeError):
-    """审核模型调用失败（HTTP 错误 / 网络异常 / 流内 error chunk）。"""
+    """Preserve provider codes for goal recovery without exposing credentials."""
+
+    def __init__(self, message, *, details=None):
+        super().__init__(message)
+        self.details = dict(details or {})
+
+
+def _http_error(response):
+    details = {"status_code": response.status_code}
+    try:
+        body = response.json()
+        error = body.get("error", body) if isinstance(body, dict) else {}
+        if isinstance(error, dict):
+            details.update({k: error[k] for k in ("code", "type", "message") if k in error})
+    except (ValueError, TypeError):
+        pass
+    return ReviewModelCallError(str(details.get("message") or f"http {response.status_code}"), details=details)
 
 
 async def _call_via_api_client(
@@ -52,7 +68,7 @@ async def _call_via_api_client(
                 text = err.get("error_message") or err.get("error_text") or str(err)
             else:
                 text = str(err)
-            raise ReviewModelCallError(text)
+            raise ReviewModelCallError(text, details=err if isinstance(err, dict) else None)
         choice = (chunk.get("choices") or [{}])[0]
         delta = choice.get("delta") or {}
         if delta.get("content"):
@@ -126,11 +142,11 @@ async def _call_regular(
                     retry_resp.raise_for_status()
                     resp = retry_resp
                 except httpx.HTTPStatusError:
-                    raise ReviewModelCallError(f"http {retry_resp.status_code}") from exc
+                    raise _http_error(retry_resp) from exc
             else:
-                raise ReviewModelCallError(f"http {exc.response.status_code if exc.response else 'unknown'}") from exc
+                raise _http_error(exc.response) from exc
         except Exception as exc:
-            raise ReviewModelCallError(str(exc)) from exc
+            raise ReviewModelCallError(str(exc), details={"error_type": type(exc).__name__}) from exc
 
     choice = ((resp.json().get("choices") or [{}])[0] or {}).get("message") or {}
     reasoning_content = (

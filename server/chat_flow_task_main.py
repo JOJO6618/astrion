@@ -131,7 +131,6 @@ from .chat_flow_tool_loop import execute_tool_calls
 from .chat_flow_stream_loop import run_streaming_attempts
 from .deep_compression import run_deep_compression
 from .goal_flow import (
-    maybe_start_goal,
     inject_goal_prompt,
     handle_goal_after_turn,
     stop_goal_user_cancel,
@@ -149,6 +148,7 @@ _VALID_USER_MESSAGE_SOURCES = {
     "goal",
     "goal_prompt",
     "goal_review",
+    "goal_recovery",
     "compression",
     "compression_handoff",
     "permission",
@@ -169,7 +169,7 @@ def _user_message_ui_defaults(source: str, *, auto_user_message_event: bool = Fa
     if normalized in {"sub_agent", "background_command", "compression", "compression_handoff"}:
         return {"visibility": "compact", "starts_work": False}
     # 目标审核续命：确实开启新一轮工作，保持 starts_work=True。
-    if normalized == "goal_review":
+    if normalized in {"goal_review", "goal_recovery"}:
         return {"visibility": "compact", "starts_work": True}
     # 工作流激活/柔性通知（任务入口派发）：开启新一轮工作，显示工作头与计时器。
     # 运行期 inline 注入走 _runtime_message_ui_defaults（延续当前工作段，不受影响）。
@@ -542,6 +542,9 @@ async def _dispatch_completion_user_notice(
     每项为 {"message": str, "payload": dict}。这些会先于触发消息写入历史/事件流，
     但不各自触发新一轮工作；仅最后一条 user_message 作为后续任务的触发消息。
     """
+    from modules.goal_policy import goal_blocks_background
+    if goal_blocks_background(web_terminal.data_dir, conversation_id):
+        raise RuntimeError("Goal is paused; completion notifications remain pending")
     extra_payload = extra_payload or {}
     preceding_notices = preceding_notices or []
     message_source = str(extra_payload.get("message_source") or "").strip().lower()
@@ -642,6 +645,11 @@ async def _dispatch_completion_user_notice(
         sender('user_message', payload)
         return
     except Exception as e:
+        from modules.goal_state_manager import GoalStateManager
+        goal = GoalStateManager(web_terminal.data_dir, conversation_id)
+        if goal.state["status"] in {"running", "reviewing", "retrying", "paused", "blocked"}:
+            # Goal tasks must always own a TaskRecord, outcome and cancellation.
+            raise
         debug_log(f"[CompletionNotice] 创建后台消息任务失败，回退直接执行: {e}")
 
     # 回退路径没有任务线程（未登记 TaskRecord），轮询器预占的门闸 token 无法随任务
@@ -996,6 +1004,10 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
     ma_debug("poll_completion_notifications_start", conversation_id=conversation_id)
     while (time.time() - start_wait) < max_wait_time:
         loop_count += 1
+        from modules.goal_policy import goal_blocks_background
+        if goal_blocks_background(web_terminal.data_dir, conversation_id):
+            await asyncio.sleep(1)
+            continue
         # 检查停止标志
         client_stop_info = get_stop_flag(client_sid, username, include_user=False)
         if client_stop_info:
@@ -1137,6 +1149,10 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
     tick_count = 0
     while (time.time() - start_wait) < max_wait_time:
         tick_count += 1
+        from modules.goal_policy import goal_blocks_background
+        if goal_blocks_background(web_terminal.data_dir, conversation_id):
+            await asyncio.sleep(1)
+            continue
         # 检查停止标志
         client_stop_info = get_stop_flag(client_sid, username, include_user=False)
         if client_stop_info:
@@ -1177,36 +1193,24 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
 
         # 1) 先检查 pending 池——主对话空闲时只要池里有消息就立即派发（情况2）。
         if state.has_pending_master_messages():
-            pending = state.drain_master_messages()
-            ma_debug(
-                "poll_ma_notifications_dispatch",
-                conversation_id=conversation_id,
-                count=len(pending),
-                running_count=len([a for a in all_insts if a.status == "running"]),
-                previews=[str(m)[:200] for m in pending],
-                tick=tick_count,
-            )
-            try:
-                await _dispatch_multi_agent_idle_messages(
-                    web_terminal=web_terminal,
-                    workspace=workspace,
-                    sender=sender,
-                    client_sid=client_sid,
-                    username=username,
-                    conversation_id=conversation_id,
-                    messages=pending,
-                )
-                ma_debug("poll_ma_dispatch_success", conversation_id=conversation_id, count=len(pending), tick=tick_count)
-            except Exception as exc:
-                debug_log(f"[MultiAgent] 分发 idle 消息失败: {exc}")
-                ma_debug(
-                    "poll_ma_notifications_dispatch_error",
-                    conversation_id=conversation_id,
-                    error=str(exc),
-                    error_type=type(exc).__name__,
-                    tick=tick_count,
-                )
-            # 分发后退出，由新任务结束后再决定是否继续轮询
+            from server.conversation_view.snapshots import VIEW_LOCK
+            # No await inside this transaction: goal pause/close cannot interleave
+            # between draining the notification pool and admitting its task.
+            with VIEW_LOCK:
+                if goal_blocks_background(web_terminal.data_dir, conversation_id):
+                    continue
+                pending = state.drain_master_messages()
+                try:
+                    _dispatch_multi_agent_idle_messages_sync(
+                        web_terminal=web_terminal, workspace=workspace, sender=sender,
+                        client_sid=client_sid, username=username,
+                        conversation_id=conversation_id, messages=pending,
+                    )
+                    ma_debug("poll_ma_dispatch_success", conversation_id=conversation_id, count=len(pending), tick=tick_count)
+                except Exception as exc:
+                    debug_log(f"[MultiAgent] 分发 idle 消息失败: {exc}")
+                    ma_debug("poll_ma_notifications_dispatch_error", conversation_id=conversation_id,
+                             error=str(exc), error_type=type(exc).__name__, tick=tick_count)
             return
 
         # 2) 没有 pending 消息：检查还有哪些子智能体在运行，决定退出还是继续等
@@ -1245,7 +1249,14 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
             ma_debug("poll_ma_idle_signal_sent", conversation_id=conversation_id, tick=tick_count)
 
 
-async def _dispatch_multi_agent_idle_messages(
+async def _dispatch_multi_agent_idle_messages(**kwargs):
+    """Async compatibility entry; persistence and admission have no await points."""
+    from server.conversation_view.snapshots import VIEW_LOCK
+    with VIEW_LOCK:
+        return _dispatch_multi_agent_idle_messages_sync(**kwargs)
+
+
+def _dispatch_multi_agent_idle_messages_sync(
     *,
     web_terminal,
     workspace,
@@ -1271,6 +1282,9 @@ async def _dispatch_multi_agent_idle_messages(
         return
 
     from modules.multi_agent.state import parse_multi_agent_message
+    from modules.goal_policy import goal_blocks_background
+    if goal_blocks_background(web_terminal.data_dir, conversation_id):
+        raise RuntimeError("Goal is paused; multi-agent notifications remain pending")
     from .tasks import task_manager
 
     parsed_messages = []
@@ -1989,23 +2003,8 @@ async def handle_task_with_sender(
     except Exception as _wf_boot_exc:
         debug_log(f"[Workflow] 任务开头进度广播失败: {_wf_boot_exc}")
 
-    # === 目标模式（Goal Mode）启动 / 续注入 ===
-    # 1) 用户请求开启目标模式 → 无条件覆盖工作区旧目标状态并启动新目标。
-    # 2) 工作区已存在活动目标（含压缩后重入、子智能体通知重入）→ 重新注入提示词，
-    #    确保主模型在长运行/压缩后仍“知道自己处于目标模式”。
+    # Admission owns start/resume. Compression only re-injects the same goal.
     try:
-        if bool(getattr(web_terminal, "_goal_mode_requested", False)):
-            maybe_start_goal(
-                web_terminal=web_terminal,
-                workspace=workspace,
-                conversation_id=conversation_id,
-                goal_text=message,
-                current_tool_calls=0,
-            )
-            # 本标记只表示“本次用户显式开启目标模式”，写入对话级目标状态后
-            # 必须立即消费掉：自动深层压缩会递归重入 handle_task_with_sender，
-            # 若不消费，压缩引导语会被误当作新目标再次启动目标模式。
-            setattr(web_terminal, "_goal_mode_requested", False)
         if goal_is_active(workspace, conversation_id):
             inject_goal_prompt(
                 web_terminal=web_terminal,
@@ -2194,6 +2193,8 @@ async def handle_task_with_sender(
                     conversation_id=conversation_id,
                 )
                 if _wf_notice:
+                    if goal_is_active(workspace, conversation_id):
+                        _wf_notice = "工作流已达到阶段轮数限制。目标模式下不得等待人工决定；请在现有权限内调整方案，无法推进时说明阻塞原因。"
                     web_terminal.inject_runtime_user_message(
                         _wf_notice,
                         messages=messages,

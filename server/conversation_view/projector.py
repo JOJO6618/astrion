@@ -400,7 +400,10 @@ class RuntimeProjection:
             progress["goal"] = data.get("goal") or previous.get("goal", "")
             for key in ("turn_count", "tokens_used", "tool_calls", "duration_seconds"):
                 progress.setdefault(key, 0)
-        self.state.update(goal_progress=progress, goal_running=status == "running")
+        previous = self.state.get("goal_progress") or {}
+        if int(progress.get("revision") or 0) < int(previous.get("revision") or 0):
+            return
+        self.state.update(goal_progress=progress, goal_running=status in {"running", "reviewing", "retrying"})
 
     def apply(self, event):
         """Consume one ordered event; duplicate indexed delivery is a no-op."""

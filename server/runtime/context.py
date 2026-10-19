@@ -56,6 +56,8 @@ class TaskParams:
     thinking_mode: Optional[bool] = None
     max_iterations: Optional[int] = None
     goal_mode: bool = False
+    goal_action: Optional[str] = None
+    goal_options: Optional[Dict[str, Any]] = None
     skill_context_messages: List[Dict[str, str]] = field(default_factory=list)
     message_source: Optional[str] = None
     queued_message_id: Optional[str] = None
@@ -66,6 +68,10 @@ class TaskParams:
     approval_timeout_seconds: Optional[int] = None
 
     def validate(self) -> None:
+        if self.goal_action not in {None, "start", "continue"}:
+            raise ValueError("Invalid goal action")
+        from modules.goal_policy import validate_limits
+        validate_limits(self.goal_options)
         if self.run_mode is not None:
             normalized = str(self.run_mode).lower()
             if normalized not in {"fast", "thinking", "deep"}:

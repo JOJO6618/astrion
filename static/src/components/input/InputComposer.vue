@@ -193,9 +193,7 @@
               <span v-if="goalRunning" class="floating-project-status__notice">{{
                 $t('input.goalModeRunning')
               }}</span>
-              <span v-else-if="goalModeArmed" class="floating-project-status__notice">{{
-                $t('input.goalModeReady')
-              }}</span>
+
               <button
                 v-if="pendingUserQuestionCount > 0"
                 type="button"
@@ -537,8 +535,9 @@
         :block-compress-conversation="blockCompressConversation"
         :block-conversation-review="blockConversationReview"
         :execution-mode-enabled="executionModeEnabled"
-        :goal-mode-armed="goalModeArmed"
+        :goal-mode-armed="false"
         :goal-running="goalRunning"
+        :goal-progress="goalProgress"
         @quick-upload="triggerQuickUpload"
         @pick-images="$emit('pick-images')"
         @pick-video="$emit('pick-video')"
@@ -1733,10 +1732,10 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
     {
       id: 'goal',
       label: t('input.goalMode'),
-      description: props.goalRunning
-        ? t('input.goalModeRunning')
-        : props.goalModeArmed
-          ? t('input.goalModeArmed')
+      description: ['paused', 'blocked'].includes(props.goalProgress?.status)
+        ? t('goal.resume')
+        : props.goalRunning
+          ? t('input.goalModeRunning')
           : t('input.goalModeToggleDesc'),
       disabled: !props.isConnected,
       action: () => emit('toggle-goal-mode')

@@ -31,14 +31,15 @@
 |---|---|---|---|---|---|---|---|
 | S1 | 对话历史与元数据 | 磁盘 conversation JSON | 执行链统一走 `ContextManager.add_conversation`（`utils/context_manager/message_mixin.py:127`）；少量外部写者（设置/压缩/CLI 命令）复用同一保存保护 | `save_conversation`（`crud_mixin.py:298`：merge-on-save 按 message_id 合并防缩减 + `_io_lock` RLock + `_atomic_write_json` 原子替换） | 内存 ContextManager 随写即存 | 对话级主任务门闸（S4）+ `create_chat_task` 单对话互斥（S2） | 删除对话；检查点恢复是唯一 allow_shrink 豁免 |
 | S2 | 任务记录（TaskRecord） | 内存 `task_manager._tasks` | 仅 `TaskManager`（`server/tasks/models.py`） | 任务内存态；未消费输入/引导由 `queue_state.py` 存入对话 metadata | 对话级持久队列在受理和 bootstrap 时恢复 | `_lock` + 所有主 Run 按对话互斥，含 cancel_requested | 任务清理/重启不删除持久队列；停止/失败暂停自动消费 |
-| S3 | 任务事件流 | `TaskRecord.events`（有界 deque maxlen=20000） | 执行链经 `_append_event`（models.py:762） | 无（内存态） | 客户端按 task_id+offset 轮询（`get_events_since`），socket 房间 `user_{username}` 推送 | `_lock` 内 idx 分配 | 任务清理/重启即失；前端靠 running-status 对账兜底 |
+| S3 | 任务事件流 | `TaskRecord.events`（有界 deque maxlen=20000） | 执行链经 `_append_event` | 无（内存态） | 客户端按 task_id+offset 轮询；显示恢复由统一 bootstrap 快照及绝对游标接续 | VIEW_LOCK → `_lock`，事务内发布显示与事件 | 事件裁剪／任务清理／重启；不靠事件重放重建全部历史 |
 | S4 | 对话级主任务门闸 | terminal 对象属性 `_main_task_gate_token` | 聊天 `process_message_task`、手动压缩 `run_compression_task` 获取/认领相同门闸；通知链预占移交 | 无 | 无 | token 匹配才能释放（`main_task_gate.py`） | 任务结束/异常兜底释放 |
-| S5 | 停止标志（stop_flags） | `state.stop_flags` dict，任务级键 = task_id（REST 任务即 client_sid） | `cancel_task`（REST 硬取消）、socket `stop_task`（软标志） | 无 | 执行链检查点轮询（流式/工具/重试/行首） | 任务级键隔离，用户级仅 socket 索引 | 任务收尾 pop |
+| S5 | 停止标志（stop_flags） | `state.stop_flags` dict，任务级键 = task_id（REST 任务即 client_sid） | RuntimeService.cancel_task → TaskManager.cancel_task，硬取消与软检查配合 | 无；目标暂停及未消费输入另行持久化 | 执行链检查点轮询（流式/工具/重试/行首） | 任务级身份隔离 | 任务收尾 pop |
 | S6 | 审批/提问条目 | 三个内存 manager（tool_approval / plan_approval / user_question），键 = approval_id/question_id；list 按 username+conversation_id | 执行链 create_request；REST answer/decide 置终态（锁内单次裁决） | 无（内存态，无 TTL） | 执行侧 asyncio.sleep 轮询（0.2~0.3s，默认超时 3600s） | manager 内 threading.Lock，已决定返回现状 | 重启即失；**超时/取消不回写终态（已知缺口）** |
 | S7 | 对话级 terminal 实例 | `state.user_terminals`，key = `username::workspace_id::conversation_id` | `get_user_resources` 创建/重建；回收器 24h 无活动关闭 | 无 | 容器句柄按工作区级共享 | 回收器 pop 前校验实例身份 | 24h 无活动回收；进程重启 |
 | S8 | 权限模式 / 执行环境 / 网络权限 | 对话 metadata + terminal 当前值 | `server/chat/permission.py` 端点：空闲立即生效，**运行中修改入队由工具循环消费**（queue_permission_mode_change 等） | 对话 metadata 持久化 | 工具循环在检查点应用 pending 变更 | 运行中排队保证单写者 | 对话删除 |
 | S9 | 多智能体实例状态 | `GLOBAL_MULTI_AGENT_STATES` 进程级单例 + 磁盘快照 | `SubAgentManager` / dispatch 链路 | 快照持久化（`mutiagents/`） | `_load_state` 恢复 + 任务记录校准终态 | `GLOBAL_MULTI_AGENT_STATES_LOCK` | terminate / 对话删除 |
 | S10 | 用户偏好（模型/模式/个性化） | settings.json / personalization.json（运行态路径） | 设置类端点；执行链只读快照 | 配置文件原子写 | RuntimeContext.principal 偏好快照在受理时固化 | 文件锁 | 用户修改 |
+| S11 | 对话级目标生命周期 | goal_states/<conversation_id>.json | 目标任务受理、审核／终态处理、显式控制端点 | GoalStateManager 原子替换 | bootstrap / running-status 读文件；goal_progress 事件投影 | 路径共享 RLock、run_id / task_id / revision；显示事务锁先于目标锁 | 关闭停止管理；重启活动态暂停；继续必须显式受理 |
 
 **约束**：
 - 新增状态必须先在表中登记权威关系，再实现。
@@ -52,7 +53,8 @@
 3. **保存保护**：merge-on-save（无 message_id 防御性跳过）+ manager 级 I/O 锁 + 原子替换 + 缩减拒绝。跨 manager 实例写同一文件不互斥——**前提是所有执行写都走对话级 terminal 专属 ContextManager**。
 4. **客户端恢复**：task 级 idx + offset 轮询 + running-status 对账 + 按 task_id/idx 去重。过期响应过滤必须保留。
 5. **审批单次裁决**：锁内裁决 pending，已决定时返回现状。
-6. **异常回退路径**：完成通知派发在 `create_chat_task` 失败时回退为直接执行 `handle_task_with_sender`（`chat_flow_task_main.py:645-675`），绕过 TaskRecord 登记。该路径在门闸保护下运行，**任何改造必须保持其门闸获取/释放、事件发送与取消语义**；它产生的事件不进任何 TaskRecord 事件流。
+6. **异常回退路径**：普通完成通知派发在 `create_chat_task` 失败时仍保留直接执行 `handle_task_with_sender` 的旧回退（不生成 TaskRecord）；它必须保持门闸释放。活动或可继续目标禁止这条回退，受理失败向通知池上报并保留待派发项，避免绕过持久暂停、任务取消与错误收尾。
+7. **目标管理独立于主任务终态**：关闭目标不取消 Run；停止 Run 持久暂停目标。网络失败的 Run 以 failed 结束，再由目标调度器在原 conversation_id 创建新的 notice Run，不修改原 Run 成功状态。重启不自动恢复目标执行。完整约束见 `docs/agents_details/goal_mode.md`。
 
 ## 4. 公共任务入口契约（RuntimeService）
 
@@ -67,11 +69,11 @@
 ├─ TaskParams（本次任务参数）─────────────────────────────────┤
 │  message / images / videos / files / conversation_id /      │
 │  model_key / run_mode / thinking_mode / max_iterations /    │
-│  goal_mode / skill_context_messages / message_source        │
+│  goal_action / goal_options / skill_context_messages /     │
+│  message_source / approval_timeout_seconds                  │
 ├─ InternalDirectives（内部执行信息）─────────────────────────┤
 │  main_task_gate_token / auto_user_message_event /           │
-│  auto_user_message_payload / preceding_user_notices /       │
-│  approval_timeout_seconds                                   │
+│  auto_user_message_payload / preceding_user_notices         │
 │  构造规则：仅内部调用方（通知链/工作流/派发器）使用，         │
 │  普通客户端提交一律拒绝或忽略                                 │
 └─────────────────────────────────────────────────────────────┘

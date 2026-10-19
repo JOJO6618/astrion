@@ -277,8 +277,8 @@ export const bootstrapMethods = {
     this.waitingForSubAgent = !!running.has_running_sub_agents;
     this.waitingForBackgroundCommand = !!running.has_running_background_commands;
     this.apiRequestPending = !!state.api_request_pending;
-    this.goalProgress = state.goal_progress || display.task?.goal_progress || null;
-    this.goalRunning = !!state.goal_running && !!running.is_main_running;
+    this.goalProgress = state.goal_progress || null;
+    this.goalRunning = ['running', 'reviewing', 'retrying'].includes(this.goalProgress?.status);
     this._summaryToolBatchId = state.summary_tool_batch_id || '';
     this._summaryToolBatchSequence = state.summary_tool_batch_sequence || 0;
     for (const message of display.messages || []) {

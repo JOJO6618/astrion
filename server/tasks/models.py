@@ -63,7 +63,7 @@ class TaskRecord:
         "task_params",
         "directives",
         # 运行期可变回写：goal_progress 事件最新快照（启动时为空，随事件流更新）
-        "goal_progress",
+        "goal_progress", "goal_run_id", "goal_error",
         "stop_requested",
         "next_event_idx",
         "runtime_pending_queue",
@@ -103,6 +103,8 @@ class TaskRecord:
         self.task_params: TaskParams = params
         self.directives: InternalDirectives = ctx.directives or InternalDirectives()
         self.goal_progress: Optional[Dict[str, Any]] = None
+        self.goal_run_id = None
+        self.goal_error = None
         self.stop_requested: bool = False
         self.next_event_idx: int = 0
         self.runtime_pending_queue: List[Dict[str, Any]] = []
@@ -200,6 +202,13 @@ class TaskManager(TaskViewMixin):
                 load_queue(record)
                 save_queue(record)
             self._tasks[task_id] = record
+        try:
+            from server.goal_runtime import prepare_goal_task
+            prepare_goal_task(record)
+        except Exception:
+            with self._lock:
+                self._tasks.pop(task_id, None)
+            raise
         thread = threading.Thread(
             target=self._run_chat_task,
             args=(record, list(params.images or []), list(params.videos or []), list(params.files or [])),
@@ -213,7 +222,14 @@ class TaskManager(TaskViewMixin):
             bind_task(self, record)
         except Exception:
             pass  # Optional desktop observer must never prevent task acceptance.
-        thread.start()
+        try:
+            thread.start()
+        except Exception as exc:
+            record.goal_error = {"message": str(exc)}
+            record.status = "failed"
+            from server.goal_runtime import finish_goal_task
+            finish_goal_task(self, record)
+            raise
         return record
 
     def get_task(self, username: str, task_id: str) -> Optional[TaskRecord]:
@@ -282,6 +298,21 @@ class TaskManager(TaskViewMixin):
             f"conv={rec.conversation_id}"
         )
 
+        # Publish cancellation before the task can finish on another thread.
+        if status_at_entry not in {"pending", "running", "cancel_requested"}:
+            return False
+        rec.stop_requested = True
+        # Persist pause before cancellation: no retry/review can race to revive it.
+        if rec.conversation_id and rec.goal_run_id:
+            from server.goal_runtime import manager_for_record, cancel_retry, emit_state
+            gsm = manager_for_record(rec)
+            from server.conversation_view.snapshots import VIEW_LOCK
+            with VIEW_LOCK, gsm.lock:
+                gsm.load()
+                if (gsm.state.get("task_id") == rec.task_id
+                        and gsm.pause(REASON_USER_CANCEL, run_id=rec.goal_run_id)):
+                    cancel_retry(rec.username, rec.workspace_id, rec.conversation_id)
+                    emit_state(self, rec, gsm)
         # 1. 硬取消主 asyncio task（如果引用还在）
         if isinstance(entry, dict):
             loop = entry.get('loop')
@@ -298,18 +329,6 @@ class TaskManager(TaskViewMixin):
             entry = stop_flags[task_id]
 
         rec.stop_requested = True
-
-        # 2. 停止目标模式
-        if rec.workspace_id:
-            try:
-                _, workspace = get_user_resources(username, rec.workspace_id, conversation_id=rec.conversation_id)
-                if workspace and rec.conversation_id:
-                    gsm = GoalStateManager(workspace.data_dir, rec.conversation_id)
-                    if gsm.is_active():
-                        gsm.mark_stopped(REASON_USER_CANCEL)
-                        debug_log(f"[Goal] 用户取消任务 {task_id}，同步停止本对话目标模式")
-            except Exception as exc:
-                debug_log(f"[Goal] 取消任务时停止目标模式失败: {exc}")
 
         # 未消费的引导和提前输入必须保留，取消只停止当前执行体。
         with self._lock:
@@ -913,6 +932,13 @@ class TaskManager(TaskViewMixin):
             except Exception:
                 pass
 
+            if getattr(rec, "goal_run_id", None):
+                from modules.goal_policy import enforce_goal_modes
+                from server.goal_runtime import manager_for_record
+                gsm = manager_for_record(rec)
+                if gsm.is_active() and gsm.state.get("run_id") == rec.goal_run_id:
+                    enforce_goal_modes(terminal, rec.conversation_id)
+                terminal._goal_run_id = rec.goal_run_id
             rec.display_projection.conversation_id = rec.conversation_id
             self.bind_display(rec, terminal.context_manager)
             terminal._display_trigger_message_id = rec.trigger_message_id
@@ -958,7 +984,11 @@ class TaskManager(TaskViewMixin):
                 if event_type == "user_message" and (data or {}).get("message_id") == rec.trigger_message_id:
                     with self._lock:
                         consume_selected_message(rec)
+                if event_type == "quota_exceeded":
+                    rec.goal_error = {"error_code": "quota_exceeded", **(data or {})}
                 if event_type == "error" and not (data or {}).get("retry"):
+                    if (data or {}).get("fatal") and not rec.goal_error:
+                        rec.goal_error = dict(data or {})
                     with self._lock:
                         rec.runtime_queue_paused = True
                         save_queue(rec)
@@ -1129,6 +1159,8 @@ class TaskManager(TaskViewMixin):
                     )
                 except Exception as exc:
                     debug_log(f"[TaskRun] 发送 task_stopped 失败: {exc}")
+            elif rec.goal_error:
+                self.finish_display_task(rec, "failed", error=str(rec.goal_error.get("message") or rec.goal_error.get("error_text") or "Model request failed"))
             else:
                 self.finish_display_task(rec, "succeeded")
 
@@ -1150,6 +1182,7 @@ class TaskManager(TaskViewMixin):
             except Exception as exc:
                 pass
         except Exception as exc:
+            rec.goal_error = {"message": str(exc)}
             debug_log(f"[Task] 后台任务失败: {exc}")
             with self._lock:
                 try:
@@ -1183,6 +1216,11 @@ class TaskManager(TaskViewMixin):
                     delattr(terminal, "max_iterations_override")
                 except Exception:
                     terminal.max_iterations_override = None
+            try:
+                from server.goal_runtime import finish_goal_task
+                finish_goal_task(self, rec)
+            except Exception as exc:
+                debug_log(f"[Goal] finish failed: {exc}")
 
 def start_task_cleanup_scheduler():
     """启动任务清理定时器"""

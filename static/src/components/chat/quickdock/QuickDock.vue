@@ -7,6 +7,12 @@
     }"
   >
     <div ref="scrollRef" class="quick-dock__scroll" @scroll.passive="handleStackScroll">
+      <GoalWindow
+        :task-busy="taskBusy"
+        @continue="$emit('continue-goal')"
+        @close-goal="$emit('close-goal')"
+        @pause="$emit('pause-goal')"
+      />
       <WorkflowWindow />
       <TodoWindow />
       <RunnerWindow kind="agent" />
@@ -86,7 +92,14 @@ import PreviewWindow from './PreviewWindow.vue';
  * 同时负责：全局 ⋯ 菜单、Esc 分层关闭、列表轮询、对话切换重置。
  */
 
-const props = defineProps<{ hostMode: boolean }>();
+import GoalWindow from './GoalWindow.vue';
+
+const props = defineProps<{ hostMode: boolean; taskBusy?: boolean }>();
+defineEmits<{
+  (event: 'continue-goal'): void;
+  (event: 'close-goal'): void;
+  (event: 'pause-goal'): void;
+}>();
 
 const quickDock = useQuickDockStore();
 const subAgentStore = useSubAgentStore();

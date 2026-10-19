@@ -343,6 +343,9 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             normalized = str(mode or "").strip().lower()
             if normalized not in {"readonly", "approval", "auto_approval", "unrestricted"}:
                 raise ValueError(tr("main_terminal.invalid_permission_mode"))
+            from modules.goal_policy import goal_for_terminal
+            if normalized not in {"auto_approval", "unrestricted"} and goal_for_terminal(self):
+                raise ValueError("目标运行期间仅支持自动审核或无限制权限，请先暂停或关闭目标。")
             self.pending_permission_mode = normalized
             self._persist_runtime_mode_metadata({
                 "pending_permission_mode": normalized,

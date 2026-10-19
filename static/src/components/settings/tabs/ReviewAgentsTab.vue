@@ -14,18 +14,14 @@ const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
   activeDropdown,
   activeTheme,
-  clampGoalMaxTokens,
-  clampGoalMaxTurns,
   closeDropdown,
   floatingMenuStyle,
   form,
-  goalTokenLimitEnabled,
   personalization,
   reviewAgentDefs,
   reviewAgentOf,
   subAgentModels,
   toggleDropdown,
-  toggleGoalTokenLimit,
   updateReviewAgent,
   updateReviewAgentInt
 } = ctx;
@@ -216,58 +212,5 @@ const defaultExtraOptions = computed(() => [
           })
         " /><FancyCheck :checked="form.goal_review_mode === 'active'"
     /></label>
-
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.goalMaxTurnsTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.goalMaxTurnsDesc') }}</span></span
-      >
-      <input
-        type="number"
-        class="settings-number-input"
-        min="1"
-        max="100"
-        :value="form.goal_max_turns"
-        @change="
-          personalization.updateField({
-            key: 'goal_max_turns',
-            value: clampGoalMaxTurns($event.target.value)
-          })
-        "
-      />
-    </div>
-
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.goalTokenLimitTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.goalTokenLimitDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="goalTokenLimitEnabled"
-        @change="toggleGoalTokenLimit($event.target.checked)" /><FancyCheck
-        :checked="goalTokenLimitEnabled"
-    /></label>
-
-    <div v-if="goalTokenLimitEnabled" class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.goalTokenLimitValueTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.goalTokenLimitValueDesc')
-        }}</span></span
-      >
-      <input
-        type="number"
-        class="settings-number-input"
-        min="1000"
-        step="1000"
-        :value="form.goal_max_tokens || 100000"
-        @change="
-          personalization.updateField({
-            key: 'goal_max_tokens',
-            value: clampGoalMaxTokens($event.target.value)
-          })
-        "
-      />
-    </div>
   </section>
 </template>

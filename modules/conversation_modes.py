@@ -44,6 +44,14 @@ def restore_conversation_modes(terminal, metadata):
         "execution_mode": terminal.get_execution_mode(),
         "network_permission": terminal.get_network_permission(),
     }, host_mode=terminal._is_host_mode())
+    from modules.goal_policy import goal_for_terminal
+    if goal_for_terminal(terminal):
+        # Admission persists the goal before this conversation is materialized.
+        # Restore its effective execution policy, not the old ask/plan snapshot.
+        modes["work_mode"] = "execute"
+        if modes["permission_mode"] not in {"auto_approval", "unrestricted"}:
+            modes["permission_mode"] = "auto_approval"
+            modes["execution_mode"] = "sandbox"
     terminal.set_work_mode(modes["work_mode"], persist=False)
     terminal.set_permission_mode(modes["permission_mode"], persist=False)
     terminal.set_execution_mode(modes["execution_mode"])

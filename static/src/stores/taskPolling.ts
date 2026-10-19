@@ -17,6 +17,8 @@ export interface CreateTaskOptions {
   message_source?: string | null;
   queued_message_id?: string | null;
   goal_mode?: boolean | null;
+  goal_action?: 'start' | 'continue';
+  goal_options?: { max_turns: number | null; max_tokens: number | null };
   skill_refs?: Array<{ name?: string; path: string }> | null;
   files?: string[] | null;
   eventHandler?: EventHandler;
@@ -39,7 +41,8 @@ export function createTaskPayload(
     thinking_mode: typeof options.thinking_mode === 'boolean' ? options.thinking_mode : undefined,
     message_source: options.message_source ?? undefined,
     queued_message_id: options.queued_message_id ?? undefined,
-    goal_mode: options.goal_mode === true ? true : undefined,
+    goal_action: options.goal_action,
+    goal_options: options.goal_options,
     skill_refs: Array.isArray(options.skill_refs) ? options.skill_refs : undefined,
     files: Array.isArray(options.files) && options.files.length ? options.files : undefined
   };

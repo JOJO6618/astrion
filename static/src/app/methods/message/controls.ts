@@ -164,8 +164,12 @@ export const messageControlMethods = {
     if (this.goalRunning || this.goalModeArmed) {
       this.goalRunning = false;
       this.goalModeArmed = false;
-      this.goalProgress = null;
-      this.goalDialogOpen = false;
+      if (this.goalProgress)
+        this.goalProgress = {
+          ...this.goalProgress,
+          status: 'paused',
+          stopped_reason: 'user_cancel'
+        };
     }
     try {
       const taskStore = useTaskStore();

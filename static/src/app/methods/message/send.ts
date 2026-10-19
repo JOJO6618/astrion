@@ -42,6 +42,17 @@ export const sendMethods = {
     const usePresetText = presetText !== null;
     const owns = () => ownsConversationSession(this, session);
     const newSettings = !this.currentConversationId ? captureNewConversationSettings(this) : null;
+    if (
+      options?.goalAction &&
+      (this.taskInProgress || this.streamingMessage || this.compressionActiveForCurrentConversation)
+    )
+      return false;
+    if (options?.goalAction && newSettings) {
+      newSettings.work_mode = 'execute';
+      if (!['auto_approval', 'unrestricted'].includes(newSettings.permission_mode)) {
+        newSettings.permission_mode = 'auto_approval';
+      }
+    }
     usePreviewStore().resetAutoOpen();
 
     if (this.compressionActiveForCurrentConversation) {
@@ -328,11 +339,13 @@ export const sendMethods = {
 
     // 对账在发送受理结束后恢复，不能用受理前的空快照覆盖乐观消息。
     this.taskInProgress = true;
-    const localMessageSource = usePresetText
-      ? options?.source === 'runtime_queue_manual_guide'
-        ? 'guidance'
-        : 'presend'
-      : 'user';
+    const localMessageSource = options?.goalAction
+      ? 'user'
+      : usePresetText
+        ? options?.source === 'runtime_queue_manual_guide'
+          ? 'guidance'
+          : 'presend'
+        : 'user';
     const optimisticUser = this.chatAddUserMessage(
       message,
       images,
@@ -355,20 +368,6 @@ export const sendMethods = {
 
     // 使用 REST API 创建任务（轮询模式）
     try {
-      const startingGoalMode = this.goalModeArmed === true;
-      if (startingGoalMode) {
-        this.goalModeArmed = false;
-        this.goalRunning = true;
-        this.goalProgress = {
-          goal: message,
-          status: 'running',
-          turn_count: 0,
-          tokens_used: 0,
-          tool_calls: 0,
-          duration_seconds: 0
-        };
-      }
-
       const created = await createOwnedMessageTask(
         this,
         session,
@@ -383,7 +382,8 @@ export const sendMethods = {
           thinking_mode: newSettings?.thinking_mode ?? this.thinkingMode,
           message_source: localMessageSource,
           queued_message_id: options?.queuedMessageId || undefined,
-          goal_mode: startingGoalMode,
+          goal_action: options?.goalAction,
+          goal_options: options?.goalOptions,
           skill_refs: skillRefs,
           files
         },

@@ -4,6 +4,7 @@ import { useSubAgentStore } from './subAgent';
 import { useBackgroundCommandStore } from './backgroundCommand';
 import { useWorkflowStore } from './workflow';
 import { usePreviewStore } from './preview';
+import { useInputStore } from './input';
 
 /**
  * 快捷窗口（Quick Dock）状态
@@ -186,7 +187,9 @@ export const useQuickDockStore = defineStore('quickDock', {
       // 掩码关闭后纯真实状态。
       // workflowStore.exiting：退出动画播放期间保持容器展开，否则容器 300ms
       // 收起会吞掉窗口自身的 240ms 退出动画（动画播完 finishExit 后才真正清空）
+      const goal = useInputStore().goalProgress;
       return (
+        (!!goal?.goal && goal.status !== 'stopped') ||
         workflowStore.isActive ||
         workflowStore.exiting ||
         (state.assumedActive ? state.assumedContent : restReal)

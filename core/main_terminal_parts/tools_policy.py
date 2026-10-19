@@ -263,6 +263,9 @@ class MainTerminalToolsPolicyMixin:
                 normalized = str(mode or "").strip().lower()
                 if normalized not in WORK_MODES:
                     raise ValueError(tr("tools_policy.invalid_work_mode"))
+                from modules.goal_policy import goal_for_terminal
+                if normalized != "execute" and goal_for_terminal(self):
+                    raise ValueError("目标运行期间工作模式固定为执行，请先暂停或关闭目标。")
                 self.current_work_mode = normalized
                 if not persist:
                     return normalized
@@ -370,6 +373,9 @@ class MainTerminalToolsPolicyMixin:
                 normalized = str(mode or "").strip().lower()
                 if normalized not in PERMISSION_MODES:
                     raise ValueError(tr("tools_policy.invalid_permission_mode"))
+                from modules.goal_policy import goal_for_terminal
+                if normalized not in {"auto_approval", "unrestricted"} and goal_for_terminal(self):
+                    raise ValueError("目标运行期间仅支持自动审核或无限制权限，请先暂停或关闭目标。")
                 # 计划模式下权限锁死为只读（后端强制）：仅允许保持/切到 readonly。
                 # 解除锁定的唯一路径是 switch_work_mode 先切离 plan 再恢复权限。
                 if normalized != "readonly" and getattr(self, "get_work_mode", None):

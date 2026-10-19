@@ -401,6 +401,9 @@ class MainTerminalToolsExecutionMixin:
                 except Exception:
                     mode = str(getattr(self, "current_permission_mode", "unrestricted") or "unrestricted")
                 args = arguments or {}
+                from modules.goal_policy import interaction_denied, DENIED_MESSAGE
+                if interaction_denied(self, tool_name, args):
+                    return {"allowed": False, "mode": mode, "code": "goal_interaction_denied", "message": DENIED_MESSAGE}
                 if any(key.startswith(("_approval_", "_execution_")) for key in args):
                     return {"allowed": False, "mode": mode, "code": "untrusted_authority", "message": "工具参数不能携带内部执行授权。"}
                 if tool_name == "run_command":
@@ -1095,6 +1098,11 @@ class MainTerminalToolsExecutionMixin:
                 """处理工具调用（添加参数预检查和改进错误处理）"""
                 logger.debug("[handle_tool_call] 工具调用开始: tool_name=%s, arguments=%s", tool_name, arguments)
                 scope = current_execution_scope()
+                from modules.goal_policy import interaction_denied, goal_for_terminal, DENIED_MESSAGE
+                if interaction_denied(self, tool_name, arguments) or (
+                    tool_name in NEED_CONFIRMATION and goal_for_terminal(self)
+                ):
+                    return json.dumps({"success": False, "code": "goal_interaction_denied", "error": DENIED_MESSAGE}, ensure_ascii=False)
                 if any(key.startswith(("_approval_", "_execution_")) for key in arguments):
                     return json.dumps({"success": False, "code": "untrusted_authority", "error": "工具参数不能携带内部执行授权。"}, ensure_ascii=False)
                 if scope is not None and scope.is_sub_agent and (

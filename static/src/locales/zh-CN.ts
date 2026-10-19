@@ -31,7 +31,10 @@ import commandBlocking from './zh-CN/commandBlocking';
 import quickEntry from './zh-CN/quickEntry';
 import git from './zh-CN/git';
 
+import goal from './zh-CN/goal';
+
 export default {
+  goal,
   git,
   quickEntry,
   common,

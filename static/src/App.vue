@@ -505,7 +505,14 @@
             />
           </div>
         </main>
-        <QuickDock v-if="!isMobileViewport" :host-mode="versioningHostMode" />
+        <QuickDock
+          v-if="!isMobileViewport"
+          :host-mode="versioningHostMode"
+          :task-busy="taskInProgress || streamingMessage"
+          @continue-goal="handleContinueGoal()"
+          @close-goal="handleCloseGoal"
+          @pause-goal="handlePauseGoal"
+        />
         <!-- 快捷窗口展开/收起按钮：零宽锚点始终贴在 QuickDock 右缘，
              按钮绝对定位悬浮在原处，不随面板挤压移动；
              无内容时也常显（不随 qdHasContent 隐藏），避免按钮时隐时现 -->
@@ -648,7 +655,12 @@
       <GoalProgressDialog
         :open="goalDialogOpen"
         :progress="goalProgress"
+        :task-busy="taskInProgress || streamingMessage"
         @close="goalDialogOpen = false"
+        @start="handleStartGoal"
+        @continue="handleContinueGoal"
+        @close-goal="handleCloseGoal"
+        @pause="handlePauseGoal"
       />
       <UserQuestionDialog
         :visible="
@@ -995,7 +1007,13 @@
                 <line x1="2" y1="15.5" x2="7" y2="15.5" />
               </svg>
             </button>
-            <QuickDock :host-mode="versioningHostMode" />
+            <QuickDock
+              :host-mode="versioningHostMode"
+              :task-busy="taskInProgress || streamingMessage"
+              @continue-goal="handleContinueGoal()"
+              @close-goal="handleCloseGoal"
+              @pause-goal="handlePauseGoal"
+            />
             <div v-if="!qdHasContent" class="mobile-quickdock-empty">
               {{ $t('quickdock.emptyHint') }}
             </div>
