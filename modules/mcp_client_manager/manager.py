@@ -20,6 +20,7 @@ from config import MCP_PROTOCOL_VERSION, MCP_DEFAULT_TIMEOUT_SECONDS
 from modules.mcp_client_manager.exceptions import MCPClientError
 from modules.mcp_client_manager.http_client import _StreamableHTTPMCPClient
 from modules.mcp_client_manager.models import MCPClientPoolEntry, MCPToolBinding
+from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope, prepare_stdio_server
 from modules.mcp_client_manager.stdio_client import _StdioMCPClient
 from modules.mcp_server_registry import MCPServerRegistry
 
@@ -37,9 +38,12 @@ class MCPClientManager:
         registry: MCPServerRegistry,
         protocol_version: str = MCP_PROTOCOL_VERSION,
         container_session: Optional["ContainerHandle"] = None,
+        *,
+        runtime_scope_resolver: Optional[Callable[[], MCPRuntimeScope]] = None,
     ):
         self.registry = registry
         self.protocol_version = str(protocol_version or MCP_PROTOCOL_VERSION)
+        self.runtime_scope_resolver = runtime_scope_resolver
         self.container_session = container_session
         self._container_session_signature = self._compute_session_signature(container_session)
         self._latest_alias_map: Dict[str, MCPToolBinding] = {}
@@ -115,6 +119,8 @@ class MCPClientManager:
         sid = str(server.get("id") or "").strip()
         if not sid:
             raise MCPClientError(tr("mcp_mgr.server_missing_id"))
+        scope = self.runtime_scope_resolver() if self.runtime_scope_resolver else None
+        server = prepare_stdio_server(server, scope, self.container_session)
         signature = self._server_signature(server)
         entry = self._client_pool.get(sid)
         needs_recreate = force_recreate or (entry is None)

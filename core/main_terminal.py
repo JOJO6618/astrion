@@ -54,6 +54,7 @@ from modules.custom_tool_registry import CustomToolRegistry, build_default_tool_
 from modules.custom_tool_executor import CustomToolExecutor
 from modules.mcp_server_registry import MCPServerRegistry, build_default_mcp_category
 from modules.mcp_client_manager import MCPClientManager
+from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope
 
 
 from core.tool_config import TOOL_CATEGORIES
@@ -197,6 +198,12 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.mcp_client_manager = MCPClientManager(
                 self.mcp_server_registry,
                 container_session=container_session,
+                runtime_scope_resolver=lambda: MCPRuntimeScope(
+                    workspace_path=self.project_path,
+                    data_dir=str(self.data_dir),
+                    conversation_id=(getattr(self, "_bound_conversation_id", None)
+                                     or self.context_manager.current_conversation_id),
+                ),
             )
             self.mcp_tool_alias_map: Dict[str, object] = {}
             if self.mcp_tools_enabled:

@@ -26,6 +26,7 @@
 | 多智能体对话类型 | `docs/agents_details/multi_agent.md` | 多智能体派发/渲染 |
 | 主任务门闸与单写者不变量 | `docs/agents_details/main_task_gate.md` | 新增主任务入口 |
 | 工具动态加载 | `docs/agents_details/tool_loading.md` | 动 tool_loading |
+| MCP 对话运行态与浏览器隔离 | `docs/agents_details/mcp_runtime_scope.md` | MCP 连接归属、stdio 启动适配、Playwright profile |
 | 网页提取与搜索 | `docs/agents_details/web_extract_and_search.md` | 提取链、搜索服务商 |
 | 设置页与提供商体系 | `docs/agents_details/settings_and_providers.md` | 设置页、提供商 catalog |
 | 预览面板 | `docs/agents_details/preview_panel.md` | 预览服务器、代理 |
