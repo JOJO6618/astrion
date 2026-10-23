@@ -45,10 +45,9 @@ function openNavigationTab(host, conversationId, workspaceId) {
 }
 
 async function saveSourceDraft(host) {
-  // Persistence errors already surface a toast and retain the scoped local draft.
-  return host
-    .persistComposerDraftNow({ reason: 'navigation', keepalive: true })
-    .catch(() => ({ success: false }));
+  // Local capture is synchronous; remote synchronization must not delay navigation.
+  void host.persistComposerDraftNow({ reason: 'navigation' }).catch(() => {});
+  return Promise.resolve();
 }
 
 async function recoverVisibleView(host, failedSession) {
@@ -66,7 +65,7 @@ async function recoverVisibleView(host, failedSession) {
         urlMode: 'none',
         source: 'navigation-recovery',
         preserveListPosition: true,
-        navigationReady: Promise.all([selection, host.prepareComposerDraftState(workspaceId)])
+        navigationReady: Promise.all([selection, host.prepareComposerDraftState(workspaceId, id)])
       });
       if (!owns() || result?.superseded) return;
       if (!result?.success) throw new Error(result?.error || t('appUi.switchFailed'));
@@ -129,7 +128,7 @@ export const workspaceNavigationMethods = {
           : Promise.resolve({});
       const draft = options.prepared
         ? Promise.resolve()
-        : this.prepareComposerDraftState(workspaceId);
+        : this.prepareComposerDraftState(workspaceId, id);
       const result = await this.enterConversation(id, {
         session,
         workspaceId,
@@ -207,7 +206,13 @@ export const workspaceNavigationMethods = {
       if (!options.newConversation && view.active_conversation_id) {
         const entered = await this.handleSelectWorkspaceConversation(
           { workspaceId: id, conversationId: view.active_conversation_id },
-          { force: true, prepared: Promise.resolve([selection, draft]) }
+          {
+            force: true,
+            prepared: Promise.all([
+              Promise.resolve(selection),
+              this.prepareComposerDraftState(id, view.active_conversation_id)
+            ])
+          }
         );
         return entered;
       }

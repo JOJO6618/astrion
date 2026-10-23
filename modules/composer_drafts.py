@@ -36,7 +36,8 @@ def atomic_write(path: Path, payload: dict) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def save_draft(path: Path, payload: dict, *, client_id="", sequence=0) -> bool:
+def save_draft(path: Path, payload: dict, *, client_id="", sequence=0,
+               base_revision=None) -> bool:
     with directory_lock(path.parent):
         previous = read_draft(path)
         versions = dict(previous.get("writer_sequences") or {})
@@ -46,7 +47,9 @@ def save_draft(path: Path, payload: dict, *, client_id="", sequence=0) -> bool:
             versions.pop(client_id, None)
             versions[client_id] = sequence
             versions = dict(list(versions.items())[-32:])
-        # Empty drafts retain the sequence watermark, so late unload beacons
-        # cannot resurrect text already cleared by a newer acknowledged save.
-        atomic_write(path, {**payload, "writer_sequences": versions})
+        revision = int(previous.get("revision") or 0)
+        if base_revision is not None and int(base_revision) != revision:
+            raise ValueError("Draft changed in another window; local text has been retained")
+        # Empty drafts retain ordering and revision watermarks.
+        atomic_write(path, {**payload, "writer_sequences": versions, "revision": revision + 1})
         return True

@@ -1,4 +1,4 @@
-"""待消费消息归属对话；任务结束/重启后仍可恢复，停止只暂停自动发送。"""
+"""引导待消费状态归属对话；未消费内容恢复到草稿，不自动续发。"""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -72,7 +72,8 @@ def save_queue(rec):
 
 
 def finish_queue(rec, *, paused=False):
-    # 引导没来得及注入时回到可见提前输入队列，保留附件和来源。
+    rec.runtime_guidance_closed = True
+    # 未消费引导保留为草稿恢复来源；不再作为下一轮消息自动发送。
     rec.runtime_pending_queue.extend(guidance_to_pending(rec.runtime_guidance_queue))
     rec.runtime_guidance_queue = []
     rec.runtime_queue_paused = bool(paused)

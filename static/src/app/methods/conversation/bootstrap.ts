@@ -113,10 +113,7 @@ export const bootstrapMethods = {
       this.clearLocalTaskUiState?.(`snapshot:${normalizedId}`);
       session.conversationId = normalizedId;
       if (options.navigationReady) {
-        if (
-          String(this.currentHostWorkspaceId || '') !== String(workspaceId || '') &&
-          this.composerDraftDirty
-        ) {
+        if (this.composerDraftDirty) {
           void this.persistComposerDraftNow({ reason: 'navigation-edits', keepalive: true }).catch(
             () => {}
           );
@@ -163,8 +160,12 @@ export const bootstrapMethods = {
       this.applyConversationTitleUpdate?.(normalizedId, meta.title || '', 'snapshot');
       this.hydrateRuntimeDisplay(display, data.running || {}, preserveInteraction);
       useWorkflowStore().setWorkflow(null, false);
-      this.runtimeQueuePaused = !!data.runtime_queue?.paused;
-      this.applyRuntimeQueuedMessages(data.runtime_queue?.messages || []);
+      // The prepared draft is already bound. Recover in this commit, before retiring the request.
+      if (options.navigationReady || syncing) {
+        this.recoverRuntimeMessagesToDraft?.(data.runtime_queue?.messages || []);
+      } else {
+        this.pendingDraftRecoveryMessages = data.runtime_queue?.messages || [];
+      }
       this.handleCompressionState(
         data.compression || { conversation_id: normalizedId, in_progress: false }
       );

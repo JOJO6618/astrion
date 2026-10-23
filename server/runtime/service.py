@@ -126,29 +126,15 @@ class RuntimeService:
     def enqueue_runtime_guidance(
         self, username: str, task_id: str, message: str, source: Optional[str] = None,
         images: Optional[List[Any]] = None, videos: Optional[List[Any]] = None,
+        files: Optional[List[str]] = None, media_paths_only: bool = False,
+        conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         from server.tasks import task_manager
 
         return task_manager.enqueue_runtime_guidance(
-            username, task_id, message, source=source, images=images, videos=videos
+            username, task_id, message, source=source, images=images, videos=videos,
+            files=files, media_paths_only=media_paths_only, conversation_id=conversation_id,
         )
-
-    def enqueue_runtime_pending_message(
-        self, username: str, task_id: str, message: str, files: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        from server.tasks import task_manager
-
-        return task_manager.enqueue_runtime_pending_message(username, task_id, message, files=files)
-
-    def remove_runtime_pending_message(self, username: str, task_id: str, message_id: str) -> Dict[str, Any]:
-        from server.tasks import task_manager
-
-        return task_manager.remove_runtime_pending_message(username, task_id, message_id)
-
-    def promote_runtime_pending_to_guidance(self, username: str, task_id: str, message_id: str) -> Dict[str, Any]:
-        from server.tasks import task_manager
-
-        return task_manager.promote_runtime_pending_to_guidance(username, task_id, message_id)
 
     # ---- 审批/提问（公共入口；三类 manager 的薄路由，裁决语义由 manager 保证）----
 

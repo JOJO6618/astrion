@@ -88,9 +88,10 @@
 |---|---|---|
 | `create_task(principal, params, directives=None) -> task_id` | 受理一轮 Run：互斥裁决 + 登记 + 起执行 | 同对话 chat 互斥（409）；notice 豁免；门闸在执行内获取或凭 token 认领 |
 | `cancel_task(username, task_id)` | 停止主 Run（不触碰后台工作者） | 硬取消（loop.call_soon_threadsafe）+ 软标志 |
-| `enqueue_runtime_guidance / enqueue_runtime_pending_message / remove_runtime_pending_message / promote_runtime_pending_to_guidance` | 运行中注入引导/追问队列 | 按 task_id 寻址 |
+| `enqueue_runtime_guidance` | 运行中追加引导；可携带 images/videos/files，主输入栏以 media_paths_only 复用隐藏路径通知 | 按 task_id 寻址并核对 conversation_id，停止/关闭受理后拒绝 |
 | `get_task(username, task_id)` / `get_task_events(username, task_id, offset)` | 内部观察接口；CLI/定时任务等后台调用方直接调用，**不必为观察任务发 HTTP 请求** | 只读 |
 
+- 2026-10-23 移除提前输入排队、队列转引导及删除接口；未消费引导/旧提前输入只作为对话草稿恢复来源，原子保存草稿后确认移除，不自动续发。引导在整批工具结果回填后或无工具回复边界注入，仍由同一主任务写历史。
 - 审批回答（tool/plan/ask_user）复用现有三个 manager 的 pending/answer，通过 approval_id 关联接入，不进 RuntimeService 首版。
 - 内部错误使用稳定状态/错误码（`task_already_running` / `not_found` / `forbidden` / `invalid_params`…），HTTP 状态码由适配层映射。
 - 事件协议沿用现有 idx/offset + sender 注入（task_id/conversation_id/workspace_id），本阶段不重写客户端。

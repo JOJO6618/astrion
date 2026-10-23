@@ -5,44 +5,10 @@
       :class="{ 'composer-locked': inputLocked }"
       ref="stadiumShellOuter"
     >
-      <div
-        class="runtime-queue-list"
-        v-show="!approvalExpanded"
-        :class="{ 'runtime-queue-list--empty': !runtimeQueuedMessagesForRender.length }"
-        ref="runtimeQueueList"
-      >
-        <div
-          v-for="(entry, index) in runtimeQueuedMessagesForRender"
-          :key="entry.id"
-          class="runtime-queue-item"
-          :class="{
-            'runtime-queue-item--top': index === 0
-          }"
-          :data-runtime-queue-id="entry.id || ''"
-          :ref="bindRuntimeQueueItemRef(entry.id)"
-        >
-          <span class="runtime-queue-item__text">{{ entry.text || '' }}</span>
-          <button
-            type="button"
-            class="runtime-queue-item__action"
-            @click.stop="$emit('guide-runtime-message', entry.id)"
-          >
-            {{ $t('input.guide') }}
-          </button>
-          <button
-            type="button"
-            class="runtime-queue-item__action runtime-queue-item__action--danger"
-            @click.stop="$emit('delete-runtime-message', entry.id)"
-          >
-            {{ $t('common.delete') }}
-          </button>
-        </div>
-      </div>
       <ComposerApprovalDock
         :visible="approvalDockVisible"
         :collapsed="!!approvalPanelCollapsed"
         :status-visible="floatingStatusVisible"
-        :queue-height="runtimeQueueHeight"
         :approvals="toolApprovals || []"
         :deciding-approval-ids="decidingApprovalIds"
         :review-records="approvalReviewRecords"
@@ -704,16 +670,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  onMounted,
-  onBeforeUnmount,
-  onBeforeUpdate,
-  onUpdated,
-  ref,
-  watch,
-  nextTick,
-  computed
-} from 'vue';
+import { onMounted, onBeforeUnmount, ref, watch, nextTick, computed } from 'vue';
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
@@ -774,8 +731,6 @@ const emit = defineEmits([
   'change-execution-mode',
   'change-network-permission',
   'open-versioning-dialog',
-  'guide-runtime-message',
-  'delete-runtime-message',
   'composer-height-change',
   'restore-user-question',
   'restore-plan-approval',
@@ -844,7 +799,6 @@ const props = defineProps<{
   networkPermissionOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
   currentContextTokens: number;
   versioningEnabled?: boolean;
-  runtimeQueuedMessages?: Array<{ id: string; text: string }>;
   projectGitSummary?: {
     has_git?: boolean;
     project_name?: string;
@@ -891,7 +845,6 @@ const props = defineProps<{
   mainChatIdle?: boolean;
   /** 未终结子实例数量；点击状态栏按钮展开快捷窗口中的子智能体卡片。 */
   subAgentCount?: number;
-  hasPendingRuntimeGuidance?: boolean;
   terminalCount?: number;
   hostMode?: boolean;
   avatarStatus?: {
@@ -1101,16 +1054,6 @@ const applyLineMetrics = (lines: number, multiline: boolean) => {
   inputStore.setInputMultiline(multiline);
 };
 
-const runtimeQueuedMessagesForRender = computed(() => {
-  const list = Array.isArray(props.runtimeQueuedMessages) ? props.runtimeQueuedMessages : [];
-  return list
-    .filter((item) => item && item.id && item.text)
-    .map((item) => ({
-      ...item,
-      text: String(item.text || '').replace(/[\r\n\u2028\u2029]+/g, ' ')
-    }));
-});
-
 const projectGitSummaryForRender = computed(() => {
   if (personalizationStore?.form?.show_git_status_bar === false) {
     return null;
@@ -1154,10 +1097,6 @@ const floatingStatusVisible = computed(() => {
   ) {
     return false;
   }
-  // 消息队列（预输入/引导消息）存在时隐藏git状态栏，与 / 菜单出现时逻辑相同
-  if (runtimeQueuedMessagesForRender.value.length > 0 || props.hasPendingRuntimeGuidance) {
-    return false;
-  }
   const visible =
     !!projectGitSummaryForRender.value ||
     !!props.goalRunning ||
@@ -1170,8 +1109,6 @@ const floatingStatusVisible = computed(() => {
 
 const showComposerAvatar = computed(() => {
   if (skillSlashMenuOpen.value || fileAtOpen.value || props.quickMenuOpen || approvalExpanded.value)
-    return false;
-  if (runtimeQueuedMessagesForRender.value.length > 0 || props.hasPendingRuntimeGuidance)
     return false;
   return !!props.avatarStatus;
 });
@@ -1597,10 +1534,11 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
     {
       id: 'image',
       label: t('input.sendImage'),
-      description: currentModelSupportsImage.value
-        ? t('input.sendImageDesc')
-        : t('input.imageNotSupported'),
-      disabled: !props.isConnected || props.streamingMessage || !currentModelSupportsImage.value,
+      description:
+        props.streamingMessage || currentModelSupportsImage.value
+          ? t('input.sendImageDesc')
+          : t('input.imageNotSupported'),
+      disabled: !props.isConnected || (!props.streamingMessage && !currentModelSupportsImage.value),
       action: () => emit('pick-images')
     },
     {
@@ -2807,235 +2745,12 @@ const toggleVoiceRecording = () => {
   }
 };
 
-/* ═══════════════════ runtime queue 动画 ═══════════════════ */
-
-const RUNTIME_QUEUE_ANIM_DURATION = 300;
-const RUNTIME_QUEUE_ANIM_EASING = 'cubic-bezier(0.25, 0.8, 0.25, 1)';
-const runtimeQueueList = ref<HTMLElement | null>(null);
-const runtimeQueueHeight = ref(0);
-const runtimeQueueItemRefs = new Map<string, HTMLElement>();
-const runtimeQueuePrevIds: string[] = [];
-const runtimeQueuePrevRects = new Map<string, DOMRect>();
-const runtimeQueuePrevElements = new Map<string, HTMLElement>();
-const runtimeQueueGhosts = new Map<string, HTMLElement>();
-const runtimeQueueFallbackTimers = new WeakMap<HTMLElement, number>();
-const runtimeQueueTransitioning = ref(false);
-let runtimeQueueAnimationReady = false;
-let runtimeQueueTransitionTimer: number | null = null;
-
-const bindRuntimeQueueItemRef = (id: string) => (el: Element | null) => {
-  if (!id) return;
-  if (el instanceof HTMLElement) {
-    runtimeQueueItemRefs.set(id, el);
-  } else {
-    runtimeQueueItemRefs.delete(id);
-  }
-};
-
-const resolveRuntimeQueueOffset = (el: HTMLElement): number => {
-  const rectHeight = Math.round(el.getBoundingClientRect().height);
-  if (rectHeight > 0) return rectHeight;
-  if (el.offsetHeight > 0) return el.offsetHeight;
-  return 34;
-};
-
-const snapshotRuntimeQueueIds = (): string[] =>
-  runtimeQueuedMessagesForRender.value
-    .map((entry) => String(entry?.id || '').trim())
-    .filter((id) => !!id);
-
-const keepRuntimeQueueTransitionCollapsed = () => {
-  runtimeQueueTransitioning.value = true;
-  if (runtimeQueueTransitionTimer !== null) window.clearTimeout(runtimeQueueTransitionTimer);
-  runtimeQueueTransitionTimer = window.setTimeout(() => {
-    runtimeQueueTransitioning.value = false;
-    runtimeQueueTransitionTimer = null;
-    emitComposerHeight();
-  }, RUNTIME_QUEUE_ANIM_DURATION + 40);
-};
-
-const cancelAnim = (el: HTMLElement) => {
-  const timer = runtimeQueueFallbackTimers.get(el);
-  if (timer) {
-    clearTimeout(timer);
-    runtimeQueueFallbackTimers.delete(el);
-  }
-  el.style.removeProperty('transition');
-  el.style.removeProperty('transform');
-  el.style.removeProperty('opacity');
-};
-
-/**
- * Schedule a CSS transition on an element.
- * All calls in the same synchronous batch share one RAF callback,
- * so all animations start in the same frame.
- */
-const scheduleTransition = (
-  el: HTMLElement,
-  props: string[],
-  from: Record<string, string>,
-  to: Record<string, string>,
-  done?: () => void
-) => {
-  const finish = () => {
-    el.style.removeProperty('transition');
-    props.forEach((p) => el.style.removeProperty(p));
-    done?.();
-  };
-  // Apply from state immediately (no transition)
-  el.style.transition = 'none';
-  Object.entries(from).forEach(([k, v]) => {
-    el.style.setProperty(k, v);
-  });
-  // Defer to next frame: enable transition + apply to state
-  // All scheduleTransition calls in the same microtask share this RAF
-  requestAnimationFrame(() => {
-    el.style.transition = props
-      .map((p) => `${p} ${RUNTIME_QUEUE_ANIM_DURATION}ms ${RUNTIME_QUEUE_ANIM_EASING}`)
-      .join(', ');
-    Object.entries(to).forEach(([k, v]) => {
-      el.style.setProperty(k, v);
-    });
-    const timer = window.setTimeout(finish, RUNTIME_QUEUE_ANIM_DURATION + 40);
-    runtimeQueueFallbackTimers.set(el, timer);
-  });
-};
-
-/* ═══════════════════ FLIP 动画 ═══════════════════ */
-
-// 上一轮渲染的 ID（onBeforeUpdate 时数据已更新，必须用这个记录旧位置）
-let runtimeQueueLastRenderedIds: string[] = [];
-
-onBeforeUpdate(() => {
-  // 用上一轮渲染的 ID 记录旧位置（此时数据已更新，snapshotRuntimeQueueIds() 是新数据）
-  runtimeQueuePrevIds.splice(0, runtimeQueuePrevIds.length, ...runtimeQueueLastRenderedIds);
-  runtimeQueuePrevRects.clear();
-  runtimeQueuePrevElements.clear();
-  runtimeQueueLastRenderedIds.forEach((id) => {
-    const el = runtimeQueueItemRefs.get(id);
-    if (!el?.isConnected) return;
-    runtimeQueuePrevRects.set(id, el.getBoundingClientRect());
-    runtimeQueuePrevElements.set(id, el);
-  });
-});
-
-onUpdated(() => {
-  const list = runtimeQueueList.value;
-  const currentIds = snapshotRuntimeQueueIds();
-
-  // First render: just bootstrap tracking state
-  if (!runtimeQueueAnimationReady) {
-    runtimeQueueAnimationReady = true;
-    runtimeQueueLastRenderedIds = [...currentIds];
-    runtimeQueuePrevIds.splice(0, runtimeQueuePrevIds.length);
-    runtimeQueuePrevRects.clear();
-    runtimeQueuePrevElements.clear();
-    return;
-  }
-
-  const previousIdSet = new Set(runtimeQueuePrevIds);
-  const currentIdSet = new Set(currentIds);
-  const enteringIds = currentIds.filter((id) => !previousIdSet.has(id));
-  const leavingIds = runtimeQueuePrevIds.filter((id) => !currentIdSet.has(id));
-
-  if (!enteringIds.length && !leavingIds.length) return;
-
-  keepRuntimeQueueTransitionCollapsed();
-
-  // ── Leave: create ghost clones at old positions ──
-  leavingIds.forEach((id) => {
-    const src = runtimeQueuePrevElements.get(id);
-    const rect = runtimeQueuePrevRects.get(id);
-    if (!src || !rect || !list?.isConnected) return;
-    cancelAnim(src);
-
-    // Clean up any stale ghost with same id
-    const existing = runtimeQueueGhosts.get(id);
-    if (existing) {
-      cancelAnim(existing);
-      existing.remove();
-      runtimeQueueGhosts.delete(id);
-    }
-
-    const ghost = src.cloneNode(true) as HTMLElement;
-    const lr = list.getBoundingClientRect();
-    ghost.style.position = 'absolute';
-    ghost.style.left = '0';
-    ghost.style.top = `${Math.round(rect.top - lr.top)}px`;
-    ghost.style.width = `${Math.round(rect.width > 0 ? rect.width : lr.width)}px`;
-    ghost.style.pointerEvents = 'none';
-    ghost.style.zIndex = '0';
-    ghost.style.margin = '0';
-    ghost.style.opacity = '1';
-    ghost.querySelectorAll('button').forEach((b) => {
-      if (b instanceof HTMLButtonElement) b.disabled = true;
-    });
-    list.appendChild(ghost);
-    runtimeQueueGhosts.set(id, ghost);
-
-    // Schedule ghost sink — shares RAF with item animations below
-    const offset = resolveRuntimeQueueOffset(ghost);
-    scheduleTransition(
-      ghost,
-      ['transform'],
-      { transform: 'translateY(0)' },
-      { transform: `translateY(${offset}px)` },
-      () => {
-        runtimeQueueGhosts.delete(id);
-        ghost.remove();
-      }
-    );
-
-    runtimeQueueItemRefs.delete(id);
-  });
-
-  // ── Remaining items: apply FLIP transforms ──
-  currentIds.forEach((id) => {
-    const el = runtimeQueueItemRefs.get(id);
-    if (!el?.isConnected) return;
-    cancelAnim(el);
-
-    if (enteringIds.includes(id)) {
-      // New item: rise from below
-      const offset = resolveRuntimeQueueOffset(el);
-      scheduleTransition(
-        el,
-        ['transform'],
-        { transform: `translateY(${offset}px)` },
-        { transform: 'translateY(0)' }
-      );
-      return;
-    }
-
-    // Existing item: invert the position delta
-    const prev = runtimeQueuePrevRects.get(id);
-    if (!prev) return;
-    const next = el.getBoundingClientRect();
-    const deltaY = prev.top - next.top;
-    if (Math.abs(deltaY) < 0.5) return;
-    scheduleTransition(
-      el,
-      ['transform'],
-      { transform: `translateY(${deltaY}px)` },
-      { transform: 'translateY(0)' }
-    );
-  });
-
-  runtimeQueuePrevIds.splice(0, runtimeQueuePrevIds.length);
-  runtimeQueuePrevRects.clear();
-  runtimeQueuePrevElements.clear();
-  // 保存本轮 ID 供下个 onBeforeUpdate 使用
-  runtimeQueueLastRenderedIds = [...currentIds];
-});
-
 const hasComposerContent = computed(() => {
   const hasText = !!(props.inputMessage || '').trim();
-  if (props.streamingMessage) {
-    return hasText;
-  }
   const hasImages = Array.isArray(props.selectedImages) && props.selectedImages.length > 0;
   const hasVideos = Array.isArray(props.selectedVideos) && props.selectedVideos.length > 0;
-  return hasText || hasImages || hasVideos;
+  const hasFiles = Array.isArray(props.selectedFiles) && props.selectedFiles.length > 0;
+  return hasText || hasImages || hasVideos || (props.streamingMessage && hasFiles);
 });
 
 const showStopIcon = computed(() => {
@@ -3063,12 +2778,10 @@ const sendButtonDisabled = computed(() => {
 });
 
 const hasRuntimeLayoutExpansion = computed(() => {
-  const hasQueue = runtimeQueuedMessagesForRender.value.length > 0;
   const hasImages = Array.isArray(props.selectedImages) && props.selectedImages.length > 0;
   const hasVideos = Array.isArray(props.selectedVideos) && props.selectedVideos.length > 0;
   const hasFiles = Array.isArray(props.selectedFiles) && props.selectedFiles.length > 0;
   return (
-    hasQueue ||
     approvalDockVisible.value ||
     approvalPanelTransitioning.value ||
     floatingStatusVisible.value ||
@@ -3109,8 +2822,6 @@ const handleSlashMenuAfterLeave = () => {
 // 让队列/菜单紧贴输入框，不再被横幅顶高。队列清空且无 skill 选择时自动恢复。
 const goalBannerCollapsed = computed(
   () =>
-    runtimeQueuedMessagesForRender.value.length > 0 ||
-    runtimeQueueTransitioning.value ||
     skillSlashMenuOpen.value ||
     fileAtOpen.value ||
     fileAtTransitioning.value ||
@@ -3145,7 +2856,7 @@ const collectComposerVisualHeight = () => {
   // 收起态横幅是脱离流、浮在角上的小圆点，不应计入为聊天区预留的高度，
   // 否则会把消息区可滚动范围顶高。故排除 .goal-mode-banner--collapsed。
   const nodes = root.querySelectorAll(
-    '.runtime-queue-list:not(.runtime-queue-list--empty), .floating-status-row, .composer-avatar, .composer-approval-restore-dock'
+    '.floating-status-row, .composer-avatar, .composer-approval-restore-dock'
   );
   nodes.forEach((node) => {
     if (!(node instanceof HTMLElement)) return;
@@ -3552,15 +3263,6 @@ watch(
 );
 
 watch(
-  () => props.runtimeQueuedMessages,
-  async () => {
-    await nextTick();
-    emitComposerHeight();
-  },
-  { deep: true }
-);
-
-watch(
   () => props.projectGitSummary,
   async () => {
     if (!projectGitSummaryForRender.value) {
@@ -3572,7 +3274,7 @@ watch(
   { deep: true }
 );
 
-watch([approvalDockVisible, approvalExpanded, fileAtOpen, runtimeQueueHeight], async () => {
+watch([approvalDockVisible, approvalExpanded, fileAtOpen], async () => {
   await nextTick();
   emitComposerHeight();
 });
@@ -3633,12 +3335,8 @@ onMounted(() => {
     emitComposerHeight();
     if (typeof ResizeObserver !== 'undefined') {
       composerResizeObserver = new ResizeObserver(() => {
-        runtimeQueueHeight.value = runtimeQueueList.value?.offsetHeight || 0;
         emitComposerHeight();
       });
-      if (runtimeQueueList.value) {
-        composerResizeObserver.observe(runtimeQueueList.value);
-      }
       if (inputAreaRoot.value) {
         composerResizeObserver.observe(inputAreaRoot.value);
       }
@@ -3657,27 +3355,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeProjectGitMenu);
   window.removeEventListener('resize', onWindowResizeRepositionMenu);
   editor.value?.destroy();
-  runtimeQueueItemRefs.forEach((el) => {
-    if (el) {
-      cancelAnim(el);
-    }
-  });
-  runtimeQueueGhosts.forEach((ghost) => {
-    cancelAnim(ghost);
-    ghost.remove();
-  });
-  runtimeQueueGhosts.clear();
-  runtimeQueueItemRefs.clear();
-  runtimeQueuePrevIds.splice(0, runtimeQueuePrevIds.length);
-  runtimeQueuePrevRects.clear();
-  runtimeQueuePrevElements.clear();
-  runtimeQueueAnimationReady = false;
-  runtimeQueueLastRenderedIds = [];
-  if (runtimeQueueTransitionTimer !== null) {
-    window.clearTimeout(runtimeQueueTransitionTimer);
-    runtimeQueueTransitionTimer = null;
-  }
-  runtimeQueueTransitioning.value = false;
   if (composerResizeObserver) {
     composerResizeObserver.disconnect();
     composerResizeObserver = null;

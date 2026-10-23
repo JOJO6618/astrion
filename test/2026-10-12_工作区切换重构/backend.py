@@ -186,7 +186,8 @@ class DisplayTests(unittest.TestCase):
         workspace = SimpleNamespace(project_path=ROOT, data_dir=ROOT, username='host')
         captured = Mock(return_value=snapshot)
         preview = module('server.chat.preview', build_preview_data_runtime=lambda *args: {})
-        with patch.dict(sys.modules, {'server.chat.preview': preview}):
+        goal = module('modules.goal_state_manager', GoalStateManager=lambda *args: SimpleNamespace(progress_snapshot=lambda: {}))
+        with patch.dict(sys.modules, {'server.chat.preview': preview, 'modules.goal_state_manager': goal}):
             routes, _ = source('server/conversation_bootstrap.py', ['_normalize_conv_id', '_existing_file', 'bootstrap_conversation'],
                 conversation_bootstrap_bp=SimpleNamespace(route=identity_decorator),
                 api_login_required=identity_decorator, with_workspace_data=identity_decorator, timed=identity_decorator,

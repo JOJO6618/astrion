@@ -7,6 +7,24 @@ import { useFileStore } from '../stores/file';
 import { currentConversationSession } from './methods/conversation/session';
 
 export const watchers = {
+  selectedFiles: {
+    deep: true,
+    handler() {
+      this.scheduleComposerDraftPersist?.();
+    }
+  },
+  selectedImages: {
+    deep: true,
+    handler() {
+      this.scheduleComposerDraftPersist?.();
+    }
+  },
+  selectedVideos: {
+    deep: true,
+    handler() {
+      this.scheduleComposerDraftPersist?.();
+    }
+  },
   inputMessage() {
     this.autoResizeInput();
     if (typeof this.scheduleComposerDraftPersist === 'function') {
@@ -17,37 +35,6 @@ export const watchers = {
     deep: true,
     handler() {
       this.refreshBlankHeroState();
-    }
-  },
-  composerBusy(newValue, oldValue) {
-    if (oldValue && !newValue && typeof this.tryAutoSendRuntimeQueuedMessages === 'function') {
-      this.tryAutoSendRuntimeQueuedMessages('watch-composer-idle');
-    }
-  },
-  runtimeQueuedMessages: {
-    deep: true,
-    handler(list) {
-      if (
-        Array.isArray(list) &&
-        list.length > 0 &&
-        !this.composerBusy &&
-        typeof this.tryAutoSendRuntimeQueuedMessages === 'function'
-      ) {
-        this.tryAutoSendRuntimeQueuedMessages('watch-runtime-queue');
-      }
-    }
-  },
-  runtimeGuidanceFallbackQueue: {
-    deep: true,
-    handler(list) {
-      if (
-        Array.isArray(list) &&
-        list.length > 0 &&
-        !this.composerBusy &&
-        typeof this.tryAutoSendRuntimeQueuedMessages === 'function'
-      ) {
-        this.tryAutoSendRuntimeQueuedMessages('watch-runtime-guidance-fallback');
-      }
     }
   },
   currentConversationTitle(newVal, oldVal) {

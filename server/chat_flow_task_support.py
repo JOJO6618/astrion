@@ -31,6 +31,7 @@ _VALID_SOURCES = {
     "network_change",
     "work_mode_change",
     "file_paths",
+    "media_paths",
     "workflow",
 }
 
@@ -38,7 +39,7 @@ _VALID_SOURCES = {
 def _runtime_message_ui_defaults(src: str, *, inline: bool = False) -> Dict[str, Any]:
     """Return UI metadata for model-facing user messages injected by the runtime."""
     normalized = str(src or "").strip().lower()
-    if normalized in {"skill", "goal_prompt", "permission", "sandbox", "file_paths"}:
+    if normalized in {"skill", "goal_prompt", "permission", "sandbox", "file_paths", "media_paths"}:
         return {"visibility": "hidden", "starts_work": False}
     if normalized in {"guidance", "notify"}:
         return {"visibility": "compact", "starts_work": False}
@@ -131,7 +132,7 @@ def inject_runtime_user_message(
             if images or videos:
                 raise
     content = formatted
-    if ctx_manager is not None and (images or videos):
+    if ctx_manager is not None and (images or videos) and not metadata.get("media_paths_only"):
         content = ctx_manager._build_content_with_images(
             formatted, images or [], videos=videos or [],
             media_refs=(saved_message or {}).get("media_refs") or [],

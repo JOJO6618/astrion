@@ -24,13 +24,13 @@ async function run() {
   assert.equal(f.requests.length, 1);
   assert.equal(f.requests[0].url, '/api/workspace-view');
   respond(f.requests[0], { success: true, data: {
-    host_mode: true, workspace: { workspace_id: 'agents', project_path: '/synthetic/agents' } } });
+    host_mode: true, draft_owner: 'synthetic-owner', workspace: { workspace_id: 'agents', project_path: '/synthetic/agents' } } });
   await flush();
   assert.equal(f.requests.length, 2);
   assert.equal(f.requests[1].url, '/api/new-conversation/settings');
   respond(f.requests[1], { success: true, data: { settings: { work_mode: 'ask', reasoning_effort: null } } });
   await flush();
-  assert.equal(f.requests[2].url, '/api/input-draft?workspace_id=agents');
+  assert.equal(f.requests[2].url, '/api/input-draft?workspace_id=agents&conversation_id=new');
   respond(f.requests[2], { success: true, data: { content: 'the correct workspace draft' } });
   await pending;
   assert.equal(f.host.currentHostWorkspaceId, 'agents');
@@ -45,7 +45,7 @@ async function run() {
   assert.equal(early.requests.length, 0); assert.equal(early.host.composerDraftDirty, true);
   const prepared = early.startup.prepareInitialWorkspaceIdentity(early.host, () => true); await flush();
   respond(early.requests[0], { success: true, data: {
-    host_mode: true, workspace: { workspace_id: 'agents' } } }); await prepared;
+    host_mode: true, draft_owner: 'synthetic-owner', workspace: { workspace_id: 'agents' } } }); await prepared;
   await early.host.restoreComposerDraftState();
   assert.equal(early.host.inputMessage, 'typed before initialization');
   assert.equal(early.requests.length, 1);
@@ -71,7 +71,7 @@ async function run() {
   const failure = startupFixture();
   const starting = failure.host.bootstrapRoute(); await flush();
   respond(failure.requests[0], { success: true, data: {
-    host_mode: true, workspace: { workspace_id: 'agents' } } }); await flush();
+    host_mode: true, draft_owner: 'synthetic-owner', workspace: { workspace_id: 'agents' } } }); await flush();
   respond(failure.requests[1], { success: true, data: { settings: { work_mode: 'ask' } } });
   await flush();
   respond(failure.requests[2], { success: false, error: 'synthetic draft failure' }, false);
@@ -79,7 +79,7 @@ async function run() {
   assert.equal(failure.host.initialRouteResolved, true);
   assert.equal(failure.host.currentHostWorkspaceId, 'agents');
   assert.equal(failure.toasts.length, 1);
-  assert.equal(failure.toasts[0].message, 'synthetic draft failure');
+  assert.equal(failure.toasts[0].message, 'appUi.fetchInputDraftFailed');
   console.log('PASS draft read failure is reported without rejecting page initialization');
 
   const directory = fixture();

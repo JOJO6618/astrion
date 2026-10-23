@@ -24,21 +24,10 @@ export const scrollMethods = {
     this.waitingForSubAgent = false;
     this.waitingForBackgroundCommand = false;
     this.dropToolEvents = false;
-    this.runtimeQueuedMessages = [];
-    this.runtimeGuidanceFallbackQueue = [];
-    this.runtimeQueueAutoSendInProgress = false;
-    this.runtimeQueueSyncLockKey = '';
-    this.runtimeQueueSyncLockUntil = 0;
     this.goalModeArmed = false;
     this.goalRunning = false;
     this.goalProgress = null;
     this.goalDialogOpen = false;
-    if (typeof this.clearRuntimeQueueSuppressionState === 'function') {
-      this.clearRuntimeQueueSuppressionState();
-    } else {
-      this.runtimeQueueSuppressedMessageIds = new Set();
-      this.runtimeGuidanceSuppressedTextCounts = {};
-    }
     if (typeof this.clearPendingTools === 'function') {
       this.clearPendingTools(reason);
     } else {

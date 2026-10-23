@@ -136,8 +136,10 @@ def workspace_view(data_context, workspace, username):
     """Read workspace identity and activity without preparing /new settings."""
     from server.runtime import runtime_service
 
+    from server.composer_drafts import draft_owner
     active = runtime_service.list_runs(username, data_context.workspace_id, status='active')
     return jsonify(success=True, data={
+        'draft_owner': draft_owner(username),
         'host_mode': data_context.identity.host_mode,
         'active_conversation_id': active[0].get('conversation_id') if active else None,
         "workspace": {"workspace_id": data_context.workspace_id,

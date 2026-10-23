@@ -15,11 +15,12 @@ function compile(file, imports = {}, globals = {}) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
   }).outputText;
   vm.runInNewContext(code, {
-    module, exports: module.exports, AbortController, Promise, Map, Set, WeakMap,
+    module, exports: module.exports, AbortController, AbortSignal, Promise, Map, Set, WeakMap,
     setTimeout: noop, clearTimeout: noop, setInterval: noop, clearInterval: noop,
     Date, console: { log: noop, warn: noop, error: noop },
     require: (key) => {
       if (Object.hasOwn(imports, key)) return imports[key];
+      if (key === './draftStorage') return compile('static/src/app/methods/ui/draftStorage.ts', {}, globals);
       if (key.endsWith('/workspaceRequestScope')) return {
         bindWorkspaceRequestHost: noop, workspaceScopedFetch: (...args) => globals.fetch(...args)
       };

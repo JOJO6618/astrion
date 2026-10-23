@@ -20,6 +20,12 @@ export const sendMethods = {
   ...messageControlMethods,
   async sendMessage(options = {}) {
     if (
+      !options?.goalAction &&
+      typeof options?.presetText !== 'string' &&
+      (this.streamingUi || this.compressionActiveForCurrentConversation)
+    )
+      return this.sendRuntimeGuidance();
+    if (
       this.hostWorkspaceSwitching ||
       this.historyLoading ||
       (!this.currentConversationId && !this.newConversationSettingsReady)
@@ -55,14 +61,8 @@ export const sendMethods = {
     }
     usePreviewStore().resetAutoOpen();
 
-    if (this.compressionActiveForCurrentConversation) {
-      return this.enqueueRuntimeQueuedMessage(
-        usePresetText ? presetText : this.inputMessage,
-        options?.files || this.selectedFiles || []
-      );
-    }
-    if (this.streamingUi && !usePresetText) {
-      return false;
+    if ((this.streamingUi || this.compressionActiveForCurrentConversation) && !usePresetText) {
+      return this.sendRuntimeGuidance();
     }
     if (!this.isConnected) {
       this.uiPushToast({
@@ -173,6 +173,7 @@ export const sendMethods = {
         ? preparedSkillRefs
         : extractSkillRefsFromMessage(message);
 
+    const submittedDraft = !usePresetText ? this.captureComposerDraftSubmission() : null;
     const wasBlank = this.isConversationBlank();
     if (wasBlank) {
       this.blankHeroExiting = true;
@@ -229,6 +230,7 @@ export const sendMethods = {
           );
         }
         targetConversationId = createResult.conversation_id;
+        this.adoptComposerDraftConversation(targetConversationId);
         session.conversationId = targetConversationId;
         this.currentConversationId = targetConversationId;
         this.currentConversationTitle = t('common.newConversation');
@@ -321,13 +323,7 @@ export const sendMethods = {
 
     // 对账在发送受理结束后恢复，不能用受理前的空快照覆盖乐观消息。
     this.taskInProgress = true;
-    const localMessageSource = options?.goalAction
-      ? 'user'
-      : usePresetText
-        ? options?.source === 'runtime_queue_manual_guide'
-          ? 'guidance'
-          : 'presend'
-        : 'user';
+    const localMessageSource = 'user';
     const optimisticUser = this.chatAddUserMessage(
       message,
       images,
@@ -363,7 +359,6 @@ export const sendMethods = {
           run_mode: newSettings?.run_mode ?? this.runMode,
           thinking_mode: newSettings?.thinking_mode ?? this.thinkingMode,
           message_source: localMessageSource,
-          queued_message_id: options?.queuedMessageId || undefined,
           goal_action: options?.goalAction,
           goal_options: options?.goalOptions,
           skill_refs: skillRefs,
@@ -373,6 +368,7 @@ export const sendMethods = {
       );
 
       if (!created || !owns()) return false;
+      if (submittedDraft) this.completeComposerDraftSubmission(submittedDraft);
       debugLog('[Message] 任务已创建，开始轮询');
       await this.refreshRunningWorkspaceTasks?.();
       if (!owns()) return false;
@@ -395,21 +391,6 @@ export const sendMethods = {
       return false;
     }
 
-    if (!usePresetText) {
-      this.inputClearMessage();
-      this.inputClearSelectedImages();
-      this.inputClearSelectedVideos();
-      this.inputClearSelectedFiles();
-      this.inputSetImagePickerOpen(false);
-      this.inputSetVideoPickerOpen(false);
-      this.inputSetLineCount(1);
-      this.inputSetMultiline(false);
-      this.persistComposerDraftNow({
-        reason: 'send-message-cleared',
-        force: true,
-        keepalive: true
-      }).catch(() => {});
-    }
     if (hasImages) {
       this.conversationHasImages = true;
       this.conversationHasVideos = false;

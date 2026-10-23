@@ -372,7 +372,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 ### 12.3 门闸入口与 token 移交
 
 - **门闸接入点共 6 处（另 1 处外层兜底释放）**：聊天 `process_message_task`（`server/chat_flow.py:139`，`:259` finally 释放）；通知派发预占（`server/chat_flow_task_main.py:1023`）；手动压缩（`server/tasks/compression.py:14`）；深度压缩 REST（`server/conversation.py:1756`）；工作流激活与通知派发（`server/workflow_runtime_api.py:125` / `:240`）；兜底释放 `server/tasks/models.py:1155`。**新增任何主任务入口必须走门闸**，chat/notice/compression 的受理检查统一按对话互斥。
-- **压缩运行语义（2026-10-23）**：空闲手动压缩是 `task_type="compression"` 的主任务；运行中点击经 `server/tasks/compression_requests.py` 在当前主任务内排队，完整响应及整批工具结果回填后以 `mode="requested"` 压缩并续接，保留工作段锚点；重复请求合并，停止取消待执行请求，禁止另起并发写入者或从事件0重放。自动压缩同属原主任务。压缩均算智能体运行（输入保持可用，发送走提前输入/引导，停止精确取消当前任务）。`server/compression_commit.py` 一次原子提交历史标记/压缩记录/引导语/上下文统计；生成失败或提交前取消保留旧历史。`server/tasks/queue_state.py` 把未消费的提前输入与引导存入对话 metadata，停止/失败只暂停自动消费。
+- **压缩运行语义（2026-10-23）**：空闲手动压缩是 `task_type="compression"` 的主任务；运行中点击经 `server/tasks/compression_requests.py` 在当前主任务内排队，完整响应及整批工具结果回填后以 `mode="requested"` 压缩并续接，保留工作段锚点；重复请求合并，停止取消待执行请求，禁止另起并发写入者或从事件0重放。自动压缩同属原主任务。压缩均算智能体运行（输入保持可用，运行中发送直接作为引导，停止精确取消当前任务）。`server/compression_commit.py` 一次原子提交历史标记/压缩记录/引导语/上下文统计；生成失败或提交前取消保留旧历史。`server/tasks/queue_state.py` 保留未消费引导和旧提前输入来源，停止/失败后连同附件恢复到所属对话草稿，保存成功后确认移除，不自动续发；压缩续接在原任务锁内重新开放引导受理。
 - **通知链移交**：轮询器派发前先预占门闸，token 经 **`RuntimeContext.directives.main_task_gate_token`**（`server/runtime/context.py`）→ `TaskRecord.directives` → `run_chat_task_sync(..., main_task_gate_token=...)` 移交下去（持 token 认领，不重复获取）；派发失败要释放门闸并回滚已打的通知标记（`_rollback_completion_notice_marks`）。⚠️ 历史文档写的 `session_data["main_task_gate_token"]` **代码中不存在**。
 - **兜底释放**：`server/tasks/models.py::_run_chat_task` 外层 `finally` 兜底，防异常路径门闸泄漏。
 
@@ -553,6 +553,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **身份与生命周期**：事件和持久化共享用户 `message_id`；工具 preparing/execution/call 别名在 hydrate 一次登记。压缩提交后 rebase 显示前缀并接管新快照；检查点按用户/工作区/对话退役旧显示。前台结束但后台仍活动时保持活动状态。
 - **存储边界**：`read_conversation`（兼容名 `load_conversation`）**不做迁移回写**；同持久化目录共享锁。**锁顺序 = 显示锁 → 任务锁**，不在任务锁内反向获取显示锁。仍维持单后端进程约束。
 - **工作区导航（2026-10-12）**：目标工作区与对话随快照一次提交，选择写入串行；同源 API 派发时捕获明确工作区，普通查询不选择工作区。首次路由先获取真实身份，**未知作用域不得猜为 default**。目录刷新不改写已提交的可见身份；草稿恢复失败反馈后继续页面初始化。具体约束见 `docs/agents_details/display_snapshot.md`。
+- **输入草稿与运行引导（2026-10-23）**：删除提前输入排队 UI、自动续发与公开队列接口；主任务运行中发送直接引导，失败保留输入。引导附件复用普通发送的 media_paths/file_paths 隐藏通知，主输入栏标记 media_paths_only，实时注入和历史重建均只传路径。草稿按认证用户／工作区／对话独立，空页每工作区一份；localStorage 同步保存，服务器后台重试，以 revision CAS 与 client/sequence 防旧写覆盖；不用无 CSRF beacon，导航不等待远端保存。未消费内容恢复草稿并去重，落盘后才确认来源。完整约束见 `docs/agents_details/display_snapshot.md`，回归 `test/2026-10-23_对话草稿与运行引导/`。
 - **查询／运行分层**：`context/workspace.py` 解析可信路径，`data.py` 提供轻量存储，`resources.py` 装配执行实例；bootstrap、列表、草稿、Token、模式及导航辅助查询不得为读取而创建 WebTerminal／容器或复制技能。必要后台恢复异步按完整身份合并；技能成功版本属于工作区，草稿按作用域排序并保留旧请求水位。
 - 回归：`python -B test/2026-10-07_运行对话快照/run_regressions.py` 与 `test/2026-10-12_工作区切换重构/README.md` 中的命令（需已安装依赖与 Node）。视觉由用户验收；**不将离线回归等同于实际速度达标或所有卡顿消失**。
 

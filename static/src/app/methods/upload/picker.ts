@@ -34,7 +34,11 @@ export const pickerMethods = {
   async openImagePicker() {
     const modelStore = useModelStore();
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
-    if (!currentModel?.supportsImage) {
+    if (
+      !this.streamingUi &&
+      !this.compressionActiveForCurrentConversation &&
+      !currentModel?.supportsImage
+    ) {
       this.uiPushToast({
         title: t('appUi.modelDoesNotSupportImage'),
         message: t('appUi.chooseImageModelMessage'),

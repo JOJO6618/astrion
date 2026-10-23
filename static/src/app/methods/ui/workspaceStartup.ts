@@ -9,7 +9,8 @@ import { selectWorkspaceIdentity } from './workspaceSelection';
 export async function prepareInitialWorkspaceIdentity(host, owns) {
   bindWorkspaceRequestHost(host);
   const explicitWorkspace = new URLSearchParams(window.location.search).get('workspace_id') || '';
-  if (host.currentHostWorkspaceId && !explicitWorkspace) return { success: true };
+  if (host.currentHostWorkspaceId && host.composerDraftOwner && !explicitWorkspace)
+    return { success: true };
   // An explicit deep link is validated by the server before selecting or loading.
   const query = explicitWorkspace ? `?workspace_id=${encodeURIComponent(explicitWorkspace)}` : '';
   const response = await fetch(`/api/workspace-view${query}`);
@@ -23,6 +24,7 @@ export async function prepareInitialWorkspaceIdentity(host, owns) {
     throw new Error(result.error || t('appUi.fetchProjectsFailed'));
   }
   const view = result.data;
+  host.composerDraftOwner = String(view.draft_owner || '');
   host.versioningHostMode = !!view.host_mode;
   host.dockerProjectMode = !view.host_mode;
   if (explicitWorkspace) {

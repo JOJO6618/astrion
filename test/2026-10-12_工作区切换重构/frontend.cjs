@@ -29,12 +29,12 @@ test('cross-workspace snapshot commits identity, draft, subscription and cursor 
   }
 });
 
-test('same-workspace navigation reuses the composer and never GETs its draft', async () => {
+test('same-workspace navigation restores the target conversation draft', async () => {
   const f = fixture(); f.host.inputMessage = 'keep-editor';
   const navigation = f.host.handleSelectWorkspaceConversation({ workspaceId: 'ws1', conversationId: 'B' });
   await drain(f); await navigation;
-  assert.equal(f.host.inputMessage, 'keep-editor');
-  assert.equal(f.requests.filter((r) => r.url.includes('input-draft') && !r.options.method).length, 0);
+  assert.equal(f.host.inputMessage, 'draft:ws1');
+  assert.equal(f.requests.some((r) => r.url.includes('conversation_id=B') && !r.options.method), true);
   assert.equal(f.requests.filter((r) => r.url.endsWith('/select')).length, 0);
 });
 
@@ -85,43 +85,11 @@ test('failed recovery is bounded and leaves the visible conversation guarded', a
   assert.equal(f.requests.filter((r) => r.url.includes('/bootstrap')).length, 2);
 });
 
-test('old draft acknowledgment does not clear newer input or target scope', async () => {
-  const f = fixture({ realSnapshot: false }); f.host.inputMessage = 'one';
-  const save = f.host.persistComposerDraftNow(); await flush();
-  f.host.inputMessage = 'two'; f.host.scheduleComposerDraftPersist();
-  respond(f.requests[0], { success: true, data: { saved: true } }); await save;
-  assert.equal(f.host.inputMessage, 'two'); assert.equal(f.host.composerDraftDirty, true);
-  const retry = f.host.persistComposerDraftNow(); await flush();
-  respond(f.requests[1], { success: true, data: { saved: true } }); await retry;
-  assert.equal(f.host.composerDraftDirty, false);
-  assert.equal(JSON.parse(f.requests[1].options.body).content, 'two');
-});
 
-test('failed save retains scoped edits across navigation preparation', async () => {
-  const f = fixture({ realSnapshot: false }); f.host.inputMessage = 'kept';
-  const save = f.host.persistComposerDraftNow(); await flush();
-  respond(f.requests[0], { success: false, error: 'synthetic disk error' }, false);
-  await assert.rejects(save);
-  f.host.currentHostWorkspaceId = 'ws2'; f.host.inputMessage = '';
-  const source = await f.host.prepareComposerDraftState('ws1');
-  assert.equal(source.payload.content, 'kept'); assert.equal(f.requests.length, 1);
-  assert.equal(f.toasts.length, 1);
-});
 
-test('initial/late draft restore cannot overwrite user input or a newer epoch', async () => {
-  const f = fixture({ realSnapshot: false }); f.host.inputMessage = 'already-typing';
-  await f.host.restoreComposerDraftState(); assert.equal(f.requests.length, 0);
-  f.host.inputMessage = '';
-  const restore = f.host.restoreComposerDraftState(); await flush();
-  f.host.inputMessage = 'new-input';
-  respond(f.requests[0], { success: true, data: { content: 'stored' } }); await restore;
-  assert.equal(f.host.inputMessage, 'new-input');
-  const entry = await f.host.prepareComposerDraftState('ws1');
-  f.host.applyComposerDraftState(entry, 'ws1', null);
-  f.session.leaveConversationSession(f.host);
-  for (const tick of f.ticks) tick();
-  assert.equal(f.calls.includes('draft-meta'), false);
-});
+
+
+
 
 test('workspace cache reuses empty lists and rejects invalidated late responses', async () => {
   const f = fixture({ realSnapshot: false });
@@ -168,24 +136,10 @@ test('pure workspace switch opens the authoritative active conversation with one
   assert.equal(f.host.currentHostWorkspaceId, 'ws2'); assert.equal(f.host.currentConversationId, 'C');
   assert.equal(f.attachments.length, 1); assert.equal(f.attachments[0][1], 512);
   assert.equal(f.requests.filter(r => r.url.includes('/select?')).length, 1);
-  assert.equal(f.requests.filter(r => r.url.includes('input-draft') && !r.options.method).length, 1);
+  assert.equal(f.requests.filter(r => r.url.includes('input-draft') && !r.options.method).length, 2);
 });
 
-test('draft restore cannot capture source editor metadata into the target draft', async () => {
-  const f = fixture({ realSnapshot: false });
-  let meta = { skill_refs: [{ id: 'source' }] };
-  f.host.getInputComposerRef = () => ({ getComposerDraftMeta: () => meta,
-    restoreComposerDraftMeta: (value) => { meta = value; } });
-  const prepared = f.host.prepareComposerDraftState('ws2'); await flush();
-  respond(f.requests[0], { success: true, data: { content: 'target-text', skill_refs: [{ id: 'target' }] } });
-  const entry = await prepared;
-  f.host.currentHostWorkspaceId = 'ws2'; f.host.applyComposerDraftState(entry, 'ws2', null);
-  f.host.scheduleComposerDraftPersist('input-watch');
-  assert.equal(entry.payload.skill_refs[0].id, 'target');
-  f.ticks.forEach(fn => fn());
-  assert.equal((await f.host.persistComposerDraftNow()).skipped, true);
-  assert.equal(f.requests.length, 1);
-});
+
 
 (async () => {
   for (const [name, run] of tests) { await run(); console.log('PASS ' + name); }

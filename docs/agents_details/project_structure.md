@@ -15,13 +15,13 @@
 - **后端核心目录**
   - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；**REST 任务轮询为唯一实时通道**——Socket.IO 已于 2026-09-11 整体移除，详见 §12.5）
   - `server/context/`（2026-10-12）：`workspace.py` 解析可信身份／工作区路径；`data.py` 与 `data_decorators.py` 提供不装配执行资源的存储访问；`resources.py` 仅创建／复用运行实例；`background.py` 聚合后台状态并合并异步激活；`modes.py`、`status_view.py`、`sub_agent_views.py` 提供对应读视图。原兼容 re-export 保留。
-  - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/queue/get_task_events）；契约见 `docs/runtime_contract.md`
+  - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/get_task_events）；契约见 `docs/runtime_contract.md`
   - `core/`: 终端与工具编排（`main_terminal.py`、`web_terminal.py`、`main_terminal_parts/*`；其中 `main_terminal_parts/context/` 和 `main_terminal_parts/tools_definition` 已拆分为 base + mixin 子包）
-  - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）；`composer_drafts.py` 负责原子草稿与保存水位，`conversation_modes.py` 共用生效模式规则，`skills_revision.py`／`skills_sync.py` 负责工作区技能版本与准备。`utils/conversation_manager/preparation.py` 合并执行侧存储准备。
+  - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）；`composer_drafts.py` 负责原子草稿、CAS revision 与保存水位；`server/composer_drafts.py` 负责对话身份、字段校验和恢复确认，`server/attachment_paths.py` 共用附件路径通知，`server/runtime_guidance.py` 在安全边界注入引导，`conversation_modes.py` 共用生效模式规则，`skills_revision.py`／`skills_sync.py` 负责工作区技能版本与准备。`utils/conversation_manager/preparation.py` 合并执行侧存储准备。
   - `config/`: 配置拆分（`api.py`, `limits.py`, `terminal.py`, `paths.py` ...），由 `config/__init__.py` 聚合并加载 `.env`
   - `utils/`: API client、日志、上下文与对话工具等公共函数（`api_client`、`tool_result_formatter`、`context_manager`、`conversation_manager` 已拆分为子包；原入口文件保留为兼容入口）
 - **前端目录**
-  - `static/src/`: Vue 3 + TS 前端；`app/methods/ui/workspaceNavigation.ts` 统一导航，`workspaceSelection.ts` 排序选择写入，`workspaceStartup.ts` 解析初始真实身份，`composerDrafts.ts` 管理草稿作用域，`navigationRefresh.ts` 负责一次辅助刷新。`workspaceRequestScope.ts` 为同源API捕获派发身份，`stores/workspaceConversationCache.ts` 按工作区维护单份列表缓存及请求身份，不分对话类型。
+  - `static/src/`: Vue 3 + TS 前端；`app/methods/ui/workspaceNavigation.ts` 统一导航，`workspaceSelection.ts` 排序选择写入，`workspaceStartup.ts` 解析初始真实身份，`composerDrafts.ts` 绑定可见对话草稿，`draftStorage.ts` 管理本地持久化和远端重试，`message/guidance.ts` 提交运行中引导，`navigationRefresh.ts` 负责一次辅助刷新。`workspaceRequestScope.ts` 为同源API捕获派发身份，`stores/workspaceConversationCache.ts` 按工作区维护单份列表缓存及请求身份，不分对话类型。
   - `cli/src/`: opentui（Zig 内核 + Yoga）+ React 19 CLI 前端（2026-09-11 起正式替代 Ink 版；旧 Ink 实现存档于 `cli/legacy-ink-src/` 仅作字段参考）
   - 监控动画相关核心文件：
     - `static/src/components/chat/monitor/MonitorDirector.ts`

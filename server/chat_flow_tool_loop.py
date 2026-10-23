@@ -1823,72 +1823,11 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 except Exception:
                     pass
 
-    # 运行期“引导对话”：需要等待同一轮全部工具执行结束后再注入，
-    # 避免一轮内并行/多工具调用时过早插入。
-    try:
-        from .tasks import task_manager
-
-        runtime_guidance_items = task_manager.consume_runtime_guidance_for_injection(
-            username=username, task_id=client_sid
-        )
-    except Exception as exc:
-        runtime_guidance_items = []
-        debug_log(f"[RuntimeGuidance] 读取引导队列失败: {exc}")
-
-    if runtime_guidance_items:
-        injected_count = 0
-        for raw_item in runtime_guidance_items:
-            runtime_guidance_source = "guidance"
-            runtime_guidance_files: List[str] = []
-            if isinstance(raw_item, dict):
-                runtime_guidance_text = str(raw_item.get("text") or "").strip()
-                runtime_guidance_source = (
-                    str(raw_item.get("source") or "guidance").strip().lower()
-                    or "guidance"
-                )
-                raw_files = raw_item.get("files")
-                if isinstance(raw_files, list):
-                    runtime_guidance_files = [
-                        str(p).strip()
-                        for p in raw_files
-                        if isinstance(p, str) and str(p).strip()
-                    ][:9]
-            else:
-                runtime_guidance_text = str(raw_item or "").strip()
-            if not runtime_guidance_text:
-                continue
-            inject_runtime_user_message(
-                web_terminal=web_terminal,
-                messages=messages,
-                text=runtime_guidance_text,
-                source=runtime_guidance_source,
-                sender=sender,
-                conversation_id=conversation_id,
-                inline=True,
-                extra_metadata={"files": runtime_guidance_files} if runtime_guidance_files else None,
-                images=raw_item.get("images") if isinstance(raw_item, dict) else None,
-                videos=raw_item.get("videos") if isinstance(raw_item, dict) else None,
-            )
-            # 携带文件的引导：同步注入一条 hidden 文件路径通知，让模型感知文件位置
-            if runtime_guidance_files:
-                file_notice_lines = ["本次消息附带的文件路径："]
-                for _path in runtime_guidance_files:
-                    file_notice_lines.append(f"- `{_path}`")
-                inject_runtime_user_message(
-                    web_terminal=web_terminal,
-                    messages=messages,
-                    text="\n".join(file_notice_lines),
-                    source="file_paths",
-                    sender=sender,
-                    conversation_id=conversation_id,
-                    inline=True,
-                )
-            injected_count += 1
-        if injected_count:
-            debug_log(
-                "[RuntimeGuidance] 已在工具结果批次结束后批量注入引导/通知 "
-                f"task_id={client_sid} count={injected_count}"
-            )
+    from server.runtime_guidance import inject_pending_guidance
+    inject_pending_guidance(
+        web_terminal=web_terminal, messages=messages, username=username, task_id=client_sid,
+        sender=sender, conversation_id=conversation_id,
+    )
 
     web_terminal._tool_loop_active = previous_tool_loop_active
     return {"stopped": False, "last_tool_call_time": last_tool_call_time}

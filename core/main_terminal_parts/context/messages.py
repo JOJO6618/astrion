@@ -589,7 +589,7 @@ class MessagesMixin:
                             videos,
                             media_refs=media_refs,
                         )
-                        if (images or videos or media_refs) else conv["content"]
+                        if (images or videos or media_refs) and not metadata.get("media_paths_only") else conv["content"]
                     )
                     # 调试：记录所有 system 消息
                     if conv["role"] == "system":

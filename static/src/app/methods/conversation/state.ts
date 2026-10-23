@@ -74,17 +74,6 @@ export const stateMethods = {
     this.inputSetLineCount(1);
     this.inputSetMultiline(false);
     this.inputClearMessage();
-    this.runtimeQueuedMessages = [];
-    this.runtimeGuidanceFallbackQueue = [];
-    this.runtimeQueueAutoSendInProgress = false;
-    this.runtimeQueueSyncLockKey = '';
-    this.runtimeQueueSyncLockUntil = 0;
-    if (typeof this.clearRuntimeQueueSuppressionState === 'function') {
-      this.clearRuntimeQueueSuppressionState();
-    } else {
-      this.runtimeQueueSuppressedMessageIds = new Set();
-      this.runtimeGuidanceSuppressedTextCounts = {};
-    }
     this.composerReservedHeight = 80;
     this.inputClearSelectedImages();
     this.inputSetImagePickerOpen(false);

@@ -183,6 +183,9 @@ export default {
   fetchRunningTasksFailed: '获取运行任务失败',
   saveInputDraftFailed: '保存输入草稿失败',
   fetchInputDraftFailed: '获取输入草稿失败',
+  inputDraftConflict: '此对话的草稿已在其他窗口更新，当前输入已保留。',
+  inputDraftLocalFailed: '无法保存本地草稿，请暂时不要关闭页面。',
+  inputDraftRecoveryTooLong: '未发送内容超过草稿文字或附件容量上限，原记录仍保留。',
 
   // ── 子智能体/后台命令完成标签（shared.ts） ──
   subAgentTaskDone: '子智能体{agentId} 任务完成',

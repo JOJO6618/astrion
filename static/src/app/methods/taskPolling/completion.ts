@@ -25,34 +25,8 @@ export const completionMethods = {
         in_progress: false
       });
     }
-    this.runtimeQueuePaused = !!data?.preserve_pending_messages;
-    if (Array.isArray(data?.runtime_queued_messages))
-      this.applyRuntimeQueuedMessages(data.runtime_queued_messages);
-    const pendingToolsBefore =
-      typeof this.hasPendingToolActions === 'function' ? this.hasPendingToolActions() : null;
-    const pendingRuntimeGuidance = Array.isArray(data?.pending_runtime_guidance_messages)
-      ? data.pending_runtime_guidance_messages
-          .map((item: any) => String(item || '').trim())
-          .filter((item: string) => item.length > 0)
-      : [];
-    if (pendingRuntimeGuidance.length > 0) {
-      const limit = Math.max(1, Number(this.runtimeQueueLimit || 5));
-      const mergedGuidance = [
-        ...(this.runtimeGuidanceFallbackQueue || []),
-        ...pendingRuntimeGuidance
-      ]
-        .map((item: any) => String(item || '').trim())
-        .filter((item: string) => item.length > 0)
-        .slice(0, limit);
-      const queueAllowance = Math.max(0, limit - mergedGuidance.length);
-      if (
-        Array.isArray(this.runtimeQueuedMessages) &&
-        this.runtimeQueuedMessages.length > queueAllowance
-      ) {
-        this.runtimeQueuedMessages = this.runtimeQueuedMessages.slice(0, queueAllowance);
-      }
-      this.runtimeGuidanceFallbackQueue = mergedGuidance;
-    }
+    this.recoverRuntimeMessagesToDraft?.(data?.runtime_queued_messages || []);
+    const pendingToolsBefore = this.hasPendingToolActions?.() ?? null;
     jsonDebug('handleTaskComplete:before', {
       data,
       taskInProgress: this.taskInProgress,
@@ -125,12 +99,6 @@ export const completionMethods = {
       this.stopWaitingTaskProbe();
       this.stopMultiAgentTaskProbe();
       this.clearTaskState(taskId); // 清理任务状态
-      this.$nextTick(() => {
-        if (!owns()) return;
-        if (typeof this.tryAutoSendRuntimeQueuedMessages === 'function') {
-          this.tryAutoSendRuntimeQueuedMessages('task_complete');
-        }
-      });
     }
 
     this.$forceUpdate();
@@ -180,9 +148,8 @@ export const completionMethods = {
     const owns = () =>
       currentConversationSession(this) === session &&
       (!useTaskStore().currentTaskId || useTaskStore().currentTaskId === taskId);
-    this.runtimeQueuePaused = true;
     if (Array.isArray(data?.runtime_queued_messages))
-      this.applyRuntimeQueuedMessages(data.runtime_queued_messages);
+      this.recoverRuntimeMessagesToDraft?.(data.runtime_queued_messages);
     this.handleCompressionState({
       conversation_id: this.currentConversationId,
       in_progress: false
@@ -234,12 +201,6 @@ export const completionMethods = {
         this.clearPendingTools('task_stopped');
       }
       this.clearTaskState(taskId);
-      this.$nextTick(() => {
-        if (!owns()) return;
-        if (typeof this.tryAutoSendRuntimeQueuedMessages === 'function') {
-          this.tryAutoSendRuntimeQueuedMessages('task_stopped');
-        }
-      });
     }
 
     goalModeDebugLog('handleTaskStopped:after', {
@@ -270,13 +231,8 @@ export const completionMethods = {
   handleTaskError(data: any) {
     if (!this.isCurrentTaskEvent(data)) return;
     const taskId = data?.task_id || useTaskStore().currentTaskId;
-    const session = currentConversationSession(this);
-    const owns = () =>
-      currentConversationSession(this) === session &&
-      (!useTaskStore().currentTaskId || useTaskStore().currentTaskId === taskId);
     if (data?.preserve_pending_messages) {
-      this.runtimeQueuePaused = true;
-      this.applyRuntimeQueuedMessages(data.runtime_queued_messages || []);
+      this.recoverRuntimeMessagesToDraft?.(data.runtime_queued_messages || []);
       this.handleCompressionState({
         conversation_id: this.currentConversationId,
         in_progress: false
@@ -399,11 +355,5 @@ export const completionMethods = {
     this.clearTaskState(taskId);
     this.waitingForSubAgent = false;
     this.waitingForBackgroundCommand = false;
-    this.$nextTick(() => {
-      if (!owns()) return;
-      if (typeof this.tryAutoSendRuntimeQueuedMessages === 'function') {
-        this.tryAutoSendRuntimeQueuedMessages('task_error');
-      }
-    });
   }
 };

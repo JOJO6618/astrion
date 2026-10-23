@@ -1,288 +1,274 @@
 // @ts-nocheck
 import { t } from '@/locales';
-import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import {
   conversationViewEpoch,
   currentConversationSession,
   ownsConversationSession
 } from '../conversation/session';
+import {
+  emptyDraft,
+  getDraft,
+  updateDraft,
+  writeLocal,
+  readRemote,
+  syncDraft
+} from './draftStorage';
 
-type DraftRecord = {
-  payload: any;
-  signature: string;
-  acknowledged: string;
-  revision: number;
-  sequence: number;
-  loaded: boolean;
-  tail: Promise<any>;
-  saving?: string;
-  read?: object;
-  warned?: string;
-};
-const hosts = new WeakMap<object, Map<string, DraftRecord>>();
-const applications = new WeakMap<
-  object,
-  { entry: DraftRecord; workspaceId: string; epoch: number }
->();
-const clientId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-const empty = () => ({ content: '', skill_refs: [], editor_json: null });
-const scope = (host) => String(host.currentHostWorkspaceId || '');
-function record(host, workspaceId = scope(host)): DraftRecord {
-  let entries = hosts.get(host);
-  if (!entries) {
-    entries = new Map();
-    hosts.set(host, entries);
-  }
-  let entry = entries.get(workspaceId);
-  if (!entry) {
-    entry = {
-      payload: empty(),
-      signature: JSON.stringify(empty()),
-      acknowledged: JSON.stringify(empty()),
-      revision: 0,
-      sequence: 0,
-      loaded: false,
-      tail: Promise.resolve()
-    };
-    entries.set(workspaceId, entry);
-  }
-  return entry;
+const visible = new WeakMap();
+const applying = new WeakMap();
+function record(
+  host,
+  workspaceId = host.currentHostWorkspaceId,
+  conversationId = host.currentConversationId
+) {
+  return getDraft(
+    host.composerDraftOwner || '',
+    String(workspaceId || ''),
+    conversationId || 'new'
+  );
 }
-function capture(host, content = host.inputMessage) {
-  const entry = record(host);
+function capture(host) {
+  const entry = visible.get(host) || record(host);
+  if (applying.has(host)) return entry;
   const meta = host.getInputComposerRef?.()?.getComposerDraftMeta?.() || {};
-  const payload = {
-    content: host.normalizeComposerDraftContent(content),
-    skill_refs: Array.isArray(meta.skill_refs) ? meta.skill_refs : [],
-    editor_json: meta.editor_json && typeof meta.editor_json === 'object' ? meta.editor_json : null
-  };
-  const signature = JSON.stringify(payload);
-  if (entry.signature !== signature) {
-    entry.payload = payload;
-    entry.signature = signature;
-    entry.revision++;
-  }
-  entry.loaded = true;
-  return entry;
+  return updateDraft(entry, {
+    ...entry.payload,
+    content: host.inputMessage || '',
+    skill_refs: meta.skill_refs || [],
+    editor_json: meta.editor_json || null,
+    files: [...(host.selectedFiles || [])],
+    images: [...(host.selectedImages || [])],
+    videos: [...(host.selectedVideos || [])]
+  });
+}
+function reportFailure(host, error, entry) {
+  // Network errors are retried quietly while the durable local copy is available.
+  if ((!entry.localFailed && !error.conflict && entry.loaded) || entry.warned) return;
+  entry.warned = true;
+  host.uiPushToast?.({
+    title: t('appUi.saveInputDraftFailed'),
+    message: error.conflict
+      ? t('appUi.inputDraftConflict')
+      : entry.localFailed
+        ? t('appUi.inputDraftLocalFailed')
+        : t('appUi.fetchInputDraftFailed'),
+    type: 'warning'
+  });
+}
+function persist(host, entry) {
+  writeLocal(entry);
+  return syncDraft(entry, (error, failed) => reportFailure(host, error, failed));
+}
+function updateDirty(host, entry) {
+  host.composerDraftDirty = entry.signature !== entry.acknowledged;
+  host.composerDraftLastSyncedContent = JSON.parse(entry.acknowledged || '{}').content || '';
+}
+function recoverPending(host) {
+  const recovered = host.pendingDraftRecoveryMessages || [];
+  host.pendingDraftRecoveryMessages = [];
+  if (recovered.length) host.recoverRuntimeMessagesToDraft(recovered);
 }
 
 export const composerDraftMethods = {
   normalizeComposerDraftContent(value) {
     return String(value ?? '').slice(0, 40000);
   },
-  scheduleComposerDraftPersist(reason = 'input') {
-    const application = applications.get(this);
-    if (
-      application &&
-      application.workspaceId === scope(this) &&
-      application.epoch === conversationViewEpoch(this) &&
-      this.inputMessage === application.entry.payload.content
-    )
-      return;
+  scheduleComposerDraftPersist() {
+    if (applying.has(this) || this.isConversationIndependentRoute?.()) return;
     const entry = capture(this);
-    this.composerDraftDirty = entry.signature !== entry.acknowledged;
+    updateDirty(this, entry);
+    if (entry.localFailed) reportFailure(this, new Error('local storage'), entry);
+    if (this.composerDraftSaveTimer) clearTimeout(this.composerDraftSaveTimer);
+    this.composerDraftSaveTimer = window.setTimeout(() => {
+      void persist(this, entry);
+    }, 700);
+  },
+  async persistComposerDraftNow() {
+    if (this.isConversationIndependentRoute?.()) return { success: true, skipped: true };
+    const entry = capture(this);
     if (this.composerDraftSaveTimer) clearTimeout(this.composerDraftSaveTimer);
     this.composerDraftSaveTimer = null;
-    if (this.composerDraftDirty)
-      this.composerDraftSaveTimer = window.setTimeout(() => {
-        void this.persistComposerDraftNow({ reason }).catch(() => {});
-      }, 1000);
+    updateDirty(this, entry);
+    if (!entry.workspaceId || !entry.owner) return { success: false, pendingWorkspace: true };
+    const result = await persist(this, entry);
+    if ((visible.get(this) || record(this)) === entry) updateDirty(this, entry);
+    return result;
   },
-  async persistComposerDraftNow(options = {}) {
-    const workspaceId = scope(this);
-    const entry = capture(
-      this,
-      Object.hasOwn(options, 'content') ? options.content : this.inputMessage
-    );
-    const signature = entry.signature;
-    if (this.composerDraftSaveTimer) clearTimeout(this.composerDraftSaveTimer);
-    this.composerDraftSaveTimer = null;
-    if (!workspaceId) {
-      this.composerDraftDirty = entry.signature !== entry.acknowledged;
-      return { success: false, pendingWorkspace: true };
-    }
-    if (entry.saving === signature) return entry.tail;
-    if (!options.force && entry.acknowledged === signature) return { success: true, skipped: true };
-    const sequence = ++entry.sequence;
-    const body = JSON.stringify({
-      ...entry.payload,
-      workspace_id: workspaceId,
-      client_id: clientId,
-      sequence
-    });
-    const url = `/api/input-draft?workspace_id=${encodeURIComponent(workspaceId)}`;
-    if (
-      options.useBeacon &&
-      typeof navigator !== 'undefined' &&
-      typeof navigator.sendBeacon === 'function'
-    ) {
-      if (navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) {
-        return { success: true, queued: true };
-      }
-    }
-    entry.saving = signature;
-    const save = async () => {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json', 'X-Astrion-Workspace-Id': workspaceId },
-          body,
-          keepalive: !!options.keepalive
-        });
-        const result = await response.json();
-        if (!response.ok || !result.success)
-          throw new Error(result.error || t('appUi.saveInputDraftFailed'));
-        if (result.data?.saved) {
-          entry.acknowledged = signature;
-          entry.warned = undefined;
-        }
-        if (scope(this) === workspaceId) {
-          this.composerDraftLastSyncedContent =
-            JSON.parse(entry.acknowledged || '{}').content || '';
-          this.composerDraftDirty = capture(this).signature !== entry.acknowledged;
-        }
-        return result;
-      } catch (error) {
-        if (entry.warned !== signature) {
-          entry.warned = signature;
-          this.uiPushToast?.({
-            title: t('appUi.saveInputDraftFailed'),
-            message: String(error?.message || error),
-            type: 'error'
-          });
-        }
-        if (scope(this) === workspaceId) this.composerDraftDirty = true;
-        throw error;
-      } finally {
-        if (entry.saving === signature) entry.saving = undefined;
-      }
-    };
-    entry.tail = entry.tail.catch(() => {}).then(save);
-    return entry.tail;
-  },
-  async prepareComposerDraftState(workspaceId) {
-    workspaceId = String(workspaceId || '');
-    if (!workspaceId) return capture(this);
-    const entry = record(this, workspaceId);
-    if (workspaceId === scope(this)) return capture(this);
-    // Failed/newer local edits remain authoritative until acknowledged.
-    if (entry.loaded && entry.signature !== entry.acknowledged) return entry;
-    const request = {};
-    entry.read = request;
-    const revision = entry.revision;
-    await entry.tail.catch(() => {});
-    const response = await fetch(
-      `/api/input-draft?workspace_id=${encodeURIComponent(workspaceId)}`,
-      {
-        headers: { 'X-Astrion-Workspace-Id': workspaceId },
-        credentials: 'same-origin'
-      }
-    );
-    const result = await response.json();
-    if (!response.ok || !result.success)
-      throw new Error(result.error || t('appUi.fetchInputDraftFailed'));
-    if (entry.read === request && entry.revision === revision) {
-      entry.payload = {
-        content: this.normalizeComposerDraftContent(result.data?.content),
-        skill_refs: result.data?.skill_refs || [],
-        editor_json: result.data?.editor_json || null
-      };
-      entry.signature = JSON.stringify(entry.payload);
-      entry.acknowledged = entry.signature;
-      entry.loaded = true;
+  async prepareComposerDraftState(workspaceId, conversationId = null) {
+    const entry = record(this, workspaceId, conversationId);
+    // Source edits belong to the visible binding, even after the target session starts.
+    if (entry === visible.get(this)) capture(this);
+    try {
+      await readRemote(entry);
+    } catch (error) {
+      reportFailure(this, error, entry);
     }
     return entry;
   },
   applyComposerDraftState(entry, workspaceId, session) {
-    if (session && !ownsConversationSession(this, session)) return;
-    if (!workspaceId || scope(this) !== String(workspaceId)) return;
-    const revision = entry.revision;
+    if (!entry || (session && !ownsConversationSession(this, session))) return;
+    if (String(this.currentHostWorkspaceId || '') !== String(workspaceId || '')) return;
+    visible.set(this, entry);
+    const application = {};
     const epoch = conversationViewEpoch(this);
-    const application = { entry, workspaceId: String(workspaceId), epoch };
-    applications.set(this, application);
-    this.composerDraftLastSyncedContent = JSON.parse(entry.acknowledged || '{}').content || '';
-    this.composerDraftDirty = entry.signature !== entry.acknowledged;
+    applying.set(this, application);
+    updateDirty(this, entry);
     this.inputSetMessage(entry.payload.content);
+    this.selectedFiles = [...entry.payload.files];
+    this.selectedImages = [...entry.payload.images];
+    this.selectedVideos = [...entry.payload.videos];
     this.$nextTick(() => {
-      if (applications.get(this) !== application) return;
-      applications.delete(this);
+      if (applying.get(this) !== application) return;
+      applying.delete(this);
       if (
-        scope(this) !== application.workspaceId ||
-        entry.revision !== revision ||
+        visible.get(this) !== entry ||
         conversationViewEpoch(this) !== epoch ||
         (session && !ownsConversationSession(this, session))
       )
         return;
-      this.getInputComposerRef?.()?.restoreComposerDraftMeta?.(entry.payload);
+      if (this.inputMessage === entry.payload.content) {
+        this.getInputComposerRef?.()?.restoreComposerDraftMeta?.(entry.payload);
+      } else {
+        capture(this);
+      }
       this.autoResizeInput?.();
-      if (this.composerDraftDirty) this.scheduleComposerDraftPersist('restored-edits');
+      if (entry.signature !== entry.acknowledged) void persist(this, entry);
+      recoverPending(this);
     });
   },
   async restoreComposerDraftState() {
-    const workspaceId = scope(this);
-    if (!workspaceId) return { success: true, skipped: true, pendingWorkspace: true };
-    const entry = record(this);
-    if (this.inputMessage || (entry.loaded && entry.signature !== entry.acknowledged)) return;
-    const revision = capture(this).revision;
-    const readOwner = {};
-    entry.read = readOwner;
-    const initialContent = this.inputMessage;
-    const epoch = conversationViewEpoch(this);
+    if (!this.currentHostWorkspaceId) return { success: true, pendingWorkspace: true };
+    if (this.isConversationIndependentRoute?.()) return;
+    if (!visible.has(this) && this.inputMessage) {
+      visible.set(this, record(this));
+      this.scheduleComposerDraftPersist();
+      recoverPending(this);
+      return { success: true, preservedEdits: true };
+    }
     const session = currentConversationSession(this);
-    const response = await fetch(
-      `/api/input-draft?workspace_id=${encodeURIComponent(workspaceId)}`,
-      {
-        headers: { 'X-Astrion-Workspace-Id': workspaceId }
-      }
+    const epoch = conversationViewEpoch(this);
+    const content = this.inputMessage;
+    const entry = await this.prepareComposerDraftState(
+      this.currentHostWorkspaceId,
+      this.currentConversationId
     );
-    const result = await response.json();
-    if (
-      scope(this) !== workspaceId ||
-      currentConversationSession(this) !== session ||
-      conversationViewEpoch(this) !== epoch ||
-      entry.read !== readOwner ||
-      entry.revision !== revision ||
-      this.inputMessage !== initialContent
-    )
+    if (conversationViewEpoch(this) !== epoch || currentConversationSession(this) !== session)
       return;
-    if (!response.ok || !result.success)
-      throw new Error(result.error || t('appUi.fetchInputDraftFailed'));
-    entry.payload = {
-      content: this.normalizeComposerDraftContent(result.data?.content),
-      skill_refs: result.data?.skill_refs || [],
-      editor_json: result.data?.editor_json || null
-    };
-    entry.signature = JSON.stringify(entry.payload);
-    entry.acknowledged = entry.signature;
-    entry.loaded = true;
-    this.applyComposerDraftState(entry, workspaceId, session);
+    if (this.inputMessage && (this.inputMessage !== content || !entry.payload.content)) {
+      visible.set(this, entry);
+      this.scheduleComposerDraftPersist();
+      recoverPending(this);
+      return;
+    }
+    this.applyComposerDraftState(entry, this.currentHostWorkspaceId, session);
   },
   handleBeforeUnloadDraftPersist() {
-    void this.persistComposerDraftNow({
-      reason: 'beforeunload',
-      force: true,
-      useBeacon: true
-    }).catch(() => {});
+    // Synchronous local persistence is the navigation guarantee. No unauthenticated beacon.
+    if (this.isConversationIndependentRoute?.()) return;
+    const entry = capture(this);
+    writeLocal(entry);
+  },
+  captureComposerDraftSubmission() {
+    const entry = capture(this);
+    return { entry, signature: entry.signature, payload: JSON.parse(entry.signature) };
+  },
+  adoptComposerDraftConversation(conversationId) {
+    const source = capture(this);
+    const target = record(this, this.currentHostWorkspaceId, conversationId);
+    updateDraft(target, source.payload);
+    visible.set(this, target);
+    return target;
+  },
+  completeComposerDraftSubmission(submission, isCurrent = true) {
+    if (!submission) return false;
+    if (!isCurrent) {
+      if (submission.entry.signature === submission.signature) {
+        updateDraft(submission.entry, {
+          ...emptyDraft(),
+          recovered_ids: submission.entry.payload.recovered_ids
+        });
+        void persist(this, submission.entry);
+      }
+      return false;
+    }
+    const current = capture(this);
+    // The user can continue typing during a request. Only clear the submitted version.
+    const matches = current.signature === submission.signature;
+    if (submission.entry !== current && submission.entry.signature === submission.signature) {
+      updateDraft(submission.entry, {
+        ...emptyDraft(),
+        recovered_ids: submission.entry.payload.recovered_ids
+      });
+      void persist(this, submission.entry);
+    }
+    if (!matches) return false;
+    updateDraft(current, { ...emptyDraft(), recovered_ids: current.payload.recovered_ids });
+    this.inputClearMessage();
+    this.inputClearSelectedImages?.();
+    this.inputClearSelectedVideos?.();
+    this.inputClearSelectedFiles?.();
+    this.getInputComposerRef?.()?.restoreComposerDraftMeta?.(emptyDraft());
+    this.inputSetLineCount?.(1);
+    this.inputSetMultiline?.(false);
+    void persist(this, current);
+    this.autoResizeInput?.();
+    return true;
+  },
+  recoverRuntimeMessagesToDraft(messages = []) {
+    if (!messages.length || !this.currentConversationId) return;
+    const entry = capture(this);
+    const known = new Set(entry.payload.recovered_ids);
+    const recovered = messages.filter(
+      (item) =>
+        item?.id &&
+        (item.text || item.files?.length || item.images?.length || item.videos?.length) &&
+        !known.has(item.id)
+    );
+    if (!recovered.length) return;
+    const payload = {
+      ...entry.payload,
+      content: [entry.payload.content, ...recovered.map((item) => item.text)]
+        .filter(Boolean)
+        .join('\n\n'),
+      editor_json: null,
+      files: [
+        ...new Set([...entry.payload.files, ...recovered.flatMap((item) => item.files || [])])
+      ],
+      images: [
+        ...new Set([...entry.payload.images, ...recovered.flatMap((item) => item.images || [])])
+      ],
+      videos: [
+        ...new Set([...entry.payload.videos, ...recovered.flatMap((item) => item.videos || [])])
+      ],
+      recovered_ids: [...known, ...recovered.map((item) => item.id)]
+    };
+    // Never truncate recovered messages. Their original persistent queue remains the fallback.
+    if (
+      payload.content.length > 40000 ||
+      payload.files.length > 9 ||
+      payload.images.length > 9 ||
+      payload.videos.length > 1
+    ) {
+      this.uiPushToast?.({
+        title: t('appUi.saveInputDraftFailed'),
+        message: t('appUi.inputDraftRecoveryTooLong'),
+        type: 'warning'
+      });
+      return;
+    }
+    updateDraft(entry, payload);
+    this.applyComposerDraftState(entry, entry.workspaceId, currentConversationSession(this));
+    void persist(this, entry);
   },
   clearComposerDraftState() {
-    this.inputClearMessage();
-    capture(this, '');
-    this.composerDraftLastSyncedContent = '';
-    this.composerDraftDirty = true;
-    if (this.composerDraftSaveTimer) clearTimeout(this.composerDraftSaveTimer);
-    this.composerDraftSaveTimer = null;
-    this.inputSetLineCount(1);
-    this.inputSetMultiline(false);
-    this.inputClearSelectedImages();
-    this.inputClearSelectedVideos();
-    this.inputSetImagePickerOpen(false);
-    this.inputSetVideoPickerOpen(false);
+    const submission = this.captureComposerDraftSubmission();
+    this.completeComposerDraftSubmission(submission);
+    this.inputSetImagePickerOpen?.(false);
+    this.inputSetVideoPickerOpen?.(false);
     this.imageEntries = [];
     this.videoEntries = [];
     this.imageLoading = false;
     this.videoLoading = false;
     this.mediaUploading = false;
-    this.$nextTick(() => this.autoResizeInput?.());
   }
 };

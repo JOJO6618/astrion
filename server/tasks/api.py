@@ -269,11 +269,14 @@ def enqueue_runtime_guidance_api(task_id: str):
     payload = request.get_json() or {}
     message = (payload.get("message") or "").strip()
     images, videos = _normalize_media_payload(payload.get("images") or [], payload.get("videos") or [])
-    if not message and not images and not videos:
+    files = _normalize_files_payload(payload.get("files"))
+    if not message and not images and not videos and not files:
         return jsonify({"success": False, "error": tr("tasks.guidance_content_empty")}), 400
 
     result = runtime_service.enqueue_runtime_guidance(
-        username, task_id, message, images=images, videos=videos
+        username, task_id, message, images=images, videos=videos, files=files,
+        media_paths_only=bool(payload.get("media_paths_only")),
+        conversation_id=payload.get("conversation_id"),
     )
     if not result.get("success"):
         code = result.get("code") or "runtime_guidance_failed"
@@ -292,82 +295,6 @@ def enqueue_runtime_guidance_api(task_id: str):
             },
         }
     )
-
-@tasks_bp.route("/api/tasks/<task_id>/runtime_queue", methods=["POST"])
-@api_login_or_host_token_required
-def enqueue_runtime_queue_message_api(task_id: str):
-    username = get_current_username()
-    payload = request.get_json() or {}
-    message = (payload.get("message") or "").strip()
-    if not message:
-        return jsonify({"success": False, "error": tr("tasks.message_empty")}), 400
-    files = _normalize_files_payload(payload.get("files"))
-    result = runtime_service.enqueue_runtime_pending_message(username, task_id, message, files=files)
-    if not result.get("success"):
-        code = result.get("code") or "runtime_queue_enqueue_failed"
-        if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
-        if code in {"queue_full", "task_not_running"}:
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_status_not_allowed")}), 409
-        return jsonify({"success": False, "error": result.get("error") or tr("tasks.message_enqueue_failed")}), 400
-    return jsonify(
-        {
-            "success": True,
-            "data": {
-                "task_id": result.get("task_id"),
-                "item": result.get("item"),
-                "messages": result.get("messages") or [],
-            },
-        }
-    )
-
-@tasks_bp.route("/api/tasks/<task_id>/runtime_queue/<message_id>", methods=["DELETE"])
-@api_login_or_host_token_required
-def delete_runtime_queue_message_api(task_id: str, message_id: str):
-    username = get_current_username()
-    result = runtime_service.remove_runtime_pending_message(username, task_id, message_id)
-    if not result.get("success"):
-        code = result.get("code") or "runtime_queue_delete_failed"
-        if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
-        if code == "message_not_found":
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.message_not_found")}), 404
-        return jsonify({"success": False, "error": result.get("error") or tr("tasks.delete_failed")}), 400
-    return jsonify(
-        {
-            "success": True,
-            "data": {
-                "task_id": result.get("task_id"),
-                "messages": result.get("messages") or [],
-            },
-        }
-    )
-
-@tasks_bp.route("/api/tasks/<task_id>/runtime_queue/<message_id>/guide", methods=["POST"])
-@api_login_or_host_token_required
-def guide_runtime_queue_message_api(task_id: str, message_id: str):
-    username = get_current_username()
-    result = runtime_service.promote_runtime_pending_to_guidance(username, task_id, message_id)
-    if not result.get("success"):
-        code = result.get("code") or "runtime_queue_guide_failed"
-        if code == "task_not_found":
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_not_found")}), 404
-        if code == "message_not_found":
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.message_not_found")}), 404
-        if code in {"guidance_queue_full", "task_not_running"}:
-            return jsonify({"success": False, "error": result.get("error") or tr("tasks.task_status_not_allowed")}), 409
-        return jsonify({"success": False, "error": result.get("error") or tr("tasks.guidance_failed")}), 400
-    return jsonify(
-        {
-            "success": True,
-            "data": {
-                "task_id": result.get("task_id"),
-                "queued_count": result.get("queued_count", 0),
-                "messages": result.get("messages") or [],
-            },
-        }
-    )
-
 
 @tasks_bp.route("/api/conversations/<conversation_id>/goal", methods=["POST"])
 @api_login_or_host_token_required

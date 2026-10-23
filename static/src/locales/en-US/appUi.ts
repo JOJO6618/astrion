@@ -190,6 +190,10 @@ export default {
   fetchRunningTasksFailed: 'Failed to load running tasks',
   saveInputDraftFailed: 'Failed to save input draft',
   fetchInputDraftFailed: 'Failed to load input draft',
+  inputDraftConflict: 'This draft changed in another window. Your current input has been retained.',
+  inputDraftLocalFailed: 'Unable to save the local draft. Please keep this page open.',
+  inputDraftRecoveryTooLong:
+    'Unsent content exceeds the draft limit. The original records are retained.',
 
   // ── Sub-agent / background command done labels (shared.ts) ──
   subAgentTaskDone: 'Sub-agent {agentId} finished',

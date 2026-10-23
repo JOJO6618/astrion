@@ -408,85 +408,16 @@ def _update_conversation_versioning_meta(
 @api_login_required
 @with_workspace_data
 def get_input_draft(data_context, workspace: UserWorkspace, username: str):
-    del data_context
-    try:
-        path, scope = _resolve_input_draft_path(workspace, username)
-        payload = _read_input_draft_payload(path)
-        content = payload.get("content")
-        updated_at = payload.get("updated_at")
-        skill_refs = payload.get("skill_refs")
-        editor_json = payload.get("editor_json")
-        return jsonify({
-            "success": True,
-            "data": {
-                "content": content if isinstance(content, str) else "",
-                "skill_refs": skill_refs if isinstance(skill_refs, list) else [],
-                "editor_json": editor_json if isinstance(editor_json, dict) else None,
-                "updated_at": str(updated_at or ""),
-                "scope": scope,
-            }
-        })
-    except Exception as exc:
-        return jsonify({"success": False, "error": tr("conversation.read_input_draft_failed", error=str(exc))}), 500
+    from .composer_drafts import get_draft
+    return get_draft(data_context, workspace, username)
 
 
 @conversation_bp.route('/api/input-draft', methods=['POST', 'PUT'])
 @api_login_required
 @with_workspace_data
 def upsert_input_draft(data_context, workspace: UserWorkspace, username: str):
-    del data_context
-    try:
-        body = request.get_json(silent=True) or {}
-        content = body.get("content") if isinstance(body, dict) else ""
-        if content is None:
-            content = ""
-        if not isinstance(content, str):
-            content = str(content)
-        if len(content) > 40000:
-            return jsonify({"success": False, "error": tr("conversation.input_draft_too_long")}), 400
-        raw_skill_refs = body.get("skill_refs") if isinstance(body, dict) else []
-        skill_refs = []
-        if isinstance(raw_skill_refs, list):
-            for item in raw_skill_refs[:100]:
-                if not isinstance(item, dict):
-                    continue
-                name = str(item.get("name") or "")[:200]
-                description = str(item.get("description") or "")[:1000]
-                path_value = str(item.get("path") or "")[:4000]
-                if name and path_value:
-                    skill_refs.append({
-                        "name": name,
-                        "description": description,
-                        "path": path_value,
-                    })
-        editor_json = body.get("editor_json") if isinstance(body, dict) else None
-        if editor_json is not None and not isinstance(editor_json, dict):
-            editor_json = None
-
-        path, scope = _resolve_input_draft_path(workspace, username)
-        payload = {
-            "content": content,
-            "skill_refs": skill_refs,
-            "editor_json": editor_json,
-            "updated_at": datetime.now().isoformat(),
-            "scope": scope,
-        }
-        from modules.composer_drafts import save_draft
-        client_id = str(body.get("client_id") or "")[:120]
-        sequence = max(0, int(body.get("sequence") or 0))
-        saved = save_draft(path, payload, client_id=client_id, sequence=sequence)
-        return jsonify({
-            "success": True,
-            "data": {
-                "saved": saved,
-                "superseded": not saved,
-                "cleared": content == "",
-                "scope": scope,
-                "updated_at": payload["updated_at"],
-            }
-        })
-    except Exception as exc:
-        return jsonify({"success": False, "error": tr("conversation.save_input_draft_failed", error=str(exc))}), 500
+    from .composer_drafts import put_draft
+    return put_draft(data_context, workspace, username)
 
 
 # === 背景生成对话标题（从 app_legacy 拆分） ===

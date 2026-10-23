@@ -1,11 +1,11 @@
 // @ts-nocheck
-import { runtimeQueueMethods } from './runtimeQueue';
+import { guidanceMethods } from './guidance';
 import { systemCommandMethods } from './systemCommand';
 import { sendMethods } from './send';
 import { chatMethods } from './chat';
 
 export const messageMethods = {
-  ...runtimeQueueMethods,
+  ...guidanceMethods,
   ...systemCommandMethods,
   ...sendMethods,
   ...chatMethods

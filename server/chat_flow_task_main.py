@@ -181,55 +181,11 @@ def _user_message_ui_defaults(source: str, *, auto_user_message_event: bool = Fa
     return {"visibility": "chat", "starts_work": normalized == "user" and not auto_user_message_event}
 
 
-def _extract_media_path(item: Any) -> str:
-    if isinstance(item, dict):
-        return str(item.get("path") or "").strip()
-    return str(item or "").strip()
-
-
-def _build_media_paths_message(images: Optional[List[Any]], videos: Optional[List[Any]]) -> Optional[str]:
-    """为本次消息附带的图片/视频生成一条 hidden user 消息文本。"""
-    paths: List[str] = []
-    for item in images or []:
-        path = _extract_media_path(item)
-        if path and path not in paths:
-            paths.append(path)
-    for item in videos or []:
-        path = _extract_media_path(item)
-        if path and path not in paths:
-            paths.append(path)
-    if not paths:
-        return None
-    lines = ["[系统通知|media_paths]", "本次消息附带的媒体文件路径："]
-    for path in paths:
-        lines.append(f"- `{path}`")
-    return "\n".join(lines)
-
-
-def _normalize_attached_files(files: Optional[List[Any]]) -> List[str]:
-    """归一化消息附加文件：仅保留字符串路径，去重，最多 9 个。"""
-    normalized: List[str] = []
-    for item in files or []:
-        if not isinstance(item, str):
-            continue
-        path = item.strip()
-        if not path or path in normalized:
-            continue
-        normalized.append(path)
-        if len(normalized) >= 9:
-            break
-    return normalized
-
-
-def _build_file_paths_message(files: Optional[List[Any]]) -> Optional[str]:
-    """为本次消息附带的文件生成一条 hidden user 消息文本（供模型感知文件位置，界面不渲染）。"""
-    paths = _normalize_attached_files(files)
-    if not paths:
-        return None
-    lines = ["[系统通知|file_paths]", "本次消息附带的文件路径："]
-    for path in paths:
-        lines.append(f"- `{path}`")
-    return "\n".join(lines)
+from server.attachment_paths import (
+    build_media_paths_message as _build_media_paths_message,
+    build_file_paths_message as _build_file_paths_message,
+    normalize_attached_files as _normalize_attached_files,
+)
 
 
 def _should_skip_versioning_for_message(
@@ -2331,6 +2287,14 @@ async def handle_task_with_sender(
                     is_first_iteration = False
                     continue
 
+            from server.runtime_guidance import inject_pending_guidance
+            if inject_pending_guidance(
+                web_terminal=web_terminal, messages=messages, username=username,
+                task_id=client_sid, sender=sender, conversation_id=conversation_id,
+                close_if_empty=True,
+            ):
+                is_first_iteration = False
+                continue
             break
 
         # 目标模式：本轮段确实产生了工具调用

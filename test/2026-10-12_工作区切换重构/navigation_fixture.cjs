@@ -44,6 +44,7 @@ function fixture({ realSnapshot = true, automaticSelection = false } = {}) {
   const host = {
     ...navigation.workspaceNavigationMethods, ...drafts.composerDraftMethods,
     ...newConversation.newConversationMethods,
+    composerDraftOwner: 'synthetic-owner',
     versioningHostMode: true, currentHostWorkspaceId: 'ws1', currentConversationId: 'A',
     hostWorkspaces: [{ workspace_id: 'ws1', label: 'one' }, { workspace_id: 'ws2', label: 'two' },
       { workspace_id: 'ws3', label: 'three' }], runningWorkspaceTasks: [], conversations: [], inputMessage: '',
@@ -107,14 +108,21 @@ function bootstrap(id, workspaceId) {
 }
 async function drain(f, target = {}) {
   const seen = new Set();
+  f.remoteDrafts ||= new Map();
   for (let turn = 0; turn < 20; turn++) {
     await flush();
     for (const request of f.requests) {
       if (seen.has(request)) continue;
       seen.add(request);
       const url = new URL(request.url, 'http://localhost');
-      if (url.pathname === '/api/input-draft') respond(request, { success: true, data:
-        request.options.method === 'POST' ? { saved: true } : { content: 'draft:' + url.searchParams.get('workspace_id') } });
+      if (url.pathname === '/api/input-draft') {
+        if (request.options.method === 'POST') {
+          const body = JSON.parse(request.options.body);
+          f.remoteDrafts.set(request.url, { ...body, revision: (body.base_revision || 0) + 1 });
+          respond(request, { success: true, data: { saved: true, revision: (body.base_revision || 0) + 1 } });
+        } else respond(request, { success: true, data: f.remoteDrafts.get(request.url) || {
+          content: 'draft:' + url.searchParams.get('workspace_id'), revision: 0 } });
+      }
       else if (url.pathname.endsWith('/select')) respond(request, { success: true, data: {
         current_workspace_id: url.searchParams.get('workspace_id') } });
       else if (url.pathname.endsWith('/bootstrap')) {

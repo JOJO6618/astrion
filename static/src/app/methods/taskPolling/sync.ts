@@ -5,53 +5,7 @@ import { invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
 
 export const syncMethods = {
   handleRuntimeQueueSync(data: any) {
-    if (data?.paused) this.runtimeQueuePaused = true;
-    const messages = Array.isArray(data?.messages) ? data.messages : [];
-    const buildSnapshotKey =
-      typeof this.buildRuntimeQueueSnapshotKey === 'function'
-        ? this.buildRuntimeQueueSnapshotKey
-        : (list: any[]) =>
-            JSON.stringify(
-              (Array.isArray(list) ? list : []).map((item: any) => [
-                String(item?.id || ''),
-                String(item?.text || ''),
-                Number(item?.createdAt ?? item?.created_at ?? 0)
-              ])
-            );
-    const incomingPreview = (Array.isArray(messages) ? messages : []).map((item: any) => ({
-      id: String(item?.id || '').trim(),
-      text: String(item?.text || '').trim(),
-      createdAt: Number(item?.created_at ?? item?.createdAt ?? 0)
-    }));
-    const incomingKey = buildSnapshotKey(incomingPreview);
-    const now = Date.now();
-    const lockKey = String(this.runtimeQueueSyncLockKey || '');
-    const lockUntil = Number(this.runtimeQueueSyncLockUntil || 0);
-    if (lockKey && now < lockUntil && incomingKey !== lockKey) {
-      debugLog('[RuntimeQueue] 忽略可能过期的轮询同步', {
-        now,
-        lockUntil,
-        incomingSize: incomingPreview.length
-      });
-      return;
-    }
-    if (lockKey && incomingKey === lockKey) {
-      this.runtimeQueueSyncLockKey = '';
-      this.runtimeQueueSyncLockUntil = 0;
-    }
-    if (typeof this.applyRuntimeQueuedMessages === 'function') {
-      this.applyRuntimeQueuedMessages(messages);
-      return;
-    }
-    const limit = Math.max(1, Number(this.runtimeQueueLimit || 5));
-    this.runtimeQueuedMessages = messages
-      .map((item: any) => ({
-        id: String(item?.id || '').trim(),
-        text: String(item?.text || '').trim(),
-        createdAt: Number(item?.created_at ?? item?.createdAt ?? Date.now())
-      }))
-      .filter((item: any) => item.id && item.text)
-      .slice(0, limit);
+    this.recoverRuntimeMessagesToDraft?.(data?.messages || []);
   },
   handleTokenUpdate(data: any) {
     if (data.conversation_id === this.currentConversationId) {

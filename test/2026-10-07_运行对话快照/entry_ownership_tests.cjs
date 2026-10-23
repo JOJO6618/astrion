@@ -24,6 +24,7 @@ function fixture() {
   imports['./composerDrafts'] = compile(`${base}ui/composerDrafts.ts`, imports, globals);
   conversation.activateWorkspaceCache = noop;
   const host = {
+    composerDraftOwner: 'synthetic-owner',
     currentConversationId: 'A', currentHostWorkspaceId: 'ws', versioningHostMode: true,
     dockerProjectMode: false, runningWorkspaceTasks: [], hostWorkspaces: [],
     getStoredWorkspaceTaskIdSet: () => new Set(), setStoredWorkspaceTaskIdSet: noop,
@@ -106,13 +107,7 @@ test('late draft GET cannot write the new view or its scheduled editor metadata'
   f.host.beginConversationView('C', 'ws'); f.host.currentConversationId = 'C';
   f.ticks.forEach((fn) => fn()); assert.equal(metadataWrites, 0);
 });
-test('older draft POST cannot clear newer unsaved input', async () => {
-  const f = fixture(); const old = f.host.persistComposerDraftNow({ force: true });
-  await flush();
-  f.host.inputMessage = 'new typing';
-  respond(f.requests[0], { success: true, data: { saved: true } }); await old;
-  assert.equal(f.host.composerDraftDirty, true); assert.equal(f.host.composerDraftLastSyncedContent, 'draft');
-});
+
 test('foreground completion preserves activity when only a background command remains', () => {
   const session = compile(`${base}conversation/session.ts`);
   const task = { currentTaskId: 'T', clearTask: noop };

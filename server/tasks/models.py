@@ -68,7 +68,7 @@ class TaskRecord:
         "stop_requested",
         "next_event_idx",
         "runtime_pending_queue",
-        "runtime_guidance_queue",
+        "runtime_guidance_queue", "runtime_guidance_closed",
         "queue_manager",
         "runtime_queue_paused",
         "last_cancel_at",
@@ -111,6 +111,7 @@ class TaskRecord:
         self.next_event_idx: int = 0
         self.runtime_pending_queue: List[Dict[str, Any]] = []
         self.runtime_guidance_queue: List[Any] = []
+        self.runtime_guidance_closed = False
         self.queue_manager = None
         self.runtime_queue_paused = False
         self.last_cancel_at: Optional[float] = None
@@ -370,7 +371,12 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                 text = str(raw_item or "").strip()
                 created_at = None
                 raw_files = None
-            if not text:
+            media = {
+                key: list(raw_item[key])[:9]
+                for key in ("images", "videos")
+                if isinstance(raw_item, dict) and isinstance(raw_item.get(key), list)
+            }
+            if not text and not (raw_files or any(media.values())):
                 continue
             if not item_id:
                 item_id = str(uuid.uuid4())
@@ -392,6 +398,9 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                 ][:9]
                 if files:
                     entry["files"] = files
+            entry.update(media)
+            if isinstance(raw_item, dict) and raw_item.get("media_paths_only"):
+                entry["media_paths_only"] = True
             normalized.append(entry)
         return normalized
 
@@ -403,7 +412,7 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                 continue
             text = str(item.get("text") or "").strip()
             item_id = str(item.get("id") or "").strip()
-            if not text or not item_id:
+            if not item_id or not (text or item.get("files") or item.get("images") or item.get("videos")):
                 continue
             entry = {
                 "id": item_id,
@@ -411,136 +420,13 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                 "created_at": item.get("created_at"),
                 "source": item.get("source", "user"),
             }
-            if isinstance(item.get("files"), list) and item["files"]:
-                entry["files"] = list(item["files"])
+            for key in ("files", "images", "videos"):
+                if isinstance(item.get(key), list) and item[key]:
+                    entry[key] = list(item[key])
+            if item.get("media_paths_only"):
+                entry["media_paths_only"] = True
             result.append(entry)
         return result
-
-    def enqueue_runtime_pending_message(
-        self,
-        username: str,
-        task_id: str,
-        message: str,
-        max_queue_size: int = 5,
-        files: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        text = str(message or "").strip()
-        if not text:
-            return {"success": False, "code": "empty_message", "error": tr("tasks.message_empty")}
-        limit = int(max(1, max_queue_size))
-        with self._lock:
-            rec = self._tasks.get(task_id)
-            if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
-            if rec.status not in {"pending", "running", "cancel_requested"}:
-                return {"success": False, "code": "task_not_running", "error": tr("tasks.task_not_running_append_message")}
-            queue = self._normalize_runtime_pending_queue(getattr(rec, "runtime_pending_queue", None))
-            if len(queue) >= limit:
-                return {
-                    "success": False,
-                    "code": "queue_full",
-                    "error": tr("tasks.queue_full_max", limit=limit),
-                }
-            item = {
-                "id": str(uuid.uuid4()),
-                "text": text,
-                "created_at": time.time(),
-            }
-            if isinstance(files, list):
-                normalized_files = [
-                    str(p).strip() for p in files if isinstance(p, str) and str(p).strip()
-                ][:9]
-                if normalized_files:
-                    item["files"] = normalized_files
-            queue.append(item)
-            rec.runtime_pending_queue = queue
-            rec.updated_at = time.time()
-            save_queue(rec)
-            return {
-                "success": True,
-                "task_id": rec.task_id,
-                "item": item,
-                "messages": self._runtime_pending_public(queue),
-            }
-
-    def remove_runtime_pending_message(
-        self, username: str, task_id: str, message_id: str
-    ) -> Dict[str, Any]:
-        target_id = str(message_id or "").strip()
-        if not target_id:
-            return {"success": False, "code": "invalid_message_id", "error": tr("tasks.invalid_message_id")}
-        with self._lock:
-            rec = self._tasks.get(task_id)
-            if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
-            queue = self._normalize_runtime_pending_queue(getattr(rec, "runtime_pending_queue", None))
-            remove_idx = -1
-            for idx, item in enumerate(queue):
-                if str(item.get("id") or "") == target_id:
-                    remove_idx = idx
-                    break
-            if remove_idx < 0:
-                return {"success": False, "code": "message_not_found", "error": tr("tasks.message_not_found")}
-            queue.pop(remove_idx)
-            rec.runtime_pending_queue = queue
-            rec.updated_at = time.time()
-            save_queue(rec)
-            return {
-                "success": True,
-                "task_id": rec.task_id,
-                "messages": self._runtime_pending_public(queue),
-            }
-
-    def promote_runtime_pending_to_guidance(
-        self,
-        username: str,
-        task_id: str,
-        message_id: str,
-        max_guidance_queue_size: int = 5,
-    ) -> Dict[str, Any]:
-        target_id = str(message_id or "").strip()
-        if not target_id:
-            return {"success": False, "code": "invalid_message_id", "error": tr("tasks.invalid_message_id")}
-        guidance_limit = int(max(1, max_guidance_queue_size))
-        with self._lock:
-            rec = self._tasks.get(task_id)
-            if not rec or rec.username != username:
-                return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
-            if rec.status not in {"pending", "running", "cancel_requested"}:
-                return {"success": False, "code": "task_not_running", "error": tr("tasks.task_not_running_guide")}
-            queue = self._normalize_runtime_pending_queue(getattr(rec, "runtime_pending_queue", None))
-            guidance_queue = getattr(rec, "runtime_guidance_queue", None)
-            if not isinstance(guidance_queue, list):
-                guidance_queue = []
-            if len(guidance_queue) >= guidance_limit:
-                return {
-                    "success": False,
-                    "code": "guidance_queue_full",
-                    "error": tr("tasks.guidance_queue_full_max", guidance_limit=guidance_limit),
-                }
-            selected = None
-            remain_queue: List[Dict[str, Any]] = []
-            for item in queue:
-                if selected is None and str(item.get("id") or "") == target_id:
-                    selected = item
-                    continue
-                remain_queue.append(item)
-            if not selected:
-                return {"success": False, "code": "message_not_found", "error": tr("tasks.message_not_found")}
-            selected_text = str(selected.get("text") or "").strip()
-            if not selected_text:
-                return {"success": False, "code": "empty_message", "error": tr("tasks.message_content_empty")}
-            guidance_queue.append({**selected, "source": "guidance"})
-            rec.runtime_guidance_queue = guidance_queue
-            rec.runtime_pending_queue = remain_queue
-            rec.updated_at = time.time()
-            save_queue(rec)
-            return {
-                "success": True,
-                "task_id": rec.task_id,
-                "queued_count": len(guidance_queue),
-                "messages": self._runtime_pending_public(remain_queue),
-            }
 
     def get_runtime_pending_messages(self, username: str, task_id: str) -> List[Dict[str, Any]]:
         with self._lock:
@@ -560,17 +446,21 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
         source: Optional[str] = None,
         images: Optional[List[Any]] = None,
         videos: Optional[List[Any]] = None,
+        files: Optional[List[str]] = None, media_paths_only: bool = False,
+        conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         text = str(message or "").strip()
-        if not text and (images or videos):
-            text = "请结合本次附带的图片或视频继续。"
+        if not text and (images or videos or files):
+            text = "请查看本次附带的附件。"
         if not text:
             return {"success": False, "code": "empty_message", "error": tr("tasks.guidance_content_empty")}
         with self._lock:
             rec = self._tasks.get(task_id)
             if not rec or rec.username != username:
                 return {"success": False, "code": "task_not_found", "error": tr("tasks.task_not_found")}
-            if rec.status not in {"pending", "running", "cancel_requested"}:
+            if (rec.status not in {"pending", "running"} or rec.stop_requested
+                    or rec.runtime_guidance_closed
+                    or (conversation_id and rec.conversation_id != conversation_id)):
                 return {"success": False, "code": "task_not_running", "error": tr("tasks.task_not_running_append_guidance")}
             queue = getattr(rec, "runtime_guidance_queue", None)
             if not isinstance(queue, list):
@@ -583,8 +473,11 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                     "error": tr("tasks.guidance_queue_full_max", guidance_limit=int(max(1, max_queue_size))),
                 }
             normalized_source = str(source or "").strip().lower()
-            if normalized_source or images or videos:
-                item = {"text": text, "source": normalized_source or "guidance"}
+            if normalized_source or images or videos or files or media_paths_only:
+                item = {"id": str(uuid.uuid4()), "text": text, "source": normalized_source or "guidance",
+                        "media_paths_only": media_paths_only}
+                if files:
+                    item["files"] = list(files)[:9]
                 if images:
                     item["images"] = list(images)[:9]
                 if videos:
@@ -641,7 +534,8 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
             save_queue(rec)
             return items
 
-    def consume_runtime_guidance_for_injection(self, username: str, task_id: str) -> List[Any]:
+    def consume_runtime_guidance_for_injection(self, username: str, task_id: str,
+                                              *, close_if_empty=False) -> List[Any]:
         """按原始结构取出整批引导/通知消息（支持 str 与 {text,source}）。"""
         with self._lock:
             rec = self._tasks.get(task_id)
@@ -649,6 +543,8 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                 return []
             queue = getattr(rec, "runtime_guidance_queue", None)
             if not isinstance(queue, list) or not queue:
+                if close_if_empty:
+                    rec.runtime_guidance_closed = True
                 return []
             items: List[Any] = []
             for item in queue:
@@ -658,6 +554,7 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
                         continue
                     src = str(item.get("source") or "").strip().lower()
                     entry = {"text": text, "source": src} if src else {"text": text}
+                    entry["media_paths_only"] = bool(item.get("media_paths_only"))
                     for media_key in ("images", "videos"):
                         if isinstance(item.get(media_key), list):
                             entry[media_key] = list(item[media_key])[:9]

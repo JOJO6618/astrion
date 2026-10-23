@@ -42,6 +42,8 @@ class CompressionRequestMixin:
                 return False
             if rec.compression_request == "pending":
                 rec.compression_request = "running"
+                # A late compression request continues this writer after its final-response boundary.
+                rec.runtime_guidance_closed = False
                 debug_log(f"[CompressionRequest] consumed task={task_id} conv={rec.conversation_id}")
                 return True
             if close_if_empty:

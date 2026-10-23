@@ -48,65 +48,19 @@ export const messageControlMethods = {
       this.clearLocalTaskUiState?.('send:new-conversation');
       return this.sendMessage();
     }
-    const mainIdle = this.mainChatIdle;
-    if (this.composerBusy && mainIdle && hasText) {
-      if (Array.isArray(this.pendingUserQuestions) && this.pendingUserQuestions.length > 0) {
-        const answered = await this.answerUserQuestionFromComposer(this.inputMessage);
-        if (!owns()) return;
-        if (answered) {
-          this.inputClearMessage();
-          this.inputSetLineCount(1);
-          this.inputSetMultiline(false);
-          this.autoResizeInput();
-        }
-        return;
-      }
-      return this.sendMessage();
-    }
-    if (this.composerBusy && mainIdle && hasMedia) {
-      this.uiPushToast({
-        title: t('appMessages.subAgentRunningTitle'),
-        message: t('appMessages.subAgentRunningMessage'),
-        type: 'warning'
-      });
-      return;
-    }
     if (this.composerBusy) {
-      if (hasText) {
-        if (Array.isArray(this.pendingUserQuestions) && this.pendingUserQuestions.length > 0) {
-          const answered = await this.answerUserQuestionFromComposer(this.inputMessage);
-          if (!owns()) return;
-          if (answered) {
-            this.inputClearMessage();
-            this.inputSetLineCount(1);
-            this.inputSetMultiline(false);
-            this.autoResizeInput();
-          }
-          return;
-        }
-        const queued = await this.enqueueRuntimeQueuedMessage(
-          this.inputMessage,
-          Array.isArray(this.selectedFiles) ? [...this.selectedFiles] : []
-        );
-        if (!owns()) return;
-        if (queued) {
-          this.inputClearMessage();
-          this.inputClearSelectedFiles();
-          this.inputSetLineCount(1);
-          this.inputSetMultiline(false);
-          this.autoResizeInput();
-        }
+      if (hasText && this.pendingUserQuestions?.length) {
+        const draft = this.captureComposerDraftSubmission();
+        const answered = await this.answerUserQuestionFromComposer(this.inputMessage);
+        if (answered) this.completeComposerDraftSubmission(draft, owns());
         return;
       }
-      if (hasMedia) {
-        this.uiPushToast({
-          title: t('appMessages.runningTextOnlyTitle'),
-          message: t('appMessages.runningTextOnlyMessage'),
-          type: 'warning'
-        });
-        return;
+      if (!this.mainChatIdle) {
+        if (hasText || hasMedia || hasFiles) return this.sendRuntimeGuidance();
+        return this.stopTask();
       }
-      return this.stopTask();
+      if (hasText || hasMedia) return this.sendMessage();
+      return;
     }
     if (this.currentWorkspaceHasRunningTask) {
       // Sidebar state may predate a navigation or task completion. Verify it
@@ -158,7 +112,6 @@ export const messageControlMethods = {
       return;
     }
     const shouldDropToolEvents = this.streamingUi;
-    this.markRuntimeQueueSuppressedByManualStop?.();
     this.stopRequested = true;
     this.dropToolEvents = shouldDropToolEvents;
     if (this.goalRunning || this.goalModeArmed) {
