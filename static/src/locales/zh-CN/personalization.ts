@@ -438,7 +438,14 @@ export default {
 
   // ── 子智能体 ──
   subAgentsIntro:
-    '配置子智能体的模型与上下文压缩阈值。子智能体保留上下文，可在完成一轮后继续工作。',
+    '配置子智能体的模型、数量与上下文压缩阈值。子智能体保留上下文，可在完成一轮后继续工作。',
+  subAgentMaxInstancesTitle: '允许同时存在的子智能体数量',
+  subAgentMaxInstancesDesc:
+    '每个主对话独立计数，空闲实例也占名额，终结后释放。默认 20，保存后生效。',
+  subAgentMaxInstancesInvalid: '子智能体数量必须是大于等于 1 的有效整数。',
+  subAgentCompressThresholdInvalid: '上下文压缩阈值必须是不小于 10000 的整数。',
+  subAgentSettingsLoadFailed: '加载子智能体设置失败，请重新进入此页面重试。',
+  subAgentSettingsSaveFailed: '保存子智能体设置失败，请重试。',
   compressThresholdTitle: '上下文压缩阈值',
   compressThresholdDesc: '子智能体上下文 tokens 超过此值时触发深度压缩（默认 250000）',
   subAgentModelTitle: '子智能体智能程度',

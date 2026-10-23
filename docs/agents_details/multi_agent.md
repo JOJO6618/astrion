@@ -22,7 +22,7 @@
 
 ### 11.2 轮次、暂停和恢复
 
-- **实例容量（2026-10-23）**：每个主对话默认最多保留20个未终结实例，配置沿用`SUB_AGENT_MAX_ACTIVE`。按`status != terminated`计数，idle、running及异常failed均占名额，terminate释放名额且保留历史；其他对话不占当前对话名额。不另设running数量限制，已有实例可全部唤醒。创建检查与登记在共享注册表锁内完成；存量超限不自动终结，只阻止继续新建。
+- **实例容量（2026-10-23）**：设置→子智能体的“允许同时存在的子智能体数量”存入用户级`personalization.json`的`sub_agent_max_instances`，默认20、只接受1至JSON最大安全整数。默认值及校验在`modules/sub_agent_settings.py`，已注册默认表与sanitize白名单。`GET/PUT /api/sub_agents/settings`读写并返回保存结果；每次创建读取最新用户偏好，保存后下一次创建立即生效。旧`SUB_AGENT_MAX_ACTIVE`环境变量入口删除，避免双重上限来源。按`status != terminated`计数，idle、running及异常failed均占名额，terminate释放名额且保留历史；其他对话不占当前对话名额。不另设running数量限制，已有实例可全部唤醒。创建检查与登记在共享注册表锁内完成；存量超限不自动终结，只阻止继续新建。
 - 全部子实例后台运行，创建立即返回，不阻塞主输入区，不发送子任务 `sub_agent_waiting`。
 - 自然无工具回复结束本轮，保存上下文和最终回复，进入 `idle`。不需要结束工具、输出文件或交付文件；idle 不算后台运行。
 - 给 idle 实例发消息沿用原上下文开启下一轮。运行中消息安全入队，在完整工具批次结束后的模型请求前追加，不能插到 assistant/tool 配对中间。

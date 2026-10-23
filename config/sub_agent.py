@@ -19,8 +19,7 @@ SUB_AGENT_TASKS_BASE_DIR = _resolve_repo_path(os.environ.get("SUB_AGENT_TASKS_BA
 SUB_AGENT_STATE_FILE = _resolve_repo_path(os.environ.get("SUB_AGENT_STATE_FILE", ""), f"{DATA_DIR}/sub_agents.json")
 # 子智能体产出结果有意落在工作区内，跟随 DEFAULT_PROJECT_PATH，不迁入运行态根目录。
 SUB_AGENT_PROJECT_RESULTS_DIR = _resolve_repo_path(os.environ.get("SUB_AGENT_PROJECT_RESULTS_DIR", ""), f"{DEFAULT_PROJECT_PATH}/sub_agent_results")
-# 每个主对话保留的未终结实例上限；idle 与 running 均占名额，只有 terminate 释放。
-SUB_AGENT_MAX_ACTIVE = int(os.environ.get("SUB_AGENT_MAX_ACTIVE", "20"))
+# 实例容量由用户设置 sub_agent_max_instances 控制，默认值与校验见 modules/sub_agent_settings.py。
 
 # 注：子智能体独立模型库（sub_agent_models.json）已于 2026-09 废弃，
 # 模型来源唯一 = 主注册表（见 modules/aux_model_resolver.py）。
@@ -32,5 +31,4 @@ __all__ = [
     "SUB_AGENT_TASKS_BASE_DIR",
     "SUB_AGENT_PROJECT_RESULTS_DIR",
     "SUB_AGENT_STATE_FILE",
-    "SUB_AGENT_MAX_ACTIVE",
 ]

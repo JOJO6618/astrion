@@ -19,6 +19,7 @@ from config.model_profiles import get_default_model_key, get_registered_model_ke
 from utils.atomic_io import atomic_write_json
 
 from modules.i18n import tr
+from modules.sub_agent_settings import DEFAULT_MAX_INSTANCES, resolve_max_instances
 
 ALLOWED_RUN_MODES = {"fast", "thinking"}
 ALLOWED_PERMISSION_MODES = {"readonly", "approval", "auto_approval", "unrestricted"}
@@ -195,7 +196,8 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "goal_end_conditions": ["max_turns"],  # 结束方式，可多选：max_turns / max_tokens
     "goal_max_turns": GOAL_MAX_TURNS_DEFAULT,  # 最多自动续命轮数
     "goal_max_tokens": None,  # 累计(输入+输出)token 上限；None 表示不启用
-    # 传统模式子智能体设置（个人空间-子智能体管理；与多智能体无关）
+    # 子智能体设置（用户级共享，每个主对话独立计算实例容量）
+    "sub_agent_max_instances": DEFAULT_MAX_INSTANCES,
     "sub_agent_compress_threshold_tokens": 250000,  # 子智能体上下文压缩阈值，最小 10000
     "sub_agent_max_turns": None,  # 子智能体最大执行轮次：None-默认 50 / 0-无上限 / 正整数-该值
     # 审核智能体统一配置（个人空间-审核智能体页）：模型留空走自动规则（注册表第一个可见模型；纯 codex 时选 -luna）
@@ -898,7 +900,11 @@ def sanitize_personalization_payload(
             base.get("goal_max_tokens"), min_value=GOAL_MAX_TOKENS_MIN, max_value=GOAL_MAX_TOKENS_MAX
         )
 
-    # 传统模式子智能体：上下文压缩阈值（最小 10000，与 PUT /api/multiagent/settings 校验一致）
+    base["sub_agent_max_instances"] = resolve_max_instances(
+        data.get("sub_agent_max_instances", base.get("sub_agent_max_instances"))
+    )
+
+    # 子智能体：上下文压缩阈值（最小 10000，与 PUT /api/sub_agents/settings 校验一致）
     if "sub_agent_compress_threshold_tokens" in data:
         base["sub_agent_compress_threshold_tokens"] = (
             _sanitize_optional_int(

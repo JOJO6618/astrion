@@ -3716,6 +3716,9 @@ onBeforeUnmount(() => {
 }
 
 .floating-project-status {
+  --status-control-height: 26px;
+  --status-control-radius: 10px;
+
   position: relative;
   left: auto;
   right: auto;
@@ -3729,10 +3732,10 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 4px;
+  padding: 3px;
   border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: var(--theme-surface-soft);
+  background: var(--surface-soft);
   box-shadow: none;
   pointer-events: auto;
 }
@@ -3808,39 +3811,43 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  height: 26px;
+  height: var(--status-control-height);
 }
 
 .floating-project-status__button,
-.floating-project-status__notice {
-  height: 26px;
+.floating-project-status__notice,
+.floating-project-status__stats,
+.floating-project-status__terminal {
+  height: var(--status-control-height);
   display: inline-flex;
   align-items: center;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--status-control-radius);
   background: transparent;
   color: var(--text-primary);
   font: inherit;
   font-size: 12px;
   line-height: 1.2;
   white-space: nowrap;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 
 .floating-project-status__button {
   min-width: 0;
   padding: 0 9px;
   cursor: pointer;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
 }
 
 .floating-project-status__button:hover,
 .floating-project-status__button--active,
 .floating-project-status__notice--button:hover,
+.floating-project-status__stats:hover,
+.floating-project-status__terminal:hover,
 .floating-project-status__submenu button:hover {
-  background: var(--theme-tab-active);
-  box-shadow: 0 1px 2px var(--shadow-color);
+  background: var(--tab-active);
+  box-shadow: 0 0 2px var(--shadow-color);
 }
 
 .floating-project-status__button--project {
@@ -3864,26 +3871,10 @@ onBeforeUnmount(() => {
 }
 
 .floating-project-status__stats {
-  display: inline-flex;
-  align-items: center;
   gap: 8px;
-  height: 26px;
   padding: 0 8px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  font-size: 12px;
-  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
-}
-
-.floating-project-status__stats:hover {
-  background: var(--theme-tab-active);
-  box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 .floating-project-status__add {
@@ -3899,26 +3890,13 @@ onBeforeUnmount(() => {
 }
 
 .floating-project-status__terminal {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
   padding: 0 8px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.2;
   cursor: pointer;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
 }
 
 .floating-project-status__terminal:hover {
-  background: var(--theme-tab-active);
   color: var(--text-primary);
-  box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 .floating-project-status__submenu {
@@ -3935,7 +3913,7 @@ onBeforeUnmount(() => {
   padding: 6px;
   border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: var(--theme-surface-soft);
+  background: var(--surface-soft);
   box-shadow: none;
   overflow: hidden;
 }
@@ -3962,23 +3940,11 @@ onBeforeUnmount(() => {
 :global(body[data-theme='dark'] .floating-project-status),
 :global(html[data-theme='dark'] .floating-project-status__submenu),
 :global(body[data-theme='dark'] .floating-project-status__submenu) {
-  background: var(--badge-bg) !important;
+  background: var(--badge-bg);
   border-color: var(--border-card-strong);
 }
 
-:global(html[data-theme='dark'] .floating-project-status__button:hover),
-:global(body[data-theme='dark'] .floating-project-status__button:hover),
-:global(html[data-theme='dark'] .floating-project-status__notice--button:hover),
-:global(body[data-theme='dark'] .floating-project-status__notice--button:hover),
-:global(html[data-theme='dark'] .floating-project-status__stats:hover),
-:global(body[data-theme='dark'] .floating-project-status__stats:hover),
-:global(html[data-theme='dark'] .floating-project-status__submenu button:hover),
-:global(body[data-theme='dark'] .floating-project-status__submenu button:hover) {
-  box-shadow: 0 1px 2px var(--shadow-color);
-}
-
-/* 经典主题：git 状态栏及子菜单与输入栏壳体对齐为纯白 --surface-raised
-   （基础 --theme-surface-soft 在经典为米色 #f5f0e8，与白色输入栏不一致） */
+/* 经典主题：git 状态栏及子菜单与输入栏壳体使用同一 --surface-raised。 */
 :global(html[data-theme='classic'] .floating-project-status),
 :global(body[data-theme='classic'] .floating-project-status),
 :global(html[data-theme='classic'] .floating-project-status__submenu),

@@ -9,9 +9,13 @@ const {
   form,
   personalization,
   saveSubAgentSettings,
+  subAgentMaxInstances,
   subAgentCompressThreshold,
   subAgentModels,
-  subAgentSettingsSaving
+  subAgentSettingsSaving,
+  subAgentSettingsLoading,
+  subAgentSettingsLoaded,
+  subAgentSettingsError
 } = ctx;
 const auxModelOptions = computed(() =>
   (subAgentModels.value || []).map((model: any) => ({
@@ -53,6 +57,23 @@ const intelligenceLevels = ['high', 'medium', 'low'] as const;
       />
     </div>
     <div class="settings-action-row">
+      <label class="settings-row-copy" for="sub-agent-max-instances">
+        <span class="settings-row-title">{{
+          $t('personalization.subAgentMaxInstancesTitle')
+        }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.subAgentMaxInstancesDesc') }}</span>
+      </label>
+      <input
+        id="sub-agent-max-instances"
+        v-model.number="subAgentMaxInstances"
+        type="number"
+        class="settings-number-input"
+        :min="1"
+        :step="1"
+        :disabled="subAgentSettingsLoading || subAgentSettingsSaving || !subAgentSettingsLoaded"
+      />
+    </div>
+    <div class="settings-action-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('personalization.compressThresholdTitle') }}</span>
         <span class="settings-row-desc">{{ $t('personalization.compressThresholdDesc') }}</span>
@@ -64,16 +85,22 @@ const intelligenceLevels = ['high', 'medium', 'low'] as const;
           class="settings-number-input"
           :min="10000"
           :step="10000"
+          :disabled="subAgentSettingsLoading || subAgentSettingsSaving || !subAgentSettingsLoaded"
         />
-        <button
-          type="button"
-          class="settings-secondary-button"
-          :disabled="subAgentSettingsSaving"
-          @click="saveSubAgentSettings"
-        >
-          {{ subAgentSettingsSaving ? $t('personalization.saving') : $t('common.save') }}
-        </button>
       </div>
+    </div>
+    <p v-if="subAgentSettingsError" class="sub-agent-settings-error" role="alert">
+      {{ subAgentSettingsError }}
+    </p>
+    <div class="sub-agent-settings-actions">
+      <button
+        type="button"
+        class="settings-secondary-button"
+        :disabled="subAgentSettingsSaving || subAgentSettingsLoading || !subAgentSettingsLoaded"
+        @click="saveSubAgentSettings"
+      >
+        {{ subAgentSettingsSaving ? $t('personalization.saving') : $t('common.save') }}
+      </button>
     </div>
   </section>
 </template>
@@ -90,5 +117,16 @@ const intelligenceLevels = ['high', 'medium', 'low'] as const;
 }
 .sub-agent-compression-controls input {
   width: 120px;
+}
+.sub-agent-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.sub-agent-settings-error {
+  margin: 8px 0;
+  max-height: 60px;
+  overflow: auto;
+  color: var(--state-danger);
 }
 </style>

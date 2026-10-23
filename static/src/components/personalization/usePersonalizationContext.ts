@@ -13,6 +13,7 @@ import { useTheme } from '@/utils/theme';
 import type { ThemeKey } from '@/utils/theme';
 import { t, currentLocale, useLocale } from '@/locales';
 import type { LocaleKey } from '@/locales';
+import { useSubAgentSettings } from './useSubAgentSettings';
 
 /**
  * 个人空间共享上下文 composable（从 PersonalizationDrawer.vue 抽离）。
@@ -724,8 +725,16 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
   });
 
   // ----- 子智能体管理 -----
-  const subAgentCompressThreshold = ref(250000);
-  const subAgentSettingsSaving = ref(false);
+  const {
+    subAgentMaxInstances,
+    subAgentCompressThreshold,
+    subAgentSettingsSaving,
+    subAgentSettingsLoading,
+    subAgentSettingsLoaded,
+    subAgentSettingsError,
+    loadSubAgentSettings,
+    saveSubAgentSettings
+  } = useSubAgentSettings();
   const subAgentModels = ref<any[]>([]);
 
   const loadSubAgentModels = async () => {
@@ -790,19 +799,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     updateReviewAgent(key, { [field]: Math.max(lo, Math.min(parsed, hi)) });
   };
 
-  const loadSubAgentSettings = async () => {
-    try {
-      const resp = await fetch('/api/sub_agents/settings', { credentials: 'same-origin' });
-      const data = await resp.json();
-      if (data.success && data.settings) {
-        subAgentCompressThreshold.value =
-          data.settings.sub_agent_compress_threshold_tokens || 250000;
-      }
-    } catch (e) {
-      // 静默处理
-    }
-  };
-
   // tab 懒加载：切到对应分区时才拉取数据（Drawer 与设置页共用同一套触发逻辑）。
   // 注意：immediate 会在 setup 阶段同步执行，本 watcher 必须位于其引用的
   // 全部 load* 函数定义之后，否则触发 TDZ（Cannot access before initialization）
@@ -836,24 +832,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     },
     { immediate: true }
   );
-
-  const saveSubAgentSettings = async () => {
-    subAgentSettingsSaving.value = true;
-    try {
-      await fetch('/api/sub_agents/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          settings: {
-            sub_agent_compress_threshold_tokens: subAgentCompressThreshold.value
-          }
-        })
-      });
-    } finally {
-      subAgentSettingsSaving.value = false;
-    }
-  };
 
   const startTutorial = () => {
     fetch('/api/tutorial-status', {
@@ -1331,9 +1309,13 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     skillsCatalog,
     stackedHideBorders,
     startTutorial,
+    subAgentMaxInstances,
     subAgentCompressThreshold,
     subAgentModels,
     subAgentSettingsSaving,
+    subAgentSettingsLoading,
+    subAgentSettingsLoaded,
+    subAgentSettingsError,
     themeLabel,
     themeOptions,
     toggleCategory,

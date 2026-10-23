@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from config import SUB_AGENT_MAX_ACTIVE
+from modules.sub_agent_settings import resolve_max_instances
 from modules.execution_scope import ExecutionScope, child_access_prompt
 from modules.scoped_execution_policy import fixed_workspace_root, fixed_working_dir
 from modules.sub_agent.creation import SubAgentCreationMixin
@@ -94,13 +94,16 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
                          timeout_seconds=None, compress_threshold_tokens=250000):
         from modules.aux_model_resolver import resolve_locked_model_profile
         from modules.multi_agent.state import AgentInstance
+        from modules.personalization_manager import load_personalization_config
         resolve_locked_model_profile(model_key)
+        prefs = load_personalization_config(self.data_dir) or {}
+        max_instances = resolve_max_instances(prefs.get("sub_agent_max_instances"))
         with self._state_lock:
             retained = sum(item.get("status") != "terminated" and item.get("conversation_id") == conversation_id
                            for item in self.tasks.values())
-            if retained >= SUB_AGENT_MAX_ACTIVE:
+            if retained >= max_instances:
                 return {"success": False, "error": (
-                    f"当前对话未终结的子智能体已达上限（{SUB_AGENT_MAX_ACTIVE} 个）；"
+                    f"当前对话未终结的子智能体已达上限（{max_instances} 个）；"
                     "请继续使用已有实例，或终结不再需要的实例后再创建。"
                 )}
             directory = self._resolve_working_dir(working_dir, agent_id=agent_id)

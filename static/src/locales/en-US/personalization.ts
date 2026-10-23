@@ -462,7 +462,15 @@ export default {
 
   // ── Sub-agents ──
   subAgentsIntro:
-    'Configure sub-agent models and context compression. Sub-agents retain context and can resume after a working round.',
+    'Configure sub-agent models, capacity and context compression. Sub-agents retain context and can resume after a working round.',
+  subAgentMaxInstancesTitle: 'Maximum existing sub-agents',
+  subAgentMaxInstancesDesc:
+    'Counted per conversation, including idle agents. Terminating an agent frees a slot. Default: 20. Applies after saving.',
+  subAgentMaxInstancesInvalid: 'The sub-agent limit must be a valid integer of at least 1.',
+  subAgentCompressThresholdInvalid:
+    'The compression threshold must be an integer of at least 10000.',
+  subAgentSettingsLoadFailed: 'Could not load sub-agent settings. Reopen this page to retry.',
+  subAgentSettingsSaveFailed: 'Could not save sub-agent settings. Please try again.',
   compressThresholdTitle: 'Context compression threshold',
   compressThresholdDesc:
     "Deep compression triggers when a sub-agent's context tokens exceed this value (default 250000)",

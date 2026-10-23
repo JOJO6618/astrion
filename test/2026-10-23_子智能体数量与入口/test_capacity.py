@@ -24,7 +24,6 @@ class CapacityTests(unittest.TestCase):
         self.manager = SubAgentManager(str(self.root), str(self.data),
                                        owner_conversation_id="parent")
         self.addCleanup(lambda: _REGISTRIES.pop(str(self.data), None))
-        self.stack.enter_context(patch("modules.sub_agent.manager.SUB_AGENT_MAX_ACTIVE", 20))
         self.stack.enter_context(patch(
             "modules.aux_model_resolver.resolve_locked_model_profile", return_value={}))
         self.stack.enter_context(patch.object(self.manager, "_launch", self.launch))
