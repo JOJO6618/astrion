@@ -24,6 +24,8 @@ export default {
   compressionAuto: '自动',
   compressing: '压缩中',
   compressingMessage: '对话正在{mode}压缩，请稍候...',
+  compressionWaiting: '等待压缩',
+  compressionWaitingMessage: '当前回复及整批工具完成后压缩，并继续任务。',
   shallowCompressionTitle: '自动浅层压缩',
   shallowCompressedMessage: '已自动压缩 {n} 条较早工具结果',
   compressionComplete: '压缩完成',

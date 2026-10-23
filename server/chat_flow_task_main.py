@@ -1946,6 +1946,25 @@ async def handle_task_with_sender(
     retry_delay_seconds = 10
     
 
+    async def continue_after_compression(deep_result):
+        guide_message = (deep_result.get("guide_message") or "").strip()
+        if deep_result.get("success") and guide_message:
+            # 压缩续接仍属于当前工作段，保留编辑摘要、计时及速度锚点。
+            finalize_run_versioning_checkpoint("deep_compress_handoff")
+            setattr(web_terminal, "_current_user_message_source", "compression_handoff")
+            try:
+                await handle_task_with_sender(
+                    web_terminal, workspace, guide_message, [], sender, client_sid,
+                    username, [], work_anchor_message_id=current_work_anchor_message_id,
+                )
+            finally:
+                setattr(web_terminal, "_current_user_message_source", "user")
+            return
+        finalize_user_work_timer()
+        finalize_run_versioning_checkpoint("deep_compress_end")
+
+    from server.tasks.compression_requests import run_requested_compression
+
     iteration = 0
     while max_iterations is None or iteration < max_iterations:
         # 检查停止标志
@@ -2253,6 +2272,14 @@ async def handle_task_with_sender(
         full_response = ""
 
         if not tool_calls:
+            # 没有工具时也兑现运行中收到的请求，不能等一个不会出现的工具。
+            requested_result = await run_requested_compression(
+                web_terminal=web_terminal, workspace=workspace, conversation_id=conversation_id,
+                username=username, task_id=client_sid, sender=sender,
+            )
+            if requested_result is not None:
+                await continue_after_compression(requested_result)
+                return
             debug_log("没有工具调用，结束迭代")
             # === 目标模式：turn 结束拦截 ===
             try:
@@ -2386,32 +2413,7 @@ async def handle_task_with_sender(
             finalize_run_versioning_checkpoint("approval_rejected")
             return
         if tool_loop_result.get("deep_compressed"):
-            deep_result = tool_loop_result.get("deep_result") or {}
-            guide_message = (deep_result.get("guide_message") or "").strip()
-            if deep_result.get("success") and guide_message:
-                # 压缩续接视为同一工作段：不在压缩处收尾 work_timer，
-                # 锚点（编辑摘要/计时/tokens）由续接任务继承。
-                finalize_run_versioning_checkpoint("deep_compress_handoff")
-                # 压缩后的续接引导语单独标记来源，使其以 compact 形式展示，
-                # 而不是混入普通用户消息流。
-                setattr(web_terminal, "_current_user_message_source", "compression_handoff")
-                try:
-                    await handle_task_with_sender(
-                        web_terminal,
-                        workspace,
-                        guide_message,
-                        [],
-                        sender,
-                        client_sid,
-                        username,
-                        [],
-                        work_anchor_message_id=current_work_anchor_message_id,
-                    )
-                finally:
-                    setattr(web_terminal, "_current_user_message_source", "user")
-                return
-            finalize_user_work_timer()
-            finalize_run_versioning_checkpoint("deep_compress_end")
+            await continue_after_compression(tool_loop_result.get("deep_result") or {})
             return
         
         # 标记不再是第一次迭代
@@ -2428,6 +2430,15 @@ async def handle_task_with_sender(
             )
 
     
+    # 原子关闭请求入口前再取一次，覆盖最终回复/目标审核期间到达的点击。
+    requested_result = await run_requested_compression(
+        web_terminal=web_terminal, workspace=workspace, conversation_id=conversation_id,
+        username=username, task_id=client_sid, sender=sender, close_if_empty=True,
+    )
+    if requested_result is not None:
+        await continue_after_compression(requested_result)
+        return
+
     # 最终统计
     # 多智能体模式：主对话任务结束，解除活跃标记
     web_terminal._multi_agent_main_task_active = False

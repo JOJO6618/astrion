@@ -1523,6 +1523,12 @@ def compress_conversation(conversation_id, terminal: WebTerminal, workspace: Use
 
         if not terminal.context_manager._get_conversation_manager_for_id(normalized_id).load_conversation(normalized_id):
             return jsonify({"success": False, "error": tr("deep_compression.conversation_not_found", conversation_id=normalized_id)}), 404
+        try:
+            queued = runtime_service.request_compression(username, workspace.workspace_id, normalized_id)
+        except RuntimeError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 409
+        if queued is not None:
+            return jsonify({"success": True, "data": queued}), 202
         token = try_acquire_main_task_gate(terminal)
         if not token:
             return jsonify({"success": False, "error": tr("tasks.task_already_running")}), 409

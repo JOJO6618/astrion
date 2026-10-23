@@ -8,14 +8,16 @@ export const compressionMethods = {
       return;
     }
     const wasInProgress = !!this.compressionInProgress;
+    const previousStage = this.compressionStage;
     this.compressionInProgress = !!data.in_progress;
     // 归属必须来自事件，禁止把其他对话的状态绑到当前页面。
     this.compressionConversationId = this.compressionInProgress ? data.conversation_id : null;
     this.compressionMode = data.mode || '';
     this.compressionStage = data.stage || '';
-    if (this.compressionInProgress && !wasInProgress) {
+    if (this.compressionInProgress && (!wasInProgress || previousStage !== this.compressionStage)) {
+      const waiting = this.compressionStage === 'waiting_for_tools';
       const modeLabel =
-        this.compressionMode === 'manual'
+        this.compressionMode === 'manual' || this.compressionMode === 'requested'
           ? t('appTasks.compressionManual')
           : t('appTasks.compressionAuto');
       if (this.compressionToastId) {
@@ -23,8 +25,10 @@ export const compressionMethods = {
         this.compressionToastId = null;
       }
       this.compressionToastId = this.uiPushToast({
-        title: t('appTasks.compressing'),
-        message: t('appTasks.compressingMessage', { mode: modeLabel }),
+        title: t(waiting ? 'appTasks.compressionWaiting' : 'appTasks.compressing'),
+        message: waiting
+          ? t('appTasks.compressionWaitingMessage')
+          : t('appTasks.compressingMessage', { mode: modeLabel }),
         type: 'info',
         duration: null,
         closable: false

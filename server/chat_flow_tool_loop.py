@@ -1086,8 +1086,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     "name": function_name,
                     "content": reject_content
                 })
-                if permission_mode != "auto_approval":
-                    web_terminal._tool_loop_active = previous_tool_loop_active
+                # 完全访问拒绝只结束本次申请；结果回填后继续当前工具批次。
+                # 真正的用户停止仍由 stop flag / CancelledError 处理。
+                if permission_mode != "auto_approval" and approval_item.get("approval_type") != "full_access":
                     return {
                         "stopped": False,
                         "approval_rejected": True,
@@ -1716,6 +1717,16 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             inline=False,
             extra_metadata={"task_id": pending_system_message.get("task_id")},
         )
+
+    # 手动请求与自动压缩共用当前写入者，且都只能在完整工具批次后执行。
+    from server.tasks.compression_requests import run_requested_compression
+    requested_result = await run_requested_compression(
+        web_terminal=web_terminal, workspace=workspace, conversation_id=conversation_id,
+        username=username, task_id=client_sid, sender=sender,
+    )
+    if requested_result is not None:
+        return {"stopped": False, "deep_compressed": True,
+                "deep_result": requested_result, "last_tool_call_time": last_tool_call_time}
 
     # 自动深层压缩必须等待同一轮全部 tool_call 的 tool 消息都已写入 messages/历史后再触发。
     if deep_compression_pending and not web_terminal.context_manager.is_compression_in_progress():

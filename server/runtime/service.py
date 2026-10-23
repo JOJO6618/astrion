@@ -118,6 +118,11 @@ class RuntimeService:
 
         return task_manager.cancel_task(username, task_id)
 
+    def request_compression(self, username: str, workspace_id: str, conversation_id: str):
+        from server.tasks import task_manager
+
+        return task_manager.request_compression(username, workspace_id, conversation_id)
+
     def enqueue_runtime_guidance(
         self, username: str, task_id: str, message: str, source: Optional[str] = None,
         images: Optional[List[Any]] = None, videos: Optional[List[Any]] = None,

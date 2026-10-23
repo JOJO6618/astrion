@@ -174,6 +174,11 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             # 收集工具调用 - 实时发送准备状态
             delta_tool_calls = delta.get("tool_calls")
             if isinstance(delta_tool_calls, list) and delta_tool_calls:
+                # 参数生成已经进入工具调用阶段，不能等整个响应结束才收起思考状态。
+                if in_thinking and not thinking_ended:
+                    in_thinking = False
+                    thinking_ended = True
+                    sender('thinking_end', {'full_content': current_thinking})
                 tool_call_stream_active = True
                 tool_chunks += 1
                 for tc in delta_tool_calls:

@@ -30,6 +30,7 @@ from server.tasks.queue_state import (
 )
 from server.conversation_view.snapshots import TaskViewMixin, VIEW_LOCK, view_transaction
 from server.conversation_view.projector import RuntimeProjection
+from server.tasks.compression_requests import CompressionRequestMixin
 
 
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
@@ -72,6 +73,7 @@ class TaskRecord:
         "runtime_queue_paused",
         "last_cancel_at",
         "task_type",
+        "compression_request", "compression_requests_closed",
     )
 
     def __init__(
@@ -113,6 +115,8 @@ class TaskRecord:
         self.runtime_queue_paused = False
         self.last_cancel_at: Optional[float] = None
         self.task_type = str(params.task_type or "chat")
+        self.compression_request = ""
+        self.compression_requests_closed = False
         self.display_base = None
         self.display_context = None
         self.display_projection = RuntimeProjection(task_id, conversation_id, self.model_key)
@@ -120,7 +124,7 @@ class TaskRecord:
         self.display_valid = True
         self.trigger_message_id = str(uuid.uuid4())
 
-class TaskManager(TaskViewMixin):
+class TaskManager(CompressionRequestMixin, TaskViewMixin):
     """线程内存版任务管理器，后续可替换为 Redis/DB。"""
 
     def __init__(self):
@@ -802,6 +806,17 @@ class TaskManager(TaskViewMixin):
             if rec.workspace_id:
                 data["workspace_id"] = rec.workspace_id
         with self._lock:
+            if event_type == "compression_state":
+                rec.compression_request = (
+                    "pending" if data.get("stage") == "waiting_for_tools" else "running"
+                ) if data.get("in_progress") else ""
+            elif event_type == "compression_finished":
+                rec.compression_request = ""
+            elif event_type in {"task_complete", "task_stopped", "quota_exceeded"} or (
+                event_type == "error" and not data.get("retry")
+            ):
+                rec.compression_request = ""
+                rec.compression_requests_closed = True
             if event_type in {"goal_progress", "goal_completed", "goal_stopped"} and isinstance(data, dict):
                 rec.goal_progress = dict(data)
             idx = getattr(rec, "next_event_idx", None)

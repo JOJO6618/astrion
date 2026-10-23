@@ -144,7 +144,7 @@
               type="button"
               class="menu-entry submenu-entry"
               @click="$emit('compress-conversation')"
-              :disabled="compressing || streamingMessage || !isConnected"
+              :disabled="compressing || !isConnected"
             >
               {{ compressing ? $t('quickdock.compressing') : $t('quickdock.compressConversation') }}
             </button>

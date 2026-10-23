@@ -79,3 +79,12 @@ Web 端实时通道曾长期双轨（REST 任务轮询为主 + Socket.IO 辅助�
 3. `WebTerminal.broadcast()` / `terminal_manager.broadcast` 调用点保留但回调恒为 None（判空安全），新代码不要依赖它们产生用户可见效果。`make_terminal_callback(username)`（`server/context/resources.py`）同理：Socket.IO 移除后是恒返 None 的兼容空操作，保留仅为维持历史 import 路径（`workflow_runtime_api.py`、`resources.py` 自身构造 WebTerminal）不炸。
 
 **Headless 形态（2026-09-11 新增）**：`server/headless_app.py` 提供无 web 站点的启动入口（CLI 自启动专用，详见 §2）；审批三类端点（tool/plan/question）已从 chat_bp 拆为独立蓝图 `server/chat/approval.py::approval_bp`（6 条 URL 一字不变），full 与 headless 双形态共用。
+
+### 2026-10-23：运行中请求压缩
+
+- 空闲点击仍创建独立 `task_type="compression"`，使用 `mode="manual"`，压缩后等待用户下一条消息。
+- 运行中点击通过 `RuntimeService.request_compression` → `CompressionRequestMixin` 在原 TaskRecord 上登记，不创建第二个任务，不竞争或释放原任务门闸。`compression_request` 为任务内存态，停止／终态／重启后不跨任务继承。
+- `VIEW_LOCK → TaskManager._lock` 下登记／消费请求。当前模型回复和整批工具调用的所有结果完整回填后执行 `mode="requested"` 深压缩；无工具的回复完成时也处理请求。最终收尾前原子消费或关闭受理窗口，防止受理成功但无人消费。
+- `requested` 压缩成功后使用原 task_id 与 `work_anchor_message_id` 续接，沿用计时、编辑摘要和速度统计。重复请求及与已开始自动压缩重合的请求合并；用户主动停止仍精确取消当前任务。
+- `compression_state.stage="waiting_for_tools"` 是排队状态；实际压缩使用既有 `generating_summary` 等阶段。状态进入 RuntimeProjection，与任务事件游标一同捕获并从 bootstrap 恢复。运行中请求的 ACK 不得将已有任务从事件0重新订阅，也不能覆盖已推进的阶段。
+- 回归见 `test/2026-10-23_运行中压缩与状态边界/`。

@@ -492,8 +492,8 @@ async def run_deep_compression(
     if compress_form not in ("file", "inject"):
         compress_form = "file"
     # compress_behavior 固定规则（无个性化开关）：
-    # - 手动压缩：只生成压缩消息（引导语），不自动续接，等待用户继续发送消息才工作。
-    # - 自动深压缩：当前任务尚未完成才触发，压缩后必须继续工作。
+    # - 空闲手动压缩（manual）：只生成引导语，等待用户下一条消息。
+    # - 自动（auto）或运行中请求（requested）：压缩后继续原任务。
     compress_behavior = "wait" if mode == "manual" else "continue"
 
     # in-place 压缩全程操作"当前对话"的内存历史：总结、标记、状态写入都依赖

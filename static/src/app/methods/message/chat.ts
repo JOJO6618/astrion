@@ -27,7 +27,7 @@ export const chatMethods = {
       return;
     }
 
-    if (this.compressionActiveForCurrentConversation || !this.mainChatIdle) {
+    if (this.compressionActiveForCurrentConversation || this.stopRequested) {
       return;
     }
     const conversationId = this.currentConversationId;
@@ -63,11 +63,22 @@ export const chatMethods = {
 
       if (response.ok && result.success && result.data?.task_id) {
         accepted = true;
-        this.taskInProgress = true;
-        this.stopRequested = false;
-        useTaskStore().attachSnapshot(result.data, 0, (event: any) => {
-          if (owns()) this.handleTaskEvent(event);
-        });
+        if (result.data.queued) {
+          // 已有任务继续原游标，不能从 0 重放它的工具和文字。
+          // 等待期间事件可能已推进到压缩完成，迟到的 ACK 不得回退阶段。
+          if (this.compressionStage === 'requesting') {
+            this.handleCompressionState(result.data.compression);
+          }
+          if (useTaskStore().currentTaskId !== result.data.task_id) {
+            await this.refreshConversationSnapshot();
+          }
+        } else {
+          this.taskInProgress = true;
+          this.stopRequested = false;
+          useTaskStore().attachSnapshot(result.data, 0, (event: any) => {
+            if (owns()) this.handleTaskEvent(event);
+          });
+        }
         await this.refreshRunningWorkspaceTasks?.();
       } else {
         const message = result.message || result.error || t('appMessages.compressionFailed');

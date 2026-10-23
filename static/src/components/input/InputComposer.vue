@@ -902,8 +902,6 @@ const props = defineProps<{
     tracking?: boolean;
     /** true 时表示当前文案是「等待 API 响应…」。 */
     apiWaiting?: boolean;
-    /** 工具间等待时继续展示上一条已完整显示的 intent。 */
-    intentRetained?: boolean;
   } | null;
 }>();
 
@@ -1184,18 +1182,15 @@ const composerAvatarText = computed(() => {
   if (props.avatarStatus.mode === 'tool' || props.avatarStatus.mode === 'think') {
     return props.avatarStatus.text || '';
   }
-  // work 模式展示工具间保留的 intent 或首次 API 等待提示。
+  // API 等待是当前真实状态；工具间隙不保留上一次的 intent。
   // 后台计数/随机等待文案仍由消息区展示。
-  if (
-    props.avatarStatus.mode === 'work' &&
-    (props.avatarStatus.intentRetained || props.avatarStatus.apiWaiting)
-  ) {
+  if (props.avatarStatus.mode === 'work' && props.avatarStatus.apiWaiting) {
     return props.avatarStatus.text || '';
   }
   return '';
 });
 
-// 工具/工作态切换时，同一条保留文案不重新退场；真正换文字才播放过渡。
+// 当前状态的文字改变时播放过渡。
 const composerAvatarTextKey = computed(() => `avatar-text-${composerAvatarText.value}`);
 
 const projectGitMenuOpen = ref<null | 'project' | 'branch'>(null);
@@ -1621,11 +1616,7 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       id: 'compress',
       label: t('input.compressConversation'),
       description: props.compressing ? t('input.compressingDesc') : t('input.compressDesc'),
-      disabled:
-        !props.isConnected ||
-        props.compressing ||
-        props.streamingMessage ||
-        props.blockCompressConversation,
+      disabled: !props.isConnected || props.compressing || props.blockCompressConversation,
       action: () => emit('compress-conversation')
     },
     {

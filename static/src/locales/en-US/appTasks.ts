@@ -23,6 +23,9 @@ export default {
   compressionAuto: 'Auto',
   compressing: 'Compressing',
   compressingMessage: 'Compressing conversation ({mode})...',
+  compressionWaiting: 'Compression queued',
+  compressionWaitingMessage:
+    'Compression will run after the current response and tool batch, then the task will continue.',
   shallowCompressionTitle: 'Auto shallow compression',
   shallowCompressedMessage: 'Auto-compressed {n} older tool results',
   compressionComplete: 'Compression complete',

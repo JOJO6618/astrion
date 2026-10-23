@@ -371,7 +371,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 ### 12.3 门闸入口与 token 移交
 
 - **门闸接入点共 6 处（另 1 处外层兜底释放）**：聊天 `process_message_task`（`server/chat_flow.py:139`，`:259` finally 释放）；通知派发预占（`server/chat_flow_task_main.py:1023`）；手动压缩（`server/tasks/compression.py:14`）；深度压缩 REST（`server/conversation.py:1756`）；工作流激活与通知派发（`server/workflow_runtime_api.py:125` / `:240`）；兜底释放 `server/tasks/models.py:1155`。**新增任何主任务入口必须走门闸**，chat/notice/compression 的受理检查统一按对话互斥。
-- **压缩运行语义（2026-10）**：手动压缩是 `task_type="compression"` 的主任务，自动压缩属于原主任务；两者均算智能体运行（输入保持可用，发送走提前输入/引导，停止精确取消当前任务）。`server/compression_commit.py` 一次原子提交历史标记/压缩记录/引导语/上下文统计；生成失败或提交前取消保留旧历史。`server/tasks/queue_state.py` 把未消费的提前输入与引导存入对话 metadata，停止/失败只暂停自动消费。
+- **压缩运行语义（2026-10-23）**：空闲手动压缩是 `task_type="compression"` 的主任务；运行中点击经 `server/tasks/compression_requests.py` 在当前主任务内排队，完整响应及整批工具结果回填后以 `mode="requested"` 压缩并续接，保留工作段锚点；重复请求合并，停止取消待执行请求，禁止另起并发写入者或从事件0重放。自动压缩同属原主任务。压缩均算智能体运行（输入保持可用，发送走提前输入/引导，停止精确取消当前任务）。`server/compression_commit.py` 一次原子提交历史标记/压缩记录/引导语/上下文统计；生成失败或提交前取消保留旧历史。`server/tasks/queue_state.py` 把未消费的提前输入与引导存入对话 metadata，停止/失败只暂停自动消费。
 - **通知链移交**：轮询器派发前先预占门闸，token 经 **`RuntimeContext.directives.main_task_gate_token`**（`server/runtime/context.py`）→ `TaskRecord.directives` → `run_chat_task_sync(..., main_task_gate_token=...)` 移交下去（持 token 认领，不重复获取）；派发失败要释放门闸并回滚已打的通知标记（`_rollback_completion_notice_marks`）。⚠️ 历史文档写的 `session_data["main_task_gate_token"]` **代码中不存在**。
 - **兜底释放**：`server/tasks/models.py::_run_chat_task` 外层 `finally` 兜底，防异常路径门闸泄漏。
 
@@ -536,7 +536,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - `working_dir_write`仅子工作目录可写，`workspace_write`为原工作区可写；workspace_root始终是原项目身份，相对路径和默认cwd使用working_dir。macOS临时目录位于对应固定写根内，不附带宿主`/tmp`写授权。原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入。工作目录按路径组件检查并安全新建，**不用字符串 startswith**。
 - **Docker 不支持 `full_access`**；最低档经 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，**不使用 DAC 降级或宿主机回退**。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`）。
 - 主 `run_command` 的 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，Docker/远端替身后端不伪装支持。已处于 direct 时无需额外申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
-- 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。**开启自动审核时自动与人工独立裁决**，任一拒绝即终结，两项通过才执行；**人工先允许不能取消自动审核**。授权记录保存执行者/根/对话/任务/工具调用/完整参数，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 在原生命令入口再次核对。授权失效返回正常工具失败结果，**不中断历史消息配对**。内置工具名禁止被自定义注册或分派覆盖。
+- 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。**开启自动审核时自动与人工独立裁决**，任一拒绝即终结该次申请，两项通过才执行；**拒绝完全访问只回填工具失败结果并继续智能体循环，不触发 task_stopped；用户主动停止仍正常取消**。**人工先允许不能取消自动审核**。授权记录保存执行者/根/对话/任务/工具调用/完整参数，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 在原生命令入口再次核对。授权失效返回正常工具失败结果，**不中断历史消息配对**。内置工具名禁止被自定义注册或分派覆盖。
 - 前台、后台均绑定该次权限，不改变主对话全局状态；后台创建经 `asyncio.to_thread`，Popen 与取消在相同锁内握手。**正常后台完成不等于取消全部后台任务。**
 - Web 审批 UI 在输入栏 `ComposerApprovalDock.vue`（人工模式：上方滚动内容 + 左下固定拒绝/允许；自动审核时才加右侧进度区）。同对话串行审批、不加翻页；完成后不自动展示记录卡片或恢复入口，`/` 与 `+` 的手动入口始终能打开。视觉由用户验收。
 - 回归目录：`test/2026-10-07_子智能体权限与单次完全访问/`、`test/2026-10-07_审批面板交互/`。

@@ -51,7 +51,7 @@ assert.equal(avatar.call(nextTool).mode, 'tool');
 const waiting = host([tool('old intent'), { type: 'text', content: 'body', streaming: false }], null);
 waiting.apiRequestPending = true;
 assert.equal(avatar.call(waiting).apiWaiting, true);
-assert.equal(avatar.call(host([tool('old intent')], null)).intentRetained, true);
+assert.equal(avatar.call(host([tool('old intent')], null)).text, '');
 console.log('Body-output status regressions passed (8 scenarios).');
 
 // Execute the actual SFC script with reactive data and inert lifecycle hooks;

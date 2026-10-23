@@ -29,7 +29,7 @@ class RuntimeProjection:
             "summary_tool_batch_sequence": 0, "streaming": False,
             "pending_tool_approvals": [], "resolved_tool_approval_ids": [],
             "pending_user_questions": [], "pending_plan_approvals": [],
-            "approval_review_records": [],
+            "approval_review_records": [], "compression": None,
         }
         self._assistant = None
         self._next_idx = 0
@@ -468,7 +468,10 @@ class RuntimeProjection:
             self._goal(event_type, data)
         elif event_type == "system_message":
             self._system(data)
+        elif event_type in {"compression_state", "compression_finished"}:
+            self.state["compression"] = deepcopy(data)
         elif event_type in _TERMINAL:
+            self.state["compression"] = None
             if event_type == "task_complete" and self._assistant is not None:
                 if isinstance(data.get("citations"), list):
                     self._assistant.setdefault("metadata", {})["citations"] = deepcopy(data["citations"])

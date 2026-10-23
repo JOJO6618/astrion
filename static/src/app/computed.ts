@@ -39,26 +39,6 @@ function getLatestToolSegment(actions) {
   return actions.slice(start, last + 1);
 }
 
-// 从本轮（最近一条 assistant 消息）actions 里，向后查找上一条“已经完整
-// 展示过”的工具 intent（打字效果已完成：rendered === full）。纯函数，无副作用。
-// 用于工具间间隙在头像上方保留上一条文案；只取最近一条 assistant 消息，
-// 因此不会跨 assistant 轮次泄漏。
-function getLastCompleteToolIntent(actions) {
-  if (!Array.isArray(actions)) return '';
-  for (let i = actions.length - 1; i >= 0; i--) {
-    const action = actions[i];
-    // Body output ends the previous tool-intent run; do not revive it after text_end.
-    if (action?.type === 'text') return '';
-    if (action?.type !== 'tool') continue;
-    const tool = action.tool;
-    if (!tool) continue;
-    const full = tool.intent_full || '';
-    const rendered = tool.intent_rendered || '';
-    if (tool.intent_complete !== false && full && rendered === full) return full;
-  }
-  return '';
-}
-
 const AVATAR_RUNNING_TOOL_STATUS = new Set([
   'preparing',
   'running',
@@ -438,13 +418,6 @@ export const computed = {
     })();
 
     const intentEnabled = !!usePersonalizationStore().form?.tool_intent_enabled;
-    // 上一条可展示的完整工具 intent：当前任务内工具间隙保留；任务停止时不再
-    // 保留（任务结束走 idle 分支自然清空；切对话后 lastAssistant 变化自然失效）。
-    const retainedIntent =
-      intentEnabled && !this.stopRequested && (this.taskInProgress || this.streamingMessage)
-        ? getLastCompleteToolIntent(lastAssistant?.actions || [])
-        : '';
-
     // 1) 思考中（防御：仅在任务仍运行时采信流式字段——异常中断后字段可能残留，
     //    虽有各终结路径的统一清理兑底，这里再加一层保险避免永久卡「思考中」）
     const isThinking =
@@ -521,32 +494,21 @@ export const computed = {
       const keys = runningTools.map((a) => toolFaceKey(a?.tool?.name));
       const getFinalIntentText = (tool: any) => {
         if (!tool) return '';
-        const full = tool.intent_full || '';
-        const rendered = tool.intent_rendered || '';
-        // 只在 intent 打字效果完成后才显示完整文案，避免头像上出现逐字动画
-        return tool.intent_complete !== false && full && rendered === full ? full : '';
+        // 准备参数时保持空白；执行开始后直接使用完整 intent，
+        // 不依赖消息区的打字动画，也不借用其他工具的文案。
+        return tool.status === 'running' && tool.intent_complete === true
+          ? tool.intent_full || ''
+          : '';
       };
       const toolTexts = runningTools.map((a) => {
         return intentEnabled && !this.stopRequested ? getFinalIntentText(a?.tool) : '';
       });
-      // 文案跟随当前第一个工具；其 intent 未就绪时保留上一条文案。
-      const text = toolTexts[0] || retainedIntent;
+      const text = toolTexts.find((value) => value) || '';
       return { mode: 'tool', toolKeys: keys, toolTexts, text, tracking: false };
     }
     if (running) {
       if (lastAssistant?.currentStreamingType === 'text') {
         return { mode: 'work', toolKeys: [], toolTexts: [], text: '', tracking: false };
-      }
-      // 工具间等待仍显示上一次 intent，直到下一条 intent 就绪。
-      if (retainedIntent) {
-        return {
-          mode: 'work',
-          toolKeys: [],
-          toolTexts: [],
-          text: retainedIntent,
-          tracking: false,
-          intentRetained: true
-        };
       }
       // 工作态：等 API / 后台运行 / 流式输出正文
       let text = bgText;

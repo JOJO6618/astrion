@@ -143,3 +143,9 @@
 - 不重写 Agent loop、前端状态管理、部署拓扑；不换传输（SSE/WS）；不做事件持久化。
 - 不实现 Schedule/Occurrence（阶段三）；不合并 Web/API 用户数据空间；不做设备配对/远程执行。
 - 不把「门面转发成功」当作「状态唯一 Owner 完成」——迁移完成以本表逐项封闭旧写路径为准。
+
+## 2026-10-23：当前 Run 的压缩请求
+
+`RuntimeService.request_compression(username, workspace_id, conversation_id)` 按完整身份查找活动 Run：空闲返回 None，由原压缩端点创建手动任务；运行中返回 `{task_id, queued: true, compression}` 并通过当前任务发布排队状态。该操作只登记请求，不产生新的执行写入者。已停止／关闭受理的 Run 拒绝新请求。
+
+TaskRecord 的 `compression_request`（空／pending／running）与 `compression_requests_closed` 在 `VIEW_LOCK → 任务锁` 下维护，完整响应及整批工具结果回填后消费，任务停止或终态清空。`mode="requested"` 深压缩后在原 Run 内续接并保留工作段锚点；排队状态从统一显示投影恢复。客户端收到 queued ACK 后沿用原游标，缺少订阅时重新取得显示快照，禁止从事件0恢复已有 Run。

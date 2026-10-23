@@ -118,8 +118,13 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
         "current_context_tokens": (conversation.get("token_statistics") or {}).get("current_context_tokens", 0),
         "runtime_queue": queue_snapshot(manager, normalized_id, include_guidance=not is_main_running,
                                         data=conversation),
-        "compression": {"in_progress": is_main_running and bool(meta.get("compression_in_progress")),
-                        "mode": meta.get("compression_mode"), "conversation_id": normalized_id},
+        "compression": {
+            **(display.get("state", {}).get("compression") or {
+                "in_progress": is_main_running and bool(meta.get("compression_in_progress")),
+                "mode": meta.get("compression_mode"), "stage": meta.get("compression_stage"),
+            }),
+            "conversation_id": normalized_id,
+        },
         "edited_files": edited_files, "preview_targets": preview_targets, **preview_runtime,
     }})
 

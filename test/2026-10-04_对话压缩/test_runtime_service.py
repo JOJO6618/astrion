@@ -122,6 +122,12 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
             mocked = patch(f"server.tasks.models.{name}")
             mocked.start()
             self.addCleanup(mocked.stop)
+        # 受理层测试不装配目标模式或真实工作区；两者均发生在旧测试编写之后。
+        for target, value in (("server.goal_runtime.prepare_goal_task", None),
+                              ("server.tasks.models.get_user_resources", (None, None))):
+            mocked = patch(target, return_value=value)
+            mocked.start()
+            self.addCleanup(mocked.stop)
 
     def tearDown(self):
         task_manager._run_chat_task = self._orig_run
@@ -185,8 +191,10 @@ class RuntimeServiceAdmissionTest(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual([e["idx"] for e in events], [0, 1])
         self.assertEqual(next_offset, 2)
-        # 缺口检测水位：未裁剪时为 0
-        self.assertEqual(meta, {"window_start": 0})
+        # 缺口检测水位与任务状态由同一显示事务捕获。
+        self.assertEqual(meta["window_start"], 0)
+        self.assertEqual(meta["status"], "running")
+        self.assertEqual(meta["updated_at"], rec.updated_at)
         # offset 续读
         events2, next2, _, meta2 = runtime_service.get_task_events("tester", rec.task_id, 1)
         self.assertEqual([e["idx"] for e in events2], [1])

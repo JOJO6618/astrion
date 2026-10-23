@@ -37,7 +37,7 @@ staleThinking.apiRequestPending = false;
 assert.equal(avatarStatus.call(staleThinking).mode, 'think');
 staleTool.apiRequestPending = false;
 assert.equal(avatarStatus.call(staleTool).mode, 'tool');
-assert.equal(avatarStatus.call(host({ apiRequestPending: false })).intentRetained, true);
+assert.equal(avatarStatus.call(host({ apiRequestPending: false })).text, '');
 assert.equal(avatarStatus.call(host({ taskInProgress: false, streamingMessage: false })).mode, 'idle');
 assert.equal(avatarStatus.call(host({ stopRequested: true })).apiWaiting, undefined);
 console.log('Avatar waiting-state regressions passed (8 scenarios).');

@@ -3,7 +3,7 @@ import { t } from '@/locales';
 
 export const reviewMethods = {
   handleCompressConversationClick() {
-    if (this.compressing || this.streamingMessage || !this.isConnected) {
+    if (this.compressing || this.stopRequested || !this.isConnected) {
       return;
     }
     if (this.compressionActiveForCurrentConversation) {
