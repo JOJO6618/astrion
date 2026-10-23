@@ -77,7 +77,11 @@ class ConversationIsRunningTest(unittest.TestCase):
 
     def test_active_main_task_true_without_terminal(self):
         """活动主任务直接判定为运行中，不需要 terminal。"""
-        self.assertTrue(_conversation_is_running(self.USER, self.WS, self.CONV, {"conv_abc"}))
+        self.assertTrue(_conversation_is_running(self.USER, self.WS, self.CONV, {(self.WS, "conv_abc")}))
+
+    def test_other_workspace_main_task_is_not_borrowed(self):
+        self.assertFalse(_conversation_is_running(self.USER, self.WS, self.CONV,
+                                                 {("other-ws", self.CONV)}))
 
     def test_no_terminal_no_run_false(self):
         """无活动 run 且无 terminal → 不运行，且不抛异常。"""
@@ -138,10 +142,10 @@ class ConversationIsRunningTest(unittest.TestCase):
         self.assertIsNone(_peek_conversation_terminal(self.USER, self.WS, ["conv_zzz"]))
         self.assertEqual(len(server_state.user_terminals), before)
 
-    def test_peek_fallback_scan_across_workspace(self):
-        """workspace_id 不一致时按三段键兜底仍能命中已存在实例。"""
+    def test_peek_never_borrows_other_workspace_terminal(self):
+        """相同对话 id 的另一个工作区实例不能污染当前标签。"""
         server_state.user_terminals[f"{self.USER}::other-ws::{self.CONV}"] = _FakeTerminal()
-        self.assertIsNotNone(_peek_conversation_terminal(self.USER, self.WS, [self.CONV]))
+        self.assertIsNone(_peek_conversation_terminal(self.USER, self.WS, [self.CONV]))
 
 
 class ActiveRunConversationIdsTest(unittest.TestCase):
@@ -149,9 +153,9 @@ class ActiveRunConversationIdsTest(unittest.TestCase):
         runs = [{"conversation_id": "conv_x"}, {"conversation_id": "y"}, {}]
         with patch("server.runtime.runtime_service.list_runs", return_value=runs):
             ids = _active_run_conversation_ids("u1", ["ws1"])
-        self.assertIn("conv_x", ids)
-        self.assertIn("y", ids)
-        self.assertIn("conv_y", ids)
+        self.assertIn(("ws1", "conv_x"), ids)
+        self.assertIn(("ws1", "y"), ids)
+        self.assertIn(("ws1", "conv_y"), ids)
 
     def test_runtime_service_failure_returns_empty(self):
         with patch("server.runtime.runtime_service.list_runs", side_effect=RuntimeError("boom")):

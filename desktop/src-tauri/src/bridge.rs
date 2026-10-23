@@ -10,9 +10,7 @@
 //!   POST /window/control    窗口控制（无边框模式的自绘三大键）：
 //!                           minimize / maximize-toggle / close
 //!   GET  /window/state      窗口状态（当前仅 maximized，供自绘三大键切换图标）
-//!   POST /chrome/dispatch   chrome 标签条 webview 的意图（激活/新建/关闭标签）→
-//!                           eval 注入主 webview（External URL 页面拿不到 Tauri JS API，
-//!                           但壳可以主动向页面执行 JS）
+//!   对话标签命令由后端 desktop_navigation 管理，不经原生桥转发。
 //!   GET  /rundata/info      运行数据目录设置（环境变量锁定/已配置/生效中/默认）
 //!   POST /rundata/apply     切换数据目录（含可选迁移）——只写设置与待迁移标记，
 //!                           真正的复制在下次启动、spawn 后端之前完成（见 rundata.rs）
@@ -376,10 +374,9 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
     let method = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");
 
-    // POST 的 body：chrome/dispatch、window/control、rundata/apply 需要内容（JSON，独立上限
-    // 64KB）；其余端点不需要 body，读完只为让 TCP 正常收尾（不读完就关连接可能触发 RST）
+    // Window/data/quick controls accept JSON; other routes only drain the body.
     let want_body = method == "POST"
-        && (path == "/chrome/dispatch" || path == "/window/control" || path == "/rundata/apply" || path == "/quick/configure");
+        && (path == "/window/control" || path == "/rundata/apply" || path == "/quick/configure");
     let content_length: usize = lines
         .filter_map(|l| l.split_once(':'))
         .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
@@ -498,24 +495,6 @@ fn handle_conn(mut stream: TcpStream, app: AppHandle) -> std::io::Result<()> {
                     }
                 }
                 None => respond(&mut stream, 409, "{\"ok\":false,\"error\":\"window_missing\"}"),
-            }
-        }
-        ("POST", "/chrome/dispatch") => {
-            // body 是 JSON Value，重序列化后就是合法 JS 字面量，无注入面
-            let payload = serde_json::from_slice::<serde_json::Value>(&body)
-                .unwrap_or(serde_json::Value::Null);
-            let js = format!(
-                "window.__astrionChromeDispatch && window.__astrionChromeDispatch({payload})"
-            );
-            match app.get_webview("main") {
-                Some(webview) => match webview.eval(&js) {
-                    Ok(()) => respond(&mut stream, 200, "{\"dispatched\":true}"),
-                    Err(e) => {
-                        let body = serde_json::json!({ "dispatched": false, "error": e.to_string() }).to_string();
-                        respond(&mut stream, 409, &body)
-                    }
-                },
-                None => respond(&mut stream, 409, "{\"dispatched\":false,\"error\":\"webview_missing\"}"),
             }
         }
         ("GET", "/rundata/info") => {

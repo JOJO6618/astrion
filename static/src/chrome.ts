@@ -2,9 +2,9 @@
 //
 // 双 webview 架构（desktop/src-tauri/src/backend.rs）：本页运行在窗口顶部 46px
 // 的独立 webview 中，与主页面同源（/chrome），fetch/CSRF/cookie 零改动复用。
-// 标签数据单一写者 = 主页面；本页只做乐观镜像 + 意图派发
-// （POST /api/desktop/chrome-dispatch → 壳控制桥 → eval 进主 webview），
-// 并周期轮询 /api/conversation-tabs 收敛。
+// 标签唯一写者在后端 modules/desktop_navigation；两个页面均提交幂等命令，
+// 并消费 GET /api/conversation-tabs 的版本快照。本页不修改结构或执行主页面 JS。
+// 主页面协调器收到目标后，复用既有 bootstrap 并确认提交显示。
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import ChromeApp from './components/chrome/ChromeApp.vue';

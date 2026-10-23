@@ -23,27 +23,6 @@ export function commitWorkspaceIdentity(host, workspaceId, data = {}) {
   host.searchResults = [];
 }
 
-function openNavigationTab(host, conversationId, workspaceId) {
-  const tabs = useConversationTabsStore();
-  if (!tabs.enabled) return;
-  const store = useConversationStore();
-  const lists = [
-    store.getWorkspaceCache(workspaceId).list,
-    ...store.workspaceGroups
-      .filter((group) => group.workspaceId === workspaceId)
-      .map((group) => group.conversations)
-  ];
-  const summary = lists.flat().find((item) => item?.id === conversationId);
-  const workspace = (host.hostWorkspaces || []).find((item) => item.workspace_id === workspaceId);
-  tabs.openConversationTab({
-    conversationId,
-    workspaceId,
-    workspaceLabel: workspace?.label || '',
-    title: summary?.title || ''
-  });
-  tabs.persistNow();
-}
-
 async function saveSourceDraft(host) {
   // Local capture is synchronous; remote synchronization must not delay navigation.
   void host.persistComposerDraftNow({ reason: 'navigation' }).catch(() => {});
@@ -99,6 +78,10 @@ export const workspaceNavigationMethods = {
     if (!id) return { success: false };
     const scoped = !!(this.versioningHostMode || this.dockerProjectMode);
     const workspaceId = String(payload?.workspaceId || this.currentHostWorkspaceId || '').trim();
+    const tabs = useConversationTabsStore();
+    if (tabs.enabled && !options.desktopNavigation && !options.desktopRecovery) {
+      return this.openDesktopConversation({ conversationId: id, workspaceId });
+    }
     const crossingWorkspace = workspaceId !== String(this.currentHostWorkspaceId || '');
     if (
       !options.force &&
@@ -113,12 +96,13 @@ export const workspaceNavigationMethods = {
     this.flushReasoningEffortSave?.();
     const draftSave = options.prepared ? Promise.resolve() : saveSourceDraft(this);
     const session = this.beginConversationView(id, workspaceId);
-    const owns = () => ownsConversationSession(this, session);
+    const owns = () =>
+      ownsConversationSession(this, session) &&
+      (!options.desktopNavigation || tabs.ownsNavigation(options.desktopNavigation));
     this.suppressTitleTyping = true;
     this.titleReady = false;
     this.hostWorkspaceSwitching =
       scoped && workspaceId !== String(this.currentHostWorkspaceId || '');
-    openNavigationTab(this, id, workspaceId);
     try {
       // Storage/target draft can be read with explicit identity before selection.
       // Selection writes are ordered, so late cookies cannot select an older target.
@@ -135,6 +119,7 @@ export const workspaceNavigationMethods = {
         urlMode: 'push',
         source: 'workspace',
         preserveListPosition: !!options.preserveListPosition,
+        desktopNavigation: options.desktopNavigation,
         navigationReady: options.prepared || Promise.all([selection, draft, draftSave])
       });
       if (!owns() || result?.superseded) return result;
@@ -144,6 +129,7 @@ export const workspaceNavigationMethods = {
           void this.loadConversationsList({ background: true, autoEnter: false });
         }
       } else {
+        if (options.desktopNavigation) return result;
         this.suppressTitleTyping = false;
         this.titleReady = true;
         this.uiPushToast({
@@ -156,6 +142,7 @@ export const workspaceNavigationMethods = {
       return result;
     } catch (error) {
       if (!owns()) return { success: false, superseded: true };
+      if (options.desktopNavigation) throw error;
       this.suppressTitleTyping = false;
       this.titleReady = true;
       this.uiPushToast({
@@ -172,6 +159,10 @@ export const workspaceNavigationMethods = {
   async handleHostWorkspaceSwitch(workspaceId, options = {}) {
     const id = String(workspaceId || '').trim();
     if (!id) return;
+    const tabs = useConversationTabsStore();
+    if (tabs.enabled && !options.desktopNavigation && !options.desktopRecovery) {
+      return this.requestDesktopWorkspace(id, options);
+    }
     const sameWorkspace = id === String(this.currentHostWorkspaceId || '');
     if (!options.newConversation && sameWorkspace && !this.historyLoading) return;
     const previousId =
@@ -179,7 +170,9 @@ export const workspaceNavigationMethods = {
     // Capture the departed view before navigation; other workspaces never inherit it.
     const save = saveSourceDraft(this);
     const session = this.beginConversationView('', id);
-    const owns = () => ownsConversationSession(this, session);
+    const owns = () =>
+      ownsConversationSession(this, session) &&
+      (!options.desktopNavigation || tabs.ownsNavigation(options.desktopNavigation));
     this.hostWorkspaceSwitching = true;
     try {
       const [selection, draft, response] = await Promise.all([
@@ -220,6 +213,9 @@ export const workspaceNavigationMethods = {
         view = await requestNewConversationView(id, null, session.controller.signal);
         if (!owns()) return;
       }
+      if (options.desktopNavigation) {
+        if (!(await tabs.commitNavigation(options.desktopNavigation)) || !owns()) return;
+      }
       if (this.composerDraftDirty) {
         void this.persistComposerDraftNow({ reason: 'navigation-edits', keepalive: true }).catch(
           () => {}
@@ -243,7 +239,11 @@ export const workspaceNavigationMethods = {
       this.historyLoadingFor = null;
       this.applyComposerDraftState(draft, id, null);
       this.refreshBlankHeroState();
-      history.replaceState({}, '', '/new');
+      history.replaceState(
+        {},
+        '',
+        tabs.enabled ? `/new?workspace_id=${encodeURIComponent(id)}` : '/new'
+      );
       void this.loadConversationsList({ background: true, autoEnter: false });
       void this.refreshRunningWorkspaceTasks?.();
       void this.refreshProjectGitSummary?.();
@@ -251,6 +251,7 @@ export const workspaceNavigationMethods = {
       this.hostWorkspaceSwitching = false;
     } catch (error) {
       if (!owns()) return;
+      if (options.desktopNavigation) throw error;
       this.uiPushToast({
         title: this.versioningHostMode
           ? t('appUi.switchWorkspaceFailed')

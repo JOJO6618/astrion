@@ -75,6 +75,8 @@ export const bootstrapMethods = {
       ownsConversationSession(this, session) && snapshotRequests.get(this) === request;
     const owns = () =>
       ownsRequest() &&
+      (!options.desktopNavigation ||
+        useConversationTabsStore().ownsNavigation(options.desktopNavigation)) &&
       (!syncing || (!session.submission && session.submissionVersion === submissionVersion));
     this.historyLoading = true;
     this.historyLoadingFor = conversationId;
@@ -107,6 +109,14 @@ export const bootstrapMethods = {
         }
       }
       const messages = [...historyState.messages, ...live];
+      if (options.desktopNavigation) {
+        if (
+          !(await useConversationTabsStore().commitNavigation(options.desktopNavigation)) ||
+          !owns()
+        ) {
+          return { success: false, superseded: true };
+        }
+      }
       const preserveInteraction = syncing && this.currentConversationId === normalizedId;
       // Keep the existing subscription while fetching; replace it only at commit.
       useTaskStore().clearTask();
@@ -179,7 +189,11 @@ export const bootstrapMethods = {
         history[urlMode === 'replace' ? 'replaceState' : 'pushState'](
           { conversationId: normalizedId },
           '',
-          `/${this.stripConversationPrefix(normalizedId)}`
+          `/${this.stripConversationPrefix(normalizedId)}${
+            useConversationTabsStore().enabled
+              ? `?workspace_id=${encodeURIComponent(session.workspaceId)}`
+              : ''
+          }`
         );
       }
       this.historyLoading = false;
@@ -202,17 +216,7 @@ export const bootstrapMethods = {
         else this.scrollHistoryToBottomInstant();
       });
       void this.fetchConversationWorkflow(normalizedId, session);
-      const tabsStore = useConversationTabsStore();
-      if (tabsStore.enabled) {
-        const wsId = workspaceId || this.currentHostWorkspaceId || '';
-        const ws = (this.hostWorkspaces || []).find((item) => item.workspace_id === wsId);
-        tabsStore.openConversationTab({
-          conversationId: normalizedId,
-          workspaceId: wsId,
-          workspaceLabel: ws?.label || '',
-          title: meta.title || ''
-        });
-      }
+      // Display refreshes never create/activate tabs. Only navigation commands own that state.
       return { success: true, title: meta.title || '', conversation_id: normalizedId };
     } catch (error) {
       if (!owns() || error?.name === 'AbortError') return { success: false, superseded: true };

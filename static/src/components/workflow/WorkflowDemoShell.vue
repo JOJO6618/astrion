@@ -157,19 +157,10 @@ async function onSaved(wf: WorkflowDef) {
 }
 
 function exitDemo() {
-  // 与对话体系完全隔离，整页返回；优先回到进入时暂存的对话标签，
-  // 找不到才落 /new（restoreConversationTabView 会补一个新对话标签）
-  try {
-    const tabsStore = useConversationTabsStore();
-    const resume = tabsStore.consumeResumeTarget();
-    if (resume) {
-      tabsStore.setActive(resume.key);
-      tabsStore.persistNow();
-      window.location.assign(resume.url);
-      return;
-    }
-  } catch (_e) {
-    // ignore
+  const tabs = useConversationTabsStore();
+  if (tabs.enabled) {
+    void tabs.resume().catch((error) => showError(error, t('workflow.loadFailed')));
+    return;
   }
   window.location.assign('/new');
 }

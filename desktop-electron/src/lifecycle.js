@@ -35,7 +35,6 @@ export async function startBackendAndCreateWindow() {
     bridgePort = await startBridge({
       version: app.getVersion(),
       isPackaged: app.isPackaged,
-      getMainView,
       getMigrationProgress,
       onMigrationContinue: () => {
         if (backendReady) {

@@ -244,6 +244,41 @@
 .chrome-tab-strip .tab-status.done {
   background: var(--state-success);
 }
+.chrome-tab-strip .tab-status.error {
+  background: var(--state-error);
+}
+.chrome-tab-strip .tab-status.loading {
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--border-subtle);
+  border-top-color: var(--text-secondary);
+  animation: chrome-tab-loading 0.8s linear infinite;
+}
+.chrome-tab-strip .chrome-sync-error {
+  -webkit-app-region: no-drag;
+  align-self: center;
+  height: 30px;
+  max-width: 140px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--state-error);
+  font: inherit;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chrome-tab-strip .tab:focus-visible,
+.chrome-tab-strip button:focus-visible {
+  outline: 1px solid var(--text-secondary);
+  outline-offset: -2px;
+}
+@keyframes chrome-tab-loading {
+  to { transform: rotate(360deg); }
+}
 // 无状态点时标题微微右移（不占位对齐）
 .chrome-tab-strip .tab:not(.has-status) .tab-title {
   margin-left: 3px;

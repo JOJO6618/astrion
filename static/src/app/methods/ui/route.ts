@@ -32,13 +32,14 @@ export const routeMethods = {
     const epoch = conversationViewEpoch(this);
     const owns = () =>
       session ? ownsConversationSession(this, session) : conversationViewEpoch(this) === epoch;
-    // 桌面端标签条：先于路由解析恢复标签列表（后续 enterConversation 挂钩与
-    // 启动恢复都依赖它；await 保证 hydrate 与标签登记不竞争）
+    // Capture the pending desktop target before loading a possibly stale address-bar URL.
+    let desktopTargetPending = false;
     try {
       const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
       const tabsStore = useConversationTabsStore();
       if (tabsStore.enabled) {
         await tabsStore.hydrate();
+        desktopTargetPending = tabsStore.navigation?.status === 'pending';
       }
     } catch (_tabsErr) {
       // 恢复失败不阻断路由
@@ -84,15 +85,20 @@ export const routeMethods = {
       } else {
         this.workflowDemoRoute = path;
       }
-      // 桌面端标签条：独立全屏路由不属于任何对话标签，清空激活态——
-      // chrome 条所有标签取消选中（暂存当前标签供返回时恢复）
-      this.stashAndClearActiveTab?.();
+      // Desktop page ownership is attached after bootstrap; no local tab mutation here.
       this.currentConversationId = null;
       this.currentConversationTitle = '';
       this.messages = [];
       this.titleReady = true;
       this.suppressTitleTyping = false;
       this.initialRouteResolved = true;
+      return;
+    }
+    if (desktopTargetPending) {
+      // The coordinator attaches after this route setup and loads the latest target.
+      // Do not let a failed stale URL create a new tab over the saved pending intent.
+      this.initialRouteResolved = true;
+      this.leaveConversationView();
       return;
     }
     if (!path || this.isExplicitNewConversationRoute()) {
@@ -207,9 +213,7 @@ export const routeMethods = {
     );
   },
   openWorkflowsPage() {
-    // 工作流编辑器是 bootstrap 级全屏路由，与退出方向（/new）对称使用整页跳转，保证状态干净
-    // 跳转前暂存当前激活标签（返回时恢复）并立刻清空激活态（chrome 选中效果即时消失）
-    this.stashAndClearActiveTab?.();
+    if (useConversationTabsStore().enabled) return this.openDesktopPage('/workflows');
     this.leaveConversationView();
     window.location.assign('/workflows');
   },
@@ -219,7 +223,8 @@ export const routeMethods = {
       this.uiPushToast?.({ message: t('git.workspaceRequired'), type: 'warning' });
       return;
     }
-    this.stashAndClearActiveTab?.();
+    if (useConversationTabsStore().enabled)
+      return this.openDesktopPage(`/git?workspace_id=${encodeURIComponent(workspaceId)}`);
     this.leaveConversationView();
     window.location.assign(`/git?workspace_id=${encodeURIComponent(workspaceId)}`);
   },
@@ -230,27 +235,12 @@ export const routeMethods = {
     );
   },
   openSettingsPage() {
-    // 设置页同样是 bootstrap 级全屏路由，整页跳转保证状态干净
-    this.stashAndClearActiveTab?.();
+    if (useConversationTabsStore().enabled) return this.openDesktopPage('/settings');
     this.leaveConversationView();
     window.location.assign('/settings');
   },
   closeSettingsPage(fallback = '/new') {
-    // 设置页返回出口：直接回到进入时的对话（暂存标签），避免先闪一个空 /new
-    // 再加载对话记录；暂存标签已不存在才落 /new（restore 会补一个新对话标签）
-    try {
-      const tabsStore = useConversationTabsStore();
-      const resume = tabsStore.consumeResumeTarget();
-      if (resume) {
-        // 选中态立即持久化，chrome 在页面加载期间就已恢复选中
-        tabsStore.setActive(resume.key);
-        tabsStore.persistNow();
-        window.location.assign(resume.url);
-        return;
-      }
-    } catch (_tabsErr) {
-      // ignore
-    }
+    if (useConversationTabsStore().enabled) return this.resumeDesktopTab();
     window.location.assign(typeof fallback === 'string' ? fallback : '/new');
   },
   stripConversationPrefix(conversationId) {

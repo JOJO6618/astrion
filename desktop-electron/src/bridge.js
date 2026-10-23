@@ -4,7 +4,7 @@
 //   POST /update/install    触发检查 → 下载 → 安装 → 重启（无感更新）
 //   GET  /update/progress   查询更新进度（前端经后端代理轮询）
 //   POST /window/drag       Electron 下窗口拖拽走 app-region CSS，此端点兼容空操作
-//   POST /chrome/dispatch   chrome 标签条意图 → executeJavaScript 注入 main 视图
+// 标签导航由后端 /api/conversation-tabs/commands 管理，不经原生控制桥。
 // 仅绑定 loopback，不鉴权：同机进程本就在同一威胁域内。
 
 import http from 'node:http';
@@ -125,7 +125,7 @@ async function tryStartInstall(isPackaged) {
 
 /**
  * 启动控制桥。
- * @param {{version: string, isPackaged: boolean, getMainView: () => import('electron').WebContentsView | null}} ctx
+ * @param {{version: string, isPackaged: boolean, getMigrationProgress: Function, onMigrationContinue: Function}} ctx
  * @returns {Promise<number>} 实际监听端口
  */
 export function startBridge(ctx) {
@@ -216,34 +216,6 @@ export function startBridge(ctx) {
         app.relaunch();
         app.exit(0);
       }, 250);
-      return;
-    }
-    if (req.method === 'POST' && pathname === '/chrome/dispatch') {
-      let body = '';
-      req.on('data', (chunk) => {
-        body += chunk;
-        if (body.length > 64 * 1024) req.destroy(); // 意图 JSON 上限 64KB（对齐 Tauri 版）
-      });
-      req.on('end', () => {
-        // body 是 JSON，重序列化后就是合法 JS 字面量，无注入面
-        let payload;
-        try {
-          payload = JSON.parse(body || 'null');
-        } catch {
-          payload = null;
-        }
-        const view = ctx.getMainView();
-        if (!view || view.webContents.isDestroyed()) {
-          send(409, { dispatched: false, error: 'webview_missing' });
-          return;
-        }
-        view.webContents
-          .executeJavaScript(
-            `window.__astrionChromeDispatch && window.__astrionChromeDispatch(${JSON.stringify(payload)})`
-          )
-          .then(() => send(200, { dispatched: true }))
-          .catch((err) => send(409, { dispatched: false, error: String(err?.message || err) }));
-      });
       return;
     }
     send(404, { error: 'not_found' });

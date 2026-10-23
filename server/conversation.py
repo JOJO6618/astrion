@@ -43,6 +43,7 @@ from config import (
     MAX_CONVERSATIONS_LIMIT,
     CONVERSATIONS_DIR,
     DATA_DIR,
+    IS_HOST_MODE,
     DEFAULT_RESPONSE_MAX_TOKENS,
     DEFAULT_PROJECT_PATH,
     LOGS_DIR,
@@ -695,10 +696,15 @@ def delete_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
         result = terminal.delete_conversation(conversation_id)
         
         if result["success"]:
-            # 对话删除/清空推送已随 WebSocket 移除：发起方依据响应刷新，
-            # 其他标签页由对话列表轮询同步。is_current 变量保留供下方响应使用。
-            pass
-            
+            if IS_HOST_MODE:
+                try:
+                    from server.conversation_tabs import navigation
+                    result["desktop_navigation"] = navigation.deleted(
+                        username, str(workspace.workspace_id), conversation_id)
+                except Exception as exc:
+                    # The conversation is already deleted. Poll reconciliation retries tab cleanup.
+                    logger.error("[API] 对话已删除，但桌面导航同步失败: %s", exc)
+                    result["desktop_navigation_error"] = str(exc)
             return jsonify(result)
         else:
             return jsonify(result), 404 if _is_not_found_message(result.get("message", "")) else 500

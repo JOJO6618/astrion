@@ -18,24 +18,10 @@ export const actionMethods = {
   },
   async createNewConversation() {
     const workspaceId = String(this.currentHostWorkspaceId || '');
-    const tabs = useConversationTabsStore();
-    if (tabs.enabled) {
-      const workspace = (this.hostWorkspaces || []).find(
-        (item) => item.workspace_id === workspaceId
-      );
-      tabs.addNewTab({ workspaceId, workspaceLabel: workspace?.label || '' });
-    }
     return this.enterNewConversationPage({ workspaceId });
   },
   async createWorkspaceConversation(workspaceId: string) {
     if (!workspaceId) return;
-    const tabs = useConversationTabsStore();
-    if (tabs.enabled) {
-      const workspace = (this.hostWorkspaces || []).find(
-        (item) => item.workspace_id === workspaceId
-      );
-      tabs.addNewTab({ workspaceId, workspaceLabel: workspace?.label || '' });
-    }
     return this.enterNewConversationPage({ workspaceId });
   },
   async deleteConversation(payload) {
@@ -76,10 +62,25 @@ export const actionMethods = {
       if (result.success) {
         debugLog('对话删除成功');
 
-        // 如果删除的是当前对话，清空界面
+        const tabs = useConversationTabsStore();
+        if (tabs.enabled) {
+          if (result.desktop_navigation) tabs.applyServerSnapshot(result.desktop_navigation);
+          else {
+            if (
+              currentConversationSession(this)?.conversationId === conversationId &&
+              (!workspaceId || currentConversationSession(this)?.workspaceId === workspaceId)
+            ) {
+              this.leaveConversationView();
+              this.historyLoading = true;
+            }
+            await tabs.refreshSnapshot().catch(() => {});
+          }
+        }
+        // Desktop successor selection belongs to the navigation manager.
         if (
-          conversationId === this.currentConversationId ||
-          currentConversationSession(this)?.conversationId === conversationId
+          !tabs.enabled &&
+          (conversationId === this.currentConversationId ||
+            currentConversationSession(this)?.conversationId === conversationId)
         ) {
           this.leaveConversationView();
           this.clearLocalTaskUiState?.(`delete-conversation:${conversationId}`);

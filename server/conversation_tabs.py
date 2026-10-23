@@ -1,7 +1,7 @@
-"""对话标签条（桌面端浏览器式顶部标签）持久化接口。
+"""桌面导航命令与版本化快照接口，状态唯一写者在 modules/desktop_navigation。
 
-存 `{DATA_DIR}/conversation_tabs.json`（按用户名分键），供桌面壳（host 模式）
-重开应用后恢复上次打开的对话标签。非 host 模式返回空数据（标签功能仅桌面壳启用）。
+存 `{DATA_DIR}/conversation_tabs.json`（按用户名分键），双 WebView 提交幂等命令，
+主页面确认 renderer/navigation 后提交显示。非 host 模式不提供标签导航。
 
 下发给标签条的 `running` 是**对话级运行态**（主任务 + 后台子智能体/后台命令/
 多智能体），与对话记录侧边栏的运行中图标同一口径；不是"主智能体还在不在工作"。
@@ -10,21 +10,20 @@ from __future__ import annotations
 
 import json
 import os
-import threading
 from typing import Any, Dict, List
 
 from flask import Blueprint, jsonify, request
 
 from config import DATA_DIR, IS_HOST_MODE
 from server.auth_helpers import api_login_required, get_current_username
-from utils.atomic_io import atomic_write_json
+from modules.desktop_navigation import DesktopNavigation, NavigationConflict
+from server.context.data import get_workspace_data
+from server.context.workspace import request_identity, resolve_workspace
 
 conversation_tabs_bp = Blueprint("conversation_tabs", __name__)
 
-_LOCK = threading.RLock()
 _TABS_PATH = os.path.join(DATA_DIR, "conversation_tabs.json")
-
-_TAB_KINDS = {"conv", "new"}
+navigation = DesktopNavigation(_TABS_PATH)
 
 
 def _load_index_titles(workspace_id: str) -> Dict[str, str]:
@@ -73,16 +72,17 @@ def _active_run_conversation_ids(username: str, workspace_ids: List[str]) -> set
         except Exception:
             continue
         for run in runs:
-            active.update(_normalized_conversation_ids(run.get("conversation_id")))
+            active.update((ws_id, conv_id) for conv_id in
+                          _normalized_conversation_ids(run.get("conversation_id")))
     return active
 
 
 def _peek_conversation_terminal(username: str, workspace_id: str, conversation_ids: List[str]):
     """读取**已存在**的对话级 terminal（不创建）。
 
-    标签条 600ms 轮询，不能走 get_user_resources 按需建终端（每个对话级终端各自持有
-    对话历史，代价不可接受）；而没有对话级 terminal 时该对话不可能有运行中的
-    子智能体/后台命令/多智能体，跳过判定语义正确。
+    标签条轮询不能走 get_user_resources 按需建终端（每个对话级终端各自持有
+    对话历史，代价不可接受）；这里只聚合已存在的后台运行实例，
+    活动主任务独立从 RuntimeService 查询，不从标签查询触发恢复。
     """
     if not conversation_ids:
         return None
@@ -95,17 +95,7 @@ def _peek_conversation_terminal(username: str, workspace_id: str, conversation_i
         terminal = state.user_terminals.get(_make_terminal_key(username, workspace_id, conv_id))
         if terminal is not None and not getattr(terminal, "_reaper_closing", False):
             return terminal
-    # 工作区标识不一致时的兜底：按 用户名 + 对话 id 扫描终端键（三段键 username::ws::conv）
-    wanted = set(conversation_ids)
-    for term_key, terminal in list(state.user_terminals.items()):
-        parts = str(term_key).split("::")
-        if len(parts) < 3 or parts[0] != username:
-            continue
-        if "::".join(parts[2:]) not in wanted:
-            continue
-        if getattr(terminal, "_reaper_closing", False):
-            continue
-        return terminal
+    # Workspace identity is part of the key; never borrow another workspace's terminal.
     return None
 
 
@@ -124,7 +114,7 @@ def _conversation_is_running(
     variants = _normalized_conversation_ids(conversation_id)
     if not variants:
         return False
-    if any(conv_id in active_run_ids for conv_id in variants):
+    if any((workspace_id, conv_id) in active_run_ids for conv_id in variants):
         return True
     terminal = _peek_conversation_terminal(username, workspace_id or "", variants)
     if terminal is None:
@@ -160,80 +150,79 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
         )
 
 
-def _load_all() -> Dict[str, Any]:
-    with _LOCK:
-        try:
-            with open(_TABS_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            return {}
-        return data if isinstance(data, dict) else {}
+def _lookup(username: str, *, with_activity: bool = False):
+    identity = request_identity()
+
+    def lookup(workspace_id: str, conversation_id: str):
+        workspace = resolve_workspace(username, workspace_id or None, identity=identity)
+        info = {"workspace_id": workspace.workspace_id,
+                "label": str(getattr(workspace, "label", "") or workspace.workspace_id)}
+        if conversation_id:
+            manager = get_workspace_data(username, workspace.workspace_id, identity=identity).manager()
+            path = manager._get_conversation_file_path(conversation_id)
+            try:
+                path.stat()
+                info["exists"] = True
+            except FileNotFoundError:
+                info["exists"] = False
+        elif with_activity:
+            from server.runtime import runtime_service
+            runs = runtime_service.list_runs(username, workspace.workspace_id, status="active")
+            info["active_conversation_id"] = next(
+                (run.get("conversation_id") for run in runs if run.get("conversation_id")), None)
+        return info
+
+    return lookup
 
 
-def _sanitize_tabs(raw: Any) -> List[Dict[str, Any]]:
-    if not isinstance(raw, list):
-        return []
-    tabs: List[Dict[str, Any]] = []
-    for item in raw[:100]:
-        if not isinstance(item, dict):
-            continue
-        kind = str(item.get("kind") or "")
-        if kind not in _TAB_KINDS:
-            continue
-        key = str(item.get("key") or "").strip()
-        if not key:
-            continue
-        tabs.append({
-            "key": key,
-            "kind": kind,
-            "conversation_id": str(item.get("conversation_id") or ""),
-            "workspace_id": str(item.get("workspace_id") or ""),
-            "workspace_label": str(item.get("workspace_label") or ""),
-            "title": str(item.get("title") or "")[:200],
-        })
-    return tabs
+def _public(username: str, state: dict) -> dict:
+    _enrich_tabs(username, state["tabs"])
+    return state
 
 
 @conversation_tabs_bp.route("/api/conversation-tabs", methods=["GET"])
 @api_login_required
 def get_conversation_tabs():
     if not IS_HOST_MODE:
-        return jsonify({"success": True, "tabs": [], "active_key": ""})
+        return jsonify(success=True, tabs=[], active_key="", revision=0)
     username = get_current_username() or ""
-    data = _load_all().get(username) or {}
-    tabs = _sanitize_tabs(data.get("tabs"))
-    # chrome 标签条独立 webview 以轮询本端点刷新，标题取索引最新值、
-    # running 取对话级运行态（主任务 + 后台子智能体/后台命令/多智能体，
-    # 与对话记录侧边栏一致）——标签持久化文件只是主页面写入的快照。
-    _enrich_tabs(username, tabs)
-    return jsonify({
-        "success": True,
-        "tabs": tabs,
-        "active_key": str(data.get("active_key") or ""),
-    })
+    try:
+        return jsonify(success=True, **_public(username, navigation.snapshot(username, _lookup(username))))
+    except Exception as exc:
+        return jsonify(success=False, error=str(exc)), 503
 
 
-@conversation_tabs_bp.route("/api/conversation-tabs", methods=["PUT"])
+@conversation_tabs_bp.route("/api/conversation-tabs/commands", methods=["POST"])
 @api_login_required
-def save_conversation_tabs():
+def command_conversation_tabs():
     if not IS_HOST_MODE:
-        return jsonify({"success": True})
+        return jsonify(success=False, error="Desktop navigation is unavailable"), 400
     username = get_current_username() or ""
-    payload = request.get_json(silent=True) or {}
-    tabs = _sanitize_tabs(payload.get("tabs"))
-    active_key = str(payload.get("active_key") or "")
-    tab_keys = {t["key"] for t in tabs}
-    if active_key and active_key not in tab_keys:
-        active_key = ""
-    with _LOCK:
-        data = _load_all()
-        previous_key = str((data.get(username) or {}).get("active_key") or "")
-        data[username] = {"tabs": tabs, "active_key": active_key}
-        atomic_write_json(_TABS_PATH, data)
-    if active_key != previous_key:
-        try:
-            from server.crosspet import focus_tab
-            focus_tab(username, next((tab for tab in tabs if tab["key"] == active_key), None))
-        except Exception:
-            pass  # Pet state cannot interfere with committed desktop navigation.
-    return jsonify({"success": True})
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify(success=False, error="Invalid navigation command"), 400
+    action = str(body.get("action") or "")
+    if action == "deleted":
+        return jsonify(success=False, error="Invalid navigation command"), 400
+    payload = body.get("payload") or {}
+    try:
+        if not isinstance(payload, dict):
+            raise ValueError("Invalid navigation command")
+        result = navigation.command(username, body.get("command_id"), action, payload,
+                                    lookup=_lookup(username, with_activity=action == "workspace"))
+        result["state"] = _public(username, result["state"])
+        if action in {"commit", "attach", "page"}:
+            try:
+                from server.crosspet import focus_tab
+                state = result["state"]
+                focus_tab(username, next((tab for tab in state["tabs"]
+                                          if tab["key"] == state["active_key"]), None))
+            except Exception:
+                pass
+        return jsonify(success=True, **result)
+    except NavigationConflict as exc:
+        return jsonify(success=False, error=str(exc), code="navigation_superseded"), 409
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except Exception as exc:
+        return jsonify(success=False, error=str(exc)), 503

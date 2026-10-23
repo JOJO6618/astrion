@@ -39,6 +39,7 @@ export async function mounted() {
   // 并行启动路由解析与初始化数据，网页端不再依赖 WebSocket 初始化
   const routePromise = this.bootstrapRoute();
   await routePromise;
+  void this.restoreConversationTabView?.();
   this.$nextTick(() => {
     this.ensureScrollListener();
     // 刷新后若无输出，自动解锁滚动锁定
@@ -62,33 +63,14 @@ export async function mounted() {
       .then(() => {
         // 初始数据加载完成后再刷新 git 摘要，确保 workspace/project_path 已就绪
         this.refreshProjectGitSummary?.();
-        // 桌面端标签条：工作区列表就绪后按持久化激活标签还原视图
-        this.restoreConversationTabView?.().catch(() => {});
+        // Desktop navigation is attached independently of auxiliary data loading.
         // 避免在初始加载阶段被覆盖，加载完成后再兜底检查一次
         this.checkTutorialPrompt();
       })
       .catch(() => {});
   }
 
-  // 桌面壳双 webview：接收 chrome 标签条意图（activate/new/close）。
-  // 壳控制桥 eval 调用 window.__astrionChromeDispatch；未就绪期间的消息在
-  // __astrionChromeQueue 排队，这里注册后一并 drain（shim 见 static/index.html）。
-  if ((window as any).__ASTRION_DESKTOP__) {
-    (window as any).__astrionChrome = {
-      handle: (msg: any) => this.handleChromeIntent?.(msg)
-    };
-    const pending = (window as any).__astrionChromeQueue;
-    if (Array.isArray(pending) && pending.length) {
-      pending.splice(0).forEach((msg: any) => {
-        try {
-          (window as any).__astrionChrome.handle(msg);
-        } catch (_e) {
-          // 单条意图失败不影响后续
-        }
-      });
-    }
-  }
-
+  // Desktop targets survive document replacement in the server navigation manager.
   // bootstrapRoute owns the complete snapshot and its live subscription.
 
   document.addEventListener('click', this.handleClickOutsideQuickMenu);
@@ -121,6 +103,7 @@ export function beforeUnmount() {
     this._todoRefreshTimer = null;
   }
 
+  this.stopConversationTabView?.();
   this.leaveConversationView();
   this.stopWorkspaceTasksRefresh();
 

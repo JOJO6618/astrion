@@ -2,7 +2,7 @@ const { compile, deferred, noop, locale } = require('../2026-10-07_运行对话�
 const base = 'static/src/app/methods/';
 const flush = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
 
-function fixture({ realSnapshot = true, automaticSelection = false } = {}) {
+function fixture({ realSnapshot = true, automaticSelection = false, desktopTabs = null } = {}) {
   const requests = [], attachments = [], toasts = [], ticks = [], calls = [], openedTabs = [];
   const fetch = (url, options = {}) => {
     const pending = deferred(); requests.push({ url, options, ...pending });
@@ -22,7 +22,7 @@ function fixture({ realSnapshot = true, automaticSelection = false } = {}) {
     ...caching.workspaceCacheActions };
   store.activateWorkspaceCache('ws1');
   const task = { clearTask: () => calls.push('clearTask'), attachSnapshot: (...args) => attachments.push(args) };
-  const tabs = { enabled: true, openConversationTab: (value) => openedTabs.push(value), persistNow: noop };
+  const tabs = desktopTabs || { enabled: false };
   const selection = compile(base + 'ui/workspaceSelection.ts', {}, globals);
   const refresh = compile(base + 'ui/navigationRefresh.ts', {
     '../conversation/session': session,

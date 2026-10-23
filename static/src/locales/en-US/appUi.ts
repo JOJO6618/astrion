@@ -205,6 +205,8 @@ export default {
   tabStripNewTabHint: 'New conversation ({mod}+T)',
   tabStripCloseHint: 'Close ({mod}+W / middle-click)',
   tabStripSettingsHint: 'Settings',
+  tabStripSyncFailed: 'Sync failed. Retry',
+  tabStripLoadFailed: 'Could not load. Click to retry',
   // Windows frameless-mode custom caption buttons (window-controls)
   tabStripWinMinimize: 'Minimize',
   tabStripWinMaximize: 'Maximize',

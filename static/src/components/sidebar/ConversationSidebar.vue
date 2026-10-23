@@ -1100,12 +1100,10 @@ function openPreferencesPage() {
 }
 function openSettingsPage() {
   closePersonalMenu();
-  // 设置页是 bootstrap 级全屏路由，整页跳转保证状态干净（与 workflows 对称）；
-  // 跳转前暂存当前激活标签（返回时恢复）并清空激活态（chrome 选中即时消失）
-  try {
-    useConversationTabsStore().stashAndClearActive();
-  } catch (_e) {
-    // ignore
+  const tabs = useConversationTabsStore();
+  if (tabs.enabled) {
+    void tabs.openPage('/settings').catch(() => {});
+    return;
   }
   window.location.assign('/settings');
 }

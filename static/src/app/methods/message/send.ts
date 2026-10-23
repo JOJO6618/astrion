@@ -19,6 +19,7 @@ export { createOwnedMessageTask, ensureMessageSession } from './ownership';
 export const sendMethods = {
   ...messageControlMethods,
   async sendMessage(options = {}) {
+    if ((window as any).__ASTRION_DESKTOP__ && !this.isDesktopNavigationReady?.()) return false;
     if (
       !options?.goalAction &&
       typeof options?.presetText !== 'string' &&
@@ -186,6 +187,7 @@ export const sendMethods = {
     }
 
     let targetConversationId = this.currentConversationId;
+    const creationTab = this.captureDesktopCreationTab?.();
     let backupToastId = null;
     if (!targetConversationId) {
       try {
@@ -230,6 +232,16 @@ export const sendMethods = {
           );
         }
         targetConversationId = createResult.conversation_id;
+        if (creationTab) {
+          const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
+          const bound = await useConversationTabsStore().bindConversation(
+            creationTab.key,
+            creationTab.workspaceId,
+            targetConversationId,
+            t('common.newConversation')
+          );
+          if (!owns() || !bound?.bound) return false;
+        }
         this.adoptComposerDraftConversation(targetConversationId);
         session.conversationId = targetConversationId;
         this.currentConversationId = targetConversationId;
@@ -286,23 +298,13 @@ export const sendMethods = {
         }
 
         const pathFragment = this.stripConversationPrefix(targetConversationId);
-        // 对话类型不再是路由概念，统一裸路径 /<id>
-        history.replaceState({ conversationId: targetConversationId }, '', `/${pathFragment}`);
+        history.replaceState(
+          { conversationId: targetConversationId },
+          '',
+          `/${pathFragment}${creationTab ? `?workspace_id=${encodeURIComponent(creationTab.workspaceId)}` : ''}`
+        );
 
-        // 桌面端标签条：首条消息落地为真实对话，把当前激活的 new 标签转换为 conv 标签
-        try {
-          const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
-          if (!owns()) return false;
-          const tabsStore = useConversationTabsStore();
-          if (tabsStore.enabled) {
-            tabsStore.convertActiveNewTab({
-              conversationId: targetConversationId,
-              title: t('common.newConversation')
-            });
-          }
-        } catch (_tabsErr) {
-          // ignore
-        }
+        // The captured creation tab was bound above; no lookup of the current active tab here.
       } catch (error) {
         if (!owns()) return false;
         this.uiPushToast({

@@ -27,7 +27,11 @@ export const titleMethods = {
     changed =
       useConversationStore().updateConversationTitle(normalizedConversationId, normalizedTitle) ||
       changed;
-    useConversationTabsStore().updateTitle(normalizedConversationId, normalizedTitle);
+    useConversationTabsStore().updateTitle(
+      normalizedConversationId,
+      normalizedTitle,
+      String(this.currentHostWorkspaceId || '')
+    );
 
     if (changed) {
       debugLog('[TaskPolling] 已同步生成后的对话标题:', {

@@ -20,6 +20,9 @@
   - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）；`composer_drafts.py` 负责原子草稿、CAS revision 与保存水位；`server/composer_drafts.py` 负责对话身份、字段校验和恢复确认，`server/attachment_paths.py` 共用附件路径通知，`server/runtime_guidance.py` 在安全边界注入引导，`conversation_modes.py` 共用生效模式规则，`skills_revision.py`／`skills_sync.py` 负责工作区技能版本与准备。`utils/conversation_manager/preparation.py` 合并执行侧存储准备。
   - `config/`: 配置拆分（`api.py`, `limits.py`, `terminal.py`, `paths.py` ...），由 `config/__init__.py` 聚合并加载 `.env`
   - `utils/`: API client、日志、上下文与对话工具等公共函数（`api_client`、`tool_result_formatter`、`context_manager`、`conversation_manager` 已拆分为子包；原入口文件保留为兼容入口）
+- **桌面标签导航（2026-10-23）**
+  - `modules/desktop_navigation/model.py` 定义稳定标签身份、迁移和关闭选后继；`service.py` 串行处理幂等命令及版本化持久化，`server/conversation_tabs.py` 做可信工作区解析、HTTP 装配与运行态富化，不创建执行实例。
+  - `static/src/stores/conversationTabs.ts` 是服务端快照投影，`desktopNavigationTransport.ts` 负责串行命令及不重叠轮询；`app/methods/ui/desktopNavigation.ts` 是主页面唯一目标协调器，复用原 bootstrap/session 与工作区导航。完整契约见 `docs/desktop_navigation.md`。
 - **前端目录**
   - `static/src/`: Vue 3 + TS 前端；`app/methods/ui/workspaceNavigation.ts` 统一导航，`workspaceSelection.ts` 排序选择写入，`workspaceStartup.ts` 解析初始真实身份，`composerDrafts.ts` 绑定可见对话草稿，`draftStorage.ts` 管理本地持久化和远端重试，`message/guidance.ts` 提交运行中引导，`navigationRefresh.ts` 负责一次辅助刷新。`workspaceRequestScope.ts` 为同源API捕获派发身份，`stores/workspaceConversationCache.ts` 按工作区维护单份列表缓存及请求身份，不分对话类型。
   - `cli/src/`: opentui（Zig 内核 + Yoga）+ React 19 CLI 前端（2026-09-11 起正式替代 Ink 版；旧 Ink 实现存档于 `cli/legacy-ink-src/` 仅作字段参考）

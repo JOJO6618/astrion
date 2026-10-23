@@ -197,6 +197,8 @@ export default {
   tabStripNewTabHint: '新对话（{mod}+T）',
   tabStripCloseHint: '关闭（{mod}+W / 中键）',
   tabStripSettingsHint: '设置',
+  tabStripSyncFailed: '同步失败，重试',
+  tabStripLoadFailed: '加载失败，点击重试',
   // Windows 无边框模式自绘三大键（window-controls）
   tabStripWinMinimize: '最小化',
   tabStripWinMaximize: '最大化',

@@ -19,6 +19,7 @@
 
 ## 工作区导航与轻量读取（2026-10-12）
 
+- **桌面标签协调（2026-10-23）**：后端 `modules/desktop_navigation/` 是标签唯一写者，命令和版本快照见 `docs/desktop_navigation.md`。主页面 `ui/desktopNavigation.ts` 在状态 patch 完成后消费最新目标，复用下述导航及唯一 bootstrap，不另建显示恢复链。显示提交前必须通过后端 renderer/navigation 确认，再检查本地 session；关闭、删除、刷新撤销旧提交权。失败恢复原视图不创建标签，空页也按原工作区恢复。桌面 URL 保留明确 workspace_id，发送必须验证 active 标签、可见 session、工作区和对话一致。
 - 工作区和对话是同一个导航身份。`ui/workspaceNavigation.ts` 并行准备选择、目标草稿与 bootstrap，目标准备成功后一次提交工作区、对话、输入作用域、模式与任务订阅。加载期间旧视图保留且旧 session 退役；迟到响应必须检查 session/epoch。选择写入由 `workspaceSelection.ts` 串行完成，不能取消后立即派发下一次选择写入。
 - `workspaceRequestScope.ts` 在派发时为同源应用 API 捕获可见工作区，保留显式 header；query 工作区优先于 header，header 优先于 body。服务端验证对话属于该工作区，普通查询不得更改选择身份。任务创建必须从已验证的工作区构造 principal，不能依赖切换中的 Cookie。
 - 首次页面进入由 `workspaceStartup.ts` 先用无显式工作区的 `/api/workspace-view` 获取认证后的真实选择，再恢复草稿和绑定路由 session。未知初始作用域不得猜为 `default`；零工作区不读取草稿，身份就绪前的输入保持在本地。这一顺序独立于完整设置/目录初始化，避免路由等待自身尚未开始的初始化。草稿读取失败须反馈并让后续页面初始化继续。工作区目录刷新只更新目录、默认项与运行计数，不能用 Cookie 的选择覆盖已提交视图；失败保留可用目录和可见身份。
