@@ -50,6 +50,8 @@
 
 `static/src/app/methods/ui/desktopNavigation.ts` 是唯一桌面导航协调器，`conversationTabs.ts` 只投影权威状态，`desktopNavigationTransport.ts` 串行发送短命令。命令串行不等待完整历史加载，关闭和新目标不会被旧加载阻塞。
 
+**启动顺序（2026-10-24 白屏修复）**：`bootstrapRoute` 完成后先执行 `loadInitialData`，待其成功或失败收尾后再恢复桌面导航。禁止在初始化尚未完成时触发标签恢复：恢复会推进 conversation epoch，使初始化的所有权检查直接退出，跳过个性化设置与工作区目录；`ChatArea` 等待个性化设置就绪，因而持续隐藏历史内容。卸载时撤销页面存活标记，迟到的路由或初始化不能再次 attach。回归：`node test/2026-10-24_桌面启动白屏/startup.cjs`。
+
 1. 主页面 hydrate 后 attach 文档，注册最新目标观察。
 2. 目标复用 `workspaceNavigation.ts` 与 `conversation/bootstrap.ts`，并行准备工作区选择、草稿和显示快照。
 3. 内容准备好后请求 commit；后端拒绝被关闭、删除、替换或旧 renderer 的提交。

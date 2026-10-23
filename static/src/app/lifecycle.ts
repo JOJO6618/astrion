@@ -9,6 +9,8 @@ import {
 } from './bootstrap';
 import { debugLog } from './methods/common';
 
+const mountedHosts = new WeakSet<object>();
+
 export function created() {
   const actionStore = useChatActionStore();
   actionStore.registerDependencies({
@@ -27,6 +29,7 @@ export function created() {
 }
 
 export async function mounted() {
+  mountedHosts.add(this);
   debugLog('Vue应用已挂载');
   if (window.ensureCsrfToken) {
     window.ensureCsrfToken().catch((err) => {
@@ -39,7 +42,7 @@ export async function mounted() {
   // 并行启动路由解析与初始化数据，网页端不再依赖 WebSocket 初始化
   const routePromise = this.bootstrapRoute();
   await routePromise;
-  void this.restoreConversationTabView?.();
+  if (!mountedHosts.has(this)) return;
   this.$nextTick(() => {
     this.ensureScrollListener();
     // 刷新后若无输出，自动解锁滚动锁定
@@ -61,11 +64,18 @@ export async function mounted() {
   if (initialDataPromise && typeof initialDataPromise.then === 'function') {
     initialDataPromise
       .then(() => {
+        if (!mountedHosts.has(this)) return;
         // 初始数据加载完成后再刷新 git 摘要，确保 workspace/project_path 已就绪
         this.refreshProjectGitSummary?.();
-        // Desktop navigation is attached independently of auxiliary data loading.
         // 避免在初始加载阶段被覆盖，加载完成后再兜底检查一次
         this.checkTutorialPrompt();
+      })
+      .finally(() => {
+        if (!mountedHosts.has(this)) return;
+        // Restoring a tab advances the conversation epoch. Finish initialization
+        // first, or its ownership checks silently skip preferences and workspaces.
+        // Attach after failures too, so a transient auxiliary error cannot strand tabs.
+        return this.restoreConversationTabView?.();
       })
       .catch(() => {});
   }
@@ -98,6 +108,7 @@ export async function mounted() {
 }
 
 export function beforeUnmount() {
+  mountedHosts.delete(this);
   if (this._todoRefreshTimer) {
     clearTimeout(this._todoRefreshTimer);
     this._todoRefreshTimer = null;
