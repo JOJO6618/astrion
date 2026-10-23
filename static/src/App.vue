@@ -440,11 +440,11 @@
                 versioningHostMode ? 'workspace' : dockerProjectMode ? 'project' : null
               "
               :main-chat-idle="mainChatIdle"
-              :active-sub-agent-count="activeSubAgentCount"
+              :sub-agent-count="subAgentCount"
               :avatar-status="showStatusAvatar && messages.length > 0 ? avatarStatus : null"
               @restore-user-question="restoreUserQuestionDialog"
               @restore-plan-approval="restorePlanApprovalDialog"
-              @stop-all-sub-agents="handleStopAllSubAgents"
+              @show-sub-agents="handleShowSubAgents"
               @update:input-message="inputSetMessage"
               @input-change="handleInputChange"
               @input-focus="handleInputFocus"
@@ -501,6 +501,7 @@
         </main>
         <QuickDock
           v-if="!isMobileViewport"
+          ref="quickDock"
           :host-mode="versioningHostMode"
           :task-busy="taskInProgress || streamingMessage"
           @continue-goal="handleContinueGoal()"
@@ -1001,6 +1002,7 @@
               </svg>
             </button>
             <QuickDock
+              ref="quickDock"
               :host-mode="versioningHostMode"
               :task-busy="taskInProgress || streamingMessage"
               @continue-goal="handleContinueGoal()"

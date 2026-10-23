@@ -321,17 +321,12 @@ export const computed = {
       this.compressionActiveForCurrentConversation
     );
   },
-  /**
-   * 子智能体非终态数（包含 running + idle，不含 failed/completed/terminated/timeout）。
-   * 用于状态栏的小按钮显示 “x 个子智能体运行中”。
-   */
-  activeSubAgentCount() {
+  /** 当前对话保留的子实例数，与后端容量限制一致：只有 terminated 不占名额。 */
+  subAgentCount() {
     const subAgentStore = useSubAgentStore();
     const list = Array.isArray(subAgentStore.subAgents) ? subAgentStore.subAgents : [];
-    const TERMINAL = new Set(['completed', 'failed', 'timeout', 'terminated']);
-    return list.filter((s: any) => {
-      const status = String(s?.status || '').toLowerCase();
-      return !TERMINAL.has(status);
+    return list.filter((agent: any) => {
+      return agent && String(agent.status || '').toLowerCase() !== 'terminated';
     }).length;
   },
   /**
@@ -406,7 +401,9 @@ export const computed = {
         const status = String(item?.status || '').toLowerCase();
         return status ? !AVATAR_TERMINAL_STATUS.has(status) : true;
       }).length;
-    const agentCount = countRunning(subAgentStore.subAgents);
+    const agentCount = (
+      Array.isArray(subAgentStore.subAgents) ? subAgentStore.subAgents : []
+    ).filter((agent) => String(agent?.status || '').toLowerCase() === 'running').length;
     const cmdCount = countRunning(bgStore.commands);
     const bgText = (() => {
       const parts = [];

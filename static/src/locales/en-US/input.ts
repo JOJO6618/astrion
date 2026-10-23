@@ -10,7 +10,7 @@ export default {
   goalModeReady: 'Goal mode ready',
   waitingForQuestion: 'Waiting for your answer',
   planApprovalPending: 'Plan awaiting approval',
-  subAgentsRunning: '{n} sub-agents running',
+  subAgentCount: '{n} sub-agents',
   terminalsRunning: '{n} terminals',
   quickMenuAriaLabel: 'Quick menu',
   workModeLockedTitle: 'A conversation is running; switch modes only when idle',

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { t } from '@/locales';
 import { useModelStore } from '../../../stores/model';
+import { useQuickDockStore } from '../../../stores/quickDock';
 import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 
 // 推理强度滑块是高频交互（后端限制 20 次/分）：档位变化只乐观更新 UI，
@@ -287,51 +288,16 @@ export const modeMethods = {
       });
     }
   },
-  async handleStopAllSubAgents() {
-    const mode = 'soft_stop';
-    const title = t('appUi.pauseAllSubAgentsTitle');
-    const message = t('appUi.pauseAllSubAgentsMessage');
-    const confirmText = t('appUi.pause');
-    let proceed = false;
-    try {
-      const uiStore = (await import('../../../stores/ui')).useUiStore();
-      proceed = await uiStore.requestConfirm({
-        title,
-        message,
-        confirmText,
-        cancelText: t('common.cancel'),
-        confirmVariant: 'danger',
-        closeOnBackdrop: true
-      });
-    } catch (error) {
-      console.error('[stopAllSubAgents] 弹窗异常:', error);
-      return;
+  async handleShowSubAgents() {
+    const owns = beginAuxiliaryRequest(this, 'show-sub-agents');
+    const quickDock = useQuickDockStore();
+    quickDock.userCollapsed = false;
+    if (this.isMobileViewport && this.activeMobileOverlay !== 'quickdock') {
+      this.openMobileOverlay('quickdock');
     }
-    if (!proceed) return;
-    try {
-      const { useSubAgentStore } = await import('../../../stores/subAgent');
-      const store = useSubAgentStore();
-      const result = await store.stopAllAgents(mode);
-      if (!result.success) {
-        this.uiPushToast({
-          title: t('appUi.stopSubAgentsFailed'),
-          message: result.error || t('appUi.pleaseRetry'),
-          type: 'error'
-        });
-        return;
-      }
-      this.uiPushToast({
-        title: isMultiAgent ? t('appUi.subAgentsPaused') : t('appUi.subAgentsTerminated'),
-        message: t('appUi.stoppedSubAgentCount', { n: result.stoppedCount || 0 }),
-        type: 'info'
-      });
-    } catch (error: any) {
-      console.error('[stopAllSubAgents] 调用失败:', error);
-      this.uiPushToast({
-        title: t('appUi.stopSubAgentsFailed'),
-        message: error?.message || String(error),
-        type: 'error'
-      });
-    }
+    // 先提交展开／移动端显示，随后只滚动对应快捷窗口，不移动消息区。
+    await this.$nextTick();
+    if (!owns()) return;
+    this.$refs.quickDock?.scrollToSubAgents();
   }
 };

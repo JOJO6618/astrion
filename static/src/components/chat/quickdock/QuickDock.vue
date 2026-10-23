@@ -15,7 +15,7 @@
       />
       <WorkflowWindow />
       <TodoWindow />
-      <RunnerWindow kind="agent" />
+      <RunnerWindow kind="agent" data-quick-dock-section="agents" />
       <RunnerWindow kind="cmd" />
       <FileWindow />
       <PreviewWindow />
@@ -66,6 +66,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
 import { downloadWorkspaceFile } from '@/utils/downloadFile';
+import { scrollToSubAgentCard } from './navigation';
 import {
   useQuickDockStore,
   persistQuickDockHadContent,
@@ -114,6 +115,7 @@ const personalizationStore = usePersonalizationStore();
 // hasContent / userCollapsed 提升到 store：App.vue 的展开收起按钮共用同一判定
 const { menu, hasContent, userCollapsed } = storeToRefs(quickDock);
 const scrollRef = ref<HTMLElement | null>(null);
+defineExpose({ scrollToSubAgents: () => scrollToSubAgentCard(scrollRef.value) });
 
 // 手动收起时关掉所有瞬态面板（详情/预览/菜单），避免固定定位的详情面板悬空
 watch(userCollapsed, (collapsed) => {

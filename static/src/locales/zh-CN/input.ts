@@ -10,7 +10,7 @@ export default {
   goalModeReady: '目标模式就绪',
   waitingForQuestion: '等待回答问题',
   planApprovalPending: '有待批准的计划',
-  subAgentsRunning: '{n} 个子智能体运行中',
+  subAgentCount: '{n} 个子智能体',
   terminalsRunning: '{n} 个终端',
   quickMenuAriaLabel: '快捷菜单',
   workModeLockedTitle: '对话运行中，运行模式只能在空闲时切换',

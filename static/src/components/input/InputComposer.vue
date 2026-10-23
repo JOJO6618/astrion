@@ -211,12 +211,12 @@
                 {{ $t('input.planApprovalPending') }}
               </button>
               <button
-                v-if="(activeSubAgentCount || 0) > 0"
+                v-if="(subAgentCount || 0) > 0"
                 type="button"
                 class="floating-project-status__notice floating-project-status__notice--button"
-                @click.stop="$emit('stop-all-sub-agents')"
+                @click.stop="$emit('show-sub-agents')"
               >
-                {{ $t('input.subAgentsRunning', { n: activeSubAgentCount }) }}
+                {{ $t('input.subAgentCount', { n: subAgentCount }) }}
               </button>
               <button
                 v-if="terminalCount > 0"
@@ -788,7 +788,7 @@ const emit = defineEmits([
   'new-conversation',
   'switch-host-workspace',
   'fetch-host-workspaces',
-  'stop-all-sub-agents'
+  'show-sub-agents'
 ]);
 
 const props = defineProps<{
@@ -889,8 +889,8 @@ const props = defineProps<{
    * 多智能体模式下，若主对话空闲，输入栏应处于“正常发送”状态，不是“停止”状态。
    */
   mainChatIdle?: boolean;
-  /** 非终态子智能体数量，用于状态栏“x 个子智能体运行中”按钮显示 */
-  activeSubAgentCount?: number;
+  /** 未终结子实例数量；点击状态栏按钮展开快捷窗口中的子智能体卡片。 */
+  subAgentCount?: number;
   hasPendingRuntimeGuidance?: boolean;
   terminalCount?: number;
   hostMode?: boolean;
@@ -1164,7 +1164,7 @@ const floatingStatusVisible = computed(() => {
     !!props.goalModeArmed ||
     Number(props.pendingUserQuestionCount || 0) > 0 ||
     (!!props.planApprovalMinimized && Number(props.pendingPlanApprovalCount || 0) > 0) ||
-    Number(props.activeSubAgentCount || 0) > 0;
+    Number(props.subAgentCount || 0) > 0;
   return visible;
 });
 

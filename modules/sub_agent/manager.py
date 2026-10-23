@@ -96,10 +96,13 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
         from modules.multi_agent.state import AgentInstance
         resolve_locked_model_profile(model_key)
         with self._state_lock:
-            active = sum(item.get("status") == "running" and item.get("conversation_id") == conversation_id
-                         for item in self.tasks.values())
-            if active >= SUB_AGENT_MAX_ACTIVE:
-                return {"success": False, "error": "当前对话运行中的子智能体已达上限。"}
+            retained = sum(item.get("status") != "terminated" and item.get("conversation_id") == conversation_id
+                           for item in self.tasks.values())
+            if retained >= SUB_AGENT_MAX_ACTIVE:
+                return {"success": False, "error": (
+                    f"当前对话未终结的子智能体已达上限（{SUB_AGENT_MAX_ACTIVE} 个）；"
+                    "请继续使用已有实例，或终结不再需要的实例后再创建。"
+                )}
             directory = self._resolve_working_dir(working_dir, agent_id=agent_id)
             task_id = "sub_" + uuid.uuid4().hex
             task_root = self.base_dir / task_id
