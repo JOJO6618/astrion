@@ -438,12 +438,12 @@ export default {
 
   // ── 子智能体 ──
   subAgentsIntro:
-    '管理多智能体模式下的子智能体角色。预设角色可编辑（创建自定义覆盖），自定义角色可创建/编辑/删除。',
+    '配置子智能体的模型与上下文压缩阈值。子智能体保留上下文，可在完成一轮后继续工作。',
   compressThresholdTitle: '上下文压缩阈值',
   compressThresholdDesc: '子智能体上下文 tokens 超过此值时触发深度压缩（默认 250000）',
-  subAgentModelTitle: '传统子智能体智能程度',
+  subAgentModelTitle: '子智能体智能程度',
   subAgentModelDesc:
-    '按模型的实际能力配置三个档位，三个档位可以选择同一个模型。和当前智能体一致无需配置，适合协作编写代码。未配置的档位会报错，可改用和当前智能体一致。所有档位统一使用思考模式，并继承创建时主智能体的推理强度；模型不支持的强度按现有模型协议处理。多智能体角色不受影响。',
+    '按模型的实际能力配置三个档位，三个档位可以选择同一个模型。和当前智能体一致无需配置，适合协作编写代码。未配置的档位会报错，可改用和当前智能体一致。所有档位统一使用思考模式，并继承创建时主智能体的推理强度；模型不支持的强度按现有模型协议处理。',
   subAgentModelUnconfigured: '未配置',
   subAgentIntelligence: { same: '和当前智能体一致', high: '高', medium: '中', low: '低' },
   subAgentIntelligenceDesc: {

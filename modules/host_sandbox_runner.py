@@ -397,7 +397,8 @@ def _scoped_macos_env(env: Dict[str, str]) -> Dict[str, str]:
     if scope and scope.workspace_only:
         import hashlib
         from modules.file_manager.scoped_io import mkdir_checked
-        root = _sandbox_workspace(scope.workspace_root)
+        from modules.scoped_execution_policy import fixed_write_root
+        root = fixed_write_root(scope)
         actor = hashlib.sha256(scope.actor_id.encode("utf-8")).hexdigest()[:24]
         temporary = root / ".astrion" / "sub_agent_runtime" / actor / "tmp"
         mkdir_checked(temporary, create_roots=[root])
@@ -413,7 +414,8 @@ def _macos_profile_for_workspace(
     work_path = _sandbox_workspace(work_path, workspace_root)
     workspace = str(work_path.resolve())
     scope = current_execution_scope()
-    writable_paths = [workspace, "/dev/null"] if scope and scope.workspace_only else [workspace, "/tmp", "/private/tmp", "/dev/null"]
+    from modules.scoped_execution_policy import fixed_write_root
+    writable_paths = [str(fixed_write_root(scope)), "/dev/null"] if scope and scope.workspace_only else [workspace, "/tmp", "/private/tmp", "/dev/null"]
     # dirhelper 放行后 TMPDIR 解析为真实 per-user 临时目录（/var/folders/.../T/）：
     # xcselect 垫片会向其中写 xcrun_db 缓存，只读/可写 profile 语义不同——
     # 可写 profile 放行其父目录（含同级 C/ 缓存目录，与放行 /tmp 的语义对齐，
@@ -580,6 +582,7 @@ def _build_windows_bwrap_argv(
     readable_paths: Optional[List[str]] = None,
     writable_paths: Optional[List[str]] = None,
     fixed_scope: bool = False,
+    workspace_write_root: Optional[str] = None,
 ) -> List[str]:
     permission = _normalize_network_permission(network_permission)
     argv: List[str] = [
@@ -598,7 +601,10 @@ def _build_windows_bwrap_argv(
         argv += ["--ro-bind", sysdir, sysdir]
     for entry in readable_paths or []:
         argv += ["--ro-bind", entry, entry]
-    argv += (["--ro-bind"] if readonly else ["--bind"]) + [ws_wsl, ws_wsl]
+    narrow = workspace_write_root is not None and workspace_write_root != ws_wsl
+    argv += (["--ro-bind"] if readonly or narrow else ["--bind"]) + [ws_wsl, ws_wsl]
+    if narrow and not readonly:
+        argv += ["--bind", workspace_write_root, workspace_write_root]
     for entry in writable_paths or []:
         argv += ["--bind", entry, entry]
     argv += [
@@ -656,11 +662,14 @@ def _build_windows_wsl_plan(
         if not scope.workspace_only and not readonly:
             for raw in get_macos_writable_paths(str(root)):
                 writable_paths.append(_win_path_to_wsl(Path(raw).expanduser().resolve()))
+    from modules.scoped_execution_policy import fixed_working_dir
     argv = _build_windows_bwrap_argv(
         ws_wsl, shell_cmd, readonly, network_permission,
         cwd_wsl=_win_path_to_wsl(work_path.resolve()),
         readable_paths=readable_paths, writable_paths=writable_paths,
         fixed_scope=fixed_child,
+        workspace_write_root=(_win_path_to_wsl(fixed_working_dir(scope))
+                              if fixed_child and scope.access_level == "working_dir_write" else None),
     )
     plan_env = dict(env or {})
     plan_env["WSL_UTF8"] = "1"

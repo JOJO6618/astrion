@@ -724,43 +724,13 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
   });
 
   // ----- 子智能体管理 -----
-  const subAgentRoles = ref<any[]>([]);
-  const subAgentRolesLoading = ref(false);
   const subAgentCompressThreshold = ref(250000);
-  /** 子智能体最大执行轮次（仅传统后台子智能体；多智能体成员不受限）：null/'' = 默认 50；0 = 无上限；正整数 = 该值 */
-  const subAgentMaxTurns = ref<number | null>(null);
   const subAgentSettingsSaving = ref(false);
   const subAgentModels = ref<any[]>([]);
-  const roleEditorOpen = ref(false);
-  const editingRole = ref<any>(null);
-  const roleSaving = ref(false);
-  const roleForm = ref({
-    role_id: '',
-    name: '',
-    description: '',
-    body_prompt: '',
-    thinking_mode: 'fast',
-    model_key: ''
-  });
-
-  const loadSubAgentRoles = async () => {
-    subAgentRolesLoading.value = true;
-    try {
-      const resp = await fetch('/api/multiagent/roles', { credentials: 'same-origin' });
-      const data = await resp.json();
-      if (data.success) {
-        subAgentRoles.value = data.roles || [];
-      }
-    } catch (e) {
-      // 静默处理
-    } finally {
-      subAgentRolesLoading.value = false;
-    }
-  };
 
   const loadSubAgentModels = async () => {
     try {
-      const resp = await fetch('/api/multiagent/models', { credentials: 'same-origin' });
+      const resp = await fetch('/api/sub_agents/models', { credentials: 'same-origin' });
       const data = await resp.json();
       if (data.success) {
         subAgentModels.value = data.models || [];
@@ -822,13 +792,11 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
 
   const loadSubAgentSettings = async () => {
     try {
-      const resp = await fetch('/api/multiagent/settings', { credentials: 'same-origin' });
+      const resp = await fetch('/api/sub_agents/settings', { credentials: 'same-origin' });
       const data = await resp.json();
       if (data.success && data.settings) {
         subAgentCompressThreshold.value =
           data.settings.sub_agent_compress_threshold_tokens || 250000;
-        // 未设置时为 null，输入框留空（placeholder 提示默认 50）
-        subAgentMaxTurns.value = data.settings.sub_agent_max_turns ?? null;
       }
     } catch (e) {
       // 静默处理
@@ -843,7 +811,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     ([tab, isVisible]) => {
       if (!isVisible) return;
       if (tab === 'sub-agents') {
-        loadSubAgentRoles();
         loadSubAgentSettings();
         loadSubAgentModels();
       }
@@ -873,115 +840,18 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
   const saveSubAgentSettings = async () => {
     subAgentSettingsSaving.value = true;
     try {
-      await fetch('/api/multiagent/settings', {
+      await fetch('/api/sub_agents/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify({
           settings: {
-            sub_agent_compress_threshold_tokens: subAgentCompressThreshold.value,
-            // 留空（null/''）提交 null → 服务端删除该键恢复默认 50；0 → 无上限
-            sub_agent_max_turns:
-              subAgentMaxTurns.value === null || (subAgentMaxTurns.value as unknown) === ''
-                ? null
-                : Number(subAgentMaxTurns.value)
+            sub_agent_compress_threshold_tokens: subAgentCompressThreshold.value
           }
         })
       });
     } finally {
       subAgentSettingsSaving.value = false;
-    }
-  };
-
-  const openRoleEditor = (role?: any) => {
-    if (role) {
-      editingRole.value = role;
-      roleForm.value = {
-        role_id: role.role_id || '',
-        name: role.name || '',
-        description: role.description || '',
-        body_prompt: role.body_prompt || '',
-        thinking_mode: role.thinking_mode || 'fast',
-        model_key: role.model_key || ''
-      };
-    } else {
-      editingRole.value = null;
-      roleForm.value = {
-        role_id: '',
-        name: '',
-        description: '',
-        body_prompt: '',
-        thinking_mode: 'fast',
-        model_key: ''
-      };
-    }
-    closeDropdown();
-    roleEditorOpen.value = true;
-  };
-
-  const closeRoleEditor = () => {
-    roleEditorOpen.value = false;
-    editingRole.value = null;
-    closeDropdown();
-  };
-
-  // 角色编辑弹窗遮罩：按下与松开都发生在遮罩上才视为「点击遮罩关闭」。
-  // 修复：在输入框内拖选文字、松开落在遮罩上时，click 事件 target 为遮罩，
-  // 会被 @click.self 误判为点击遮罩，导致整个编辑器关闭、表单内容丢失。
-  const roleEditorOverlayPressActive = ref(false);
-
-  const handleRoleEditorOverlayPressStart = (event: MouseEvent) => {
-    roleEditorOverlayPressActive.value = event.target === event.currentTarget && event.button === 0;
-  };
-
-  const handleRoleEditorOverlayPressEnd = (event: MouseEvent) => {
-    const shouldClose = roleEditorOverlayPressActive.value && event.target === event.currentTarget;
-    roleEditorOverlayPressActive.value = false;
-    if (shouldClose) {
-      closeRoleEditor();
-    }
-  };
-
-  const saveRole = async () => {
-    roleSaving.value = true;
-    try {
-      const isEdit = !!editingRole.value;
-      const url = isEdit
-        ? `/api/multiagent/roles/${roleForm.value.role_id}`
-        : '/api/multiagent/roles';
-      const method = isEdit ? 'PUT' : 'POST';
-      const resp = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          ...roleForm.value,
-          model_key: roleForm.value.model_key || null
-        })
-      });
-      const data = await resp.json();
-      if (data.success) {
-        closeRoleEditor();
-        await loadSubAgentRoles();
-      }
-    } finally {
-      roleSaving.value = false;
-    }
-  };
-
-  const deleteRole = async (role: any) => {
-    if (!confirm(t('personalization.deleteRoleConfirm', { name: role.name }))) return;
-    try {
-      const resp = await fetch(`/api/multiagent/roles/${role.role_id}`, {
-        method: 'DELETE',
-        credentials: 'same-origin'
-      });
-      const data = await resp.json();
-      if (data.success) {
-        await loadSubAgentRoles();
-      }
-    } catch (e) {
-      // 静默处理
     }
   };
 
@@ -1393,7 +1263,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     blockDisplayOptions,
     checkAppUpdate,
     closeDropdown,
-    closeRoleEditor,
     commitProjectMemoryInjectLimitInput,
     commitRecentConversationsPromptLimitInput,
     communicationStyleLabel,
@@ -1403,11 +1272,9 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     currentBlockDisplayMode,
     currentCompactMessageDisplay,
     defaultModelLabel,
-    deleteRole,
     deleteVoiceModel,
     downloadLatestApp,
     downloadVoiceModel,
-    editingRole,
     fetchUsageSummary,
     filteredModelOptions,
     floatingMenuStyle,
@@ -1418,8 +1285,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     handleMinimalExpandHeightLimitedChange,
     handleProjectMemoryInjectLimitInput,
     handleRecentConversationsPromptLimitInput,
-    handleRoleEditorOverlayPressEnd,
-    handleRoleEditorOverlayPressStart,
     handleStackedHideBordersChange,
     imageCompressionLabel,
     imageCompressionOptions,
@@ -1436,7 +1301,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     openApiAdmin,
     openCustomTools,
     openMcpConfig,
-    openRoleEditor,
     permissionModeLabel,
     personalization,
     projectMemoryInjectLimitMin,
@@ -1447,11 +1311,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     restoreRecentConversationsPromptLimit,
     reviewAgentDefs,
     reviewAgentOf,
-    roleEditorOpen,
-    roleForm,
-    roleSaving,
     runModeLabel,
-    saveRole,
     saveSubAgentSettings,
     saving,
     selectBlockDisplayMode,
@@ -1472,10 +1332,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     stackedHideBorders,
     startTutorial,
     subAgentCompressThreshold,
-    subAgentMaxTurns,
     subAgentModels,
-    subAgentRoles,
-    subAgentRolesLoading,
     subAgentSettingsSaving,
     themeLabel,
     themeOptions,

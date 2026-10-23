@@ -49,6 +49,9 @@ DEFERRABLE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "create_sub_agent",
             "get_sub_agent_status",
             "terminate_sub_agent",
+            "send_message_to_sub_agent",
+            "stop_sub_agent",
+            "answer_sub_agent_question",
         ],
     },
     "conversation": {
@@ -215,19 +218,15 @@ def build_snapshot(
 
 def snapshot_overrides_from_prefs(
     personalization_config: Any,
-    multi_agent_mode: bool = False,
 ) -> Dict[str, Any]:
     """创建对话时合并进 metadata_overrides 的 tool_loading 部分（适配层调用）。
 
-    返回 {} 表示本对话不启用（多智能体对话 v1 不启用 / 个人空间总开关关闭）。
+    返回 {} 表示本对话不启用（个人空间总开关关闭）。
     老对话（功能上线前创建）无此字段，读侧一律按未启用处理，不做迁移。
 
     Args:
         personalization_config: 调用方已加载的个人空间配置（本函数不做 I/O）。
-        multi_agent_mode: 是否为多智能体对话。
     """
-    if multi_agent_mode:
-        return {}
     prefs = personalization_config if isinstance(personalization_config, dict) else {}
     if prefs.get("tool_loading_enabled", False) is not True:
         return {}

@@ -125,13 +125,13 @@ test('initial/late draft restore cannot overwrite user input or a newer epoch', 
 
 test('workspace cache reuses empty lists and rejects invalidated late responses', async () => {
   const f = fixture({ realSnapshot: false });
-  const page = f.caching.fetchConversationPage(f.store, 'ws2', 'normal'); await flush();
+  const page = f.caching.fetchConversationPage(f.store, 'ws2'); await flush();
   respond(f.requests[0], { success: true, data: { conversations: [], has_more: false } }); await page;
-  await f.caching.fetchConversationPage(f.store, 'ws2', 'normal'); assert.equal(f.requests.length, 1);
-  const late = f.caching.fetchConversationPage(f.store, 'ws2', 'normal', { refresh: true }); await flush();
+  await f.caching.fetchConversationPage(f.store, 'ws2'); assert.equal(f.requests.length, 1);
+  const late = f.caching.fetchConversationPage(f.store, 'ws2', { refresh: true }); await flush();
   f.store.invalidateWorkspaceCache('ws2');
   respond(f.requests[1], { success: true, data: { conversations: [{ id: 'late' }] } }); await late;
-  assert.equal(f.store.getWorkspaceCache('ws2').normal.list.length, 0);
+  assert.equal(f.store.getWorkspaceCache('ws2').list.length, 0);
   assert.equal(f.store.conversationCacheWorkspaceId, 'ws1');
 });
 

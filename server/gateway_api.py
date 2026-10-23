@@ -37,8 +37,6 @@ def list_runtime_sessions():
     workspace_id = _resolve_workspace_id(request.args.get("workspace_id", ""))
     limit = request.args.get("limit", 50, type=int)
     offset = request.args.get("offset", 0, type=int)
-    ma_param = request.args.get("multi_agent_mode", None)
-    multi_agent_mode = None if ma_param is None else ma_param in ("1", "true", "True")
     quick_param = request.args.get("quick_entry")
     quick_entry = None if quick_param is None else quick_param in ("1", "true", "True")
     username = str(session.get("username") or "")
@@ -50,7 +48,6 @@ def list_runtime_sessions():
             principal,
             limit=limit,
             offset=offset,
-            multi_agent_mode=multi_agent_mode,
             quick_entry=quick_entry,
         )
         return jsonify({"success": True, **(result or {})})
@@ -78,7 +75,6 @@ def create_runtime_session():
             run_mode=data.get("run_mode"),
             thinking_mode=data.get("thinking_mode"),
             model_key=data.get("model_key"),
-            multi_agent_mode=bool(data.get("multi_agent_mode")),
             work_mode=data.get("work_mode"),
             permission_mode=data.get("permission_mode"),
             execution_mode=data.get("execution_mode"),

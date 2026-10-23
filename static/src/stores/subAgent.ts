@@ -16,6 +16,8 @@ interface SubAgent {
   conversation_id?: string;
   notice_pending?: boolean;
   display_name?: string;
+  name?: string;
+  working_dir?: string;
   current_context_tokens?: number;
   created_at?: number | string;
 }
@@ -74,29 +76,14 @@ export const useSubAgentStore = defineStore('subAgent', {
         this.subAgents = this.subAgents.filter(
           (item) => !item.conversation_id || item.conversation_id === convId
         );
-        let resp;
-        if (conversationStore.multiAgentMode) {
-          resp = await fetch(
-            `/api/multiagent/active_sub_agents?conversation_id=${encodeURIComponent(convId)}`
-          );
-        } else {
-          // 必须携带 conversation_id：后端按 terminal 的当前对话过滤，无参数时落到
-          // 工作区级服务 terminal，其 current_conversation_id 与用户查看的对话不一致。
-          resp = await fetch(`/api/sub_agents?conversation_id=${encodeURIComponent(convId)}`);
-        }
+        const resp = await fetch(`/api/sub_agents?conversation_id=${encodeURIComponent(convId)}`);
         if (!resp.ok) {
           throw new Error(await resp.text());
         }
         const data = await resp.json();
         if (!owns()) return;
         if (data.success) {
-          const agents = conversationStore.multiAgentMode
-            ? Array.isArray(data.agents)
-              ? data.agents
-              : []
-            : Array.isArray(data.data)
-              ? data.data
-              : [];
+          const agents = Array.isArray(data.data) ? data.data : [];
           // 统一按创建时间升序（最新在末尾）：传统模式后端返回倒序，
           // 快捷窗口设计要求最新条目出现在列表底部（与待办/后台指令/文件一致）。
           agents.sort(

@@ -78,9 +78,6 @@ export const watchers = {
         if (!newValue) {
           const session = currentConversationSession(this);
           if (session?.conversationId && !this.historyLoading) this.leaveConversationView();
-          // 空对话态：对话类型复位（进入对话时由 enterConversation 从 metadata 落地）
-          this.currentConversationType = null;
-          useConversationStore().$patch({ multiAgentMode: false });
         }
         const quickDock = useQuickDockStore();
         // 关闭详情/预览/菜单等瞬态（必须立即）

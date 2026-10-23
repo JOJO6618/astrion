@@ -40,9 +40,6 @@ from utils.tool_result_formatter.agent_context import (
     _format_send_message_to_sub_agent,
     _format_stop_sub_agent,
     _format_answer_sub_agent_question,
-    _format_create_custom_agent,
-    _format_list_agents,
-    _format_list_active_sub_agents,
     _format_submit_plan,
 )
 from utils.tool_result_formatter.web_media import (
@@ -144,9 +141,6 @@ TOOL_FORMATTERS = {
     "send_message_to_sub_agent": _format_send_message_to_sub_agent,
     "stop_sub_agent": _format_stop_sub_agent,
     "answer_sub_agent_question": _format_answer_sub_agent_question,
-    "create_custom_agent": _format_create_custom_agent,
-    "list_agents": _format_list_agents,
-    "list_active_sub_agents": _format_list_active_sub_agents,
     "get_sub_agent_status": _format_get_sub_agent_status,
     "submit_plan": _format_submit_plan,
 }

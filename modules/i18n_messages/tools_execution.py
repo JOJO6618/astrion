@@ -216,72 +216,12 @@ MESSAGES = {
         "en-US": "Waiting for operation to complete",
     },
     "tools_exec.sleep_no_params": {
-        "zh-CN": "sleep 至少需要提供一个参数：seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id",
-        "en-US": "sleep requires at least one argument: seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id",
+        "zh-CN": "sleep 至少需要提供一个参数：seconds / wait_runcommand_id",
+        "en-US": "sleep requires at least one argument: seconds / wait_runcommand_id",
     },
     "tools_exec.sleep_params_exclusive": {
-        "zh-CN": "sleep 的等待参数互斥：seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id 只能提供一个",
-        "en-US": "sleep wait arguments are mutually exclusive: provide exactly one of seconds / wait_sub_agent_ids / wait_sub_agent_output / wait_runcommand_id",
-    },
-    "tools_exec.agent_output_multi_agent_only": {
-        "zh-CN": "wait_sub_agent_output 仅在多智能体模式下可用",
-        "en-US": "wait_sub_agent_output is only available in multi-agent mode",
-    },
-    "tools_exec.sub_agent_manager_unavailable": {
-        "zh-CN": "子智能体管理器不可用",
-        "en-US": "Sub-agent manager unavailable",
-    },
-    "tools_exec.no_multi_agent_state": {
-        "zh-CN": "当前对话没有多智能体状态",
-        "en-US": "The current conversation has no multi-agent state",
-    },
-    "tools_exec.list_sep": {
-        "zh-CN": "、",
-        "en-US": ", ",
-    },
-    "tools_exec.none_placeholder": {
-        "zh-CN": "（无）",
-        "en-US": "(none)",
-    },
-    "tools_exec.agent_not_found": {
-        "zh-CN": "未找到子智能体「{display_name}」。当前已有: {available}",
-        "en-US": "Sub-agent \"{display_name}\" not found. Current: {available}",
-    },
-    "tools_exec.agent_output_wait_timeout": {
-        "zh-CN": "等待 {display_name} 输出超时（5分钟）。可用 send_message_to_sub_agent 重新激活。",
-        "en-US": "Timed out waiting for {display_name} output (5 minutes). You can reactivate it with send_message_to_sub_agent.",
-    },
-    "tools_exec.agent_output_wait_cancelled": {
-        "zh-CN": "等待 {display_name} 被取消。该子智能体现在不可用，可用 send_message_to_sub_agent 重新激活。",
-        "en-US": "Waiting for {display_name} was cancelled. The sub-agent is now unavailable; reactivate it with send_message_to_sub_agent.",
-    },
-    "tools_exec.agent_reactivate_hint": {
-        "zh-CN": " 可用 send_message_to_sub_agent 重新激活。",
-        "en-US": " You can reactivate it with send_message_to_sub_agent.",
-    },
-    "tools_exec.agent_output_wait_failed": {
-        "zh-CN": "等待 {display_name} 输出失败: {error}。可用 send_message_to_sub_agent 重新激活。",
-        "en-US": "Failed to wait for {display_name} output: {error}. You can reactivate it with send_message_to_sub_agent.",
-    },
-    "tools_exec.sleep_wait_ids_not_supported": {
-        "zh-CN": "多智能体模式下 sleep 工具不支持 wait_sub_agent_ids，请使用 wait_sub_agent_output。",
-        "en-US": "In multi-agent mode the sleep tool does not support wait_sub_agent_ids; use wait_sub_agent_output instead.",
-    },
-    "tools_exec.wait_ids_nonempty": {
-        "zh-CN": "wait_sub_agent_ids 必须是非空数组",
-        "en-US": "wait_sub_agent_ids must be a non-empty array",
-    },
-    "tools_exec.wait_ids_invalid": {
-        "zh-CN": "wait_sub_agent_ids 含非法值: {invalid}",
-        "en-US": "wait_sub_agent_ids contains invalid values: {invalid}",
-    },
-    "tools_exec.agent_not_found_by_id": {
-        "zh-CN": "未找到对应子智能体: {missing}",
-        "en-US": "Matching sub-agent not found: {missing}",
-    },
-    "tools_exec.waited_agents_done": {
-        "zh-CN": "已等待 {count} 个子智能体结束",
-        "en-US": "Finished waiting for {count} sub-agents",
+        "zh-CN": "sleep 的等待参数互斥：seconds / wait_runcommand_id 只能提供一个",
+        "en-US": "sleep wait arguments are mutually exclusive: provide exactly one of seconds / wait_runcommand_id",
     },
     "tools_exec.background_manager_unavailable": {
         "zh-CN": "后台命令管理器不可用",

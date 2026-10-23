@@ -57,16 +57,10 @@ export const searchMethods = {
     this.searchResults = [];
     this.searchGroups = [];
 
-    // 搜索范围跟随侧边栏类型过滤器（普通/多智能体）
-    const { useConversationStore } = await import('../../stores/conversation');
-    const maParam =
-      useConversationStore().sidebarConversationType === 'multi_agent'
-        ? '&multi_agent_mode=1'
-        : '&multi_agent_mode=0';
     const grouped = this.isGroupedSidebarSearch();
     const url = grouped
-      ? `/api/conversations/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_GROUP_LIMIT}&all_workspaces=1${maParam}`
-      : `/api/conversations/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_FLAT_LIMIT}${maParam}`;
+      ? `/api/conversations/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_GROUP_LIMIT}&all_workspaces=1`
+      : `/api/conversations/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_FLAT_LIMIT}`;
 
     try {
       const response = await fetch(url);

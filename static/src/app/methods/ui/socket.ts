@@ -377,10 +377,7 @@ export const socketMethods = {
         ? null
         : await this.getRunningTaskConversationId();
       const resumeConversationId = statusConversationId || runningConversationId;
-      const currentPath = window.location.pathname.replace(/^\/+/, '');
-      const isMultiAgentNewRoute = currentPath === 'multiagent/new' || currentPath === 'multiagent';
-
-      // 显式新建对话路由（/new、/multiagent/new）与独立全屏路由（工作流编辑器等）
+      // 显式新建对话路由（/new）与独立全屏路由（工作流编辑器等）
       // 永不自动恢复运行中的对话：前者是用户明确要空白页，后者不归对话体系，
       // 运行中任务可从侧边栏随时切回。
       // 桌面端标签条模式同样禁用：恢复权威是持久化标签列表而非后端单槽位状态。
@@ -391,7 +388,6 @@ export const socketMethods = {
         currentConversationSession(this) === startupSession &&
         !this.historyLoading &&
         !this.currentConversationId &&
-        !isMultiAgentNewRoute &&
         !isExplicitNewRoute &&
         !this.isConversationIndependentRoute() &&
         !(window as any).__ASTRION_DESKTOP__

@@ -37,7 +37,6 @@ try:
         WORKSPACE_MEMORY_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
     )
-    from config.paths import WEB_PRESET_ROLES_DIR
 except ImportError:
     import sys
     project_root = Path(__file__).resolve().parents[2]
@@ -64,7 +63,6 @@ except ImportError:
         WORKSPACE_MEMORY_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
     )
-    from config.paths import WEB_PRESET_ROLES_DIR
 
 from modules.file_manager import FileManager
 from modules.search_engine import SearchEngine
@@ -190,6 +188,9 @@ class MainTerminalToolsExecutionMixin:
     }
     _SUB_AGENT_SERIES_TOOLS = {
         "create_sub_agent",
+        "send_message_to_sub_agent",
+        "stop_sub_agent",
+        "answer_sub_agent_question",
         "terminate_sub_agent",
         "get_sub_agent_status",
     }
@@ -222,6 +223,9 @@ class MainTerminalToolsExecutionMixin:
         "terminal_snapshot",
         # 子智能体全生命周期（只读权限会传播给子智能体，计划模式调研主力）
         "create_sub_agent",
+        "send_message_to_sub_agent",
+        "stop_sub_agent",
+        "answer_sub_agent_question",
         "terminate_sub_agent",
         "get_sub_agent_status",
         # MCP 服务列举（mcp__* 工具在 evaluate_tool_permission 中按前缀放行）
@@ -1466,17 +1470,11 @@ class MainTerminalToolsExecutionMixin:
                     # sleep工具
                     elif tool_name == "sleep":
                         seconds = arguments.get("seconds")
-                        wait_sub_agent_ids = arguments.get("wait_sub_agent_ids")
-                        wait_sub_agent_output = arguments.get("wait_sub_agent_output")
                         wait_runcommand_id = arguments.get("wait_runcommand_id")
                         reason = arguments.get("reason", tr("tools_exec.sleep_reason_default"))
 
                         provided = 0
                         if seconds is not None:
-                            provided += 1
-                        if wait_sub_agent_ids:
-                            provided += 1
-                        if wait_sub_agent_output:
                             provided += 1
                         if wait_runcommand_id:
                             provided += 1
@@ -1490,120 +1488,6 @@ class MainTerminalToolsExecutionMixin:
                                 "success": False,
                                 "error": tr("tools_exec.sleep_params_exclusive")
                             }
-                        elif wait_sub_agent_output:
-                            if not getattr(self, "multi_agent_mode", False):
-                                result = {"success": False, "error": tr("tools_exec.agent_output_multi_agent_only")}
-                            else:
-                                display_name = str(wait_sub_agent_output or "").strip()
-                                manager = getattr(self, "sub_agent_manager", None)
-                                if not manager:
-                                    result = {"success": False, "error": tr("tools_exec.sub_agent_manager_unavailable")}
-                                else:
-                                    state = manager.get_multi_agent_state(getattr(self.context_manager, "current_conversation_id", None))
-                                    if not state:
-                                        result = {"success": False, "error": tr("tools_exec.no_multi_agent_state")}
-                                    else:
-                                        # 显示名寻址：模型只传显示名，内部解析为全局 agent_id
-                                        inst = state.get_instance_by_display_name(display_name)
-                                        if not inst:
-                                            available = tr("tools_exec.list_sep").join(state.list_display_names()) or tr("tools_exec.none_placeholder")
-                                            result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available)}
-                                        else:
-                                            try:
-                                                loop = asyncio.get_running_loop()
-                                                fut = state.register_output_wait(inst.agent_id, loop)
-                                                msg = await asyncio.wait_for(fut, timeout=300)
-                                                result = {
-                                                    "success": True,
-                                                    "mode": "wait_sub_agent_output",
-                                                    "display_name": inst.display_name,
-                                                    "message": msg,
-                                                }
-                                            except asyncio.TimeoutError:
-                                                result = {"success": False, "error": tr("tools_exec.agent_output_wait_timeout", display_name=inst.display_name)}
-                                            except asyncio.CancelledError:
-                                                result = {"success": False, "error": tr("tools_exec.agent_output_wait_cancelled", display_name=inst.display_name)}
-                                            except RuntimeError as exc:
-                                                error_msg = str(exc)
-                                                if "send_message_to_sub_agent" not in error_msg:
-                                                    error_msg += tr("tools_exec.agent_reactivate_hint")
-                                                result = {"success": False, "error": error_msg}
-                                            except Exception as exc:
-                                                result = {"success": False, "error": tr("tools_exec.agent_output_wait_failed", display_name=inst.display_name, error=str(exc))}
-                        elif wait_sub_agent_ids:
-                            if getattr(self, "multi_agent_mode", False):
-                                result = {
-                                    "success": False,
-                                    "error": tr("tools_exec.sleep_wait_ids_not_supported")
-                                }
-                            elif not isinstance(wait_sub_agent_ids, list) or not wait_sub_agent_ids:
-                                result = {"success": False, "error": tr("tools_exec.wait_ids_nonempty")}
-                            else:
-                                normalized_ids = []
-                                invalid = []
-                                for item in wait_sub_agent_ids:
-                                    try:
-                                        agent_id = int(item)
-                                        if agent_id <= 0:
-                                            raise ValueError()
-                                        normalized_ids.append(agent_id)
-                                    except Exception:
-                                        invalid.append(item)
-                                if invalid:
-                                    result = {"success": False, "error": tr("tools_exec.wait_ids_invalid", invalid=invalid)}
-                                else:
-                                    manager = getattr(self, "sub_agent_manager", None)
-                                    if not manager:
-                                        result = {"success": False, "error": tr("tools_exec.sub_agent_manager_unavailable")}
-                                    else:
-                                        task_ids = []
-                                        missing = []
-                                        for aid in normalized_ids:
-                                            task = manager.lookup_task(agent_id=aid)
-                                            if not task:
-                                                missing.append(aid)
-                                            else:
-                                                task_ids.append(task.get("task_id"))
-                                        if missing:
-                                            result = {"success": False, "error": tr("tools_exec.agent_not_found_by_id", missing=missing)}
-                                        else:
-                                            wait_results = []
-                                            waited_task_ids = []
-                                            for tid in task_ids:
-                                                wait_result = await asyncio.to_thread(
-                                                    manager.wait_for_completion,
-                                                    task_id=tid,
-                                                    timeout_seconds=None,
-                                                )
-                                                wait_results.append(wait_result)
-                                                waited_task_ids.append(tid)
-                                                try:
-                                                    task = manager.tasks.get(tid)
-                                                    if isinstance(task, dict):
-                                                        task["notified"] = True
-                                                        task["updated_at"] = time.time()
-                                                except Exception:
-                                                    pass
-                                            try:
-                                                manager._save_state()
-                                            except Exception:
-                                                pass
-                                            result = {
-                                                "success": True,
-                                                "mode": "wait_sub_agent_ids",
-                                                "agent_ids": normalized_ids,
-                                                "waited_task_ids": waited_task_ids,
-                                                "results": wait_results,
-                                                "message": tr("tools_exec.waited_agents_done", count=len(normalized_ids))
-                                            }
-                                            try:
-                                                if not hasattr(self, "_announced_sub_agent_tasks"):
-                                                    self._announced_sub_agent_tasks = set()
-                                                for tid in waited_task_ids:
-                                                    if tid:
-                                                        self._announced_sub_agent_tasks.add(tid)
-                                            except Exception:
-                                                pass
                         elif wait_runcommand_id:
                             bg_manager = getattr(self, "background_command_manager", None)
                             if not bg_manager:
@@ -2258,380 +2142,10 @@ class MainTerminalToolsExecutionMixin:
                             completed=arguments.get("completed", True)
                         )
 
-                    elif tool_name == "create_sub_agent":
-                        from modules.execution_scope import validate_child_access
-                        arguments = dict(arguments)
-                        arguments["access_level"] = validate_child_access(self, arguments.get("access_level"))
-                        # 多智能体模式：create_sub_agent 走新签名，需要 role_id/display_name/multi_agent_mode
-                        if getattr(self, "multi_agent_mode", False):
-                            role_id = arguments.get("role_id")
-                            if not role_id:
-                                result = {"success": False, "error": tr("tools_exec.create_sub_agent_need_role_id")}
-                            elif arguments.get("deliverables_dir"):
-                                result = {"success": False, "error": tr("tools_exec.create_sub_agent_no_deliverables")}
-                            else:
-                                try:
-                                    from modules.multi_agent.role_store import load_preset_role, infer_custom_roles_dir
-                                    from modules.multi_agent.prompts import build_multi_agent_sub_agent_prompt
-                                    _data_dir = str(getattr(self, "data_dir", ""))
-                                    _custom_dir = infer_custom_roles_dir(_data_dir)
-                                    # host模式下 custom_dir 就是 runtime_dir；web模式下 runtime_dir 指向 web 预设目录
-                                    # Windows 下 data_dir 用反斜杠，统一归一化再匹配
-                                    _is_web = '/web/users/' in _data_dir.replace("\\", "/")
-                                    _runtime_dir = WEB_PRESET_ROLES_DIR if _is_web else _custom_dir
-                                    role = load_preset_role(role_id, runtime_dir=_runtime_dir, custom_dir=_custom_dir)
-                                    if not role:
-                                        result = {"success": False, "error": tr("tools_exec.role_not_found", role_id=role_id)}
-                                    else:
-                                        conv_id = self.context_manager.current_conversation_id
-                                        multi_agent_state = self.sub_agent_manager.get_or_create_multi_agent_state(conv_id)
-                                        # 角色内编号：显示名后缀（如 UI Operator_1），是唯一对模型/用户
-                                        # 暴露的编号。采用 peek + commit：先预取构造显示名，创建成功后才
-                                        # 提交计数器，失败不消耗编号，避免跳号。
-                                        role_seq = multi_agent_state.peek_agent_id_for_role(role_id)
-                                        # 全局 agent_id 是纯内部实现细节（任务字典 key / task_id 生成），
-                                        # 不暴露给模型与用户，也不接受模型指定：自动分配对话级最小空闲正整数。
-                                        agent_id = self.sub_agent_manager.next_free_agent_id(
-                                            conv_id, extra_used=set(multi_agent_state.agents.keys())
-                                        )
-                                        # 构造显示名
-                                        display_name = role.display_name(int(role_seq))
-                                        # 构造多智能体版系统提示词（含动态上下文注入）
-                                        workspace_path = str(getattr(self, "project_path", ""))
-                                        data_dir = str(getattr(self, "data_dir", ""))
-                                        # 提示词跟随子实例固定档位，不复制主智能体当前环境。
-                                        sandbox_mode = "direct" if arguments["access_level"] == "full_access" else "sandbox"
-                                        from modules.execution_scope import ExecutionScope, bind_execution_scope
-                                        prompt_scope = ExecutionScope(
-                                            executor_kind="sub_agent", actor_id=display_name,
-                                            workspace_root=Path(workspace_path).resolve(),
-                                            access_level=arguments["access_level"], conversation_id=conv_id,
-                                        )
-                                        with bind_execution_scope(prompt_scope):
-                                            system_prompt = build_multi_agent_sub_agent_prompt(
-                                                role.body_prompt, display_name, workspace_path,
-                                                data_dir=data_dir,
-                                                sandbox_mode=sandbox_mode,
-                                            )
-                                        # 构造 task_message（作为 Team Leader 的任务发布）
-                                        from modules.multi_agent.state import build_master_dispatch_text
-                                        task_message = build_master_dispatch_text(arguments.get("task", ""))
-                                        summary_text = (arguments.get("summary") or f"{role.name}作业")[:80]
-                                        thinking_mode = arguments.get("thinking_mode") or role.thinking_mode or "fast"
-                                        # 读取子智能体压缩阈值配置（多智能体成员长期存在，不设轮次上限，
-                                        # sub_agent_max_turns 仅对传统后台子智能体生效，这里不读取）
-                                        _compress_threshold = 250_000
-                                        try:
-                                            # 禁止在此重复 import load_personalization_config：函数内 import 会把
-                                            # 该名字变成局部变量，使同一函数内更早位置（extract_webpage /
-                                            # save_webpage 读提取商配置）抛 UnboundLocalError 并被静默吞掉。
-                                            _prefs = load_personalization_config(data_dir) or {}
-                                            _compress_threshold = int(_prefs.get("sub_agent_compress_threshold_tokens", 250_000))
-                                        except Exception:
-                                            pass
-                                        # 走原行 发事件创建（避免后期重建提供重复工能重费，直接使用 multi_agent_mode=True 调用）
-                                        result = self.sub_agent_manager.create_sub_agent(
-                                            agent_id=agent_id,
-                                            access_level=arguments.get("access_level"),
-                                            summary=summary_text,
-                                            task=arguments.get("task", ""),
-                                            run_in_background=False,
-                                            conversation_id=conv_id,
-                                            model_key=role.model_key,
-                                            thinking_mode=thinking_mode,
-                                            multi_agent_mode=True,
-                                            role_id=role_id,
-                                            display_name=display_name,
-                                            system_prompt=system_prompt,
-                                            task_message=task_message,
-                                            compress_threshold_tokens=_compress_threshold,
-                                            max_turns=None,  # 多智能体成员不设轮次上限（task.py 对 multi_agent_mode 亦强制豁免）
-                                        )
-                                        # 在多智能体模式下，子智能体是团队协作成员，不是传统后台任务。
-                                        # run_in_background=False 避免触发后台完成通知轮询，保持主对话输入区可用。
-                                        if result.get("success"):
-                                            # 创建成功才提交角色内编号；失败时 peek 未提交，编号不被消耗
-                                            multi_agent_state.commit_agent_id_for_role(role_id, role_seq)
-                                except Exception as exc:
-                                    logger.exception("[multi_agent] create_sub_agent failed")
-                                    result = {"success": False, "error": str(exc)}
-                        else:
-                            # 读取子智能体最大轮次配置（None=默认50、0=无上限、N=N轮）
-                            _max_turns = None
-                            _prefs = {}
-                            try:
-                                # 同上：不要在此重复 import（会毒化整个函数作用域）
-                                _prefs = load_personalization_config(str(getattr(self, "data_dir", ""))) or {}
-                                _raw_max_turns = _prefs.get("sub_agent_max_turns")
-                                if _raw_max_turns is not None:
-                                    _max_turns = int(_raw_max_turns)
-                            except Exception:
-                                pass
-                            from modules.sub_agent.intelligence import resolve_intelligence_model
-                            _intelligence = arguments.get("intelligence")
-                            try:
-                                _sub_agent_model = resolve_intelligence_model(
-                                    _intelligence, _prefs or {}, getattr(self.api_client, "model_key", None)
-                                )
-                            except (ValueError, RuntimeError) as exc:
-                                result = {"success": False, "error": str(exc)}
-                            else:
-                                result = self.sub_agent_manager.create_sub_agent(
-                                    agent_id=arguments.get("agent_id"),
-                                    access_level=arguments.get("access_level"),
-                                    summary=arguments.get("summary", ""),
-                                    task=arguments.get("task", ""),
-                                    deliverables_dir=arguments.get("deliverables_dir", ""),
-                                    run_in_background=arguments.get("run_in_background", False),
-                                    timeout_seconds=arguments.get("timeout_seconds"),
-                                    thinking_mode="thinking",
-                                    conversation_id=self.context_manager.current_conversation_id,
-                                    model_key=_sub_agent_model,
-                                    intelligence=_intelligence,
-                                    reasoning_effort=getattr(self.api_client, "reasoning_effort", None),
-                                    max_turns=_max_turns,
-                                )
-
-                            # 如果不是后台运行，阻塞等待完成
-                            if not arguments.get("run_in_background", False) and result.get("success"):
-                                task_id = result.get("task_id")
-                                wait_result = self.sub_agent_manager.wait_for_completion(
-                                    task_id=task_id,
-                                    timeout_seconds=arguments.get("timeout_seconds")
-                                )
-                                # 合并结果：保留创建元数据，使用执行结果作为主体展示，
-                                # 避免 wait_result 里的 success=False + 旧 message 导致
-                                # 「create_sub_agent 失败：子智能体 X 已创建」的误导性文案。
-                                creation_meta = {
-                                    "agent_id": result.get("agent_id"),
-                                    "task_id": result.get("task_id"),
-                                    "deliverables_dir": result.get("deliverables_dir"),
-                                    "access_level": result.get("access_level"),
-                                    "run_in_background": False,
-                                }
-                                execution_message = (
-                                    wait_result.get("message")
-                                    or wait_result.get("system_message")
-                                    or result.get("message")
-                                )
-                                result = {
-                                    **result,
-                                    **wait_result,
-                                    **creation_meta,
-                                    "message": execution_message,
-                                }
-                                # 阻塞式执行不需要额外插入 system 消息
-                                result.pop("system_message", None)
-                                # 标记已通知，避免后续轮询再插入 system 消息
-                                try:
-                                    task = self.sub_agent_manager.tasks.get(task_id)
-                                    if isinstance(task, dict):
-                                        task["notified"] = True
-                                        task["updated_at"] = time.time()
-                                        self.sub_agent_manager._save_state()
-                                except Exception:
-                                    pass
-
-                    elif tool_name == "terminate_sub_agent":
-                        if getattr(self, "multi_agent_mode", False):
-                            # 多智能体模式：按显示名寻址，内部解析为全局 agent_id
-                            conv_id = self.context_manager.current_conversation_id
-                            state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                            display_name = str(arguments.get("display_name") or "").strip()
-                            inst = state.get_instance_by_display_name(display_name) if state else None
-                            if not inst:
-                                available = tr("tools_exec.list_sep").join(state.list_display_names()) if state else ""
-                                result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available or tr("tools_exec.none_placeholder"))}
-                            else:
-                                result = self.sub_agent_manager.terminate_sub_agent(agent_id=inst.agent_id)
-                                if isinstance(result, dict):
-                                    result["display_name"] = inst.display_name
-                                    state.mark_status(inst.agent_id, "terminated")
-                        else:
-                            result = self.sub_agent_manager.terminate_sub_agent(
-                                agent_id=arguments.get("agent_id")
-                            )
-                        # 主智能体主动终结时，tool 结果（message）已包含结论，
-                        # 摘掉 system_message 避免工具循环再注入一条冗余 user 消息
-                        # （且「已被手动关闭」措辞对此场景是误导）。
-                        # 前端 UI 手动终止走 server/conversation.py API 直调 manager，不受影响。
-                        if isinstance(result, dict):
-                            result.pop("system_message", None)
-
-                    elif tool_name == "get_sub_agent_status":
-                        if getattr(self, "multi_agent_mode", False):
-                            # 多智能体模式：按显示名列表查询，内部解析为全局 agent_id
-                            names = arguments.get("display_names")
-                            if not isinstance(names, list) or not names:
-                                result = {"success": False, "error": tr("tools_exec.display_names_nonempty")}
-                            else:
-                                conv_id = self.context_manager.current_conversation_id
-                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                                agent_ids = []
-                                not_found_names = []
-                                for name in names:
-                                    inst = state.get_instance_by_display_name(str(name)) if state else None
-                                    if inst:
-                                        agent_ids.append(inst.agent_id)
-                                    else:
-                                        not_found_names.append(str(name))
-                                results = []
-                                if agent_ids:
-                                    # agent_ids 非空时 manager 侧总是返回 success=True
-                                    r = self.sub_agent_manager.get_sub_agent_status(agent_ids=agent_ids)
-                                    results.extend(r.get("results") or [])
-                                for name in not_found_names:
-                                    results.append({"found": False, "display_name": name, "error": tr("tools_exec.agent_not_exist")})
-                                result = {"success": True, "results": results}
-                        else:
-                            result = self.sub_agent_manager.get_sub_agent_status(
-                                agent_ids=arguments.get("agent_ids", [])
-                            )
-
-                    # 多智能体模式专属工具：send_message_to_sub_agent / stop_sub_agent / answer_sub_agent_question / create_custom_agent / list_agents / list_active_sub_agents
-                    elif tool_name == "send_message_to_sub_agent":
-                        if not getattr(self, "multi_agent_mode", False):
-                            result = {"success": False, "error": tr("tools_exec.multi_agent_only")}
-                        else:
-                            try:
-                                from modules.multi_agent.state import build_master_message_to_sub_agent
-                                display_name = str(arguments.get("display_name") or "").strip()
-                                message = arguments.get("message", "")
-                                conv_id = self.context_manager.current_conversation_id
-                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                                if not state:
-                                    result = {"success": False, "error": tr("tools_exec.multi_agent_state_not_ready")}
-                                else:
-                                    # 显示名寻址：模型只知道角色内编号显示名（如 UI Operator_1），
-                                    # 全局 agent_id 在内部解析，不暴露给模型
-                                    inst = state.get_instance_by_display_name(display_name)
-                                    if not inst:
-                                        available = tr("tools_exec.list_sep").join(state.list_display_names()) or tr("tools_exec.none_placeholder")
-                                        result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available)}
-                                    else:
-                                        agent_id = inst.agent_id
-                                        # 构造消息文本并插入子对话
-                                        text = build_master_message_to_sub_agent(message)
-                                        ma_debug(
-                                            "tool_send_message_to_sub_agent",
-                                            agent_id=agent_id,
-                                            display_name=display_name,
-                                            raw_message=str(message)[:500],
-                                            wrapped_message_preview=text[:500],
-                                            conversation_id=conv_id,
-                                        )
-                                        ok = self.sub_agent_manager.inject_message_to_sub_agent(agent_id, text)
-                                        if not ok:
-                                            latest = self.sub_agent_manager._latest_task_for_agent(agent_id)
-                                            if latest and latest.get("status") == "terminated":
-                                                result = {"success": False, "error": tr("tools_exec.agent_terminated_no_message", display_name=display_name)}
-                                            else:
-                                                result = {"success": False, "error": tr("tools_exec.agent_not_exist_or_ended", display_name=display_name)}
-                                        else:
-                                            result = {"success": True, "display_name": display_name}
-                                        ma_debug(
-                                            "tool_send_message_to_sub_agent_result",
-                                            agent_id=agent_id,
-                                            conversation_id=conv_id,
-                                            ok=ok,
-                                            result=result,
-                                        )
-                            except Exception as exc:
-                                logger.exception("[multi_agent] send_message_to_sub_agent failed")
-                                result = {"success": False, "error": str(exc)}
-
-                    elif tool_name == "stop_sub_agent":
-                        if not getattr(self, "multi_agent_mode", False):
-                            result = {"success": False, "error": tr("tools_exec.multi_agent_only")}
-                        else:
-                            try:
-                                display_name = str(arguments.get("display_name") or "").strip()
-                                conv_id = self.context_manager.current_conversation_id
-                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                                inst = state.get_instance_by_display_name(display_name) if state else None
-                                if not inst:
-                                    available = tr("tools_exec.list_sep").join(state.list_display_names()) if state else ""
-                                    result = {"success": False, "error": tr("tools_exec.agent_not_found", display_name=display_name, available=available or tr("tools_exec.none_placeholder"))}
-                                else:
-                                    result = self.sub_agent_manager.stop_sub_agent(agent_id=inst.agent_id)
-                                    if isinstance(result, dict):
-                                        result["display_name"] = inst.display_name
-                            except Exception as exc:
-                                logger.exception("[multi_agent] stop_sub_agent failed")
-                                result = {"success": False, "error": str(exc)}
-
-                    elif tool_name == "answer_sub_agent_question":
-                        if not getattr(self, "multi_agent_mode", False):
-                            result = {"success": False, "error": tr("tools_exec.multi_agent_only")}
-                        else:
-                            try:
-                                question_id = arguments.get("question_id", "")
-                                answer = arguments.get("answer", "")
-                                conv_id = self.context_manager.current_conversation_id
-                                state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                                ma_debug(
-                                    "tool_answer_sub_agent_question",
-                                    question_id=question_id,
-                                    answer_preview=str(answer)[:500],
-                                    conversation_id=conv_id,
-                                )
-                                if not state:
-                                    result = {"success": False, "error": tr("tools_exec.multi_agent_state_not_ready")}
-                                else:
-                                    ok = state.provide_answer(question_id, answer)
-                                    result = {"success": bool(ok), "question_id": question_id}
-                            except Exception as exc:
-                                result = {"success": False, "error": str(exc)}
-
-                    elif tool_name == "create_custom_agent":
-                        try:
-                            from modules.multi_agent.role_store import RoleConfig, save_custom_role, list_roles
-                            role_id = arguments.get("role_id", "").strip()
-                            name = arguments.get("name", "").strip()
-                            body_prompt = arguments.get("body_prompt", "").strip()
-                            description = arguments.get("description", "").strip()
-                            thinking_mode_arg = arguments.get("thinking_mode", "fast")
-                            model_key_arg = arguments.get("model_key", "").strip() or None
-                            if not role_id or not name or not body_prompt:
-                                result = {"success": False, "error": tr("tools_exec.custom_agent_fields_required")}
-                            else:
-                                _data_dir = str(getattr(self, "data_dir", ""))
-                                from modules.multi_agent.role_store import infer_custom_roles_dir
-                                _custom_dir = infer_custom_roles_dir(_data_dir)
-                                # Windows 下 data_dir 用反斜杠，统一归一化再匹配
-                                _is_web = '/web/users/' in _data_dir.replace("\\", "/")
-                                _runtime_dir = None if _is_web else _custom_dir
-                                existing_ids = {r.role_id for r in list_roles(runtime_dir=_runtime_dir, custom_dir=_custom_dir)}
-                                # 同 role_id 重复创建 = 覆盖式修改（仅影响之后创建的实例；运行中实例 prompt 已快照冻结）
-                                role = RoleConfig(role_id=role_id, name=name, description=description, body_prompt=body_prompt, thinking_mode=thinking_mode_arg, model_key=model_key_arg, is_custom=True)
-                                f = save_custom_role(role, custom_dir=_custom_dir)
-                                result = {"success": True, "role_id": role_id, "name": name, "file": str(f), "overwritten": role_id in existing_ids}
-                        except Exception as exc:
-                            result = {"success": False, "error": str(exc)}
-
-                    elif tool_name == "list_agents":
-                        try:
-                            from modules.multi_agent.role_store import list_roles, infer_custom_roles_dir
-                            _data_dir = str(getattr(self, "data_dir", ""))
-                            _custom_dir = infer_custom_roles_dir(_data_dir)
-                            # Windows 下 data_dir 用反斜杠，统一归一化再匹配
-                            _is_web = '/web/users/' in _data_dir.replace("\\", "/")
-                            _runtime_dir = None if _is_web else _custom_dir
-                            roles = list_roles(runtime_dir=_runtime_dir, custom_dir=_custom_dir)
-                            result = {"success": True, "roles": [r.to_dict() for r in roles]}
-                        except Exception as exc:
-                            result = {"success": False, "error": str(exc)}
-
-                    elif tool_name == "list_active_sub_agents":
-                        try:
-                            conv_id = self.context_manager.current_conversation_id
-                            state = self.sub_agent_manager.get_multi_agent_state(conv_id)
-                            if not state:
-                                result = {"success": True, "agents": []}
-                            else:
-                                result = {"success": True, "agents": [a.to_dict() for a in state.list_all()]}
-                        except Exception as exc:
-                            result = {"success": False, "error": str(exc)}
+                    elif tool_name in {"create_sub_agent", "send_message_to_sub_agent", "get_sub_agent_status",
+                                       "stop_sub_agent", "terminate_sub_agent", "answer_sub_agent_question"}:
+                        from modules.sub_agent.named import handle_named_tool
+                        result = await handle_named_tool(self, tool_name, arguments)
 
                     elif tool_name == "trigger_easter_egg":
                         result = self.easter_egg_manager.trigger_effect(arguments.get("effect"))

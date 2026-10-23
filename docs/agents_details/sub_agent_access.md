@@ -1,6 +1,6 @@
 # 固定子权限与单次命令完全访问（完整）
 
-> 本文由 `AGENTS.md` §18 小节**原样下沉**而来（2026-10-08 压缩 AGENTS.md 时导出，内容未改写）。
+> 源自 `AGENTS.md` §18；2026-10-22同步统一子智能体及四档固定权限。
 > 用途：`AGENTS.md` 只保留硬约束与「改代码必须知道」，机制细节、历史沿革、逐条清单在此查阅。
 > 若与代码冲突，一律以代码为准，并回来同步本文与 `AGENTS.md`。
 
@@ -8,11 +8,11 @@
 
 ## 18) 固定子权限与单次命令完全访问（2026-10-07）
 
-- **对话激活恢复（2026-10-12）**：SubAgentManager 构造不恢复任务；执行资源入口调用 `restore_for_activation()`，仅恢复所属对话并合并并发。没有运行实例时，显示查询读取持久化任务与真实全局多智能体状态，必要恢复由 `server/context/background.py` 按用户／工作区／对话异步激活，不能阻塞完整历史显示。恢复仍校验创建时固定档位与原工作区路径，旧记录缺档位不恢复；多智能体实例沿用 idle 恢复，不在启动时无条件重跑历史任务。回归见 `test/2026-10-12_工作区切换重构/`。
-- `create_sub_agent`（普通/多智能体）必填 `access_level`：`workspace_write`、`sandbox_write`、`full_access`。创建时校验主权限上限；plan/readonly 仍可创建最低档并交付工作区文件。每个新实例保存创建时规范化的 `workspace_root` 与固定档位，恢复时核对原路径身份，不重新 resolve 后扩大授权。旧记录缺少档位不迁移、不恢复。
-- 可信权限唯一入口为 `modules/execution_scope.py` 的 ContextVar；子工具通过 `modules/sub_agent/execution.py` 使用独立 FileManager/TerminalOperator/TerminalManager，不修改父对象再恢复。路径授权每次读取现行配置；父权限和执行环境切换不改变已有子档位，也不发送误导环境通知。子工具只开放自身白名单，不继承父自定义分派，不开放后台命令或单次升级参数。
-- `workspace_write` 的写根始终为创建时工作区，命令 cwd 只能在其内。macOS 临时文件放 `.astrion/sub_agent_runtime/<actor哈希>/tmp`，不附带宿主 `/tmp` 或额外路径写授权。原生 IO 使用 POSIX no-follow 描述符或 Windows 句柄，拒绝替换链接、特殊文件和多硬链接写入；媒体读取复用安全二进制接口。交付目录按路径组件检查并安全新建，不使用字符串 startswith。
-- Docker 不支持 `full_access`。最低档通过 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，不使用 DAC 降级或宿主机回退。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`），临时文件也在工作区。Landlock 不覆盖的权限/归属/扩展属性等元数据系统调用由 seccomp 拒绝。`sandbox_write` 沿用现有容器边界。Docker/Windows 的真实运行行为仍需对应平台验收；Linux 首批适配与验证范围见 §20。
+- **统一恢复**：新格式注册表在 `sub_agent_runtime.json`，按工作区data_dir共享任务、实例、句柄和通信状态；构造不启动模型请求，执行资源入口按对话激活idle恢复。不读取旧传统子任务记录。查询不创建执行资源，不替换活动记录。新生命周期详见 `multi_agent.md`。
+- create必填access_level：working_dir_write（仅子工作目录）、workspace_write（当前工作区）、sandbox_write（当前工作区＋沙箱授权可写路径）、full_access（宿主完全访问）。创建校验主权限上限；plan/readonly允许前两个窄档。恢复校验创建时规范化workspace_root、working_dir与固定档位，不重新resolve后扩大身份。
+- 可信权限唯一入口为execution_scope.py的ContextVar；子内置工具通过execution.py使用独立FileManager/TerminalOperator/TerminalManager，不修改父对象再恢复，不继承父自定义分派，不开放后台命令或单次升级。父权限／执行环境变化不改变已有子档位。**MCP是外置插件，不进入子内置ExecutionScope，也不受本节目录写沙箱约束。**
+- workspace_root始终是原项目；相对路径及默认命令cwd以working_dir解析，可读取原工作区及现行授权范围。working_dir_write的固定写根为子目录；workspace_write为原工作区。macOS临时目录放相应固定写根内，不附带宿主/tmp写授权。原生IO继续no-follow描述符／Windows句柄、链接替换／特殊文件／多硬链接检查；媒体复用同一安全读取。
+- Docker不支持full_access。两个窄档必须Landlock ABI≥3＋libseccomp＋capability清理，失败即拒绝；working_dir_write只授父项目read、子目录write，HOME／TMP位于子写根。不授父full再试图收窄子目录，不回退DAC或宿主执行。Windows为父ro-bind＋子bind；Linux助手请求增加workspace_write_root，父只读＋子可写。**已有Linux助手需按安装器升级，旧助手拒绝新字段时不能静默扩大权限。** sandbox_write沿用平台授权路径。
 - 主 `run_command` 的 `request_full_access=true` 必须提供非空原因；plan/readonly 拒绝，Docker/远端替身后端不伪装支持宿主机直接执行。已处于 direct 时无需额外申请。Windows direct 使用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。
 - 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。开启自动审核时自动与人工独立裁决，任一拒绝即终结，两项通过才执行；人工先允许不能取消自动审核。可信记录保存执行者/根/对话/任务/工具调用/完整参数，`claim_execution` 原子领取一次；`FullAccessGrant.consume` 在原生命令入口再次核对并消费。授权失效返回正常工具失败结果，不中断历史消息配对。内置工具名禁止被自定义注册或分派覆盖。
 - 前台、后台均绑定该次权限，不改变主对话全局状态。后台创建经 `asyncio.to_thread`；Popen 与取消在相同锁内握手，取消发生在 ID 分配前时通过 Event 与回调处理迟到创建。正常后台完成不等于取消全部后台任务。

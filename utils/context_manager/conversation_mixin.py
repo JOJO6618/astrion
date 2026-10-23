@@ -79,41 +79,8 @@ AUTO_SHALLOW_TOOL_WHITELIST = {
 class ConversationMixin:
     """ContextManager conversation mixin 能力 mixin。"""
 
-    def _get_conversation_manager_for_multi_agent_mode(self, multi_agent_mode: bool = False):
-        """根据是否为多智能体会话返回对应的 ConversationManager。"""
-        if multi_agent_mode:
-            return getattr(self, "multi_agent_conversation_manager", None) or self.conversation_manager
-        return self.conversation_manager
-
     def _get_conversation_manager_for_id(self, conversation_id: str):
-        """根据对话ID判断它属于哪个 ConversationManager。
-
-        优先检查多智能体管理器（如果存在），再回退到普通管理器。
-        """
-        ma_manager = getattr(self, "multi_agent_conversation_manager", None)
-        if not ma_manager:
-            return self.conversation_manager
-        # 先查多智能体索引/文件
-        try:
-            ma_path = ma_manager._get_conversation_file_path(conversation_id)
-            if ma_path.exists():
-                return ma_manager
-        except Exception:
-            pass
-        try:
-            regular_path = self.conversation_manager._get_conversation_file_path(conversation_id)
-            if regular_path.exists():
-                return self.conversation_manager
-        except Exception:
-            pass
-        # 都不存在时：若ID在常规索引中则走常规，否则默认走多智能体（兼容新建对话后立刻保存）
-        try:
-            regular_index = self.conversation_manager._load_index()
-            if conversation_id in regular_index:
-                return self.conversation_manager
-        except Exception:
-            pass
-        return ma_manager
+        return self.conversation_manager
 
     def start_new_conversation(
         self,
@@ -155,19 +122,18 @@ class ConversationMixin:
         except Exception as exc:
             print(f"[Skills] 同步失败: {exc}")
         
-        # 创建新对话：多智能体对话使用独立的 conversation_manager
-        is_multi_agent = bool((metadata_overrides or {}).get("multi_agent_mode"))
-        # 工具动态加载：创建即钉死快照（多智能体对话 v1 不启用；老对话无字段=不启用）
+        # Tool definitions are frozen once for each conversation.
+        # All conversations use the workspace's single storage directory.
         try:
             from core.tool_loading import snapshot_overrides_from_prefs
             from modules.personalization_manager import load_personalization_config as _load_tl_prefs
             _tl_prefs = getattr(self, "custom_personalization_config", None) or _load_tl_prefs(self.data_dir)
-            _tl_overrides = snapshot_overrides_from_prefs(_tl_prefs, multi_agent_mode=is_multi_agent)
+            _tl_overrides = snapshot_overrides_from_prefs(_tl_prefs)
             if _tl_overrides:
                 metadata_overrides = {**_tl_overrides, **(metadata_overrides or {})}
         except Exception:
             pass
-        target_manager = self._get_conversation_manager_for_multi_agent_mode(is_multi_agent)
+        target_manager = self.conversation_manager
         conversation_id = target_manager.create_conversation(
             project_path=project_path,
             thinking_mode=thinking_mode,
@@ -220,17 +186,6 @@ class ConversationMixin:
         # 加载指定对话：先按ID路由到对应 manager
         target_manager = self._get_conversation_manager_for_id(conversation_id)
         conversation_data = target_manager.load_conversation(conversation_id)
-        if not conversation_data:
-            # 兜底：如果目标 manager 没有，再尝试另一个
-            fallback_manager = (
-                self.conversation_manager
-                if target_manager is self.multi_agent_conversation_manager
-                else self.multi_agent_conversation_manager
-            )
-            try:
-                conversation_data = fallback_manager.load_conversation(conversation_id)
-            except Exception:
-                conversation_data = None
         if not conversation_data:
             print(f"⌘ 对话 {conversation_id} 不存在")
             return False
@@ -419,39 +374,10 @@ class ConversationMixin:
         except Exception as e:
             print(f"⌘ 自动保存异常: {e}")
 
-    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None, quick_entry: Optional[bool] = None) -> Dict:
-        """获取对话列表。
-
-        多智能体对话存储在独立目录，需要合并普通管理器和多智能体管理器的结果。
-        """
+    def get_conversation_list(self, limit=50, offset=0, non_empty=False, quick_entry=None) -> Dict:
         filters = {} if quick_entry is None else {"quick_entry": quick_entry}
-        # 多智能体模式只查多智能体管理器；常规模式只查普通管理器；None 时合并
-        if multi_agent_mode is True:
-            ma_manager = getattr(self, "multi_agent_conversation_manager", None)
-            if ma_manager:
-                return ma_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode, **filters)
-            return self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode, **filters)
-        if multi_agent_mode is False:
-            return self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode, **filters)
-
-        # None：合并两个管理器的结果
-        regular = self.conversation_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=False, **filters)
-        ma_manager = getattr(self, "multi_agent_conversation_manager", None)
-        if not ma_manager:
-            return regular
-        ma = ma_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=True, **filters)
-
-        merged_conversations = list(regular.get("conversations", [])) + list(ma.get("conversations", []))
-        merged_conversations.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
-        total = (regular.get("total") or 0) + (ma.get("total") or 0)
-        result = merged_conversations[offset:offset + limit]
-        return {
-            "conversations": result,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "has_more": offset + limit < total
-        }
+        return self.conversation_manager.get_conversation_list(
+            limit=limit, offset=offset, non_empty=non_empty, **filters)
 
     def delete_conversation_by_id(self, conversation_id: str) -> bool:
         """删除指定对话"""
@@ -475,28 +401,11 @@ class ConversationMixin:
                 print(f"⌘ 刷新待办列表失败: {exc}")
                 self.todo_list = None
 
-        # 先定位对话所在 manager，再删除；两个目录都尝试兜底
-        target_manager = self._get_conversation_manager_for_id(conversation_id)
-        try:
-            if target_manager.load_conversation(conversation_id):
-                return target_manager.delete_conversation(conversation_id)
-        except Exception:
-            pass
-        fallback_manager = (
-            self.conversation_manager
-            if target_manager is self.multi_agent_conversation_manager
-            else self.multi_agent_conversation_manager
-        )
-        try:
-            if fallback_manager.load_conversation(conversation_id):
-                return fallback_manager.delete_conversation(conversation_id)
-        except Exception:
-            pass
-        return False
+        return self.conversation_manager.delete_conversation(conversation_id)
 
-    def search_conversations(self, query: str, limit: int = 20, multi_agent_mode: Optional[bool] = None) -> List[Dict]:
-        """搜索对话"""
-        return self.conversation_manager.search_conversations(query, limit, multi_agent_mode=multi_agent_mode)
+    def search_conversations(self, query: str, limit: int = 20) -> List[Dict]:
+        """搜索当前工作区的对话。"""
+        return self.conversation_manager.search_conversations(query, limit)
 
     def get_conversation_statistics(self) -> Dict:
         """获取对话统计"""

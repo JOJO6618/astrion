@@ -59,11 +59,6 @@ from utils.host_workspace_debug import write_host_workspace_debug
 from utils.media_store import MediaStore
 from utils.token_usage import normalize_usage_payload
 
-try:
-    from modules.multi_agent.role_store import DEFAULT_MUTIAGENTS_DIR
-except Exception:
-    DEFAULT_MUTIAGENTS_DIR = None
-
 AUTO_SHALLOW_PLACEHOLDER = "过早的工具结果已经被自动压缩"
 AUTO_SHALLOW_TOOL_WHITELIST = {
     "write_file",
@@ -106,12 +101,7 @@ class ContextManagerBase:
         
         # 新增：对话持久化管理器
         self.conversation_manager = ConversationManager(base_dir=self.data_dir, project_path=str(self.project_path))
-        # 多智能体对话独立存储到 mutiagents/conversations
-        ma_base_dir = DEFAULT_MUTIAGENTS_DIR if DEFAULT_MUTIAGENTS_DIR else (self.data_dir.parent / "mutiagents")
-        self.multi_agent_conversation_manager = ConversationManager(
-            base_dir=str(ma_base_dir),
-            project_path=str(self.project_path),
-        )
+
         self.media_store = MediaStore(self.data_dir)
         self.current_conversation_id: Optional[str] = None
         self.auto_save_enabled = True

@@ -1,6 +1,7 @@
 // 工具增强显示的渲染函数
 
 import { t } from '@/locales';
+import { renderSubAgentResult } from './subAgentResults';
 
 export function escapeHtml(text: string): string {
   const div = document.createElement('div');
@@ -14,28 +15,6 @@ export function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds <= 0) return t('toolResults.duration.zero');
-  if (seconds < 60) return t('toolResults.duration.seconds', { seconds });
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (minutes < 60) {
-    return remainingSeconds > 0
-      ? t('toolResults.duration.minutesSeconds', { minutes, seconds: remainingSeconds })
-      : t('toolResults.duration.minutes', { minutes });
-  }
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (remainingMinutes === 0 && remainingSeconds === 0) {
-    return t('toolResults.duration.hours', { hours });
-  }
-  return t('toolResults.duration.hoursMinutesSeconds', {
-    hours,
-    minutes: remainingMinutes,
-    seconds: remainingSeconds
-  });
 }
 
 function formatToolStatusLabel(
@@ -78,6 +57,9 @@ export function renderEnhancedToolResult(
   if (typeof result === 'string') {
     return `<div class="tool-result-content scrollable"><pre>${escapeHtml(result)}</pre></div>`;
   }
+
+  const childResult = renderSubAgentResult(name, result, args);
+  if (childResult !== null) return childResult;
 
   // 网络检索类
   if (name === 'web_search') {
@@ -168,25 +150,6 @@ export function renderEnhancedToolResult(
   // 彩蛋类
   else if (name === 'trigger_easter_egg') {
     return renderEasterEgg(result, args);
-  }
-
-  // 子智能体类
-  else if (name === 'create_sub_agent') {
-    return renderCreateSubAgent(result, args);
-  } else if (name === 'terminate_sub_agent') {
-    return renderTerminateSubAgent(result, args);
-  } else if (name === 'send_message_to_sub_agent') {
-    return renderSendMessageToSubAgent(result, args);
-  } else if (name === 'answer_sub_agent_question') {
-    return renderAnswerSubAgentQuestion(result, args);
-  } else if (name === 'create_custom_agent') {
-    return renderCreateCustomAgent(result, args);
-  } else if (name === 'list_agents') {
-    return renderListAgents(result);
-  } else if (name === 'list_active_sub_agents') {
-    return renderListActiveSubAgents(result);
-  } else if (name === 'get_sub_agent_status') {
-    return renderGetSubAgentStatus(result);
   }
 
   // 工具动态加载
@@ -861,130 +824,33 @@ function renderSleep(result: any, args: any): string {
   let html = '<div class="tool-result-meta">';
   html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
   html += `<div><strong>${escapeHtml(t('toolResults.labels.mode'))}</strong>${escapeHtml(mode)}</div>`;
-
-  if (mode === 'seconds' || mode === '' || mode === null) {
-    const seconds = args.seconds || args.duration || 0;
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.waitTime'))}</strong>${escapeHtml(t('toolResults.duration.seconds', { seconds }))}</div>`;
-    if (args.reason) {
+  if (mode === 'wait_runcommand_id') {
+    const commandId = result.command_id ?? args.wait_runcommand_id ?? '';
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.backgroundCommandId'))}</strong>${escapeHtml(String(commandId))}</div>`;
+  } else {
+    html += `<div><strong>${escapeHtml(t('toolResults.labels.waitTime'))}</strong>${escapeHtml(t('toolResults.duration.seconds', { seconds: args.seconds ?? 0 }))}</div>`;
+    if (args.reason)
       html += `<div><strong>${escapeHtml(t('toolResults.labels.reason'))}</strong>${escapeHtml(String(args.reason))}</div>`;
-    }
-  } else if (mode === 'wait_sub_agent_output') {
-    const targetName = result?.display_name ?? args?.wait_sub_agent_output ?? '';
-    if (targetName !== '') {
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.waitSubAgent'))}</strong>${escapeHtml(String(targetName))}</div>`;
-    }
-  } else if (mode === 'wait_sub_agent_ids') {
-    const agentIds = Array.isArray(result?.agent_ids) ? result.agent_ids : [];
-    if (agentIds.length > 0) {
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.waitSubAgent'))}</strong>${agentIds.map(String).join(', ')}</div>`;
-    }
-    const taskIds = Array.isArray(result?.waited_task_ids) ? result.waited_task_ids : [];
-    if (taskIds.length > 0) {
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${taskIds.map(String).join(', ')}</div>`;
-    }
-  } else if (mode === 'wait_runcommand_id') {
-    const commandId = result?.command_id ?? args?.wait_runcommand_id ?? '';
-    if (commandId !== '') {
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.backgroundCommandId'))}</strong>${escapeHtml(String(commandId))}</div>`;
-    }
-  }
-
-  if (!result?.success && result?.error) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
   }
   html += '</div>';
-
-  // content
-  if (mode === 'seconds' || mode === '' || mode === null) {
-    const message = result?.message || '';
-    if (message) {
-      html += '<div class="tool-result-content scrollable">';
-      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.result'))}</div>`;
-      html += `<pre>${escapeHtml(String(message))}</pre>`;
-      html += '</div>';
-    }
-  } else if (mode === 'wait_sub_agent_output') {
-    const message = result?.message || '';
-    if (message) {
-      html += '<div class="tool-result-content scrollable">';
-      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.subAgentOutput'))}</div>`;
-      html += `<pre>${escapeHtml(String(message))}</pre>`;
-      html += '</div>';
-    }
-  } else if (mode === 'wait_sub_agent_ids') {
-    const results = Array.isArray(result?.results) ? result.results : [];
-    if (results.length > 0) {
-      html += '<div class="tool-result-content scrollable">';
-      html += `<div class="content-label">${escapeHtml(t('toolResults.labels.waitedSubAgents', { n: results.length }))}</div>`;
-      results.forEach((item: any) => {
-        if (!item || typeof item !== 'object') return;
-        const agentId = item.agent_id ?? '?';
-        const taskId = item.task_id ?? '?';
-        const itemStatus = item.status ?? 'unknown';
-        const success = item.success === true;
-        html += '<div class="sub-agent-result-item">';
-        const outcome = success
-          ? t('toolResults.status.successMark')
-          : t('toolResults.status.failedMark');
-        html += `<div><strong>${escapeHtml(t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) }))}</strong>${escapeHtml(t('toolResults.sentences.subAgentResultMeta', { taskId: String(taskId), status: String(itemStatus), outcome }))}</div>`;
-        const itemMessage = item.message || item.error || '';
-        if (itemMessage) {
-          const runtime = item.runtime_seconds ?? item.elapsed_seconds ?? null;
-          const runtimeNote =
-            runtime !== null
-              ? t('toolResults.duration.runtimeNote', { n: Math.round(Number(runtime)) })
-              : '';
-          const stats = item.stats;
-          if (runtimeNote || stats) {
-            html += '<div class="sub-agent-meta">';
-            if (runtimeNote) {
-              html += `<span>${escapeHtml(runtimeNote)}</span>`;
-            }
-            if (stats && typeof stats === 'object') {
-              const statParts = [];
-              if (stats.api_calls != null)
-                statParts.push(t('toolResults.counts.statApiCalls', { n: stats.api_calls }));
-              if (stats.files_read != null)
-                statParts.push(t('toolResults.counts.statFilesRead', { n: stats.files_read }));
-              if (stats.edit_files != null)
-                statParts.push(t('toolResults.counts.statEditFiles', { n: stats.edit_files }));
-              if (stats.searches != null)
-                statParts.push(t('toolResults.counts.statSearches', { n: stats.searches }));
-              if (stats.web_pages != null)
-                statParts.push(t('toolResults.counts.statWebPages', { n: stats.web_pages }));
-              if (stats.commands != null)
-                statParts.push(t('toolResults.counts.statCommands', { n: stats.commands }));
-              if (statParts.length > 0) {
-                html += `<span>${escapeHtml(statParts.join(' | '))}</span>`;
-              }
-            }
-            html += '</div>';
-          }
-          html += `<pre>${escapeHtml(String(itemMessage))}</pre>`;
-        }
-        html += '</div>';
-      });
-      html += '</div>';
-    }
+  if (!result.success && result.error) {
+    html += `<div class="tool-result-content scrollable"><pre>${escapeHtml(String(result.error))}</pre></div>`;
   } else if (mode === 'wait_runcommand_id') {
-    const nested = result?.result;
+    const nested = result.result;
     if (nested && typeof nested === 'object') {
-      const output = nested.output || nested.stdout || '';
-      const exitCode = nested.exit_code !== undefined ? nested.exit_code : nested.returncode;
+      const exitCode = nested.return_code ?? nested.exit_code;
       html += '<div class="tool-result-content scrollable">';
       html += `<div class="content-label">${escapeHtml(t('toolResults.labels.backgroundCommandOutput'))}</div>`;
-      if (exitCode !== undefined) {
+      if (exitCode !== undefined)
         html += `<div><strong>${escapeHtml(t('toolResults.labels.exitCode'))}</strong>${escapeHtml(String(exitCode))}</div>`;
-      }
-      if (output) {
-        html += `<pre>${escapeHtml(String(output))}</pre>`;
-      } else {
-        html += `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noOutput'))}</div>`;
-      }
+      html += nested.output
+        ? `<pre>${escapeHtml(String(nested.output))}</pre>`
+        : `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noOutput'))}</div>`;
       html += '</div>';
     }
+  } else if (result.message) {
+    html += `<div class="tool-result-content scrollable"><pre>${escapeHtml(String(result.message))}</pre></div>`;
   }
-
   return html;
 }
 
@@ -1577,341 +1443,6 @@ function renderLoadTools(result: any, args: any): string {
   } else if (!result?.success && result?.error) {
     html += `<div class="tool-result-content scrollable"><div>${escapeHtml(String(result.error))}</div></div>`;
   }
-
-  return html;
-}
-
-function renderCreateSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(
-    result,
-    t('toolResults.status.created'),
-    t('toolResults.status.createFailed')
-  );
-  const agentId = result.agent_id ?? args.agent_id ?? '';
-  // 多智能体模式：只展示角色内编号显示名，全局 agent_id/task_id 不暴露
-  const displayName = result.display_name ?? '';
-  const taskId = result.task_id ?? '';
-  const deliverablesDir = result.deliverables_dir ?? '';
-  const taskDescription = args.task ?? '';
-  const message = result.message ?? result.summary ?? '';
-
-  const stats = result.stats || {};
-  const runtimeSeconds =
-    result.runtime_seconds ?? result.elapsed_seconds ?? stats.runtime_seconds ?? 0;
-  const apiCalls = stats.api_calls ?? stats.turn_count ?? 0;
-  const toolCount =
-    (stats.files_read || 0) +
-    (stats.write_files || 0) +
-    (stats.edit_files || 0) +
-    (stats.searches || 0) +
-    (stats.web_pages || 0) +
-    (stats.commands || 0);
-  const hasStats = runtimeSeconds > 0 || apiCalls > 0 || toolCount > 0;
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
-  if (displayName) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
-  } else if (agentId !== '') {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
-  }
-  const accessLevel = result.access_level ?? args.access_level;
-  if (['workspace_write', 'sandbox_write', 'full_access'].includes(accessLevel)) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.accessLevel'))}</strong>${escapeHtml(t(`toolResults.access.${accessLevel}`))}</div>`;
-  }
-  const intelligence = args.intelligence;
-  if (!displayName && ['same', 'high', 'medium', 'low'].includes(intelligence)) {
-    html += `<div><strong>${escapeHtml(t('personalization.subAgentModelTitle'))}</strong>${escapeHtml(t(`personalization.subAgentIntelligence.${intelligence}`))}</div>`;
-  }
-  if (taskId !== '' && !displayName) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
-  }
-  if (deliverablesDir !== '' && !displayName) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.deliverablesDir'))}</strong>${escapeHtml(String(deliverablesDir))}</div>`;
-  }
-  if (taskDescription) {
-    const preview = String(taskDescription).slice(0, 200);
-    const suffix = String(taskDescription).length > 200 ? '…' : '';
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.task'))}</strong>${escapeHtml(preview + suffix)}</div>`;
-  }
-  html += '</div>';
-
-  if (message || hasStats) {
-    html += '<div class="tool-result-content scrollable">';
-    if (hasStats) {
-      html += `<div class="content-label">${escapeHtml(t('toolResults.sectionLabels.executionStats'))}</div>`;
-      if (runtimeSeconds > 0) {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.workTime'))}</strong>${formatDuration(runtimeSeconds)}</div>`;
-      }
-      if (apiCalls > 0) {
-        html += `<div>${escapeHtml(t('toolResults.counts.apiCalls', { n: apiCalls }))}</div>`;
-      }
-      if (toolCount > 0) {
-        html += `<div>${escapeHtml(t('toolResults.counts.toolCalls', { n: toolCount }))}</div>`;
-      }
-    }
-    if (message) {
-      if (hasStats) {
-        html += `<div class="content-label">${escapeHtml(t('toolResults.sectionLabels.finalReply'))}</div>`;
-      }
-      html += `<div>${escapeHtml(String(message))}</div>`;
-    }
-    html += '</div>';
-  }
-
-  return html;
-}
-
-function renderTerminateSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(
-    result,
-    t('toolResults.status.closed'),
-    t('toolResults.status.closeFailed')
-  );
-  const displayName = result.display_name ?? args.display_name ?? '';
-  const agentId = result.agent_id ?? args.agent_id ?? '';
-  const taskId = result.task_id ?? '';
-  const message = result.message ?? result.system_message ?? '';
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
-  if (displayName) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
-  } else if (agentId !== '') {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
-  }
-  if (taskId !== '' && !displayName) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
-  }
-  html += '</div>';
-
-  if (message) {
-    html += '<div class="tool-result-content scrollable">';
-    html += `<div>${escapeHtml(String(message))}</div>`;
-    html += '</div>';
-  }
-
-  return html;
-}
-
-function renderGetSubAgentStatus(result: any): string {
-  if (!result.success) {
-    const error = result.error ?? t('toolResults.sentences.queryFailed');
-    return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
-  }
-
-  const results = Array.isArray(result.results) ? result.results : [];
-  if (results.length === 0) {
-    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noSubAgentStatus'))}</div>`;
-  }
-
-  let html = '<div class="sub-agent-status-list">';
-  results.forEach((item: any) => {
-    const agentId = item.agent_id ?? '';
-    const found = item.found !== false;
-    const status = String(item.status || '');
-    const taskId = item.task_id ?? '';
-    const summary = item.summary ?? item.final_result?.message ?? item.final_result?.summary ?? '';
-
-    html += '<div class="sub-agent-status-item">';
-    const itemDisplayName = item.display_name || '';
-    const itemHeader =
-      itemDisplayName ||
-      t('toolResults.sentences.subAgentResultName', { agentId: String(agentId) });
-    html += `<div class="sub-agent-status-header">${escapeHtml(String(itemHeader))}</div>`;
-
-    if (!found) {
-      html += '<div class="tool-result-meta">';
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.notFound'))}</div>`;
-      html += '</div>';
-    } else {
-      html += '<div class="tool-result-meta">';
-      if (status === 'completed') {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.done'))}</div>`;
-      } else if (status === 'terminated') {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.terminated'))}</div>`;
-      } else if (status === 'running') {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('common.running'))}</div>`;
-      } else if (status === 'pending') {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(t('toolResults.status.waiting'))}</div>`;
-      } else {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${escapeHtml(status || t('toolResults.values.unknown'))}</div>`;
-      }
-      if (taskId !== '' && !itemDisplayName) {
-        html += `<div><strong>${escapeHtml(t('toolResults.labels.taskId'))}</strong>${escapeHtml(String(taskId))}</div>`;
-      }
-      html += '</div>';
-
-      if (summary) {
-        html += '<div class="tool-result-content scrollable">';
-        html += `<div>${escapeHtml(String(summary))}</div>`;
-        html += '</div>';
-      }
-    }
-
-    html += '</div>';
-  });
-  html += '</div>';
-
-  return html;
-}
-
-function renderSendMessageToSubAgent(result: any, args: any): string {
-  const status = formatToolStatusLabel(
-    result,
-    t('toolResults.status.sent'),
-    t('toolResults.status.sendFailed')
-  );
-  const displayName = args.display_name ?? result.display_name ?? '';
-  const agentId = args.agent_id ?? result.agent_id ?? '';
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
-  if (displayName) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgent'))}</strong>${escapeHtml(String(displayName))}</div>`;
-  } else if (agentId !== '') {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.subAgentId'))}</strong>${escapeHtml(String(agentId))}</div>`;
-  }
-  if (!result?.success && result?.error) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
-  }
-  html += '</div>';
-
-  return html;
-}
-
-function renderAnswerSubAgentQuestion(result: any, args: any): string {
-  const status = formatToolStatusLabel(
-    result,
-    t('toolResults.status.replied'),
-    t('toolResults.status.replyFailed')
-  );
-  const questionId = args.question_id ?? result.question_id ?? '';
-  const answer = args.answer ?? '';
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
-  if (questionId) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.questionId'))}</strong>${escapeHtml(String(questionId))}</div>`;
-  }
-  if (!result?.success && result?.error) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
-  }
-  html += '</div>';
-
-  if (answer && typeof answer === 'string') {
-    html += '<div class="tool-result-content scrollable">';
-    html += `<div class="content-label">${escapeHtml(t('toolResults.sectionLabels.replyContent'))}</div>`;
-    const preview = String(answer).slice(0, 500);
-    const suffix = String(answer).length > 500 ? '…' : '';
-    html += `<pre>${escapeHtml(preview + suffix)}</pre>`;
-    html += '</div>';
-  }
-
-  return html;
-}
-
-function renderCreateCustomAgent(result: any, args: any): string {
-  const overwritten = !!result?.overwritten;
-  const status = result?.success
-    ? overwritten
-      ? t('toolResults.status.overwrittenUpdated')
-      : t('toolResults.status.created')
-    : t('toolResults.status.createFailed');
-  const roleId = args.role_id ?? result.role_id ?? '';
-  const name = args.name ?? result.name ?? roleId;
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.status'))}</strong>${status}</div>`;
-  if (roleId !== '') {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.roleId'))}</strong>${escapeHtml(String(roleId))}</div>`;
-  }
-  if (name && name !== roleId) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.roleName'))}</strong>${escapeHtml(String(name))}</div>`;
-  }
-  if (!result?.success && result?.error) {
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.error'))}</strong>${escapeHtml(String(result.error))}</div>`;
-  }
-  html += '</div>';
-
-  return html;
-}
-
-function renderListAgents(result: any): string {
-  if (!result?.success) {
-    const error = result?.error ?? t('toolResults.sentences.queryFailed');
-    return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
-  }
-
-  const roles = Array.isArray(result.roles) ? result.roles : [];
-  if (roles.length === 0) {
-    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noRoles'))}</div>`;
-  }
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.roleCount'))}</strong>${roles.length}</div>`;
-  html += '</div>';
-
-  html += '<div class="search-result-list">';
-  roles.forEach((role: any) => {
-    const roleId = role.role_id || t('toolResults.values.unknown');
-    const name = role.name || roleId;
-    const description = role.description || '';
-    const thinkingMode = role.thinking_mode || 'fast';
-    const isCustom = role.is_custom ? t('toolResults.values.yes') : t('toolResults.values.no');
-
-    html += '<div class="search-result-item">';
-    html += `<div class="search-result-title">${escapeHtml(roleId)} — ${escapeHtml(name)}</div>`;
-    if (description) {
-      html += `<div>${escapeHtml(description)}</div>`;
-    }
-    html += `<div><strong>${escapeHtml(t('toolResults.labels.thinkingMode'))}</strong>${escapeHtml(thinkingMode)} | <strong>${escapeHtml(t('toolResults.labels.custom'))}</strong>${escapeHtml(isCustom)}</div>`;
-    html += '</div>';
-  });
-  html += '</div>';
-
-  return html;
-}
-
-function renderListActiveSubAgents(result: any): string {
-  if (!result?.success) {
-    const error = result?.error ?? t('toolResults.sentences.queryFailed');
-    return `<div class="tool-result-error">⚠️ ${escapeHtml(String(error))}</div>`;
-  }
-
-  const agents = Array.isArray(result.agents) ? result.agents : [];
-  if (agents.length === 0) {
-    return `<div class="tool-result-empty">${escapeHtml(t('toolResults.sentences.noActiveSubAgents'))}</div>`;
-  }
-
-  let html = '<div class="tool-result-meta">';
-  html += `<div><strong>${escapeHtml(t('toolResults.labels.activeCount'))}</strong>${agents.length}</div>`;
-  html += '</div>';
-
-  html += '<div class="sub-agent-status-list">';
-  agents.forEach((agent: any) => {
-    const agentId = agent.agent_id ?? '?';
-    const displayName = agent.display_name || `Agent_${agentId}`;
-    const status = agent.status || 'unknown';
-    const summary = agent.summary || '';
-    const lastOutput = agent.last_output || '';
-
-    html += '<div class="sub-agent-status-item">';
-    // 只展示角色内编号显示名，不暴露全局 agent_id
-    html += `<div class="sub-agent-status-header">${escapeHtml(displayName)} [${escapeHtml(status)}]</div>`;
-    html += '<div class="tool-result-meta">';
-    if (summary) {
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.task'))}</strong>${escapeHtml(String(summary))}</div>`;
-    }
-    if (lastOutput) {
-      const preview = String(lastOutput).slice(0, 120);
-      const suffix = String(lastOutput).length > 120 ? '…' : '';
-      html += `<div><strong>${escapeHtml(t('toolResults.labels.lastOutput'))}</strong>${escapeHtml(preview + suffix)}</div>`;
-    }
-    html += '</div>';
-    html += '</div>';
-  });
-  html += '</div>';
 
   return html;
 }

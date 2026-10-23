@@ -8,14 +8,16 @@
 //   - queryFailed「查询失败」/ title「标题」/ description「描述」/ mode「模式」
 export default {
   access: {
+    working_dir_write: '沙箱 · 仅工作目录可写',
     workspace_write: '沙箱 · 仅工作区可写',
-    sandbox_write: '沙箱 · 按路径授权读写',
+    sandbox_write: '沙箱 · 工作区与授权路径可写',
     full_access: '完全访问',
     onceGranted: '本次完全访问已批准',
     alreadyActive: '当前为完全访问'
   },
   // —— 状态标签（带符号前缀，与 common 的裸词不同义）——
   status: {
+    idle: '本轮结束 · 可继续',
     successMark: '✓ 成功',
     failedMark: '✗ 失败',
     completed: '✓ 完成',
@@ -53,6 +55,7 @@ export default {
 
   // —— html 片段中的 <strong>字段标签：</strong>（含冒号）——
   labels: {
+    workingDir: '工作目录：',
     tool: '工具：',
     status: '状态：',
     path: '路径：',

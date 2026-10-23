@@ -21,6 +21,8 @@ class MCPRuntimeScope:
     workspace_path: str
     data_dir: str
     conversation_id: Optional[str]
+    actor_id: Optional[str] = None
+    working_dir: Optional[str] = None
 
 
 _PACKAGE = re.compile(r"^@playwright/mcp(?:@[^/\\]+)?$")
@@ -54,6 +56,10 @@ def prepare_stdio_server(
     Explicit browser attachment, isolated mode, profile/config overrides retain
     their configured semantics. HTTP services manage their own browser state.
     """
+    if server.get("transport") == "stdio" and scope and scope.actor_id and scope.working_dir:
+        server = dict(server)
+        if not server.get("cwd"):
+            server["cwd"] = scope.working_dir
     if (server.get("transport") != "stdio" or scope is None
             or not scope.conversation_id or not _is_playwright(server)):
         return server
@@ -88,6 +94,8 @@ def prepare_stdio_server(
         str(scope.conversation_id),
         str(server.get("id") or ""),
     ]
+    if scope.actor_id:
+        identity.append(scope.actor_id)
     digest = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode("utf-8")).hexdigest()
     if docker:
         # The workspace bind mount survives container recreation. Do not pass an

@@ -1,7 +1,7 @@
-"""多智能体会话状态机。
+"""统一子智能体的对话级通信状态。
 
-一个 MultiAgentState 绑定到一个多智能体对话的 conversation_id，维护：
-- 已创建的子智能体实例（agent_id ↔ role_id ↔ display_name ↔ task_id ↔ status）
+MultiAgentState按主对话conversation_id维护：
+- 命名子实例（内部agent_id ↔ display_name ↔ task_id ↔ status）
 - 待插入到主对话的待发 user 消息队列（pending_master_messages）
 - 主智能体工具调用 answer_sub_agent_question / answer_other_agent 写回答案的 futomap
 - 子智能体调用 ask_master / ask_other_agent 时挂起的 futomap
@@ -59,7 +59,7 @@ def format_multi_agent_message(
     """按统一格式构造 user 消息字符串。
 
     Args:
-        display_name: 发出方显示名（如 UI Operator_1 / Team Leader）
+        display_name: 发出方显示名（由主智能体指定 / Team Leader）
         msg_type: 消息类型，对应上方 TYPE_* 常量
         content: 消息正文
         msg_id: 消息 id；不传则自动生成
@@ -238,7 +238,6 @@ class AgentInstance:
     """一个多智能体会话中已创建的子智能体实例。"""
 
     agent_id: int
-    role_id: str
     display_name: str
     task_id: str
     status: str = "running"          # running / idle / terminated / failed / timeout
@@ -249,7 +248,6 @@ class AgentInstance:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "agent_id": self.agent_id,
-            "role_id": self.role_id,
             "display_name": self.display_name,
             "task_id": self.task_id,
             "status": self.status,
@@ -269,6 +267,8 @@ class MultiAgentState:
 
     def __init__(self, conversation_id: str):
         self.conversation_id = conversation_id
+        import threading
+        self._message_lock = threading.RLock()
         # agent_id 映射；同一会话里 agent_id 唯一
         self.agents: Dict[int, AgentInstance] = {}
         # task_id -> agent_id（便于在 SubAgentTask 完成时回写）
@@ -285,40 +285,17 @@ class MultiAgentState:
         # 一个 agent 可能同时只阻塞在一个 ask 工具上（最简实现）
         # key = agent_id, value = question_id（表示当前 agent 正阻塞等待）
         self.agent_blocking_question: Dict[int, str] = {}
-        # 主智能体通过 sleep(wait_sub_agent_output) 等待某个子智能体下一次输出
-        # key = agent_id, value = asyncio.Future（结果为完整消息文本）
-        self.output_waits: Dict[int, asyncio.Future] = {}
-        # 角色实例计数：role_id -> 已成功创建实例使用的最大角色内编号
-        # 角色内编号是显示名后缀（如 UI Operator_1），也是唯一对模型/用户暴露的编号；
-        # 全局 agent_id 为内部实现细节，不对外暴露。
-        # 采用 peek + commit 两步：创建失败不消耗编号，避免跳号。
-        self.role_counters: Dict[str, int] = {}
-
-    # ----- 创建/查询 -----
-    def peek_agent_id_for_role(self, role_id: str) -> int:
-        """预取指定角色的下一个角色内编号（不递增计数器）。
-
-        创建子智能体时先 peek 构造显示名，创建成功后必须调
-        commit_agent_id_for_role 提交；失败则不提交，编号不被消耗。
-        """
-        return self.role_counters.get(role_id, 0) + 1
-
-    def commit_agent_id_for_role(self, role_id: str, seq: int) -> None:
-        """创建成功后提交角色内编号（单调递增，不回退）。"""
-        if seq > self.role_counters.get(role_id, 0):
-            self.role_counters[role_id] = seq
-
     def get_instance_by_display_name(self, display_name: str) -> Optional[AgentInstance]:
-        """按显示名（如 UI Operator_1）查找实例；精确匹配优先，大小写不敏感兜底。"""
+        """按显示名（由主智能体指定）查找实例；精确匹配优先，大小写不敏感兜底。"""
         name = (display_name or "").strip()
         if not name:
             return None
         for a in self.agents.values():
             if a.display_name == name:
                 return a
-        lowered = name.lower()
+        lowered = name.casefold()
         for a in self.agents.values():
-            if a.display_name.lower() == lowered:
+            if a.display_name.casefold() == lowered:
                 return a
         return None
 
@@ -364,35 +341,6 @@ class MultiAgentState:
         a.status = status
         if last_output:
             a.last_output = last_output
-        # 当子智能体进入终态/idle 时，立即取消 sleep(wait_sub_agent_output) 的等待
-        if status in ("failed", "terminated", "idle"):
-            self._cancel_output_wait(agent_id, status)
-
-    def _cancel_output_wait(self, agent_id: int, status: str) -> None:
-        """取消指定 agent 的 sleep 输出等待，并提示可用 send_message_to_sub_agent 重新激活。"""
-        fut = self.output_waits.pop(agent_id, None)
-        if not fut or fut.done():
-            return
-        inst = self.agents.get(agent_id)
-        name = inst.display_name if inst else str(agent_id)
-        if status == "terminated":
-            msg = f"子智能体 {name} 已终止，无法继续等待输出。"
-        elif status == "failed":
-            msg = f"子智能体 {name} 已失败，无法继续等待输出。该子智能体可被复活，可用 send_message_to_sub_agent 重新激活。"
-        else:
-            msg = f"子智能体 {name} 已进入空闲状态，无法继续等待输出。可用 send_message_to_sub_agent 重新激活。"
-        try:
-            loop = fut.get_loop()
-            if loop and not loop.is_closed():
-                loop.call_soon_threadsafe(fut.set_exception, RuntimeError(msg))
-                return
-        except Exception:
-            pass
-        try:
-            fut.set_exception(RuntimeError(msg))
-        except Exception:
-            pass
-
     # ----- 主对话注入 -----
     def push_master_message(self, message_text: str) -> None:
         """把一条 user 消息追加到主对话待插入队列。"""
@@ -403,12 +351,19 @@ class MultiAgentState:
             queue_len_before=len(self.pending_master_messages),
             msg_preview=str(message_text)[:200],
         )
-        self.pending_master_messages.append(message_text)
+        with self._message_lock:
+            self.pending_master_messages.append(message_text)
+
+    def restore_master_messages(self, messages: List[str]) -> None:
+        """Admission failed: restore older notices ahead of newly queued ones."""
+        with self._message_lock:
+            self.pending_master_messages[0:0] = messages
 
     def drain_master_messages(self) -> List[str]:
         """取出（清空）所有待插入主对话的消息。"""
-        msgs = self.pending_master_messages
-        self.pending_master_messages = []
+        with self._message_lock:
+            msgs = self.pending_master_messages
+            self.pending_master_messages = []
         ma_debug(
             "state_drain_master_messages",
             conversation_id=self.conversation_id,
@@ -421,77 +376,6 @@ class MultiAgentState:
     def has_pending_master_messages(self) -> bool:
         return len(self.pending_master_messages) > 0
 
-    # ----- 等待子智能体输出（sleep wait_sub_agent_output） -----
-    def register_output_wait(
-        self, agent_id: int, loop: AbstractEventLoop
-    ) -> asyncio.Future:
-        """注册等待指定子智能体的下一次输出。
-
-        如果 `pending_master_messages` 里已经有该子智能体的未消费输出，
-        则立即消费并返回该消息；否则返回一个 future，由后续输出唤醒。
-        """
-        fut: asyncio.Future = loop.create_future()
-        inst = self.agents.get(agent_id)
-        if not inst:
-            fut.set_exception(ValueError("未找到该子智能体"))
-            return fut
-
-        if inst.status in ("terminated", "failed"):
-            fut.set_exception(
-                RuntimeError(
-                    f"子智能体 {inst.display_name} 当前状态为 {inst.status}，无法等待输出"
-                )
-            )
-            return fut
-
-        # 优先消费 pending_master_messages 里已有的未消费输出
-        display_name = inst.display_name
-        for i, msg in enumerate(self.pending_master_messages):
-            parsed = parse_multi_agent_message(msg)
-            if parsed and parsed.get("display_name") == display_name:
-                self.pending_master_messages.pop(i)
-                fut.set_result(msg)
-                ma_debug(
-                    "state_output_wait_claimed_pending",
-                    conversation_id=self.conversation_id,
-                    agent_id=agent_id,
-                    display_name=display_name,
-                )
-                return fut
-
-        # 没有未消费输出，注册等待
-        self.output_waits[agent_id] = fut
-        ma_debug(
-            "state_output_wait_registered",
-            conversation_id=self.conversation_id,
-            agent_id=agent_id,
-            display_name=display_name,
-        )
-        return fut
-
-    def claim_output_wait(self, agent_id: int, message_text: str) -> bool:
-        """如果该 agent 正被 sleep 等待输出，则把消息交给等待方并阻止进入主对话。"""
-        fut = self.output_waits.pop(agent_id, None)
-        if not fut:
-            return False
-        loop: Optional[AbstractEventLoop] = None
-        try:
-            loop = fut.get_loop()
-        except Exception:
-            pass
-        if loop and not loop.is_closed():
-            try:
-                loop.call_soon_threadsafe(fut.set_result, message_text)
-                return True
-            except Exception:
-                pass
-        try:
-            fut.set_result(message_text)
-        except Exception:
-            pass
-        return True
-
-    # ----- 阻塞问答 -----
     async def wait_for_answer(self, question_id: str, agent_id: int, timeout: float = 600.0) -> str:
         """子智能体 ask_* 工具调用后阻塞等待答案。
 
@@ -606,14 +490,15 @@ class MultiAgentState:
     def to_snapshot(self) -> Dict[str, Any]:
         return {
             "conversation_id": self.conversation_id,
-            "agents": [a.to_dict() for a in self.agents.values()],
-            "role_counters": self.role_counters,
+            "agents": [a.to_dict() for a in list(self.agents.values())],
+            "pending_master_messages": list(self.pending_master_messages),
         }
 
     @classmethod
     def from_snapshot(cls, snapshot: Dict[str, Any]) -> "MultiAgentState":
         state = cls(conversation_id=snapshot.get("conversation_id", ""))
-        state.role_counters = dict(snapshot.get("role_counters") or {})
+        state.pending_master_messages = [message for message in snapshot.get("pending_master_messages", [])
+                                         if isinstance(message, str)]
         for a_data in snapshot.get("agents") or []:
             a = AgentInstance(**a_data)
             state.agents[a.agent_id] = a
@@ -622,9 +507,9 @@ class MultiAgentState:
         return state
 
     def clear(self) -> None:
-        """清空所有运行态：实例、pending消息、阻塞问答、角色计数。
+        """清空实例、pending消息和阻塞问答。
 
-        用于用户连续第二下按停止按钮时，强制丢弃所有运行中/半成品状态。
+        显式清理时取消全部问答，不用于普通导航或新轮次。
         """
         # 取消所有阻塞中的 future，避免泄漏
         for qid, fut in list(self.pending_questions.items()):
@@ -634,17 +519,6 @@ class MultiAgentState:
                     loop.call_soon_threadsafe(fut.cancel)
                 except Exception:
                     pass
-        for fut in list(self.output_waits.values()):
-            if not fut.done():
-                try:
-                    loop = fut.get_loop()
-                    if loop and not loop.is_closed():
-                        loop.call_soon_threadsafe(fut.cancel)
-                    else:
-                        fut.cancel()
-                except Exception:
-                    pass
-        self.output_waits.clear()
         self.agents.clear()
         self.task_id_to_agent_id.clear()
         self.pending_master_messages.clear()
@@ -652,20 +526,3 @@ class MultiAgentState:
         self.pending_question_loops.clear()
         self.pending_answers.clear()
         self.agent_blocking_question.clear()
-        self.role_counters.clear()
-
-
-# ----------------------------------------------------------------------
-# 进程级全局注册表（所有 SubAgentManager 共享）
-# ----------------------------------------------------------------------
-# MultiAgentState 是会话级运行态，本质上不属于任何单个 SubAgentManager。
-# 历史上它存放在 manager.multi_agent_states（manager 实例属性）里，而对话级
-# terminal 缓存重建会产生多个 manager；每个 manager 的 _load_state 都从磁盘快照
-# from_snapshot 恢复一份副本，导致同一对话的 MultiAgentState 在内存中同时存在
-# N 份（terminate 只标记了其中一份，其余副本仍是陈旧 idle，前端轮询落到哪份
-# 就看到哪份的状态）。现在全进程共享同一份注册表，任何 manager 读写的都是同一
-# 对象，从根上消除多副本分裂。
-GLOBAL_MULTI_AGENT_STATES: Dict[str, "MultiAgentState"] = {}
-# get-or-create / drop / _load_state restore 的 check-then-act 需要互斥；
-# 用 RLock 防止与调用方已有锁重入死锁。
-GLOBAL_MULTI_AGENT_STATES_LOCK = threading.RLock()

@@ -19,7 +19,8 @@ _TERMINAL = {"completed", "succeeded", "failed", "timeout", "cancelled", "cancel
 
 
 def persisted_sub_agents(data: WorkspaceData) -> dict:
-    path = Path(data.workspace.data_dir) / "sub_agents.json"
+    from modules.sub_agent.persistence import STATE_FILENAME
+    path = Path(data.workspace.data_dir) / STATE_FILENAME
     try:
         stat = path.stat()
     except FileNotFoundError:
@@ -64,18 +65,12 @@ def background_status(data: WorkspaceData, conversation_id: str, *, activate=Fal
         if status in _TERMINAL:
             continue
         recoverable = True
-        if task.get("multi_agent_mode"):
-            if status != "idle":
-                result["has_running_multi_agent"] = True
-        else:
-            result["has_running_sub_agents"] = True
-    from modules.multi_agent.state import GLOBAL_MULTI_AGENT_STATES, GLOBAL_MULTI_AGENT_STATES_LOCK
-    with GLOBAL_MULTI_AGENT_STATES_LOCK:
-        multi = GLOBAL_MULTI_AGENT_STATES.get(conversation_id)
-        if multi and (multi.has_pending_master_messages() or
-                      any(instance.status == 'running' for instance in multi.agents.values())):
-            result['has_running_multi_agent'] = True
-            recoverable = True
+        if status == "running":
+            result["has_running_multi_agent"] = True
+    state = (saved.get("states") or {}).get(conversation_id) or {}
+    if state.get("pending_master_messages"):
+        result["has_running_multi_agent"] = True
+        recoverable = True
     # Background commands are process-local. Live commands keep their owning
     # runtime alive; there is no persisted command process to resurrect here.
     if activate and recoverable:

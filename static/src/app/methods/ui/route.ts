@@ -22,17 +22,6 @@ async function restoreRouteDraft(host, reason) {
 export const routeMethods = {
   async bootstrapRoute() {
     let path = window.location.pathname.replace(/^\/+|\/+$/g, '');
-    // 兼容重定向：旧多智能体路由统一收敛到裸路径。
-    // 对话类型是 metadata 属性（创建时确定），不再是路由概念。
-    if (path === 'multiagent/new' || path === 'multiagent') {
-      history.replaceState({}, '', '/new');
-      path = 'new';
-    } else if (path.startsWith('multiagent/')) {
-      const convPart = path.slice('multiagent/'.length);
-      const bareId = convPart.startsWith('conv_') ? convPart.slice('conv_'.length) : convPart;
-      history.replaceState({}, '', `/${bareId}`);
-      path = bareId;
-    }
     const blankRoute =
       !path || this.isExplicitNewConversationRoute() || this.isConversationIndependentRoute();
     if (blankRoute) this.leaveConversationView();
@@ -116,15 +105,6 @@ export const routeMethods = {
       this.startTitleTyping(t('common.newConversation'), { animate: false });
       this.initialRouteResolved = true;
       this.refreshBlankHeroState();
-      // 触发后端重建索引以补全旧对话的 multi_agent_mode 字段（每次页面加载最多一次）
-      if (!this.multiAgentIndexRebuildTriggered) {
-        this.multiAgentIndexRebuildTriggered = true;
-        try {
-          await fetch('/api/multiagent/rebuild-index', { method: 'POST' });
-        } catch (_e) {
-          // 重建失败不阻断主流程
-        }
-      }
       if (!owns()) return { success: false, superseded: true };
       try {
         await this.loadNewConversationSettings();

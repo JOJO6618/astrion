@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Optional
 
-ACCESS_LEVELS = frozenset({"workspace_write", "sandbox_write", "full_access"})
+ACCESS_LEVELS = frozenset({"working_dir_write", "workspace_write", "sandbox_write", "full_access"})
 
 
 def command_fingerprint(arguments: Mapping[str, Any]) -> str:
@@ -70,6 +70,7 @@ class ExecutionScope:
     write_granted: bool = False
     network_granted: bool = False
     full_access_grant: Optional[FullAccessGrant] = None
+    working_dir: Optional[Path] = None
 
     @property
     def is_sub_agent(self) -> bool:
@@ -77,7 +78,7 @@ class ExecutionScope:
 
     @property
     def workspace_only(self) -> bool:
-        return self.is_sub_agent and self.access_level == "workspace_write"
+        return self.is_sub_agent and self.access_level in {"working_dir_write", "workspace_write"}
 
     @property
     def execution_mode(self) -> str:
@@ -111,13 +112,13 @@ def uses_docker(terminal: Any) -> bool:
 
 def validate_child_access(terminal: Any, access_level: Any) -> str:
     if not isinstance(access_level, str) or access_level not in ACCESS_LEVELS:
-        raise ValueError("创建子智能体必须明确选择 access_level：workspace_write、sandbox_write 或 full_access。")
+        raise ValueError("创建子智能体必须明确选择 access_level：working_dir_write、workspace_write、sandbox_write 或 full_access。")
     permission = terminal.get_permission_mode()
     work_mode = terminal.get_work_mode()
     if permission == "readonly" or work_mode == "plan":
-        allowed = {"workspace_write"}
+        allowed = {"working_dir_write", "workspace_write"}
     elif terminal.get_execution_mode() != "direct":
-        allowed = {"workspace_write", "sandbox_write"}
+        allowed = {"working_dir_write", "workspace_write", "sandbox_write"}
     else:
         allowed = ACCESS_LEVELS
     if access_level == "full_access" and (
@@ -131,8 +132,9 @@ def validate_child_access(terminal: Any, access_level: Any) -> str:
 
 def child_access_prompt(access_level: str) -> str:
     descriptions = {
-        "workspace_write": "沙箱，仅创建时绑定的工作区根目录内可写；区外禁止写入。读取遵循当前路径授权。",
-        "sandbox_write": "沙箱，按当前路径授权范围读写。",
+        "working_dir_write": "沙箱，仅创建时绑定的子工作目录可写；读取遵循当前路径授权。目录写限制适用于内置工具，MCP沿用外置服务权限。",
+        "workspace_write": "沙箱，仅创建时绑定的工作区根目录内可写；区外禁止写入。读取遵循当前路径授权。目录写限制适用于内置工具，MCP沿用外置服务权限。",
+        "sandbox_write": "沙箱，当前工作区+沙箱授权路径可写。目录写限制适用于内置工具，MCP沿用外置服务权限。",
         "full_access": "宿主机完全访问，拥有运行 Astrion 的系统账户权限。",
     }
     return "\n\n[固定执行权限]\n" + descriptions[access_level] + "主智能体后续切换权限或执行环境不会改变你的档位。"

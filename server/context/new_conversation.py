@@ -36,15 +36,8 @@ def _previous_metadata(terminal: Any, previous_id: str | None) -> dict:
         return {}
     previous_id = previous_id if previous_id.startswith("conv_") else f"conv_{previous_id}"
     context = terminal.context_manager
-    managers = [context.conversation_manager]
-    multi = getattr(context, "multi_agent_conversation_manager", None)
-    if multi is not None:
-        managers.append(multi)
-    for manager in managers:
-        data = manager.read_conversation(previous_id)
-        if data is not None:
-            return data.get("metadata") or {}
-    return {}
+    data = context.conversation_manager.read_conversation(previous_id)
+    return (data or {}).get("metadata") or {}
 
 
 def draft_settings(terminal: Any) -> dict:
@@ -164,7 +157,7 @@ def validate_creation_settings(settings: Any, *, host_mode: bool, can_manage: bo
             "restore_modes": {key: restore.get(key) for key in RESTORE_KEYS}}
 
 
-def create_from_settings(terminal: Any, workspace: Any, settings: Any, *, multi_agent: bool = False) -> dict:
+def create_from_settings(terminal: Any, workspace: Any, settings: Any) -> dict:
     """Create a file without changing any running conversation or workspace focus."""
     if getattr(terminal, "_bound_conversation_id", None):
         raise ValueError("Creation requires a workspace runtime")
@@ -176,13 +169,13 @@ def create_from_settings(terminal: Any, workspace: Any, settings: Any, *, multi_
         raise PermissionError("Selected model is disabled by administrator policy")
     prefs = load_personalization_config(workspace.data_dir)
     context = terminal.context_manager
-    manager = (context.multi_agent_conversation_manager if multi_agent else context.conversation_manager)
+    manager = context.conversation_manager
     metadata = {key: resolved[key] for key in
                 ("work_mode", "permission_mode", "execution_mode", "network_permission", "reasoning_effort")}
     metadata.update(resolved["restore_modes"])
-    metadata.update(multi_agent_mode=multi_agent, pending_permission_mode=None,
+    metadata.update(pending_permission_mode=None,
                     pending_execution_mode=None, pending_network_permission=None)
-    metadata.update(snapshot_overrides_from_prefs(prefs, multi_agent_mode=multi_agent))
+    metadata.update(snapshot_overrides_from_prefs(prefs))
     with manager._io_lock:
         previous_id = manager.current_conversation_id
         try:
@@ -200,4 +193,4 @@ def create_from_settings(terminal: Any, workspace: Any, settings: Any, *, multi_
             _ensure_conversation_versioning_enabled(terminal, workspace, conversation_id)
         except Exception as exc:
             debug_log(f"[Versioning] New conversation initialization failed: {exc}")
-    return {"success": True, "conversation_id": conversation_id, "multi_agent_mode": multi_agent}
+    return {"success": True, "conversation_id": conversation_id}

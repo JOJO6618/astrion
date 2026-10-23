@@ -1,20 +1,21 @@
 import type { ConversationSummary } from './conversation';
 import { workspaceScopedFetch as fetch } from '../app/methods/workspaceRequestScope';
 
-export type ConversationListCache = {
+export type WorkspaceListCache = {
   list: ConversationSummary[];
   offset: number;
   hasMore: boolean;
   loaded: boolean;
 };
-export type WorkspaceListCache = Record<'normal' | 'multi_agent', ConversationListCache>;
 export const emptyWorkspaceCache = (): WorkspaceListCache => ({
-  normal: { list: [], offset: 0, hasMore: false, loaded: false },
-  multi_agent: { list: [], offset: 0, hasMore: false, loaded: false }
+  list: [],
+  offset: 0,
+  hasMore: false,
+  loaded: false
 });
 
 const requests = new WeakMap<
-  ConversationListCache,
+  WorkspaceListCache,
   { owner: object; key: string; promise: Promise<void> }
 >();
 
@@ -29,18 +30,16 @@ export const workspaceCacheActions = {
     const id = workspaceId || 'default';
     if (this.conversationCacheWorkspaceId === id) return;
     if (this.conversationCacheWorkspaceId) {
-      const old = this.conversationsCache[this.sidebarConversationType];
-      old.offset = this.conversationsOffset;
-      old.hasMore = this.hasMoreConversations;
+      this.conversationsCache.offset = this.conversationsOffset;
+      this.conversationsCache.hasMore = this.hasMoreConversations;
     }
     const cache = this.getWorkspaceCache(id);
     this.conversationCacheWorkspaceId = id;
     this.conversationsCache = cache;
-    const visible = cache[this.sidebarConversationType];
-    this.conversations = visible.list;
-    this.conversationsOffset = visible.offset;
-    this.hasMoreConversations = visible.hasMore;
-    this.conversationsLoading = !visible.loaded;
+    this.conversations = cache.list;
+    this.conversationsOffset = cache.offset;
+    this.hasMoreConversations = cache.hasMore;
+    this.conversationsLoading = !cache.loaded;
     this.loadingMoreConversations = false;
   },
   invalidateWorkspaceCache(this: any, workspaceId: string) {
@@ -50,7 +49,7 @@ export const workspaceCacheActions = {
       WorkspaceListCache
     ][]) {
       if (JSON.parse(key)[0] !== id) continue;
-      for (const value of Object.values(cache)) requests.delete(value);
+      requests.delete(cache);
       delete this.conversationsByWorkspace[key];
     }
     if (this.conversationCacheWorkspaceId === id) {
@@ -63,14 +62,12 @@ export const workspaceCacheActions = {
 export function fetchConversationPage(
   store: any,
   workspaceId: string,
-  type: 'normal' | 'multi_agent',
   { limit = 20, offset = 0, refresh = false, nonEmpty = false } = {}
 ) {
-  const pair: WorkspaceListCache = store.getWorkspaceCache(
+  const cache: WorkspaceListCache = store.getWorkspaceCache(
     workspaceId,
     nonEmpty ? 'non-empty' : 'default'
   );
-  const cache = pair[type];
   if (!refresh && cache.loaded && offset === 0) return Promise.resolve();
   const key = JSON.stringify([limit, offset, nonEmpty]);
   const current = requests.get(cache);
@@ -84,7 +81,6 @@ export function fetchConversationPage(
         workspace_id: workspaceId || 'default',
         limit: String(limit),
         offset: String(offset),
-        multi_agent_mode: type === 'multi_agent' ? '1' : '0',
         non_empty: nonEmpty ? '1' : '0'
       });
       const response = await fetch(`/api/conversations?${query}`);

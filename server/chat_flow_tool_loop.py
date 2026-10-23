@@ -644,7 +644,7 @@ async def execute_tool_calls(**kwargs):
         web_terminal._tool_loop_active = previous_tool_loop_active
 
 
-async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages, client_sid: str, username: str, iteration: int, conversation_id: Optional[str], last_tool_call_time: float, process_sub_agent_updates, process_background_command_updates, process_multi_agent_master_messages=process_multi_agent_master_messages, get_stop_flag, clear_stop_flag, workspace=None):
+async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages, client_sid: str, username: str, iteration: int, conversation_id: Optional[str], last_tool_call_time: float, process_background_command_updates, process_multi_agent_master_messages=process_multi_agent_master_messages, get_stop_flag, clear_stop_flag, workspace=None):
     previous_tool_loop_active = getattr(web_terminal, "_tool_loop_active", False)
     web_terminal._tool_loop_active = True
     allowed_tool_names = set()
@@ -1423,17 +1423,6 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 action_message = summary
             debug_log(f"{function_name} 执行完成: {summary or '无摘要'}")
 
-        if function_name == "sleep":
-            try:
-                if isinstance(result_data, dict) and result_data.get("mode") == "wait_sub_agent_ids":
-                    waited_task_ids = result_data.get("waited_task_ids") or []
-                    if not hasattr(web_terminal, "_announced_sub_agent_tasks"):
-                        web_terminal._announced_sub_agent_tasks = set()
-                    for tid in waited_task_ids:
-                        if tid:
-                            web_terminal._announced_sub_agent_tasks.add(str(tid))
-            except Exception:
-                pass
         monitor_snapshot_after = None
         if function_name in MONITOR_FILE_TOOLS:
             result_path = None
@@ -1762,14 +1751,6 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
     if last_completed_tool_call_id:
         debug_log(
             f"[SubAgent] after all tools finished -> poll updates inline after_tool_call_id={last_completed_tool_call_id}"
-        )
-        await process_sub_agent_updates(
-            messages=messages,
-            inline=True,
-            after_tool_call_id=last_completed_tool_call_id,
-            web_terminal=web_terminal,
-            sender=sender,
-            debug_log=debug_log,
         )
         debug_log(
             "[BgCmdDebug] after all tools finished -> poll background command updates "

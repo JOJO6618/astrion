@@ -170,8 +170,8 @@ class CommandDispatchTests(unittest.IsolatedAsyncioTestCase):
         self.terminal._apply_execution_mode_to_runtime = Mock()
         manager = SimpleNamespace(terminal=self.terminal, project_path=self.root,
                                   data_dir=self.root, container_session=self.terminal.container_session)
-        scope = ExecutionScope("sub_agent", "child", self.root, "workspace_write", "c", "child")
-        child = SimpleNamespace(manager=manager, execution_scope=scope)
+        scope = ExecutionScope("sub_agent", "child", self.root, "workspace_write", "c", "child", working_dir=self.root)
+        child = SimpleNamespace(manager=manager, task_id="child", execution_scope=scope)
         modes = []
         async def run(command, **kwargs):
             modes.append(current_execution_scope().access_level)

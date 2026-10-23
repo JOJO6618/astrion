@@ -22,7 +22,7 @@ from core import tool_loading as tl  # noqa: E402
 class RegistryIntegrityTest(unittest.TestCase):
     def test_registry_has_expected_shape(self):
         names = tl.deferrable_tool_names()
-        self.assertEqual(len(names), 18)
+        self.assertEqual(len(names), 21)
         self.assertEqual(len(set(names)), len(names), "注册表内工具名重复")
         for cat in tl.DEFERRABLE_REGISTRY.values():
             self.assertTrue(cat.get("label"))
@@ -39,7 +39,7 @@ class RegistryIntegrityTest(unittest.TestCase):
         payload = tl.build_registry_payload()
         self.assertEqual(len(payload), len(tl.DEFERRABLE_REGISTRY))
         total = sum(len(item["tools"]) for item in payload)
-        self.assertEqual(total, 18)
+        self.assertEqual(total, 21)
 
 
 class SnapshotTest(unittest.TestCase):
@@ -69,7 +69,6 @@ class SnapshotTest(unittest.TestCase):
         self.assertIn(tl.LOAD_TOOLS_NAME, snap["initial_exposed"])
 
     def test_overrides_from_prefs(self):
-        self.assertEqual(tl.snapshot_overrides_from_prefs({}, multi_agent_mode=True), {})
         self.assertEqual(tl.snapshot_overrides_from_prefs({"tool_loading_enabled": False}), {})
         # 默认关闭：空配置不启用
         self.assertEqual(tl.snapshot_overrides_from_prefs({}), {})
@@ -187,7 +186,7 @@ class PersonalizationFieldsTest(unittest.TestCase):
 
         result = sanitize_personalization_payload({})
         self.assertFalse(result["tool_loading_enabled"])
-        self.assertEqual(len(result["tool_loading_deferred"]), 18)
+        self.assertEqual(len(result["tool_loading_deferred"]), 21)
 
     def test_sanitize_explicit_values(self):
         from modules.personalization_manager import sanitize_personalization_payload

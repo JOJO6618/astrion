@@ -189,121 +189,6 @@ def inject_runtime_user_message(
     return formatted
 
 
-async def process_sub_agent_updates(*, messages: List[Dict], inline: bool = False, after_tool_call_id: Optional[str] = None, web_terminal, sender, debug_log):
-    """轮询子智能体任务并通知前端，并把结果插入当前对话上下文。"""
-    manager = getattr(web_terminal, "sub_agent_manager", None)
-    if not manager:
-        return
-
-    # 获取已通知的任务集合
-    if not hasattr(web_terminal, '_announced_sub_agent_tasks'):
-        web_terminal._announced_sub_agent_tasks = set()
-
-    try:
-        updates = manager.poll_updates()
-        debug_log(f"[SubAgent] poll inline={inline} after_tool_call_id={after_tool_call_id} updates={len(updates)}")
-    except Exception as exc:
-        debug_log(f"子智能体状态检查失败: {exc}")
-        return
-
-    # 兜底：如果 poll_updates 没命中，但任务已被别处更新为终态且未通知，补发一次
-    if not updates:
-        synthesized = []
-        try:
-            for task_id, task in getattr(manager, "tasks", {}).items():
-                if not isinstance(task, dict):
-                    continue
-                status = task.get("status")
-                if status not in TERMINAL_STATUSES.union({"terminated"}):
-                    continue
-                if task.get("notified"):
-                    continue
-                if task.get("multi_agent_mode"):
-                    continue
-                task_conv_id = task.get("conversation_id")
-                current_conv_id = getattr(getattr(web_terminal, "context_manager", None), "current_conversation_id", None)
-                if task_conv_id and current_conv_id and task_conv_id != current_conv_id:
-                    continue
-                final_result = task.get("final_result")
-                if not final_result:
-                    try:
-                        final_result = manager._check_task_status(task)
-                    except Exception:
-                        final_result = None
-                if isinstance(final_result, dict):
-                    synthesized.append(final_result)
-        except Exception as exc:
-            debug_log(f"[SubAgent] synthesized updates failed: {exc}")
-            synthesized = []
-
-        if synthesized:
-            updates = synthesized
-            debug_log(f"[SubAgent] synthesized updates count={len(updates)}")
-
-    if inline and not hasattr(web_terminal, "_inline_sub_agent_notified"):
-        web_terminal._inline_sub_agent_notified = set()
-
-    for update in updates:
-        task_id = update.get("task_id")
-        task_info = manager.tasks.get(task_id) if task_id else None
-        current_conv_id = getattr(getattr(web_terminal, "context_manager", None), "current_conversation_id", None)
-        task_conv_id = task_info.get("conversation_id") if isinstance(task_info, dict) else None
-        if task_conv_id and current_conv_id and task_conv_id != current_conv_id:
-            debug_log(f"[SubAgent] 跳过非当前对话任务: task={task_id} conv={task_conv_id} current={current_conv_id}")
-            continue
-        if task_id and task_info is None:
-            debug_log(f"[SubAgent] 找不到任务详情，跳过: task={task_id}")
-            continue
-
-        # 检查是否已经通知过这个任务
-        if task_id and task_id in web_terminal._announced_sub_agent_tasks:
-            debug_log(f"[SubAgent] 任务 {task_id} 已通知过，跳过")
-            continue
-        if isinstance(task_info, dict) and task_info.get("notified"):
-            debug_log(f"[SubAgent] 任务 {task_id} notified=true，跳过")
-            continue
-
-        message = update.get("system_message")
-        if not message:
-            debug_log(f"[SubAgent] update missing system_message: task={task_id} keys={list(update.keys())}")
-            continue
-
-        if inline:
-            inline_key = ("task", task_id) if task_id else ("msg", message)
-            if inline_key in web_terminal._inline_sub_agent_notified:
-                debug_log(f"[SubAgent] inline 通知已发送，跳过: key={inline_key}")
-                continue
-
-        debug_log(f"[SubAgent] update task={task_id} inline={inline} msg={message}")
-
-        # 标记任务已通知
-        if task_id:
-            web_terminal._announced_sub_agent_tasks.add(task_id)
-            if isinstance(task_info, dict):
-                task_info["notified"] = True
-                task_info["updated_at"] = time.time()
-                try:
-                    manager._save_state()
-                except Exception as exc:
-                    debug_log(f"[SubAgent] 保存通知状态失败: {exc}")
-
-        conversation_id = getattr(getattr(web_terminal, "context_manager", None), "current_conversation_id", None)
-        inject_runtime_user_message(
-            web_terminal=web_terminal,
-            messages=messages,
-            text=message,
-            source="sub_agent",
-            sender=sender,
-            conversation_id=conversation_id,
-            after_tool_call_id=after_tool_call_id,
-            inline=inline,
-            extra_metadata={"task_id": task_id},
-        )
-        if inline:
-            web_terminal._inline_sub_agent_notified.add(inline_key)
-        debug_log(f"[SubAgent] 插入子智能体通知 after_tool_call_id={after_tool_call_id} inline={inline}")
-
-
 async def process_workflow_updates(
     *,
     web_terminal,
@@ -482,6 +367,9 @@ def inject_multi_agent_master_message(
             )
     except Exception as exc:
         ma_debug("inject_ma_message_save_error", error=str(exc))
+        raise
+    if saved_message is None:
+        raise RuntimeError("子消息未持久化，保留在通知队列等待重试。")
 
     if messages is not None:
         insert_index = len(messages)
@@ -542,7 +430,6 @@ async def process_multi_agent_master_messages(
     manager = getattr(web_terminal, "sub_agent_manager", None)
     ma_debug(
         "process_ma_messages_enter",
-        multi_agent_mode=getattr(web_terminal, "multi_agent_mode", False),
         has_manager=bool(manager),
         manager_id=id(manager) if manager else None,
         conversation_id=getattr(getattr(web_terminal, "context_manager", None), "current_conversation_id", None),
@@ -550,8 +437,6 @@ async def process_multi_agent_master_messages(
         after_tool_call_id=after_tool_call_id,
         messages_len_before=len(messages) if messages else 0,
     )
-    if not getattr(web_terminal, "multi_agent_mode", False):
-        return 0
     manager = getattr(web_terminal, "sub_agent_manager", None)
     if not manager:
         ma_debug("process_ma_messages_no_manager")
@@ -576,17 +461,22 @@ async def process_multi_agent_master_messages(
         count=len(pending),
         previews=[str(m)[:200] for m in pending],
     )
-    for msg in pending:
-        inject_multi_agent_master_message(
-            web_terminal=web_terminal,
-            messages=messages,
-            text=msg,
-            sender=sender,
-            conversation_id=conversation_id,
-            inline=inline,
-            after_tool_call_id=after_tool_call_id,
-        )
-    return len(pending)
+    inserted = 0
+    try:
+        for msg in pending:
+            inject_multi_agent_master_message(
+                web_terminal=web_terminal, messages=messages, text=msg, sender=sender,
+                conversation_id=conversation_id, inline=inline,
+                # 整批工具已经完成，按队列顺序追加，不能每次插到同一 tool 后反转消息。
+                after_tool_call_id=None,
+            )
+            inserted += 1
+    except Exception:
+        state.restore_master_messages(pending[inserted:])
+        raise
+    finally:
+        manager._save_state()
+    return inserted
 
 
 async def wait_retry_delay(*, delay_seconds: int, client_sid: str, username: str, sender, get_stop_flag, clear_stop_flag) -> bool:

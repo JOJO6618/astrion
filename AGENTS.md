@@ -23,7 +23,7 @@
 | 权限模式 / 路径授权 / 平台沙箱 | `docs/agents_details/permission_and_sandbox.md` | 权限、沙箱、平台隔离 |
 | 运行模式（work_mode） | `docs/agents_details/work_mode.md` | plan/ask/execute 链路 |
 | 对话级目标模式 | `docs/agents_details/goal_mode.md` | 目标开始／继续／关闭、暂停、审核及重试 |
-| 多智能体对话类型 | `docs/agents_details/multi_agent.md` | 多智能体派发/渲染 |
+| 统一子智能体 | `docs/agents_details/multi_agent.md` | 命名实例、恢复、轮次与通知 |
 | 主任务门闸与单写者不变量 | `docs/agents_details/main_task_gate.md` | 新增主任务入口 |
 | 工具动态加载 | `docs/agents_details/tool_loading.md` | 动 tool_loading |
 | MCP 对话运行态与浏览器隔离 | `docs/agents_details/mcp_runtime_scope.md` | MCP 连接归属、stdio 启动适配、Playwright profile |
@@ -312,7 +312,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 **实现要点（改代码必须知道）**：
 
 - 后端核心 `core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁、`RESTRICTED_PERMISSION_MODES` 与受限档⇄沙箱联动）；执行环境锁在 `core/main_terminal.py::set_execution_mode`（只拦 direct）。
-- **Web 新对话初始化（2026-10-16）**：所有新建按钮只进入 `/new`，删除立即创建空文件的个人选项；首条消息才创建。工作区 terminal 独立缓存个人默认模型、思考模式、推理强度、工作模式、权限模式；进入 `/new` 经 `POST /api/new-conversation/settings` 装配。执行环境/网络只继承**刚离开的同工作区正在查看的对话**；跨工作区、直接打开或来源缺失固定 `sandbox + restricted`，禁止扫描最近对话。推理强度 `null` 是有效默认。空页切换只改前端，首消息提交完整 `settings`，普通/多智能体共用 `server/context/new_conversation.py` 校验创建；创建时不再覆盖个人默认。状态轮询不得覆盖空页选择。CLI/Gateway 与工作流创建尚保留各自入口，不据此宣称已统一。**任何创建路径不得在 plan 锁之前调用非只读 set**（曾因此 500）。
+- **Web 新对话初始化（2026-10-16）**：所有新建按钮只进入 `/new`，删除立即创建空文件的个人选项；首条消息才创建。工作区 terminal 独立缓存个人默认模型、思考模式、推理强度、工作模式、权限模式；进入 `/new` 经 `POST /api/new-conversation/settings` 装配。执行环境/网络只继承**刚离开的同工作区正在查看的对话**；跨工作区、直接打开或来源缺失固定 `sandbox + restricted`，禁止扫描最近对话。推理强度 `null` 是有效默认。空页切换只改前端，首消息提交完整 `settings`，统一由 `server/context/new_conversation.py` 校验创建；创建时不再覆盖个人默认。状态轮询不得覆盖空页选择。CLI/Gateway 与工作流创建尚保留各自入口，不据此宣称已统一。**任何创建路径不得在 plan 锁之前调用非只读 set**（曾因此 500）。
 - 提示词：`prompts/work_mode.txt` + `mode.py::_build_work_mode_rules`（三档规则唯一来源）；冻结注入在 `messages.py`；切换走 drift 机制（`_RUNTIME_MODE_KINDS` 第四种）。
 - API：`GET/POST /api/work-mode`；**仅空闲可切换，运行中 409**。
 - 前端：输入栏 `work-mode-switcher`（streaming 时锁定）；plan 下权限/执行环境两组选项禁用+锁定标记（**网络权限组保持可调**，不整体锁死菜单）。
@@ -334,80 +334,20 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 > 平台细节、常量清单与实测记录见 `docs/agents_details/permission_and_sandbox.md`。
 
-## 11) 多智能体对话类型（multi-agent conversation type）
+## 11) 统一子智能体（2026-10-22）
 
-多智能体是**对话的不可变属性**（`metadata.multi_agent_mode = true`，创建时确定、不可变），不再是全局模式。URL 统一 `/<conv_id>`；数据目录 `~/.astrion/astrion/host/mutiagents/`（保留原拼写）。
+所有主对话只用普通 ConversationManager；取消对话类型、角色模板和第二存储目录，列表／搜索／创建／bootstrap／快速对话没有类型分流。旧多智能体主对话仅由离线脚本迁入主目录，**禁止在业务代码加入双目录回退或旧传统子任务恢复**。迁移说明 `docs/sub_agent_migration.md`。
 
-### 11.0 前端对话类型模型
+- **名称和工具**：`modules/sub_agent/definitions.py` 为唯一签名来源，`named.py` 分派。公开 name/names 寻址，同对话casefold唯一、1–80字符、终结后不复用；内部编号不对模型暴露。主侧6工具=create/send/status/stop/terminate/answer；子侧ask_master/ask_other_agent/answer_other_agent/status。统一get_sub_agent_status：names省略查询全部，传入非空列表按名称查询，统一results数组；删除list_active_sub_agents。模型工具结果不返回task_id/conversation_id，前端运行视图保留。模型用intelligence选；删除角色工具、finish_task、强制交付文件、子等待sleep和公开run_in_background。
+- **轮次边界**：全部后台，自然最终回复进入idle，保留上下文。timeout_seconds可省略，新轮省略即不限时；**预算到期必须完成当前模型响应和整批工具并真实回填后，才阻止下一次模型请求**。显式stop即时取消执行worker：半截响应不提交，已提交调用的缺失结果补写“被主智能体取消”（界面停止为“被用户取消”），已完成结果保留；停止后idle、end_reason=stopped且可继续。terminate为吸收态并优先于stop。运行中消息安全入队，不能插到assistant/tool中间；idle靠Event等待，跨线程唤醒。idle不算后台运行。
+- **持久化与恢复**：`persistence.py`按工作区data_dir共享tasks/instances/running/states注册表，查询不得覆盖活动记录。新状态仅`sub_agent_runtime.json`（version=1），上下文在`sub_agent_tasks/<task_id>/conversation.json`。不读旧sub_agents.json。保存pending_work、pending_master_messages及work_paused；stop暂停排队工作的自动消费，后续新消息再解除暂停，恢复时同样遵守。恢复校验原模型、固定权限、项目身份和工作目录，不隐式重跑旧任务。默认工作目录`.astrion/sub_agent_work/agent_N[_suffix]/`。
+- **通知与单写者**：普通中间输出留子记录，每轮只将最终回复作为user消息通知主；主子／子子问答保留，子子通信同时报告主。生产端只入队；主运行中在完整工具批次后按顺序消费，主空闲时poll预占门闸并经RuntimeService移交token派发notice。**有消息立即消费，不等running全部退出**，避免ask_master互锁。受理失败回队；前置消息认领门闸后才持久化；逐条写失败只回队未写尾段。目标暂停策略不被自动通知解除。
+- **显示契约**：`auto_message_type=multi_agent_*`、visibility=chat、starts_work=false仍是协作消息协议。持久化和事件共用message_id，恢复只走显示快照。传输字段has_running_multi_agent表示running子实例／待消费消息，不是对话类型；后台命令／工作流另用通知池。禁止恢复子任务waiting阻塞输入。
+- **MCP与权限**：每子实例独立MCPClientManager，复用父注册表及可见映射，不共享活动客户端。默认Playwright profile加入稳定actor_id；未配置cwd时使用子working_dir，显式配置优先。MCP不套内置目录写权限沙箱。四档内置权限见§18。
+- **显示和分类**：主formatter在agent_context.py并注册dispatch；子formatter在toolkit.py；前端toolRenderers.ts委派subAgentResults.ts，备用ToolAction同用。meta只参数、content只结果。新增工具同步tool_config类别、工具系列／只读清单和动态加载注册。
+- **调试与验证**：ma_debug沿用multi_agent_loop.log，记录轮次／恢复／pending／门闸／跨循环问答。统一回归`test/2026-10-22_子智能体统一/`；相关快照、工作区、固定权限、MCP回归按影响执行。真实模型、UI和各原生平台另需实机验收。
 
-三个语义单一的 state，**互不复用**：`currentConversationType`（已打开对话类型）、`newConversationType`（空对话待创建类型，localStorage `agents_new_conversation_type`）、`sidebarConversationType`（侧边栏过滤器，localStorage `agents_sidebar_conversation_type`）。`stores/conversation.ts` 的 `multiAgentMode` 字段保留但语义变为「当前对话是否多智能体」，**不得删除**（`stores/subAgent.ts` 有读取点）。侧边栏类型切换 UI 统一显示在「搜索对话」下方，列表用推挤式 `<Transition>` 动画。
-
-### 11.1 角色与实例
-
-- 主智能体显示名固定 `Team Leader`，不需要预置角色文件。
-- 子智能体 = `role_id` + 角色内编号；显示名 `{Role Name}_{编号}`（如 `UI Operator_1`），**后缀永远带数字**。
-- **编号暴露原则（2026-08-26）**：角色内编号显示名是**唯一**对模型和用户暴露的身份；全局 `agent_id` 是纯内部细节（任务字典 key / task_id 生成），不接受模型指定、不出现在工具参数/结果文案/前端展示中。**所有寻址类工具一律用显示名。**
-- **`send_message_to_sub_agent` 与 `ask_sub_agent` 语义不同，必须保留两者**（前者插入引导不阻塞，后者阻塞等一轮回答）。
-- 子智能体间通信**必须同时向主智能体输出汇报**，不允许偷偷沟通。
-
-### 11.2 子智能体执行机制
-
-- 主进程内 `asyncio.Task` + 独立后台事件循环线程；工具调用复用主进程沙箱/容器链路。
-- **模型请求重试**：最多 5 次尝试、间隔 10s（`asyncio.sleep` 分段等待并响应软停止/取消）；**仅当「零接收」才重试**，已收到内容后断流直接失败。失败终态分模式：多智能体下 5 次全失败 → 转 idle 并向主智能体报错；输出期间断开 → 直接 failed。
-- **工具「正在调用」进度事件**：`_call_model` 在工具名+id 首个流式 chunk 到达时即 emit `status="calling"`（与后续 running/completed 共用同一 tool_call id），前端按 id 原地更新。新增状态文案时前端 `normalizeStatus` 需识别 `calling`。
-- 多智能体模式下：`create_sub_agent` 强制 `run_in_background=False`，不触发 `sub_agent_waiting`；自然输出结束即进入 `idle`（上下文保留，**不算 failed**）；**不能把 `output.success == null` 直接判为 failed**；idle 等待必须用 `asyncio.Event`（跨线程唤醒用 `call_soon_threadsafe`）；任务记录里 `multi_agent_mode` 字段**必须显式写入**（缺失会被传统后台通知池误当后台任务）。
-
-### 11.3 消息池与派发链路（重点）
-
-**输出端 ↔ 接收端分离**：输出端只 `push_master_message` 到 `MultiAgentState.pending_master_messages`；接收端按主智能体状态选插入方式——情况1（主运行中）在 `execute_tool_calls` 末尾 inline 插入；情况2（主空闲）后台 poll drain 后派发 `task_type="notice"` 的后续 task；情况3（主最后一轮无工具调用）同 path 继续迭代。
-
-**情况2 硬约束（调试踩过坑）**：
-
-1. **Pool 优先**：pool 有消息就立即 drain，**不能等所有 running 退出**（`ask_master` await 期间 status=running 但不会产生新输出，只有主对话回答才能解套）。「对话处于运行状态」只决定前端显示态，不阻塞 pool 消费。
-2. **持久化不要重复**：前置 N-1 条调 `inject_multi_agent_master_message` 绑定持久化；**最后一条只 emit 不持久化**，在后续 `handle_task_with_sender` 里才 `add_conversation`。否则历史出现两条相同 user 消息、前端刷新渲染两遍。
-3. **Metadata `visibility` 必须显式为 `"chat"`**：`_user_message_ui_defaults("sub_agent")` 默认给 `{visibility:"compact"}`，所以有 `**ui_defaults` 时必须在它**之后**再写 `"visibility": "chat"`（后出现 key 胜出）；`handle_task_with_sender` 里 `update(multi_agent_meta)` 之后同样要显式覆盖。
-4. **必须传 `auto_message_type`**：前端 `isMultiAgentMessage()` 只看 `auto_message_type.startsWith('multi_agent_')`，字段不能为空，否则前端 fallback 起通知渲染。
-
-### 11.4 通知池轮询器完全独立
-
-`poll_completion_notifications`（传统后台子智能体／后台命令）与 `poll_multi_agent_notifications`（多智能体）**完全独立**，避免 task_manager 单工作区互斥竞争。`task_complete` 事件中 `has_running_sub_agents` **只算传统后台任务**，`has_running_multi_agent` 为多智能体专用（含 _running_ 实例与 pending master 消息）。
-
-### 11.5 渲染与前端约定
-
-- 多智能体消息渲染是**两个独立判断**：`isMultiAgentMessage()`（看 `auto_message_type` 前缀）与 `getMessageVisibility()`（看 `metadata.visibility`），**两者都必须正确**，任一错都会 fallback 到通知渲染。
-- 多智能体消息不显示 assistant 回复头部（`metadata.starts_work=false`），但前端通过 `has_running_multi_agent` 单独恢复轮询。
-- 子智能体进度弹窗：输出与工具按真实时间线混排，默认 3 行，过长省略或内部滚动；颜色走语义 token。
-
-### 11.6 工具结果格式化与前端渲染位置
-
-新增多智能体工具必须**同时补齐后端 formatter 与前端 renderer**，否则前端 fallback 到原始 JSON 或空白。
-
-- 后端 formatter（主智能体工具）：实现 `utils/tool_result_formatter/agent_context.py`，注册 `utils/tool_result_formatter/dispatch.py` 的 `TOOL_FORMATTERS`。
-- 后端 formatter（子智能体通信工具）：`modules/sub_agent/toolkit.py::_format_tool_result()`，覆盖 `ask_master`/`ask_other_agent`/`answer_other_agent`/`list_active_sub_agents`。
-- 前端 renderer（主路径）：`static/src/components/chat/actions/toolRenderers.ts::renderEnhancedToolResult()`，调用方 `MinimalBlocks.vue` / `StackedBlocks.vue`（两者已移除开关判断，**所有工具块强制结构化渲染**）。
-- 前端 renderer（备用）：`static/src/components/chat/actions/ToolAction.vue::renderToolResult()`，调用方 `ChatArea.vue`。
-
-**新增工具 checklist**：① `modules/multi_agent/tools.py` 定义签名；② `core/main_terminal_parts/tools_execution.py` 实现 handler 并返回标准 dict；③ `agent_context.py` 加 `_format_<tool_name>()` 并在 `dispatch.py` 注册；④ `toolRenderers.ts` 加 `render<PascalCaseToolName>()` 并分发；⑤ 子智能体通信工具同步补 `toolkit.py` formatter。
-
-### 11.7 调试机制
-
-统一走 `modules/multi_agent/debug_logger.py::ma_debug()`，写 `~/.astrion/astrion/host/logs/multi_agent_loop.log`。**关键状态转换点必须打**：`handle_task_with_sender_start`／`state_push_master_message`／`poll_ma_tick`（0.5s，含完整状态快照）／`dispatch_ma_idle_*` 全链路／`create_chat_task` 异常／`provide_answer` 跨循环回写／`runtime_injected` 字段（区分 inline/idle/ask 插入路径）。
-
-### 11.8 已知坑
-
-- 多智能体模式下根本不 emit `sub_agent_waiting`（避免前端进入输入区阻塞态）。
-- `_announced_sub_agent_tasks`/`notified` 等标记只适用于传统后台任务，多智能体不走这条通知路径。
-- 多智能体任务 `output.json` 的 `status` 在自然 idle 时会被写为 `"idle"`，`_check_task_status` 由 `_check_task_status_keep_alive` 跳过以防误判 failed。
-- 传统后台通知池 `_collect_pending_completion_notices` 与 `_has_pending_completion_work` 在 `multi_agent_mode` 为真时一律跳过，**两者永远独立，不得混用**。
-
-### 11.9 对话切换与状态保留
-
-- 切换会话**不清理** `_running_tasks` 和 `_sub_agent_instances`。子智能体对话存 `~/.astrion/astrion/host/host/data/sub_agents/`，重启后走 `manager.restore_sub_agent`。
-- **`MultiAgentState` 是进程级全局单例**（`modules/multi_agent/state.py` 的 `GLOBAL_MULTI_AGENT_STATES`，key=`conversation_id`），所有 manager 共享；`get_or_create`/`drop`/`_load_state` 均通过 `GLOBAL_MULTI_AGENT_STATES_LOCK` 互斥。**不要**把它改回 manager 实例属性（曾致 terminate 只标记一份副本、前端轮询显示陈旧 idle）。
-- 进程重启后 `_load_state` 会用任务记录（持久真相）校准实例终态。
-- **显示名编号**：`tools_execution.py` 的 `peek_agent_id_for_role` + `commit_agent_id_for_role` 两步走——先 peek 构造显示名，创建成功才提交计数器，**失败不消耗编号**；全局 `agent_id` 由 `manager.next_free_agent_id()` 分配。两套命名空间**不得混用**。
-
-> 完整派发链路、字段清单与调试记录见 `docs/agents_details/multi_agent.md`。
+> 完整契约及执行器职责拆分见 `docs/agents_details/multi_agent.md`。
 
 ## 12) 对话级主任务门闸与单写者不变量（2026-08-12）
 
@@ -461,7 +401,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 **硬约束（改代码必须知道）**：
 
-1. **对话文件是唯一权威**：`metadata.tool_loading` 在**创建对话时快照一次**（多智能体对话不写入=不启用）。之后个人空间改动只影响新建对话；执行链路**禁止**为该功能读 personalization／Flask session。
+1. **对话文件是唯一权威**：`metadata.tool_loading` 在**创建对话时快照一次**（所有新主对话统一快照，无类型例外）。之后个人空间改动只影响新建对话；执行链路**禁止**为该功能读 personalization／Flask session。
 2. **老对话无字段 = 未启用**：读侧一律走 `get_tool_loading_state()` 防御性解析，**不做迁移**；字段损坏同样按未启用处理。
 3. **tools 数组对话级稳定（stub 常驻）**：deferred 工具不整个剔除，而是替换为 stub——模型只敢调用「出现在工具列表里」的工具，纯 tool result 塞定义曾导致所有测试模型反复 load 死循环。stub 只由完整定义决定、与加载状态无关，数组每轮逐字节一致（前缀缓存不受影响）。**禁止**把 loaded 工具追加回 tools 数组。
 4. **prompt 目录走现有冻结机制**（key=`frozen_tool_loading_prompt`），目录**不**随 loaded 状态变化（system prompt 是缓存首段，动了全破）。
@@ -591,9 +531,9 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ## 18) 子智能体固定权限与单次命令完全访问（2026-10-07）
 
-- **`create_sub_agent` 必填 `access_level`**：`workspace_write`/`sandbox_write`/`full_access`，创建时校验主权限上限；plan/readonly 仍可创建最低档。每个实例保存创建时规范化的 `workspace_root` 与固定档位，恢复时核对原路径身份，**不重新 resolve 后扩大授权**。旧记录缺档位不迁移、不恢复。
+- **`create_sub_agent` 必填 `access_level`**：`working_dir_write`/`workspace_write`/`sandbox_write`/`full_access`，创建时校验主权限上限；plan/readonly 可创建两个窄档。sandbox_write口径=工作区＋沙箱授权可写路径。每个实例保存创建时规范化的 `workspace_root`、`working_dir` 与固定档位，恢复时核对原路径身份，**不重新 resolve 后扩大授权**。旧记录缺档位不迁移、不恢复。
 - **可信权限唯一入口 = `modules/execution_scope.py` 的 ContextVar**；子工具通过 `modules/sub_agent/execution.py` 使用独立 FileManager/TerminalOperator/TerminalManager，**不修改父对象再恢复**。父权限/执行环境切换不改变已有子档位；子工具只开放自身白名单，不继承父自定义分派，**不开放后台命令或单次升级参数**。
-- `workspace_write` 的写根始终为创建时工作区，命令 cwd 只能在其内；macOS 临时文件放 `.astrion/sub_agent_runtime/<actor哈希>/tmp`，不附带宿主 `/tmp` 授权。原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入。交付目录按路径组件检查并安全新建，**不用字符串 startswith**。
+- `working_dir_write`仅子工作目录可写，`workspace_write`为原工作区可写；workspace_root始终是原项目身份，相对路径和默认cwd使用working_dir。macOS临时目录位于对应固定写根内，不附带宿主`/tmp`写授权。原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入。工作目录按路径组件检查并安全新建，**不用字符串 startswith**。
 - **Docker 不支持 `full_access`**；最低档经 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，**不使用 DAC 降级或宿主机回退**。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`）。
 - 主 `run_command` 的 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，Docker/远端替身后端不伪装支持。已处于 direct 时无需额外申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
 - 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。**开启自动审核时自动与人工独立裁决**，任一拒绝即终结，两项通过才执行；**人工先允许不能取消自动审核**。授权记录保存执行者/根/对话/任务/工具调用/完整参数，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 在原生命令入口再次核对。授权失效返回正常工具失败结果，**不中断历史消息配对**。内置工具名禁止被自定义注册或分派覆盖。

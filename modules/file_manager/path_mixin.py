@@ -99,18 +99,20 @@ class PathMixin:
             self.project_path = project_root
 
         if (scope is not None and scope.is_sub_agent) or self._is_host_mode():
+            from modules.scoped_execution_policy import fixed_working_dir
+            base = fixed_working_dir(scope) if scope and scope.is_sub_agent else project_root
             normalized = (path or "").strip()
             if normalized == "/workspace":
-                normalized = ""
-            elif normalized.startswith("/workspace/"):
-                normalized = normalized.split("/workspace/", 1)[1]
-            if not normalized:
                 return True, "", project_root
+            elif normalized.startswith("/workspace/"):
+                normalized = str(project_root / normalized.split("/workspace/", 1)[1])
+            if not normalized:
+                return True, "", base
             try:
                 if Path(normalized).is_absolute() or (len(normalized) > 1 and normalized[1] == ":"):
                     full_path = Path(normalized).expanduser().resolve()
                 else:
-                    full_path = (project_root / normalized).resolve()
+                    full_path = (base / normalized).resolve()
             except (OSError, RuntimeError) as exc:
                 return False, str(exc), None
             return True, "", full_path
@@ -186,8 +188,9 @@ class PathMixin:
         scope = current_execution_scope()
         workspace = fixed_workspace_root(scope) if scope else self.project_path.resolve()
         if scope and scope.workspace_only and access == "write":
-            # Temporary dirs are shell runtime allowances, never native write grants.
-            return [workspace]
+            # The project remains readable while the fixed child write root can be narrower.
+            from modules.scoped_execution_policy import fixed_write_root
+            return [fixed_write_root(scope)]
         roots: List[Path] = [workspace, *temp_roots]
         # 2026-09-27 起传入工作区路径：并入该工作区的工作区级路径授权（只增不减）
         if access == "write":

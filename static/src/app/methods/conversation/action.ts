@@ -1,10 +1,8 @@
 // @ts-nocheck
 import { debugLog } from '../common';
 import { t } from '@/locales';
-import { persistNewConversationType } from '../../state';
 import './shared';
 import { currentConversationSession } from './session';
-import { useConversationStore } from '../../../stores/conversation';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
 export const actionMethods = {
@@ -19,9 +17,6 @@ export const actionMethods = {
     }
   },
   async createNewConversation() {
-    this.newConversationType =
-      useConversationStore().sidebarConversationType === 'multi_agent' ? 'multi_agent' : 'agent';
-    persistNewConversationType(this.newConversationType);
     const workspaceId = String(this.currentHostWorkspaceId || '');
     const tabs = useConversationTabsStore();
     if (tabs.enabled) {
@@ -34,9 +29,6 @@ export const actionMethods = {
   },
   async createWorkspaceConversation(workspaceId: string) {
     if (!workspaceId) return;
-    this.newConversationType =
-      useConversationStore().sidebarConversationType === 'multi_agent' ? 'multi_agent' : 'agent';
-    persistNewConversationType(this.newConversationType);
     const tabs = useConversationTabsStore();
     if (tabs.enabled) {
       const workspace = (this.hostWorkspaces || []).find(

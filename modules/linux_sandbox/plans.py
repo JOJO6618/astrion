@@ -42,6 +42,9 @@ def build_plan(work_path, environment, argv, network_permission=None, readonly=F
                "workspace_only": workspace_only, "network": network_permission or "restricted",
                "argv": argv, "env": {k: str(v) for k, v in environment.items() if k in SAFE_ENVIRONMENT},
                "umask": 0o022}
+    if scope and scope.access_level == "working_dir_write" and not readonly:
+        from modules.scoped_execution_policy import fixed_working_dir
+        request["workspace_write_root"] = str(fixed_working_dir(scope))
     try:
         validate_request(request)
         probe()

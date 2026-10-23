@@ -144,28 +144,6 @@ def _format_sleep(result_data: Dict[str, Any]) -> str:
     if not result_data.get("success"):
         return _format_failure("sleep", result_data)
     mode = result_data.get("mode")
-    if mode == "wait_sub_agent_output":
-        message = result_data.get("message") or ""
-        header = f"已收到 {result_data.get('display_name') or '子智能体'} 的输出"
-        if message:
-            return f"{header}\n\n{message}"
-        return header
-    if mode == "wait_sub_agent_ids":
-        results = result_data.get("results") or []
-        header = result_data.get("message") or tr("fmt_terminal2.waited_sub_agents", n=len(results))
-        detail_blocks: List[str] = []
-        for item in results:
-            if not isinstance(item, dict):
-                continue
-            # 优先复用子智能体原始 system_message，确保与系统通知内容一致
-            sys_msg = item.get("system_message")
-            if isinstance(sys_msg, str) and sys_msg.strip():
-                detail_blocks.append(sys_msg.strip())
-            else:
-                detail_blocks.append(_format_wait_sub_agent(item))
-        if detail_blocks:
-            return "\n\n".join([header] + detail_blocks)
-        return header
     if mode == "wait_runcommand_id":
         nested = result_data.get("result")
         if isinstance(nested, dict):

@@ -28,10 +28,10 @@ function openNavigationTab(host, conversationId, workspaceId) {
   if (!tabs.enabled) return;
   const store = useConversationStore();
   const lists = [
-    ...Object.values(store.getWorkspaceCache(workspaceId)).map((cache) => cache.list),
+    store.getWorkspaceCache(workspaceId).list,
     ...store.workspaceGroups
       .filter((group) => group.workspaceId === workspaceId)
-      .flatMap((group) => Object.values(group.conversationsByType || {}))
+      .map((group) => group.conversations)
   ];
   const summary = lists.flat().find((item) => item?.id === conversationId);
   const workspace = (host.hostWorkspaces || []).find((item) => item.workspace_id === workspaceId);

@@ -165,10 +165,10 @@ export function useQuickRuntime() {
   async function loadSessions() {
     const ticket = generation,
       requestedWorkspace = workspace.value;
-    const result = await request('/api/runtime/sessions?limit=20&quick_entry=1&multi_agent_mode=0');
+    const result = await request('/api/runtime/sessions?limit=20&quick_entry=1');
     if (ticket !== generation || requestedWorkspace !== workspace.value) return;
     sessions.value = (result.conversations || result.sessions || result.data?.sessions || [])
-      .filter((item: any) => item.quick_entry === true && !item.multi_agent_mode)
+      .filter((item: any) => item.quick_entry === true)
       .map((item: any) => ({ ...item, conversation_id: item.conversation_id || item.id }));
   }
   async function restoreWorkspace() {
@@ -194,10 +194,7 @@ export function useQuickRuntime() {
     const ticket = generation;
     const history = await request(`/api/runtime/sessions/${encodeURIComponent(id)}/history`);
     if (ticket !== generation) return;
-    if (
-      history.conversation?.metadata?.quick_entry !== true ||
-      history.conversation?.metadata?.multi_agent_mode
-    ) {
+    if (history.conversation?.metadata?.quick_entry !== true) {
       conversation.value = '';
       task.value = '';
       running.value = false;

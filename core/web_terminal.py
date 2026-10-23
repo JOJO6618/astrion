@@ -445,14 +445,7 @@ class WebTerminal(MainTerminal):
                     self.pending_permission_mode = str(meta.get("pending_permission_mode") or "").strip().lower() or None
                     self.pending_execution_mode = str(meta.get("pending_execution_mode") or "").strip().lower() or None
                     self.pending_network_permission = str(meta.get("pending_network_permission") or "").strip().lower() or None
-                    # 多智能体模式：以会话 metadata.multi_agent_mode 为唯一切换开关
-                    self.multi_agent_mode = bool(meta.get("multi_agent_mode", False))
-                    # 同步主智能体 sub_agent_manager 的 开关
-                    try:
-                        if hasattr(self, "sub_agent_manager"):
-                            self.sub_agent_manager.multi_agent_mode = self.multi_agent_mode
-                    except Exception:
-                        pass
+
                 except Exception:
                     pass
                 # 重置相关状态
@@ -477,7 +470,6 @@ class WebTerminal(MainTerminal):
                     "run_mode": self.run_mode,
                     "thinking_mode": self.thinking_mode,
                     "model_key": getattr(self, "model_key", None),
-                    "multi_agent_mode": bool(getattr(self, "multi_agent_mode", False)),
                     "message": tr("web_terminal.conversation_loaded", conversation_id=conversation_id)
                 }
             else:
@@ -494,10 +486,10 @@ class WebTerminal(MainTerminal):
                 "message": tr("web_terminal.conversation_load_exception", error=e)
             }
     
-    def get_conversations_list(self, limit: int = 20, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None) -> Dict:
+    def get_conversations_list(self, limit: int = 20, offset: int = 0, non_empty: bool = False) -> Dict:
         """获取对话列表（Web版本）"""
         try:
-            result = self.context_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty, multi_agent_mode=multi_agent_mode)
+            result = self.context_manager.get_conversation_list(limit=limit, offset=offset, non_empty=non_empty)
             return {
                 "success": True,
                 "data": result
@@ -531,10 +523,10 @@ class WebTerminal(MainTerminal):
                 "message": tr("web_terminal.conversation_delete_exception", error=e)
             }
     
-    def search_conversations(self, query: str, limit: int = 20, multi_agent_mode: Optional[bool] = None) -> Dict:
+    def search_conversations(self, query: str, limit: int = 20) -> Dict:
         """搜索对话（Web版本）"""
         try:
-            results = self.context_manager.search_conversations(query, limit, multi_agent_mode=multi_agent_mode)
+            results = self.context_manager.search_conversations(query, limit)
             return {
                 "success": True,
                 "results": results,

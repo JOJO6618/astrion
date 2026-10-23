@@ -24,29 +24,7 @@ export const persistWorkspaceMode = (isHostMode: boolean): void => {
   }
 };
 
-/* 待创建对话类型缓存：/new 页输入栏「智能体/多智能体」选择器的上次选择，
-   刷新后恢复，避免每次新建都要重新选。 */
-const NEW_CONVERSATION_TYPE_STORAGE_KEY = 'agents_new_conversation_type';
-
-const loadNewConversationType = (): 'agent' | 'multi_agent' => {
-  try {
-    const v = window.localStorage.getItem(NEW_CONVERSATION_TYPE_STORAGE_KEY);
-    return v === 'multi_agent' ? 'multi_agent' : 'agent';
-  } catch {
-    return 'agent';
-  }
-};
-
-export const persistNewConversationType = (type: string): void => {
-  try {
-    window.localStorage.setItem(NEW_CONVERSATION_TYPE_STORAGE_KEY, type);
-  } catch {
-    /* ignore */
-  }
-};
-
 const cachedWorkspaceMode = loadCachedWorkspaceMode();
-const cachedNewConversationType = loadNewConversationType();
 
 export function dataState() {
   return {
@@ -58,16 +36,6 @@ export function dataState() {
     // 设置页路由（'settings' | 'settings/<section>'，空串 = 不在设置视图）
     settingsRoute: '',
     gitRoute: '',
-    // 当前打开对话的类型（'normal' | 'multi_agent'，创建时确定、不可变）；
-    // 空对话态为 null。权威来源是对话 metadata.multi_agent_mode。
-    currentConversationType: null,
-    // /new 页输入栏选择器的待创建类型（'agent' | 'multi_agent'，localStorage 持久化）
-    newConversationType: cachedNewConversationType,
-    // 输入栏类型选择器菜单开关
-    agentTypeMenuOpen: false,
-    // 多智能体索引重建触发去重（每次页面加载最多一次）
-    multiAgentIndexRebuildTriggered: false,
-
     // 轮询模式标志（禁用 WebSocket 事件处理）
     usePollingMode: true,
     // 后台子智能体等待状态

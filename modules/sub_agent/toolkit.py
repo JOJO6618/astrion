@@ -272,23 +272,6 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
     },
 ]
 
-FINISH_TOOL: Dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "finish_task",
-        "description": "完成当前任务并退出。调用此工具表示你已经完成了分配的任务，所有交付文件已准备好。",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "success": {"type": "boolean"},
-                "summary": {"type": "string", "description": "任务完成摘要（50-200字）。"},
-            },
-            "required": ["success", "summary"],
-        },
-    },
-}
-
-
 def _format_tool_result(name: str, raw: Any) -> str:
     """把主进程返回的工具结果格式化为文本，供 LLM 消费。"""
     if not isinstance(raw, dict):
@@ -362,8 +345,8 @@ def _format_tool_result(name: str, raw: Any) -> str:
     # 多智能体通信工具
     if name == "ask_master":
         if raw.get("success"):
-            return f"Team Leader 的回答：\n{raw.get('answer') or ''}"
-        return raw.get("error") or "向 Team Leader 提问失败"
+            return f"主智能体的回答：\n{raw.get('answer') or ''}"
+        return raw.get("error") or "向主智能体提问失败"
     if name == "ask_other_agent":
         if raw.get("success"):
             return f"子智能体的回答：\n{raw.get('answer') or ''}"
@@ -372,8 +355,8 @@ def _format_tool_result(name: str, raw: Any) -> str:
         if raw.get("success"):
             return "回复已发送。"
         return raw.get("error") or "回复失败"
-    if name == "list_active_sub_agents":
-        from utils.tool_result_formatter.agent_context import _format_active_sub_agents_list
-        return _format_active_sub_agents_list(raw.get("agents") or [])
+    if name == "get_sub_agent_status":
+        from utils.tool_result_formatter.agent_context import _format_get_sub_agent_status
+        return _format_get_sub_agent_status(raw)
     return json.dumps(raw, ensure_ascii=False)
 

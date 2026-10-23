@@ -43,7 +43,7 @@ def launch_review(username: str, workspace_id: str, repo_id: str, repo: Path,
                                       project_path=str(data.workspace.project_path))
         metadata = {**snapshot_overrides_from_prefs(prefs), "work_mode": "execute",
                     "permission_mode": "readonly", "execution_mode": "sandbox",
-                    "multi_agent_mode": False, "skip_auto_title_generation": True,
+                    "skip_auto_title_generation": True,
                     "git_review": {"repo_id": repo_id, "repo_path": str(repo), **compare}}
         conversation_id = manager.create_conversation(
             project_path=str(data.workspace.project_path), model_key=model_key,

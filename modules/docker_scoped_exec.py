@@ -17,6 +17,12 @@ def wrap_scoped_docker_command(mount_path: str, command: List[str], scope=None) 
     if not scope or not scope.workspace_only:
         return command
     actor = hashlib.sha256(scope.actor_id.encode("utf-8")).hexdigest()[:24]
+    root = (mount_path or "/workspace").rstrip("/")
+    options = []
+    if scope.access_level == "working_dir_write":
+        from modules.scoped_execution_policy import fixed_working_dir
+        relative = fixed_working_dir(scope).relative_to(Path(scope.workspace_root))
+        options = ["--write-root=" + str(Path(root) / relative)]
     # Isolated Python + a clean environment prevent user startup hooks from
     # running before the mandatory domain has been installed.
     return [
@@ -25,5 +31,5 @@ def wrap_scoped_docker_command(mount_path: str, command: List[str], scope=None) 
         "LANG=C.UTF-8", "PYTHONUNBUFFERED=1", "GIT_CONFIG_GLOBAL=/dev/null",
         "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=safe.directory", "GIT_CONFIG_VALUE_0=*",
         "python3", "-I", "-S", "-c", _LAUNCHER,
-        (mount_path or "/workspace").rstrip("/"), actor, *command,
+        root, actor, *options, *command,
     ]

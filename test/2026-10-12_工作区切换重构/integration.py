@@ -25,7 +25,6 @@ from server.context.status_view import workspace_status
 from server.conversation_bootstrap import bootstrap_conversation
 from server.chat.permission import get_permission_mode, get_execution_mode, get_network_permission, get_work_mode
 from server.conversation import get_input_draft, get_conversation_token_statistics, get_conversation_tokens
-from server.multi_agent import rebuild_conversation_index_api
 from utils.conversation_manager import ConversationManager
 from server import state
 
@@ -93,16 +92,14 @@ class DataIntegrationTests(unittest.TestCase):
         self.assertEqual(self.invoke(get_conversation_tokens, cid=True).get_json()['data']['total_tokens'], 73)
         self.assertEqual(state.user_terminals, {})
 
-    def test_explicit_index_repair_does_not_allocate_a_runtime(self):
-        manager = self.context.manager(True)
-        manager.conversations_dir.mkdir(parents=True, exist_ok=True)
-        path = manager._get_conversation_file_path('conv_synthetic_multi')
-        path.write_text(json.dumps({'id': 'conv_synthetic_multi', 'messages': [],
-            'metadata': {'multi_agent_mode': True}}), encoding='utf-8')
-        response = self.invoke(rebuild_conversation_index_api).get_json()
-        self.assertTrue(response['success'])
-        self.assertEqual(response['index_size'], 1)
-        self.assertTrue(json.loads(manager.index_file.read_text())['conv_synthetic_multi']['multi_agent_mode'])
+    def test_single_store_index_includes_all_conversations_without_runtime(self):
+        manager = self.context.manager()
+        path = manager._get_conversation_file_path('conv_synthetic_child_parent')
+        path.write_text(json.dumps({'id': 'conv_synthetic_child_parent', 'messages': [],
+            'metadata': {}}), encoding='utf-8')
+        rebuilt = manager._rebuild_index_from_files()
+        self.assertEqual(set(rebuilt), {self.cid, 'conv_synthetic_child_parent'})
+        self.assertTrue(all('multi_agent_mode' not in item for item in rebuilt.values()))
         self.assertEqual(state.user_terminals, {})
 
     def test_cold_idle_status_reads_without_memory_file_creation(self):

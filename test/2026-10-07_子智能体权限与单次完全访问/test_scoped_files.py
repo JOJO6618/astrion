@@ -101,24 +101,24 @@ class ScopedFilesTests(unittest.TestCase):
 
     def test_delivery_paths_reject_sibling_and_external_parent(self):
         with self.assertRaises(ValueError):
-            self.creation._resolve_deliverables_dir("../project-other/new")
+            self.creation._resolve_working_dir("../project-other/new", agent_id=1)
         (self.root / ".astrion").symlink_to(self.outside, target_is_directory=True)
-        with self.assertRaises(ValueError):
-            self.creation._resolve_deliverables_dir(None, agent_id=1)
+        with self.assertRaises((ValueError, OSError)):
+            self.creation._resolve_working_dir(None, agent_id=1)
         self.assertFalse((self.outside / "new").exists())
         self.assertFalse((self.outside / "sub_agent_results").exists())
 
-    def test_deliveries_are_new_and_auto_names_do_not_collide(self):
-        path = self.creation._resolve_deliverables_dir("output/result")
+    def test_working_directory_reuses_existing_and_auto_names_do_not_collide(self):
+        path = self.creation._resolve_working_dir("output/result", agent_id=1)
         self.assertTrue(path.is_dir())
-        with self.assertRaises(ValueError):
-            self.creation._resolve_deliverables_dir("output/result")
-        first = self.creation._resolve_deliverables_dir(None, agent_id=1)
-        second = self.creation._resolve_deliverables_dir(None, agent_id=1)
+        self.assertEqual(self.creation._resolve_working_dir("output/result", agent_id=1), path)
+        first = self.creation._resolve_working_dir(None, agent_id=1)
+        second = self.creation._resolve_working_dir(None, agent_id=1)
         self.assertNotEqual(first, second)
 
     def test_restored_root_is_not_reresolved_into_new_authority(self):
-        record = {"workspace_root": str(self.root), "access_level": "workspace_write"}
+        record = {"task_id": "child", "workspace_root": str(self.root),
+                  "working_dir": str(self.root), "access_level": "workspace_write"}
         self.assertTrue(SubAgentManager._has_fixed_access(record))
         self.root.rmdir()
         self.root.symlink_to(self.outside, target_is_directory=True)

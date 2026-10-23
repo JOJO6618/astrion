@@ -29,7 +29,7 @@ else:
     PYBIN = RUNTIME_DIR / "python" / "bin" / "python3.12"
 
 # 1) 源码与程序级资源（保持相对结构）
-ITEMS = ("server", "core", "modules", "utils", "config", "prompts", "agentskills", "multi_agent_roles")
+ITEMS = ("server", "core", "modules", "utils", "config", "prompts", "agentskills")
 
 # 3) 私有/部署级配置剔除（打包卫生，防泄露 + 保证全新初始态）
 PRIVATE_CONFIGS = (

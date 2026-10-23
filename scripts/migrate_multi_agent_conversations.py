@@ -1,142 +1,189 @@
 #!/usr/bin/env python3
-"""把误存到常规对话目录的多智能体会话迁移到 mutiagents/conversations/。
+"""离线合并旧多智能体主对话。默认预览；停服务后显式 --apply。
 
-用法:
-    python3 scripts/migrate_multi_agent_conversations.py [--dry-run]
+目录参数均指 conversations 层，脚本保留其下工作区相对路径。
+不加载应用配置，不读取或迁移旧子任务，不覆盖已有主对话。
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-import shutil
-import sys
-import time
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
-# 加载项目配置以确定数据目录
-project_root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(project_root))
-from config import DATA_DIR, IS_HOST_MODE
-from modules.multi_agent.role_store import DEFAULT_MUTIAGENTS_DIR
+REMOVED_METADATA = {
+    "multi_agent_mode", "frozen_available_agents_prompt",
+    "frozen_main_system_prompt_multi_agent",
+}
+INDEX_FIELDS = (
+    "project_path", "project_relative_path", "thinking_mode", "run_mode",
+    "model_key", "has_images", "has_videos", "total_messages", "total_tools", "status",
+)
 
 
-def load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+def encode(value: dict) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
-def save_json(path: Path, data: dict) -> None:
+def atomic_write(path: Path, raw: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(f".tmp.{int(time.time() * 1000)}")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    shutil.move(str(tmp), str(path))
+    fd, temporary = tempfile.mkstemp(prefix=".migration-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
-def migrate(dry_run: bool = False) -> dict:
-    regular_dir = Path(DATA_DIR) / "conversations" / "workspace"
-    ma_dir = Path(DEFAULT_MUTIAGENTS_DIR) / "conversations" / "workspace"
+def checked_root(value: Path, *, required: bool = False) -> Path:
+    path = Path(os.path.abspath(value))
+    for component in (path, *path.parents):
+        if component.is_symlink():
+            raise ValueError(f"目录不能经过符号链接: {component}")
+    if required and not path.is_dir():
+        raise ValueError(f"源目录不存在: {path}")
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"不是目录: {path}")
+    if path.exists():
+        for directory, dirs, files in os.walk(path, followlinks=False):
+            for name in dirs + files:
+                candidate = Path(directory) / name
+                if candidate.is_symlink():
+                    raise ValueError(f"目录内存在符号链接: {candidate}")
+    return path
 
-    regular_index_path = regular_dir / "index.json"
-    ma_index_path = ma_dir / "index.json"
 
-    regular_index = load_json(regular_index_path) if regular_index_path.exists() else {}
-    ma_index = load_json(ma_index_path) if ma_index_path.exists() else {}
+def load_conversation(path: Path) -> tuple[bytes, dict]:
+    raw = path.read_bytes()
+    data = json.loads(raw)
+    if not isinstance(data, dict) or data.get("id") != path.stem:
+        raise ValueError(f"对话 ID 与文件名不一致: {path}")
+    if not isinstance(data.get("messages"), list) or not isinstance(data.get("metadata"), dict):
+        raise ValueError(f"无效对话结构: {path}")
+    return raw, data
 
-    moved = []
-    skipped = []
-    errors = []
 
-    for f in sorted(regular_dir.glob("conv_*.json")):
-        if f.name == "index.json":
-            continue
-        try:
-            data = load_json(f)
-        except Exception as exc:
-            errors.append({"file": str(f), "error": f"读取失败: {exc}"})
-            continue
-
-        meta = data.get("metadata", {}) or {}
-        if not meta.get("multi_agent_mode"):
-            skipped.append(f.name)
-            continue
-
-        conv_id = data.get("id") or f.stem
-        target_file = ma_dir / f.name
-
-        # 目标已存在时跳过，避免覆盖
-        if target_file.exists():
-            errors.append({"file": str(f), "error": f"目标已存在: {target_file}"})
-            continue
-
-        if dry_run:
-            moved.append({"id": conv_id, "file": f.name, "target": str(target_file)})
-            continue
-
-        try:
-            # 移动文件
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(f), str(target_file))
-
-            # 更新索引
-            if conv_id in regular_index:
-                ma_index[conv_id] = regular_index.pop(conv_id)
-            else:
-                # 从文件重建索引条目
-                ma_index[conv_id] = {
-                    "title": data.get("title") or "未命名对话",
-                    "created_at": data.get("created_at"),
-                    "updated_at": data.get("updated_at"),
-                    "project_path": meta.get("project_path"),
-                    "project_relative_path": meta.get("project_relative_path"),
-                    "thinking_mode": meta.get("thinking_mode", False),
-                    "run_mode": meta.get("run_mode") or ("thinking" if meta.get("thinking_mode") else "fast"),
-                    "model_key": meta.get("model_key"),
-                    "has_images": meta.get("has_images", False),
-                    "has_videos": meta.get("has_videos", False),
-                    "total_messages": meta.get("total_messages", 0),
-                    "total_tools": meta.get("total_tools", 0),
-                    "status": meta.get("status", "active"),
-                    "multi_agent_mode": True,
-                }
-
-            moved.append({"id": conv_id, "file": f.name, "target": str(target_file)})
-        except Exception as exc:
-            errors.append({"file": str(f), "error": f"迁移失败: {exc}"})
-
-    if not dry_run:
-        # 保存索引
-        save_json(regular_index_path, regular_index)
-        save_json(ma_index_path, ma_index)
-
+def index_entry(data: dict) -> dict:
+    metadata = data["metadata"]
     return {
-        "dry_run": dry_run,
-        "regular_dir": str(regular_dir),
-        "ma_dir": str(ma_dir),
-        "moved": moved,
-        "skipped_count": len(skipped),
-        "errors": errors,
+        "title": data.get("title") or "未命名对话",
+        "created_at": data.get("created_at"), "updated_at": data.get("updated_at"),
+        **{key: metadata.get(key) for key in INDEX_FIELDS},
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description="迁移多智能体会话到 mutiagents 目录")
-    parser.add_argument("--dry-run", action="store_true", help="只预览，不实际移动")
+def migrate(source_dir: Path, target_dir: Path, *, apply: bool = False,
+            backup_dir: Path | None = None) -> dict:
+    source = checked_root(source_dir, required=True)
+    target = checked_root(target_dir)
+    if source == target or source in target.parents or target in source.parents:
+        raise ValueError("源与目标不能相同或互相包含")
+    files = sorted(source.rglob("conv_*.json"))
+    existing_ids = {p.stem for p in target.rglob("conv_*.json")} if target.exists() else set()
+    records, ids, indexes = [], set(), {}
+    for path in files:
+        raw, data = load_conversation(path)
+        if path.stem in ids or path.stem in existing_ids:
+            raise ValueError(f"对话 ID 冲突，整批迁移取消: {path.stem}")
+        ids.add(path.stem)
+        destination = target / path.relative_to(source)
+        if destination.exists():
+            raise ValueError(f"目标已存在: {destination}")
+        clean = dict(data)
+        clean["metadata"] = {k: v for k, v in data["metadata"].items() if k not in REMOVED_METADATA}
+        records.append((path, destination, raw, clean))
+        for index in (path.parent / "index.json", destination.parent / "index.json"):
+            if index not in indexes:
+                original = index.read_bytes() if index.exists() else None
+                decoded = json.loads(original) if original is not None else {}
+                if not isinstance(decoded, dict):
+                    raise ValueError(f"无效索引: {index}")
+                indexes[index] = (original, decoded)
+    report = {"apply": apply, "source": str(source), "target": str(target),
+              "conversation_count": len(records), "workspace_count": len({p.parent for p in files})}
+    if not apply or not records:
+        return report
+    backup = checked_root(backup_dir or source.parent / (
+        "conversation-merge-backup-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f")))
+    if backup.exists() or any(root == backup or root in backup.parents for root in (source, target)):
+        raise ValueError("备份目录必须全新且位于源、目标目录树之外")
+    backup.mkdir(parents=True)
+    manifest = {"source": str(source), "target": str(target), "files": [], "indexes": []}
+    for path, destination, raw, _ in records:
+        saved = backup / "conversations" / path.relative_to(source)
+        atomic_write(saved, raw)
+        manifest["files"].append({"source": str(path), "target": str(destination),
+                                  "backup": str(saved), "sha256": hashlib.sha256(raw).hexdigest()})
+    for number, (index, (raw, _)) in enumerate(indexes.items()):
+        saved = backup / "indexes" / f"{number}.json"
+        if raw is not None:
+            atomic_write(saved, raw)
+        manifest["indexes"].append({"path": str(index), "backup": str(saved) if raw is not None else None})
+    atomic_write(backup / "manifest.json", encode(manifest))
+    created, deleted, modified_indexes = [], [], []
+    try:
+        for path, _, raw, _ in records:
+            if path.read_bytes() != raw:
+                raise RuntimeError("源数据在备份期间改变，请先停止服务")
+        for index, (raw, _) in indexes.items():
+            if (index.read_bytes() if index.exists() else None) != raw:
+                raise RuntimeError("索引在备份期间改变，请先停止服务")
+        for _, destination, _, data in records:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            # 独占创建，绝不覆盖预检之后并发出现的目标文件。
+            with destination.open("xb") as stream:
+                created.append(destination)
+                stream.write(encode(data))
+                stream.flush()
+                os.fsync(stream.fileno())
+            if destination.read_bytes() != encode(data):
+                raise RuntimeError(f"目标写入校验失败: {destination}")
+        for path, destination, raw, data in records:
+            if path.read_bytes() != raw:
+                raise RuntimeError("源数据在迁移期间改变，请先停止服务")
+            indexes[path.parent / "index.json"][1].pop(path.stem, None)
+            indexes[destination.parent / "index.json"][1][path.stem] = index_entry(data)
+            path.unlink()
+            deleted.append((path, raw))
+        for index, (original, updated) in indexes.items():
+            if (index.read_bytes() if index.exists() else None) != original:
+                raise RuntimeError("索引在迁移期间改变，请先停止服务")
+            modified_indexes.append(index)
+            atomic_write(index, encode(updated))
+    except BaseException:
+        for path, raw in deleted:
+            atomic_write(path, raw)
+        for index in modified_indexes:
+            raw = indexes[index][0]
+            if raw is None:
+                index.unlink(missing_ok=True)
+            else:
+                atomic_write(index, raw)
+        for path in created:
+            path.unlink(missing_ok=True)
+        raise
+    report["backup"] = str(backup)
+    return report
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-dir", type=Path, required=True)
+    parser.add_argument("--target-dir", type=Path, required=True)
+    parser.add_argument("--backup-dir", type=Path)
+    parser.add_argument("--apply", action="store_true", help="停服务后应用；不传则只读预览")
     args = parser.parse_args()
-
-    result = migrate(dry_run=args.dry_run)
-
-    print(f"常规目录: {result['regular_dir']}")
-    print(f"目标目录: {result['ma_dir']}")
-    print(f"模式: {'预览' if args.dry_run else '实际迁移'}")
-    print(f"将迁移: {len(result['moved'])} 个对话")
-    print(f"跳过（非多智能体）: {result['skipped_count']} 个")
-    print(f"错误: {len(result['errors'])}")
-
-    for item in result["moved"]:
-        print(f"  → {item['id']} -> {item.get('target', item['file'])}")
-
-    for err in result["errors"]:
-        print(f"  ⚠ {err['file']}: {err['error']}")
+    try:
+        result = migrate(args.source_dir, args.target_dir, apply=args.apply, backup_dir=args.backup_dir)
+    except (OSError, ValueError, RuntimeError) as error:
+        parser.exit(1, f"迁移未完成: {error}\n")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

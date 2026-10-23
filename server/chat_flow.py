@@ -127,7 +127,7 @@ def detect_malformed_tool_call(text):
     return _detect_malformed_tool_call(text)
 
 
-def process_message_task(terminal: WebTerminal, message: str, images, sender, client_sid, workspace: UserWorkspace, username: str, videos=None, files=None, main_task_gate_token: Optional[str] = None):
+def process_message_task(terminal: WebTerminal, message: str, images, sender, client_sid, workspace: UserWorkspace, username: str, videos=None, files=None, main_task_gate_token: Optional[str] = None, preceding_child_notices=None):
     """在后台处理消息任务"""
     videos = videos or []
     files = files or []
@@ -149,6 +149,13 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         return
 
     try:
+        # 受理成功且认领门闸后才写入前置子消息。
+        from .chat_flow_task_support import inject_multi_agent_master_message
+        for item in preceding_child_notices or []:
+            inject_multi_agent_master_message(
+                web_terminal=terminal, messages=None, text=item["message"], sender=sender,
+                conversation_id=terminal.context_manager.current_conversation_id, inline=False,
+            )
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
@@ -253,6 +260,7 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         })
 
     finally:
+        terminal._multi_agent_main_task_active = False
         # 清理任务引用
         clear_stop_flag(client_sid, username)
         # 释放对话级主任务门闸（仅持有者可释放，重复调用为无操作）
@@ -274,6 +282,6 @@ def start_chat_task(terminal, message: str, images: Any, sender, client_sid: str
     )
 
 
-def run_chat_task_sync(terminal, message: str, images: Any, sender, client_sid: str, workspace, username: str, videos: Any = None, files: Any = None, main_task_gate_token: Optional[str] = None):
+def run_chat_task_sync(terminal, message: str, images: Any, sender, client_sid: str, workspace, username: str, videos: Any = None, files: Any = None, main_task_gate_token: Optional[str] = None, preceding_child_notices=None):
     """同步执行（测试/CLI 使用）。"""
-    return process_message_task(terminal, message, images, sender, client_sid, workspace, username, videos, files, main_task_gate_token=main_task_gate_token)
+    return process_message_task(terminal, message, images, sender, client_sid, workspace, username, videos, files, main_task_gate_token=main_task_gate_token, preceding_child_notices=preceding_child_notices)

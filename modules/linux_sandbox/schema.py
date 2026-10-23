@@ -41,12 +41,18 @@ def validate_request(request: object) -> dict:
         return request
     fields = {"operation", "workspace", "cwd", "reads", "writes", "readonly", "workspace_only",
               "network", "argv", "env", "umask"}
-    if set(request) != fields or request.get("operation") != "run":
+    if set(request) - {"workspace_write_root"} != fields or request.get("operation") != "run":
         raise RequestError("Invalid sandbox request fields")
     workspace = absolute_path(request["workspace"])
     cwd = absolute_path(request["cwd"])
     if not PurePosixPath(cwd).is_relative_to(workspace):
         raise RequestError("Working directory is outside the workspace")
+    if "workspace_write_root" in request:
+        write_root = absolute_path(request["workspace_write_root"])
+        if not PurePosixPath(write_root).is_relative_to(workspace) or request["readonly"]:
+            raise RequestError("Invalid fixed workspace write root")
+        if not request["workspace_only"] or request["writes"]:
+            raise RequestError("Narrow workspace writes cannot include external grants")
     if type(request["readonly"]) is not bool or type(request["workspace_only"]) is not bool:
         raise RequestError("Invalid sandbox write policy")
     if request["network"] not in {"full", "restricted", "none"}:

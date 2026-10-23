@@ -26,6 +26,7 @@ def build_child_terminal(manager: Any, record: Dict[str, Any]) -> Any:
     root = fixed_workspace_root(ExecutionScope(
         executor_kind="sub_agent", actor_id=str(record.get("task_id", "")),
         workspace_root=Path(record["workspace_root"]), access_level=record["access_level"],
+        working_dir=Path(record["working_dir"]) if record.get("working_dir") else None,
     ))
     child = copy.copy(parent)
     child.custom_tools_enabled = False
@@ -61,7 +62,9 @@ async def execute_child_tool(manager: Any, name: str, arguments: Dict[str, Any],
     scope = getattr(instance, "execution_scope", None)
     if instance.manager is not manager or scope is None or scope.access_level not in ACCESS_LEVELS:
         raise ValueError("子智能体没有有效的固定权限身份，请重新创建。")
-    record = {"access_level": scope.access_level, "workspace_root": str(scope.workspace_root)}
+    record = {"task_id": instance.task_id, "access_level": scope.access_level,
+              "workspace_root": str(scope.workspace_root),
+              "working_dir": str(scope.working_dir) if scope.working_dir else None}
     if name not in _ALLOWED_TOOLS:
         raise ValueError("该工具不属于此子智能体的工具集。")
     if "request_full_access" in arguments or "full_access_reason" in arguments:
@@ -83,5 +86,6 @@ async def execute_child_tool(manager: Any, name: str, arguments: Dict[str, Any],
             if not allowed:
                 raise ValueError(error)
             import json
-            return json.dumps(await handle_read_mediafile(scope.workspace_root, arguments, file_manager=child.file_manager), ensure_ascii=False)
+            resolved_arguments = {**arguments, "path": str(resolved)}
+            return json.dumps(await handle_read_mediafile(scope.workspace_root, resolved_arguments, file_manager=child.file_manager), ensure_ascii=False)
         return await child.handle_tool_call(name, arguments)

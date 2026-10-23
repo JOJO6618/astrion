@@ -358,50 +358,7 @@
                   <path d="M12 5v14" />
                 </svg>
               </button>
-              <div class="agent-type-switcher" :class="{ 'is-disabled': agentTypeLocked }">
-                <button
-                  type="button"
-                  class="agent-type-switcher__btn"
-                  @click.stop="$emit('toggle-agent-type-menu')"
-                  :disabled="!isConnected || agentTypeLocked"
-                  :aria-expanded="agentTypeMenuOpen"
-                  aria-haspopup="true"
-                >
-                  <span>{{ agentTypeLabel }}</span>
-                  <svg
-                    class="agent-type-switcher__caret"
-                    :class="{ open: agentTypeMenuOpen }"
-                    viewBox="0 0 10 10"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M2.75 3.75L5 6.25L7.25 3.75"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </button>
-                <div
-                  v-if="agentTypeMenuOpen && !agentTypeLocked"
-                  class="agent-type-switcher__menu"
-                  @click.stop
-                >
-                  <button
-                    v-for="option in agentTypeOptions"
-                    :key="option.value"
-                    type="button"
-                    class="agent-type-switcher__menu-item"
-                    :class="{ 'is-active': option.value === newConversationType }"
-                    @click.stop="$emit('select-new-conversation-type', option.value)"
-                  >
-                    <span class="agent-type-switcher__menu-label">{{ option.label }}</span>
-                    <span class="agent-type-switcher__menu-desc">{{ option.description }}</span>
-                  </button>
-                </div>
-              </div>
+
               <div
                 class="agent-type-switcher work-mode-switcher"
                 :class="{ 'is-disabled': workModeLocked }"
@@ -826,8 +783,6 @@ const emit = defineEmits([
   'open-goal-dialog',
   'workflow-activated',
   'open-git-changes-panel',
-  'toggle-agent-type-menu',
-  'select-new-conversation-type',
   'toggle-work-mode-menu',
   'change-work-mode',
   'new-conversation',
@@ -909,12 +864,6 @@ const props = defineProps<{
   goalModeArmed?: boolean;
   goalRunning?: boolean;
   goalProgress?: Record<string, any> | null;
-  /** 当前已打开对话的类型（创建时确定、不可变；null = 空对话） */
-  currentConversationType?: 'normal' | 'multi_agent' | null;
-  /** 空对话状态下待创建对话的类型（用户可在输入栏切换） */
-  newConversationType?: 'agent' | 'multi_agent';
-  /** 类型选择器菜单是否展开 */
-  agentTypeMenuOpen?: boolean;
   /** 当前运行模式（plan/ask/execute） */
   currentWorkMode?: 'plan' | 'ask' | 'execute';
   /** 运行模式菜单是否展开 */
@@ -978,8 +927,7 @@ type SlashMenuMode =
   | 'run-mode'
   | 'network'
   | 'work-mode'
-  | 'workspace'
-  | 'conversation-type';
+  | 'workspace';
 type SlashMenuItem = {
   id: string;
   label: string;
@@ -1696,13 +1644,6 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       mode: 'workflows'
     },
     {
-      id: 'conversation-type',
-      label: t('input.conversationType'),
-      description: t('input.conversationTypeDesc'),
-      disabled: !props.isConnected,
-      mode: 'conversation-type'
-    },
-    {
       id: 'work-mode',
       label: t('input.switchWorkMode'),
       description: t('input.switchWorkModeDesc'),
@@ -2006,24 +1947,6 @@ const workspaceSlashMenuItems = computed<SlashMenuItem[]>(() => {
   }));
 });
 
-const conversationTypeSlashMenuItems = computed<SlashMenuItem[]>(() => {
-  void currentLocale.value;
-  // 已打开对话时类型不可变（类型是创建时确定的对话属性），子菜单项整体锁定
-  const locked = agentTypeLocked.value;
-  const current = String(props.newConversationType || 'agent');
-  return agentTypeOptions.value.map((opt) => ({
-    id: `convtype:${opt.value}`,
-    label: opt.label,
-    description: locked
-      ? t('input.conversationTypeLockedDesc')
-      : opt.value === current
-        ? t('input.optionWithCurrent', { desc: opt.description || '' })
-        : opt.description || '',
-    disabled: locked,
-    action: () => emit('select-new-conversation-type', opt.value as 'agent' | 'multi_agent')
-  }));
-});
-
 const skillSlashMenuItems = computed<SlashMenuItem[]>(() =>
   filteredSkills.value.map((skill) => ({
     id: `skill:${skill.path}`,
@@ -2064,9 +1987,6 @@ const activeSlashMenuItems = computed<SlashMenuItem[]>(() => {
   if (slashMenuMode.value === 'workspace') {
     return workspaceSlashMenuItems.value;
   }
-  if (slashMenuMode.value === 'conversation-type') {
-    return conversationTypeSlashMenuItems.value;
-  }
   return rootSlashMenuItems.value;
 });
 
@@ -2085,7 +2005,6 @@ const slashMenuAriaLabel = computed(() => {
     return props.workspaceKind === 'project'
       ? t('input.slashProjectAria')
       : t('input.slashWorkspaceAria');
-  if (slashMenuMode.value === 'conversation-type') return t('input.slashConversationTypeAria');
   return t('input.slashRootAria');
 });
 
@@ -2102,7 +2021,6 @@ const slashMenuEmptyText = computed(() => {
   if (slashMenuMode.value === 'work-mode') return t('input.workModeEmpty');
   if (slashMenuMode.value === 'workspace')
     return props.workspaceKind === 'project' ? t('input.projectEmpty') : t('input.workspaceEmpty');
-  if (slashMenuMode.value === 'conversation-type') return t('input.conversationTypeEmpty');
   return t('input.commandEmpty');
 });
 
@@ -3454,38 +3372,6 @@ const currentPermissionLabel = computed(() => {
 });
 
 /** 对话类型选择器：选项定义（响应式：随语言切换刷新） */
-const agentTypeOptions = computed(() => {
-  void currentLocale.value;
-  return [
-    {
-      value: 'agent' as const,
-      label: t('input.agentType'),
-      description: t('input.agentTypeDesc')
-    },
-    {
-      value: 'multi_agent' as const,
-      label: t('input.multiAgentType'),
-      description: t('input.multiAgentTypeDesc')
-    }
-  ];
-});
-
-/** 已打开对话时类型不可变（类型是创建时确定的对话属性） */
-const agentTypeLocked = computed(() => !!props.currentConversationId);
-
-/** 按钮文案：有对话显示对话类型，空对话显示待创建类型 */
-const agentTypeLabel = computed(() => {
-  void currentLocale.value;
-  if (props.currentConversationId) {
-    return props.currentConversationType === 'multi_agent'
-      ? t('input.multiAgentType')
-      : t('input.agentType');
-  }
-  return props.newConversationType === 'multi_agent'
-    ? t('input.multiAgentType')
-    : t('input.agentType');
-});
-
 /** 运行模式：对话运行中不可切换（后端也会 409 拒绝，UI 侧先锁定避免误点） */
 const workModeLocked = computed(() => !!props.streamingMessage);
 

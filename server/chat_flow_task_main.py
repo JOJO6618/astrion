@@ -120,7 +120,6 @@ from .chat_flow_runtime import (
 )
 
 from .chat_flow_task_support import (
-    process_sub_agent_updates,
     process_background_command_updates,
     process_multi_agent_master_messages,
     inject_multi_agent_master_message,
@@ -742,67 +741,6 @@ def _collect_pending_completion_notices(*, web_terminal, conversation_id: str) -
     """
     notices: List[Dict[str, Any]] = []
 
-    # 1) 子智能体
-    sub_manager = getattr(web_terminal, "sub_agent_manager", None)
-    if sub_manager:
-        if not hasattr(web_terminal, "_announced_sub_agent_tasks"):
-            web_terminal._announced_sub_agent_tasks = set()
-        # 关键：先 reconcile 刷新真实状态，然后**直接遍历 tasks** 找终态+未通知的任务。
-        # 不依赖 poll_updates() —— 它只返回「本次调用里恰好 running→terminal」的跃迁项，
-        # 任务一旦被提前 reconcile 成 completed，跃迁就丢了，poll_updates 永远返回空。
-        try:
-            sub_manager.reconcile_task_states(conversation_id=conversation_id)
-        except Exception:
-            pass
-        candidates = [
-            t for t in sub_manager.tasks.values()
-            if isinstance(t, dict)
-            and t.get("conversation_id") == conversation_id
-            and t.get("status") in TERMINAL_STATUSES  # completed/failed/timeout（不含 terminated）
-            and not t.get("notified")
-            and t.get("task_id") not in web_terminal._announced_sub_agent_tasks
-            and not t.get("multi_agent_mode")  # 多智能体任务走独立注入路径，不在这里发传统通知
-        ]
-        candidates.sort(key=lambda t: t.get("updated_at") or t.get("created_at") or 0)
-        for task_info in candidates:
-            task_id = task_info.get("task_id")
-            final_result = task_info.get("final_result")
-            if not isinstance(final_result, dict):
-                # 兜底：状态已是终态但 final_result 缺失，主动取一次
-                try:
-                    final_result = sub_manager._check_task_status(task_info)
-                except Exception:
-                    pass
-            if not isinstance(final_result, dict):
-                final_result = {}
-            # 就地标记已通知
-            if task_id:
-                web_terminal._announced_sub_agent_tasks.add(task_id)
-            task_info["notified"] = True
-            task_info["updated_at"] = time.time()
-
-            agent_id = task_info.get("agent_id")
-            summary = task_info.get("summary") or ""
-            notice_text = _build_sub_agent_notice_text(
-                final_result,
-                summary_override=summary,
-            )
-            notices.append({
-                "kind": "sub_agent",
-                "message": notice_text,
-                "payload": {
-                    "sub_agent_notice": True,
-                    "message_source": "sub_agent",
-                    "agent_id": agent_id,
-                    "task_id": task_id,
-                },
-                "sort_key": task_info.get("updated_at") or task_info.get("created_at") or time.time(),
-            })
-        try:
-            sub_manager._save_state()
-        except Exception:
-            pass
-
     # 2) 后台 run_command
     bg_manager = getattr(web_terminal, "background_command_manager", None)
     if bg_manager:
@@ -873,21 +811,11 @@ def _rollback_completion_notice_marks(*, web_terminal, notices: List[Dict[str, A
     """派发失败时回滚 _collect_pending_completion_notices 的就地标记，
     避免通知被标记为已消费却从未派发（静默丢失）。
     """
-    sub_manager = getattr(web_terminal, "sub_agent_manager", None)
-    announced = getattr(web_terminal, "_announced_sub_agent_tasks", set())
     bg_manager = getattr(web_terminal, "background_command_manager", None)
     wf_restore: List[Dict[str, Any]] = []
     for item in notices or []:
         payload = item.get("payload") or {}
-        if item.get("kind") == "sub_agent":
-            task_id = payload.get("task_id")
-            if not task_id:
-                continue
-            announced.discard(task_id)
-            task_info = sub_manager.tasks.get(task_id) if sub_manager else None
-            if isinstance(task_info, dict):
-                task_info["notified"] = False
-        elif item.get("kind") == "background_command":
+        if item.get("kind") == "background_command":
             command_id = payload.get("command_id")
             if not command_id or not bg_manager:
                 continue
@@ -919,11 +847,6 @@ def _rollback_completion_notice_marks(*, web_terminal, notices: List[Dict[str, A
                 WorkflowStateManager(web_terminal.data_dir, cid).restore_notices(items)
         except Exception:
             pass
-    if sub_manager:
-        try:
-            sub_manager._save_state()
-        except Exception:
-            pass
 
 
 def _has_pending_completion_work(*, web_terminal, conversation_id: str) -> bool:
@@ -932,26 +855,6 @@ def _has_pending_completion_work(*, web_terminal, conversation_id: str) -> bool:
     多智能体模式下的 pending 消息由独立的 poll_multi_agent_notifications 处理，
     不再混入本函数。
     """
-    sub_manager = getattr(web_terminal, "sub_agent_manager", None)
-    if sub_manager:
-        announced = getattr(web_terminal, "_announced_sub_agent_tasks", set())
-        has_running_non_ma = False
-        has_unnotified_non_ma = False
-        for task in sub_manager.tasks.values():
-            if not isinstance(task, dict):
-                continue
-            if task.get("conversation_id") != conversation_id:
-                continue
-            status = task.get("status")
-            multi_agent_flag = task.get("multi_agent_mode") or False
-            if status not in TERMINAL_STATUSES.union({"terminated"}):
-                if not multi_agent_flag and task.get("run_in_background"):
-                    has_running_non_ma = True
-                continue
-            if not multi_agent_flag and task.get("run_in_background") and (task.get("task_id") not in announced) and not task.get("notified"):
-                has_unnotified_non_ma = True
-        if has_running_non_ma or has_unnotified_non_ma:
-            return True
     bg_manager = getattr(web_terminal, "background_command_manager", None)
     if bg_manager:
         try:
@@ -1130,9 +1033,6 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
     通知竞争 task_manager 的单工作区互斥。
     """
 
-    max_wait_time = 3600
-    start_wait = time.time()
-
     def sender(event_type, data):
         # WebSocket 推送已移除：事件均经任务事件流（_append_event）由轮询消费。
         return
@@ -1142,12 +1042,12 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
         "poll_ma_notifications_start",
         conversation_id=conversation_id,
         thread_id=_threading.get_ident(),
-        multi_agent_mode=getattr(web_terminal, "multi_agent_mode", False),
         main_task_active_at_start=getattr(web_terminal, "_multi_agent_main_task_active", False),
     )
 
     tick_count = 0
-    while (time.time() - start_wait) < max_wait_time:
+    manager = getattr(web_terminal, "sub_agent_manager", None)
+    while True:
         tick_count += 1
         from modules.goal_policy import goal_blocks_background
         if goal_blocks_background(web_terminal.data_dir, conversation_id):
@@ -1193,25 +1093,39 @@ async def poll_multi_agent_notifications(*, web_terminal, workspace, conversatio
 
         # 1) 先检查 pending 池——主对话空闲时只要池里有消息就立即派发（情况2）。
         if state.has_pending_master_messages():
+            gate_token = try_acquire_main_task_gate(web_terminal)
+            if gate_token is None:
+                await asyncio.sleep(0.5)
+                continue
             from server.conversation_view.snapshots import VIEW_LOCK
             # No await inside this transaction: goal pause/close cannot interleave
             # between draining the notification pool and admitting its task.
             with VIEW_LOCK:
                 if goal_blocks_background(web_terminal.data_dir, conversation_id):
+                    release_main_task_gate(web_terminal, gate_token)
                     continue
                 pending = state.drain_master_messages()
                 try:
                     _dispatch_multi_agent_idle_messages_sync(
                         web_terminal=web_terminal, workspace=workspace, sender=sender,
                         client_sid=client_sid, username=username,
-                        conversation_id=conversation_id, messages=pending,
+                        conversation_id=conversation_id, messages=pending, gate_token=gate_token,
                     )
                     ma_debug("poll_ma_dispatch_success", conversation_id=conversation_id, count=len(pending), tick=tick_count)
                 except Exception as exc:
-                    debug_log(f"[MultiAgent] 分发 idle 消息失败: {exc}")
+                    release_main_task_gate(web_terminal, gate_token)
+                    state.restore_master_messages(pending)
+                    manager._save_state()
+                    debug_log(f"[MultiAgent] 分发 idle 消息失败，消息已回队: {exc}")
                     ma_debug("poll_ma_notifications_dispatch_error", conversation_id=conversation_id,
                              error=str(exc), error_type=type(exc).__name__, tick=tick_count)
-            return
+                    pending = None
+                else:
+                    manager._save_state()
+            if pending is not None:
+                return
+            await asyncio.sleep(0.5)
+            continue
 
         # 2) 没有 pending 消息：检查还有哪些子智能体在运行，决定退出还是继续等
         running_agents = [a for a in all_insts if a.status == "running"]
@@ -1265,11 +1179,12 @@ def _dispatch_multi_agent_idle_messages_sync(
     username,
     conversation_id,
     messages: List[str],
+    gate_token: Optional[str] = None,
 ):
     """主智能体空闲时，把多智能体 pending 消息作为新一轮用户消息分发。
 
-    所有消息先持久化到对话历史；前 N-1 条作为前置通知写入任务事件流；
-    最后一条创建 task_type="notice" 任务触发 Team Leader 新一轮工作。
+    受理阶段只装配directives，不写历史或回显；认领门闸后再提交前N-1条。
+    最后一条通过正常notice任务输入链持久化并触发主智能体工作。
     """
     ma_debug(
         "dispatch_ma_idle_enter",
@@ -1296,67 +1211,8 @@ def _dispatch_multi_agent_idle_messages_sync(
             "subtype": parsed.get("subtype"),
         })
 
-    # 1) 前置通知全部写入历史 + emit给在线客户端（未后一条会由后续任务自己持久化，
-    #    避免重复产生两条相同 user 消息导致刷新后被渲染两遍）。
-    ma_debug(
-        "dispatch_ma_idle_preceding",
-        conversation_id=conversation_id,
-        preceding_count=max(0, len(parsed_messages) - 1),
-    )
-    for item in parsed_messages[:-1]:
-        produced = inject_multi_agent_master_message(
-            web_terminal=web_terminal,
-            messages=None,
-            text=item["text"],
-            sender=sender,
-            conversation_id=conversation_id,
-            inline=False,
-        )
-        item["message_id"] = produced["message_id"] if produced else None
-
-    # 1.5) 最后一条只 emit 给在线客户端，不在这里持久化（后续 task handle_task_with_sender
-    #      会以这条文本作为 message 创建任务，并写入历史，从而避免重复写入。）
     last = parsed_messages[-1]
     message_source = "sub_agent"
-    last_emit_payload = {
-        "message": last["text"],
-        "content": last["text"],
-        "conversation_id": conversation_id,
-        "message_source": message_source,
-        "sub_agent_notice": True,
-        "multi_agent_message": True,
-        "multi_agent_display_name": last["display_name"],
-        "multi_agent_subtype": last["subtype"],
-        "auto_message_type": _auto_message_type_for_multi_agent_subtype(last["subtype"]),
-        "visibility": "chat",
-        "starts_work": False,
-        "metadata": {
-            "message_source": message_source,
-            "auto_message_type": _auto_message_type_for_multi_agent_subtype(last["subtype"]),
-            "multi_agent_message": True,
-            "multi_agent_display_name": last["display_name"],
-            "multi_agent_subtype": last["subtype"],
-            "visibility": "chat",
-            "starts_work": False,
-        },
-        "timestamp": datetime.now().isoformat(),
-    }
-    try:
-        sender("user_message", last_emit_payload)
-        ma_debug(
-            "dispatch_ma_idle_last_emit",
-            conversation_id=conversation_id,
-            message_preview=last["text"][:200],
-        )
-    except Exception as exc:
-        ma_debug(
-            "dispatch_ma_idle_last_emit_error",
-            conversation_id=conversation_id,
-            error=str(exc),
-        )
-
-    # 2) 前置通知的回显已在上述注入 inject_multi_agent_master_message 内
-    #    同时完成（经 sender/事件流），避免在多智能体消息场景重复发送相同事件。
 
     # 3) 最后一条触发新一轮工作
     ui_defaults = dict(_user_message_ui_defaults(message_source, auto_user_message_event=True))
@@ -1434,6 +1290,7 @@ def _dispatch_multi_agent_idle_messages_sync(
                 auto_user_message_event=True,
                 auto_user_message_payload=auto_payload,
                 preceding_user_notices=preceding_list,
+                main_task_gate_token=gate_token,
             ),
         )
         rec = runtime_service.create_task(ctx)
@@ -1448,37 +1305,7 @@ def _dispatch_multi_agent_idle_messages_sync(
     task_id_created = getattr(rec, "task_id", None)
     ma_debug("dispatch_ma_idle_task_created", conversation_id=conversation_id, task_id=task_id_created)
 
-    payload = {
-        "message": last["text"],
-        "content": last["text"],
-        "conversation_id": conversation_id,
-        "task_id": getattr(rec, "task_id", None),
-        "message_source": message_source,
-        "sub_agent_notice": True,
-        "multi_agent_message": True,
-        "multi_agent_display_name": last["display_name"],
-        "multi_agent_subtype": last["subtype"],
-        "visibility": "chat",
-        "starts_work": False,
-        "auto_message_type": _auto_message_type_for_multi_agent_subtype(last["subtype"]),
-        "metadata": {
-            "message_source": message_source,
-            "auto_message_type": _auto_message_type_for_multi_agent_subtype(last["subtype"]),
-            "multi_agent_message": True,
-            "multi_agent_display_name": last["display_name"],
-            "multi_agent_subtype": last["subtype"],
-            "visibility": "chat",
-            "starts_work": False,
-        },
-        "timestamp": datetime.now().isoformat(),
-    }
-    sender("user_message", payload)
-    ma_debug(
-        "dispatch_ma_idle_sender_user_message",
-        conversation_id=conversation_id,
-        task_id=getattr(rec, "task_id", None),
-        payload_message_preview=last["text"][:200],
-    )
+    # 用户消息只由认领门闸后的持久化／任务事件链发布，受理阶段不乐观回显。
     ma_debug(
         "dispatch_ma_idle_exit_ok",
         conversation_id=conversation_id,
@@ -1505,7 +1332,7 @@ async def handle_task_with_sender(
     web_terminal = terminal
     conversation_id = getattr(web_terminal.context_manager, "current_conversation_id", None)
     # 多智能体模式：标记主对话任务正在运行，供后台通知池判断是否可以安全消费
-    if getattr(web_terminal, "multi_agent_mode", False):
+    if getattr(web_terminal, "sub_agent_manager", None) is not None:
         web_terminal._multi_agent_main_task_active = True
         manager = getattr(web_terminal, "sub_agent_manager", None)
         pending_count = 0
@@ -2145,19 +1972,10 @@ async def handle_task_with_sender(
                     _manager.reconcile_task_states(conversation_id=conversation_id)
                 except Exception:
                     pass
-                if getattr(web_terminal, "multi_agent_mode", False):
+                if _manager:
                     _state = _manager.get_multi_agent_state(conversation_id)
                     if _state:
                         _stopped_has_ma = any(a.status == "running" for a in _state.list_all())
-                for _t in _manager.tasks.values():
-                    if _t.get("conversation_id") != conversation_id:
-                        continue
-                    if _t.get("status") in TERMINAL_STATUSES.union({"terminated"}):
-                        continue
-                    if _t.get("multi_agent_mode"):
-                        continue
-                    _stopped_has_bg = True
-                    break
             _bg_mgr = getattr(web_terminal, "background_command_manager", None)
             if _bg_mgr and conversation_id:
                 try:
@@ -2468,7 +2286,7 @@ async def handle_task_with_sender(
 
             # 多智能体模式：没有工具调用时，先消费子智能体待转发到主对话的消息；
             # 如果有新消息注入，继续迭代让 Team Leader 响应，而不是直接结束任务。
-            if getattr(web_terminal, "multi_agent_mode", False):
+            if getattr(web_terminal, "sub_agent_manager", None) is not None:
                 injected_count = await process_multi_agent_master_messages(
                     messages=messages,
                     inline=False,
@@ -2544,7 +2362,6 @@ async def handle_task_with_sender(
             iteration=iteration,
             conversation_id=conversation_id,
             last_tool_call_time=last_tool_call_time,
-            process_sub_agent_updates=process_sub_agent_updates,
             process_background_command_updates=process_background_command_updates,
             process_multi_agent_master_messages=process_multi_agent_master_messages,
             get_stop_flag=get_stop_flag,
@@ -2601,7 +2418,7 @@ async def handle_task_with_sender(
         is_first_iteration = False
 
         # 多智能体模式：在进入下一轮模型调用前，消费子智能体最新输出到主对话
-        if getattr(web_terminal, "multi_agent_mode", False):
+        if getattr(web_terminal, "sub_agent_manager", None) is not None:
             await process_multi_agent_master_messages(
                 messages=messages,
                 inline=False,
@@ -2613,8 +2430,7 @@ async def handle_task_with_sender(
     
     # 最终统计
     # 多智能体模式：主对话任务结束，解除活跃标记
-    if getattr(web_terminal, "multi_agent_mode", False):
-        web_terminal._multi_agent_main_task_active = False
+    web_terminal._multi_agent_main_task_active = False
 
     debug_log(f"\n{'='*40}")
     debug_log(f"任务完成统计:")
@@ -2628,6 +2444,7 @@ async def handle_task_with_sender(
     manager = getattr(web_terminal, "sub_agent_manager", None)
     has_running_sub_agents = False
     has_running_multi_agent = False
+    has_pending_ma_messages = False
     bg_manager = getattr(web_terminal, "background_command_manager", None)
     has_running_background_commands = False
     if manager:
@@ -2642,37 +2459,11 @@ async def handle_task_with_sender(
         # idle 实例已完成当前输出、保留上下文等待后续指令；pending 消息会在主任务
         # 结束后由 poll_multi_agent_notifications 继续消费并触发新一轮工作。
         has_pending_ma_messages = False
-        if getattr(web_terminal, "multi_agent_mode", False):
+        if manager:
             state = manager.get_multi_agent_state(conversation_id)
             if state:
                 has_running_multi_agent = any(a.status == "running" for a in state.list_all())
                 has_pending_ma_messages = state.has_pending_master_messages()
-
-        running_tasks = [
-            task for task in manager.tasks.values()
-            if task.get("status") not in TERMINAL_STATUSES.union({"terminated"})
-            and task.get("run_in_background")
-            and not task.get("multi_agent_mode")
-            and task.get("conversation_id") == conversation_id
-        ]
-        pending_notice_tasks = [
-            task for task in manager.tasks.values()
-            if task.get("status") in TERMINAL_STATUSES.union({"terminated"})
-            and task.get("run_in_background")
-            and not task.get("multi_agent_mode")
-            and task.get("conversation_id") == conversation_id
-            and task.get("task_id") not in web_terminal._announced_sub_agent_tasks
-        ]
-
-        if running_tasks or pending_notice_tasks:
-            has_running_sub_agents = True
-            notify_tasks = running_tasks + pending_notice_tasks
-            debug_log(f"[SubAgent] 后台子智能体等待: running={len(running_tasks)} pending_notice={len(pending_notice_tasks)}")
-            # 先通知前端：有子智能体在运行/待通知，保持等待状态
-            sender('sub_agent_waiting', {
-                'count': len(notify_tasks),
-                'tasks': [{'agent_id': t.get('agent_id'), 'summary': t.get('summary')} for t in notify_tasks]
-            })
 
     # 检查是否有后台 run_command 或待通知任务
     if bg_manager and conversation_id:
@@ -2722,12 +2513,10 @@ async def handle_task_with_sender(
 
     # 多智能体模式独立通知池：处理 running 实例 / idle 实例待消费的 pending 消息。
     # 与传统后台任务完全分离，避免两者竞争 create_chat_task 的单工作区互斥。
-    ma_mode_flag = bool(getattr(web_terminal, "multi_agent_mode", False))
-    needs_ma_poll = ma_mode_flag and (has_running_multi_agent or has_pending_ma_messages)
+    needs_ma_poll = has_running_multi_agent or has_pending_ma_messages
     ma_debug(
         "ma_poll_decision",
         conversation_id=conversation_id,
-        multi_agent_mode=ma_mode_flag,
         has_running_multi_agent=has_running_multi_agent,
         has_pending_ma_messages=has_pending_ma_messages,
         needs_ma_poll=needs_ma_poll,

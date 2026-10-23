@@ -747,24 +747,9 @@ class TaskManager(TaskViewMixin):
         if sub_agent_manager:
             try:
                 sub_agent_manager.reconcile_task_states(conversation_id=conversation_id)
-                terminal_statuses = SUB_AGENT_TERMINAL_STATUSES.union({"terminated"})
                 for task_info in sub_agent_manager.tasks.values():
-                    if task_info.get('conversation_id') != conversation_id:
-                        continue
-                    status = task_info.get('status')
-                    if status in terminal_statuses:
-                        continue
-                    if task_info.get('multi_agent_mode'):
-                        # idle = 本轮输出结束、保留上下文等待指令，不算运行中。
-                        # 对齐 socket task_complete 语义（chat_flow_task_main.py：
-                        # 仅 running 实例 + pending master 消息算活跃），否则
-                        # REST 对账会把已空闲的多智能体对话误判为运行中（前端
-                        # 幽灵轮询），且回收器永远不敢回收该对话的 terminal。
-                        if status == "idle":
-                            continue
+                    if task_info.get("conversation_id") == conversation_id and task_info.get("status") == "running":
                         result["has_running_multi_agent"] = True
-                    else:
-                        result["has_running_sub_agents"] = True
             except Exception as exc:
                 debug_log(f"[Task] 对账检查子智能体失败: {exc}")
             try:
@@ -957,6 +942,9 @@ class TaskManager(TaskViewMixin):
                             if not notice_msg:
                                 continue
                             notice_payload = dict(item.get("payload") or {})
+                            if notice_payload.get("multi_agent_message"):
+                                # 子通知由持有门闸的执行体落盘并发同身份事件。
+                                continue
                             notice_payload["starts_work"] = False
                             notice_event = {
                                 "message": notice_msg,
@@ -1099,6 +1087,10 @@ class TaskManager(TaskViewMixin):
                         videos=videos,
                         files=files or [],
                         main_task_gate_token=rec.directives.main_task_gate_token,
+                        preceding_child_notices=[
+                            item for item in (rec.directives.preceding_user_notices or [])
+                            if (item.get("payload") or {}).get("multi_agent_message")
+                        ],
                     )
             finally:
                 try:

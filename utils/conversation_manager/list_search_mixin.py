@@ -49,7 +49,7 @@ class ConversationMetadata:
 class ListSearchMixin:
     """ConversationManager list search mixin 能力 mixin。"""
 
-    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, multi_agent_mode: Optional[bool] = None, quick_entry: Optional[bool] = None) -> Dict:
+    def get_conversation_list(self, limit: int = 50, offset: int = 0, non_empty: bool = False, quick_entry: Optional[bool] = None) -> Dict:
         """
         获取对话列表
 
@@ -57,26 +57,14 @@ class ListSearchMixin:
             limit: 限制数量
             offset: 偏移量
             non_empty: 仅返回有内容（total_messages > 0）的对话，分页基于过滤后的结果
-            multi_agent_mode: 若为 True 仅返回多智能体模式对话；若为 False 仅返回常规对话；None 不过滤
 
         Returns:
             Dict: 包含对话列表和统计信息
         """
         t0 = time.perf_counter()
         if perf_log:
-            perf_log("get_conversation_list enter", extra={"limit": limit, "offset": offset, "non_empty": non_empty, "multi_agent_mode": multi_agent_mode})
+            perf_log("get_conversation_list enter", extra={"limit": limit, "offset": offset, "non_empty": non_empty})
         try:
-            def _filter_by_multi_agent(items):
-                """按 multi_agent_mode 元数据过滤。"""
-                if multi_agent_mode is None:
-                    return items
-                result = []
-                for conv_id, meta in items:
-                    conv_ma = bool(meta.get("multi_agent_mode", False))
-                    if conv_ma == multi_agent_mode:
-                        result.append((conv_id, meta))
-                return result
-
             if non_empty or quick_entry is not None:
                 # 来源筛选必须覆盖全部文件，再在匹配结果上分页。
                 file_count = len(self._iter_conversation_files(sort_by_mtime=False))
@@ -96,8 +84,6 @@ class ListSearchMixin:
                         item for item in sorted_conversations
                         if (item[1].get("quick_entry") is True) == quick_entry
                     ]
-                if multi_agent_mode is not None:
-                    sorted_conversations = _filter_by_multi_agent(sorted_conversations)
                 total = len(sorted_conversations)
                 conversations = sorted_conversations[offset:offset + limit]
             else:
@@ -113,11 +99,9 @@ class ListSearchMixin:
                     reverse=True
                 )
 
-                if multi_agent_mode is not None:
-                    sorted_conversations = _filter_by_multi_agent(sorted_conversations)
 
                 # 分页
-                total = max(len(sorted_conversations), total_files if multi_agent_mode is None else len(sorted_conversations))
+                total = max(len(sorted_conversations), total_files)
                 conversations = sorted_conversations[offset:offset+limit]
 
             # 格式化结果
@@ -138,7 +122,6 @@ class ListSearchMixin:
                     "total_messages": metadata.get("total_messages", 0),
                     "total_tools": metadata.get("total_tools", 0),
                     "status": metadata.get("status", "active"),
-                    "multi_agent_mode": bool(metadata.get("multi_agent_mode", False)),
                     "quick_entry": metadata.get("quick_entry") is True,
                 })
 
@@ -329,14 +312,13 @@ class ListSearchMixin:
             print(f"⌘ 归档对话失败 {conversation_id}: {e}")
             return False
 
-    def search_conversations(self, query: str, limit: int = 20, multi_agent_mode: Optional[bool] = None) -> List[Dict]:
+    def search_conversations(self, query: str, limit: int = 20) -> List[Dict]:
         """
         搜索对话（标题 / 首条用户消息首句，与原前端客户端搜索口径一致）
 
         Args:
             query: 搜索关键词
             limit: 限制数量
-            multi_agent_mode: True 仅多智能体对话；False 仅常规对话；None 不过滤
 
         Returns:
             List[Dict]: 匹配的对话列表
@@ -350,11 +332,6 @@ class ListSearchMixin:
                 return []
 
             for conv_id, metadata in index.items():
-                if multi_agent_mode is not None:
-                    conv_ma = bool(metadata.get("multi_agent_mode", False))
-                    if conv_ma != multi_agent_mode:
-                        continue
-
                 entry = {
                     "id": conv_id,
                     "title": metadata.get("title"),

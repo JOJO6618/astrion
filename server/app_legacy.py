@@ -1058,13 +1058,7 @@ def initialize_system(path: str, thinking_mode: bool = False):
     print(f"{OUTPUT_FORMATS['info']} 调试日志: {DEBUG_LOG_FILE}")
     app.config['DEFAULT_THINKING_MODE'] = thinking_mode
     app.config['DEFAULT_RUN_MODE'] = "thinking" if thinking_mode else "fast"
-    # 同步预设子智能体角色到运行态目录
-    try:
-        from modules.multi_agent.role_store import sync_preset_roles
-        sync_preset_roles()
-        print(f"{OUTPUT_FORMATS['success']} 预设子智能体角色同步完成")
-    except Exception as _e:
-        print(f"{OUTPUT_FORMATS['warning']} 预设子智能体角色同步失败: {_e}")
+
     # host 模式启动即生成 CLI Bearer token（原惰性生成依赖首个 Bearer 请求触发，
     # CLI 无 token 不发请求会形成鸡生蛋死锁；启动时生成根治）
     if TERMINAL_SANDBOX_MODE == "host":

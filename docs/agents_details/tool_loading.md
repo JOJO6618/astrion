@@ -16,7 +16,7 @@
 
 ### 13.2 硬约束（改代码必须知道）
 
-1. **对话文件是唯一权威**：`metadata.tool_loading = {enabled, deferred_set, initial_exposed, loaded, pending}` 在**创建对话时快照一次**（注入点：`conversation_mixin.start_new_conversation`、`server/conversation.py` 活跃任务分支、`workflow_runtime_api.py`、`runtime/service.py`×2；多智能体对话不写入=不启用）。之后个人空间改动只影响新建对话；执行链路**禁止**为该功能读 personalization / Flask session。
+1. **对话文件是唯一权威**：`metadata.tool_loading = {enabled, deferred_set, initial_exposed, loaded, pending}` 在**创建对话时快照一次**，所有新主对话统一，无类型例外。统一子工具create/send/status/stop/terminate/answer均注册在sub_agent类别；status支持省略names查询全部，原独立list工具已删除；类别开关、工具系列／只读清单、延迟注册须同步。之后个人空间改动只影响新建对话；执行链路**禁止**为该功能读personalization／Flask session。
 2. **老对话无字段 = 未启用**：读侧一律走 `get_tool_loading_state()` 防御性解析（None 即未启用，全量工具），不做迁移。字段损坏同样按未启用处理。
 3. **tools 数组对话级稳定（stub 常驻，2026-09-24 起）**：deferred 工具不整个剔除，而是替换为 stub（name + 一句引导式 description + 空 parameters，`core/tool_loading.py::build_tool_stub()`）——模型只敢调用「出现在工具列表里」的工具（训练先验，Answer.AI 实验与 Anthropic 官方 tool search 均证实），纯 tool result 塞定义曾导致所有测试模型反复 load 死循环。stub 只由完整定义决定、与加载状态无关，数组每轮逐字节一致，前缀缓存不受影响；loaded 后完整定义仍在 tool result 中，stub 不替换回完整定义。`initial_exposed` 只是首个请求懒记录的审计快照，不作为过滤依据。（历史：此前过滤语义为「构建集 − deferred_set」整个剔除，因上述死循环问题改为 stub。）
 4. **prompt 目录走现有冻结机制**：key=`frozen_tool_loading_prompt`（`_get_or_init_frozen_prompt`，拼接在 skills 段之后）；模板 `prompts/tool_loading.txt` 只在冻结那一刻读一次。目录**不**随 loaded 状态变化（system prompt 是缓存首段，动了全破）。

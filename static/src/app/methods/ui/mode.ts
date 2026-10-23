@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { t } from '@/locales';
-import { persistNewConversationType } from '../../state';
 import { useModelStore } from '../../../stores/model';
 import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
 
@@ -35,7 +34,6 @@ export const modeMethods = {
     this.inputCloseMenus();
     this.modeMenuOpen = false;
     this.modelMenuOpen = false;
-    this.agentTypeMenuOpen = false;
     this.workModeMenuOpen = false;
   },
   handleToggleGoalMode() {
@@ -95,41 +93,6 @@ export const modeMethods = {
       await this.enterConversation(normalized, { source: 'sidebar', urlMode: 'push' });
     } catch (error) {
       console.warn('[Workflow] 激活后进入新对话失败:', error);
-    }
-  },
-  // 输入栏「智能体/多智能体」类型选择器：空对话态可选（写 newConversationType），
-  // 已有对话为禁用展示态（类型创建时确定、不可变）。
-  handleToggleAgentTypeMenu() {
-    if (!this.isConnected || this.currentConversationId) {
-      return;
-    }
-    const next = !this.agentTypeMenuOpen;
-    this.agentTypeMenuOpen = next;
-    if (next) {
-      this.permissionMenuOpen = false;
-      this.workModeMenuOpen = false;
-      this.modelMenuOpen = false;
-      this.modeMenuOpen = false;
-      this.inputCloseMenus?.();
-    }
-  },
-  async handleSelectNewConversationType(type) {
-    const normalized = type === 'multi_agent' ? 'multi_agent' : 'agent';
-    this.newConversationType = normalized;
-    persistNewConversationType(normalized);
-    this.agentTypeMenuOpen = false;
-    // 选择即联动：同步切换侧边栏「智能体/多智能体」过滤器（纯本地引用交换、零请求）。
-    // 选择器仅在空对话可用（有对话时禁用展示态），此处置空判断作防御；
-    // 进入已有对话后两个状态保持解耦，互不干扰。
-    if (!this.currentConversationId) {
-      try {
-        const { useConversationStore } = await import('../../../stores/conversation');
-        useConversationStore().setSidebarConversationType(
-          normalized === 'multi_agent' ? 'multi_agent' : 'normal'
-        );
-      } catch (_e) {
-        // ignore
-      }
     }
   },
   toggleModeMenu() {
@@ -325,15 +288,10 @@ export const modeMethods = {
     }
   },
   async handleStopAllSubAgents() {
-    const isMultiAgent = this.currentConversationType === 'multi_agent';
-    const mode = isMultiAgent ? 'soft_stop' : 'terminate';
-    const title = isMultiAgent
-      ? t('appUi.pauseAllSubAgentsTitle')
-      : t('appUi.terminateAllSubAgentsTitle');
-    const message = isMultiAgent
-      ? t('appUi.pauseAllSubAgentsMessage')
-      : t('appUi.terminateAllSubAgentsMessage');
-    const confirmText = isMultiAgent ? t('appUi.pause') : t('appUi.terminate');
+    const mode = 'soft_stop';
+    const title = t('appUi.pauseAllSubAgentsTitle');
+    const message = t('appUi.pauseAllSubAgentsMessage');
+    const confirmText = t('appUi.pause');
     let proceed = false;
     try {
       const uiStore = (await import('../../../stores/ui')).useUiStore();

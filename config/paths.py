@@ -161,12 +161,6 @@ HOST_PROJECT_PATH = _resolve_repo_path(os.environ.get("HOST_PROJECT_PATH", ""), 
 # ── 源码树内的配置与资源（不随运行态根目录迁移）──
 PROMPTS_DIR = _resolve_repo_path(os.environ.get("PROMPTS_DIR", ""), "./prompts")
 AGENT_SKILLS_DIR = _resolve_repo_path(os.environ.get("AGENT_SKILLS_DIR", ""), "./agentskills")
-# 多智能体预设角色目录（源码树内，随版本分发）
-PRESET_ROLES_DIR = _resolve_repo_path(os.environ.get("PRESET_ROLES_DIR", ""), "./multi_agent_roles")
-# 运行态预设/自定义角色目录（host 模式：预设+自定义同目录；web 模式：仅预设）
-CUSTOM_ROLES_DIR = str(Path(RUNTIME_ROOT) / _MODE / "mutiagents" / "agents")
-# web 模式预设角色目录（web 模式下使用，host 模式下不用）
-WEB_PRESET_ROLES_DIR = str(Path(RUNTIME_ROOT) / "web" / "mutiagents" / "agents")
 WORKSPACE_SKILLS_DIRNAME = ".astrion/skills"
 # 行业通用技能目录（Agent Skills 开放标准，工作区根目录下，扫描不同步复制）
 PROJECT_AGENTS_SKILLS_DIRNAME = ".agents/skills"
@@ -207,9 +201,6 @@ __all__ = [
     "ADMIN_POLICY_FILE",
     "API_USER_SPACE_DIR",
     "CUSTOM_SKILLS_DIR",
-    "PRESET_ROLES_DIR",
-    "CUSTOM_ROLES_DIR",
-    "WEB_PRESET_ROLES_DIR",
     "API_USERS_DB_FILE",
     "API_TOKENS_FILE",
     "API_USAGE_FILE",

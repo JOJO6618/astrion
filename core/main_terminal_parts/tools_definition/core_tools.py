@@ -88,72 +88,12 @@ DISABLE_LENGTH_CHECK = True
 class ToolsDefinitionCoreToolsMixin:
 
     def _build_sleep_tool_definition(self) -> Dict:
-        """根据运行模式构建 sleep 工具定义。
-
-        多智能体模式下子智能体不会调用 finish_task 结束，因此不提供
-        wait_sub_agent_ids 参数；常规模式保留完整功能。
-        """
-        is_multi_agent = getattr(self, "multi_agent_mode", False)
-        if is_multi_agent:
-            return {
-                "type": "function",
-                "function": {
-                    "name": "sleep",
-                    "description": "等待工具。三种模式三选一：1) seconds：短暂延迟；2) wait_runcommand_id：等待指定后台 run_command 结束并直接返回结果；3) wait_sub_agent_output：等待指定子智能体下一次输出并直接返回该消息（多智能体模式专用）。若同时提供多个等待参数会报错。",
-                    "parameters": {
-                        "type": "object",
-                        "properties": self._inject_intent({
-                            "seconds": {
-                                "type": "number",
-                                "description": "等待的秒数，可以是小数（如0.2秒）。建议范围：0.1-10秒"
-                            },
-                            "wait_runcommand_id": {
-                                "type": "string",
-                                "description": "等待指定后台 run_command 的 command_id 结束后返回。"
-                            },
-                            "wait_sub_agent_output": {
-                                "type": "string",
-                                "description": "等待指定子智能体下一次输出并直接返回该消息。多智能体模式专用，传子智能体显示名（如 UI Operator_1）。"
-                            },
-                            "reason": {
-                                "type": "string",
-                                "description": "等待的原因说明（可选）"
-                            }
-                        }),
-                        "required": []
-                    }
-                }
-            }
-        return {
-            "type": "function",
-            "function": {
-                "name": "sleep",
-                "description": "等待工具。三种模式三选一：1) seconds：短暂延迟；2) wait_sub_agent_ids：等待指定子智能体全部结束并直接返回结果；3) wait_runcommand_id：等待指定后台 run_command 结束并直接返回结果。若同时提供多个等待参数会报错。",
-                "parameters": {
-                    "type": "object",
-                    "properties": self._inject_intent({
-                        "seconds": {
-                            "type": "number",
-                            "description": "等待的秒数，可以是小数（如0.2秒）。建议范围：0.1-10秒"
-                        },
-                        "wait_sub_agent_ids": {
-                            "type": "array",
-                            "items": {"type": "integer"},
-                            "description": "等待这些子智能体全部结束后返回（可提供一个或多个编号）。"
-                        },
-                        "wait_runcommand_id": {
-                            "type": "string",
-                            "description": "等待指定后台 run_command 的 command_id 结束后返回。"
-                        },
-                        "reason": {
-                            "type": "string",
-                            "description": "等待的原因说明（可选）"
-                        }
-                    }),
-                    "required": []
-                }
-            }
-        }
+        from modules.sub_agent.definitions import tool
+        return tool("sleep", "短暂等待，或等待指定后台命令结束；子智能体完成后自动通知，无需等待。", {
+            "seconds": {"type": "number", "description": "等待秒数。"},
+            "wait_runcommand_id": {"type": "string", "description": "后台命令ID。"},
+            "reason": {"type": "string", "description": "等待原因。"},
+        })
 
     def _build_core_tools(self) -> List[Dict]:
         return [

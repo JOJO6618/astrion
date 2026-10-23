@@ -214,7 +214,6 @@ class RuntimeService:
         principal: Optional[TrustedPrincipal] = None,
         limit: int = 50,
         offset: int = 0,
-        multi_agent_mode: Optional[bool] = None,
         quick_entry: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """会话列表查询。principal 省略时按 username/workspace_id 构造最小身份快照。
@@ -227,7 +226,7 @@ class RuntimeService:
         if cm is None:
             raise RuntimeError(tr("tasks.system_not_initialized"))
         filters = {} if quick_entry is None else {"quick_entry": quick_entry}
-        return cm.get_conversation_list(limit=limit, offset=offset, multi_agent_mode=multi_agent_mode, **filters)
+        return cm.get_conversation_list(limit=limit, offset=offset, **filters)
 
     def get_session_history(
         self,
@@ -276,7 +275,6 @@ class RuntimeService:
         run_mode: Optional[str] = None,
         thinking_mode: Optional[bool] = None,
         model_key: Optional[str] = None,
-        multi_agent_mode: bool = False,
         work_mode: Optional[str] = None,
         permission_mode: Optional[str] = None,
         execution_mode: Optional[str] = None,
@@ -307,8 +305,6 @@ class RuntimeService:
         _meta_overrides = session_mode_overrides(
             terminal, principal, work_mode, permission_mode, execution_mode
         )
-        if multi_agent_mode:
-            _meta_overrides["multi_agent_mode"] = True
         if quick_entry is True:
             _meta_overrides["quick_entry"] = True
         try:
@@ -316,7 +312,6 @@ class RuntimeService:
             from modules.personalization_manager import load_personalization_config as _load_tl_prefs
             _meta_overrides.update(snapshot_overrides_from_prefs(
                 _load_tl_prefs(getattr(workspace, "data_dir", None)),
-                multi_agent_mode=multi_agent_mode,
             ))
         except Exception:
             pass

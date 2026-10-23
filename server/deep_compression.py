@@ -185,31 +185,17 @@ def _normalize_deep_compression_records(metadata: Dict[str, Any]) -> List[Dict[s
 def _collect_runtime_state_lines(web_terminal, conversation_id: str) -> List[str]:
     """收集压缩后模型续接所需的运行时状态。
 
-    - 子智能体编号：仅传统模式列出（该模式下编号由模型指定且重复会创建失败）；
-      多智能体模式不列编号（模型可通过 list_active_sub_agents 工具查询活跃实例）。
+    - 子智能体：列出当前主对话的名称；模型可用 get_sub_agent_status 查询全部或指定实例。
+      内部编号和运行记录ID不提供给模型。
     - 持久终端：只列数量与名称。
     """
     lines: List[str] = []
-    is_multi_agent = bool(getattr(web_terminal, "multi_agent_mode", False))
-    if not is_multi_agent:
-        used: List[int] = []
-        manager = getattr(web_terminal, "sub_agent_manager", None)
-        if manager is not None:
-            try:
-                agents_map = getattr(manager, "conversation_agents", None) or {}
-                raw_used = agents_map.get(conversation_id) or []
-                used = sorted(int(x) for x in raw_used)
-            except Exception:
-                used = []
-        if used:
-            next_id = max(used) + 1
-            used_text = "、".join(str(x) for x in used)
-            lines.append(
-                f"- 子智能体编号：本对话已使用编号 {used_text}，下一个可用编号为 {next_id}。"
-                "新建子智能体时请使用该编号，重复使用已用编号会创建失败。"
-            )
-        else:
-            lines.append("- 子智能体编号：本对话尚未创建过子智能体，下一个可用编号为 1。")
+    manager = getattr(web_terminal, "sub_agent_manager", None)
+    if manager is not None:
+        names = [record["name"] for record in manager.tasks.values()
+                 if record.get("conversation_id") == conversation_id]
+        if names:
+            lines.append("- 已创建的子智能体名称：" + "、".join(names) + "。继续工作请发送消息；名称不可重复创建。")
     terminal_names: List[str] = []
     terminal_manager = getattr(web_terminal, "terminal_manager", None)
     if terminal_manager is not None:

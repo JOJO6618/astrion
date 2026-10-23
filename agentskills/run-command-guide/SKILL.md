@@ -60,10 +60,10 @@ description: run_command 工具使用指南。介绍前台与后台模式、后�
 
 ## `sleep` 工具的互斥参数规则
 
-- `sleep` 工具支持三种等待方式：`seconds`（纯等待）、`wait_sub_agent_ids`（等待子智能体）、`wait_runcommand_id`（等待后台 `run_command`）。
+- `sleep` 只支持两种等待方式：`seconds`（短暂延迟）、`wait_runcommand_id`（等待后台 `run_command`）。子智能体不通过sleep等待，本轮结束后自动以user消息通知主对话。
 - **只能选择其中一个等待参数**，否则会报错 “sleep 的等待参数互斥”；
-- 如果你需要短暂停顿而非等待任务完成，传 `seconds` 并可选填 `reason`；
-- 需要等待后台命令完成时仅填写 `wait_runcommand_id`，其余两个参数必须为 `null`/不传。
+- 如果需要短暂停顿，传 `seconds` 并可选填 `reason`；
+- 等待后台命令完成时仅填写 `wait_runcommand_id`，seconds必须为null或不传。
 - `wait_runcommand_id` 返回：
   ```
   {

@@ -53,8 +53,11 @@ def specifications(request: dict) -> list[dict]:
     for path in request["writes"]:
         if path not in request["reads"]:
             sources.append({"source": path, "target": path, "write": True, "system": False})
+    write_root = request.get("workspace_write_root", request["workspace"])
     sources.append({"source": request["workspace"], "target": request["workspace"],
-                    "write": not request["readonly"], "system": False})
+                    "write": not request["readonly"] and write_root == request["workspace"], "system": False})
+    if not request["readonly"] and write_root != request["workspace"]:
+        sources.append({"source": write_root, "target": write_root, "write": True, "system": False})
     unique = {}
     for item in sources:
         if item["target"] not in unique:

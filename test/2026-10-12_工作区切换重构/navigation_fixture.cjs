@@ -16,7 +16,7 @@ function fixture({ realSnapshot = true, automaticSelection = false } = {}) {
   const session = compile(base + 'conversation/session.ts');
   const caching = compile('static/src/stores/workspaceConversationCache.ts', {}, globals);
   const store = { conversationsByWorkspace: {}, conversationsCache: {}, conversationCacheWorkspaceId: '',
-    sidebarConversationType: 'normal', workspaceGroups: [], conversationsOffset: 0, hasMoreConversations: false,
+    workspaceGroups: [], conversationsOffset: 0, hasMoreConversations: false,
     $patch(value) { Object.assign(this, value); },
     setCurrentConversationId(id) { this.currentConversationId = id; },
     ...caching.workspaceCacheActions };

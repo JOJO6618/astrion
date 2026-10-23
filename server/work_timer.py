@@ -25,11 +25,11 @@ def has_running_background_work(terminal: Any, conversation_id: Optional[str]) -
                 if task_info.get("conversation_id") != conversation_id:
                     continue
                 status = task_info.get("status")
-                if status not in SUB_AGENT_TERMINAL_STATUSES.union({"terminated"}):
+                if status == "running":
                     return True
-                # 已完成但尚未发出通知，对话仍应视为运行中
-                if status in SUB_AGENT_TERMINAL_STATUSES and not task_info.get("notified"):
-                    return True
+            state = sub_agent_manager.get_multi_agent_state(conversation_id)
+            if state and state.has_pending_master_messages():
+                return True
         except Exception:
             pass
 

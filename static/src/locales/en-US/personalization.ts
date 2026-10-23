@@ -462,13 +462,13 @@ export default {
 
   // ── Sub-agents ──
   subAgentsIntro:
-    'Manage sub-agent roles for multi-agent mode. Preset roles can be edited (creating a custom override); custom roles can be created, edited and deleted.',
+    'Configure sub-agent models and context compression. Sub-agents retain context and can resume after a working round.',
   compressThresholdTitle: 'Context compression threshold',
   compressThresholdDesc:
     "Deep compression triggers when a sub-agent's context tokens exceed this value (default 250000)",
-  subAgentModelTitle: 'Traditional sub-agent intelligence',
+  subAgentModelTitle: 'Sub-agent intelligence',
   subAgentModelDesc:
-    'Configure tiers based on actual model capability; tiers may use the same model. Same as current agent needs no configuration and suits collaborative coding. Unconfigured tiers return an error; use same as current agent instead. All tiers use thinking mode and inherit the main agent’s reasoning effort at creation; unsupported effort follows existing protocol handling. Multi-agent roles are unaffected.',
+    'Configure tiers based on actual model capability; tiers may use the same model. Same as current agent needs no configuration and suits collaborative coding. Unconfigured tiers return an error; use same as current agent instead. All tiers use thinking mode and inherit the main agent’s reasoning effort at creation; unsupported effort follows existing protocol handling.',
   subAgentModelUnconfigured: 'Not configured',
   subAgentIntelligence: {
     same: 'Same as current agent',

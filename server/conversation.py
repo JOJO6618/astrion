@@ -111,33 +111,6 @@ from .deep_compression import run_deep_compression, heal_stale_compression_flag
 conversation_bp = Blueprint('conversation', __name__)
 
 
-def _terminate_running_sub_agents(terminal: WebTerminal, reason: str = "") -> int:
-    """切换/新建对话时，强制终止当前对话仍在运行的子智能体，并记录系统消息。"""
-    manager = getattr(terminal, "sub_agent_manager", None)
-    if not manager:
-        return 0
-    current_conv_id = getattr(getattr(terminal, "context_manager", None), "current_conversation_id", None)
-    if not current_conv_id:
-        return 0
-    try:
-        manager.reconcile_task_states(conversation_id=current_conv_id)
-    except Exception:
-        pass
-    running_tasks = [
-        task for task in manager.tasks.values()
-        if task.get("status") not in TERMINAL_STATUSES.union({"terminated"})
-        and task.get("run_in_background")
-        and task.get("conversation_id") == current_conv_id
-    ]
-    if not running_tasks:
-        return 0
-    stopped_count = 0
-    for task in running_tasks:
-        task_id = task.get("task_id")
-        manager.terminate_sub_agent(task_id=task_id)
-        stopped_count += 1
-    return stopped_count
-
 
 def _cancel_running_tasks(username: str, workspace_id: str, timeout_seconds: float = 4.0) -> Tuple[int, bool]:
     """取消当前工作区运行中的主任务，并等待其停止，避免切换对话后串写。"""
@@ -569,22 +542,14 @@ def get_conversations(data_context, workspace: UserWorkspace, username: str):
         limit = request.args.get('limit', 20, type=int)
         offset = request.args.get('offset', 0, type=int)
         non_empty = request.args.get('non_empty', '0') in ('1', 'true', 'True')
-        # multi_agent_mode: '1' 仅多智能体模式对话；'0' 仅常规对话；未传 None 不过滤
-        ma_param = request.args.get('multi_agent_mode', None)
-        if ma_param in ('1', 'true', 'True'):
-            multi_agent_filter: Optional[bool] = True
-        elif ma_param in ('0', 'false', 'False'):
-            multi_agent_filter = False
-        else:
-            multi_agent_filter = None
+
         target_workspace_id = request.args.get('workspace_id', '', type=str).strip()
 
         # 限制参数范围
         limit = max(1, min(limit, 10000))  # 限制在1-10000之间
         offset = max(0, offset)
 
-        rows = data_context.list_conversations(limit=limit, offset=offset, non_empty=non_empty,
-                                               multi_agent_mode=multi_agent_filter)
+        rows = data_context.list_conversations(limit=limit, offset=offset, non_empty=non_empty)
         result = {"success": True, "data": rows}
         cm = data_context.manager()
         write_host_workspace_debug(
@@ -823,19 +788,12 @@ def search_conversations(data_context, workspace: UserWorkspace, username: str):
 
     默认仅搜索当前工作区，返回扁平结果；
     all_workspaces=1 时跨当前用户的全部工作区搜索，按工作区分组返回。
-    multi_agent_mode: '1' 仅多智能体对话；'0' 仅常规对话；未传不过滤。
     """
     try:
         query = request.args.get('q', '').strip()
         limit = request.args.get('limit', 20, type=int)
         search_all = request.args.get('all_workspaces', '0') in ('1', 'true', 'True')
-        ma_param = request.args.get('multi_agent_mode', None)
-        if ma_param in ('1', 'true', 'True'):
-            multi_agent_filter: Optional[bool] = True
-        elif ma_param in ('0', 'false', 'False'):
-            multi_agent_filter = False
-        else:
-            multi_agent_filter = None
+
 
         if not query:
             return jsonify({
@@ -848,7 +806,7 @@ def search_conversations(data_context, workspace: UserWorkspace, username: str):
         limit = max(1, min(limit, 50))
 
         if not search_all:
-            rows = data_context.search(query, limit, multi_agent_mode=multi_agent_filter)
+            rows = data_context.search(query, limit)
             result = {"results": rows, "count": len(rows)}
             return jsonify({
                 "success": True,
@@ -886,7 +844,7 @@ def search_conversations(data_context, workspace: UserWorkspace, username: str):
                 logger.error(f"[API] 搜索跳过工作区 {ws_id}: {resolve_err}")
                 continue
             try:
-                rows = target_data.search(query, limit, multi_agent_mode=multi_agent_filter)
+                rows = target_data.search(query, limit)
                 result = {"results": rows, "count": len(rows)}
             except Exception as search_err:
                 logger.error(f"[API] 搜索工作区对话失败 {ws_id}: {search_err}")
@@ -1651,105 +1609,9 @@ def list_sub_agents(data_context, workspace: UserWorkspace, username: str):
         from server.context.sub_agent_views import stored_overview
         return jsonify(success=True, data=stored_overview(data_context, conversation_id))
     try:
-        try:
-            # 防止不同进程创建的子智能体未被当前进程感知
-            manager._load_state()
-        except Exception:
-            pass
-        # CLI 等 Bearer 客户端经 query 显式指定对话（其装配的 terminal 无当前对话概念）
-        conversation_id = (request.args.get("conversation_id") or "").strip() or terminal.context_manager.current_conversation_id
-        data = manager.get_overview(conversation_id=conversation_id)
-
-        # 传统模式子智能体列表必须排除多智能体任务，避免 /new 等无当前对话场景
-        # 把最近一次多智能体模式的 running/idle 子智能体串过来。
-        def _is_multi_agent_task(item: dict) -> bool:
-            task_id = item.get("task_id")
-            raw_task = manager.tasks.get(task_id) if task_id else None
-            return bool(raw_task.get("multi_agent_mode")) if isinstance(raw_task, dict) else False
-
-        data = [item for item in data if not _is_multi_agent_task(item)]
-
-        # 仅在未绑定具体对话时（如全新会话尚未创建 conversation_id），才回退为全局运行态；
-        # 否则只显示当前对话关联的子智能体，避免新对话看到其他对话的任务。
-        if not data and not conversation_id:
-            all_overview = manager.get_overview(conversation_id=None)
-            if all_overview:
-                terminal_statuses = TERMINAL_STATUSES.union({"terminated"})
-                running_only = [
-                    item for item in all_overview
-                    if item.get("status") not in terminal_statuses and not _is_multi_agent_task(item)
-                ]
-                if running_only:
-                    data = running_only
-        debug_log(
-            "[SubAgent] /api/sub_agents overview "
-            + json.dumps({
-                "conversation_id": conversation_id,
-                "count": len(data),
-                "tasks": [
-                    {
-                        "task_id": item.get("task_id"),
-                        "status": item.get("status"),
-                        "run_in_background": item.get("run_in_background"),
-                        "conversation_id": item.get("conversation_id"),
-                    } for item in data
-                ],
-            }, ensure_ascii=False)
-        )
-        if not hasattr(terminal, "_announced_sub_agent_tasks"):
-            terminal._announced_sub_agent_tasks = set()
-        announced = terminal._announced_sub_agent_tasks
-        notified_from_history = set()
-        try:
-            # 服务实例（工作区级）不挂载历史：通知去重标记以磁盘对话为准
-            history = []
-            if conversation_id:
-                notify_manager = terminal.context_manager._get_conversation_manager_for_id(conversation_id)
-                notify_conv_data = notify_manager.load_conversation(conversation_id) or {}
-                history = notify_conv_data.get("messages") or []
-            for msg in history:
-                meta = msg.get("metadata") or {}
-                task_id = meta.get("task_id")
-                if meta.get("sub_agent_notice") and task_id:
-                    notified_from_history.add(task_id)
-        except Exception:
-            notified_from_history = set()
-        for item in data:
-            task_id = item.get("task_id")
-            raw_task = manager.tasks.get(task_id) if task_id else None
-            run_in_background = bool(raw_task.get("run_in_background")) if isinstance(raw_task, dict) else False
-            item["run_in_background"] = run_in_background
-            status = item.get("status")
-            notified_flag = bool(raw_task.get("notified")) if isinstance(raw_task, dict) else False
-            already_notified = (
-                (task_id in announced) or
-                (task_id in notified_from_history) or
-                notified_flag
-            )
-            notice_pending = (
-                run_in_background
-                and task_id
-                and not already_notified
-                and (status in TERMINAL_STATUSES or status == "terminated")
-            )
-            item["notice_pending"] = notice_pending
-        debug_log(
-            "[SubAgent] /api/sub_agents notice_pending computed "
-            + json.dumps({
-                "conversation_id": conversation_id,
-                "tasks": [
-                    {
-                        "task_id": item.get("task_id"),
-                        "status": item.get("status"),
-                        "run_in_background": item.get("run_in_background"),
-                        "notice_pending": item.get("notice_pending"),
-                    } for item in data
-                ],
-            }, ensure_ascii=False)
-        )
-        return jsonify({"success": True, "data": data})
+        return jsonify(success=True, data=manager.get_overview(conversation_id=conversation_id))
     except Exception as exc:
-        return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify(success=False, error=str(exc)), 500
 
 
 @conversation_bp.route('/api/sub_agents/<task_id>/activity', methods=['GET'])
@@ -1817,11 +1679,11 @@ def stop_all_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, usernam
     """批量停止当前会话的所有非终态子智能体。
 
     body: {"mode": "terminate" | "soft_stop"}
-      - mode=terminate: 传统模式终结子智能体（重、不保留实例）
-      - mode=soft_stop: 多智能体模式软停止（轻、保留实例可被后续唤醒）
+      - mode=terminate: 终结实例，不能再次激活
+      - mode=soft_stop: 暂停当前轮次，保留上下文
     """
     data = request.get_json(silent=True) or {}
-    mode = str(data.get('mode') or 'terminate').strip().lower()
+    mode = str(data.get('mode') or 'soft_stop').strip().lower()
     if mode not in {'terminate', 'soft_stop'}:
         return jsonify({"success": False, "error": tr("conversation.unsupported_stop_mode")}), 400
     manager = getattr(terminal, 'sub_agent_manager', None)

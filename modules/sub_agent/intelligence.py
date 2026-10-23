@@ -1,11 +1,11 @@
-"""传统子智能体创建时的模型选择。多智能体角色不使用此模块。"""
-from typing import Any, Mapping
+"""统一子智能体创建时的模型选择。"""
+from typing import Any, Mapping, Optional
 
 INTELLIGENCE_LEVELS = ("same", "high", "medium", "low")
 
 
 def resolve_intelligence_model(
-    level: str, preferences: Mapping[str, Any], current_model: str | None
+    level: str, preferences: Mapping[str, Any], current_model: Optional[str]
 ) -> str:
     """严格解析档位；未配置或不可用时拒绝创建，不自动降档。"""
     from modules.aux_model_resolver import resolve_locked_model_profile

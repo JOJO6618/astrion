@@ -48,7 +48,6 @@ from modules.terminal_manager import TerminalManager
 from modules.todo_manager import TodoManager
 from modules.sub_agent import SubAgentManager
 from modules.webpage_extractor import extract_webpage_content, tavily_extract
-from modules.multi_agent.prompts import build_available_agents_prompt
 from modules.ocr_client import OCRClient
 from modules.easter_egg_manager import EasterEggManager
 from modules.personalization_manager import (
@@ -147,22 +146,7 @@ class MessagesMixin:
             model_key = getattr(self, "model_key", None)
             prompt_replacements = get_model_prompt_replacements(model_key)
 
-            is_multi_agent_mode = bool(getattr(self, "multi_agent_mode", False))
-
             def _build_main_system_prompt() -> str:
-                if is_multi_agent_mode:
-                    # 多智能体模式下主 prompt 使用 Team Leader 专属模板
-                    try:
-                        from modules.multi_agent.prompts import _load_template
-                        template = _load_template("master")
-                        # master.txt 含 HTML 示例等单花括号内容，不能走 str.format；
-                        # 仅替换模型描述占位符，避免字面量泄漏
-                        return template.replace(
-                            "{model_description}",
-                            prompt_replacements.get("model_description", ""),
-                        )
-                    except Exception as exc:
-                        logger.warning(f"[messages] 加载多智能体主 prompt 失败: {exc}")
                 system_prompt_template = self.load_prompt(prompt_name)
                 # main_system.txt / main_system_vl.txt 仅使用 {model_description}
                 base_prompt = system_prompt_template.format(
@@ -183,11 +167,7 @@ class MessagesMixin:
                     logger.warning(f"[messages] 构建修改留痕 prompt 失败: {exc}")
                 return base_prompt
 
-            main_system_frozen_key = (
-                "frozen_main_system_prompt_multi_agent"
-                if is_multi_agent_mode
-                else "frozen_main_system_prompt"
-            )
+            main_system_frozen_key = "frozen_main_system_prompt"
             system_prompt = self._get_or_init_frozen_prompt(
                 main_system_frozen_key,
                 _build_main_system_prompt,
@@ -490,17 +470,11 @@ class MessagesMixin:
                 lambda: self._format_disabled_tool_notice() or "",
             )
 
-            # 多智能体模式额外提示词：可用的子智能体角色（动态 prompt，第一个用户消息后冻结）
-            if getattr(self, "multi_agent_mode", False):
-                try:
-                    available_agents_prompt = self._get_or_init_frozen_prompt(
-                        "frozen_available_agents_prompt",
-                        lambda: build_available_agents_prompt() or "",
-                    )
-                    if available_agents_prompt:
-                        messages.append({"role": "system", "content": available_agents_prompt})
-                except Exception as exc:
-                    logger.warning(f"[messages] 注入可用子智能体 prompt 失败: {exc}")
+            messages.append({"role": "system", "content": (
+                "子智能体按name命名并保留上下文，所有任务后台执行，结束一轮后最后回复会以user消息通知。"
+                "需要继续时向原name发送消息，不重复创建同名实例。无需角色模板、finish工具或sleep等待。"
+                "主子、子子提问可正常通信，及时处理问题。目录写入档位只约束内置工具，MCP沿用外置插件权限。"
+            )})
             if disabled_notice:
                 messages.append({
                     "role": "system",

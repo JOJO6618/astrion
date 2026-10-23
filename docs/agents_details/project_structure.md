@@ -21,7 +21,7 @@
   - `config/`: 配置拆分（`api.py`, `limits.py`, `terminal.py`, `paths.py` ...），由 `config/__init__.py` 聚合并加载 `.env`
   - `utils/`: API client、日志、上下文与对话工具等公共函数（`api_client`、`tool_result_formatter`、`context_manager`、`conversation_manager` 已拆分为子包；原入口文件保留为兼容入口）
 - **前端目录**
-  - `static/src/`: Vue 3 + TS 前端；`app/methods/ui/workspaceNavigation.ts` 统一导航，`workspaceSelection.ts` 排序选择写入，`workspaceStartup.ts` 解析初始真实身份，`composerDrafts.ts` 管理草稿作用域，`navigationRefresh.ts` 负责一次辅助刷新。`workspaceRequestScope.ts` 为同源 API 捕获派发身份，`stores/workspaceConversationCache.ts` 按工作区／类型／筛选缓存列表。
+  - `static/src/`: Vue 3 + TS 前端；`app/methods/ui/workspaceNavigation.ts` 统一导航，`workspaceSelection.ts` 排序选择写入，`workspaceStartup.ts` 解析初始真实身份，`composerDrafts.ts` 管理草稿作用域，`navigationRefresh.ts` 负责一次辅助刷新。`workspaceRequestScope.ts` 为同源API捕获派发身份，`stores/workspaceConversationCache.ts` 按工作区维护单份列表缓存及请求身份，不分对话类型。
   - `cli/src/`: opentui（Zig 内核 + Yoga）+ React 19 CLI 前端（2026-09-11 起正式替代 Ink 版；旧 Ink 实现存档于 `cli/legacy-ink-src/` 仅作字段参考）
   - 监控动画相关核心文件：
     - `static/src/components/chat/monitor/MonitorDirector.ts`
@@ -32,6 +32,7 @@
   - `docs/cli_slash_commands_spec.md`: CLI `/` 指令设计说明
 - **其他子项目/资源**
   - `android-webview-app/`: Android WebView 客户端工程
-  - `modules/sub_agent/`: 子智能体执行逻辑（主进程内 `asyncio.Task`，工具调用复用主进程链路）
+  - `modules/sub_agent/`: definitions/named定义公开接口；manager/persistence负责共享记录与恢复；task/engine/runtime管理轮次和MCP；cancellation负责即时停止、来源和取消结果补齐；communication/model/history分别负责问答、API流、压缩及用量；execution负责固定内置权限。新状态sub_agent_runtime.json，子上下文sub_agent_tasks/<task_id>/conversation.json。
+  - `modules/multi_agent/`: 只保留通信状态、消息协议和日志，无角色或主对话类型。旧角色不再打包；离线迁移脚本在scripts/migrate_multi_agent_conversations.py。
   - `easyagent/`: 旧版 Node.js 子智能体实现，暂时保留但已不再使用
   - `_experiments/`: 本地实验残留与历史文档归档目录（**不纳入 git**，见 §7）

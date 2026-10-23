@@ -99,7 +99,8 @@ def _install_seccomp():
         lib.seccomp_release(context)
 
 
-def install(root):
+def install(root, write_root=None):
+    write_root = write_root or root
     libc = ctypes.CDLL(None, use_errno=True)
     abi = libc.syscall(444, None, 0, 1, 0, 0, 0)
     if abi < 3:
@@ -109,8 +110,9 @@ def install(root):
     ruleset = Ruleset(handled)
     fd = _check(libc.syscall(444, ctypes.byref(ruleset), ctypes.sizeof(ruleset), 0, 0, 0, 0), "create Landlock ruleset")
     read = 1 | (1 << 2) | (1 << 3)
+    grants = [(root, read), (write_root, handled)] if write_root != root else [(root, handled)]
     try:
-        for path, access in [(root, handled)] + [(p, read) for p in (
+        for path, access in grants + [(p, read) for p in (
             "/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt", "/proc", "/dev", "/sys",
         )]:
             if not os.path.exists(path):
@@ -144,9 +146,16 @@ def main():
         raise ValueError("Invalid fixed workspace or command")
     if len(actor) != 24 or any(c not in "0123456789abcdef" for c in actor):
         raise ValueError("Invalid execution identity")
-    temporary = _temporary(root, actor)
-    os.environ.update({"HOME": root, "TMPDIR": temporary, "TMP": temporary, "TEMP": temporary})
-    install(root)
+    write_root = root
+    if command[0].startswith("--write-root="):
+        write_root = command.pop(0).partition("=")[2]
+        if (not os.path.isabs(write_root) or os.path.realpath(write_root) != write_root
+                or os.path.commonpath([root, write_root]) != root
+                or not os.path.isdir(write_root) or not command):
+            raise ValueError("Invalid fixed working directory or command")
+    temporary = _temporary(write_root, actor)
+    os.environ.update({"HOME": write_root, "TMPDIR": temporary, "TMP": temporary, "TEMP": temporary})
+    install(root, write_root)
     os.execvpe(command[0], command, os.environ)
 
 

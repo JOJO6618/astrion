@@ -184,611 +184,581 @@
         </label>
       </div>
 
-      <div v-if="!searchActive" class="conversation-type-switch">
-        <button
-          type="button"
-          class="conversation-type-option"
-          :class="{ active: sidebarType === 'normal' }"
-          @click="setSidebarType('normal')"
-        >
-          {{ $t('sidebar.normalConversations') }}
-        </button>
-        <button
-          type="button"
-          class="conversation-type-option"
-          :class="{ active: sidebarType === 'multi_agent' }"
-          @click="setSidebarType('multi_agent')"
-        >
-          {{ $t('sidebar.multiAgent') }}
-        </button>
-      </div>
-
       <div ref="conversationListEl" class="conversation-list">
-        <Transition :name="slideTransitionName">
-          <div :key="sidebarType" class="conversation-list-pane">
-            <div
-              v-if="runningTaskItems.length && !searchActive && !isGroupByWorkspaceActive"
-              class="running-task-section"
+        <div class="conversation-list-pane">
+          <div
+            v-if="runningTaskItems.length && !searchActive && !isGroupByWorkspaceActive"
+            class="running-task-section"
+          >
+            <div class="running-task-section-title">{{ $t('sidebar.runningTasksTitle') }}</div>
+            <button
+              v-for="task in runningTaskItems"
+              :key="task.task_id"
+              type="button"
+              class="running-task-item"
+              :class="{ active: task.conversation_id === currentConversationId }"
+              @click="$emit('select-running-task', task)"
             >
-              <div class="running-task-section-title">{{ $t('sidebar.runningTasksTitle') }}</div>
-              <button
-                v-for="task in runningTaskItems"
-                :key="task.task_id"
-                type="button"
-                class="running-task-item"
-                :class="{ active: task.conversation_id === currentConversationId }"
-                @click="$emit('select-running-task', task)"
-              >
-                <span class="running-task-workspace">{{
-                  task.workspace_label || task.workspace_id
+              <span class="running-task-workspace">{{
+                task.workspace_label || task.workspace_id
+              }}</span>
+              <span class="running-task-main">
+                <span class="running-task-title">{{
+                  task.conversation_title || task.message || $t('sidebar.runningConversation')
                 }}</span>
-                <span class="running-task-main">
-                  <span class="running-task-title">{{
-                    task.conversation_title || task.message || $t('sidebar.runningConversation')
-                  }}</span>
-                  <span
-                    v-if="isTaskActive(task)"
-                    class="conversation-running-loader running-task-state"
-                    :aria-label="$t('common.running')"
-                  ></span>
-                  <span
-                    v-else
-                    class="conversation-complete-check running-task-state"
-                    :aria-label="$t('sidebar.completed')"
-                  ></span>
-                </span>
-              </button>
-            </div>
-            <template v-if="isGroupByWorkspaceActive && !searchActive">
-              <div class="workspace-groups" :class="{ 'switch-instant': workspaceSwitchInstant }">
+                <span
+                  v-if="isTaskActive(task)"
+                  class="conversation-running-loader running-task-state"
+                  :aria-label="$t('common.running')"
+                ></span>
+                <span
+                  v-else
+                  class="conversation-complete-check running-task-state"
+                  :aria-label="$t('sidebar.completed')"
+                ></span>
+              </span>
+            </button>
+          </div>
+          <template v-if="isGroupByWorkspaceActive && !searchActive">
+            <div class="workspace-groups" :class="{ 'switch-instant': workspaceSwitchInstant }">
+              <div
+                v-for="ws in sortedWorkspaces"
+                :key="String(ws.workspace_id || ws.label)"
+                class="workspace-group"
+              >
                 <div
-                  v-for="ws in sortedWorkspaces"
-                  :key="String(ws.workspace_id || ws.label)"
-                  class="workspace-group"
+                  class="workspace-group-header"
+                  :class="{ active: String(ws.workspace_id || '') === currentWorkspaceId }"
+                  @mouseenter="hoverWorkspaceId = String(ws.workspace_id || '')"
+                  @mouseleave="hoverWorkspaceId = null"
                 >
+                  <button
+                    type="button"
+                    class="workspace-group-toggle"
+                    @click="toggleWorkspaceExpanded(String(ws.workspace_id || ''))"
+                  >
+                    <span
+                      class="icon icon-sm workspace-folder-icon"
+                      :style="
+                        iconStyle(
+                          isWorkspaceExpanded(String(ws.workspace_id || ''))
+                            ? 'folderOpen'
+                            : 'folderClosed'
+                        )
+                      "
+                      aria-hidden="true"
+                    ></span>
+                    <span class="workspace-group-label">{{ ws.label || ws.workspace_id }}</span>
+                    <span
+                      v-if="String(ws.workspace_id || '') === currentWorkspaceId"
+                      class="workspace-current-dot"
+                      :aria-label="$t('sidebar.currentWorkspace')"
+                    ></span>
+                    <span
+                      v-if="
+                        isWorkspaceRunning(String(ws.workspace_id || '')) &&
+                        !isWorkspaceExpanded(String(ws.workspace_id || '')) &&
+                        hoverWorkspaceId !== String(ws.workspace_id || '') &&
+                        openWorkspaceMenuId !== String(ws.workspace_id || '')
+                      "
+                      class="workspace-running-loader"
+                      :aria-label="$t('common.running')"
+                    ></span>
+                  </button>
                   <div
-                    class="workspace-group-header"
-                    :class="{ active: String(ws.workspace_id || '') === currentWorkspaceId }"
-                    @mouseenter="hoverWorkspaceId = String(ws.workspace_id || '')"
-                    @mouseleave="hoverWorkspaceId = null"
+                    class="workspace-group-actions"
+                    :class="{
+                      visible:
+                        hoverWorkspaceId === String(ws.workspace_id || '') ||
+                        openWorkspaceMenuId === String(ws.workspace_id || '')
+                    }"
                   >
                     <button
                       type="button"
-                      class="workspace-group-toggle"
-                      @click="toggleWorkspaceExpanded(String(ws.workspace_id || ''))"
+                      class="workspace-new-btn"
+                      :title="$t('sidebar.newConversation')"
+                      :aria-label="$t('sidebar.newConversation')"
+                      @click="handleCreateWorkspaceConversation(String(ws.workspace_id || ''))"
                     >
                       <span
-                        class="icon icon-sm workspace-folder-icon"
-                        :style="
-                          iconStyle(
-                            isWorkspaceExpanded(String(ws.workspace_id || ''))
-                              ? 'folderOpen'
-                              : 'folderClosed'
-                          )
-                        "
+                        class="icon icon-sm"
+                        :style="iconStyle('pencil')"
                         aria-hidden="true"
                       ></span>
-                      <span class="workspace-group-label">{{ ws.label || ws.workspace_id }}</span>
-                      <span
-                        v-if="String(ws.workspace_id || '') === currentWorkspaceId"
-                        class="workspace-current-dot"
-                        :aria-label="$t('sidebar.currentWorkspace')"
-                      ></span>
-                      <span
-                        v-if="
-                          isWorkspaceRunning(String(ws.workspace_id || '')) &&
-                          !isWorkspaceExpanded(String(ws.workspace_id || '')) &&
-                          hoverWorkspaceId !== String(ws.workspace_id || '') &&
-                          openWorkspaceMenuId !== String(ws.workspace_id || '')
-                        "
-                        class="workspace-running-loader"
-                        :aria-label="$t('common.running')"
-                      ></span>
+                    </button>
+                    <button
+                      type="button"
+                      class="workspace-more-btn"
+                      :title="$t('common.moreActions')"
+                      :aria-label="$t('common.moreActions')"
+                      :aria-expanded="openWorkspaceMenuId === String(ws.workspace_id || '')"
+                      @click.stop="toggleWorkspaceMenu(String(ws.workspace_id || ''))"
+                    >
+                      <span aria-hidden="true"></span>
                     </button>
                     <div
-                      class="workspace-group-actions"
-                      :class="{
-                        visible:
-                          hoverWorkspaceId === String(ws.workspace_id || '') ||
-                          openWorkspaceMenuId === String(ws.workspace_id || '')
+                      class="workspace-actions-menu"
+                      :class="{ open: openWorkspaceMenuId === String(ws.workspace_id || '') }"
+                    >
+                      <button
+                        type="button"
+                        @click="handlePinWorkspace(String(ws.workspace_id || ''))"
+                      >
+                        <span>{{
+                          pinnedWorkspaceIds.has(String(ws.workspace_id || ''))
+                            ? $t('sidebar.unpinWorkspace')
+                            : $t('sidebar.pinWorkspace')
+                        }}</span>
+                      </button>
+                      <button
+                        v-if="props.versioningHostMode"
+                        type="button"
+                        @click="handleRevealWorkspace(String(ws.workspace_id || ''))"
+                      >
+                        <span>{{ $t('sidebar.revealInFolder') }}</span>
+                      </button>
+                      <button type="button" @click="startRenameWorkspace(ws)">
+                        <span>{{ $t('sidebar.rename') }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="workspace-group-children"
+                  :class="{ expanded: isWorkspaceExpanded(String(ws.workspace_id || '')) }"
+                >
+                  <div class="workspace-group-children-inner">
+                    <div
+                      v-if="
+                        !getWorkspaceGroup(String(ws.workspace_id || ''))?.conversations?.length
+                      "
+                      class="workspace-no-conversations"
+                    >
+                      {{ $t('sidebar.noConversations') }}
+                    </div>
+                    <template v-else>
+                      <div
+                        class="workspace-conversations-viewport"
+                        :style="{
+                          '--workspace-visible-count':
+                            getWorkspaceGroup(String(ws.workspace_id || ''))?.visibleLimit || 5
+                        }"
+                      >
+                        <transition-group
+                          name="conversation-delete"
+                          tag="div"
+                          class="workspace-conversations-list"
+                          :class="`animation-mode-${conversationListAnimationMode}`"
+                          @before-leave="lockLeaveItemPosition"
+                        >
+                          <div
+                            v-for="conv in getWorkspaceVisibleAndBufferConversations(
+                              String(ws.workspace_id || '')
+                            )"
+                            :key="conv.id"
+                            class="conversation-item workspace-conversation-item"
+                            :class="{
+                              active: conv.id === currentConversationId,
+                              running:
+                                isConversationActive(conv.id) || isConversationCompleted(conv.id),
+                              'insert-from-left':
+                                conversationInsertAnimations[conv.id] === 'create',
+                              'insert-from-under':
+                                conversationInsertAnimations[conv.id] === 'duplicate',
+                              'duplicate-source-mask':
+                                conversationInsertAnimations[conv.id] === 'duplicateSource'
+                            }"
+                            @click="
+                              handleWorkspaceConversationClick(
+                                conv.id,
+                                String(ws.workspace_id || '')
+                              )
+                            "
+                          >
+                            <div class="conversation-title">{{ conv.title }}</div>
+                            <div
+                              class="conversation-action-wrap"
+                              :class="{ 'menu-open': openActionMenuId === conv.id }"
+                              @click.stop
+                            >
+                              <span
+                                v-if="isConversationActive(conv.id)"
+                                class="conversation-running-loader"
+                                :aria-label="$t('common.running')"
+                                :title="$t('common.running')"
+                              ></span>
+                              <span
+                                v-else-if="isConversationCompleted(conv.id)"
+                                class="conversation-complete-check"
+                                :aria-label="$t('sidebar.completed')"
+                                :title="$t('sidebar.completed')"
+                              ></span>
+                              <button
+                                v-else
+                                type="button"
+                                class="conversation-more-btn"
+                                :title="$t('common.moreActions')"
+                                :aria-label="$t('common.moreActions')"
+                                :data-action-trigger="conv.id"
+                                :aria-expanded="openActionMenuId === conv.id"
+                                @click="toggleActionMenu(conv.id)"
+                              >
+                                <span aria-hidden="true"></span>
+                              </button>
+                              <Teleport to="body">
+                                <div
+                                  v-if="shouldShowActionMenu(conv.id)"
+                                  class="conversation-actions-menu conversation-actions-menu--fixed"
+                                  :class="{ open: openActionMenuId === conv.id }"
+                                  :style="{
+                                    top: actionMenuPosition.top + 'px',
+                                    right: actionMenuPosition.right + 'px'
+                                  }"
+                                >
+                                  <button
+                                    type="button"
+                                    @click="
+                                      openActionMenuId = null;
+                                      $emit('duplicate', conv.id);
+                                    "
+                                  >
+                                    <span
+                                      class="icon icon-sm"
+                                      :style="iconStyle('copy')"
+                                      aria-hidden="true"
+                                    ></span>
+                                    <span>{{ $t('common.copy') }}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="danger"
+                                    @click="
+                                      openActionMenuId = null;
+                                      $emit('delete', {
+                                        id: conv.id,
+                                        workspaceId: String(ws.workspace_id || '')
+                                      });
+                                    "
+                                  >
+                                    <span
+                                      class="icon icon-sm"
+                                      :style="iconStyle('trash')"
+                                      aria-hidden="true"
+                                    ></span>
+                                    <span>{{ $t('common.delete') }}</span>
+                                  </button>
+                                </div>
+                              </Teleport>
+                            </div>
+                          </div>
+                        </transition-group>
+                      </div>
+                      <div
+                        v-if="getWorkspaceHasMore(String(ws.workspace_id || ''))"
+                        class="load-more workspace-load-more"
+                      >
+                        <button
+                          class="load-more-btn"
+                          type="button"
+                          :disabled="getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore"
+                          @click="loadMoreWorkspaceConversations(String(ws.workspace_id || ''))"
+                        >
+                          {{
+                            getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore
+                              ? $t('sidebar.loadingMore')
+                              : $t('sidebar.loadMore')
+                          }}
+                        </button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="isGroupByWorkspaceActive && searchActive">
+            <div class="workspace-groups search-result-groups">
+              <div v-if="!searchInProgress && !sortedSearchGroups.length" class="no-conversations">
+                {{ $t('sidebar.noMatchingConversations') }}
+              </div>
+              <div
+                v-for="group in sortedSearchGroups"
+                :key="String(group.workspace_id || '')"
+                class="workspace-group"
+              >
+                <div class="workspace-group-header search-result-group-header">
+                  <div class="workspace-group-toggle search-result-group-toggle">
+                    <span
+                      class="icon icon-sm workspace-folder-icon"
+                      :style="iconStyle('folderClosed')"
+                      aria-hidden="true"
+                    ></span>
+                    <span class="workspace-group-label">{{
+                      group.label || group.workspace_id
+                    }}</span>
+                  </div>
+                </div>
+                <div class="workspace-group-children expanded">
+                  <div class="workspace-group-children-inner">
+                    <div class="workspace-conversations-list">
+                      <div
+                        v-for="conv in group.results"
+                        :key="conv.id"
+                        class="conversation-item workspace-conversation-item"
+                        :class="{
+                          active: conv.id === currentConversationId,
+                          running: isConversationActive(conv.id) || isConversationCompleted(conv.id)
+                        }"
+                        @click="
+                          handleWorkspaceConversationClick(
+                            conv.id,
+                            String(group.workspace_id || '')
+                          )
+                        "
+                      >
+                        <div class="conversation-title">{{ conv.title }}</div>
+                        <div
+                          class="conversation-action-wrap"
+                          :class="{ 'menu-open': openActionMenuId === conv.id }"
+                          @click.stop
+                        >
+                          <span
+                            v-if="isConversationActive(conv.id)"
+                            class="conversation-running-loader"
+                            :aria-label="$t('common.running')"
+                            :title="$t('common.running')"
+                          ></span>
+                          <span
+                            v-else-if="isConversationCompleted(conv.id)"
+                            class="conversation-complete-check"
+                            :aria-label="$t('sidebar.completed')"
+                            :title="$t('sidebar.completed')"
+                          ></span>
+                          <button
+                            v-else
+                            type="button"
+                            class="conversation-more-btn"
+                            :title="$t('common.moreActions')"
+                            :aria-label="$t('common.moreActions')"
+                            :data-action-trigger="conv.id"
+                            :aria-expanded="openActionMenuId === conv.id"
+                            @click="toggleActionMenu(conv.id)"
+                          >
+                            <span aria-hidden="true"></span>
+                          </button>
+                          <Teleport to="body">
+                            <div
+                              v-if="shouldShowActionMenu(conv.id)"
+                              class="conversation-actions-menu conversation-actions-menu--fixed"
+                              :class="{ open: openActionMenuId === conv.id }"
+                              :style="{
+                                top: actionMenuPosition.top + 'px',
+                                right: actionMenuPosition.right + 'px'
+                              }"
+                            >
+                              <button
+                                type="button"
+                                @click="
+                                  openActionMenuId = null;
+                                  $emit('duplicate', conv.id);
+                                "
+                              >
+                                <span
+                                  class="icon icon-sm"
+                                  :style="iconStyle('copy')"
+                                  aria-hidden="true"
+                                ></span>
+                                <span>{{ $t('common.copy') }}</span>
+                              </button>
+                              <button
+                                type="button"
+                                class="danger"
+                                @click="
+                                  openActionMenuId = null;
+                                  $emit('delete', {
+                                    id: conv.id,
+                                    workspaceId: String(group.workspace_id || '')
+                                  });
+                                "
+                              >
+                                <span
+                                  class="icon icon-sm"
+                                  :style="iconStyle('trash')"
+                                  aria-hidden="true"
+                                ></span>
+                                <span>{{ $t('common.delete') }}</span>
+                              </button>
+                            </div>
+                          </Teleport>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+            <div
+              v-if="
+                loading && !displayConversations.length && !searchActive && !isDeletingConversation
+              "
+              class="loading-conversations"
+            >
+              {{ $t('sidebar.loading') }}
+            </div>
+            <div
+              v-else-if="!displayConversations.length && !loading && !isDeletingConversation"
+              class="no-conversations"
+            >
+              {{
+                searchActive
+                  ? $t('sidebar.noMatchingConversations')
+                  : $t('sidebar.noConversationHistory')
+              }}
+            </div>
+            <transition-group
+              v-else
+              name="conversation-delete"
+              tag="div"
+              class="conversation-list-items"
+              :class="`animation-mode-${conversationListAnimationMode}`"
+            >
+              <div
+                v-for="conv in displayConversations"
+                :key="conv.id"
+                class="conversation-item"
+                :class="{
+                  active: conv.id === currentConversationId,
+                  running: isConversationActive(conv.id) || isConversationCompleted(conv.id),
+                  'insert-from-left': conversationInsertAnimations[conv.id] === 'create',
+                  'insert-from-under': conversationInsertAnimations[conv.id] === 'duplicate',
+                  'duplicate-source-mask':
+                    conversationInsertAnimations[conv.id] === 'duplicateSource',
+                  deleting: pendingDeletingConversationIds.includes(conv.id)
+                }"
+                @click="
+                  openActionMenuId = null;
+                  handleWorkspaceConversationClick(conv.id, String(currentWorkspaceId || ''));
+                "
+              >
+                <div class="conversation-title">{{ conv.title }}</div>
+                <div
+                  class="conversation-action-wrap"
+                  :class="{ 'menu-open': openActionMenuId === conv.id }"
+                  @click.stop
+                >
+                  <span
+                    v-if="isConversationActive(conv.id)"
+                    class="conversation-running-loader"
+                    :aria-label="$t('common.running')"
+                    :title="$t('common.running')"
+                  ></span>
+                  <span
+                    v-else-if="isConversationCompleted(conv.id)"
+                    class="conversation-complete-check"
+                    :aria-label="$t('sidebar.completed')"
+                    :title="$t('sidebar.completed')"
+                  ></span>
+                  <button
+                    v-else
+                    type="button"
+                    class="conversation-more-btn"
+                    :title="$t('common.moreActions')"
+                    :aria-label="$t('common.moreActions')"
+                    :data-action-trigger="conv.id"
+                    :aria-expanded="openActionMenuId === conv.id"
+                    @click="toggleActionMenu(conv.id)"
+                  >
+                    <span aria-hidden="true"></span>
+                  </button>
+                  <Teleport to="body">
+                    <div
+                      v-if="
+                        !isConversationActive(conv.id) &&
+                        !isConversationCompleted(conv.id) &&
+                        openActionMenuId === conv.id
+                      "
+                      class="conversation-actions-menu conversation-actions-menu--fixed"
+                      :class="{ open: openActionMenuId === conv.id }"
+                      :style="{
+                        top: actionMenuPosition.top + 'px',
+                        right: actionMenuPosition.right + 'px'
                       }"
                     >
                       <button
                         type="button"
-                        class="workspace-new-btn"
-                        :title="$t('sidebar.newConversation')"
-                        :aria-label="$t('sidebar.newConversation')"
-                        @click="handleCreateWorkspaceConversation(String(ws.workspace_id || ''))"
+                        @click="
+                          openActionMenuId = null;
+                          $emit('duplicate', conv.id);
+                        "
                       >
                         <span
                           class="icon icon-sm"
-                          :style="iconStyle('pencil')"
+                          :style="iconStyle('copy')"
                           aria-hidden="true"
                         ></span>
+                        <span>{{ $t('common.copy') }}</span>
                       </button>
                       <button
                         type="button"
-                        class="workspace-more-btn"
-                        :title="$t('common.moreActions')"
-                        :aria-label="$t('common.moreActions')"
-                        :aria-expanded="openWorkspaceMenuId === String(ws.workspace_id || '')"
-                        @click.stop="toggleWorkspaceMenu(String(ws.workspace_id || ''))"
+                        class="danger"
+                        @click="
+                          openActionMenuId = null;
+                          $emit('delete', conv.id);
+                        "
                       >
-                        <span aria-hidden="true"></span>
+                        <span
+                          class="icon icon-sm"
+                          :style="iconStyle('trash')"
+                          aria-hidden="true"
+                        ></span>
+                        <span>{{ $t('common.delete') }}</span>
                       </button>
-                      <div
-                        class="workspace-actions-menu"
-                        :class="{ open: openWorkspaceMenuId === String(ws.workspace_id || '') }"
-                      >
-                        <button
-                          type="button"
-                          @click="handlePinWorkspace(String(ws.workspace_id || ''))"
-                        >
-                          <span>{{
-                            pinnedWorkspaceIds.has(String(ws.workspace_id || ''))
-                              ? $t('sidebar.unpinWorkspace')
-                              : $t('sidebar.pinWorkspace')
-                          }}</span>
-                        </button>
-                        <button
-                          v-if="props.versioningHostMode"
-                          type="button"
-                          @click="handleRevealWorkspace(String(ws.workspace_id || ''))"
-                        >
-                          <span>{{ $t('sidebar.revealInFolder') }}</span>
-                        </button>
-                        <button type="button" @click="startRenameWorkspace(ws)">
-                          <span>{{ $t('sidebar.rename') }}</span>
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                  <div
-                    class="workspace-group-children"
-                    :class="{ expanded: isWorkspaceExpanded(String(ws.workspace_id || '')) }"
-                  >
-                    <div class="workspace-group-children-inner">
-                      <div
-                        v-if="
-                          !getWorkspaceGroup(String(ws.workspace_id || ''))?.conversations?.length
-                        "
-                        class="workspace-no-conversations"
-                      >
-                        {{ $t('sidebar.noConversations') }}
-                      </div>
-                      <template v-else>
-                        <div
-                          class="workspace-conversations-viewport"
-                          :style="{
-                            '--workspace-visible-count':
-                              getWorkspaceGroup(String(ws.workspace_id || ''))?.visibleLimit || 5
-                          }"
-                        >
-                          <transition-group
-                            name="conversation-delete"
-                            tag="div"
-                            class="workspace-conversations-list"
-                            :class="`animation-mode-${conversationListAnimationMode}`"
-                            @before-leave="lockLeaveItemPosition"
-                          >
-                            <div
-                              v-for="conv in getWorkspaceVisibleAndBufferConversations(
-                                String(ws.workspace_id || '')
-                              )"
-                              :key="conv.id"
-                              class="conversation-item workspace-conversation-item"
-                              :class="{
-                                active: conv.id === currentConversationId,
-                                running:
-                                  isConversationActive(conv.id) || isConversationCompleted(conv.id),
-                                'insert-from-left':
-                                  conversationInsertAnimations[conv.id] === 'create',
-                                'insert-from-under':
-                                  conversationInsertAnimations[conv.id] === 'duplicate',
-                                'duplicate-source-mask':
-                                  conversationInsertAnimations[conv.id] === 'duplicateSource'
-                              }"
-                              @click="
-                                handleWorkspaceConversationClick(
-                                  conv.id,
-                                  String(ws.workspace_id || '')
-                                )
-                              "
-                            >
-                              <div class="conversation-title">{{ conv.title }}</div>
-                              <div
-                                class="conversation-action-wrap"
-                                :class="{ 'menu-open': openActionMenuId === conv.id }"
-                                @click.stop
-                              >
-                                <span
-                                  v-if="isConversationActive(conv.id)"
-                                  class="conversation-running-loader"
-                                  :aria-label="$t('common.running')"
-                                  :title="$t('common.running')"
-                                ></span>
-                                <span
-                                  v-else-if="isConversationCompleted(conv.id)"
-                                  class="conversation-complete-check"
-                                  :aria-label="$t('sidebar.completed')"
-                                  :title="$t('sidebar.completed')"
-                                ></span>
-                                <button
-                                  v-else
-                                  type="button"
-                                  class="conversation-more-btn"
-                                  :title="$t('common.moreActions')"
-                                  :aria-label="$t('common.moreActions')"
-                                  :data-action-trigger="conv.id"
-                                  :aria-expanded="openActionMenuId === conv.id"
-                                  @click="toggleActionMenu(conv.id)"
-                                >
-                                  <span aria-hidden="true"></span>
-                                </button>
-                                <Teleport to="body">
-                                  <div
-                                    v-if="shouldShowActionMenu(conv.id)"
-                                    class="conversation-actions-menu conversation-actions-menu--fixed"
-                                    :class="{ open: openActionMenuId === conv.id }"
-                                    :style="{
-                                      top: actionMenuPosition.top + 'px',
-                                      right: actionMenuPosition.right + 'px'
-                                    }"
-                                  >
-                                    <button
-                                      type="button"
-                                      @click="
-                                        openActionMenuId = null;
-                                        $emit('duplicate', conv.id);
-                                      "
-                                    >
-                                      <span
-                                        class="icon icon-sm"
-                                        :style="iconStyle('copy')"
-                                        aria-hidden="true"
-                                      ></span>
-                                      <span>{{ $t('common.copy') }}</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      class="danger"
-                                      @click="
-                                        openActionMenuId = null;
-                                        $emit('delete', {
-                                          id: conv.id,
-                                          workspaceId: String(ws.workspace_id || '')
-                                        });
-                                      "
-                                    >
-                                      <span
-                                        class="icon icon-sm"
-                                        :style="iconStyle('trash')"
-                                        aria-hidden="true"
-                                      ></span>
-                                      <span>{{ $t('common.delete') }}</span>
-                                    </button>
-                                  </div>
-                                </Teleport>
-                              </div>
-                            </div>
-                          </transition-group>
-                        </div>
-                        <div
-                          v-if="getWorkspaceHasMore(String(ws.workspace_id || ''))"
-                          class="load-more workspace-load-more"
-                        >
-                          <button
-                            class="load-more-btn"
-                            type="button"
-                            :disabled="
-                              getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore
-                            "
-                            @click="loadMoreWorkspaceConversations(String(ws.workspace_id || ''))"
-                          >
-                            {{
-                              getWorkspaceGroup(String(ws.workspace_id || ''))?.loadingMore
-                                ? $t('sidebar.loadingMore')
-                                : $t('sidebar.loadMore')
-                            }}
-                          </button>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
+                  </Teleport>
                 </div>
               </div>
-            </template>
+            </transition-group>
+          </template>
 
-            <template v-else-if="isGroupByWorkspaceActive && searchActive">
-              <div class="workspace-groups search-result-groups">
-                <div
-                  v-if="!searchInProgress && !sortedSearchGroups.length"
-                  class="no-conversations"
-                >
-                  {{ $t('sidebar.noMatchingConversations') }}
-                </div>
-                <div
-                  v-for="group in sortedSearchGroups"
-                  :key="String(group.workspace_id || '')"
-                  class="workspace-group"
-                >
-                  <div class="workspace-group-header search-result-group-header">
-                    <div class="workspace-group-toggle search-result-group-toggle">
-                      <span
-                        class="icon icon-sm workspace-folder-icon"
-                        :style="iconStyle('folderClosed')"
-                        aria-hidden="true"
-                      ></span>
-                      <span class="workspace-group-label">{{
-                        group.label || group.workspace_id
-                      }}</span>
-                    </div>
-                  </div>
-                  <div class="workspace-group-children expanded">
-                    <div class="workspace-group-children-inner">
-                      <div class="workspace-conversations-list">
-                        <div
-                          v-for="conv in group.results"
-                          :key="conv.id"
-                          class="conversation-item workspace-conversation-item"
-                          :class="{
-                            active: conv.id === currentConversationId,
-                            running:
-                              isConversationActive(conv.id) || isConversationCompleted(conv.id)
-                          }"
-                          @click="
-                            handleWorkspaceConversationClick(
-                              conv.id,
-                              String(group.workspace_id || '')
-                            )
-                          "
-                        >
-                          <div class="conversation-title">{{ conv.title }}</div>
-                          <div
-                            class="conversation-action-wrap"
-                            :class="{ 'menu-open': openActionMenuId === conv.id }"
-                            @click.stop
-                          >
-                            <span
-                              v-if="isConversationActive(conv.id)"
-                              class="conversation-running-loader"
-                              :aria-label="$t('common.running')"
-                              :title="$t('common.running')"
-                            ></span>
-                            <span
-                              v-else-if="isConversationCompleted(conv.id)"
-                              class="conversation-complete-check"
-                              :aria-label="$t('sidebar.completed')"
-                              :title="$t('sidebar.completed')"
-                            ></span>
-                            <button
-                              v-else
-                              type="button"
-                              class="conversation-more-btn"
-                              :title="$t('common.moreActions')"
-                              :aria-label="$t('common.moreActions')"
-                              :data-action-trigger="conv.id"
-                              :aria-expanded="openActionMenuId === conv.id"
-                              @click="toggleActionMenu(conv.id)"
-                            >
-                              <span aria-hidden="true"></span>
-                            </button>
-                            <Teleport to="body">
-                              <div
-                                v-if="shouldShowActionMenu(conv.id)"
-                                class="conversation-actions-menu conversation-actions-menu--fixed"
-                                :class="{ open: openActionMenuId === conv.id }"
-                                :style="{
-                                  top: actionMenuPosition.top + 'px',
-                                  right: actionMenuPosition.right + 'px'
-                                }"
-                              >
-                                <button
-                                  type="button"
-                                  @click="
-                                    openActionMenuId = null;
-                                    $emit('duplicate', conv.id);
-                                  "
-                                >
-                                  <span
-                                    class="icon icon-sm"
-                                    :style="iconStyle('copy')"
-                                    aria-hidden="true"
-                                  ></span>
-                                  <span>{{ $t('common.copy') }}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="danger"
-                                  @click="
-                                    openActionMenuId = null;
-                                    $emit('delete', {
-                                      id: conv.id,
-                                      workspaceId: String(group.workspace_id || '')
-                                    });
-                                  "
-                                >
-                                  <span
-                                    class="icon icon-sm"
-                                    :style="iconStyle('trash')"
-                                    aria-hidden="true"
-                                  ></span>
-                                  <span>{{ $t('common.delete') }}</span>
-                                </button>
-                              </div>
-                            </Teleport>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <template v-else>
-              <div
-                v-if="
-                  loading &&
-                  !displayConversations.length &&
-                  !searchActive &&
-                  !isDeletingConversation
-                "
-                class="loading-conversations"
-              >
-                {{ $t('sidebar.loading') }}
-              </div>
-              <div
-                v-else-if="!displayConversations.length && !loading && !isDeletingConversation"
-                class="no-conversations"
-              >
-                {{
-                  searchActive
-                    ? $t('sidebar.noMatchingConversations')
-                    : $t('sidebar.noConversationHistory')
-                }}
-              </div>
-              <transition-group
-                v-else
-                name="conversation-delete"
-                tag="div"
-                class="conversation-list-items"
-                :class="`animation-mode-${conversationListAnimationMode}`"
-              >
-                <div
-                  v-for="conv in displayConversations"
-                  :key="conv.id"
-                  class="conversation-item"
-                  :class="{
-                    active: conv.id === currentConversationId,
-                    running: isConversationActive(conv.id) || isConversationCompleted(conv.id),
-                    'insert-from-left': conversationInsertAnimations[conv.id] === 'create',
-                    'insert-from-under': conversationInsertAnimations[conv.id] === 'duplicate',
-                    'duplicate-source-mask':
-                      conversationInsertAnimations[conv.id] === 'duplicateSource',
-                    deleting: pendingDeletingConversationIds.includes(conv.id)
-                  }"
-                  @click="
-                    openActionMenuId = null;
-                    handleWorkspaceConversationClick(conv.id, String(currentWorkspaceId || ''));
-                  "
-                >
-                  <div class="conversation-title">{{ conv.title }}</div>
-                  <div
-                    class="conversation-action-wrap"
-                    :class="{ 'menu-open': openActionMenuId === conv.id }"
-                    @click.stop
-                  >
-                    <span
-                      v-if="isConversationActive(conv.id)"
-                      class="conversation-running-loader"
-                      :aria-label="$t('common.running')"
-                      :title="$t('common.running')"
-                    ></span>
-                    <span
-                      v-else-if="isConversationCompleted(conv.id)"
-                      class="conversation-complete-check"
-                      :aria-label="$t('sidebar.completed')"
-                      :title="$t('sidebar.completed')"
-                    ></span>
-                    <button
-                      v-else
-                      type="button"
-                      class="conversation-more-btn"
-                      :title="$t('common.moreActions')"
-                      :aria-label="$t('common.moreActions')"
-                      :data-action-trigger="conv.id"
-                      :aria-expanded="openActionMenuId === conv.id"
-                      @click="toggleActionMenu(conv.id)"
-                    >
-                      <span aria-hidden="true"></span>
-                    </button>
-                    <Teleport to="body">
-                      <div
-                        v-if="
-                          !isConversationActive(conv.id) &&
-                          !isConversationCompleted(conv.id) &&
-                          openActionMenuId === conv.id
-                        "
-                        class="conversation-actions-menu conversation-actions-menu--fixed"
-                        :class="{ open: openActionMenuId === conv.id }"
-                        :style="{
-                          top: actionMenuPosition.top + 'px',
-                          right: actionMenuPosition.right + 'px'
-                        }"
-                      >
-                        <button
-                          type="button"
-                          @click="
-                            openActionMenuId = null;
-                            $emit('duplicate', conv.id);
-                          "
-                        >
-                          <span
-                            class="icon icon-sm"
-                            :style="iconStyle('copy')"
-                            aria-hidden="true"
-                          ></span>
-                          <span>{{ $t('common.copy') }}</span>
-                        </button>
-                        <button
-                          type="button"
-                          class="danger"
-                          @click="
-                            openActionMenuId = null;
-                            $emit('delete', conv.id);
-                          "
-                        >
-                          <span
-                            class="icon icon-sm"
-                            :style="iconStyle('trash')"
-                            aria-hidden="true"
-                          ></span>
-                          <span>{{ $t('common.delete') }}</span>
-                        </button>
-                      </div>
-                    </Teleport>
-                  </div>
-                </div>
-              </transition-group>
-            </template>
-
-            <div v-if="!searchActive && !isGroupByWorkspaceActive && hasMore" class="load-more">
-              <button
-                class="load-more-btn"
-                type="button"
-                :disabled="loadingMore"
-                @click="$emit('load-more')"
-              >
-                {{ loadingMore ? $t('sidebar.loadingMore') : $t('sidebar.loadMore') }}
-              </button>
-            </div>
-            <div v-else-if="searchActive" class="load-more search-more">
-              <div v-if="searchInProgress" class="search-progress">
-                <span class="search-spinner" aria-hidden="true">
-                  <span class="search-spinner-orbit">
-                    <span
-                      class="icon icon-sm search-spinner-icon"
-                      :style="iconStyle('search')"
-                    ></span>
-                  </span>
+          <div v-if="!searchActive && !isGroupByWorkspaceActive && hasMore" class="load-more">
+            <button
+              class="load-more-btn"
+              type="button"
+              :disabled="loadingMore"
+              @click="$emit('load-more')"
+            >
+              {{ loadingMore ? $t('sidebar.loadingMore') : $t('sidebar.loadMore') }}
+            </button>
+          </div>
+          <div v-else-if="searchActive" class="load-more search-more">
+            <div v-if="searchInProgress" class="search-progress">
+              <span class="search-spinner" aria-hidden="true">
+                <span class="search-spinner-orbit">
+                  <span
+                    class="icon icon-sm search-spinner-icon"
+                    :style="iconStyle('search')"
+                  ></span>
                 </span>
-                <span class="search-progress-text">{{ $t('sidebar.searching') }}</span>
-              </div>
-              <button
-                v-else-if="searchMoreAvailable"
-                class="load-more-btn"
-                type="button"
-                @click="$emit('search-more')"
-              >
-                {{ $t('sidebar.searchMore') }}
-              </button>
-              <div v-else-if="displayConversations.length" class="search-done">
-                {{ $t('sidebar.searchExhausted') }}
-              </div>
+              </span>
+              <span class="search-progress-text">{{ $t('sidebar.searching') }}</span>
+            </div>
+            <button
+              v-else-if="searchMoreAvailable"
+              class="load-more-btn"
+              type="button"
+              @click="$emit('search-more')"
+            >
+              {{ $t('sidebar.searchMore') }}
+            </button>
+            <div v-else-if="displayConversations.length" class="search-done">
+              {{ $t('sidebar.searchExhausted') }}
             </div>
           </div>
-        </Transition>
+        </div>
       </div>
 
       <div
@@ -1078,7 +1048,6 @@ const emit = defineEmits<{
   (event: 'reveal-workspace', workspaceId: string): void;
   (event: 'rename-workspace', payload: { workspaceId: string; label: string }): void;
   (event: 'pin-workspace', workspaceId: string): void;
-  (event: 'conversation-type-change', type: 'normal' | 'multi_agent'): void;
   (event: 'open-workflows'): void;
   (event: 'open-git'): void;
 }>();
@@ -1168,26 +1137,7 @@ async function fetchSessionUsername() {
   }
 }
 
-/** 侧边栏对话类型过滤器（普通/多智能体），唯一真相在 conversation store */
-const sidebarType = computed(() => conversationStore.sidebarConversationType);
-
-/** 列表切换动画方向：切到多智能体向左滑出/从右侧进入，切回反向 */
-const slideTransitionName = computed(() =>
-  sidebarType.value === 'multi_agent' ? 'type-slide-left' : 'type-slide-right'
-);
-
-/** 列表容器：切换类型时重置滚动位置，保证推挤动画从顶部开始 */
 const conversationListEl = ref<HTMLElement | null>(null);
-
-/* 切换为纯本地操作：store 内两种类型的列表常驻缓存，setSidebarConversationType
-   同步交换 conversations 引用与分页状态，无请求无加载态；pane key 与数据同 tick 变化，
-   新面板初始挂载即新数据（transition-group 初始渲染不播动画），只保留整板左右平移 */
-const setSidebarType = (type: 'normal' | 'multi_agent') => {
-  if (conversationStore.sidebarConversationType === type) return;
-  if (conversationListEl.value) conversationListEl.value.scrollTop = 0;
-  conversationStore.setSidebarConversationType(type);
-  emit('conversation-type-change', type);
-};
 
 const { sidebarCollapsed: collapsed } = storeToRefs(uiStore);
 const {

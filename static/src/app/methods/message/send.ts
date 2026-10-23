@@ -204,9 +204,8 @@ export const sendMethods = {
           this.versioningInitializingBackupToastId = backupToastId;
         }
 
-        // 首条消息创建：类型来自输入栏「智能体/多智能体」选择器（newConversationType）
-        const isMultiAgent = this.newConversationType === 'multi_agent';
-        const createUrl = isMultiAgent ? '/api/multiagent/conversations' : '/api/conversations';
+        // All new conversations use the shared resumable child runtime.
+        const createUrl = '/api/conversations';
         const createBody = JSON.stringify({
           workspace_id: session.workspaceId,
           settings: newSettings
@@ -230,8 +229,6 @@ export const sendMethods = {
           );
         }
         targetConversationId = createResult.conversation_id;
-        // 创建即定型：落地对话类型（与后端 metadata 保持一致）
-        this.currentConversationType = isMultiAgent ? 'multi_agent' : 'normal';
         session.conversationId = targetConversationId;
         this.currentConversationId = targetConversationId;
         this.currentConversationTitle = t('common.newConversation');
@@ -242,28 +239,21 @@ export const sendMethods = {
           total_messages: 0,
           total_tools: 0
         };
-        // 新建对话的类型同时决定侧边栏过滤器目标类型
-        const targetType = isMultiAgent ? 'multi_agent' : 'normal';
         try {
           const { useConversationStore } = await import('../../../stores/conversation');
           if (!owns()) return false;
           const conversationStore = useConversationStore();
-          conversationStore.$patch({ multiAgentMode: isMultiAgent });
 
-          // 占位对话按「新建类型」插入对应过滤器缓存（而非当前过滤器类型的缓存），
-          // 并同步切换侧边栏「智能体/多智能体」过滤器，避免创建后错位显示（需刷新才归位）。
-          const targetCache = conversationStore.conversationsCache[targetType];
+          // 占位记录写入当前工作区列表。
+          const targetCache = conversationStore.conversationsCache;
           targetCache.list.splice(
             0,
             targetCache.list.length,
             newPlaceholder,
             ...targetCache.list.filter((conv: any) => conv && conv.id !== targetConversationId)
           );
-          if (conversationStore.sidebarConversationType !== targetType) {
-            conversationStore.setSidebarConversationType(targetType);
-          }
 
-          // 分组视图下同步到当前工作区（同样按目标类型缓存落位）
+          // 同步当前工作区分组。
           try {
             const currentWorkspaceId = this.currentHostWorkspaceId;
             if (currentWorkspaceId) {
@@ -272,7 +262,7 @@ export const sendMethods = {
                 (g: any) => g.workspaceId === currentWorkspaceId
               );
               if (group) {
-                const groupList = group.conversationsByType?.[targetType];
+                const groupList = group.conversations;
                 if (groupList) {
                   groupList.splice(
                     0,
@@ -288,14 +278,6 @@ export const sendMethods = {
             }
           } catch (_err) {
             // ignore
-          }
-
-          // 目标类型缓存从未加载过时走切换补载：placeholder 会被真实列表全量覆盖，
-          // 新创建对话在后端 updated_at 最新仍在顶部，不会重复也不会丢失。
-          if (!conversationStore.conversationsCache[targetType].loaded) {
-            if (typeof this.handleSidebarConversationTypeChange === 'function') {
-              this.handleSidebarConversationTypeChange(targetType).catch(() => {});
-            }
           }
         } catch (_e) {
           // ignore

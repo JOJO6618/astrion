@@ -78,7 +78,8 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
     ),
     "sub_agent": ToolCategory(
         label="子智能体",
-        tools=["create_sub_agent", "terminate_sub_agent", "get_sub_agent_status"],
+        tools=["create_sub_agent", "send_message_to_sub_agent", "get_sub_agent_status",
+               "stop_sub_agent", "terminate_sub_agent", "answer_sub_agent_question"],
     ),
     "easter_egg": ToolCategory(
         label="彩蛋实验",

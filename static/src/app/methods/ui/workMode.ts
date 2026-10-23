@@ -126,11 +126,10 @@ export const workModeMethods = {
     const next = !this.workModeMenuOpen;
     this.workModeMenuOpen = next;
     if (next) {
-      // 与其他弹出菜单互斥（仿 handleToggleAgentTypeMenu）
+      // 与其他弹出菜单互斥。
       this.permissionMenuOpen = false;
       this.modelMenuOpen = false;
       this.modeMenuOpen = false;
-      this.agentTypeMenuOpen = false;
       this.inputCloseMenus?.();
     }
   },

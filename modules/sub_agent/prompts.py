@@ -47,24 +47,6 @@ def _format_template(name: str, **kwargs) -> str:
     return template.format(**kwargs)
 
 
-def build_user_message(
-    agent_id: int,
-    summary: str,
-    task: str,
-    deliverables_path: str,
-    timeout_seconds: int,
-) -> str:
-    """构建发送给子智能体的用户消息。"""
-    return _format_template(
-        "user_message",
-        agent_id=agent_id,
-        summary=summary,
-        task=task,
-        deliverables_path=deliverables_path,
-        timeout_seconds=timeout_seconds,
-    )
-
-
 def build_system_prompt(workspace_path: str, execution_mode: str = "") -> str:
     """构建子智能体的系统提示。
 

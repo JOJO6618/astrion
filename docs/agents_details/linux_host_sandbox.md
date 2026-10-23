@@ -17,3 +17,7 @@
 - **网页/headless**：沿用现有沙箱向导及三条 `/api/sandbox/*` 路由，Linux manager 与独立脚本共用安装实现；无系统授权方式时给终端命令。网页不收 sudo 密码。三端点共享现有 host Cookie/Bearer 装饰器，沙箱适配阶段未改变认证逻辑。
 - **证据与限制**：`test/2026-10-08_Linux_host沙箱实验/`（248 项网络/文件断言和双向 localhost）；`test/2026-10-08_Linux_host沙箱助手/`（真实 UID、完整 broker、嵌套拒绝、终端管道、SIGKILL 孙进程清理）；`test/2026-10-08_Linux_host沙箱适配/`（契约、安装回滚、Linux 专属回归和 dry-run）。这些是有限验证，不等同跨发行版安全认证或生产全局安装验收。
 - **安装与网页登录密码分离**：沙箱安装脚本不设置或存储网页登录密码。安装说明见 `docs/linux_host_sandbox_setup.md`；Host 可选密码见 §21。
+
+### 统一子智能体的窄写根（2026-10-23）
+
+`working_dir_write` 请求增加 `workspace_write_root`：工作区父挂载只读，固定子工作目录挂载可写。已安装的可信助手是独立副本，部署新功能时需通过原安装入口更新助手。旧助手拒绝此字段时应报告升级要求，禁止静默回退到整个工作区可写或direct执行。当前macOS开发机仅验证请求、schema与挂载结构，Linux原生执行仍需实机验收。

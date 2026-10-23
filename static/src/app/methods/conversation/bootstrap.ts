@@ -147,8 +147,6 @@ export const bootstrapMethods = {
         this.networkPermissionEnabled = meta.network_permission_enabled;
       this.reasoningEffort =
         typeof meta.reasoning_effort === 'string' ? meta.reasoning_effort : null;
-      this.currentConversationType = meta.multi_agent_mode ? 'multi_agent' : 'normal';
-      useConversationStore().$patch({ multiAgentMode: !!meta.multi_agent_mode });
       this.currentConversationId = normalizedId;
       useConversationStore().setCurrentConversationId(normalizedId);
       this.messages = messages;

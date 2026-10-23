@@ -1,14 +1,16 @@
 // Locale namespace: toolResults (en-US mirror, keys must match zh-CN/toolResults.ts exactly).
 export default {
   access: {
+    working_dir_write: 'Sandbox · working directory writes only',
     workspace_write: 'Sandbox · workspace writes only',
-    sandbox_write: 'Sandbox · authorized paths',
+    sandbox_write: 'Sandbox · workspace and authorized paths writable',
     full_access: 'Full access',
     onceGranted: 'Full access approved for this command',
     alreadyActive: 'Full access is already active'
   },
   // —— Status labels (symbol-prefixed, semantically different from bare common.* words) ——
   status: {
+    idle: 'Round ended · resumable',
     successMark: '✓ Success',
     failedMark: '✗ Failed',
     completed: '✓ Done',
@@ -46,6 +48,7 @@ export default {
 
   // —— Field labels in HTML fragments (with colon) ——
   labels: {
+    workingDir: 'Working directory:',
     tool: 'Tool:',
     status: 'Status:',
     path: 'Path:',
