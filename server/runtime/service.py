@@ -248,6 +248,9 @@ class RuntimeService:
         字段由 context_manager 定义（total_input_tokens/total_output_tokens/
         total_cached_input_tokens/cache_exempt_input_tokens/current_context_tokens 等），
         本服务只做资源装配与转发。对话不存在或无统计时返回空 dict。
+
+        附加的对话画像（model_key/context_window/message_count/title）只用于非 Web
+        客户端展示上下文占用比例，不改变 token 统计本身的口径。
         """
         if not str(conversation_id or "").strip():
             raise ValueError("runtime_context: conversation_id 不能为空")
@@ -255,7 +258,34 @@ class RuntimeService:
         cm = getattr(terminal, "context_manager", None)
         if cm is None:
             raise RuntimeError(tr("tasks.system_not_initialized"))
-        return cm.get_conversation_token_statistics(conversation_id) or {}
+        stats = cm.get_conversation_token_statistics(conversation_id) or {}
+        if stats:
+            stats.update(self._conversation_profile(cm, conversation_id))
+        return stats
+
+    @staticmethod
+    def _conversation_profile(context_manager, conversation_id: str) -> Dict[str, Any]:
+        """读取对话元信息（模型/窗口/消息条数）；读失败不影响已取到的 token 统计。"""
+        profile: Dict[str, Any] = {
+            "model_key": "", "context_window": None, "message_count": 0, "title": "",
+        }
+        try:
+            manager = context_manager._get_conversation_manager_for_id(conversation_id)
+            conversation = manager.load_conversation(conversation_id) or {}
+        except Exception:
+            return profile
+        meta = conversation.get("metadata") or {}
+        model_key = str(meta.get("model_key") or "")
+        profile["model_key"] = model_key
+        profile["message_count"] = len(conversation.get("messages") or [])
+        profile["title"] = str(conversation.get("title") or "")
+        if model_key:
+            try:
+                from config.model_profiles import get_model_context_window
+                profile["context_window"] = get_model_context_window(model_key)
+            except Exception:
+                profile["context_window"] = None
+        return profile
 
     def create_session(
         self,
