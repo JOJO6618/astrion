@@ -139,8 +139,9 @@ const renderedTabs = computed(() => {
 });
 const donePending = ref(new Set<string>());
 const prevRunning = new Map<string, boolean>();
-function statusOf(tab: ConversationTab): 'running' | 'done' | 'loading' | 'error' | null {
-  if (tab.key === tabsStore.requestedKey) return 'loading';
+// 切换过程中不渲染任何临时标记：状态点参与 flex 排版，临时点会把标题推右再弹回
+// （0.6.4 的 loading 环即如此）。切换进度由标签的 aria-busy 表达，见模板。
+function statusOf(tab: ConversationTab): 'running' | 'done' | 'error' | null {
   if (tab.error) return 'error';
   if (tab.running) return 'running';
   return tab.key !== tabsStore.activeKey && donePending.value.has(tab.key) ? 'done' : null;
