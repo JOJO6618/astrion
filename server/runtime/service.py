@@ -260,14 +260,16 @@ class RuntimeService:
             raise RuntimeError(tr("tasks.system_not_initialized"))
         stats = cm.get_conversation_token_statistics(conversation_id) or {}
         if stats:
-            stats.update(self._conversation_profile(cm, conversation_id))
+            stats.update(self._conversation_profile(cm, conversation_id, _workspace))
         return stats
 
     @staticmethod
-    def _conversation_profile(context_manager, conversation_id: str) -> Dict[str, Any]:
+    def _conversation_profile(context_manager, conversation_id: str,
+                              workspace: Any = None) -> Dict[str, Any]:
         """读取对话元信息（模型/窗口/消息条数）；读失败不影响已取到的 token 统计。"""
         profile: Dict[str, Any] = {
             "model_key": "", "context_window": None, "message_count": 0, "title": "",
+            "context_limit": None, "context_limit_source": "",
         }
         try:
             manager = context_manager._get_conversation_manager_for_id(conversation_id)
@@ -279,13 +281,38 @@ class RuntimeService:
         profile["model_key"] = model_key
         profile["message_count"] = len(conversation.get("messages") or [])
         profile["title"] = str(conversation.get("title") or "")
+        window = None
         if model_key:
             try:
                 from config.model_profiles import get_model_context_window
-                profile["context_window"] = get_model_context_window(model_key)
+                window = get_model_context_window(model_key)
             except Exception:
-                profile["context_window"] = None
+                window = None
+        profile["context_window"] = window
+        profile["context_limit"], profile["context_limit_source"] = \
+            RuntimeService._context_limit(workspace, window)
         return profile
+
+    @staticmethod
+    def _context_limit(workspace: Any, model_window) -> Tuple[Optional[int], str]:
+        """上下文占用分母：与输入栏一致——自动深度压缩开启时取深压缩阈值，否则取模型窗口。"""
+        fallback = (model_window, "model_window" if model_window else "")
+        if workspace is None:
+            return fallback
+        try:
+            from modules.personalization_manager import (
+                load_personalization_config, resolve_context_compression_settings,
+            )
+            prefs = load_personalization_config(workspace.data_dir)
+        except Exception:
+            return fallback
+        if not prefs.get("auto_deep_compress_enabled"):
+            return fallback
+        try:
+            deep = int(resolve_context_compression_settings(prefs)["deep_trigger_tokens"])
+        except Exception:
+            return fallback
+        return (deep, "deep_compress") if deep > 0 else fallback
 
     def create_session(
         self,

@@ -20,7 +20,9 @@ STATS = {
     'conversation_id': 'conv_demo',
     'title': 'QQ 群',
     'model_key': 'demo-model',
-    'context_window': 256000,
+    'context_window': 1000000,
+    'context_limit': 250000,
+    'context_limit_source': 'deep_compress',
     'current_context_tokens': 48213,
     'message_count': 128,
     'total_input_tokens': 1234567,
@@ -60,8 +62,8 @@ class ParseTests(unittest.TestCase):
 class RenderTests(unittest.TestCase):
     def test_context_report_has_ratio_and_cache_hit(self):
         text = render_context(STATS, 'conv_demo')
-        self.assertIn('demo-model', text)
-        self.assertIn('48,213 / 256,000（18.8%）', text)
+        self.assertIn('模型：demo-model · 窗口 1,000,000', text)
+        self.assertIn('48,213 / 250,000（19.3% · 自动深度压缩阈值）', text)
         self.assertIn('缓存命中：1,100,000（89.1%）', text)
         self.assertIn('累计输出：56,789', text)
         self.assertIn('$1.23', text)
@@ -76,6 +78,11 @@ class RenderTests(unittest.TestCase):
         stats = dict(STATS, total_input_tokens=600, total_cached_input_tokens=0,
                      cache_exempt_input_tokens=600)
         self.assertIn('（样本不足）', render_context(stats, 'conv_demo'))
+
+    def test_missing_limit_falls_back_to_model_window(self):
+        stats = {key: value for key, value in STATS.items()
+                 if key not in ('context_limit', 'context_limit_source')}
+        self.assertIn('48,213 / 1,000,000（4.8%）', render_context(stats, 'conv_demo'))
 
     def test_missing_window_and_partial_costs_are_explicit(self):
         stats = dict(STATS, context_window=None,
