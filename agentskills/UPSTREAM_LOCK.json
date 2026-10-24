@@ -1,0 +1,1164 @@
+{
+  "schema_version": 2,
+  "reviewed_at": "2026-10-24",
+  "sources": {
+    "manim": {
+      "repository": "adithya-s-k/manim_skill",
+      "commit": "cef045011722d285692e3381d12d4d637da56e18",
+      "commit_date": "2026-01-23T16:30:41Z",
+      "url": "https://github.com/adithya-s-k/manim_skill/tree/cef045011722d285692e3381d12d4d637da56e18",
+      "archive_bytes": 246825
+    },
+    "anthropic": {
+      "repository": "anthropics/skills",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "commit_date": "2026-10-09T18:45:49Z",
+      "url": "https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "archive_bytes": 4090739
+    },
+    "vercel": {
+      "repository": "vercel-labs/agent-skills",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "commit_date": "2026-08-28T13:36:07Z",
+      "url": "https://github.com/vercel-labs/agent-skills/tree/063bee94c3f4df8453406c830b0a7df0f2860278",
+      "archive_bytes": 841046
+    },
+    "marketing": {
+      "repository": "coreyhaines31/marketingskills",
+      "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+      "commit_date": "2026-10-19T21:29:53Z",
+      "url": "https://github.com/coreyhaines31/marketingskills/tree/e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+      "archive_bytes": 1846172
+    },
+    "web-guidelines": {
+      "repository": "vercel-labs/web-interface-guidelines",
+      "commit": "434b7f91364665f2f733b310ec54809bf8f37937",
+      "commit_date": "2026-10-05T20:49:16Z",
+      "url": "https://github.com/vercel-labs/web-interface-guidelines/tree/434b7f91364665f2f733b310ec54809bf8f37937",
+      "archive_bytes": 15657
+    },
+    "impeccable": {
+      "repository": "pbakaus/impeccable",
+      "commit": "fdb532263578a179721be817fca6fae6917506c0",
+      "commit_date": "2026-10-23T19:40:54Z",
+      "url": "https://github.com/pbakaus/impeccable/tree/fdb532263578a179721be817fca6fae6917506c0",
+      "archive_bytes": 26336407
+    },
+    "remotion": {
+      "repository": "remotion-dev/skills",
+      "commit": "6c67adcd9cdbe6eb84d76342da89b225f9161cb2",
+      "commit_date": "2026-10-22T15:31:16Z",
+      "url": "https://github.com/remotion-dev/skills/tree/6c67adcd9cdbe6eb84d76342da89b225f9161cb2",
+      "archive_bytes": 749589
+    },
+    "scientific": {
+      "repository": "K-Dense-AI/scientific-agent-skills",
+      "commit": "593377bb048752abb0152deab9fbb1083a6087df",
+      "commit_date": "2026-10-19T09:33:56Z",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/593377bb048752abb0152deab9fbb1083a6087df",
+      "archive_bytes": 244739583
+    }
+  },
+  "skills": [
+    {
+      "skill": "frontend-design",
+      "source": "anthropic",
+      "path": "skills/frontend-design",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+        "SKILL.md": "d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "12b7c8217e78c90e4f8b198efae5edec5b6076f6e875d543e9bb90ff0d265371"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "skill-creator",
+      "source": "anthropic",
+      "path": "skills/skill-creator",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+        "SKILL.md": "dcd4803e61e913e6fc27294184cd3a71f09f5e924ff20c8a9a20173e7b3c2bcf",
+        "agents/analyzer.md": "bf68f4cac5a56c673a928c2e6d619586c5b93ea364026ab37547772cb45a663a",
+        "agents/comparator.md": "fe1fc9787c495d864c5d6eada47396478572325fde1b33a96d78bf4b849b7a3e",
+        "agents/grader.md": "57134da0c1a4eea33fbd74a1c9c44aa814f07d6bc64de303edb586f941e5d21a",
+        "assets/eval_review.html": "ce477dcc74dc1c0d1d3352646a79167b5a63634e936b1019160025065974e452",
+        "eval-viewer/generate_review.py": "fc9d1b9243fe5ab6012ebd579bd76d0035de1b79fd3b969de114defab26478fb",
+        "eval-viewer/viewer.html": "a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa",
+        "references/schemas.md": "8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f",
+        "scripts/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "scripts/aggregate_benchmark.py": "123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa",
+        "scripts/generate_report.py": "13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453",
+        "scripts/improve_description.py": "87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80",
+        "scripts/package_skill.py": "1a33059b0db1ef73375d46d513e5ea81369d2e8838c970597b0d52ddef8d1c0f",
+        "scripts/quick_validate.py": "67cf5703402013936c8fb75ad6a1afecd8841d45cc5e606b634eb05825fde365",
+        "scripts/run_eval.py": "43e3b8f80dbf69c343967ba77e268fae991d9fa3ed68b32a0ff02532cd48657f",
+        "scripts/run_loop.py": "7bd6f674203168520517eec94c55f493c0d154339b061b4d7c0f0dad187d0f21",
+        "scripts/utils.py": "3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "c58e4593b3d16740752cd39f8b754c7719900a32d3bcc775705bc53b8b3e622f"
+        },
+        "added": {
+          "scripts/init_skill.py": "cf12790f1d4958799281920d599f56aea38fb5c26e2812a61dd740bf3d4b6b99"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "docx",
+      "source": "anthropic",
+      "path": "skills/docx",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa",
+        "SKILL.md": "8017469ea95fb7d28225c62daf8e2f3492a7b516fc64c18c28977cbf8980b7fe",
+        "scripts/__init__.py": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "scripts/accept_changes.py": "0c991d2bc7304a1248e9f3bf9b1498f0b6e76641fc457e7cbd73c99b4eef3a74",
+        "scripts/comment.py": "37d116e5f56bb142b208c6c6a4bbcf960495abf470ddb7c6675ccfac864ba3d7",
+        "scripts/merge_runs.py": "3ab367fd7fba4647943d0aa5e65203b15458551410f5ffc821d902616a4b9f40",
+        "scripts/office/helpers/__init__.py": "678e42456d9e10923c8b9a93691cdd993de3433448a184fa72a0c31f4ae086d5",
+        "scripts/office/helpers/pptx_chart.py": "47ac266f7d39d11ede6bb0d1f3a19d801394fd2964636f1b48beb701f1832964",
+        "scripts/office/helpers/pptx_slide.py": "7b9f69b4a5bd6a2d9eabf9e0e3e796d7a421373145f6a8cd11f60b7ba2d6a5d0",
+        "scripts/office/helpers/pptx_theme.py": "ebb54c56e9c13807f5f98f0cae22d47cdd0162da8525eaa664e3f2c8c8d6bb03",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd": "41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd": "3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd": "29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd": "5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd": "5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd": "5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd": "b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd": "bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd": "d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd": "3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd": "0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd": "e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd": "0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd": "0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd": "9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd": "bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd": "7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd": "3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd": "12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd": "beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd": "f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd": "585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd": "133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd": "6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd": "475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd": "c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd": "a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2",
+        "scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd": "9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a",
+        "scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd": "451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8",
+        "scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd": "6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24",
+        "scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd": "f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26",
+        "scripts/office/schemas/mce/mc.xsd": "3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413",
+        "scripts/office/schemas/microsoft/wml-2010.xsd": "568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2",
+        "scripts/office/schemas/microsoft/wml-2012.xsd": "0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74",
+        "scripts/office/schemas/microsoft/wml-2018.xsd": "be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad",
+        "scripts/office/schemas/microsoft/wml-cex-2018.xsd": "fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081",
+        "scripts/office/schemas/microsoft/wml-cid-2016.xsd": "127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d",
+        "scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd": "842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604",
+        "scripts/office/schemas/microsoft/wml-symex-2015.xsd": "16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b",
+        "scripts/office/soffice.py": "df2c8d7249c132a4512d744482e4b5ed0ecbe885f0bcfb1295e7e6a7ced0432c",
+        "scripts/office/validate.py": "346a4c89d92fff55e610f11efda48c30228815b29bdb10b987e48f7af70acf1e",
+        "scripts/office/validators/__init__.py": "83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987",
+        "scripts/office/validators/base.py": "f818ea28c793ba42960fa4498265e2632a62c86f7b5d6aff6fa89dacc02d59ea",
+        "scripts/office/validators/docx.py": "93d3444c0ef3f043d21a2285c46d2cda478426b930dc33dcf3b11265935517b5",
+        "scripts/office/validators/pptx.py": "17eadad2b7a8374ccbe4cda45693bcd6a36f9d61a7d60f9c9ceef9464dec8299",
+        "scripts/office/validators/redlining.py": "ed50d0885eee4b9c387f546b059bcaed64086815880a5167336244f93e305123",
+        "scripts/templates/comments.xml": "a08ba83ee8790ac9e3dc61921f4988f19edd7e06ac09d6f1897a877c1581818d",
+        "scripts/templates/commentsExtended.xml": "544eeecfeceed4b468fff163cd9c366d33641c8b8ab691ce002576197846afe8",
+        "scripts/templates/commentsExtensible.xml": "bad10b3283e6ad6e7ef6d1ca5169683721ed690ee331282c65df04017e080631",
+        "scripts/templates/commentsIds.xml": "db20f9616e004ec42ef736e80c2384e45db0f8d1194d31dc8b37c7d6ecdd6420",
+        "scripts/templates/people.xml": "056f63aa1197fd8c9dda980c9f1b9ff016fd5fa4a462df8aec5f384f39d23e37"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "6582969d744319e1dade10d706d8047d4f60af4a8aef91e157d5afed4051918b",
+          "scripts/accept_changes.py": "193f7a697c7d6f16f0bd7143d05c4f17bcd0808743918a88991daba619fd5a9e",
+          "scripts/comment.py": "72ad3186aa697fbcd8aeee5c22e84f4b2eb90e954c516c9424f9d2354f5b2796",
+          "scripts/office/validate.py": "1e32f0608528df1c47c3e0bc1ef206f708f59f8a2de54c3c6f4f1f4de6b07a2f",
+          "scripts/office/validators/base.py": "d75372a56bc529bb363466209d99a68c5cb543f8034de5a959b4594f3f8c5bde",
+          "scripts/office/validators/docx.py": "1456d9b7257e5d25efb6485d01a1333dcdb558b5473398bb130b85fad9d083f7",
+          "scripts/office/validators/pptx.py": "a70b9d0089df3be68cb612555516158da1b2ed9fad9d148d1ce483dcbb986009",
+          "scripts/office/validators/redlining.py": "18f906d062bc794a82a11239f0025156a79b737e41ed9d143367ada1b12435ee"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "pptx",
+      "source": "anthropic",
+      "path": "skills/pptx",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa",
+        "SKILL.md": "a7ff03e2c85b636f55232a6b1555f5dd90216b7a1a359ab289d8364e6acbc6a0",
+        "scripts/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "scripts/add_slide.py": "3922f819ee1f6b8bdc6aa146d1a86de70640f5f919321fe3f01a764482ff69c9",
+        "scripts/clean.py": "5c808cd4dff7e02661ef3c68b5917f4e25097cc6610c92a3a7df4a6366a5c3c1",
+        "scripts/office/helpers/__init__.py": "678e42456d9e10923c8b9a93691cdd993de3433448a184fa72a0c31f4ae086d5",
+        "scripts/office/helpers/pptx_chart.py": "47ac266f7d39d11ede6bb0d1f3a19d801394fd2964636f1b48beb701f1832964",
+        "scripts/office/helpers/pptx_slide.py": "7b9f69b4a5bd6a2d9eabf9e0e3e796d7a421373145f6a8cd11f60b7ba2d6a5d0",
+        "scripts/office/helpers/pptx_theme.py": "ebb54c56e9c13807f5f98f0cae22d47cdd0162da8525eaa664e3f2c8c8d6bb03",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd": "41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd": "3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd": "29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd": "5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd": "5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd": "5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd": "b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd": "bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd": "d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd": "3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd": "0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd": "e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd": "0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd": "0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd": "9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd": "bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd": "7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd": "3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd": "12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd": "beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd": "f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd": "585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd": "133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd": "6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd": "475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd": "c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd": "a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2",
+        "scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd": "9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a",
+        "scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd": "451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8",
+        "scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd": "6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24",
+        "scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd": "f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26",
+        "scripts/office/schemas/mce/mc.xsd": "3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413",
+        "scripts/office/schemas/microsoft/wml-2010.xsd": "568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2",
+        "scripts/office/schemas/microsoft/wml-2012.xsd": "0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74",
+        "scripts/office/schemas/microsoft/wml-2018.xsd": "be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad",
+        "scripts/office/schemas/microsoft/wml-cex-2018.xsd": "fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081",
+        "scripts/office/schemas/microsoft/wml-cid-2016.xsd": "127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d",
+        "scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd": "842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604",
+        "scripts/office/schemas/microsoft/wml-symex-2015.xsd": "16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b",
+        "scripts/office/soffice.py": "df2c8d7249c132a4512d744482e4b5ed0ecbe885f0bcfb1295e7e6a7ced0432c",
+        "scripts/office/validate.py": "346a4c89d92fff55e610f11efda48c30228815b29bdb10b987e48f7af70acf1e",
+        "scripts/office/validators/__init__.py": "83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987",
+        "scripts/office/validators/base.py": "f818ea28c793ba42960fa4498265e2632a62c86f7b5d6aff6fa89dacc02d59ea",
+        "scripts/office/validators/docx.py": "93d3444c0ef3f043d21a2285c46d2cda478426b930dc33dcf3b11265935517b5",
+        "scripts/office/validators/pptx.py": "17eadad2b7a8374ccbe4cda45693bcd6a36f9d61a7d60f9c9ceef9464dec8299",
+        "scripts/office/validators/redlining.py": "ed50d0885eee4b9c387f546b059bcaed64086815880a5167336244f93e305123",
+        "scripts/thumbnail.py": "94ef83a84346aa2d63913de0d42bb2fe902ccdc17bfac6130096ca758381793c"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "a0779841d8bcecb95f977fdd14b301155215c123022f36fd7b9169a0698b8be4",
+          "scripts/office/validate.py": "1e32f0608528df1c47c3e0bc1ef206f708f59f8a2de54c3c6f4f1f4de6b07a2f",
+          "scripts/office/validators/base.py": "d75372a56bc529bb363466209d99a68c5cb543f8034de5a959b4594f3f8c5bde",
+          "scripts/office/validators/docx.py": "1456d9b7257e5d25efb6485d01a1333dcdb558b5473398bb130b85fad9d083f7",
+          "scripts/office/validators/pptx.py": "a70b9d0089df3be68cb612555516158da1b2ed9fad9d148d1ce483dcbb986009",
+          "scripts/office/validators/redlining.py": "18f906d062bc794a82a11239f0025156a79b737e41ed9d143367ada1b12435ee",
+          "scripts/thumbnail.py": "4eb5abc308e07d82539ffc2e3bff6c42efe0459202270cbfd43bdcf433b744d5"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "xlsx",
+      "source": "anthropic",
+      "path": "skills/xlsx",
+      "mode": "verbatim",
+      "upstream_files": {
+        "LICENSE.txt": "79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa",
+        "SKILL.md": "6712b39718fe815054abca9c3ee72f989613e6f771c8a5c58f30a65a6c905622",
+        "scripts/office/helpers/__init__.py": "678e42456d9e10923c8b9a93691cdd993de3433448a184fa72a0c31f4ae086d5",
+        "scripts/office/helpers/pptx_chart.py": "47ac266f7d39d11ede6bb0d1f3a19d801394fd2964636f1b48beb701f1832964",
+        "scripts/office/helpers/pptx_slide.py": "7b9f69b4a5bd6a2d9eabf9e0e3e796d7a421373145f6a8cd11f60b7ba2d6a5d0",
+        "scripts/office/helpers/pptx_theme.py": "ebb54c56e9c13807f5f98f0cae22d47cdd0162da8525eaa664e3f2c8c8d6bb03",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd": "41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd": "3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd": "29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd": "5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd": "5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd": "5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd": "b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd": "bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd": "d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd": "3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd": "0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd": "e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd": "0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd": "0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd": "9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd": "bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd": "7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd": "3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd": "12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd": "beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd": "f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd": "585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd": "133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd": "6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd": "475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd": "c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd",
+        "scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd": "a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2",
+        "scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd": "9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a",
+        "scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd": "451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8",
+        "scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd": "6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24",
+        "scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd": "f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26",
+        "scripts/office/schemas/mce/mc.xsd": "3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413",
+        "scripts/office/schemas/microsoft/wml-2010.xsd": "568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2",
+        "scripts/office/schemas/microsoft/wml-2012.xsd": "0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74",
+        "scripts/office/schemas/microsoft/wml-2018.xsd": "be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad",
+        "scripts/office/schemas/microsoft/wml-cex-2018.xsd": "fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081",
+        "scripts/office/schemas/microsoft/wml-cid-2016.xsd": "127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d",
+        "scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd": "842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604",
+        "scripts/office/schemas/microsoft/wml-symex-2015.xsd": "16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b",
+        "scripts/office/soffice.py": "df2c8d7249c132a4512d744482e4b5ed0ecbe885f0bcfb1295e7e6a7ced0432c",
+        "scripts/office/validate.py": "346a4c89d92fff55e610f11efda48c30228815b29bdb10b987e48f7af70acf1e",
+        "scripts/office/validators/__init__.py": "83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987",
+        "scripts/office/validators/base.py": "f818ea28c793ba42960fa4498265e2632a62c86f7b5d6aff6fa89dacc02d59ea",
+        "scripts/office/validators/docx.py": "93d3444c0ef3f043d21a2285c46d2cda478426b930dc33dcf3b11265935517b5",
+        "scripts/office/validators/pptx.py": "17eadad2b7a8374ccbe4cda45693bcd6a36f9d61a7d60f9c9ceef9464dec8299",
+        "scripts/office/validators/redlining.py": "ed50d0885eee4b9c387f546b059bcaed64086815880a5167336244f93e305123",
+        "scripts/recalc.py": "66f6e726d5a53cfabea0b6471d6669deb95e54e96cb7913b687e4388da1bb3d9"
+      },
+      "adaptation": {
+        "modified": {},
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "pdf",
+      "source": "anthropic",
+      "path": "skills/pdf",
+      "mode": "verbatim",
+      "upstream_files": {
+        "LICENSE.txt": "79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa",
+        "SKILL.md": "9f78b8359fbd4943ad260a7a1e436e5a96503406d6c34e99f69223d647d85b9c",
+        "forms.md": "9530b3f57034792e0242a3abfe8b3c296466329551916f2ff6c5a70db78f7e44",
+        "reference.md": "03a5f964f8abecbbe156f363356e927e864d7ee964f1012c84ee1bfc8acbeb95",
+        "scripts/check_bounding_boxes.py": "0ced522402dd7b3c82a0be9518cf4e485fa9cc0467d7beab6ddb04cb36fcc3e1",
+        "scripts/check_fillable_fields.py": "1fe10b9980a5493c9bbec8c20630c603eaa475b45403751c08f26738736647b8",
+        "scripts/convert_pdf_to_images.py": "7f58e292a67e18a8ff000d30bad2469389546731f7e8a698cc1d0aed001ea15d",
+        "scripts/create_validation_image.py": "8fa9fd7962c9f940045b81cf6b991e7c1057c1838e3f9cc6d305007a222ffebf",
+        "scripts/extract_form_field_info.py": "bb235b36f497bbb1c7c6821cecf527bbba7213520de11219da99f7b13a38c109",
+        "scripts/extract_form_structure.py": "6814e3fe8f78c2b16d766c132b5a727ff7a31b71d76a7d46bd6e40fe50bc97c5",
+        "scripts/fill_fillable_fields.py": "d140872c2e92e41b1e05370ae8d270c5b7f5ebdf55d9905f03bc974a9c708ff5",
+        "scripts/fill_pdf_form_with_annotations.py": "8a56e063a49ed53c0b0e1d312ecf8023af76816ed139486ec3b539873de202fd"
+      },
+      "adaptation": {
+        "modified": {},
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "canvas-design",
+      "source": "anthropic",
+      "path": "skills/canvas-design",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+        "SKILL.md": "a1f288079624402f30682753c1d43920b6664785698d21d3e7aa197450a6448b",
+        "canvas-fonts/ArsenalSC-OFL.txt": "8ddd61b18ba2c0d0dbe4a691cf5f1a0673f473d02fa0546e67ee88c006aeff6e",
+        "canvas-fonts/ArsenalSC-Regular.ttf": "65e6f89df58f68fd905b3add34a79dd6106aa3b3044df0dad9676fff53d504b9",
+        "canvas-fonts/BigShoulders-Bold.ttf": "b43bcd198b9fdf717dd42aa61a34dba32e01aceaeae659d689afd0ca52c37ea2",
+        "canvas-fonts/BigShoulders-OFL.txt": "fbc746aabf0eb1847dfd92e2efc4596d79fa897d60b8e64062a22f585508fb3f",
+        "canvas-fonts/BigShoulders-Regular.ttf": "18a879fc71978a4447150705caf880a9da3860083c259fd29e6dc03057b6842a",
+        "canvas-fonts/Boldonse-OFL.txt": "45cc82ab4032273c0924025ffcf8f0665a68e1a5955e3f7247e5daf1deeb1326",
+        "canvas-fonts/Boldonse-Regular.ttf": "cc2e540604565c0f90a7d8d46194a2f42fc9c45512cd2e39bf03b50eb68c35a4",
+        "canvas-fonts/BricolageGrotesque-Bold.ttf": "a737b146fe0d77ffe8a86e3cd16700dd431d3b1e420d4fd80e142cd68a1cb50d",
+        "canvas-fonts/BricolageGrotesque-OFL.txt": "0e4f4eb8534bc66a76aca13dd19c1f9731b2008866b29ccff182b764649df9b4",
+        "canvas-fonts/BricolageGrotesque-Regular.ttf": "972a6d098c9867ae131d0ea99e221e63976b11a19d4b931c2c7ace525674e4f6",
+        "canvas-fonts/CrimsonPro-Bold.ttf": "48f191e38355c8db100eb3ce157c20f9302a3b9a37b44a660f77ecfce3986609",
+        "canvas-fonts/CrimsonPro-Italic.ttf": "52318db3526b644e6efa60be0b3ca5a50e40fbe8bd026c261e0aa206f0772267",
+        "canvas-fonts/CrimsonPro-OFL.txt": "35680d14547b6748b6f362a052a46d22764ce5eccf96e18b74f567bb2ee58114",
+        "canvas-fonts/CrimsonPro-Regular.ttf": "48fad08cb1917a7b2f2c6fe5135d6c07743a6663cf7631ec4481108aaf081422",
+        "canvas-fonts/DMMono-OFL.txt": "bfe7842fcb88323e2981e24710c25202677385a8c75fb6a87217b275a0247ae3",
+        "canvas-fonts/DMMono-Regular.ttf": "f98ada968dc3b6b2c08d3f5caaf266977df0bfe0929372b93df5a06cf2ace450",
+        "canvas-fonts/EricaOne-OFL.txt": "e0de629968b52255548d5fafcf30b24ff9edae0eda362380755a75816404d0fa",
+        "canvas-fonts/EricaOne-Regular.ttf": "db1d89e80e33a8a01beaaac7a85df582857d24a43f1e181461aa7ff5d701476a",
+        "canvas-fonts/GeistMono-Bold.ttf": "75c0828d5c1ee44b9ef9f4df577bf41595ec362e2ea3f1e558590c9e92c7949d",
+        "canvas-fonts/GeistMono-OFL.txt": "6a873c900f584109b13ae0aaf81d6e3cf0a68751a216b03f7b6c68d547057bb4",
+        "canvas-fonts/GeistMono-Regular.ttf": "a55c1b51cda4afeab9e471e7947b85a20f7c8831d7e6b1470c1b7fbdc0f0f15e",
+        "canvas-fonts/Gloock-OFL.txt": "c0a3f3125ac491ef3d1f09f401be4834c646562f647e44f2bcbc49f0466c656d",
+        "canvas-fonts/Gloock-Regular.ttf": "e86b4ce66dbd3f1f83eee8db99ec96e0da1128c3f53df0e9b3b7472025dfe960",
+        "canvas-fonts/IBMPlexMono-Bold.ttf": "dbd2a2fb024579438d6400a84e57579bfd2dbe67c306c8fd9fde92a61e4f2eea",
+        "canvas-fonts/IBMPlexMono-OFL.txt": "5294ce778857e1eb02e830b6ab06435537d38f43055327e73d03a2d4d57d5123",
+        "canvas-fonts/IBMPlexMono-Regular.ttf": "ab08018ccd276b79fb2c636bb95b9c543598f9d50505fe92506fcb4dae7810cd",
+        "canvas-fonts/IBMPlexSerif-Bold.ttf": "b8d294e9b5c5a0940f167c3ced0f7ef2e3f57082ca3ff096ef30e86e26c1c159",
+        "canvas-fonts/IBMPlexSerif-BoldItalic.ttf": "da64b75f4284f53e7b5c71fa190a35b8bf3494fe19f1804c81c3a53340bca570",
+        "canvas-fonts/IBMPlexSerif-Italic.ttf": "b11f1048745e715a55c9d837b3f10226ca3d78867b7db7251ddad8f98dcf0f38",
+        "canvas-fonts/IBMPlexSerif-Regular.ttf": "77cd233a2af8dc6b1022faea3bb3b01f3c75af68bcf530cb6aeb15982ff3dbb7",
+        "canvas-fonts/InstrumentSans-Bold.ttf": "444f85bf1c4b0e1ce1ca624f6be54bcd832207714ccaf4ea99ee531341683bdf",
+        "canvas-fonts/InstrumentSans-BoldItalic.ttf": "3762f6cef95d6039489ad5ba5787d4c30f17a1ad01e9ac3c816ed69692722a68",
+        "canvas-fonts/InstrumentSans-Italic.ttf": "78e85858e371b2cb4e18f617c10f0f937c0e12a0887ffee98555b24ed305b3a7",
+        "canvas-fonts/InstrumentSans-OFL.txt": "bf4dc6d13a8cccd4807133c77a1ee9619a16b92cb23322258725ab6731c2f6e5",
+        "canvas-fonts/InstrumentSans-Regular.ttf": "a22cb26e48fd79bcb01bf2fc92d36785474dce36d9c544ab0a8868c2657c4a87",
+        "canvas-fonts/InstrumentSerif-Italic.ttf": "9c86e4d5a47b50224a2463a9eca8535835257c8e85c470c2c6b454b1af6f046e",
+        "canvas-fonts/InstrumentSerif-Regular.ttf": "56ac3be03ac3ba283196b3e77850ab2ffcf56cfb6fd3212c5620109a972f8c99",
+        "canvas-fonts/Italiana-OFL.txt": "8373b11312ace78c4cec2e8f9f6aa9f2330601107dac7bcf899c6f2dbd40c5a5",
+        "canvas-fonts/Italiana-Regular.ttf": "15c4dd6ab8cf4a29ba8826f65edcbe2f6c266c557d34d081f25072dfd5605fd2",
+        "canvas-fonts/JetBrainsMono-Bold.ttf": "a2349098b9e45419e7bf0e2958d6c4937a049dded37387b08be725be4c7615f3",
+        "canvas-fonts/JetBrainsMono-OFL.txt": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697",
+        "canvas-fonts/JetBrainsMono-Regular.ttf": "b6b1ff4ddefe36d7f2a6174e1d001cab374e594519ee9049af028d577b64c5f5",
+        "canvas-fonts/Jura-Light.ttf": "c891a381df056b2c4dfe85841e911bf45da0890fa21a7b2692cbe5ea1f505e1e",
+        "canvas-fonts/Jura-Medium.ttf": "c72965cb732a92872643819fd1734128238583cc36b116313859137a51d3368a",
+        "canvas-fonts/Jura-OFL.txt": "eaf9bdb675f6d87e5feb88199ab3ea581d3bd2082f426e384fa9c394576d7260",
+        "canvas-fonts/LibreBaskerville-OFL.txt": "55959eef5b0c3b2e3c1c7631b8ff0f9447d75de20f29cfa7db5bcfb026763343",
+        "canvas-fonts/LibreBaskerville-Regular.ttf": "2101302538d9e88adb679031c04623e4578b5745e89566284fd2c508d79acae0",
+        "canvas-fonts/Lora-Bold.ttf": "7d74015e950c2fb66519c7295b8155621d22200ae2ca2a4c6b43ce3c490cac87",
+        "canvas-fonts/Lora-BoldItalic.ttf": "152f87e71f5ddb60d5c57ecd9132807c947e65c42977193c9164e7c5a6690081",
+        "canvas-fonts/Lora-Italic.ttf": "be627e595184e8afe521f08da0607eee613f1997d423bc8dadc5798995581377",
+        "canvas-fonts/Lora-OFL.txt": "62e37a82d3f1ef2a70712885fa8b3144b65fd144d8e748d6196b690a354d792c",
+        "canvas-fonts/Lora-Regular.ttf": "7ed00e7c9cdf16ab7e2fd2361fe45d4f0b61263cd60aae398b27b7ee08108827",
+        "canvas-fonts/NationalPark-Bold.ttf": "69ac4c301c4a7233c6e602d12a92c54d7967b575f4449951c45ce773f7acff53",
+        "canvas-fonts/NationalPark-OFL.txt": "81c6c71d83b5b45d7344f96df12bb4a2477a5b092a9144757ee1d0f50f855175",
+        "canvas-fonts/NationalPark-Regular.ttf": "a477338b7e18308d476650dfe31235ef86a883572665e56ffb5fb80f82009b58",
+        "canvas-fonts/NothingYouCouldDo-OFL.txt": "7c2a6970584ddad04919816163746f83b378078015899b18468b40f05e9ce128",
+        "canvas-fonts/NothingYouCouldDo-Regular.ttf": "d866f985896d3280f4fce72db7e17302c24a0c1fdb0699b6b5ed3af14f944d57",
+        "canvas-fonts/Outfit-Bold.ttf": "6654b93d21301ec61887d3cedd6c11d9df1b1dfb63f9cf45ac7995f6e2235ab1",
+        "canvas-fonts/Outfit-OFL.txt": "1945b62cd76da9a3051a1660dde72afaa64ffc2666d30e7a78356d651653ba2f",
+        "canvas-fonts/Outfit-Regular.ttf": "f24945365147c9e783e91d8649959b59be6b00c9ee4ecd2f6b33afbb2dd871fe",
+        "canvas-fonts/PixelifySans-Medium.ttf": "38397504f71c122b03d234ea6f55118e3d5bdbddffd82bedddbd7755d3b3be82",
+        "canvas-fonts/PixelifySans-OFL.txt": "7f54d1d9f1ae1ba9f2722f978145f90324fea34ca3c2304b3a29cfa96ac6037e",
+        "canvas-fonts/PoiretOne-OFL.txt": "2eaf541f7eb8b512e4c757a5212060abf5b6edfef230e9d7640bf736b315c33a",
+        "canvas-fonts/PoiretOne-Regular.ttf": "9cf265b139648b36b6c0afdfeb0bf27f7e66db9a16094bc40f644d8da05bc318",
+        "canvas-fonts/RedHatMono-Bold.ttf": "7ef48353f4be5ddb90f000f6fad48f2b62b3e8c27d9818d8d45ff46c201065e0",
+        "canvas-fonts/RedHatMono-OFL.txt": "435fbfb7e66988b2a06686a4cb966faec733f35d8fe100a1601573c27f3e0bb8",
+        "canvas-fonts/RedHatMono-Regular.ttf": "452fe826871b37539f5212b20c87cf30f82f58dd2741f1c96edd1dcbdc0db6b4",
+        "canvas-fonts/Silkscreen-OFL.txt": "6b849745119bbe85ec01fd080c9cd50234da9f52ac6e48b55d1a424a0c4d7ca9",
+        "canvas-fonts/Silkscreen-Regular.ttf": "49567408600809e25147e9225ac4f37f410e2df45a750696c45027531fb65f1b",
+        "canvas-fonts/SmoochSans-Medium.ttf": "dd76e6e77cce82f827a8654cd906e9ce58f3aaf78adda63c4a7f655b8ecb41f0",
+        "canvas-fonts/SmoochSans-OFL.txt": "74c9c4eb88e891483e1b7bc54780b452cbf4f4df66d4e71881d7569aa2130749",
+        "canvas-fonts/Tektur-Medium.ttf": "52bbe8c9b057b3d2da4eeace31a524b1ea26a1375ae34319cf6900ccc57a4c82",
+        "canvas-fonts/Tektur-OFL.txt": "3f1466cb5438f31782eeb6e895f3a655bc4d090e24263e331f555357d1cb734e",
+        "canvas-fonts/Tektur-Regular.ttf": "162e1b36c4718c5b051b36c971ad7e50d341944f35618f480422ebbe72988f98",
+        "canvas-fonts/WorkSans-Bold.ttf": "240d125fc9f8561363dc1ea3f513501253bd70942f41468f48f0b0cafb0c82e2",
+        "canvas-fonts/WorkSans-BoldItalic.ttf": "a5b2cad813df0aaa7d16621f2e93b5117c25e9bc788bc9a3ad218e9d6348ce34",
+        "canvas-fonts/WorkSans-Italic.ttf": "6b7f7002e0b0c8b261fe878658ef5551e3e59d9f6b609b04efb90dde1e2c1ada",
+        "canvas-fonts/WorkSans-OFL.txt": "ace8c22a3326318b54e67c3691857929634205533f454a70ef5a3473ddb2e2ba",
+        "canvas-fonts/WorkSans-Regular.ttf": "e67985a843df0d3cdee51a3d0f329eb1774a344ad9ff0c9ab923751f1577e2a4",
+        "canvas-fonts/YoungSerif-OFL.txt": "cdcb8039606b40a027a6d24586ec62d5fe29c701343d82a048c829cb28a3dd28",
+        "canvas-fonts/YoungSerif-Regular.ttf": "f8dc08f77abad753a00670af70756a8ace938e5c3f0b770f4f4c2071c4bd8fc6"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "41667eeebd1f29c01284da8e12dffda452ee144ec385f9a26b068a6cf30602c1"
+        },
+        "added": {
+          "canvas-fonts/IBMPlexSerif-OFL.txt": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+          "canvas-fonts/InstrumentSerif-OFL.txt": "129ed7618959716959f2941fdd5b49e0ad6e6c1d78726761786a00253d865521"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "algorithmic-art",
+      "source": "anthropic",
+      "path": "skills/algorithmic-art",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+        "SKILL.md": "3bc4092c09804853186524c826bc0621b940bb6122c05b84496dff95388e6eef",
+        "templates/generator_template.js": "9ee0f1da52ef8f7bbfde1917123654880890d43f2d388642d71eab6dd78f94c4",
+        "templates/viewer.html": "86c79d7ce97d2599ebe4bd9b97fdeb7295c9d3ed61ceeb513cbe1b2bb5d1ce29"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "96d02314bb54188314f8d5ab3a10786873b1ec96c765a645d3898748cf66f3a4",
+          "templates/viewer.html": "f45437aa835004280124986c5f00d24d08adfc312856258c9ab77d33effa26da"
+        },
+        "added": {
+          "templates/css/style.css": "a0fdf0f938fd88294f7d1aeca8a94a1e07d074a5a22ee30ffb3a01522ffed386",
+          "templates/js/app.js": "087ff856643da1bb5b98f6cf58977ce82e51854a409c82570a49ddcd38a97c15",
+          "templates/vendor/p5-LICENSE.txt": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6",
+          "templates/vendor/p5.min.js": "bb7f8f14b9ce2e2344ff5cd6c06f2e105eb99541ecbfec77139e2886d9c0b9ba"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "doc-coauthoring",
+      "source": "anthropic",
+      "path": "skills/doc-coauthoring",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "2e47d78846faeea4a56e9809c52700087a15a2155a3f293a3efbaded81398ef4"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "e164ea3d6d494987e9fdeef61030ff4eb17bbd5137fe9467b07837102df84eea"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "mcp-builder",
+      "source": "anthropic",
+      "path": "skills/mcp-builder",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+        "SKILL.md": "0f4592dcb53cf2b5d6b7febee6b4152018b565551a1c29e3c612f57b218ab295",
+        "reference/evaluation.md": "8c99479f8a2d22a636c38e274537aac3610879e26f34e0709825077c4576f427",
+        "reference/mcp_best_practices.md": "80fb4369a349447cf18ecdd7494fe7938b6065377e9f08c077cec411093a3007",
+        "reference/node_mcp_server.md": "c3ba35a4f599dd53be9c6555ae72c19a7bf412cd5426576c2c08d42755482c66",
+        "reference/python_mcp_server.md": "2da52f77e675191014ca2e146a4b95aa04d0ca7dd7e2b100322df15ade685e80",
+        "scripts/connections.py": "9403668a2041568772082a8b334122c1f88daf0541fb393af4522d0094a47a6e",
+        "scripts/evaluation.py": "49ed1d17cdce5da101b210197740713f49b935c29d4f339542a14b132658e6f7",
+        "scripts/example_evaluation.xml": "9272b348ddcc4b06ba562367ccd0770e018158c0068ac5116d5e34aaeff8777a",
+        "scripts/requirements.txt": "d5d7558b2368ecea9dfeed7d1fbc71ee9e0750bebd1282faa527d528a344c3c7"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "de53a242d8476f50459999aea5517616647ecbd64572929ecae50241c3c95a92",
+          "reference/python_mcp_server.md": "8f0e7b9d7cfef25266e55a0dbd55fa0786ae725e7ec92b6af8688c2a125d3669"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "webapp-testing",
+      "source": "anthropic",
+      "path": "skills/webapp-testing",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+        "SKILL.md": "51b7349e77ec63b7744a6f63647e7566a0b4d2e301121cc10e8c2113af6556a2",
+        "examples/console_logging.py": "ea46877289acb82da7e7ce59d0bc37c8977cd57e2a006d0c88d7a1c625bf95da",
+        "examples/element_discovery.py": "d63c89604a22f8845d724e95dda45db49b1bf57c25ce0a83afbb7b8da3d402f0",
+        "examples/static_html_automation.py": "9d533aafb875ee3ab8b8ebf8f5b9003ac8d999da3d09b285cce252e623140064",
+        "scripts/with_server.py": "b0dcf4918935b795f4eda9821579b9902119235ff4447f687a30286e7d0925fd"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "6a8ea0258ea3cda641fa1c42bd2d44e430f2eb97a9ece4c4e0b61869505de0fe"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "remotion-best-practices",
+      "source": "remotion",
+      "path": "skills/remotion-best-practices",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "23c5c52d379ccca73dfdc644b700bf0286518c842b3bb61441c675d1c14f8eca",
+        "agents/openai.yaml": "752b402c013ba6f02bd827a7cc56d19e8facb159b52e2e3cecaf2d0229fdefb3",
+        "assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-captions/REFERENCE.md": "d7ca89b4e6bf2689dd1cefafebdfb12181efe8894428b2213a779e726b588b85",
+        "remotion-captions/agents/openai.yaml": "3b39a48bd00251cf124e80090fe1b792b73020bee858c5d48b5629256cc5f045",
+        "remotion-captions/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-captions/display-captions.md": "12676a7250f33f126a8ccb0a2b28de22f5ccc9cad0d5baab53a736e205690a17",
+        "remotion-captions/import-srt-captions.md": "e328b6845babd08ed2a747f82c59796fd1d7b85140c8eb4d36e41639779473ad",
+        "remotion-captions/transcribe-captions.md": "0830184ed1f634a6912536768a3aabc0092313db22796c4455e8b46dad874803",
+        "remotion-create/REFERENCE.md": "1a7afecc8277a629de0d12efad2dfeb6d0a9f49bd8c19375b9a9c738098c4935",
+        "remotion-create/agents/openai.yaml": "ff3b357b492da1791c672e18ae401a23c31bd1e6f1fa6f98c5efabbb3124bd9c",
+        "remotion-create/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-create/tailwind.md": "3ef07d3225d212af6a5076e62797a04d22d394434dcdbe2c050dab0d92806f36",
+        "remotion-create/video-layout.md": "7ad94c22e3ad87671292ebb9b22f234c544d6c7fed13f8cb112b84b0f7077d4c",
+        "remotion-docs/REFERENCE.md": "3cedd441c00e8614dd135d28106ad46f0dcf2ed7f3330c292808bbfebe089320",
+        "remotion-docs/agents/openai.yaml": "ab02cb3008e6fc0702d7a601bfdd2f332e1224fda3c37de0265c24311c00d456",
+        "remotion-docs/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-interactivity/REFERENCE.md": "8853985e798eb06d5f74c4f5662a833505fa1f10913ee4015ed7b306d7d5e596",
+        "remotion-interactivity/agents/openai.yaml": "84cd86b0b10e1f8b5be97bbd46677d5f618304303d922f1016ce0ea6a015d4b9",
+        "remotion-interactivity/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-interactivity/inline-effects.md": "e2204691164855f195ffefc88706785089153a1e97dae06781841575892a30a6",
+        "remotion-interactivity/timeline-structure.md": "e75a122d41f51f2f049a3c4c69653f3fd4bbd3e5540ffc117e16291ed1d30dfa",
+        "remotion-maps/REFERENCE.md": "da116f9bf15fed3eadc48b5ced196a651a9e233ed0cc7a8572ca55d7f4788358",
+        "remotion-maps/agents/openai.yaml": "9c6c75daec6eabd78cf6fbc7169be3f7dde934df1316e41df6658052056b29ee",
+        "remotion-maps/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-maps/techniques/cesium/TECHNIQUE.md": "09057e77b67dcda23eed8ddbf1b5bd44541a952f380913a00b3bfddaa39ab675",
+        "remotion-maps/techniques/cesium/assets/CesiumFlythrough.tsx": "4d4a90e373176e840ae76ae91533fcd9dc445407693b17091c376bb597dbcb10",
+        "remotion-maps/techniques/cesium/assets/cesium-path.json": "329621928df19d115f93c472a0b7ddbd2463cad502a10722d3c23579a7441d44",
+        "remotion-maps/techniques/cesium/assets/city-path.json": "3bb420736d196f726b856420b319e21a8d7fc24bca7e626d67e8b00b0544e630",
+        "remotion-maps/techniques/cesium/assets/example-Root.tsx": "51c2df109015adc992b66b62f1ffc9801ad13f3dc47e4290de40cbe1b8e7809e",
+        "remotion-maps/techniques/cesium/assets/flight-path.ts": "fab65d2d9cc0c4ca56f8a1422494d178c0e57f92a048a4720358d236ced980f0",
+        "remotion-maps/techniques/cesium/assets/sample-river.geojson": "2c9f6dd35ac4aed56580078046941235ed7e1a5d432a6549dbf7fea4e8d1e9be",
+        "remotion-maps/techniques/cesium/references/3d-data-sources.md": "23ac1acc576d49d599b33c812dc697b264ebe28849088c04e9827cb47b95275f",
+        "remotion-maps/techniques/cesium/references/3d-flyover-architecture.md": "09e1891cec991a246eec60dbcf76c4ea84c52e0bee14321471197703395d0a91",
+        "remotion-maps/techniques/cesium/references/3d-troubleshooting.md": "c803fe443f5bab1a50408f1f6aa6aded7913577eaefcb586b320c5a96c391bf2",
+        "remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs": "6dbb4d1ae3f5fef9f3f6eb23e2a6d58622750714bb847b088ff58a3533839463",
+        "remotion-maps/techniques/mapbox/TECHNIQUE.md": "8c434f680988a7212a9443ef9be0f62ef734f3d92af4dc47c11dad184677eec9",
+        "remotion-maps/techniques/mapbox/references/render-stability.md": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9",
+        "remotion-maps/techniques/maplibre/TECHNIQUE.md": "8a13debcd2abfce415b5c8b7f323420ec77092d81ceb935853171ca9697b902c",
+        "remotion-maps/techniques/maplibre/references/render-stability.md": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9",
+        "remotion-maps/techniques/maptiler/TECHNIQUE.md": "72896873e63d675caaab765941dbb8d668f2790090a63b94e165f254b77ef887",
+        "remotion-maps/techniques/maptiler/assets/CountryLabel.tsx": "6be8c7d5b3435c8d933f05394ce5e807da5fc9fe0565db94ccaee6ac049df137",
+        "remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts": "c8137792824323b9db997a88c3b923e8072cf2886cd90c38d84fdbbaad8258ed",
+        "remotion-maps/techniques/maptiler/assets/RiverReveal.tsx": "c3091e23dfd80178788d05c0bc43b17aee12aa4236d658f1a97c5acfb29a0f92",
+        "remotion-maps/techniques/maptiler/assets/example-Root.tsx": "e53677a7a207e37cbc04693eca8ccbab5f5f040efdc67a8b5c030c3913895e83",
+        "remotion-maps/techniques/maptiler/assets/sample-data/country-meta.json": "470a76cc5a45e58e7e1702cd80f74fcacf9d6e8b1ef7b05011f69853a999ba7b",
+        "remotion-maps/techniques/maptiler/assets/sample-data/yarlung-flow.json": "73a99e77a2ce31cb3ac39be8fe4775d53ecf127a56137b587fca090067dfbb96",
+        "remotion-maps/techniques/maptiler/assets/tokens.ts": "29ae05eedb4988b5b8f2eb44d241b9c472533fb6ed05d4b33df3e71e0eabc71c",
+        "remotion-maps/techniques/maptiler/references/map-data-sources.md": "b99680cbda8e7d70dc2cb1a8823f66247a21fc59d10c6dae0dd9ba24d2f15b80",
+        "remotion-maps/techniques/maptiler/references/map-explainer-architecture.md": "e09de8a4d00ea9a82b992918ec4d0302ee18979b73e6c777d584a9743092344f",
+        "remotion-maps/techniques/maptiler/references/map-geo-prep.md": "a97b1913f06195601889d4e090ad056db2fffb7b83918924c8cd92847b3829ef",
+        "remotion-maps/techniques/maptiler/references/render-stability.md": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9",
+        "remotion-maps/techniques/maptiler/scripts/prep-geo.mjs": "8265f56bd7c27a7d1a5fa528a77bbe1b29c6acc0e6730233583ca53e2632d490",
+        "remotion-maps/techniques/static-map/TECHNIQUE.md": "1d2b15f2e09cbb2b2ba0d5a6ec54ecf619b6696acced0b7bec7e010fbe1f1f03",
+        "remotion-markup/3d.md": "42cef6d68fb4a266ab495d35df0c60e03672b0d85c043f9b567f6aa7ff00dd0d",
+        "remotion-markup/REFERENCE.md": "343ff8e312423a3fd4b1b674b17f8f744fb985d00024ec35de17025c212f0926",
+        "remotion-markup/agents/openai.yaml": "79e440561b613adf930f61b9f2ececc3284dfd92d06c4c282b73b461ffd16cb6",
+        "remotion-markup/arabic-text.md": "e062dc1e589275d98dd21d32ab08211cd85c2111b36a6fb522203a2ad1347922",
+        "remotion-markup/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-markup/audio-visualization.md": "0f4043de86639b6390e5ab888eaa66a24a10a8bd540f1443327cb88107eae1e9",
+        "remotion-markup/audio.md": "857bf47188c6de8936f51e862f670da7e1cafa38aea8e1ae4a4920789f224077",
+        "remotion-markup/calculate-metadata.md": "711743642a475970dcadddb71805939dd6ee8f348825818cc8897b6a01e1eef0",
+        "remotion-markup/color-correction.md": "0cab0efa3cc9bce42f136e4f22f58d7f332ba229997bb8b79dbdb923b5bb59f9",
+        "remotion-markup/compositions.md": "2b09427165c8708510153c83add50c0f03992bf968962bfd5e3c373860d3853c",
+        "remotion-markup/connected-compositions.md": "b3319698a63a9ecadb266d29820cdca51a35c090214bd9c25c72e9ce4d6d3a8e",
+        "remotion-markup/cropping.md": "e775c020c44261ceb11e8aec83233b8d0dcc00517e512d30eb88fe955d6b64cd",
+        "remotion-markup/effects.md": "f32d2ac56711a83b674022e7439bec725f859dffe0d82b4d65429428ee8bb188",
+        "remotion-markup/embedding-videos.md": "3b0484bc92cd1d54fd6c9a54bc75c4f837054c90bb35e5e8959701d320c6a551",
+        "remotion-markup/ffmpeg.md": "1d83085dfb63724f374acc5f01967f6c18f3aa7df62146438262a4061a839770",
+        "remotion-markup/gifs.md": "91e17126f7f0d57efdbdbaf34e0c234f874bd6aa66ec7854b80f17b0e32c3b22",
+        "remotion-markup/google-fonts.md": "fff29cf692ccab0cda263cd85255cf634dbb4d1d2d99e8372b01d9fedbd6cbfd",
+        "remotion-markup/html-in-canvas.md": "9b896dab368f8d9aec41114f8d0b96c1fbee981419b7077d6fd61621a0a54be4",
+        "remotion-markup/images.md": "0e6c2af8ad73483ebbc761237f230c8c0db1bd9db6b60d01d48a24b8a4059284",
+        "remotion-markup/light-leaks.md": "531514d4740c5a1a3798782300db69ebfe8f61191fc7852960bc5bdf5b82200b",
+        "remotion-markup/local-fonts.md": "fcad2a2e3a05419d4555c59a75454c4891455dbea91ad596c1095e2887d26a11",
+        "remotion-markup/lottie.md": "666268c8151d91042162f9efe3f02fe8c62b4c45053614eb1a9325c169428826",
+        "remotion-markup/measuring-dom-nodes.md": "a677b976eaf1cbc3cdd29cf29a3fd546c557b9a31e6b1fd70e473fde7e828733",
+        "remotion-markup/measuring-text.md": "4bed81d1ea818db3975f878152dc24ecbc17e163117dcab10761dc8690c33f0c",
+        "remotion-markup/motion-blur.md": "bc7559c9d0e56dffef72dcc4fb2d89d42c587ec2204ac21d33ae0c583d59632d",
+        "remotion-markup/multi-scene-video.md": "9d4abe6b0c22e86f378871b34539ed15f4f16d3d8814fafefbc672bd8d3ce3cf",
+        "remotion-markup/parameters.md": "b002ac9959105b2b91da5786bcb20aa6ff4c6632ed37074b32711f248867dff0",
+        "remotion-markup/remotion-maps/REFERENCE.md": "da116f9bf15fed3eadc48b5ced196a651a9e233ed0cc7a8572ca55d7f4788358",
+        "remotion-markup/remotion-maps/agents/openai.yaml": "9c6c75daec6eabd78cf6fbc7169be3f7dde934df1316e41df6658052056b29ee",
+        "remotion-markup/remotion-maps/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-markup/remotion-maps/techniques/cesium/TECHNIQUE.md": "09057e77b67dcda23eed8ddbf1b5bd44541a952f380913a00b3bfddaa39ab675",
+        "remotion-markup/remotion-maps/techniques/cesium/assets/CesiumFlythrough.tsx": "4d4a90e373176e840ae76ae91533fcd9dc445407693b17091c376bb597dbcb10",
+        "remotion-markup/remotion-maps/techniques/cesium/assets/cesium-path.json": "329621928df19d115f93c472a0b7ddbd2463cad502a10722d3c23579a7441d44",
+        "remotion-markup/remotion-maps/techniques/cesium/assets/city-path.json": "3bb420736d196f726b856420b319e21a8d7fc24bca7e626d67e8b00b0544e630",
+        "remotion-markup/remotion-maps/techniques/cesium/assets/example-Root.tsx": "51c2df109015adc992b66b62f1ffc9801ad13f3dc47e4290de40cbe1b8e7809e",
+        "remotion-markup/remotion-maps/techniques/cesium/assets/flight-path.ts": "fab65d2d9cc0c4ca56f8a1422494d178c0e57f92a048a4720358d236ced980f0",
+        "remotion-markup/remotion-maps/techniques/cesium/assets/sample-river.geojson": "2c9f6dd35ac4aed56580078046941235ed7e1a5d432a6549dbf7fea4e8d1e9be",
+        "remotion-markup/remotion-maps/techniques/cesium/references/3d-data-sources.md": "23ac1acc576d49d599b33c812dc697b264ebe28849088c04e9827cb47b95275f",
+        "remotion-markup/remotion-maps/techniques/cesium/references/3d-flyover-architecture.md": "09e1891cec991a246eec60dbcf76c4ea84c52e0bee14321471197703395d0a91",
+        "remotion-markup/remotion-maps/techniques/cesium/references/3d-troubleshooting.md": "c803fe443f5bab1a50408f1f6aa6aded7913577eaefcb586b320c5a96c391bf2",
+        "remotion-markup/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs": "6dbb4d1ae3f5fef9f3f6eb23e2a6d58622750714bb847b088ff58a3533839463",
+        "remotion-markup/remotion-maps/techniques/mapbox/TECHNIQUE.md": "8c434f680988a7212a9443ef9be0f62ef734f3d92af4dc47c11dad184677eec9",
+        "remotion-markup/remotion-maps/techniques/mapbox/references/render-stability.md": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9",
+        "remotion-markup/remotion-maps/techniques/maplibre/TECHNIQUE.md": "8a13debcd2abfce415b5c8b7f323420ec77092d81ceb935853171ca9697b902c",
+        "remotion-markup/remotion-maps/techniques/maplibre/references/render-stability.md": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9",
+        "remotion-markup/remotion-maps/techniques/maptiler/TECHNIQUE.md": "72896873e63d675caaab765941dbb8d668f2790090a63b94e165f254b77ef887",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/CountryLabel.tsx": "6be8c7d5b3435c8d933f05394ce5e807da5fc9fe0565db94ccaee6ac049df137",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts": "c8137792824323b9db997a88c3b923e8072cf2886cd90c38d84fdbbaad8258ed",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx": "c3091e23dfd80178788d05c0bc43b17aee12aa4236d658f1a97c5acfb29a0f92",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/example-Root.tsx": "e53677a7a207e37cbc04693eca8ccbab5f5f040efdc67a8b5c030c3913895e83",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data/country-meta.json": "470a76cc5a45e58e7e1702cd80f74fcacf9d6e8b1ef7b05011f69853a999ba7b",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data/yarlung-flow.json": "73a99e77a2ce31cb3ac39be8fe4775d53ecf127a56137b587fca090067dfbb96",
+        "remotion-markup/remotion-maps/techniques/maptiler/assets/tokens.ts": "29ae05eedb4988b5b8f2eb44d241b9c472533fb6ed05d4b33df3e71e0eabc71c",
+        "remotion-markup/remotion-maps/techniques/maptiler/references/map-data-sources.md": "b99680cbda8e7d70dc2cb1a8823f66247a21fc59d10c6dae0dd9ba24d2f15b80",
+        "remotion-markup/remotion-maps/techniques/maptiler/references/map-explainer-architecture.md": "e09de8a4d00ea9a82b992918ec4d0302ee18979b73e6c777d584a9743092344f",
+        "remotion-markup/remotion-maps/techniques/maptiler/references/map-geo-prep.md": "a97b1913f06195601889d4e090ad056db2fffb7b83918924c8cd92847b3829ef",
+        "remotion-markup/remotion-maps/techniques/maptiler/references/render-stability.md": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9",
+        "remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs": "8265f56bd7c27a7d1a5fa528a77bbe1b29c6acc0e6730233583ca53e2632d490",
+        "remotion-markup/remotion-maps/techniques/static-map/TECHNIQUE.md": "6fcb61a66084f4037a2fa0deb988500dd18e4ae7fa3c6923fb1142c1e521e9be",
+        "remotion-markup/sequencing.md": "59f2349b125314188506cca8ea8d1386db0fa5031594569577bf1b4a555696c8",
+        "remotion-markup/sfx.md": "1f72e2d8858505ae2d31fa89231432714f8bc34c36164d3c0cc43a290b3f826a",
+        "remotion-markup/silence-detection.md": "7e777b141e339ade03bbdc1d002390e849781ebd3059183f60e1b24a91210f14",
+        "remotion-markup/text-highlights.md": "70773952286e1aec2ba02f2f54d2d776dad7799d87744df03b0c75637ebfb21f",
+        "remotion-markup/timing-props.md": "9401cb2bb5754af3c4868cb4e5c02a98f19bfcf7d8e74802377be8c9686894ba",
+        "remotion-markup/timing.md": "48047e758b96aea519916479ede62b832bf51f982924978e091c37f569ab4bac",
+        "remotion-markup/transitions.md": "ab1f33f5ecbca6c12c5dbb3c2845189a036fdf782e13a820d28780bd18dd0707",
+        "remotion-markup/video-editing.md": "4bf61502564d04c48b5544a5e00371ecd49c7fcf8d6098a3ef61b36c636e12fe",
+        "remotion-markup/voiceover.md": "c310b9425559fac09c4ac660ae18243621565a00fb2aa052fd6e73ef34c57c7f",
+        "remotion-multimedia/REFERENCE.md": "259db7738731b3cce6183994688f2472088ae3ac46b5870d1e039a8900bff28c",
+        "remotion-multimedia/agents/openai.yaml": "74e07a383bbf02808320ede199873d00a5fc976cb99d407056456b9abdfb0cb7",
+        "remotion-multimedia/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-multimedia/get-audio-duration.md": "53b2e2ff232cae14ff9c0f7bb3ddf95c6137f7f1804cdaf50f7fe742befe0fd0",
+        "remotion-multimedia/get-video-dimensions.md": "9d4cd07f11ce8fabda258b4d826e7c9b3d6827e87ee036a2c4c8a7a5aca7db76",
+        "remotion-multimedia/get-video-duration.md": "6df955602cf7fb591ecb3f529fa9740d26ec1a4893a816aa08ea9b780379a8a0",
+        "remotion-render/REFERENCE.md": "e63ccad00121c09c0b25279187f3065b60b3bd5f86d7cb01c5d8b65a641c5ca7",
+        "remotion-render/agents/openai.yaml": "386699c32fdc63840ce7ff7412953831095dc4cdf60368648378c32895281290",
+        "remotion-render/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-render/transparent-videos.md": "394ccda476e084522d544471fee92d7c65672e2cbaf2201a785c3dd5c74f31a4",
+        "remotion-saas/REFERENCE.md": "3a39b08776b794f5734f6e7b7af9e9cec024d5bfb55eeaa07bd004567b66dd76",
+        "remotion-saas/agents/openai.yaml": "66be5403b3d10194c99e886372bbc1f4bdb2994fe560278bc7a39b4fbe7753a2",
+        "remotion-saas/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-saas/framework.md": "5e35ca3306ac15ad1df189789642cefbc62c59f4929372ffc10a67165d7b04b5",
+        "remotion-saas/player.md": "cc2f2944f1158d6ff1ddfc421a6a790f99ae86f54bbe0f0b18ef8bc7485e1b05",
+        "remotion-saas/rendering.md": "b2f30b53e0191ef9e7f2da7360b36c0c5448ab5bdcf55575e1f7e55c5bbd257f",
+        "remotion-studio/REFERENCE.md": "10f6c2c0bccf118696723137f31db18d1ccae426fd263611bc333d9c78eb367b",
+        "remotion-studio/agents/openai.yaml": "43afba3c8088614ece62949e33a7c8350092e76436bad87ad41e1a1ccaebea5d",
+        "remotion-studio/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58",
+        "remotion-upgrade/REFERENCE.md": "0445e0d1a1355dd32cae9fc8ab4473951a4a6235196109b96fc93db58289229c",
+        "remotion-upgrade/agents/openai.yaml": "3f3bc995d3531cfb5a714fd8f951954e118909b749217cc8418a235326d003cb",
+        "remotion-upgrade/assets/remotion-icon.svg": "5007669bd0555b0f4565b4e7176fa191310ab0039b2ed09d867a9270f5b0ce58"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "4dd7a30896edfe274e9b524be3ff360aac0bfb085f97f8a61aeee94bc3f29828",
+          "remotion-upgrade/REFERENCE.md": "e3fc0cc62438551536dfdbdc8a71ea66343e5f74cd10097695af88bf7a167a3c"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "scientific-visualization",
+      "source": "scientific",
+      "path": "skills/scientific-visualization",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "8cbde7cdc10d959cf72cfd08335cc8ce996247eee6ebdb900eb64a4cb0ff34a3",
+        "assets/color_palettes.py": "98ee4aa4b9bbb010996d55144ea6bf45a0ab294009b9bb0ef6d9c5ec9fed5154",
+        "assets/nature.mplstyle": "f37a361cdda8846da0794fd879cc8173402094f110239d57e0227fdd8299a4f6",
+        "assets/presentation.mplstyle": "d0e5a768e5965aa3893b12c0f7decd4c3b09502044391a840ebdee37dfea44da",
+        "assets/publication.mplstyle": "eba3001f346649a9e41d9ac1d56101abbae10aefecdad3be9530f4c9cd9269b3",
+        "assets/publisher_profiles.json": "1e1b1b5a4e0e3dfc57877f2abf1e96888fe6b65617234b078f193b8f76e0ebe9",
+        "references/color_palettes.md": "c9b6a596dd1dd1e08050fdcbb304a0268ee515bce2120a9bbd3fba31cd7fa119",
+        "references/journal_requirements.md": "f7c4b6660eb70f7c5778d13908409e1dc690f00e3dfc8314f430feb89781740c",
+        "references/matplotlib_examples.md": "74fd5977ce57b09b476285309559bbcbe3b1748943b719844b28a6b61378c041",
+        "references/publication_guidelines.md": "5f70c6b22dbb5e0fae18b0f1197b8794896bf7afc059874bcf7afbd5aa86bbe5",
+        "references/sources.md": "3ff34759c0fed3baf33286a8005fd81f0c3466a554c8b0d45f43ad30b1e5b505",
+        "scripts/_common.py": "e4eea2c2e5f5d8cfa544c6bed152cdb88a3d7c7952df99bcd74b45077fd6f707",
+        "scripts/export_plan.py": "c20962bf4c624b9939c80bd16815fc0a18fe2be285f0654a6a53704c663add0e",
+        "scripts/figure_export.py": "fe9c77878da61297ce55224b67282d128631deb628d930aa1929c9eb7330bf79",
+        "scripts/image_metadata.py": "45f79cefd99b8e5dabcbfd1a29b7346363f383411cc43540bf9f73e67fed634e",
+        "scripts/palette_audit.py": "3a90b3c9a4a39dde6a341dc3de7b99cd2bca4773c66564fc90cdc2706a5a8165",
+        "scripts/style_presets.py": "8413cfae7f2cbc4a5dd9d4301d74b051fd8eb0c7a4b3375ae59e1da91db3a985",
+        "scripts/style_preview.py": "ca14e714dc2fb32541ff80292db97b3acbac074a65c4f2fb290f38354f880ba7"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "3c9a0d5d1a7a7439fb32153b4d144eaa3bfd0ddbe30d6add69782e62f816bde7"
+        },
+        "added": {
+          "LICENSE.md": "09b02a3c9df3053c55531d503357a9c7cde275970e6c3ceaa1ddf5f0e90b40c1"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "literature-review",
+      "source": "scientific",
+      "path": "skills/literature-review",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "16a9e85bcdcb9bb859e1646bf836e51b22900445ba2e367d8d75be05b5a5cba8",
+        "assets/review_template.md": "08671516976d01a7004f8ae7c944a50c253877504720c15d5fa24eed90889819",
+        "references/citation_styles.md": "2a50e43b18c2fff781e04406deb66186ba8f91ed28af32004aba63c63dcc1789",
+        "references/core_workflow.md": "4d63f1087c98efeec7c7bf622bed6e0456a9c7c3defe584995917f2de6f2c601",
+        "references/database_strategies.md": "24b56cd88128a9016520ed6b5e2abb79e19dc9b86cbf064927e9056aa1504f48",
+        "references/example_workflow.md": "86336c42f78ff282430a6cdd2282a99562cc9d5e46b62e70a33bd839f9ab726a",
+        "references/search_and_citation.md": "f33d671351989ee86066b9a21bdbf630a1f60001ada92fda4c942006d37b74fe",
+        "scripts/generate_pdf.py": "0ba1b16b196b64d4966e5f055a289f0c17e3579a84254abe47ff63be95b4f136",
+        "scripts/generate_schematic.py": "0c81ce099d5ab9aa3d3c486aa9bd3e81ee1117e18a54db14bb0a68de61eaa4bc",
+        "scripts/generate_schematic_ai.py": "7316f2df92f442b8c60a5dd2bd8b504e17449d4be89352e5af24be2239700046",
+        "scripts/search_databases.py": "76f47fd18ca28df4985ffc6d30d5ad659e67c8058bb3de8f385c2443752f4eaf",
+        "scripts/verify_citations.py": "4c8e8377718ddd47e9cd7cef706935b04910af5d13bfd920970dcf41d4ef3706"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "16062cbec81a28c76327bdf4d474fcdfbc6fe17c0d1a0dfdcc3f5494ced7bee8"
+        },
+        "added": {
+          "LICENSE.md": "09b02a3c9df3053c55531d503357a9c7cde275970e6c3ceaa1ddf5f0e90b40c1"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "manimce-best-practices",
+      "source": "manim",
+      "path": "skills/manimce-best-practices",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "LICENSE.txt": "c02371d11efe3579c38db2bb73258f939cc74ecd729d69128ad3c65c4138b009",
+        "SKILL.md": "ae09751ec9e3e9389b85f923f4e34b706a32e01b18e378759163d1d855f90d4e",
+        "examples/3d_visualization.py": "214dcd11b09b83025405050bc618cfa7d8749691e39f136a0b987de82e47ff95",
+        "examples/attention/__init__.py": "6c13b542eb4c66701cb349a4c95606a8d9767711eb3155032136e75babe46f7f",
+        "examples/attention/helpers.py": "82014263adf85db640774467ac6dae00798347b995b02d34d6664e6e917c1409",
+        "examples/attention/scenes.py": "10aef8fc1d8c65d2043a95215f3b310ff1591f5aaab92139aa48969f50991533",
+        "examples/basic_animations.py": "d95f075d90d5cb4114923d99a1b7ad167acfaf8343ae808b682adc3c830c7506",
+        "examples/graph_plotting.py": "32f9c68313daf3b2a42e5e75e85d24b46628ef77872615eef798036840b52b83",
+        "examples/lorenz_attractor.py": "eee8b2d5d5e6b10c61978c46921e1189c3d7a43b94cb6706f2505724f7e03392",
+        "examples/math_visualization.py": "e890b6be5fd8322631f708b71ac8da7d9201d639d5676977313a659a1cb87ded",
+        "examples/updater_patterns.py": "f372ad2991835320a2a2243dae5efb4ad7ddbcf8a82cebfd0f85760220ced635",
+        "rules/3d.md": "00857a259d770b43877c02aecc276e44adc1a8c69ae6f8a067a30ee9cc35223c",
+        "rules/animation-groups.md": "9eb1ebfc7bd91690a77b5626de309d4f9d49ba38d21938add04a9787a05db211",
+        "rules/animations.md": "6ad3596f9d4aa176f25847d97cad073a3cbefb078e28ae998047a8e873a17620",
+        "rules/axes.md": "5a0acdb55f332f9a7e31821078d088e987754bc252f5faa28bca31a53173f7dd",
+        "rules/camera.md": "cfa876df13e9b2d26e0bb40e8b210c7bc91359c6d6c1e4036d5eb3c90b6f3b48",
+        "rules/cli.md": "faee09f0f37f6aa41b94f762a9cdb8ef5536a1e6b1e9e3ac05de1680e576ba6b",
+        "rules/colors.md": "b8e63c042ab6d652bb3d42a3309e11cc4c62a7e06f3b9811a4bf2f822eda3020",
+        "rules/config.md": "9ef880d55b7c4d8c4b7aeabd6f095c42164f05cfb770e9a8ba25a184034c0c2a",
+        "rules/creation-animations.md": "0bdbf8cacf5137e4acd60bb29ae1bb03bf3e059aa08b7cc2faa43f81491d354f",
+        "rules/graphing.md": "8996cca86e2d3c6d032ddceb119724312ac29a1e462f835b040f931422187354",
+        "rules/grouping.md": "05330699f1b935eb9dd6cd5237592bd04ef56dbe9a50444983379b81d6e26dce",
+        "rules/latex.md": "9d244fe31662d734e182fd0d19ce147d9c93b3ee25cb5df137d29c4b186abee1",
+        "rules/lines.md": "d13858e8a4016a5bd0dca3b121c5679a8350541dc9d0779562d40fba1abe5443",
+        "rules/mobjects.md": "a96c8eef4c0e2830cbcbb32f3a25cf9eb30c2788cc593be5a8ca1a60b8fc4449",
+        "rules/positioning.md": "83230968eaf354cc5993c5c6736fb053cbda48cc7bdd110faf8a04dbb71f7106",
+        "rules/scenes.md": "7dc32c7c8bfd50d9266351f90cbfc59b2b71f610a37ea6a836af9946dc64b3ba",
+        "rules/shapes.md": "3054d04c9b8d9cb79cb4f8554a39be46e5a6c78d29a24109c7ab367ff6640133",
+        "rules/styling.md": "740e0bb7dc428db866cefeb0a7272f2c5e16f816e84a87976d146577bf94424e",
+        "rules/text-animations.md": "4c8478c1921f56e05b17802abe0666dde1c80ef75e66447d1c8a145fc33159c8",
+        "rules/text.md": "a4caeb70c295ef879ac718f7e722c4dd2b99805d887233bc217a6b91ae7b5c22",
+        "rules/timing.md": "0534df4e9b694da16a4993a22689e2dab4b7857df008248ee9fe655b97b2ec4e",
+        "rules/transform-animations.md": "3565293834394ecdcbf080504d8a015b44f85b5d3fc2b3493fd4d1ffd1903774",
+        "rules/updaters.md": "b0520d45fc72380bd279df76b80028901a9273becfac61039f6c48e0a345c767",
+        "templates/basic_scene.py": "fd47d30ecfd6b03a8baff4a9fb9e88c4cf023fed9b57cf405366e99cbf84c515",
+        "templates/camera_scene.py": "51f46e59278a54415bfdf65124d3064ab58f0538716b964b381e69078d711010",
+        "templates/threed_scene.py": "73ef6dfb132472beb8b239d61c8538b2f1a37dd0e263682e650f9334c10ce023"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "112b7365695b29ac4cf7f43195ad7dcd510c147bf17f88f11d97230ee79d8ada"
+        },
+        "added": {
+          "LICENSE": "c02371d11efe3579c38db2bb73258f939cc74ecd729d69128ad3c65c4138b009"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "web-design-guidelines",
+      "source": "vercel",
+      "path": "skills/web-design-guidelines",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "f4647ca866a3accf763777f83e7682954f0187cd6bea7eea0399796652414e8f"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "fc87eaf04128dcface83927dd24f55cbd752be7e82b871bf6d24006ff6006556"
+        },
+        "added": {
+          "references/WEB_GUIDELINES_LICENSE": "6cd1609c9c12233507cdd2ce0d32e9a721e3c27494951be06b90090deeeb7af2",
+          "references/web-interface-guidelines.md": "d246b026f4f29b5823a9cc857f9edf3d2507002e055e32040cadeaf3b38e0234"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "react-best-practices",
+      "source": "vercel",
+      "path": "skills/react-best-practices",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "AGENTS.md": "fc93e7421177bbf869cce892bc60a6c83a4517d974bc3bf65c4e2c1e58a6ccf6",
+        "README.md": "9eafb2123d3b8b2aef41fba0db2648a3f4f49996f8c7c8bb2c86263befd8b48a",
+        "SKILL.md": "71ed7794962fa6e803ee83030517b5b93a9f70fbfeb431ec4535c5480a8d8355",
+        "metadata.json": "c4e18bac3290fbe1b471a605867d4df68b03144ea26b8befdbe8f9d8fd124354",
+        "rules/_sections.md": "01c59969e4e867f0708c8f8ef9c6d87fab9a07d0586244f429ff84013db8a115",
+        "rules/_template.md": "99df2a3ea088c6c22de2484ddc7e964d0e9923846f44c63380343ecc64455442",
+        "rules/advanced-effect-event-deps.md": "55ed8f9f27a1bff803d6fa55828176207714b02123cbb97ddb8a90d88024a723",
+        "rules/advanced-event-handler-refs.md": "a3097edeecfb2ff6851cd66ed8cdf0617c3c88180504bee824aa6e75a215bbbc",
+        "rules/advanced-init-once.md": "3e4dc22173eb0e2b6dcf583e3babd862b8696328f8f59aee7c4d746c5bc05f6c",
+        "rules/advanced-use-latest.md": "8a3f64dfe5a77d1564248faf17fe662ae75b55d497a243cb30b38eb07ccbbf9a",
+        "rules/async-api-routes.md": "523338540d73427dc14c0cbb19f2741ebccdf8b105a7b2c1b33d2905cf237a42",
+        "rules/async-cheap-condition-before-await.md": "03107c1f70a293cd58a8abc5474c5548e20ea4efdf01b6d45aae7ad0ac1cb32c",
+        "rules/async-defer-await.md": "f3c142d090615abdcc99d31c123be37b31f0f1ed8d9ec9f7789a3bc6883ae0fb",
+        "rules/async-dependencies.md": "16ef469f877e30c6b8e1e1b4bc3e527312fa3c6318cb785a4eca186ea236131a",
+        "rules/async-parallel.md": "6d2f841896279e976dfcdc1ac89e70771ac188baadfd43c096b5706cb838b961",
+        "rules/async-suspense-boundaries.md": "de05fedac2eb7ae563b887b5a424464ec3dfaf84e5b7797467ebe2a796ac8afc",
+        "rules/bundle-analyzable-paths.md": "62090b5c815fd71bf1133dce754f51abc16a9456d0ccd025fd627de27726e92a",
+        "rules/bundle-barrel-imports.md": "e648f6d54525f07a691357040ca5bff6ea3424788a91ff63812adb29622a671b",
+        "rules/bundle-conditional.md": "09c8259c3efb04fc0abb8e412ccbda217c222ae8118516283e571c995fe3a7d4",
+        "rules/bundle-defer-third-party.md": "3719fb47b191e8db4fe22686ec88448ad5af9e6838585425abbe103d0b642e37",
+        "rules/bundle-dynamic-imports.md": "401817a7369f315fc5a68a1095742ff7d53d0461906880dc9d64a41495ee1986",
+        "rules/bundle-preload.md": "d1f7cc28da7cd5ab249acd287edc5b761afcfb194e9cb62cd44c5f3543db2de2",
+        "rules/client-event-listeners.md": "242a873349febc1ce685e85617994784dbab92c2eaa68aed7fed5a83e7680e93",
+        "rules/client-localstorage-schema.md": "0fb7cdf9dc93fdf22f87e3669f953fb9d4ac9b0be42eec4a29fe9a2560610b88",
+        "rules/client-passive-event-listeners.md": "1f35016f9053de69e884ee9be00654e37979c2ca85f5e57764dc2626ff7acb4b",
+        "rules/client-swr-dedup.md": "644652c39c6cc00de8d1c77a7273612e868dc3f7edda30764164c12ec0f764a3",
+        "rules/js-batch-dom-css.md": "480b891b9eaf96e929dc1e964274a4828e3a78009b7d00ccd965a0d425215959",
+        "rules/js-cache-function-results.md": "3daaa11d24f4295cb6be8bc6f407f2ce83cc7b5bd1f0e68891ea8ab835721dc7",
+        "rules/js-cache-property-access.md": "73e47431e74878a927061bf0ddc7cd91a7556cb35d2573f3421e82300d9ae311",
+        "rules/js-cache-storage.md": "11b826b0433898c1ece2d3547010d8e77db9fb240185748c45db91493de9b6cc",
+        "rules/js-combine-iterations.md": "71add08aeeb43091d4ff4c0b2842cce8b4bdef8ad3e732cc034bb5a84827e746",
+        "rules/js-early-exit.md": "925ce5ce87f3347186ca62212f29cc6baa2b8c85a96d2720ad07c3d0abf781c0",
+        "rules/js-flatmap-filter.md": "9e5b166a41914d975bef7635467f8fb32cd98b5c3126c0bc6f163490812fb5f0",
+        "rules/js-hoist-regexp.md": "f9e9aef2f7c2307dd7310f283df85dcada45fc43e9bb941b0c3aa414dec21ec4",
+        "rules/js-index-maps.md": "5df1bdc2cfabb2c98abd55d26762e5c18189535c2e686184f426082e62920391",
+        "rules/js-length-check-first.md": "8b54a311c826b299272f29187fc58bc55772a04c4a72eeb29456ee96dc9fc624",
+        "rules/js-min-max-loop.md": "87dfb67e2f39df6ad8bcfb5b78c5fb364d3c07554ad188a202408d99f3763421",
+        "rules/js-request-idle-callback.md": "ee08f83905b4011abbc33d594033157d77561b5bbd9b36b04f0f409581ffec32",
+        "rules/js-set-map-lookups.md": "a7fd781a6ba9ad49065961b6f9a90ef486bf6b648390e1a08704025f98e1642b",
+        "rules/js-tosorted-immutable.md": "d0a5e1b0fec48a0a81397957e2f068e224329f7c42cb5feeed8aae6fa64025e8",
+        "rules/rendering-activity.md": "1e5e7eaf3555e61d6a2e900089c676527d26259501db5594f59544b6c664f85a",
+        "rules/rendering-animate-svg-wrapper.md": "9c6ae0ca7a51434e803887c64cded760956579a1452ccb80a461a03f9c937c77",
+        "rules/rendering-conditional-render.md": "2ec2fa23c4148285144687050c52369adba3da2fbe3d486f8d3e0aad8f06f2bc",
+        "rules/rendering-content-visibility.md": "64eee6d5b916fe74df33363994b27fc7f71bea3bcedc7ee04bda23107ca3e6e4",
+        "rules/rendering-hoist-jsx.md": "93b229560fae92005ed9a2a829064607b39b2e984e92d221d05b2d41df2b7c0e",
+        "rules/rendering-hydration-no-flicker.md": "dc7ab358c67c177bca6e6f360fbc935ebe4efa928c0ba3ebd3f9f3d9e2000ca3",
+        "rules/rendering-hydration-suppress-warning.md": "915bacb934e2927d84b37a3f3d225a47b309ac8f9e494ed2bcb66ce07c5676a2",
+        "rules/rendering-resource-hints.md": "351b1095d641717b930f1b2253282b7120af3023bc74e06c17675168d4286864",
+        "rules/rendering-script-defer-async.md": "4cea07b7875ba7fc2c7465ff23b63a2bb334f90aaf2d9293d38d67b05fdb32ab",
+        "rules/rendering-svg-precision.md": "ed468533f6e95f622859c884b122cf21f9f593ed6bb3d500a54de4b9f9bcb9fb",
+        "rules/rendering-usetransition-loading.md": "3a1249c3f13026b6f54ab5712c388df219d6af01b12aa542749acd99a46f4bc1",
+        "rules/rerender-defer-reads.md": "234050a77faf50cb306be10a9e15bd4421134ab5907e75f13e6d78e2bd262dc9",
+        "rules/rerender-dependencies.md": "17eb5830956fb56486fd3cfc7431f5849d39751730c05ad9e77dd4f0c27169c5",
+        "rules/rerender-derived-state-no-effect.md": "cb11ec76f50aa7b6847269f02d79b120c889a30d9ecd2c1d578f75144419c77a",
+        "rules/rerender-derived-state.md": "1c326bb67b01fb084eb00c8911b0a7cff54681c2315b629f88e49b64eaa6481d",
+        "rules/rerender-functional-setstate.md": "5e68df6b2ae8058e67f476ff1ac67bde159f5a9d18df439e46eabcdeb7b52e58",
+        "rules/rerender-lazy-state-init.md": "4ae844740f266fc8cbf050701230286624a2440ec5be67b9a63d9edc3c580573",
+        "rules/rerender-memo-with-default-value.md": "81c47476564ad8a79fc68fc442734255ca7d6829424359464503fda0a9f9a0dd",
+        "rules/rerender-memo.md": "1f258990c2f27ff6256b3cc5c43300631bb3f0d81f749aed08d07fcdcc131dd1",
+        "rules/rerender-move-effect-to-event.md": "abc2cbf167bee056743023351e96806a411d3398da8802093620aecf0721f029",
+        "rules/rerender-no-inline-components.md": "1cc32907a770272524ba682eef9e7efdd8ad4533b6f89b718a1fcd7d1d0eb6a3",
+        "rules/rerender-simple-expression-in-memo.md": "5bdcf2d1558ba5204e643c887b7b4060f89630969425651eb68e96427d97f800",
+        "rules/rerender-split-combined-hooks.md": "6f45d703343484ef9acef9388397f3642966ae6a5a258899a0cf1f9977cfbf6c",
+        "rules/rerender-transitions.md": "60f4033909a62df5e5b8c601494f9e50a562e2f8c1c2d81eac24f38142265f1c",
+        "rules/rerender-use-deferred-value.md": "8c3579576a61a949884167745dcfaf1d5426ba305cc61fd0a79602d70fda4909",
+        "rules/rerender-use-ref-transient-values.md": "f1a649af9d1d0b5c762f6c9c4c1c70c90d7df82aa10296ee87aadb78c1b76c54",
+        "rules/server-after-nonblocking.md": "d0b8d24a3db9f0f65f9e2bddbf230b0e03a5f60e1229d93a4a18f5e7a991c7c2",
+        "rules/server-auth-actions.md": "a2ca8aa102839251c7971ec784560fab943c20b36fe6f80365d4110c13260c23",
+        "rules/server-cache-lru.md": "1924b64561841923b88a657085097a0aeba3e0ba2d5470b9f5c15cc10d6ae70f",
+        "rules/server-cache-react.md": "fddeea6c870bb3da4134b61d54b7d09b83d2603f929b7547cd3dc1dc269edd5c",
+        "rules/server-dedup-props.md": "c2747424cdac46be62f835f245a0aa887b0090b416d28e2ac8676702645eeb37",
+        "rules/server-hoist-static-io.md": "5abea4dd882b13661bd5f7dfb93f9e547d5f08176c61c448ade91b210ed5d49f",
+        "rules/server-no-shared-module-state.md": "4d869bf1cd2f1632e5ca4c0e64b1cf0e71c5f5a0f940bc8a22174d205e735ed7",
+        "rules/server-parallel-fetching.md": "569a2e9fc04f9606686cd75c5894ef8781b502786a7fffe241396846c7733472",
+        "rules/server-parallel-nested-fetching.md": "ad5d9656984d4a959997a2367bf59cc6632297b4634a1dd13a087939d83f30b3",
+        "rules/server-serialization.md": "f4c7d68b29c82381baad059c4a7f09e868e71ec9c3115a26ad3ae7d24c0dfe1f"
+      },
+      "adaptation": {
+        "modified": {
+          "AGENTS.md": "1fe182a457585dc5d1f532beef4c956f2d071d452a1fa243602297c97b7eb7e4",
+          "SKILL.md": "a60b49c074b3f2b8de460101d6e5ae16327c1f36b0a4bb8ec9e423dfaf223dc1"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "composition-patterns",
+      "source": "vercel",
+      "path": "skills/composition-patterns",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "AGENTS.md": "89e3ddd58fcf99a53a50e25dfd21b8cde1be5f10b7df6bacd3dfa6796932f516",
+        "README.md": "85915a43a6f0b4efe525e3cf6398dd866166da2025837c4460468a24a940da94",
+        "SKILL.md": "e38e0eaa609316b10423a9a138ed95e35099accd3f735585295c8a8f165c28a3",
+        "metadata.json": "49262ed5cb4186f31ee980cf8d990be0170c51efed4908d0464a1cff9905bd05",
+        "rules/_sections.md": "a174213b87e6911e2b766995a2cbaf8d1534057076e82fb79fe3f0ecb38047df",
+        "rules/_template.md": "587f7d16b0660eb61fee4a4d3d7df2b3077d6835de170602c7d6e60bee559131",
+        "rules/architecture-avoid-boolean-props.md": "007555ebb020f4d552582a2c4db194db71a1fd33094012e5187bcfa4f8c392d5",
+        "rules/architecture-compound-components.md": "f246af13dc269b521cf20eb8ad99a0cb645beac381c8c9b117262c34612c8457",
+        "rules/patterns-children-over-render-props.md": "7c45a0d21b3c4126a32cba916ee31adeae195386ad1dbbe6634aedb7457aa0ad",
+        "rules/patterns-explicit-variants.md": "8c19e596e61807549d01ce8c6954c6358199f97a8511c0c02c625ec0efda8c0e",
+        "rules/react19-no-forwardref.md": "881830adb7534c4b2d70db426556646ad9837f5478f744f35641f635ada22227",
+        "rules/state-context-interface.md": "09e73afbf9285fa416679cc864a287b9e8b821d0969272ab784295386d8c9bc3",
+        "rules/state-decouple-implementation.md": "76a8c1eb29a70d8996ab3f71260345af2f7bc89deab815a421d6c87c6591a9c3",
+        "rules/state-lift-state.md": "74c54038a6c554c748fe31cec673b80861b5d920b7553cf78cdf10d18b4b759b"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "0be13144e597ae08eb7c60335a09fc48a44a5b980e59057902845f29ad3fbecf"
+        },
+        "added": {},
+        "removed": []
+      }
+    },
+    {
+      "skill": "impeccable",
+      "source": "impeccable",
+      "path": ".agents/skills/impeccable",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "7ceec4e863e52befc85e592ccf67caa84c12998a98099844b660c2c7bcbbb41d",
+        "agents/impeccable_asset_producer.toml": "4dbdb0cfdc2466961da6b22d200f3ec7bf8bb47c27448a2e6e3c03cdbf589831",
+        "agents/impeccable_documenter.toml": "2feb3768125ba6469c92a50d516727e6d42f44579165ddfd33409948e2a3803d",
+        "agents/impeccable_finish_reviewer.toml": "1b80232e22d52b06a7278b9ca1f24f871a181c62cd91f4b18728807e7cf49dbd",
+        "agents/impeccable_manual_edit_applier.toml": "6c9ce3e27ec4520ead001da3aad2a2ebba481c4e5cd22873db8890259ee579fe",
+        "agents/openai.yaml": "ce9967ad70f99cf04456f3347c266723c2fbbb600267d10a822b7cd20562c321",
+        "reference/adapt.md": "9807cdc112b8bcbdeff9cd2516cda4d07129f1d47f29df4d57645344f34950c1",
+        "reference/adapt.native.md": "2455a2613e1fa29b986521c73cbad9424ccda70ef6cbe505779dbca5e16272a2",
+        "reference/android.md": "43780abcf10ac12a569d98001ae38af2b337727a0f7ce66268246ac1d54b5d34",
+        "reference/animate.md": "d658c48ffbe0031e8e3b318996cad6ceafe29e40aa50d5bb25e4bf1d6839dc7c",
+        "reference/audit.md": "5ba9e3a090fc4c4d212c8cbfa5a48f7454ceb10fa81a284b4a7b4e8351ece2f1",
+        "reference/audit.native.md": "2898eff507738f9102107809e671df3e69f889dee30073030fe96fb2483d8ea3",
+        "reference/bolder.md": "05b78fb0595e4d5afbf5f17470c84e89cf82f205fea3a6e9b6d8d779b7c4aab1",
+        "reference/clarify.md": "173dd66abe65633910dcb04a51f40d6ff2a793f87088f022a02fc4cad24dd133",
+        "reference/colorize.md": "bc5f71f1129d0f2c310d913d07c8dc609a1d25644121bd78c308f42d52a0b9e9",
+        "reference/component-review.md": "10489e5265e49a4ef2737cd0e674c149ed41e1f703efe922e53ea3c91e833427",
+        "reference/craft-floor.md": "808a50e0e6c74617a07b0eaf7fd80f58d8e48a13f48e47c658c7534b1724e5c2",
+        "reference/craft.md": "9205e222bc6565b37fb504ceec93233c2d2a456802b69d16e6b1c44723907c4c",
+        "reference/critique.md": "c210c9506877c6c8d88880a337fddd95d4315daf70ed6bc631ee6520481f1a0c",
+        "reference/degraded/asset-producer.md": "877d274f41500c780bad25b2bca7fa95eff1a32a7b95397dd388c72848e86a6c",
+        "reference/degraded/documenter.md": "bcc05ea92faebb5c74037a9d4263a5ce9a56f5ab07c8ab3c59ee704d8cade745",
+        "reference/degraded/finish-reviewer.md": "c33c4cfa7f0ce0bedde80d4fc3b595e747d0e9b43a77f06cacb8e899802f709d",
+        "reference/degraded/manual-edit-applier.md": "5fae7f8a2fc3ddd49ad0a413446dc44daedef5b6b7de5eb935bd2fbfad646d58",
+        "reference/delight.md": "098a891028ce59c212b747d3c70468dd750aff7053a703d1336045ed31e0da7c",
+        "reference/distill.md": "8b9283510e38f0d190652f300ea0793acfb5a514b38b991fdc0a289bade83391",
+        "reference/doctor.md": "33aff200de6f76a74b333d7ae4f7d2f4fc2a0da4c1a57264567d88eb8f33b52b",
+        "reference/document.md": "7e7e97388cac7b5af7afa5b6fec19a6576c89ce6a998c973cb007b8e5494a8c9",
+        "reference/extract.md": "5477ae97189e5c1236cee71a25a5ae50014429a5a2e6da28355c8021a6cdeddd",
+        "reference/generate.md": "11385badfb532196cec249e73bac2b7f58ada033ed8c4b02b9f0d64ddb46f0dc",
+        "reference/harden.md": "4167eb7fc456cdfe09ff0ac2dbcb5e59cee57e590137aab6cc8ec08aafb6d775",
+        "reference/hooks.md": "4a19b53425643c01332a2f83ae71d58f267f4a1fb72e07378a5310f69c34108e",
+        "reference/init.md": "51349b3a32c7f907102dd680d8e2df9da27082caf46ee15c673be7ce14a5363b",
+        "reference/ios.md": "40c87038b5f75147a5952a96237acf312a327bf70c1bcd8e0a5f064625ae9668",
+        "reference/layout.md": "0bc7d7971b3edf2acd0580e847458dc6d84129d90715b452799ace3bed815c7c",
+        "reference/live-setup.md": "2b5b2fbf5f658f34ea1997fb1aeebe01604d05187f75c6a4f1f55a5bc78520a4",
+        "reference/live.md": "a4251b0282f987d723f9d1bcff8f1bcde87d25cdd297bcc2343695082903535a",
+        "reference/mode-operate.md": "7a52dd7a94ee75f6ae89542c86a1b6e1d306812b16e0d9dbf12d4acad44d148b",
+        "reference/mode-persuade.md": "21e78c8a77badb3f83290cd4577ed3b24bd4dd3b57136d7da75733d4f3ee9ac0",
+        "reference/mode-read.md": "a569989e6a3d6453b4c45e9474e162a15cc54e11732ac6baa7990a6e7cccc0b5",
+        "reference/new-work.md": "2ecb8674f239b5386faf955a52f9cc58c7a064a27d7c91bfc871b63d6a9c9c15",
+        "reference/onboard.md": "a2b8fd01ea12139b39b3285393f805bb8c326e11b2234dbff4c26c17b4e9c280",
+        "reference/operate.md": "a9d2203acd45ca33a13d5c68b02b23ed512425ac15f0e8438318ed124b43729d",
+        "reference/optimize.md": "092c85e5a644e6e528aaff0f341ee1ed57e012c195162fef0a5fc97605f9bb73",
+        "reference/overdrive.md": "0a0d4ae6eea720c6d6e1c073fc77192d7c2100f78a44d9a8d262ddf22270cf4d",
+        "reference/polish.md": "81666fc7f783b4e3514db6554e713dc0479bd9cdedb06e93d15f8b579aae869a",
+        "reference/quieter.md": "9e03b55c6bbdd4acba28cfa9c3b74ba1a4448cdbd35a7200990ab460c6eecaa0",
+        "reference/region-map.md": "778cedc9199b407d3e23fa1041e38d548b00b1101a33517aa2a2eb299f9d0edc",
+        "reference/routing.md": "77ae09542fbc10aa4e8b119d6fd19359908a47c13c30068d6a150bfdb50e3e10",
+        "reference/shape.md": "a55f016c046cb6a27c55bd7f346375aeb506a755c4fbca19a5f92dbd42309c23",
+        "reference/typeset.md": "c26c5b4524f3ccb650ed0680c10c25fd18083f8ebfd00a54c4d983c4747aab70",
+        "reference/visualize.md": "0c431d0dafbcac7ae8bde70ffa622f9ee542c44ec12e14b48bb44b269bef67eb",
+        "scripts/VERSION": "7470694a0b5af87394b523c1a640e2ad099efbe0e6d9e6d2f7a70703e4d04457",
+        "scripts/command-metadata.json": "c6dcbeed7f13152205ca022c8f24d08683770835083f0a7325261c1c2d5f215c",
+        "scripts/data/font-index-failures.json": "835f19a0a3812f3652dd6979a2ce5597f654fd01f26e1b420b92d5f42b997ce4",
+        "scripts/data/font-index.json": "47edbdfaf27073c47033d1ac7dfee881be49e2dcbda7671d1157300481dde6da",
+        "scripts/impeccable": "8f800085283c365e3e7c1745a03668380328c0ffb177d3249cc5e918f6935310",
+        "scripts/impeccable.cmd": "e6c5f6a1b4cfb5c2d3548ad7581f4bcfa71f44aa04c5a02d40c9e48102980925",
+        "scripts/live-browser-dom.js": "4b379aff87ce0f485008a2b6a0dc711d00a869f5cf0ec2459279d6364fbf0c9e",
+        "scripts/live-browser-ignores.js": "ba8905ab865fde5162e34fc17eb80eba26cc990b319b14a6eed6ca89fd491897",
+        "scripts/live-browser-session.js": "e042339a54d4521fc47555b602013ed5b51410ec9d7d8878d99a526f5f237f68",
+        "scripts/live-browser.js": "718b7e3c5c9cc3cc8fb75ed99b32a7ebce627e3b6a108e21656fa0fd298e34f0",
+        "scripts/modern-screenshot.umd.js": "bb36665889124a0b6e15f16045265737449c3bdcf2712cdb08af3cfa01563e2b"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "ba42a924f2873e65d64f5d63b15880db017cb96e9e0794937451713e103353ca",
+          "reference/critique.md": "a01133fb4e28e6066849741ea87fe6f488639db5163601615c6c85396464b9f3",
+          "reference/generate.md": "349421e3125f30afb9e4f4bf60aba33a93bc0a2e6f472c5b8b9b7b628bea3f17",
+          "reference/hooks.md": "94786b2876790b97fdac0817e3ffb72d4aeff9102d6c5ae6b08c1bdeda6234bb",
+          "reference/live.md": "02a72eb3c03a86300ce31c0ad3939978486ab5488d11e9f0aaead594d80a4b8e"
+        },
+        "added": {
+          "LICENSE": "02bb8c3b4e70190e3986c0404ad2fd8d639b4f534252d82379cc1b502b6d1812",
+          "NOTICE.md": "c60a093c2845fd9fb82f9c6f742ece31f379f8190b535309d32d66c45ccffdcb"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "copywriting",
+      "source": "marketing",
+      "path": "skills/copywriting",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567",
+        "evals/evals.json": "ccec86052a0edd8646d0e50e63c08e0e971f443d8f6e9178843a1629f79efdb0",
+        "references/ai-tells.md": "b98c3a19b3a75c714d69e80a0076e4c07244b0e833c2ce81ff2631224fb7f7b2",
+        "references/copy-frameworks.md": "352122944bf9e891ceb0e003adce41591d111e9d97057700626249919dfe430d",
+        "references/natural-transitions.md": "9bd61b0de5be2c4de4ce130c68236b4f290b12737823827a458bb2b4c8584683"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "ea3fbe904d8d7c8da89258ff58a5b89a17216222c9688a308164b164acb251c3"
+        },
+        "added": {
+          "LICENSE": "b70d71e24e40fce5da8f4b6f9cd862096a048e433db7f3c8cac5e348e6d34591"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "copy-editing",
+      "source": "marketing",
+      "path": "skills/copy-editing",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "2a072606d9d5662509ea6ef62c65719487dcb68876acab9286bde4d1af5c030f",
+        "evals/evals.json": "cc18c9f51094058759267d465cfcc50da65f248f66b923326781aa642d622ca7",
+        "references/checklist.md": "4cf94c922286223681fc53721fcc65ae7299f1e36e797e7397d369d674580c60",
+        "references/content-refresh.md": "ba73cdf278fe6b552eee27eb1452494f11f9d17ef67d720657e0982f76fb961b",
+        "references/plain-english-alternatives.md": "df4f820d4c63ae8a517c64a243c101658352cd07d002355bf3c97de0a00f3775"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "0913e2932aaad827fc85b808ba7cad0bab8b6ebc05e1925c13ce556e958f41ed"
+        },
+        "added": {
+          "LICENSE": "b70d71e24e40fce5da8f4b6f9cd862096a048e433db7f3c8cac5e348e6d34591"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "emails",
+      "source": "marketing",
+      "path": "skills/emails",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "8709631cc21717d17db9bb7e787ea44768d77182daf9846de8718a2ae7433b91",
+        "evals/evals.json": "b90182c8b6edbb866ef82ad022db3d2fe8598e7329469117fb39edd9ab069f67",
+        "references/copy-guidelines.md": "02f08897e4aa99ecc4ec1893d61d0c26d0c5e62e09af26f175087455e9b68e01",
+        "references/email-types.md": "a5dd4f0555a7b21d2ff426948d15657825b9d16265652563f5e272d2e1879bfd",
+        "references/sequence-templates.md": "f8f318f10e29abcd009cbee29e2bd178981d96c973099b508d30af6c10ab8d79"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "c766a8f879d7f4c2789568be8d4a2a7932221788e7f23ad492d3c97a778737a4"
+        },
+        "added": {
+          "LICENSE": "b70d71e24e40fce5da8f4b6f9cd862096a048e433db7f3c8cac5e348e6d34591"
+        },
+        "removed": []
+      }
+    },
+    {
+      "skill": "product-marketing",
+      "source": "marketing",
+      "path": "skills/product-marketing",
+      "mode": "astrion-adapted",
+      "upstream_files": {
+        "SKILL.md": "19ece0fa75c72a5a8b6e90db80f506586f54cc93bae6bffbb1bd2ef4ae7d603c",
+        "evals/evals.json": "0c6599b88f50ec1be91096a36ba6c5a15cf8312151394e3469e5ddb991b19afb",
+        "references/brand-voice.md": "932f3453db2761f03050792e39800150495dab449750b40913a4314ea97e7672"
+      },
+      "adaptation": {
+        "modified": {
+          "SKILL.md": "52aa4b3c92ccc5dcb32fc6aee2f0eac9c544bc4956e18f05ea580dc036c95ef1"
+        },
+        "added": {
+          "LICENSE": "b70d71e24e40fce5da8f4b6f9cd862096a048e433db7f3c8cac5e348e6d34591"
+        },
+        "removed": []
+      }
+    }
+  ],
+  "local_skills": {
+    "ui-aesthetic-design": {
+      "origin": "Astrion",
+      "files": {
+        "SKILL.md": "7888325f92396cd1484a4ba06bd10f69cbf0f6007c88b965c82c95f679e3d154"
+      }
+    },
+    "media-toolkit": {
+      "origin": "Astrion",
+      "files": {
+        "SKILL.md": "6f27cefebe1c0f1f8e2f51325a00c9720f5d27cac6a4ce28e9a01676523f055c"
+      }
+    }
+  },
+  "supplemental_assets": {
+    "algorithmic-art/templates/vendor/p5.min.js": "https://cdn.jsdelivr.net/npm/p5@1.7.0/lib/p5.min.js",
+    "algorithmic-art/templates/vendor/p5-LICENSE.txt": "https://cdn.jsdelivr.net/npm/p5@1.7.0/license.txt",
+    "canvas-design/canvas-fonts/IBMPlexSerif-OFL.txt": "https://cdn.jsdelivr.net/gh/IBM/plex@master/LICENSE.txt",
+    "canvas-design/canvas-fonts/InstrumentSerif-OFL.txt": "https://cdn.jsdelivr.net/gh/Instrument/instrument-serif@main/OFL.txt"
+  }
+}

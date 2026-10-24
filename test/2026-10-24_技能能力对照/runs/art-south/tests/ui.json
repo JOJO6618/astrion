@@ -1,0 +1,71 @@
+{
+  "steps": {
+    "init": {
+      "canvas": "570×684",
+      "pixelDensity": 2,
+      "looping": true,
+      "status": "正在沉积 0%",
+      "playLabel": "暂停",
+      "lines": "9",
+      "grains": "4,290",
+      "ariaLabel": "潮汐档案生成作品：种子 tangent-01，9 道水线，4290 粒沉积。可用右侧控件或快捷键操作。",
+      "sliderFill": "44.83%"
+    },
+    "completed": {
+      "status": "档案完成",
+      "playLabel": "重播",
+      "looping": false,
+      "stateText": "完成",
+      "imageDraws": 101
+    },
+    "replay": {
+      "status": "正在沉积 0%",
+      "looping": true,
+      "playLabel": "暂停"
+    },
+    "pauseResume": {
+      "paused": {
+        "status": "已暂停 45%",
+        "looping": false,
+        "label": "继续"
+      },
+      "afterTicks": "已暂停 45%",
+      "resumedStatus": "正在沉积 45%",
+      "resumedLoop": true,
+      "resumedLabel": "暂停"
+    },
+    "seedApply": {
+      "status": "正在沉积 0%",
+      "aria": "潮汐档案生成作品：种子 spring-2048，9 道水线，3696 粒沉积。可用右侧控件或快捷键操作。"
+    },
+    "slider": {
+      "outputImmediate": "14",
+      "status": "档案完成",
+      "aria": "潮汐档案生成作品：种子 spring-2048，14 道水线，5379 粒沉积。可用右侧控件或快捷键操作。",
+      "lines": "14",
+      "looping": false
+    },
+    "export": {
+      "graphicsCreated": 1,
+      "anchorClicked": 1,
+      "filename": "tidal-archive_spring-2048_14lines_100-100.png",
+      "status": "已导出 tidal-archive_spring-2048_14lines_100-100.png"
+    },
+    "exportSettled": {
+      "status": "档案完成"
+    },
+    "keyboard": {
+      "status": "正在沉积 0%",
+      "looping": true
+    },
+    "keyboardTyping": {
+      "status": "正在沉积 0%"
+    },
+    "resize": {
+      "canvas": "354×425",
+      "status": "正在沉积 0%"
+    }
+  },
+  "failures": [],
+  "errors": []
+}

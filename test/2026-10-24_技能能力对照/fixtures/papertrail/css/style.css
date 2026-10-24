@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px Arial, sans-serif; color: #747474; background: #fff; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 3px solid #c1c1c1; }
+h1 { font-size: 17px; }
+.demo { color: #aaa; font-size: 10px; }
+main { display: flex; min-width: 980px; }
+aside { width: 190px; flex: none; padding: 16px; border-right: 1px solid #aaa; }
+aside p { padding: 12px; border: 1px solid #ccc; border-radius: 12px; cursor: pointer; }
+.workspace { width: 100%; padding: 12px 28px; }
+.workspace h2 { font-size: 26px; margin-top: 36px; }
+.intro { color: #aaa; }
+.stats { display: flex; gap: 15px; }
+.stats div { background: #ececec; padding: 18px 30px; border-radius: 16px; border: 1px solid #bbb; }
+.tools { display: flex; justify-content: space-between; gap: 10px; margin: 24px 0; }
+input { width: 230px; height: 30px; border: 1px solid #bbb; padding: 4px; }
+button { border: 1px solid #aaa; border-radius: 9px; padding: 5px 12px; color: #777; background: #eee; cursor: pointer; }
+button:hover { background: #d0d0d0; }
+button.active { border-color: #999; background: #ddd; }
+.papers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; }
+.paper { padding: 14px; border: 2px solid #ddd; border-radius: 18px; box-shadow: 0 7px 12px #ddd; }
+.paper:hover { background: #f6f6f6; }
+.paper h3 { color: #555; font-size: 16px; margin-top: 8px; }
+.paper .meta { font-size: 11px; color: #aaa; }
+.paper .abstract { font-size: 12px; line-height: 1.3; }
+.paper .tag { border: 1px solid #ccc; border-radius: 12px; padding: 4px 9px; display: inline-block; margin: 4px; }
+.paper .actions { display: flex; justify-content: space-between; margin-top: 20px; }
+.detail { position: fixed; top: 18%; left: 25%; width: 50%; padding: 25px; border: 2px solid #bbb; border-radius: 18px; background: #eee; box-shadow: 0 10px 60px #888; }
+.detail[hidden] { display: none; }
+.detail h2 { color: #555; }

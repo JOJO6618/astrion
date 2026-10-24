@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papertrail · 论文阅读工作台</title>
+<meta name="description" content="演示数据、本地运行的论文查找、筛选与阅读管理工作台">
+<link rel="stylesheet" href="css/style.css">
+<script defer src="js/data.js"></script>
+<script defer src="js/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#papers">跳到论文列表</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand__mark" aria-hidden="true">P</span>
+    <div class="brand__text">
+      <h1 class="brand__name">Papertrail</h1>
+      <span class="brand__sub">论文阅读工作台</span>
+    </div>
+  </div>
+  <div class="topbar__right">
+    <button type="button" class="btn btn--ghost" id="shortcut-btn" aria-expanded="false" aria-controls="shortcut-panel">
+      快捷键 <kbd>?</kbd>
+    </button>
+    <span class="badge"><span class="badge__dot" aria-hidden="true"></span>演示数据<span class="badge__extra"> · 本地运行</span></span>
+  </div>
+  <div class="shortcut-panel" id="shortcut-panel" hidden>
+    <h2 id="shortcut-title">键盘操作</h2>
+    <dl aria-labelledby="shortcut-title">
+      <div><dt><kbd>/</kbd></dt><dd>聚焦搜索框</dd></div>
+      <div><dt><kbd>J</kbd><kbd>K</kbd></dt><dd>在论文条目间移动焦点</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>打开聚焦条目的详情</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>关闭详情、菜单或搜索</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>显示或隐藏本面板</dd></div>
+    </dl>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" aria-label="筛选与数据说明">
+    <section class="facet">
+      <h2 class="facet__title">阅读状态</h2>
+      <div class="facet__list" id="status-filters" role="group" aria-label="按阅读状态筛选">
+        <button type="button" class="facet__item" data-status="all" aria-pressed="true">全部<span class="facet__count" data-count="all">9</span></button>
+        <button type="button" class="facet__item" data-status="unread" aria-pressed="false"><span class="dot dot--unread" aria-hidden="true"></span>未读<span class="facet__count" data-count="unread">4</span></button>
+        <button type="button" class="facet__item" data-status="reading" aria-pressed="false"><span class="dot dot--reading" aria-hidden="true"></span>在读<span class="facet__count" data-count="reading">2</span></button>
+        <button type="button" class="facet__item" data-status="read" aria-pressed="false"><span class="dot dot--read" aria-hidden="true"></span>已读<span class="facet__count" data-count="read">3</span></button>
+      </div>
+    </section>
+
+    <section class="facet">
+      <h2 class="facet__title">主题</h2>
+      <div class="facet__list" id="topic-filters" role="group" aria-label="按主题筛选"></div>
+    </section>
+
+    <section class="facet sidebar__note">
+      <h2 class="facet__title">数据说明</h2>
+      <p>9 条记录均为虚构演示资料，标题、作者、年份、期刊、页数与摘要照原始素材保留；检索、筛选与笔记都在本机完成，没有账户、后端或在线同步。</p>
+      <button type="button" class="linkbtn" id="reset-all">恢复演示初始状态</button>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <div class="search">
+        <svg class="search__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.6"></circle><path d="M10.6 10.6 14 14"></path>
+        </svg>
+        <label class="sr-only" for="search">搜索论文标题或作者</label>
+        <input id="search" type="search" placeholder="搜索标题或作者 · 按 / 聚焦" autocomplete="off" spellcheck="false">
+        <button type="button" class="search__clear" id="search-clear" aria-label="清除搜索" hidden>×</button>
+      </div>
+      <div class="sort" role="group" aria-label="排序方式">
+        <span class="sort__label" aria-hidden="true">排序</span>
+        <button type="button" class="sort__btn" data-sort="year" aria-pressed="true">年份<span class="sort__dir" data-dir>↓</span></button>
+        <button type="button" class="sort__btn" data-sort="title" aria-pressed="false">标题<span class="sort__dir" data-dir hidden>↓</span></button>
+        <button type="button" class="sort__btn" data-sort="pages" aria-pressed="false">页数<span class="sort__dir" data-dir hidden>↓</span></button>
+      </div>
+    </div>
+
+    <div class="resultbar">
+      <p id="result-count" aria-live="polite">共 9 篇</p>
+      <div class="resultbar__filters" id="active-filters"></div>
+    </div>
+
+    <ul class="papers" id="papers" aria-label="论文列表"></ul>
+
+    <div class="empty" id="empty" hidden>
+      <p>没有符合条件的论文</p>
+      <button type="button" class="btn" id="empty-clear">清除搜索与筛选</button>
+    </div>
+
+    <p class="colophon">Papertrail 演示 · 9 条虚构记录，字段保持原始内容 · 搜索、筛选与笔记都在本机完成，无账户、无后端、无在线同步 · 刷新页面会重置阅读状态</p>
+  </main>
+
+  <aside class="rail" aria-label="阅读概览与笔记">
+    <section class="rail__group">
+      <h2 class="rail__title">当前范围</h2>
+      <div class="meter" id="meter" role="img" aria-label="阅读状态分布"></div>
+      <div class="rail__legend" id="legend"></div>
+    </section>
+    <section class="rail__group">
+      <h2 class="rail__title">有笔记的论文</h2>
+      <div class="rail__note-list" id="rail-notes"></div>
+    </section>
+  </aside>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" inert>
+  <div class="drawer__head">
+    <p class="drawer__eyebrow">论文详情 · 演示数据</p>
+    <div class="drawer__nav">
+      <button type="button" class="iconbtn" id="prev-paper" aria-label="按当前列表查看上一篇">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M10 3 5 8l5 5"></path></svg>
+      </button>
+      <button type="button" class="iconbtn" id="next-paper" aria-label="按当前列表查看下一篇">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3l5 5-5 5"></path></svg>
+      </button>
+      <button type="button" class="iconbtn" id="close-drawer" aria-label="关闭论文详情">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"></path></svg>
+      </button>
+    </div>
+  </div>
+  <div class="drawer__body" id="drawer-body"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="icon-note" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M3 2.5h10v11H3z"></path><path d="M5.5 6h5M5.5 9h3.5"></path>
+  </symbol>
+</svg>
+</body>
+</html>

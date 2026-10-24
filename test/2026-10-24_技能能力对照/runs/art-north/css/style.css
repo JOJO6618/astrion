@@ -1,0 +1,338 @@
+/* 潮汐档案 / Tidal Archive — 界面样式
+   版式取档案著录卡的语言：细线、编号、留白，让控件像标注而不是仪表盘。 */
+
+:root {
+  color-scheme: light dark;
+  --bg: #e6e1d4;
+  --panel: #f4f0e6;
+  --panel-sunken: #ece6d8;
+  --ink: #23282a;
+  --ink-soft: #5b605d;
+  --line: #cec6b4;
+  --line-soft: #ded7c6;
+  --accent: #8a4a2f;
+  --accent-ink: #fbf6ec;
+  --focus: #1c5d78;
+  --shadow: rgba(48, 38, 22, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181a;
+    --panel: #1f2223;
+    --panel-sunken: #262a2a;
+    --ink: #e9e5da;
+    --ink-soft: #a5a59b;
+    --line: #3b3f3d;
+    --line-soft: #2e3231;
+    --accent: #c98a63;
+    --accent-ink: #1a1a17;
+    --focus: #7fc4dd;
+    --shadow: rgba(0, 0, 0, 0.55);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.6 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 报头 ─────────────────────────────────────────── */
+.masthead {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 26px 32px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 24px;
+}
+.masthead__id { display: flex; align-items: baseline; gap: 16px; }
+.masthead__title {
+  margin: 0;
+  font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", Georgia, serif;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.masthead__latin {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: var(--ink-soft);
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.masthead__note {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* ── 版式 ─────────────────────────────────────────── */
+.page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 18px 32px 48px;
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 34px;
+  align-items: start;
+}
+
+.panel {
+  border-top: 1px solid var(--ink);
+  padding-top: 16px;
+}
+
+.block {
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.block:last-of-type { border-bottom: 0; margin-bottom: 8px; }
+
+.block__title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.block__latin {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* ── 种子 ─────────────────────────────────────────── */
+.seed-readout {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--panel-sunken);
+  border-left: 2px solid var(--accent);
+}
+.seed-readout__label { font-size: 11.5px; color: var(--ink-soft); letter-spacing: 0.08em; }
+.seed-readout__value {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.field-row { display: flex; gap: 8px; }
+.field-row input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  font: inherit;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+.field-row input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.field-row input[aria-invalid="true"] { border-style: dashed; border-color: var(--accent); }
+
+/* ── 按钮 ─────────────────────────────────────────── */
+.button-row { display: flex; gap: 8px; margin-top: 8px; }
+button {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+button:hover { background: var(--panel-sunken); border-color: var(--ink-soft); }
+button:active { background: var(--panel); }
+button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+button[aria-disabled="true"] { opacity: 0.55; cursor: default; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ── 滑杆 ─────────────────────────────────────────── */
+.control { margin-bottom: 16px; }
+.control__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.control__label { font-size: 13px; }
+.control__value {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.control__hint {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.slider {
+  position: relative;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.slider__track {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--line);
+}
+.slider__fill {
+  position: absolute;
+  left: 0;
+  height: 2px;
+  width: var(--pos, 50%);
+  background: var(--accent);
+}
+.slider__thumb {
+  position: absolute;
+  left: var(--pos, 50%);
+  width: 13px;
+  height: 13px;
+  margin-left: -6.5px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1.5px solid var(--accent);
+  transition: transform 0.12s ease;
+}
+.slider:hover .slider__thumb { transform: scale(1.12); }
+.slider:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+
+/* ── 色调 ─────────────────────────────────────────── */
+.palette-list { display: flex; flex-direction: column; gap: 6px; }
+.palette {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  justify-content: flex-start;
+}
+.palette__swatches { display: flex; flex: none; }
+.palette__swatches i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  margin-left: -1px;
+}
+.palette__swatches i:first-child { margin-left: 0; }
+.palette__name { font-size: 13px; }
+.palette[aria-pressed="true"] { color: var(--accent-ink); }
+.palette[aria-pressed="true"] .palette__swatches i { border-color: rgba(255, 255, 255, 0.5); }
+
+/* ── 状态 ─────────────────────────────────────────── */
+.status {
+  margin: 4px 0 6px;
+  min-height: 2.6em;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}
+.hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  opacity: 0.85;
+}
+
+/* ── 画面 ─────────────────────────────────────────── */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.canvas-frame {
+  width: 100%;
+  max-width: min(1080px, 82vh);
+  background: var(--panel);
+  box-shadow: 0 22px 44px -30px var(--shadow), 0 0 0 1px var(--line-soft);
+}
+.canvas-frame canvas { display: block; width: 100%; height: auto; }
+.stage__caption {
+  margin: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+/* ── 窄屏 ─────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .masthead { padding: 18px 16px 0; }
+  .masthead__title { font-size: 24px; }
+  .masthead__id { gap: 10px; flex-wrap: wrap; }
+  .masthead__note { font-size: 12px; }
+
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px 16px 40px;
+    gap: 22px;
+  }
+  .stage { order: 1; }
+  .panel { order: 2; border-top-color: var(--line); }
+  .canvas-frame { max-width: 100%; }
+
+  button { min-height: 44px; font-size: 13.5px; }
+  .field-row input { height: 44px; font-size: 15px; }
+  .slider { height: 38px; }
+  .slider__thumb { width: 16px; height: 16px; margin-left: -8px; }
+  .palette { min-height: 44px; }
+  .control__hint { font-size: 12px; }
+  .status { font-size: 12.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+}

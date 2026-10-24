@@ -1,79 +1,75 @@
 ---
 name: frontend-design
-description: 创建具有鲜明风格、生产级品质和高设计水准的前端界面。当用户要求构建 Web 组件、页面、作品、海报或应用，以及创建html卡片时使用此 skill（例如网站、落地页、仪表盘、React 组件、HTML/CSS 布局，或任何 Web UI 的样式设计/美化）。生成富有创意、精致完善的代码与 UI 设计，避免泛泛的 AI 风格审美。
+description: 设计或重设计网页、组件、应用、落地页与聊天内交互作品，确定贴合题材的视觉方向、排版和布局。用于需要鲜明设计与完整实现的任务；系统面板精修可配合ui-aesthetic-design，静态海报用canvas-design。
 license: Complete terms in LICENSE.txt
 ---
 
-这个 skill 用于指导创建具有鲜明风格、生产级品质的前端界面，避免通用、粗糙的“AI 垃圾感”审美。请实现真正可工作的代码，并对审美细节与创意选择投入极高关注。
+# Frontend Design
 
-用户会提供前端需求：要构建的组件、页面、应用或界面。他们也可能提供用途、受众或技术约束等上下文。
+Approach this as the design lead at a design studio known for giving every client a distinct visual identity that is not mistaken for anyone else's. This client has already rejected proposals that felt cliché or templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take aesthetic risk if justified.
 
-## 设计思考
+## Ground your designs in the subject matter
 
-在编码之前，先理解上下文，并明确采用一个**大胆且符合实际业务场景**的审美方向：
+If the brief does not identify what the product or subject matter is, identify it yourself before designing, and confirm with the client. You can come up with one concrete subject, the design's audience, and the design's primary job, as a proposal. If there's any information in your memory about the client's preferences or context about what they're building, use that as a hint. The subject's industry, subject matter, materials, and vernacular are where distinctive visual choices come from — a design for a toy for girls aged 8–11 will be very aesthetically different from a dashboard for financial analysts. Build with the brief's real content and subject matter throughout.
 
-- **目的**：这个界面解决什么问题？谁会使用它？
-- **调性**：选择一种鲜明取向：极致极简、极繁混沌、复古未来主义、有机/自然、奢华/精致、玩具般俏皮、编辑部/杂志风、粗野主义/原始感、装饰艺术/几何、柔和/粉彩、工业/实用主义，等等。可从这些方向中获取灵感，但最终设计必须忠于所选的审美方向。
-- **约束**：技术要求（框架、性能、可访问性）。
-- **差异化**：是什么让它令人难忘？用户会记住的那一个点是什么？
+## Design principles
 
-**关键要求**：选择清晰的概念方向，并以精准方式执行。大胆不等于浮夸，克制也不等于平庸。大胆的极繁主义和克制的精致极简都可以成功——重点是意图明确、符合场景，而不是视觉强度本身。
+For web designs, the hero is the first thing viewers will see. Open with the most characteristic thing in the subject's world, in the form that is most appropriate: a headline, an image, an animation, a live demo, an interactive moment, or other treatments. Be deliberate with your choice: a big number with a small label, supporting stats, and a gradient accent is the default treatment, so only use it if that's truly the best option.
 
-审美方向必须服务于产品目标、用户心智和使用场景。例如，论文查重、AIGC 检测、金融、医疗、法律、政企工具、学术系统等场景，通常更需要可信、清晰、冷静、专业和可解释，而不是霓虹赛博朋克、过量发光边框、强烈蓝紫渐变或炫技动效。娱乐、游戏、活动页、艺术项目等场景可以更大胆实验，但仍然必须与内容和受众相匹配。
+Typography carries the personality of the page. You don't need a different typeface for display or headline text and body content: use one family or two, and if two, make them clearly distinct.
 
-然后实现可工作的代码（HTML/CSS/JS、React、Vue 等），并确保它：
+Choose your typefaces deliberately, not the default families you would reach for on any other project, and set a clear type scale following the default guidance of The Elements of Typographic Style with intentional weights, widths, and spacing. When type is used as a headline or visual element, use the type treatment itself as an active part of the design, not a neutral delivery vehicle for the content.
 
-- 具备生产级质量且功能完整
-- 视觉上醒目、令人印象深刻
-- 具有统一且清晰的审美观点
-- 每一个细节都经过认真打磨
+Default to line lengths of less than 80 characters. Serif typefaces can have slightly longer line lengths; give serif body text slightly more line-height than a sans-serif.
 
-## 前端审美指南
+Avoid these default typographic treatments; they are the commonest tells of a generated page:
+- Accenting just a single word or phrase in a headline, like putting one word in italic/bold or a different color.
+- Using all caps for labels.
+- Adding unnecessary typographic labels above content.
 
-重点关注：
+Visual structure is information. Structural devices like outlines, borders, numbering, eyebrows, dividers, labels, etc., encode useful information about the content rather than decorate it. Many generic designs use numbered markers (01 / 02 / 03), but that's only appropriate if the content actually is a sequence — like a stepped process or a timeline. Before adding numbered markers, check the content really is a sequence.
 
-- **字体排印**：选择美观、独特、有趣的字体。避免使用 Arial、Inter 这类常见字体；改用能提升前端审美的、有辨识度且富有性格的字体选择。将独特的展示字体与精致的正文字体搭配使用。
-- **色彩与主题**：坚持统一的审美体系。使用 CSS 变量保持一致性。主导色配合锐利强调色，通常比胆怯、平均分配的调色板更有表现力。
-- **动效**：使用动画增强效果与微交互。对于 HTML，优先采用纯 CSS 方案。React 中如可用，可使用 Motion 库。关注高影响力时刻：一次精心编排、带有错峰显现（animation-delay）的页面加载动画，往往比零散的微交互更令人愉悦。使用令人惊喜的滚动触发与悬停状态。
-- **空间构图**：采用出人意料的布局。不对称、重叠、对角线流动、打破网格的元素。可以使用充足的留白，也可以使用受控的高密度排布。
-- **背景与视觉细节**：营造氛围与深度，而不是默认使用纯色背景。添加符合整体审美的上下文效果与纹理。运用富有创意的形式，例如渐变网格、噪声纹理、几何图案、分层透明、戏剧化阴影、装饰性边框、自定义光标与颗粒叠层。
+Use non-user-triggered motion sparingly and deliberately, only to draw attention. A single orchestrated moment — one page-load sequence or one reveal — lands better than scattered effects; fade-and-slide-up entrances on each section and hover transitions on every card are the generic default and read as AI-generated. Motion that answers a person's action (opening, expanding, confirming) is welcome when it shows what changed.
 
-绝不要使用通用的 AI 生成式审美，例如过度使用的字体家族（Inter、Roboto、Arial、系统字体）、陈词滥调的配色方案（尤其是白色背景上的紫色渐变）、可预测的布局与组件模式，以及缺少特定上下文个性的模板化设计。
+Consider written content carefully. Often a design brief may not contain real content, and it's up to you to come up with copy and placeholder content. Copy can make a design feel as templated as the design itself. See the below section on writing for more guidance.
 
-### 必须避免的 AI 味垃圾审美
+## Process: plan, review against the brief, build, critique
 
-尤其要避免以下常见问题：
+For calibration, AI-generated design right now clusters around some traits:
+1. a warm cream background (near #F4F1EA) with a high-contrast serif display and a terracotta or warm-clay accent (often near #D97757 — Anthropic's own Claude-interaction accent, so on a user's brief it reads as a tell);
+2. a near-black background with a single bright acid-green or vermilion accent;
+3. a broadsheet-style layout with hairline rules, zero border-radius, and dense newspaper-like columns;
+4. the SaaS-card kit: content chopped into identical rounded cards, one border-radius on everything regardless of hierarchy, the same soft grey shadow (rgba(0,0,0,.1)) under each, and gradient washes as decoration;
+5. template chrome that appears whatever the subject: a tracked-out ALL-CAPS eyebrow label above every heading; meta strings joined with middle dots ('A · B · C'); labels built as 'WORD — fragment' with a spaced em dash; tinted near-black (#0B0B0B, #111) standing in for black; a monospace face for small data labels; a '→' appended to link and button text.
 
-- 大面积蓝色、紫色、粉紫色渐变背景，尤其是在与业务气质无关时。
-- 把标题、按钮、卡片、背景、图标全部做成蓝紫渐变或霓虹发光效果。
-- 机械套用玻璃拟态、毛玻璃、模糊圆斑、发光描边和大阴影。
-- 页面看起来像通用 AI SaaS 模板：大标题、紫色渐变按钮、三张功能卡片、虚假数据面板。
-- 为了“科技感”加入与产品无关的星空、网格、粒子、赛博朋克霓虹、3D 球体或漂浮光效。
-- 滥用 emoji，尤其是火箭、闪电、星星、魔法棒、机器人、彩虹等和产品气质不匹配的符号。
-- 用 emoji 替代真正设计过的图标系统。除非产品本身是轻松、社交、儿童、游戏或玩具化风格，否则应优先使用统一风格的 SVG 图标、线性图标、品牌插画或纯排版符号。
-- 图标风格混乱：emoji、线性 icon、填充 icon、3D 图标、表情符号随意混用。
-- 过度圆角、过度阴影、过度发光、过度动画，导致信息层级和专业感被削弱。
-- 动效只是为了炫酷存在，而不是用于强调状态变化、引导视线、解释结构或提升反馈。
-- 配色只追求“炫”，不考虑阅读性、可信度、业务语境、品牌一致性和可访问性。
+All traits are legitimate for some briefs, but they are defaults rather than choices, and they appear regardless of subject. Where the brief pins down a visual direction, follow it exactly — the brief's own words always win, including when it asks for one of these looks. Where it leaves an axis free, don't spend that freedom on one of these defaults. As with a hired human designer, there's often a careful balance between doing what you're good at and taking each project as a chance to experiment and learn.
 
-要进行创造性解读，做出意想不到但真正贴合上下文的选择。任何设计都不应该彼此雷同。请在明暗主题、不同字体、不同审美方向之间变化。绝不要在多次生成中趋同到常见选择（例如 Space Grotesk）。
+Work in two passes. First, brainstorm a short design plan based on the client's design brief: create a compact token system with color, type, layout, and principles.
+- Color: describe a compact named palette; preserve an existing project's semantic tokens. Use original colors for independent artworks, and follow the injected `show_ui` theme rules for chat-embedded interface surfaces.
+- Type: the typefaces and their roles; check CJK coverage for Chinese content.
+- Layout: a layout concept, using one-sentence prose descriptions and ASCII wireframes to ideate and compare. Include alignment guidance; should the content be left aligned, center aligned, justified?
+- Principles: the high-level guidance for what makes this page unique.
 
-## HTML 卡片与小尺寸展示规范
+Then review that plan against the brief before building: if any part of it reads like the generic default you would produce for any similar page (work through a similar prompt to see if you arrive somewhere similar) rather than a choice made for this specific brief — revise that part, say what you changed and why. Only after you've confirmed the relative uniqueness of your design plan should you start to write the code, following the revised plan.
 
-在本项目中，HTML 卡片也是重要的展示形态。不要默认把所有 HTML 输出都设计成完整官网或大型落地页；很多时候它会出现在聊天流、报告流、任务结果或侧边面板中，更像一张精心设计的信息卡、报告摘要或小型操作面板。
+When writing the code, be careful of structuring your CSS selector specificities. It's easy to generate CSS classes that cancel each other out (especially with a type-based selector like .section and an element-based selector like .cta). This can happen often with padding/margin between sections.
 
-设计 HTML 卡片时遵循：
+## Restraint and self-critique
 
-- 默认按小容器设计，而不是按全屏页面设计。卡片常见显示区域约为 `600px` 左右宽高。
-- 实际渲染内容不要过大，避免在聊天界面或结果面板中出现超长滚动、巨大留白或需要大屏才能看清的布局。
-- 优先在有限空间内表达最关键的信息层级：标题/结论、核心数据或状态、简短说明、必要操作或提示。
-- 使用紧凑但不拥挤的间距。字号、图表、按钮、图标都要适配卡片尺寸。
-- 避免依赖全屏背景、大面积装饰、复杂滚动叙事、多栏大屏布局或过长动画。
-- 如果信息很多，优先使用摘要、分组、折叠、分页或“查看详情”结构，而不是把所有内容无差别堆进卡片。
-- 卡片可以有明确审美与细节，例如精致边框、轻量纹理、局部 SVG、状态色、微动效，但必须服务于信息表达。
-- 对于报告、检测、审核、论文、AIGC 率、风险分析等场景，卡片应优先体现可信、清晰、可读和结论明确，而不是浮夸科技感。
-- 卡片可以包含精美优雅的动画交互，但不要包含任何元素的初始动画或出场动画效果
+Spend your boldness in one place. Let one element be the memorable thing, keep everything around it quiet and disciplined, and cut any decoration that does not serve the brief. Build to a quality floor without announcing it: responsive down to mobile, visible keyboard focus, reduced motion respected, visually accessible, harmonious color palettes. Review the rendered result using available Playwright tools when the task and workspace allow it; if the workspace assigns visual acceptance to the user, provide the preview and checks instead. Consider Chanel's advice: before leaving the house, take a look in the mirror and remove one accessory. Human creatives have memory and always try to do something new, so if you have a space to quickly jot down notes about what you've tried, it can help you in future passes.
 
-**重要**：让实现复杂度与审美愿景相匹配。极繁主义设计需要更复杂的代码、大量动画与效果。极简或精致设计则需要克制、精准，以及对间距、字体排印和细微细节的谨慎关注。优雅来自于对愿景的高质量执行。
+## More on writing in design
 
-请记住：你能够完成非凡的创造性工作。不要保守，要展示在跳出框架思考并完全投入鲜明愿景时，真正能够创造出的作品。
+Words appear in a design for one reason: to make it easier to understand and use. They are design content, not decoration. Bring the same intentionality and minimalism to copywriting that you would bring to spacing and color. Before writing anything, ask what the design needs to say, and how it can best be said to help the person navigate the experience.
+
+Write from the end user's perspective. Name things by what users will understand in simple language, not by how the system is built. A user manages notifications, not webhook config. Describe what something is or does in plain terms rather than selling it. Being specific and legible to new users is always better than being clever.
+
+Use active voice as default. A CTA says exactly what happens when it is used: "Save changes," not "Submit." An action keeps the same name through the whole flow, so the button that says "Publish" produces a toast that says "Published." The vocabulary of an interface is the signposting for someone navigating the product. Cohesion and consistency are how people learn their way around.
+
+Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
+
+Keep the tone conversational: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each written element do exactly one job.
+
+## Choose the delivery surface
+
+Use `show_ui` for flowing explanations and small interactions, `show_html` for fixed-composition works, following the current conversation's injected protocol. Do not impose a fixed 600px card on all content. For a saved website or app, retain the project's framework or separate HTML, CSS and JavaScript files. After starting a dev server in an Astrion persistent terminal, write its exact localhost URL in the response so it enters the preview panel. Deliver real files through `show_file` or a `download://` link. The user's project keeps its own brand and technology stack; Astrion's application-source theme rules do not automatically apply to unrelated artworks.

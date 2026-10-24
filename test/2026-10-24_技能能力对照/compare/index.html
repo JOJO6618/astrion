@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>技能效果 · 匿名对比</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <main class="comparison">
+    <header class="heading"><div><h1>技能效果对比</h1><p>两组相同任务 · 四个独立 low 实例 · 先比较，再揭示条件</p></div><button id="reveal" type="button">揭示技能条件</button></header>
+    <nav class="toolbar" aria-label="对比设置">
+      <div class="tabs" role="group" aria-label="任务"><button type="button" data-group="art" aria-pressed="true">潮汐档案</button><button type="button" data-group="ui" aria-pressed="false">论文阅读工作台</button></div>
+      <div class="tabs" role="group" aria-label="画布宽度"><button type="button" data-size="desktop" aria-pressed="true">桌面 1440</button><button type="button" data-size="mobile" aria-pressed="false">窄屏 390</button></div>
+    </nav>
+    <p id="task-description" class="description"></p>
+    <div class="results" id="results"></div>
+    <section class="feedback" aria-label="对比反馈">
+      <div class="feedback-row"><span>你的偏好</span><div class="tabs" role="group" aria-label="选择更喜欢的版本"><button type="button" data-preference="A" aria-pressed="false">A 更好</button><button type="button" data-preference="B" aria-pressed="false">B 更好</button><button type="button" data-preference="tie" aria-pressed="false">差不多</button></div></div>
+      <label for="notes">理由或发现的问题</label><textarea id="notes" rows="3" placeholder="例如构图、操作、信息层级或实际遇到的问题"></textarea>
+      <div class="feedback-row"><span id="save-status" role="status"></span><button id="export" type="button">导出两组反馈</button></div>
+    </section>
+    <footer>桌面作品按相同比例缩小展示；点击“单独查看”可直接操作。这里每种条件只有一次生成，结果用于观察本次差异。</footer>
+  </main>
+</body>
+</html>

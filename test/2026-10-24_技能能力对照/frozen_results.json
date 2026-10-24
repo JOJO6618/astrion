@@ -1,0 +1,186 @@
+{
+  "art-north": {
+    "end_reason": "timeout",
+    "budget_seconds": 1200,
+    "files": {
+      "css/style.css": {
+        "sha256": "9168ceb8ee674ccc6a8c961622d105b05a3b62568fd00dd377eb40d33fddca10",
+        "bytes": 9161
+      },
+      "index.html": {
+        "sha256": "0f0a31c2e6cb20846e5a9b207ebcb33ac6d3158833b3e43f97e2726c50691e85",
+        "bytes": 7921
+      },
+      "js/app.js": {
+        "sha256": "c3365a6c0a649d0744200fd228515b20ddbefbb680452377127f7ea3e886b3e7",
+        "bytes": 16159
+      },
+      "js/core.js": {
+        "sha256": "0e9c35576a428101cbc07b1be2503aebbb4c81557a91607a6cbf5e691e5b1cab",
+        "bytes": 17604
+      },
+      "tools/check-composition.cjs": {
+        "sha256": "b7bd63fa9fc65d2972cc203a33f29bd04d0a9d8732be74046705b6b40bc8abd1",
+        "bytes": 3426
+      },
+      "tools/check-core.cjs": {
+        "sha256": "3796cb61bf630f93ab8d55192e2952dc93d5d91d00b26b8bb0111d04d80110b5",
+        "bytes": 3552
+      },
+      "tools/check-page.cjs": {
+        "sha256": "a91bb7f4c7522b55564258bcfda7c33708c4a696652f00407b08984c6d487109",
+        "bytes": 4631
+      },
+      "tools/composition.txt": {
+        "sha256": "fcde27e36aa781241843b6b995f449535aa5a49a6b4c68e012d519f0d7cf638e",
+        "bytes": 11274
+      },
+      "tools/out.txt": {
+        "sha256": "af526e583f23fa8ee56c516a75998b32537af12dae6af856b31e9e2b2f55fae0",
+        "bytes": 988
+      },
+      "vendor/p5-LICENSE.txt": {
+        "sha256": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6",
+        "bytes": 24480
+      },
+      "vendor/p5.min.js": {
+        "sha256": "bb7f8f14b9ce2e2344ff5cd6c06f2e105eb99541ecbfec77139e2886d9c0b9ba",
+        "bytes": 977055
+      }
+    }
+  },
+  "art-south": {
+    "end_reason": "timeout",
+    "budget_seconds": 1200,
+    "files": {
+      "css/style.css": {
+        "sha256": "0634bb0784895c8a2e9f4d487032ce61801e0e62ff545e11b132c620b64e618e",
+        "bytes": 8462
+      },
+      "index.html": {
+        "sha256": "962ffa2b411f7bd2a6fd9bf5ae01af4d10401fde31e763ba5b6eaf6ec6d85bc8",
+        "bytes": 4572
+      },
+      "js/archive.js": {
+        "sha256": "d42ba63ec0ed6f98de104b444a1100445d44701c8decc70b5a613e7cb75cb83b",
+        "bytes": 14005
+      },
+      "js/p5-LICENSE.txt": {
+        "sha256": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6",
+        "bytes": 24480
+      },
+      "js/p5.min.js": {
+        "sha256": "bb7f8f14b9ce2e2344ff5cd6c06f2e105eb99541ecbfec77139e2886d9c0b9ba",
+        "bytes": 977055
+      },
+      "js/painter.js": {
+        "sha256": "34d321d21acb4126ba10ae9c3ee46c430926dc1f5cad60f85192f9c89db64c30",
+        "bytes": 17985
+      },
+      "js/sketch.js": {
+        "sha256": "ff348211547df6bbead4e56183957a34777c761c5d7f698b8dffc2d605366d28",
+        "bytes": 13598
+      },
+      "tests/check-html.cjs": {
+        "sha256": "ab8f6d67851bc2c17744625adb803a3a9b7f351c5571f55d635a8519ed5fe24e",
+        "bytes": 4535
+      },
+      "tests/check-painter.cjs": {
+        "sha256": "0901a73f95c9ddf95267b3c10df735918f5071bdfd81fc40fff53ec05e0d7e8d",
+        "bytes": 10112
+      },
+      "tests/check-ui.cjs": {
+        "sha256": "38fa4b964b46b240fe67040c208149f4e704f07ae562d28fdd00e6249722cf13",
+        "bytes": 12602
+      },
+      "tests/err.txt": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "tests/html-err.txt": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "tests/html.json": {
+        "sha256": "9d81a0fc61fe6f76cf28913636cacec448495a34fd5c6e16c4db4373e65b30a4",
+        "bytes": 1618
+      },
+      "tests/out.json": {
+        "sha256": "4b7aaa7cd22cf06b003f5ab493d4d085d3679d309f574c98242b153891b91409",
+        "bytes": 1166
+      },
+      "tests/ui-err.txt": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "tests/ui.json": {
+        "sha256": "0aa3846f0010991ae52826423bc1b733665416332ce8c2bea58532161c9a3848",
+        "bytes": 1956
+      }
+    }
+  },
+  "ui-east": {
+    "end_reason": "timeout",
+    "budget_seconds": 1200,
+    "files": {
+      "checks/dom-smoke.cjs": {
+        "sha256": "c4f266f1c67489efbb609266531a26983f18b687a70e962042c64b2dabc38ee8",
+        "bytes": 28142
+      },
+      "checks/verify.cjs": {
+        "sha256": "a43b82a6b468aad0c75a403dca2624d6f82721a0d3201d331a74c3a7527e69bb",
+        "bytes": 12267
+      },
+      "css/style.css": {
+        "sha256": "689369774b91aa30dc5947774fdb1d923c015601342bf54d18cd37a6b79c3aaf",
+        "bytes": 22137
+      },
+      "index.html": {
+        "sha256": "7b87f36b29cc8d5252501374d08bb613ef7ed5a8f24acf4932453a1019f15f5b",
+        "bytes": 7235
+      },
+      "js/app.js": {
+        "sha256": "6855a207692121d0cf985bd44bbacd5a377de019c70a7ad683e43a975adcb4e8",
+        "bytes": 38310
+      },
+      "js/data.js": {
+        "sha256": "44c06c53fec871274b993cf48c9af6a640278a7d26a16c3ac66b90b8ddd7c5e6",
+        "bytes": 3597
+      }
+    }
+  },
+  "ui-west": {
+    "end_reason": "timeout",
+    "budget_seconds": 1200,
+    "files": {
+      "css/style.css": {
+        "sha256": "7b96568748b688dea7c9859d76602a2ec17b4c198c5a838f039a982df707a1bc",
+        "bytes": 25769
+      },
+      "index.html": {
+        "sha256": "2d7567776008dedf5f56649f7f56dcc86b055298287ccc6803413c1e4665a25b",
+        "bytes": 10336
+      },
+      "js/app.js": {
+        "sha256": "60f85121e657106acc3205a74db40d788a9ee97f9d33cad6c3615f2fa6c62e52",
+        "bytes": 24031
+      },
+      "js/core.js": {
+        "sha256": "858bc8fb250cb3edec563d16f34943ae57fe7a09f81642f23d88bcbd43d71e50",
+        "bytes": 4535
+      },
+      "js/data.js": {
+        "sha256": "f1542089b74ef47a5ba9ab3f26de13cba7d9db424a892caf444fdcd7ad8fa24e",
+        "bytes": 4123
+      },
+      "tests/verify-core.cjs": {
+        "sha256": "c39e70083839a600ad1669c8c2c0e37ada4afe2711d72ab026d021008b1ed335",
+        "bytes": 6247
+      },
+      "tests/verify-static.py": {
+        "sha256": "7576fdb9305a7ad10e99c7161b057bcf1d403031a2f66896b1842f339c03654e",
+        "bytes": 10012
+      }
+    }
+  }
+}

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>潮汐档案 / Tidal Archive</title>
+  <meta name="description" content="一件由种子生成的潮汐沉积档案：退潮之后的曲线、颗粒与时间痕迹。">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="vendor/p5.min.js"></script>
+  <script defer src="js/core.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead__id">
+      <h1 class="masthead__title">潮汐档案</h1>
+      <p class="masthead__latin">TIDAL ARCHIVE</p>
+    </div>
+    <p class="masthead__note">退潮之后，海留下的曲线、颗粒与时间</p>
+  </header>
+
+  <main class="page">
+    <aside class="panel" aria-label="作品控制面板">
+      <section class="block" aria-labelledby="seed-heading">
+        <h2 class="block__title" id="seed-heading">种子 <span class="block__latin">SEED</span></h2>
+        <p class="seed-readout">
+          <span class="seed-readout__label">当前种子</span>
+          <span class="seed-readout__value" id="seed-value">6271</span>
+        </p>
+        <div class="field-row">
+          <label class="sr-only" for="seed-input">输入种子编号，1 至 2147483647</label>
+          <input id="seed-input" type="number" inputmode="numeric" min="1" max="2147483647" step="1" value="6271" autocomplete="off">
+          <button type="button" id="seed-jump">跳转</button>
+        </div>
+        <div class="button-row">
+          <button type="button" id="seed-prev">上一粒</button>
+          <button type="button" id="seed-next">下一粒</button>
+          <button type="button" id="seed-random">随机</button>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="param-heading">
+        <h2 class="block__title" id="param-heading">沉积参数 <span class="block__latin">PARAMETERS</span></h2>
+
+        <div class="control">
+          <div class="control__head">
+            <span class="control__label" id="layers-label">潮汐层数</span>
+            <output class="control__value" id="layers-value">9</output>
+          </div>
+          <div class="slider" id="layers-slider" role="slider" tabindex="0"
+               data-param="layers" data-step="1" data-decimals="0" data-unit=" 层"
+               aria-labelledby="layers-label" aria-valuemin="3" aria-valuemax="14" aria-valuenow="9" aria-valuetext="9 层">
+            <span class="slider__track" aria-hidden="true"></span>
+            <span class="slider__fill" aria-hidden="true"></span>
+            <span class="slider__thumb" aria-hidden="true"></span>
+          </div>
+          <p class="control__hint">档案被记下的次数，每一次都是一道潮线。</p>
+        </div>
+
+        <div class="control">
+          <div class="control__head">
+            <span class="control__label" id="tidalRange-label">潮差</span>
+            <output class="control__value" id="tidalRange-value">0.62</output>
+          </div>
+          <div class="slider" id="tidalRange-slider" role="slider" tabindex="0"
+               data-param="tidalRange" data-step="0.01" data-decimals="2"
+               aria-labelledby="tidalRange-label" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.62" aria-valuetext="0.62">
+            <span class="slider__track" aria-hidden="true"></span>
+            <span class="slider__fill" aria-hidden="true"></span>
+            <span class="slider__thumb" aria-hidden="true"></span>
+          </div>
+          <p class="control__hint">潮线起伏的幅度：小则平缓，大则动荡。</p>
+        </div>
+
+        <div class="control">
+          <div class="control__head">
+            <span class="control__label" id="sediment-label">沉积密度</span>
+            <output class="control__value" id="sediment-value">0.85</output>
+          </div>
+          <div class="slider" id="sediment-slider" role="slider" tabindex="0"
+               data-param="sediment" data-step="0.05" data-decimals="2"
+               aria-labelledby="sediment-label" aria-valuemin="0.2" aria-valuemax="1.6" aria-valuenow="0.85" aria-valuetext="0.85">
+            <span class="slider__track" aria-hidden="true"></span>
+            <span class="slider__fill" aria-hidden="true"></span>
+            <span class="slider__thumb" aria-hidden="true"></span>
+          </div>
+          <p class="control__hint">沙砾与碎屑的多少，决定滩面是清瘦还是厚重。</p>
+        </div>
+
+        <div class="control">
+          <div class="control__head">
+            <span class="control__label" id="erosion-label">侵蚀细沟</span>
+            <output class="control__value" id="erosion-value">0.45</output>
+          </div>
+          <div class="slider" id="erosion-slider" role="slider" tabindex="0"
+               data-param="erosion" data-step="0.05" data-decimals="2"
+               aria-labelledby="erosion-label" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.45" aria-valuetext="0.45">
+            <span class="slider__track" aria-hidden="true"></span>
+            <span class="slider__fill" aria-hidden="true"></span>
+            <span class="slider__thumb" aria-hidden="true"></span>
+          </div>
+          <p class="control__hint">退水切开的细沟与断口，让线条不再完整。</p>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="color-heading">
+        <h2 class="block__title" id="color-heading">色调 <span class="block__latin">PALETTE</span></h2>
+        <div class="palette-list" role="group" aria-labelledby="color-heading">
+          <button class="palette" type="button" data-palette="ebb" aria-pressed="true">
+            <span class="palette__swatches" aria-hidden="true">
+              <i style="background:#efe6d5"></i><i style="background:#a87a44"></i><i style="background:#2c322e"></i>
+            </span>
+            <span class="palette__name">退潮赭</span>
+          </button>
+          <button class="palette" type="button" data-palette="moon" aria-pressed="false">
+            <span class="palette__swatches" aria-hidden="true">
+              <i style="background:#151b1e"></i><i style="background:#b99a6d"></i><i style="background:#ccd6cf"></i>
+            </span>
+            <span class="palette__name">月夜砂</span>
+          </button>
+          <button class="palette" type="button" data-palette="salt" aria-pressed="false">
+            <span class="palette__swatches" aria-hidden="true">
+              <i style="background:#e9e8e2"></i><i style="background:#93a3a0"></i><i style="background:#33393a"></i>
+            </span>
+            <span class="palette__name">盐霜白</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="action-heading">
+        <h2 class="block__title" id="action-heading">操作 <span class="block__latin">ACTIONS</span></h2>
+        <div class="button-row">
+          <button type="button" id="replay">重新沉积</button>
+          <button type="button" id="reset">重置参数</button>
+        </div>
+        <div class="button-row">
+          <button type="button" id="pause" aria-pressed="false">暂停</button>
+          <button type="button" id="export">导出 PNG</button>
+        </div>
+      </section>
+
+      <p class="status" id="art-status" role="status" aria-live="polite">正在载入本地 p5 运行时…</p>
+      <p class="hint">相同种子与参数，重现同一份档案。</p>
+    </aside>
+
+    <section class="stage" aria-label="作品">
+      <div class="canvas-frame" id="canvas-container" role="img"
+           aria-label="潮汐档案：由种子生成的潮线、沙砾与侵蚀细沟">
+      </div>
+      <p class="stage__caption">种子生成 · p5.js · 每一粒种子沉积一份不同的档案</p>
+    </section>
+  </main>
+</body>
+</html>

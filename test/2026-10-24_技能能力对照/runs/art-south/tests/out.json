@@ -1,0 +1,60 @@
+{
+  "scene": {
+    "lines": 9,
+    "grains": 4290,
+    "version": 1
+  },
+  "coords": {
+    "issueCount": 0,
+    "examples": []
+  },
+  "determinism": {
+    "sameSeedSameScene": true,
+    "differentSeedDifferentScene": true,
+    "differentParamDifferentScene": true,
+    "sceneFingerprint": "d5af8bb7ef45d72862808ef2d064bbcd87c60447"
+  },
+  "painter": {
+    "small": {
+      "calls": 43712,
+      "strokes": 1894,
+      "fills": 3846,
+      "texts": 93,
+      "gradients": 49,
+      "bad": 0,
+      "outOfRange": 0
+    },
+    "large": {
+      "calls": 63392,
+      "strokes": 2907,
+      "fills": 3846,
+      "texts": 93,
+      "gradients": 49,
+      "bad": 0,
+      "outOfRange": 0
+    },
+    "badExamples": [],
+    "completenessIssues": [],
+    "idempotentRepaint": true
+  },
+  "stages": {
+    "strokeAtZero": 510,
+    "strokeAtOne": 1768,
+    "textAtZero": 46,
+    "textAtOne": 93,
+    "zeroFewerStrokes": true
+  },
+  "paramEffects": {
+    "tideRange": true,
+    "tides": true,
+    "density": true
+  },
+  "geometry": {
+    "combos": 72,
+    "minSeparation": 0.00424,
+    "maxY": 0.8555,
+    "minY": 0.166,
+    "separationFailures": 0,
+    "boundsFailures": 0
+  }
+}

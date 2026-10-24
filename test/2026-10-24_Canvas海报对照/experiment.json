@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-24",
+  "brief": "我要设计一张“午夜植物园”主题的展览海报，给我 HTML。",
+  "requested_intelligence": "medium",
+  "model_basis": "沿用上一轮用户配置的中档MiniMax M2.5；底层实际API模型标识尚未独立核实",
+  "timeout_seconds": null,
+  "access_level": "working_dir_write",
+  "variants": {
+    "A": {"agent": "PosterIris", "directory": "runs/poster-iris", "skill": "agentskills/canvas-design/SKILL.md"},
+    "B": {"agent": "PosterMoss", "directory": "runs/poster-moss", "skill": null}
+  },
+  "conditions": [
+    "两个全新实例，设计任务相同。",
+    "一边完整阅读canvas-design正文，可使用自身目录附属资料；另一边禁止读取任何技能。",
+    "仅隔离工作目录并禁止互看和互相通信；没有额外禁止联网、素材查找、依赖安装或浏览器工具。",
+    "没有20分钟轮次预算，没有预设字体、配色、比例、布局、文案或技术路线。",
+    "只要求HTML交付与最终回复中的路径、实际验证及阅读记录；不强制评审文件或trial.json。",
+    "主智能体冻结原始产物，另做匿名查看入口，不替任何一方改设计。",
+    "用户先匿名查看；主智能体知道映射；单样本结果不能推广为普遍提升。"
+  ]
+}

@@ -1,0 +1,939 @@
+{
+  "common_inputs_changed": [],
+  "trials": {
+    "art-north": {
+      "required_missing": [
+        "trial.json",
+        "design.md"
+      ],
+      "assets_missing": [],
+      "external_assets": [],
+      "syntax": [
+        {
+          "file": "js/app.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/core.js",
+          "exit": 0,
+          "detail": "passed"
+        }
+      ],
+      "read_condition": "not established",
+      "limitations": [],
+      "external_stylesheet_count": 1,
+      "external_script_count": 3,
+      "inline_script_count": 0,
+      "native_controls_to_inspect": [],
+      "files": {
+        "css/style.css": {
+          "bytes": 9161,
+          "sha256": "9168ceb8ee674ccc6a8c961622d105b05a3b62568fd00dd377eb40d33fddca10"
+        },
+        "index.html": {
+          "bytes": 7921,
+          "sha256": "0f0a31c2e6cb20846e5a9b207ebcb33ac6d3158833b3e43f97e2726c50691e85"
+        },
+        "js/app.js": {
+          "bytes": 16159,
+          "sha256": "c3365a6c0a649d0744200fd228515b20ddbefbb680452377127f7ea3e886b3e7"
+        },
+        "js/core.js": {
+          "bytes": 17604,
+          "sha256": "0e9c35576a428101cbc07b1be2503aebbb4c81557a91607a6cbf5e691e5b1cab"
+        },
+        "tools/check-composition.cjs": {
+          "bytes": 3426,
+          "sha256": "b7bd63fa9fc65d2972cc203a33f29bd04d0a9d8732be74046705b6b40bc8abd1"
+        },
+        "tools/check-core.cjs": {
+          "bytes": 3552,
+          "sha256": "3796cb61bf630f93ab8d55192e2952dc93d5d91d00b26b8bb0111d04d80110b5"
+        },
+        "tools/check-page.cjs": {
+          "bytes": 4631,
+          "sha256": "a91bb7f4c7522b55564258bcfda7c33708c4a696652f00407b08984c6d487109"
+        },
+        "tools/composition.txt": {
+          "bytes": 11274,
+          "sha256": "fcde27e36aa781241843b6b995f449535aa5a49a6b4c68e012d519f0d7cf638e"
+        },
+        "tools/out.txt": {
+          "bytes": 988,
+          "sha256": "af526e583f23fa8ee56c516a75998b32537af12dae6af856b31e9e2b2f55fae0"
+        },
+        "vendor/p5-LICENSE.txt": {
+          "bytes": 24480,
+          "sha256": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6"
+        },
+        "vendor/p5.min.js": {
+          "bytes": 977055,
+          "sha256": "bb7f8f14b9ce2e2344ff5cd6c06f2e105eb99541ecbfec77139e2886d9c0b9ba"
+        }
+      }
+    },
+    "art-south": {
+      "required_missing": [
+        "trial.json",
+        "design.md"
+      ],
+      "assets_missing": [],
+      "external_assets": [],
+      "syntax": [
+        {
+          "file": "js/archive.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/p5.min.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/painter.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/sketch.js",
+          "exit": 0,
+          "detail": "passed"
+        }
+      ],
+      "read_condition": "not established",
+      "limitations": [],
+      "external_stylesheet_count": 1,
+      "external_script_count": 4,
+      "inline_script_count": 0,
+      "native_controls_to_inspect": [
+        {
+          "tag": "input",
+          "type": "range",
+          "id": "tide-range"
+        },
+        {
+          "tag": "input",
+          "type": "range",
+          "id": "tide-count"
+        },
+        {
+          "tag": "input",
+          "type": "range",
+          "id": "density"
+        }
+      ],
+      "files": {
+        "css/style.css": {
+          "bytes": 8462,
+          "sha256": "0634bb0784895c8a2e9f4d487032ce61801e0e62ff545e11b132c620b64e618e"
+        },
+        "index.html": {
+          "bytes": 4572,
+          "sha256": "962ffa2b411f7bd2a6fd9bf5ae01af4d10401fde31e763ba5b6eaf6ec6d85bc8"
+        },
+        "js/archive.js": {
+          "bytes": 14005,
+          "sha256": "d42ba63ec0ed6f98de104b444a1100445d44701c8decc70b5a613e7cb75cb83b"
+        },
+        "js/p5-LICENSE.txt": {
+          "bytes": 24480,
+          "sha256": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6"
+        },
+        "js/p5.min.js": {
+          "bytes": 977055,
+          "sha256": "bb7f8f14b9ce2e2344ff5cd6c06f2e105eb99541ecbfec77139e2886d9c0b9ba"
+        },
+        "js/painter.js": {
+          "bytes": 17985,
+          "sha256": "34d321d21acb4126ba10ae9c3ee46c430926dc1f5cad60f85192f9c89db64c30"
+        },
+        "js/sketch.js": {
+          "bytes": 13598,
+          "sha256": "ff348211547df6bbead4e56183957a34777c761c5d7f698b8dffc2d605366d28"
+        },
+        "tests/check-html.cjs": {
+          "bytes": 4535,
+          "sha256": "ab8f6d67851bc2c17744625adb803a3a9b7f351c5571f55d635a8519ed5fe24e"
+        },
+        "tests/check-painter.cjs": {
+          "bytes": 10112,
+          "sha256": "0901a73f95c9ddf95267b3c10df735918f5071bdfd81fc40fff53ec05e0d7e8d"
+        },
+        "tests/check-ui.cjs": {
+          "bytes": 12602,
+          "sha256": "38fa4b964b46b240fe67040c208149f4e704f07ae562d28fdd00e6249722cf13"
+        },
+        "tests/err.txt": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "tests/html-err.txt": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "tests/html.json": {
+          "bytes": 1618,
+          "sha256": "9d81a0fc61fe6f76cf28913636cacec448495a34fd5c6e16c4db4373e65b30a4"
+        },
+        "tests/out.json": {
+          "bytes": 1166,
+          "sha256": "4b7aaa7cd22cf06b003f5ab493d4d085d3679d309f574c98242b153891b91409"
+        },
+        "tests/ui-err.txt": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "tests/ui.json": {
+          "bytes": 1956,
+          "sha256": "0aa3846f0010991ae52826423bc1b733665416332ce8c2bea58532161c9a3848"
+        }
+      }
+    },
+    "ui-east": {
+      "required_missing": [
+        "trial.json",
+        "review.md"
+      ],
+      "assets_missing": [],
+      "external_assets": [],
+      "syntax": [
+        {
+          "file": "js/app.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/data.js",
+          "exit": 0,
+          "detail": "passed"
+        }
+      ],
+      "read_condition": "not established",
+      "limitations": [],
+      "external_stylesheet_count": 1,
+      "external_script_count": 2,
+      "inline_script_count": 0,
+      "native_controls_to_inspect": [],
+      "files": {
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/0535d717": {
+          "bytes": 4788,
+          "sha256": "3c76b96f6db8d54ecc496e0f1aa57177b7d7cc23863896a0d73f0c57a3c6b29a"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/09cc6bf3": {
+          "bytes": 7436,
+          "sha256": "81cd2d0a4734a65c110be3dbd9addf67f49234eb91552bb9bf937f2d104eb4bc"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/0c92995d": {
+          "bytes": 73924,
+          "sha256": "71e499db98bc9de6a895a37e5b33743c9a1c9b49e311f10a2033f5427befd5f0"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1134cedf": {
+          "bytes": 980,
+          "sha256": "486eb7170d20f75b4220d9b2dc337ac8d1538121594b0f79e81f07d80a49e576"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1215b633": {
+          "bytes": 860,
+          "sha256": "5041321437ddb9bdfe152f8343bef5611a718fce4b320b9989ff0346bd2c91fa"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/14003ba0": {
+          "bytes": 2188,
+          "sha256": "c98250ef3dd00dbba84ce8aa9fb1b41a17c212da0ea3b7591e06ab5ddd685d0b"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1400e130": {
+          "bytes": 1412,
+          "sha256": "3ebe2f63ac3015393de7aeb2dd52e86d601029753595e58ca32f8bec934a3e01"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/14321a91": {
+          "bytes": 1212,
+          "sha256": "1117f7e57cf5169b4e8a15fcfaa019c700d5d32044752b9164978e67deb2caae"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1b711ba2": {
+          "bytes": 988,
+          "sha256": "23e717d373d2a5876736478c44ecdd68fcec9ed053d1e5ce9c58b6a1c5ae0e83"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/22a79fc3": {
+          "bytes": 1620,
+          "sha256": "f91ee2a84b9409eaf073bd4e372b772075c8ab598263c6f0e3f9d5c58d48d711"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2512a231": {
+          "bytes": 1420,
+          "sha256": "4904e8a9377308c060d7ed8cda37749ea504026545e3a15939012be94546ecf9"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2b80aaeb": {
+          "bytes": 7164,
+          "sha256": "fa4551a31d45e95226722e282da9f9f85162bc26c072119208767c2adda8641e"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2d189c75": {
+          "bytes": 876,
+          "sha256": "3652abc27d298d562af7b6b96b004d7b3d9b35d34544814a71ebbac68ba44fbd"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2d333828": {
+          "bytes": 916,
+          "sha256": "11a6914ed52412542f0427862147dcb1f84ea4b05e0473dff0f04f1560b50b42"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/31503801": {
+          "bytes": 1380,
+          "sha256": "6274adce1d0a4afefa9db8bc7a3c9618fa01ce4b64e4c7791c3f7680c109b630"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/31af2baa": {
+          "bytes": 1108,
+          "sha256": "38bf288fd23273c22ca824110fc12ad4ca473089ea27b34a2f9fc6bf0d15c110"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/34d66bd2": {
+          "bytes": 1508,
+          "sha256": "bc08963e0f36b775ef9257afa0d2bdba03001d74456a4d00824bf60b881cbae9"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/36354dfa": {
+          "bytes": 2836,
+          "sha256": "8b4a93680be8fa5109396e02e565e2f97c931491a15f3464806504eaaf22bb9c"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/3c96d784": {
+          "bytes": 1948,
+          "sha256": "53bd50f332500aa4516b1498c50ab0b7a94ba8dad60ee54a11295ed0b5fe1574"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/40194e3b": {
+          "bytes": 2324,
+          "sha256": "4a619568c8578dcd6ab22c202ded35e8d8c6e234efdca281853c63ecedb32578"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/47f4c8eb": {
+          "bytes": 916,
+          "sha256": "3c4b713312fd2fcfd1274cfeb8175c9ce7cd56c8efe3f4a7b6805f5db2f12bcf"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/4e2640f8": {
+          "bytes": 2596,
+          "sha256": "ec519e606e1e17255e2d952278d7cc8ea96e89ae4cb8f28ea0a9dcb0885b5e3f"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/52839e32": {
+          "bytes": 2548,
+          "sha256": "9b1493e4a250e1231484738ffade0960200f00aea720b48b92a3c46ecfebba59"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/557c0551": {
+          "bytes": 9484,
+          "sha256": "d5418a5dea2a7c26fb0768db6dee6586a143839bc84a693f098d4adefb1fba68"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/596e3987": {
+          "bytes": 8340,
+          "sha256": "36d08c786f5c9a009a3e7863f2a699065a0baf3d970b2e95f03685553219d10c"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/5d6fa746": {
+          "bytes": 2300,
+          "sha256": "414c85ad98aa94b0a0b6560ae8ebbd412226c6ea0b8513a0d48aa369a39ed3a0"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/5f917876": {
+          "bytes": 1076,
+          "sha256": "2889ee370ea94a1822c5826fe26d3767728966e3a1cbdba5eba790ca130f91fb"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/67bd5aa5": {
+          "bytes": 1700,
+          "sha256": "7c5ddc87f0d8bb6b3f915d8b4a2fb5ba4c3bfaa12c841aad74f301fb15c23a02"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/6e2af0ae": {
+          "bytes": 4660,
+          "sha256": "568e1e748b09b8308b29cd05532fc884b48713b812baed0001b8751cdd4d315d"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/6fefea4d": {
+          "bytes": 1068,
+          "sha256": "70f5e86644bd0ff5536633cebbe54651ceffcb645ea8e7da77bfc3debfc8b054"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/78b597a2": {
+          "bytes": 1140,
+          "sha256": "ba5e48075c0edc4ad13f38b5c76022ac35f18935e22fe3105b4cffe072c236b2"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/7ff8930f": {
+          "bytes": 13004,
+          "sha256": "60bb3fa2a979ab0946d4d2b15225340c1b438df251313148ae1642618c60c955"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8197999c": {
+          "bytes": 1484,
+          "sha256": "1837c1fd3b65de1fdabeb208c1f890fd7ce6c3ee3cbee8cbe39687c0dd3da685"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/82aab2a4": {
+          "bytes": 5716,
+          "sha256": "984f87980ad55e8d3211364a98820b9f996ef89385238270e352b8257aaa9b85"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/88c20709": {
+          "bytes": 916,
+          "sha256": "53ba19790e7302a03199933b4fa4bbc3ab1198dcd1bb04deed745d17173b9a59"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8983e5b2": {
+          "bytes": 1980,
+          "sha256": "57670c20eb9444d9c4b264557ef20715cc1dfde2108809d557b65453755e605f"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8b2837bb": {
+          "bytes": 2284,
+          "sha256": "3257c193ad711cad992e348c4bdd66a6d624d31d249d15bdf92802e92a377cfb"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8d6b6687": {
+          "bytes": 2380,
+          "sha256": "65d829079ea76d5640b1759b86e61bbb4512e2e4d35d09fac06d420b028cefb3"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9680544a": {
+          "bytes": 1284,
+          "sha256": "41c7e64d72a205e22a62368153cb8e9a151ce9b6f0cbab187285767fc2423f54"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9c76eda3": {
+          "bytes": 1388,
+          "sha256": "b0dceed8893492994983af6f17700ccfc9bfc81c4c3fb93f5fe18ad85d7fa8cc"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9e3d89b2": {
+          "bytes": 924,
+          "sha256": "673fcd369db95dac2360084f7208a3c424cf3f94e46eba0a328b6601e47036c6"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9eec5070": {
+          "bytes": 1004,
+          "sha256": "fe630e40fce62896e990e75b46b0e97dc0aa6abd0b2c22ef434b669c3a678494"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9f0dcddd": {
+          "bytes": 924,
+          "sha256": "106cbce73ad2d824f65807addd61458373309f5967823527469f714f5de5ba85"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9f164f81": {
+          "bytes": 3516,
+          "sha256": "c2a1608d3894370cfaf866915647651e09f8520aa308e364135c02811c5dde7e"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9f37670a": {
+          "bytes": 2916,
+          "sha256": "417c5b09d155781480471836b5131d15ff1c1619ed4e43d3517d8cd00564ca65"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a01932e9": {
+          "bytes": 3516,
+          "sha256": "db9579bd6036917a43bf16fba7cc31ea28f73d7fce5530b22546e8e6a5e42e97"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a0fc4530": {
+          "bytes": 3764,
+          "sha256": "90f19abaea93ce2aa4f2efceee1002113a112b65001a1c96855084e53b4cbfc0"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a2bbb47c": {
+          "bytes": 948,
+          "sha256": "a6a7189fc8d440bb8860d4923ff8c0a83a2a2320fe3ba5a2146e276d187ad673"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a57eba5c": {
+          "bytes": 4396,
+          "sha256": "dc492da3c64e8f7ca8408e9fd2bee048b266dee3842fc32dba1aa6977b6b8adf"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a6197ae0": {
+          "bytes": 2492,
+          "sha256": "93757fa6a63bdbda06010f8299bcfa794c5edd0975978b6368060df28e88b1bb"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a800670b": {
+          "bytes": 940,
+          "sha256": "c8c4bdf806f6ee8fb0761612a3e1614a4f9f57a57ceed06724bca5e6d0bc7656"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/aa1c21db": {
+          "bytes": 1052,
+          "sha256": "3dc53427e2afcf42bf2487e7cf83234ef8b9eccecaff3f7c9f21142f68668795"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/ac22db77": {
+          "bytes": 1516,
+          "sha256": "de059f1eb44fe758598cf9eb447291a4236e828b59812d607a960d13ef9b6ffc"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/aff87990": {
+          "bytes": 1212,
+          "sha256": "d48862d88e3899d3faac076d8e0ec342143ea3be2a1cc248d4b92f921573c196"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/b20c954a": {
+          "bytes": 916,
+          "sha256": "2978535942fdc2c6c923b3056ca87c6aad8449744f69a22b715f1e4d8f966665"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/b2413048": {
+          "bytes": 1020,
+          "sha256": "4ec038b7571661471b3695dded4d93ef2e4007875d3212820d7fc77b61d9ee75"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/bf0630bb": {
+          "bytes": 4308,
+          "sha256": "6f192c1567cdafa5ae07c93a4676cfc0cb4734d2153ceaea30131fba7fbfcdc1"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/bf65294b": {
+          "bytes": 3068,
+          "sha256": "6ac40383c5a8bf3e611dc855b2b9b897e3b79b73e4e5b1c12d3f1a177ae60fe1"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/bff28abc": {
+          "bytes": 2572,
+          "sha256": "e425852b13e0653eb67f43cd41c54d90b1377ef8b91fafc2e1f410441208dfc6"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/c115827e": {
+          "bytes": 2276,
+          "sha256": "246a4cfd7ba082e24c03af40893e06ee6bb793ce16ae47d4370b27bae273a63b"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/c5dca45b": {
+          "bytes": 916,
+          "sha256": "690bb36c02d119e1bac4bf81de8cd7a859a18b2fcd33f4a7c78450b9bf0e1010"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/c750d204": {
+          "bytes": 1092,
+          "sha256": "8bd74da8f9c967d4a066c2a76d0c1749af2576b73206778fcdfe3e6433809980"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/cfbd32c3": {
+          "bytes": 8748,
+          "sha256": "bdec7b7dcd1ce5ed6314dffe899aab23a26f7a08a1bd16efa0a0b0c4e18ae681"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d1c0dbc9": {
+          "bytes": 1484,
+          "sha256": "f33bbf79a6cd560fda03aa43d445748651a46c6062cb907ffa8fa703556ae3e6"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d2cc9f7b": {
+          "bytes": 3468,
+          "sha256": "31463a68c05fefa9ad7ab90c29b7fb5b4865bd7453573dcb496a62a60b9ab0e0"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d3fca832": {
+          "bytes": 2316,
+          "sha256": "374e32bd8ade34a299f387b4a2fb500c04e46f0cc7b327cf7fede2fe68ad6d63"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d652d8a3": {
+          "bytes": 1268,
+          "sha256": "a9151e823d8a1182959b682387ec6b8d2bb626a823f9da7c5f0786f6a19e4437"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/dc7166bc": {
+          "bytes": 1060,
+          "sha256": "287cfdf8255a8af4617f48e44a7ac76d3cc1c413e45f927d44b2609943d0b8b1"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e0b61e81": {
+          "bytes": 1124,
+          "sha256": "5422932f1614875bd39e7bec2426048ad8551513c82d4a4a42f777c9bbf947a7"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e200e7d9": {
+          "bytes": 916,
+          "sha256": "0de2658fd6d67fa9aa67a606add9821e8a5f91f9a128d1ccca97281c32869c56"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e3ac4f75": {
+          "bytes": 876,
+          "sha256": "2c452e4d68fdbc10c3adc4fe13aa300248fb3666440d35ccea15a31e4c9c35ea"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e8e2d976": {
+          "bytes": 1540,
+          "sha256": "8d4f7e29c495f408199e3a73fd0a7fda179a67bb2d58899af291d3d3d3cfcc56"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e9502cdb": {
+          "bytes": 1820,
+          "sha256": "9f6935b87fa02fd95fe9a7f156fdb524733cb40ea46faacb66d227e53bf20cb3"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/f3620b98": {
+          "bytes": 908,
+          "sha256": "2ce2ef5911108ba44df2d0f155f41d7d23c5f62c228039cb03094e9235817a15"
+        },
+        ".astrion/sub_agent_runtime/6263688307662ad6022f9d08/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/ffa931aa": {
+          "bytes": 948,
+          "sha256": "0027da2bbc320d87e760d64620b988c66bfde8f0a5496bf2ba93a8c5b7d8c875"
+        },
+        "checks/dom-smoke.cjs": {
+          "bytes": 28142,
+          "sha256": "c4f266f1c67489efbb609266531a26983f18b687a70e962042c64b2dabc38ee8"
+        },
+        "checks/verify.cjs": {
+          "bytes": 12267,
+          "sha256": "a43b82a6b468aad0c75a403dca2624d6f82721a0d3201d331a74c3a7527e69bb"
+        },
+        "css/style.css": {
+          "bytes": 22137,
+          "sha256": "689369774b91aa30dc5947774fdb1d923c015601342bf54d18cd37a6b79c3aaf"
+        },
+        "index.html": {
+          "bytes": 7235,
+          "sha256": "7b87f36b29cc8d5252501374d08bb613ef7ed5a8f24acf4932453a1019f15f5b"
+        },
+        "js/app.js": {
+          "bytes": 38310,
+          "sha256": "6855a207692121d0cf985bd44bbacd5a377de019c70a7ad683e43a975adcb4e8"
+        },
+        "js/data.js": {
+          "bytes": 3597,
+          "sha256": "44c06c53fec871274b993cf48c9af6a640278a7d26a16c3ac66b90b8ddd7c5e6"
+        }
+      }
+    },
+    "ui-west": {
+      "required_missing": [
+        "trial.json",
+        "review.md"
+      ],
+      "assets_missing": [],
+      "external_assets": [],
+      "syntax": [
+        {
+          "file": "js/app.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/core.js",
+          "exit": 0,
+          "detail": "passed"
+        },
+        {
+          "file": "js/data.js",
+          "exit": 0,
+          "detail": "passed"
+        }
+      ],
+      "read_condition": "not established",
+      "limitations": [],
+      "external_stylesheet_count": 1,
+      "external_script_count": 3,
+      "inline_script_count": 0,
+      "native_controls_to_inspect": [
+        {
+          "tag": "select",
+          "type": null,
+          "id": "sort"
+        }
+      ],
+      "files": {
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/0535d717": {
+          "bytes": 4788,
+          "sha256": "6f2a3f8667f4bf3f913e90540ad33a548373cf95d51d31c4211eee379cd699b7"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/0555bc32": {
+          "bytes": 876,
+          "sha256": "3ebba262bea3bbfbad4213765b58d71f1f9a2d40aafbcd92fc246413d9446208"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/09cc6bf3": {
+          "bytes": 7436,
+          "sha256": "0d8647a7a27672cf97b3d90901b3b1d1461b80efa31e1dfe3359ddd089e83a31"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/0c92995d": {
+          "bytes": 73924,
+          "sha256": "a361261a163a7421f5a038799602126715fb7090224ac25c0a01bd92354c5dfc"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1134cedf": {
+          "bytes": 980,
+          "sha256": "78d6c2e9f15672a8f095a141ea96fae28ca372e965ba1258bdb09fabe62b9e58"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1215b633": {
+          "bytes": 860,
+          "sha256": "30c3307b6e86bced58d7281adc608c65eafd4be522f51da34661ec7d0359677e"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/14003ba0": {
+          "bytes": 2188,
+          "sha256": "f83d8d5afb45868ff2ae7cffe368b35bb353d21ebbdcfe0e8bcf4cd211ec904c"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1400e130": {
+          "bytes": 1412,
+          "sha256": "8eadc4e359723c052e551777d4f1c146ce5d8f557bcdcf1fe761be0083d3c8e4"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/14321a91": {
+          "bytes": 1212,
+          "sha256": "18352326b59509317f2211a96b5fcd8ad78555759c5ec8b6132f870af2da73ce"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/1b711ba2": {
+          "bytes": 988,
+          "sha256": "4fe50e0e5efb632ee2e3247a7127b6edd4c654896a7b2dc9999cf84ac611df06"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2512a231": {
+          "bytes": 1420,
+          "sha256": "7906f635e9936cd5eeb2610d8ac5a8d9b9043651216ee5cf9010d4bd7050f794"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2b80aaeb": {
+          "bytes": 7164,
+          "sha256": "190cb6600754c139e9f5c711a566ac3531acf0ef6e44caed820fe84d0902f8a9"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2d189c75": {
+          "bytes": 876,
+          "sha256": "8570036e4a81f79e488ad2c4415ab680897a30a92ab778363700d6401f34ed92"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/2d333828": {
+          "bytes": 916,
+          "sha256": "e4e1537a67978cd99b34bc3bb0c30f1dca49394b095382c8513efc932363eb3d"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/31503801": {
+          "bytes": 1380,
+          "sha256": "38c562966443128f2cf69c631e4509c0f868456bffb05c24df9d5b226563a152"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/31af2baa": {
+          "bytes": 1108,
+          "sha256": "7afbd301e1e74595344e5ade162b523f0d543ffe29293be1efe393d6cf0bc960"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/34d66bd2": {
+          "bytes": 1508,
+          "sha256": "71e2ab2ae09f81a6d66c88c369ffd4781674c8b110ec175a888ffd2726cec883"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/36354dfa": {
+          "bytes": 2836,
+          "sha256": "fc79b7f070bc76713af5c6c2a7ad06ca1355a01834dd4ceb660f2a752fb239c0"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/3c96d784": {
+          "bytes": 1948,
+          "sha256": "557735214cab85356ab54623e6c4b62bca88860f7a87b0ae86c55c5ebc758e3e"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/40194e3b": {
+          "bytes": 2324,
+          "sha256": "12c2409edd3ffda2142b55c095bd0621b8281e768670d732d68d0a171e239162"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/47f4c8eb": {
+          "bytes": 916,
+          "sha256": "56c169e4f75e815b4e00150d82904e9b4e7a58b19b0dfa701644301ab65efdc9"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/49b91afd": {
+          "bytes": 1260,
+          "sha256": "725067f5b3ec3158a6405bbab6768c377c6c4c5396fc0bfd100c2bc9fc58130f"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/4e2640f8": {
+          "bytes": 2596,
+          "sha256": "8aacefd84bf19f6db1af806c6e9367219df4c542620f5846ea36d7f4efbfaef9"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/5244a2f6": {
+          "bytes": 884,
+          "sha256": "df36aea25dbff65ee94e9700f2f6803ad3f9b8006f1682d97403e0de4d12d89a"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/557c0551": {
+          "bytes": 9484,
+          "sha256": "a2e0d5f1a101c2bb6387d774658cc8fe94a69a2fafefa551dd3fdd96fb665842"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/596e3987": {
+          "bytes": 8340,
+          "sha256": "3a5d480f8d3d5e585cebab11529137465ab153ba38606db474896e527f44f66d"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/5d6fa746": {
+          "bytes": 2300,
+          "sha256": "4880c78031abcdc14cbbc560b46ac5ac6b7bdf653fa335385073fd3fabfcc74e"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/5f917876": {
+          "bytes": 1076,
+          "sha256": "6eb28f268ca4ffd49673b2f572bc22340c55acafd4abdf86998de70f607fade7"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/67bd5aa5": {
+          "bytes": 1700,
+          "sha256": "71cf1e4931d5cbcc618ee18e806c5de4397638b08fdd622bdd982e077aa515fb"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/6e2af0ae": {
+          "bytes": 4660,
+          "sha256": "83a807b0efaa207717517bf23294c1df6e8c7e10ca78034ed1f811a5498342d8"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/6fefea4d": {
+          "bytes": 1068,
+          "sha256": "1b36d4605315854a58218ee62915a941b15e31b00d70adc669ba6b03a0f77a28"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/70ba0036": {
+          "bytes": 1324,
+          "sha256": "fd7549964e1170427c1ccf0276c549c7275cc5959c90ff0e885086953fbb8436"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/78b597a2": {
+          "bytes": 1140,
+          "sha256": "3cfbf3ea7bf60ab12363e13b3612cd70a5e52a9dba1d6bdc0122cec4685593e5"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/7ff8930f": {
+          "bytes": 13012,
+          "sha256": "9bb546ee3f256f948c4c1f28b7458186f54e36d262b72e2631ef45f0f21122f9"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8197999c": {
+          "bytes": 1484,
+          "sha256": "9f891927f0042ffd9698f8b580fcf74f97f49b0bf64617baf3a2dd7d76a3d47f"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/82aab2a4": {
+          "bytes": 5716,
+          "sha256": "295a7e3ba2dc4de200256456509666d4894854f98c33e6dd1ac8bf04f38ced98"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/82b0c840": {
+          "bytes": 900,
+          "sha256": "60e451429f4c6ba1c547f0efe529c0bdde23f5aa2d2671b01233d0ead6d79e0b"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/88c20709": {
+          "bytes": 916,
+          "sha256": "ec04a48148846064034e16e5a34e39c65047f9370eac7a309a65c297df5c1267"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8983e5b2": {
+          "bytes": 1980,
+          "sha256": "efaa90f79184e8c751da3fc08c0d0f31a1495b3d29c304a9d493b975d58f5794"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8b2837bb": {
+          "bytes": 2284,
+          "sha256": "5d9e03e9d42a94d1045380d3acb2a306ba0599763c4d39b6b4f64cc01d5a1fda"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/8d6b6687": {
+          "bytes": 2380,
+          "sha256": "17ac71fcfa29823622942f0579cbfbee98af443f7a9642c677f33d6f97943c65"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9680544a": {
+          "bytes": 1284,
+          "sha256": "f59832db7c372923534c663485899edf1c39199b70965af5d43afc45d8e2fb51"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/996086c4": {
+          "bytes": 2676,
+          "sha256": "94c05bd66e1ce98fca43c026a9a690590023372e583e280d4987f813c16a7443"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9c76eda3": {
+          "bytes": 1388,
+          "sha256": "63462cd15b8328f66e109a02c023c667a536582bb65700e0d07cc1b7cde8b841"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9e3d89b2": {
+          "bytes": 924,
+          "sha256": "c86126c8591efa85e0104a9e379faf485de5af00ba07914ab36633a252f973f3"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9eec5070": {
+          "bytes": 1004,
+          "sha256": "fc39e215b044f8aaf3461e7354f3f42e22888f5a518af055f1d0ec84328b8a8d"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9f0dcddd": {
+          "bytes": 924,
+          "sha256": "64969578fe05c0afc2581c3453712bde13a145a5fe755683a786c49b3548c057"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9f164f81": {
+          "bytes": 3516,
+          "sha256": "6c228983e958d5599af8675e9999f48fe6f89a9556cdb70c4a13987a311f0046"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/9f37670a": {
+          "bytes": 2916,
+          "sha256": "d85937d325ae6c07d21f9ed716e30258924070450135c21dd3ffae0ce04b06d4"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a01932e9": {
+          "bytes": 3516,
+          "sha256": "959c99b5b9fc9f82b286b8f728bb1522f3f8dbb26dc63c6ae2002596b783c3d9"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a0fc4530": {
+          "bytes": 3764,
+          "sha256": "9684b946c44ae20fe66962f0eda52c506c8ecf4c185066065af46b498ed3cd5d"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a2bbb47c": {
+          "bytes": 948,
+          "sha256": "49bf48f2fccf635b8961e6b855458f5843a97e1be8e3ecceafd8454e013e5fd4"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a57eba5c": {
+          "bytes": 4396,
+          "sha256": "eec0ed20b187d42a4ab982410666ce41c91ad41f832056da3ef95fbee3053c38"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a6197ae0": {
+          "bytes": 2492,
+          "sha256": "bef18050a301b169efbb8f6222dc2c06a39e7b56d0ec0d480c1458d9502bb286"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/a800670b": {
+          "bytes": 940,
+          "sha256": "2262f74889253c3fa2bb7a08d610d3c6073a2ee2dc02369a8475bfd645ef7428"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/aa1c21db": {
+          "bytes": 1052,
+          "sha256": "e8b6ad220bf54be448d26525b34d1255e0305b55cc9e42472f5df9389dd96587"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/ac22db77": {
+          "bytes": 1516,
+          "sha256": "1606278b637f8f1a8b05ab67484ae7bdef596bef7ef8551e34fc6d08dc24bce9"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/aca69bca": {
+          "bytes": 5716,
+          "sha256": "04b8e9872523f6827d6fdfb242bc1f5eeebea6871e9e18ca3b38ea069c09f051"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/aff87990": {
+          "bytes": 1212,
+          "sha256": "c8b472313934e2470cc302008ca5b8f67291c98aa48ae626d96c9f0f816e765d"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/b20c954a": {
+          "bytes": 916,
+          "sha256": "db982dc78eb828388545551fa707cde41b7305f7e3c7106e78f150b44b4646ce"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/b2413048": {
+          "bytes": 1020,
+          "sha256": "fd70bb8a34b3b078e90b7df0fa949ef75f1346721043bfb8a360317d5ad35bfd"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/bf0630bb": {
+          "bytes": 4308,
+          "sha256": "66be86dacaf34747529dcda960fce6cb6dfdeaa7125fb7df41ddf65da17c22ad"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/bf65294b": {
+          "bytes": 3068,
+          "sha256": "bd615dcd684ce3ddcef9721d541511782eb5719435811d214a6407e292a54d80"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/bff28abc": {
+          "bytes": 2572,
+          "sha256": "e1f1d121b629840afa5c21fb4dc5cc70abb684c554744f4db28433259601d1f1"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/c115827e": {
+          "bytes": 2276,
+          "sha256": "769b27045908f55a9f99438a3080c2f6d6a79beb55ef0fe15c4faacda7176d31"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/c5dca45b": {
+          "bytes": 916,
+          "sha256": "08bbe66e0c5f4c96669b3e7c9413f2d9b5a9305602074c1e92370d57ed900aee"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/c750d204": {
+          "bytes": 1092,
+          "sha256": "edab17331238446f5102dc2c7b9d3aaddc9cece34e9dab3022ed0a23c294c264"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/cfbd32c3": {
+          "bytes": 8748,
+          "sha256": "380d9b43f62cc4b2b48e00f8a9308a2c89c0fbac6fff0a64c79105dc0e5b1911"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d1c0dbc9": {
+          "bytes": 1484,
+          "sha256": "a491304a6d6e08505f5522ca5f4b895dca14eab25a322e9bb6272fa478b42b99"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d2cc9f7b": {
+          "bytes": 3468,
+          "sha256": "397a33aca11bfa99b5778d4ccdda52e561a16942789dab1d66c3a1558121a2ab"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d3fca832": {
+          "bytes": 2316,
+          "sha256": "fc93caf988e35c38fb73ac54a3f2083cb9079b74c3ef444580cae8471a87a66f"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/d652d8a3": {
+          "bytes": 1268,
+          "sha256": "0a7fe9f7954ad582ce56bdfda9f6aa1630b2bc97e62cdf948b244b01689bbaed"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/dc7166bc": {
+          "bytes": 1060,
+          "sha256": "b009e7b2dd3b2c535500a19406678130bc19a9737c46b0a1a78bf66b969b5596"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/de2caf7a": {
+          "bytes": 908,
+          "sha256": "bf63b16e015530b2b2a03dad873f690c38e3dcd6447ba73c78055307f6df7679"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e0b61e81": {
+          "bytes": 1124,
+          "sha256": "79d6d139bc1d45db98ba3799303af93fc45184c30bf18816627eceaf589d92f6"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e200e7d9": {
+          "bytes": 916,
+          "sha256": "e9ee86e26b0e2c27ff34ad3aa0d3739d0a09d644ea9582492c6e1782449ec74c"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e3ac4f75": {
+          "bytes": 876,
+          "sha256": "e0cfabb1dc9884dfc0a009ad185375c12f3c176f8ab0b8671ccf85b2658a1264"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/e8e2d976": {
+          "bytes": 1540,
+          "sha256": "0e73027009c00b6b40ab939c6c838bc3f3d2b93067fd0cf048bc3e7d4cd1a0e8"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/eebc5e81": {
+          "bytes": 2892,
+          "sha256": "4a593edbc03e7fbd03ec546c4dd2a6c4aa7ed51b4a7ad0dfb525282e9b11fc51"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/f3620b98": {
+          "bytes": 908,
+          "sha256": "bdb2c1f19837ee8aee470265e1edbd338ce2aa85a12941c55c2738ac88373411"
+        },
+        ".astrion/sub_agent_runtime/3ed540878b3fb00806e82482/tmp/node-compile-cache/v24.11.1-arm64-ef5a0af0-501/ffa931aa": {
+          "bytes": 948,
+          "sha256": "824e737cebb3d6d3a9d5e05dc22830f1e98834fbe089e38fadf8ea1a05010c62"
+        },
+        "css/style.css": {
+          "bytes": 25769,
+          "sha256": "7b96568748b688dea7c9859d76602a2ec17b4c198c5a838f039a982df707a1bc"
+        },
+        "index.html": {
+          "bytes": 10336,
+          "sha256": "2d7567776008dedf5f56649f7f56dcc86b055298287ccc6803413c1e4665a25b"
+        },
+        "js/app.js": {
+          "bytes": 24031,
+          "sha256": "60f85121e657106acc3205a74db40d788a9ee97f9d33cad6c3615f2fa6c62e52"
+        },
+        "js/core.js": {
+          "bytes": 4535,
+          "sha256": "858bc8fb250cb3edec563d16f34943ae57fe7a09f81642f23d88bcbd43d71e50"
+        },
+        "js/data.js": {
+          "bytes": 4123,
+          "sha256": "f1542089b74ef47a5ba9ab3f26de13cba7d9db424a892caf444fdcd7ad8fa24e"
+        },
+        "tests/verify-core.cjs": {
+          "bytes": 6247,
+          "sha256": "c39e70083839a600ad1669c8c2c0e37ada4afe2711d72ab026d021008b1ed335"
+        },
+        "tests/verify-static.py": {
+          "bytes": 10012,
+          "sha256": "7576fdb9305a7ad10e99c7161b057bcf1d403031a2f66896b1842f339c03654e"
+        }
+      }
+    }
+  },
+  "scope": "Non-visual static checks; read conditions are self-reported, not a complete tool transcript audit."
+}

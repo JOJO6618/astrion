@@ -1,0 +1,96 @@
+{
+  "logic": {
+    "scope": "Pure data/filter/status logic in isolated Node VM; rendering functions disabled for status checks. No DOM, focus, visual or accessibility acceptance.",
+    "trials": {
+      "ui-copper": {
+        "passed": true,
+        "status_cases": 9,
+        "records_preserved": 9,
+        "filter_combinations": 80
+      },
+      "ui-silver": {
+        "passed": true,
+        "status_cases": 3,
+        "records_preserved": 9,
+        "filter_combinations": 80
+      }
+    },
+    "original_status_rule": {
+      "expression": "status === 'read' ? 'unread' : 'read'",
+      "input": "reading",
+      "output": "read",
+      "conclusion": "The original already allows reading -> read. Both reviews incorrectly claimed this transition was impossible; adding a way to enter reading is a separate valid improvement."
+    }
+  },
+  "logic_exit": 0,
+  "logic_stderr": "",
+  "http": [
+    {
+      "url": "http://127.0.0.1:8767/compare/css/style.css",
+      "status": 200,
+      "bytes": 2741
+    },
+    {
+      "url": "http://127.0.0.1:8767/compare/index.html",
+      "status": 200,
+      "bytes": 2004
+    },
+    {
+      "url": "http://127.0.0.1:8767/compare/js/app.js",
+      "status": 200,
+      "bytes": 4002
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-copper/css/style.css",
+      "status": 200,
+      "bytes": 14993
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-copper/index.html",
+      "status": 200,
+      "bytes": 3968
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-copper/js/app.js",
+      "status": 200,
+      "bytes": 12880
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-copper/js/data.js",
+      "status": 200,
+      "bytes": 3467
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-silver/css/style.css",
+      "status": 200,
+      "bytes": 14915
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-silver/index.html",
+      "status": 200,
+      "bytes": 5239
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-silver/js/app.js",
+      "status": 200,
+      "bytes": 9589
+    },
+    {
+      "url": "http://127.0.0.1:8767/runs/ui-silver/js/data.js",
+      "status": 200,
+      "bytes": 3467
+    }
+  ],
+  "frozen_changes": {
+    "ui-copper": {
+      "added": [],
+      "removed": [],
+      "modified": []
+    },
+    "ui-silver": {
+      "added": [],
+      "removed": [],
+      "modified": []
+    }
+  }
+}

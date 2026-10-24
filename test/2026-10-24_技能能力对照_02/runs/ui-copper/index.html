@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Papertrail 论文阅读工作台</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 跳转到内容链接（无障碍） -->
+  <a href="#main-content" class="skip-link">跳到主要内容</a>
+
+  <!-- 头部 -->
+  <header class="header">
+    <div class="header__brand">
+      <div class="header__logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+      </div>
+      <h1 class="header__title">Papertrail</h1>
+    </div>
+    <span class="header__demo">演示数据 · 本地操作</span>
+  </header>
+
+  <!-- 主布局 -->
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" aria-label="论文分类">
+      <div class="sidebar__section">
+        <p class="sidebar__label">全部论文</p>
+        <ul class="sidebar__nav">
+          <li id="sidebar-all" class="sidebar__item is-active" role="button" tabindex="0">
+            <span>全部</span>
+            <span class="sidebar__count" id="count-all">—</span>
+          </li>
+        </ul>
+      </div>
+      <div class="sidebar__section">
+        <p class="sidebar__label">按主题</p>
+        <ul class="sidebar__nav" id="sidebar-topics">
+          <!-- 动态渲染 -->
+        </ul>
+      </div>
+    </aside>
+
+    <!-- 工作区 -->
+    <main class="workspace" id="main-content">
+      <!-- 统计 -->
+      <div class="stats" id="stats" aria-label="论文统计">
+        <!-- 动态渲染 -->
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="tools">
+        <div class="search-box">
+          <svg class="search-box__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input 
+            id="search-input" 
+            type="search" 
+            class="search-box__input" 
+            placeholder="搜索论文或作者（按 / 聚焦）"
+            aria-label="搜索论文或作者"
+          >
+        </div>
+        <div class="filters" role="group" aria-label="按阅读状态筛选">
+          <button class="filter-btn is-active" data-status="all" type="button">全部</button>
+          <button class="filter-btn" data-status="unread" type="button">未读</button>
+          <button class="filter-btn" data-status="reading" type="button">在读</button>
+          <button class="filter-btn" data-status="read" type="button">已读</button>
+        </div>
+      </div>
+
+      <!-- 论文列表 -->
+      <div class="papers" id="papers" role="list" aria-label="论文列表">
+        <!-- 动态渲染 -->
+      </div>
+
+      <!-- 空状态 -->
+      <div id="empty" class="empty" style="display:none" role="status" aria-live="polite">
+        <svg class="empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>
+        </svg>
+        <p class="empty__text">没有找到匹配的论文</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- 详情面板 -->
+  <div class="detail-overlay" id="detail-overlay" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <div class="detail-panel" id="detail-panel">
+      <!-- 动态渲染 -->
+    </div>
+  </div>
+
+  <!-- 数据脚本 -->
+  <script src="js/data.js"></script>
+  <!-- 应用脚本 -->
+  <script src="js/app.js"></script>
+</body>
+</html>

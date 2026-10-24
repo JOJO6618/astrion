@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-24",
+  "round": 2,
+  "task": "Papertrail论文阅读工作台评审与改版",
+  "requested_intelligence": "medium",
+  "user_reported_medium_model": "MiniMax M2.5",
+  "actual_runtime_model_independently_verified": false,
+  "budget_seconds_each": 1200,
+  "access_level": "working_dir_write",
+  "common_brief": "briefs/ui.md",
+  "common_fixtures": "fixtures/papertrail",
+  "identical_to_previous_round_inputs": true,
+  "previous_round": "../2026-10-24_技能能力对照",
+  "common_constraints": {
+    "network": false,
+    "dependency_installation": false,
+    "browser_automation": false,
+    "screenshots": false,
+    "agent_started_servers": false,
+    "cross_trial_reads_or_communication": false
+  },
+  "variants": {
+    "A": {"agent": "UISilver", "directory": "runs/ui-silver", "skill": null},
+    "B": {"agent": "UICopper", "directory": "runs/ui-copper", "skill": "agentskills/impeccable/SKILL.md"}
+  },
+  "rating_dimensions": ["诊断质量", "信息结构与任务效率", "视觉完成度", "功能与可访问性", "工程交付"],
+  "protocol": [
+    "两个全新实例，同组共同任务和四份公共页面逐字节一致；唯一设计干预为技能阅读条件。",
+    "技能组只允许加载impeccable及该目录自身的参考和资源；对照组禁止任何技能。",
+    "主智能体不修改子实例作品，不补文档，不单方加时；未完成项如实保留。",
+    "到时先冻结；如需要跟进回顾，只允许根据已有上下文报告事实，不得补实现。",
+    "先做非视觉检查，再交用户匿名评判；未经实际视觉验收不填审美分数。",
+    "每条件单一样本，不能推导普遍能力提升百分比。",
+    "用户配置的中低档是路由名称，不作为模型能力强弱的证据。",
+    "同预算不等于同token或计算量；具体运行模型若未独立核实必须明确标记。"
+  ],
+  "model_research": {
+    "deepseek_official": "https://api-docs.deepseek.com/news/news261017",
+    "deepseek_independent": "https://artificialanalysis.ai/models/deepseek-v4-1-flash-1017",
+    "minimax_official": "https://www.minimax.io/news/minimax-m25",
+    "minimax_m25_release_date": "2026-02-12",
+    "notes": "官方发布定位与第三方评测分开陈述；DeepSeek页面的Max配置未证明等于上一轮实际推理配置。MiniMax M2.5并非距当前日期一年多。"
+  }
+}

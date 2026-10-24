@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>潮汐档案 / Tidal Archive</title>
+  <meta name="description" content="潮汐档案：用种子生成潮间带沉积剖面的可交互生成艺术作品。">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/p5.min.js"></script>
+  <script defer src="js/archive.js"></script>
+  <script defer src="js/painter.js"></script>
+  <script defer src="js/sketch.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <div class="masthead__titles">
+        <p class="eyebrow">第 07 号生成档案 · 潮间带沉积</p>
+        <h1>潮汐档案</h1>
+        <p class="latin">TIDAL ARCHIVE</p>
+      </div>
+      <p class="masthead__intro">
+        退潮之后，水线把时间留在沙上：每一道曲线是一次停留，每一粒沉积是一段记录。
+        输入种子，重新安排这一片潮间带。
+      </p>
+    </header>
+
+    <main class="studio">
+      <section class="stage" id="stage" aria-label="生成艺术作品">
+        <div class="stage__canvas" id="canvas-mount"></div>
+        <div class="stage__meta">
+          <span class="status" id="status" role="status" aria-live="polite">正在准备画布…</span>
+          <span class="stage__note">本地生成 · 无外部请求</span>
+        </div>
+        <noscript><p class="stage__fallback">本作品需要启用 JavaScript 才能生成。</p></noscript>
+      </section>
+
+      <aside class="panel" aria-label="作品控制">
+        <section class="panel__block">
+          <h2 class="panel__title">种子</h2>
+          <div class="seed">
+            <label class="visually-hidden" for="seed-input">种子文本</label>
+            <input id="seed-input" type="text" value="tangent-01" maxlength="40"
+                   autocomplete="off" spellcheck="false" placeholder="输入任意种子">
+            <button id="apply-seed" type="button" class="btn btn--ghost">应用</button>
+          </div>
+          <button id="regenerate" type="button" class="btn btn--solid">重新生成</button>
+          <p class="hint">同一种子与参数会重现同一幅档案。</p>
+        </section>
+
+        <section class="panel__block">
+          <h2 class="panel__title">参数</h2>
+          <div class="field">
+            <div class="field__head">
+              <label for="tide-range">潮差</label>
+              <output id="tide-range-val" for="tide-range">1.00</output>
+            </div>
+            <input id="tide-range" type="range" min="0.4" max="1.8" step="0.05" value="1">
+            <p class="field__hint">水线的起伏幅度与间距张力。</p>
+          </div>
+          <div class="field">
+            <div class="field__head">
+              <label for="tide-count">潮汐次数</label>
+              <output id="tide-count-val" for="tide-count">9</output>
+            </div>
+            <input id="tide-count" type="range" min="5" max="14" step="1" value="9">
+            <p class="field__hint">档案里一次退潮留下的水线数量。</p>
+          </div>
+          <div class="field">
+            <div class="field__head">
+              <label for="density">沉积密度</label>
+              <output id="density-val" for="density">1.00</output>
+            </div>
+            <input id="density" type="range" min="0.35" max="1.8" step="0.05" value="1">
+            <p class="field__hint">沙砾、云母与盐霜的铺陈密度。</p>
+          </div>
+        </section>
+
+        <section class="panel__block">
+          <h2 class="panel__title">动作</h2>
+          <div class="btn-row">
+            <button id="toggle-play" type="button" class="btn">暂停</button>
+            <button id="replay" type="button" class="btn">重绘</button>
+            <button id="export" type="button" class="btn">导出 PNG</button>
+          </div>
+          <p class="hint">快捷键：空格 暂停/继续 · R 重绘 · E 导出</p>
+        </section>
+
+        <dl class="readout">
+          <div><dt>水线</dt><dd id="stat-lines">—</dd></div>
+          <div><dt>沉积</dt><dd id="stat-grains">—</dd></div>
+          <div><dt>状态</dt><dd id="stat-state">—</dd></div>
+        </dl>
+      </aside>
+    </main>
+
+    <footer class="colophon">
+      <p>潮汐档案 · 生成艺术实验</p>
+      <p>p5.js 本地运行 · 种子驱动的沉积模型 · 可导出 2 倍尺寸 PNG</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+{
+  "skills": [
+    "agents-md-writer",
+    "algorithmic-art",
+    "canvas-design",
+    "composition-patterns",
+    "copy-editing",
+    "copywriting",
+    "doc-coauthoring",
+    "docx",
+    "emails",
+    "frontend-design",
+    "impeccable",
+    "literature-review",
+    "manimce-best-practices",
+    "mcp-builder",
+    "mcp-tool-config",
+    "media-toolkit",
+    "pdf",
+    "pptx",
+    "product-marketing",
+    "react-best-practices",
+    "remotion-best-practices",
+    "run-command-guide",
+    "scientific-visualization",
+    "skill-creator",
+    "sub-agent-guide",
+    "terminal-guide",
+    "ui-aesthetic-design",
+    "web-design-guidelines",
+    "webapp-testing",
+    "workflow-authoring",
+    "xlsx"
+  ],
+  "skill_count": 31,
+  "python_syntax_passed": 94,
+  "verbatim": {
+    "xlsx": {
+      "files": 53,
+      "added": [],
+      "missing": [],
+      "modified": []
+    },
+    "pdf": {
+      "files": 12,
+      "added": [],
+      "missing": [],
+      "modified": []
+    }
+  },
+  "viewer_assets": [
+    "css/style.css",
+    "vendor/p5.min.js",
+    "js/app.js"
+  ],
+  "failures": []
+}

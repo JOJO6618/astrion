@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>午夜植物园 | Midnight Botanica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    @font-face {
+      font-family: 'CrimsonPro';
+      src: url('https://fonts.gstatic.com/s/crimsonpro/v24/q5uUsoa5M_tv7IihmnkabC5XiXCAlXGks1WZzm1MP5s7.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #050a12;
+      font-family: 'CrimsonPro', Georgia, serif;
+    }
+    
+    .poster {
+      position: relative;
+      width: 100%;
+      max-width: 1200px;
+      aspect-ratio: 16 / 9;
+      background: linear-gradient(165deg, #0a1628 0%, #060d18 50%, #030810 100%);
+      overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8);
+    }
+    
+    /* Subtle paper texture overlay */
+    .poster::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.03;
+      pointer-events: none;
+    }
+    
+    /* Main botanical specimen - center plant */
+    .specimen {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 42%;
+      height: 80%;
+    }
+    
+    .specimen svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Glow effect behind specimen */
+    .specimen::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 50%;
+      height: 70%;
+      background: radial-gradient(ellipse at center, rgba(125, 211, 192, 0.08) 0%, transparent 70%);
+      filter: blur(40px);
+      pointer-events: none;
+    }
+    
+    /* Reference lines */
+    .ref-line {
+      position: absolute;
+      background: rgba(125, 211, 192, 0.25);
+    }
+    
+    .ref-line.horizontal {
+      height: 1px;
+      width: 100%;
+    }
+    
+    .ref-line.vertical {
+      width: 1px;
+      height: 100%;
+    }
+    
+    .ref-line.top { top: 15%; left: 0; }
+    .ref-line.bottom { bottom: 15%; left: 0; }
+    .ref-line.left { left: 12%; top: 0; }
+    .ref-line.right { right: 12%; top: 0; }
+    
+    /* Corner markers */
+    .corner {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-color: rgba(125, 211, 192, 0.3);
+      border-style: solid;
+      border-width: 0;
+    }
+    
+    .corner.tl { top: 8%; left: 5%; border-top-width: 1px; border-left-width: 1px; }
+    .corner.tr { top: 8%; right: 5%; border-top-width: 1px; border-right-width: 1px; }
+    .corner.bl { bottom: 8%; left: 5%; border-bottom-width: 1px; border-left-width: 1px; }
+    .corner.br { bottom: 8%; right: 5%; border-bottom-width: 1px; border-right-width: 1px; }
+    
+    /* Main title */
+    .title-main {
+      position: absolute;
+      top: 6%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'CrimsonPro', Georgia, serif;
+      font-size: clamp(14px, 2.2vw, 28px);
+      font-weight: 400;
+      color: rgba(196, 181, 253, 0.9);
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    
+    /* Subtitle */
+    .title-sub {
+      position: absolute;
+      top: 11%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'CrimsonPro', Georgia, serif;
+      font-size: clamp(8px, 1.1vw, 14px);
+      font-weight: 400;
+      color: rgba(196, 181, 253, 0.5);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    
+    /* Left side annotations */
+    .annotation {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'CrimsonPro', Georgia, serif;
+      font-size: clamp(7px, 0.85vw, 11px);
+      color: rgba(196, 181, 253, 0.6);
+      letter-spacing: 0.15em;
+    }
+    
+    .annotation.left {
+      left: 6%;
+      flex-direction: row;
+    }
+    
+    .annotation.right {
+      right: 6%;
+      flex-direction: row-reverse;
+    }
+    
+    .annotation-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(125, 211, 192, 0.6);
+      flex-shrink: 0;
+    }
+    
+    .annotation-line {
+      width: 30px;
+      height: 1px;
+      background: rgba(125, 211, 192, 0.3);
+    }
+    
+    .annotation-text {
+      line-height: 1.6;
+    }
+    
+    .annotation-text em {
+      font-style: italic;
+      color: rgba(251, 191, 36, 0.7);
+    }
+    
+    /* Position variations */
+    .ann-1 { top: 22%; }
+    .ann-2 { top: 35%; }
+    .ann-3 { top: 48%; }
+    .ann-4 { top: 61%; }
+    .ann-5 { top: 74%; }
+    
+    /* Bottom info bar */
+    .info-bar {
+      position: absolute;
+      bottom: 5%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: clamp(20px, 4vw, 60px);
+      font-family: 'CrimsonPro', Georgia, serif;
+      font-size: clamp(7px, 0.9vw, 11px);
+      color: rgba(196, 181, 253, 0.5);
+      letter-spacing: 0.2em;
+      white-space: nowrap;
+    }
+    
+    .info-divider {
+      width: 40px;
+      height: 1px;
+      background: rgba(125, 211, 192, 0.3);
+    }
+    
+    /* Specimen number */
+    .specimen-num {
+      position: absolute;
+      top: 18%;
+      right: 8%;
+      font-family: 'CrimsonPro', Georgia, serif;
+      font-size: clamp(8px, 1vw, 12px);
+      color: rgba(251, 191, 36, 0.6);
+      letter-spacing: 0.1em;
+    }
+    
+    /* Decorative dots pattern */
+    .dot-pattern {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-image: radial-gradient(circle, rgba(125, 211, 192, 0.08) 1px, transparent 1px);
+      background-size: clamp(20px, 3vw, 40px) clamp(20px, 3vw, 40px);
+      pointer-events: none;
+    }
+    
+    /* Bioluminescent particles */
+    .particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(125, 211, 192, 0.6);
+      box-shadow: 0 0 8px rgba(125, 211, 192, 0.8);
+      animation: float 6s ease-in-out infinite;
+    }
+    
+    .particle:nth-child(1) { top: 25%; left: 18%; animation-delay: 0s; }
+    .particle:nth-child(2) { top: 40%; left: 25%; animation-delay: 1s; width: 2px; height: 2px; }
+    .particle:nth-child(3) { top: 55%; left: 20%; animation-delay: 2s; }
+    .particle:nth-child(4) { top: 70%; left: 28%; animation-delay: 3s; width: 2px; height: 2px; }
+    .particle:nth-child(5) { top: 30%; right: 22%; animation-delay: 0.5s; }
+    .particle:nth-child(6) { top: 50%; right: 18%; animation-delay: 1.5s; width: 2px; height: 2px; }
+    .particle:nth-child(7) { top: 65%; right: 26%; animation-delay: 2.5s; }
+    .particle:nth-child(8) { top: 45%; right: 30%; animation-delay: 4s; width: 4px; height: 4px; }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); opacity: 0.6; }
+      50% { transform: translateY(-8px); opacity: 1; }
+    }
+    
+    /* Small decorative elements */
+    .deco-circle {
+      position: absolute;
+      border: 1px solid rgba(125, 211, 192, 0.15);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    
+    .deco-circle.c1 { width: 80px; height: 80px; top: 20%; left: 8%; }
+    .deco-circle.c2 { width: 50px; height: 50px; bottom: 25%; right: 10%; border-color: rgba(251, 191, 36, 0.1); }
+  </style>
+</head>
+<body>
+  <div class="poster">
+    <!-- Background pattern -->
+    <div class="dot-pattern"></div>
+    
+    <!-- Decorative circles -->
+    <div class="deco-circle c1"></div>
+    <div class="deco-circle c2"></div>
+    
+    <!-- Reference lines -->
+    <div class="ref-line horizontal top"></div>
+    <div class="ref-line horizontal bottom"></div>
+    <div class="ref-line vertical left"></div>
+    <div class="ref-line vertical right"></div>
+    
+    <!-- Corner markers -->
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    
+    <!-- Bioluminescent particles -->
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    
+    <!-- Main title -->
+    <div class="title-main">午夜植物园</div>
+    <div class="title-sub">Midnight Botanica · Exhibition</div>
+    
+    <!-- Specimen number -->
+    <div class="specimen-num">No. 0247</div>
+    
+    <!-- Main botanical specimen SVG -->
+    <div class="specimen">
+      <svg viewBox="0 0 200 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Main stem -->
+        <path d="M100 370 Q100 300 98 250 Q96 200 100 150 Q104 100 100 50" 
+              stroke="rgba(125, 211, 192, 0.6)" stroke-width="1.5" fill="none"/>
+        
+        <!-- Leaf pairs - left -->
+        <g opacity="0.8">
+          <!-- Lower left leaf -->
+          <path d="M98 280 Q60 260 40 240 Q55 255 75 270 Q88 275 98 280" 
+                fill="rgba(125, 211, 192, 0.15)" stroke="rgba(125, 211, 192, 0.5)" stroke-width="0.8"/>
+          <path d="M98 280 Q70 270 50 255" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.3" fill="none"/>
+          
+          <!-- Middle left leaf -->
+          <path d="M99 220 Q55 195 30 170 Q50 185 70 205 Q88 215 99 220" 
+                fill="rgba(125, 211, 192, 0.12)" stroke="rgba(125, 211, 192, 0.45)" stroke-width="0.8"/>
+          <path d="M99 220 Q65 200 45 185" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.3" fill="none"/>
+          
+          <!-- Upper left leaf -->
+          <path d="M99 160 Q50 130 25 100 Q50 120 70 145 Q88 155 99 160" 
+                fill="rgba(196, 181, 253, 0.1)" stroke="rgba(196, 181, 253, 0.4)" stroke-width="0.8"/>
+          <path d="M99 160 Q60 140 40 120" stroke="rgba(196, 181, 253, 0.25)" stroke-width="0.3" fill="none"/>
+        </g>
+        
+        <!-- Leaf pairs - right -->
+        <g opacity="0.8">
+          <!-- Lower right leaf -->
+          <path d="M100 300 Q140 280 160 260 Q145 275 125 290 Q110 297 100 300" 
+                fill="rgba(125, 211, 192, 0.15)" stroke="rgba(125, 211, 192, 0.5)" stroke-width="0.8"/>
+          <path d="M100 300 Q130 290 150 275" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.3" fill="none"/>
+          
+          <!-- Middle right leaf -->
+          <path d="M100 240 Q150 215 175 190 Q155 205 135 225 Q115 235 100 240" 
+                fill="rgba(125, 211, 192, 0.12)" stroke="rgba(125, 211, 192, 0.45)" stroke-width="0.8"/>
+          <path d="M100 240 Q135 220 155 205" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.3" fill="none"/>
+          
+          <!-- Upper right leaf -->
+          <path d="M100 180 Q155 150 180 120 Q155 140 130 165 Q112 175 100 180" 
+                fill="rgba(196, 181, 253, 0.1)" stroke="rgba(196, 181, 253, 0.4)" stroke-width="0.8"/>
+          <path d="M100 180 Q140 160 160 140" stroke="rgba(196, 181, 253, 0.25)" stroke-width="0.3" fill="none"/>
+        </g>
+        
+        <!-- Top flower/moon element -->
+        <g transform="translate(100, 35)">
+          <circle r="18" fill="rgba(251, 191, 36, 0.08)" stroke="rgba(251, 191, 36, 0.3)" stroke-width="0.5"/>
+          <circle r="12" fill="rgba(251, 191, 36, 0.05)" stroke="rgba(251, 191, 36, 0.2)" stroke-width="0.3"/>
+          <circle r="5" fill="rgba(251, 191, 36, 0.15)"/>
+          
+          <!-- Petal-like rays -->
+          <g stroke="rgba(251, 191, 36, 0.2)" stroke-width="0.5" fill="none">
+            <line x1="0" y1="-20" x2="0" y2="-28"/>
+            <line x1="14" y1="-14" x2="20" y2="-20"/>
+            <line x1="20" y1="0" x2="28" y2="0"/>
+            <line x1="14" y1="14" x2="20" y2="20"/>
+            <line x1="-14" y1="-14" x2="-20" y2="-20"/>
+            <line x1="-20" y1="0" x2="-28" y2="0"/>
+            <line x1="-14" y1="14" x2="-20" y2="20"/>
+          </g>
+        </g>
+        
+        <!-- Small side branches with dots (flowers) -->
+        <g opacity="0.7">
+          <circle cx="45" cy="235" r="4" fill="rgba(196, 181, 253, 0.3)" stroke="rgba(196, 181, 253, 0.5)" stroke-width="0.5"/>
+          <circle cx="155" cy="255" r="3" fill="rgba(125, 211, 192, 0.3)" stroke="rgba(125, 211, 192, 0.5)" stroke-width="0.5"/>
+          <circle cx="35" cy="155" r="3.5" fill="rgba(196, 181, 253, 0.25)" stroke="rgba(196, 181, 253, 0.4)" stroke-width="0.5"/>
+          <circle cx="165" cy="175" r="4" fill="rgba(125, 211, 192, 0.25)" stroke="rgba(125, 211, 192, 0.4)" stroke-width="0.5"/>
+          <circle cx="55" cy="305" r="3" fill="rgba(251, 191, 36, 0.2)" stroke="rgba(251, 191, 36, 0.4)" stroke-width="0.5"/>
+          <circle cx="145" cy="315" r="2.5" fill="rgba(196, 181, 253, 0.2)" stroke="rgba(196, 181, 253, 0.35)" stroke-width="0.5"/>
+        </g>
+        
+        <!-- Root base -->
+        <g opacity="0.5">
+          <path d="M100 370 Q85 375 70 378" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.8" fill="none"/>
+          <path d="M100 370 Q115 375 130 378" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.8" fill="none"/>
+          <path d="M100 370 Q100 378 100 385" stroke="rgba(125, 211, 192, 0.2)" stroke-width="0.6" fill="none"/>
+        </g>
+        
+        <!-- Venation details on leaves -->
+        <g opacity="0.4" stroke="rgba(125, 211, 192, 0.3)" stroke-width="0.2" fill="none">
+          <path d="M75 265 Q65 260 55 252"/>
+          <path d="M72 268 Q62 265 55 260"/>
+          <path d="M130 285 Q140 280 150 272"/>
+          <path d="M128 288 Q138 285 145 278"/>
+        </g>
+      </svg>
+    </div>
+    
+    <!-- Left annotations -->
+    <div class="annotation left ann-1">
+      <span class="annotation-dot"></span>
+      <span class="annotation-line"></span>
+      <span class="annotation-text"><em>Luna florens</em><br>月下绽放</span>
+    </div>
+    <div class="annotation left ann-2">
+      <span class="annotation-dot"></span>
+      <span class="annotation-line"></span>
+      <span class="annotation-text">叶序 Alternate<br>对生叶序</span>
+    </div>
+    <div class="annotation left ann-3">
+      <span class="annotation-dot"></span>
+      <span class="annotation-line"></span>
+      <span class="annotation-text">Caudex<br>茎干 · 380mm</span>
+    </div>
+    
+    <!-- Right annotations -->
+    <div class="annotation right ann-2">
+      <span class="annotation-dot"></span>
+      <span class="annotation-line"></span>
+      <span class="annotation-text">Phosphor leaf<br>荧光叶片</span>
+    </div>
+    <div class="annotation right ann-4">
+      <span class="annotation-dot"></span>
+      <span class="annotation-line"></span>
+      <span class="annotation-text"><em>Nocturnus</em><br>夜生种</span>
+    </div>
+    <div class="annotation right ann-5">
+      <span class="annotation-dot"></span>
+      <span class="annotation-line"></span>
+      <span class="annotation-text">Radix<br>根系 · 块茎</span>
+    </div>
+    
+    <!-- Bottom info -->
+    <div class="info-bar">
+      <span>2026 · 冬季特展</span>
+      <span class="info-divider"></span>
+      <span>国家植物园东馆</span>
+      <span class="info-divider"></span>
+      <span>策展人：王明远</span>
+    </div>
+  </div>
+</body>
+</html>

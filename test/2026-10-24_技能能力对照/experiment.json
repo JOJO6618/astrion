@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-24",
+  "intelligence": "low",
+  "timeout_seconds_per_trial": 1200,
+  "access_level": "working_dir_write",
+  "common_constraints": {
+    "network": false,
+    "dependency_installation": false,
+    "browser_automation": false,
+    "cross_trial_reading_or_communication": false,
+    "implementation_authorized": true
+  },
+  "groups": {
+    "art": {
+      "brief": "briefs/art.md",
+      "A": {"agent": "ArtSouth", "directory": "runs/art-south", "skill": null},
+      "B": {"agent": "ArtNorth", "directory": "runs/art-north", "skill": "agentskills/algorithmic-art/SKILL.md"}
+    },
+    "ui": {
+      "brief": "briefs/ui.md",
+      "A": {"agent": "UIWest", "directory": "runs/ui-west", "skill": "agentskills/impeccable/SKILL.md"},
+      "B": {"agent": "UIEast", "directory": "runs/ui-east", "skill": null}
+    }
+  },
+  "notes": [
+    "Each trial is a newly created instance. Tasks within a group share the exact brief file and input assets.",
+    "Skill-directory references and templates are part of the skill intervention. This is not a prompt-text-only experiment.",
+    "No individual capability uplift percentage can be inferred from one sample per condition.",
+    "Reading-condition compliance is reported by each agent and may be reviewed through visible activity; static outputs alone do not establish complete tool-history compliance."
+  ]
+}

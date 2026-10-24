@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>午夜植物园 · Midnight Botanica</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #050510;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      font-family: 'Georgia', 'Times New Roman', serif;
+    }
+
+    .poster {
+      position: relative;
+      width: 620px;
+      height: 877px;
+      background: #050510;
+      overflow: hidden;
+    }
+
+    /* === 背景层 === */
+    .bg-gradient {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 20%, #0a0a2e 0%, transparent 70%),
+        radial-gradient(ellipse 80% 60% at 50% 100%, #0d0518 0%, transparent 70%),
+        linear-gradient(180deg, #050510 0%, #080818 40%, #060512 100%);
+    }
+
+    /* 月光 */
+    .moon {
+      position: absolute;
+      top: 40px;
+      right: 60px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #e8e8ff, #aaaadd);
+      box-shadow: 0 0 30px 10px rgba(180,180,255,0.15), 0 0 60px 20px rgba(150,150,220,0.08);
+    }
+
+    /* 星光 */
+    .stars {
+      position: absolute;
+      inset: 0;
+    }
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: rgba(220,220,255,0.7);
+    }
+    .star:nth-child(odd) {
+      animation: twinkle 3s ease-in-out infinite;
+    }
+    .star:nth-child(even) {
+      animation: twinkle 4s ease-in-out infinite 1.5s;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* 地面渐变 */
+    .ground {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 180px;
+      background: linear-gradient(0deg, #020208 0%, transparent 100%);
+    }
+
+    /* === 植物剪影 SVG === */
+    .plants-left {
+      position: absolute;
+      bottom: 0;
+      left: -10px;
+      width: 200px;
+      height: 500px;
+      opacity: 0.85;
+    }
+    .plants-right {
+      position: absolute;
+      bottom: 0;
+      right: -10px;
+      width: 200px;
+      height: 500px;
+      opacity: 0.85;
+    }
+    .plants-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 200px;
+      opacity: 0.6;
+    }
+
+    /* === 发光花朵 === */
+    .flower {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(1px);
+    }
+    .flower-1 {
+      top: 140px;
+      left: 45px;
+      width: 8px;
+      height: 8px;
+      background: #00ffcc;
+      box-shadow: 0 0 12px 4px rgba(0,255,204,0.5), 0 0 30px 10px rgba(0,255,204,0.2);
+      animation: pulse 3s ease-in-out infinite;
+    }
+    .flower-2 {
+      top: 200px;
+      left: 120px;
+      width: 6px;
+      height: 6px;
+      background: #cc66ff;
+      box-shadow: 0 0 10px 3px rgba(204,102,255,0.5), 0 0 25px 8px rgba(204,102,255,0.2);
+      animation: pulse 4s ease-in-out infinite 1s;
+    }
+    .flower-3 {
+      top: 280px;
+      left: 30px;
+      width: 5px;
+      height: 5px;
+      background: #00ffaa;
+      box-shadow: 0 0 8px 3px rgba(0,255,170,0.5);
+      animation: pulse 3.5s ease-in-out infinite 0.5s;
+    }
+    .flower-4 {
+      top: 160px;
+      right: 50px;
+      width: 7px;
+      height: 7px;
+      background: #9966ff;
+      box-shadow: 0 0 11px 4px rgba(153,102,255,0.5), 0 0 28px 8px rgba(153,102,255,0.2);
+      animation: pulse 3.8s ease-in-out infinite 1.5s;
+    }
+    .flower-5 {
+      top: 230px;
+      right: 110px;
+      width: 5px;
+      height: 5px;
+      background: #00ffcc;
+      box-shadow: 0 0 8px 3px rgba(0,255,204,0.5);
+      animation: pulse 2.8s ease-in-out infinite 2s;
+    }
+    .flower-6 {
+      top: 310px;
+      right: 35px;
+      width: 6px;
+      height: 6px;
+      background: #ff66cc;
+      box-shadow: 0 0 10px 3px rgba(255,102,204,0.5);
+      animation: pulse 4.2s ease-in-out infinite 0.8s;
+    }
+    .flower-7 {
+      top: 380px;
+      left: 80px;
+      width: 4px;
+      height: 4px;
+      background: #66ccff;
+      box-shadow: 0 0 7px 2px rgba(102,204,255,0.5);
+      animation: pulse 3.2s ease-in-out infinite 1.2s;
+    }
+    .flower-8 {
+      top: 360px;
+      right: 85px;
+      width: 5px;
+      height: 5px;
+      background: #aaffee;
+      box-shadow: 0 0 8px 3px rgba(170,255,238,0.5);
+      animation: pulse 3.6s ease-in-out infinite 0.3s;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+
+    /* 萤火虫 */
+    .firefly {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(200,255,180,0.9);
+      box-shadow: 0 0 6px 2px rgba(200,255,180,0.4);
+      animation: float var(--dur) ease-in-out infinite var(--delay);
+    }
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); opacity: 0.2; }
+      25% { transform: translate(var(--dx1), var(--dy1)); opacity: 0.9; }
+      50% { transform: translate(var(--dx2), var(--dy2)); opacity: 0.4; }
+      75% { transform: translate(var(--dx3), var(--dy3)); opacity: 0.8; }
+    }
+
+    /* === 主内容区 === */
+    .content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    /* 装饰分隔线 */
+    .divider-top {
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #00ffcc, transparent);
+      margin-bottom: 20px;
+      opacity: 0.7;
+    }
+
+    /* 英文副标题 */
+    .subtitle-en {
+      font-family: 'Georgia', serif;
+      font-size: 10px;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: rgba(180,220,200,0.5);
+      margin-bottom: 12px;
+    }
+
+    /* 中文主标题 */
+    .title-zh {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 58px;
+      font-weight: normal;
+      color: transparent;
+      background: linear-gradient(180deg, #e8e8ff 0%, #aaaadd 50%, #8888cc 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      line-height: 1.1;
+      text-align: center;
+      margin-bottom: 6px;
+      text-shadow: none;
+      letter-spacing: 0.1em;
+    }
+
+    /* 英文主标题 */
+    .title-en {
+      font-family: 'Georgia', serif;
+      font-size: 13px;
+      font-weight: normal;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: rgba(160,200,180,0.6);
+      margin-bottom: 8px;
+    }
+
+    /* 装饰分隔线2 */
+    .divider-mid {
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,255,204,0.3), #00ffcc, rgba(0,255,204,0.3), transparent);
+      margin: 16px 0;
+    }
+
+    /* 描述文字 */
+    .description {
+      font-family: 'Georgia', serif;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: rgba(200,200,220,0.45);
+      text-align: center;
+      line-height: 1.8;
+      padding: 0 60px;
+    }
+
+    /* 装饰分隔线3 */
+    .divider-bot {
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #9966ff, transparent);
+      margin: 16px 0;
+      opacity: 0.5;
+    }
+
+    /* 展览信息 */
+    .info {
+      font-family: 'Georgia', serif;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: rgba(180,180,200,0.4);
+      text-align: center;
+      line-height: 2;
+      text-transform: uppercase;
+    }
+    .info span {
+      color: rgba(0,255,204,0.5);
+    }
+
+    /* 日期特别高亮 */
+    .date {
+      font-family: 'Georgia', serif;
+      font-size: 12px;
+      letter-spacing: 0.3em;
+      color: rgba(200,200,255,0.6);
+      margin-top: 8px;
+    }
+    .date span {
+      color: rgba(153,102,255,0.8);
+    }
+
+    /* 底部装饰 */
+    .bottom-deco {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .bottom-deco .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(0,255,204,0.3);
+    }
+    .bottom-deco .dot:nth-child(2) {
+      background: rgba(153,102,255,0.3);
+    }
+    .bottom-deco .dot:nth-child(3) {
+      background: rgba(255,102,204,0.3);
+    }
+
+    /* 边缘光晕 */
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 90% 90% at 50% 50%, transparent 50%, rgba(5,5,16,0.7) 100%);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* 扫描线纹理（极淡） */
+    .scanlines {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 6;
+    }
+  </style>
+</head>
+<body>
+  <div class="poster">
+    <!-- 背景 -->
+    <div class="bg-gradient"></div>
+
+    <!-- 月亮 -->
+    <div class="moon"></div>
+
+    <!-- 星星 -->
+    <div class="stars">
+      <div class="star" style="top:30px;left:40px"></div>
+      <div class="star" style="top:55px;left:140px;width:1px;height:1px"></div>
+      <div class="star" style="top:20px;left:240px"></div>
+      <div class="star" style="top:70px;left:330px;width:1px;height:1px"></div>
+      <div class="star" style="top:35px;left:460px"></div>
+      <div class="star" style="top:80px;left:520px;width:1px;height:1px"></div>
+      <div class="star" style="top:15px;left:570px"></div>
+      <div class="star" style="top:60px;left:90px;width:1px;height:1px"></div>
+      <div class="star" style="top:45px;left:380px"></div>
+      <div class="star" style="top:90px;left:190px;width:1px;height:1px"></div>
+      <div class="star" style="top:25px;left:490px"></div>
+      <div class="star" style="top:100px;left:280px;width:1px;height:1px"></div>
+      <div class="star" style="top:110px;left:400px"></div>
+      <div class="star" style="top:5px;left:160px;width:1px;height:1px"></div>
+      <div class="star" style="top:50px;left:550px"></div>
+    </div>
+
+    <!-- 地面 -->
+    <div class="ground"></div>
+
+    <!-- 左侧植物剪影 -->
+    <svg class="plants-left" viewBox="0 0 200 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- 大型蕨类 -->
+      <path d="M30 500 Q35 450 20 400 Q5 350 30 300 Q15 280 25 250 Q10 220 30 180 Q20 160 35 130 Q25 100 40 70 Q35 40 50 10"
+            stroke="#0a1a15" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M35 400 Q60 370 50 340 Q40 310 55 280 Q70 250 55 220 Q40 190 55 160 Q65 130 55 100 Q45 70 60 45"
+            stroke="#0a1a15" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M25 380 Q-5 360 0 330 Q5 300 -10 270 Q0 240 -5 210"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M40 340 Q65 320 60 295 Q55 270 70 250 Q80 230 68 205"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M35 280 Q10 260 15 235 Q20 210 5 185"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- 大叶子 -->
+      <path d="M60 500 Q80 430 55 370 Q30 310 60 250 Q45 200 70 150 Q60 110 85 70 Q75 30 95 5"
+            stroke="#080f0c" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M55 400 Q20 380 25 350 Q30 320 10 290 Q25 260 15 230 Q5 200 20 170"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M65 350 Q100 325 90 295 Q80 265 100 235 Q110 205 95 175"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <!-- 更暗的底层植物 -->
+      <path d="M90 500 Q110 440 90 380 Q70 320 95 260 Q80 200 105 140 Q90 90 110 40 Q100 10 120 -10"
+            stroke="#050a08" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M85 420 Q50 400 55 370 Q60 340 40 310 Q55 280 45 250 Q35 220 50 190"
+            stroke="#050a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M95 360 Q130 340 120 310 Q110 280 130 250 Q140 220 125 190"
+            stroke="#050a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <!-- 小枝杈 -->
+      <path d="M110 500 Q130 460 115 420 Q100 380 120 340 Q105 300 125 260"
+            stroke="#060c09" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M115 450 Q145 430 138 405 Q131 380 150 360"
+            stroke="#060c09" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- 花茎 -->
+      <path d="M130 500 Q150 460 140 420 Q130 380 145 340 Q155 300 142 260 Q130 220 150 180 Q140 150 155 120 Q150 100 160 80"
+            stroke="#060c09" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M135 380 Q160 360 155 335 Q150 310 168 290"
+            stroke="#060c09" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M140 320 Q115 300 120 275 Q125 250 105 225"
+            stroke="#060c09" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </svg>
+
+    <!-- 右侧植物剪影 -->
+    <svg class="plants-right" viewBox="0 0 200 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M170 500 Q165 450 180 400 Q195 350 170 300 Q185 280 175 250 Q190 220 170 180 Q180 160 165 130 Q175 100 160 70 Q165 40 150 10"
+            stroke="#0a1a15" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M165 400 Q140 370 150 340 Q160 310 145 280 Q130 250 145 220 Q160 190 145 160 Q135 130 150 100 Q160 70 145 45"
+            stroke="#0a1a15" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M175 380 Q205 360 200 330 Q195 300 210 270 Q200 240 205 210"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M160 340 Q135 320 140 295 Q145 270 130 250 Q120 230 132 205"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M165 280 Q190 260 185 235 Q180 210 195 185"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M140 500 Q120 430 145 370 Q170 310 140 250 Q155 200 130 150 Q145 110 125 70 Q135 30 115 5"
+            stroke="#080f0c" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M145 400 Q180 380 175 350 Q170 320 190 290 Q175 260 185 230 Q195 200 180 170"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M135 350 Q100 325 110 295 Q120 265 100 235 Q90 205 105 175"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M110 500 Q90 440 110 380 Q130 320 105 260 Q120 200 95 140 Q110 90 90 40 Q100 10 80 -10"
+            stroke="#050a08" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M115 420 Q150 400 145 370 Q140 340 160 310 Q145 280 155 250 Q165 220 150 190"
+            stroke="#050a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M105 360 Q70 340 80 310 Q90 280 70 250 Q60 220 75 190"
+            stroke="#050a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M90 500 Q70 460 85 420 Q100 380 80 340 Q95 300 75 260"
+            stroke="#060c09" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M85 450 Q55 430 62 405 Q69 380 50 360"
+            stroke="#060c09" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M70 500 Q50 460 60 420 Q70 380 55 340 Q45 300 58 260 Q70 220 50 180 Q60 150 45 120 Q50 100 40 80"
+            stroke="#060c09" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M65 380 Q40 360 45 335 Q50 310 32 290"
+            stroke="#060c09" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M60 320 Q85 300 80 275 Q75 250 95 225"
+            stroke="#060c09" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </svg>
+
+    <!-- 底部植物剪影 -->
+    <svg class="plants-bottom" viewBox="0 0 700 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 200 Q30 170 20 140 Q10 110 30 80 Q20 50 35 20 Q30 0 40 -10"
+            stroke="#0a1a15" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M20 200 Q50 165 40 130 Q30 95 50 60 Q45 30 55 0"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M50 200 Q80 170 70 135 Q60 100 80 65 Q75 35 88 10"
+            stroke="#0a1a15" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M680 200 Q650 170 660 140 Q670 110 650 80 Q660 50 645 20 Q650 0 640 -10"
+            stroke="#0a1a15" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M660 200 Q630 165 640 130 Q650 95 630 60 Q635 30 625 0"
+            stroke="#0a1a15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M640 200 Q610 170 620 135 Q630 100 610 65 Q615 35 602 10"
+            stroke="#0a1a15" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <!-- 中间草丛 -->
+      <path d="M300 200 Q310 180 305 160 Q300 140 308 120 Q305 100 312 80"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M320 200 Q335 175 328 155 Q321 135 332 115 Q330 95 338 75"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M340 200 Q350 178 345 158 Q340 138 350 118 Q348 98 355 80"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M360 200 Q370 180 365 160 Q360 140 370 120 Q368 100 375 82"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M380 200 Q390 180 385 160 Q380 140 390 120 Q388 100 395 82"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M400 200 Q410 178 405 158 Q400 138 410 118 Q408 98 415 80"
+            stroke="#080f0c" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </svg>
+
+    <!-- 发光花朵 -->
+    <div class="flower flower-1"></div>
+    <div class="flower flower-2"></div>
+    <div class="flower flower-3"></div>
+    <div class="flower flower-4"></div>
+    <div class="flower flower-5"></div>
+    <div class="flower flower-6"></div>
+    <div class="flower flower-7"></div>
+    <div class="flower flower-8"></div>
+
+    <!-- 萤火虫 -->
+    <div class="firefly" style="top:180px;left:90px;--dur:5s;--delay:0s;--dx1:15px;--dy1:-20px;--dx2:5px;--dy2:-35px;--dx3:-10px;--dy3:-15px"></div>
+    <div class="firefly" style="top:250px;left:50px;--dur:6s;--delay:1s;--dx1:-10px;--dy1:-15px;--dx2:5px;--dy2:-30px;--dx3:15px;--dy3:-10px"></div>
+    <div class="firefly" style="top:200px;right:80px;--dur:4.5s;--delay:2s;--dx1:10px;--dy1:-25px;--dx2:-5px;--dy2:-40px;--dx3:8px;--dy3:-20px"></div>
+    <div class="firefly" style="top:300px;right:50px;--dur:5.5s;--delay:0.5s;--dx1:-8px;--dy1:-18px;--dx2:12px;--dy2:-28px;--dx3:-5px;--dy3:-12px"></div>
+    <div class="firefly" style="top:350px;left:200px;--dur:7s;--delay:3s;--dx1:20px;--dy1:-12px;--dx2:5px;--dy2:-25px;--dx3:-15px;--dy3:-8px"></div>
+    <div class="firefly" style="top:320px;right:200px;--dur:6.5s;--delay:1.5s;--dx1:-12px;--dy1:-22px;--dx2:8px;--dy2:-35px;--dx3:10px;--dy3:-15px"></div>
+    <div class="firefly" style="top:420px;left:280px;--dur:5s;--delay:2.5s;--dx1:8px;--dy1:-30px;--dx2:-5px;--dy2:-15px;--dx3:15px;--dy3:-25px"></div>
+    <div class="firefly" style="top:400px;right:280px;--dur:6s;--delay:0.8s;--dx1:-15px;--dy1:-18px;--dx2:10px;--dy2:-32px;--dx3:5px;--dy3:-10px"></div>
+
+    <!-- 主内容 -->
+    <div class="content">
+      <div class="divider-top"></div>
+      <div class="subtitle-en">A Nocturnal Exhibition</div>
+      <div class="title-zh">午夜植物园</div>
+      <div class="title-en">Midnight Botanica</div>
+      <div class="divider-mid"></div>
+      <div class="description">
+        在月光与星辉的交织中<br>
+        探索那些只在黑暗中绽放的神秘生灵
+      </div>
+      <div class="divider-bot"></div>
+      <div class="info">
+        <span>·</span> 植物标本特展 <span>·</span><br>
+        城市美术馆 · 三号展厅
+      </div>
+      <div class="date">
+        <span>2026</span> . 11 . 15 — 12 . 31
+      </div>
+    </div>
+
+    <!-- 底部装饰 -->
+    <div class="bottom-deco">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+
+    <!-- 效果层 -->
+    <div class="vignette"></div>
+    <div class="scanlines"></div>
+  </div>
+</body>
+</html>

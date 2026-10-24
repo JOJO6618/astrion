@@ -1,0 +1,57 @@
+{
+  "scope": "Trial deliverables; .astrion runtime caches excluded explicitly.",
+  "trials": {
+    "ui-copper": {
+      "css/style.css": {
+        "sha256": "183ce968b5266e30bf2ad764bd9d9dafdca62d9c1a0b34ce122236b56d204683",
+        "bytes": 14993
+      },
+      "index.html": {
+        "sha256": "bcab3e819037a493a50159499eb5d6fe3deeaa15f64c700e24cbaf3d74ed223d",
+        "bytes": 3968
+      },
+      "js/app.js": {
+        "sha256": "815c9d087856e7df8a81fed8e619a36fe559b9caced57a63e3527f39e760556f",
+        "bytes": 12880
+      },
+      "js/data.js": {
+        "sha256": "c5b7d4ac68a9d3bffc271ceb992f66f5f7f26d4074b66a53bc9ca8392f86c519",
+        "bytes": 3467
+      },
+      "review.md": {
+        "sha256": "08514cd294093dbd40ae80d66a34ed14e20f268cfdc7e573cec546f831a1e53f",
+        "bytes": 3313
+      },
+      "trial.json": {
+        "sha256": "0a5a7c92fc2c0ce044da7a734a03320951ff8f892f478d6c2a8da51802e7ed74",
+        "bytes": 2219
+      }
+    },
+    "ui-silver": {
+      "css/style.css": {
+        "sha256": "619b4f5d75739ddf2759103a26948e2ba0fe306fc91bfb6adff296c422da1245",
+        "bytes": 14915
+      },
+      "index.html": {
+        "sha256": "64180b701f96a7eeb5ed47b8726695be4490dfe9b69c436db8f66db80c7bafdc",
+        "bytes": 5239
+      },
+      "js/app.js": {
+        "sha256": "48bc50933ead96c2ccf8f2fb449e2a10d7990f42f90129b949ddacd4d2f51641",
+        "bytes": 9589
+      },
+      "js/data.js": {
+        "sha256": "c5b7d4ac68a9d3bffc271ceb992f66f5f7f26d4074b66a53bc9ca8392f86c519",
+        "bytes": 3467
+      },
+      "review.md": {
+        "sha256": "a52e95277bfc5486d154b86df8aca244eb65a48de5df8c715cec7855c42b665e",
+        "bytes": 2680
+      },
+      "trial.json": {
+        "sha256": "4a9d6ab93204105086c62b668e86b0bffe7ff3153f3649b692b593d6d6cac60c",
+        "bytes": 1962
+      }
+    }
+  }
+}

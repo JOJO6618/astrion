@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!-- p5 viewer scaffolding: replace the example algorithm and its parameters. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generative Art Viewer</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="vendor/p5.min.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <main class="container">
+    <aside class="sidebar" aria-label="Artwork controls">
+      <h1>Generative Art</h1>
+      <p class="subtitle">Example flow field — replace with your artistic concept.</p>
+      <section class="control-section" aria-labelledby="seed-label">
+        <h2 id="seed-label">Seed</h2>
+        <label for="seed-input">Reproducible seed</label>
+        <input id="seed-input" type="number" min="1" max="2147483647" value="12345">
+        <div class="button-row">
+          <button type="button" id="previous-seed">Previous</button>
+          <button type="button" id="next-seed">Next</button>
+          <button type="button" id="random-seed">Random</button>
+        </div>
+      </section>
+      <section class="control-section" aria-labelledby="params-title">
+        <h2 id="params-title">Parameters</h2>
+        <div class="control-group">
+          <label id="particleCount-label">Particle count</label>
+          <div class="slider-row"><div class="slider" role="slider" tabindex="0" data-param="particleCount" aria-labelledby="particleCount-label" aria-valuemin="100" aria-valuemax="10000" aria-valuenow="1500" data-step="100"><span></span></div><output id="particleCount-value">1500</output></div>
+        </div>
+        <div class="control-group">
+          <label id="flowSpeed-label">Flow speed</label>
+          <div class="slider-row"><div class="slider" role="slider" tabindex="0" data-param="flowSpeed" aria-labelledby="flowSpeed-label" aria-valuemin="0.1" aria-valuemax="2" aria-valuenow="0.5" data-step="0.1"><span></span></div><output id="flowSpeed-value">0.5</output></div>
+        </div>
+        <div class="control-group">
+          <label id="noiseScale-label">Noise scale</label>
+          <div class="slider-row"><div class="slider" role="slider" tabindex="0" data-param="noiseScale" aria-labelledby="noiseScale-label" aria-valuemin="0.001" aria-valuemax="0.02" aria-valuenow="0.005" data-step="0.001"><span></span></div><output id="noiseScale-value">0.005</output></div>
+        </div>
+        <div class="control-group">
+          <label id="trailLength-label">Trail length</label>
+          <div class="slider-row"><div class="slider" role="slider" tabindex="0" data-param="trailLength" aria-labelledby="trailLength-label" aria-valuemin="2" aria-valuemax="20" aria-valuenow="8" data-step="1"><span></span></div><output id="trailLength-value">8</output></div>
+        </div>
+      </section>
+      <section class="control-section" aria-labelledby="colors-title">
+        <h2 id="colors-title">Palette</h2>
+        <label for="color1">Primary color (hex)</label><input id="color1" class="color-input" type="text" value="#db7448" pattern="#[0-9a-fA-F]{6}" maxlength="7">
+        <label for="color2">Secondary color (hex)</label><input id="color2" class="color-input" type="text" value="#3677aa" pattern="#[0-9a-fA-F]{6}" maxlength="7">
+        <label for="color3">Accent color (hex)</label><input id="color3" class="color-input" type="text" value="#657e49" pattern="#[0-9a-fA-F]{6}" maxlength="7">
+      </section>
+      <section class="control-section" aria-label="Actions">
+        <div class="button-row"><button type="button" id="regenerate">Regenerate</button><button type="button" id="reset">Reset</button></div>
+        <div class="button-row"><button type="button" id="pause" aria-pressed="false">Pause</button><button type="button" id="download">Download PNG</button></div>
+      </section>
+      <p id="art-status" role="status" aria-live="polite">Loading local p5 runtime…</p>
+    </aside>
+    <section class="canvas-area" aria-label="Generative artwork">
+      <div id="canvas-container" role="img" aria-label="Seeded particles trace a colored flow field"></div>
+    </section>
+  </main>
+</body>
+</html>

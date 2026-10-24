@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Papertrail · 论文阅读工作台</title>
+  <meta name="description" content="本地演示的论文阅读工作台：按标题或作者检索、按状态筛选、查看摘要与笔记。">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/data.js"></script>
+  <script defer src="js/core.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#list-heading">跳到论文列表</a>
+
+  <header class="app-header">
+    <div class="app-header__inner">
+      <h1 class="brand">
+        <svg class="brand__mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 6.5h10M4 12h16M4 17.5h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          <circle cx="19.5" cy="17.5" r="1.6" fill="currentColor"></circle>
+        </svg>
+        <span class="brand__name">Papertrail</span>
+        <span class="brand__sub">论文阅读工作台</span>
+      </h1>
+      <p class="demo-badge" role="note">
+        <span class="demo-badge__mark" aria-hidden="true"></span>
+        <span>演示数据</span>
+        <span class="demo-badge__extra">· 仅本页操作</span>
+      </p>
+    </div>
+  </header>
+
+  <noscript>
+    <p class="noscript">此工作台需要 JavaScript 才能检索、筛选和打开论文。</p>
+  </noscript>
+
+  <div class="shell" id="shell" data-view="list">
+    <aside class="rail" aria-label="研究主题筛选与说明">
+      <div class="rail__inner">
+        <section class="rail-block">
+          <h2 class="rail-title" id="topics-title">研究主题</h2>
+          <div class="topic-list" id="topic-list" role="group" aria-labelledby="topics-title">
+            <button class="topic-item is-active" type="button" data-topic="all" aria-pressed="true">
+              <span class="topic-swatch topic-swatch--all" aria-hidden="true"></span>
+              <span class="topic-item__label">全部主题</span>
+              <span class="topic-item__count" data-topic-count="all">9</span>
+            </button>
+            <button class="topic-item" type="button" data-topic="视觉与图形" aria-pressed="false">
+              <span class="topic-swatch topic-swatch--viz" aria-hidden="true"></span>
+              <span class="topic-item__label">视觉与图形</span>
+              <span class="topic-item__count" data-topic-count="视觉与图形">3</span>
+            </button>
+            <button class="topic-item" type="button" data-topic="人机交互" aria-pressed="false">
+              <span class="topic-swatch topic-swatch--hci" aria-hidden="true"></span>
+              <span class="topic-item__label">人机交互</span>
+              <span class="topic-item__count" data-topic-count="人机交互">3</span>
+            </button>
+            <button class="topic-item" type="button" data-topic="科研方法" aria-pressed="false">
+              <span class="topic-swatch topic-swatch--method" aria-hidden="true"></span>
+              <span class="topic-item__label">科研方法</span>
+              <span class="topic-item__count" data-topic-count="科研方法">3</span>
+            </button>
+          </div>
+        </section>
+
+        <details class="rail-help">
+          <summary>键盘操作与说明</summary>
+          <div class="rail-help__body">
+            <dl class="kbd-list">
+              <div><dt><kbd>/</kbd></dt><dd>聚焦搜索</dd></div>
+              <div><dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>下一篇 / 上一篇</dd></div>
+              <div><dt><kbd>Enter</kbd></dt><dd>打开当前论文</dd></div>
+              <div><dt><kbd>R</kbd></dt><dd>标为已读 / 未读</dd></div>
+              <div><dt><kbd>Esc</kbd></dt><dd>关闭详情或清除搜索</dd></div>
+            </dl>
+            <p>状态与主题上的数字会随搜索、筛选更新；当前选中的状态数字始终等于列表结果数。</p>
+            <p>9 条记录均为虚构演示资料，不是真实文献；无账户、无在线同步，阅读状态只在本页生效。</p>
+          </div>
+        </details>
+
+        <p class="rail-footnote">
+          <strong>演示数据</strong><br>
+          9 条虚构记录，非真实文献。<br>
+          无在线同步或账户能力。
+        </p>
+      </div>
+    </aside>
+
+    <main class="workspace" id="workspace" data-panel="closed">
+      <section class="list-pane" id="list-pane" aria-labelledby="list-heading">
+        <div class="list-head">
+          <div class="list-head__intro">
+            <h2 id="list-heading" tabindex="-1">论文库</h2>
+            <p class="list-sub">9 条虚构演示记录 · 状态只在本页生效</p>
+          </div>
+
+          <div class="tools">
+            <div class="field field--search" role="search" aria-label="论文搜索">
+              <label class="field-label" for="search">搜索</label>
+              <div class="search-field">
+                <svg class="search-field__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.6"></circle>
+                  <path d="M12.4 12.4 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                </svg>
+                <input id="search" type="search" placeholder="标题或作者，空格分隔多个词" autocomplete="off" spellcheck="false" aria-describedby="search-help">
+                <button class="search-clear" id="search-clear" type="button" hidden aria-label="清除搜索">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+                  </svg>
+                </button>
+              </div>
+              <p class="sr-only" id="search-help">输入论文标题或作者中的词；多个关键词用空格分隔，结果需同时包含这些词。</p>
+            </div>
+
+            <div class="field field--sort">
+              <label class="field-label" for="sort">排序</label>
+              <select id="sort">
+                <option value="year-desc">年份：新到旧</option>
+                <option value="year-asc">年份：旧到新</option>
+                <option value="title">标题</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="status-row">
+            <div class="segmented status-filter" id="status-filter" role="group" aria-label="按阅读状态筛选">
+              <button class="segmented__item is-active" type="button" data-status="all" aria-pressed="true">
+                <span class="segmented__label">全部</span>
+                <span class="segmented__count" data-status-count="all">9</span>
+              </button>
+              <button class="segmented__item" type="button" data-status="unread" aria-pressed="false">
+                <span class="segmented__label">未读</span>
+                <span class="segmented__count" data-status-count="unread">4</span>
+              </button>
+              <button class="segmented__item" type="button" data-status="reading" aria-pressed="false">
+                <span class="segmented__label">在读</span>
+                <span class="segmented__count" data-status-count="reading">2</span>
+              </button>
+              <button class="segmented__item" type="button" data-status="read" aria-pressed="false">
+                <span class="segmented__label">已读</span>
+                <span class="segmented__count" data-status-count="read">3</span>
+              </button>
+            </div>
+
+            <div class="reading-progress">
+              <div class="reading-progress__text">
+                <span>阅读进度</span>
+                <span id="progress-label">已读 3 / 9</span>
+              </div>
+              <div class="reading-progress__track" id="progress-track" role="img" aria-label="已读 3 篇，在读 2 篇，未读 4 篇，共 9 篇">
+                <span class="reading-progress__seg reading-progress__seg--read" data-seg="read"></span>
+                <span class="reading-progress__seg reading-progress__seg--reading" data-seg="reading"></span>
+                <span class="reading-progress__seg reading-progress__seg--unread" data-seg="unread"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-line">
+            <p class="result-text" id="result-text" aria-live="polite">9 篇论文</p>
+            <button class="link-button" id="clear-filters" type="button" hidden>清除筛选</button>
+          </div>
+        </div>
+
+        <ul class="paper-list" id="paper-list" aria-labelledby="list-heading"></ul>
+
+        <div class="empty-state" id="empty-state" hidden>
+          <div class="empty-state__mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" focusable="false">
+              <rect x="7" y="10" width="26" height="30" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+              <path d="M13 17h14M13 23h14M13 29h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+              <circle cx="34" cy="33" r="7" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+              <path d="m39 38 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            </svg>
+          </div>
+          <h3>没有匹配的论文</h3>
+          <p id="empty-copy">试试更短的关键词，或清除当前筛选。</p>
+          <div class="empty-state__actions">
+            <button class="button button--primary" id="empty-clear-all" type="button" hidden>清除全部搜索与筛选</button>
+            <button class="button button--quiet" id="empty-clear-search" type="button" hidden>只清除搜索词</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="detail-pane" id="detail-pane" aria-label="论文详情与阅读台">
+        <div id="detail-content"></div>
+      </aside>
+    </main>
+  </div>
+
+  <p class="sr-only" id="live" role="status" aria-live="polite"></p>
+</body>
+</html>

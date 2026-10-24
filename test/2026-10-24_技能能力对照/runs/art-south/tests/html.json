@@ -1,0 +1,94 @@
+{
+  "assetRefs": [
+    {
+      "ref": "css/style.css",
+      "exists": true
+    },
+    {
+      "ref": "js/p5.min.js",
+      "exists": true
+    },
+    {
+      "ref": "js/archive.js",
+      "exists": true
+    },
+    {
+      "ref": "js/painter.js",
+      "exists": true
+    },
+    {
+      "ref": "js/sketch.js",
+      "exists": true
+    }
+  ],
+  "externalUrls": [],
+  "ids": {
+    "htmlCount": 18,
+    "missingInHtml": [],
+    "unusedHtmlIds": []
+  },
+  "buttons": {
+    "count": 5,
+    "allHaveId": true,
+    "bindings": [
+      {
+        "id": "apply-seed",
+        "bound": true
+      },
+      {
+        "id": "regenerate",
+        "bound": true
+      },
+      {
+        "id": "toggle-play",
+        "bound": true
+      },
+      {
+        "id": "replay",
+        "bound": true
+      },
+      {
+        "id": "export",
+        "bound": true
+      }
+    ],
+    "allBound": true
+  },
+  "ranges": [
+    {
+      "id": "tide-range",
+      "labelled": true,
+      "boundInJs": true
+    },
+    {
+      "id": "tide-count",
+      "labelled": true,
+      "boundInJs": true
+    },
+    {
+      "id": "density",
+      "labelled": true,
+      "boundInJs": true
+    }
+  ],
+  "structure": {
+    "doctype": true,
+    "lang": true,
+    "viewport": true,
+    "hasNoscript": true,
+    "canvasMountPresent": true,
+    "p5BeforeSketch": true
+  },
+  "css": {
+    "hasMobileQuery": true,
+    "hasTabletQuery": true,
+    "customFocusVisible": true,
+    "noViewportUnits": true
+  },
+  "generatorPurity": {
+    "archiveUsesMathRandom": false,
+    "archiveUsesDate": false,
+    "painterUsesMathRandom": false,
+    "sketchMathRandomCount": 1
+  }
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>论文阅读工作台</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-brand">
+      <h1>论文阅读工作台</h1>
+      <span class="demo-badge">演示数据 · 本地操作</span>
+    </div>
+    <div class="header-stats" id="header-stats"></div>
+  </header>
+  
+  <div class="layout">
+    <aside class="sidebar">
+      <nav class="category-nav" aria-label="论文分类">
+        <button class="category-btn active" data-topic="all">
+          <span class="category-icon">📚</span>
+          <span class="category-name">全部论文</span>
+          <span class="category-count" id="count-all"></span>
+        </button>
+        <button class="category-btn" data-topic="视觉与图形">
+          <span class="category-icon">🎨</span>
+          <span class="category-name">视觉与图形</span>
+          <span class="category-count" id="count-视觉与图形"></span>
+        </button>
+        <button class="category-btn" data-topic="人机交互">
+          <span class="category-icon">👆</span>
+          <span class="category-name">人机交互</span>
+          <span class="category-count" id="count-人机交互"></span>
+        </button>
+        <button class="category-btn" data-topic="科研方法">
+          <span class="category-icon">🔬</span>
+          <span class="category-name">科研方法</span>
+          <span class="category-count" id="count-科研方法"></span>
+        </button>
+      </nav>
+      
+      <div class="sidebar-divider"></div>
+      
+      <div class="status-summary">
+        <h3>阅读状态</h3>
+        <div class="status-item">
+          <span class="status-dot unread"></span>
+          <span>未读</span>
+          <span class="status-count" id="stat-unread"></span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot reading"></span>
+          <span>在读</span>
+          <span class="status-count" id="stat-reading"></span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot read"></span>
+          <span>已读</span>
+          <span class="status-count" id="stat-read"></span>
+        </div>
+      </div>
+    </aside>
+    
+    <main class="main-content">
+      <div class="toolbar">
+        <div class="search-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input 
+            type="search" 
+            id="search-input" 
+            class="search-input" 
+            placeholder="搜索标题或作者..."
+            aria-label="搜索论文"
+          >
+          <button id="clear-search" class="clear-btn" hidden>×</button>
+        </div>
+        
+        <div class="filter-group" role="group" aria-label="阅读状态筛选">
+          <button class="filter-btn active" data-status="all">
+            全部 <span class="filter-count" id="filter-all"></span>
+          </button>
+          <button class="filter-btn" data-status="unread">
+            未读 <span class="filter-count" id="filter-unread"></span>
+          </button>
+          <button class="filter-btn" data-status="reading">
+            在读 <span class="filter-count" id="filter-reading"></span>
+          </button>
+          <button class="filter-btn" data-status="read">
+            已读 <span class="filter-count" id="filter-read"></span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="papers-grid" id="papers-grid" role="list"></div>
+      
+      <div class="empty-state" id="empty-state" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"></path>
+        </svg>
+        <p>没有找到匹配的论文</p>
+        <span>尝试调整搜索词或筛选条件</span>
+      </div>
+    </main>
+  </div>
+  
+  <!-- 详情模态框 -->
+  <div class="modal-overlay" id="modal-overlay" hidden aria-hidden="true">
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button class="modal-close" id="modal-close" aria-label="关闭详情">×</button>
+      <div class="modal-header">
+        <span class="modal-topic" id="modal-topic"></span>
+        <span class="modal-status" id="modal-status"></span>
+      </div>
+      <h2 class="modal-title" id="modal-title"></h2>
+      <div class="modal-meta" id="modal-meta"></div>
+      <div class="modal-body">
+        <h3>摘要</h3>
+        <p id="modal-abstract"></p>
+        <h3>我的笔记</h3>
+        <p id="modal-note" class="note-content"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-toggle-status">切换状态</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
