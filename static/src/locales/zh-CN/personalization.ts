@@ -87,8 +87,8 @@ export default {
   adultContentTitle: '成人内容限制',
   adultContentDesc: '控制成年人题材与亲密情节的表达范围',
   adultContentNone: '无',
-  adultContentNoneDesc: '宽容讨论虚构成年人题材，亲密描写仍非露骨',
-  adultContentLowDesc: '允许自愿、非剥削的成年人非露骨亲密情节',
+  adultContentNoneDesc: '虚构角色的露骨性内容，不限题材，参与者须为成年人',
+  adultContentLowDesc: '露骨性内容，限成年人自愿参与，不得色情化胁迫与剥削',
   adultContentMediumDesc: '亲密情节服务剧情，不以性刺激为目的',
   adultContentHighDesc: '仅非性化的恋爱互动与客观性教育',
 

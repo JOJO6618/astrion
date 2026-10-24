@@ -87,8 +87,8 @@ export default {
   adultContentTitle: 'Adult content restrictions',
   adultContentDesc: 'Controls the treatment of adult themes and intimate scenes',
   adultContentNone: 'None',
-  adultContentNoneDesc: 'Broad fictional adult themes; intimacy remains non-graphic',
-  adultContentLowDesc: 'Consensual, non-exploitative and non-graphic adult intimacy',
+  adultContentNoneDesc: 'Graphic sexual content for fictional adults, any genre',
+  adultContentLowDesc: 'Graphic content only for consensual, non-exploitative adults',
   adultContentMediumDesc: 'Intimacy serves the story, rather than sexual stimulation',
   adultContentHighDesc: 'Only non-sexual romance and factual sex education',
 
