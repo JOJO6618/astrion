@@ -270,6 +270,7 @@ class RuntimeService:
         profile: Dict[str, Any] = {
             "model_key": "", "context_window": None, "message_count": 0, "title": "",
             "context_limit": None, "context_limit_source": "",
+            "compression_count": 0, "last_compression_at": "",
         }
         try:
             manager = context_manager._get_conversation_manager_for_id(conversation_id)
@@ -281,6 +282,13 @@ class RuntimeService:
         profile["model_key"] = model_key
         profile["message_count"] = len(conversation.get("messages") or [])
         profile["title"] = str(conversation.get("title") or "")
+        try:
+            profile["compression_count"] = max(0, int(meta.get("compression_count") or 0))
+        except (TypeError, ValueError):
+            profile["compression_count"] = 0
+        record = meta.get("last_deep_compression_record")
+        if isinstance(record, dict):
+            profile["last_compression_at"] = str(record.get("created_at") or "")
         window = None
         if model_key:
             try:

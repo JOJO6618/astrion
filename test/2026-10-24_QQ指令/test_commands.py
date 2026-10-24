@@ -23,6 +23,8 @@ STATS = {
     'context_window': 1000000,
     'context_limit': 250000,
     'context_limit_source': 'deep_compress',
+    'compression_count': 3,
+    'last_compression_at': '2026-10-24T21:03:12.456789',
     'current_context_tokens': 48213,
     'message_count': 128,
     'total_input_tokens': 1234567,
@@ -69,6 +71,8 @@ class RenderTests(unittest.TestCase):
         self.assertIn('$1.23', text)
         self.assertIn('含子智能体 $0.01', text)
         self.assertIn('约 ¥8.73', text)
+        self.assertIn('消息：128 条', text)
+        self.assertIn('深度压缩：3 次（最近 2026-10-24 21:03）', text)
         self.assertIn('更新：2026-10-24 21:30:12', text)
 
     def test_cache_denominator_excludes_exempt_input(self):
@@ -78,6 +82,11 @@ class RenderTests(unittest.TestCase):
         stats = dict(STATS, total_input_tokens=600, total_cached_input_tokens=0,
                      cache_exempt_input_tokens=600)
         self.assertIn('（样本不足）', render_context(stats, 'conv_demo'))
+
+    def test_zero_compression_has_no_timestamp(self):
+        text = render_context(dict(STATS, compression_count=0), 'conv_demo')
+        self.assertIn('深度压缩：0 次', text)
+        self.assertNotIn('最近', text)
 
     def test_missing_limit_falls_back_to_model_window(self):
         stats = {key: value for key, value in STATS.items()
