@@ -30,7 +30,7 @@ STATS = {
     'cache_exempt_input_tokens': 0,
     'updated_at': '2026-10-24T21:30:12',
     'costs': {'currency': 'USD', 'total_usd': '1.23', 'partial': False, 'has_priced': True,
-              'exchange_rate': 7.1,
+              'exchange_rate': {'usd_cny': 7.1, 'source': 'test'},
               'actors': [{'id': 'main', 'kind': 'main', 'cost_usd': '1.22'},
                          {'id': 'task_1', 'kind': 'sub_agent', 'cost_usd': '0.01'}]},
 }
@@ -66,6 +66,7 @@ class RenderTests(unittest.TestCase):
         self.assertIn('累计输出：56,789', text)
         self.assertIn('$1.23', text)
         self.assertIn('含子智能体 $0.01', text)
+        self.assertIn('约 ¥8.73', text)
         self.assertIn('更新：2026-10-24 21:30:12', text)
 
     def test_cache_denominator_excludes_exempt_input(self):
