@@ -26,7 +26,7 @@ class TrustedPrincipal:
     """
 
     username: str
-    workspace_id: str
+    workspace_id: Optional[str]
     role: str = "user"
     is_api_user: bool = False
     host_mode: bool = False
@@ -34,11 +34,17 @@ class TrustedPrincipal:
     preferred_model_key: Optional[str] = None
     preferred_run_mode: Optional[str] = None
     preferred_thinking_mode: Optional[bool] = None
+    conversation_kind: str = "agent"
 
     def validate(self) -> None:
         if not str(self.username or "").strip():
             raise ValueError("runtime_context: username 不能为空")
-        if not str(self.workspace_id or "").strip():
+        if self.conversation_kind not in {"agent", "chat"}:
+            raise ValueError("Invalid conversation kind")
+        if self.conversation_kind == "chat":
+            if self.workspace_id is not None:
+                raise ValueError("Chat has no workspace identity")
+        elif not str(self.workspace_id or "").strip():
             raise ValueError("runtime_context: workspace_id 不能为空")
 
 
@@ -62,12 +68,24 @@ class TaskParams:
     message_source: Optional[str] = None
     queued_message_id: Optional[str] = None
     task_type: str = "chat"
+    chat_operation_id: Optional[str] = None
+    chat_parent_id: Optional[str] = None
+    chat_regenerate_turn_id: Optional[str] = None
+    chat_edit_message_id: Optional[str] = None
+    chat_settings: Dict[str, Any] = field(default_factory=dict)
     # 审批/提问等待超时透传（秒）。None = 保持既有默认语义（3600s）不变；
     # 超时后的语义（拒绝当前动作继续 vs 结束任务）属阶段三产品决策，
     # 本阶段仅建立透传机制，适配层暂不向 Web 客户端暴露该字段。
     approval_timeout_seconds: Optional[int] = None
 
     def validate(self) -> None:
+        if not isinstance(self.chat_settings, dict) or set(self.chat_settings) - {"reasoning_effort", "network_enabled"}:
+            raise ValueError("Invalid Chat settings")
+        effort = self.chat_settings.get("reasoning_effort")
+        if effort is not None and (not isinstance(effort, str) or effort not in {"minimal", "low", "medium", "high", "xhigh"}):
+            raise ValueError("Invalid Chat reasoning effort")
+        if "network_enabled" in self.chat_settings and not isinstance(self.chat_settings["network_enabled"], bool):
+            raise ValueError("Chat network setting must be a boolean")
         if self.goal_action not in {None, "start", "continue"}:
             raise ValueError("Invalid goal action")
         from modules.goal_policy import validate_limits

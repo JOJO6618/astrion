@@ -1,0 +1,22 @@
+- generic [ref=e63] [box=172,54,900,311]:
+  - generic [ref=e66] [box=172,54,900,120]:
+    - generic [ref=e67] [box=1021,54,51,20]: 用户
+    - generic [ref=e70] [box=904,84,168,56]: Browser message 1
+    - generic [box=1020,150,52,28]:
+      - generic [box=1020,150,52,28]:
+        - button "复制" [box=1020,154,20,20]
+        - button "编辑" [box=1044,150,28,28]
+  - generic [ref=e74] [box=172,198,900,167]:
+    - generic [ref=e75] [box=172,200,151,19]:
+      - generic [ref=e76] [box=172,200,52,19]: Astrion
+      - generic [ref=e77] [box=238,201,84,17]: 工作完成 00:04
+    - generic [ref=e78] [box=172,245,900,76]:
+      - generic "Checking the message and preparing the reply." [ref=e83] [cursor=pointer] [box=172,245,874,26]:
+        - generic [aria-hidden] [ref=e84] [box=172,245,874,26]:
+          - generic [box=172,245,311,26]: Checking the message and preparing the reply.
+        - generic [aria-hidden] [box=172,245,311,26]: Checking the message and preparing the reply.
+      - paragraph [ref=e94] [box=172,295,900,26]: "Reply received: Browser message 1"
+    - generic [ref=e95] [box=172,337,900,28]:
+      - button "复制" [ref=e96] [cursor=pointer] [box=172,341,20,20]
+      - button "编辑" [ref=e97] [cursor=pointer] [box=196,337,28,28]
+      - button "重新生成" [ref=e100] [cursor=pointer] [box=228,337,28,28]

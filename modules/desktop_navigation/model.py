@@ -22,8 +22,9 @@ def conversation_id(value) -> str:
 
 
 def make_tab(workspace_id: str, *, key: str = "", conv_id: str = "",
-             title: str = "", label: str = "") -> dict:
+             title: str = "", label: str = "", conversation_kind: str = "agent") -> dict:
     return {
+        "conversation_kind": conversation_kind,
         "key": key or new_key(), "kind": "conv" if conv_id else "new",
         "conversation_id": conversation_id(conv_id), "workspace_id": workspace_id,
         "workspace_label": label, "title": str(title or "")[:200], "error": "",
@@ -58,6 +59,8 @@ def migrate(raw) -> dict:
             if (not isinstance(tab, dict) or not isinstance(tab.get("key"), str) or
                     not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", tab["key"]) or tab["key"] in keys or
                     tab.get("kind") not in {"conv", "new"} or
+                    tab.get("conversation_kind", "agent") not in {"chat", "agent"} or
+                    (tab.get("conversation_kind") == "chat" and bool(tab.get("workspace_id"))) or
                     any(not isinstance(tab.get(key), str) for key in
                         ("conversation_id", "workspace_id", "workspace_label", "title", "error"))):
                 raise ValueError("Invalid desktop tab")
@@ -138,7 +141,8 @@ def remove_tabs(state: dict, keys: set[str], *, ensure_exit: bool = True) -> Non
         return
     if not state["tabs"] and ensure_exit:
         state["tabs"].append(make_tab(removed[0]["workspace_id"],
-                                      label=removed[0]["workspace_label"]))
+                                      label=removed[0]["workspace_label"],
+                                      conversation_kind=removed[0].get("conversation_kind", "agent")))
     target = find_tab(state, nav.get("key", "")) or find_tab(state, state["active_key"])
     if not target and state["tabs"]:
         target = state["tabs"][min(index, len(state["tabs"]) - 1)]

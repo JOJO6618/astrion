@@ -77,8 +77,14 @@ AUTO_SHALLOW_TOOL_WHITELIST = {
 class ContextManagerBase:
     """ContextManager 基础类，包含初始化与跨模块公共工具方法。"""
 
-    def __init__(self, project_path: str, data_dir: Optional[str] = None):
-        self.project_path = Path(project_path).resolve()
+    def __init__(self, project_path: Optional[str], data_dir: Optional[str] = None,
+                 *, conversation_kind: str = "agent"):
+        if conversation_kind == "agent" and not project_path:
+            raise ValueError("Agent context requires a project path")
+        if conversation_kind == "chat" and project_path is not None:
+            raise ValueError("Chat context has no project path")
+        self.conversation_kind = conversation_kind
+        self.project_path = Path(project_path).resolve() if project_path else None
         self.initial_project_path = self.project_path
         self.container_mount_path = TERMINAL_SANDBOX_MOUNT_PATH or "/workspace"
         self.container_cpu_limit = TERMINAL_SANDBOX_CPUS or "未限制"
@@ -100,7 +106,11 @@ class ContextManagerBase:
         self._shallow_compact_round: int = 0
         
         # 新增：对话持久化管理器
-        self.conversation_manager = ConversationManager(base_dir=self.data_dir, project_path=str(self.project_path))
+        self.conversation_manager = ConversationManager(
+            base_dir=self.data_dir,
+            project_path=str(self.project_path) if self.project_path is not None else None,
+            conversation_kind=conversation_kind,
+        )
 
         self.media_store = MediaStore(self.data_dir)
         self.current_conversation_id: Optional[str] = None
@@ -110,7 +120,8 @@ class ContextManagerBase:
         # 用于接收Web终端的回调函数
         self._web_terminal_callback = None
 
-        self.load_annotations()
+        if conversation_kind == "agent":
+            self.load_annotations()
 
     def _is_host_mode_without_safety(self) -> bool:
         """是否处于宿主机模式且未启用安全保护。"""

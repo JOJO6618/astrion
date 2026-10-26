@@ -95,7 +95,10 @@ DEFAULT_SHALLOW_KEEP_USER_TURN_TOOLS = 3
 # 三个审核智能体的固定键：自动审批 / 目标审核 / 工作流审核
 REVIEW_AGENT_KEYS = ("auto_approval", "goal_review", "workflow_review")
 
+from modules.chat_mode.settings import CHAT_DEFAULTS, sanitize_chat_settings
+
 DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
+    **CHAT_DEFAULTS,
     "enabled": False,
     "communication_style": "default",  # default / human_like / auto
     "conversation_continuity": "medium",  # high / medium / low
@@ -986,6 +989,7 @@ def sanitize_personalization_payload(
     base["webpage_extract_provider"] = (
         extract_provider if extract_provider in ("jina", "tavily", "exa", "parallel") else "jina"
     )
+    base.update(sanitize_chat_settings(data, base, allowed_models))
 
     return base
 

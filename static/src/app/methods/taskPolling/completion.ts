@@ -3,6 +3,7 @@ import { debugLog, goalModeDebugLog } from '../common';
 import { useTaskStore } from '../../../stores/task';
 import { jsonDebug } from './shared';
 import { t } from '@/locales';
+import { isToolArgumentError, taskErrorToast } from '@/utils/taskErrorToast';
 import { currentConversationSession } from '../conversation/session';
 
 export const completionMethods = {
@@ -262,28 +263,13 @@ export const completionMethods = {
       this.streamingMessage = true;
       this.$forceUpdate();
 
-      this.uiPushToast({
-        title: t('appTasks.retrySoonTitle'),
-        message: t('appTasks.retryInSeconds', {
-          n: retryIn,
-          attempt,
-          max: maxAttempts,
-          error: data?.message || t('common.unknownError')
-        }),
-        type: 'info',
-        duration: Math.max(retryIn, 1) * 1000
-      });
+      this.uiPushToast(taskErrorToast(data));
       return;
     }
 
     const errorMessage = data.message || t('common.unknownError');
     const errorType = data.error_type || 'unknown';
-    const isToolArgumentParseError =
-      // 双语匹配后端 modules/i18n.py tool.param_parse_failed 的 zh/en 产出（\u 转义仅过审计）
-      errorType === 'parameter_format_error' ||
-      /(?:\u5de5\u5177\u53c2\u6570\u89e3\u6790\u5931\u8d25|Failed to parse tool arguments)/.test(
-        String(errorMessage || '')
-      );
+    const isToolArgumentParseError = isToolArgumentError(data);
 
     // 工具参数解析失败属于“单个工具调用失败”，后端会继续执行主任务。
     // 这里不能停止轮询，否则会出现“后端继续跑、前端不再更新”的假死状态。
@@ -296,40 +282,15 @@ export const completionMethods = {
         streamingMessage: this.streamingMessage,
         stopRequested: this.stopRequested
       });
-      this.uiPushToast({
-        title: t('appTasks.toolCallFailed'),
-        message: errorMessage,
-        type: 'warning',
-        duration: 6000
-      });
+      this.uiPushToast(taskErrorToast(data));
       // 保持当前运行态，不在这里强制置为“工作中”，避免后续任务结束时状态粘住
       this.stopRequested = false;
       this.$forceUpdate();
       return;
     }
 
-    let title = t('appTasks.taskFailedTitle');
-    let message = errorMessage;
-
-    // 根据错误类型提供友好提示
-    if (errorType === 'api_error') {
-      title = t('appTasks.apiErrorTitle');
-      message = t('appTasks.apiErrorMessage', { error: errorMessage });
-    } else if (errorType === 'timeout') {
-      title = t('appTasks.timeoutTitle');
-      message = t('appTasks.timeoutMessage');
-    } else if (errorType === 'quota_exceeded') {
-      title = t('appTasks.quotaTitle');
-      message = t('appTasks.quotaMessage');
-    }
-
     console.error('[TaskPolling] 任务错误:', data.message);
-    this.uiPushToast({
-      title,
-      message,
-      type: 'error',
-      duration: 8000
-    });
+    this.uiPushToast(taskErrorToast(data));
 
     // 清理状态（顺序：先清依赖 awaitingFirstContent 判定的空占位，再清残留流式字段）
     this.cleanupTrailingEmptyAssistantPlaceholder?.('task_error');

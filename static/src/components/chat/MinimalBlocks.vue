@@ -15,7 +15,11 @@
             <span class="summary-preview">
               <SummarySweepText
                 v-bind="getSummarySweepInput(group.actions, group.id)"
-                :reel-view="summaryToolReel.shouldShow(group.id) ? summaryToolReel.getView(group.id) : undefined"
+                :reel-view="
+                  summaryToolReel.shouldShow(group.id)
+                    ? summaryToolReel.getView(group.id)
+                    : undefined
+                "
                 @settled="onSummarySettled(group.id, $event)"
               />
             </span>
@@ -102,7 +106,12 @@
         class="text-output"
         :class="{ 'streaming-text': group.streaming }"
       >
-        <div class="text-content" :class="{ 'streaming-text': group.streaming }">
+        <slot
+          v-if="editingMessageId && editingMessageId === group.responseMessageId"
+          name="text-editor"
+          :action="group"
+        />
+        <div v-else class="text-content" :class="{ 'streaming-text': group.streaming }">
           <MarkdownRenderer
             :content="group.content || ''"
             :is-streaming="group.streaming"
@@ -111,6 +120,7 @@
             :enable-citations="enableCitations"
           />
         </div>
+        <slot name="text-actions" :action="group" />
       </div>
       <div v-else-if="group.type === 'system'" class="summary-group sub-agent-system-group">
         <div class="summary-line-text sub-agent-system-summary-line">
@@ -161,6 +171,7 @@ interface Action {
   streaming?: boolean;
   blockId?: string;
   toolBatchId?: string;
+  responseMessageId?: string;
   tool?: {
     name?: string;
     intent?: string;
@@ -188,10 +199,12 @@ interface BlockGroup {
   actions?: Action[];
   content?: string;
   streaming?: boolean;
+  responseMessageId?: string;
 }
 
 const props = defineProps<{
   actions: Action[];
+  editingMessageId?: string;
   citations?: CitationAnnotation[];
   citationsFinal?: boolean;
   enableCitations?: boolean;
@@ -283,8 +296,12 @@ const getToolBatchKey = (actions: Action[]) => {
 const isSummaryIntentReady = (action: Action): boolean => {
   if (!personalizationStore.form.tool_intent_enabled) return true;
   const tool = action.tool;
-  return tool?.intent_complete === true ||
-    (tool?.intent_complete === undefined && tool?.status !== 'preparing' && tool?.status !== 'hinted');
+  return (
+    tool?.intent_complete === true ||
+    (tool?.intent_complete === undefined &&
+      tool?.status !== 'preparing' &&
+      tool?.status !== 'hinted')
+  );
 };
 
 const getSummaryToolItems = (actions: Action[]) => {
@@ -372,9 +389,10 @@ const blockGroups = computed(() => {
         // 添加 text 组
         groups.push({
           type: 'text',
-          id: `text-${idx}`,
+          id: action.id || `text-${idx}`,
           content: text,
-          streaming: action.streaming
+          streaming: action.streaming,
+          responseMessageId: action.responseMessageId
         });
       } else {
         // 添加 system 组（用于子智能体完成通知，保持顺序）
@@ -614,7 +632,8 @@ const isSummaryRunning = (actions: Action[], groupId: string) => {
 
   // text_start creates an empty action before its first nonempty chunk.
   const lastActionIndex = props.actions.indexOf(actions[actions.length - 1]);
-  const hasTextAfter = lastActionIndex >= 0 &&
+  const hasTextAfter =
+    lastActionIndex >= 0 &&
     props.actions.slice(lastActionIndex + 1).some((action) => action.type === 'text');
 
   // 只有当后面有文本输出时，才显示对勾（说明这个摘要组已经完成并开始输出了）
@@ -640,14 +659,18 @@ const summaryToolReel = useSummaryToolReel(() =>
     if (group.type !== 'summary' || !group.actions) return [];
     const tools = getLatestToolSegment(group.actions);
     const batchKey = getToolBatchKey(group.actions);
-    return [{
-      id: group.id,
-      batchKey,
-      items: getSummaryToolItems(group.actions).filter((item) => item.ready).map((item) => item.text),
-      ready: summaryEntries.value[group.id] === `${batchKey}:tools`,
-      running: isSummaryRunning(group.actions, group.id),
-      active: tools.some(isActiveToolAction)
-    }];
+    return [
+      {
+        id: group.id,
+        batchKey,
+        items: getSummaryToolItems(group.actions)
+          .filter((item) => item.ready)
+          .map((item) => item.text),
+        ready: summaryEntries.value[group.id] === `${batchKey}:tools`,
+        running: isSummaryRunning(group.actions, group.id),
+        active: tools.some(isActiveToolAction)
+      }
+    ];
   })
 );
 
@@ -655,13 +678,19 @@ const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepI
   const running = isSummaryRunning(actions, groupId);
   const lastAction = actions[actions.length - 1];
   const thinkingIdentity = lastAction?.id || lastAction?.blockId || `${groupId}:thinking`;
-  const thinkingComplete = lastAction?.type === 'thinking' && lastAction.streaming === false &&
+  const thinkingComplete =
+    lastAction?.type === 'thinking' &&
+    lastAction.streaming === false &&
     summaryThinkingEntries.value[groupId] === thinkingIdentity;
   const latestSummary = blockGroups.value.filter((group) => group.type === 'summary').pop();
   // Only keep a finished thought until its entry has appeared. Body streaming
   // must not postpone the final summary until the whole API call completes.
-  const thinkingDuringOutput = lastAction?.type === 'thinking' && !thinkingComplete &&
-    latestSummary?.id === groupId && props.conversationRunning && props.isLatestMessage;
+  const thinkingDuringOutput =
+    lastAction?.type === 'thinking' &&
+    !thinkingComplete &&
+    latestSummary?.id === groupId &&
+    props.conversationRunning &&
+    props.isLatestMessage;
   if (thinkingComplete || (!running && !thinkingDuringOutput)) {
     return {
       text: getCompletedSummaryText(actions),
@@ -681,12 +710,18 @@ const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepI
     // 首项文字，避免状态变化重播外层入场；一旦首项拿到完整 intent，就回落到
     // 实时文案，使“准备调用…”兜底能被真实 intent 替换，而不会被永久锁住。
     const firstTool = tools[0];
-    const firstHasIntent = personalizationStore.form.tool_intent_enabled &&
+    const firstHasIntent =
+      personalizationStore.form.tool_intent_enabled &&
       isSummaryIntentReady(firstTool) &&
-      !!(firstTool?.tool?.intent_full || firstTool?.tool?.intent_rendered ||
-        firstTool?.tool?.arguments?.intent);
-    const entryText = items.length > 1 && summaryEntries.value[groupId] === identity &&
-      !firstHasIntent ? summaryEntryTexts.value[groupId] : undefined;
+      !!(
+        firstTool?.tool?.intent_full ||
+        firstTool?.tool?.intent_rendered ||
+        firstTool?.tool?.arguments?.intent
+      );
+    const entryText =
+      items.length > 1 && summaryEntries.value[groupId] === identity && !firstHasIntent
+        ? summaryEntryTexts.value[groupId]
+        : undefined;
     return {
       // The reel owns subsequent row updates. Status changes must not replay
       // this batch's first entry or rebuild the outer summary animation.

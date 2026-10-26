@@ -23,6 +23,8 @@ function compile(file, globals, imports = {}) {
     setTimeout, clearTimeout, Date, console: { log: noop, warn: noop, error: noop },
     require: (key) => {
       if (Object.hasOwn(imports, key)) return imports[key];
+      if (key === '@/utils/generatingLabel') return require('./ts_fixture.cjs').compile(
+        'static/src/utils/generatingLabel.ts', { '@/locales': { t: key => key } });
       if (key.endsWith('/workspaceRequestScope')) return {
         bindWorkspaceRequestHost: noop,
         workspaceScopedFetch: (...args) => globals.fetch(...args)

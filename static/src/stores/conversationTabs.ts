@@ -5,6 +5,7 @@ export interface ConversationTab {
   /** Immutable for the entire tab lifetime, including new -> conversation binding. */
   key: string;
   kind: 'conv' | 'new';
+  conversationKind: 'chat' | 'agent';
   conversationId: string;
   workspaceId: string;
   workspaceLabel: string;
@@ -37,6 +38,7 @@ function normalizeTab(raw: any): ConversationTab {
   return {
     key: String(raw.key),
     kind: raw.kind,
+    conversationKind: raw.conversation_kind === 'chat' ? 'chat' : 'agent',
     conversationId: String(raw.conversation_id || ''),
     workspaceId: String(raw.workspace_id || ''),
     workspaceLabel: String(raw.workspace_label || ''),
@@ -170,10 +172,18 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         throw error;
       }
     },
-    addNewTab(payload: { workspaceId?: string; workspaceLabel?: string } = {}) {
+    addNewTab(
+      payload: {
+        workspaceId?: string;
+        workspaceLabel?: string;
+        conversationKind?: 'chat' | 'agent';
+      } = {}
+    ) {
+      const kind = payload.conversationKind || this.activeTab?.conversationKind || 'agent';
       return this.command('create', {
         key: `tab_${navigationId()}`,
-        workspace_id: payload.workspaceId || this.workspaceId,
+        conversation_kind: kind,
+        workspace_id: kind === 'chat' ? '' : payload.workspaceId || this.workspaceId,
         workspace_label: payload.workspaceLabel || ''
       });
     },
@@ -204,7 +214,14 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       return this.command('page', { page });
     },
     resume() {
-      return this.command('resume', { workspace_id: this.workspaceId });
+      const chatPage =
+        window.location.pathname === '/settings/chat' ||
+        new URLSearchParams(window.location.search).get('from') === 'chat';
+      const kind = this.activeTab?.conversationKind || (chatPage ? 'chat' : 'agent');
+      return this.command('resume', {
+        workspace_id: kind === 'chat' ? '' : this.workspaceId,
+        conversation_kind: kind
+      });
     },
     updateTitle(conversationId: string, title: string, workspaceId: string) {
       if (!this.enabled || !title) return;

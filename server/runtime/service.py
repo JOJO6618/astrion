@@ -52,6 +52,22 @@ class RuntimeService:
         失败时返回 None，由受理层拒绝启动；每个任务必须先确定对话身份，
         才能取得对话级资源并发布唯一显示快照。
         """
+        if ctx.principal.conversation_kind == "chat":
+            from server.chat_mode_scope import scope_for_principal
+            from modules.chat_mode.storage import ChatStorage
+            from modules.personalization_manager import load_personalization_config
+            scope = scope_for_principal(ctx.principal)
+            prefs = load_personalization_config(scope.preferences_dir)
+            return ChatStorage(scope.root).create_for_operation(
+                ctx.params.chat_operation_id,
+                model_key=ctx.params.model_key or prefs.get("chat_default_model") or None,
+                thinking_mode=(ctx.params.thinking_mode if ctx.params.thinking_mode is not None
+                               else prefs.get("chat_default_thinking_mode", True)),
+                reasoning_effort=ctx.params.chat_settings.get(
+                    "reasoning_effort", prefs.get("chat_default_reasoning_effort")),
+                network_enabled=ctx.params.chat_settings.get(
+                    "network_enabled", prefs.get("chat_network_enabled", True)),
+            )
         try:
             from server.context import RuntimeIdentity, get_user_resources
             from server.utils_common import debug_log

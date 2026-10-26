@@ -8,6 +8,8 @@ import { t } from '@/locales';
 const controllers = new WeakMap();
 
 function pathFor(tab) {
+  if (tab.conversationKind === 'chat')
+    return tab.kind === 'conv' ? `/chat/${tab.conversationId.replace(/^conv_/, '')}` : '/chat/new';
   const path = tab.kind === 'conv' ? `/${tab.conversationId.replace(/^conv_/, '')}` : '/new';
   return `${path}?workspace_id=${encodeURIComponent(tab.workspaceId)}`;
 }
@@ -50,6 +52,15 @@ async function applyTarget(host, control) {
     return;
   }
   if (!tab) return;
+  if (tab.conversationKind === 'chat' || host.isChatMode) {
+    if (tab.conversationKind === 'chat' && host.isChatMode) {
+      await host.handleChatNavigation(tab, owner);
+    } else if (owns()) {
+      host.leaveConversationView();
+      window.location.assign(pathFor(tab));
+    }
+    return;
+  }
   if (host.isConversationIndependentRoute?.()) {
     host.leaveConversationView();
     if (owns()) window.location.assign(pathFor(tab));
@@ -139,7 +150,8 @@ export async function startDesktopNavigation(host) {
         ? window.location.pathname + window.location.search
         : '';
       await tabs.attach({
-        workspace_id: host.currentHostWorkspaceId || '',
+        workspace_id: host.isChatMode ? '' : host.currentHostWorkspaceId || '',
+        conversation_kind: host.isChatMode ? 'chat' : 'agent',
         conversation_id: page ? '' : host.currentConversationId || '',
         page
       });

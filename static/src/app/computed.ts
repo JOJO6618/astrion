@@ -19,42 +19,7 @@ import { useSubAgentStore } from '../stores/subAgent';
 import { useBackgroundCommandStore } from '../stores/backgroundCommand';
 import { usePersonalizationStore } from '../stores/personalization';
 import { useQuickDockStore } from '../stores/quickDock';
-import { toolFaceKey } from '../utils/avatarFace';
-import { messageStartsWork } from '../utils/messageVisibility';
-
-// 取最后一段连续的 tool actions（对应模型一次并行调用的一批工具）
-function getLatestToolSegment(actions) {
-  if (!Array.isArray(actions)) return [];
-  let last = -1;
-  for (let i = actions.length - 1; i >= 0; i--) {
-    if (actions[i]?.type === 'tool') {
-      last = i;
-      break;
-    }
-    if (actions[i]?.type === 'thinking') break;
-  }
-  if (last < 0) return [];
-  let start = last;
-  while (start > 0 && actions[start - 1]?.type === 'tool') start--;
-  return actions.slice(start, last + 1);
-}
-
-const AVATAR_RUNNING_TOOL_STATUS = new Set([
-  'preparing',
-  'running',
-  'pending',
-  'queued',
-  'awaiting_approval',
-  'pending_approval',
-  'awaiting_user_answer'
-]);
-const AVATAR_TERMINAL_STATUS = new Set([
-  'completed',
-  'failed',
-  'timeout',
-  'terminated',
-  'cancelled'
-]);
+import { resolveAvatarStatus } from '../utils/avatarStatus';
 
 export const computed = {
   ...mapWritableState(useConnectionStore, [
@@ -381,159 +346,19 @@ export const computed = {
   },
   // 状态形象：驱动 StatusAvatar（欢迎页 + 对话末尾指示器）
   avatarStatus() {
-    void currentLocale.value;
-    const messages = Array.isArray(this.messages) ? this.messages : [];
-    const lastAssistant = (() => {
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const message = messages[i];
-        if (message?.role === 'assistant') return message;
-        if (message?.role === 'user' && messageStartsWork(message)) break;
-      }
-      return null;
-    })();
-
-    // 后台运行计数（用于 work 文案）
-    const subAgentStore = useSubAgentStore();
-    const bgStore = useBackgroundCommandStore();
-    const countRunning = (arr) =>
-      (Array.isArray(arr) ? arr : []).filter((item) => {
-        if (!item) return false;
-        const status = String(item?.status || '').toLowerCase();
-        return status ? !AVATAR_TERMINAL_STATUS.has(status) : true;
-      }).length;
-    const agentCount = (
-      Array.isArray(subAgentStore.subAgents) ? subAgentStore.subAgents : []
-    ).filter((agent) => String(agent?.status || '').toLowerCase() === 'running').length;
-    const cmdCount = countRunning(bgStore.commands);
-    const bgText = (() => {
-      const parts = [];
-      if (cmdCount > 0)
-        parts.push(t('appCore.backgroundCommandCount', { n: cmdCount, count: cmdCount }));
-      if (agentCount > 0)
-        parts.push(t('appCore.backgroundAgentCount', { n: agentCount, count: agentCount }));
-      return parts.length ? `${parts.join('，')}${t('appCore.backgroundRunning')}` : '';
-    })();
-
-    const intentEnabled = !!usePersonalizationStore().form?.tool_intent_enabled;
-    // 1) 思考中（防御：仅在任务仍运行时采信流式字段——异常中断后字段可能残留，
-    //    虽有各终结路径的统一清理兑底，这里再加一层保险避免永久卡「思考中」）
-    const isThinking =
-      !!lastAssistant &&
-      (this.taskInProgress || this.streamingMessage) &&
-      (lastAssistant.currentStreamingType === 'thinking' || lastAssistant.activeThinkingId != null);
-
-    // 2) 工具执行中（取最后一段并行工具，过滤未完成的）
-    let runningTools = [];
-    if (lastAssistant) {
-      const segment = getLatestToolSegment(lastAssistant.actions || []);
-      runningTools = segment.filter((a) => {
-        const s = String(a?.tool?.status || '').toLowerCase();
-        return a?.tool?.awaiting_content || !s || AVATAR_RUNNING_TOOL_STATUS.has(s);
-      });
-    }
-    if (runningTools.length === 0) {
-      const mapActions = [
-        ...Array.from(this.preparingTools?.values?.() || []),
-        ...Array.from(this.activeTools?.values?.() || [])
-      ];
-      runningTools = mapActions
-        .map((item) => (item?.type === 'tool' ? item : { type: 'tool', tool: item }))
-        .filter((a) => {
-          const tool = a?.tool;
-          if (!tool) return false;
-          const s = String(tool?.status || '').toLowerCase();
-          return tool?.awaiting_content || !s || AVATAR_RUNNING_TOOL_STATUS.has(s);
-        });
-    }
-    const hasMapTools =
-      (this.preparingTools && this.preparingTools.size > 0) ||
-      (this.activeTools && this.activeTools.size > 0);
-
-    // 3) 运行/等待态标志
-    const running =
-      this.streamingMessage ||
-      this.taskInProgress ||
-      this.waitingForSubAgent ||
-      this.waitingForBackgroundCommand ||
-      this.stopRequested ||
-      hasMapTools ||
-      runningTools.length > 0 ||
-      agentCount > 0 ||
-      cmdCount > 0;
-
-    // An explicit new API request supersedes the previous request's retained
-    // intent and any stale streaming/tool fields. Response-start events clear it.
-    if (
-      this.apiRequestPending &&
-      !this.stopRequested &&
-      (this.taskInProgress || this.streamingMessage)
-    ) {
-      return {
-        mode: 'work',
-        toolKeys: [],
-        toolTexts: [],
-        text: t('appCore.waitingApiResponse'),
-        tracking: false,
-        apiWaiting: true
-      };
-    }
-    // ---- 决策 ----
-    if (isThinking) {
-      return {
-        mode: 'think',
-        toolKeys: [],
-        toolTexts: [],
-        text: t('appCore.thinking'),
-        tracking: false
-      };
-    }
-    if (runningTools.length > 0) {
-      const keys = runningTools.map((a) => toolFaceKey(a?.tool?.name));
-      const getFinalIntentText = (tool: any) => {
-        if (!tool) return '';
-        // 准备参数时保持空白；执行开始后直接使用完整 intent，
-        // 不依赖消息区的打字动画，也不借用其他工具的文案。
-        return tool.status === 'running' && tool.intent_complete === true
-          ? tool.intent_full || ''
-          : '';
-      };
-      const toolTexts = runningTools.map((a) => {
-        return intentEnabled && !this.stopRequested ? getFinalIntentText(a?.tool) : '';
-      });
-      const text = toolTexts.find((value) => value) || '';
-      return { mode: 'tool', toolKeys: keys, toolTexts, text, tracking: false };
-    }
-    if (running) {
-      if (lastAssistant?.currentStreamingType === 'text') {
-        return { mode: 'work', toolKeys: [], toolTexts: [], text: '', tracking: false };
-      }
-      // 工作态：等 API / 后台运行 / 流式输出正文
-      let text = bgText;
-      // 「等待 API 响应…」优先于随机等待文案：后端已发出请求、尚未开始回复
-      // （api_request_start 事件驱动，覆盖首轮与工具轮次间的每一次等待）
-      if (!text && this.apiRequestPending && !this.stopRequested) {
-        return {
-          mode: 'work',
-          toolKeys: [],
-          toolTexts: [],
-          text: t('appCore.waitingApiResponse'),
-          tracking: false,
-          apiWaiting: true
-        };
-      }
-      if (!text) {
-        const awaitingMsg =
-          lastAssistant && lastAssistant.awaitingFirstContent ? lastAssistant : null;
-        if (awaitingMsg) {
-          text =
-            (typeof awaitingMsg.generatingLabel === 'string' &&
-              awaitingMsg.generatingLabel.trim()) ||
-            '';
-        }
-      }
-      return { mode: 'work', toolKeys: [], toolTexts: [], text, tracking: false };
-    }
-    // 空闲
-    return { mode: 'idle', toolKeys: [], toolTexts: [], text: '', tracking: true };
+    return resolveAvatarStatus({
+      messages: this.messages,
+      taskInProgress: this.taskInProgress,
+      streamingMessage: this.streamingMessage,
+      waitingForSubAgent: this.waitingForSubAgent,
+      waitingForBackgroundCommand: this.waitingForBackgroundCommand,
+      stopRequested: this.stopRequested,
+      apiRequestPending: this.apiRequestPending,
+      preparingTools: this.preparingTools,
+      activeTools: this.activeTools,
+      subAgents: useSubAgentStore().subAgents,
+      backgroundCommands: useBackgroundCommandStore().commands,
+      toolIntentEnabled: !!usePersonalizationStore().form?.tool_intent_enabled
+    });
   }
 };

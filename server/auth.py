@@ -453,6 +453,14 @@ def new_page():
     return serve_entry_html('index.html')
 
 
+@auth_bp.route('/chat')
+@auth_bp.route('/chat/new')
+@auth_bp.route('/chat/<conv:conversation_id>')
+@login_required
+def chat_mode_page(conversation_id=None):
+    return serve_entry_html('index.html')
+
+
 @auth_bp.route('/chrome')
 def chrome_page():
     # 桌面壳双 webview 的顶部对话标签条页面（chrome webview 同源加载，

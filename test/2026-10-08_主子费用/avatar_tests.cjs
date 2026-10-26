@@ -11,6 +11,10 @@ function mockRequire(name) {
   if (name === 'pinia') return { mapState: () => ({}), mapWritableState: () => ({}) };
   if (name.includes('avatarFace')) return { toolFaceKey: name => name };
   if (name.includes('messageVisibility')) return { messageStartsWork: () => true };
+  if (name.includes('avatarStatus')) return require('../2026-10-07_运行对话快照/ts_fixture.cjs').compile('static/src/utils/avatarStatus.ts', {
+    '@/locales': mockRequire('@/locales'), './avatarFace': mockRequire('avatarFace'),
+    './messageVisibility': mockRequire('messageVisibility')
+  });
   return new Proxy({}, { get: () => () => store });
 }
 new Function('require', 'exports', code)(mockRequire, exportsObject);

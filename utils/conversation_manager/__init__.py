@@ -9,10 +9,11 @@ from utils.conversation_manager.crud_mixin import CrudMixin
 from utils.conversation_manager.token_mixin import TokenMixin
 from utils.conversation_manager.list_search_mixin import ListSearchMixin
 from utils.conversation_manager.stats_mixin import StatsMixin
+from utils.conversation_manager.transactions import ConversationTransactionsMixin
 
 __all__ = ["ConversationManager"]
 
 
-class ConversationManager(ConversationManagerBase, PathMixin, IndexMixin, MetadataMixin, CrudMixin, TokenMixin, ListSearchMixin, StatsMixin):
+class ConversationManager(ConversationManagerBase, PathMixin, IndexMixin, MetadataMixin, CrudMixin, TokenMixin, ListSearchMixin, StatsMixin, ConversationTransactionsMixin):
     """对话管理器：组合各功能 mixin 的对外统一入口。"""
     pass

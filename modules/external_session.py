@@ -107,6 +107,21 @@ def resolve_conversation_headers(
     return {"x-opencode-session": sid} if sid else {}
 
 
+def resolve_context_headers(base_url: Optional[str], context_manager, base_dir=None) -> Dict[str, str]:
+    """Agent/Chat 共用的惰性请求头入口；身份与存储始终由当前上下文提供。"""
+    try:
+        conversation_id = getattr(context_manager, "current_conversation_id", None)
+        if not conversation_id:
+            return {}
+        return resolve_conversation_headers(
+            base_url, conversation_id,
+            manager=context_manager._get_conversation_manager_for_id(conversation_id),
+            base_dir=base_dir,
+        )
+    except Exception:
+        return {}
+
+
 def resolve_ephemeral_headers(base_url: Optional[str], base_dir=None) -> Dict[str, str]:
     """无对话连续性的调用（审核智能体等）用：每次生成一次性 session 头。
 

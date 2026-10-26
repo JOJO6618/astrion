@@ -59,7 +59,7 @@ class DesktopNavigation:
     def _reconcile(state: dict, lookup: Callable) -> None:
         missing = set()
         for tab in state["tabs"]:
-            if not tab["workspace_id"]:
+            if not tab["workspace_id"] and tab.get("conversation_kind") != "chat":
                 tab["error"] = "workspace_unavailable"
                 continue
             try:
@@ -101,6 +101,12 @@ class DesktopNavigation:
 
     @staticmethod
     def _workspace(payload: dict, state: dict, lookup: Callable | None) -> tuple[str, str]:
+        if payload.get("conversation_kind") == "chat":
+            if payload.get("workspace_id"):
+                raise ValueError("Chat has no workspace")
+            return "", ""
+        if payload.get("conversation_kind", "agent") != "agent":
+            raise ValueError("Invalid conversation kind")
         workspace = str(payload.get("workspace_id") or state.get("workspace_id") or "")
         info = lookup(workspace, "") if lookup else {}
         workspace = str(info.get("workspace_id") or workspace)
@@ -124,7 +130,8 @@ class DesktopNavigation:
             raise ValueError("Too many open tabs")
         info = lookup(workspace, conv) if conv and lookup else {}
         tab = make_tab(workspace, key=key, conv_id=conv,
-                       title=info.get("title") or payload.get("title"), label=label)
+                       title=info.get("title") or payload.get("title"), label=label,
+                       conversation_kind=payload.get("conversation_kind", "agent"))
         if info.get("exists") is False:
             raise NavigationConflict("Conversation no longer exists")
         state["tabs"].append(tab)
@@ -174,7 +181,9 @@ class DesktopNavigation:
                     state["renderer_id"] != payload.get("renderer_id")):
                 raise NavigationConflict("Tab owner has changed")
             conv = conversation_id(payload.get("conversation_id"))
-            if tab["kind"] != "new" or not conv:
+            if not conv:
+                return {"bound": False}
+            if tab["kind"] != "new":
                 if tab["conversation_id"] == conv:
                     return {"bound": True}
                 raise NavigationConflict("Tab is already bound")
@@ -210,8 +219,12 @@ class DesktopNavigation:
             if unchanged and not pending and page:
                 self._apply(state, "page", {"page": page}, lookup)
                 state["navigation"]["status"] = "committed"
-            elif unchanged and not pending and payload.get("conversation_id"):
-                tab = self._open(state, payload, lookup)
+            elif unchanged and not pending and (payload.get("conversation_id") or
+                                                 payload.get("conversation_kind") == "chat"):
+                tab = find_tab(state, nav.get("key", ""))
+                if not (not payload.get("conversation_id") and tab and tab["kind"] == "new"
+                        and tab.get("conversation_kind") == "chat"):
+                    tab = self._open(state, payload, lookup)
                 navigate(state, tab["key"])
                 self._commit(state, state["navigation"])
             elif nav.get("key") and find_tab(state, nav["key"]):
@@ -262,7 +275,8 @@ class DesktopNavigation:
         nav.update(status="committed", error="")
         state["active_key"] = tab["key"] if tab else ""
         if tab:
-            state["workspace_id"] = tab["workspace_id"]
+            if tab.get("conversation_kind") != "chat":
+                state["workspace_id"] = tab["workspace_id"]
             state["resume_key"] = tab["key"]
             tab["error"] = ""
 

@@ -943,7 +943,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         setattr(web_terminal, "_recent_tool_actions", list(recent_tool_actions))
 
         execution_scope = None
-        approval_root = Path(web_terminal.context_manager.project_path).resolve()
+        project_path = web_terminal.context_manager.project_path
+        approval_root = Path(project_path).resolve() if project_path is not None else None
         permission_eval = web_terminal.evaluate_tool_permission(function_name, arguments)
         approval_fingerprint = command_fingerprint(arguments) if permission_eval.get("approval_type") == "full_access" else None
         if not permission_eval.get("allowed", True):
@@ -1701,6 +1702,12 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 debug_log(f"[RuntimeMode] 应用挂起模式变更失败: {exc}")
 
         await asyncio.sleep(0.2)
+
+    if getattr(web_terminal, "conversation_kind", "agent") == "chat":
+        # The shared batch is complete. Chat's next-request hook refreshes edited
+        # text and applies hidden network notices at this protocol-safe boundary.
+        web_terminal._tool_loop_active = previous_tool_loop_active
+        return {"stopped": False, "last_tool_call_time": last_tool_call_time}
 
     # 工具结果附带的 system_message：必须等待同一轮全部 tool_call 的 tool 消息
     # 都已写入 messages/历史后再注入，避免夹断 assistant.tool_calls 的 tool 序列。

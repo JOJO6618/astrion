@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.atomic_io import replace_with_retry
+from utils.conversation_manager.locking import directory_lock
 
 from modules.i18n import tr
 
@@ -99,8 +100,9 @@ class MediaStore:
         self.root_dir = self.conversations_dir / "media_store"
         self.blobs_dir = self.root_dir / "blobs"
         self.index_file = self.root_dir / "index.json"
-        self._lock = threading.RLock()
-        self._ensure_dirs()
+        self._lock = directory_lock(self.root_dir)
+        with self._lock:
+            self._ensure_dirs()
 
     def _ensure_dirs(self) -> None:
         self.conversations_dir.mkdir(parents=True, exist_ok=True)

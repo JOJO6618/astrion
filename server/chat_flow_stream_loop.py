@@ -17,9 +17,35 @@ from .chat_flow_task_support import wait_retry_delay, cancel_pending_tools
 from .state import get_stop_flag, clear_stop_flag
 
 from modules.i18n import tr
+from .chat_flow_partial import PartialResponse, commit_pending_response
 
 
-async def run_streaming_attempts(*, web_terminal, messages, tools, sender, client_sid: str, username: str, conversation_id: Optional[str], current_iteration: int, max_api_retries: int, retry_delay_seconds: int, detected_tool_intent: Dict[str, str], full_response: str, tool_calls: list, current_thinking: str, detected_tools: Dict[str, str], last_usage_payload, in_thinking: bool, thinking_started: bool, thinking_ended: bool, text_started: bool, text_has_content: bool, text_streaming: bool, text_chunk_index: int, last_text_chunk_time, chunk_count: int, reasoning_chunks: int, content_chunks: int, tool_chunks: int, last_finish_reason: Optional[str], accumulated_response: str) -> Dict[str, Any]:
+async def run_streaming_attempts(**kwargs):
+    terminal = kwargs["web_terminal"]
+    context = getattr(terminal, "context_manager", None)
+    from uuid import uuid4
+    message_id = context._generate_message_id() if context else f"msg_{uuid4().hex}"
+    partial = PartialResponse(message_id=message_id)
+    terminal._stream_partial = partial
+    original_sender = kwargs["sender"]
+
+    def identified_sender(event, data):
+        if event.startswith(("text_", "thinking_")):
+            data = {**(data or {}), "response_message_id": message_id}
+        original_sender(event, data)
+
+    kwargs["sender"] = identified_sender
+    try:
+        result = await _run_streaming_attempts_impl(**kwargs)
+        if result.get("stopped"):
+            commit_pending_response(terminal, kwargs["sender"])
+        return result
+    except asyncio.CancelledError:
+        commit_pending_response(terminal, kwargs["sender"])
+        raise
+
+
+async def _run_streaming_attempts_impl(*, web_terminal, messages, tools, sender, client_sid: str, username: str, conversation_id: Optional[str], current_iteration: int, max_api_retries: int, retry_delay_seconds: int, detected_tool_intent: Dict[str, str], full_response: str, tool_calls: list, current_thinking: str, detected_tools: Dict[str, str], last_usage_payload, in_thinking: bool, thinking_started: bool, thinking_ended: bool, text_started: bool, text_has_content: bool, text_streaming: bool, text_chunk_index: int, last_text_chunk_time, chunk_count: int, reasoning_chunks: int, content_chunks: int, tool_chunks: int, last_finish_reason: Optional[str], accumulated_response: str) -> Dict[str, Any]:
     api_error = None
     tool_call_stream_active = False
     completed_intents: set[str] = set()
@@ -49,6 +75,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
             last_finish_reason = None
             tool_call_stream_active = False
             completed_intents.clear()
+            web_terminal._stream_partial.reset()
 
         # 通知前端：API 请求已发出、尚未收到首个响应（每次重试前都会重新触发）。
         # 前端据此驱动状态形象的「等待 API 响应…」文案；响应开始（thinking_start/
@@ -169,11 +196,13 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                     await asyncio.sleep(0.05)
 
                 current_thinking += reasoning_content
+                web_terminal._stream_partial.thinking = current_thinking
                 sender('thinking_chunk', {'content': reasoning_content})
 
             # 收集工具调用 - 实时发送准备状态
             delta_tool_calls = delta.get("tool_calls")
             if isinstance(delta_tool_calls, list) and delta_tool_calls:
+                web_terminal._stream_partial.has_tools = True
                 # 参数生成已经进入工具调用阶段，不能等整个响应结束才收起思考状态。
                 if in_thinking and not thinking_ended:
                     in_thinking = False
@@ -318,6 +347,7 @@ async def run_streaming_attempts(*, web_terminal, messages, tools, sender, clien
                         await asyncio.sleep(0.05)
 
                     full_response += content
+                    web_terminal._stream_partial.text = full_response
                     accumulated_response += content
                     text_has_content = True
                     # 预览面板：滚动缓冲增量扫描 localhost/127.0.0.1 链接，

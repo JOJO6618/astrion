@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
-import { t } from '@/locales';
 import { getMessageVisibility, messageStartsWork } from '@/utils/messageVisibility';
+import { randomGeneratingLabel } from '@/utils/generatingLabel';
 
 interface ScrollStatePayload {
   autoScrollEnabled?: boolean;
@@ -25,42 +25,11 @@ interface ChatState {
 const COLLAPSE_ANIMATION_MS = 260;
 const collapseSkipTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-// 生成中的趣味占位标签：模块顶层禁止调 t()，这里只存 key，在创建消息时 t(key) 求值
-const GENERATING_LABEL_KEYS = [
-  'stores.generatingBrainstorming',
-  'stores.generatingPreparing',
-  'stores.generatingPreparingTools',
-  'stores.generatingThink',
-  'stores.generatingAnswerSoon',
-  'stores.generatingLoadingInspiration',
-  'stores.generatingAssemblingIdeas',
-  'stores.generatingBestApproach',
-  'stores.generatingBrainMeeting',
-  'stores.generatingOrganizing',
-  'stores.generatingPolishing',
-  'stores.generatingContext',
-  'stores.generatingMemorySearch',
-  'stores.generatingAlmostDone',
-  'stores.generatingDomainExpand',
-  'stores.generatingToolchain',
-  'stores.generatingSentence',
-  'stores.generatingRethinking',
-  'stores.generatingKnowledgeSearch'
-];
-
 const SHOW_HTML_COMPLETE_BLOCK_RE = /<show_html\b[\s\S]*?<\/show_html>/i;
 
 function hasCompletedShowHtmlBlock(content: string | null | undefined) {
   if (!content) return false;
   return SHOW_HTML_COMPLETE_BLOCK_RE.test(content);
-}
-
-function randomGeneratingLabel() {
-  if (!GENERATING_LABEL_KEYS.length) {
-    return '';
-  }
-  const index = Math.floor(Math.random() * GENERATING_LABEL_KEYS.length);
-  return t(GENERATING_LABEL_KEYS[index]);
 }
 
 function createAssistantMessage() {

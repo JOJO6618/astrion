@@ -1,5 +1,11 @@
+@use './header';
+
 /* Modern reveal conversation sidebar（挤压式：在文档流内推开主内容） */
 .conversation-sidebar {
+  --conversation-nav-gap: 2px;
+  --conversation-header-height: 40px;
+  --conversation-header-top-gap: 12px;
+  --conversation-header-bottom-gap: 8px;
   --conversation-collapsed-width: 44px;
   --conversation-expanded-width: 306px;
   --conversation-icon-cell: 32px;
@@ -42,14 +48,14 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 12px 6px 10px 6px;
+  padding: var(--conversation-header-top-gap) 6px 10px;
   background: inherit;
 }
 
 .conversation-primary-actions {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--conversation-nav-gap);
   flex: 0 0 auto;
 }
 
@@ -163,10 +169,6 @@
 .chat-icon svg {
   width: 23px;
   height: 23px;
-}
-
-.conversation-menu-btn .chat-icon svg {
-  transform: translateY(2px);
 }
 
 .pencil-icon svg {

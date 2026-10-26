@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-26",
+  "base_url": "http://127.0.0.1:8097",
+  "runner": "Playwright MCP browser_checks.js, six separately invoked phases on the same page",
+  "phases": ["messages", "branches", "tools", "stop", "draft", "mobile"],
+  "passed": [
+    "Send shows user, original Astrion header, generating block and original API-wait status",
+    "Actual thinking chunks drive original thinking status",
+    "Text displays while streaming; final snapshot clears waiting state without custom avatar text",
+    "User edit/save changes content without creating a branch",
+    "Regeneration creates version 2/2, browsing shows 1/2, reload returns to latest 2/2",
+    "Real update_memory tool and continuation render exactly two assistant blocks before and after reload",
+    "Stop persists received body, clears wait/avatar state, and reload preserves exactly one partial reply",
+    "Delayed draft read keeps editor/send locked; restored editor accepts input without clearing it",
+    "390px mobile shows actual reply, original header and editor without approvals"
+  ],
+  "count": 9,
+  "browserErrors": [],
+  "failedResponses": [],
+  "model": "isolated deterministic streaming fixture",
+  "runtime": "real Chat blueprint, RuntimeService, TaskManager, shared model/tool loop, actual built frontend",
+  "real_tool": "update_memory, isolated Chat memory",
+  "screenshots": ["browser-waiting.png", "browser-mobile.png", "browser-final.png"],
+  "limits": [
+    "No real paid model or user credentials used",
+    "Mobile is a 390x844 browser viewport, not a native-device test",
+    "Real multimodal/network-provider calls and Chat-to-Agent workspace handoff remain unverified in this browser run",
+    "Earlier failed long-script execution is not counted as passed"
+  ]
+}

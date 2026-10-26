@@ -51,6 +51,14 @@ export async function mounted() {
   setupShowImageObserver();
   setupImagePreviewDelegation();
 
+  if (this.settingsRoute) {
+    // Settings load their own account data without initializing Agent resources.
+    await this.restoreConversationTabView?.();
+    window.addEventListener('popstate', this.handlePopState);
+    window.addEventListener('keydown', this.handleGlobalTabShortcut);
+    return;
+  }
+
   // 立即加载初始数据（并行获取状态，优先同步运行模式）
   const initialDataPromise = this.loadInitialData();
   this.startProjectGitSummaryIdleRefresh?.();

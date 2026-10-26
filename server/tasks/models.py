@@ -31,6 +31,7 @@ from server.tasks.queue_state import (
 from server.conversation_view.snapshots import TaskViewMixin, VIEW_LOCK, view_transaction
 from server.conversation_view.projector import RuntimeProjection
 from server.tasks.compression_requests import CompressionRequestMixin
+from server.tasks.chat_mode import ChatModeTaskMixin
 
 
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
@@ -72,7 +73,7 @@ class TaskRecord:
         "queue_manager",
         "runtime_queue_paused",
         "last_cancel_at",
-        "task_type",
+        "task_type", "chat_turn_id",
         "compression_request", "compression_requests_closed",
     )
 
@@ -116,6 +117,7 @@ class TaskRecord:
         self.runtime_queue_paused = False
         self.last_cancel_at: Optional[float] = None
         self.task_type = str(params.task_type or "chat")
+        self.chat_turn_id = None
         self.compression_request = ""
         self.compression_requests_closed = False
         self.display_base = None
@@ -125,7 +127,7 @@ class TaskRecord:
         self.display_valid = True
         self.trigger_message_id = str(uuid.uuid4())
 
-class TaskManager(CompressionRequestMixin, TaskViewMixin):
+class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
     """线程内存版任务管理器，后续可替换为 Redis/DB。"""
 
     def __init__(self):
@@ -171,6 +173,8 @@ class TaskManager(CompressionRequestMixin, TaskViewMixin):
         if ctx is None:
             raise ValueError(tr("tasks.missing_session_data"))
         ctx.validate()
+        if ctx.principal.conversation_kind == "chat":
+            return self._create_workspace_free_chat_task(ctx, conversation_id or ctx.params.conversation_id)
         principal = ctx.principal
         params = ctx.params
         username = principal.username
@@ -1154,6 +1158,10 @@ def conversation_title_for_task(rec: TaskRecord) -> Optional[str]:
     if not conv_id.startswith("conv_"):
         conv_id = f"conv_{conv_id}"
     try:
+        if rec.principal.conversation_kind == "chat":
+            from server.chat_mode_scope import scope_for_principal
+            from modules.chat_mode.storage import ChatStorage
+            return ChatStorage(scope_for_principal(rec.principal).root).read(conv_id).get("title")
         if rec.username == "host":
             path = Path(DATA_DIR).expanduser().resolve() / "conversations" / rec.workspace_id / f"{conv_id}.json"
         else:
@@ -1171,6 +1179,8 @@ def conversation_title_for_task(rec: TaskRecord) -> Optional[str]:
 
 
 def workspace_label_for_task(rec: TaskRecord) -> Optional[str]:
+    if rec.principal.conversation_kind == "chat":
+        return None
     try:
         if rec.username == "host":
             from modules.host_workspace_manager import load_host_workspace_catalog
@@ -1195,6 +1205,7 @@ def task_public_payload(rec: TaskRecord, *, include_title: bool = True) -> Dict[
         "task_id": rec.task_id,
         "username": rec.username,
         "workspace_id": rec.workspace_id,
+        "conversation_kind": rec.principal.conversation_kind,
         "workspace_label": workspace_label_for_task(rec),
         "status": rec.status,
         "created_at": rec.created_at,

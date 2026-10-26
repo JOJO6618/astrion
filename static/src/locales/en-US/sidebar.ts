@@ -2,8 +2,8 @@
 // Used by: static/src/components/sidebar/*, static/src/components/token/TokenDrawer.vue
 export default {
   // ── ConversationSidebar: navigation & conversation history ──
-  expandConversations: 'Expand conversation history',
-  collapseConversations: 'Collapse conversation history',
+  expandConversations: 'Expand sidebar',
+  collapseConversations: 'Collapse sidebar',
   conversationHistory: 'Conversations',
   newConversation: 'New Chat',
   project: 'Project',

@@ -20,6 +20,9 @@ function compile(file, imports = {}, globals = {}) {
     Date, console: { log: noop, warn: noop, error: noop },
     require: (key) => {
       if (Object.hasOwn(imports, key)) return imports[key];
+      if (['@/utils/generatingLabel', '@/utils/taskErrorToast'].includes(key)) {
+        return compile(`static/src/utils/${key.split('/').pop()}.ts`, { '@/locales': imports['@/locales'] || locale }, globals);
+      }
       if (key === './draftStorage') return compile('static/src/app/methods/ui/draftStorage.ts', {}, globals);
       if (key.endsWith('/workspaceRequestScope')) return {
         bindWorkspaceRequestHost: noop, workspaceScopedFetch: (...args) => globals.fetch(...args)

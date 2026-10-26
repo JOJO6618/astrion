@@ -2,6 +2,7 @@
 import { inject } from 'vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import SettingsChoiceDropdown from '@/components/personalization/SettingsChoiceDropdown.vue';
 
 defineOptions({ name: 'ModelPrefTab' });
 
@@ -16,9 +17,7 @@ const {
   activeDropdown,
   filteredModelOptions,
   floatingMenuStyle,
-  isEffortActive,
   isRunModeActive,
-  reasoningEffortLabel,
   runModeLabel,
   selectDefaultModel,
   selectDefaultReasoningEffort,
@@ -85,37 +84,12 @@ const {
           $t('personalization.reasoningEffortDesc')
         }}</span></span
       >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'reasoning-effort' }"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="settings-select-button"
-          @click="toggleDropdown('reasoning-effort')"
-        >
-          {{ reasoningEffortLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in reasoningEffortOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: isEffortActive(option.value) }"
-            @click="selectDefaultReasoningEffort(option.value)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
-      </div>
+      <SettingsChoiceDropdown
+        :model-value="form.default_reasoning_effort || null"
+        dropdown-id="reasoning-effort"
+        :options="reasoningEffortOptions"
+        @select="selectDefaultReasoningEffort"
+      />
     </div>
     <!-- 标题生成模型选择器已挪到「常规」页 autoTitle 开关下方 -->
     <!-- 外部会话标识：opt-in，开启后向 opencode.ai 端点发送每对话稳定的 session 头 -->

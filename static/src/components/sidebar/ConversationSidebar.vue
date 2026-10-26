@@ -1,39 +1,28 @@
 <template>
   <aside class="conversation-sidebar" :class="{ collapsed }">
     <div class="conversation-sidebar-inner">
-      <div class="conversation-primary-actions">
+      <div class="conversation-sidebar-header">
+        <div class="conversation-sidebar-mode" :inert="collapsed" :aria-hidden="collapsed">
+          <ModeSwitcher v-if="!collapsed" :mode="chatMode ? 'chat' : 'agent'" />
+        </div>
         <button
           type="button"
-          class="sidebar-nav-row conversation-menu-btn"
-          :title="
+          class="conversation-sidebar-toggle"
+          :aria-label="
             collapsed ? $t('sidebar.expandConversations') : $t('sidebar.collapseConversations')
           "
+          :aria-expanded="!collapsed"
+          data-tutorial="conversation-menu"
           @click="$emit('toggle')"
         >
           <span
-            class="sidebar-nav-icon chat-icon"
-            data-tutorial="conversation-menu"
+            class="icon"
+            :style="personalMenuIconStyle(collapsed ? 'panelLeft' : 'panelRight')"
             aria-hidden="true"
-          >
-            <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M5 6.5c0-1.38 1.12-2.5 2.5-2.5h13c1.38 0 2.5 1.12 2.5 2.5v8.5c0 1.38-1.12 2.5-2.5 2.5h-5.6l-3.4 3.2.6-3.2H7.5c-1.38 0-2.5-1.12-2.5-2.5V6.5z"
-                stroke="currentColor"
-                stroke-width="1.45"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M9 9.5h10"
-                stroke="currentColor"
-                stroke-width="1.45"
-                stroke-linecap="round"
-              />
-              <path d="M9 13h6" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" />
-            </svg>
-          </span>
-          <span class="sidebar-nav-label">{{ $t('sidebar.conversationHistory') }}</span>
+          ></span>
         </button>
-
+      </div>
+      <div class="conversation-primary-actions">
         <button
           type="button"
           class="sidebar-nav-row"
@@ -104,6 +93,7 @@
           type="button"
           class="sidebar-nav-row"
           :title="$t('sidebar.workflows')"
+          v-if="!chatMode"
           @click="$emit('open-workflows')"
         >
           <span class="sidebar-nav-icon workflow-icon" aria-hidden="true">
@@ -132,7 +122,7 @@
           <span class="sidebar-nav-label">{{ $t('sidebar.workflows') }}</span>
         </button>
 
-        <button type="button" class="sidebar-nav-row" @click="$emit('open-git')">
+        <button v-if="!chatMode" type="button" class="sidebar-nav-row" @click="$emit('open-git')">
           <span class="sidebar-nav-icon git-brand-icon" aria-hidden="true"></span>
           <span class="sidebar-nav-label">{{ $t('sidebar.git') }}</span>
         </button>
@@ -978,11 +968,13 @@ import { useDesktopUpdateStore } from '@/stores/desktopUpdate';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
 import { ICONS } from '@/utils/icons';
 import { openExternal } from '@/utils/openExternal';
+import ModeSwitcher from '@/components/chat-mode/ModeSwitcher.vue';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 import SoftwareUpdateDialog from './SoftwareUpdateDialog.vue';
 
 const props = withDefaults(
   defineProps<{
+    chatMode?: boolean;
     formatTime?: (input: unknown) => string;
     iconStyle?: (key: string) => Record<string, string>;
     showCollapseButton?: boolean;
@@ -1102,10 +1094,10 @@ function openSettingsPage() {
   closePersonalMenu();
   const tabs = useConversationTabsStore();
   if (tabs.enabled) {
-    void tabs.openPage('/settings').catch(() => {});
+    void tabs.openPage(props.chatMode ? '/settings/chat' : '/settings').catch(() => {});
     return;
   }
-  window.location.assign('/settings');
+  window.location.assign(props.chatMode ? '/settings/chat?from=chat' : '/settings');
 }
 function handleLogout() {
   closePersonalMenu();

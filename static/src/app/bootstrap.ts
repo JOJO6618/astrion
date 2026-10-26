@@ -14,6 +14,7 @@ import {
 import { downloadWorkspaceFile } from '../utils/downloadFile';
 
 let showImageRenderSeq = 0;
+let allowWorkspaceContent = true;
 let showImageDebugLogCount = 0;
 const SHOW_IMAGE_DEBUG_VERSION = 'v2-lite-throttled';
 const SHOW_IMAGE_DEBUG_MAX_LOGS = 200;
@@ -169,6 +170,11 @@ function normalizeShowImageSrc(src: string) {
   let trimmed = src.trim();
   if (!trimmed) return '';
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (!allowWorkspaceContent) {
+    return /^sha256:[a-f0-9]{64}$/.test(trimmed)
+      ? `/api/chat/media/${encodeURIComponent(trimmed)}`
+      : '';
+  }
   // file:// 前缀剥离按本地路径处理（浏览器禁止 http 页面直接加载 file:// 资源）
   if (/^file:\/\//i.test(trimmed)) {
     trimmed = trimmed.replace(/^file:\/\//i, '');
@@ -1012,7 +1018,8 @@ function renderShowImages(root: ParentNode | null = document) {
   // ===== show_file 预览卡片 =====
   fileNodes.forEach((node) => {
     if (!node.isConnected || node.hasAttribute('data-rendered')) return;
-    renderShowFileCard(node);
+    if (allowWorkspaceContent) renderShowFileCard(node);
+    else node.replaceChildren();
     node.setAttribute('data-rendered', '1');
   });
 
@@ -1296,7 +1303,8 @@ export function setupImagePreviewDelegation() {
   });
 }
 
-export function setupShowImageObserver() {
+export function setupShowImageObserver(options: { allowWorkspaceContent?: boolean } = {}) {
+  allowWorkspaceContent = options.allowWorkspaceContent !== false;
   if (showImageObserver || showContainerObserver) return;
   setupLayoutDebugObservers();
   const bind = () => {
@@ -1516,7 +1524,7 @@ function bindDownloadLinks(root: ParentNode) {
       e.preventDefault();
       e.stopPropagation();
       const path = link.getAttribute('data-path') || '';
-      if (path) {
+      if (path && allowWorkspaceContent) {
         dispatchShowFileDownload(path);
       }
     });

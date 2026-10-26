@@ -43,14 +43,19 @@ class ConversationManagerBase:
     """ConversationManager 基础类，包含初始化与目录管理。"""
 
     def __init__(self, base_dir: Optional[str] = None, project_path: Optional[str] = None,
-                 *, read_only: bool = False):
+                 *, read_only: bool = False, conversation_kind: str = "agent"):
+        if conversation_kind not in {"agent", "chat"}:
+            raise ValueError("Invalid conversation kind")
+        if conversation_kind == "chat" and project_path is not None:
+            raise ValueError("Chat conversations have no project path")
+        self.conversation_kind = conversation_kind
         self.read_only = read_only
         self.base_dir = Path(base_dir).expanduser().resolve() if base_dir else Path(DATA_DIR).resolve()
         self.conversations_root = self.base_dir / "conversations"
         self._io_lock = directory_lock(self.conversations_root)
         self.current_conversation_id: Optional[str] = None
         self.workspace_root = Path(__file__).resolve().parents[1]
-        self.host_workspaces = self._load_host_workspaces()
+        self.host_workspaces = self._load_host_workspaces() if conversation_kind == "agent" else []
         self.current_project_path = self._normalize_path(project_path) if project_path else None
         self.current_workspace_id = self._resolve_workspace_id(self.current_project_path)
         # 当前管理器只暴露“当前工作区”的对话目录；未匹配到工作区时保留根目录作为兜底写入位置。
@@ -73,7 +78,8 @@ class ConversationManagerBase:
         """确保必要的目录存在，并迁移可归类的旧版根目录对话。"""
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.conversations_root.mkdir(parents=True, exist_ok=True)
-        self._migrate_legacy_conversation_files()
+        if self.conversation_kind == "agent":
+            self._migrate_legacy_conversation_files()
         self.conversations_dir.mkdir(parents=True, exist_ok=True)
 
         # 如果当前工作区索引文件不存在，创建空索引

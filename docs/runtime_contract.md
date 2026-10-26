@@ -82,6 +82,8 @@
 **默认值解析优先级**：本次显式传参 > 对话元数据绑定 > 用户偏好快照 > 系统默认。
 会话级模型/模式恢复仍在资源装配与会话加载链路内完成；RuntimeContext 携带「身份快照 + 本次覆盖」，不替代既有恢复逻辑。
 
+2026-10-26 Chat 扩展：`TrustedPrincipal.conversation_kind` 默认 `agent`；Agent 仍要求非空工作区，可信 Chat 身份必须是 `chat + workspace_id=None`，禁止伪造工作区。`TaskParams` 的 `chat_operation_id/chat_parent_id/chat_regenerate_turn_id/chat_edit_message_id/chat_settings` 由 Chat 适配层校验。首消息创建与受理命令幂等，分支层将固定 turn 路径交给共用循环；`server/tasks/chat_mode.py` 不调用 Agent `get_user_resources`。Chat 仍复用 TaskManager 登记、主任务门闸、取消、任务事件及显示锁，最终树提交和完整工具取消配对后才发布终态。详细边界见 `docs/chat_mode.md`。
+
 ### 4.2 服务接口（首版最小集）
 
 | 方法 | 语义 | 裁决/互斥 |

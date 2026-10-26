@@ -119,6 +119,14 @@ class CrudMixin:
             "last_deep_compression_record": None,
             "skip_auto_title_generation": False,
         }
+        if getattr(self, "conversation_kind", "agent") == "chat":
+            # Keep the shared document shape without Agent execution settings.
+            metadata = {key: value for key, value in metadata.items() if key in {
+                "project_path", "project_relative_path", "thinking_mode", "run_mode",
+                "model_key", "has_images", "has_videos", "total_messages", "total_tools",
+                "status", "compression_count", "deep_compression_records",
+            }}
+            metadata["conversation_kind"] = "chat"
         if isinstance(metadata_overrides, dict):
             metadata.update(metadata_overrides)
 
@@ -341,6 +349,11 @@ class CrudMixin:
                 print(f"⚠️ 对话 {conversation_id} 不存在，无法更新")
                 return False
             
+            if existing_data.get("metadata", {}).get("conversation_kind") == "chat":
+                # A branch projection must never replace or merge into the tree.
+                # Chat writes through mutate_conversation under the same lock.
+                return False
+
             # 方向 C（merge-on-save）：正常保存不做全量覆写，按 message_id 合并，
             # 任何实例任何时机的写回都不会丢消息（旧内存回写从根免疫）。
             # 仅检查点恢复等 allow_shrink=True 路径保持覆写语义。

@@ -15,6 +15,11 @@ new Function('require', 'exports', code)((name) => {
   if (name === 'pinia') return { mapState: () => ({}), mapWritableState: () => ({}) };
   if (name.includes('avatarFace')) return { toolFaceKey: name => name };
   if (name.includes('messageVisibility')) return { messageStartsWork: () => true };
+  if (name.includes('avatarStatus')) return compile('static/src/utils/avatarStatus.ts', {
+    '@/locales': { ...locale, currentLocale: { value: 'zh-CN' } },
+    './avatarFace': { toolFaceKey: name => name },
+    './messageVisibility': { messageStartsWork: () => true }
+  });
   return new Proxy({}, { get: () => () => stores });
 }, computedModule);
 const computed = computedModule.computed;

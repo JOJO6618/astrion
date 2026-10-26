@@ -1433,6 +1433,39 @@
   user-select: none;
 }
 
+/* 正文编辑入口只定位，不额外撑高正文，保持共享摘要的上下间距。 */
+.text-output:has(.message-inline-actions) {
+  position: relative;
+}
+
+.assistant-token-speed.message-inline-actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin-top: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.text-output:hover .message-inline-actions,
+.text-output:focus-within .message-inline-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .text-output:hover .message-inline-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .message-block--chat-actions .text-output .message-inline-actions,
+  .text-output:focus-within .message-inline-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .user-message:not(.user-message--compact):not(.user-message--brief):hover .user-bubble-actions,
 .user-message:not(.user-message--compact):not(.user-message--brief):focus-within .user-bubble-actions {
   opacity: 1;
@@ -1459,7 +1492,7 @@
 }
 
 .user-bubble-action-btn:hover {
-  background-color: var(--theme-tab-active);
+  background-color: var(--tab-active);
   color: var(--text-primary);
 }
 
@@ -1471,6 +1504,25 @@
   background: currentColor;
   mask: center / contain no-repeat;
   -webkit-mask: center / contain no-repeat;
+}
+
+.user-bubble-action-btn.message-action-btn::before {
+  mask-image: var(--message-action-icon);
+  -webkit-mask-image: var(--message-action-icon);
+}
+
+.user-bubble-action-btn.message-action-btn--text::before {
+  display: none;
+}
+
+.user-bubble-action-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.user-bubble-action-btn:disabled:hover {
+  background-color: transparent;
+  color: var(--text-secondary);
 }
 
 .user-bubble-action-btn.copy::before {

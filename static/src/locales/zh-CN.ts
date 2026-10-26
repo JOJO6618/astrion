@@ -3,6 +3,7 @@
 import common from './zh-CN/common';
 import personalization from './zh-CN/personalization';
 import settings from './zh-CN/settings';
+import chatMode from './zh-CN/chatMode';
 import toolResults from './zh-CN/toolResults';
 import input from './zh-CN/input';
 import tutorial from './zh-CN/tutorial';
@@ -40,6 +41,7 @@ export default {
   common,
   personalization,
   settings,
+  chatMode,
   toolResults,
   input,
   tutorial,

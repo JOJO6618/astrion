@@ -15,6 +15,10 @@ function avatarRequire(name) {
   if (name === 'pinia') return { mapState: () => ({}), mapWritableState: () => ({}) };
   if (name.includes('avatarFace')) return { toolFaceKey: name => name };
   if (name.includes('messageVisibility')) return { messageStartsWork: () => true };
+  if (name.includes('avatarStatus')) return require('../2026-10-07_运行对话快照/ts_fixture.cjs').compile('static/src/utils/avatarStatus.ts', {
+    '@/locales': avatarRequire('@/locales'), './avatarFace': avatarRequire('avatarFace'),
+    './messageVisibility': avatarRequire('messageVisibility')
+  });
   return new Proxy({}, { get: () => () => stores });
 }
 const avatarModule = {};

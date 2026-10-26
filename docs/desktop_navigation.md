@@ -9,7 +9,7 @@
 存储仍为 `<DATA_DIR>/conversation_tabs.json`，按用户名分键。version=2，单后端进程内 RLock 串行处理命令，以原子文件替换提交。每个成功命令递增 revision；GET 仅在迁移或核验导致持久状态变化时递增。
 
 - `tabs[]`：最多 100 个。`key=tab_*` 贯穿 new→conv 绑定及关闭，不能用对话 ID 或双页计数器作 key。
-- 对话唯一身份是 `(workspace_id, normalized conversation_id)`；相同 ID 的不同工作区分别显示与计算运行态。
+- 对话唯一身份包含 `conversation_kind`（默认 `agent`）及 `(workspace_id, normalized conversation_id)`；相同 ID 的不同工作区分别显示与计算运行态。Chat 使用 `conversation_kind=chat` 和空工作区，不解析成 Agent 默认工作区，标签外观不添加模式标记。
 - `active_key`：已经确认提交的内容标签。`resume_key`：独立页面返回目标。
 - `navigation`：最新请求，含 `id/key/page/status/error`，status 为 pending、committed 或 error。加载期间可同时保留旧 active 和新目标；禁止把请求已受理当成内容已提交。
 - `renderer_id`：主页面当前文档身份。刷新后重新 attach，旧文档失去提交权。
@@ -63,6 +63,8 @@
 保持原唯一显示快照、任务事件游标和串行工作区选择机制。桌面 URL 在会话/空页路径保留 workspace_id，刷新不猜默认工作区。发送前校验标签、可见 session、工作区及对话一致；请求目标尚未提交时不能发送到旧内容。新建首消息使用发送前捕获的源 key 绑定，即使其间切到另一个标签也不改绑当前 active。
 
 主页面 attach 失败自动重试，单次生命周期只提示一次启动错误。卸载撤销观察、重连 timer、轮询 owner 和请求，迟到响应不得重新开始轮询。
+
+2026-10-26 Chat：URL 为 `/chat/new`、`/chat/<id>`，不携带假工作区；继续使用同一个 `startDesktopNavigation` 协调器。首消息捕获真正 `new/chat` 标签的 key 进行绑定，迟到受理不能改绑当前标签。Chat 空页刷新复用原标签，纯 Chat 设置页返回恢复原模式；查询坏 Chat 文档仅标记对应标签错误。跨模式导航整页切换，Chat 页面不会挂载 Agent 的工作区初始化。
 
 ## 关闭、删除与恢复
 

@@ -11,8 +11,8 @@ class AdmissionTests(unittest.TestCase):
         terminal = SimpleNamespace(data_dir="synthetic", context_manager=Mock())
         sender = Mock()
         with patch("modules.goal_policy.goal_blocks_background", return_value=False), \
-             patch("server.chat_flow_task_main.RuntimeContext.from_terminal", return_value=object()) as build, \
-             patch("server.chat_flow_task_main.runtime_service.create_task", side_effect=RuntimeError("busy")):
+             patch("server.chat_flow_notice_idle.RuntimeContext.from_terminal", return_value=object()) as build, \
+             patch("server.chat_flow_notice_idle.runtime_service.create_task", side_effect=RuntimeError("busy")):
             with self.assertRaisesRegex(RuntimeError, "busy"):
                 _dispatch_multi_agent_idle_messages_sync(web_terminal=terminal,
                     workspace=SimpleNamespace(workspace_id="workspace"), sender=sender,
@@ -28,8 +28,8 @@ class AdmissionTests(unittest.TestCase):
         terminal = SimpleNamespace(data_dir="synthetic", context_manager=Mock())
         sender = Mock()
         with patch("modules.goal_policy.goal_blocks_background", return_value=False), \
-             patch("server.chat_flow_task_main.RuntimeContext.from_terminal", return_value=object()), \
-             patch("server.chat_flow_task_main.runtime_service.create_task",
+             patch("server.chat_flow_notice_idle.RuntimeContext.from_terminal", return_value=object()), \
+             patch("server.chat_flow_notice_idle.runtime_service.create_task",
                    return_value=SimpleNamespace(task_id="notice")):
             _dispatch_multi_agent_idle_messages_sync(web_terminal=terminal,
                 workspace=SimpleNamespace(workspace_id="workspace"), sender=sender,

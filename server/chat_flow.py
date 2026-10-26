@@ -148,6 +148,7 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         })
         return
 
+    loop = None
     try:
         # 受理成功且认领门闸后才写入前置子消息。
         from .chat_flow_task_support import inject_multi_agent_master_message
@@ -178,13 +179,21 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         # 每个任务使用独立的停止 entry，不复用用户级索引中的旧 entry。
         # 这样同一用户的多个对话并行运行时，取消/停止只精确作用于本任务，
         # 不会通过共享 entry 互相覆盖 task/loop 引用或广播 stop 标志。
-        entry = {'stop': False, 'task': task, 'terminal': terminal, 'loop': loop}
+        previous_entry = get_stop_flag(client_sid, None, include_user=False)
+        entry = {'stop': bool(previous_entry and previous_entry.get('stop')),
+                 'task': task, 'terminal': terminal, 'loop': loop}
         set_stop_flag(client_sid, username, entry)
-        
+        stop_requested = getattr(terminal, 'is_stop_requested', None)
+        if entry['stop'] or (callable(stop_requested) and stop_requested()):
+            entry['stop'] = True
+            task.cancel()
+
         try:
             loop.run_until_complete(task)
         except asyncio.CancelledError:
             debug_log(f"[ChatFlow] 任务被成功取消: client_sid={client_sid}")
+            from .chat_flow_partial import commit_pending_response
+            commit_pending_response(terminal, sender)
             # 检测是否仍有后台任务在跑，通知前端保持停止按钮
             has_running_sub_agents = False
             has_running_background_commands = False
@@ -231,7 +240,6 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
             # task_stopped 事件统一在 _run_chat_task finally 中发送，避免重复
             reset_system_state(terminal)
 
-        loop.close()
     except Exception as e:
         # 【新增】错误时确保对话状态不丢失
         try:
@@ -243,9 +251,8 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
             debug_log(f"错误恢复：保存对话状态失败: {save_error}")
         
         # 原有的错误处理逻辑
-        debug_log(f"任务处理错误: {e}")
         import traceback
-        traceback.print_exc()
+        debug_log(f"任务处理错误: {e}\n{traceback.format_exc()}")
         sender('error', {
             'message': str(e),
             'conversation_id': getattr(getattr(terminal, "context_manager", None), "current_conversation_id", None),
@@ -260,6 +267,9 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         })
 
     finally:
+        if loop is not None and not loop.is_closed():
+            loop.close()
+            asyncio.set_event_loop(None)
         terminal._multi_agent_main_task_active = False
         # 清理任务引用
         clear_stop_flag(client_sid, username)

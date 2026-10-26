@@ -19,6 +19,7 @@
 | 启动 / 构建 / 打包命令 | `docs/agents_details/commands.md` | 启动入口、打包链路 |
 | 测试现状与执行方式 | `docs/agents_details/testing.md` | 写测试、跑回归 |
 | 前端设计风格统一规范 | `docs/agents_details/frontend_design_style.md` | 写/改任何 UI |
+| 独立 Chat 与消息树 | `docs/chat_mode.md` | Chat 页面、分支、九工具、无工作区运行、媒体记忆或 Agent 交接；前端必须复用 Agent 组件 |
 | Android 发布联动 | `docs/agents_details/android_release.md` | 发 Android 版本 |
 | 权限模式 / 路径授权 / 平台沙箱 | `docs/agents_details/permission_and_sandbox.md` | 权限、沙箱、平台隔离 |
 | 运行模式（work_mode） | `docs/agents_details/work_mode.md` | plan/ask/execute 链路 |
@@ -110,6 +111,7 @@
 
 ## 4) 代码修改约定（实用版）
 
+- **Chat / Agent 尽可能共用代码（强制）**：两者是功能和设计不同的两种模式，尽可能复用前后端代码、组件、样式与通用机制，禁止因为模式不同就维护两套通用实现。已确认的差异通过模式配置、能力边界和必要的专属适配表达；共有 UI 使用同一组件与同一份样式，共有智能体／工具循环使用同一套逻辑，通用修复应同时作用于两种模式。具体差异与共享边界见 `docs/chat_mode.md`。
 - **根治优先**：能根治的应告知用户方案与影响范围并询问是否执行；一定范围内的重构可接受，尽量避免打补丁式临时修改。
 - **精确读取**：**禁止整文件通读**。先用搜索工具（grep / 符号查找 / 关键字定位）锁定行段，只精确提取相关片段。
 - **编辑方式**：优先 `write_file`/`edit_file` 等原生编辑工具，不要用 bash/python 脚本批量改文件（除非原生工具明显不适合）。
@@ -446,7 +448,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 **设置页拆分**：原个人空间抽屉（13 Tab）拆成「个性化 + 账户」留抽屉，其余迁 `/settings` 全屏页（5 组 14 分区）；路由沿用 workflows 已验证的手写 History API 分支（**不引 vue-router**）。
 
 1. **路由必须前后端双登记**（曾因只登前端导致整页跳转 404）：后端 `server/auth.py` 注册 `/settings` 与 `/settings/<path:section>`；前端 `route.ts` 登记 `settings`、`settings/*`。**进出都是整页跳转，不做 SPA 内 pushState**（pinia store 每次重建，`activeSection` 永远从 `general` 开始）。
-2. **挂载在 App.vue**，与 WorkflowDemoShell 同位置、v-else-if 互斥；组件在 `app/components.ts` 异步注册。
+2. **挂载在 App.vue 的 Agent 加载门槛之前**，以 `settingsRoute` 独立互斥显示；组件在 `app/components.ts` 异步注册。设置页自己加载账号／偏好／分区数据，生命周期不启动 Agent 连接、工作区运行态或轮询；禁止用 `isConnected` 阻挡挂载。
 3. URL 深链由 SettingsShell onMounted 解析（先 `await fetchSessionStatus()` 确保管理员判定就绪）；非法分区或非管理员访问管理员分区时回默认。
 4. **SettingsShell 与 PersonalizationDrawer 禁止同时可见**（两者都 provide 同一份 `personalizationDrawer` context）。
 5. **新增设置分区三处同步**：SettingsShell 的 NAV_GROUPS + SECTION_META、`stores/settings.ts` 的 SettingsSection 类型；文案走 `settings` 命名空间。

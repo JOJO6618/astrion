@@ -2,6 +2,7 @@
 import { debugLog } from '../common';
 import { parseSystemNoticeLabel } from '../ui/shared';
 import { displayMessageTime } from './display';
+import { prepareGeneratingLabels } from '@/utils/generatingLabel';
 import { useTaskStore } from '../../../stores/task';
 import { useQuickDockStore } from '../../../stores/quickDock';
 import { usePreviewStore } from '../../../stores/preview';
@@ -100,6 +101,7 @@ export const bootstrapMethods = {
         normalizedId
       );
       const live = Array.isArray(display.messages) ? display.messages : [];
+      prepareGeneratingLabels(live, this.messages);
       for (const message of live) {
         if (message.role === 'user') {
           message.created_at = displayMessageTime(message.created_at ?? message.timestamp);

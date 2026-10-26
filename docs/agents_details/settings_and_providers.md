@@ -17,7 +17,7 @@
 **硬约束（改代码必须知道）**：
 
 1. **路由必须前后端双登记**（2026-09-24 踩坑：只登前端导致整页跳转 404）：后端 `server/auth.py` 页面路由组注册 `/settings` 与 `/settings/<path:section>` 返回 `index.html`（conv converter 只匹配时间戳格式 `\d{8}_\d{6}_\d{3}`，不会收容任意路径——`/workflows` 能通则是因为 `server/workflow_page.py` 专门注册过）；前端 `route.ts` 的 `isConversationIndependentRoute()` 登记 `settings` 与 `settings/*`，`bootstrapRoute` 独立路由分支写 `state.settingsRoute`（空串=不在设置视图）；进出都是整页跳转（`openSettingsPage` → `/settings`，`closeSettingsPage` → `/new`），**不做 SPA 内 pushState**——pinia store 每次重建，`activeSection` 永远从 `general` 开始（用户拍板默认落「通用」），不存在跨页会话记忆。
-2. **挂载在 App.vue**：`<SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />`（与 WorkflowDemoShell 同位置、v-else-if 互斥）；组件在 `app/components.ts` 异步注册。
+2. **挂载在 App.vue 的 Agent 加载门槛之前**：`<SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />`；后续加载页和 Agent 内容用 `v-else-if`／`v-else` 互斥。组件在 `app/components.ts` 异步注册。SettingsShell 自己加载账号／偏好／分区数据，`lifecycle.mounted` 在设置路由只恢复桌面导航和必要监听，不启动 Agent 连接、工作区运行态或轮询。禁止以 `isConnected` 阻挡设置页挂载，否则跳过 Agent 初始化会造成永久加载（2026-10-26 已实测复现并修复）。
 3. **URL 深链**：`/settings/<section>` 由 SettingsShell onMounted 解析（先 `await fetchSessionStatus()` 确保管理员判定就绪），非法分区、或非管理员访问管理员分区时不生效回默认。
 4. **两宿主互斥**：SettingsShell 与 PersonalizationDrawer 都 `provide('personalizationDrawer')` 同一份 context（`usePersonalizationContext.ts`，124 键）且各自注册全局监听——**禁止同时可见**（路由层已天然互斥：抽屉只在非 settings 路由渲染，注意保持）。
 5. **新增设置分区三处同步**：SettingsShell 的 NAV_GROUPS + SECTION_META、stores/settings.ts 的 SettingsSection 类型；文案走 `settings` 命名空间（zh-CN 为源）。

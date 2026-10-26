@@ -241,6 +241,10 @@ export const routeMethods = {
   },
   closeSettingsPage(fallback = '/new') {
     if (useConversationTabsStore().enabled) return this.resumeDesktopTab();
+    if (new URLSearchParams(window.location.search).get('from') === 'chat') {
+      window.location.assign('/chat/new');
+      return;
+    }
     window.location.assign(typeof fallback === 'string' ? fallback : '/new');
   },
   stripConversationPrefix(conversationId) {

@@ -6,8 +6,8 @@ export default {
   //  加载更多/载入中.../搜索中.../已完成/暂无对话/默认/重命名/创建/创建中.../暂无项目/暂无工作区
 
   // ── ConversationSidebar：导航与对话记录 ──
-  expandConversations: '展开对话记录',
-  collapseConversations: '收起对话记录',
+  expandConversations: '展开侧边栏',
+  collapseConversations: '收起侧边栏',
   conversationHistory: '对话记录',
   newConversation: '新建对话',
   project: '项目',

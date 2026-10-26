@@ -1,0 +1,62 @@
+.conversation-sidebar-header {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 var(--conversation-header-height);
+  height: var(--conversation-header-height);
+  margin-bottom: var(--conversation-header-bottom-gap);
+}
+
+.conversation-sidebar-mode {
+  width: calc(100% - var(--conversation-icon-cell) - 8px);
+  height: var(--conversation-header-height);
+  opacity: 1;
+  transition: opacity 220ms ease 80ms;
+}
+
+.conversation-sidebar-toggle {
+  position: absolute;
+  top: calc((var(--conversation-header-height) - var(--conversation-row-height)) / 2);
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: var(--conversation-icon-cell);
+  height: var(--conversation-row-height);
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transform: translateX(
+    calc(var(--conversation-expanded-width) - var(--conversation-collapsed-width))
+  );
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 140ms ease;
+}
+
+.conversation-sidebar-toggle .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.conversation-sidebar-toggle:hover,
+.conversation-sidebar-toggle:focus-visible {
+  background: var(--hover-bg);
+}
+
+.conversation-sidebar-toggle:focus-visible {
+  outline: 1px solid var(--border-default);
+  outline-offset: -1px;
+}
+
+.conversation-sidebar.collapsed .conversation-sidebar-toggle {
+  transform: translateX(0);
+}
+
+.conversation-sidebar.collapsed .conversation-sidebar-mode {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition-delay: 0ms;
+}

@@ -8,6 +8,7 @@ import ModelsTab from './tabs/ModelsTab.vue';
 import ModelPrefTab from './tabs/ModelPrefTab.vue';
 import CodexTab from './tabs/CodexTab.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
+import ChatTab from './tabs/ChatTab.vue';
 import QuickEntrySettings from './tabs/QuickEntrySettings.vue';
 import { isDesktopShell } from '@/utils/desktopPlatform';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
@@ -78,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
     titleKey: 'settings.groupSystem',
     items: [
       { id: 'general', labelKey: 'settings.navGeneral', icon: 'general' },
+      { id: 'chat', labelKey: 'chatMode.settings', icon: 'context' },
       { id: 'quick-chat', labelKey: 'settings.navQuickChat', icon: 'quick-chat' },
       { id: 'workspace', labelKey: 'settings.navWorkspace', icon: 'workspace' },
       { id: 'search', labelKey: 'settings.navSearch', icon: 'search' },
@@ -135,6 +137,7 @@ const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string 
   'model-pref': { titleKey: 'settings.modelPrefTitle', descKey: 'settings.modelPrefDesc' },
   codex: { titleKey: 'settings.codexTitle', descKey: 'settings.codexDesc' },
   general: { titleKey: 'settings.generalTitle', descKey: 'settings.generalDesc' },
+  chat: { titleKey: 'chatMode.settings', descKey: 'chatMode.instructions' },
   'quick-chat': { titleKey: 'settings.quickChatTitle', descKey: 'settings.quickChatDesc' },
   workspace: { titleKey: 'settings.workspaceTitle', descKey: 'settings.workspaceDesc' },
   search: { titleKey: 'settings.searchTitle', descKey: 'settings.searchDesc' },
@@ -154,6 +157,7 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   'model-pref': ModelPrefTab,
   codex: CodexTab,
   general: GeneralTab,
+  chat: ChatTab,
   'quick-chat': QuickEntrySettings,
   workspace: WorkspaceTab,
   search: SearchTab,

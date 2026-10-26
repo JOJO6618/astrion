@@ -34,6 +34,7 @@ from server.files import files_bp
 from server.admin import admin_bp
 from server.conversation import conversation_bp
 from server.chat import chat_bp
+from server.chat_mode import chat_mode_bp
 from server.chat.approval import approval_bp
 from server.usage import usage_bp
 from server.status import status_bp
@@ -304,6 +305,7 @@ app.register_blueprint(files_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(conversation_bp)
 app.register_blueprint(chat_bp)
+app.register_blueprint(chat_mode_bp)
 app.register_blueprint(approval_bp)
 app.register_blueprint(usage_bp)
 app.register_blueprint(status_bp)

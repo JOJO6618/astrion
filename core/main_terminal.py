@@ -280,22 +280,12 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             的稳定 session ID（首次请求生成并存入对话 metadata，深压缩后重置）。
             任何异常返回空 dict，不影响主请求。
             """
-            try:
-                from modules.external_session import resolve_conversation_headers
+            from modules.external_session import resolve_context_headers
 
-                cm = getattr(self, "context_manager", None)
-                conversation_id = getattr(cm, "current_conversation_id", None) if cm else None
-                if not conversation_id:
-                    return {}
-                manager = cm._get_conversation_manager_for_id(conversation_id)
-                return resolve_conversation_headers(
-                    base_url,
-                    conversation_id,
-                    manager=manager,
-                    base_dir=getattr(self, "data_dir", None),
-                )
-            except Exception:
-                return {}
+            return resolve_context_headers(
+                base_url, getattr(self, "context_manager", None),
+                base_dir=getattr(self, "data_dir", None),
+            )
 
     def _apply_container_session(self, session: Optional["ContainerHandle"]):
             self.container_session = session

@@ -233,6 +233,7 @@ def finalize_message_citations(
     text: str,
     registry: Optional[CitationRegistry],
     workspace_root: str,
+    *, allow_files: bool = True,
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """assistant 消息落库前处理：剥离无效 marker，返回 (clean_text, used_annotations)。
 
@@ -268,6 +269,9 @@ def finalize_message_citations(
                 if _keep(ann):
                     kept.append(token)
             else:
+                # Workspace-free Chat must never interpret a reference as local IO.
+                if not allow_files:
+                    continue
                 # 文件来源：路径在工作区内且存在才保留
                 ref = _parse_file_ref(token)
                 if not ref:

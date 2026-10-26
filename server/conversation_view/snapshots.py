@@ -27,6 +27,13 @@ def normalize_id(value: Any) -> str:
     return str(value or "").strip().removeprefix("conv_")
 
 
+def conversation_messages(document):
+    if document.get("metadata", {}).get("conversation_kind") == "chat":
+        from modules.chat_mode.tree import MessageTree
+        return MessageTree(document).path()
+    return document.get("messages") or []
+
+
 class TaskViewMixin:
     @view_transaction
     def bind_display(self, rec, context_manager) -> None:
@@ -42,8 +49,10 @@ class TaskViewMixin:
             for item in (rec.directives.preceding_user_notices or [])
             if isinstance(item, dict)
         } - {None, ""}
+        # Chat accepts its user node atomically before the worker starts. It is
+        # already part of the frozen prefix and has no second user-message echo.
         rec.display_base = deepcopy([
-            msg for msg in data.get("messages") or []
+            msg for msg in conversation_messages(data)
             if msg.get("message_id") not in preceding_ids
         ])
         rec.display_context = context_manager
@@ -98,7 +107,7 @@ class TaskViewMixin:
             latest = max(records, key=lambda rec: rec.created_at, default=None)
             task = task_summary(latest) if latest is not None else None
             projected = {"messages": [], "state": {}}
-            base = deepcopy(data.get("messages") or [])
+            base = deepcopy(conversation_messages(data))
             cursor = latest.next_event_idx if latest is not None else 0
             revision = latest.display_revision if latest is not None else None
             if latest is not None:

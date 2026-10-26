@@ -41,6 +41,8 @@ export const ICONS = Object.freeze({
   notebookPen: '/static/icons/notebook-pen.svg',
   notebookSearch: '/static/icons/notebook-search.svg',
   octagon: '/static/icons/octagon.svg',
+  panelLeft: '/static/icons/panel-left.svg',
+  panelRight: '/static/icons/panel-right.svg',
   pencil: '/static/icons/pencil.svg',
   play: '/static/icons/play.svg',
   plus: '/static/icons/plus.svg',

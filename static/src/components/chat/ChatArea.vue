@@ -25,12 +25,19 @@
                 'message-block--sub-agent-notice': isSubAgentNoticeOnlyMessage(msg),
                 'message-block--before-sub-agent-notice': isFollowedBySubAgentNotice(index),
                 'message-block--multi-agent': isMultiAgentMessage(msg),
+                'message-block--chat-actions': chatMode && tappedChatMessageId === msg.messageId,
                 'message-block--first': index === 0,
                 'message-block--last': index === (filteredMessages || []).length - 1
               }"
+              @click="chatMode && (tappedChatMessageId = msg.messageId)"
             >
+              <slot
+                v-if="msg.role === 'user' && editingMessageId && editingMessageId === msg.messageId"
+                name="message-editor"
+                :message="msg"
+              />
               <div
-                v-if="msg.role === 'user'"
+                v-else-if="msg.role === 'user'"
                 class="user-message"
                 :class="{
                   'user-message--multi-agent': isMultiAgentMessage(msg),
@@ -136,24 +143,26 @@
                     </div>
                   </div>
                   <div v-if="!isMultiAgentMessage(msg)" class="user-bubble-actions">
-                    <button
-                      class="user-bubble-action-btn copy"
-                      :class="{ copied: isUserBubbleCopied(msg, index) }"
-                      :title="
-                        isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')
-                      "
-                      :aria-label="
-                        isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')
-                      "
-                      @click="copyUserMessage(msg, index)"
-                    ></button>
-                    <button
-                      class="user-bubble-action-btn branch"
-                      :title="$t('chat.branch')"
-                      :aria-label="$t('chat.branch')"
-                      @click="branchUserMessage(msg)"
-                    ></button>
-                    <span class="user-bubble-time">{{ formatUserMessageTime(msg) }}</span>
+                    <slot name="user-actions" :message="msg">
+                      <button
+                        class="user-bubble-action-btn copy"
+                        :class="{ copied: isUserBubbleCopied(msg, index) }"
+                        :title="
+                          isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                        "
+                        :aria-label="
+                          isUserBubbleCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                        "
+                        @click="copyUserMessage(msg, index)"
+                      ></button>
+                      <button
+                        class="user-bubble-action-btn branch"
+                        :title="$t('chat.branch')"
+                        :aria-label="$t('chat.branch')"
+                        @click="branchUserMessage(msg)"
+                      ></button>
+                      <span class="user-bubble-time">{{ formatUserMessageTime(msg) }}</span>
+                    </slot>
                   </div>
                 </template>
               </div>
@@ -197,6 +206,7 @@
                   <MinimalBlocks
                     v-if="hasRenderableAssistantActions(msg.actions || [])"
                     :actions="msg.actions || []"
+                    :editing-message-id="editingMessageId"
                     :citations="citationsForMessage(msg)"
                     :citations-final="citationsFinalForMessage(msg)"
                     enable-citations
@@ -213,7 +223,14 @@
                     :handle-thinking-scroll="props.handleThinkingScroll"
                     @group-toggle="handleMinimalGroupToggle"
                     @group-collapse-finished="handleMinimalGroupCollapseFinished"
-                  />
+                  >
+                    <template #text-editor="{ action }">
+                      <slot name="text-editor" :message="msg" :action="action" />
+                    </template>
+                    <template #text-actions="{ action }"
+                      ><slot name="text-actions" :message="msg" :action="action"
+                    /></template>
+                  </MinimalBlocks>
                 </template>
                 <template v-else-if="stackedBlocksEnabled">
                   <template
@@ -332,7 +349,14 @@
                       </div>
 
                       <div v-else-if="group.action?.type === 'text'" class="text-output">
+                        <slot
+                          v-if="editingMessageId && editingMessageId === group.action.responseMessageId"
+                          name="text-editor"
+                          :message="msg"
+                          :action="group.action"
+                        />
                         <div
+                          v-else
                           class="text-content"
                           :class="{ 'streaming-text': group.action.streaming }"
                         >
@@ -344,6 +368,7 @@
                             enable-citations
                           />
                         </div>
+                        <slot name="text-actions" :message="msg" :action="group.action" />
                       </div>
 
                       <div
@@ -570,7 +595,13 @@
                       </div>
 
                       <div v-else-if="action.type === 'text'" class="text-output">
-                        <div class="text-content" :class="{ 'streaming-text': action.streaming }">
+                        <slot
+                          v-if="editingMessageId && editingMessageId === action.responseMessageId"
+                          name="text-editor"
+                          :message="msg"
+                          :action="action"
+                        />
+                        <div v-else class="text-content" :class="{ 'streaming-text': action.streaming }">
                           <MarkdownRenderer
                             :content="action.content || ''"
                             :is-streaming="action.streaming"
@@ -579,6 +610,7 @@
                             enable-citations
                           />
                         </div>
+                        <slot name="text-actions" :message="msg" :action="action" />
                       </div>
 
                       <div
@@ -717,25 +749,32 @@
                   :icon-style="iconStyleSafe"
                 />
 
-                <!-- 本段主智能体 tokens/s：段真正结束后常驻，左侧复制、右侧速度值 -->
-                <div v-if="assistantTokenSpeedEnds.has(index)" class="assistant-token-speed">
-                  <button
-                    class="user-bubble-action-btn copy"
-                    :class="{ copied: isTokenSpeedCopied(msg, index) }"
-                    :title="
-                      isTokenSpeedCopied(msg, index) ? $t('common.copied') : $t('common.copy')
-                    "
-                    :aria-label="
-                      isTokenSpeedCopied(msg, index) ? $t('common.copied') : $t('common.copy')
-                    "
-                    @click="copyAssistantPlainText(msg, index)"
-                  ></button>
-                  <span class="assistant-token-speed-value">{{
-                    $t('chat.tokenSpeedValue', {
-                      value: formatTokenSpeed(assistantTokenSpeedEnds.get(index))
-                    })
-                  }}</span>
-                </div>
+                <slot
+                  name="assistant-actions"
+                  :message="msg"
+                  :token-speed="
+                    assistantTokenSpeedEnds.has(index)
+                      ? formatTokenSpeed(assistantTokenSpeedEnds.get(index))
+                      : null
+                  "
+                  :copy="() => copyAssistantPlainText(msg, index)"
+                  :copied="isTokenSpeedCopied(msg, index)"
+                >
+                  <!-- 本段主智能体 tokens/s：段真正结束后常驻，左侧复制、右侧速度值 -->
+                  <MessageActions
+                    v-if="assistantTokenSpeedEnds.has(index)"
+                    :token-speed="formatTokenSpeed(assistantTokenSpeedEnds.get(index))"
+                  >
+                    <MessageActionButton
+                      :icon="isTokenSpeedCopied(msg, index) ? ICONS.check : ICONS.copy"
+                      :copied="isTokenSpeedCopied(msg, index)"
+                      :label="
+                        isTokenSpeedCopied(msg, index) ? $t('common.copied') : $t('common.copy')
+                      "
+                      @click="copyAssistantPlainText(msg, index)"
+                    />
+                  </MessageActions>
+                </slot>
               </div>
               <div v-else class="system-message">
                 <div
@@ -772,6 +811,7 @@
             </div>
           </template>
         </Virtualizer>
+        <slot name="after-messages" />
       </div>
       <div class="messages-bottom-spacer" aria-hidden="true"></div>
     </div>
@@ -817,6 +857,9 @@ import ToolAction from '@/components/chat/actions/ToolAction.vue';
 import StackedBlocks from './StackedBlocks.vue';
 import MinimalBlocks from './MinimalBlocks.vue';
 import MarkdownRenderer from './MarkdownRenderer.vue';
+import MessageActions from './MessageActions.vue';
+import MessageActionButton from './MessageActionButton.vue';
+import { ICONS } from '@/utils/icons';
 import { mergeAssistantDisplayRuns } from './assistantDisplayRuns';
 import { collectConversationCitations, type CitationAnnotation } from './citationChips';
 import EditSummaryCard from './EditSummaryCard.vue';
@@ -827,6 +870,8 @@ import { getMessageVisibility, messageStartsWork } from '@/utils/messageVisibili
 import { t, currentLocale } from '@/locales';
 
 const props = defineProps<{
+  chatMode?: boolean;
+  editingMessageId?: string;
   messages: Array<any>;
   iconStyle: (key: string, size?: string) => Record<string, string>;
   expandedBlocks: Set<string>;
@@ -858,6 +903,7 @@ const emit = defineEmits<{
 }>();
 
 const personalization = usePersonalizationStore();
+const tappedChatMessageId = ref('');
 const personalizationReady = computed(() => {
   return !!personalization.loaded || !!personalization.error;
 });
@@ -1310,7 +1356,9 @@ const isHiddenUserMessage = (message: any) => {
   const meta = message.metadata || {};
   const source = String(
     meta.message_source || meta.source || message.message_source || message.source || 'user'
-  ).trim().toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
   return getMessageVisibility(message) === 'compact' || !['user', 'presend'].includes(source);
 };
 const isEmptyAssistantMessage = (message: any) => {
@@ -1363,7 +1411,9 @@ const filteredMessages = computed(() => {
       dropped: source.length - result.length
     });
   }
-  return compactMessageDisplay.value === 'hidden' ? mergeAssistantDisplayRuns(result) : result;
+  return props.chatMode || compactMessageDisplay.value === 'hidden'
+    ? mergeAssistantDisplayRuns(result)
+    : result;
 });
 const getFilteredMessagesSafe = () =>
   Array.isArray(filteredMessages.value) ? filteredMessages.value : [];
@@ -2363,6 +2413,10 @@ function resolveMessageMediaRef(message: any, input: any, kind: 'image' | 'video
 }
 
 function getPreviewUrl(message: any, input: any, kind: 'image' | 'video'): string {
+  if (props.chatMode) {
+    const id = typeof input === 'string' ? input : input?.media_id;
+    return id ? `/api/chat/media/${encodeURIComponent(id)}` : '';
+  }
   const mediaRef = resolveMessageMediaRef(message, input, kind);
   const mediaId = typeof mediaRef?.media_id === 'string' ? mediaRef.media_id : '';
   if (mediaId) {

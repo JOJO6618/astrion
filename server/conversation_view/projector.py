@@ -41,6 +41,7 @@ class RuntimeProjection:
         self._action_attempts = {}
         self._tools = {}
         self._split_html = set()
+        self._content_message_id = None
 
     def snapshot(self):
         """Return a detached frontend view, never references to mutable state."""
@@ -76,6 +77,8 @@ class RuntimeProjection:
         msg["generatingLabel"] = ""
         action = {"id": self._id(kind), "type": kind,
                   "timestamp": self._action_timestamp, **fields}
+        if kind in {"text", "thinking"} and self._content_message_id:
+            action["responseMessageId"] = self._content_message_id
         msg["actions"].append(action)
         self._action_attempts[action["id"]] = self._attempt
         return action
@@ -159,6 +162,7 @@ class RuntimeProjection:
 
     def _content_event(self, event_type, data):
         kind, phase = event_type.split("_", 1)
+        self._content_message_id = data.get("response_message_id")
         msg = self._ensure_assistant()
         if phase == "start":
             self._start_content(kind)

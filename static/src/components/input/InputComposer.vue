@@ -6,6 +6,7 @@
       ref="stadiumShellOuter"
     >
       <ComposerApprovalDock
+        v-if="!chatMode"
         :visible="approvalDockVisible"
         :collapsed="!!approvalPanelCollapsed"
         :status-visible="floatingStatusVisible"
@@ -223,6 +224,11 @@
           ref="fileUploadInput"
           class="file-input-hidden"
           multiple
+          :accept="
+            chatMode
+              ? 'image/png,image/jpeg,image/webp,image/gif,image/bmp,video/mp4,video/webm,video/quicktime'
+              : undefined
+          "
           @change="onFileChange"
         />
         <div class="input-stack">
@@ -266,7 +272,16 @@
             class="image-inline-row video-inline-row"
           >
             <div class="image-thumbnail-wrapper" v-for="video in selectedVideos" :key="video">
+              <video
+                v-if="chatMode"
+                :src="getPreviewUrl(video)"
+                class="image-thumbnail"
+                preload="metadata"
+                muted
+                playsinline
+              />
               <img
+                v-else
                 :src="getPreviewUrl(video)"
                 :alt="formatImageName(video)"
                 class="image-thumbnail"
@@ -325,7 +340,19 @@
                 </svg>
               </button>
 
+              <div v-if="chatMode" class="agent-type-switcher work-mode-switcher">
+                <button
+                  type="button"
+                  class="agent-type-switcher__btn"
+                  :aria-pressed="networkEnabled"
+                  :disabled="!isConnected"
+                  @click.stop="$emit('toggle-chat-network')"
+                >
+                  <span>{{ networkEnabled ? $t('chatMode.online') : $t('chatMode.offline') }}</span>
+                </button>
+              </div>
               <div
+                v-else
                 class="agent-type-switcher work-mode-switcher"
                 :class="{ 'is-disabled': workModeLocked }"
               >
@@ -432,6 +459,7 @@
         </div>
       </div>
       <QuickMenu
+        v-if="!chatMode"
         :open="quickMenuOpen"
         :is-connected="isConnected"
         :uploading="uploading"
@@ -481,7 +509,7 @@
         @open-command-blocking="$emit('open-command-blocking')"
         @toggle-goal-mode="$emit('toggle-goal-mode')"
       />
-      <div class="permission-switcher" @click.stop>
+      <div v-if="!chatMode" class="permission-switcher" @click.stop>
         <button
           type="button"
           class="permission-switcher__btn"
@@ -647,7 +675,7 @@
           type="button"
           class="context-usage-switcher__btn"
           :disabled="!isConnected"
-          @click="$emit('toggle-token-panel')"
+          @click="!chatMode && $emit('toggle-token-panel')"
         >
           <span
             class="context-usage-ring"
@@ -693,6 +721,7 @@ defineOptions({ name: 'InputComposer' });
 
 const emit = defineEmits([
   'update:input-message',
+  'toggle-chat-network',
   'input-change',
   'input-focus',
   'input-blur',
@@ -747,6 +776,9 @@ const emit = defineEmits([
 ]);
 
 const props = defineProps<{
+  chatMode?: boolean;
+  networkEnabled?: boolean;
+  mediaPreviewUrl?: (path: string) => string;
   inputMessage: string;
   inputIsMultiline: boolean;
   inputIsFocused: boolean;
@@ -798,6 +830,7 @@ const props = defineProps<{
   currentNetworkPermission?: 'restricted' | 'full';
   networkPermissionOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
   currentContextTokens: number;
+  contextTokenLimit?: number;
   versioningEnabled?: boolean;
   projectGitSummary?: {
     has_git?: boolean;
@@ -1046,6 +1079,7 @@ const previewImage = (path: string) => {
 
 const getPreviewUrl = (path: string): string => {
   if (!path) return '';
+  if (props.chatMode) return props.mediaPreviewUrl?.(path) || '';
   return `/api/gui/files/download?path=${encodeURIComponent(path)}`;
 };
 
@@ -1081,6 +1115,7 @@ const projectGitSummaryForRender = computed(() => {
 const approvalPanelTransitioning = ref(false);
 const approvalDockVisible = computed(
   () =>
+    !props.chatMode &&
     !skillSlashMenuOpen.value &&
     !fileAtOpen.value &&
     !props.quickMenuOpen &&
@@ -1332,7 +1367,7 @@ const scheduleFileAtSearch = (query: string) => {
 };
 
 const refreshFileAtState = () => {
-  const token = findAtToken();
+  const token = props.chatMode ? null : findAtToken();
   if (!token || !props.isConnected || props.inputLocked) {
     closeFileAtMenu();
     return;
@@ -2135,7 +2170,7 @@ const workflowSlashMenuItems = computed<SlashMenuItem[]>(() => {
 });
 
 const refreshSkillSlashState = () => {
-  const token = findSlashToken();
+  const token = props.chatMode ? null : findSlashToken();
   if (!token || !props.isConnected || props.inputLocked) {
     closeSlashMenu();
     return;
@@ -3008,7 +3043,7 @@ const onFileChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const files = target?.files || null;
 
-  if (fileAtPickerActive.value && files && files.length > 0) {
+  if (!props.chatMode && fileAtPickerActive.value && files && files.length > 0) {
     fileAtPickerActive.value = false;
     const file = files[0];
     try {
@@ -3161,6 +3196,9 @@ const deepCompressLimit = computed(() => {
 });
 
 const contextUsageLimit = computed(() => {
+  if (props.chatMode) {
+    return Number(props.contextTokenLimit) || 250000;
+  }
   if (autoDeepCompressEnabled.value) {
     return deepCompressLimit.value;
   }

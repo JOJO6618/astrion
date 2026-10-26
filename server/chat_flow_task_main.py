@@ -1,1273 +1,45 @@
 from __future__ import annotations
-
 import asyncio
-import json
 import time
-import re
-import zipfile
-from collections import defaultdict, Counter, deque
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
-from werkzeug.utils import secure_filename
-
-from config import (
-    OUTPUT_FORMATS,
-    AUTO_FIX_TOOL_CALL,
-    AUTO_FIX_MAX_ATTEMPTS,
-    MAX_ITERATIONS_PER_TASK,
-    MAX_CONSECUTIVE_SAME_TOOL,
-    MAX_TOTAL_TOOL_CALLS,
-    TOOL_CALL_COOLDOWN,
-    MAX_UPLOAD_SIZE,
-    DEFAULT_CONVERSATIONS_LIMIT,
-    MAX_CONVERSATIONS_LIMIT,
-    CONVERSATIONS_DIR,
-    DEFAULT_RESPONSE_MAX_TOKENS,
-    DEFAULT_PROJECT_PATH,
-    LOGS_DIR,
-    AGENT_VERSION,
-    PROJECT_MAX_STORAGE_MB,
-    PROJECT_MAX_STORAGE_BYTES,
-    UPLOAD_SCAN_LOG_SUBDIR,
-)
-from modules.personalization_manager import (
-    load_personalization_config,
-    save_personalization_config,
-    resolve_context_compression_settings,
-)
+from collections import defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from config import AUTO_FIX_TOOL_CALL, AUTO_FIX_MAX_ATTEMPTS, MAX_ITERATIONS_PER_TASK, MAX_CONSECUTIVE_SAME_TOOL, MAX_TOTAL_TOOL_CALLS
+from modules.personalization_manager import load_personalization_config, resolve_context_compression_settings
 from modules.skill_hint_manager import SkillHintManager
 from modules.i18n import tr
-from modules.upload_security import UploadSecurityError
 from modules.user_manager import UserWorkspace
-from modules.usage_tracker import QUOTA_DEFAULTS
-from modules.sub_agent import TERMINAL_STATUSES
-from server.runtime import InternalDirectives, RuntimeContext, TaskParams, runtime_service
 from modules.multi_agent.debug_logger import ma_debug
-from modules.versioning_manager import ConversationVersioningManager, VersioningError
-from modules.shallow_versioning import ShallowVersioningManager
 from core.web_terminal import WebTerminal
-from utils.tool_result_formatter import format_tool_result_for_context
-from utils.conversation_manager import ConversationManager
 from config.model_profiles import get_default_model_key, get_model_context_window, get_model_profile
-
-from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
-from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
 from .work_timer import finalize_conversation_work_timer
-from .utils_common import (
-    build_review_lines,
-    debug_log,
-    log_backend_chunk,
-    log_frontend_chunk,
-    log_streaming_debug_entry,
-    brief_log,
-    DEBUG_LOG_FILE,
-    CHUNK_BACKEND_LOG_FILE,
-    CHUNK_FRONTEND_LOG_FILE,
-    STREAMING_DEBUG_LOG_FILE,
-)
-from .security import rate_limited, compact_web_search_result, validate_csrf_request, requires_csrf_protection, get_csrf_token
-from .main_task_gate import try_acquire_main_task_gate, release_main_task_gate
-from .monitor import cache_monitor_snapshot, get_cached_monitor_snapshot
+from .utils_common import debug_log
 from .extensions import run_background
-from .state import (
-    MONITOR_FILE_TOOLS,
-    MONITOR_MEMORY_TOOLS,
-    MONITOR_SNAPSHOT_CHAR_LIMIT,
-    MONITOR_MEMORY_ENTRY_LIMIT,
-    RATE_LIMIT_BUCKETS,
-    FAILURE_TRACKERS,
-    usage_trackers,
-    MONITOR_SNAPSHOT_CACHE,
-    MONITOR_SNAPSHOT_CACHE_LIMIT,
-    PROJECT_STORAGE_CACHE,
-    PROJECT_STORAGE_CACHE_TTL_SECONDS,
-    RECENT_UPLOAD_EVENT_LIMIT,
-    RECENT_UPLOAD_FEED_LIMIT,
-    TITLE_PROMPT_PATH,
-    get_last_active_ts,
-    user_manager,
-    container_manager,
-    custom_tool_registry,
-    user_terminals,
-    terminal_rooms,
-    connection_users,
-    stop_flags,
-    active_polling_tasks,
-    get_stop_flag,
-    set_stop_flag,
-    clear_stop_flag,
-)
-from .chat_flow_helpers import (
-    detect_malformed_tool_call as _detect_malformed_tool_call,
-    detect_tool_failure,
-    generate_conversation_title_background as _generate_conversation_title_background,
-)
-
-
-from .chat_flow_runner_helpers import (
-    extract_intent_from_partial,
-    resolve_monitor_path,
-    resolve_monitor_memory,
-    capture_monitor_snapshot,
-)
-
-
-from .chat_flow_runtime import (
-    generate_conversation_title_background,
-    detect_malformed_tool_call,
-)
-
-from .chat_flow_task_support import (
-    process_background_command_updates,
-    process_multi_agent_master_messages,
-    inject_multi_agent_master_message,
-    inject_runtime_user_message,
-    _auto_message_type_for_multi_agent_subtype,
-)
+from .state import get_stop_flag, clear_stop_flag
+from .chat_flow_runtime import generate_conversation_title_background, detect_malformed_tool_call
+from .chat_flow_task_support import process_background_command_updates, process_multi_agent_master_messages, inject_runtime_user_message, _auto_message_type_for_multi_agent_subtype
 from .chat_flow_tool_loop import execute_tool_calls
 from .chat_flow_stream_loop import run_streaming_attempts
 from .deep_compression import run_deep_compression
-from .goal_flow import (
-    inject_goal_prompt,
-    handle_goal_after_turn,
-    stop_goal_user_cancel,
-    goal_is_active,
-    emit_goal_progress,
-)
-
-_VALID_USER_MESSAGE_SOURCES = {
-    "user",
-    "guidance",
-    "notify",
-    "presend",
-    "sub_agent",
-    "background_command",
-    "goal",
-    "goal_prompt",
-    "goal_review",
-    "goal_recovery",
-    "compression",
-    "compression_handoff",
-    "permission",
-    "sandbox",
-    "skill",
-    "workflow",
-}
-
-
-def _user_message_ui_defaults(source: str, *, auto_user_message_event: bool = False) -> Dict[str, Any]:
-    normalized = str(source or "").strip().lower()
-    if normalized in {"skill", "goal_prompt", "permission", "sandbox"}:
-        return {"visibility": "hidden", "starts_work": False}
-    if normalized in {"guidance", "notify"}:
-        return {"visibility": "compact", "starts_work": False}
-    # 后台完成通知 / 运行期压缩续接：本质属于当前这轮工作的延续，
-    # 不应暂停上一轮计时器、也不应开启新的工作头与计时器。
-    if normalized in {"sub_agent", "background_command", "compression", "compression_handoff"}:
-        return {"visibility": "compact", "starts_work": False}
-    # 目标审核续命：确实开启新一轮工作，保持 starts_work=True。
-    if normalized in {"goal_review", "goal_recovery"}:
-        return {"visibility": "compact", "starts_work": True}
-    # 工作流激活/柔性通知（任务入口派发）：开启新一轮工作，显示工作头与计时器。
-    # 运行期 inline 注入走 _runtime_message_ui_defaults（延续当前工作段，不受影响）。
-    if normalized == "workflow":
-        return {"visibility": "chat", "starts_work": True}
-    if normalized == "presend":
-        return {"visibility": "chat", "starts_work": True}
-    if normalized == "goal":
-        return {"visibility": "compact", "starts_work": True}
-    return {"visibility": "chat", "starts_work": normalized == "user" and not auto_user_message_event}
-
-
-from server.attachment_paths import (
-    build_media_paths_message as _build_media_paths_message,
-    build_file_paths_message as _build_file_paths_message,
-    normalize_attached_files as _normalize_attached_files,
-)
-
-
-def _should_skip_versioning_for_message(
-    *,
-    message: str,
-    auto_user_message_event: bool,
-) -> bool:
-    if auto_user_message_event:
-        return True
-    text = (message or "").strip()
-    if not text:
-        return True
-    if text.startswith("这是一句系统自动发送的user消息"):
-        return True
-    return False
-
-
-def _prepare_hidden_versioning_baseline_for_first_input(
-    *,
-    web_terminal,
-    workspace,
-    conversation_id: str,
-    message: str,
-    auto_user_message_event: bool,
-) -> None:
-    """Ensure first-run baseline is committed (hidden, no checkpoint row)."""
-    try:
-        if _should_skip_versioning_for_message(
-            message=message,
-            auto_user_message_event=auto_user_message_event,
-        ):
-            return
-        cm = getattr(getattr(web_terminal, "context_manager", None), "conversation_manager", None)
-        if not cm:
-            return
-        conv_data = cm.load_conversation(conversation_id) or {}
-        versioning_meta = ((conv_data.get("metadata") or {}).get("versioning") or {})
-        if not bool(versioning_meta.get("enabled", False)):
-            return
-        backup_mode = str(versioning_meta.get("backup_mode") or "shallow").strip().lower()
-        if backup_mode == "full":
-            tracking_mode = ConversationVersioningManager.normalize_tracking_mode(
-                versioning_meta.get("tracking_mode")
-            )
-            if (
-                tracking_mode == ConversationVersioningManager.TRACKING_MODE_WORKSPACE_AND_CONVERSATION
-                and not bool(getattr(web_terminal, "username", None) == "host")
-            ):
-                return
-            manager = ConversationVersioningManager(
-                project_path=workspace.project_path,
-                data_dir=workspace.data_dir,
-                conversation_id=conversation_id,
-            )
-            baseline = manager.ensure_baseline_for_first_input(tracking_mode=tracking_mode)
-            debug_log(
-                f"[Versioning][Baseline] conv={conversation_id} "
-                f"tracking_mode={tracking_mode} "
-                f"created={baseline.get('created')} skipped={baseline.get('skipped')} "
-                f"reason={baseline.get('reason')} head={baseline.get('head')}"
-            )
-        # shallow 模式下不需要完整 workspace baseline，由工具调用前的 track_edit 处理
-    except VersioningError as exc:
-        debug_log(f"[Versioning] 创建首轮基线失败: {exc}")
-    except Exception as exc:
-        debug_log(f"[Versioning] 创建首轮基线异常: {exc}")
-
-
-def _record_hidden_versioning_checkpoint_after_run(
-    *,
-    web_terminal,
-    workspace,
-    conversation_id: str,
-    message: str,
-    message_index: int,
-    auto_user_message_event: bool,
-    run_status: str = "completed",
-) -> None:
-    """Hidden snapshot after current manual user input run finished."""
-    try:
-        if _should_skip_versioning_for_message(
-            message=message,
-            auto_user_message_event=auto_user_message_event,
-        ):
-            return
-        cm = getattr(getattr(web_terminal, "context_manager", None), "conversation_manager", None)
-        if not cm:
-            return
-        conv_data = cm.load_conversation(conversation_id) or {}
-        versioning_meta = ((conv_data.get("metadata") or {}).get("versioning") or {})
-        if not bool(versioning_meta.get("enabled", False)):
-            return
-        tracking_mode = ConversationVersioningManager.normalize_tracking_mode(
-            versioning_meta.get("tracking_mode")
-        )
-        if (
-            tracking_mode == ConversationVersioningManager.TRACKING_MODE_WORKSPACE_AND_CONVERSATION
-            and not bool(getattr(web_terminal, "username", None) == "host")
-        ):
-            return
-        snapshot_messages = conv_data.get("messages") or []
-        # 找到当前用户消息的消息ID（用于浅备份快照）
-        message_id = None
-        try:
-            target_msg = snapshot_messages[int(message_index)] if 0 <= int(message_index) < len(snapshot_messages) else None
-            if target_msg and target_msg.get("role") == "user":
-                message_id = target_msg.get("message_id") or target_msg.get("id")
-        except Exception:
-            message_id = None
-
-        backup_mode = str(versioning_meta.get("backup_mode") or "shallow").strip().lower()
-        if backup_mode == "full":
-            snapshot_payload = {
-                "conversation_id": conversation_id,
-                "title": conv_data.get("title"),
-                "metadata": conv_data.get("metadata") or {},
-                "messages": snapshot_messages,
-                "message_index": int(message_index),
-                "run_status": str(run_status or "completed"),
-            }
-            manager = ConversationVersioningManager(
-                project_path=workspace.project_path,
-                data_dir=workspace.data_dir,
-                conversation_id=conversation_id,
-            )
-            row = manager.create_checkpoint(
-                message=message,
-                message_index=message_index,
-                workspace_path=str(workspace.project_path),
-                conversation_snapshot=snapshot_payload,
-                run_status=str(run_status or "completed"),
-                tracking_mode=tracking_mode,
-            )
-            debug_log(
-                f"[Versioning][Checkpoint] conv={conversation_id} seq={row.get('seq')} "
-                f"tracking_mode={tracking_mode} "
-                f"msg_index={message_index} snapshot_messages={len(snapshot_messages)} "
-                f"tree_hash={row.get('tree_hash')} changed={row.get('changed')} status={row.get('run_status')}"
-            )
-            cm.update_conversation_metadata(
-                conversation_id,
-                {
-                    "versioning": {
-                        "enabled": True,
-                        "mode": "overwrite",
-                        "tracking_mode": tracking_mode,
-                        "backup_mode": "full",
-                        "last_commit": row.get("tree_hash"),
-                        "last_input_seq": int(row.get("seq") or 0),
-                        "updated_at": datetime.now().isoformat(),
-                    }
-                },
-            )
-        else:
-            # 浅备份：每个用户消息结束时对 tracked files 做快照
-            shallow_files: List[Dict[str, Any]] = []
-            shallow_insertions = 0
-            shallow_deletions = 0
-            if message_id:
-                shallow_manager = ShallowVersioningManager(
-                    project_path=workspace.project_path,
-                    data_dir=workspace.data_dir,
-                    conversation_id=conversation_id,
-                )
-                snapshot = shallow_manager.make_snapshot(str(message_id))
-                shallow_files = shallow_manager.get_file_diff_stats(str(message_id))
-                stats = shallow_manager.get_diff_stats(str(message_id)) or {}
-                shallow_insertions = int(stats.get("insertions") or 0)
-                shallow_deletions = int(stats.get("deletions") or 0)
-                debug_log(
-                    f"[Versioning][ShallowSnapshot] conv={conversation_id} "
-                    f"msg_id={message_id} tracked_files={snapshot.get('tracked_files_count')}"
-                )
-
-            # 同时写入一个轻量 ConversationVersioningManager 检查点行，
-            # 让前端版本管理弹窗能统一列出回溯点。
-            manager = ConversationVersioningManager(
-                project_path=workspace.project_path,
-                data_dir=workspace.data_dir,
-                conversation_id=conversation_id,
-            )
-            snapshot_payload = {
-                "conversation_id": conversation_id,
-                "title": conv_data.get("title"),
-                "metadata": conv_data.get("metadata") or {},
-                "messages": snapshot_messages,
-                "message_index": int(message_index),
-                "run_status": str(run_status or "completed"),
-                "shallow_message_id": str(message_id) if message_id else None,
-            }
-            row = manager.create_checkpoint(
-                message=message,
-                message_index=int(message_index),
-                workspace_path=str(workspace.project_path),
-                conversation_snapshot=snapshot_payload,
-                run_status=str(run_status or "completed"),
-                tracking_mode=tracking_mode,
-                diff_summary={
-                    "insertions": shallow_insertions,
-                    "deletions": shallow_deletions,
-                    "files_changed": len(shallow_files),
-                    "files": shallow_files,
-                },
-            )
-            debug_log(
-                f"[Versioning][ShallowCheckpoint] conv={conversation_id} seq={row.get('seq')} "
-                f"msg_index={message_index} files={len(shallow_files)} "
-                f"insertions={shallow_insertions} deletions={shallow_deletions}"
-            )
-            cm.update_conversation_metadata(
-                conversation_id,
-                {
-                    "versioning": {
-                        "enabled": True,
-                        "mode": "overwrite",
-                        "tracking_mode": tracking_mode,
-                        "backup_mode": "shallow",
-                        "last_commit": row.get("tree_hash"),
-                        "last_input_seq": int(row.get("seq") or 0),
-                        "updated_at": datetime.now().isoformat(),
-                    }
-                },
-            )
-    except VersioningError as exc:
-        debug_log(f"[Versioning] 记录快照失败: {exc}")
-    except Exception as exc:
-        debug_log(f"[Versioning] 记录快照异常: {exc}")
-    finally:
-        # 当前输入处理结束，清除浅备份消息 ID，避免后续无消息上下文时的错误归属。
-        try:
-            ctx = getattr(web_terminal, "context_manager", None)
-            if ctx is not None and hasattr(ctx, "current_shallow_message_id"):
-                ctx.current_shallow_message_id = None
-        except Exception:
-            pass
-
-
-def _persist_and_echo_preceding_notice(
-    *,
-    web_terminal,
-    sender,
-    conversation_id: str,
-    message: str,
-    payload: Dict[str, Any],
-) -> None:
-    """预写一条「前置完成通知」：写入对话历史 + 任务事件流回显（不触发新一轮工作）。
-
-    用于「通知池」一次取出多条时，前 N-1 条随同一后续任务一起呈现。
-    这些通知必须落历史，否则模型看不到、刷新后也会丢失。
-    """
-    message = (message or "").strip()
-    if not message:
-        return
-    src = str(payload.get("message_source") or "sub_agent").strip().lower()
-    if src not in _VALID_USER_MESSAGE_SOURCES:
-        src = "sub_agent"
-    ui_defaults = _user_message_ui_defaults(src, auto_user_message_event=True)
-    # 前置通知渲染为完成态气泡：不开启独立工作计时器
-    ui_defaults = {**ui_defaults, "starts_work": False}
-    metadata = {
-        "message_source": src,
-        "is_auto_generated": True,
-        "auto_message_type": "completion_notice",
-        **ui_defaults,
-    }
-    import uuid
-    payload["message_id"] = str(uuid.uuid4())
-    try:
-        cm = getattr(web_terminal, "context_manager", None)
-        if cm is not None:
-            saved = cm.add_conversation(
-                "user", message, metadata=metadata, message_id=payload["message_id"]
-            )
-            payload["message_id"] = saved["message_id"]
-    except Exception as exc:
-        debug_log(f"[CompletionNotice] 前置通知写入历史失败: {exc}")
-    # 回显经 sender 通道（任务内=任务事件流；poll 轮询器=no-op）；
-    # 轮询客户端统一由后续任务事件流回放，前端按 message_id 更新同一消息。
-    try:
-        echo_payload = {
-            "message": message,
-            "conversation_id": conversation_id,
-            "message_source": src,
-            **ui_defaults,
-            **{k: v for k, v in (payload or {}).items() if k not in {"message", "conversation_id"}},
-        }
-        echo_payload["starts_work"] = False
-        echo_payload["metadata"] = {**metadata}
-        sender("user_message", echo_payload)
-    except Exception:
-        pass
-
-async def _dispatch_completion_user_notice(
-    *,
-    web_terminal,
-    workspace,
-    sender,
-    client_sid: str,
-    username: str,
-    conversation_id: str,
-    user_message: str,
-    extra_payload: Optional[Dict[str, Any]] = None,
-    preceding_notices: Optional[List[Dict[str, Any]]] = None,
-    main_task_gate_token: Optional[str] = None,
-):
-    """复用子智能体完成后的 user 代发机制。
-
-    preceding_notices：本批「通知池」里除最后一条以外的前置通知列表，
-    每项为 {"message": str, "payload": dict}。这些会先于触发消息写入历史/事件流，
-    但不各自触发新一轮工作；仅最后一条 user_message 作为后续任务的触发消息。
-    """
-    from modules.goal_policy import goal_blocks_background
-    if goal_blocks_background(web_terminal.data_dir, conversation_id):
-        raise RuntimeError("Goal is paused; completion notifications remain pending")
-    extra_payload = extra_payload or {}
-    preceding_notices = preceding_notices or []
-    message_source = str(extra_payload.get("message_source") or "").strip().lower()
-    if not message_source:
-        if extra_payload.get("runtime_mode_notice"):
-            message_source = "notify"
-        elif extra_payload.get("runtime_guidance"):
-            message_source = "guidance"
-        elif extra_payload.get("background_command_notice"):
-            message_source = "background_command"
-        elif extra_payload.get("sub_agent_notice"):
-            message_source = "sub_agent"
-    if message_source not in _VALID_USER_MESSAGE_SOURCES:
-        message_source = "user"
-
-    # 先把前置通知写入历史并经 sender 回显（Socket.IO 移除后无即时推送，
-    # 统一通过后续任务事件流回放，见 _run_chat_task 的 preceding_user_notices 注入）。
-    for item in preceding_notices:
-        _persist_and_echo_preceding_notice(
-            web_terminal=web_terminal,
-            sender=sender,
-            conversation_id=conversation_id,
-            message=str(item.get("message") or ""),
-            payload=item.setdefault("payload", {}),
-        )
-
-    try:
-        ui_defaults = _user_message_ui_defaults(
-            message_source,
-            auto_user_message_event=True,
-        )
-        # 关键：通知类后台任务需要把 user_message 写入任务事件流，
-        # 否则前端轮询只会看到 AI/tool 事件，看不到 user_message。
-        auto_payload = {
-            **dict(extra_payload or {}),
-            **ui_defaults,
-            "timestamp": datetime.now().isoformat(),
-        }
-        # 轮询客户端通过后续任务事件流回放前置通知。
-        preceding_list = None
-        if preceding_notices:
-            preceding_list = [
-                {
-                    "message": str(item.get("message") or ""),
-                    "payload": dict(item.get("payload") or {}),
-                }
-                for item in preceding_notices
-                if str(item.get("message") or "").strip()
-            ]
-        # 公共任务入口：内部调用方，从 terminal 构造可信上下文；
-        # 模型/模式覆盖取 terminal 当前值（与偏好快照同值，对齐既有通知链语义）。
-        ctx = RuntimeContext.from_terminal(
-            web_terminal,
-            workspace,
-            username,
-            params=TaskParams(
-                message=user_message,
-                conversation_id=conversation_id,
-                message_source=message_source,
-                model_key=getattr(web_terminal, "model_key", None),
-                run_mode=getattr(web_terminal, "run_mode", None),
-                thinking_mode=getattr(web_terminal, "thinking_mode", None),
-            ),
-            directives=InternalDirectives(
-                # 派发方预占的主任务门闸 token 随任务移交，由任务线程认领
-                main_task_gate_token=main_task_gate_token,
-                auto_user_message_event=True,
-                auto_user_message_payload=auto_payload,
-                preceding_user_notices=preceding_list,
-            ),
-        )
-        ma_debug(
-            "dispatch_completion_create_chat_task",
-            conversation_id=conversation_id,
-            user_message_preview=user_message[:300],
-            preceding_count=len(preceding_notices),
-        )
-        rec = runtime_service.create_task(ctx)
-        ma_debug(
-            "dispatch_completion_task_created",
-            conversation_id=conversation_id,
-            task_id=getattr(rec, "task_id", None),
-        )
-        payload = {
-            'message': user_message,
-            'conversation_id': conversation_id,
-            'task_id': rec.task_id,
-            'message_source': message_source,
-            'timestamp': datetime.now().isoformat(),
-            **ui_defaults,
-        }
-        payload.update(extra_payload)
-        payload["metadata"] = {
-            "message_source": message_source,
-            **ui_defaults,
-            **(payload.get("metadata") or {}),
-        }
-        sender('user_message', payload)
-        return
-    except Exception as e:
-        from modules.goal_state_manager import GoalStateManager
-        goal = GoalStateManager(web_terminal.data_dir, conversation_id)
-        if goal.state["status"] in {"running", "reviewing", "retrying", "paused", "blocked"}:
-            # Goal tasks must always own a TaskRecord, outcome and cancellation.
-            raise
-        debug_log(f"[CompletionNotice] 创建后台消息任务失败，回退直接执行: {e}")
-
-    # 回退路径没有任务线程（未登记 TaskRecord），轮询器预占的门闸 token 无法随任务
-    # 移交释放；必须在本函数内随回退执行结束释放，否则对话门闸会被长期占用，
-    # 后续通知派发将恒被 try_acquire_main_task_gate 拒绝（2026-09-07 N1 修复）。
-    # release_main_task_gate 对 None 或不匹配的 token 为无操作，可安全调用。
-    try:
-        payload = {
-            'message': user_message,
-            'conversation_id': conversation_id,
-            'message_source': message_source,
-            'timestamp': datetime.now().isoformat(),
-        }
-        payload.update(_user_message_ui_defaults(message_source, auto_user_message_event=True))
-        payload.update(extra_payload)
-        payload["metadata"] = {
-            "message_source": message_source,
-            "visibility": payload.get("visibility"),
-            "starts_work": payload.get("starts_work"),
-            **(payload.get("metadata") or {}),
-        }
-        sender('user_message', payload)
-        try:
-            task_handle = asyncio.create_task(handle_task_with_sender(
-                terminal=web_terminal,
-                workspace=workspace,
-                message=user_message,
-                images=[],
-                sender=sender,
-                client_sid=client_sid,
-                username=username,
-                videos=[],
-                auto_user_message_event=True,
-            ))
-            await task_handle
-        except Exception as inner_exc:
-            debug_log(f"[CompletionNotice] 回退处理 user_message 失败: {inner_exc}")
-    finally:
-        release_main_task_gate(web_terminal, main_task_gate_token)
-
-
-def _build_shared_waiting_payload(items: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """构建与子智能体一致的 waiting 事件载荷结构。"""
-    normalized = []
-    for item in items or []:
-        summary = item.get('summary') or item.get('command') or '后台任务'
-        normalized.append({
-            'agent_id': item.get('agent_id') or item.get('command_id') or item.get('task_id'),
-            'summary': summary,
-        })
-    return {
-        'count': len(normalized),
-        'tasks': normalized,
-    }
-
-def _build_sub_agent_notice_text(update: Dict[str, Any], *, summary_override: Optional[str] = None) -> str:
-    """根据子智能体完成结果构建一条 user 通知文本（统一 [系统通知|sub_agent] 前缀）。
-
-    update 通常是 task 的 final_result，其中 system_message 已经是一条完整的格式化通知
-    （含 ✅/❌ 前缀、统计、运行秒数、summary、交付目录）。这里直接复用它，只补统一前缀，
-    不再在外层重复拼 agent/运行秒数/交付目录，避免内容出现两遍。
-    """
-    system_message = (update.get("system_message") or "").strip()
-    if not system_message:
-        # 兜底：极少数情况下 final_result 没有 system_message，用最小信息拼一条
-        agent_id = update.get("agent_id")
-        summary = summary_override or update.get("summary") or update.get("message") or ""
-        deliverables_dir = update.get("deliverables_dir", "") or ""
-        lines = [tr("task_main.sub_agent_done_line", agent_id=agent_id, summary=summary)]
-        msg = update.get("message")
-        if msg:
-            lines.append(str(msg))
-        if deliverables_dir:
-            lines.append(tr("task_main.deliverables_line", dir=deliverables_dir))
-        system_message = "\n\n".join(lines)
-    return f"[系统通知|sub_agent]\n{system_message}"
-
-
-def _collect_pending_completion_notices(*, web_terminal, conversation_id: str) -> List[Dict[str, Any]]:
-    """从子智能体 + 后台 run_command 两路统一取出所有待通知项（已按时间排序）。
-
-    返回的每一项形如：
-        {
-            "kind": "sub_agent" | "background_command",
-            "message": <user 通知文本>,
-            "payload": <前端事件 extra payload>,
-            "sort_key": <用于跨两路排序的时间戳>,
-        }
-    取出时即就地标记 notified，确保不会被下一轮重复消费。
-    """
-    notices: List[Dict[str, Any]] = []
-
-    # 2) 后台 run_command
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
-    if bg_manager:
-        try:
-            bg_updates = bg_manager.poll_updates(conversation_id=conversation_id)
-        except Exception:
-            bg_updates = []
-        for update in bg_updates or []:
-            command_id = update.get("command_id")
-            command = update.get("command") or ""
-            output = update.get("output") or ""
-            return_code = update.get("return_code")
-            try:
-                bg_manager.mark_notified(str(command_id))
-            except Exception:
-                pass
-            # 统一 [系统通知|background_command] 前缀；正文给出命令、退出码、输出
-            header = tr("background_tasks.done_header")
-            if command:
-                header += "\n\n" + tr("background_tasks.command_line", command=command)
-            if return_code is not None:
-                header += "\n" + tr("background_tasks.return_code_line", code=return_code)
-            body = output if output else "[no_output]"
-            message_text = f"[系统通知|background_command]\n{header}\n\n{tr('background_tasks.output_section')}\n{body}"
-            notices.append({
-                "kind": "background_command",
-                "message": message_text,
-                "payload": {
-                    # 与子智能体完成通知完全复用同一前端通道/处理逻辑
-                    "sub_agent_notice": True,
-                    "message_source": "background_command",
-                    "background_command_notice": True,
-                    "command_id": command_id,
-                },
-                "sort_key": update.get("updated_at") or time.time(),
-            })
-
-    # 3) 工作流柔性通知（撞限询问 / 用户 slash 退出等）
-    try:
-        from modules.workflow_state_manager import WorkflowStateManager
-
-        _wsm = WorkflowStateManager(web_terminal.data_dir, conversation_id)
-        wf_updates = _wsm.poll_notices()
-    except Exception:
-        wf_updates = []
-        _wsm = None
-    for notice in wf_updates or []:
-        notice_text = str((notice or {}).get("message") or "").strip()
-        if not notice_text:
-            continue
-        notices.append({
-            "kind": "workflow",
-            "message": notice_text,
-            "payload": {
-                "sub_agent_notice": True,
-                "message_source": "workflow",
-                "workflow_notice": True,
-                "conversation_id": conversation_id,
-            },
-            "sort_key": notice.get("created_at") or time.time(),
-        })
-
-    notices.sort(key=lambda item: item.get("sort_key") or 0)
-    return notices
-
-
-def _rollback_completion_notice_marks(*, web_terminal, notices: List[Dict[str, Any]]) -> None:
-    """派发失败时回滚 _collect_pending_completion_notices 的就地标记，
-    避免通知被标记为已消费却从未派发（静默丢失）。
-    """
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
-    wf_restore: List[Dict[str, Any]] = []
-    for item in notices or []:
-        payload = item.get("payload") or {}
-        if item.get("kind") == "background_command":
-            command_id = payload.get("command_id")
-            if not command_id or not bg_manager:
-                continue
-            try:
-                with bg_manager._lock:
-                    rec = bg_manager._records.get(str(command_id))
-                    if rec:
-                        rec["notified"] = False
-            except Exception:
-                pass
-        elif item.get("kind") == "workflow":
-            wf_restore.append(item)
-    # 工作流通知：按 conversation 分组统一放回池（restore_notices 会保留现有未消费项）
-    if wf_restore:
-        try:
-            from modules.workflow_state_manager import WorkflowStateManager
-
-            _groups: Dict[str, List[Dict[str, Any]]] = {}
-            for item in wf_restore:
-                cid = str((item.get("payload") or {}).get("conversation_id") or "")
-                if not cid:
-                    continue
-                _groups.setdefault(cid, []).append({
-                    "type": "workflow",
-                    "message": item.get("message") or "",
-                    "created_at": item.get("sort_key") or time.time(),
-                })
-            for cid, items in _groups.items():
-                WorkflowStateManager(web_terminal.data_dir, cid).restore_notices(items)
-        except Exception:
-            pass
-
-
-def _has_pending_completion_work(*, web_terminal, conversation_id: str) -> bool:
-    """是否还有运行中或待通知的传统后台任务（子智能体/后台 run_command）。
-
-    多智能体模式下的 pending 消息由独立的 poll_multi_agent_notifications 处理，
-    不再混入本函数。
-    """
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
-    if bg_manager:
-        try:
-            if bg_manager.has_pending_for_conversation(conversation_id):
-                return True
-        except Exception:
-            pass
-    return False
-
-
-def _has_pending_workflow_notices(*, web_terminal, conversation_id: str) -> bool:
-    """是否还有未消费的工作流柔性通知（撞限询问 / 用户退出等）。"""
-    try:
-        from modules.workflow_state_manager import WorkflowStateManager
-
-        return WorkflowStateManager(web_terminal.data_dir, conversation_id).has_pending_notices()
-    except Exception:
-        return False
-
-
-async def poll_completion_notifications(*, web_terminal, workspace, conversation_id, client_sid, username):
-    """统一的“通知池”轮询器。
-
-    把子智能体完成通知与后台 run_command 完成通知合并到同一条链路：
-    - 每轮把两路所有待通知项一次性取出（池化），按时间排序；
-    - 这一批里前 N-1 条作为「预写通知」随同一个后续任务一起注入（写历史 + 事件流），
-      不各自触发新一轮工作；
-    - 仅最后 1 条作为后续 chat task 的触发消息，启动一次「工作 → 停止」循环；
-    - 该后续任务结束后回到 handle_task_with_sender 结尾重新 spawn 本轮询器，继续消费剩余通知。
-
-    这样多个后台任务同时完成时，会被合并成一次（而非每条都触发一轮停止-再工作）。
-    """
-
-    sub_manager = getattr(web_terminal, "sub_agent_manager", None)
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
-    if not sub_manager and not bg_manager:
-        return
-    if not hasattr(web_terminal, "_announced_sub_agent_tasks"):
-        web_terminal._announced_sub_agent_tasks = set()
-
-    max_wait_time = 3600  # 最多等待 1 小时
-    start_wait = time.time()
-
-    def sender(event_type, data):
-        # WebSocket 推送已移除：事件均经任务事件流（_append_event）由轮询消费；
-        # 此 sender 仅保留签名以兼容既有调用点，不再做任何实时推送。
-        return
-
-    loop_count = 0
-    ma_debug("poll_completion_notifications_start", conversation_id=conversation_id)
-    while (time.time() - start_wait) < max_wait_time:
-        loop_count += 1
-        from modules.goal_policy import goal_blocks_background
-        if goal_blocks_background(web_terminal.data_dir, conversation_id):
-            await asyncio.sleep(1)
-            continue
-        # 检查停止标志
-        client_stop_info = get_stop_flag(client_sid, username, include_user=False)
-        if client_stop_info:
-            stop_requested = client_stop_info.get('stop', False) if isinstance(client_stop_info, dict) else client_stop_info
-            if stop_requested:
-                ma_debug("poll_completion_notifications_stop_requested", conversation_id=conversation_id)
-                break
-
-        # 若主对话仍在工具循环中，暂不消费完成事件，避免抢占 system 消息插入
-        if getattr(web_terminal, "_tool_loop_active", False):
-            ma_debug("poll_completion_notifications_wait_tool_loop", conversation_id=conversation_id)
-            await asyncio.sleep(1)
-            continue
-
-        # 多智能体模式：主对话任务仍在运行时，由主循环自己消费 pending 消息
-        if getattr(web_terminal, "_multi_agent_main_task_active", False):
-            ma_debug("poll_completion_notifications_wait_main_task", conversation_id=conversation_id)
-            await asyncio.sleep(1)
-            continue
-
-        # 主任务门闸：仅当对话没有正在运行的主任务时才预占门闸。
-        # 防止通知任务与主任务并发交叉写入对话历史（2026-08-12 平行时空事故）。
-        # 预占成功后排发：门闸 token 经 RuntimeContext.directives 移交给新任务线程认领释放；
-        # 排发失败则释放门闸并回滚通知标记，下轮重新收集。
-        gate_token = try_acquire_main_task_gate(web_terminal)
-        if gate_token is None:
-            ma_debug("poll_completion_notifications_wait_main_task_gate", conversation_id=conversation_id)
-            await asyncio.sleep(1)
-            continue
-
-        ma_debug("poll_completion_notifications_collect", conversation_id=conversation_id, loop_count=loop_count)
-        notices = _collect_pending_completion_notices(
-            web_terminal=web_terminal,
-            conversation_id=conversation_id,
-        )
-        ma_debug("poll_completion_notifications_collected", conversation_id=conversation_id, notice_count=len(notices))
-
-        if not notices:
-            # 本轮没有待通知项：释放门闸后按原逻辑判断退出或继续
-            release_main_task_gate(web_terminal, gate_token)
-
-        if notices:
-            # 取出后剩余是否还有未完成/未通知的后台工作（决定前端是否保持等待态）
-            has_remaining = _has_pending_completion_work(
-                web_terminal=web_terminal,
-                conversation_id=conversation_id,
-            )
-
-            preceding = notices[:-1]
-            last_notice = notices[-1]
-
-            # 前 N-1 条预写通知：随后续任务注入历史/事件流，不单独触发工作
-            preceding_payload: List[Dict[str, Any]] = []
-            for item in preceding:
-                payload = dict(item.get("payload") or {})
-                payload["starts_work"] = False  # 预写通知渲染为完成态气泡，不起独立计时器
-                preceding_payload.append({
-                    "message": item.get("message") or "",
-                    "payload": payload,
-                })
-
-            last_payload = dict(last_notice.get("payload") or {})
-            last_payload.update({
-                "has_running_sub_agents": has_remaining,
-                "has_running_background_commands": has_remaining,
-                "remaining_count": 1 if has_remaining else 0,
-            })
-
-            try:
-                await _dispatch_completion_user_notice(
-                    web_terminal=web_terminal,
-                    workspace=workspace,
-                    sender=sender,
-                    client_sid=client_sid,
-                    username=username,
-                    conversation_id=conversation_id,
-                    user_message=last_notice.get("message") or "",
-                    extra_payload=last_payload,
-                    preceding_notices=preceding_payload,
-                    main_task_gate_token=gate_token,
-                )
-            except Exception as exc:
-                # 派发失败：释放门闸 + 回滚通知标记，下轮轮询重新收集，杜绝静默丢失
-                debug_log(f"[CompletionPoll] 派发完成通知失败，释放门闸并回滚标记: {exc}")
-                release_main_task_gate(web_terminal, gate_token)
-                _rollback_completion_notice_marks(web_terminal=web_terminal, notices=notices)
-                ma_debug("poll_completion_notifications_dispatch_failed", conversation_id=conversation_id, error=str(exc))
-                await asyncio.sleep(5)
-                continue
-
-            # 本轮已派发一个后续任务，门闸随任务移交（由任务线程 finally 释放），
-            # 由该任务结束后重新 spawn 本轮询器继续消费剩余通知
-            return
-
-        # 没有待通知项：若也没有运行中的后台工作或工作流待通知，结束轮询
-        pending = _has_pending_completion_work(
-            web_terminal=web_terminal, conversation_id=conversation_id
-        ) or _has_pending_workflow_notices(
-            web_terminal=web_terminal, conversation_id=conversation_id
-        )
-        if not pending:
-            break
-
-        await asyncio.sleep(5)
-
-
-async def poll_multi_agent_notifications(*, web_terminal, workspace, conversation_id, client_sid, username):
-    """多智能体模式专用通知池。
-
-    只在主任务结束后启动，负责两件事：
-    1. 若主任务已空闲且 MultiAgentState 中有 pending_master_messages，
-       一次性取出并触发新一轮主任务工作——即使仍有 running 子智能体也立即派发
-       （主对话空闲时消息池有消息就该全部插入，设计中属情况2）。
-    2. 若 pending 为空且仍有 running 实例，循环等待下一次 push 新输出。
-
-    重要：旧实现要求所有 running 实例退出再 drain，导致 ask_master 阻塞中的
-    子智能体永远等不到主对话回答而超时——现已修复为池优先。
-
-    与 poll_completion_notifications 完全分离，避免多智能体消息和传统后台
-    通知竞争 task_manager 的单工作区互斥。
-    """
-
-    def sender(event_type, data):
-        # WebSocket 推送已移除：事件均经任务事件流（_append_event）由轮询消费。
-        return
-
-    import threading as _threading
-    ma_debug(
-        "poll_ma_notifications_start",
-        conversation_id=conversation_id,
-        thread_id=_threading.get_ident(),
-        main_task_active_at_start=getattr(web_terminal, "_multi_agent_main_task_active", False),
-    )
-
-    tick_count = 0
-    manager = getattr(web_terminal, "sub_agent_manager", None)
-    while True:
-        tick_count += 1
-        from modules.goal_policy import goal_blocks_background
-        if goal_blocks_background(web_terminal.data_dir, conversation_id):
-            await asyncio.sleep(1)
-            continue
-        # 检查停止标志
-        client_stop_info = get_stop_flag(client_sid, username, include_user=False)
-        if client_stop_info:
-            stop_requested = client_stop_info.get('stop', False) if isinstance(client_stop_info, dict) else client_stop_info
-            if stop_requested:
-                ma_debug("poll_ma_notifications_stop_requested", conversation_id=conversation_id, tick=tick_count)
-                break
-
-        manager = getattr(web_terminal, "sub_agent_manager", None)
-        if not manager:
-            ma_debug("poll_ma_no_manager", conversation_id=conversation_id, tick=tick_count)
-            break
-
-        state = manager.get_multi_agent_state(conversation_id)
-        if not state:
-            ma_debug("poll_ma_no_state", conversation_id=conversation_id, tick=tick_count)
-            break
-
-        # 主任务又被唤醒了（用户发送新消息等），让主循环自己处理，本通知池退出
-        if getattr(web_terminal, "_multi_agent_main_task_active", False):
-            ma_debug("poll_ma_notifications_main_task_active", conversation_id=conversation_id, tick=tick_count)
-            break
-
-        # 状态快照
-        all_insts = state.list_all()
-        statuses = [a.status for a in all_insts]
-        pending_count_now = len(state.pending_master_messages)
-        main_active = getattr(web_terminal, "_multi_agent_main_task_active", False)
-        ma_debug(
-            "poll_ma_tick",
-            conversation_id=conversation_id,
-            tick=tick_count,
-            instance_count=len(all_insts),
-            statuses=statuses,
-            pending_count=pending_count_now,
-            main_active=main_active,
-        )
-
-        # 1) 先检查 pending 池——主对话空闲时只要池里有消息就立即派发（情况2）。
-        if state.has_pending_master_messages():
-            gate_token = try_acquire_main_task_gate(web_terminal)
-            if gate_token is None:
-                await asyncio.sleep(0.5)
-                continue
-            from server.conversation_view.snapshots import VIEW_LOCK
-            # No await inside this transaction: goal pause/close cannot interleave
-            # between draining the notification pool and admitting its task.
-            with VIEW_LOCK:
-                if goal_blocks_background(web_terminal.data_dir, conversation_id):
-                    release_main_task_gate(web_terminal, gate_token)
-                    continue
-                pending = state.drain_master_messages()
-                try:
-                    _dispatch_multi_agent_idle_messages_sync(
-                        web_terminal=web_terminal, workspace=workspace, sender=sender,
-                        client_sid=client_sid, username=username,
-                        conversation_id=conversation_id, messages=pending, gate_token=gate_token,
-                    )
-                    ma_debug("poll_ma_dispatch_success", conversation_id=conversation_id, count=len(pending), tick=tick_count)
-                except Exception as exc:
-                    release_main_task_gate(web_terminal, gate_token)
-                    state.restore_master_messages(pending)
-                    manager._save_state()
-                    debug_log(f"[MultiAgent] 分发 idle 消息失败，消息已回队: {exc}")
-                    ma_debug("poll_ma_notifications_dispatch_error", conversation_id=conversation_id,
-                             error=str(exc), error_type=type(exc).__name__, tick=tick_count)
-                    pending = None
-                else:
-                    manager._save_state()
-            if pending is not None:
-                return
-            await asyncio.sleep(0.5)
-            continue
-
-        # 2) 没有 pending 消息：检查还有哪些子智能体在运行，决定退出还是继续等
-        running_agents = [a for a in all_insts if a.status == "running"]
-        if not running_agents:
-            ma_debug("poll_ma_notifications_no_work_end", conversation_id=conversation_id, tick=tick_count)
-            break
-
-        ma_debug(
-            "poll_ma_notifications_wait_running",
-            conversation_id=conversation_id,
-            running_count=len(running_agents),
-            tick=tick_count,
-        )
-        await asyncio.sleep(0.5)
-
-    ma_debug("poll_ma_notifications_end", conversation_id=conversation_id, tick=tick_count)
-
-    # poll 退出时，如果主智能体也空闲且没有 pending 消息，发送 task_complete 通知前端对话变空闲。
-    # 否则前端会一直保持 taskInProgress=true，MultiAgentTaskProbe 会持续轮询但找不到任务。
-    if not getattr(web_terminal, "_multi_agent_main_task_active", False):
-        state = manager.get_multi_agent_state(conversation_id) if manager else None
-        still_running = state and any(a.status == "running" for a in state.list_all())
-        still_pending = state and state.has_pending_master_messages()
-        if not still_running and not still_pending:
-            sender('task_complete', {
-                'total_iterations': 0,
-                'total_tool_calls': 0,
-                'auto_fix_attempts': 0,
-                'has_running_sub_agents': False,
-                'has_running_background_commands': False,
-                'has_running_multi_agent': False,
-                'pending_runtime_guidance_messages': [],
-                'multi_agent_idle_signal': True,
-            })
-            ma_debug("poll_ma_idle_signal_sent", conversation_id=conversation_id, tick=tick_count)
-
-
-async def _dispatch_multi_agent_idle_messages(**kwargs):
-    """Async compatibility entry; persistence and admission have no await points."""
-    from server.conversation_view.snapshots import VIEW_LOCK
-    with VIEW_LOCK:
-        return _dispatch_multi_agent_idle_messages_sync(**kwargs)
-
-
-def _dispatch_multi_agent_idle_messages_sync(
-    *,
-    web_terminal,
-    workspace,
-    sender,
-    client_sid,
-    username,
-    conversation_id,
-    messages: List[str],
-    gate_token: Optional[str] = None,
-):
-    """主智能体空闲时，把多智能体 pending 消息作为新一轮用户消息分发。
-
-    受理阶段只装配directives，不写历史或回显；认领门闸后再提交前N-1条。
-    最后一条通过正常notice任务输入链持久化并触发主智能体工作。
-    """
-    ma_debug(
-        "dispatch_ma_idle_enter",
-        conversation_id=conversation_id,
-        count=len(messages) if messages else 0,
-        previews=[str(m)[:150] for m in (messages or [])],
-    )
-    if not messages:
-        ma_debug("dispatch_ma_idle_no_messages", conversation_id=conversation_id)
-        return
-
-    from modules.multi_agent.state import parse_multi_agent_message
-    from modules.goal_policy import goal_blocks_background
-    if goal_blocks_background(web_terminal.data_dir, conversation_id):
-        raise RuntimeError("Goal is paused; multi-agent notifications remain pending")
-    from .tasks import task_manager
-
-    parsed_messages = []
-    for msg_text in messages:
-        parsed = parse_multi_agent_message(msg_text) or {}
-        parsed_messages.append({
-            "text": msg_text,
-            "display_name": parsed.get("display_name"),
-            "subtype": parsed.get("subtype"),
-        })
-
-    last = parsed_messages[-1]
-    message_source = "sub_agent"
-
-    # 3) 最后一条触发新一轮工作
-    ui_defaults = dict(_user_message_ui_defaults(message_source, auto_user_message_event=True))
-    ui_defaults["starts_work"] = False
-
-    workspace_id = getattr(workspace, "workspace_id", None) or "default"
-    ma_auto_type = _auto_message_type_for_multi_agent_subtype(last["subtype"])
-    # 重要：ui_defaults 默认会给出 visibility="compact"/starts_work=False，
-    # 多智能体主消息是正常聊天消息，必须在 **ui_defaults 之后覆写为 chat，
-    # 否则后端历史 metadata.visibility=compact 会让加载的消息走通知渲染。
-    auto_payload = {
-        **ui_defaults,
-        "message_source": message_source,
-        "sub_agent_notice": True,
-        "multi_agent_message": True,
-        "multi_agent_display_name": last["display_name"],
-        "multi_agent_subtype": last["subtype"],
-        "auto_message_type": ma_auto_type,
-        "starts_work": False,
-        "visibility": "chat",
-        "timestamp": datetime.now().isoformat(),
-    }
-    ma_debug(
-        "dispatch_ma_idle_before_create_task",
-        conversation_id=conversation_id,
-        last_text_preview=last["text"][:300],
-        workspace_id=workspace_id,
-        username=username,
-    )
-    auto_payload.setdefault("metadata", {
-        **ui_defaults,
-        "message_source": message_source,
-        "auto_message_type": ma_auto_type,
-        "multi_agent_message": True,
-        "multi_agent_display_name": last["display_name"],
-        "multi_agent_subtype": last["subtype"],
-        "starts_work": False,
-        "visibility": "chat",
-    })
-    preceding_list = None
-    if len(parsed_messages) > 1:
-        preceding_list = [
-            {
-                "message": item["text"],
-                "payload": {
-                    "message_id": item.get("message_id"),
-                    "message_source": "sub_agent",
-                    "sub_agent_notice": True,
-                    "multi_agent_message": True,
-                    "multi_agent_display_name": item["display_name"],
-                    "multi_agent_subtype": item["subtype"],
-                    "auto_message_type": _auto_message_type_for_multi_agent_subtype(item["subtype"]),
-                    "visibility": "chat",
-                    "starts_work": False,
-                },
-            }
-            for item in parsed_messages[:-1]
-        ]
-
-    try:
-        ctx = RuntimeContext.from_terminal(
-            web_terminal,
-            workspace,
-            username,
-            params=TaskParams(
-                message=last["text"],
-                conversation_id=conversation_id,
-                message_source=message_source,
-                model_key=getattr(web_terminal, "model_key", None),
-                run_mode=getattr(web_terminal, "run_mode", None),
-                thinking_mode=getattr(web_terminal, "thinking_mode", None),
-                task_type="notice",
-            ),
-            directives=InternalDirectives(
-                auto_user_message_event=True,
-                auto_user_message_payload=auto_payload,
-                preceding_user_notices=preceding_list,
-                main_task_gate_token=gate_token,
-            ),
-        )
-        rec = runtime_service.create_task(ctx)
-    except Exception as exc:
-        ma_debug(
-            "dispatch_ma_idle_create_task_exception",
-            conversation_id=conversation_id,
-            error=str(exc),
-            error_type=type(exc).__name__,
-        )
-        raise
-    task_id_created = getattr(rec, "task_id", None)
-    ma_debug("dispatch_ma_idle_task_created", conversation_id=conversation_id, task_id=task_id_created)
-
-    # 用户消息只由认领门闸后的持久化／任务事件链发布，受理阶段不乐观回显。
-    ma_debug(
-        "dispatch_ma_idle_exit_ok",
-        conversation_id=conversation_id,
-        count=len(parsed_messages),
-        task_id=getattr(rec, "task_id", None),
-    )
+from .goal_flow import inject_goal_prompt, handle_goal_after_turn, stop_goal_user_cancel, goal_is_active, emit_goal_progress
+from server.attachment_paths import build_media_paths_message as _build_media_paths_message, build_file_paths_message as _build_file_paths_message, normalize_attached_files as _normalize_attached_files
+from .chat_flow_message_policy import _VALID_USER_MESSAGE_SOURCES
+from .chat_flow_notice_state import _build_shared_waiting_payload
+from .chat_flow_notice_state import _has_pending_completion_work
+from .chat_flow_notice_state import _has_pending_workflow_notices
+from .chat_flow_versioning import _prepare_hidden_versioning_baseline_for_first_input
+from .chat_flow_versioning import _record_hidden_versioning_checkpoint_after_run
+from .chat_flow_message_policy import _user_message_ui_defaults
+from .chat_flow_notice_poll import poll_completion_notifications
+from .chat_flow_notice_poll import poll_multi_agent_notifications
+
+
+from .chat_flow_message_policy import _user_message_ui_defaults
+from .chat_flow_versioning import _should_skip_versioning_for_message, _prepare_hidden_versioning_baseline_for_first_input, _record_hidden_versioning_checkpoint_after_run
+from .chat_flow_notice_dispatch import _persist_and_echo_preceding_notice, _dispatch_completion_user_notice
+from .chat_flow_notice_state import _build_shared_waiting_payload, _build_sub_agent_notice_text, _collect_pending_completion_notices, _rollback_completion_notice_marks, _has_pending_completion_work, _has_pending_workflow_notices
+from .chat_flow_notice_poll import poll_completion_notifications, poll_multi_agent_notifications
+from .chat_flow_notice_idle import _dispatch_multi_agent_idle_messages, _dispatch_multi_agent_idle_messages_sync
 
 
 async def handle_task_with_sender(
@@ -1286,6 +58,7 @@ async def handle_task_with_sender(
     """处理任务并发送消息 - 集成token统计版本"""
 
     web_terminal = terminal
+    is_agent = getattr(terminal, "conversation_kind", "agent") == "agent"
     conversation_id = getattr(web_terminal.context_manager, "current_conversation_id", None)
     # 多智能体模式：标记主对话任务正在运行，供后台通知池判断是否可以安全消费
     if getattr(web_terminal, "sub_agent_manager", None) is not None:
@@ -1472,7 +245,7 @@ async def handle_task_with_sender(
                     "skill_path": skill_path,
                 }
             )
-    if not auto_user_message_event:
+    if is_agent and not auto_user_message_event:
         media_paths_message = _build_media_paths_message(images, videos)
         if media_paths_message:
             web_terminal.context_manager.add_conversation(
@@ -1556,13 +329,14 @@ async def handle_task_with_sender(
                     )
                 except Exception as exc:
                     debug_log(f"[RuntimeMode] 空闲期切换通知注入失败: {exc}")
-    _prepare_hidden_versioning_baseline_for_first_input(
-        web_terminal=web_terminal,
-        workspace=workspace,
-        conversation_id=conversation_id,
-        message=message,
-        auto_user_message_event=bool(auto_user_message_event),
-    )
+    if is_agent:
+        _prepare_hidden_versioning_baseline_for_first_input(
+            web_terminal=web_terminal,
+            workspace=workspace,
+            conversation_id=conversation_id,
+            message=message,
+            auto_user_message_event=bool(auto_user_message_event),
+        )
 
     def finalize_user_work_timer(index: Optional[int] = None):
         target_index = current_work_user_message_index if index is None else index
@@ -1613,6 +387,9 @@ async def handle_task_with_sender(
         target_msg["metadata"] = metadata
         history[target_index] = target_msg
         web_terminal.context_manager.auto_save_conversation(force=True)
+        finalized_work_message_indices.add(target_index)
+        if not is_agent:
+            return
         # 修改留痕收尾：写入完成时间；被 rm/移动的文件转为可恢复 diff（实时内容已在编辑时落盘）
         try:
             from modules.modify_history import finalize_modify_history_for_task
@@ -1643,7 +420,7 @@ async def handle_task_with_sender(
 
     def finalize_run_versioning_checkpoint(run_status: str = "completed"):
         nonlocal versioning_checkpoint_recorded
-        if versioning_checkpoint_recorded:
+        if versioning_checkpoint_recorded or not is_agent:
             return
         _record_hidden_versioning_checkpoint_after_run(
             web_terminal=web_terminal,
@@ -1658,7 +435,7 @@ async def handle_task_with_sender(
 
     # Skill 提示系统：检测关键词并在用户消息之后插入 system 消息
     try:
-        personal_config = load_personalization_config(workspace.data_dir)
+        personal_config = load_personalization_config(workspace.data_dir) if is_agent else {}
         skill_hints_enabled = personal_config.get("skill_hints_enabled", False)
 
         if skill_hints_enabled and message:
@@ -1679,7 +456,7 @@ async def handle_task_with_sender(
     except Exception as exc:
         debug_log(f"Skill hints 处理失败: {exc}")
 
-    if is_first_user_message and getattr(web_terminal, "context_manager", None):
+    if is_agent and is_first_user_message and getattr(web_terminal, "context_manager", None):
         try:
             personal_config = load_personalization_config(workspace.data_dir)
         except Exception:
@@ -1699,9 +476,9 @@ async def handle_task_with_sender(
                 personal_config.get("title_model", "")
             )
 
-    # 自动深层压缩（用户输入后触发）
+    # Agent 的文件式压缩不适用于 Chat；Chat 在请求钩子中压缩分支投影。
     try:
-        personal_config = load_personalization_config(workspace.data_dir)
+        personal_config = load_personalization_config(workspace.data_dir) if is_agent else {}
     except Exception:
         personal_config = {}
     compression_settings = resolve_context_compression_settings(personal_config)
@@ -1767,7 +544,7 @@ async def handle_task_with_sender(
     tools = web_terminal.define_tools()
 
     # === 工作流：真实用户消息到达时清零单步轮数（知情交互，撞限询问后可重新计数）===
-    if user_message_source == "user":
+    if is_agent and user_message_source == "user":
         try:
             from modules.workflow_state_manager import WorkflowStateManager as _WorkflowStateManager
             _wf_mgr = _WorkflowStateManager(web_terminal.data_dir, conversation_id)
@@ -1780,7 +557,7 @@ async def handle_task_with_sender(
     # REST activate 的 socketio 广播在轮询架构下到不了前端；事件流才是可靠通道。
     try:
         from server.workflow_flow import get_active_manager as _get_active_wfm, emit_workflow_progress as _emit_wf_progress
-        _wsm_boot = _get_active_wfm(web_terminal.data_dir, conversation_id)
+        _wsm_boot = _get_active_wfm(web_terminal.data_dir, conversation_id) if is_agent else None
         if _wsm_boot is not None:
             _emit_wf_progress(wsm=_wsm_boot, sender=sender, conversation_id=conversation_id)
     except Exception as _wf_boot_exc:
@@ -1978,8 +755,8 @@ async def handle_task_with_sender(
         try:
             from modules.workflow_state_manager import WorkflowStateManager as _WorkflowStateManager2
             from server.workflow_flow import build_round_limit_notice as _build_round_limit_notice
-            _wf_mgr2 = _WorkflowStateManager2(web_terminal.data_dir, conversation_id)
-            if _wf_mgr2.is_active():
+            _wf_mgr2 = _WorkflowStateManager2(web_terminal.data_dir, conversation_id) if is_agent else None
+            if _wf_mgr2 is not None and _wf_mgr2.is_active():
                 _wf_mgr2.increment_stage_rounds()
                 _wf_notice = _build_round_limit_notice(
                     data_dir=web_terminal.data_dir,
@@ -2051,6 +828,9 @@ async def handle_task_with_sender(
         tool_call_limit_label = MAX_TOTAL_TOOL_CALLS if MAX_TOTAL_TOOL_CALLS is not None else "∞"
         debug_log(f"[API] 第{current_iteration}次调用 (总工具调用: {total_tool_calls}/{tool_call_limit_label})")
         
+        prepare_request = getattr(web_terminal, "prepare_model_messages", None)
+        if callable(prepare_request):
+            messages = await prepare_request(messages, sender=sender)
         stream_result = await run_streaming_attempts(
             web_terminal=web_terminal,
             messages=messages,
@@ -2179,6 +959,7 @@ async def handle_task_with_sender(
                     assistant_content,
                     get_registry(web_terminal),
                     str(getattr(web_terminal, "project_path", "") or ""),
+                    allow_files=is_agent,
                 )
                 for ann in round_citations:
                     if ann.get("id"):
@@ -2218,8 +999,12 @@ async def handle_task_with_sender(
                 assistant_content,
                 tool_calls=tool_calls if tool_calls else None,
                 reasoning_content=current_thinking or "",
-                metadata=assistant_metadata or None
+                metadata=assistant_metadata or None,
+                message_id=getattr(getattr(web_terminal, "_stream_partial", None), "message_id", None),
             )
+        partial = getattr(web_terminal, "_stream_partial", None)
+        if partial is not None:
+            partial.committed = True
         
         # 为下一轮迭代重置流状态标志，但保留 full_response 供上面保存使用
         text_streaming = False
@@ -2401,6 +1186,16 @@ async def handle_task_with_sender(
     )
     if requested_result is not None:
         await continue_after_compression(requested_result)
+        return
+
+    if not is_agent:
+        finalize_user_work_timer()
+        sender('task_complete', {
+            'total_iterations': total_iterations, 'total_tool_calls': total_tool_calls,
+            'auto_fix_attempts': auto_fix_attempts, 'citations': list(task_citations.values()),
+            'has_running_sub_agents': False, 'has_running_background_commands': False,
+            'has_running_multi_agent': False,
+        })
         return
 
     # 最终统计

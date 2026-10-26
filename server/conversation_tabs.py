@@ -142,6 +142,16 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
             tab["running"] = False
             continue
         conv_id = str(tab.get("conversation_id") or "")
+        if tab.get("conversation_kind") == "chat":
+            try:
+                from server.chat_mode.context import resources, principal
+                from server.chat_mode.conversations import records, ACTIVE
+                _, _, chat = resources()
+                tab["title"] = chat.read(conv_id)["title"][:200]
+                tab["running"] = any(record.status in ACTIVE for record in records(principal(), conv_id))
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                tab["error"] = str(exc)
+            continue
         fresh = title_maps.get(tab.get("workspace_id") or "", {}).get(conv_id)
         if fresh:
             tab["title"] = fresh[:200]
@@ -154,6 +164,17 @@ def _lookup(username: str, *, with_activity: bool = False):
     identity = request_identity()
 
     def lookup(workspace_id: str, conversation_id: str):
+        if workspace_id == "":
+            from server.chat_mode.context import resources
+            _, _, chat = resources()
+            try:
+                document = chat.read(conversation_id) if conversation_id else {}
+                return {"workspace_id": "", "label": "", "exists": True,
+                        "title": document.get("title", "")}
+            except FileNotFoundError:
+                return {"exists": False}
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                return {"workspace_id": "", "exists": True, "error": str(exc)}
         workspace = resolve_workspace(username, workspace_id or None, identity=identity)
         info = {"workspace_id": workspace.workspace_id,
                 "label": str(getattr(workspace, "label", "") or workspace.workspace_id)}

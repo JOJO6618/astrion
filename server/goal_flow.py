@@ -29,7 +29,8 @@ def inject_goal_prompt(*, web_terminal, messages, sender, conversation_id):
 
 
 def goal_is_active(workspace, conversation_id: Optional[str]) -> bool:
-    return bool(conversation_id and GoalStateManager(workspace.data_dir, conversation_id).is_active())
+    return bool(workspace is not None and conversation_id
+                and GoalStateManager(workspace.data_dir, conversation_id).is_active())
 
 
 def _emit_snapshot(sender, event, gsm, **kwargs):
@@ -166,7 +167,7 @@ async def handle_goal_after_turn(*, web_terminal, workspace, messages, sender,
 
 
 def stop_goal_user_cancel(*, web_terminal, workspace, sender, conversation_id, total_tool_calls=0):
-    if not conversation_id:
+    if workspace is None or not conversation_id:
         return False
     gsm = GoalStateManager(workspace.data_dir, conversation_id)
     changed = gsm.pause("user_cancel")
