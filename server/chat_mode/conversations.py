@@ -6,6 +6,7 @@ from server.tasks import task_manager
 from modules.chat_mode.configuration import configure_conversation
 from . import chat_mode_bp
 from .context import resources, body, operation
+from .handoff_view import public_document
 
 ACTIVE = {"pending", "running", "cancel_requested"}
 
@@ -44,8 +45,10 @@ def bootstrap(conversation_id):
             raise FileNotFoundError("Chat conversation unavailable")
         # The document is the authoritative tree; display is the shared running
         # projection with its absolute cursor. Browsing a leaf never writes it.
-        return jsonify(success=True, data={"document": snapshot["data"],
-                                            "display": snapshot["display"]})
+        return jsonify(success=True, data={
+            "document": public_document(snapshot["data"], host_mode=identity.host_mode),
+            "display": snapshot["display"],
+        })
 
 
 @chat_mode_bp.post("/conversations/<conversation_id>/duplicate")

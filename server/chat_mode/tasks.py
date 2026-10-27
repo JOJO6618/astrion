@@ -6,6 +6,7 @@ from server.tasks.models import task_public_payload
 from modules.chat_mode.media import resolve_refs
 from . import chat_mode_bp
 from .context import resources, body, operation, owned_task
+from .handoff_view import public_document
 
 
 @chat_mode_bp.post("/tasks")
@@ -64,7 +65,8 @@ def events(task_id):
         snapshot = task_manager.capture_display(identity.username, record.conversation_id,
                                                  storage.manager, workspace_id=None)
     return jsonify(success=True, data={
-        "view": {"document": snapshot["data"], "display": snapshot["display"]} if snapshot else None,
+        "view": {"document": public_document(snapshot["data"], host_mode=identity.host_mode),
+                 "display": snapshot["display"]} if snapshot else None,
         **task_public_payload(record, include_title=False),
         "events": events or [], "next_offset": cursor,
         "window_start": (metadata or {}).get("window_start", 0),

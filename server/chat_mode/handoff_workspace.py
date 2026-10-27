@@ -25,32 +25,39 @@ def projects(principal):
     return [{"id": key, "label": value.get("label") or key} for key, value in rows.items()]
 
 
+def default_project_name(title):
+    """Use the Chat title as the editable folder suggestion on every platform."""
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', str(title or ''))
+    return name.strip(' .')[:80].rstrip(' .') or 'Chat'
+
+
+def _project_name(payload):
+    name = payload.get("project_name")
+    if not isinstance(name, str) or not name.strip() or len(name) > 80 or re.search(r'[/\\\x00-\x1f]', name):
+        raise ValueError("A project name of at most 80 characters is required")
+    name = name.strip()
+    if name in {".", ".."}:
+        raise ValueError("Invalid project name")
+    return name
+
+
 def resolve_target(principal, payload):
     workspace_id = payload.get("workspace_id")
     if workspace_id:
         if workspace_id not in {item["id"] for item in projects(principal)}:
             raise ValueError("Workspace unavailable")
     else:
-        name = payload.get("project_name")
-        if not isinstance(name, str) or not name.strip() or len(name) > 80 or re.search(r'[/\\\x00-\x1f]', name):
-            raise ValueError("A project name of at most 80 characters is required")
-        name = name.strip()
-        if name in {".", ".."}:
-            raise ValueError("Invalid project name")
         if principal.host_mode:
             from modules.host_workspace_manager import create_host_workspace
             path = payload.get("project_path")
             if not isinstance(path, str) or not path.strip():
-                path = str(Path.home() / "Desktop" / "Astrion" / name)
-            else:
-                # The picker supplies a base directory; an explicit different
-                # project directory is respected instead of silently relocated.
-                candidate = Path(path).expanduser()
-                if candidate.name == "Astrion":
-                    path = str(candidate / name)
-            workspace_id = create_host_workspace(path, label=name)["workspace"]["workspace_id"]
+                path = str(Path.home() / "Desktop" / "Astrion" / _project_name(payload))
+            # The selected path is the project folder. The shared creator derives
+            # its label from the folder name when no explicit label is supplied.
+            workspace_id = create_host_workspace(path)["workspace"]["workspace_id"]
         else:
             from server import state
+            name = _project_name(payload)
             if principal.is_api_user:
                 workspace_id = f"chat-{uuid4().hex[:12]}"
                 state.api_user_manager.ensure_workspace(principal.username, workspace_id)

@@ -20,6 +20,7 @@
       />
       <template v-if="workspace === 'new'">
         <input
+          v-if="!state.host"
           v-model="name"
           :readonly="!!state.target_workspace_id"
           :aria-label="$t('chatMode.projectName')"
@@ -59,6 +60,7 @@ interface Handoff {
   deadline: number;
   server_time: number;
   host: boolean;
+  default_name: string;
   default_path: string;
   projects: Array<{ id: string; label: string }>;
   error?: string;
@@ -96,9 +98,10 @@ async function apply(value: Handoff) {
   state.value = value;
   offset = value.server_time * 1000 - Date.now();
   if (!path.value) path.value = value.default_path;
+  if (!name.value && !selectionRestored) name.value = value.default_name;
   if (!selectionRestored && value.selection) {
     workspace.value = value.selection.workspace_id || 'new';
-    name.value = value.selection.project_name || '';
+    name.value = value.selection.project_name || value.default_name;
     path.value = value.selection.project_path || value.default_path;
     selectionRestored = true;
   }

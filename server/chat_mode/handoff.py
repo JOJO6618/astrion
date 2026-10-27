@@ -6,8 +6,9 @@ from flask import jsonify, request
 from server.auth_helpers import api_login_required
 from server.conversation_view.snapshots import VIEW_LOCK
 from modules.chat_mode.handoff import read, update, select, decline, schedule_deadline
-from .handoff_workspace import projects, resolve_target
+from .handoff_workspace import projects, resolve_target, default_project_name
 from .handoff_execution import freeze, start, is_running
+from .handoff_view import public_handoff
 from . import chat_mode_bp
 from .context import resources, body, operation
 
@@ -19,15 +20,18 @@ def public_state(storage, conversation_id, message_id, principal):
     if state["status"] == "preparing" and not is_running(storage, conversation_id, message_id):
         state = update(storage, conversation_id, message_id, lambda current, _: current.update(
             status="failed", error="Handoff was interrupted; retry to continue with the saved selection"))
-    return {**state, "server_time": time.time(), "host": principal.host_mode,
-            "default_path": str(Path.home() / "Desktop" / "Astrion") if principal.host_mode else "",
+    name = default_project_name(storage.read(conversation_id).get("title"))
+    return {**public_handoff(state, host_mode=principal.host_mode),
+            "server_time": time.time(), "host": principal.host_mode,
+            "default_name": name,
+            "default_path": str(Path.home() / "Desktop" / "Astrion" / name) if principal.host_mode else "",
             "projects": projects(principal)}
 
 
 @chat_mode_bp.route("/conversations/<conversation_id>/handoff", methods=["GET", "POST"])
 @api_login_required
 def handoff_api(conversation_id):
-    principal, _, storage = resources(read_only=False)
+    principal, scope, storage = resources(read_only=False)
     payload = body() if request.method == "POST" else request.args
     message_id = payload.get("message_id")
     if not isinstance(message_id, str):
@@ -55,8 +59,10 @@ def handoff_api(conversation_id):
                         status="preparing", operation_id=operation_id, error="",
                         target_workspace_id=workspace.workspace_id,
                         selection={key: payload.get(key) for key in
-                                   ("workspace_id", "project_name", "project_path")}))
-                    start(storage, conversation_id, message_id, agent, workspace, snapshot)
+                                   (("workspace_id", "project_name", "project_path") if principal.host_mode
+                                    else ("workspace_id", "project_name"))}))
+                    start(storage, conversation_id, message_id, agent, workspace, snapshot,
+                          preferences_dir=scope.preferences_dir)
             else:
                 raise ValueError("Invalid handoff decision")
         return jsonify(success=True, data=public_state(storage, conversation_id, message_id, principal))

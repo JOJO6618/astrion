@@ -10,7 +10,14 @@
       @click="open = !open"
     >
       <span>{{ options.find((option) => option.value === modelValue)?.label || label }}</span>
-      <span aria-hidden="true">⌄</span>
+      <svg
+        class="chat-choice__chevron"
+        :class="{ open }"
+        viewBox="0 0 10 10"
+        aria-hidden="true"
+      >
+        <path d="M2.75 3.75L5 6.25L7.25 3.75" />
+      </svg>
     </button>
     <div v-if="open" class="chat-choice__options" role="listbox" :aria-label="label">
       <button
@@ -21,8 +28,15 @@
         :aria-selected="option.value === modelValue"
         @click="choose(option.value)"
       >
-        <span>{{ option.label }}</span
-        ><span v-if="option.value === modelValue" aria-hidden="true">✓</span>
+        <span>{{ option.label }}</span>
+        <svg
+          v-if="option.value === modelValue"
+          class="chat-choice__check"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="M5 12.5 9.5 17 19 7" />
+        </svg>
       </button>
     </div>
   </div>
@@ -73,6 +87,30 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.chat-choice__chevron,
+.chat-choice__check {
+  display: block;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chat-choice__chevron {
+  width: 12px;
+  height: 12px;
+  padding: 1px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease;
+}
+.chat-choice__chevron.open {
+  transform: rotate(180deg);
+}
+.chat-choice__check {
+  width: 16px;
+  height: 16px;
 }
 .chat-choice button:disabled {
   opacity: 0.45;

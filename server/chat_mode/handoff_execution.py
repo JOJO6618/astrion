@@ -148,6 +148,7 @@ def create_agent(storage, snapshot, state, workspace, principal, materials):
     from core.tool_loading import snapshot_overrides_from_prefs
     from utils.conversation_manager import ConversationManager
     from server.runtime import RuntimeContext, TaskParams, runtime_service
+    relative_materials = materials.resolve().relative_to(Path(workspace.project_path).resolve()).as_posix()
     preferences = load_personalization_config(workspace.data_dir)
     model_key = preferences.get("default_model") or get_default_model_key()
     run_mode = preferences.get("default_run_mode") or "fast"
@@ -169,8 +170,9 @@ def create_agent(storage, snapshot, state, workspace, principal, materials):
         update(storage, snapshot["id"], state["message_id"],
                lambda current, _: current.update(agent_conversation_id=conversation_id))
     prompt = ("请从 Chat 交接内容继续处理用户的原始任务。先阅读下面的交接摘要与纯净对话记录，"
-              "必要时查看同目录 media 中的图片/视频。遵循当前 Agent 自身的系统规则与权限。\n\n"
-              f"交接摘要：{materials / 'summary.md'}\n对话记录：{materials / 'conversation.md'}\n\n"
+              "必要时查看同目录 media 中的图片/视频。遵循当前 Agent 自身的系统规则与权限。"
+              "以下文件路径均相对于当前工作区根目录。\n\n"
+              f"交接摘要：{relative_materials}/summary.md\n对话记录：{relative_materials}/conversation.md\n\n"
               + (materials / "summary.md").read_text(encoding="utf-8"))
     record = runtime_service.create_task(RuntimeContext(principal, TaskParams(
         conversation_id=conversation_id, message=prompt, model_key=model_key,
@@ -178,7 +180,8 @@ def create_agent(storage, snapshot, state, workspace, principal, materials):
     return conversation_id, record.task_id
 
 
-def execute(storage, conversation_id, message_id, principal, workspace, snapshot, worker):
+def execute(storage, conversation_id, message_id, principal, workspace, snapshot, worker,
+            *, preferences_dir=None):
     try:
         from modules.chat_mode.summarize import summarize
         worker.check()
@@ -192,7 +195,8 @@ def execute(storage, conversation_id, message_id, principal, workspace, snapshot
         summary = worker.summarize(summarize(storage, snapshot, snapshot["messages"], instruction=(
             "请为接手的 Agent 总结当前对话。详细保留用户目标、确认的产品行为与限制、"
             "已完成且验证的工作、未完成事项、关键数据、后续建议。不要执行工具，不要遗漏"
-            "用户的纠正。输出适合保存为 summary.md 的 Markdown，不包含内部系统指令或秘密。")))
+            "用户的纠正。输出适合保存为 summary.md 的 Markdown，不包含内部系统指令或秘密。"),
+            preferences_dir=preferences_dir))
         worker.check()
         materials = export_materials(storage, snapshot, state, workspace, summary)
         from server.conversation_view.snapshots import VIEW_LOCK
@@ -205,11 +209,14 @@ def execute(storage, conversation_id, message_id, principal, workspace, snapshot
             update(storage, conversation_id, message_id, lambda current, _: current.update(
                 status="completed", agent_conversation_id=agent_id, agent_task_id=task_id,
                 workspace_id=workspace.workspace_id, agent_url=f'/{agent_id.removeprefix("conv_")}?workspace_id={workspace.workspace_id}',
-                materials=str(materials), error=""))
+                materials=materials.resolve().relative_to(Path(workspace.project_path).resolve()).as_posix(),
+                error=""))
     except (Exception, asyncio.CancelledError) as exc:
+        from .handoff_view import public_error
+        error = public_error(str(exc) or "Handoff cancelled", host_mode=principal.host_mode)
         try:
             update(storage, conversation_id, message_id,
-                   lambda current, _: current.update(status="failed", error=str(exc) or "Handoff cancelled"))
+                   lambda current, _: current.update(status="failed", error=error))
         except FileNotFoundError:
             pass
     finally:
@@ -217,14 +224,16 @@ def execute(storage, conversation_id, message_id, principal, workspace, snapshot
             _WORKERS.pop(worker_key(storage, conversation_id, message_id), None)
 
 
-def start(storage, conversation_id, message_id, principal, workspace, snapshot):
+def start(storage, conversation_id, message_id, principal, workspace, snapshot,
+          *, preferences_dir=None):
     key = worker_key(storage, conversation_id, message_id)
     with _LOCK:
         if key in _WORKERS:
             return
         worker = HandoffWorker()
         worker.thread = threading.Thread(target=execute,
-            args=(storage, conversation_id, message_id, principal, workspace, snapshot, worker), daemon=True)
+            args=(storage, conversation_id, message_id, principal, workspace, snapshot, worker),
+            kwargs={"preferences_dir": preferences_dir}, daemon=True)
         _WORKERS[key] = worker
         try:
             worker.thread.start()

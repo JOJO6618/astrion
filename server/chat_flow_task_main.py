@@ -114,6 +114,13 @@ async def handle_task_with_sender(
     finalized_work_message_indices: set[int] = set()
     history_len_before = len(getattr(web_terminal.context_manager, "conversation_history", []) or [])
     is_first_user_message = history_len_before == 0
+    if not is_agent:
+        # Chat 在受理时已经保存首条 user；后续分支、重生成和压缩续接不再起标题。
+        turns = (web_terminal.context_manager.conversation_metadata or {}).get("chat", {}).get("turns", [])
+        is_first_user_message = (
+            history_len_before == 1 and len(turns) == 1
+            and turns[0].get("id") == getattr(web_terminal, "turn_id", None)
+        )
     # 构建 user 消息来源与 metadata
     source_from_terminal = str(getattr(web_terminal, "_current_user_message_source", "user") or "user").strip().lower()
     user_message_source = source_from_terminal or "user"
@@ -456,9 +463,10 @@ async def handle_task_with_sender(
     except Exception as exc:
         debug_log(f"Skill hints 处理失败: {exc}")
 
-    if is_agent and is_first_user_message and getattr(web_terminal, "context_manager", None):
+    if is_first_user_message and getattr(web_terminal, "context_manager", None):
         try:
-            personal_config = load_personalization_config(workspace.data_dir)
+            preferences_dir = workspace.data_dir if is_agent else web_terminal.preferences_dir
+            personal_config = load_personalization_config(preferences_dir)
         except Exception:
             personal_config = {}
         auto_title_enabled = personal_config.get("auto_generate_title", True)

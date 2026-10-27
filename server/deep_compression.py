@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from modules.external_session import new_external_session_id
 from modules.i18n import tr
 from server.compression_commit import check_compression_cancelled, commit_compression
+from utils.summary_request import request_summary
 
 def _load_summary_prompt(web_terminal) -> str:
     """从 prompts/deep_compression_summary.txt 加载压缩总结提示词。"""
@@ -367,27 +368,12 @@ async def _generate_summary(web_terminal, prompt: str, retries: int = 5) -> Tupl
     for _ in range(max(1, retries)):
         check_compression_cancelled()
         try:
-            # 统一走流式（Codex 通道仅支持流式；常规通道同样适用）
-            response_parts: list = []
-            stream = web_terminal.api_client.chat(messages, tools=tools, stream=True)
-            try:
-                async for chunk in stream:
-                    check_compression_cancelled()
-                    if not isinstance(chunk, dict) or chunk.get("error"):
-                        continue
-                    choices = chunk.get("choices") or []
-                    if choices:
-                        delta = choices[0].get("delta") or {}
-                        piece = delta.get("content")
-                        if isinstance(piece, str) and piece:
-                            response_parts.append(piece)
-            finally:
-                # Python 3.9 没有 contextlib.aclosing；取消或异常也必须关闭请求流。
-                await stream.aclose()
-            response_text = "".join(response_parts)
-            if response_text.strip():
-                return response_text.strip(), None
-            last_reason = tr("deep_compression.empty_model_content")
+            response_text = await request_summary(
+                web_terminal.api_client, messages, tools,
+                check_cancelled=check_compression_cancelled,
+                empty_message=tr("deep_compression.empty_model_content"),
+            )
+            return response_text, None
         except Exception as exc:
             last_reason = str(exc)
         await asyncio.sleep(0.2)

@@ -58,8 +58,11 @@ async def _generate_title_async(
 
                 cm = getattr(_term, "context_manager", None)
                 manager = cm._get_conversation_manager_for_id(_cid) if cm else None
+                preferences_dir = getattr(_term, "preferences_dir", None)
+                if preferences_dir is None:
+                    preferences_dir = getattr(_term, "data_dir", None)
                 return resolve_conversation_headers(
-                    base_url, _cid, manager=manager, base_dir=getattr(_term, "data_dir", None)
+                    base_url, _cid, manager=manager, base_dir=preferences_dir
                 )
             except Exception:
                 return {}

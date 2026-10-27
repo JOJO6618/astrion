@@ -81,7 +81,7 @@ async def maybe_compress(runtime, sender):
         source = prefix
         if existing:
             source = [{"role": "user", "content": existing["content"]}, *prefix[len(existing["message_ids"]):]]
-        text = await summarize(runtime.storage, document, source)
+        text = await summarize(runtime.storage, document, source, api_client=runtime.api_client)
         digest = fingerprint(prefix)
         ids = [message["message_id"] for message in prefix]
 

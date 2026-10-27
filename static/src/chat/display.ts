@@ -29,18 +29,33 @@ function streamState(actions: any[]) {
 }
 
 /** Adapt the tree's path without discarding the shared task projection's UI state. */
-export function toDisplayMessages(messages: ChatMessage[], projected: any[] = []) {
+export function toDisplayMessages(
+  messages: ChatMessage[],
+  projected: any[] = [],
+  identities = new Map<string, string>()
+) {
+  const identity = (key: string, fallback: string) => {
+    const value = identities.get(key) || fallback;
+    identities.set(key, value);
+    return value;
+  };
   const results = new Map(
     messages.filter((m) => m.role === 'tool').map((m) => [m.tool_call_id, m])
   );
   const liveTools = new Map<string, any>();
   const liveContent = new Map<string, any[]>();
+  const responseOwners = new Map<string, string>();
+  const toolOwners = new Map<string, string>();
   for (const message of projected) {
     for (const action of message.actions || []) {
       if (action.type === 'tool') {
-        for (const alias of toolAliases(action)) liveTools.set(alias, action);
+        for (const alias of toolAliases(action)) {
+          liveTools.set(alias, action);
+          toolOwners.set(alias, message.id);
+        }
       }
       if (action.responseMessageId && ['text', 'thinking'].includes(action.type)) {
+        responseOwners.set(action.responseMessageId, message.id);
         const items = liveContent.get(action.responseMessageId) || [];
         items.push(action);
         liveContent.set(action.responseMessageId, items);
@@ -50,11 +65,16 @@ export function toDisplayMessages(messages: ChatMessage[], projected: any[] = []
   const displayed = messages
     .filter((m) => m.role !== 'tool' && m.metadata?.visibility !== 'hidden')
     .map((message) => {
+      // Persistence must not replace the projection's component identity: doing
+      // so remounts the shared summary and loses the user's expanded state.
+      const projectedId =
+        responseOwners.get(message.message_id) ||
+        (message.tool_calls || []).map((call) => toolOwners.get(call.id)).find(Boolean);
       const base = {
         role: message.role,
         messageId: message.message_id,
         backendMessageId: message.message_id,
-        id: message.message_id,
+        id: identity(`message:${message.message_id}`, projectedId || message.message_id),
         metadata: message.metadata || {},
         raw: message,
         timestamp: (message as any).timestamp,
@@ -67,23 +87,31 @@ export function toDisplayMessages(messages: ChatMessage[], projected: any[] = []
       };
       if (message.role === 'user') return { ...base, actions: [] };
       const actions: any[] = [];
+      const projectedThinking = liveContent.get(message.message_id)?.find(
+        (action) => action.type === 'thinking'
+      );
+      const thinkingId = identity(
+        `thinking:${message.message_id}`,
+        projectedThinking?.id || `${message.message_id}:thinking`
+      );
       const runtimeContent = message.live && liveContent.get(message.message_id);
       if (runtimeContent) {
         // Preserve start events, show_html boundaries, and actual thinking/text transitions.
         actions.push(
           ...runtimeContent.map((action) => ({
             ...action,
+            ...(action === projectedThinking ? { id: thinkingId, blockId: thinkingId } : {}),
             content: action.type === 'text' ? visibleText(action.content || '') : action.content
           }))
         );
       } else {
         if (message.reasoning_content)
           actions.push({
-            id: `${message.message_id}:thinking`,
+            id: thinkingId,
             type: 'thinking',
             content: message.reasoning_content,
             streaming: !!message.live,
-            blockId: `${message.message_id}:thinking`,
+            blockId: thinkingId,
             responseMessageId: message.message_id
           });
         const content = visibleText(textOf(message)).trim();
@@ -100,29 +128,33 @@ export function toDisplayMessages(messages: ChatMessage[], projected: any[] = []
         const result = results.get(call.id);
         const args = parsed(call.function.arguments);
         const projectedTool = liveTools.get(call.id);
+        const toolId = identity(`tool:${call.id}`, projectedTool?.id || call.id);
         const resultData = result ? parsed(textOf(result)) : null;
         const failed =
           result?.metadata?.cancelled ||
           resultData?.success === false ||
           ['cancelled', 'failed', 'error'].includes(resultData?.status);
         actions.push(
-          (!result && projectedTool) || {
-            id: call.id,
-            blockId: call.id,
-            toolBatchId: message.message_id,
-            type: 'tool',
-            content: '',
-            tool: {
-              id: call.id,
-              name: call.function.name,
-              arguments: args,
-              intent_full: args?.intent || '',
-              intent_rendered: args?.intent || '',
-              result: resultData,
-              status: result ? (failed ? 'failed' : 'completed') : 'running'
-            },
-            streaming: !result
-          }
+          !result && projectedTool
+            ? { ...projectedTool, id: toolId, blockId: toolId }
+            : {
+                id: toolId,
+                blockId: toolId,
+                toolBatchId: projectedTool?.toolBatchId || message.message_id,
+                type: 'tool',
+                content: '',
+                tool: {
+                  ...projectedTool?.tool,
+                  id: call.id,
+                  name: call.function.name,
+                  arguments: args,
+                  intent_full: args?.intent || '',
+                  intent_rendered: args?.intent || '',
+                  result: resultData,
+                  status: result ? (failed ? 'failed' : 'completed') : 'running'
+                },
+                streaming: !result
+              }
         );
       }
       return {

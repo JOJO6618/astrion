@@ -36,8 +36,14 @@ export function useChatPage() {
   const isMobile = ref(window.innerWidth <= 768);
   let alive = true;
   let searchTimer = 0;
+  const displayIdentities = new Map<string, string>();
+  watch(
+    () => chat.cid,
+    () => displayIdentities.clear(),
+    { flush: 'sync' }
+  );
   const messages = computed(() =>
-    toDisplayMessages(chat.messages, chat.viewingLeaf ? [] : chat.display?.messages)
+    toDisplayMessages(chat.messages, chat.viewingLeaf ? [] : chat.display?.messages, displayIdentities)
   );
   const avatarStatus = computed(() =>
     resolveAvatarStatus({
