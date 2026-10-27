@@ -79,7 +79,9 @@ export const messageControlMethods = {
       if (this.currentWorkspaceHasRunningTask) {
         this.uiPushToast({
           title: t('appMessages.conversationRunningTitle'),
-          message: t('appMessages.conversationRunningMessage'),
+          message: this.versioningHostMode
+            ? t('appMessages.conversationRunningMessage')
+            : t('appMessages.conversationRunningMessageProject'),
           type: 'warning'
         });
         return;

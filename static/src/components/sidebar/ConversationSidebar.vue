@@ -251,7 +251,11 @@
                     <span
                       v-if="String(ws.workspace_id || '') === currentWorkspaceId"
                       class="workspace-current-dot"
-                      :aria-label="$t('sidebar.currentWorkspace')"
+                      :aria-label="
+                        workspaceKind === 'project'
+                          ? $t('sidebar.currentProject')
+                          : $t('sidebar.currentWorkspace')
+                      "
                     ></span>
                     <span
                       v-if="
@@ -436,6 +440,7 @@
                                   </button>
                                   <ConversationTransferMenu
                                     :chat-mode="chatMode"
+                                    :project="workspaceKind === 'project'"
                                     :icon-style="iconStyle"
                                     @export="
                                       openActionMenuId = null;
@@ -596,6 +601,7 @@
                               </button>
                               <ConversationTransferMenu
                                 :chat-mode="chatMode"
+                                :project="workspaceKind === 'project'"
                                 :icon-style="iconStyle"
                                 @export="
                                   openActionMenuId = null;
@@ -745,6 +751,7 @@
                       </button>
                       <ConversationTransferMenu
                         :chat-mode="chatMode"
+                        :project="workspaceKind === 'project'"
                         :icon-style="iconStyle"
                         @export="
                           openActionMenuId = null;
@@ -1020,6 +1027,7 @@
       ref="transferDialog"
       :chat-mode="chatMode"
       :workspace-id="currentWorkspaceId"
+      :workspace-kind="workspaceKind"
       @completed="$emit('select-workspace-conversation', $event)"
     />
   </aside>

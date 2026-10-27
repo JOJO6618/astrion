@@ -97,6 +97,7 @@ export default {
   switchProject: 'Switch Project',
   switchWorkspace: 'Switch Workspace',
   workspaceDesc: 'workspace / project',
+  projectDesc: 'project',
   versioningOn: 'Currently on',
   versioningOff: 'Currently off',
   gitStatusBar: 'Git Status Bar',

@@ -77,8 +77,11 @@ export default {
   // TODO(common): 候选公共词
   permissionUnrestricted: '无限制',
   permissionReadonlyDesc: '仅允许读取/搜索类工具，禁止修改工作区',
+  permissionReadonlyDescProject: '仅允许读取/搜索类工具，禁止修改项目',
   permissionApprovalDesc: '对工作区文件进行修改的工具需用户批准后才会执行',
+  permissionApprovalDescProject: '对项目文件进行修改的工具需用户批准后才会执行',
   permissionAutoApprovalDesc: '工作区内写入直通，高风险操作由后台审核智能体自动审批',
+  permissionAutoApprovalDescProject: '项目内写入直通，高风险操作由后台审核智能体自动审批',
   permissionUnrestrictedDesc: '保持当前默认行为，不额外拦截',
   executionSandboxDesc: '所有指令会在系统沙箱中执行',
   executionDirectDesc: '所有指令会在宿主机直接执行'

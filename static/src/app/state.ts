@@ -225,17 +225,20 @@ export function dataState() {
       {
         value: 'readonly',
         labelKey: 'personalization.permissionReadonly',
-        descriptionKey: 'appCore.permissionReadonlyDesc'
+        descriptionKey: 'appCore.permissionReadonlyDesc',
+        descriptionKeyProject: 'appCore.permissionReadonlyDescProject'
       },
       {
         value: 'approval',
         labelKey: 'appCore.permissionApproval',
-        descriptionKey: 'appCore.permissionApprovalDesc'
+        descriptionKey: 'appCore.permissionApprovalDesc',
+        descriptionKeyProject: 'appCore.permissionApprovalDescProject'
       },
       {
         value: 'auto_approval',
         labelKey: 'appCore.permissionAutoApproval',
-        descriptionKey: 'appCore.permissionAutoApprovalDesc'
+        descriptionKey: 'appCore.permissionAutoApprovalDesc',
+        descriptionKeyProject: 'appCore.permissionAutoApprovalDescProject'
       },
       {
         value: 'unrestricted',

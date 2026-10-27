@@ -25,26 +25,24 @@ def projects(principal):
 
 
 _DEFAULT_LOCK = RLock()
-_DEFAULT_WORKSPACE_ID = "astrion-default"
+# 项目模式（docker/web）下固定落到用户已有的默认项目，绝不新建：
+# user_manager.list_user_workspaces() 保证 "default" 项目始终存在（label「默认项目」）。
+_DEFAULT_WORKSPACE_ID = "default"
 
 
 def default_target(principal):
-    """Create the shared handoff workspace once, without changing user selection."""
+    """Resolve the handoff target without changing the user's project selection."""
     with _DEFAULT_LOCK:
         if principal.host_mode:
             from modules.host_workspace_manager import create_host_workspace
             path = Path.home() / "Desktop" / "Astrion" / "Default"
             workspace_id = create_host_workspace(str(path), label="默认工作区")["workspace"]["workspace_id"]
         else:
-            from server import state
             workspace_id = _DEFAULT_WORKSPACE_ID
             if principal.is_api_user:
+                # API 用户没有 user_manager 的 default 兜底，需先把 default 项目建出来（可见）
+                from server import state
                 state.api_user_manager.ensure_workspace(principal.username, workspace_id)
-            else:
-                rows = state.user_manager.list_user_workspaces(principal.username, prepare=False)
-                if workspace_id not in rows:
-                    state.user_manager.create_user_workspace(principal.username,
-                        workspace_id=workspace_id, label="默认工作区")
         return resolve_target(principal, {"workspace_id": workspace_id})
 
 

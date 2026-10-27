@@ -44,6 +44,8 @@ const {
   versioningBackupModeLabel,
   workModeLabel,
   permissionModeOptions,
+  permissionDescKey,
+  wsDescKey,
   workModeOptions,
   activeTheme
 } = ctx;
@@ -80,7 +82,7 @@ const {
             @click="selectDefaultPermissionMode(option.id)"
           >
             <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
+            ><span>{{ $t(permissionDescKey(option)) }}</span
             ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
           </button>
         </div>
@@ -161,7 +163,9 @@ const {
     <label class="settings-toggle-row"
       ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.agentsMdInjectTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.agentsMdInjectDesc') }}</span></span
+        ><span class="settings-row-desc">{{
+          $t(wsDescKey('personalization.agentsMdInjectDesc'))
+        }}</span></span
       ><input
         type="checkbox"
         :checked="form.agents_md_auto_inject"
@@ -176,7 +180,9 @@ const {
     <label class="settings-toggle-row"
       ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.claudeMdInjectTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.claudeMdInjectDesc') }}</span></span
+        ><span class="settings-row-desc">{{
+          $t(wsDescKey('personalization.claudeMdInjectDesc'))
+        }}</span></span
       ><input
         type="checkbox"
         :checked="form.claude_md_auto_inject"
@@ -192,7 +198,7 @@ const {
       ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.agentsSkillsScanTitle') }}</span
         ><span class="settings-row-desc">{{
-          $t('personalization.agentsSkillsScanDesc')
+          $t(wsDescKey('personalization.agentsSkillsScanDesc'))
         }}</span></span
       ><input
         type="checkbox"
@@ -208,7 +214,9 @@ const {
     <label class="settings-toggle-row"
       ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.modifyHistoryTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.modifyHistoryDesc') }}</span></span
+        ><span class="settings-row-desc">{{
+          $t(wsDescKey('personalization.modifyHistoryDesc'))
+        }}</span></span
       ><input
         type="checkbox"
         :checked="form.modify_history_enabled"
@@ -246,7 +254,9 @@ const {
     <div class="settings-select-row">
       <span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.backupModeTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.backupModeDesc') }}</span></span
+        ><span class="settings-row-desc">{{
+          $t(wsDescKey('personalization.backupModeDesc'))
+        }}</span></span
       >
       <div
         class="settings-select-wrap"
@@ -282,7 +292,7 @@ const {
             @click="selectVersioningBackupMode('full')"
           >
             <strong>{{ $t('personalization.fullBackup') }}</strong
-            ><span>{{ $t('personalization.fullBackupDesc') }}</span
+            ><span>{{ $t(wsDescKey('personalization.fullBackupDesc')) }}</span
             ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
           </button>
         </div>

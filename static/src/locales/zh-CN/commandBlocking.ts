@@ -9,6 +9,8 @@ export default {
   settingsTitle: '指令拦截',
   settingsDesc:
     '开启后，包含拦截规则的指令会在执行前被拦截。规则为个人设置，对你的所有工作区生效。',
+  settingsDescProject:
+    '开启后，包含拦截规则的指令会在执行前被拦截。规则为个人设置，对你的所有项目生效。',
   manageRules: '管理规则',
 
   // ── 规则管理窗口（CommandBlockingDialog） ──
@@ -18,6 +20,7 @@ export default {
   loading: '加载中...',
   matchHint: '匹配方式：不区分大小写的文本包含，指令文本包含任一规则即被拦截。',
   sharedHint: '规则为个人级设置，对你的所有工作区共享生效。',
+  sharedHintProject: '规则为个人级设置，对你的所有项目共享生效。',
   rulesLabel: '拦截规则',
   rulesPlaceholder: '每行一条规则，例如：rm -rf',
   useRecommended: '使用推荐的规则',

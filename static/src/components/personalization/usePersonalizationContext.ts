@@ -334,6 +334,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     id: PermissionModeValue;
     labelKey: string;
     descKey: string;
+    descKeyProject?: string;
   }> = [
     {
       id: 'readonly',
@@ -343,12 +344,14 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     {
       id: 'approval',
       labelKey: 'personalization.permissionApproval',
-      descKey: 'personalization.permissionApprovalDesc'
+      descKey: 'personalization.permissionApprovalDesc',
+      descKeyProject: 'personalization.permissionApprovalDescProject'
     },
     {
       id: 'auto_approval',
       labelKey: 'personalization.permissionAutoApproval',
-      descKey: 'personalization.permissionAutoApprovalDesc'
+      descKey: 'personalization.permissionAutoApprovalDesc',
+      descKeyProject: 'personalization.permissionAutoApprovalDescProject'
     },
     {
       id: 'unrestricted',
@@ -356,6 +359,11 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
       descKey: 'personalization.permissionUnrestrictedDesc'
     }
   ];
+  /** 项目模式（docker/web）下优先用「项目」口径的权限说明。 */
+  const permissionDescKey = (option: { descKey: string; descKeyProject?: string }) =>
+    !settingsStore.isHostMode && option.descKeyProject ? option.descKeyProject : option.descKey;
+  /** 设置项说明：项目模式下改用同名 +Project 的文案 key（仅限已补齐双份文案的 key）。 */
+  const wsDescKey = (key: string) => (!settingsStore.isHostMode ? `${key}Project` : key);
 
   type WorkModeValue = 'plan' | 'ask' | 'execute';
   const workModeOptions: Array<{
@@ -1341,6 +1349,8 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     runModeOptions,
     reasoningEffortOptions,
     permissionModeOptions,
+    permissionDescKey,
+    wsDescKey,
     workModeOptions,
     clampGoalMaxTurns,
     clampGoalMaxTokens

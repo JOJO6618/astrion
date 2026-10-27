@@ -22,7 +22,7 @@
           v-if="mode === 'migrate'"
           v-model="target"
           :disabled="busy"
-          :label="$t('sidebar.transferTarget')"
+          :label="isProject ? $t('sidebar.transferTargetProject') : $t('sidebar.transferTarget')"
           :options="targets"
         />
         <ModelSelectDropdown
@@ -71,7 +71,11 @@ import {
   type TransferScope
 } from '@/utils/conversationTransfer';
 
-const props = defineProps<{ chatMode?: boolean; workspaceId?: string }>();
+const props = defineProps<{
+  chatMode?: boolean;
+  workspaceId?: string;
+  workspaceKind?: 'workspace' | 'project';
+}>();
 const emit = defineEmits<{ completed: [value: { conversationId: string; workspaceId: string }] }>();
 const { t } = useI18n();
 const ui = useUiStore();
@@ -87,8 +91,13 @@ const selectedModel = ref('');
 const target = ref<string | null>(null);
 const targets = ref<Array<{ value: string; label: string }>>([]);
 const error = ref('');
+const isProject = computed(() => props.workspaceKind === 'project');
 const heading = computed(() =>
-  t(mode.value === 'import' ? 'sidebar.importConversation' : 'sidebar.migrateConversation')
+  mode.value === 'import'
+    ? t('sidebar.importConversation')
+    : isProject.value
+      ? t('sidebar.migrateConversationProject')
+      : t('sidebar.migrateConversation')
 );
 let alive = true;
 let requestGeneration = 0;
@@ -149,7 +158,10 @@ async function openMigration(id: string, workspaceId: string) {
     targets.value = rows
       .filter((row) => row.id !== workspaceId)
       .map((row) => ({ value: row.id, label: row.label }));
-    if (!targets.value.length) error.value = t('sidebar.transferNoTarget');
+    if (!targets.value.length)
+      error.value = isProject.value
+        ? t('sidebar.transferNoTargetProject')
+        : t('sidebar.transferNoTarget');
   } catch (cause) {
     if (alive && generation === requestGeneration) error.value = (cause as Error).message;
   }

@@ -52,6 +52,8 @@ export default {
   conversationRunningTitle: 'Conversation is running',
   conversationRunningMessage:
     'Please wait for the current conversation task to finish before sending a new message; other conversations in the same workspace can run in parallel.',
+  conversationRunningMessageProject:
+    'Please wait for the current conversation task to finish before sending a new message; other conversations in the same project can run in parallel.',
   connectionLostTitle: 'Connection lost',
   connectionLostMessage:
     "Messages can't be sent right now; please retry after the connection is restored",

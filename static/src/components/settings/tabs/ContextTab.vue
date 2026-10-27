@@ -21,7 +21,8 @@ const {
   recentConversationsPromptLimitRange,
   restoreCompressionDefaults,
   restoreProjectMemoryInjectLimit,
-  restoreRecentConversationsPromptLimit
+  restoreRecentConversationsPromptLimit,
+  wsDescKey
 } = ctx;
 </script>
 
@@ -31,7 +32,7 @@ const {
       ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.recentConversationsTitle') }}</span
         ><span class="settings-row-desc">{{
-          $t('personalization.recentConversationsDesc')
+          $t(wsDescKey('personalization.recentConversationsDesc'))
         }}</span></span
       ><input
         type="checkbox"

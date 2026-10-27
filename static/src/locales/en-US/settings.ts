@@ -23,6 +23,7 @@ export default {
   navGeneral: 'General',
   navQuickChat: 'Quick Chat',
   navWorkspace: 'Workspace',
+  navWorkspaceProject: 'Project',
   navSearch: 'Web Search',
   navTools: 'Tools',
   navContext: 'Context & Memory',
@@ -100,6 +101,7 @@ export default {
     unknown: 'The operation failed. Check directory permissions and try again.'
   },
   workspaceTitle: 'Workspace',
+  workspaceTitleProject: 'Project',
   workspaceDesc: 'Default permissions, sandbox environment, and versioning defaults.',
   searchTitle: 'Web Search',
   searchDesc: 'Tavily search API key and webpage extraction policy.',

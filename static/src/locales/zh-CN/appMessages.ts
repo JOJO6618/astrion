@@ -50,6 +50,8 @@ export default {
   conversationRunningTitle: '当前对话正在运行',
   conversationRunningMessage:
     '请等待当前对话任务完成后再发送新消息；同工作区的其他对话可正常并行。',
+  conversationRunningMessageProject:
+    '请等待当前对话任务完成后再发送新消息；同项目的其他对话可正常并行。',
   connectionLostTitle: '连接已断开',
   connectionLostMessage: '当前无法发送消息，请等待连接恢复后重试',
   uploadingTitle: '上传中',

@@ -15,7 +15,8 @@ const {
   skillsCatalog,
   toggleCategory,
   toolCategories,
-  toolLoadingRegistry
+  toolLoadingRegistry,
+  wsDescKey
 } = ctx;
 
 /**
@@ -179,7 +180,9 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
     <div class="settings-group-block" v-if="skillsCatalog.length">
       <div class="settings-group-title">
         <span class="settings-row-title">{{ $t('personalization.availableSkillsTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.availableSkillsDesc') }}</span>
+        ><span class="settings-row-desc">{{
+          $t(wsDescKey('personalization.availableSkillsDesc'))
+        }}</span>
       </div>
       <div class="settings-check-grid">
         <label v-for="skill in skillsCatalog" :key="skill.id" class="settings-toggle-row inner"

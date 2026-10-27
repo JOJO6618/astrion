@@ -5,10 +5,16 @@
   </button>
   <button v-if="!chatMode" type="button" @click="$emit('migrate')">
     <span class="icon icon-sm" :style="iconStyle?.('folder')" aria-hidden="true"></span>
-    <span>{{ $t('sidebar.migrateConversation') }}</span>
+    <span>{{
+      project ? $t('sidebar.migrateConversationProject') : $t('sidebar.migrateConversation')
+    }}</span>
   </button>
 </template>
 <script setup lang="ts">
-defineProps<{ chatMode?: boolean; iconStyle?: (key: string) => Record<string, string> }>();
+defineProps<{
+  chatMode?: boolean;
+  project?: boolean;
+  iconStyle?: (key: string) => Record<string, string>;
+}>();
 defineEmits<{ export: []; migrate: [] }>();
 </script>

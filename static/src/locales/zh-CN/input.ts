@@ -95,6 +95,7 @@ export default {
   switchProject: '切换项目',
   switchWorkspace: '切换工作区',
   workspaceDesc: 'workspace / project · 工作区 / 项目',
+  projectDesc: 'project · 项目',
   versioningOn: '当前：开启',
   versioningOff: '当前：关闭',
   gitStatusBar: 'Git 状态栏',

@@ -194,6 +194,8 @@ export default {
   showGitStatusBarTitle: 'Show Git status bar',
   showGitStatusBarDesc:
     'Show branch and change stats above the input when the workspace is a Git repo',
+  showGitStatusBarDescProject:
+    'Show branch and change stats above the input when the project is a Git repo',
   autoOpenTerminalTitle: 'Auto-open terminal panel',
   autoOpenTerminalDesc: 'Open the sidebar terminal panel automatically when a terminal is created',
   quickDockAutoExpandTitle: 'Auto-expand quick dock',
@@ -250,9 +252,12 @@ export default {
   permissionReadonlyDesc: 'Read/search tools only; modification operations are rejected',
   permissionApproval: 'Approval',
   permissionApprovalDesc: 'Tools that modify workspace files require manual approval',
+  permissionApprovalDescProject: 'Tools that modify project files require manual approval',
   permissionAutoApproval: 'Auto-approval',
   permissionAutoApprovalDesc:
     'Writes pass through; high-risk operations are auto-approved by the background review agent',
+  permissionAutoApprovalDescProject:
+    'Writes in the project pass through; high-risk operations are auto-approved by the background review agent',
   permissionUnrestricted: 'Unrestricted',
   permissionUnrestrictedDesc: 'Tools execute directly through the normal flow',
   defaultWorkModeTitle: 'Default work mode',
@@ -266,15 +271,23 @@ export default {
   agentsMdInjectTitle: 'Auto-inject AGENTS.md',
   agentsMdInjectDesc:
     'Automatically inject system prompt when AGENTS.md exists in the workspace root',
+  agentsMdInjectDescProject:
+    'Automatically inject system prompt when AGENTS.md exists in the project root',
   claudeMdInjectTitle: 'Auto-inject CLAUDE.md',
   claudeMdInjectDesc:
     'Automatically inject system prompt when CLAUDE.md exists in the workspace root (off by default, injected alongside AGENTS.md)',
+  claudeMdInjectDescProject:
+    'Automatically inject system prompt when CLAUDE.md exists in the project root (off by default, injected alongside AGENTS.md)',
   agentsSkillsScanTitle: 'Scan .agents/skills/ directory',
   agentsSkillsScanDesc:
     'Auto-scan industry skills under .agents/skills/ (Agent Skills open standard path) and list them with .astrion/skills/ skills; duplicates with the same name make read_skill error out and suggest reading by specific path',
+  agentsSkillsScanDescProject:
+    'Auto-scan industry skills under .agents/skills/ (Agent Skills open standard path) in the project and list them with .astrion/skills/ skills; duplicates with the same name make read_skill error out and suggest reading by specific path',
   modifyHistoryTitle: 'Track file changes',
   modifyHistoryDesc:
     'After each task, save this round of write/edit file changes as diffs under .astrion/modify_history/ so accidental overwrites (e.g. by git checkout) can be recovered manually',
+  modifyHistoryDescProject:
+    'After each task, save this round of write/edit file changes as diffs under .astrion/modify_history/ in the project so accidental overwrites (e.g. by git checkout) can be recovered manually',
   versionControlDivider: 'Version control',
   versioningByDefaultTitle: 'Enable versioning for new chats',
   versioningByDefaultDesc:
@@ -282,10 +295,13 @@ export default {
   backupModeTitle: 'Backup mode',
   backupModeDesc:
     'Shallow backup only tracks AI-edited files; full backup snapshots the whole workspace',
+  backupModeDescProject:
+    'Shallow backup only tracks AI-edited files; full backup snapshots the whole project',
   shallowBackup: 'Shallow',
   shallowBackupDesc: 'Fast, only restores edited files',
   fullBackup: 'Full',
   fullBackupDesc: 'Full workspace snapshot; the first one may be slow',
+  fullBackupDescProject: 'Full project snapshot; the first one may be slow',
   goalModeDivider: 'Goal mode',
   goalReviewActiveTitle: 'Review agent gathers evidence',
   goalReviewActiveDesc:
@@ -301,6 +317,8 @@ export default {
   recentConversationsTitle: 'Recent conversation hints',
   recentConversationsDesc:
     'Inject several recent non-empty conversations from the current workspace into the system prompt',
+  recentConversationsDescProject:
+    'Inject several recent non-empty conversations from the current project into the system prompt',
   recentConversationsCountTitle: 'Recent conversations to inject',
   restoreDefault: 'Restore default',
   maxMemoryInjectTitle: 'Max memory injection',
@@ -340,6 +358,8 @@ export default {
   availableSkillsTitle: 'Available skills',
   availableSkillsDesc:
     'Checked skills are injected into the system prompt and synced to .astrion/skills/ in the workspace',
+  availableSkillsDescProject:
+    'Checked skills are injected into the system prompt and synced to .astrion/skills/ in the project',
   disabledToolCategoriesTitle: 'Default disabled tool categories',
   disabledToolCategoriesDesc: 'These categories stay off in new tasks once selected',
   toolLoadingTitle: 'On-demand tools (dynamic loading)',

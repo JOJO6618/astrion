@@ -119,7 +119,13 @@ const canShowSection = (section: SettingsSection) =>
 const visibleNavGroups = computed(() =>
   NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => canShowSection(item.id))
+    items: group.items
+      .filter((item) => canShowSection(item.id))
+      .map((item) =>
+        item.id === 'workspace' && !settingsStore.isHostMode
+          ? { ...item, labelKey: 'settings.navWorkspaceProject' }
+          : item
+      )
   })).filter((group) => group.items.length > 0)
 );
 
@@ -171,7 +177,12 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   admin: AdminTab
 };
 
-const activeMeta = computed(() => SECTION_META[activeSection.value] || SECTION_META.general);
+const activeMeta = computed(() => {
+  const meta = SECTION_META[activeSection.value] || SECTION_META.general;
+  return activeSection.value === 'workspace' && !settingsStore.isHostMode
+    ? { ...meta, titleKey: 'settings.workspaceTitleProject' }
+    : meta;
+});
 const activeComponent = computed(
   () => SECTION_COMPONENTS[activeSection.value] || SECTION_COMPONENTS.general
 );

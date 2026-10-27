@@ -606,7 +606,9 @@
                 @click="$emit('change-permission-mode', option.value)"
               >
                 <span class="permission-switcher__item-label">{{ $t(option.labelKey) }}</span>
-                <span class="permission-switcher__item-desc">{{ $t(option.descriptionKey) }}</span>
+                <span class="permission-switcher__item-desc">{{
+                  $t(permissionDescKey(option))
+                }}</span>
               </button>
             </div>
             <div
@@ -822,7 +824,12 @@ const props = defineProps<{
   blockConversationReview?: boolean;
   currentPermissionMode: 'readonly' | 'approval' | 'auto_approval' | 'unrestricted';
   permissionMenuOpen: boolean;
-  permissionOptions: Array<{ value: string; labelKey: string; descriptionKey: string }>;
+  permissionOptions: Array<{
+    value: string;
+    labelKey: string;
+    descriptionKey: string;
+    descriptionKeyProject?: string;
+  }>;
   executionModeEnabled?: boolean;
   currentExecutionMode?: 'sandbox' | 'direct';
   executionModeOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
@@ -893,6 +900,14 @@ const props = defineProps<{
 
 const inputStore = useInputStore();
 const personalizationStore = usePersonalizationStore();
+
+/** 项目模式（docker/web）下优先用「项目」口径的权限说明。 */
+function permissionDescKey(option: { descriptionKey: string; descriptionKeyProject?: string }) {
+  return !props.hostMode && option.descriptionKeyProject
+    ? option.descriptionKeyProject
+    : option.descriptionKey;
+}
+
 const inputAreaRoot = ref<HTMLElement | null>(null);
 const stadiumShellOuter = ref<HTMLElement | null>(null);
 const compactInputShell = ref<HTMLElement | null>(null);
@@ -1709,7 +1724,8 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
               props.workspaceKind === 'project'
                 ? t('input.switchProject')
                 : t('input.switchWorkspace'),
-            description: t('input.workspaceDesc'),
+            description:
+              props.workspaceKind === 'project' ? t('input.projectDesc') : t('input.workspaceDesc'),
             disabled: !props.isConnected || props.streamingMessage,
             mode: 'workspace'
           } as SlashMenuItem

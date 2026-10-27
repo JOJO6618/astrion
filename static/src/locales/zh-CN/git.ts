@@ -43,6 +43,7 @@ export default {
   noReviews: '当前比较范围暂无评审对话',
   noOptions: '没有可选项',
   workspaceRequired: '工作区尚未加载，请稍后再进入项目 Git。',
+  projectRequired: '项目尚未加载，请稍后再进入项目 Git。',
   fileStatus: { A: '新增', M: '修改', D: '删除', R: '重命名', C: '复制', T: '类型变更' },
   status: {
     pending: '待启动',

@@ -43,6 +43,7 @@ export default {
   noReviews: 'No review conversations for this comparison',
   noOptions: 'No options available',
   workspaceRequired: 'The workspace is still loading. Open Project Git once it is ready.',
+  projectRequired: 'The project is still loading. Open Project Git once it is ready.',
   fileStatus: {
     A: 'Added',
     M: 'Modified',

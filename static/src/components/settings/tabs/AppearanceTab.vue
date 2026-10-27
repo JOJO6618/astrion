@@ -29,6 +29,7 @@ const {
   personalization,
   selectBlockDisplayMode,
   selectCompactMessageDisplay,
+  wsDescKey,
   selectLocaleOption,
   selectThemeOption,
   stackedHideBorders,
@@ -200,7 +201,7 @@ const selectCurrency = (value: 'USD' | 'CNY') => {
       ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.showGitStatusBarTitle') }}</span
         ><span class="settings-row-desc">{{
-          $t('personalization.showGitStatusBarDesc')
+          $t(wsDescKey('personalization.showGitStatusBarDesc'))
         }}</span></span
       ><input
         type="checkbox"

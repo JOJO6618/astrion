@@ -72,9 +72,13 @@ export default {
   permissionAutoApproval: 'Auto-approval',
   permissionUnrestricted: 'Unrestricted',
   permissionReadonlyDesc: 'Read/search tools only; no workspace modifications',
+  permissionReadonlyDescProject: 'Read/search tools only; no project modifications',
   permissionApprovalDesc: 'Tools that modify workspace files run only after your approval',
+  permissionApprovalDescProject: 'Tools that modify project files run only after your approval',
   permissionAutoApprovalDesc:
     'Writes in the workspace pass through; high-risk operations are auto-approved by the background agent',
+  permissionAutoApprovalDescProject:
+    'Writes in the project pass through; high-risk operations are auto-approved by the background agent',
   permissionUnrestrictedDesc: 'Keep current default behavior with no extra restrictions',
   executionSandboxDesc: 'All commands run in the system sandbox',
   executionDirectDesc: 'All commands run directly on the host'

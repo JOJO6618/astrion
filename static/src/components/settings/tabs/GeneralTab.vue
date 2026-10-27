@@ -30,7 +30,8 @@ const {
   appUpdateChecking,
   checkAppUpdate,
   downloadLatestApp,
-  subAgentModels
+  subAgentModels,
+  wsDescKey
 } = ctx;
 
 // 运行数据目录：两个桌面壳（macOS Electron / Windows Tauri）都支持——
@@ -237,7 +238,7 @@ onMounted(() => {
     <label class="settings-toggle-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('commandBlocking.settingsTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('commandBlocking.settingsDesc') }}</span>
+        <span class="settings-row-desc">{{ $t(wsDescKey('commandBlocking.settingsDesc')) }}</span>
         <span
           v-if="commandBlocking.error && !commandBlocking.dialogOpen"
           class="command-blocking-error"

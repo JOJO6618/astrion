@@ -6,6 +6,9 @@ export default {
   settingsDesc:
     'When enabled, commands containing a blocking rule are stopped before execution. ' +
     'Rules are personal and apply to all of your workspaces.',
+  settingsDescProject:
+    'When enabled, commands containing a blocking rule are stopped before execution. ' +
+    'Rules are personal and apply to all of your projects.',
   manageRules: 'Manage rules',
 
   // ── Rules dialog (CommandBlockingDialog) ──
@@ -16,6 +19,7 @@ export default {
   matchHint:
     'Matching: case-insensitive text containment. A command is blocked when it contains any rule.',
   sharedHint: 'Rules are personal and shared across all of your workspaces.',
+  sharedHintProject: 'Rules are personal and shared across all of your projects.',
   rulesLabel: 'Blocking rules',
   rulesPlaceholder: 'One rule per line, e.g. rm -rf',
   useRecommended: 'Use recommended rules',

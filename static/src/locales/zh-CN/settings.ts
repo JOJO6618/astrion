@@ -23,6 +23,7 @@ export default {
   navGeneral: '通用',
   navQuickChat: '快捷对话',
   navWorkspace: '工作区',
+  navWorkspaceProject: '项目',
   navSearch: '网络搜索',
   navTools: '工具',
   navContext: '上下文与记忆',
@@ -91,6 +92,7 @@ export default {
     unknown: '操作失败，请检查目录权限后重试。'
   },
   workspaceTitle: '工作区',
+  workspaceTitleProject: '项目',
   workspaceDesc: '默认权限、沙箱环境与版本控制默认值。',
   searchTitle: '网络搜索',
   searchDesc: 'Tavily 搜索密钥与网页提取策略。',

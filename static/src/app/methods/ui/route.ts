@@ -220,7 +220,10 @@ export const routeMethods = {
   openGitPage() {
     const workspaceId = this.currentHostWorkspaceId;
     if (!workspaceId) {
-      this.uiPushToast?.({ message: t('git.workspaceRequired'), type: 'warning' });
+      this.uiPushToast?.({
+        message: this.versioningHostMode ? t('git.workspaceRequired') : t('git.projectRequired'),
+        type: 'warning'
+      });
       return;
     }
     if (useConversationTabsStore().enabled)
