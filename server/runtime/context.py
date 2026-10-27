@@ -72,6 +72,7 @@ class TaskParams:
     chat_parent_id: Optional[str] = None
     chat_regenerate_turn_id: Optional[str] = None
     chat_edit_message_id: Optional[str] = None
+    chat_presentation_id: Optional[str] = None
     chat_settings: Dict[str, Any] = field(default_factory=dict)
     # 审批/提问等待超时透传（秒）。None = 保持既有默认语义（3600s）不变；
     # 超时后的语义（拒绝当前动作继续 vs 结束任务）属阶段三产品决策，
@@ -79,6 +80,9 @@ class TaskParams:
     approval_timeout_seconds: Optional[int] = None
 
     def validate(self) -> None:
+        if self.chat_presentation_id is not None and (
+                not isinstance(self.chat_presentation_id, str) or not 1 <= len(self.chat_presentation_id) <= 128):
+            raise ValueError("Invalid Chat presentation identity")
         if not isinstance(self.chat_settings, dict) or set(self.chat_settings) - {"reasoning_effort", "network_enabled"}:
             raise ValueError("Invalid Chat settings")
         effort = self.chat_settings.get("reasoning_effort")

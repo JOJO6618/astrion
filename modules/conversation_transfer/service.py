@@ -142,9 +142,14 @@ def import_document(document: dict, manifest: dict, files: dict, manager,
             tree = MessageTree(result)
             if tree.state.get("active_turn_id"):
                 raise ValueError("An active Chat turn cannot be imported")
-            tree._append(notice, tree.state["latest_leaf_id"])
+            previous_leaf = tree.state["latest_leaf_id"]
+            from modules.chat_mode.handoff_records import detach
+            detach(result)
+            tree._append(notice, previous_leaf)
+            for state in tree.state["handoffs"].values():
+                if state.get("leaf_id") == previous_leaf:
+                    state["leaf_id"] = notice["message_id"]
             tree.state["commands"] = {}
-            tree.state["handoffs"] = {}
             result["metadata"]["pending_network_notices"] = []
         else:
             result["messages"].append(notice)

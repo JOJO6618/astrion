@@ -44,6 +44,7 @@ def send():
         chat_operation_id=operation(payload), chat_parent_id=payload.get("parent_id"),
         chat_regenerate_turn_id=payload.get("regenerate_turn_id"),
         chat_edit_message_id=payload.get("edit_message_id"), chat_settings=settings,
+        chat_presentation_id=payload.get("presentation_id"),
     )
     record = runtime_service.create_task(RuntimeContext(identity, params))
     return jsonify(success=True, data=task_public_payload(record))

@@ -206,8 +206,9 @@ def execute(storage, conversation_id, message_id, principal, workspace, snapshot
             if current["status"] != "preparing":
                 raise asyncio.CancelledError()
             agent_id, task_id = create_agent(storage, snapshot, current, workspace, principal, materials)
-            update(storage, conversation_id, message_id, lambda current, _: current.update(
-                status="completed", agent_conversation_id=agent_id, agent_task_id=task_id,
+            from modules.chat_mode.handoff_records import complete
+            update(storage, conversation_id, message_id, lambda current, document: complete(
+                current, document, agent_conversation_id=agent_id, agent_task_id=task_id,
                 workspace_id=workspace.workspace_id, agent_url=f'/{agent_id.removeprefix("conv_")}?workspace_id={workspace.workspace_id}',
                 materials=materials.resolve().relative_to(Path(workspace.project_path).resolve()).as_posix(),
                 error=""))
@@ -216,7 +217,8 @@ def execute(storage, conversation_id, message_id, principal, workspace, snapshot
         error = public_error(str(exc) or "Handoff cancelled", host_mode=principal.host_mode)
         try:
             update(storage, conversation_id, message_id,
-                   lambda current, _: current.update(status="failed", error=error))
+                   lambda current, _: current.update(status="failed", error=error)
+                   if current["status"] == "preparing" else None)
         except FileNotFoundError:
             pass
     finally:

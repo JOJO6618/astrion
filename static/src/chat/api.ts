@@ -26,8 +26,18 @@ export async function chatApi<T = any>(path: string, options: RequestInit = {}):
 export const command = <T = any>(path: string, data: Record<string, unknown>, method = 'POST') =>
   chatApi<T>(path, { method, body: JSON.stringify(data) });
 export const operationId = () => crypto.randomUUID();
-export const loadView = (id: string) =>
-  chatApi<ChatView>(`/conversations/${encodeURIComponent(id)}`);
+export const loadView = (id: string, presentationId?: string) =>
+  presentationId
+    ? command<ChatView>(`/conversations/${encodeURIComponent(id)}/presentation`, {
+        presentation_id: presentationId
+      })
+    : chatApi<ChatView>(`/conversations/${encodeURIComponent(id)}`);
+export const releasePresentation = (id: string, presentationId: string) =>
+  chatApi(`/conversations/${encodeURIComponent(id)}/presentation`, {
+    method: 'POST',
+    keepalive: true,
+    body: JSON.stringify({ presentation_id: presentationId, release: true })
+  });
 export async function uploadMedia(file: File): Promise<MediaRef> {
   const data = new FormData();
   data.append('media', file);

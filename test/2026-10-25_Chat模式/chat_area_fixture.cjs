@@ -7,6 +7,7 @@ const compiler = require('../../node_modules/@vue/compiler-sfc');
 const { renderToString } = require('../../node_modules/@vue/server-renderer');
 const { compile } = require('../2026-10-07_运行对话快照/ts_fixture.cjs');
 const visibility = compile('static/src/utils/messageVisibility.ts');
+const { mergeAssistantDisplayRuns } = compile('static/src/components/chat/assistantDisplayRuns.ts');
 const filename = 'static/src/components/chat/ChatArea.vue';
 const { descriptor } = compiler.parse(fs.readFileSync(filename, 'utf8'), { filename });
 const ast = ts.createSourceFile(filename + '.ts', descriptor.scriptSetup.content,
@@ -40,6 +41,7 @@ const { render } = evaluate(template.code);
 exports.renderMessages = async function renderMessages(messages) {
   const scope = {
     ...visibility, computed: vue.computed, props: { messages, chatMode: true },
+    mergeAssistantDisplayRuns,
     compactMessageDisplay: vue.ref('hidden'), currentLocale: vue.ref('zh-CN'),
     t: key => key, isMultiAgentMessage: () => false,
     userMDebug() {}, debugLoggedUnknownActionKeys: new Set()

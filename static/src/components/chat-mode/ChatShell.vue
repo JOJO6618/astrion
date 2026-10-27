@@ -41,7 +41,9 @@
             :current-model-label="currentModel?.label || $t('chatMode.model')"
             :header-effort-label="
               chat.thinking && currentModel?.supportsThinking
-                ? String(chat.effort ?? '').trim().toLowerCase() || 'default'
+                ? String(chat.effort ?? '')
+                    .trim()
+                    .toLowerCase() || 'default'
                 : ''
             "
             :current-conversation-title="title"
@@ -161,14 +163,18 @@
             />
           </template>
           <template #after-messages>
-            <HandoffCard
-              v-if="suggestion && !chat.viewingLeaf && !chat.running"
-              :key="suggestion"
-              :conversation-id="chat.cid"
-              :message-id="suggestion"
-              @changed="chat.reload()"
-              @error="chat.report"
-            />
+            <template v-if="!chat.viewingLeaf && !chat.running && !chat.loading">
+              <HandoffCard
+                v-for="suggestion in suggestions"
+                :key="`${chat.cid}:${suggestion.id}:${chat.presentationId}`"
+                :conversation-id="chat.cid"
+                :handoff-id="suggestion.id"
+                :presentation-id="chat.presentationId"
+                :initial-state="suggestion"
+                @changed="chat.reload()"
+                @error="chat.report"
+              />
+            </template>
             <button
               v-if="chat.viewingLeaf"
               type="button"
@@ -352,7 +358,7 @@ const {
   currentModel,
   groups,
   modeOptions,
-  suggestion,
+  suggestions,
   retryTurn,
   contextTokens,
   images,
@@ -395,13 +401,19 @@ function getToolStatusText(tool: any) {
 }
 function canEditIntermediate(action: any) {
   const message = messageForAction(action);
-  return !!message && !message.live && !chat.finalMessage(message) &&
-    editing.value?.message_id !== message.message_id;
+  return (
+    !!message &&
+    !message.live &&
+    !chat.finalMessage(message) &&
+    editing.value?.message_id !== message.message_id
+  );
 }
 function isFirstEditedText(message: any, action: any) {
-  return message.actions?.find((item: any) =>
-    item.type === 'text' && item.responseMessageId === editing.value?.message_id
-  )?.id === action.id;
+  return (
+    message.actions?.find(
+      (item: any) => item.type === 'text' && item.responseMessageId === editing.value?.message_id
+    )?.id === action.id
+  );
 }
 function toggleBlock(id: string) {
   expandedBlocks.has(id) ? expandedBlocks.delete(id) : expandedBlocks.add(id);

@@ -35,10 +35,18 @@ def list_conversations():
 
 
 @chat_mode_bp.get("/conversations/<conversation_id>")
+@chat_mode_bp.post("/conversations/<conversation_id>/presentation")
 @api_login_required
 def bootstrap(conversation_id):
-    identity, _, storage = resources()
+    identity, _, storage = resources(read_only=request.method == "GET")
     with VIEW_LOCK:
+        if request.method == "POST":
+            from modules.chat_mode.handoff import presentation
+            payload = body()
+            presentation(storage, conversation_id, payload.get("presentation_id"),
+                         release=payload.get("release") is True)
+            if payload.get("release") is True:
+                return jsonify(success=True)
         snapshot = task_manager.capture_display(identity.username, conversation_id, storage.manager,
                                                  workspace_id=None)
         if snapshot is None:

@@ -64,6 +64,7 @@ class ChatModeTaskMixin:
                 conversation_id, params.chat_operation_id, parent_id=params.chat_parent_id,
                 message=message, regenerate_turn_id=params.chat_regenerate_turn_id,
                 edit_message_id=params.chat_edit_message_id,
+                presentation_id=params.chat_presentation_id,
             )
             turn = receipt["value"]
             record = TaskRecord(str(uuid4()), ctx, conversation_id)
@@ -144,10 +145,12 @@ class ChatModeTaskMixin:
                 from modules.chat_mode.recovery import recover_turn
                 if status == "succeeded":
                     storage.finish(record.conversation_id, record.chat_turn_id, tree_status)
-                    from modules.chat_mode.handoff import register
-                    register(storage, record.conversation_id, record.principal)
                 else:
                     recover_turn(storage, record.conversation_id, record.chat_turn_id, tree_status)
+                from modules.chat_mode.handoff import register
+                register(storage, record.conversation_id, record.principal,
+                         turn_id=record.chat_turn_id,
+                         presentation_id=record.task_params.chat_presentation_id if status == "succeeded" else None)
             except Exception as exc:
                 status = "failed"
                 record.error = f"Chat persistence failed: {exc}"

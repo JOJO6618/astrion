@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="state && !['declined', 'superseded'].includes(state.status)"
+    v-if="!handledHandoff(state)"
     class="handoff-card"
     :aria-label="$t('chatMode.switchAgent')"
   >
@@ -16,112 +16,148 @@
       <button type="button" :disabled="working" @click="decline">
         {{ $t('chatMode.stayChat') }}
       </button>
-      <span v-if="state.status === 'pending'">{{ $t('chatMode.expires', { seconds }) }}</span>
+      <span v-if="counting">{{ $t('chatMode.expires', { seconds }) }}</span>
     </div>
     <p v-if="state.error" role="status">{{ state.error }}</p>
     <p v-if="state.status === 'preparing'">{{ $t('chatMode.handoffBusy') }}</p>
-    <button v-else-if="state.status === 'completed'" type="button" @click="openAgent(state)">
-      {{ $t('chatMode.switchAgent') }}
-    </button>
   </section>
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { chatApi, command, operationId } from '@/chat/api';
+import { handledHandoff } from '@/chat/handoff';
+import type { Handoff } from '@/chat/handoff';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
-interface Handoff {
-  id: string;
-  status: string;
-  reason: string;
-  deadline: number;
-  server_time: number;
-  error?: string;
-  agent_conversation_id?: string;
-  workspace_id?: string;
-  agent_url?: string;
-}
-const props = defineProps<{ conversationId: string; messageId: string }>();
+
+const props = defineProps<{
+  conversationId: string;
+  handoffId: string;
+  presentationId: string;
+  initialState: Handoff;
+}>();
 const emit = defineEmits<{ (event: 'changed'): void; (event: 'error', cause: unknown): void }>();
-const state = ref<Handoff | null>(null);
+const state = ref<Handoff>({ ...props.initialState });
 const working = ref(false);
 const now = ref(Date.now());
 let timer = 0;
 let pollTimer = 0;
 let offset = 0;
 let disposed = false;
-let navigating = false;
+let suspended = false;
+let requestEpoch = 0;
 let awaitingAgent = false;
 const base = `/conversations/${props.conversationId}/handoff`;
+const counting = computed(
+  () =>
+    !suspended &&
+    state.value.status === 'pending' &&
+    state.value.countdown_enabled &&
+    state.value.presentation_id === props.presentationId &&
+    !!state.value.deadline
+);
 const seconds = computed(() =>
-  Math.max(0, Math.ceil(((state.value?.deadline || 0) * 1000 - now.value - offset) / 1000))
+  Math.max(0, Math.ceil(((state.value.deadline || 0) * 1000 - now.value - offset) / 1000))
 );
 async function apply(value: Handoff) {
   if (disposed) return;
   state.value = value;
-  offset = value.server_time * 1000 - Date.now();
-  if (value.status === 'preparing') awaitingAgent = true;
-  if (value.status === 'completed' && awaitingAgent) await openAgent(value);
-  if (['declined', 'superseded'].includes(value.status)) emit('changed');
-}
-async function openAgent(value: Handoff) {
-  if (disposed || navigating || !value.agent_url) return;
-  navigating = true;
-  try {
-    const tabs = useConversationTabsStore();
-    if (tabs.enabled)
-      await tabs.openConversationTab({
-        conversationId: value.agent_conversation_id!,
-        workspaceId: value.workspace_id!
-      });
-    else window.location.assign(value.agent_url);
-  } catch (cause) {
-    navigating = false;
-    emit('error', cause);
+  offset = (value.server_time || Date.now() / 1000) * 1000 - Date.now();
+  if (value.status === 'completed' && awaitingAgent && value.agent_url) {
+    awaitingAgent = false;
+    try {
+      const tabs = useConversationTabsStore();
+      if (tabs.enabled)
+        await tabs.openConversationTab({
+          conversationId: value.agent_conversation_id!,
+          workspaceId: value.workspace_id!
+        });
+      else window.location.assign(value.agent_url);
+    } catch (cause) {
+      if (!disposed) emit('error', cause);
+    }
   }
+  if (!disposed && handledHandoff(value)) emit('changed');
 }
 async function poll() {
   window.clearTimeout(pollTimer);
+  const owner = requestEpoch;
   try {
-    await apply(await chatApi<Handoff>(`${base}?message_id=${props.messageId}`));
+    const value = counting.value
+      ? await command<Handoff>(base, {
+          operation_id: operationId(),
+          handoff_id: props.handoffId,
+          presentation_id: props.presentationId,
+          decision: 'observe'
+        })
+      : await chatApi<Handoff>(`${base}?handoff_id=${encodeURIComponent(props.handoffId)}`);
+    if (owner !== requestEpoch) return;
+    await apply(value);
   } catch (cause) {
-    if (!disposed) emit('error', cause);
+    if (!disposed && owner === requestEpoch) emit('error', cause);
   }
-  if (!disposed && state.value && ['pending', 'preparing'].includes(state.value.status))
-    pollTimer = window.setTimeout(() => void poll(), 700);
+  if (!disposed && owner === requestEpoch && !handledHandoff(state.value))
+    pollTimer = window.setTimeout(() => void poll(), counting.value || awaitingAgent ? 700 : 2000);
 }
 async function decide(decision: string) {
-  if (working.value) return;
+  if (working.value || handledHandoff(state.value)) return;
   working.value = true;
+  requestEpoch++;
+  window.clearTimeout(pollTimer);
+  awaitingAgent = decision === 'accept';
   try {
     await apply(
       await command<Handoff>(base, {
         operation_id: operationId(),
-        message_id: props.messageId,
+        handoff_id: props.handoffId,
         decision
       })
     );
-    if (!disposed && state.value?.status === 'preparing') {
-      window.clearTimeout(pollTimer);
-      pollTimer = window.setTimeout(() => void poll(), 700);
-    }
   } catch (cause) {
+    awaitingAgent = false;
     if (!disposed) emit('error', cause);
   } finally {
-    if (!disposed) working.value = false;
+    if (!disposed) {
+      working.value = false;
+      if (!handledHandoff(state.value)) pollTimer = window.setTimeout(() => void poll(), 700);
+    }
   }
+}
+function suspend() {
+  if (!counting.value) return;
+  suspended = true;
+  state.value = { ...state.value, countdown_enabled: false, deadline: null };
+  void chatApi(base, {
+    method: 'POST',
+    keepalive: true,
+    body: JSON.stringify({
+      operation_id: operationId(),
+      handoff_id: props.handoffId,
+      presentation_id: props.presentationId,
+      decision: 'pause'
+    })
+  }).catch(() => {});
+}
+function visibilityChanged() {
+  if (window.document.hidden) suspend();
 }
 const decline = () => decide('decline');
 const accept = () => decide('accept');
 onMounted(() => {
+  visibilityChanged();
   void poll();
+  window.addEventListener('pagehide', suspend);
+  window.document.addEventListener('visibilitychange', visibilityChanged);
   timer = window.setInterval(() => {
     now.value = Date.now();
   }, 250);
 });
 onBeforeUnmount(() => {
+  suspend();
   disposed = true;
   window.clearInterval(timer);
   window.clearTimeout(pollTimer);
+  window.removeEventListener('pagehide', suspend);
+  window.document.removeEventListener('visibilitychange', visibilityChanged);
 });
 </script>
 <style scoped lang="scss">

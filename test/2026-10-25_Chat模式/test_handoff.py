@@ -20,13 +20,16 @@ class HandoffTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.storage = ChatStorage(self.root / "chat")
         self.cid = self.storage.create(model_key="synthetic")
+        from modules.chat_mode.handoff import presentation
+        presentation(self.storage, self.cid, "fixture-view")
         self.turn = self.storage.begin(self.cid, "send", message={
             "role": "user", "message_id": "u1", "content": "Build an app"})["value"]["id"]
         self.storage.append(self.cid, self.turn, {"role": "assistant", "message_id": "a1",
             "content": 'Ready <suggest_agent reason="需要修改实际文件" />'})
         self.storage.finish(self.cid, self.turn)
         self.principal = TrustedPrincipal("synthetic", None, conversation_kind="chat")
-        self.state = register(self.storage, self.cid, self.principal, schedule=False)
+        self.state = register(self.storage, self.cid, self.principal, schedule=False,
+                              presentation_id="fixture-view")
 
     def test_registration_does_not_reset_deadline(self):
         repeated = register(self.storage, self.cid, self.principal, schedule=False)
@@ -53,7 +56,7 @@ class HandoffTests(unittest.TestCase):
         with patch("server.runtime.runtime_service.create_task") as create, \
              patch("modules.chat_mode.handoff.time.time", return_value=self.state["deadline"] + 1):
             result = decline(self.storage, self.cid, self.principal, "a1", expired=True)
-        self.assertEqual(result["status"], "superseded")
+        self.assertEqual(result["status"], "declined")
         create.assert_not_called()
 
     def test_export_and_summary_use_same_frozen_path(self):

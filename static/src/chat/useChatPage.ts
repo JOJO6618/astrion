@@ -3,8 +3,8 @@ import { t } from '@/locales';
 import { useChat } from './useChat';
 import { useChatDraft } from './useChatDraft';
 import { command, operationId, uploadMedia } from './api';
-import { textOf } from './types';
 import type { ChatMessage } from './types';
+import { visibleHandoffs } from './handoff';
 import { toDisplayMessages } from './display';
 import { resolveAvatarStatus } from '@/utils/avatarStatus';
 import { taskErrorToast } from '@/utils/taskErrorToast';
@@ -43,7 +43,11 @@ export function useChatPage() {
     { flush: 'sync' }
   );
   const messages = computed(() =>
-    toDisplayMessages(chat.messages, chat.viewingLeaf ? [] : chat.display?.messages, displayIdentities)
+    toDisplayMessages(
+      chat.messages,
+      chat.viewingLeaf ? [] : chat.display?.messages,
+      displayIdentities
+    )
   );
   const avatarStatus = computed(() =>
     resolveAvatarStatus({
@@ -82,10 +86,7 @@ export function useChatPage() {
     { value: 'fast', label: t('appCore.fastMode'), desc: t('appCore.fastModeDesc') },
     { value: 'thinking', label: t('input.thinkingMode'), desc: t('appCore.thinkingModeDesc') }
   ]);
-  const suggestion = computed(() => {
-    const last = [...chat.messages].reverse().find((m) => m.role === 'assistant');
-    return last && /<suggest_agent\b[^>]*\/>/i.test(textOf(last)) ? last.message_id : '';
-  });
+  const suggestions = computed(() => visibleHandoffs(chat.document, chat.path));
   const retryTurn = computed(() => {
     const turn = chat.document?.metadata.chat.turns.find(
       (turn) => turn.tip_id === chat.path[chat.path.length - 1]?.message_id
@@ -122,8 +123,8 @@ export function useChatPage() {
     if (tabs.enabled) void run(() => tabs.openPage(path));
     else window.location.assign(`${path}?from=chat`);
   }
-  const messagesById = computed(() =>
-    new Map(chat.messages.map((message) => [message.message_id, message]))
+  const messagesById = computed(
+    () => new Map(chat.messages.map((message) => [message.message_id, message]))
   );
   function messageForAction(action: { responseMessageId?: string }) {
     return action.responseMessageId ? messagesById.value.get(action.responseMessageId) : undefined;
@@ -378,7 +379,7 @@ export function useChatPage() {
     currentModel,
     groups,
     modeOptions,
-    suggestion,
+    suggestions,
     retryTurn,
     contextTokens,
     preview,

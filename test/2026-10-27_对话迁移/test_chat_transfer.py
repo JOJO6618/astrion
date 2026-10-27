@@ -59,15 +59,18 @@ class ChatTransferTests(TransferFixture):
         tree = MessageTree(imported)
         self.assertEqual(tree.path("a1", latest=False), MessageTree(before).path("a1", latest=False))
         self.assertEqual(tree.path()[-1]["metadata"]["chat"]["parent_id"], "a2")
-        self.assertEqual(tree.state["handoffs"], {})
+        states = list(tree.state["handoffs"].values())
+        self.assertEqual(len(states), 1)
+        self.assertEqual(states[0]["status"], "completed")
+        self.assertFalse(states[0]["countdown_enabled"])
         ref = imported["messages"][0]["media_refs"][0]
         self.assertEqual(MediaStore(target.root).load_bytes(ref), b"chat-image")
         for name in ("summary.md", "conversation.md", "manifest.json", "media/pic.png"):
             old = f".astrion/handoff/handoff_chat/{name}"
             self.assertEqual(Path(mapped_path(imported["metadata"], target.root, old)).read_bytes(),
                              (directory / name).read_bytes())
-        # The completed worker state is cleared, but every material remains
-        # discoverable through aliases when this imported Chat is exported again.
+        # Decisions remain historical; live worker ownership is removed. Materials
+        # are discoverable through aliases when this imported Chat is exported again.
         second = export_archive(imported, target.root, None, {"environment": "chat"})
         _, again, _ = read_archive(second)
         self.assertTrue(any(".astrion/handoff/handoff_chat/media/pic.png" in row["paths"]

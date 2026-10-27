@@ -5,6 +5,8 @@ import re
 
 _PUBLIC_FIELDS = {
     "id", "message_id", "status", "reason", "deadline", "error",
+    "sequence", "tag_index", "present", "created_at", "decided_at", "decision_source",
+    "countdown_enabled", "presentation_id", "leaf_id",
     "agent_conversation_id", "workspace_id", "agent_url",
     "target_workspace_id", "selection",
 }

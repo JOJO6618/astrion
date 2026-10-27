@@ -84,18 +84,27 @@ class ChatStorage:
 
     def begin(self, conversation_id, operation_id, *, parent_id=None,
               message=None, regenerate_turn_id=None, edit_message_id=None,
-              expected_revision=None):
+              expected_revision=None, presentation_id=None):
         payload = {"action": "begin", "parent_id": parent_id, "message": message,
                    "regenerate_turn_id": regenerate_turn_id,
                    "edit_message_id": edit_message_id}
 
         def apply(tree):
+            from modules.chat_mode.handoff_records import continue_after_send
+            if any(s["status"] == "preparing" for s in tree.state.get("handoffs", {}).values()):
+                raise TreeConflict("Wait for the current Agent handoff to finish")
+            previous_leaf = tree.state["latest_leaf_id"]
+            if not tree.messages and presentation_id:
+                tree.state["handoff_presentation_id"] = presentation_id
             if edit_message_id is not None:
                 if regenerate_turn_id is not None or message is None:
                     raise ValueError("Invalid edit-and-send command")
-                return tree.fork_user(edit_message_id, message["content"])
-            return tree.begin_turn(parent_id=parent_id, user_message=message,
-                                   regenerate_turn_id=regenerate_turn_id)
+                result = tree.fork_user(edit_message_id, message["content"])
+            else:
+                result = tree.begin_turn(parent_id=parent_id, user_message=message,
+                                         regenerate_turn_id=regenerate_turn_id)
+            continue_after_send(tree, previous_leaf)
+            return result
         return self.command(conversation_id, operation_id, payload, apply,
                             expected_revision=expected_revision)
 
@@ -118,7 +127,9 @@ class ChatStorage:
     def edit(self, conversation_id, operation_id, message_id, content,
              *, expected_revision=None):
         def apply(tree):
+            from modules.chat_mode.handoff_records import sync
             tree.edit(message_id, content)
+            sync(tree.document)
             return {"message_id": message_id}
         return self.command(
             conversation_id, operation_id,

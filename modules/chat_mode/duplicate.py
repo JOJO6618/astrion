@@ -27,8 +27,9 @@ def duplicate(storage, conversation_id, operation_id):
             document["messages"] = deepcopy(source["messages"])
             document["metadata"] = deepcopy(metadata)
             state = document["metadata"]["chat"]
-            state.update(creation_operation_id=key, copied_from=conversation_id,
-                         commands={}, handoffs={})
+            state.update(creation_operation_id=key, copied_from=conversation_id, commands={})
+            from modules.chat_mode.handoff_records import detach
+            detach(document)
             document["metadata"]["pending_network_notices"] = []
             document["title"] = source.get("title", "Chat") + " (copy)"
             MessageTree(document).validate()

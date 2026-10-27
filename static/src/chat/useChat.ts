@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { chatApi, command, loadView, operationId } from './api';
+import { chatApi, command, loadView, operationId, releasePresentation } from './api';
 import { activeStatuses, pathOf, textOf } from './types';
 import type { ChatDocument, ChatMessage, ChatSettings, ChatView, MediaRef } from './types';
 import { prepareGeneratingLabels } from '@/utils/generatingLabel';
@@ -18,6 +18,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   const thinking = ref(true);
   const effort = ref<string | null>(null);
   const network = ref(true);
+  const presentationId = ref(operationId());
   let epoch = 0;
   let listSequence = 0;
   let navigationOwns = () => true;
@@ -96,8 +97,9 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     network.value = metadata.network_enabled;
   }
   function schedule(token: number, initial = false) {
+    if (!owns(token)) return;
     window.clearTimeout(pollTimer);
-    if (owns(token) && (running.value || (initial && task.value?.status === 'failed')))
+    if (running.value || (initial && task.value?.status === 'failed'))
       pollTimer = window.setTimeout(() => void poll(token), 250);
   }
   async function poll(token: number) {
@@ -130,8 +132,14 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     }
     schedule(token);
   }
+  function releaseView() {
+    if (cid.value && document.value?.metadata.chat.handoff_presentation_id === presentationId.value)
+      void releasePresentation(cid.value, presentationId.value).catch(() => {});
+  }
   async function load(id: string, owner: () => boolean = () => true) {
+    releaseView();
     const token = ++epoch;
+    presentationId.value = operationId();
     navigationOwns = owner;
     window.clearTimeout(pollTimer);
     loading.value = true;
@@ -139,7 +147,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     error.value = '';
     viewingLeaf.value = null;
     try {
-      if (id) apply(await loadView(id), token);
+      if (id) apply(await loadView(id, presentationId.value), token);
       else if (owns(token)) {
         document.value = null;
         display.value = null;
@@ -152,12 +160,18 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     return owns(token);
   }
   function leave() {
+    releaseView();
     epoch++;
     window.clearTimeout(pollTimer);
   }
   async function reload() {
     const token = epoch;
-    if (cid.value) apply(await loadView(cid.value), token);
+    const conversationId = cid.value;
+    if (!conversationId) return;
+    const view = await loadView(conversationId);
+    if (!owns(token)) return;
+    apply(view, token);
+    schedule(token, true);
   }
   async function send(text: string, media: MediaRef[], extra: Record<string, unknown> = {}) {
     if (busy.value) return null;
@@ -167,6 +181,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     const payload = {
       operation_id: operationId(),
       conversation_id: cid.value || null,
+      presentation_id: presentationId.value,
       message: text,
       parent_id: path.value[path.value.length - 1]?.message_id || null,
       model_key: model.value,
@@ -276,9 +291,11 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   async function stop() {
     if (task.value) await command(`/tasks/${task.value.task_id}/cancel`, {});
   }
+  window.addEventListener('pagehide', releaseView);
   onBeforeUnmount(() => {
     disposed = true;
     leave();
+    window.removeEventListener('pagehide', releaseView);
   });
   return {
     settings,
@@ -296,6 +313,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     thinking,
     effort,
     network,
+    presentationId,
     cid,
     path,
     messages,

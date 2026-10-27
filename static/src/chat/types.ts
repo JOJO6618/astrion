@@ -32,6 +32,9 @@ export interface ChatDocument {
       latest_leaf_id: string | null;
       active_turn_id: string | null;
       turns: ChatTurn[];
+      handoffs?: Record<string, import('./handoff').Handoff>;
+      handoff_count?: number;
+      handoff_presentation_id?: string | null;
     };
   };
 }
