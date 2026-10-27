@@ -55,8 +55,6 @@ def build_system_prompt(workspace_path: str, execution_mode: str = "") -> str:
     """
     from modules.execution_env_text import build_sub_agent_env_section
 
-    from modules.inline_ui_prompt import load_inline_ui_prompt
-
     system_info = f"{platform.system()} {platform.release()}"
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     base_prompt = _format_template(
@@ -66,4 +64,4 @@ def build_system_prompt(workspace_path: str, execution_mode: str = "") -> str:
         current_time=current_time,
         execution_env_section=build_sub_agent_env_section(workspace_path, execution_mode),
     )
-    return f"{base_prompt.rstrip()}\n\n{load_inline_ui_prompt()}\n"
+    return f"{base_prompt.rstrip()}\n"
