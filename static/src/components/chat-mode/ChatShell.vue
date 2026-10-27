@@ -27,7 +27,13 @@
         @dragover.prevent
         @drop.prevent="upload($event.dataTransfer?.files || null)"
       >
-        <div ref="ribbon" :class="isMobile ? 'mobile-panel-trigger' : 'conversation-ribbon'">
+        <div
+          ref="ribbon"
+          :class="[
+            isMobile ? 'mobile-panel-trigger' : 'conversation-ribbon',
+            { 'is-hidden': isMobile && mobileOpen }
+          ]"
+        >
           <ConversationModelHeader
             :mobile="isMobile"
             :header-menu-open="headerMenuOpen"
@@ -69,7 +75,7 @@
                 :aria-label="$t('chatMode.showSidebar')"
                 @click="mobileOpen = !mobileOpen"
               >
-                <img :src="ICONS.menu" alt="" aria-hidden="true" />
+                <img :src="ICONS.alignLeft" alt="" aria-hidden="true" />
               </button>
             </template>
           </ConversationModelHeader>
@@ -273,6 +279,7 @@
           <ConversationSidebar
             class="mobile-overlay-content"
             chat-mode
+            :collapsed="false"
             :icon-style="iconStyle"
             :current-conversation-id="chat.cid"
             :current-task-in-progress="chat.running"

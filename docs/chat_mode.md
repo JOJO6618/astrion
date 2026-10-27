@@ -35,6 +35,7 @@
 - 桌面标签沿用现有外观，不添加 Chat / Agent 区别标识；内部明确区分身份，仍由统一标签管理器管理。
 - Chat 桌面和手机侧栏的「个人空间」「个性化」均通过 `personalization.openDrawer(tab)` 打开共用 `PersonalizationDrawer`，保留页签参数，不能跳转到 Chat 设置页；Chat 自己挂载同一个弹窗，打开时手机侧栏先收起。「设置」入口仍进入全屏设置页。
 - 顶部栏与 Agent 一致：开启思考且模型支持时，推理强度未指定显示英文 `default`，指定档位显示 low／medium／high／xhigh／max；不使用「默认」或「自动」的翻译。
+- 手机侧栏的 Chat／Agent 两处挂载均显式传入 `collapsed=false`，由 `ConversationSidebar` 的可选属性覆盖全局桌面折叠状态；桌面未传属性时仍读取 `ui.sidebarCollapsed`。禁止仅显示手机遮罩却让侧栏内部保留收起态，否则模式名称、导航文字与历史列表会隐藏。Chat 手机顶部由 `ConversationModelHeader` 渲染对话标题，空标题沿用 Agent 的未命名文案，侧栏入口统一用 `align-left.svg` 及既有热区／样式；抽屉打开时隐藏顶部栏。
 - 设置返回原 Chat / Agent 页面。关闭标签不停止后台生成。
 
 ## 3. 消息树与编辑契约

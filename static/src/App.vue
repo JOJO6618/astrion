@@ -761,6 +761,7 @@
           <div class="mobile-panel-sheet mobile-panel-sheet--conversation">
             <ConversationSidebar
               class="mobile-overlay-content"
+              :collapsed="false"
               :icon-style="iconStyle"
               :format-time="formatTime"
               :running-tasks="runningWorkspaceTasks"

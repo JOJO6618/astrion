@@ -35,7 +35,14 @@
       </svg>
     </button>
 
-    <span v-if="!mobile" class="conversation-ribbon__text">{{
+    <div
+      v-if="mobile"
+      class="mobile-topbar-title"
+      :title="currentConversationTitle || $t('overlay.unnamedConversation')"
+    >
+      {{ currentConversationTitle || $t('overlay.unnamedConversation') }}
+    </div>
+    <span v-else class="conversation-ribbon__text">{{
       titleTypingText || currentConversationTitle
     }}</span>
 

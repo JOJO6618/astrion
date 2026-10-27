@@ -1047,6 +1047,8 @@ const transferDialog = ref<InstanceType<typeof ConversationTransferDialog>>();
 const props = withDefaults(
   defineProps<{
     chatMode?: boolean;
+    /** 手机抽屉显式展开；桌面未传时沿用全局折叠状态。 */
+    collapsed?: boolean;
     formatTime?: (input: unknown) => string;
     iconStyle?: (key: string) => Record<string, string>;
     showCollapseButton?: boolean;
@@ -1069,6 +1071,7 @@ const props = withDefaults(
     currentConversationId?: string;
   }>(),
   {
+    collapsed: undefined,
     showCollapseButton: true,
     collapseButtonVariant: 'toggle',
     showRefreshButton: false,
@@ -1201,7 +1204,7 @@ async function fetchSessionUsername() {
 
 const conversationListEl = ref<HTMLElement | null>(null);
 
-const { sidebarCollapsed: collapsed } = storeToRefs(uiStore);
+const collapsed = computed(() => props.collapsed ?? uiStore.sidebarCollapsed);
 const {
   searchQuery,
   searchResults,
