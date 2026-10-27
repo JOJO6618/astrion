@@ -20,6 +20,7 @@
 | 测试现状与执行方式 | `docs/agents_details/testing.md` | 写测试、跑回归 |
 | 前端设计风格统一规范 | `docs/agents_details/frontend_design_style.md` | 写/改任何 UI |
 | 独立 Chat 与消息树 | `docs/chat_mode.md` | Chat 页面、分支、九工具、无工作区运行、媒体记忆或 Agent 交接；前端必须复用 Agent 组件 |
+| 对话导出／导入与迁移 | `docs/conversation_transfer.md` | 内部直接迁移、跨机器 ZIP、历史不改写、媒体／摘要映射、迁移回执及默认交接工作区 |
 | Android 发布联动 | `docs/agents_details/android_release.md` | 发 Android 版本 |
 | 权限模式 / 路径授权 / 平台沙箱 | `docs/agents_details/permission_and_sandbox.md` | 权限、沙箱、平台隔离 |
 | 运行模式（work_mode） | `docs/agents_details/work_mode.md` | plan/ask/execute 链路 |

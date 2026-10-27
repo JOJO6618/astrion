@@ -38,7 +38,10 @@ function downloadUrl(path: string, kind: 'file' | 'folder'): string {
 }
 
 /** 桌面壳：请求宿主后端弹原生保存对话框并把文件写到用户选定位置 */
-async function saveViaHostDialog(path: string, filename: string): Promise<WorkspaceDownloadOutcome> {
+async function saveViaHostDialog(
+  path: string,
+  filename: string
+): Promise<WorkspaceDownloadOutcome> {
   try {
     const response = await fetch('/api/system/save-file', {
       method: 'POST',
@@ -61,8 +64,18 @@ async function saveViaHostDialog(path: string, filename: string): Promise<Worksp
 }
 
 /** 浏览器：原有 blob 下载通道（保留错误信息，便于调用方提示） */
-async function browserDownload(path: string, filename: string, kind: 'file' | 'folder'): Promise<WorkspaceDownloadOutcome> {
-  const url = downloadUrl(path, kind);
+async function browserDownload(
+  path: string,
+  filename: string,
+  kind: 'file' | 'folder'
+): Promise<WorkspaceDownloadOutcome> {
+  return browserDownloadUrl(downloadUrl(path, kind), filename);
+}
+
+async function browserDownloadUrl(
+  url: string,
+  filename: string
+): Promise<WorkspaceDownloadOutcome> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -94,7 +107,9 @@ async function browserDownload(path: string, filename: string, kind: 'file' | 'f
  * 下载/另存工作区文件。所有下载入口（文件卡片、download:// 链接、快捷 dock、
  * 文件树右键、chatActions）都应调用本函数。
  */
-export async function downloadWorkspaceFile(options: WorkspaceDownloadOptions): Promise<WorkspaceDownloadOutcome> {
+export async function downloadWorkspaceFile(
+  options: WorkspaceDownloadOptions
+): Promise<WorkspaceDownloadOutcome> {
   const path = (options.path || '').trim();
   if (!path) return { status: 'failed', error: 'missing path' };
   const kind = options.kind || 'file';
@@ -124,4 +139,36 @@ export async function downloadWorkspaceFile(options: WorkspaceDownloadOptions): 
   }
 
   return await browserDownload(path, filename, kind);
+}
+
+/** Authenticated application exports use the same desktop / Android / web channels. */
+export async function downloadApplicationFile(
+  url: string,
+  filename: string
+): Promise<WorkspaceDownloadOutcome> {
+  const target = new URL(url, window.location.href);
+  if (target.origin !== window.location.origin)
+    return { status: 'failed', error: 'invalid export URL' };
+  const bridge = (window as any).AndroidDownloadBridge;
+  if (bridge && typeof bridge.downloadFile === 'function') {
+    bridge.downloadFile(target.href, filename);
+    return { status: 'started' };
+  }
+  if (isDesktopShell()) {
+    try {
+      await (window as any).ensureCsrfToken?.();
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success)
+        return { status: 'failed', error: result.error || response.statusText };
+      return { status: result.data?.saved ? 'saved' : 'cancelled' };
+    } catch (cause) {
+      return { status: 'failed', error: (cause as Error).message };
+    }
+  }
+  return browserDownloadUrl(url, filename);
 }

@@ -1310,6 +1310,10 @@ class MainTerminalToolsExecutionMixin:
                     elif custom_tool:
                         result = await self.custom_tool_executor.run(tool_name, arguments)
                     elif tool_name == "read_file":
+                        from modules.conversation_transfer.assets import tool_path
+                        arguments = {**arguments, "path": tool_path(
+                            self.context_manager.conversation_metadata,
+                            Path(self.context_manager.project_path), arguments.get("path", ""))}
                         result = self._handle_read_tool(arguments)
                         self._mark_skill_read_from_result(tool_name, arguments, result)
                         self._mark_file_read_from_result(tool_name, arguments, result)
@@ -1334,7 +1338,9 @@ class MainTerminalToolsExecutionMixin:
                             return json.dumps({"success": False, "error": tr("tools_exec.missing_path_param"), "warnings": []}, ensure_ascii=False)
                         result = self.ocr_client.vlm_analyze(path=path, prompt=prompt or "")
                     elif tool_name == "view_image":
-                        path = (arguments.get("path") or "").strip()
+                        from modules.conversation_transfer.assets import tool_path
+                        path = tool_path(self.context_manager.conversation_metadata,
+                            Path(self.context_manager.project_path), (arguments.get("path") or "").strip())
                         if not path:
                             return json.dumps({"success": False, "error": tr("tools_exec.path_empty")}, ensure_ascii=False)
                         host_unrestricted = self._is_host_mode()
@@ -1372,7 +1378,9 @@ class MainTerminalToolsExecutionMixin:
                             "size": abs_path.stat().st_size,
                         }
                     elif tool_name == "view_video":
-                        path = (arguments.get("path") or "").strip()
+                        from modules.conversation_transfer.assets import tool_path
+                        path = tool_path(self.context_manager.conversation_metadata,
+                            Path(self.context_manager.project_path), (arguments.get("path") or "").strip())
                         if not path:
                             return json.dumps({"success": False, "error": tr("tools_exec.path_empty")}, ensure_ascii=False)
                         host_unrestricted = self._is_host_mode()

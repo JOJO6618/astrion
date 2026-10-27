@@ -16,6 +16,10 @@ class CompressionTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
+        preferences = patch("modules.chat_mode.compression.load_personalization_config",
+                            return_value={"chat_deep_compress_trigger_tokens": 16000})
+        preferences.start()
+        self.addCleanup(preferences.stop)
         self.store = ChatStorage(Path(self.temp.name))
         self.cid = self.store.create()
         turn = self.store.begin(self.cid, "first", message={"message_id": "u1", "role": "user", "content": "中" * 20000})["value"]["id"]
@@ -29,12 +33,13 @@ class CompressionTests(unittest.IsolatedAsyncioTestCase):
         context.build_api_history = lambda: [{"role": m["role"], "content": m["content"]} for m in context.conversation_history]
         self.runtime = SimpleNamespace(storage=self.store, conversation_id=self.cid, turn_id=self.turn,
                                        context_manager=context, model_profile={"context_window": 20000},
+                                       preferences_dir=Path(self.temp.name), api_client=object(),
                                        thinking_mode=False, record_model_call=lambda _: (True, None))
         self.events = []
 
     async def test_summary_preserves_tree_and_protocol_batch_and_is_reused(self):
         captured = []
-        async def summarize(_, __, messages):
+        async def summarize(_, __, messages, **kwargs):
             captured.append(deepcopy(messages))
             return "short summary"
         before = self.store.read(self.cid)["messages"]
@@ -51,7 +56,7 @@ class CompressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.events[-1][1]["in_progress"])
 
     async def test_concurrent_prefix_edit_prevents_stale_summary_commit(self):
-        async def summarize(*_):
+        async def summarize(*_, **kwargs):
             self.store.edit(self.cid, "edit-during-summary", "u1", "corrected")
             return "outdated summary"
         with patch("modules.chat_mode.summarize.summarize", summarize):
@@ -62,7 +67,7 @@ class CompressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.events[-1][1]["in_progress"])
 
     async def test_cancellation_keeps_original_history_and_clears_compression_state(self):
-        async def summarize(*_):
+        async def summarize(*_, **kwargs):
             raise asyncio.CancelledError()
         with patch("modules.chat_mode.summarize.summarize", summarize):
             with self.assertRaises(asyncio.CancelledError):

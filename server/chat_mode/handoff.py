@@ -1,12 +1,11 @@
-"""Workspace choices and idempotent, server-owned Chat -> Agent handoff."""
-from pathlib import Path
+"""One-click, idempotent Chat -> Agent handoff to the shared workspace."""
 import time
 from flask import jsonify, request
 
 from server.auth_helpers import api_login_required
 from server.conversation_view.snapshots import VIEW_LOCK
 from modules.chat_mode.handoff import read, update, select, decline, schedule_deadline
-from .handoff_workspace import projects, resolve_target, default_project_name
+from .handoff_workspace import default_target
 from .handoff_execution import freeze, start, is_running
 from .handoff_view import public_handoff
 from . import chat_mode_bp
@@ -19,13 +18,9 @@ def public_state(storage, conversation_id, message_id, principal):
         schedule_deadline(storage, conversation_id, principal, state)
     if state["status"] == "preparing" and not is_running(storage, conversation_id, message_id):
         state = update(storage, conversation_id, message_id, lambda current, _: current.update(
-            status="failed", error="Handoff was interrupted; retry to continue with the saved selection"))
-    name = default_project_name(storage.read(conversation_id).get("title"))
+            status="failed", error="Handoff was interrupted; retry to continue in the default workspace"))
     return {**public_handoff(state, host_mode=principal.host_mode),
-            "server_time": time.time(), "host": principal.host_mode,
-            "default_name": name,
-            "default_path": str(Path.home() / "Desktop" / "Astrion" / name) if principal.host_mode else "",
-            "projects": projects(principal)}
+            "server_time": time.time(), "host": principal.host_mode}
 
 
 @chat_mode_bp.route("/conversations/<conversation_id>/handoff", methods=["GET", "POST"])
@@ -47,20 +42,15 @@ def handoff_api(conversation_id):
                 decline(storage, conversation_id, principal, message_id)
             elif decision == "accept":
                 if state["status"] not in {"preparing", "completed"}:
-                    if state["status"] not in {"selecting", "failed"}:
-                        raise RuntimeError("Choose a workspace before accepting the handoff")
+                    if state["status"] == "pending":
+                        select(storage, conversation_id, message_id)
+                    elif state["status"] not in {"selecting", "failed"}:
+                        raise RuntimeError("Suggestion has already been decided")
                     snapshot = freeze(storage, conversation_id, message_id)
-                    if state.get("target_workspace_id"):
-                        target_payload = {"workspace_id": state["target_workspace_id"]}
-                    else:
-                        target_payload = payload
-                    workspace, agent = resolve_target(principal, target_payload)
+                    workspace, agent = default_target(principal)
                     update(storage, conversation_id, message_id, lambda current, _: current.update(
                         status="preparing", operation_id=operation_id, error="",
-                        target_workspace_id=workspace.workspace_id,
-                        selection={key: payload.get(key) for key in
-                                   (("workspace_id", "project_name", "project_path") if principal.host_mode
-                                    else ("workspace_id", "project_name"))}))
+                        target_workspace_id=workspace.workspace_id, selection={}))
                     start(storage, conversation_id, message_id, agent, workspace, snapshot,
                           preferences_dir=scope.preferences_dir)
             else:

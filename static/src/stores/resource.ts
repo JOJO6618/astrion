@@ -42,6 +42,7 @@ interface QuotaTier {
 }
 
 interface UsageQuota {
+  applicable: boolean | null;
   fast: QuotaTier;
   thinking: QuotaTier;
   search: QuotaTier;
@@ -56,6 +57,7 @@ const defaultQuotaTier = (): QuotaTier => ({
 });
 
 const buildDefaultQuota = (): UsageQuota => ({
+  applicable: null,
   fast: defaultQuotaTier(),
   thinking: defaultQuotaTier(),
   search: defaultQuotaTier(),
@@ -100,6 +102,8 @@ export const useResourceStore = defineStore('resource', {
     projectStorageFailCount: 0,
     projectStorageIntervalMs: PROJECT_STORAGE_POLL_INTERVAL_MS,
     usageQuota: buildDefaultQuota(),
+    usageQuotaInFlight: false,
+    usageQuotaGeneration: 0,
     usageQuotaTimer: null as ReturnType<typeof setInterval> | null
   }),
   actions: {
@@ -407,6 +411,7 @@ export const useResourceStore = defineStore('resource', {
       const quotas = (raw && raw.quotas) || {};
       const role = quotas.role || (raw && raw.role) || 'user';
       return {
+        applicable: true,
         fast: { ...base.fast, ...(quotas.fast || {}) },
         thinking: { ...base.thinking, ...(quotas.thinking || {}) },
         search: { ...base.search, ...(quotas.search || {}) },
@@ -417,29 +422,41 @@ export const useResourceStore = defineStore('resource', {
       this.usageQuota = this.normalizeUsageQuota(raw);
     },
     async fetchUsageQuota() {
+      if (this.usageQuota.applicable === false || this.usageQuotaInFlight) return;
+      const generation = this.usageQuotaGeneration;
+      this.usageQuotaInFlight = true;
       try {
         const response = await fetch('/api/usage');
+        if (generation !== this.usageQuotaGeneration) return;
         if (!response.ok) {
           throw new Error(response.statusText || t('stores.requestFailed'));
         }
         const data = await response.json();
-        if (data && data.success && data.data) {
+        if (generation !== this.usageQuotaGeneration) return;
+        if (data?.success && data.applicable === false) {
+          this.usageQuota = { ...buildDefaultQuota(), applicable: false };
+          this.stopUsageQuotaPolling();
+        } else if (data?.success && data.data) {
           this.setUsageQuota(data.data);
         }
       } catch (error) {
-        console.warn('获取用量配额失败:', error);
+        if (generation === this.usageQuotaGeneration) {
+          console.warn('获取用量配额失败:', error);
+        }
+      } finally {
+        if (generation === this.usageQuotaGeneration) this.usageQuotaInFlight = false;
       }
     },
     startUsageQuotaPolling() {
-      if (this.usageQuotaTimer) {
-        return;
-      }
-      this.fetchUsageQuota();
+      if (this.usageQuota.applicable === false || this.usageQuotaTimer) return;
       this.usageQuotaTimer = setInterval(() => {
-        this.fetchUsageQuota();
+        void this.fetchUsageQuota();
       }, 60000);
+      void this.fetchUsageQuota();
     },
     stopUsageQuotaPolling() {
+      this.usageQuotaGeneration++;
+      this.usageQuotaInFlight = false;
       if (this.usageQuotaTimer) {
         clearInterval(this.usageQuotaTimer);
         this.usageQuotaTimer = null;

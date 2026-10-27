@@ -82,6 +82,9 @@ class MediaMixin:
         if not path_text:
             return None
         try:
+            from modules.conversation_transfer.assets import mapped_path
+            path_text = mapped_path(getattr(self, "conversation_metadata", {}) or {},
+                                    Path(self.project_path), path_text)
             candidate = Path(path_text).expanduser()
             if candidate.is_absolute():
                 return candidate.resolve()

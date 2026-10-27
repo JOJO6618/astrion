@@ -63,7 +63,7 @@ for(const file of sharedFiles){
 (async()=>{
   for(const empty of [true,false]) {
     const page = vue.reactive({
-      chat:{cid:'conv_test',settings:{},thinking:true,effort:null,running:false,busy:false,loading:false,model:'m',network:true,finalMessage:m=>m.message_id==='a2',report(){},browse(){},regenerate(){}},
+      chat:{cid:'conv_test',settings:{settings:{chat_deep_compress_trigger_tokens:100000}},thinking:true,effort:null,running:false,busy:false,loading:false,model:'m',network:true,finalMessage:m=>m.message_id==='a2',report(){},browse(){},regenerate(){}},
       draft:{text:'Draft',identity:1},ui:{toggleSidebar(){}},personalization:{form:{show_status_avatar:true}},
       collapsedGroups:new Set(),expandedBlocks:new Set(),headerMenuOpen:false,modelMenuSearchQuery:'',inputFocused:false,uploading:false,editing:null,saving:false,tokenOpen:false,mobileOpen:false,isMobile:false,
       messages:empty?[]:displayed,title:'Chat title',modelOptions:[{key:'m',label:'Model'}],currentModel:{key:'m',label:'Model',supportsThinking:true},groups:[],modeOptions:[],suggestion:'',retryTurn:null,contextTokens:42,images:[],videos:[],

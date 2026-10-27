@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import time
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, session
 from typing import Optional
 
 from .auth_helpers import api_login_required, get_current_username
@@ -21,13 +21,16 @@ usage_bp = Blueprint('usage', __name__)
 @usage_bp.route('/api/usage', methods=['GET'])
 @api_login_required
 def get_usage_stats():
-    """返回当前用户的模型/搜索调用统计。"""
+    """返回账号调用配额；宿主机身份不适用应用配额。"""
+    if session.get("host_mode"):
+        return jsonify({"success": True, "applicable": False, "data": None})
     username = get_current_username()
     tracker = get_or_create_usage_tracker(username)
     if not tracker:
         return jsonify({"success": False, "error": tr("auth.usage_user_not_found")}), 404
     return jsonify({
         "success": True,
+        "applicable": True,
         "data": tracker.get_stats()
     })
 

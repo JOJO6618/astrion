@@ -1,8 +1,7 @@
 """The only handoff stage allowed to create/select an execution workspace."""
 from dataclasses import replace
 from pathlib import Path
-import re
-from uuid import uuid4
+from threading import RLock
 
 from server.context.identity import RuntimeIdentity
 from server.context.workspace import resolve_workspace
@@ -25,20 +24,28 @@ def projects(principal):
     return [{"id": key, "label": value.get("label") or key} for key, value in rows.items()]
 
 
-def default_project_name(title):
-    """Use the Chat title as the editable folder suggestion on every platform."""
-    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', str(title or ''))
-    return name.strip(' .')[:80].rstrip(' .') or 'Chat'
+_DEFAULT_LOCK = RLock()
+_DEFAULT_WORKSPACE_ID = "astrion-default"
 
 
-def _project_name(payload):
-    name = payload.get("project_name")
-    if not isinstance(name, str) or not name.strip() or len(name) > 80 or re.search(r'[/\\\x00-\x1f]', name):
-        raise ValueError("A project name of at most 80 characters is required")
-    name = name.strip()
-    if name in {".", ".."}:
-        raise ValueError("Invalid project name")
-    return name
+def default_target(principal):
+    """Create the shared handoff workspace once, without changing user selection."""
+    with _DEFAULT_LOCK:
+        if principal.host_mode:
+            from modules.host_workspace_manager import create_host_workspace
+            path = Path.home() / "Desktop" / "Astrion" / "Default"
+            workspace_id = create_host_workspace(str(path), label="默认工作区")["workspace"]["workspace_id"]
+        else:
+            from server import state
+            workspace_id = _DEFAULT_WORKSPACE_ID
+            if principal.is_api_user:
+                state.api_user_manager.ensure_workspace(principal.username, workspace_id)
+            else:
+                rows = state.user_manager.list_user_workspaces(principal.username, prepare=False)
+                if workspace_id not in rows:
+                    state.user_manager.create_user_workspace(principal.username,
+                        workspace_id=workspace_id, label="默认工作区")
+        return resolve_target(principal, {"workspace_id": workspace_id})
 
 
 def resolve_target(principal, payload):
@@ -47,24 +54,7 @@ def resolve_target(principal, payload):
         if workspace_id not in {item["id"] for item in projects(principal)}:
             raise ValueError("Workspace unavailable")
     else:
-        if principal.host_mode:
-            from modules.host_workspace_manager import create_host_workspace
-            path = payload.get("project_path")
-            if not isinstance(path, str) or not path.strip():
-                path = str(Path.home() / "Desktop" / "Astrion" / _project_name(payload))
-            # The selected path is the project folder. The shared creator derives
-            # its label from the folder name when no explicit label is supplied.
-            workspace_id = create_host_workspace(path)["workspace"]["workspace_id"]
-        else:
-            from server import state
-            name = _project_name(payload)
-            if principal.is_api_user:
-                workspace_id = f"chat-{uuid4().hex[:12]}"
-                state.api_user_manager.ensure_workspace(principal.username, workspace_id)
-            else:
-                workspace = state.user_manager.create_user_workspace(principal.username,
-                    workspace_id=f"chat-{uuid4().hex[:12]}", label=name)
-                workspace_id = workspace.workspace_id
+        raise ValueError("Workspace identity is required")
     workspace = resolve_workspace(principal.username, workspace_id,
                                   identity=identity_for(principal, workspace_id), prepare=True)
     agent = replace(principal, workspace_id=workspace_id, conversation_kind="agent",

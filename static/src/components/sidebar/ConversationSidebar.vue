@@ -172,6 +172,15 @@
             "
           />
         </label>
+        <button
+          v-if="!isGroupByWorkspaceActive"
+          type="button"
+          class="conversation-import-button"
+          :aria-label="$t('sidebar.importConversation')"
+          @click="transferDialog?.pickImport()"
+        >
+          <span class="icon icon-sm" :style="iconStyle('file')" aria-hidden="true"></span>
+        </button>
       </div>
 
       <div ref="conversationListEl" class="conversation-list">
@@ -301,6 +310,12 @@
                         }}</span>
                       </button>
                       <button
+                        type="button"
+                        @click="handleImportWorkspaceConversation(String(ws.workspace_id || ''))"
+                      >
+                        <span>{{ $t('sidebar.importConversation') }}</span>
+                      </button>
+                      <button
                         v-if="props.versioningHostMode"
                         type="button"
                         @click="handleRevealWorkspace(String(ws.workspace_id || ''))"
@@ -419,6 +434,24 @@
                                     ></span>
                                     <span>{{ $t('common.copy') }}</span>
                                   </button>
+                                  <ConversationTransferMenu
+                                    :chat-mode="chatMode"
+                                    :icon-style="iconStyle"
+                                    @export="
+                                      openActionMenuId = null;
+                                      transferDialog?.startExport(
+                                        conv.id,
+                                        String(ws.workspace_id || '')
+                                      );
+                                    "
+                                    @migrate="
+                                      openActionMenuId = null;
+                                      transferDialog?.openMigration(
+                                        conv.id,
+                                        String(ws.workspace_id || '')
+                                      );
+                                    "
+                                  />
                                   <button
                                     type="button"
                                     class="danger"
@@ -561,6 +594,24 @@
                                 ></span>
                                 <span>{{ $t('common.copy') }}</span>
                               </button>
+                              <ConversationTransferMenu
+                                :chat-mode="chatMode"
+                                :icon-style="iconStyle"
+                                @export="
+                                  openActionMenuId = null;
+                                  transferDialog?.startExport(
+                                    conv.id,
+                                    String(group.workspace_id || '')
+                                  );
+                                "
+                                @migrate="
+                                  openActionMenuId = null;
+                                  transferDialog?.openMigration(
+                                    conv.id,
+                                    String(group.workspace_id || '')
+                                  );
+                                "
+                              />
                               <button
                                 type="button"
                                 class="danger"
@@ -692,6 +743,18 @@
                         ></span>
                         <span>{{ $t('common.copy') }}</span>
                       </button>
+                      <ConversationTransferMenu
+                        :chat-mode="chatMode"
+                        :icon-style="iconStyle"
+                        @export="
+                          openActionMenuId = null;
+                          transferDialog?.startExport(conv.id, currentWorkspaceId);
+                        "
+                        @migrate="
+                          openActionMenuId = null;
+                          transferDialog?.openMigration(conv.id, currentWorkspaceId);
+                        "
+                      />
                       <button
                         type="button"
                         class="danger"
@@ -953,6 +1016,12 @@
         </Teleport>
       </div>
     </div>
+    <ConversationTransferDialog
+      ref="transferDialog"
+      :chat-mode="chatMode"
+      :workspace-id="currentWorkspaceId"
+      @completed="$emit('select-workspace-conversation', $event)"
+    />
   </aside>
 </template>
 
@@ -971,7 +1040,10 @@ import { openExternal } from '@/utils/openExternal';
 import ModeSwitcher from '@/components/chat-mode/ModeSwitcher.vue';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 import SoftwareUpdateDialog from './SoftwareUpdateDialog.vue';
+import ConversationTransferDialog from './ConversationTransferDialog.vue';
+import ConversationTransferMenu from './ConversationTransferMenu.vue';
 
+const transferDialog = ref<InstanceType<typeof ConversationTransferDialog>>();
 const props = withDefaults(
   defineProps<{
     chatMode?: boolean;
@@ -1553,6 +1625,11 @@ const handleWorkspaceConversationClick = (conversationId: string, workspaceId: s
 const handleCreateWorkspaceConversation = (workspaceId: string) => {
   openWorkspaceMenuId.value = null;
   emit('create-workspace-conversation', workspaceId);
+};
+
+const handleImportWorkspaceConversation = (workspaceId: string) => {
+  openWorkspaceMenuId.value = null;
+  transferDialog.value?.pickImport(workspaceId);
 };
 
 const toggleWorkspaceMenu = (workspaceId: string) => {

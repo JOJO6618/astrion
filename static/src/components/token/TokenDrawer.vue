@@ -87,7 +87,7 @@
           </div>
           <div class="usage-cell usage-cell--left usage-cell--quota panel-card">
             <div class="usage-title">{{ $t('sidebar.quotaStats') }}</div>
-            <div class="stat-grid stat-grid--triple">
+            <div class="stat-grid stat-grid--triple" v-if="usageQuota.applicable !== false">
               <div class="stat-block" v-for="tier in quotaTiers" :key="tier.key">
                 <div class="stat-label">{{ $t(tier.label) }}</div>
                 <div class="stat-value">{{ formatQuotaValue(tier.value) }}</div>
@@ -96,6 +96,7 @@
                 </div>
               </div>
             </div>
+            <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoQuota') }}</div>
           </div>
           <div class="usage-cell usage-cell--right usage-cell--resource panel-card">
             <div class="usage-title">{{ $t('sidebar.resourceStats') }}</div>
@@ -157,6 +158,7 @@ const props = defineProps<{
   containerNetRate: { down_bps: number | null; up_bps: number | null };
   projectStorage: { used_bytes: number; limit_bytes?: number; usage_percent?: number };
   usageQuota: {
+    applicable?: boolean | null;
     fast: Record<string, any>;
     thinking: Record<string, any>;
     search: Record<string, any>;

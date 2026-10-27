@@ -280,6 +280,29 @@ class DesktopNavigation:
             state["resume_key"] = tab["key"]
             tab["error"] = ""
 
+    def relocated(self, username: str, source_workspace_id: str,
+                  target_workspace_id: str, conv_id: str, label: str = "") -> dict:
+        """Server-only relocation; preserve tab identity and revoke stale loading."""
+        with self.lock:
+            data = self._load()
+            state = self._state(data, username)
+            moved = set()
+            for tab in state["tabs"]:
+                if (tab.get("conversation_kind", "agent") == "agent"
+                        and tab["workspace_id"] == source_workspace_id
+                        and tab["conversation_id"] == conv_id):
+                    tab.update(workspace_id=target_workspace_id,
+                               workspace_label=label, error="")
+                    moved.add(tab["key"])
+            if moved:
+                nav = state["navigation"]
+                if nav.get("key") in moved and not nav.get("page"):
+                    navigate(state, nav["key"])
+                elif state["active_key"] in moved and not nav.get("page") and not nav.get("key"):
+                    navigate(state, state["active_key"])
+                self._save(data, username, state)
+            return public_state(state)
+
     def deleted(self, username: str, workspace_id: str, conv_id: str) -> dict:
         from uuid import uuid4
         return self.command(username, uuid4().hex, "deleted", {
