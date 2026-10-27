@@ -66,6 +66,8 @@
 
 | 文件 | 内容 | 说明 |
 |------|------|------|
+| [studio_design.md](studio_design.md) | Studio / Design 产品设计草案：作品类型、框选批注、版本管理与首版范围建议 | 2026-10-27 讨论归档；明确用户方向、建议与待定项，尚未实施 |
+| [knowledge_open_source_research.md](knowledge_open_source_research.md) | Knowledge 开源复用调研：六个候选、源码与许可、工程难点和验证路线 | 2026-10-27；区分代码核验、官方说明与未实测项，未开始集成 |
 | `coauthor_trailer.md` | Commit 共同作者尾注完整规范（格式、邮箱、多作者、自检） | 2026-10-08 新建，`AGENTS.md` §6 引用；原先该规范只存在于本地私有项目记忆，clone 后读不到 |
 | `sub_agent_unification_plan.md` | 统一子智能体实施记录、轮次恢复、工具与MCP边界 | 2026-10-22 更新；含离线验证与实机验收边界 |
 | `sub_agent_migration.md` | 旧多智能体主对话离线迁入普通目录 | 默认预览、备份与冲突回滚；本机217条数据已用隔离副本验证 |
