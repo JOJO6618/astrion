@@ -75,6 +75,9 @@ class APIClientProfileMixin:
         self.provider_id = str(profile.get("provider_id") or "") or None
         self.api_protocol = str(profile.get("api_protocol") or "") or None
         self.responses_auth = str(profile.get("responses_auth") or "") or None
+        # Codex 多账号（2026-10-29）：请求必须精确使用所选连接对应的账号凭证/
+        # 模型缓存，缺省（旧 profile）为主账号。
+        self.responses_account_id = str(profile.get("responses_account_id") or "") or None
         self.responses_instructions_source = str(profile.get("instructions_source") or "") or None
         self.model_multimodal = self._normalize_multimodal_capability(profile.get("multimodal"))
         self.default_context_window = profile.get("context_window") or fast.get("context_window")

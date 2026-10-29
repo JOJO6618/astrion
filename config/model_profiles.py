@@ -199,15 +199,18 @@ def _load_provider_models() -> Dict[str, Dict[str, Any]]:
 
 
 def _load_codex_models() -> Dict[str, Dict[str, Any]]:
-    """合并 Codex 订阅动态模型（host 模式；无凭证/无缓存时静默返回空）。
+    """合并 Codex 订阅动态模型（全部已登录账号；无凭证/无缓存时静默返回空）。
+
+    多账号（2026-10-29）：每个账号一套模型 key（``{账号连接id}/{slug}``），
+    主账号沿用 ``openai-codex/{slug}``，旧对话/角色引用保持有效。
 
     延迟导入避免配置层与 api_client 层的导入耦合；codex 子包任何异常
     都不应影响常规模型列表的可用性。
     """
     try:
-        from utils.api_client.codex.models import get_models_manager
+        from utils.api_client.codex.models import get_all_codex_profiles
 
-        return get_models_manager().get_profiles()
+        return get_all_codex_profiles()
     except Exception:
         return {}
 

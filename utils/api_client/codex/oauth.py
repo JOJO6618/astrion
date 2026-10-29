@@ -88,14 +88,24 @@ class _V6OnlyHTTPServer(HTTPServer):
         super().server_bind()
 
 
-class CodexOAuthFlow:
-    """一次登录流程的状态机：pending → completed / failed / timeout / cancelled。"""
+class _LoginCancelled(Exception):
+    """内部信号：凭证提交边界发现流程已被取消/判负，禁止落盘。"""
 
-    def __init__(self, auth_manager: CodexAuthManager) -> None:
-        self._auth = auth_manager
+
+class CodexOAuthFlow:
+    """一次登录流程的状态机：pending → completed / failed / timeout / cancelled。
+
+    多账号（2026-10-29）：构造时传账号注册表，授权完成后由注册表按账号身份
+    决定「更新原账号」还是「新建账号」（不在这里直接写凭证文件）。
+    """
+
+    def __init__(self, account_store) -> None:
+        self._store = account_store
         self._status = "pending"
         self._error: Optional[str] = None
         self._account_id: Optional[str] = None
+        self._connection_id: Optional[str] = None
+        self._account_hash: Optional[str] = None
         self._servers: List[HTTPServer] = []
         self._done = threading.Event()
         self._started_at = time.time()
@@ -108,6 +118,8 @@ class CodexOAuthFlow:
         # phase: waiting=等待浏览器授权回调；exchanging=换 token 中（后台线程）
         self._phase = "waiting"
         self._exchange_started = False
+        # 取消/提交同步边界：cancel 与凭证落盘互斥，只能二选一
+        self._commit_lock = threading.Lock()
 
     # ------------------------------------------------------------- 生命周期
 
@@ -209,6 +221,8 @@ class CodexOAuthFlow:
             "status": self._status,
             "error": self._error,
             "account_id": self._account_id,
+            "connection_id": self._connection_id,
+            "account_hash": self._account_hash,
             "flow_mode": "browser",
         }
         if self._status == "pending":
@@ -216,34 +230,57 @@ class CodexOAuthFlow:
         return result
 
     def cancel(self) -> None:
-        if self._status == "pending":
-            self._status = "cancelled"
+        # 与凭证提交互斥：如果提交已开始（落盘临界区），取消等待并让登录正常
+        # 完成；否则在落盘前把状态置为 cancelled，提交边界会拒绝写入。
+        with self._commit_lock:
+            if self._status == "pending":
+                self._status = "cancelled"
         self._shutdown_server()
 
     # ------------------------------------------------------------- 内部步骤
 
     def _exchange(self) -> None:
-        """后台线程：授权码换 token（网络失败自动重试）并落盘。"""
+        """后台线程：授权码换 token（网络失败自动重试）并由注册表落盘。"""
         assert self._code is not None
-        error, account_id = _exchange_code_for_tokens_with_retry(
-            self._auth,
-            code=self._code,
-            verifier=self._verifier,
-            redirect_uri=OAUTH_REDIRECT_URI,
-            should_abort=lambda: self._status != "pending",
-        )
-        if self._status != "pending":
+        try:
+            error, account_id, record = _exchange_code_for_tokens_with_retry(
+                self._store,
+                code=self._code,
+                verifier=self._verifier,
+                redirect_uri=OAUTH_REDIRECT_URI,
+                should_abort=lambda: self._status != "pending",
+                commit=self._commit_tokens,
+            )
+        except _LoginCancelled:
+            return  # 取消先于提交：不写凭证，终态仍为 cancelled
+        if self._status not in ("pending", "completed"):
             return  # 已取消/超时判负：不覆盖终态
         if error:
             self._fail(error)
             return
         self._account_id = account_id
+        if record:
+            self._connection_id = str(record.get("id") or "") or None
+            self._account_hash = str(record.get("hash") or "") or None
         self._status = "completed"
         self._shutdown_server()
 
+    def _commit_tokens(self, action):
+        """在取消/提交同步边界内落盘（与 cancel 互斥，避免取消后仍写凭证）。"""
+        with self._commit_lock:
+            if self._status != "pending":
+                raise _LoginCancelled()
+            record = action()
+            # 与落盘同一临界区置 completed：之后到来的 cancel 只能看到已完成。
+            self._status = "completed"
+            return record
+
     def _fail(self, message: str) -> None:
-        self._status = "failed"
-        self._error = message
+        with self._commit_lock:
+            if self._status != "pending":
+                return  # 已完成/已取消：不覆盖终态，也不在完成后报失败
+            self._status = "failed"
+            self._error = message
         self._done.set()
         # 释放监听必须异步：_fail 可能在 handler 线程内被调用（state 不匹配 /
         # 授权错误分支），而 HTTPServer.shutdown() 会等待 serve_forever 退出——
@@ -267,61 +304,24 @@ class CodexOAuthFlow:
 # ---------------------------------------------------------------------------
 
 
-def _persist_tokens(
-    auth_manager: CodexAuthManager,
-    access: str,
-    refresh: str,
-    id_token: str,
-    account_id: Optional[str],
-) -> None:
-    """写入 astrion 独立凭证文件（结构与 CLI auth.json 对齐；不触碰 CLI 文件）。"""
-    from datetime import datetime, timezone
-    import json as _json
-    import os
-    from pathlib import Path
-
-    path = Path(auth_manager.auth_path)
-    existing: Dict[str, Any] = {}
-    if path.exists():
-        try:
-            existing = _json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            existing = {}
-    data: Dict[str, Any] = {
-        "auth_mode": existing.get("auth_mode") or "chatgpt",
-        "OPENAI_API_KEY": existing.get("OPENAI_API_KEY"),
-        "tokens": {
-            "id_token": id_token,
-            "access_token": access,
-            "refresh_token": refresh,
-            "account_id": account_id,
-        },
-        "last_refresh": datetime.now(timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%S.%fZ"
-        ),
-    }
-    tmp = path.with_suffix(path.suffix + ".tmp-astrion")
-    with open(tmp, "w", encoding="utf-8") as f:
-        _json.dump(data, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, path)
-    auth_manager.reload()
-
-
 def _exchange_code_for_tokens(
-    auth_manager: CodexAuthManager,
+    account_store,
     *,
     code: str,
     verifier: str,
     redirect_uri: str,
-) -> tuple[Optional[str], Optional[str], bool]:
-    """授权码 + PKCE verifier 换 token 并原子落盘。
+    commit: Optional[Any] = None,
+) -> tuple[Optional[str], Optional[str], Optional[Dict[str, Any]], bool]:
+    """授权码 + PKCE verifier 换 token 并由账号注册表落盘。
 
-    返回 (error, account_id, retryable)：retryable=True 表示网络层异常
-    （连接/握手/读超时等，请求可能未到达服务端），值得自动重试；
-    HTTP 非 200（授权码无效等终态错误）与凭证落盘失败不重试。
+    ``commit`` 可选：接收一个执行落盘的 callable，在流程自己的“取消/提交”
+    同步边界内调用；被取消时抛 ``_LoginCancelled``。网络请求必须在边界外，
+    因此取消按钮不会等网络超时，但落盘绝不会发生在取消之后。
+
+    返回 (error, account_id, account_record, retryable)：retryable=True 表示
+    网络层异常（请求可能未到达服务端），值得自动重试；HTTP 非 200 与
+    凭证落盘失败不重试。account_record = {id, hash, display_name, ...}，
+    重复登录时返回被更新的原账号（不新建）。
     """
     body = urllib.parse.urlencode(
         {
@@ -340,39 +340,56 @@ def _exchange_code_for_tokens(
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
     except Exception as exc:
-        return f"换取 token 网络失败: {exc}", None, True
+        return f"换取 token 网络失败: {exc}", None, None, True
     if resp.status_code != 200:
-        return f"换取 token 失败 (HTTP {resp.status_code}): {resp.text[:300]}", None, False
+        return f"换取 token 失败 (HTTP {resp.status_code}): {resp.text[:300]}", None, None, False
     payload = resp.json()
     access = payload.get("access_token")
     refresh = payload.get("refresh_token")
     id_token = payload.get("id_token") or ""
     if not access or not refresh:
-        return "token 响应缺少 access_token/refresh_token", None, False
+        return "token 响应缺少 access_token/refresh_token", None, None, False
     account_id = account_id_from_id_token(id_token)
+
+    def _upsert():
+        return account_store.upsert_tokens(
+            access_token=access,
+            refresh_token=refresh,
+            id_token=id_token,
+            account_id=account_id,
+        )
+
     try:
-        _persist_tokens(auth_manager, access, refresh, id_token, account_id)
+        if commit is not None:
+            record = commit(_upsert)
+        else:
+            record = _upsert()
+    except _LoginCancelled:
+        raise
     except Exception as exc:
-        return f"写入凭证失败: {exc}", None, False
-    return None, account_id, False
+        return f"写入凭证失败: {exc}", None, None, False
+    return None, account_id, record, False
 
 
 _EXCHANGE_RETRY_DELAYS = (2.0, 4.0)  # 第 2/3 次尝试前的等待秒数
 
 
 def _exchange_code_for_tokens_with_retry(
-    auth_manager: CodexAuthManager,
+    account_store,
     *,
     code: str,
     verifier: str,
     redirect_uri: str,
     should_abort: Optional[Any] = None,
-) -> tuple[Optional[str], Optional[str]]:
-    """换 token 带网络重试（最多 3 次，间隔 2s/4s）。返回 (error, account_id)。
+    commit: Optional[Any] = None,
+) -> tuple[Optional[str], Optional[str], Optional[Dict[str, Any]]]:
+    """换 token 带网络重试（最多 3 次，间隔 2s/4s）。
 
-    仅在后台线程中调用（单次尝试最长 30s 网络超时，严禁放请求线程）。
-    should_abort（可选回调）在重试等待期间以 0.2s 粒度检查，返回 True
-    表示流程已被取消/超时，立即放弃且保留原错误（调用方据状态丢弃）。
+    返回 (error, account_id, account_record)；仅在后台线程中调用
+    （单次尝试最长 30s 网络超时，严禁放请求线程）。should_abort（可选回调）
+    在重试等待期间以 0.2s 粒度检查，返回 True 表示流程已被取消/超时，
+    立即放弃且保留原错误（调用方据状态丢弃）。``commit`` 透传给底层，
+    用于把凭证落盘限定在流程的取消/提交同步边界内。
     """
     delays = (0.0, *_EXCHANGE_RETRY_DELAYS)
     error: Optional[str] = None
@@ -381,16 +398,20 @@ def _exchange_code_for_tokens_with_retry(
             deadline = time.monotonic() + delay
             while time.monotonic() < deadline:
                 if should_abort is not None and should_abort():
-                    return error, None
+                    return error, None, None
                 time.sleep(min(0.2, deadline - time.monotonic()))
-        error, account_id, retryable = _exchange_code_for_tokens(
-            auth_manager, code=code, verifier=verifier, redirect_uri=redirect_uri
+        error, account_id, record, retryable = _exchange_code_for_tokens(
+            account_store,
+            code=code,
+            verifier=verifier,
+            redirect_uri=redirect_uri,
+            commit=commit,
         )
         if error is None:
-            return None, account_id
+            return None, account_id, record
         if not retryable:
-            return error, None
-    return error, None
+            return error, None, None
+    return error, None, None
 
 
 class CodexDeviceFlow:
@@ -405,15 +426,18 @@ class CodexDeviceFlow:
     status/poll 等 Flask 请求端点零阻塞，慢代理下不会再卡住页面加载。
     """
 
-    def __init__(self, auth_manager: CodexAuthManager) -> None:
-        self._auth = auth_manager
+    def __init__(self, account_store) -> None:
+        self._store = account_store
         self._status = "pending"
         self._error: Optional[str] = None
         self._account_id: Optional[str] = None
+        self._connection_id: Optional[str] = None
+        self._account_hash: Optional[str] = None
         self._started_at = time.time()
         # phase: starting=请求设备码中；waiting=等待用户输码授权；exchanging=换 token 中
         self._phase = "starting"
         self._wake = threading.Event()  # cancel 唤醒，中断轮询间隔等待
+        self._commit_lock = threading.Lock()
 
         self._device_auth_id: Optional[str] = None
         self.user_code: Optional[str] = None
@@ -492,6 +516,8 @@ class CodexDeviceFlow:
             "status": self._status,
             "error": self._error,
             "account_id": self._account_id,
+            "connection_id": self._connection_id,
+            "account_hash": self._account_hash,
             "user_code": self.user_code,
             "verification_uri": self.verification_uri,
             "flow_mode": "device",
@@ -501,8 +527,9 @@ class CodexDeviceFlow:
         return result
 
     def cancel(self) -> None:
-        if self._status == "pending":
-            self._status = "cancelled"
+        with self._commit_lock:
+            if self._status == "pending":
+                self._status = "cancelled"
         self._wake.set()
 
     # ------------------------------------------------------------- 内部步骤
@@ -550,24 +577,43 @@ class CodexDeviceFlow:
     def _exchange(self, code: str, verifier: str) -> None:
         """授权码换 token（网络失败自动重试）；仅在后台线程中调用。"""
         self._phase = "exchanging"
-        error, account_id = _exchange_code_for_tokens_with_retry(
-            self._auth,
-            code=code,
-            verifier=verifier,
-            redirect_uri=OAUTH_DEVICE_REDIRECT_URI,
-            should_abort=lambda: self._status != "pending",
-        )
-        if self._status != "pending":
+        try:
+            error, account_id, record = _exchange_code_for_tokens_with_retry(
+                self._store,
+                code=code,
+                verifier=verifier,
+                redirect_uri=OAUTH_DEVICE_REDIRECT_URI,
+                should_abort=lambda: self._status != "pending",
+                commit=self._commit_tokens,
+            )
+        except _LoginCancelled:
+            return  # 取消先于提交：不写凭证
+        if self._status not in ("pending", "completed"):
             return  # 已取消：不覆盖终态
         if error:
             self._fail(error)
             return
         self._account_id = account_id
+        if record:
+            self._connection_id = str(record.get("id") or "") or None
+            self._account_hash = str(record.get("hash") or "") or None
         self._status = "completed"
 
+    def _commit_tokens(self, action):
+        """与 cancel 互斥的凭证提交边界（设备码流与浏览器流同语义）。"""
+        with self._commit_lock:
+            if self._status != "pending":
+                raise _LoginCancelled()
+            record = action()
+            self._status = "completed"
+            return record
+
     def _fail(self, message: str) -> None:
-        self._status = "failed"
-        self._error = message
+        with self._commit_lock:
+            if self._status != "pending":
+                return
+            self._status = "failed"
+            self._error = message
 
 
 # ---------------------------------------------------------------------------
@@ -578,18 +624,21 @@ _current_flow: Optional[Any] = None  # CodexOAuthFlow | CodexDeviceFlow
 _flow_lock = threading.Lock()
 
 
-def start_login_flow(auth_manager: CodexAuthManager) -> Dict[str, Any]:
-    """开启浏览器登录流程；已有进行中的流程时直接返回其状态（幂等）。"""
+def start_login_flow(account_store) -> Dict[str, Any]:
+    """开启浏览器登录流程。
+
+    **串行约束（2026-10-29）**：已有进行中的登录流程时明确拒绝新请求
+    （返回 error=login_in_progress + 既有流程状态），绝不静默取消/覆盖
+    别人正在进行的登录。
+    """
     global _current_flow
     with _flow_lock:
         if _current_flow is not None:
             state = _current_flow.poll()
             if state["status"] == "pending":
-                if isinstance(_current_flow, CodexOAuthFlow):
-                    return {"authorize_url": _current_flow.authorize_url, **state}
-                return state  # 对方为设备流：返回其状态，前端按 flow_mode 展示
+                return {**state, "reused": True, "error": "login_in_progress"}
             _current_flow = None
-        flow = CodexOAuthFlow(auth_manager)
+        flow = CodexOAuthFlow(account_store)
         flow.start()
         state = flow.poll()
         if state["status"] == "failed":
@@ -598,8 +647,8 @@ def start_login_flow(auth_manager: CodexAuthManager) -> Dict[str, Any]:
         return {"authorize_url": flow.authorize_url, **state}
 
 
-def start_device_login_flow(auth_manager: CodexAuthManager) -> Dict[str, Any]:
-    """开启设备码登录流程；已有进行中的流程时直接返回其状态（幂等）。
+def start_device_login_flow(account_store) -> Dict[str, Any]:
+    """开启设备码登录流程；已有进行中的流程时明确拒绝（不覆盖/不取消）。
 
     start() 仅 spawn 后台线程，本函数立即返回 pending（phase=starting）；
     设备码请求失败等错误由后台线程异步置 failed，经 poll 呈现给前端。
@@ -609,11 +658,9 @@ def start_device_login_flow(auth_manager: CodexAuthManager) -> Dict[str, Any]:
         if _current_flow is not None:
             state = _current_flow.poll()
             if state["status"] == "pending":
-                if isinstance(_current_flow, CodexOAuthFlow):
-                    return {"authorize_url": _current_flow.authorize_url, **state}
-                return state
+                return {**state, "reused": True, "error": "login_in_progress"}
             _current_flow = None
-        flow = CodexDeviceFlow(auth_manager)
+        flow = CodexDeviceFlow(account_store)
         flow.start()
         state = flow.poll()
         if state["status"] == "failed":

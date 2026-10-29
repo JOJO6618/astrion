@@ -83,12 +83,23 @@ INSTRUCTIONS_OVERRIDE_PATH = str(
     Path(DATA_DIR).parent / "config" / "codex_instructions.txt"
 )
 
-# astrion 侧 codex 数据文件（模型缓存 + proxy/client_version 配置）
+# astrion 侧 codex 数据文件（主账号模型缓存 + 全局 proxy/client_version 配置）
+# 多账号（2026-10-29）后：主账号缓存仍放这里（保留旧数据与全局配置键），
+# 其它账号的模型缓存放 CODEX_MODELS_DIR/<connection_id>.json，互不覆盖。
 CODEX_DATA_PATH = str(Path(DATA_DIR) / "codex_models.json")
 
 # astrion 独立 OAuth 凭证文件（0600；结构与 CLI auth.json 对齐：
-# auth_mode / OPENAI_API_KEY / tokens / last_refresh）
+# auth_mode / OPENAI_API_KEY / tokens / last_refresh）。
+# 多账号后它是「主账号」legacy 凭证文件，id 固定为 LEGACY_CODEX_ACCOUNT_ID；
+# 新增账号的凭证放 CODEX_ACCOUNTS_DIR/<connection_id>.json，账号索引见
+# CODEX_ACCOUNTS_INDEX_PATH（只存身份哈希/显示哈希/时间，不存 token）。
 CODEX_AUTH_PATH = str(Path(DATA_DIR) / "codex_auth.json")
+LEGACY_CODEX_ACCOUNT_ID = "openai-codex"
+CODEX_ACCOUNTS_DIR = str(Path(DATA_DIR) / "codex_accounts")
+CODEX_ACCOUNTS_INDEX_PATH = str(Path(DATA_DIR) / "codex_accounts.json")
+CODEX_MODELS_DIR = str(Path(DATA_DIR) / "codex_models")
+# ChatGPT 订阅账号在模型菜单里的展示基名（追加「-<账号短哈希>」）
+CODEX_ACCOUNT_DISPLAY_BASE = "OpenAI（ChatGPT 订阅）"
 
 
 def load_codex_data() -> Dict[str, Any]:

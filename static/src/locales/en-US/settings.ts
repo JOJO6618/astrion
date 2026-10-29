@@ -125,7 +125,8 @@ export default {
   // ── Providers section ──
   providersConnectedSection: 'Connected',
   providersCatalogSection: 'Add provider',
-  providersCatalogDesc: 'Pick a provider and enter an API key; its model list syncs automatically.',
+  providersCatalogDesc:
+    'Pick a provider and enter an API key; its model list syncs automatically. Connected providers can take additional independent API keys, each with its own model list, refresh and disconnect.',
   protocolNoteMultiPartial:
     'Multi-protocol gateway: Chat Completions and Responses models work out of the box; Anthropic / Google protocol models are registered and listed, but calls are not supported in this version.',
   protocolNoteMultiPartialCount: '{count} of them use protocols not yet supported for calls.',
@@ -139,6 +140,11 @@ export default {
   providerDeleting: 'Deleting…',
   providerConnect: 'Connect',
   providerConnecting: 'Connecting…',
+  providerAddKey: 'Add API key',
+  providerAddAccount: 'Add account',
+  providerCredentialMissing: 'Credentials missing',
+  providerRemoveAccount: 'Remove account',
+  providerDuplicateConnection: 'This API key already has an active connection.',
   providerLastSync: 'Last synced {time}',
   refreshSuccess: 'Refreshed. {count} models in total.',
   disconnectConfirmTitle: 'Disconnect provider',

@@ -29,6 +29,26 @@ export interface ProviderCatalogEntry {
   local?: boolean;
   protocol_note?: string | null; // 'multi_protocol_partial' 等
   connected: boolean;
+  /** 条目类型：catalog=目录入口行（可连接/继续添加）；connection=一条已登记连接 */
+  entry_kind?: 'catalog' | 'connection';
+  kind?: 'catalog' | 'connection';
+  connection?: boolean;
+  /** 连接真实状态：ready / credential_missing 等（目录行为空） */
+  state?: string | null;
+  /** 已登记但本地凭证缺失：仍作为连接行管理，可移除 */
+  credential_missing?: boolean;
+  catalog_id?: string | null;
+  /** 目录入口行：该提供商已有连接数（已有连接仍在目录区提供「添加」入口） */
+  has_connections?: boolean;
+  connection_count?: number;
+  /** 本地无密钥条目已有连接时不可再添加 */
+  can_add?: boolean;
+  /** 连接展示序号：0=原名，1=原名-1…（删除不改剩余编号） */
+  display_index?: number;
+  base_name?: string;
+  api_key_masked?: string | null;
+  /** ChatGPT 订阅账号的稳定短哈希 */
+  account_hash?: string | null;
   /** 自定义提供商（或目录已下线的孤儿记录）：无图标，断开即彻底删除 */
   custom?: boolean;
   models_count?: number;
@@ -102,10 +122,18 @@ export const useProvidersStore = defineStore('providers', {
   }),
   getters: {
     connectedEntries(state): ProviderCatalogEntry[] {
-      return state.catalog.filter((entry) => entry.connected);
+      // 按登记身份（entry_kind）分类，不按 connected 布尔：凭证暂缺的已登记
+      // ChatGPT 账号 connected=false，但仍必须出现在提供商页并可移除。
+      return state.catalog.filter(
+        (entry) =>
+          entry.entry_kind === 'connection' || (entry.entry_kind == null && entry.connection)
+      );
     },
-    disconnectedEntries(state): ProviderCatalogEntry[] {
-      return state.catalog.filter((entry) => !entry.connected);
+    catalogEntries(state): ProviderCatalogEntry[] {
+      // 目录入口行：始终展示，已有连接时按钮变「添加」，仍可继续添加独立 Key
+      return state.catalog.filter(
+        (entry) => entry.entry_kind === 'catalog' || (entry.entry_kind == null && !entry.connection)
+      );
     }
   },
   actions: {
@@ -144,11 +172,13 @@ export const useProvidersStore = defineStore('providers', {
         .fetchModels()
         .catch(() => {});
     },
-    /** 连接目录条目（api_key 传密钥；auth=none 本地条目无需密钥） */
+    /** 连接目录条目（api_key 传密钥；auth=none 本地条目无需密钥）。
+     * 同一目录可多次调用以添加多个独立 Key 连接（展示名由后端分配序号）。
+     */
     async connectCatalog(entry: ProviderCatalogEntry, apiKey = ''): Promise<ProviderActionResult> {
       this._setBusy(entry.id, 'connect');
       try {
-        const payload: Record<string, any> = { catalog_id: entry.id };
+        const payload: Record<string, any> = { catalog_id: entry.catalog_id || entry.id };
         if (apiKey.trim()) {
           payload.api_key = apiKey.trim();
         }
@@ -205,13 +235,13 @@ export const useProvidersStore = defineStore('providers', {
         this._clearBusy(id || '__custom__');
       }
     },
-    /** 刷新模型列表；codex_oauth 条目映射到 Codex 模型刷新端点 */
+    /** 刷新模型列表；codex_oauth 连接映射到指定账号的 Codex 模型刷新端点 */
     async refreshProvider(entry: ProviderCatalogEntry): Promise<ProviderActionResult> {
       this._setBusy(entry.id, 'refresh');
       try {
         const url =
           entry.auth === 'codex_oauth'
-            ? '/api/codex/models/refresh'
+            ? `/api/codex/models/refresh?account_id=${encodeURIComponent(entry.id)}`
             : `/api/providers/${encodeURIComponent(entry.id)}/refresh`;
         const resp = await fetch(url, { method: 'POST' });
         const data = await parseJson(resp);
@@ -230,15 +260,23 @@ export const useProvidersStore = defineStore('providers', {
         this._clearBusy(entry.id);
       }
     },
-    /** 断开连接；codex_oauth 条目映射到 Codex 登出 */
+    /** 断开连接；codex_oauth 连接映射到指定账号的 Codex 登出 */
     async disconnectProvider(entry: ProviderCatalogEntry): Promise<ProviderActionResult> {
       this._setBusy(entry.id, 'disconnect');
       try {
-        const url =
-          entry.auth === 'codex_oauth'
-            ? '/api/codex/logout'
-            : `/api/providers/${encodeURIComponent(entry.id)}`;
-        const resp = await fetch(url, { method: entry.auth === 'codex_oauth' ? 'POST' : 'DELETE' });
+        const isCodex = entry.auth === 'codex_oauth';
+        const url = isCodex
+          ? '/api/codex/logout'
+          : `/api/providers/${encodeURIComponent(entry.id)}`;
+        const resp = await fetch(url, {
+          method: isCodex ? 'POST' : 'DELETE',
+          ...(isCodex
+            ? {
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ account_id: entry.id })
+              }
+            : {})
+        });
         const data = await parseJson(resp);
         if (!resp.ok || !data?.success) {
           return { ok: false, error: data?.error || `http_${resp.status}` };

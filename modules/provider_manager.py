@@ -1,4 +1,4 @@
-"""第三方 OpenAI 兼容提供商管理（opencode 模式，2026-09-24）。
+"""第三方 OpenAI 兼容提供商管理（opencode 模式，2026-09-24；多连接 2026-10-29）。
 
 职责：
 - 预置提供商目录（``config/providers_catalog.json``，程序能力配置随版本走）；
@@ -8,8 +8,25 @@
   ``config.model_profiles.get_registered_model_profiles()``（key 形如
   ``deepseek/deepseek-chat``，``provider_type="provider"``）。
 
-协议范围：仅 OpenAI Chat Completions（POST ``{base_url}/chat/completions``）。
-多协议网关（OpenCode Zen/Go 等）仅其 chat/completions 子集可用，
+多连接语义（2026-10-29 用户要求）：
+- 同一目录提供商可添加多个独立 API Key 连接，每个连接独立模型列表/刷新/删除；
+- 存储用 **内部连接 id** 作键：新目录连接一律随机
+  ``<catalog_id>-<8位十六进制>``，新自定义连接一律随机
+  ``custom-<请求id>-<8位十六进制>``，**永不复用**（删除后也不会再生成同 id），
+  因此旧对话/旧模型配置里的 ``{连接id}/{model}`` 在连接删除后只会解析失败，
+  绝不会静默落到新 Key；用户填写的自定义 ``provider_id`` 只作基础标识/展示，
+  不作为可复用路由身份；
+- 展示名由「目录名 + 展示序号」派生：序号 0 = 原名，1 = 原名-1，2 = 原名-2…
+  序号在创建时分配并存盘，删除不改剩余编号；新增取当前最小空闲序号
+  （删除「原名-1」后新连接重新占「原名-1」，再添加则占「原名-3」之类的下一个
+  空闲号）。序号只影响展示，不参与请求路由；
+- 不存删除墓碑、不存 Key 历史；重复活跃 Key（同一目录 + 同一 api_key）拒绝
+  重复添加（``duplicate_connection``）；
+- 旧版 ``providers.json``（v1，单连接）启动时一次性迁移：原记录保持原键
+  （如 ``deepseek``）作为内部连接 id、展示序号 0，旧模型引用保持有效。
+
+协议范围：OpenAI Chat Completions + Responses（Responses 见
+``utils/api_client/responses``）。多协议网关仅其 chat/completions 子集可用，
 由目录条目的 ``protocol_note`` 标注，前端负责提示。
 
 权限模型：连接/断开/刷新等全部管理操作仅管理员（host 或 docker 模式），
@@ -22,6 +39,7 @@ import json
 import os
 import re
 import threading
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -31,6 +49,7 @@ from config.paths import DATA_DIR
 
 _CATALOG_PATH = Path(__file__).resolve().parent.parent / "config" / "providers_catalog.json"
 _STORE_FILENAME = "providers.json"
+_STORE_VERSION = 2
 _FETCH_TIMEOUT = 20
 # /models 返回中明显不是聊天模型的 id 片段（embedding/tts/图像/审核等），发现时剔除
 _NON_CHAT_ID_PATTERN = re.compile(
@@ -38,6 +57,7 @@ _NON_CHAT_ID_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _PROVIDER_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+_CODEX_CATALOG_ID = "openai-codex"
 
 
 def _now_iso() -> str:
@@ -51,6 +71,9 @@ def _mask_key(api_key: Optional[str]) -> Optional[str]:
     if not api_key:
         return None
     text = str(api_key)
+    # 无密钥提供商（Ollama / LM Studio）存的内部占位值不是真实凭证，不应展示掩码
+    if text == "not-required":
+        return None
     if len(text) <= 8:
         return text[:2] + "..." if len(text) > 2 else "***"
     return f"{text[:5]}...{text[-4:]}"
@@ -110,7 +133,7 @@ class ProviderManager:
     """已连接提供商的存储、发现与 profile 输出（进程级单例）。"""
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._memory: Optional[Dict[str, Any]] = None
 
     # ------------------------------------------------------------ 存储
@@ -119,11 +142,12 @@ class ProviderManager:
     def _store_path() -> Path:
         return Path(DATA_DIR) / _STORE_FILENAME
 
-    def _load(self) -> Dict[str, Any]:
-        if self._memory is not None:
+    def _load_locked(self, reload: bool = False) -> Dict[str, Any]:
+        """读存储（锁内调用）。version<2 时一次性迁移到多连接结构。"""
+        if self._memory is not None and not reload:
             return self._memory
         path = self._store_path()
-        data: Dict[str, Any] = {"version": 1, "providers": {}}
+        data: Dict[str, Any] = {"version": _STORE_VERSION, "providers": {}}
         try:
             if path.exists():
                 raw = json.loads(path.read_text(encoding="utf-8"))
@@ -131,17 +155,145 @@ class ProviderManager:
                     data = raw
         except Exception:
             pass
+        if not isinstance(data.get("providers"), dict):
+            data["providers"] = {}
+        if self._ensure_schema_locked(data):
+            # 受限只读目录（测试沙箱）不阻断读取；真正写入操作会单独失败报错。
+            try:
+                self._save_locked(data)
+            except OSError:
+                pass
         self._memory = data
         return data
 
-    def _save(self, data: Dict[str, Any]) -> None:
+    def _load(self) -> Dict[str, Any]:
+        # 无锁读取：仅凭内存缓存，必要时进入加锁路径初始化
+        if self._memory is not None:
+            return self._memory
+        with self._lock:
+            return self._load_locked()
+
+    def _save_locked(self, data: Dict[str, Any]) -> None:
         path = self._store_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".json.tmp")
+        tmp = path.with_suffix(f".json.tmp-{os.getpid()}-{threading.get_ident()}-{uuid.uuid4().hex[:8]}")
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
         self._memory = data
+
+    def _ensure_schema_locked(self, data: Dict[str, Any]) -> bool:
+        """v1 → v2 一次性迁移（幂等）：补 display_index/base_name/name。
+
+        旧记录保持原键作内部连接 id（如 ``deepseek``），展示序号 0，因此
+        ``deepseek/xxx`` 等旧模型引用继续有效，不会串到任何新连接。
+        """
+        changed = False
+        catalog_names = {e["id"]: str(e.get("name") or e["id"]) for e in self.catalog_entries()}
+        records = data.get("providers") or {}
+        # 按目录分组，为缺失序号的记录分配最小空闲序号（组内已有序号保持不变）
+        groups: Dict[str, List[str]] = {}
+        for pid, record in records.items():
+            if not isinstance(record, dict):
+                continue
+            catalog_id = str(record.get("catalog_id") or "")
+            group_key = catalog_id or f"__custom__:{pid}"
+            groups.setdefault(group_key, []).append(pid)
+        for group_key, ids in groups.items():
+            used = {
+                int(records[pid]["display_index"])
+                for pid in ids
+                if isinstance(records[pid].get("display_index"), int)
+            }
+            missing = [
+                pid for pid in ids if not isinstance(records[pid].get("display_index"), int)
+            ]
+            if not missing:
+                continue
+            # 旧记录按 connected_at 排序，先来先得，保证迁移顺序稳定
+            missing.sort(key=lambda pid: (str(records[pid].get("connected_at") or ""), pid))
+            next_index = 0
+            for pid in missing:
+                while next_index in used:
+                    next_index += 1
+                record = records[pid]
+                record["display_index"] = next_index
+                used.add(next_index)
+                next_index += 1
+                changed = True
+        for pid, record in records.items():
+            if not isinstance(record, dict):
+                continue
+            catalog_id = str(record.get("catalog_id") or "")
+            if "requested_id" not in record:
+                # 存量迁移身份：旧记录键就是当年的路由身份（目录 id 或用户自定义 id）
+                record["requested_id"] = catalog_id or pid
+                changed = True
+            if "base_name" not in record:
+                record["base_name"] = (
+                    catalog_names.get(catalog_id) or str(record.get("name") or pid)
+                )
+                changed = True
+            expected_name = self._display_name(
+                str(record.get("base_name") or pid), int(record.get("display_index") or 0)
+            )
+            if record.get("name") != expected_name:
+                record["name"] = expected_name
+                changed = True
+        if int(data.get("version") or 1) < _STORE_VERSION:
+            data["version"] = _STORE_VERSION
+            changed = True
+        return changed
+
+    @staticmethod
+    def _display_name(base_name: str, display_index: int) -> str:
+        return base_name if display_index <= 0 else f"{base_name}-{display_index}"
+
+    @staticmethod
+    def _allocate_display_index(records: Dict[str, Any], catalog_id: str) -> int:
+        """新增连接取当前最小空闲展示序号（删除不改剩余编号）。"""
+        used = {
+            int(record.get("display_index") or 0)
+            for record in records.values()
+            if str(record.get("catalog_id") or "") == catalog_id
+            and isinstance(record.get("display_index"), int)
+        }
+        index = 0
+        while index in used:
+            index += 1
+        return index
+
+    @staticmethod
+    def _new_connection_id(records: Dict[str, Any], catalog_id: str) -> str:
+        """分配永不复用的内部连接 id（随机后缀，不以展示序号派生）。"""
+        for _ in range(32):
+            candidate = f"{catalog_id}-{uuid.uuid4().hex[:8]}"
+            if candidate not in records:
+                return candidate
+        raise RuntimeError("无法分配提供商连接 id")
+
+    @staticmethod
+    def _requested_id_of(provider_id: str, record: Dict[str, Any]) -> str:
+        """连接的用户可见基础标识（自定义 provider_id / 目录 id）；仅作展示与配置。"""
+        value = str(record.get("requested_id") or "").strip()
+        if value:
+            return value
+        return str(record.get("catalog_id") or provider_id or "")
+
+    def _new_custom_connection_id(self, records: Dict[str, Any], requested_id: str) -> str:
+        """自定义连接内部 id：``custom-<请求id>-<随机8位>``，永不复用。
+
+        用户填写的 provider_id 只当基础标识；绝不能直接当路由身份（否则删除后同
+        ID 重建会让旧 ``{pid}/{model}`` 静默串到新 Key，甚至能彽持已删订阅的
+        ``openai-codex/...`` 旧模型 key）。``custom-`` 前缀同时与目录/订阅 id 隔离。
+        """
+        slug = re.sub(r"[^a-z0-9_-]", "", str(requested_id or "").lower())[:32] or "provider"
+        catalog_ids = {e["id"] for e in self.catalog_entries()}
+        for _ in range(32):
+            candidate = f"custom-{slug}-{uuid.uuid4().hex[:8]}"
+            if candidate not in records and candidate not in catalog_ids:
+                return candidate
+        raise RuntimeError("无法分配自定义提供商连接 id")
 
     # ------------------------------------------------------------ 目录
 
@@ -157,27 +309,99 @@ class ProviderManager:
         return []
 
     def catalog(self) -> List[Dict[str, Any]]:
-        """目录 + 连接状态合并（供提供商页展示）。"""
-        connected = self._load()["providers"]
-        codex_connected = self._codex_connected()
+        """目录 + 连接状态合并（供提供商页展示）。
+
+        输出两类条目（用 ``entry_kind`` 明确区分，而不是用 connected 布尔分类）：
+        - ``entry_kind="catalog"``（``connection=False``）：目录服务商行，用于「连接 /
+          添加另一个 Key」入口；已有连接（含凭证暂缺的已登记账号）时
+          ``has_connections=True``；
+        - ``entry_kind="connection"``（``connection=True``）：每一条已登记连接（一个 Key
+          一条；ChatGPT 订阅一个账号一条），带独立 id/模型统计/刷新与断开入口；
+          凭证暂缺的订阅账号仍输出，``connected=False``、``state="credential_missing"``，
+          模型统计归零，供前端展示状态并执行移除。
+        """
+        data = self._load()
+        records: Dict[str, Any] = data["providers"]
         entries = self.catalog_entries()
+        catalog_by_id = {e["id"]: e for e in entries}
+        # ChatGPT 订阅账号（不属于 providers.json，单独存储）。
+        # 2026-10-29 复审修正：**所有已登记账号**都要作为连接行输出（包括凭证暂缺
+        # 的 credential_missing），否则登记身份在唯一管理入口里不可见、无法移除；
+        # connected/state 保留真实值，由前端展示为“凭证缺失”而不是已连接。
+        account_rows: List[Dict[str, Any]] = []
+        try:
+            from utils.api_client.codex.accounts import get_codex_account_store
+
+            account_rows = list(get_codex_account_store().list_accounts())
+        except Exception:
+            account_rows = []
+
         output: List[Dict[str, Any]] = []
+        connections_by_catalog: Dict[str, int] = {}
+        for pid, record in records.items():
+            catalog_id = str(record.get("catalog_id") or "")
+            connections_by_catalog[catalog_id] = connections_by_catalog.get(catalog_id, 0) + 1
+
+        # 目录入口行
         for entry in entries:
             item = dict(entry)
-            # 图标 URL 由后端拼接（静态目录伺服），前端零约定开箱即用
             icon = item.get("icon")
             item["icon_url"] = f"/static/icons/providers/{icon}" if icon else None
-            pid = entry["id"]
+            item["catalog_id"] = entry["id"]
+            item["kind"] = "catalog"
+            item["entry_kind"] = "catalog"
+            item["connection"] = False
+            item["connected"] = False
             if entry.get("auth") == "codex_oauth":
-                item["connected"] = codex_connected
+                item["has_connections"] = bool(account_rows)
+                item["connection_count"] = len(account_rows)
             else:
-                item["connected"] = pid in connected and bool(connected[pid].get("enabled", True))
-            if item["connected"] and pid in connected:
-                summary = self._public_summary(pid, connected[pid])
-                item["models_count"] = len(summary.get("models") or [])
-                item["models_fetched_at"] = summary.get("models_fetched_at")
-                item["models_error"] = summary.get("models_error")
-                # 多协议网关提示：统计协议暂不支持调用的模型数（前端配置页展示）
+                item["has_connections"] = connections_by_catalog.get(entry["id"], 0) > 0
+                item["connection_count"] = connections_by_catalog.get(entry["id"], 0)
+            # 本地无密钥提供商（auth=none）同一地址再次连接没有意义（无独立 Key），
+            # 已有连接时不再提供添加入口；其余目录条目允许继续添加独立 Key。
+            item["can_add"] = entry.get("auth") != "none" or not item["has_connections"]
+            output.append(item)
+
+        # 每一条 API Key 连接（含自定义提供商 / 目录已下线的孤儿记录）
+        for pid, record in records.items():
+            if not record.get("enabled", True):
+                continue
+            catalog_id = str(record.get("catalog_id") or "")
+            entry = catalog_by_id.get(catalog_id)
+            summary = self._public_summary(pid, record)
+            item: Dict[str, Any] = {
+                "id": pid,
+                "catalog_id": catalog_id or None,
+                "requested_id": self._requested_id_of(pid, record),
+                "kind": "connection",
+                "entry_kind": "connection",
+                "connection": True,
+                "name": summary.get("name") or pid,
+                "base_name": record.get("base_name"),
+                "display_index": record.get("display_index") or 0,
+                "base_url": summary.get("base_url") or "",
+                "icon": entry.get("icon") if entry else None,
+                "icon_url": (
+                    f"/static/icons/providers/{entry.get('icon')}" if entry and entry.get("icon") else None
+                ),
+                "icon_mono": bool(entry.get("icon_mono")) if entry else False,
+                "auth": "none" if record.get("api_key") == "not-required" else "api_key",
+                "key_url": entry.get("key_url") if entry else None,
+                "badge": entry.get("badge") if entry else None,
+                "local": bool(entry.get("local")) if entry else False,
+                "protocol_note": entry.get("protocol_note") if entry else None,
+                "custom": entry is None,
+                "connected": True,
+                "state": "ready",
+                "credential_missing": False,
+                "models_count": len(summary.get("models") or []),
+                "models_fetched_at": summary.get("models_fetched_at"),
+                "models_error": summary.get("models_error"),
+                "api_key_masked": summary.get("api_key_masked"),
+                "has_custom_headers": summary.get("has_custom_headers"),
+            }
+            if entry:
                 from modules import modelsdev_registry
 
                 unsupported = 0
@@ -194,46 +418,55 @@ class ProviderManager:
                     item["unsupported_protocol_count"] = unsupported
             output.append(item)
 
-        # 自定义提供商（connect 时 catalog_id=None、不在静态目录中）以及目录条目
-        # 已下线的孤儿记录：追加为同构条目输出——否则已连接区域永远看不到它们，
-        # 也没有任何删除入口（disconnect/refresh 对它们本就可用）。无 protocol_map
-        # 与 models.dev 门控，resolve_protocol 恒默认 chat_completions，无需统计
-        # unsupported_protocol_count。
-        catalog_ids = {e["id"] for e in entries}
-        for pid, record in connected.items():
-            catalog_id = record.get("catalog_id")
-            if catalog_id and catalog_id in catalog_ids:
-                continue  # 目录条目，已在上方合并
-            summary = self._public_summary(pid, record)
+        # 每一条 ChatGPT 订阅账号连接（连接/断开/刷新仍只在提供商页）
+        codex_entry = catalog_by_id.get(_CODEX_CATALOG_ID)
+        for account in account_rows:
+            registered_connected = bool(account.get("connected"))
+            state = str(
+                account.get("state") or ("ready" if registered_connected else "credential_missing")
+            )
+            credential_missing = bool(
+                account.get("credential_missing") or state == "credential_missing"
+            )
+            # 凭证暂缺的登记账号保留为连接行，但不能读取/展示旧模型缓存。
+            models_summary: Dict[str, Any] = {}
+            if registered_connected:
+                try:
+                    from utils.api_client.codex.models import get_models_manager
+
+                    models_summary = get_models_manager(account["id"]).status_summary()
+                except Exception:
+                    models_summary = {}
             output.append(
                 {
-                    "id": pid,
-                    "name": summary.get("name") or pid,
-                    "base_url": summary.get("base_url") or "",
-                    "icon": None,
-                    "icon_url": None,
-                    "auth": "none" if record.get("api_key") == "not-required" else "api_key",
-                    "key_url": None,
-                    "badge": None,
-                    "local": False,
+                    "id": account["id"],
+                    "catalog_id": _CODEX_CATALOG_ID,
+                    "kind": "connection",
+                    "entry_kind": "connection",
+                    "connection": True,
+                    "name": account.get("display_name"),
+                    "account_hash": account.get("hash"),
+                    "base_url": (codex_entry or {}).get("base_url") or "",
+                    "icon": (codex_entry or {}).get("icon"),
+                    "icon_url": (
+                        f"/static/icons/providers/{codex_entry.get('icon')}"
+                        if codex_entry and codex_entry.get("icon")
+                        else None
+                    ),
+                    "icon_mono": bool((codex_entry or {}).get("icon_mono")),
+                    "auth": "codex_oauth",
+                    "badge": (codex_entry or {}).get("badge"),
                     "protocol_note": None,
-                    "custom": True,
-                    "connected": bool(record.get("enabled", True)),
-                    "models_count": len(summary.get("models") or []),
-                    "models_fetched_at": summary.get("models_fetched_at"),
-                    "models_error": summary.get("models_error"),
+                    "custom": False,
+                    "connected": registered_connected,
+                    "state": state or "ready",
+                    "credential_missing": credential_missing,
+                    "models_count": int(models_summary.get("model_count") or 0),
+                    "models_fetched_at": models_summary.get("fetched_at"),
+                    "models_error": None,
                 }
             )
         return output
-
-    @staticmethod
-    def _codex_connected() -> bool:
-        try:
-            from utils.api_client.codex.settings import CODEX_AUTH_PATH
-
-            return Path(CODEX_AUTH_PATH).exists()
-        except Exception:
-            return False
 
     # ------------------------------------------------------------ 查询
 
@@ -250,7 +483,10 @@ class ProviderManager:
         return {
             "id": provider_id,
             "catalog_id": record.get("catalog_id"),
+            "requested_id": ProviderManager._requested_id_of(provider_id, record),
             "name": record.get("name"),
+            "base_name": record.get("base_name"),
+            "display_index": record.get("display_index") or 0,
             "base_url": record.get("base_url"),
             "api_key_masked": _mask_key(record.get("api_key")),
             "has_custom_headers": bool(record.get("headers")),
@@ -267,10 +503,11 @@ class ProviderManager:
         """连接提供商：校验 → 保存凭证 → 立即拉取模型列表。
 
         payload 两种形态：
-        - 目录条目：``{catalog_id, api_key?}``（base_url 等从目录取）
-        - 自定义：``{provider_id, name, base_url, api_key?, headers?}``
+        - 目录条目：``{catalog_id, api_key?}``（base_url 等从目录取；同一目录可
+          多次连接，产生多个独立 Key 连接）
+        - 自定义：``{provider_id, name, base_url, api_key?, headers?}``（``provider_id``
+          只是基础标识，内部路由 id 由后端随机分配、永不复用）
         """
-        data = self._load()
         catalog_id = str(payload.get("catalog_id") or "").strip()
         api_key = str(payload.get("api_key") or "").strip()
 
@@ -280,22 +517,20 @@ class ProviderManager:
                 return {"success": False, "error": "unknown_catalog_id"}
             if entry.get("auth") == "codex_oauth":
                 return {"success": False, "error": "codex_oauth_use_codex_api"}
-            provider_id = entry["id"]
-            name = entry["name"]
+            base_name = entry["name"]
             base_url = entry["base_url"]
             auth = entry.get("auth") or "api_key"
+            requested_id = catalog_id
         else:
             entry = None
-            provider_id = str(payload.get("provider_id") or "").strip()
-            name = str(payload.get("name") or "").strip() or provider_id
+            requested_id = str(payload.get("provider_id") or "").strip()
+            base_name = str(payload.get("name") or "").strip() or requested_id
             base_url = str(payload.get("base_url") or "").strip()
             auth = "api_key" if api_key else "none"
-            if not _PROVIDER_ID_PATTERN.match(provider_id):
+            if not _PROVIDER_ID_PATTERN.match(requested_id):
                 return {"success": False, "error": "invalid_provider_id"}
             if not base_url.startswith(("http://", "https://")):
                 return {"success": False, "error": "invalid_base_url"}
-            if provider_id in data["providers"]:
-                return {"success": False, "error": "provider_id_exists"}
 
         if auth == "api_key" and not api_key:
             return {"success": False, "error": "api_key_required"}
@@ -309,27 +544,54 @@ class ProviderManager:
             headers = {}
         headers = {str(k).strip(): str(v) for k, v in headers.items() if str(k).strip()}
 
-        record: Dict[str, Any] = {
-            "catalog_id": catalog_id or None,
-            "name": name,
-            "base_url": base_url.rstrip("/"),
-            "api_key": api_key,
-            "headers": headers,
-            "enabled": True,
-            "connected_at": _now_iso(),
-            "models": [],
-            "models_fetched_at": None,
-            "models_error": None,
-        }
+        # 模型探测是网络请求（最长 _FETCH_TIMEOUT 秒），必须在锁外完成，
+        # 否则会阻塞其他连接/断开/刷新；提交阶段再锁内做重复校验 + 分配序号。
+        models, error = self._fetch_models(base_url.rstrip("/"), api_key, headers)
+        models, error = self._static_models_fallback(entry, models, error)
 
         with self._lock:
-            data["providers"][provider_id] = record
-            models, error = self._fetch_models(record["base_url"], record["api_key"], headers)
-            models, error = self._static_models_fallback(entry, models, error)
-            record["models"] = models
-            record["models_fetched_at"] = _now_iso()
-            record["models_error"] = error
-            self._save(data)
+            data = self._load_locked(reload=True)
+            records: Dict[str, Any] = data["providers"]
+            if catalog_id:
+                # 重复活跃 Key 拒绝重复添加（历史删除记录不留墓碑，因此只比对现存连接）
+                for existing in records.values():
+                    if (
+                        str(existing.get("catalog_id") or "") == catalog_id
+                        and existing.get("enabled", True)
+                        and str(existing.get("api_key") or "") == api_key
+                    ):
+                        return {"success": False, "error": "duplicate_connection"}
+                display_index = self._allocate_display_index(records, catalog_id)
+                provider_id = self._new_connection_id(records, catalog_id)
+            else:
+                # 用户填写的 provider_id 只作基础标识：活跃重复仍拒绝，但内部路由 id
+                # 必须是随机且永不复用的，避免删除后用同一 ID 重建时旧模型引用串新 Key。
+                for existing_id, existing in records.items():
+                    if existing.get("catalog_id"):
+                        continue  # 目录命名空间与自定义命名空间互不占用
+                    if self._requested_id_of(existing_id, existing) == requested_id:
+                        return {"success": False, "error": "provider_id_exists"}
+                display_index = 0
+                provider_id = self._new_custom_connection_id(records, requested_id)
+
+            now = _now_iso()
+            record: Dict[str, Any] = {
+                "catalog_id": catalog_id or None,
+                "requested_id": requested_id,
+                "base_name": base_name,
+                "display_index": display_index,
+                "name": self._display_name(base_name, display_index),
+                "base_url": base_url.rstrip("/"),
+                "api_key": api_key,
+                "headers": headers,
+                "enabled": True,
+                "connected_at": now,
+                "models": models,
+                "models_fetched_at": now,
+                "models_error": error,
+            }
+            records[provider_id] = record
+            self._save_locked(data)
         self._refresh_modelsdev_cache()
 
         result: Dict[str, Any] = {
@@ -342,38 +604,55 @@ class ProviderManager:
         return result
 
     def disconnect(self, provider_id: str) -> bool:
-        data = self._load()
-        if provider_id not in data["providers"]:
-            return False
         with self._lock:
+            data = self._load_locked(reload=True)
+            if provider_id not in data["providers"]:
+                return False
             data["providers"].pop(provider_id, None)
-            self._save(data)
+            self._save_locked(data)
         return True
 
     def refresh_models(self, provider_id: str) -> Dict[str, Any]:
-        data = self._load()
-        record = data["providers"].get(provider_id)
-        if not record:
-            return {"success": False, "error": "provider_not_found"}
-        catalog_id = str(record.get("catalog_id") or "")
-        entry = (
-            next((e for e in self.catalog_entries() if e["id"] == catalog_id), None)
-            if catalog_id
-            else None
-        )
+        # 锁内只读取快照，网络探测在锁外；提交前再校验记录是否已被删除/替换，
+        # 避免把旧连接的模型列表写回新记录。
         with self._lock:
-            models, error = self._fetch_models(
-                record["base_url"], record.get("api_key") or "", record.get("headers") or {}
+            data = self._load_locked(reload=True)
+            record = data["providers"].get(provider_id)
+            if not record:
+                return {"success": False, "error": "provider_not_found"}
+            catalog_id = str(record.get("catalog_id") or "")
+            snapshot = (
+                record.get("connected_at"),
+                record.get("base_url"),
+                record.get("api_key"),
             )
-            models, error = self._static_models_fallback(entry, models, error)
-            if error and models:
-                # 部分失败（如解析告警）仍更新列表
-                pass
+            entry = (
+                next((e for e in self.catalog_entries() if e["id"] == catalog_id), None)
+                if catalog_id
+                else None
+            )
+        models, error = self._fetch_models(
+            record["base_url"], record.get("api_key") or "", record.get("headers") or {}
+        )
+        models, error = self._static_models_fallback(entry, models, error)
+        with self._lock:
+            data = self._load_locked(reload=True)
+            current = data["providers"].get(provider_id)
+            if not current:
+                return {"success": False, "error": "provider_not_found"}
+            if (
+                current.get("connected_at"),
+                current.get("base_url"),
+                current.get("api_key"),
+            ) != snapshot:
+                # 期间连接被删除并重建为另一个记录：丢弃本次旧探测结果
+                return {"success": False, "error": "provider_not_found"}
             if not error or models:
-                record["models"] = models
-                record["models_fetched_at"] = _now_iso()
-            record["models_error"] = error
-            self._save(data)
+                current["models"] = models
+                current["models_fetched_at"] = _now_iso()
+            current["models_error"] = error
+            self._save_locked(data)
+            record = current
         self._refresh_modelsdev_cache()
         result: Dict[str, Any] = {
             "success": not error or bool(models),
@@ -456,11 +735,10 @@ class ProviderManager:
     # ------------------------------------------------------------ profile 输出
 
     def get_profiles(self) -> Dict[str, Dict[str, Any]]:
-        """把已连接提供商的已发现模型转成注册表 profile（key = ``{pid}/{model_id}``）。
+        """把已连接提供商的已发现模型转成注册表 profile（key = ``{连接id}/{model_id}``）。
 
-        2026-09-25 协议泛化：按 catalog 条目裁决 ``api_protocol``（静态 protocol_map
-        → models.dev npm → 默认 chat_completions），并用 models.dev 能力数据 enrich
-        四字段（思考支持/图片视频多模态/上下文窗口/最大输出），查不到回退原默认。
+        连接 id 是内部唯一身份（不复用），所以每个 Key 连接的模型 key、请求路由、
+        加密 reasoning 隔离边界都天然独立；展示名（``provider_name``）才带序号。
         """
         from modules import modelsdev_registry
 
@@ -474,13 +752,15 @@ class ProviderManager:
             headers = record.get("headers") or {}
             if not base_url:
                 continue
-            catalog_entry = catalog_by_id.get(str(record.get("catalog_id") or pid))
+            catalog_id = str(record.get("catalog_id") or "")
+            catalog_entry = catalog_by_id.get(catalog_id)
+            display_name = str(record.get("name") or record.get("base_name") or pid)
             for model in record.get("models") or []:
                 model_id = str(model.get("id") or "").strip()
                 if not model_id:
                     continue
                 ctx = model.get("context_length")
-                display_name = str(model.get("name") or model_id)
+                model_display_name = str(model.get("name") or model_id)
 
                 # ── 协议裁决与能力 enrich（models.dev，命中才覆盖）──
                 api_protocol = (
@@ -519,12 +799,13 @@ class ProviderManager:
                 max_output = meta.get("max_output")
 
                 profile: Dict[str, Any] = {
-                    "name": display_name,
-                    "description": str(record.get("name") or pid),
-                    "model_description": f"你是 {display_name}。",
+                    "name": model_display_name,
+                    "description": display_name,
+                    "model_description": f"你是 {model_display_name}。",
                     "provider_type": "provider",
                     "provider_id": pid,
-                    "provider_name": str(record.get("name") or pid),
+                    "provider_name": display_name,
+                    "provider_base_name": str(record.get("base_name") or display_name),
                     "api_protocol": api_protocol,
                     "is_custom_model": False,
                     "hidden": False,

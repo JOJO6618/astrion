@@ -90,20 +90,18 @@ DISABLE_LENGTH_CHECK = True
 def _same_responses_provider(source_model_key: str, current_model_key: str) -> bool:
     """两个 model_key 是否同属一个 responses provider（加密 reasoning 块可回放的边界）。
 
+    判定已提取到中性模块 ``utils/responses_reasoning.same_responses_provider``，
+    Agent 与 Chat 共用（Chat 历史构建在 ``modules/chat_mode/context.py``）。
     双方都解析出非空 provider_id 且相等才放行；解析失败（模型已失效/未知）一律剥离，
     避免把不兼容的加密块发给错误上游。
-    """
-    if not source_model_key or not current_model_key:
-        return False
-    try:
-        from config.model_profiles import get_registered_model_profiles
 
-        profiles = get_registered_model_profiles()
-        src = (profiles.get(source_model_key) or {}).get("provider_id")
-        cur = (profiles.get(current_model_key) or {}).get("provider_id")
-        return bool(src) and bool(cur) and src == cur
-    except Exception:
-        return False
+    多连接/多账号（2026-10-29）：provider_id 已是「连接身份」（同一目录不同 Key =
+    不同 provider_id，Codex 不同账号 = 不同连接 id），因此不同 Key/账号的加密推理
+    天然隔离；responses_account_id 再比对一次作双保险。
+    """
+    from utils.responses_reasoning import same_responses_provider
+
+    return same_responses_provider(source_model_key, current_model_key)
 
 
 def _build_sub_md_notice(filename: str, sub_paths: List[str], total: int) -> str:

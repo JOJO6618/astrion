@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { t } from '@/locales';
 import { useSettingsStore } from '@/stores/settings';
 import { useUiStore } from '@/stores/ui';
@@ -28,6 +28,24 @@ const credits = ref<Record<string, any> | null>(null);
 const creditsError = ref('');
 const consumeBusy = ref(false);
 
+// ── 多账号查看选择器（仅影响本页查看，不影响运行对话）──
+const accounts = ref<Record<string, any>[]>([]);
+const selectedAccountId = ref('');
+const accountMenuOpen = ref(false);
+const accountSelectRef = ref<HTMLElement | null>(null);
+/** 请求代次（按资源独立计数）：晚到的旧账号/旧代次响应不得覆盖当前视图。
+ *  分开计数是为了让 status/usage/credits 的并发请求互不取消。 */
+let statusSeq = 0;
+let usageSeq = 0;
+let creditsSeq = 0;
+
+const selectedAccount = computed(
+  () => accounts.value.find((item) => item.id === selectedAccountId.value) || null
+);
+
+const withAccount = (url: string, accountId: string): string =>
+  accountId ? `${url}?account_id=${encodeURIComponent(accountId)}` : url;
+
 const connected = computed(() => !!status.value?.connected);
 const modelsInfo = computed(() => status.value?.models || {});
 
@@ -50,11 +68,9 @@ const statusLine = computed(() => {
     return status.value?.error || t('personalization.codexNotConnectedDesc');
   }
   const parts: string[] = [];
-  if (status.value?.account_id) {
+  if (status.value?.account_hash) {
     parts.push(
-      t('personalization.codexAccountLine', {
-        account: String(status.value.account_id).slice(0, 8)
-      })
+      t('personalization.codexAccountLine', { account: String(status.value.account_hash) })
     );
   }
   if (expiresText.value) parts.push(expiresText.value);
@@ -77,19 +93,43 @@ const modelsLine = computed(() => {
   return `${t(sourceKey)} · ${t('personalization.codexModelsTotal', { count })} · ${fetched}`;
 });
 
-const fetchStatus = async () => {
+const fetchAccounts = async () => {
   try {
-    const resp = await fetch('/api/codex/status', { cache: 'no-store' });
+    const resp = await fetch('/api/codex/accounts', { cache: 'no-store' });
     const data = await resp.json();
+    if (!data?.success || !Array.isArray(data.accounts)) {
+      loadError.value = data?.error || t('personalization.codexAccountsLoadFailed');
+      return;
+    }
+    accounts.value = data.accounts;
+    const exists = accounts.value.some((item) => item.id === selectedAccountId.value);
+    if (!exists) {
+      selectedAccountId.value =
+        String(data.primary_account_id || '') || accounts.value[0]?.id || '';
+    }
+  } catch (e: any) {
+    loadError.value = String(e?.message || e);
+  }
+};
+
+const fetchStatus = async () => {
+  const seq = ++statusSeq;
+  const accountId = selectedAccountId.value;
+  try {
+    const resp = await fetch(withAccount('/api/codex/status', accountId), { cache: 'no-store' });
+    const data = await resp.json();
+    // 晚到的旧账号 / 旧代次响应一律丢弃，不覆盖当前视图
+    if (seq !== statusSeq || selectedAccountId.value !== accountId) return;
     if (data?.success) {
       status.value = data;
+      loadError.value = '';
     } else {
       loadError.value = data?.error || t('personalization.codexLoadFailed');
     }
   } catch (e: any) {
-    loadError.value = String(e?.message || e);
+    if (seq === statusSeq) loadError.value = String(e?.message || e);
   } finally {
-    loading.value = false;
+    if (seq === statusSeq) loading.value = false;
   }
 };
 
@@ -106,13 +146,16 @@ const fetchSettings = async () => {
 };
 
 const fetchUsage = async () => {
-  if (!connected.value) {
+  const seq = ++usageSeq;
+  const accountId = selectedAccountId.value;
+  if (!accountId) {
     usage.value = null;
     return;
   }
   try {
-    const resp = await fetch('/api/codex/usage', { cache: 'no-store' });
+    const resp = await fetch(withAccount('/api/codex/usage', accountId), { cache: 'no-store' });
     const data = await resp.json();
+    if (seq !== usageSeq || selectedAccountId.value !== accountId) return;
     if (data?.success) {
       usage.value = data.usage || null;
       usageError.value = '';
@@ -120,7 +163,7 @@ const fetchUsage = async () => {
       usageError.value = data?.error || t('personalization.codexUsageLoadFailed');
     }
   } catch (e: any) {
-    usageError.value = String(e?.message || e);
+    if (seq === usageSeq) usageError.value = String(e?.message || e);
   }
 };
 
@@ -168,13 +211,18 @@ const usagePlanText = computed(() => {
 // ── 重置额度（banked rate-limit resets）──
 
 const fetchCredits = async () => {
-  if (!connected.value) {
+  const seq = ++creditsSeq;
+  const accountId = selectedAccountId.value;
+  if (!accountId) {
     credits.value = null;
     return;
   }
   try {
-    const resp = await fetch('/api/codex/reset-credits', { cache: 'no-store' });
+    const resp = await fetch(withAccount('/api/codex/reset-credits', accountId), {
+      cache: 'no-store'
+    });
     const data = await resp.json();
+    if (seq !== creditsSeq || selectedAccountId.value !== accountId) return;
     if (data?.success) {
       credits.value = data;
       creditsError.value = '';
@@ -182,7 +230,7 @@ const fetchCredits = async () => {
       creditsError.value = data?.error || t('personalization.codexUsageLoadFailed');
     }
   } catch (e: any) {
-    creditsError.value = String(e?.message || e);
+    if (seq === creditsSeq) creditsError.value = String(e?.message || e);
   }
 };
 
@@ -237,6 +285,9 @@ const creditStatusKey = (credit: Record<string, any>): string => {
 
 const consumeReset = async (credit: Record<string, any>) => {
   if (!credit?.id || consumeBusy.value) return;
+  // 捕获目标账号：用户在确认弹窗/请求期间切换选择器，也不能把兑换打到另一个账号
+  const targetAccountId = selectedAccountId.value;
+  if (!targetAccountId) return;
   const ok = await uiStore.requestConfirm({
     title: t('personalization.codexResetConfirmTitle'),
     message: t('personalization.codexResetConfirmMessage', {
@@ -251,7 +302,7 @@ const consumeReset = async (credit: Record<string, any>) => {
     const resp = await fetch('/api/codex/reset-credits/consume', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credit_id: credit.id })
+      body: JSON.stringify({ credit_id: credit.id, account_id: targetAccountId })
     });
     const data = await resp.json();
     if (data?.success) {
@@ -259,7 +310,10 @@ const consumeReset = async (credit: Record<string, any>) => {
         message: t('personalization.codexResetSuccess'),
         type: 'success'
       });
-      await Promise.all([fetchUsage(), fetchCredits()]);
+      // 仅当仍在查看同一个账号时才刷新（否则保留当前账号视图）
+      if (selectedAccountId.value === targetAccountId) {
+        await Promise.all([fetchUsage(), fetchCredits()]);
+      }
     } else {
       uiStore.pushToast({
         message: t('personalization.codexResetFailed', { error: data?.error || 'unknown' }),
@@ -296,14 +350,46 @@ const saveProxy = async () => {
   }
 };
 
-onMounted(() => {
-  fetchStatus().then(() => {
+const selectAccount = async (accountId: string) => {
+  accountMenuOpen.value = false;
+  if (!accountId || accountId === selectedAccountId.value) return;
+  selectedAccountId.value = accountId;
+  // 切账号立即清空旧账号数据，避免串号展示；随后拉新数据（带代次校验）
+  status.value = {};
+  usage.value = null;
+  usageError.value = '';
+  credits.value = null;
+  creditsError.value = '';
+  await fetchStatus();
+  if (connected.value) {
+    void fetchUsage();
+    void fetchCredits();
+  }
+};
+
+const onDocumentClick = (event: MouseEvent) => {
+  if (!accountMenuOpen.value) return;
+  const root = accountSelectRef.value;
+  if (root && !root.contains(event.target as Node)) accountMenuOpen.value = false;
+};
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocumentClick);
+});
+
+onMounted(async () => {
+  document.addEventListener('click', onDocumentClick);
+  await fetchAccounts();
+  if (selectedAccountId.value) {
+    await fetchStatus();
     if (connected.value) {
-      fetchUsage();
-      fetchCredits();
+      void fetchUsage();
+      void fetchCredits();
     }
-  });
-  fetchSettings();
+  } else {
+    loading.value = false;
+  }
+  void fetchSettings();
 });
 </script>
 
@@ -320,6 +406,73 @@ onMounted(() => {
       {{ $t('personalization.loadingPersonalization') }}
     </div>
     <template v-else>
+      <!-- 多账号查看选择器（仅影响本页查看，不影响运行对话） -->
+      <template v-if="accounts.length">
+        <div class="settings-section-divider">
+          <span class="settings-section-divider__label">{{
+            $t('personalization.codexAccountSelectorTitle')
+          }}</span>
+        </div>
+        <div class="codex-account-bar">
+          <div ref="accountSelectRef" class="codex-account-select">
+            <button
+              type="button"
+              class="codex-account-select__button"
+              :aria-expanded="accountMenuOpen"
+              aria-haspopup="listbox"
+              @click.stop="accountMenuOpen = !accountMenuOpen"
+            >
+              <span class="codex-account-select__name">
+                {{ selectedAccount?.display_name || $t('personalization.codexNotConnected') }}
+              </span>
+              <span v-if="selectedAccount?.hash" class="codex-account-select__hash">
+                #{{ selectedAccount.hash }}
+              </span>
+              <svg
+                class="codex-account-select__chevron"
+                :class="{ 'codex-account-select__chevron--open': accountMenuOpen }"
+                width="12"
+                height="12"
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div v-if="accountMenuOpen" class="codex-account-menu" role="listbox">
+              <button
+                v-for="account in accounts"
+                :key="account.id"
+                type="button"
+                class="codex-account-menu__item"
+                :class="{ 'codex-account-menu__item--active': account.id === selectedAccountId }"
+                role="option"
+                :aria-selected="account.id === selectedAccountId"
+                @click.stop="selectAccount(account.id)"
+              >
+                <span class="codex-account-menu__main">
+                  <span class="codex-account-menu__name">{{ account.display_name }}</span>
+                  <span class="codex-account-menu__hash">#{{ account.hash }}</span>
+                </span>
+                <span v-if="account.is_primary" class="codex-account-menu__badge">
+                  {{ $t('personalization.codexAccountPrimaryBadge') }}
+                </span>
+              </button>
+            </div>
+          </div>
+          <span class="codex-account-bar__hint">
+            {{ $t('personalization.codexAccountSelectorHint') }}
+          </span>
+        </div>
+      </template>
+
       <!-- 连接状态 -->
       <div class="settings-section-divider">
         <span class="settings-section-divider__label">{{
@@ -496,6 +649,145 @@ onMounted(() => {
 <style scoped>
 .codex-proxy-row input {
   min-width: 220px;
+}
+
+/* ── 多账号查看选择器 ── */
+.codex-account-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.codex-account-select {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.codex-account-select__button {
+  height: 32px;
+  max-width: 340px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.codex-account-select__button:hover {
+  background: var(--hover-bg);
+}
+
+.codex-account-select__button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.codex-account-select__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-account-select__hash {
+  flex-shrink: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.codex-account-select__chevron {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: transform 0.15s ease;
+}
+
+.codex-account-select__chevron--open {
+  transform: rotate(180deg);
+}
+
+.codex-account-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 260px;
+  max-width: 360px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-mid);
+}
+
+.codex-account-menu__item {
+  width: 100%;
+  height: 40px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.codex-account-menu__item:hover,
+.codex-account-menu__item--active {
+  background: var(--hover-bg);
+}
+
+.codex-account-menu__main {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.codex-account-menu__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-account-menu__hash {
+  flex-shrink: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.codex-account-menu__badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--badge-bg);
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 16px;
+}
+
+.codex-account-bar__hint {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
 }
 
 .codex-usage-windows {

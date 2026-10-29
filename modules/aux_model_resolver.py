@@ -37,12 +37,19 @@ def _visible_profiles() -> Dict[str, Dict[str, Any]]:
 
 
 def auto_default_model_key() -> Optional[str]:
-    """留空自动规则：常规取注册表第一个可见模型；纯 Codex（openai-codex）时选 -luna。"""
+    """留空自动规则：常规取注册表第一个可见模型；纯 Codex 订阅时选 -luna。
+
+    多账号（2026-10-29）：Codex 模型的 provider_id 是「账号连接 id」
+    （主账号 openai-codex / 新增账号 openai-codex-<hash>），不能用等值判断；
+    以 responses_auth == codex_oauth 识别订阅模型（与账号数量无关）。
+    """
     profiles = _visible_profiles()
     if not profiles:
         return None
     keys = list(profiles.keys())
-    if all(profiles[k].get("provider_id") == "openai-codex" for k in keys):
+    if all(
+        str(profiles[k].get("responses_auth") or "") == "codex_oauth" for k in keys
+    ):
         for key in keys:
             if "-luna" in key:
                 return key
@@ -94,7 +101,11 @@ def resolve_locked_model_profile(model_key: str) -> Dict[str, Any]:
 
 
 def list_aux_models() -> List[Dict[str, Any]]:
-    """下拉选项源：主注册表可见模型（全部来源，codex 条目带 provider_type 标记）。"""
+    """下拉选项源：主注册表可见模型（全部来源）。
+
+    多连接（2026-10-29）：带 provider_id/provider_name 便于所有共用选择器
+    按连接分组；key 本身已包含连接身份，保存后请求严格按所选连接路由。
+    """
     items: List[Dict[str, Any]] = []
     for key, profile in _visible_profiles().items():
         fast = profile.get("fast") or {}
@@ -104,6 +115,9 @@ def list_aux_models() -> List[Dict[str, Any]]:
                 "name": str(profile.get("name") or key),
                 "description": str(profile.get("description") or ""),
                 "provider_type": str(profile.get("provider_type") or ""),
+                "provider_id": profile.get("provider_id"),
+                "provider_name": profile.get("provider_name"),
+                "api_protocol": profile.get("api_protocol"),
                 "supports_thinking": bool(profile.get("supports_thinking")),
                 "fast_only": bool(profile.get("fast_only")),
                 "thinking_only": bool(profile.get("thinking_only")),

@@ -9,6 +9,7 @@ from copy import deepcopy
 from datetime import datetime
 
 from utils.context_manager import ContextManager
+from utils.responses_reasoning import same_responses_provider
 from modules.chat_mode.storage import ChatStorage
 from modules.chat_mode.tree import MessageTree, TreeConflict, identifier
 
@@ -107,8 +108,20 @@ class ChatContext(ContextManager):
     def is_compression_in_progress(self):
         return bool(self.conversation_metadata.get("compression_in_progress"))
 
+    def _current_model_key(self) -> str:
+        """当前请求的模型 key（Chat 运行时可中途换同协议模型）。
+
+        优先用运行时（Chat 页能直接在对话内切模型），回退到对话元数据，
+        用于 Responses 加密 reasoning 的「同上游连接」判定。
+        """
+        key = getattr(getattr(self, "main_terminal", None), "model_key", None)
+        if not key:
+            key = (self.conversation_metadata or {}).get("model_key")
+        return str(key or "")
+
     def build_api_history(self):
         result = []
+        current_model_key = self._current_model_key()
         for stored in self.conversation_history:
             message = {"role": stored["role"], "content": stored.get("content", "")}
             if stored.get("media_refs") or stored.get("images") or stored.get("videos"):
@@ -119,8 +132,13 @@ class ChatContext(ContextManager):
             for key in ("tool_calls", "tool_call_id", "name", "reasoning_content"):
                 if key in stored:
                     message[key] = deepcopy(stored[key])
-            items = stored.get("metadata", {}).get("responses_reasoning_items")
-            if items:
+            # Chat 历史与 Agent 同规：只有「同上游连接」才回插 Responses 加密
+            # reasoning items（Chat 允许同协议换账号/换连接，加密块不可跨账号回放）。
+            metadata = stored.get("metadata") or {}
+            items = metadata.get("responses_reasoning_items")
+            if items and same_responses_provider(
+                str(metadata.get("model_key") or ""), current_model_key
+            ):
                 message["responses_reasoning_items"] = deepcopy(items)
             result.append(message)
         return result

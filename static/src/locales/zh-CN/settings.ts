@@ -116,7 +116,8 @@ export default {
   // ── 提供商分区 ──
   providersConnectedSection: '已连接',
   providersCatalogSection: '添加提供商',
-  providersCatalogDesc: '选择服务商并填入 API 密钥，模型列表将自动同步。',
+  providersCatalogDesc:
+    '选择服务商并填入 API 密钥，模型列表将自动同步。已连接的服务商可继续添加独立 API 密钥；每个连接拥有独立的模型列表与刷新/断开操作。',
   protocolNoteMultiPartial:
     '多协议网关：Chat Completions 与 Responses 模型可直接使用；Anthropic / Google 协议模型会正常注册显示，但当前版本暂不支持调用。',
   protocolNoteMultiPartialCount: '其中 {count} 个模型的协议暂不支持调用。',
@@ -130,6 +131,11 @@ export default {
   providerDeleting: '删除中…',
   providerConnect: '连接',
   providerConnecting: '连接中…',
+  providerAddKey: '添加 API 密钥',
+  providerAddAccount: '添加账号',
+  providerCredentialMissing: '凭证缺失',
+  providerRemoveAccount: '移除账号',
+  providerDuplicateConnection: '该 API 密钥已存在活动连接，无需重复添加。',
   providerLastSync: '上次同步 {time}',
   refreshSuccess: '已刷新，共 {count} 个模型。',
   disconnectConfirmTitle: '断开提供商',

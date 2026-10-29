@@ -19,7 +19,7 @@ defineOptions({ name: 'ProvidersTab' });
  */
 
 const providersStore = useProvidersStore();
-const { catalog, loading, loadError, busyMap, connectedEntries, disconnectedEntries } =
+const { catalog, loading, loadError, busyMap, connectedEntries, catalogEntries } =
   storeToRefs(providersStore);
 const uiStore = useUiStore();
 
@@ -67,16 +67,31 @@ const connectLocal = async (entry: ProviderCatalogEntry) => {
       type: result.modelsError ? 'warning' : 'success'
     });
   } else {
-    // 后端错误原样展示
-    uiStore.pushToast({ message: result.error || t('common.unknownError'), type: 'error' });
+    // 后端错误原样展示（已知语义错误转成人话）
+    uiStore.pushToast({ message: errorText(result.error), type: 'error' });
   }
+};
+
+/** 后端错误码 → 展示文案（未知错误原样展示） */
+const errorText = (error?: string): string => {
+  if (error === 'duplicate_connection') return t('settings.providerDuplicateConnection');
+  if (error === 'login_in_progress') return t('personalization.codexLoginInProgress');
+  return error || t('common.unknownError');
+};
+
+/** 目录入口行按钮文案：已有连接时是「添加」（继续添加独立 Key / 账号） */
+const addLabel = (entry: ProviderCatalogEntry): string => {
+  if (entry.auth === 'codex_oauth') {
+    return entry.has_connections ? t('settings.providerAddAccount') : t('settings.providerConnect');
+  }
+  return entry.has_connections ? t('settings.providerAddKey') : t('settings.providerConnect');
 };
 
 // ── 刷新 / 断开 ──
 const refresh = async (entry: ProviderCatalogEntry) => {
   const result = await providersStore.refreshProvider(entry);
   if (!result.ok) {
-    uiStore.pushToast({ message: result.error || t('common.unknownError'), type: 'error' });
+    uiStore.pushToast({ message: errorText(result.error), type: 'error' });
   } else if (result.modelsError) {
     uiStore.pushToast({ message: result.modelsError, type: 'warning' });
   } else {
@@ -88,7 +103,9 @@ const refresh = async (entry: ProviderCatalogEntry) => {
 };
 
 const disconnect = async (entry: ProviderCatalogEntry) => {
-  // 自定义提供商不在目录中，断开即彻底删除（凭证+模型一并移除），文案区分
+  const missing = isCredentialMissing(entry);
+  // 自定义提供商不在目录中，断开即彻底删除（凭证+模型一并移除），文案区分。
+  // 凭证暂缺的订阅账号仍使用 /api/codex/logout 移除登记（复用同一链路）。
   const ok = await uiStore.requestConfirm({
     title: entry.custom
       ? t('settings.deleteProviderConfirmTitle')
@@ -96,13 +113,17 @@ const disconnect = async (entry: ProviderCatalogEntry) => {
     message: entry.custom
       ? t('settings.deleteProviderConfirmMessage', { name: entry.name })
       : t('settings.disconnectConfirmMessage', { name: entry.name }),
-    confirmText: entry.custom ? t('settings.providerDelete') : t('settings.providerDisconnect'),
+    confirmText: entry.custom
+      ? t('settings.providerDelete')
+      : missing
+        ? t('settings.providerRemoveAccount')
+        : t('settings.providerDisconnect'),
     confirmVariant: 'danger'
   });
   if (!ok) return;
   const result = await providersStore.disconnectProvider(entry);
   if (!result.ok) {
-    uiStore.pushToast({ message: result.error || t('common.unknownError'), type: 'error' });
+    uiStore.pushToast({ message: errorText(result.error), type: 'error' });
   }
 };
 
@@ -117,8 +138,21 @@ const formatSyncTime = (iso?: string | null): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const isCredentialMissing = (entry: ProviderCatalogEntry): boolean =>
+  entry.credential_missing === true ||
+  entry.state === 'credential_missing' ||
+  entry.connected === false;
+
 const connectedDesc = (entry: ProviderCatalogEntry): string => {
+  if (isCredentialMissing(entry)) {
+    const parts = [t('settings.providerCredentialMissing')];
+    if (entry.base_url) parts.push(entry.base_url);
+    return parts.join(' · ');
+  }
   const parts = [entry.base_url];
+  if (entry.api_key_masked) {
+    parts.push(entry.api_key_masked);
+  }
   if (entry.models_fetched_at) {
     parts.push(t('settings.providerLastSync', { time: formatSyncTime(entry.models_fetched_at) }));
   }
@@ -184,9 +218,23 @@ onMounted(() => {
                 {{ entry.models_error }}
               </div>
             </div>
-            <span class="providers-status" :title="$t('settings.providerConnected')">
+            <span
+              class="providers-status"
+              :class="{ 'providers-status--warning': isCredentialMissing(entry) }"
+              :title="
+                isCredentialMissing(entry)
+                  ? $t('settings.providerCredentialMissing')
+                  : $t('settings.providerConnected')
+              "
+            >
               <span class="providers-status__dot" aria-hidden="true"></span>
-              <span v-if="typeof entry.models_count === 'number'" class="providers-status__count">
+              <span v-if="isCredentialMissing(entry)" class="providers-status__count">
+                {{ $t('settings.providerCredentialMissing') }}
+              </span>
+              <span
+                v-else-if="typeof entry.models_count === 'number'"
+                class="providers-status__count"
+              >
                 {{ $t('settings.providerModelsCount', { count: entry.models_count }) }}
               </span>
               <span v-else class="providers-status__count">{{
@@ -196,7 +244,7 @@ onMounted(() => {
             <button
               type="button"
               class="providers-btn"
-              :disabled="!!busyOf[entry.id]"
+              :disabled="!!busyOf[entry.id] || isCredentialMissing(entry)"
               @click="refresh(entry)"
             >
               {{
@@ -218,7 +266,9 @@ onMounted(() => {
                     : $t('settings.providerDisconnecting')
                   : entry.custom
                     ? $t('settings.providerDelete')
-                    : $t('settings.providerDisconnect')
+                    : isCredentialMissing(entry)
+                      ? $t('settings.providerRemoveAccount')
+                      : $t('settings.providerDisconnect')
               }}
             </button>
           </div>
@@ -230,7 +280,7 @@ onMounted(() => {
         <div class="providers-section-title">{{ $t('settings.providersCatalogSection') }}</div>
         <div class="providers-section-desc">{{ $t('settings.providersCatalogDesc') }}</div>
         <div class="providers-list">
-          <div v-for="entry in disconnectedEntries" :key="entry.id" class="providers-row">
+          <div v-for="entry in catalogEntries" :key="entry.id" class="providers-row">
             <ProviderIcon :name="entry.name" :icon-url="entry.icon_url" :mono="!!entry.icon_mono" />
             <div class="providers-row__main">
               <div class="providers-row__name">
@@ -267,13 +317,11 @@ onMounted(() => {
             <button
               type="button"
               class="providers-btn"
-              :disabled="!!busyOf[entry.id]"
+              :disabled="!!busyOf[entry.id] || entry.can_add === false"
               @click="openConnect(entry)"
             >
               {{
-                busyOf[entry.id] === 'connect'
-                  ? $t('settings.providerConnecting')
-                  : $t('settings.providerConnect')
+                busyOf[entry.id] === 'connect' ? $t('settings.providerConnecting') : addLabel(entry)
               }}
             </button>
           </div>
@@ -469,6 +517,14 @@ onMounted(() => {
   font-size: 12px;
   color: var(--state-success);
   white-space: nowrap;
+}
+
+.providers-status--warning .providers-status__dot {
+  background: var(--state-warning);
+}
+
+.providers-status--warning .providers-status__count {
+  color: var(--state-warning);
 }
 
 /* ── 按钮（对齐设计稿 .btn.sm） ── */

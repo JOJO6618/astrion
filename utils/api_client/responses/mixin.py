@@ -47,6 +47,20 @@ class APIClientResponsesMixin:
     def _is_codex_oauth(self) -> bool:
         return str(getattr(self, "responses_auth", None) or "") == "codex_oauth"
 
+    def _codex_account_id(self) -> Optional[str]:
+        """本请求绑定的 Codex 账号连接 id（多账号隔离；None=主账号）。"""
+        return str(getattr(self, "responses_account_id", None) or "").strip() or None
+
+    def _codex_auth_manager(self):
+        from utils.api_client.codex.accounts import get_codex_account_store
+
+        return get_codex_account_store().get_auth_manager(self._codex_account_id())
+
+    def _codex_models_manager(self):
+        from utils.api_client.codex.models import get_models_manager
+
+        return get_models_manager(self._codex_account_id())
+
     def _resolve_responses_effort(self, model_id: str) -> Optional[str]:
         """会话 reasoning_effort → Responses effort。
 
@@ -58,9 +72,7 @@ class APIClientResponsesMixin:
             return requested or None
         info = None
         try:
-            from utils.api_client.codex.models import get_models_manager
-
-            info = get_models_manager().get_model_info(model_id)
+            info = self._codex_models_manager().get_model_info(model_id)
         except Exception:
             pass
         supported = {
@@ -81,10 +93,9 @@ class APIClientResponsesMixin:
         """
         if str(getattr(self, "responses_instructions_source", None) or "") == "codex_models_cache":
             try:
-                from utils.api_client.codex.models import get_models_manager
                 from utils.api_client.codex.prompt import build_instructions
 
-                return build_instructions(model_id, "", get_models_manager())
+                return build_instructions(model_id, "", self._codex_models_manager())
             except Exception:
                 return ""
         return ""
@@ -127,14 +138,16 @@ class APIClientResponsesMixin:
     ) -> AsyncGenerator[Dict, None]:
         codex_oauth = self._is_codex_oauth()
         auth = None
+        CodexAuthError = None
         if codex_oauth:
-            from utils.api_client.codex.auth import CodexAuthError, get_auth_manager
-            from utils.api_client.codex.models import get_models_manager
+            # 多账号（2026-10-29）：严格使用所选连接对应的账号凭证与模型缓存
+            from utils.api_client.codex.auth import CodexAuthError as _CodexAuthError
 
-            auth = get_auth_manager()
+            CodexAuthError = _CodexAuthError
+            auth = self._codex_auth_manager()
             # 模型发现（懒加载 + 陈旧后台刷新）；失败不阻塞请求（有缓存兜底）
             try:
-                await get_models_manager().ensure_fresh()
+                await self._codex_models_manager().ensure_fresh()
             except Exception:
                 pass
 

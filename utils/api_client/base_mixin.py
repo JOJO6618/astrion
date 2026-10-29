@@ -72,6 +72,8 @@ class APIClientBaseMixin:
         self.supports_reasoning_effort = False  # 当前模型是否支持推理强度，由 apply_profile 注入
         # 模型提供方类型（None=OpenAI 兼容；"codex"=ChatGPT 订阅 OAuth 通道）
         self.provider_type: Optional[str] = None
+        # Responses 通道的 Codex 账号连接 id（多账号路由；None=主账号）
+        self.responses_account_id: Optional[str] = None
         # Responses 通道通用：本轮响应收集到的加密 reasoning items，
         # 由 server 落盘逻辑读走写入消息 metadata（供下轮回插上下文）
         self.last_responses_reasoning_items: Optional[list] = None

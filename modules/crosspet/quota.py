@@ -112,9 +112,24 @@ class SubscriptionQuota:
             generation = self._generation
         if not self._allowed():
             return
-        from utils.api_client.codex.auth import get_auth_manager
+        # Codex 多账号（2026-10-29 用户拍板）：CrossPet 不新增配置、不跟随 Codex 页
+        # 查看选择器；固定跟随「主账号」——旧 codex_auth.json 迁移账号优先（稳定
+        # 身份，不依赖旧文件是否存在做优先级），否则最早添加且仍保留的账号；被删
+        # 除后自然顺延到下一个。运行中的对话不受本选择影响。
+        from utils.api_client.codex.accounts import get_codex_account_store
 
-        auth = get_auth_manager()
+        try:
+            store = get_codex_account_store()
+            primary = store.primary_account_id()
+            auth = store.get_auth_manager(primary) if primary else None
+        except Exception:
+            auth = None
+        if auth is None:
+            with self._lock:
+                if generation == self._generation:
+                    self._packet = {"connected": False, "status": "unavailable"}
+                    self._identity = None
+            return
         try:
             identity = self._identity_of(auth)
         except Exception:

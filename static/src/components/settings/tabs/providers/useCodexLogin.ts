@@ -68,7 +68,11 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
       const resp = await fetch('/api/codex/login/start', { method: 'POST' });
       const data = await resp.json();
       if (!data?.success) {
-        error.value = data?.error || t('personalization.codexLoginStartFailed');
+        // 同时只允许一个登录流程：409 login_in_progress 明确提示，不静默接管别人的登录
+        error.value =
+          data?.error === 'login_in_progress'
+            ? t('personalization.codexLoginInProgress')
+            : data?.error || t('personalization.codexLoginStartFailed');
         return;
       }
       if (data.flow_mode === 'device') {
@@ -101,7 +105,10 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
       const resp = await fetch('/api/codex/login/device/start', { method: 'POST' });
       const data = await resp.json();
       if (!data?.success) {
-        error.value = data?.error || t('personalization.codexLoginStartFailed');
+        error.value =
+          data?.error === 'login_in_progress'
+            ? t('personalization.codexLoginInProgress')
+            : data?.error || t('personalization.codexLoginStartFailed');
         return;
       }
       loginFlow.value = data;

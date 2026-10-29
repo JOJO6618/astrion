@@ -42,7 +42,10 @@ const submit = async () => {
   const result = await providersStore.connectCatalog(props.entry, apiKey.value);
   submitting.value = false;
   if (!result.ok) {
-    errorText.value = result.error || t('common.unknownError');
+    errorText.value =
+      result.error === 'duplicate_connection'
+        ? t('settings.providerDuplicateConnection')
+        : result.error || t('common.unknownError');
     return;
   }
   successCount.value = result.modelsCount ?? 0;
