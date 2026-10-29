@@ -24,10 +24,17 @@ from typing import Dict, Optional
 
 from flask import Flask, request, jsonify
 
-# token -> (username, workspace_id, conversation_id)，进程内注册表；
+# token -> (username, workspace_id, conversation_id, role)，进程内注册表；
 # 每次向主应用拉取 targets/bootstrap 都会重建，重启后前端重新拉取即自愈。
 # 存会话身份而非 terminal 引用：对话级 terminal 会被 24h 回收器销毁，
 # 身份三元组可随时重建工作区级 terminal（容器句柄工作区级共享）。
+#
+# ⚠️ identity 必须完整（含 role）：本服务器是独立 Flask app，没有主应用 session，
+# 若解析时依赖 request_identity()，host_mode 会恒为 False，resolve_workspace 会走
+# 非 host 分支造出 users/<u>/projects/<ws>/project 假工作区，并用同一个
+# (owner, workspace_id, None) 缓存键毒化全局终端池——首个预览请求抢在
+# 主应用之前建 terminal 时，工作区级 terminal 的 project_path 会永久跑偏，
+# 文件预览从此一律「文件不可用或不在可访问范围内」。
 _REGISTRY: Dict[str, tuple] = {}
 _REGISTRY_LOCK = threading.RLock()
 
@@ -39,26 +46,47 @@ preview_app = Flask("astrion_preview")
 preview_app.config["SESSION_COOKIE_NAME"] = "preview_void"
 
 
-def register_token(token: str, username: str, workspace_id: str, conversation_id: str) -> None:
+def register_token(token: str, username: str, workspace_id: str, conversation_id: str,
+                   role: Optional[str] = None) -> None:
     if not token or not conversation_id:
         return
     with _REGISTRY_LOCK:
-        _REGISTRY[token] = (username, workspace_id, conversation_id)
+        _REGISTRY[token] = (username, workspace_id, conversation_id, role)
 
 
 def _resolve_context(token: str):
     """token → (terminal, conversation_id)。工作区级 terminal 足以承载
-    文件读边界（file_manager）与容器会话（container_session 工作区级共享）。"""
+    文件读边界（file_manager）与容器会话（container_session 工作区级共享）。
+
+    身份必须显式传入（见文件头注释）：绝不走 request_identity()。
+    """
     with _REGISTRY_LOCK:
         entry = _REGISTRY.get(token)
     if not entry:
         return None, None
-    username, workspace_id, conversation_id = entry
+    username, workspace_id, conversation_id, role = entry
     try:
+        from server.context.identity import RuntimeIdentity
         from server.context.resources import get_user_resources
-        terminal, _workspace = get_user_resources(
+        identity = None
+        try:
+            from config.paths import IS_HOST_MODE
+            host_mode = bool(IS_HOST_MODE)
+        except Exception:
+            host_mode = False
+        if host_mode and workspace_id:
+            identity = RuntimeIdentity(
+                host_mode=True,
+                host_workspace_id=workspace_id,
+                role=role or "admin",
+            )
+        terminal, workspace = get_user_resources(
             username, workspace_id=workspace_id, update_session=False,
+            identity=identity,
         )
+        # 双保险：解析结果必须是注册时那个工作区，绝不从别的工作区服务文件
+        if workspace is not None and getattr(workspace, "workspace_id", None) != workspace_id:
+            return None, None
     except Exception:
         terminal = None
     return terminal, conversation_id

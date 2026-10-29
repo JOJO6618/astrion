@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import re
 import secrets
 import subprocess
@@ -33,6 +35,11 @@ from modules.user_manager import UserWorkspace
 # 代理响应体上限（防御性；正常页面远小于此）
 _PROXY_MAX_BYTES = 50 * 1024 * 1024
 _PROXY_TIMEOUT = 30.0
+
+# 预览 token 兜底派生用的进程密钥：只在内存，重启即换，不落盘不记日志。
+# 用处：metadata.preview_token 被任务整文件回写冲掉时仍能给出可用 token（见
+# _preview_token_for_manager 注释）。
+_PREVIEW_TOKEN_KEY = secrets.token_bytes(32)
 
 _HOP_BY_HOP_HEADERS = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -170,20 +177,40 @@ def _get_or_create_preview_token(terminal: WebTerminal, conversation_id: str) ->
 
 
 def _preview_token_for_manager(manager, conversation_id, conversation=None):
+    """每对话预览 token。
+
+    优先用 metadata.preview_token（跨进程稳定、便于排查）；但**不能依赖它必然写成功**——
+    任务运行/压缩期间主任务会用内存快照整文件回写 conversation，落盘的 token 随时可能
+    被抹掉，而写锁也可能被长任务占住。一旦返回 None，前端就拿不到 preview_base，
+    会退化成同源 /api/preview/file/... 路径。故兜底改为「按对话 ID 进程内派生」，
+    派生值只在本进程有效（重启后前端会重新拉 bootstrap），不产生任何 IO。
+    """
     token = ((conversation or {}).get("metadata") or {}).get("preview_token")
     if isinstance(token, str) and len(token) >= 16:
         return token
-    with manager._io_lock:
-        data = manager.read_conversation(conversation_id)
-        if not data:
-            return None
-        token = (data.get("metadata") or {}).get("preview_token")
-        if isinstance(token, str) and len(token) >= 16:
-            return token
-        token = secrets.token_urlsafe(24)
-        if manager.update_conversation_metadata(conversation_id, {"preview_token": token}):
-            return token
-    return None
+    try:
+        with manager._io_lock:
+            data = manager.read_conversation(conversation_id)
+            token = ((data or {}).get("metadata") or {}).get("preview_token")
+            if isinstance(token, str) and len(token) >= 16:
+                return token
+            token = secrets.token_urlsafe(24)
+            if manager.update_conversation_metadata(conversation_id, {"preview_token": token}):
+                return token
+    except Exception:
+        pass
+    return _derived_preview_token(conversation_id)
+
+
+def _derived_preview_token(conversation_id: str) -> str:
+    """进程内稳定的预览 token（HMAC(进程密钥, 对话 ID)）。
+
+    只用于落盘失败/被覆盖时的兜底：不需要写文件、不会因并发回写而丢失，
+    同一进程内对同一对话恒定，重启后自动换新（前端会重新拉取运行时）。
+    """
+    if not conversation_id:
+        return ""
+    return hmac.new(_PREVIEW_TOKEN_KEY, conversation_id.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
 
 
 def build_preview_runtime(
@@ -222,7 +249,15 @@ def build_preview_data_runtime(manager, username, workspace, conversation_id, co
         from server.preview_server import ensure_preview_server, register_token
         port = ensure_preview_server()
         workspace_id = getattr(workspace, "workspace_id", None) or "default"
-        register_token(token, username, workspace_id, conversation_id)
+        # role 必须随 token 一起登记：预览服务器没有主应用 session，解析终端时
+        # 只能靠这份显式身份（否则会被当成非 host 用户解析到假工作区）
+        role = None
+        try:
+            from server.auth_helpers import get_current_user_role
+            role = get_current_user_role()
+        except Exception:
+            role = None
+        register_token(token, username, workspace_id, conversation_id, role)
         return {"preview_base": f"http://127.0.0.1:{port}", "preview_token": token}
     except Exception:
         return empty
@@ -376,7 +411,12 @@ def preview_proxy(terminal: WebTerminal, workspace: UserWorkspace, username: str
     # 旧同源端点：保留给远端域名访问回退（本机访问走独立预览服务器，见文件头注释）
     if not is_preview_enabled():
         return jsonify({"success": False, "error": tr("preview.disabled_in_docker")}), 403
-    return serve_proxy_response(terminal, port, sub_path)
+    # iframe 导航带不了请求头，工作区/对话身份随 query 传；
+    # 未传时回退当前 terminal 的对话（与旧行为一致）
+    conversation_id = str(request.args.get("conversation_id") or "").strip() or None
+    if conversation_id and not conversation_id.startswith("conv_"):
+        conversation_id = f"conv_{conversation_id}"
+    return serve_proxy_response(terminal, port, sub_path, conversation_id=conversation_id)
 
 
 def serve_proxy_response(terminal: WebTerminal, port: int, sub_path: str = "",

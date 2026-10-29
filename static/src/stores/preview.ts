@@ -39,6 +39,8 @@ interface PreviewState {
   previewBase: string;
   /** 当前对话的预览 token（路径鉴权用，随对话 metadata 持久化） */
   previewToken: string;
+  /** 运行时补拉进行中（避免面板每次打开都重复请求） */
+  runtimeRequesting: boolean;
 }
 
 export const usePreviewStore = defineStore('preview', {
@@ -50,7 +52,8 @@ export const usePreviewStore = defineStore('preview', {
     autoOpenSuppressed: false,
     lastAutoOpenedKey: '',
     previewBase: '',
-    previewToken: ''
+    previewToken: '',
+    runtimeRequesting: false
   }),
   getters: {
     activeTarget(state): PreviewTarget | null {
@@ -132,9 +135,23 @@ export const usePreviewStore = defineStore('preview', {
       if (typeof base === 'string' && base) this.previewBase = base;
       if (typeof token === 'string' && token) this.previewToken = token;
     },
-    /** 推导目标的 iframe 地址：有独立预览服务器时走隔离源，否则回退旧同源端点 */
-    previewUrlFor(target: PreviewTarget, hostMode: boolean): string {
+    /** 推导目标的 iframe 地址：有独立预览服务器时走隔离源，否则回退旧同源端点。
+     *
+     * 回退端点必须自带 workspace_id + conversation_id：iframe 导航无法携带
+     * `X-Astrion-Workspace-Id` 头，旧实现只能按「session 选中工作区」解析，
+     * 对话属于别的工作区时必然去错目录找文件（表现为「文件不可用或不在可访问范围内」）。
+     */
+    previewUrlFor(
+      target: PreviewTarget,
+      hostMode: boolean,
+      workspaceId?: string,
+      conversationId?: string
+    ): string {
       const isolated = this.previewBase && this.previewToken;
+      const query = new URLSearchParams();
+      if (workspaceId) query.set('workspace_id', workspaceId);
+      if (conversationId) query.set('conversation_id', conversationId);
+      const suffix = query.toString() ? `?${query.toString()}` : '';
       if (target.type === 'file') {
         const encoded = (target.path || '')
           .split('/')
@@ -142,7 +159,7 @@ export const usePreviewStore = defineStore('preview', {
           .join('/');
         return isolated
           ? `${this.previewBase}/${this.previewToken}/file/${encoded}`
-          : `/api/preview/file/${encoded}`;
+          : `/api/preview/file/${encoded}${suffix}`;
       }
       const url = target.url || '';
       // host 模式：浏览器与服务器同机，直连 localhost（保真，HMR 可用；与主应用天然跨源）
@@ -153,7 +170,34 @@ export const usePreviewStore = defineStore('preview', {
       const path = m[2] || '/';
       return isolated
         ? `${this.previewBase}/${this.previewToken}/proxy/${port}${path}`
-        : `/api/preview/proxy/${port}${path}`;
+        : `/api/preview/proxy/${port}${path}${suffix}`;
+    },
+    /** 补齐预览运行时（preview_base + token）。
+     *
+     * bootstrap 只在「打开已有对话」时下发运行时；首条消息创建的对话不跑 bootstrap，
+     * 于是永远没有 token、只能走同源回退。面板打开时补拉一次即可让新对话也用上隔离源。
+     */
+    async ensureRuntime(workspaceId?: string, conversationId?: string): Promise<void> {
+      if (this.previewBase && this.previewToken) return;
+      const id = String(conversationId || '').trim();
+      if (!id || this.runtimeRequesting) return;
+      this.runtimeRequesting = true;
+      try {
+        const query = new URLSearchParams({ conversation_id: id });
+        if (workspaceId) query.set('workspace_id', workspaceId);
+        const resp = await fetch(`/api/preview/targets?${query.toString()}`);
+        const payload = await resp.json().catch(() => ({}));
+        if (resp.ok && payload && payload.success) {
+          this.setRuntime(payload.preview_base, payload.preview_token);
+          if (Array.isArray(payload.preview_targets)) {
+            this.setTargets(payload.preview_targets, false);
+          }
+        }
+      } catch {
+        /* 补拉失败时保留同源回退（已带 workspace_id/conversation_id） */
+      } finally {
+        this.runtimeRequesting = false;
+      }
     },
     closePanel() {
       this.activeKey = null;
@@ -171,6 +215,7 @@ export const usePreviewStore = defineStore('preview', {
       this.lastAutoOpenedKey = '';
       this.previewBase = '';
       this.previewToken = '';
+      this.runtimeRequesting = false;
       this.ephemeralTargets = [];
     },
     async removeTarget(key: string) {

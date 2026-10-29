@@ -75,6 +75,10 @@ MESSAGES = {
         "zh-CN": "无法在系统浏览器中打开链接",
         "en-US": "Failed to open the link in the system browser",
     },
+    "status_file_open.open_file_failed": {
+        "zh-CN": "无法用系统默认程序打开文件",
+        "en-US": "Failed to open the file with the system default application",
+    },
     "status_file_open.app_icon_unavailable": {
         "zh-CN": "应用图标不可用",
         "en-US": "App icon unavailable",

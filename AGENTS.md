@@ -489,7 +489,8 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 **安全模型 = 换源隔离**：主应用同源端点 + `sandbox="allow-scripts allow-same-origin"` 对同源内容等于无沙箱，业界全部用换源。
 
-- **localhost 目标 = 独立预览服务器**（`server/preview_server.py`）：只绑 127.0.0.1 的随机高位端口迷你 Flask；路径带每对话随机 token；两道关卡 = Host 头白名单（防 DNS rebinding）+ token 注册表反查（注册表存会话身份三元组，不存 terminal 引用——对话级 terminal 会被回收）。下发链路 `build_preview_runtime()` 在 targets/bootstrap/messages 三处响应里带 `preview_base` + `preview_token`。
+- **localhost 目标 = 独立预览服务器**（`server/preview_server.py`）：只绑 127.0.0.1 的随机高位端口迷你 Flask；路径带每对话 token（优先用 `metadata.preview_token`，落盘被主任务整文件回写冲掉时由 `_derived_preview_token()` 进程内派生兜底）；两道关卡 = Host 头白名单（防 DNS rebinding）+ token 注册表反查（注册表存会话身份四元组，不存 terminal 引用——对话级 terminal 会被回收）。下发链路 `build_preview_runtime()` 在 targets/bootstrap/messages 三处响应里带 `preview_base` + `preview_token`。
+- **预览服务器解析工作区必须传显式身份（2026-10-29 修复，硬约束）**：独立 Flask app 无主应用 session，`_resolve_context()` 必须传 `identity=RuntimeIdentity(host_mode=True, host_workspace_id=<注册工作区>, role=<注册角色>)`；否则会走非 host 分支造出 `users/<u>/projects/<ws>/project` 假工作区，并用同一缓存键把错误 project_path 的 terminal 写进全局终端池（重启/压缩后文件预览必然「文件不可用」，直到进程重启）。
 - **docker/web 模式 = 预览整体禁用**（红队演练确认 docker 是唯一把端口暴露到公网的形态）。**唯一判定 = `is_preview_enabled()`（=IS_HOST_MODE）**，四处门控：记录入口／端点／序列化／prompt。前端无目标自然隐藏。
 - **远端域名访问（host 模式经反向代理的边角场景）**：浏览器到不了 127.0.0.1 预览服务器，`build_preview_runtime` 对非回环 Host 返回 None，前端**回退旧同源端点**（`/api/preview/file|proxy`，仅 host 可用）。残余风险已知（有 CSRF + 无 CORS 兜底）。
 - **SSRF 防护：仅允许代理当前对话已登记的端口。**

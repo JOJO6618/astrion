@@ -796,6 +796,43 @@ def open_external_url():
     return jsonify({"success": True})
 
 
+@status_bp.route('/api/system/open-file', methods=['POST'])
+@api_login_required
+@with_terminal
+def open_workspace_file(terminal, workspace, username):
+    """用系统默认程序打开工作区内的**真实文件**（file:// 语义）。
+
+    预览面板的「在浏览器打开」对文件目标走这里：打开的是文件本身
+    （http:// 页面上无法直接跳 file://，必须由宿主调系统 open），
+    而不是预览服务器的代理地址（随机端口 + 对话 token，复制出去无意义）。
+
+    安全语义同 /api/system/open-external、/api/system/save-file：仅 host 模式；
+    源路径必须通过工作区路径校验，不能借此打开主机任意文件。
+    """
+    if not _is_host_mode_request():
+        return jsonify({"success": False, "error": tr("status_file_open.host_mode_only")}), 403
+    data = request.get_json(silent=True) or {}
+    path = str(data.get("path") or "").strip()
+    if not path:
+        return jsonify({"success": False, "error": tr("status_file_open.invalid_path")}), 400
+
+    valid, error, full_path = terminal.file_manager._validate_path(path)
+    if not valid or full_path is None:
+        return jsonify({"success": False, "error": error or tr("status_file_open.invalid_path")}), 400
+    # host 模式的 _validate_path 不做包含性检查（读边界由沙箱另外兜），
+    # 这里必须自己收紧到工作区内：预览目标只会是工作区文件，不开放主机任意文件。
+    try:
+        project_root = Path(getattr(terminal, "project_path", "") or "").expanduser().resolve()
+        full_path.resolve().relative_to(project_root)
+    except Exception:
+        return jsonify({"success": False, "error": tr("status_file_open.invalid_path")}), 400
+    if not full_path.exists() or not full_path.is_file():
+        return jsonify({"success": False, "error": tr("status_file_open.file_not_found")}), 404
+    if not _open_path_in_file_manager(full_path):
+        return jsonify({"success": False, "error": tr("status_file_open.open_file_failed")}), 500
+    return jsonify({"success": True, "data": {"path": str(full_path)}})
+
+
 @status_bp.route('/api/system/save-file', methods=['POST'])
 @api_login_required
 @with_terminal
