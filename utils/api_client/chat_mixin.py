@@ -126,6 +126,11 @@ class APIClientChatMixin:
         extra_params = self.thinking_extra_params if current_thinking_mode else self.fast_extra_params
         if extra_params:
             payload.update(extra_params)
+        # Qwen 快速模式显式关闭思考，覆盖所有共享此请求入口的调用。
+        # 使用实际请求模型名（兼容 qwen/qwen-*），保留显式 extra_params。
+        request_model = str(payload.get("model") or "").rsplit("/", 1)[-1].lower()
+        if not current_thinking_mode and request_model.startswith("qwen"):
+            payload.setdefault("enable_thinking", False)
         # 推理强度：思考模式下且模型支持时注入（与额外参数同级的平铺参数）
         if current_thinking_mode and self.supports_reasoning_effort and self.reasoning_effort:
             payload["reasoning_effort"] = self.reasoning_effort

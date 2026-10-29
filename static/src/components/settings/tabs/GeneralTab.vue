@@ -59,6 +59,14 @@ const defaultExtraOptions = computed(() => [
   { key: '', label: t('personalization.defaultModelOption') }
 ]);
 
+function updateThinkingSummaryInterval(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const parsed = input.value.trim() ? Number(input.value) : NaN;
+  const value = Number.isFinite(parsed) ? Math.min(3600, Math.max(1, Math.trunc(parsed))) : 20;
+  input.value = String(value);
+  personalization.updateField({ key: 'thinking_summary_interval_seconds', value });
+}
+
 const knownRunDataErrors = new Set([
   'environment_locked',
   'path_required',
@@ -233,6 +241,65 @@ onMounted(() => {
         :extra-options="defaultExtraOptions"
         @select="(v) => personalization.updateField({ key: 'title_model', value: v })"
       />
+    </div>
+
+    <div class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.thinkingSummaryModelTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.thinkingSummaryModelDesc') }}</span>
+      </span>
+      <ModelSelectDropdown
+        :model-value="form.thinking_summary_model"
+        :options="auxModelOptions"
+        :placeholder="$t('personalization.thinkingSummaryModelRequired')"
+        @select="(v) => personalization.updateField({ key: 'thinking_summary_model', value: v })"
+      />
+    </div>
+
+    <label
+      class="settings-toggle-row thinking-summary-toggle"
+      :aria-disabled="!form.thinking_summary_model"
+    >
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.thinkingSummaryTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.thinkingSummaryDesc') }}</span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="form.thinking_summary_enabled"
+        :disabled="!form.thinking_summary_model"
+        @change="
+          personalization.updateField({
+            key: 'thinking_summary_enabled',
+            value: ($event.target as HTMLInputElement).checked && !!form.thinking_summary_model
+          })
+        "
+      />
+      <FancyCheck :checked="form.thinking_summary_enabled" />
+    </label>
+
+    <div v-if="form.thinking_summary_enabled" class="settings-input-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.thinkingSummaryIntervalTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.thinkingSummaryIntervalDesc') }}</span>
+      </span>
+      <div class="settings-number-row">
+        <input
+          type="number"
+          min="1"
+          max="3600"
+          step="1"
+          :aria-label="$t('personalization.thinkingSummaryIntervalTitle')"
+          :value="form.thinking_summary_interval_seconds"
+          @change="updateThinkingSummaryInterval"
+        />
+        <button
+          type="button"
+          @click="personalization.updateField({ key: 'thinking_summary_interval_seconds', value: 20 })"
+        >
+          {{ $t('personalization.restoreDefault') }}
+        </button>
+      </div>
     </div>
 
     <label class="settings-toggle-row">
@@ -470,6 +537,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.thinking-summary-toggle[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .command-blocking-error {
   display: block;
   margin-top: 6px;

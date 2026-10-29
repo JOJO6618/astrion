@@ -1,7 +1,7 @@
 export interface CostActor {
   id: string;
   name: string;
-  kind: 'main' | 'sub_agent';
+  kind: 'main' | 'sub_agent' | 'thinking_summary';
   cost_usd: string;
   requests: number;
   priced_requests: number;

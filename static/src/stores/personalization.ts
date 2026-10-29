@@ -102,6 +102,9 @@ interface PersonalForm {
   auto_generate_title: boolean;
   /** 标题生成模型（注册表模型 key）；留空 = 自动规则 */
   title_model: string;
+  thinking_summary_enabled: boolean;
+  thinking_summary_model: string;
+  thinking_summary_interval_seconds: number;
   /** 传统子智能体分档模型；空值表示未配置。 */
   sub_agent_model_high: string;
   sub_agent_model_medium: string;
@@ -348,6 +351,9 @@ const defaultForm = (): PersonalForm => ({
   adult_content_restriction: 'medium',
   auto_generate_title: true,
   title_model: '',
+  thinking_summary_enabled: false,
+  thinking_summary_model: '',
+  thinking_summary_interval_seconds: 20,
   sub_agent_model_high: '',
   sub_agent_model_medium: '',
   sub_agent_model_low: '',
@@ -599,6 +605,14 @@ export const usePersonalizationStore = defineStore('personalization', {
             : 'medium',
         auto_generate_title: data.auto_generate_title !== false,
         title_model: typeof data.title_model === 'string' ? data.title_model : '',
+        thinking_summary_enabled: !!data.thinking_summary_enabled && !!data.thinking_summary_model,
+        thinking_summary_model:
+          typeof data.thinking_summary_model === 'string' ? data.thinking_summary_model : '',
+        thinking_summary_interval_seconds:
+          typeof data.thinking_summary_interval_seconds === 'number' &&
+          Number.isFinite(data.thinking_summary_interval_seconds)
+            ? Math.min(3600, Math.max(1, Math.trunc(data.thinking_summary_interval_seconds)))
+            : 20,
         sub_agent_model_high:
           typeof data.sub_agent_model_high === 'string' ? data.sub_agent_model_high : '',
         sub_agent_model_medium:

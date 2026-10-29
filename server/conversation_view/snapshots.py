@@ -135,6 +135,8 @@ class TaskViewMixin:
                 for key in ("images", "videos", "media_refs"):
                     if key in saved:
                         msg[key] = deepcopy(saved[key])
+        from modules.thinking_summary.storage import decorate_snapshot
+        decorate_snapshot(manager, conversation_id, data, base, projected["messages"])
         return {"data": data, "messages": base, "display": {
             "revision": revision, "messages": projected["messages"],
             "state": projected["state"], "task": task, "next_event_idx": cursor,

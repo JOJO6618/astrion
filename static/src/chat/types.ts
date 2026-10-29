@@ -9,6 +9,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string | Array<{ type: string; text?: string }>;
   reasoning_content?: string;
+  thinking_summary?: { text: string; revision: number; generation: string };
   media_refs?: MediaRef[];
   tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
   tool_call_id?: string;

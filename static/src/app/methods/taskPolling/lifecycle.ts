@@ -110,6 +110,10 @@ export const lifecycleMethods = {
         this.handleThinkingEnd(eventData, eventIdx);
         break;
 
+      case 'thinking_summary':
+        this.handleThinkingSummary(eventData);
+        break;
+
       case 'text_start':
         this.handleTextStart(eventData, eventIdx);
         break;

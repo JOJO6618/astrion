@@ -33,7 +33,8 @@ def _read(path: Path) -> dict[str, Any]:
 def record_request(data_dir: str | Path, conversation_id: str, request_id: str,
                    actor_id: str, name: str, kind: str, entry: dict[str, Any],
                    *, historical_unpriced: bool = False,
-                   baseline: dict[str, int] | None = None) -> bool:
+                   baseline: dict[str, int] | None = None,
+                   count_goal_usage: bool = True) -> bool:
     from datetime import datetime, timezone
     path = _path(data_dir, conversation_id)
     with directory_lock(path.parent):
@@ -63,6 +64,10 @@ def record_request(data_dir: str | Path, conversation_id: str, request_id: str,
             'actor_id': actor_id, 'recorded_at': datetime.now(timezone.utc).isoformat(), **entry,
         }
         atomic_write_json(path, data)
+    # Display-only auxiliary calls contribute costs, but goal token limits keep
+    # their existing main/sub-agent scope.
+    if not count_goal_usage:
+        return True
     # Goal limits use only this conversation's newly committed requests. Keep the
     # ledger lock released before taking the independent goal lifecycle lock.
     try:

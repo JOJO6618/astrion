@@ -172,6 +172,8 @@ interface Action {
   blockId?: string;
   toolBatchId?: string;
   responseMessageId?: string;
+  thinkingSummary?: string;
+  thinkingSummaryRevision?: number;
   tool?: {
     name?: string;
     intent?: string;
@@ -588,7 +590,7 @@ const getCompletedSummaryText = (actions: Action[]): string => {
     // 没有工具时回退到最后一条思考的单行内容
     const lastThinking = actions.filter((a) => a.type === 'thinking').pop();
     if (lastThinking) {
-      return getFirstLine(lastThinking.content || '');
+      return lastThinking.thinkingSummary || getFirstLine(lastThinking.content || '');
     }
     return '';
   }
@@ -674,10 +676,15 @@ const summaryToolReel = useSummaryToolReel(() =>
   })
 );
 
+const thinkingSweepIdentity = (action: Action | undefined, groupId: string): string => {
+  const base = action?.id || action?.blockId || `${groupId}:thinking`;
+  return action?.thinkingSummary ? `${base}:summary:${action.thinkingSummaryRevision || 0}` : base;
+};
+
 const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepInput => {
   const running = isSummaryRunning(actions, groupId);
   const lastAction = actions[actions.length - 1];
-  const thinkingIdentity = lastAction?.id || lastAction?.blockId || `${groupId}:thinking`;
+  const thinkingIdentity = thinkingSweepIdentity(lastAction, groupId);
   const thinkingComplete =
     lastAction?.type === 'thinking' &&
     lastAction.streaming === false &&
@@ -692,11 +699,16 @@ const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepI
     props.conversationRunning &&
     props.isLatestMessage;
   if (thinkingComplete || (!running && !thinkingDuringOutput)) {
+    const summaryUpdate =
+      lastAction?.type === 'thinking' &&
+      !!lastAction.thinkingSummary &&
+      props.conversationRunning &&
+      props.isLatestMessage;
     return {
       text: getCompletedSummaryText(actions),
-      identity: `${groupId}:complete`,
-      kind: 'static',
-      animate: false,
+      identity: summaryUpdate ? thinkingIdentity : `${groupId}:complete`,
+      kind: summaryUpdate ? 'thinking' : 'static',
+      animate: !!summaryUpdate,
       sweeping: false
     };
   }
@@ -738,8 +750,8 @@ const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepI
   }
   const thinking = actions.filter((action) => action.type === 'thinking').pop();
   return {
-    text: getFirstLine(thinking?.content || ''),
-    identity: thinking?.id || thinking?.blockId || `${groupId}:thinking`,
+    text: thinking?.thinkingSummary || getFirstLine(thinking?.content || ''),
+    identity: thinkingSweepIdentity(thinking, groupId),
     kind: 'thinking',
     animate: true,
     sweeping: running && thinking?.streaming !== false

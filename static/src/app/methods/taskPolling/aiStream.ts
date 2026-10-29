@@ -68,6 +68,10 @@ export const aiStreamMethods = {
     trackStreamAttempt(this, data, eventIdx);
     const result = this.chatStartThinkingAction();
     identifyAction(this, result?.action, data, eventIdx, 'thinking');
+    if (result?.action) {
+      result.action.responseMessageId = data.response_message_id;
+      result.action.thinkingGeneration = data.thinking_generation;
+    }
     const blockId = result?.action?.blockId;
     if (blockId) {
       this.chatExpandBlock(blockId);
@@ -90,6 +94,22 @@ export const aiStreamMethods = {
     this.monitorShowThinking();
     this.$forceUpdate();
     this.conditionalScrollToBottom();
+  },
+  handleThinkingSummary(data: any) {
+    for (const message of this.messages) {
+      for (const action of message.actions || []) {
+        if (
+          action.type === 'thinking' &&
+          action.responseMessageId === data.response_message_id &&
+          action.thinkingGeneration === data.generation &&
+          data.revision > (action.thinkingSummaryRevision || 0)
+        ) {
+          action.thinkingSummary = data.summary;
+          action.thinkingSummaryRevision = data.revision;
+        }
+      }
+    }
+    this.$forceUpdate();
   },
   handleThinkingEnd(data: any) {
     if (this.runMode === 'fast' || this.thinkingMode === false) return;

@@ -88,6 +88,10 @@ async def handle_task_with_sender(
             return
         payload = dict(data)
         current_conv = conversation_id or getattr(web_terminal.context_manager, "current_conversation_id", None)
+        if event_type in {"task_stopped", "quota_exceeded"}:
+            summary_work = getattr(web_terminal, "_thinking_summary_work", None)
+            if summary_work:
+                summary_work.cancel()
 
         # 为所有事件添加 conversation_id，确保前端能正确匹配
         if current_conv and event_type not in {"connect", "disconnect", "system_ready"}:
@@ -216,6 +220,9 @@ async def handle_task_with_sender(
         if inherited_anchor_index >= 0:
             current_work_anchor_message_id = inherited_anchor_id
             current_work_user_message_index = inherited_anchor_index
+    from modules.thinking_summary import begin_work
+    begin_work(web_terminal, saved_user_message or message, inherited_anchor_id)
+
     # 为浅备份 track_edit 提供当前用户消息 ID，避免文件修改被归到上一个输入。
     try:
         web_terminal.context_manager.current_shallow_message_id = current_work_anchor_message_id
@@ -1195,6 +1202,9 @@ async def handle_task_with_sender(
     if requested_result is not None:
         await continue_after_compression(requested_result)
         return
+
+    from modules.thinking_summary import finish_work
+    await finish_work(web_terminal)
 
     if not is_agent:
         finalize_user_work_timer()

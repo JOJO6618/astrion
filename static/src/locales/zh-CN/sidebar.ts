@@ -83,6 +83,7 @@ export default {
   totalCost: '总花费',
   costDetails: '花费明细',
   costMainAgent: '主智能体',
+  costThinkingSummary: '思考摘要',
   costPartial: '部分统计',
   costIncomplete: '未计价的历史或请求不包含在金额中。',
   costUnpriced: '未计价',

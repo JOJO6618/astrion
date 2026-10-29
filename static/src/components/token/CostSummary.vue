@@ -165,7 +165,11 @@ onBeforeUnmount(() => {
         <div class="cost-heading">{{ $t('sidebar.costDetails') }}</div>
         <div v-for="actor in costs?.actors || []" :key="actor.id" class="cost-row">
           <span class="cost-name">{{
-            actor.kind === 'main' ? $t('sidebar.costMainAgent') : actor.name
+            actor.kind === 'main'
+              ? $t('sidebar.costMainAgent')
+              : actor.kind === 'thinking_summary'
+                ? $t('sidebar.costThinkingSummary')
+                : actor.name
           }}</span>
           <span class="cost-amount">{{ actorAmount(actor) }}</span>
           <span v-if="actor.historical_unpriced || actor.unpriced_requests" class="cost-row-note">{{

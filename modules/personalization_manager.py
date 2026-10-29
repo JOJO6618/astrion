@@ -120,6 +120,9 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "default_work_mode": "plan",  # 默认运行模式：plan / ask / execute
     "auto_generate_title": True,
     "title_model": "",  # 对话标题生成使用的注册表模型 key（空=自动规则）
+    "thinking_summary_enabled": False,
+    "thinking_summary_model": "",
+    "thinking_summary_interval_seconds": 20,
     "sub_agent_model_high": "",
     "sub_agent_model_medium": "",
     "sub_agent_model_low": "",
@@ -457,6 +460,17 @@ def sanitize_personalization_payload(
         base[key] = value if value in allowed else "medium"
     base["auto_generate_title"] = bool(data.get("auto_generate_title", base["auto_generate_title"]))
     base["title_model"] = str(data.get("title_model", base.get("title_model", "")) or "").strip()
+    base["thinking_summary_model"] = str(data.get("thinking_summary_model", base.get("thinking_summary_model", "")) or "").strip()
+    base["thinking_summary_enabled"] = bool(
+        data.get("thinking_summary_enabled", base.get("thinking_summary_enabled", False))
+        and base["thinking_summary_model"]
+    )
+    base["thinking_summary_interval_seconds"] = (
+        _sanitize_optional_int(
+            data.get("thinking_summary_interval_seconds", base.get("thinking_summary_interval_seconds")),
+            min_value=1, max_value=3600,
+        ) or DEFAULT_PERSONALIZATION_CONFIG["thinking_summary_interval_seconds"]
+    )
     for level in ("high", "medium", "low"):
         key = f"sub_agent_model_{level}"
         # 仅缺少新低档字段时迁移；显式清空低档不会复活旧值。

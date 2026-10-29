@@ -110,6 +110,10 @@ export function toDisplayMessages(
             id: thinkingId,
             type: 'thinking',
             content: message.reasoning_content,
+            thinkingSummary: message.thinking_summary?.text || projectedThinking?.thinkingSummary || '',
+            thinkingSummaryRevision:
+              message.thinking_summary?.revision || projectedThinking?.thinkingSummaryRevision || 0,
+            thinkingGeneration: message.thinking_summary?.generation || projectedThinking?.thinkingGeneration,
             streaming: !!message.live,
             blockId: thinkingId,
             responseMessageId: message.message_id

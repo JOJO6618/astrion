@@ -525,6 +525,13 @@ export default {
   reviewDefaultModelDesc: '注册表第一个可用模型；仅 Codex 模型时选 -luna 快速款',
   titleModelTitle: '标题生成模型',
   titleModelDesc: '选择用于生成对话标题的 AI 模型，留空则自动选择',
+  thinkingSummaryTitle: '思考内容摘要',
+  thinkingSummaryDesc: '极简模式以简短摘要展示思考进展；Responses 模型使用原生摘要',
+  thinkingSummaryModelTitle: '思考摘要模型',
+  thinkingSummaryModelDesc: '选择一个模型后才能开启，使用关闭思考的独立请求生成摘要',
+  thinkingSummaryModelRequired: '请选择模型',
+  thinkingSummaryIntervalTitle: '摘要生成间隔（秒）',
+  thinkingSummaryIntervalDesc: '默认20秒，且需新增至少500字符；保存后从下一次任务生效',
   externalSessionHeaderTitle: '外部会话标识',
   externalSessionHeaderDesc:
     '向 OpenCode 端点发送每个对话稳定的 x-opencode-session 请求头，用于会话路由与缓存优化；关闭则不发送',

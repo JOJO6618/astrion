@@ -165,7 +165,9 @@ class RuntimeProjection:
         self._content_message_id = data.get("response_message_id")
         msg = self._ensure_assistant()
         if phase == "start":
-            self._start_content(kind)
+            action = self._start_content(kind)
+            if kind == "thinking":
+                action["thinkingGeneration"] = data.get("thinking_generation")
             return
         if kind == "thinking":
             action = self._active_thinking(msg)
@@ -457,6 +459,15 @@ class RuntimeProjection:
         elif event_type in {"thinking_start", "thinking_chunk", "thinking_end",
                             "text_start", "text_chunk", "text_end"}:
             self._content_event(event_type, data)
+        elif event_type == "thinking_summary":
+            for message in self.messages:
+                for action in message.get("actions", []):
+                    if (action.get("type") == "thinking"
+                            and action.get("responseMessageId") == data.get("response_message_id")
+                            and action.get("thinkingGeneration") == data.get("generation")
+                            and data.get("revision", 0) > action.get("thinkingSummaryRevision", 0)):
+                        action["thinkingSummary"] = data.get("summary", "")
+                        action["thinkingSummaryRevision"] = data["revision"]
         elif event_type == "stream_reset":
             self._reset(data)
         elif event_type in {"tool_preparing", "tool_start", "tool_intent", "tool_update_action", "update_action"}:

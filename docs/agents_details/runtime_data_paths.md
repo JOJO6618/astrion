@@ -64,3 +64,7 @@
 - 迁移脚本：`scripts/migrate_runtime_data.py`（源码树 → 运行态根；复制+备份+可回滚+幂等，`logs/` 丢弃不迁）。
   - 脚本 `import config` 复用程序同一套路径解析（含 `.env`），**模式由 `.env` 决定**；执行前务必先 `--dry-run` 确认目标。
 - 清理误迁副本：`scripts/cleanup_misplaced_web.sh`。
+
+### 思考摘要显示文件（2026-10-29）
+
+`modules/thinking_summary/storage.py` 以真实 manager 的 `_get_conversation_file_path` 解析所在目录，独立写入 `<实际对话目录>/thinking_summaries/<conversation_id>.json`，沿用 Agent／Studio namespace、工作区及 Chat 账号隔离。每次发布原子保存最新摘要、版本、代次和该思考块摘要序列，不写原对话文件或模型上下文；读取缺文件不创建目录。完整生成与显示契约见 `docs/thinking_summaries.md`，本次仅语法验证。

@@ -80,6 +80,7 @@ export default {
   totalCost: 'Total cost',
   costDetails: 'Cost breakdown',
   costMainAgent: 'Main agent',
+  costThinkingSummary: 'Thinking summaries',
   costPartial: 'Partial',
   costIncomplete: 'Unpriced history or requests are excluded from this amount.',
   costUnpriced: 'Unpriced',

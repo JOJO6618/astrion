@@ -268,8 +268,14 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
 
     finally:
         if loop is not None and not loop.is_closed():
-            loop.close()
-            asyncio.set_event_loop(None)
+            try:
+                from modules.thinking_summary import dispose_work
+                loop.run_until_complete(dispose_work(terminal))
+            except Exception as exc:
+                debug_log(f"思考摘要清理失败: {type(exc).__name__}")
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
         terminal._multi_agent_main_task_active = False
         # 清理任务引用
         clear_stop_flag(client_sid, username)

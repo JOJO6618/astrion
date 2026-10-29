@@ -28,20 +28,49 @@ async def run_streaming_attempts(**kwargs):
     partial = PartialResponse(message_id=message_id)
     terminal._stream_partial = partial
     original_sender = kwargs["sender"]
+    work = getattr(terminal, "_thinking_summary_work", None)
+    summary_block = None
 
     def identified_sender(event, data):
+        nonlocal summary_block
+        if event == "api_request_start" and summary_block:
+            summary_block.cancel()
+            summary_block.clear_saved()
+            summary_block = None
+        if event == "thinking_start" and work:
+            summary_block = work.block(message_id, kwargs.get("conversation_id"), original_sender)
         if event.startswith(("text_", "thinking_")):
             data = {**(data or {}), "response_message_id": message_id}
+        if event == "thinking_start" and summary_block:
+            data["thinking_generation"] = summary_block.generation
         original_sender(event, data)
+        if summary_block:
+            if event == "thinking_chunk":
+                summary_block.feed((data or {}).get("content", ""))
+            elif event in {"thinking_end", "text_start", "tool_preparing"}:
+                summary_block.end()
+            elif event in {"task_stopped", "quota_exceeded"}:
+                summary_block.cancel()
 
     kwargs["sender"] = identified_sender
     try:
         result = await _run_streaming_attempts_impl(**kwargs)
+        if summary_block:
+            if result.get("stopped") or result.get("api_error"):
+                summary_block.cancel()
+            else:
+                summary_block.end()
         if result.get("stopped"):
             commit_pending_response(terminal, kwargs["sender"])
         return result
     except asyncio.CancelledError:
+        if work:
+            work.cancel()
         commit_pending_response(terminal, kwargs["sender"])
+        raise
+    except Exception:
+        if work:
+            work.cancel()
         raise
 
 

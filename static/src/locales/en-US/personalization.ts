@@ -568,6 +568,16 @@ export default {
   titleModelTitle: 'Title generation model',
   titleModelDesc:
     'Choose the AI model used to generate conversation titles; leave empty for automatic selection',
+  thinkingSummaryTitle: 'Thinking summaries',
+  thinkingSummaryDesc:
+    'Show brief thinking progress in minimal mode; Responses models use their native summaries',
+  thinkingSummaryModelTitle: 'Thinking summary model',
+  thinkingSummaryModelDesc:
+    'Select a model before enabling; summaries use separate requests with thinking disabled',
+  thinkingSummaryModelRequired: 'Select a model',
+  thinkingSummaryIntervalTitle: 'Summary interval (seconds)',
+  thinkingSummaryIntervalDesc:
+    'Defaults to 20 seconds and requires 500 new characters; saved changes apply to the next task',
   externalSessionHeaderTitle: 'External session header',
   externalSessionHeaderDesc:
     'Send a stable per-conversation x-opencode-session header to OpenCode endpoints for session routing and cache optimization; disabled means no header is sent',
