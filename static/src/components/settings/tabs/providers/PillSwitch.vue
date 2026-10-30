@@ -26,7 +26,6 @@ const emit = defineEmits<{ (e: 'toggle'): void }>();
     role="switch"
     :aria-checked="on"
     :aria-label="label"
-    :title="label"
     :disabled="disabled"
     @click="emit('toggle')"
   >

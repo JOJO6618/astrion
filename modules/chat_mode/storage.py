@@ -19,7 +19,10 @@ class ChatStorage:
         )
 
     def create(self, *, model_key=None, thinking_mode=False,
-               reasoning_effort=None, network_enabled=True, creation_operation_id=None) -> str:
+               reasoning_effort=None, network_enabled=True, creation_operation_id=None,
+               chatgpt_fast_mode=False) -> str:
+        from utils.api_client.codex.service_tier import validate_fast_mode
+        chatgpt_fast_mode = validate_fast_mode(chatgpt_fast_mode)
         state = initial_state()
         state["creation_operation_id"] = creation_operation_id
         return self.manager.create_conversation(
@@ -28,6 +31,7 @@ class ChatStorage:
             metadata_overrides={
                 "conversation_kind": "chat", "chat": state,
                 "reasoning_effort": reasoning_effort,
+                "chatgpt_fast_mode": chatgpt_fast_mode,
                 "network_enabled": bool(network_enabled), "network_revision": 0,
                 "pending_network_notices": [],
             },

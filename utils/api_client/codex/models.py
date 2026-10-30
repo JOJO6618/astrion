@@ -66,6 +66,8 @@ def _profile_from_model_info(
     supports_image = "image" in input_modalities
     context_window = info.get("context_window")
     levels = info.get("supported_reasoning_levels") or []
+    from utils.api_client.codex.service_tier import supports_fast_mode
+
     display_name = str(info.get("display_name") or slug)
     description = str(info.get("description") or "")
     # 与常规模型（custom_models.json 手写描述）风格对齐：带上模型名让模型知道自己是谁
@@ -105,6 +107,7 @@ def _profile_from_model_info(
         "fast_only": False,
         "thinking_only": True,  # 前端不显示 thinking/fast 切换
         "supports_reasoning_effort": True,
+        "supports_chatgpt_fast_mode": supports_fast_mode(info),
         "supported_reasoning_levels": [
             {
                 "effort": str(lv.get("effort") or ""),

@@ -22,6 +22,8 @@ export interface ModelOption {
   supportsThinking: boolean;
   thinkingOnly?: boolean;
   supportsReasoningEffort?: boolean;
+  isChatgptModel?: boolean;
+  supportsChatgptFastMode?: boolean;
   /** 'codex' = ChatGPT 订阅通道；'provider' = 提供商同步；其余/缺省为手写自定义 */
   providerType?: string | null;
   /** 协议标识（2026-09-25 泛化）：'chat_completions'（缺省）/ 'responses' / 其他暂不支持 */
@@ -148,6 +150,8 @@ export const useModelStore = defineStore('model', {
             supportsThinking: !!item.supports_thinking,
             thinkingOnly: !!item.thinking_only,
             supportsReasoningEffort: !!item.supports_reasoning_effort,
+            isChatgptModel: item.is_chatgpt_model === true,
+            supportsChatgptFastMode: item.supports_chatgpt_fast_mode === true,
             providerType: item.provider_type ? String(item.provider_type) : null,
             providerId: item.provider_id ? String(item.provider_id) : null,
             providerName: item.provider_name ? String(item.provider_name) : null,

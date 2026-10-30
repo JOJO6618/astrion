@@ -40,13 +40,16 @@ class ChatModeTaskMixin:
             from modules.chat_mode.media import resolve_refs
             images = resolve_refs(scope.root, params.images, "image")
             videos = resolve_refs(scope.root, params.videos, "video")
-            if params.model_key or params.thinking_mode is not None or "reasoning_effort" in params.chat_settings:
+            if (params.model_key or params.thinking_mode is not None
+                    or any(key in params.chat_settings for key in ("reasoning_effort", "chatgpt_fast_mode"))):
                 from modules.chat_mode.configuration import configure_conversation
                 configure_conversation(storage, conversation_id, {
                     **({"model_key": params.model_key} if params.model_key else {}),
                     **({"thinking_mode": params.thinking_mode} if params.thinking_mode is not None else {}),
                     **({"reasoning_effort": params.chat_settings["reasoning_effort"]}
                        if "reasoning_effort" in params.chat_settings else {}),
+                    **({"chatgpt_fast_mode": params.chat_settings["chatgpt_fast_mode"]}
+                       if "chatgpt_fast_mode" in params.chat_settings else {}),
                 })
             # A restart retires in-memory workers; never implicitly resume tools.
             old_turn = document["metadata"]["chat"]["active_turn_id"]

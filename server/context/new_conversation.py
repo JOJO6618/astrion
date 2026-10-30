@@ -48,6 +48,7 @@ def draft_settings(terminal: Any) -> dict:
         "run_mode": terminal.run_mode,
         "thinking_mode": terminal.thinking_mode,
         "reasoning_effort": terminal.reasoning_effort,
+        "chatgpt_fast_mode": meta.get("chatgpt_fast_mode") is True,
         "work_mode": terminal.get_work_mode(),
         "permission_mode": terminal.get_permission_mode(),
         "execution_mode": terminal.get_execution_mode(),
@@ -105,7 +106,9 @@ def prepare_draft_settings(terminal: Any, workspace: Any, previous_id: str | Non
     terminal.set_execution_mode(modes["execution_mode"])
     terminal.set_network_permission(modes["network_permission"])
     # Applying runtime constraints must not replace the draft's restoration record.
-    context.conversation_metadata = {**modes, **restore}
+    context.conversation_metadata = {
+        **modes, **restore, "chatgpt_fast_mode": previous.get("chatgpt_fast_mode") is True,
+    }
     terminal.pending_permission_mode = None
     terminal.pending_execution_mode = None
     terminal.pending_network_permission = None
@@ -143,6 +146,8 @@ def validate_creation_settings(settings: Any, *, host_mode: bool, can_manage: bo
     if ((profile.get("thinking_only") and settings["run_mode"] != "thinking") or
             (profile.get("fast_only") and settings["run_mode"] != "fast")):
         raise ValueError("Selected model does not support the requested thinking mode")
+    from utils.api_client.codex.service_tier import validate_fast_mode
+    fast_mode = validate_fast_mode(settings.get("chatgpt_fast_mode", False))
     restore = settings.get("restore_modes", {})
     if not isinstance(restore, dict):
         raise ValueError("Invalid restore_modes")
@@ -154,6 +159,7 @@ def validate_creation_settings(settings: Any, *, host_mode: bool, can_manage: bo
         if value == "direct" and not (host_mode and can_manage):
             raise PermissionError("Direct execution restoration requires a host administrator")
     return {**{key: settings[key] for key in SETTING_KEYS},
+            "chatgpt_fast_mode": fast_mode,
             "restore_modes": {key: restore.get(key) for key in RESTORE_KEYS}}
 
 
@@ -171,7 +177,8 @@ def create_from_settings(terminal: Any, workspace: Any, settings: Any) -> dict:
     context = terminal.context_manager
     manager = context.conversation_manager
     metadata = {key: resolved[key] for key in
-                ("work_mode", "permission_mode", "execution_mode", "network_permission", "reasoning_effort")}
+                ("work_mode", "permission_mode", "execution_mode", "network_permission", "reasoning_effort",
+                 "chatgpt_fast_mode")}
     metadata.update(resolved["restore_modes"])
     metadata.update(pending_permission_mode=None,
                     pending_execution_mode=None, pending_network_permission=None)

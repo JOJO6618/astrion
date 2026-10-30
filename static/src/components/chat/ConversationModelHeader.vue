@@ -188,6 +188,14 @@
           <div v-if="showEffortSlider" class="dropdown-effort">
             <EffortSlider :model-value="reasoningEffort" @update:model-value="setReasoningEffort" />
           </div>
+          <ChatgptFastModeSection
+            v-if="isChatgptModel"
+            :enabled="chatgptFastMode && supportsChatgptFastMode"
+            :disabled="
+              streamingMessage || !isConnected || chatgptFastModeSaving || !supportsChatgptFastMode
+            "
+            @toggle="toggleChatgptFastMode"
+          />
         </div>
       </div>
     </transition>
@@ -197,6 +205,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import EffortSlider from '@/components/input/EffortSlider.vue';
+import ChatgptFastModeSection from './ChatgptFastModeSection.vue';
 const props = defineProps<{
   mobile?: boolean;
   headerMenuOpen: boolean;
@@ -222,6 +231,11 @@ const props = defineProps<{
   showEffortSlider: boolean;
   reasoningEffort: any;
   setReasoningEffort: (value: any) => void;
+  isChatgptModel: boolean;
+  supportsChatgptFastMode: boolean;
+  chatgptFastMode: boolean;
+  chatgptFastModeSaving?: boolean;
+  toggleChatgptFastMode: () => void;
 }>();
 const emit = defineEmits(['update:modelMenuSearchQuery']);
 const searchQuery = computed({

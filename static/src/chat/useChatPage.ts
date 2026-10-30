@@ -71,6 +71,8 @@ export function useChatPage() {
       supportsThinking: m.supports_thinking,
       fastOnly: !m.supports_thinking,
       supportsReasoningEffort: m.supports_thinking,
+      isChatgptModel: m.is_chatgpt_model === true,
+      supportsChatgptFastMode: m.supports_chatgpt_fast_mode === true,
       providerId: m.provider_id,
       providerName: m.provider_name
     }))

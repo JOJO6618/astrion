@@ -31,6 +31,8 @@ export default {
   fastMode: 'Fast mode',
   fastModeDesc: 'No reasoning, faster responses',
   thinkingModeDesc: 'Continuous reasoning for complex tasks',
+  chatgptFastMode: 'ChatGPT Fast mode',
+  chatgptFastModeDesc: 'Faster model output, but uses more of your allowance',
   modelNotSelected: 'No model selected',
   // Plural forms in English; callers should pass both {n} and {count}.
   backgroundCommandCount: '1 background command | {count} background commands',

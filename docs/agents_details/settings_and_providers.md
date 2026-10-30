@@ -46,3 +46,12 @@
 
 
 ---
+
+### ChatGPT高速模式（2026-10-30）
+
+- UI：推理强度下增加「ChatGPT高速模式」，一个开关及「模型输出更快，但会消耗更多额度」。仅 `responses_auth=codex_oauth` 的模型显示；模型不支持时禁用。共用 `ChatgptFastModeSection.vue`，Agent 手机独立菜单也挂同一组件。
+- 能力：`utils/api_client/codex/service_tier.py` 按所选账号模型目录的 `service_tiers[].id=priority` 或官方旧字段 `additional_speed_tiers` 包含 `fast` 判断。模型 API 与 Chat 设置目录分别下发 `is_chatgpt_model` 和 `supports_chatgpt_fast_mode`；不按模型名或提供商前缀猜测。
+- 状态：唯一权威 `metadata.chatgpt_fast_mode`，布尔值，旧对话缺字段为关闭。Agent 新空页继承显式同工作区 `previous_conversation_id`，无来源关闭；Chat 空页保留刚离开对话的值。首消息捕获并保存本次选择；现有对话从 bootstrap／Chat 文档恢复，空页不受状态轮询覆盖。
+- 写入：Agent `POST /api/chatgpt-fast-mode` 明确传 `conversation_id`，持显示锁→任务锁检查 pending/running/cancel_requested 和门闸，事务成功后才同步运行实例；Chat 复用设置 PATCH 及任务受理校验。运行中不可切换，保存失败不伪报成功。
+- 请求：OAuth、开启且目录支持时，在共用 Responses 链路发送 `service_tier=priority`（官方 Fast.request_value 的实际取值）。关闭或非 OAuth 不发送；保持思考模式和 reasoning effort 独立。子智能体、标题、摘要等独立客户端不自动继承。
+- 回归：`test/2026-10-30_ChatGPT高速模式/`；离线捕获请求体不代表真实订阅已授权或实际吞吐已达某个倍率，实机速度与视觉由用户验收。

@@ -15,6 +15,8 @@ def settings_payload(scope):
     models = [{"key": key, "name": value.get("display_name") or value.get("name") or key,
                "api_protocol": value.get("api_protocol", "chat"),
                "supports_thinking": value.get("supports_thinking", False),
+               "is_chatgpt_model": value.get("responses_auth") == "codex_oauth",
+               "supports_chatgpt_fast_mode": value.get("supports_chatgpt_fast_mode", False),
                "supports_images": value.get("supports_images", False),
                "supports_videos": value.get("supports_videos", False),
                "provider_id": value.get("provider_id"),

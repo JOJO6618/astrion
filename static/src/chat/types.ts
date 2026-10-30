@@ -52,6 +52,8 @@ export interface ChatModel {
   key: string;
   name: string;
   supports_thinking: boolean;
+  is_chatgpt_model?: boolean;
+  supports_chatgpt_fast_mode?: boolean;
   supports_images?: boolean;
   supports_videos?: boolean;
   provider_id?: string;

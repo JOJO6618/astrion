@@ -69,6 +69,7 @@ class APIClientBaseMixin:
         self.project_path: Optional[str] = None
         # 推理强度（reasoning effort）：None=默认（不传参）；由会话级设置注入
         self.reasoning_effort: Optional[str] = None
+        self.chatgpt_fast_mode = False  # 对话独立设置，不随模型或推理强度切换
         self.supports_reasoning_effort = False  # 当前模型是否支持推理强度，由 apply_profile 注入
         # 模型提供方类型（None=OpenAI 兼容；"codex"=ChatGPT 订阅 OAuth 通道）
         self.provider_type: Optional[str] = None

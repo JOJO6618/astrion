@@ -462,7 +462,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 2. **协议 = Chat Completions + Responses 双协议**：`/models` 不标注协议，裁决走混合策略（catalog `protocol_map` 最高优先 → models.dev `npm` 字段（须有 `protocol_source` 门控）→ 默认 chat）。Responses 统一走 `utils/api_client/responses/`。**Anthropic Messages / Google 原生协议不做适配**：模型正常注册显示，`chat()` 明确报错 + 配置页 tooltip 提示。`_fetch_models` 在 fetch 层剔除非聊天模型，**解析层 `parse_models_payload` 保持纯净**（兼容 `{data:[]}`/裸数组/`{models:[]}`）。
 3. **注册表三路合并**：手写 custom + provider 同步 + Codex；provider 模型 key = `{provider_id}/{model_id}`，带 `api_protocol` 字段；get_profiles() 同时用 models.dev enrich 四字段，查不到回退默认。
 4. **权限=管理员级**：`server/providers.py` 全部端点 `@api_login_required + @admin_api_required`；用户级 key 是后续预留方向，**改动深，勿擅自做**。
-5. **推理强度滑块绑思考能力**：`supports_reasoning_effort` 在所有路径统一跟随 `supports_thinking`（provider 同步／手写 custom／codex 三方一致）。
+5. **推理强度滑块绑思考能力**：`supports_reasoning_effort` 在所有路径统一跟随 `supports_thinking`（provider 同步／手写 custom／codex 三方一致）。**ChatGPT高速模式独立（2026-10-30）**：只在 OAuth 模型菜单推理强度下显示，Agent／Chat／手机共用 `ChatgptFastModeSection`；状态权威 `metadata.chatgpt_fast_mode`，新对话继承刚离开的显式对话，无来源时关闭；仅模型目录支持 Fast 时发送 `service_tier=priority`。不与原 `fast/thinking` 混用，不自动传给子智能体或辅助请求。细节见提供商文档。
 6. **custom_models.json UI 化**：`/api/custom-models` CRUD 直接读写部署目录；`_sanitize_custom_model` 白名单校验，写入始终落 `DEPLOY_CONFIG_DIR`。
 7. **模型可见性 = 用户级**：`personalization.hidden_models`，后端只注册字段 + sanitize，**过滤在前端** `stores/model.ts` 做；与提供商管理（管理员级）是两条独立权限线，**不要混**。
 8. **Codex 即 openai-codex**：OpenAI 拆 openai-api（api key）与 openai-codex（ChatGPT 订阅 OAuth）。**连接管理单一入口**：连接/断开/刷新模型只在「提供商」分区操作（登录唯一实现 = `settings/tabs/providers/useCodexLogin.ts` + `CodexConnectDialog.vue`）；设置页 Codex 分区只保留状态展示与用量/重置额度/代理等高级管理，**禁止**再内联登录/断开/刷新按钮。

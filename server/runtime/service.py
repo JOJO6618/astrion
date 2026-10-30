@@ -67,6 +67,7 @@ class RuntimeService:
                     "reasoning_effort", prefs.get("chat_default_reasoning_effort")),
                 network_enabled=ctx.params.chat_settings.get(
                     "network_enabled", prefs.get("chat_network_enabled", True)),
+                chatgpt_fast_mode=ctx.params.chat_settings.get("chatgpt_fast_mode", False),
             )
         try:
             from server.context import RuntimeIdentity, get_user_resources

@@ -152,6 +152,11 @@
               :show-effort-slider="showEffortSlider"
               :reasoning-effort="reasoningEffort"
               :set-reasoning-effort="setReasoningEffort"
+              :is-chatgpt-model="isChatgptModel"
+              :supports-chatgpt-fast-mode="supportsChatgptFastMode"
+              :chatgpt-fast-mode="chatgptFastMode"
+              :chatgpt-fast-mode-saving="chatgptFastModeSaving"
+              :toggle-chatgpt-fast-mode="toggleChatgptFastMode"
               v-model:model-menu-search-query="modelMenuSearchQuery"
             />
           </div>
@@ -748,6 +753,17 @@
                   @update:model-value="setReasoningEffort"
                 />
               </div>
+              <ChatgptFastModeSection
+                v-if="isChatgptModel"
+                :enabled="chatgptFastMode && supportsChatgptFastMode"
+                :disabled="
+                  streamingMessage ||
+                  !isConnected ||
+                  chatgptFastModeSaving ||
+                  !supportsChatgptFastMode
+                "
+                @toggle="toggleChatgptFastMode"
+              />
             </div>
           </div>
         </transition>
@@ -859,6 +875,7 @@
 import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import appOptions from './app';
 import ConversationModelHeader from './components/chat/ConversationModelHeader.vue';
+import ChatgptFastModeSection from './components/chat/ChatgptFastModeSection.vue';
 import VideoPicker from './components/overlay/VideoPicker.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
 import QuickDock from './components/chat/quickdock/QuickDock.vue';

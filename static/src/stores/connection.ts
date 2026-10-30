@@ -9,6 +9,8 @@ interface ConnectionState {
   thinkingMode: boolean;
   runMode: 'fast' | 'thinking';
   reasoningEffort: ReasoningEffort | null;
+  chatgptFastMode: boolean;
+  chatgptFastModeSaving: boolean;
 }
 
 export const useConnectionStore = defineStore('connection', {
@@ -19,7 +21,9 @@ export const useConnectionStore = defineStore('connection', {
     agentVersion: '',
     thinkingMode: true,
     runMode: 'thinking',
-    reasoningEffort: null
+    reasoningEffort: null,
+    chatgptFastMode: false,
+    chatgptFastModeSaving: false
   }),
   actions: {
     setConnected(value: boolean) {

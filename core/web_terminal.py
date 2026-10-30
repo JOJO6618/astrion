@@ -428,6 +428,7 @@ class WebTerminal(MainTerminal):
                         self.thinking_mode = bool(meta.get("thinking_mode", self.thinking_mode))
                         self.run_mode = "thinking" if self.thinking_mode else "fast"
                     self.api_client.thinking_mode = self.thinking_mode
+                    self.api_client.chatgpt_fast_mode = meta.get("chatgpt_fast_mode") is True
                     try:
                         self.set_reasoning_effort(meta.get("reasoning_effort"))
                     except ValueError:

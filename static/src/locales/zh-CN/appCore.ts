@@ -35,6 +35,8 @@ export default {
   fastMode: '快速模式',
   fastModeDesc: '无思考，响应更快',
   thinkingModeDesc: '持续推理，适合复杂任务',
+  chatgptFastMode: 'ChatGPT高速模式',
+  chatgptFastModeDesc: '模型输出更快，但会消耗更多额度',
   modelNotSelected: '未选择模型',
   // 复数：英文用管道（调用方需同时传 {n} 与 {count}）；中文不区分
   backgroundCommandCount: '{n} 个后台指令',

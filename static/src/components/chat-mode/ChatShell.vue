@@ -69,6 +69,11 @@
             :show-effort-slider="chat.thinking && !!currentModel?.supportsThinking"
             :reasoning-effort="chat.effort"
             :set-reasoning-effort="(value) => configure({ reasoning_effort: value })"
+            :is-chatgpt-model="!!currentModel?.isChatgptModel"
+            :supports-chatgpt-fast-mode="!!currentModel?.supportsChatgptFastMode"
+            :chatgpt-fast-mode="chat.fastMode"
+            :chatgpt-fast-mode-saving="chat.configuring"
+            :toggle-chatgpt-fast-mode="() => configure({ chatgpt_fast_mode: !chat.fastMode })"
           >
             <template v-if="isMobile" #leading>
               <button

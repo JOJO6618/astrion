@@ -22,8 +22,10 @@ import { conversationTabsMethods } from './conversationTabs';
 import { systemMethods } from './system';
 import { resizeMethods } from './resize';
 import { newConversationMethods } from './newConversation';
+import { chatgptFastModeMethods } from './chatgptFastMode';
 
 export const uiMethods = {
+  ...chatgptFastModeMethods,
   ...newConversationMethods,
   ...gitMethods,
   ...scrollMethods,

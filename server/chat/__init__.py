@@ -4,6 +4,7 @@ from flask import Blueprint
 chat_bp = Blueprint("chat", __name__)
 
 from server.chat.settings import *
+from server.chat.fast_mode import *
 from server.chat.files import *
 from server.chat.permission import *
 from server.chat.approval import *

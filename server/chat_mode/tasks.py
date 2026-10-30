@@ -30,8 +30,11 @@ def send():
     if thinking is not None and not isinstance(thinking, bool):
         raise ValueError("Thinking mode must be a boolean")
     settings = payload.get("settings", {})
-    if not isinstance(settings, dict) or set(settings) - {"reasoning_effort", "network_enabled"}:
+    if not isinstance(settings, dict) or set(settings) - {"reasoning_effort", "network_enabled", "chatgpt_fast_mode"}:
         raise ValueError("Invalid Chat initial settings")
+    if "chatgpt_fast_mode" in settings:
+        from utils.api_client.codex.service_tier import validate_fast_mode
+        validate_fast_mode(settings["chatgpt_fast_mode"])
     if "network_enabled" in settings and not isinstance(settings["network_enabled"], bool):
         raise ValueError("Network state must be a boolean")
     from modules.chat_mode.configuration import EFFORTS

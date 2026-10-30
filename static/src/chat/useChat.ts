@@ -17,6 +17,8 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   const model = ref('');
   const thinking = ref(true);
   const effort = ref<string | null>(null);
+  const fastMode = ref(false);
+  const configuring = ref(false);
   const network = ref(true);
   const presentationId = ref(operationId());
   let epoch = 0;
@@ -94,6 +96,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     model.value = metadata.model_key || model.value;
     thinking.value = metadata.thinking_mode ?? thinking.value;
     effort.value = metadata.reasoning_effort ?? null;
+    fastMode.value = metadata.chatgpt_fast_mode === true;
     network.value = metadata.network_enabled;
   }
   function schedule(token: number, initial = false) {
@@ -144,6 +147,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     window.clearTimeout(pollTimer);
     loading.value = true;
     sending.value = false;
+    configuring.value = false;
     error.value = '';
     viewingLeaf.value = null;
     try {
@@ -186,7 +190,11 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
       parent_id: path.value[path.value.length - 1]?.message_id || null,
       model_key: model.value,
       thinking_mode: thinking.value,
-      settings: { reasoning_effort: effort.value, network_enabled: network.value },
+      settings: {
+        reasoning_effort: effort.value,
+        chatgpt_fast_mode: fastMode.value,
+        network_enabled: network.value
+      },
       images: media.filter((item) => item.kind === 'image'),
       videos: media.filter((item) => item.kind === 'video'),
       ...extra
@@ -281,12 +289,20 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     if (owns(token)) network.value = enabled;
   }
   async function configure(patch: Record<string, unknown>) {
+    const fastChange = 'chatgpt_fast_mode' in patch;
+    if (fastChange && (busy.value || configuring.value)) return;
     const token = epoch;
-    if (cid.value) await command(`/conversations/${cid.value}/settings`, patch, 'PATCH');
-    if (!owns(token)) return;
-    if ('model_key' in patch) model.value = String(patch.model_key);
-    if ('thinking_mode' in patch) thinking.value = Boolean(patch.thinking_mode);
-    if ('reasoning_effort' in patch) effort.value = patch.reasoning_effort as string | null;
+    if (fastChange) configuring.value = true;
+    try {
+      if (cid.value) await command(`/conversations/${cid.value}/settings`, patch, 'PATCH');
+      if (!owns(token)) return;
+      if ('model_key' in patch) model.value = String(patch.model_key);
+      if ('thinking_mode' in patch) thinking.value = Boolean(patch.thinking_mode);
+      if ('reasoning_effort' in patch) effort.value = patch.reasoning_effort as string | null;
+      if ('chatgpt_fast_mode' in patch) fastMode.value = patch.chatgpt_fast_mode === true;
+    } finally {
+      if (fastChange && owns(token)) configuring.value = false;
+    }
   }
   async function stop() {
     if (task.value) await command(`/tasks/${task.value.task_id}/cancel`, {});
@@ -312,6 +328,8 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     model,
     thinking,
     effort,
+    fastMode,
+    configuring,
     network,
     presentationId,
     cid,

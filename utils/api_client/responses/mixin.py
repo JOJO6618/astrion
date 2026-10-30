@@ -188,6 +188,14 @@ class APIClientResponsesMixin:
             session_id=self._responses_session_id() if codex_oauth else None,
         )
 
+        # Fast is a service tier, not a reasoning mode. Resolve per account/model.
+        if codex_oauth and getattr(self, "chatgpt_fast_mode", False) is True:
+            from utils.api_client.codex.service_tier import supports_fast_mode
+
+            info = self._codex_models_manager().get_model_info(model_id)
+            if supports_fast_mode(info):
+                body["service_tier"] = "priority"
+
         # 请求（codex_oauth：401 自愈后整体重试一次；bearer：单次）
         max_attempts = 2 if codex_oauth else 1
         attempt = 0
@@ -230,6 +238,7 @@ class APIClientResponsesMixin:
                         "api_protocol": "responses",
                         "auth": "codex_oauth" if codex_oauth else "bearer",
                         "effort": effort,
+                        "service_tier": body.get("service_tier"),
                         "attempt": attempt,
                         "input_items": len(body.get("input") or []),
                         "tools": len(body.get("tools") or []),

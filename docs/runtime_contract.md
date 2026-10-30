@@ -40,6 +40,9 @@
 | S9 | 多智能体实例状态 | `GLOBAL_MULTI_AGENT_STATES` 进程级单例 + 磁盘快照 | `SubAgentManager` / dispatch 链路 | 快照持久化（`mutiagents/`） | `_load_state` 恢复 + 任务记录校准终态 | `GLOBAL_MULTI_AGENT_STATES_LOCK` | terminate / 对话删除 |
 | S10 | 用户偏好（模型/模式/个性化） | settings.json / personalization.json（运行态路径） | 设置类端点；执行链只读快照 | 配置文件原子写 | RuntimeContext.principal 偏好快照在受理时固化 | 文件锁 | 用户修改 |
 | S11 | 对话级目标生命周期 | goal_states/<conversation_id>.json | 目标任务受理、审核／终态处理、显式控制端点 | GoalStateManager 原子替换 | bootstrap / running-status 读文件；goal_progress 事件投影 | 路径共享 RLock、run_id / task_id / revision；显示事务锁先于目标锁 | 关闭停止管理；重启活动态暂停；继续必须显式受理 |
+| S12 | ChatGPT 高速模式 | conversation metadata.chatgpt_fast_mode（缺省 false） | 空闲设置端点／Chat 事务／首消息快照 | ConversationManager 目录锁＋原子写 | APIClient 装配＋bootstrap／Chat 快照 | VIEW_LOCK → 任务锁，拒绝活动任务期间修改 | 对话删除；新对话仅继承显式来源 |
+
+2026-10-30：`metadata.chatgpt_fast_mode` 是对话级 ChatGPT 高速模式的唯一权威，缺字段为 false。Agent 设置端点与 Chat 设置事务仅在空闲时写入，复用 ConversationManager 的锁与原子写；运行实例加载时装配 APIClient，bootstrap／Chat 快照恢复前端。`/new` 继承刚离开的显式对话，无来源时关闭；首消息保存前端快照。仅 ChatGPT OAuth 模型显示开关，仅模型目录支持 Fast 时发送 `service_tier=priority`。与思考模式、推理强度独立，子智能体和辅助请求不自动继承。
 
 **约束**：
 - 新增状态必须先在表中登记权威关系，再实现。

@@ -156,6 +156,8 @@ export const bootstrapMethods = {
         this.networkPermissionEnabled = meta.network_permission_enabled;
       this.reasoningEffort =
         typeof meta.reasoning_effort === 'string' ? meta.reasoning_effort : null;
+      this.chatgptFastMode = meta.chatgpt_fast_mode === true;
+      this.chatgptFastModeSaving = false;
       this.currentConversationId = normalizedId;
       useConversationStore().setCurrentConversationId(normalizedId);
       this.messages = messages;

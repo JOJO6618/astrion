@@ -107,6 +107,7 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
             "title": conversation.get("title", tr("bootstrap.unknown_conversation")),
             "run_mode": run_mode, "thinking_mode": bool(meta.get("thinking_mode", run_mode != "fast")),
             "reasoning_effort": meta.get("reasoning_effort"), "model_key": meta.get("model_key"),
+            "chatgpt_fast_mode": meta.get("chatgpt_fast_mode") is True,
             **modes,
             "pending_runtime_modes": pending_modes(data_context, meta, normalized_id),
             "execution_mode_enabled": data_context.identity.host_mode and data_context.identity.role == 'admin',

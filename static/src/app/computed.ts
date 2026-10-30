@@ -29,7 +29,9 @@ export const computed = {
     'agentVersion',
     'thinkingMode',
     'runMode',
-    'reasoningEffort'
+    'reasoningEffort',
+    'chatgptFastMode',
+    'chatgptFastModeSaving'
   ]),
   ...mapState(useFileStore, ['contextMenu', 'fileTree', 'expandedFolders', 'todoList']),
   ...mapState(useQuickDockStore, {
@@ -132,6 +134,12 @@ export const computed = {
     return (
       this.resolvedRunMode === 'thinking' && !!modelStore.currentModel?.supportsReasoningEffort
     );
+  },
+  isChatgptModel() {
+    return !!useModelStore().currentModel?.isChatgptModel;
+  },
+  supportsChatgptFastMode() {
+    return !!useModelStore().currentModel?.supportsChatgptFastMode;
   },
   // 顶部栏强度标签：与滑块同条件（思考模式 + 模型支持）；档位沿用滑块原文
   // low/medium/high/xhigh/max，未设置（null）显示 default；

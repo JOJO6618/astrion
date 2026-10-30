@@ -745,6 +745,8 @@ def list_models_api():
             "fast_only": profile.get("fast_only", False),
             "thinking_only": profile.get("thinking_only", False),
             "supports_reasoning_effort": profile.get("supports_reasoning_effort", False),
+            "is_chatgpt_model": profile.get("responses_auth") == "codex_oauth",
+            "supports_chatgpt_fast_mode": profile.get("supports_chatgpt_fast_mode", False),
             "multimodal": multimodal,
             "context_window": profile.get("context_window"),
             "max_output_tokens": (profile.get("fast") or {}).get("max_tokens"),

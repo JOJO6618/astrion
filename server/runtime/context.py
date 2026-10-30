@@ -83,8 +83,11 @@ class TaskParams:
         if self.chat_presentation_id is not None and (
                 not isinstance(self.chat_presentation_id, str) or not 1 <= len(self.chat_presentation_id) <= 128):
             raise ValueError("Invalid Chat presentation identity")
-        if not isinstance(self.chat_settings, dict) or set(self.chat_settings) - {"reasoning_effort", "network_enabled"}:
+        if not isinstance(self.chat_settings, dict) or set(self.chat_settings) - {"reasoning_effort", "network_enabled", "chatgpt_fast_mode"}:
             raise ValueError("Invalid Chat settings")
+        if "chatgpt_fast_mode" in self.chat_settings:
+            from utils.api_client.codex.service_tier import validate_fast_mode
+            validate_fast_mode(self.chat_settings["chatgpt_fast_mode"])
         effort = self.chat_settings.get("reasoning_effort")
         if effort is not None and (not isinstance(effort, str) or effort not in {"minimal", "low", "medium", "high", "xhigh"}):
             raise ValueError("Invalid Chat reasoning effort")

@@ -26,6 +26,7 @@ export function captureNewConversationSettings(host) {
     run_mode: host.runMode,
     thinking_mode: host.runMode === 'thinking',
     reasoning_effort: host.reasoningEffort ?? null,
+    chatgpt_fast_mode: host.chatgptFastMode === true,
     work_mode: host.currentWorkMode,
     permission_mode: host.currentPermissionMode,
     execution_mode: host.currentExecutionMode,
@@ -41,6 +42,8 @@ export const newConversationMethods = {
     this.runMode = settings.run_mode;
     this.thinkingMode = settings.thinking_mode;
     this.reasoningEffort = settings.reasoning_effort;
+    this.chatgptFastMode = settings.chatgpt_fast_mode === true;
+    this.chatgptFastModeSaving = false;
     this.currentWorkMode = settings.work_mode;
     this.currentPermissionMode = settings.permission_mode;
     this.currentExecutionMode = settings.execution_mode;

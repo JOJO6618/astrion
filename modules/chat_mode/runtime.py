@@ -61,6 +61,9 @@ class ChatRuntime:
         self.api_client.apply_profile(profile)
         self.api_client.thinking_mode = self.thinking_mode
         self.api_client.reasoning_effort = self.reasoning_effort
+        self.api_client.chatgpt_fast_mode = (
+            self.context_manager.conversation_metadata.get("chatgpt_fast_mode") is True
+        )
 
     def set_model(self, model_key):
         profile = get_model_profile(model_key)
