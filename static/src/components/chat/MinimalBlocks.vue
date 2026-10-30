@@ -152,6 +152,7 @@ import { ref, computed, watch, nextTick, onBeforeUnmount, Component } from 'vue'
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useSummaryToolReel } from '@/composables/useSummaryToolReel';
+import { createElementScrollFollow, type ElementScrollFollow } from '@/composables/elementScrollFollow';
 import SummarySweepText from './SummarySweepText.vue';
 import type { SummarySweepInput } from './summarySweepController';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
@@ -239,9 +240,8 @@ const collapseSkipTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const COLLAPSE_ANIMATION_MS = 300;
 const thinkingRefs = new Map<string, HTMLElement>();
 const stepsWrapperRefs = new Map<string, HTMLElement>();
-const stepsWrapperScrollLocks = new Map<string, boolean>();
+const stepsWrapperFollowers = new Map<string, ElementScrollFollow>();
 const summaryLoaders = new Map<string, Component>();
-const STEPS_WRAPPER_BOTTOM_THRESHOLD = 20;
 
 const getFirstLine = (raw: string) => {
   const text = typeof raw === 'string' ? raw : '';
@@ -769,37 +769,27 @@ const getSummarySteps = (actions: Action[]) => {
   }));
 };
 
-const isStepsWrapperNearBottom = (wrapper: HTMLElement) => {
-  const distance = wrapper.scrollHeight - wrapper.scrollTop - wrapper.clientHeight;
-  return distance <= STEPS_WRAPPER_BOTTOM_THRESHOLD;
-};
-
-const handleStepsWrapperScroll = (groupId: string, event: Event) => {
-  const wrapper = event.target as HTMLElement;
-  if (!wrapper) return;
-  const escaped = !isStepsWrapperNearBottom(wrapper);
-  stepsWrapperScrollLocks.set(groupId, escaped);
-};
-
 const registerStepsWrapper = (groupId: string, el: Element | null) => {
-  const prev = stepsWrapperRefs.get(groupId);
-  if (prev) {
-    prev.removeEventListener('scroll', handleStepsWrapperScroll as EventListener);
-  }
+  if (stepsWrapperRefs.get(groupId) === el) return;
+  stepsWrapperFollowers.get(groupId)?.dispose();
+  stepsWrapperFollowers.delete(groupId);
   if (el instanceof HTMLElement) {
     stepsWrapperRefs.set(groupId, el);
-    el.addEventListener('scroll', (event) => handleStepsWrapperScroll(groupId, event));
+    stepsWrapperFollowers.set(groupId, createElementScrollFollow(el, {
+      threshold: 20,
+      isCurrent: () => {
+        const group = blockGroups.value.find((item) => item.id === groupId);
+        return stepsWrapperRefs.get(groupId) === el && expandedGroups.value.has(groupId) &&
+          !!group?.actions && isSummaryRunning(group.actions, groupId);
+      }
+    }));
   } else {
     stepsWrapperRefs.delete(groupId);
-    stepsWrapperScrollLocks.delete(groupId);
   }
 };
 
 const scrollStepsWrapperToBottom = (groupId: string) => {
-  const wrapper = stepsWrapperRefs.get(groupId);
-  if (wrapper && !stepsWrapperScrollLocks.get(groupId)) {
-    wrapper.scrollTop = wrapper.scrollHeight;
-  }
+  stepsWrapperFollowers.get(groupId)?.requestFollow();
 };
 
 const handleGroupTransitionEnd = (groupId: string, event: TransitionEvent) => {
@@ -863,11 +853,9 @@ const toggleExpand = (groupId: string) => {
     nextTick(() => {
       const group = blockGroups.value.find((g) => g.id === groupId);
       if (group && group.actions) {
-        // 展开时重置锁定：用户新展开的内容默认跟随到底部
-        stepsWrapperScrollLocks.set(groupId, false);
-        // 运行中展开时，将展开区滚动到底部
+        // 运行中重新展开时重置锁定，并在 DOM 提交后跟随到底部。
         if (isSummaryRunning(group.actions, groupId)) {
-          scrollStepsWrapperToBottom(groupId);
+          stepsWrapperFollowers.get(groupId)?.reset();
         }
         group.actions.forEach((action) => {
           if (action.type === 'thinking') {
@@ -952,6 +940,8 @@ const registerThinking = (key: string, el: Element | null) => {
     thinkingRefs.set(key, el);
   } else {
     thinkingRefs.delete(key);
+    props.registerThinkingRef?.(key, null);
+    return;
   }
 
   // 检查当前思考内容所在的摘要是否展开
@@ -997,11 +987,11 @@ watch(
 onBeforeUnmount(() => {
   collapseSkipTimers.forEach((timer) => clearTimeout(timer));
   collapseSkipTimers.clear();
-  stepsWrapperRefs.forEach((el) => {
-    el.removeEventListener('scroll', handleStepsWrapperScroll as EventListener);
-  });
+  thinkingRefs.forEach((_, key) => props.registerThinkingRef?.(key, null));
+  thinkingRefs.clear();
+  stepsWrapperFollowers.forEach((follow) => follow.dispose());
+  stepsWrapperFollowers.clear();
   stepsWrapperRefs.clear();
-  stepsWrapperScrollLocks.clear();
 });
 </script>
 

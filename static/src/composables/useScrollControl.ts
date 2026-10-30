@@ -1,4 +1,5 @@
 // 负责聊天区域滚动控制的通用方法，解耦 App.vue 中的 DOM 操作
+import { createElementScrollFollow, type ElementScrollFollow } from './elementScrollFollow';
 
 type ScrollContext = {
   getMessagesAreaElement?: () => HTMLElement | null;
@@ -6,6 +7,7 @@ type ScrollContext = {
   chatToggleScrollLockState?: () => boolean;
   chatSetScrollState?: (payload: { autoScrollEnabled?: boolean; userScrolling?: boolean }) => void;
   thinkingScrollLocks?: Map<string, boolean>;
+  chatSetThinkingLock?: (blockId: string, locked: boolean) => void;
   _setScrollingFlag?: (value: boolean) => void;
   autoScrollEnabled?: boolean;
   userScrolling?: boolean;
@@ -605,15 +607,48 @@ export function normalizeScrollLock(ctx: ScrollContext) {
   }
 }
 
+const thinkingFollowers = new WeakMap<HTMLElement, {
+  ctx: ScrollContext;
+  blockId: string;
+  follow: ElementScrollFollow;
+}>();
+
+function getThinkingFollower(ctx: ScrollContext, blockId: string, el: HTMLElement) {
+  let entry = thinkingFollowers.get(el);
+  if (entry && (entry.ctx !== ctx || entry.blockId !== blockId)) {
+    entry.follow.dispose();
+    entry = undefined;
+  }
+  if (!entry) {
+    entry = {
+      ctx,
+      blockId,
+      follow: createElementScrollFollow(el, {
+        isLocked: () => !!ctx.thinkingScrollLocks?.get(blockId),
+        setLocked: (locked) => ctx.chatSetThinkingLock?.(blockId, locked),
+        isCurrent: () => ctx.getThinkingContentElement?.(blockId) === el
+      })
+    };
+    thinkingFollowers.set(el, entry);
+  }
+  return entry.follow;
+}
+
+export function disposeThinkingScrollFollow(el: HTMLElement) {
+  thinkingFollowers.get(el)?.follow.dispose();
+  thinkingFollowers.delete(el);
+}
+
+export function handleThinkingScroll(ctx: ScrollContext, blockId: string, event: Event) {
+  const el = event.target;
+  if (!blockId || !(el instanceof HTMLElement) || ctx.getThinkingContentElement?.(blockId) !== el) {
+    return;
+  }
+  getThinkingFollower(ctx, blockId, el).scroll();
+}
+
 export function scrollThinkingToBottom(ctx: ScrollContext, blockId: string) {
-  if (!blockId) {
-    return;
-  }
-  if (!ctx.thinkingScrollLocks?.get(blockId)) {
-    return;
-  }
+  if (!blockId) return;
   const el = ctx.getThinkingContentElement?.(blockId);
-  if (el) {
-    el.scrollTop = el.scrollHeight;
-  }
+  if (el) getThinkingFollower(ctx, blockId, el).requestFollow();
 }

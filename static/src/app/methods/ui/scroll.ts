@@ -3,7 +3,8 @@ import { createHistoryScrollSession } from './historyScrollSession';
 import {
   scrollToBottom as scrollToBottomHelper,
   conditionalScrollToBottom as conditionalScrollToBottomHelper,
-  scrollThinkingToBottom as scrollThinkingToBottomHelper
+  scrollThinkingToBottom as scrollThinkingToBottomHelper,
+  handleThinkingScroll as handleThinkingScrollHelper
 } from '../../../composables/useScrollControl';
 import { uiBounceTrace } from './shared';
 
@@ -332,13 +333,8 @@ export const scrollMethods = {
     });
   },
   handleThinkingScroll(blockId, event) {
-    if (!blockId || !event || !event.target) {
-      return;
-    }
-    const el = event.target;
-    const threshold = 12;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-    this.chatSetThinkingLock(blockId, atBottom);
+    if (!event) return;
+    handleThinkingScrollHelper(this, blockId, event);
   },
   toggleBlock(blockId) {
     if (!blockId) {

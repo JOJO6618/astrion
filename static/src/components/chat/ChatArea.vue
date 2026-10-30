@@ -813,7 +813,7 @@
         </Virtualizer>
         <slot name="after-messages" />
       </div>
-      <div class="messages-bottom-spacer" aria-hidden="true"></div>
+      <div ref="bottomSpacerRef" class="messages-bottom-spacer" aria-hidden="true"></div>
     </div>
     <!-- 左侧用户输入快捷跳转导航：每个真实用户输入一根横线，hover 波浪 + 预览，点击跳转 -->
     <nav
@@ -853,6 +853,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } f
 import { Virtualizer } from 'virtua/vue';
 import { useBlockExpansionAnchor } from '@/composables/useBlockExpansionAnchor';
 import { useVirtualListLayoutCommit } from '@/composables/useVirtualListLayoutCommit';
+import { disposeThinkingScrollFollow } from '@/composables/useScrollControl';
 import ToolAction from '@/components/chat/actions/ToolAction.vue';
 import StackedBlocks from './StackedBlocks.vue';
 import MinimalBlocks from './MinimalBlocks.vue';
@@ -1492,6 +1493,7 @@ const userMDebug = (...args: any[]) => {
 // 脱锁（escaped）期间引擎完全停写，「触底即可信」因此成立。
 const scrollRef = ref<HTMLElement | null>(null);
 const contentRef = ref<HTMLElement | null>(null);
+const bottomSpacerRef = ref<HTMLElement | null>(null);
 
 type FollowState = 'locked' | 'escaped';
 const followState = ref<FollowState>('locked');
@@ -1711,17 +1713,22 @@ function setupContentResizeObserver() {
     contentResizeObserver.disconnect();
     contentResizeObserver = null;
   }
-  if (contentRef.value) {
+  const targets = [contentRef.value, bottomSpacerRef.value].filter(
+    (element): element is HTMLElement => element !== null
+  );
+  if (targets.length) {
     contentResizeObserver = new ResizeObserver(() => {
+      if (followState.value === 'locked') markProgrammaticHint('ChatArea.content-layout');
       requestFollowWrite('content-resize');
       syncStickState();
     });
-    contentResizeObserver.observe(contentRef.value);
+    targets.forEach((element) => contentResizeObserver?.observe(element));
   }
 }
 
 // 视口尺寸变化（窗口拖拽/输入栏高度变化）：同样驱动跟随追底
 function handleViewportResize() {
+  if (followState.value === 'locked') markProgrammaticHint('ChatArea.viewport-layout');
   updateChatScrollbarWidth();
   requestFollowWrite('viewport-resize');
   syncStickState();
@@ -1732,11 +1739,15 @@ const BOUNCE_TRACE_MAX = 240;
 const bounceTraceLastTsByKey = new Map<string, number>();
 let lastObservedTop = 0;
 let lastObservedHeight = 0;
+let lastObservedClientHeight = 0;
+let lastObservedSpacerHeight = 0;
 let lastUserDownScrollTs = 0;
 let lastProgrammaticHintTs = 0;
 let lastProgrammaticHintSource = '';
 let scrollListener: ((event: Event) => void) | null = null;
 let wheelListener: ((event: WheelEvent) => void) | null = null;
+let scrollbarPointerListener: ((event: PointerEvent) => void) | null = null;
+let keyboardScrollListener: ((event: KeyboardEvent) => void) | null = null;
 let touchStartListener: ((event: TouchEvent) => void) | null = null;
 let touchMoveListener: ((event: TouchEvent) => void) | null = null;
 let touchEndListener: ((event: TouchEvent) => void) | null = null;
@@ -1833,6 +1844,12 @@ function detachBounceListener() {
   if (el && wheelListener) {
     el.removeEventListener('wheel', wheelListener as EventListener, true);
   }
+  if (el && scrollbarPointerListener) {
+    el.removeEventListener('pointerdown', scrollbarPointerListener);
+  }
+  if (el && keyboardScrollListener) {
+    el.ownerDocument.removeEventListener('keydown', keyboardScrollListener);
+  }
   if (el && touchStartListener) {
     el.removeEventListener('touchstart', touchStartListener as EventListener, true);
   }
@@ -1845,6 +1862,8 @@ function detachBounceListener() {
   }
   scrollListener = null;
   wheelListener = null;
+  scrollbarPointerListener = null;
+  keyboardScrollListener = null;
   touchStartListener = null;
   touchMoveListener = null;
   touchEndListener = null;
@@ -1859,6 +1878,12 @@ function attachBounceListener() {
   if (wheelListener) {
     el.removeEventListener('wheel', wheelListener as EventListener, true);
   }
+  if (scrollbarPointerListener) {
+    el.removeEventListener('pointerdown', scrollbarPointerListener);
+  }
+  if (keyboardScrollListener) {
+    el.ownerDocument.removeEventListener('keydown', keyboardScrollListener);
+  }
   if (touchStartListener) {
     el.removeEventListener('touchstart', touchStartListener as EventListener, true);
   }
@@ -1871,6 +1896,41 @@ function attachBounceListener() {
   }
   lastObservedTop = el.scrollTop || 0;
   lastObservedHeight = el.scrollHeight || 0;
+  lastObservedClientHeight = el.clientHeight;
+  lastObservedSpacerHeight = bottomSpacerRef.value?.offsetHeight || 0;
+  scrollbarPointerListener = (event: PointerEvent) => {
+    if (!event.isTrusted || event.target !== el || event.button !== 0) return;
+    const gutter = el.offsetWidth - el.clientWidth;
+    if (gutter <= 0 || event.clientX < el.getBoundingClientRect().right - gutter) return;
+    lastUserScrollInputTs = Date.now();
+    lastProgrammaticHintTs = 0;
+    lastProgrammaticHintSource = '';
+    escapeFollowLock('scrollbar-pointer');
+    stopBlockExpansionAnchors();
+    cancelQuickNavJump();
+  };
+  el.addEventListener('pointerdown', scrollbarPointerListener);
+  keyboardScrollListener = (event: KeyboardEvent) => {
+    if (!event.isTrusted || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
+      return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target !== el.ownerDocument.body && !el.contains(target)) return;
+    if (target.closest('input, textarea, button, [contenteditable="true"]') ||
+      isNestedScrollableTarget(target)) return;
+    const upward = ['ArrowUp', 'PageUp', 'Home'].includes(event.key) ||
+      (event.key === ' ' && event.shiftKey);
+    const downward = ['ArrowDown', 'PageDown', 'End'].includes(event.key) ||
+      (event.key === ' ' && !event.shiftKey);
+    if (!upward && !downward) return;
+    lastUserScrollInputTs = Date.now();
+    if (!upward) return;
+    escapeFollowLock('keyboard-up');
+    stopBlockExpansionAnchors();
+    cancelQuickNavJump();
+    emit('user-scroll-intent', { ts: lastUserScrollInputTs, delta: -1, top: el.scrollTop });
+  };
+  el.ownerDocument.addEventListener('keydown', keyboardScrollListener);
   touchScrollStartY = 0;
   touchEscapeFired = false;
   touchStartListener = (event: TouchEvent) => {
@@ -1883,6 +1943,7 @@ function attachBounceListener() {
     touchEscapeFired = false;
   };
   touchMoveListener = (event: TouchEvent) => {
+    if (isNestedScrollableTarget(event.target)) return;
     // 任意单指滑动都记为用户输入证据（回锁判定用）
     if (event.touches.length === 1) {
       lastUserScrollInputTs = Date.now();
@@ -1894,7 +1955,6 @@ function attachBounceListener() {
     const deltaY = event.touches[0].clientY - touchScrollStartY;
     if (deltaY <= 8) return;
     const now = Date.now();
-    if (isNestedScrollableTarget(event.target)) return;
     touchEscapeFired = true;
     escapeFollowLock('touch-drag');
     stopBlockExpansionAnchors();
@@ -1923,7 +1983,7 @@ function attachBounceListener() {
     const target = scrollRef.value;
     if (!target) return;
     const trusted = (event as any).isTrusted === true;
-    if (!trusted) return;
+    if (!trusted || isNestedScrollableTarget(event.target)) return;
     const deltaY = Number(event.deltaY || 0);
     const now = Date.now();
     // 任意方向的真实滚轮都记为用户输入证据（回锁判定用）
@@ -1955,8 +2015,13 @@ function attachBounceListener() {
     const delta = top - lastObservedTop;
     const height = target.scrollHeight || 0;
     const heightDelta = height - lastObservedHeight;
+    const clientHeightDelta = target.clientHeight - lastObservedClientHeight;
+    const spacerHeight = bottomSpacerRef.value?.offsetHeight || 0;
+    const spacerHeightDelta = spacerHeight - lastObservedSpacerHeight;
     lastObservedTop = top;
     lastObservedHeight = height;
+    lastObservedClientHeight = target.clientHeight;
+    lastObservedSpacerHeight = spacerHeight;
 
     // 左侧快捷导航：滚动位置同步（直接 DOM 监听，用户滚动与程序平滑滚动都会触发）
     updateQuickNavCurrent(top);
@@ -1987,26 +2052,20 @@ function attachBounceListener() {
     // 但「纯位置变化」型事件（同事件内 scrollHeight 未变、且近期无程序滚动标记）
     // 基本只能来自用户拖拽/惯性/键盘。布局驱动（高度变化伴随）与程序滚动都排除。
     const userScrollEvidence =
-      trusted && delta !== 0 && heightDelta === 0 && !closeToProgrammaticHint;
+      trusted && delta !== 0 && heightDelta === 0 && clientHeightDelta === 0 &&
+      spacerHeightDelta === 0 && !closeToProgrammaticHint;
     if (userScrollEvidence) {
       lastUserScrollInputTs = now;
     }
-    // 脱锁：locked 期间检测到用户向上滚动。
-    // 流式期间程序标记几乎逐帧刷新，证据法会被压制，故保留大幅快速上滚的直通路径
-    // （对齐旧 strongManualUp 行为：拖拽滚动条上滚依赖它）。
-    // 关键不变量（2026-09-28）：必须真正「离开底部」才算脱锁——内容 shrink（折叠动画/
-    // 思考块自动收起）时浏览器 clamp 会把 scrollTop 向下收，产生 delta<-18 的 scroll
-    // 事件但 remain≈0；此前 strongManualUp 直通不区分这个，把 clamp 帧误判为用户上滚
-    // 脱锁，且无任何自愈——之后所有增长（下次展开/下一条引导）全部锁不住，必须手动
-    // 滚一轮 escape→relock 才能恢复（「向上再使劲向下滚一下下次就能锁上」的根因）。
-    // virtua 补偿写入保持视口位置（remain 不变），同样被本条件天然排除。
+    // 大幅位移也必须有用户证据；virtua 补偿、面板占位收缩和视口变化
+    // 都可能产生向上的 scroll，不能绕过布局/程序写入检查。
+    // 滚轮、触摸直接表达脱锁意图；滚动条拖动在 pointerdown 时停写。
     const remainAfterScroll = height - top - target.clientHeight;
-    const strongManualUp = delta < -18;
     if (
       followState.value === 'locked' &&
       delta < -2 &&
       remainAfterScroll > ESCAPE_LEAVE_BOTTOM_PX &&
-      (strongManualUp || userScrollEvidence)
+      userScrollEvidence
     ) {
       escapeFollowLock('scroll-up');
       stopBlockExpansionAnchors();
@@ -2025,7 +2084,8 @@ function attachBounceListener() {
           ts: now,
           closeToProgrammaticHint,
           userScrollEvidence,
-          strongManualUp,
+          clientHeightDelta,
+          spacerHeightDelta,
           ...getScrollMetrics(target)
         },
         'user-scroll-intent',
@@ -2244,6 +2304,8 @@ const registerCollapseContent = (key: string, el: Element | null) => {
 };
 
 function registerThinkingRef(key: string, el: Element | null) {
+  const previous = thinkingRefs.get(key);
+  if (previous && previous !== el) disposeThinkingScrollFollow(previous);
   if (el instanceof HTMLElement) {
     thinkingRefs.set(key, el);
   } else {
@@ -2755,11 +2817,15 @@ watch(scrollRef, () => {
   }
 });
 
-watch(contentRef, () => {
+watch([contentRef, bottomSpacerRef], () => {
   setupContentResizeObserver();
 });
 
 onBeforeUnmount(() => {
+  thinkingRefs.forEach((element) => {
+    if (element) disposeThinkingScrollFollow(element);
+  });
+  thinkingRefs.clear();
   pendingMinimalCollapses.clear();
   detachBounceListener();
   stopBlockExpansionAnchors();
