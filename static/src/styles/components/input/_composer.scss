@@ -408,6 +408,46 @@ body[data-theme='light'] {
   transform: translateY(0);
 }
 
+/* ChatGPT 订阅额度卡：展开状态由 InputComposer 控制（hover / 点击 / 键盘焦点） */
+.context-usage-switcher--quota-open .context-usage-switcher__btn {
+  background: var(--surface-muted);
+}
+
+.context-usage-switcher__quota-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 1;
+  width: min(248px, calc(100vw - 32px));
+  max-height: min(360px, calc(100vh - 120px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+.context-usage-switcher__quota-popover--pinned {
+  width: min(300px, calc(100vw - 32px));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .context-usage-switcher__quota-popover {
+    animation: context-quota-popover-in 0.16s ease-out;
+  }
+}
+
+@keyframes context-quota-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .permission-switcher__btn {
   border: none;
   background: transparent;

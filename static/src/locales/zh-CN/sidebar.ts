@@ -75,6 +75,11 @@ export default {
   // ── TokenDrawer：Token/用量统计抽屉 ──
   collapseUsage: '收起用量统计',
   tokenStats: 'Token 统计',
+  chatgptQuota: 'ChatGPT 订阅额度',
+  chatgptAccount: '账号 {hash}',
+  chatgptQuotaUnavailable: '订阅额度暂不可用',
+  chatgptQuotaLoading: '正在查询订阅额度…',
+  chatgptQuotaNotApplicable: '当前模型未使用 ChatGPT 订阅',
   currentContext: '当前上下文',
   cumulativeInput: '累计输入',
   cumulativeOutput: '累计输出',

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { t } from '@/locales';
 import { useSettingsStore } from '@/stores/settings';
 import { useUiStore } from '@/stores/ui';
+import { useChatgptQuotaStore } from '@/stores/chatgptQuota';
 
 defineOptions({ name: 'CodexTab' });
 
@@ -15,6 +16,7 @@ defineOptions({ name: 'CodexTab' });
 
 const settingsStore = useSettingsStore();
 const uiStore = useUiStore();
+const quotaStore = useChatgptQuotaStore();
 
 const loading = ref(true);
 const loadError = ref('');
@@ -145,26 +147,19 @@ const fetchSettings = async () => {
   }
 };
 
-const fetchUsage = async () => {
+const fetchUsage = async (force = false) => {
   const seq = ++usageSeq;
   const accountId = selectedAccountId.value;
   if (!accountId) {
     usage.value = null;
     return;
   }
-  try {
-    const resp = await fetch(withAccount('/api/codex/usage', accountId), { cache: 'no-store' });
-    const data = await resp.json();
-    if (seq !== usageSeq || selectedAccountId.value !== accountId) return;
-    if (data?.success) {
-      usage.value = data.usage || null;
-      usageError.value = '';
-    } else {
-      usageError.value = data?.error || t('personalization.codexUsageLoadFailed');
-    }
-  } catch (e: any) {
-    if (seq === usageSeq) usageError.value = String(e?.message || e);
-  }
+  usageError.value = '';
+  await quotaStore.fetchQuota(accountId, force);
+  if (seq !== usageSeq || selectedAccountId.value !== accountId) return;
+  const entry = quotaStore.entries[accountId];
+  usage.value = entry?.usage || null;
+  usageError.value = entry?.error || '';
 };
 
 const formatResetDuration = (seconds: number): string => {
@@ -312,7 +307,7 @@ const consumeReset = async (credit: Record<string, any>) => {
       });
       // 仅当仍在查看同一个账号时才刷新（否则保留当前账号视图）
       if (selectedAccountId.value === targetAccountId) {
-        await Promise.all([fetchUsage(), fetchCredits()]);
+        await Promise.all([fetchUsage(true), fetchCredits()]);
       }
     } else {
       uiStore.pushToast({
@@ -374,6 +369,9 @@ const onDocumentClick = (event: MouseEvent) => {
 };
 
 onBeforeUnmount(() => {
+  statusSeq++;
+  usageSeq++;
+  creditsSeq++;
   document.removeEventListener('click', onDocumentClick);
 });
 
@@ -530,7 +528,11 @@ onMounted(async () => {
             </span>
           </span>
           <div class="settings-number-row">
-            <button type="button" @click="fetchUsage">
+            <button
+              type="button"
+              :disabled="quotaStore.entries[selectedAccountId]?.loading"
+              @click="fetchUsage(true)"
+            >
               {{ $t('personalization.usageRefresh') }}
             </button>
           </div>

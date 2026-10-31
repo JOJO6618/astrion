@@ -173,8 +173,16 @@ class CodexAuthManager:
         if not access:
             return None
         if self._is_fresh(access) is False:
-            self._refresh_sync()
-            access = (self._get_cached().get("tokens") or {}).get("access_token")
+            with self._lock:
+                # 同步查询与异步模型请求共用锁，等待期间可能已轮换凭证。
+                data = self._read_file()
+                access = (data.get("tokens") or {}).get("access_token")
+                if not access:
+                    return None
+                if not self._is_fresh(access):
+                    return self._refresh_sync()["access_token"]
+                self._cached = data
+                self._cached_stat = self._file_stat()
         return access
 
     # ------------------------------------------------------------------ 刷新
@@ -203,7 +211,9 @@ class CodexAuthManager:
         ).encode()
         proxy = resolve_proxy()
         try:
-            with httpx.Client(proxy=proxy, timeout=30) as client:
+            with httpx.Client(
+                proxy=proxy, timeout=httpx.Timeout(10, connect=5)
+            ) as client:
                 resp = client.post(
                     OAUTH_TOKEN_URL,
                     content=body,

@@ -72,6 +72,11 @@ export default {
   // ── TokenDrawer: token/usage stats drawer ──
   collapseUsage: 'Collapse usage stats',
   tokenStats: 'Token stats',
+  chatgptQuota: 'ChatGPT subscription quota',
+  chatgptAccount: 'Account {hash}',
+  chatgptQuotaUnavailable: 'Subscription quota unavailable',
+  chatgptQuotaLoading: 'Loading subscription quota…',
+  chatgptQuotaNotApplicable: 'The current model does not use a ChatGPT subscription',
   currentContext: 'Current context',
   cumulativeInput: 'Total input',
   cumulativeOutput: 'Total output',

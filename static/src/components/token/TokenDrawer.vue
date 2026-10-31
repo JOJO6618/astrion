@@ -8,8 +8,11 @@
         @click="emit('toggle')"
       />
       <div class="token-panel-content">
-        <div class="usage-dashboard">
-          <div class="usage-cell usage-cell--left usage-cell--token panel-card">
+        <div class="usage-dashboard" :class="{ 'usage-dashboard--host': isHostMode }">
+          <div
+            class="usage-cell usage-cell--token panel-card"
+            :class="isHostMode ? 'usage-cell--full' : 'usage-cell--left'"
+          >
             <div class="usage-title">{{ $t('sidebar.tokenStats') }}</div>
             <div class="stat-grid stat-grid--triple">
               <div class="stat-block">
@@ -49,80 +52,85 @@
               />
             </div>
           </div>
-          <div class="usage-cell usage-cell--right usage-cell--performance panel-card">
-            <div class="usage-title">
-              <span>{{ $t('sidebar.performanceStats') }}</span>
-              <span class="status-pill" v-if="containerStatus" :class="containerStatusClass">
-                {{ containerStatusText }}
-              </span>
-            </div>
-            <template v-if="containerStatus && containerStatus.mode === 'docker'">
-              <template v-if="hasContainerStats">
-                <div class="stat-grid stat-grid--double">
-                  <div class="stat-block">
-                    <div class="stat-label">CPU</div>
-                    <div class="stat-value">
-                      {{ formatPercentage(containerStatus.stats.cpu_percent) }}
+          <!-- 容器相关统计只在 docker 模式显示；宿主机模式整块移除 -->
+          <template v-if="!isHostMode">
+            <div class="usage-cell usage-cell--right usage-cell--performance panel-card">
+              <div class="usage-title">
+                <span>{{ $t('sidebar.performanceStats') }}</span>
+                <span class="status-pill" v-if="containerStatus" :class="containerStatusClass">
+                  {{ containerStatusText }}
+                </span>
+              </div>
+              <template v-if="containerStatus && containerStatus.mode === 'docker'">
+                <template v-if="hasContainerStats">
+                  <div class="stat-grid stat-grid--double">
+                    <div class="stat-block">
+                      <div class="stat-label">CPU</div>
+                      <div class="stat-value">
+                        {{ formatPercentage(containerStatus.stats.cpu_percent) }}
+                      </div>
+                    </div>
+                    <div class="stat-block">
+                      <div class="stat-label">{{ $t('sidebar.memory') }}</div>
+                      <div class="stat-value stat-value--mono">
+                        {{ formatBytes(containerStatus.stats.memory.used_bytes) }}
+                        <template v-if="containerStatus.stats.memory.limit_bytes">
+                          / {{ formatBytes(containerStatus.stats.memory.limit_bytes) }}
+                        </template>
+                      </div>
+                      <div class="stat-foot" v-if="containerStatus.stats.memory.percent">
+                        {{ formatPercentage(containerStatus.stats.memory.percent) }}
+                      </div>
                     </div>
                   </div>
-                  <div class="stat-block">
-                    <div class="stat-label">{{ $t('sidebar.memory') }}</div>
-                    <div class="stat-value stat-value--mono">
-                      {{ formatBytes(containerStatus.stats.memory.used_bytes) }}
-                      <template v-if="containerStatus.stats.memory.limit_bytes">
-                        / {{ formatBytes(containerStatus.stats.memory.limit_bytes) }}
-                      </template>
-                    </div>
-                    <div class="stat-foot" v-if="containerStatus.stats.memory.percent">
-                      {{ formatPercentage(containerStatus.stats.memory.percent) }}
-                    </div>
-                  </div>
+                </template>
+                <div class="usage-placeholder" v-else>
+                  {{ $t('sidebar.containerMetricsPending') }}
                 </div>
               </template>
-              <div class="usage-placeholder" v-else>
-                {{ $t('sidebar.containerMetricsPending') }}
+              <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoContainer') }}</div>
+            </div>
+            <div class="usage-cell usage-cell--left usage-cell--quota panel-card">
+              <div class="usage-title">{{ $t('sidebar.quotaStats') }}</div>
+              <div class="stat-grid stat-grid--triple" v-if="usageQuota.applicable !== false">
+                <div class="stat-block" v-for="tier in quotaTiers" :key="tier.key">
+                  <div class="stat-label">{{ $t(tier.label) }}</div>
+                  <div class="stat-value">{{ formatQuotaValue(tier.value) }}</div>
+                  <div class="stat-foot" v-if="(tier.value.count || 0) > 0">
+                    {{ $t('sidebar.resetAt', { time: formatResetTime(tier.value.reset_at) }) }}
+                  </div>
+                </div>
               </div>
-            </template>
-            <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoContainer') }}</div>
-          </div>
-          <div class="usage-cell usage-cell--left usage-cell--quota panel-card">
-            <div class="usage-title">{{ $t('sidebar.quotaStats') }}</div>
-            <div class="stat-grid stat-grid--triple" v-if="usageQuota.applicable !== false">
-              <div class="stat-block" v-for="tier in quotaTiers" :key="tier.key">
-                <div class="stat-label">{{ $t(tier.label) }}</div>
-                <div class="stat-value">{{ formatQuotaValue(tier.value) }}</div>
-                <div class="stat-foot" v-if="(tier.value.count || 0) > 0">
-                  {{ $t('sidebar.resetAt', { time: formatResetTime(tier.value.reset_at) }) }}
+              <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoQuota') }}</div>
+            </div>
+            <div class="usage-cell usage-cell--right usage-cell--resource panel-card">
+              <div class="usage-title">{{ $t('sidebar.resourceStats') }}</div>
+              <div class="stat-grid stat-grid--double">
+                <div class="stat-block">
+                  <div class="stat-label">{{ $t('sidebar.network') }}</div>
+                  <div class="stat-value stat-value--mono">
+                    ↓{{ formatRate(containerNetRate.down_bps) }} ↑{{
+                      formatRate(containerNetRate.up_bps)
+                    }}
+                  </div>
+                </div>
+                <div class="stat-block">
+                  <div class="stat-label">{{ $t('sidebar.storage') }}</div>
+                  <div class="stat-value stat-value--mono">
+                    {{ formatBytes(projectStorage.used_bytes) }}
+                    <template v-if="projectStorage.limit_bytes"
+                      >/ {{ formatBytes(projectStorage.limit_bytes) }}</template
+                    >
+                  </div>
+                  <div class="stat-foot" v-if="typeof projectStorage.usage_percent === 'number'">
+                    {{ projectStorage.usage_percent.toFixed(1) }}%
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoQuota') }}</div>
-          </div>
-          <div class="usage-cell usage-cell--right usage-cell--resource panel-card">
-            <div class="usage-title">{{ $t('sidebar.resourceStats') }}</div>
-            <div class="stat-grid stat-grid--double">
-              <div class="stat-block">
-                <div class="stat-label">{{ $t('sidebar.network') }}</div>
-                <div class="stat-value stat-value--mono">
-                  ↓{{ formatRate(containerNetRate.down_bps) }} ↑{{
-                    formatRate(containerNetRate.up_bps)
-                  }}
-                </div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">{{ $t('sidebar.storage') }}</div>
-                <div class="stat-value stat-value--mono">
-                  {{ formatBytes(projectStorage.used_bytes) }}
-                  <template v-if="projectStorage.limit_bytes"
-                    >/ {{ formatBytes(projectStorage.limit_bytes) }}</template
-                  >
-                </div>
-                <div class="stat-foot" v-if="typeof projectStorage.usage_percent === 'number'">
-                  {{ projectStorage.usage_percent.toFixed(1) }}%
-                </div>
-              </div>
-            </div>
-          </div>
+          </template>
+          <!-- 宿主机模式：ChatGPT 订阅额度（跟随当前模型所属 OAuth 账号） -->
+          <ChatgptQuotaPanel v-else :active="visible && !collapsed" />
         </div>
       </div>
     </div>
@@ -134,8 +142,10 @@ defineOptions({ name: 'TokenDrawer' });
 
 import { computed } from 'vue';
 import { t, currentLocale } from '@/locales';
+import { useSettingsStore } from '@/stores/settings';
 import CloseButton from '@/components/common/CloseButton.vue';
 import CostSummary from './CostSummary.vue';
+import ChatgptQuotaPanel from './ChatgptQuotaPanel.vue';
 import type { ConversationCosts } from './costTypes';
 
 const emit = defineEmits<{
@@ -176,6 +186,11 @@ const quotaTiers = computed(() => [
   { key: 'thinking', label: 'sidebar.quotaTierThinking', value: props.usageQuota.thinking },
   { key: 'search', label: 'sidebar.quotaTierSearch', value: props.usageQuota.search }
 ]);
+
+// 宿主机判定：settings store 先看容器状态 mode，未就绪时回落已验证的 session 身份；
+// docker 模式保持原有四格布局不变。
+const settingsStore = useSettingsStore();
+const isHostMode = computed(() => settingsStore.isHostMode);
 
 // 缓存命中率 = 累积缓存命中输入 / (累计总输入 - 冷启动豁免输入)；
 // 豁免值由后端累计：首轮及压缩后首轮若未命中缓存，其输入属于建立缓存的成本，不计入分母
@@ -229,3 +244,19 @@ const containerStatusText = computed(() => {
   return stopped ? t('sidebar.stopped') : t('sidebar.containerRunning');
 });
 </script>
+
+<style scoped lang="scss">
+/* 宿主机模式：取消双列与中间分隔线，Token 统计与 ChatGPT 订阅额度上下排列 */
+.usage-dashboard--host {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 20px;
+}
+
+.usage-dashboard--host::before {
+  display: none;
+}
+
+.usage-cell--full {
+  padding: 0;
+}
+</style>

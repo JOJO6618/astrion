@@ -276,7 +276,7 @@ def _wham_request(account_id: str, method: str, url: str, json_body: dict | None
     """
     import httpx
 
-    from utils.api_client.codex.settings import resolve_proxy
+    from utils.api_client.codex.usage import subscription_queries
 
     store = get_codex_account_store()
     auth = store.get_auth_manager(account_id)
@@ -297,8 +297,11 @@ def _wham_request(account_id: str, method: str, url: str, json_body: dict | None
     if account_id_header:
         headers["chatgpt-account-id"] = account_id_header
     try:
-        with httpx.Client(proxy=resolve_proxy(), timeout=30) as client:
-            resp = client.request(method, url, headers=headers, json=json_body)
+        resp = subscription_queries.request(account_id, method, url, headers, json_body)
+    except httpx.ConnectTimeout:
+        return None, (jsonify({"success": False, "error": "连接 ChatGPT 超时，请检查订阅代理连接。"}), 502)
+    except httpx.ReadTimeout:
+        return None, (jsonify({"success": False, "error": "ChatGPT 额度服务响应超时，请稍后刷新。"}), 502)
     except Exception as exc:
         return None, (jsonify({"success": False, "error": str(exc)}), 502)
     if resp.status_code != 200:
@@ -312,16 +315,38 @@ def _wham_request(account_id: str, method: str, url: str, json_body: dict | None
 def codex_usage():
     """订阅用量查询（转发 chatgpt.com wham/usage，CLI /status 的数据源）。"""
     from utils.api_client.codex.settings import USAGE_URL
+    from utils.api_client.codex.usage import subscription_queries
 
     account_id, err = _resolve_account(_requested_account_id())
     if err:
         return err
-    resp, wham_err = _wham_request(account_id, "GET", USAGE_URL)
-    if wham_err:
-        return wham_err
-    return jsonify(
-        {"success": True, "account_id": account_id, "usage": resp.json()}
-    )
+    store = get_codex_account_store()
+
+    class QueryFailed(Exception):
+        pass
+
+    failure = None
+
+    def fetch_usage():
+        nonlocal failure
+        resp, failure = _wham_request(account_id, "GET", USAGE_URL)
+        if failure:
+            raise QueryFailed()
+        return resp.json()
+
+    try:
+        usage = subscription_queries.usage(
+            account_id, store.get_auth_manager(account_id), fetch_usage,
+            force=request.args.get("refresh") == "1",
+        )
+    except QueryFailed:
+        return failure
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    return jsonify({
+        "success": True, "account_id": account_id,
+        "account_hash": store.get_account(account_id).get("hash", ""), "usage": usage,
+    })
 
 
 @codex_auth_bp.route("/api/codex/reset-credits", methods=["GET"])
@@ -367,6 +392,8 @@ def codex_reset_credits_consume():
     )
     if wham_err:
         return wham_err
+    from utils.api_client.codex.usage import subscription_queries
+    subscription_queries.invalidate(account_id)
     return jsonify({"success": True, "account_id": account_id, **resp.json()})
 
 

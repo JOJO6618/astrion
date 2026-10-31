@@ -104,6 +104,9 @@ function drawer() {
   vm.runInNewContext(code, { module, exports: module.exports, require(key) {
     if (key === 'vue') return vue;
     if (key === '@/locales') return { t: key => key, currentLocale: vue.ref('zh-CN') };
+    // TokenDrawer 现在按 settings.isHostMode 分支宿主机/docker 布局；本回归只覆盖
+    // docker（非宿主机）四格与应用配额，固定 false，原有断言不变。
+    if (key === '@/stores/settings') return { useSettingsStore: () => ({ isHostMode: false }) };
     if (key.endsWith('.vue')) return { default: vue.defineComponent({ render: () => null }) };
     throw new Error(`Unexpected import ${key}`);
   } }, { filename: file });

@@ -55,3 +55,12 @@
 - 写入：Agent `POST /api/chatgpt-fast-mode` 明确传 `conversation_id`，持显示锁→任务锁检查 pending/running/cancel_requested 和门闸，事务成功后才同步运行实例；Chat 复用设置 PATCH 及任务受理校验。运行中不可切换，保存失败不伪报成功。
 - 请求：OAuth、开启且目录支持时，在共用 Responses 链路发送 `service_tier=priority`（官方 Fast.request_value 的实际取值）。关闭或非 OAuth 不发送；保持思考模式和 reasoning effort 独立。子智能体、标题、摘要等独立客户端不自动继承。
 - 回归：`test/2026-10-30_ChatGPT高速模式/`；离线捕获请求体不代表真实订阅已授权或实际吞吐已达某个倍率，实机速度与视觉由用户验收。
+
+### ChatGPT 订阅额度展示与查询（2026-10-31）
+
+- 宿主机用量抽屉仅保留上下排列的 Token 统计与 ChatGPT 订阅额度；容器模式保留原四格。输入栏圆环复用同一额度状态，桌面 hover／键盘焦点展开、手机点击开关，原 Token 上下文始终显示。悬停小卡只显示额度数字与重置时间，不显示百分比条；点击打开的大面板与手机点击态才显示条。
+- 使用 ChatGPT 订阅模型时，按精确选中模型的 `isChatgptModel + providerId` 定位 OAuth 连接；使用其他模型时，也显示额度，选择账号列表中第一个已登录订阅（跳过缺凭证／未连接条目）。不按模型名或普通提供商 ID 猜测 OAuth 身份。管理查询仍只允许管理员；普通用户的圆环保留原 Token 信息。
+- `static/src/stores/chatgptQuota.ts` 按账号隔离数据和在途请求，30 秒缓存、请求 30 秒截止。`components/token/useChatgptQuota.ts` 共用窗口百分比与本地重置日期格式，仅可见期间每分钟刷新，卸载清理；百分比统一为已使用。
+- `/api/codex/usage` 返回显式 `account_id`、`account_hash` 和 `usage`；`refresh=1` 为手动刷新。后端 `utils/api_client/codex/usage.py` 按账号合并查询，缓存 30 秒，凭证文件元数据变化即失效；成功兑换限额重置后失效缓存。HTTP 客户端按账号复用，代理变化时换连接，connect=5 秒／read=10 秒；只读 GET 连接失败重试一次，不重试兑换 POST。
+- `CodexAuthManager.get_access_token_sync()` 与异步模型请求共用同一刷新锁并做二次检查，防止设置页同时查询 usage/reset-credits 导致重复轮换 refresh token。网络刷新使用 connect=5 秒／read=10 秒。
+- 离线回归：`test/2026-10-31_ChatGPT额度/`；真实代理网络、订阅服务稳定性与移动端视觉仍需实机确认。
