@@ -1,6 +1,7 @@
 // 工具增强显示的渲染函数
 
 import { t } from '@/locales';
+import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import { renderSubAgentResult } from './subAgentResults';
 
 export function escapeHtml(text: string): string {
@@ -737,7 +738,7 @@ function renderViewImage(result: any, args: any): string {
   // （host 模式支持绝对路径，docker/web 模式限工作区相对路径，与工具本身的路径约束一致）
   let imageUrl = result.image_url || result.url || '';
   if (!imageUrl && path && result.success !== false) {
-    imageUrl = `/api/file/content?path=${encodeURIComponent(path)}`;
+    imageUrl = withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(path)}`);
   }
 
   let html = '<div class="tool-result-meta">';

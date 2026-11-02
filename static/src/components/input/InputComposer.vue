@@ -749,6 +749,7 @@ import { useInputStore } from '@/stores/input';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useUiStore } from '@/stores/ui';
 import { useWorkflowStore } from '@/stores/workflow';
+import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import { t, currentLocale } from '@/locales';
 
 defineOptions({ name: 'InputComposer' });
@@ -1131,7 +1132,7 @@ const previewImage = (path: string) => {
 const getPreviewUrl = (path: string): string => {
   if (!path) return '';
   if (props.chatMode) return props.mediaPreviewUrl?.(path) || '';
-  return `/api/gui/files/download?path=${encodeURIComponent(path)}`;
+  return withWorkspaceScope(`/api/gui/files/download?path=${encodeURIComponent(path)}`);
 };
 
 const applyLineMetrics = (lines: number, multiline: boolean) => {

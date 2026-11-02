@@ -12,6 +12,7 @@ import {
   type ShowHtmlFullscreenPayload
 } from '../utils/showHtmlFullscreen';
 import { downloadWorkspaceFile } from '../utils/downloadFile';
+import { withWorkspaceScope } from './methods/workspaceRequestScope';
 
 let showImageRenderSeq = 0;
 let allowWorkspaceContent = true;
@@ -172,7 +173,7 @@ function normalizeShowImageSrc(src: string) {
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (!allowWorkspaceContent) {
     return /^sha256:[a-f0-9]{64}$/.test(trimmed)
-      ? `/api/chat/media/${encodeURIComponent(trimmed)}`
+      ? withWorkspaceScope(`/api/chat/media/${encodeURIComponent(trimmed)}`)
       : '';
   }
   // file:// 前缀剥离按本地路径处理（浏览器禁止 http 页面直接加载 file:// 资源）
@@ -181,7 +182,7 @@ function normalizeShowImageSrc(src: string) {
     // Windows file:///C:/... → C:/...
     trimmed = trimmed.replace(/^\/(?=[A-Za-z]:\/)/, '');
   }
-  if (trimmed.startsWith('/user_upload/')) return trimmed;
+  if (trimmed.startsWith('/user_upload/')) return withWorkspaceScope(trimmed);
   // 兼容容器内部绝对路径：/workspace/.../user_upload/xxx.png 或 /workspace/user_upload/xxx
   // 注意：.astrion/user_upload/xxx 是工作区相对路径，不在此特判，
   // 让它落到下方通用分支走 /api/file/content（与 _validate_path 同源解析，
@@ -189,7 +190,7 @@ function normalizeShowImageSrc(src: string) {
   if (trimmed.startsWith('/')) {
     const idx = trimmed.toLowerCase().indexOf('/user_upload/');
     if (idx >= 0) {
-      return '/user_upload/' + trimmed.slice(idx + '/user_upload/'.length);
+      return withWorkspaceScope('/user_upload/' + trimmed.slice(idx + '/user_upload/'.length));
     }
   }
   // /workspace 前缀是容器内绝对路径写法，剥掉后按工作区相对路径处理
@@ -205,13 +206,13 @@ function normalizeShowImageSrc(src: string) {
   if (trimmed.startsWith('/')) {
     if (getShowImageWorkspaceMode() === 'host') {
       // host 模式保留绝对路径语义（如 /Users/xxx/img.png），后端全放行
-      return `/api/file/content?path=${encodeURIComponent(trimmed)}`;
+      return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(trimmed)}`);
     }
     // docker 模式下前导 / 视为工作区根相对路径（真绝对路径会被后端拒绝）
     trimmed = trimmed.replace(/^\/+/, '');
     if (!trimmed) return '';
   }
-  return `/api/file/content?path=${encodeURIComponent(trimmed)}`;
+  return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(trimmed)}`);
 }
 
 function parsePixelSize(raw: string | null, fallback: number) {

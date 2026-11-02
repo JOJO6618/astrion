@@ -868,6 +868,7 @@ import { usePersonalizationStore } from '@/stores/personalization';
 import { useUiStore } from '@/stores/ui';
 import FileChips from '@/components/chat/FileChips.vue';
 import { getMessageVisibility, messageStartsWork } from '@/utils/messageVisibility';
+import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import { t, currentLocale } from '@/locales';
 
 const props = defineProps<{
@@ -2477,16 +2478,16 @@ function resolveMessageMediaRef(message: any, input: any, kind: 'image' | 'video
 function getPreviewUrl(message: any, input: any, kind: 'image' | 'video'): string {
   if (props.chatMode) {
     const id = typeof input === 'string' ? input : input?.media_id;
-    return id ? `/api/chat/media/${encodeURIComponent(id)}` : '';
+    return id ? withWorkspaceScope(`/api/chat/media/${encodeURIComponent(id)}`) : '';
   }
   const mediaRef = resolveMessageMediaRef(message, input, kind);
   const mediaId = typeof mediaRef?.media_id === 'string' ? mediaRef.media_id : '';
   if (mediaId) {
-    return `/api/conversations/media/${encodeURIComponent(mediaId)}`;
+    return withWorkspaceScope(`/api/conversations/media/${encodeURIComponent(mediaId)}`);
   }
   const path = normalizeMediaPath(input);
   if (!path) return '';
-  return `/api/gui/files/download?path=${encodeURIComponent(path)}`;
+  return withWorkspaceScope(`/api/gui/files/download?path=${encodeURIComponent(path)}`);
 }
 
 function mediaPreviewKey(message: any, input: any, index: number): string {

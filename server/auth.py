@@ -508,7 +508,16 @@ def _resolve_serving_workspace_roots(user):
     host_mode_session = bool(session.get("host_mode"))
     sandbox_is_host = (TERMINAL_SANDBOX_MODE or "").lower() == "host"
     if host_mode_session and sandbox_is_host:
-        selected_workspace_id = session.get("host_workspace_id") or session.get("workspace_id")
+        # `<img>`/`<iframe>` 等原生资源请求无法携带 X-Astrion-Workspace-Id 头，
+        # 只靠 session 选中工作区时，多窗口/并发响应会让 session 与当前可见工作区
+        # 不一致，导致上传目录图片 404。调用方因此会在资源 URL 上显式带
+        # workspace_id；该值仍受 host_workspaces.json 目录校验，不是任意路径。
+        requested_workspace_id = (request.args.get("workspace_id") or "").strip()
+        selected_workspace_id = (
+            requested_workspace_id
+            or session.get("host_workspace_id")
+            or session.get("workspace_id")
+        )
         active_workspace_path = None
         if not selected_workspace_id:
             with state.HOST_ACTIVE_WORKSPACE_LOCK:

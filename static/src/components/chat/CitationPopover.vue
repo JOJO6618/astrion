@@ -158,6 +158,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue'
 import { t } from '@/locales';
 import { useQuickDockStore } from '@/stores/quickDock';
 import { useUiStore } from '@/stores/ui';
+import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import {
   citationPopover,
   keepCitationPopover,
@@ -241,7 +242,7 @@ function isImageFile(ann: CitationAnnotation): boolean {
 
 /** /api/file/content 的 inline 白名单含 image/，可直接作为 <img> 源 */
 function fileContentUrl(ann: CitationAnnotation): string {
-  return `/api/file/content?path=${encodeURIComponent(ann.file_path || '')}`;
+  return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(ann.file_path || '')}`);
 }
 
 /** 点击引用图片缩略图：打开全局灯箱预览 */

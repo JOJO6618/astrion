@@ -28,3 +28,24 @@ export function bindWorkspaceRequestHost(value: WorkspaceHost) {
 export function workspaceScopedFetch(input: RequestInfo | URL, init?: RequestInit) {
   return globalThis.fetch(input, init);
 }
+
+/** 当前可见工作区（与 fetch 头使用同一来源）。 */
+export function currentWorkspaceScopeId(): string {
+  return String(host?.currentHostWorkspaceId || '');
+}
+
+/**
+ * 给同源相对资源地址补 `workspace_id`。
+ *
+ * `<img>` / `<video>` / `<iframe>` 等浏览器原生请求无法携带
+ * `X-Astrion-Workspace-Id` 头，后端只能按 session 选中工作区解析；多窗口或
+ * 并发响应下 session 可能与当前可见工作区不一致，导致图片/文件去错目录找文件
+ * （表现为「图片加载失败」「文件不存在」）。资源地址因此必须自带工作区身份。
+ */
+export function withWorkspaceScope(url: string): string {
+  if (!url || !url.startsWith('/') || url.startsWith('//')) return url;
+  const workspace = currentWorkspaceScopeId();
+  if (!workspace) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}workspace_id=${encodeURIComponent(workspace)}`;
+}

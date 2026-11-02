@@ -86,6 +86,7 @@ import PdfPreview from './PdfPreview.vue';
 import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
 import { downloadWorkspaceFile } from '@/utils/downloadFile';
+import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 
 // 文本类文件内容缓存，避免父组件反复重建卡片时重复 fetch 导致闪烁
 const SHOW_FILE_CONTENT_CACHE = new Map<string, { content: string; ts: number }>();
@@ -268,7 +269,7 @@ function inferShowFileType(path: string): string {
 }
 
 function buildContentUrl() {
-  return `/api/file/content?path=${encodeURIComponent(props.path)}`;
+  return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(props.path)}`);
 }
 
 /**

@@ -60,6 +60,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, withDefaults } from 'vue';
 import CloseButton from '@/components/common/CloseButton.vue';
+import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 
 interface ImageEntry {
   name: string;
@@ -142,7 +143,8 @@ const onLocalChange = (event: Event) => {
   }, 200);
 };
 
-const previewUrl = (path: string) => `/api/gui/files/download?path=${encodeURIComponent(path)}`;
+const previewUrl = (path: string) =>
+  withWorkspaceScope(`/api/gui/files/download?path=${encodeURIComponent(path)}`);
 
 onMounted(() => {
   selectedSet.value = new Set(props.initialSelected || []);
