@@ -73,6 +73,8 @@ export const useResourceStore = defineStore('resource', {
   state: () => ({
     tokenPanelCollapsed: true,
     currentContextTokens: 0,
+    // 对话固定开销基线（自适应压缩阈值：分母 = 配置阈值 + 基线）
+    contextBaselineTokens: 0,
     currentConversationTokens: {
       cumulative_input_tokens: 0,
       cumulative_output_tokens: 0,
@@ -111,6 +113,7 @@ export const useResourceStore = defineStore('resource', {
       invalidateAuxiliaryRequest(this, 'token-statistics');
       invalidateAuxiliaryRequest(this, 'context-tokens');
       this.currentContextTokens = 0;
+      this.contextBaselineTokens = 0;
       this.currentConversationTokens = {
         cumulative_input_tokens: 0,
         cumulative_output_tokens: 0,
@@ -122,6 +125,9 @@ export const useResourceStore = defineStore('resource', {
     setCurrentContextTokens(value: number) {
       invalidateAuxiliaryRequest(this, 'context-tokens');
       this.currentContextTokens = value || 0;
+    },
+    setContextBaselineTokens(value: number) {
+      this.contextBaselineTokens = Number(value) > 0 ? Number(value) : 0;
     },
     toggleTokenPanel() {
       this.tokenPanelCollapsed = !this.tokenPanelCollapsed;

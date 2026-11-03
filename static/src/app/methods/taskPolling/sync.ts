@@ -24,6 +24,10 @@ export const syncMethods = {
       } else {
         this.updateCurrentContextTokens();
       }
+      // 自适应压缩阈值：分母 = 配置阈值 + 对话固定开销基线
+      if (typeof data.context_baseline_tokens === 'number') {
+        useResourceStore().setContextBaselineTokens(data.context_baseline_tokens);
+      }
 
       // 工作段结束：本段 tokens/s 汇总挂到铺点 user 消息，就地渲染速度行
       if (data?.token_speed && Number(data.token_speed.avg_tps) > 0) {

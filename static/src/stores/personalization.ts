@@ -185,7 +185,6 @@ interface PersonalForm {
   shallow_compress_max_replace_per_round: number | null;
   shallow_compress_trigger_tool_calls_interval: number | null;
   deep_compress_trigger_tokens: number | null;
-  deep_compress_form: 'file' | 'inject';
   agents_md_auto_inject: boolean;
   claude_md_auto_inject: boolean;
   agents_skills_scan_enabled: boolean;
@@ -421,7 +420,6 @@ const defaultForm = (): PersonalForm => ({
   shallow_compress_max_replace_per_round: null,
   shallow_compress_trigger_tool_calls_interval: null,
   deep_compress_trigger_tokens: null,
-  deep_compress_form: 'file',
   agents_md_auto_inject: false,
   claude_md_auto_inject: false,
   agents_skills_scan_enabled: true,
@@ -762,7 +760,6 @@ export const usePersonalizationStore = defineStore('personalization', {
         deep_compress_trigger_tokens: this.normalizeCompressionNumber(
           data.deep_compress_trigger_tokens
         ),
-        deep_compress_form: data.deep_compress_form === 'inject' ? 'inject' : 'file',
         agents_md_auto_inject: !!data.agents_md_auto_inject,
         claude_md_auto_inject: !!data.claude_md_auto_inject,
         agents_skills_scan_enabled:

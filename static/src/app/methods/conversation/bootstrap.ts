@@ -186,6 +186,7 @@ export const bootstrapMethods = {
       useQuickDockStore().setEditedFiles(data.edited_files || []);
       useFileStore().setTodoList(data.todo_list || null);
       useResourceStore().setCurrentContextTokens(Number(data.current_context_tokens || 0));
+      useResourceStore().setContextBaselineTokens(Number(data.context_baseline_tokens || 0));
       usePreviewStore().setRuntime(data.preview_base, data.preview_token);
       usePreviewStore().setTargets(data.preview_targets || [], false);
       if (!preserveListPosition) this.promoteConversationToTop(normalizedId);

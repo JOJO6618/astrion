@@ -309,6 +309,7 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                     "error": tr("chat_settings.protocol_switch_locked"),
                 }), 409
 
+        _previous_model_key = str(getattr(terminal, "model_key", "") or "")
         terminal.set_model(model_key)
         try:
             from server.crosspet import focus_model
@@ -344,6 +345,18 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                     )
                 except Exception as exc:
                     logger.error(f"[API] 保存模型到对话失败: {exc}")
+                if _previous_model_key and _previous_model_key != str(terminal.model_key or ""):
+                    # 固定开销随模型变化（提示词/工具规模/分词不同）：
+                    # 自适应压缩基线失效，下次请求完成后重测。
+                    try:
+                        from modules.adaptive_context import invalidated_metadata
+                        updates = invalidated_metadata()
+                        ctx.conversation_metadata.update(updates)
+                        ctx._get_conversation_manager_for_id(current_cid).update_conversation_metadata(
+                            current_cid, updates
+                        )
+                    except Exception as exc:
+                        logger.error(f"[API] 重置压缩基线失败: {exc}")
             else:
                 print(
                     f"[API] 跳过模型保存：请求对话 {requested_cid} "

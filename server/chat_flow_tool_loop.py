@@ -1684,9 +1684,13 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
 
         # 自动深层压缩（工具调用后触发）
         current_context_tokens = web_terminal.context_manager.get_current_context_tokens(conversation_id)
+        from modules.adaptive_context import effective_trigger_for as _effective_trigger
+        deep_trigger_for_conversation = _effective_trigger(
+            web_terminal.context_manager, conversation_id, compression_settings["deep_trigger_tokens"]
+        )
         if (
             auto_deep_enabled
-            and current_context_tokens > compression_settings["deep_trigger_tokens"]
+            and current_context_tokens > deep_trigger_for_conversation
             and not web_terminal.context_manager.is_compression_in_progress()
         ):
             # 只标记，不能在本工具刚结束时立即压缩。若本轮是并行 tool_calls，

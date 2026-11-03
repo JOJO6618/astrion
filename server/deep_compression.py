@@ -213,23 +213,6 @@ def _collect_runtime_state_lines(web_terminal, conversation_id: str) -> List[str
     return lines
 
 
-def _build_guide_message(*, compression_index: int, compact_file: str) -> str:
-    """生成文件模式的引导语：仅提示压缩文件位置，由模型自行阅读。"""
-    return f"当前对话已经被第{compression_index}次压缩。请阅读 {compact_file} 并继续工作。"
-
-
-def _read_compact_file_content(project_path: Path, relative_path: str) -> str:
-    """读取 compact 文件全文，读取失败时返回空串。"""
-    rel = str(relative_path or "").strip()
-    if not rel:
-        return ""
-    try:
-        target = (Path(project_path) / rel).resolve()
-        return target.read_text(encoding="utf-8").strip()
-    except Exception:
-        return ""
-
-
 def _read_summary_from_record(record: Dict[str, Any]) -> str:
     """从 deep_compression_records 条目中读取保存的总结内容。"""
     summary = record.get("summary")
@@ -287,34 +270,41 @@ def _build_summaries_section(
     return lines
 
 
-def _build_inject_guide_message(
+def _build_hybrid_guide_message(
     *,
     compression_index: int,
-    current_record: Dict[str, Any],
-    previous_records: List[Dict[str, Any]],
-    user_inputs: List[str],
+    compact_file: str,
+    summary_text: str,
     runtime_state_lines: Optional[List[str]] = None,
 ) -> str:
-    """生成直接注入模式的引导语：把历次压缩总结、用户输入按顺序拼入正文。"""
+    """混合模式引导语：本次摘要内联，历次记录留在文件里。
+
+    设计意图：模型续接只需要“本次压缩成什么结论 + 当前运行时状态”，不必为了
+    一次概要读全文；而每一次压缩的完整记录（用户输入 + 历次总结）落在文件里，
+    需要早期细节时再按需检索。
+    """
     lines: List[str] = [
-        f"当前对话已被第{compression_index}次压缩。以下为按时间顺序汇总的用户输入、历次压缩总结，请据此继续工作。",
+        f"当前对话已被第{compression_index}次压缩，请依据下方摘要与运行时状态继续工作。",
         "",
-        "用户的所有输入",
+        f"压缩记录文件：{compact_file}",
+        (f"（该文件已包含此前 {compression_index - 1} 次压缩的总结与用户输入记录，"
+         "本次摘要见下方。）" if compression_index > 1
+         else "（该文件为本次压缩的完整记录，本次摘要见下方。）"),
+        "",
+        "本次压缩摘要：",
+        summary_text or "（生成失败）",
     ]
-    lines.append(_build_user_inputs_section(user_inputs, previous_records, compression_index))
-    lines.append("")
-    lines.append("历次压缩总结")
-    lines.append("")
-    summary_lines = _build_summaries_section(
-        previous_records,
-        current_record.get("summary", ""),
-        compression_index,
-    )
-    lines.extend(summary_lines)
     if runtime_state_lines:
         lines.append("")
-        lines.append("当前运行时状态")
+        lines.append("当前运行时状态：")
         lines.extend(runtime_state_lines)
+    lines.append("")
+    lines.append("注意：不建议完整阅读之前的压缩记录（内容冗长，且与当前进度大量重叠）。")
+    if compression_index >= 4:
+        lines.append(
+            f"确实需要回看更早内容时，推荐用子智能体读取 {compact_file} 并提炼总结，"
+            "或用搜索功能只查看相关片段。"
+        )
     return "\n".join(lines).strip()
 
 
@@ -467,17 +457,10 @@ async def run_deep_compression(
     if metadata.get("compression_in_progress"):
         return {"success": False, "error": tr("deep_compression.in_progress"), "in_progress": True}
 
-    # 读取个性化压缩设置：
-    # - compress_form: file（生成文件，引导语提示位置） / inject（把历次压缩内容注入引导语）
-    try:
-        from modules.personalization_manager import load_personalization_config
-        pconfig = load_personalization_config(workspace.data_dir) or {}
-    except Exception:
-        pconfig = {}
-    compress_form = str(pconfig.get("deep_compress_form") or "file").strip().lower()
-    if compress_form not in ("file", "inject"):
-        compress_form = "file"
-    # compress_behavior 固定规则（无个性化开关）：
+    # 压缩形式固定为混合模式（无个性化开关）：
+    # - 每次都写一份完整记录文件（用户输入 + 历次总结 + 运行时状态）；
+    # - 引导语只内联“本次摘要 + 运行时状态 + 记录文件位置”，历次细节留在文件里。
+    # compress_behavior 固定规则：
     # - 空闲手动压缩（manual）：只生成引导语，等待用户下一条消息。
     # - 自动（auto）或运行中请求（requested）：压缩后继续原任务。
     compress_behavior = "wait" if mode == "manual" else "continue"
@@ -574,20 +557,13 @@ async def run_deep_compression(
     }
     all_records = previous_records + [current_record]
 
-    # 构建引导语（按压缩形式）。
-    if compress_form == "inject":
-        guide_message = _build_inject_guide_message(
-            compression_index=target_count,
-            current_record=current_record,
-            previous_records=previous_records,
-            user_inputs=user_inputs,
-            runtime_state_lines=runtime_state_lines,
-        )
-    else:
-        guide_message = _build_guide_message(
-            compression_index=target_count,
-            compact_file=relative_compact_path,
-        )
+    # 混合模式引导语：本次摘要 + 运行时状态内联，历次记录留在文件里。
+    guide_message = _build_hybrid_guide_message(
+        compression_index=target_count,
+        compact_file=relative_compact_path,
+        summary_text=summary_text,
+        runtime_state_lines=runtime_state_lines,
+    )
 
     # 更新对话 metadata：压缩记录 + 清理压缩状态标记（同一对话，无切换）。
     # 同时清除 frozen prompt 缓存，使压缩后下一次请求自动重新加载动态内容。
@@ -609,6 +585,9 @@ async def run_deep_compression(
         "compression_count": target_count,
         "deep_compression_records": all_records,
         "last_deep_compression_record": current_record,
+        # 上下文被重写后固定开销发生变化：下一个请求完成后重测基线，
+        # 在此之前沿用旧基线（避免阈值瞬间回落到裸配置值）。
+        "context_baseline_pending": True,
         "compression_in_progress": False,
         "compression_mode": None,
         "compression_stage": None,
@@ -648,7 +627,6 @@ async def run_deep_compression(
         "in_progress": False,
         "compact_file": relative_compact_path,
         "marked_count": marked_count,
-        "compress_form": compress_form,
         "compress_behavior": compress_behavior,
         "mode": mode,
         "guide_inserted": mode == "manual",
@@ -660,7 +638,6 @@ async def run_deep_compression(
         "compressed_conversation_id": conversation_id,
         "compact_file": relative_compact_path,
         "marked_count": marked_count,
-        "compress_form": compress_form,
         "compress_behavior": compress_behavior,
         "summary_failed": bool(summary_fail_reason),
         "guide_message": guide_message,

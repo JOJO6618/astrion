@@ -315,12 +315,16 @@ class RuntimeService:
                 window = None
         profile["context_window"] = window
         profile["context_limit"], profile["context_limit_source"] = \
-            RuntimeService._context_limit(workspace, window)
+            RuntimeService._context_limit(workspace, window, meta)
         return profile
 
     @staticmethod
-    def _context_limit(workspace: Any, model_window) -> Tuple[Optional[int], str]:
-        """上下文占用分母：与输入栏一致——自动深度压缩开启时取深压缩阈值，否则取模型窗口。"""
+    def _context_limit(workspace: Any, model_window, metadata: Any = None) -> Tuple[Optional[int], str]:
+        """上下文占用分母：与输入栏一致——自动深度压缩开启时取深压缩阈值，否则取模型窗口。
+
+        阈值含本对话记录的固定开销基线（modules/adaptive_context）：
+        配置 250k + 固定开销 50k 时，分母为 300k。
+        """
         fallback = (model_window, "model_window" if model_window else "")
         if workspace is None:
             return fallback
@@ -337,7 +341,10 @@ class RuntimeService:
             deep = int(resolve_context_compression_settings(prefs)["deep_trigger_tokens"])
         except Exception:
             return fallback
-        return (deep, "deep_compress") if deep > 0 else fallback
+        if deep <= 0:
+            return fallback
+        from modules.adaptive_context import effective_trigger
+        return (effective_trigger(metadata, deep), "deep_compress")
 
     def create_session(
         self,

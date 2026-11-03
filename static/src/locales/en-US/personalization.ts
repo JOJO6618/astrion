@@ -339,9 +339,6 @@ export default {
   shallowMaxReplace: 'Max replacements per round',
   shallowToolInterval: 'Trigger on tool-call interval',
   deepTriggerTokens: 'Deep compression trigger context',
-  deepCompressInjectTitle: 'Directly inject deep compression',
-  deepCompressInjectDesc:
-    'When on, inject the full text of previous compressions; when off, only hint the file location',
   restoreCompressionDefaults: 'Restore compression defaults',
 
   // ── Tools & Skills ──

@@ -499,9 +499,14 @@ async def handle_task_with_sender(
     compression_settings = resolve_context_compression_settings(personal_config)
     auto_deep_enabled = bool(personal_config.get("auto_deep_compress_enabled", False))
     current_tokens_for_deep = web_terminal.context_manager.get_current_context_tokens(conversation_id)
+    # 触发点 = 配置阈值 + 本对话固定开销基线（未测量时就是配置阈值）。
+    from modules.adaptive_context import effective_trigger_for as _effective_trigger
+    deep_trigger_for_conversation = _effective_trigger(
+        web_terminal.context_manager, conversation_id, compression_settings["deep_trigger_tokens"]
+    )
     if (
         auto_deep_enabled
-        and current_tokens_for_deep > compression_settings["deep_trigger_tokens"]
+        and current_tokens_for_deep > deep_trigger_for_conversation
         and not web_terminal.context_manager.is_compression_in_progress()
     ):
         web_terminal.context_manager._set_meta_flag("is_ultra_long_conversation", True)

@@ -168,7 +168,6 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "shallow_compress_trigger_tool_calls_interval": None,
     "shallow_compress_keep_user_turn_tools": None,  # 保留最近N次用户输入后的工具不压缩（默认3）
     "deep_compress_trigger_tokens": None,
-    "deep_compress_form": "file",  # 深压缩形式：file-生成文件 / inject-直接注入文件全文
     "silent_tool_disable": True,  # 禁用工具时不向模型插入提示（默认开启）
     "hide_tool_approval_panel": True,  # 自动审核模式下不自动打开工具审核面板（默认开启）
     "enhanced_tool_display": True,  # 增强工具显示
@@ -429,6 +428,8 @@ def sanitize_personalization_payload(
     base = deepcopy(DEFAULT_PERSONALIZATION_CONFIG)
     if fallback:
         base.update(fallback)
+    # 压缩形式已固定为混合模式（文件 + 内联摘要），历史配置不再保留该字段。
+    base.pop("deep_compress_form", None)
     data = payload or {}
     allowed_tool_categories = set(TOOL_CATEGORIES.keys())
     allowed_models = set(get_registered_model_keys(visible_only=True))
@@ -682,13 +683,6 @@ def sanitize_personalization_payload(
             min_value=MIN_COMPRESSION_TRIGGER_TOKENS,
             max_value=MAX_COMPRESSION_TRIGGER_TOKENS,
         )
-
-    # 深压缩形式：file（生成文件，引导语提示位置）/ inject（直接注入文件全文）
-    deep_form = data.get("deep_compress_form", base.get("deep_compress_form"))
-    if isinstance(deep_form, str) and deep_form.strip().lower() in ("file", "inject"):
-        base["deep_compress_form"] = deep_form.strip().lower()
-    else:
-        base["deep_compress_form"] = "file"
 
     if "shallow_compress_trigger_tool_calls_interval" in data:
         base["shallow_compress_trigger_tool_calls_interval"] = _sanitize_optional_int(

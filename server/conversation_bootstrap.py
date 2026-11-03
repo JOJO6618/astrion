@@ -24,6 +24,12 @@ def _normalize_conv_id(conversation_id: str) -> str:
     return value if not value or value.startswith("conv_") else f"conv_{value}"
 
 
+def _context_baseline_tokens(metadata) -> int:
+    """对话固定开销基线（未测量时为 0）。"""
+    from modules.adaptive_context import baseline_tokens
+    return baseline_tokens(metadata)
+
+
 def _existing_file(file_manager, path: str) -> bool:
     try:
         valid, _error, full_path = file_manager._validate_path(path)
@@ -117,6 +123,8 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
         "messages": snapshot["messages"], "display": display, "running": running,
         "todo_list": conversation.get("todo_list"),
         "current_context_tokens": (conversation.get("token_statistics") or {}).get("current_context_tokens", 0),
+        # 对话级自适应压缩阈值：分母 = 配置阈值 + 本对话固定开销基线
+        "context_baseline_tokens": _context_baseline_tokens(meta),
         "runtime_queue": queue_snapshot(manager, normalized_id, include_guidance=not is_main_running,
                                         data=conversation),
         "compression": {

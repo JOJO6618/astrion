@@ -319,8 +319,6 @@ export default {
   shallowMaxReplace: '每轮最大替换数量',
   shallowToolInterval: '工具调用间隔触发',
   deepTriggerTokens: '深压缩触发上下文',
-  deepCompressInjectTitle: '深压缩直接注入',
-  deepCompressInjectDesc: '开启后直接注入历次压缩全文，关闭则只提示文件位置',
   restoreCompressionDefaults: '恢复压缩默认值',
 
   // ── 工具与 Skills ──

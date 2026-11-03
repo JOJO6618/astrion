@@ -260,6 +260,8 @@ class TokenMixin:
             )
 
             if success:
+                # 首个请求 / 压缩后首个请求：记录固定开销基线，随本次广播下发。
+                self._record_context_baseline(current_context_tokens, target_id)
                 self.safe_broadcast_token_update()
 
             return success
@@ -327,6 +329,35 @@ class TokenMixin:
             return 0
         return stats.get("current_context_tokens", 0)
 
+    def _context_baseline_tokens(self) -> int:
+        """当前对话的固定开销基线（对话级自适应压缩阈值）。"""
+        try:
+            from modules.adaptive_context import baseline_tokens
+            return baseline_tokens(self.conversation_metadata)
+        except Exception:
+            return 0
+
+    def _record_context_baseline(self, current_context_tokens: int, target_id: Optional[str] = None) -> None:
+        """待重测时把本次请求的 input tokens 记为固定开销基线。
+
+        只在 metadata 标记了待重测（新对话创建、深度压缩后、切换模型）时写入，
+        因此正常对话的后续请求不会反复覆盖基线。
+        """
+        try:
+            from modules.adaptive_context import record_baseline
+            if not target_id or target_id != self.current_conversation_id:
+                return
+            updates = record_baseline(self.conversation_metadata, current_context_tokens)
+            if not updates:
+                return
+            self.conversation_metadata.update(updates)
+            target_manager = getattr(
+                self, "_get_conversation_manager_for_id", lambda _: self.conversation_manager
+            )(target_id)
+            target_manager.update_conversation_metadata(target_id, updates)
+        except Exception as exc:
+            logger.warning(f"[AdaptiveContext] 记录压缩基线失败: {exc}")
+
     def safe_broadcast_token_update(self, extra: Optional[Dict[str, Any]] = None):
         """安全的token更新广播（只广播累计统计，不重新计算）
 
@@ -355,6 +386,7 @@ class TokenMixin:
                 'cumulative_cached_input_tokens': cumulative_stats.get("total_cached_input_tokens", 0) if cumulative_stats else 0,
                 'cache_exempt_input_tokens': cumulative_stats.get("cache_exempt_input_tokens", 0) if cumulative_stats else 0,
                 'current_context_tokens': cumulative_stats.get("current_context_tokens", 0) if cumulative_stats else 0,
+                'context_baseline_tokens': self._context_baseline_tokens(),
                 'costs': cumulative_stats.get('costs') if cumulative_stats else None,
                 'updated_at': datetime.now().isoformat()
             }

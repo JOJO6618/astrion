@@ -747,6 +747,7 @@ import { useChatgptQuota } from '@/components/token/useChatgptQuota';
 import type { ModelOption } from '@/stores/model';
 import { useInputStore } from '@/stores/input';
 import { usePersonalizationStore } from '@/stores/personalization';
+import { useResourceStore } from '@/stores/resource';
 import { useUiStore } from '@/stores/ui';
 import { useWorkflowStore } from '@/stores/workflow';
 import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
@@ -937,6 +938,7 @@ const props = defineProps<{
 
 const inputStore = useInputStore();
 const personalizationStore = usePersonalizationStore();
+const resourceStore = useResourceStore();
 
 /** 项目模式（docker/web）下优先用「项目」口径的权限说明。 */
 function permissionDescKey(option: { descriptionKey: string; descriptionKeyProject?: string }) {
@@ -3248,12 +3250,20 @@ const deepCompressLimit = computed(() => {
   return 250000;
 });
 
+const contextBaselineTokens = computed(() => {
+  // 对话固定开销基线（提示词/工具等）：只对 Agent、且自动深度压缩开启时计入分母。
+  if (props.chatMode || !autoDeepCompressEnabled.value) return 0;
+  const value = Number(resourceStore.contextBaselineTokens || 0);
+  return value > 0 ? value : 0;
+});
+
 const contextUsageLimit = computed(() => {
   if (props.chatMode) {
     return Number(props.contextTokenLimit) || 250000;
   }
   if (autoDeepCompressEnabled.value) {
-    return deepCompressLimit.value;
+    // 阈值 + 固定开销：让配置的 250k 真正留给对话内容
+    return deepCompressLimit.value + contextBaselineTokens.value;
   }
   if (modelContextWindow.value > 0) {
     return modelContextWindow.value;

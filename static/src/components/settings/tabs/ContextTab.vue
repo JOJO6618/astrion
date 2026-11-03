@@ -157,24 +157,6 @@ const {
             @input="handleCompressionNumberInput('deep_compress_trigger_tokens', $event)"
         /></label>
       </div>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-copy"
-          ><span class="settings-row-title">{{
-            $t('personalization.deepCompressInjectTitle')
-          }}</span
-          ><span class="settings-row-desc">{{
-            $t('personalization.deepCompressInjectDesc')
-          }}</span></span
-        ><input
-          type="checkbox"
-          :checked="form.deep_compress_form === 'inject'"
-          @change="
-            personalization.updateField({
-              key: 'deep_compress_form',
-              value: $event.target.checked ? 'inject' : 'file'
-            })
-          " /><FancyCheck :checked="form.deep_compress_form === 'inject'"
-      /></label>
       <div class="settings-inline-actions right">
         <button type="button" class="settings-secondary-button" @click="restoreCompressionDefaults">
           {{ $t('personalization.restoreCompressionDefaults') }}

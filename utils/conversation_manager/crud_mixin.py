@@ -117,6 +117,8 @@ class CrudMixin:
             "compression_resume_payload": None,
             "deep_compression_records": [],
             "last_deep_compression_record": None,
+            # 自适应压缩阈值：首个请求完成后记录固定开销基线
+            "context_baseline_pending": True,
             "skip_auto_title_generation": False,
         }
         if getattr(self, "conversation_kind", "agent") == "chat":

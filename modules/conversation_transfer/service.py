@@ -126,6 +126,11 @@ def import_document(document: dict, manifest: dict, files: dict, manager,
             metadata["compression_in_progress"] = False
             metadata["compression_stage"] = None
             metadata["compression_mode"] = None
+            # 固定开销随目标环境（提示词/工具/工作区）变化：导入后重测基线。
+            metadata["context_baseline_tokens"] = None
+            metadata["context_baseline_model_key"] = None
+            metadata["context_baseline_at"] = None
+            metadata["context_baseline_pending"] = True
             # Deferred tool definitions are not bundled as current capabilities.
             # Preserve their original snapshot, and let normal tools policy apply.
         if model_key:
