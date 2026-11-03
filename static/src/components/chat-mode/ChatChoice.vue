@@ -1,48 +1,55 @@
 <template>
   <div ref="root" class="chat-choice" @keydown.esc="open = false">
     <button
+      ref="trigger"
       type="button"
       :disabled="disabled"
       class="chat-choice__trigger"
       :aria-label="label"
       aria-haspopup="listbox"
       :aria-expanded="open"
-      @click="open = !open"
+      @click="toggle"
     >
       <span>{{ options.find((option) => option.value === modelValue)?.label || label }}</span>
-      <svg
-        class="chat-choice__chevron"
-        :class="{ open }"
-        viewBox="0 0 10 10"
-        aria-hidden="true"
-      >
+      <svg class="chat-choice__chevron" :class="{ open }" viewBox="0 0 10 10" aria-hidden="true">
         <path d="M2.75 3.75L5 6.25L7.25 3.75" />
       </svg>
     </button>
-    <div v-if="open" class="chat-choice__options" role="listbox" :aria-label="label">
-      <button
-        v-for="option in options"
-        :key="String(option.value)"
-        type="button"
-        role="option"
-        :aria-selected="option.value === modelValue"
-        @click="choose(option.value)"
+    <!-- 浮层挂到 body：弹窗/面板常带 max-height + overflow，绝对定位会被裁剪 -->
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="menu"
+        class="chat-choice__options"
+        :style="menuStyle"
+        role="listbox"
+        :aria-label="label"
+        @keydown.esc.stop="open = false"
       >
-        <span>{{ option.label }}</span>
-        <svg
-          v-if="option.value === modelValue"
-          class="chat-choice__check"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
+        <button
+          v-for="option in options"
+          :key="String(option.value)"
+          type="button"
+          role="option"
+          :aria-selected="option.value === modelValue"
+          @click="choose(option.value)"
         >
-          <path d="M5 12.5 9.5 17 19 7" />
-        </svg>
-      </button>
-    </div>
+          <span>{{ option.label }}</span>
+          <svg
+            v-if="option.value === modelValue"
+            class="chat-choice__check"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M5 12.5 9.5 17 19 7" />
+          </svg>
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 defineProps<{
   modelValue: string | null;
   label: string;
@@ -51,16 +58,81 @@ defineProps<{
 }>();
 const emit = defineEmits<{ (event: 'update:modelValue', value: string | null): void }>();
 const root = ref<HTMLElement>();
+const trigger = ref<HTMLElement>();
+const menu = ref<HTMLElement>();
+const menuStyle = ref<Record<string, string>>({});
 const open = ref(false);
+const MENU_MAX_HEIGHT = 340;
+
+/** 固定定位跟随触发按钮，并按可用空间翻转/收高，避免超出视口。 */
+function updatePosition() {
+  const anchor = trigger.value;
+  if (!anchor || !open.value || typeof window === 'undefined') return;
+  const rect = anchor.getBoundingClientRect();
+  const padding = 8;
+  const gap = 6;
+  const width = Math.min(360, Math.max(190, window.innerWidth - 32));
+  const left = Math.max(padding, Math.min(rect.left, window.innerWidth - width - padding));
+  const measured = menu.value?.getBoundingClientRect().height;
+  const menuHeight = Math.min(
+    measured && measured > 0 ? measured : MENU_MAX_HEIGHT,
+    MENU_MAX_HEIGHT
+  );
+  const spaceBelow = window.innerHeight - rect.bottom - padding;
+  const spaceAbove = rect.top - padding;
+  let top: number;
+  let maxHeight: number | undefined;
+  if (spaceBelow >= menuHeight + gap) {
+    top = rect.bottom + gap;
+  } else if (spaceAbove >= menuHeight + gap) {
+    top = rect.top - menuHeight - gap;
+  } else if (spaceBelow >= spaceAbove) {
+    maxHeight = Math.max(120, spaceBelow - gap);
+    top = rect.bottom + gap;
+  } else {
+    maxHeight = Math.max(120, spaceAbove - gap);
+    top = Math.max(padding, rect.top - maxHeight - gap);
+  }
+  menuStyle.value = {
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+    width: `${Math.round(width)}px`,
+    ...(maxHeight !== undefined ? { maxHeight: `${Math.round(maxHeight)}px` } : {})
+  };
+}
+
+function toggle() {
+  open.value = !open.value;
+}
 function choose(value: string | null) {
   emit('update:modelValue', value);
   open.value = false;
 }
 function outside(event: Event) {
-  if (!root.value?.contains(event.target as Node)) open.value = false;
+  if (!open.value) return;
+  const target = event.target as Node | null;
+  if (!target) return;
+  if (root.value?.contains(target) || menu.value?.contains(target)) return;
+  open.value = false;
 }
-onMounted(() => document.addEventListener('pointerdown', outside));
-onBeforeUnmount(() => document.removeEventListener('pointerdown', outside));
+watch(open, async (isOpen) => {
+  if (!isOpen) {
+    menuStyle.value = {};
+    return;
+  }
+  await nextTick();
+  updatePosition();
+});
+onMounted(() => {
+  document.addEventListener('pointerdown', outside, true);
+  window.addEventListener('resize', updatePosition);
+  window.addEventListener('scroll', updatePosition, true);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', outside, true);
+  window.removeEventListener('resize', updatePosition);
+  window.removeEventListener('scroll', updatePosition, true);
+});
 </script>
 <style scoped lang="scss">
 .chat-choice {
@@ -117,19 +189,17 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside));
   cursor: default;
 }
 .chat-choice__options {
-  position: absolute;
-  top: 44px;
-  left: 0;
+  position: fixed;
+  z-index: 3000;
   min-width: 190px;
-  max-width: min(360px, 85vw);
   max-height: 340px;
   overflow: auto;
+  box-sizing: border-box;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 5px;
   box-shadow: var(--shadow-mid);
-  z-index: 25;
 }
 .chat-choice__options button {
   display: flex;

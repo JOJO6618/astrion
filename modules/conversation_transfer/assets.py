@@ -162,12 +162,18 @@ def collect(document: dict, data_dir: Path, project: Path | None, *, shared_medi
                 candidates = sorted(directory.rglob("*"))
             else:
                 candidates = [candidate]
+            # 压缩记录属于历史文字引用：消息正文或工具结果可能提到已被删除、或
+            # 属于其他对话的 compact 文件。这种情况应尽可能导出仍存在的材料，
+            # 而不是让整个归档失败（历史文本不改写，新环境里该路径自然失效）。
+            best_effort = relative.startswith(".astrion/compact_result/")
             for path in candidates:
                 if path.is_symlink():
                     raise ValueError("Conversation resources cannot use symbolic links")
                 if path.is_dir():
                     continue
                 if not path.is_file():
+                    if best_effort:
+                        continue
                     raise FileNotFoundError(f"Conversation material is missing: {relative}")
                 path.resolve().relative_to(project.resolve())
                 old = path.relative_to(project).as_posix() if actual == raw else raw

@@ -1847,13 +1847,9 @@ def review_conversation_preview(conversation_id, terminal: WebTerminal, workspac
     if policy.get("ui_blocks", {}).get("block_conversation_review"):
         return jsonify({"success": False, "error": tr("conversation.review_blocked_by_admin")}), 403
     try:
-        current_id = terminal.context_manager.current_conversation_id
-        if conversation_id == current_id:
-            return jsonify({
-                "success": False,
-                "message": tr("conversation.cannot_review_current_conversation")
-            }), 400
-
+        # 回顾只读磁盘文件：with_terminal 现在返回对话级 terminal，其
+        # current_conversation_id 恒等于 URL 里的 id，不能再据此拦截「当前对话」
+        #（前端已单独拦截当前对话）。
         conversation_data = terminal.context_manager._get_conversation_manager_for_id(conversation_id).load_conversation(conversation_id)
         if not conversation_data:
             return jsonify({
@@ -1893,13 +1889,6 @@ def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserW
     if policy.get("ui_blocks", {}).get("block_conversation_review"):
         return jsonify({"success": False, "error": tr("conversation.review_blocked_by_admin")}), 403
     try:
-        current_id = terminal.context_manager.current_conversation_id
-        if conversation_id == current_id:
-            return jsonify({
-                "success": False,
-                "message": tr("conversation.cannot_review_current_conversation")
-            }), 400
-
         conversation_data = terminal.context_manager._get_conversation_manager_for_id(conversation_id).load_conversation(conversation_id)
         if not conversation_data:
             return jsonify({
