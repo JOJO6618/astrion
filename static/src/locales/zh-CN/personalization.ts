@@ -182,6 +182,12 @@ export default {
   codexResetGrantedAt: '获得 {time}',
   codexResetRedeemedAt: '使用 {time}',
   codexResetExpiresAt: '{time} 过期',
+  codexWeeklySection: '本周期价值',
+  codexWeeklyApiValue: '本周期 API 价值',
+  codexWeeklyMaxValue: '本周期最大 API 价值（推算）',
+  codexWeeklyHistory: '历史周期',
+  codexWeeklyLoading: '统计中…',
+  codexWeeklyLoadFailed: '价值统计加载失败',
 
   // ── 外观与显示 ──
   themeTitle: '主题切换',

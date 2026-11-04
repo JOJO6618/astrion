@@ -349,6 +349,21 @@ def codex_usage():
     })
 
 
+@codex_auth_bp.route("/api/codex/weekly-value", methods=["GET"])
+@api_login_required
+@admin_api_required
+def codex_weekly_value():
+    """本周期 GPT 请求折算价值与历史周期（后台每小时采样，账本为金额唯一来源）。"""
+    account_id, err = _resolve_account(_requested_account_id())
+    if err:
+        return err
+    from modules.weekly_quota import get_snapshot, request_sample
+
+    if request.args.get("refresh") == "1":
+        request_sample()
+    return jsonify({"success": True, "account_id": account_id, **get_snapshot(account_id)})
+
+
 @codex_auth_bp.route("/api/codex/reset-credits", methods=["GET"])
 @api_login_required
 @admin_api_required

@@ -323,6 +323,11 @@ app.register_blueprint(codex_auth_bp)
 app.register_blueprint(providers_bp)
 app.register_blueprint(project_git_bp)
 
+# 周额度价值采样：随进程启动，每小时一次（账本为金额唯一来源）
+from modules.weekly_quota import start_tracker as _start_weekly_quota_tracker
+
+_start_weekly_quota_tracker()
+
 # 安全钩子（CSRF 校验 + 响应头）
 attach_security_hooks(app)
 

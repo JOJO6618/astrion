@@ -4,6 +4,7 @@ import { t } from '@/locales';
 import { useSettingsStore } from '@/stores/settings';
 import { useUiStore } from '@/stores/ui';
 import { useChatgptQuotaStore } from '@/stores/chatgptQuota';
+import CodexWeeklyValue from './CodexWeeklyValue.vue';
 
 defineOptions({ name: 'CodexTab' });
 
@@ -619,6 +620,9 @@ onMounted(async () => {
             <span v-else class="codex-credit-item__status">{{ $t(creditStatusKey(c)) }}</span>
           </div>
         </div>
+
+        <!-- 本周期价值（每小时采样，账本折算） -->
+        <CodexWeeklyValue :account-id="selectedAccountId" />
       </template>
 
       <!-- 代理设置 -->

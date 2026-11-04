@@ -183,6 +183,12 @@ export default {
   codexResetGrantedAt: 'Granted {time}',
   codexResetRedeemedAt: 'Used {time}',
   codexResetExpiresAt: 'Expires {time}',
+  codexWeeklySection: 'This period',
+  codexWeeklyApiValue: 'API value this period',
+  codexWeeklyMaxValue: 'Estimated max API value',
+  codexWeeklyHistory: 'Previous periods',
+  codexWeeklyLoading: 'Collecting…',
+  codexWeeklyLoadFailed: 'Failed to load value stats',
 
   // ── Appearance & Display ──
   themeTitle: 'Theme',
