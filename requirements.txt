@@ -3,7 +3,9 @@
 flask
 flask-cors
 werkzeug
-httpx[http2]
+# socks extra：环境里配置了 SOCKS 代理（ALL_PROXY=socks5://…）时 httpx 需要 socksio，
+# 否则构造 Client 直接 ImportError，所有 httpx 请求（汇率/网页等）都会失败
+httpx[http2,socks]
 openai
 cryptography
 pillow
