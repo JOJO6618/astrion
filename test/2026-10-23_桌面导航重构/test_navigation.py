@@ -246,6 +246,87 @@ class NavigationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.command("page", {"page": "https://example.invalid"})
 
+    def test_mode_switch_back_is_not_pulled_to_previous_mode(self):
+        """agent 空页 -> chat 空页 -> 回到 agent 文档：不能被旧导航目标拉回 chat。"""
+        agent = self.commit(self.attach(self.create()))
+        agent_key = agent["tabs"][0]["key"]
+        chat = self.commit(self.attach(
+            agent, renderer="renderer-B", workspace_id="",
+            conversation_kind="chat", conversation_id=""), "renderer-B")
+        self.assertEqual(chat["active_key"], chat["tabs"][-1]["key"])
+        self.assertEqual(chat["tabs"][-1]["conversation_kind"], "chat")
+        back = self.attach(chat, renderer="renderer-C", conversation_kind="agent",
+                           conversation_id="")
+        self.assertEqual(back["navigation"]["status"], "committed")
+        self.assertEqual(back["navigation"]["key"], agent_key)
+        self.assertEqual(back["active_key"], agent_key)
+
+    def test_mode_switch_back_reuses_one_blank_tab_per_mode(self):
+        agent = self.commit(self.attach(self.create()))
+        chat = self.commit(self.attach(
+            agent, renderer="renderer-B", workspace_id="", conversation_kind="chat",
+            conversation_id=""), "renderer-B")
+        back = self.commit(self.attach(
+            chat, renderer="renderer-C", conversation_kind="agent", conversation_id=""),
+            "renderer-C")
+        again = self.commit(self.attach(
+            back, renderer="renderer-D", workspace_id="", conversation_kind="chat",
+            conversation_id=""), "renderer-D")
+        self.assertEqual(len(again["tabs"]), 2)
+        self.assertEqual(sorted(tab["conversation_kind"] for tab in again["tabs"]),
+                         ["agent", "chat"])
+
+    def test_returning_from_page_is_not_pulled_back(self):
+        state = self.commit(self.attach(self.create()))
+        # 设置页已 attach 并提交（真实返回前的状态）
+        state = self.command("attach", {
+            "renderer_id": "renderer-S", "page": "/settings",
+            "seen_navigation_id": state["navigation"]["id"],
+        })["state"]
+        self.assertEqual(state["navigation"]["page"], "/settings")
+        self.assertEqual(state["navigation"]["status"], "committed")
+        back = self.attach(state, renderer="renderer-B", conversation_kind="agent",
+                           conversation_id="")
+        self.assertEqual(back["navigation"]["page"], "")
+        self.assertEqual(back["navigation"]["key"], "tab_A")
+        self.assertEqual(back["active_key"], "tab_A")
+
+    def test_reload_keeps_current_blank_tab_when_another_blank_exists(self):
+        self.commit(self.attach(self.create("tab_A")))
+        second = self.create("tab_B")
+        reloaded = self.attach(second, renderer="renderer-B", conversation_kind="agent",
+                               conversation_id="")
+        self.assertEqual(reloaded["navigation"]["key"], "tab_B")
+
+    def test_chat_conversation_attach_does_not_steal_agent_tab(self):
+        agent = self.commit(self.attach(self.create()))
+        chat = self.attach(agent, renderer="renderer-B", workspace_id="",
+                           conversation_kind="chat", conversation_id="abc")
+        target = next(tab for tab in chat["tabs"] if tab["key"] == chat["navigation"]["key"])
+        self.assertEqual(target["conversation_kind"], "chat")
+        self.assertEqual(target["conversation_id"], "conv_abc")
+        self.assertEqual(agent["active_key"], agent["tabs"][0]["key"])
+
+    def test_attach_without_navigation_ignores_other_mode_tab(self):
+        """持久化状态里只有 chat 标签时，无导航态的 agent 文档不能落到 chat 标签。"""
+        self.path.write_text(json.dumps({"user": {
+            "version": 2, "revision": 3, "tabs": [{
+                "conversation_kind": "chat", "key": "tab_chat", "kind": "new",
+                "conversation_id": "", "workspace_id": "", "workspace_label": "",
+                "title": "", "error": "",
+            }],
+            "active_key": "tab_chat", "resume_key": "tab_chat", "workspace_id": "",
+            "renderer_id": "", "navigation": None, "receipts": [], "closed_keys": [],
+        }}))
+        state = self.command("attach", {
+            "renderer_id": "renderer-A", "workspace_id": "ws1",
+            "conversation_kind": "agent", "conversation_id": "",
+            "seen_navigation_id": "",
+        })["state"]
+        target = next(tab for tab in state["tabs"] if tab["key"] == state["navigation"]["key"])
+        self.assertEqual(target["conversation_kind"], "agent")
+        self.assertEqual(target["workspace_id"], "ws1")
+
 
 if __name__ == "__main__":
     unittest.main()

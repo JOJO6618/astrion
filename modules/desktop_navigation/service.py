@@ -137,6 +137,26 @@ class DesktopNavigation:
         state["tabs"].append(tab)
         return tab
 
+    def _blank_target(self, state: dict, payload: dict, lookup: Callable | None,
+                      nav_tab: dict | None) -> dict | None:
+        """同一模式的空白标签：当前导航目标优先，其次复用同工作区空标签。
+
+        切模式/换页后回到空对话时复用已有空标签，避免来回切换堆出多个空标签；
+        非空对话由 `_open` 按 workspace＋conversation 去重。
+        """
+        if payload.get("conversation_id"):
+            return None
+        kind = payload.get("conversation_kind") or "agent"
+        workspace = "" if kind == "chat" else self._workspace(payload, state, lookup)[0]
+
+        def matches(tab: dict | None) -> bool:
+            return bool(tab) and tab["kind"] == "new" and \
+                tab.get("conversation_kind", "agent") == kind and \
+                tab["workspace_id"] == workspace
+
+        return nav_tab if matches(nav_tab) else next(
+            (tab for tab in state["tabs"] if matches(tab)), None)
+
     @staticmethod
     def _owns(state: dict, payload: dict) -> dict:
         nav = state.get("navigation") or {}
@@ -216,26 +236,36 @@ class DesktopNavigation:
             unchanged = nav.get("id", "") == str(payload.get("seen_navigation_id") or "")
             page = str(payload.get("page") or "")
             pending = nav.get("status") == "pending"
+            nav_tab = find_tab(state, nav.get("key", ""))
+            declared_kind = payload.get("conversation_kind") or "agent"
+            # 文档自报的是另一种模式（chat <-> agent）或对话页，而旧目标仍是上一模式/
+            # 独立页面：这是用户主动切换，不是刷新，不能把文档拉回旧目标。
+            switched = bool(nav) and not page and (
+                bool(nav.get("page")) or
+                (nav_tab is not None and
+                 nav_tab.get("conversation_kind", "agent") != declared_kind))
             if unchanged and not pending and page:
                 self._apply(state, "page", {"page": page}, lookup)
                 state["navigation"]["status"] = "committed"
-            elif unchanged and not pending and (payload.get("conversation_id") or
-                                                 payload.get("conversation_kind") == "chat"):
-                tab = find_tab(state, nav.get("key", ""))
-                if not (not payload.get("conversation_id") and tab and tab["kind"] == "new"
-                        and tab.get("conversation_kind") == "chat"):
-                    tab = self._open(state, payload, lookup)
+            elif unchanged and not pending and (
+                    switched or payload.get("conversation_id") or declared_kind == "chat"):
+                tab = (self._blank_target(state, payload, lookup, nav_tab) or
+                       self._open(state, payload, lookup))
                 navigate(state, tab["key"])
                 self._commit(state, state["navigation"])
-            elif nav.get("key") and find_tab(state, nav["key"]):
+            elif nav_tab is not None:
                 # Reloads must reacquire the selected document even after a previous commit.
                 navigate(state, nav["key"])
             elif nav.get("page"):
                 navigate(state, page=nav["page"])
             else:
                 tab = find_tab(state, state["active_key"]) or find_tab(state, state["resume_key"])
+                if tab is not None and \
+                        tab.get("conversation_kind", "agent") != declared_kind:
+                    tab = None
                 if tab is None:
-                    tab = state["tabs"][0] if state["tabs"] else self._open(state, payload, lookup)
+                    tab = (self._blank_target(state, payload, lookup, None) or
+                           self._open(state, payload, lookup))
                 navigate(state, tab["key"])
             return {}
         if action == "commit":

@@ -70,6 +70,17 @@ async function applyTarget(host, control) {
   const visible = tabs.tabs.find((item) => item.key === tabs.activeKey);
   if (!visible) host.historyLoading = true;
   try {
+    // 目标空视图已提交且当前正在显示（模式切回 / 刷新）：无需重建空页，也不再重复 commit。
+    if (
+      nav.status === 'committed' &&
+      tabs.activeKey === tab.key &&
+      tab.kind === 'new' &&
+      tab.conversationKind === 'agent' &&
+      !host.historyLoading &&
+      !host.currentConversationId &&
+      String(host.currentHostWorkspaceId || '') === tab.workspaceId
+    )
+      return;
     if (tab.kind === 'conv') {
       const result = await host.handleSelectWorkspaceConversation(
         {

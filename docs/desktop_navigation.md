@@ -39,7 +39,7 @@
 | close | 立即移除目标并选择继任者；最后一个实际对话关闭后同事务补空标签 |
 | bind | 将发送前捕获的空标签绑定真实对话，不改变 key；源标签已关返回 bound=false，不复活 |
 | page/resume | 设置、工作流、Git 等独立页往返，共用导航身份 |
-| attach | 注册新 renderer；刷新继承最新 pending 目标，旧地址不能覆盖尚未完成的切换 |
+| attach | 注册新 renderer；同模式刷新继承最新 pending 目标，旧地址不能覆盖尚未完成的切换；文档自报另一种模式（chat↔agent）或对话页时按自身身份定位标签，不复用旧目标 |
 | commit/fail | 必须匹配 renderer_id＋navigation_id；error 状态不能再 commit，需重新 activate |
 | title | 仅更新明确工作区＋对话的标题 |
 | deleted | 仅服务端删除成功钩子可调用，客户端不得伪造 |
@@ -65,6 +65,8 @@
 主页面 attach 失败自动重试，单次生命周期只提示一次启动错误。卸载撤销观察、重连 timer、轮询 owner 和请求，迟到响应不得重新开始轮询。
 
 2026-10-26 Chat：URL 为 `/chat/new`、`/chat/<id>`，不携带假工作区；继续使用同一个 `startDesktopNavigation` 协调器。首消息捕获真正 `new/chat` 标签的 key 进行绑定，迟到受理不能改绑当前标签。Chat 空页刷新复用原标签，纯 Chat 设置页返回恢复原模式；查询坏 Chat 文档仅标记对应标签错误。跨模式导航整页切换，Chat 页面不会挂载 Agent 的工作区初始化。
+
+**跨模式 attach 不能拉回旧目标（2026-11-04 修复）**：`attach` 只在旧导航目标与文档自报身份同一模式时才继承它（刷新、重载）。当旧目标属于另一种模式（chat ↔ agent）或独立页面（`nav.page`），而当前文档是对话页时，按 `payload.conversation_kind` 定位标签：优先复用同类型空标签（agent 还要求同 `workspace_id`），没有才新建，然后 `navigate`＋`commit`。否则 agent 空页在 `loadInitialData` 之后才 attach，会被旧 Chat 目标重新导航回 `/chat/new`（切回 Agent 后几秒弹回 Chat 空对话页）。前端切换模式走标签命令（`ModeSwitcher.vue` 优先 `activate` 同类型空标签，没有才 `addNewTab`），整页跳转只作为未 attach／命令失败时的回退。回归：`test/2026-10-23_桌面导航重构/test_navigation.py` 的 `test_mode_switch_*` 与 `test_returning_from_page_is_not_pulled_back`。
 
 ## 关闭、删除与恢复
 

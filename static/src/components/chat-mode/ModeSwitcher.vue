@@ -37,13 +37,45 @@
 </template>
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { useConversationTabsStore } from '@/stores/conversationTabs';
+
 const props = defineProps<{ mode: 'chat' | 'agent' }>();
 const open = ref(false);
 const root = ref<HTMLElement>();
 const modes = ['agent', 'chat'] as const;
-function choose(mode: 'chat' | 'agent') {
+const switching = ref(false);
+
+function fallback(mode: 'chat' | 'agent') {
+  window.location.assign(mode === 'chat' ? '/chat/new' : '/new');
+}
+
+async function choose(mode: 'chat' | 'agent') {
   open.value = false;
-  if (mode !== props.mode) window.location.assign(mode === 'chat' ? '/chat/new' : '/new');
+  if (mode === props.mode || switching.value) return;
+  const tabs = useConversationTabsStore();
+  // 桌面端由标签导航统一加载：复用同类型空标签，没有才新建。
+  // 整页跳转会把旧导航目标留给新文档，attach 时需要靠标签身份重新定位。
+  const workspaceId = mode === 'agent' ? String(tabs.workspaceId || '') : '';
+  if (!tabs.enabled || !tabs.attached || (mode === 'agent' && !workspaceId)) {
+    fallback(mode);
+    return;
+  }
+  switching.value = true;
+  try {
+    const blank = tabs.tabs.find(
+      (tab) =>
+        tab.kind === 'new' &&
+        tab.conversationKind === mode &&
+        (mode === 'chat' || tab.workspaceId === workspaceId)
+    );
+    if (blank) await tabs.setActive(blank.key);
+    else await tabs.addNewTab({ conversationKind: mode, workspaceId });
+  } catch {
+    // 命令失败（网络/冲突）退回整页跳转；新文档会按自身身份重新定位标签。
+    fallback(mode);
+  } finally {
+    switching.value = false;
+  }
 }
 function outside(event: Event) {
   if (!root.value?.contains(event.target as Node)) open.value = false;
