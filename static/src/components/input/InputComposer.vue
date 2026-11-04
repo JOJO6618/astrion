@@ -717,12 +717,29 @@
             :context-percent-label="contextUsagePercentLabel"
             :context-text="contextUsageCompactText"
             :show-bars="quotaCardPinned"
+            :context-editable="compressLimitEditable"
+            @edit-context="openCompressLimitDialog"
           />
         </div>
-        <div v-if="!chatgptQuotaVisible" class="context-usage-switcher__tooltip">
-          <div>{{ $t('input.usedPercent', { n: contextUsagePercentLabel }) }}</div>
-          <div>{{ contextUsageCompactText }}</div>
-        </div>
+        <button
+          v-if="!chatgptQuotaVisible"
+          type="button"
+          class="context-usage-switcher__tooltip"
+          :class="{ 'context-usage-switcher__tooltip--editable': compressLimitEditable }"
+          :aria-label="$t('input.compressLimitEdit')"
+          @click.stop="openCompressLimitDialog"
+        >
+          <span>{{ $t('input.usedPercent', { n: contextUsagePercentLabel }) }}</span>
+          <span class="context-usage-switcher__limit">{{ contextUsageCompactText }}</span>
+        </button>
+        <CompressLimitDialog
+          :open="compressLimitDialogOpen"
+          :value="deepCompressLimit"
+          :saving="compressLimitSaving"
+          :error="compressLimitError"
+          @close="closeCompressLimitDialog"
+          @save="saveCompressLimit"
+        />
       </div>
     </div>
   </div>
@@ -737,6 +754,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { TextSelection } from 'prosemirror-state';
 import QuickMenu from '@/components/input/QuickMenu.vue';
 import ComposerApprovalDock from '@/components/input/ComposerApprovalDock.vue';
+import CompressLimitDialog from '@/components/input/CompressLimitDialog.vue';
 import type { ToolApproval, ApprovalReviewRecord } from '@/components/input/approvalModel';
 import FileAtMenu, { type FileAtItem } from '@/components/input/FileAtMenu.vue';
 import FileChips from '@/components/chat/FileChips.vue';
@@ -757,6 +775,7 @@ defineOptions({ name: 'InputComposer' });
 
 const emit = defineEmits([
   'update:input-message',
+  'compress-limit-updated',
   'toggle-chat-network',
   'input-change',
   'input-focus',
@@ -934,6 +953,10 @@ const props = defineProps<{
     /** true 时表示当前文案是「等待 API 响应…」。 */
     apiWaiting?: boolean;
   } | null;
+  /** 对话级深压缩阈值（Chat 模式由 ChatShell 传入；Agent 读 resource store） */
+  compressLimit?: number;
+  /** 任务运行中不可编辑（后端也会拒绝写入） */
+  compressLimitReadonly?: boolean;
 }>();
 
 const inputStore = useInputStore();
@@ -3244,22 +3267,88 @@ const autoDeepCompressEnabled = computed(() => {
   return !!personalizationStore?.form?.auto_deep_compress_enabled;
 });
 
+const compressLimitDialogOpen = ref(false);
+const compressLimitSaving = ref(false);
+const compressLimitError = ref('');
+
+/** 对话级阈值：Chat 由父组件传入，Agent 读 resource store（bootstrap 下发）。 */
+const conversationCompressLimit = computed(() => {
+  const explicit = Number(props.compressLimit || 0);
+  if (explicit > 0) return explicit;
+  const stored = Number(resourceStore.compressLimitTokens || 0);
+  return stored > 0 ? stored : 0;
+});
+
+const compressLimitEditable = computed(() => {
+  if (props.compressLimitReadonly) return false;
+  return !!props.currentConversationId;
+});
+
+const openCompressLimitDialog = () => {
+  if (!compressLimitEditable.value) return;
+  compressLimitError.value = '';
+  compressLimitDialogOpen.value = true;
+};
+
+const closeCompressLimitDialog = () => {
+  if (compressLimitSaving.value) return;
+  compressLimitDialogOpen.value = false;
+};
+
+const saveCompressLimit = async (tokens: number) => {
+  const conversationId = String(props.currentConversationId || '');
+  if (!conversationId || compressLimitSaving.value) return;
+  compressLimitSaving.value = true;
+  compressLimitError.value = '';
+  try {
+    await (window as any).ensureCsrfToken?.();
+    const url = props.chatMode
+      ? `/api/chat/conversations/${encodeURIComponent(conversationId)}/compress-limit`
+      : '/api/conversation/compress-limit';
+    const payload = props.chatMode ? { tokens } : { conversation_id: conversationId, tokens };
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok || !result?.success) throw new Error(String(result?.error || ''));
+    const next = Number(result?.data?.compress_limit_tokens || tokens);
+    resourceStore.setCompressLimit(next, String(result?.data?.compress_limit_source || 'custom'));
+    emit('compress-limit-updated', next);
+    compressLimitDialogOpen.value = false;
+  } catch (error) {
+    const message = String((error as Error)?.message || '');
+    compressLimitError.value = message.includes('after the current task finishes')
+      ? t('input.compressLimitRunning')
+      : t('input.compressLimitFailed');
+  } finally {
+    compressLimitSaving.value = false;
+  }
+};
+
+const adaptiveCompressEnabled = computed(() => {
+  return !!personalizationStore?.form?.adaptive_compress_enabled;
+});
+
 const deepCompressLimit = computed(() => {
+  if (conversationCompressLimit.value > 0) return conversationCompressLimit.value;
   const custom = Number(personalizationStore?.form?.deep_compress_trigger_tokens || 0);
   if (custom > 0) return custom;
   return 250000;
 });
 
 const contextBaselineTokens = computed(() => {
-  // 对话固定开销基线（提示词/工具等）：只对 Agent、且自动深度压缩开启时计入分母。
-  if (props.chatMode || !autoDeepCompressEnabled.value) return 0;
+  // 对话固定开销基线（提示词/工具等）：只对 Agent、自动深度压缩与自适应阈值都开启时计入分母。
+  if (props.chatMode || !autoDeepCompressEnabled.value || !adaptiveCompressEnabled.value) return 0;
   const value = Number(resourceStore.contextBaselineTokens || 0);
   return value > 0 ? value : 0;
 });
 
 const contextUsageLimit = computed(() => {
   if (props.chatMode) {
-    return Number(props.contextTokenLimit) || 250000;
+    return Number(props.contextTokenLimit) || deepCompressLimit.value;
   }
   if (autoDeepCompressEnabled.value) {
     // 阈值 + 固定开销：让配置的 250k 真正留给对话内容

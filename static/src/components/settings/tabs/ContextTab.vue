@@ -111,6 +111,22 @@ const {
             })
           " /><FancyCheck :checked="form.auto_deep_compress_enabled"
       /></label>
+      <label class="settings-toggle-row inner"
+        ><span class="settings-row-copy"
+          ><span class="settings-row-title">{{ $t('personalization.adaptiveCompressTitle') }}</span
+          ><span class="settings-row-desc">{{
+            $t('personalization.adaptiveCompressDesc')
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.adaptive_compress_enabled"
+          @change="
+            personalization.updateField({
+              key: 'adaptive_compress_enabled',
+              value: $event.target.checked
+            })
+          " /><FancyCheck :checked="form.adaptive_compress_enabled"
+      /></label>
       <div class="settings-compression-grid">
         <label
           ><span>{{ $t('personalization.shallowTriggerTokens') }}</span

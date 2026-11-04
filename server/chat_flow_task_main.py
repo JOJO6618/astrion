@@ -499,11 +499,20 @@ async def handle_task_with_sender(
     compression_settings = resolve_context_compression_settings(personal_config)
     auto_deep_enabled = bool(personal_config.get("auto_deep_compress_enabled", False))
     current_tokens_for_deep = web_terminal.context_manager.get_current_context_tokens(conversation_id)
-    # 触发点 = 配置阈值 + 本对话固定开销基线（未测量时就是配置阈值）。
+    # 阈值以对话文件记录为准（创建时快照，老对话缺字段时回退个人配置）；
+    # 自适应开关打开时再叠加本对话固定开销基线。
     from modules.adaptive_context import effective_trigger_for as _effective_trigger
-    deep_trigger_for_conversation = _effective_trigger(
+    from modules.adaptive_context import is_adaptive_enabled as _is_adaptive_enabled
+    from modules.conversation_compress_limit import resolved_for as _resolved_limit
+    conversation_limit = _resolved_limit(
         web_terminal.context_manager, conversation_id, compression_settings["deep_trigger_tokens"]
     )
+    if _is_adaptive_enabled(personal_config):
+        deep_trigger_for_conversation = _effective_trigger(
+            web_terminal.context_manager, conversation_id, conversation_limit
+        )
+    else:
+        deep_trigger_for_conversation = conversation_limit
     if (
         auto_deep_enabled
         and current_tokens_for_deep > deep_trigger_for_conversation

@@ -2136,3 +2136,60 @@ def get_conversation_tokens(conversation_id, data_context, workspace: UserWorksp
             "success": False,
             "error": str(e)
         }), 500
+
+
+@conversation_bp.route('/api/conversation/compress-limit', methods=['POST'])
+@api_login_required
+@with_terminal
+def update_conversation_compress_limit(terminal, workspace: UserWorkspace, username: str):
+    """设置当前对话的深压缩阈值（只允许空闲时写）。
+
+    body: {"conversation_id": str, "tokens": int | null}
+    tokens 为 null 时按当前个人配置重新写入快照（老对话补写 / 恢复默认）。
+    """
+    from modules.conversation_compress_limit import (
+        configured_for, custom_update, snapshot_update, source,
+    )
+    from server.main_task_gate import is_main_task_gate_busy
+    from server.tasks import task_manager
+    from server.conversation_view.snapshots import VIEW_LOCK
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(success=False, error="Invalid settings"), 400
+    context = terminal.context_manager
+    conversation_id = context.current_conversation_id
+    if not conversation_id or payload.get("conversation_id") != conversation_id:
+        return jsonify(success=False, error="Conversation not found"), 404
+    tokens = payload.get("tokens")
+    with VIEW_LOCK, task_manager._lock:
+        busy = is_main_task_gate_busy(terminal) or any(
+            record.username == username and record.conversation_id == conversation_id
+            and record.workspace_id == workspace.workspace_id
+            and record.status in {"pending", "running", "cancel_requested"}
+            for record in task_manager._tasks.values()
+        )
+        if busy:
+            return jsonify(success=False,
+                           error="Change settings after the current task finishes"), 409
+        try:
+            if tokens is None:
+                configured = configured_for(workspace.data_dir, "agent")
+                if configured is None:
+                    return jsonify(success=False,
+                                   error="Personal compression setting unavailable"), 400
+                update = snapshot_update(configured)
+            else:
+                update = custom_update(tokens)
+        except ValueError as exc:
+            return jsonify(success=False, error=str(exc)), 400
+        manager = context.conversation_manager
+        if not manager.update_conversation_metadata(conversation_id, update):
+            return jsonify(success=False, error="Conversation not found"), 404
+        meta = context.conversation_metadata
+        if isinstance(meta, dict):
+            meta.update(update)
+    return jsonify(success=True, data={
+        "compress_limit_tokens": update["compress_limit_tokens"],
+        "compress_limit_source": source(update),
+    })

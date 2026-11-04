@@ -339,6 +339,9 @@ export default {
   compressionStrategyDesc: 'Control auto shallow and deep compression separately',
   autoShallowCompressTitle: 'Auto shallow compression',
   autoDeepCompressTitle: 'Auto deep compression',
+  adaptiveCompressTitle: 'Adaptive compression threshold',
+  adaptiveCompressDesc:
+    'Count fixed overhead such as the system prompt and tool definitions toward the trigger threshold so compression does not fire early. When off, the threshold above is used as-is.',
   shallowTriggerTokens: 'Shallow compression trigger context',
   shallowKeepRecentTools: 'Recent tools kept in shallow compression',
   shallowKeepTurnTools: 'Tools kept for current turn (shallow)',

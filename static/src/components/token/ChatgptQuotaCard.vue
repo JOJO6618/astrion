@@ -37,13 +37,20 @@
     <div v-else class="chatgpt-quota-card__note">
       {{ $t('sidebar.chatgptQuotaNotApplicable') }}
     </div>
-    <div class="chatgpt-quota-card__context">
+    <button
+      type="button"
+      class="chatgpt-quota-card__context"
+      :class="{ 'chatgpt-quota-card__context--editable': contextEditable }"
+      :disabled="!contextEditable"
+      :aria-label="$t('input.compressLimitEdit')"
+      @click.stop="contextEditable && emit('edit-context')"
+    >
       <span class="chatgpt-quota-card__context-label">{{ $t('sidebar.currentContext') }}</span>
       <span class="chatgpt-quota-card__context-value">
         {{ $t('input.usedPercent', { n: contextPercentLabel }) }}
         <span class="chatgpt-quota-card__context-tokens">{{ contextText }}</span>
       </span>
-    </div>
+    </button>
   </div>
 </template>
 
@@ -71,9 +78,13 @@ withDefaults(
     contextText: string;
     /** hover 小卡只显示数字；点击打开的宽弹窗才显示进度条 */
     showBars?: boolean;
+    /** 上下文行是否可点击编辑压缩阈值（运行中/空页时为 false） */
+    contextEditable?: boolean;
   }>(),
-  { showBars: false }
+  { showBars: false, contextEditable: false }
 );
+
+const emit = defineEmits<{ 'edit-context': [] }>();
 
 const percentModifier = (percent: number) => {
   if (percent >= 95) return 'chatgpt-quota-card--danger';
@@ -212,11 +223,27 @@ const percentModifier = (percent: number) => {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
   min-width: 0;
-  padding-top: 9px;
+  margin: 0;
+  padding: 9px 0 0;
+  border: 0;
   border-top: 1px solid var(--border-default);
+  background: transparent;
+  font: inherit;
+  text-align: left;
   color: var(--text-tertiary);
   font-size: 11px;
+  cursor: default;
+}
+
+.chatgpt-quota-card__context--editable {
+  cursor: pointer;
+}
+
+.chatgpt-quota-card__context--editable:hover .chatgpt-quota-card__context-tokens {
+  color: var(--text-primary);
+  text-decoration: underline;
 }
 
 .chatgpt-quota-card__context-label {

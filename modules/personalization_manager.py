@@ -162,6 +162,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "image_compression": "original",  # original / 1080p / 720p / 540p
     "auto_shallow_compress_enabled": False,
     "auto_deep_compress_enabled": True,
+    "adaptive_compress_enabled": False,
     "shallow_compress_trigger_tokens": None,
     "shallow_compress_keep_recent_tools": None,
     "shallow_compress_max_replace_per_round": None,
@@ -618,6 +619,12 @@ def sanitize_personalization_payload(
         base["auto_deep_compress_enabled"] = bool(data.get("auto_deep_compress_enabled"))
     else:
         base["auto_deep_compress_enabled"] = bool(base.get("auto_deep_compress_enabled", False))
+
+    # 自适应压缩阈值：默认关闭，关闭时触发点就是裸配置阈值
+    if "adaptive_compress_enabled" in data:
+        base["adaptive_compress_enabled"] = bool(data.get("adaptive_compress_enabled"))
+    else:
+        base["adaptive_compress_enabled"] = bool(base.get("adaptive_compress_enabled", False))
 
     if "shallow_compress_trigger_tokens" in data:
         base["shallow_compress_trigger_tokens"] = _sanitize_optional_int(

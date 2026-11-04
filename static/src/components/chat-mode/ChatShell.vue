@@ -253,7 +253,9 @@
             :permission-menu-open="false"
             :permission-options="[]"
             :current-context-tokens="contextTokens"
-            :context-token-limit="chat.settings?.settings.chat_deep_compress_trigger_tokens"
+            :context-token-limit="chatCompressLimit"
+            :compress-limit="chatCompressLimit"
+            :compress-limit-readonly="chat.running"
             :versioning-enabled="false"
             :workspace-kind="null"
             :main-chat-idle="!chat.running"
@@ -271,6 +273,7 @@
             @remove-image="removeMedia"
             @remove-video="removeMedia"
             @toggle-chat-network="run(chat.toggleNetwork)"
+            @compress-limit-updated="onCompressLimitUpdated"
             @send-message="send"
             @send-or-stop="chat.running ? run(chat.stop) : send()"
             @composer-height-change="setComposerHeight"
@@ -313,7 +316,7 @@
   </AppShell>
 </template>
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import AppShell from '@/components/shell/AppShell.vue';
 import ConversationSidebar from '@/components/sidebar/ConversationSidebar.vue';
 import ChatArea from '@/components/chat/ChatArea.vue';
@@ -345,6 +348,45 @@ import {
 } from '@/utils/chatDisplay';
 const page = reactive(useChatPage());
 const { chat, draft, ui, personalization, collapsedGroups, expandedBlocks } = page;
+
+/** 对话级深压缩阈值：对话文件里的值优先，老对话回退到 Chat 个人设置。 */
+const chatCompressLimit = computed(() => {
+  const stored = Number((chat.document as any)?.metadata?.compress_limit_tokens || 0);
+  if (stored > 0) return stored;
+  return Number(chat.settings?.settings.chat_deep_compress_trigger_tokens || 0) || 250000;
+});
+
+const compressLimitSnapshotAsked = new Set<string>();
+/** 老对话没有阈值快照时，空闲补写一次（写入后不再随个人设置变动）。 */
+async function ensureChatCompressLimit() {
+  const cid = String(chat.cid || '');
+  const document = chat.document as any;
+  if (!cid || !document || chat.running) return;
+  if (Number(document?.metadata?.compress_limit_tokens || 0) > 0) return;
+  if (compressLimitSnapshotAsked.has(cid)) return;
+  compressLimitSnapshotAsked.add(cid);
+  try {
+    await (window as any).ensureCsrfToken?.();
+    const response = await fetch(
+      `/api/chat/conversations/${encodeURIComponent(cid)}/compress-limit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: '{}'
+      }
+    );
+    if (response.ok) await chat.reload();
+  } catch {
+    // 补写失败不阻塞页面，下次打开再试
+  }
+}
+
+watch(() => [chat.cid, chat.running], ensureChatCompressLimit, { immediate: true });
+
+const onCompressLimitUpdated = () => {
+  void chat.reload();
+};
 // Keep refs reactive when exposing the shared component state to the template.
 import { toRefs } from 'vue';
 const {

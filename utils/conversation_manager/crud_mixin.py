@@ -121,12 +121,23 @@ class CrudMixin:
             "context_baseline_pending": True,
             "skip_auto_title_generation": False,
         }
-        if getattr(self, "conversation_kind", "agent") == "chat":
+        # 对话级深压缩阈值：创建时从个人配置快照一次，之后判定只读本对话记录
+        conversation_kind = getattr(self, "conversation_kind", "agent")
+        try:
+            from modules.conversation_compress_limit import configured_for, snapshot_update
+
+            initial_limit = configured_for(self.base_dir, conversation_kind)
+            if initial_limit is not None:
+                metadata.update(snapshot_update(initial_limit))
+        except Exception:
+            pass
+        if conversation_kind == "chat":
             # Keep the shared document shape without Agent execution settings.
             metadata = {key: value for key, value in metadata.items() if key in {
                 "project_path", "project_relative_path", "thinking_mode", "run_mode",
                 "model_key", "has_images", "has_videos", "total_messages", "total_tools",
                 "status", "compression_count", "deep_compression_records",
+                "compress_limit_tokens", "compress_limit_source",
             }}
             metadata["conversation_kind"] = "chat"
         if isinstance(metadata_overrides, dict):

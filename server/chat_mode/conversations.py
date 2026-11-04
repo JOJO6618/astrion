@@ -147,3 +147,37 @@ def delete(conversation_id):
             from server.utils_common import debug_log
             debug_log(f"[Chat] Media collection deferred: {exc}")
     return jsonify(success=True)
+
+
+@chat_mode_bp.post("/conversations/<conversation_id>/compress-limit")
+@api_login_required
+def update_compress_limit(conversation_id):
+    """设置 Chat 对话的深压缩阈值；只允许空闲时写，tokens 为空表示重新快照。"""
+    from modules.conversation_compress_limit import (
+        configured_for, custom_update, snapshot_update, source,
+    )
+
+    identity, scope, storage = resources(read_only=False)
+    with VIEW_LOCK:
+        if any(record.status in ACTIVE for record in records(identity, conversation_id)):
+            return jsonify(success=False,
+                           error="Change settings after the current task finishes"), 409
+        payload = body()
+        tokens = payload.get("tokens")
+        try:
+            if tokens is None:
+                configured = configured_for(scope.preferences_dir, "chat")
+                if configured is None:
+                    return jsonify(success=False,
+                                   error="Personal compression setting unavailable"), 400
+                update = snapshot_update(configured)
+            else:
+                update = custom_update(tokens)
+        except ValueError as exc:
+            return jsonify(success=False, error=str(exc)), 400
+        if not storage.manager.update_conversation_metadata(conversation_id, update):
+            raise FileNotFoundError("Chat conversation unavailable")
+    return jsonify(success=True, data={
+        "compress_limit_tokens": update["compress_limit_tokens"],
+        "compress_limit_source": source(update),
+    })

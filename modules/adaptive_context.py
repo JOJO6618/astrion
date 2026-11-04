@@ -45,6 +45,13 @@ def effective_trigger(metadata: Optional[Mapping[str, Any]], configured_trigger:
     return _as_int(configured_trigger) + baseline_tokens(metadata)
 
 
+def is_adaptive_enabled(personal_config: Optional[Mapping[str, Any]]) -> bool:
+    """个人设置中的「自适应压缩阈值」开关；缺省关闭（走裸配置阈值）。"""
+    if not isinstance(personal_config, Mapping):
+        return False
+    return bool(personal_config.get("adaptive_compress_enabled", False))
+
+
 def pending_metadata() -> Dict[str, Any]:
     """新对话创建 / 深度压缩完成后：标记基线待重测。
 

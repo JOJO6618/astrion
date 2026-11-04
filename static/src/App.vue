@@ -230,6 +230,7 @@
               :settings-open="settingsOpen"
               :compressing="compressionActiveForCurrentConversation"
               :current-conversation-id="currentConversationId"
+              :compress-limit-readonly="!mainChatIdle"
               :icon-style="iconStyle"
               :tool-category-icon="toolCategoryIcon"
               :selected-images="selectedImages"

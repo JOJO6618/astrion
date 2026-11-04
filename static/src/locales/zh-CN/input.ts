@@ -25,6 +25,18 @@ export default {
   networkPermission: '网络权限',
   usedPercent: '{n} 已用',
 
+  // ── 上下文压缩阈值弹窗 ──
+  compressLimitEdit: '修改本对话的压缩上下文',
+  compressLimitTitle: '压缩上下文',
+  compressLimitDesc:
+    '当前对话达到该 token 数时自动深度压缩。只影响当前对话，不影响其他对话与个人设置。',
+  compressLimitRange: '可填 1000 – 2000000；开启自适应时会再叠加系统提示词等固定开销',
+  compressLimitInvalid: '请输入 1000 到 2000000 之间的整数',
+  compressLimitSave: '保存',
+  compressLimitCancel: '取消',
+  compressLimitRunning: '任务运行中不能修改，请等待当前任务结束',
+  compressLimitFailed: '保存失败，请重试',
+
   // ── 头像戳戳文案 ──
   pokeStop: '不要！',
   pokeHalt: '停下来！',

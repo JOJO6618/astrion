@@ -75,6 +75,9 @@ export const useResourceStore = defineStore('resource', {
     currentContextTokens: 0,
     // 对话固定开销基线（自适应压缩阈值：分母 = 配置阈值 + 基线）
     contextBaselineTokens: 0,
+    // 对话级深压缩阈值（创建时快照，圆环卡片可改；null=老对话未快照）
+    compressLimitTokens: null as number | null,
+    compressLimitSource: 'missing' as 'snapshot' | 'custom' | 'missing',
     currentConversationTokens: {
       cumulative_input_tokens: 0,
       cumulative_output_tokens: 0,
@@ -114,6 +117,8 @@ export const useResourceStore = defineStore('resource', {
       invalidateAuxiliaryRequest(this, 'context-tokens');
       this.currentContextTokens = 0;
       this.contextBaselineTokens = 0;
+      this.compressLimitTokens = null;
+      this.compressLimitSource = 'missing';
       this.currentConversationTokens = {
         cumulative_input_tokens: 0,
         cumulative_output_tokens: 0,
@@ -128,6 +133,10 @@ export const useResourceStore = defineStore('resource', {
     },
     setContextBaselineTokens(value: number) {
       this.contextBaselineTokens = Number(value) > 0 ? Number(value) : 0;
+    },
+    setCompressLimit(tokens: number | null, source: string) {
+      this.compressLimitTokens = Number(tokens) > 0 ? Number(tokens) : null;
+      this.compressLimitSource = source === 'custom' || source === 'snapshot' ? source : 'missing';
     },
     toggleTokenPanel() {
       this.tokenPanelCollapsed = !this.tokenPanelCollapsed;

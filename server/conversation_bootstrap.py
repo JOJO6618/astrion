@@ -30,6 +30,17 @@ def _context_baseline_tokens(metadata) -> int:
     return baseline_tokens(metadata)
 
 
+def _compress_limit_tokens(metadata):
+    """对话级深压缩阈值；未快照（老对话）时为 None，前端空闲时补写。"""
+    from modules.conversation_compress_limit import limit_tokens
+    return limit_tokens(metadata)
+
+
+def _compress_limit_source(metadata) -> str:
+    from modules.conversation_compress_limit import source
+    return source(metadata)
+
+
 def _existing_file(file_manager, path: str) -> bool:
     try:
         valid, _error, full_path = file_manager._validate_path(path)
@@ -125,6 +136,9 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
         "current_context_tokens": (conversation.get("token_statistics") or {}).get("current_context_tokens", 0),
         # 对话级自适应压缩阈值：分母 = 配置阈值 + 本对话固定开销基线
         "context_baseline_tokens": _context_baseline_tokens(meta),
+        # 对话级深压缩阈值：创建时快照，可在圆环卡片里修改（老对话为 null 待补写）
+        "compress_limit_tokens": _compress_limit_tokens(meta),
+        "compress_limit_source": _compress_limit_source(meta),
         "runtime_queue": queue_snapshot(manager, normalized_id, include_guidance=not is_main_running,
                                         data=conversation),
         "compression": {

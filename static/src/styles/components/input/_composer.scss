@@ -395,6 +395,12 @@ body[data-theme='light'] {
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1.35;
+  font-family: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   opacity: 0;
   transform: translateY(4px);
   pointer-events: none;
@@ -403,9 +409,28 @@ body[data-theme='light'] {
     transform 0.16s ease;
 }
 
+/* 桥接按钮与卡片之间的 8px 间隙，避免鼠标移向卡片时 hover 中断 */
+.context-usage-switcher__tooltip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 10px;
+}
+
+.context-usage-switcher__tooltip--editable {
+  cursor: pointer;
+}
+
+.context-usage-switcher__tooltip--editable:hover {
+  background: var(--hover-bg);
+}
+
 .context-usage-switcher:hover .context-usage-switcher__tooltip {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 /* ChatGPT 订阅额度卡：展开状态由 InputComposer 控制（hover / 点击 / 键盘焦点） */

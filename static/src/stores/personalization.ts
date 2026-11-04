@@ -179,6 +179,7 @@ interface PersonalForm {
   image_compression: string;
   auto_shallow_compress_enabled: boolean;
   auto_deep_compress_enabled: boolean;
+  adaptive_compress_enabled: boolean;
   shallow_compress_trigger_tokens: number | null;
   shallow_compress_keep_recent_tools: number | null;
   shallow_compress_keep_user_turn_tools: number | null;
@@ -414,6 +415,7 @@ const defaultForm = (): PersonalForm => ({
   image_compression: 'original',
   auto_shallow_compress_enabled: false,
   auto_deep_compress_enabled: true,
+  adaptive_compress_enabled: false,
   shallow_compress_trigger_tokens: null,
   shallow_compress_keep_recent_tools: null,
   shallow_compress_keep_user_turn_tools: null,
@@ -742,6 +744,7 @@ export const usePersonalizationStore = defineStore('personalization', {
           typeof data.image_compression === 'string' ? data.image_compression : 'original',
         auto_shallow_compress_enabled: !!data.auto_shallow_compress_enabled,
         auto_deep_compress_enabled: !!data.auto_deep_compress_enabled,
+        adaptive_compress_enabled: !!data.adaptive_compress_enabled,
         shallow_compress_trigger_tokens: this.normalizeCompressionNumber(
           data.shallow_compress_trigger_tokens
         ),

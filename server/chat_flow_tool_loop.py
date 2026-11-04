@@ -1685,9 +1685,17 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         # 自动深层压缩（工具调用后触发）
         current_context_tokens = web_terminal.context_manager.get_current_context_tokens(conversation_id)
         from modules.adaptive_context import effective_trigger_for as _effective_trigger
-        deep_trigger_for_conversation = _effective_trigger(
+        from modules.adaptive_context import is_adaptive_enabled as _is_adaptive_enabled
+        from modules.conversation_compress_limit import resolved_for as _resolved_limit
+        conversation_limit = _resolved_limit(
             web_terminal.context_manager, conversation_id, compression_settings["deep_trigger_tokens"]
         )
+        if _is_adaptive_enabled(personal_config):
+            deep_trigger_for_conversation = _effective_trigger(
+                web_terminal.context_manager, conversation_id, conversation_limit
+            )
+        else:
+            deep_trigger_for_conversation = conversation_limit
         if (
             auto_deep_enabled
             and current_context_tokens > deep_trigger_for_conversation

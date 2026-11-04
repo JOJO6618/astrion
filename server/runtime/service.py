@@ -322,8 +322,8 @@ class RuntimeService:
     def _context_limit(workspace: Any, model_window, metadata: Any = None) -> Tuple[Optional[int], str]:
         """上下文占用分母：与输入栏一致——自动深度压缩开启时取深压缩阈值，否则取模型窗口。
 
-        阈值含本对话记录的固定开销基线（modules/adaptive_context）：
-        配置 250k + 固定开销 50k 时，分母为 300k。
+        阈值以对话文件记录为准（创建时快照，老对话缺字段回退个人配置）；
+        「自适应压缩阈值」开启时再叠加本对话记录的固定开销基线（modules/adaptive_context）。
         """
         fallback = (model_window, "model_window" if model_window else "")
         if workspace is None:
@@ -343,8 +343,12 @@ class RuntimeService:
             return fallback
         if deep <= 0:
             return fallback
-        from modules.adaptive_context import effective_trigger
-        return (effective_trigger(metadata, deep), "deep_compress")
+        from modules.conversation_compress_limit import resolved as _resolved_limit
+        limit = _resolved_limit(metadata, deep)
+        from modules.adaptive_context import effective_trigger, is_adaptive_enabled
+        if not is_adaptive_enabled(prefs):
+            return (limit, "deep_compress")
+        return (effective_trigger(metadata, limit), "deep_compress")
 
     def create_session(
         self,

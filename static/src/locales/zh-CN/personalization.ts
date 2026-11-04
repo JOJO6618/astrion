@@ -319,6 +319,9 @@ export default {
   compressionStrategyDesc: '可分别控制自动浅层压缩与自动深层压缩',
   autoShallowCompressTitle: '自动浅层压缩',
   autoDeepCompressTitle: '自动深层压缩',
+  adaptiveCompressTitle: '自适应压缩阈值',
+  adaptiveCompressDesc:
+    '把系统提示词、工具定义等固定开销计入触发阈值，避免压缩提前触发；关闭时直接按上方阈值触发',
   shallowTriggerTokens: '浅压缩触发上下文',
   shallowKeepRecentTools: '浅压缩保留最近工具数',
   shallowKeepTurnTools: '浅压缩保留当前轮工具数',

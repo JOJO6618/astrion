@@ -27,6 +27,19 @@ export default {
   networkPermission: 'Network Access',
   usedPercent: '{n} used',
 
+  // ── Compression limit dialog ──
+  compressLimitEdit: 'Change this conversation compression context',
+  compressLimitTitle: 'Compression context',
+  compressLimitDesc:
+    'Auto deep compression starts when this conversation reaches this token count. It only affects this conversation, not other conversations or personal settings.',
+  compressLimitRange:
+    '1000 – 2000000. With the adaptive threshold on, fixed overhead like the system prompt is added on top.',
+  compressLimitInvalid: 'Enter an integer from 1000 to 2000000',
+  compressLimitSave: 'Save',
+  compressLimitCancel: 'Cancel',
+  compressLimitRunning: 'Change settings after the current task finishes',
+  compressLimitFailed: 'Save failed, please retry',
+
   // ── Avatar poke texts ──
   pokeStop: 'No!',
   pokeHalt: 'Stop it!',

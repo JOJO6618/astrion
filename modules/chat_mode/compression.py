@@ -55,8 +55,13 @@ async def maybe_compress(runtime, sender):
         estimated_path = [{"content": existing["content"]}, *path[len(existing["message_ids"]):]]
     # Provider usage remains authoritative for billing and the context ring.
     size = estimate_tokens(estimated_path) + 4096
-    preferences = load_personalization_config(runtime.preferences_dir)
-    threshold = preferences["chat_deep_compress_trigger_tokens"]
+    # 阈值以对话文件记录为准；仅老对话缺字段时才回退个人 Chat 设置。
+    from modules.conversation_compress_limit import limit_tokens as _limit_tokens
+    from modules.conversation_compress_limit import resolved as _resolved_limit
+    threshold = _limit_tokens(document.get("metadata"))
+    if threshold is None:
+        preferences = load_personalization_config(runtime.preferences_dir)
+        threshold = _resolved_limit(document.get("metadata"), preferences["chat_deep_compress_trigger_tokens"])
     if size < threshold:
         return
     path = deepcopy(context.conversation_history)

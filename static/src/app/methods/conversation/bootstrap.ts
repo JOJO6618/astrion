@@ -62,6 +62,35 @@ export const bootstrapMethods = {
       source: 'sync'
     });
   },
+  /** 老对话没有对话级阈值时，空闲补写一次快照（写入后不再随个人设置变动）。 */
+  async ensureCompressLimitSnapshot(conversationId, running = {}) {
+    if (!conversationId || running?.is_truly_active) return;
+    const resource = useResourceStore();
+    if (resource.compressLimitSource !== 'missing') return;
+    this.compressLimitSnapshotPending ??= new Set();
+    if (this.compressLimitSnapshotPending.has(conversationId)) return;
+    this.compressLimitSnapshotPending.add(conversationId);
+    try {
+      await (window as any).ensureCsrfToken?.();
+      const response = await fetch('/api/conversation/compress-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ conversation_id: conversationId })
+      });
+      const value = await response.json();
+      if (value?.success && value.data && this.currentConversationId === conversationId) {
+        resource.setCompressLimit(
+          value.data.compress_limit_tokens,
+          value.data.compress_limit_source
+        );
+      }
+    } catch {
+      // 补写失败不阻塞对话加载，下次打开再试
+    } finally {
+      this.compressLimitSnapshotPending.delete(conversationId);
+    }
+  },
   async enterConversation(conversationId, options = {}) {
     const { workspaceId = '', urlMode = 'push', preserveListPosition = false } = options;
     const session = options.session || this.beginConversationView(conversationId, workspaceId);
@@ -187,6 +216,11 @@ export const bootstrapMethods = {
       useFileStore().setTodoList(data.todo_list || null);
       useResourceStore().setCurrentContextTokens(Number(data.current_context_tokens || 0));
       useResourceStore().setContextBaselineTokens(Number(data.context_baseline_tokens || 0));
+      useResourceStore().setCompressLimit(
+        Number(data.compress_limit_tokens || 0) || null,
+        String(data.compress_limit_source || 'missing')
+      );
+      this.ensureCompressLimitSnapshot?.(normalizedId, data.running || {});
       usePreviewStore().setRuntime(data.preview_base, data.preview_token);
       usePreviewStore().setTargets(data.preview_targets || [], false);
       if (!preserveListPosition) this.promoteConversationToTop(normalizedId);
