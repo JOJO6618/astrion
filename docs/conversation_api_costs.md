@@ -2,7 +2,7 @@
 
 ## 范围与价格
 
-用量面板的「总花费」汇总主智能体、归属于该对话的每个子智能体及思考摘要模型请求。自动审批、目标审核、工作流审核暂不计入。现有累计 token 五项仍为主智能体口径，不将子智能体或思考摘要用量混入其上下文、缓存命中率或输出速度。
+用量面板的「总花费」汇总主智能体、归属于该对话的每个子智能体、思考摘要及三个审核智能体（自动审核、目标审核、工作流审核）的模型请求。现有累计 token 五项仍为主智能体口径，不将子智能体、思考摘要或审核用量混入其上下文、缓存命中率或输出速度。
 
 按每次成功响应返回的真实 `usage` 计算：
 
@@ -74,3 +74,15 @@ npm run build --silent 2>&1 | tail -n 5
 摘要费用计入总金额，明细本地化为「思考摘要 / Thinking summaries」。提交后复用完整 token_update 载荷刷新费用，只读取主模型原有累计 Token 字段，不增加主模型 Token 或 tokens/s。费用面板的定时查询及重载继续读取同一账本。`record_request(count_goal_usage=False)` 保持目标模式 Token 限制仅统计主／子请求。
 
 本次按用户要求做语法检查与前端构建，不运行模型请求、功能回归或浏览器验证；真实提供商账单与显示效果仍需用户验收。
+
+## 审核智能体请求（2026-11-06）
+
+`modules/review_model_caller.py::call_review_model` 是三个审核智能体唯一的模型调用出口，统一经 `APIClient` 流式请求（Chat Completions 与 Responses 同一路径），固定思考模式、不设置推理强度。调用方在构造审核智能体时传入所属对话 ID（`auto_approval_service`、`goal_flow`、`workflow_flow`），由 `review_billing_for` 结合 terminal 的 ContextManager `data_dir` 生成账本归属；对话 ID 缺失或为 `temp_` 临时 ID 时不计费并记 warning。
+
+- **账本身份**：`actor_id=review_agent:<agent_key>`、`kind=review_agent`、`name=<agent_key>`（`auto_approval`／`goal_review`／`workflow_review`），三个审核智能体各自独立累计；前端按 key 本地化为「自动审核／目标审核／工作流审核」，未知 key 原样显示。
+- **逐轮计费**：每一轮模型请求一个独立 UUID，发起前捕获审核模型（注册表 key）的精确价格，不借主模型价格。入账口径与思考摘要一致：成功响应、或已拿到 usage／部分输出的请求入账；无 usage 记未计价；完全没有响应的认证／网络失败不登记。`record_request(count_goal_usage=False)`，不占用目标模式 Token 上限。
+- **超时**：`timeout_seconds` 以 `asyncio.wait_for` 约束整次请求（含 Responses），超时抛 `ReviewModelCallError(error_type=timeout)`，目标模式恢复按可重试处理；超时前已收到部分输出的请求按未计价入账。
+- **刷新**：入账后仅当该对话正是 ContextManager 当前对话时复用 `safe_broadcast_token_update`；费用面板的定时读取兜底。
+- **历史**：此前的审核请求没有 usage 记录，不补算。
+
+回归：`python3 -B -m unittest discover -s test/2026-11-06_审核智能体计费 -p 'test_*.py'`（替身 APIClient 模块与临时账本，不依赖 httpx、不调用真实模型）。

@@ -207,10 +207,11 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "sub_agent_compress_threshold_tokens": 250000,  # 子智能体上下文压缩阈值，最小 10000
     "sub_agent_max_turns": None,  # 子智能体最大执行轮次：None-默认 50 / 0-无上限 / 正整数-该值
     # 审核智能体统一配置（个人空间-审核智能体页）：模型留空走自动规则（注册表第一个可见模型；纯 codex 时选 -luna）
+    # 思考模式固定开启、推理强度走模型默认，不再存 thinking 字段（旧值保存时被清洗丢弃）
     "review_agents": {
-        "auto_approval": {"model": "", "thinking": False, "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 20},
-        "goal_review": {"model": "", "thinking": False, "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 60},
-        "workflow_review": {"model": "", "thinking": False, "timeout_seconds": 120, "max_rounds": 6, "max_command_timeout": 60},
+        "auto_approval": {"model": "", "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 20},
+        "goal_review": {"model": "", "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 60},
+        "workflow_review": {"model": "", "timeout_seconds": 120, "max_rounds": 6, "max_command_timeout": 60},
     },
 }
 
@@ -1042,7 +1043,6 @@ def _sanitize_review_agents(value: Any) -> Dict[str, Dict[str, Any]]:
         item = src.get(key) if isinstance(src.get(key), dict) else {}
         out[key] = {
             "model": str(item.get("model") or "").strip()[:100],
-            "thinking": bool(item.get("thinking", d["thinking"])),
             "timeout_seconds": _clamp_int(item.get("timeout_seconds"), d["timeout_seconds"], 5, 3600),
             "max_rounds": _clamp_int(item.get("max_rounds"), d["max_rounds"], 1, 50),
             "max_command_timeout": _clamp_int(item.get("max_command_timeout"), d["max_command_timeout"], 1, 600),

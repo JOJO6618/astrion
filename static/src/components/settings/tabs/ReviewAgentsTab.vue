@@ -12,16 +12,11 @@ defineOptions({ name: 'ReviewAgentsTab' });
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  activeDropdown,
-  activeTheme,
-  closeDropdown,
-  floatingMenuStyle,
   form,
   personalization,
   reviewAgentDefs,
   reviewAgentOf,
   subAgentModels,
-  toggleDropdown,
   updateReviewAgent,
   updateReviewAgentInt
 } = ctx;
@@ -65,58 +60,6 @@ const defaultExtraOptions = computed(() => [
           :extra-options="defaultExtraOptions"
           @select="(v) => updateReviewAgent(agent.key, { model: v })"
         />
-      </div>
-
-      <div class="settings-select-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.thinkingModeTitle') }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.reviewThinkingDesc') }}</span>
-        </span>
-        <div
-          class="settings-select-wrap"
-          :class="{ open: activeDropdown === `review-thinking-${agent.key}` }"
-          @click.stop
-        >
-          <button
-            type="button"
-            class="settings-select-button"
-            @click="toggleDropdown(`review-thinking-${agent.key}`)"
-          >
-            {{ reviewAgentOf(agent.key).thinking ? 'thinking' : 'fast' }}
-            <span class="select-chevron" aria-hidden="true"></span>
-          </button>
-          <div
-            :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-            :style="
-              activeDropdown === `review-thinking-${agent.key}` ? floatingMenuStyle : undefined
-            "
-          >
-            <button
-              type="button"
-              class="settings-menu-option"
-              :class="{ selected: !reviewAgentOf(agent.key).thinking }"
-              @click="
-                updateReviewAgent(agent.key, { thinking: false });
-                closeDropdown();
-              "
-            >
-              <strong>fast</strong><span>{{ $t('personalization.fastResponseMode') }}</span
-              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-            </button>
-            <button
-              type="button"
-              class="settings-menu-option"
-              :class="{ selected: reviewAgentOf(agent.key).thinking }"
-              @click="
-                updateReviewAgent(agent.key, { thinking: true });
-                closeDropdown();
-              "
-            >
-              <strong>thinking</strong><span>{{ $t('personalization.thinkingReasoningMode') }}</span
-              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-            </button>
-          </div>
-        </div>
       </div>
 
       <div class="settings-select-row">

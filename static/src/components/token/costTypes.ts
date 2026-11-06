@@ -1,7 +1,8 @@
 export interface CostActor {
   id: string;
   name: string;
-  kind: 'main' | 'sub_agent' | 'thinking_summary';
+  /** review_agent：三个审核智能体，name 为 agent key（auto_approval / goal_review / workflow_review） */
+  kind: 'main' | 'sub_agent' | 'thinking_summary' | 'review_agent';
   cost_usd: string;
   requests: number;
   priced_requests: number;

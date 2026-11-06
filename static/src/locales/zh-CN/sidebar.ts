@@ -89,6 +89,11 @@ export default {
   costDetails: '花费明细',
   costMainAgent: '主智能体',
   costThinkingSummary: '思考摘要',
+  costReviewAgents: {
+    auto_approval: '自动审核',
+    goal_review: '目标审核',
+    workflow_review: '工作流审核'
+  },
   costPartial: '部分统计',
   costIncomplete: '未计价的历史或请求不包含在金额中。',
   costUnpriced: '未计价',

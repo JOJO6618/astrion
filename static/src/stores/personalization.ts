@@ -32,21 +32,18 @@ type VersioningBackupMode = 'shallow' | 'full';
 const defaultReviewAgents = (): Record<ReviewAgentKey, ReviewAgentSetting> => ({
   auto_approval: {
     model: '',
-    thinking: false,
     timeout_seconds: 60,
     max_rounds: 3,
     max_command_timeout: 20
   },
   goal_review: {
     model: '',
-    thinking: false,
     timeout_seconds: 60,
     max_rounds: 3,
     max_command_timeout: 60
   },
   workflow_review: {
     model: '',
-    thinking: false,
     timeout_seconds: 120,
     max_rounds: 6,
     max_command_timeout: 60
@@ -69,7 +66,6 @@ const sanitizeReviewAgents = (raw: any): Record<ReviewAgentKey, ReviewAgentSetti
     const item = src[key] && typeof src[key] === 'object' ? src[key] : {};
     out[key] = {
       model: typeof item.model === 'string' ? item.model : '',
-      thinking: typeof item.thinking === 'boolean' ? item.thinking : d.thinking,
       timeout_seconds: clamp(item.timeout_seconds, d.timeout_seconds, 5, 3600),
       max_rounds: clamp(item.max_rounds, d.max_rounds, 1, 50),
       max_command_timeout: clamp(item.max_command_timeout, d.max_command_timeout, 1, 600)
@@ -80,11 +76,10 @@ const sanitizeReviewAgents = (raw: any): Record<ReviewAgentKey, ReviewAgentSetti
 
 /** 审核智能体键：自动审批 / 目标审核 / 工作流审核 */
 export type ReviewAgentKey = 'auto_approval' | 'goal_review' | 'workflow_review';
+/** 思考模式固定开启、推理强度走模型默认，均不提供设置项（后端 review_model_caller） */
 export interface ReviewAgentSetting {
   /** 注册表模型 key（与主模型选择器同源，含 openai-codex/ 前缀）；留空 = 自动规则 */
   model: string;
-  /** 思考模式开关（模型不支持思考时后端自动回落 fast 段） */
-  thinking: boolean;
   /** 审核请求超时（秒） */
   timeout_seconds: number;
   /** 审核最大轮次 */

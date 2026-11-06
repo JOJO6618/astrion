@@ -302,7 +302,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ### 10.5 审核智能体配置与调试
 
-- 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段 `model`（留空=自动规则）/`thinking`/`timeout_seconds`/`max_rounds`/`max_command_timeout`。
+- 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段 `model`（留空=自动规则）/`timeout_seconds`/`max_rounds`/`max_command_timeout`。**思考固定开启、推理强度走模型默认，均无设置项（2026-11-06）**；三者统一经 `modules/review_model_caller.py` 走 `APIClient`（两种协议同一通道，`timeout_seconds` 对整次请求生效），每次请求计入对话账本（见 §22）。
 - 解析入口 `modules/review_agent_config.py::resolve_review_agent_config`（复用 `aux_model_resolver`）。旧的独立 json（`config/auto_approval.json`/`goal_review.json`/`workflow_review.json.example`）与 `sub_agent_models.json` 库均已彻底废除，**无向后兼容**。
 - 调试开关：`modules/approval_agent.py` 的 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`，开启后写 `logs/approval_agent/`。
 
@@ -592,7 +592,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ## 22) 主／子智能体 API 花费（2026-10-08）
 
-- **范围**：总花费 = 主 + 每个子智能体 + 思考摘要请求，**三个审核智能体暂不计入**。按非缓存输入、缓存命中输入、输出三项计价，不单列缓存写入；缓存命中率的冷启动豁免不减免费用。原有 token 五项和 tokens/s 保持主智能体口径，目标模式 Token 上限保持主／子口径，思考摘要只增加费用；摘要明细独立显示，详见 `docs/conversation_api_costs.md`。
+- **范围**：总花费 = 主 + 每个子智能体 + 思考摘要 + 三个审核智能体请求（审核自 2026-11-06 起计入，之前的审核请求不补算）。按非缓存输入、缓存命中输入、输出三项计价，不单列缓存写入；缓存命中率的冷启动豁免不减免费用。原有 token 五项和 tokens/s 保持主智能体口径，目标模式 Token 上限保持主／子口径，思考摘要与审核只增加费用；明细按执行者独立显示（审核 `actor_id=review_agent:<key>`、`kind=review_agent`），详见 `docs/conversation_api_costs.md`。
 - **价格与账本**：`modules/api_pricing.py` 捕获请求当时的精确提供商/模型价格；`modelsdev_registry.py` 版本 2 缓存保留 `cost.input/cache_read/output` 及来源时间，**不借其它提供商价格**。`modules/conversation_costs.py` 在 `<工作区 data_dir>/api_costs/<conversation_id>.json` 原子保存，以请求 UUID 防重、Decimal 累加。**旧历史、缺单价或缺 usage 标记为未计价，禁止当免费。**
 - **子恢复**：`modules/sub_agent/usage.py` 统一归一化、保存 `token_usage.cached_input`、继承累计统计；两个恢复入口都调用。压缩只清上下文、**不清历史累计**。
 - **币种**：外观 `display_currency` = USD/CNY，默认 USD。**人民币只转换显示，不改账本**；`modules/exchange_rates.py` 每 UTC 日后台更新 Frankfurter 参考汇率，失败保留缓存，**无首次缓存不虚构汇率**。

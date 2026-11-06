@@ -506,10 +506,7 @@ export default {
   roleNamePlaceholder: '如 API Designer',
   roleDescTitle: '描述',
   roleDescPlaceholder: '一句话描述职责',
-  thinkingModeTitle: '思考模式',
   roleThinkingDesc: 'fast = 快速响应，thinking = 思考推理',
-  fastResponseMode: '快速响应模式',
-  thinkingReasoningMode: '思考推理模式',
   modelTitle: '模型',
   roleModelEmptyDesc: '留空则自动选择模型',
   defaultModelOption: '自动',
@@ -543,7 +540,6 @@ export default {
   externalSessionHeaderDesc:
     '向 OpenCode 端点发送每个对话稳定的 x-opencode-session 请求头，用于会话路由与缓存优化；关闭则不发送',
   titleDefaultModelDesc: '注册表第一个可用模型；仅 Codex 模型时选 -luna 快速款',
-  reviewThinkingDesc: '模型不支持思考时自动回落快速模式',
   timeoutTitle: '审核请求超时',
   timeoutDesc: '单次模型请求超时（5-3600 秒）',
   maxRoundsTitle: '最大审核轮次',
