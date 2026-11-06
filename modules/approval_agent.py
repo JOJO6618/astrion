@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from config import LOGS_DIR
 from modules.review_agent_config import resolve_review_agent_config
-from modules.review_model_caller import ReviewModelCallError, call_review_model
+from modules.review_model_caller import ReviewModelCallError, call_review_model, review_billing_for
 from modules.i18n import tr
 
 
@@ -29,9 +29,11 @@ def load_approval_agent_config() -> Dict[str, Any]:
 
 
 class ApprovalAgent:
-    def __init__(self, *, web_terminal: Any):
+    def __init__(self, *, web_terminal: Any, conversation_id: Optional[str] = None):
         self.web_terminal = web_terminal
         self.cfg = load_approval_agent_config()
+        # 审核请求计入所属对话账本（kind=review_agent）；对话身份缺失时不计费
+        self.billing = review_billing_for(web_terminal, conversation_id, "auto_approval")
 
     @staticmethod
     def _system_prompt() -> str:
@@ -172,7 +174,7 @@ class ApprovalAgent:
                 progress_cb({"stage": "model_call", "round": rounds, "message": tr("approval_agent.round_progress", rounds=rounds)})
             _trace("request", {"round": rounds, "messages": messages, "tools": tools})
             try:
-                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds)
+                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds, billing=self.billing)
             except ReviewModelCallError as exc:
                 _trace("http_error", {"round": rounds, "error": str(exc)})
                 out = {

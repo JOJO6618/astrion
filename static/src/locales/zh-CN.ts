@@ -33,9 +33,11 @@ import quickEntry from './zh-CN/quickEntry';
 import git from './zh-CN/git';
 
 import goal from './zh-CN/goal';
+import usageStats from './zh-CN/usageStats';
 
 export default {
   goal,
+  usageStats,
   git,
   quickEntry,
   common,

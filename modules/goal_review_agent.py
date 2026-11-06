@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, List, Optional
 from config import PROMPTS_DIR, LOGS_DIR
 from modules.goal_state_manager import REVIEW_MODE_ACTIVE, REVIEW_MODE_READONLY
 from modules.review_agent_config import resolve_review_agent_config
-from modules.review_model_caller import ReviewModelCallError, call_review_model
+from modules.review_model_caller import ReviewModelCallError, call_review_model, review_billing_for
 from modules.i18n import tr
 
 PROMPT_NAME = "goal_review_agent.txt"
@@ -42,9 +42,11 @@ def load_goal_review_agent_config() -> Dict[str, Any]:
 
 
 class GoalReviewAgent:
-    def __init__(self, *, web_terminal: Any):
+    def __init__(self, *, web_terminal: Any, conversation_id: Optional[str] = None):
         self.web_terminal = web_terminal
         self.cfg = load_goal_review_agent_config()
+        # 审核请求计入所属对话账本（kind=review_agent）；对话身份缺失时不计费
+        self.billing = review_billing_for(web_terminal, conversation_id, "goal_review")
 
     @staticmethod
     def _system_prompt(review_mode: str) -> str:
@@ -214,7 +216,7 @@ class GoalReviewAgent:
                 progress_cb({"stage": "model_call", "round": rounds, "message": tr("goal_review.round_progress", round=rounds)})
             _trace("request", {"round": rounds, "messages": messages, "tools": tools})
             try:
-                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds)
+                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds, billing=self.billing)
             except ReviewModelCallError as exc:
                 _trace("http_error", {"round": rounds, "error": str(exc)})
                 out = {**getattr(exc, "details", {}), "status": "error", "message": str(exc)}

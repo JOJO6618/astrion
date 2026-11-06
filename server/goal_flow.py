@@ -81,7 +81,7 @@ async def _review_with_recovery(*, gsm, run_id, web_terminal, payload_text, send
             if callable(sender):
                 sender("goal_review_progress", {"conversation_id": conversation_id, "progress": data})
         try:
-            result = await GoalReviewAgent(web_terminal=web_terminal).review(
+            result = await GoalReviewAgent(web_terminal=web_terminal, conversation_id=conversation_id).review(
                 payload_text=payload_text, review_mode=gsm.get_review_mode(),
                 progress_cb=progress, cancel_check=cancel_check)
         except Exception as exc:

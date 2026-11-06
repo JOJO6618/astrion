@@ -622,7 +622,7 @@ async def run_stage_review(
                 pass
 
     try:
-        agent = WorkflowReviewAgent(web_terminal=web_terminal)
+        agent = WorkflowReviewAgent(web_terminal=web_terminal, conversation_id=conversation_id)
         result = await agent.review(payload_text=payload, review_mode=review_mode, progress_cb=_progress)
     except Exception as exc:
         result = {

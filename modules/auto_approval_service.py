@@ -78,7 +78,7 @@ async def run_auto_approval(
                 risk_markers=risk_markers,
             )
             payload += "\n本次申请仅针对当前工具调用的单次完全访问权限，请审核该权限提升的危险性和越权风险。"
-            agent = ApprovalAgent(web_terminal=web_terminal)
+            agent = ApprovalAgent(web_terminal=web_terminal, conversation_id=conversation_id)
             return await agent.review(payload_text=payload, progress_cb=progress_cb, cancel_check=cancel_check)
 
         return await run_full_access_review(
@@ -112,7 +112,7 @@ async def run_auto_approval(
         arguments=arguments,
         risk_markers=risk_markers,
     )
-    agent = ApprovalAgent(web_terminal=web_terminal)
+    agent = ApprovalAgent(web_terminal=web_terminal, conversation_id=conversation_id)
     result = await agent.review(payload_text=payload, progress_cb=_progress, cancel_check=_manual_takeover)
     if not _manual_takeover():
         decided = tool_approval_manager.decide(

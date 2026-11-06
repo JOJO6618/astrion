@@ -86,6 +86,11 @@ export default {
   costDetails: 'Cost breakdown',
   costMainAgent: 'Main agent',
   costThinkingSummary: 'Thinking summaries',
+  costReviewAgents: {
+    auto_approval: 'Auto approval review',
+    goal_review: 'Goal review',
+    workflow_review: 'Workflow review'
+  },
   costPartial: 'Partial',
   costIncomplete: 'Unpriced history or requests are excluded from this amount.',
   costUnpriced: 'Unpriced',

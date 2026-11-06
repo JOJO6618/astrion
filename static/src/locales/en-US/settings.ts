@@ -13,6 +13,7 @@ export default {
   groupSystem: 'System',
   groupAgents: 'Agents',
   groupInterface: 'Interface',
+  groupAccount: 'Account',
   groupAdmin: 'Administration',
 
   // ── Nav items ──
@@ -31,6 +32,7 @@ export default {
   navVoice: 'Voice',
   navSubAgents: 'Sub-agents',
   navReviewAgents: 'Review Agents',
+  navUsage: 'Usage',
   navAppearance: 'Appearance',
   navAdmin: 'Admin',
 
@@ -117,6 +119,8 @@ export default {
   subAgentsDesc: 'Sub-agent models, compression threshold, and role management.',
   reviewAgentsTitle: 'Review Agents',
   reviewAgentsDesc: 'Models and runtime parameters for review agents.',
+  usageTitle: 'Usage',
+  usageDesc: 'Daily model request usage and cost across workspaces and Chat, from the conversation cost ledgers.',
   appearanceTitle: 'Appearance',
   appearanceDesc: 'Theme, interface language, and display options.',
   adminTitle: 'Admin',

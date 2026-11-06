@@ -43,6 +43,7 @@
 | CLI 交互与分层 | `docs/agents_details/cli_workflow.md` | 改 CLI 交互/分层 |
 | 项目 Git 记录与评审 | `docs/project_git.md` | 仓库扫描、历史 diff、评审启动及工作区深链 |
 | CrossPet 本机接入 | `docs/crosspet_integration.md` | 桌宠状态输出、任务观察、模型角色及接入协议 |
+| 用量统计页 | `docs/agents_details/usage_stats.md` | 设置页用量统计、账本汇总口径、来源归集与派生缓存 |
 
 ## 0) 项目名称
 
@@ -303,7 +304,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ### 10.5 审核智能体配置与调试
 
-- 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段 `model`（留空=自动规则）/`thinking`/`timeout_seconds`/`max_rounds`/`max_command_timeout`。
+- 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段 `model`（留空=自动规则）/`timeout_seconds`/`max_rounds`/`max_command_timeout`。**思考固定开启、推理强度走模型默认，均无设置项（2026-11-06）**；三者统一经 `modules/review_model_caller.py` 走 `APIClient`（两种协议同一通道，`timeout_seconds` 对整次请求生效），每次请求计入对话账本（见 §22）。
 - 解析入口 `modules/review_agent_config.py::resolve_review_agent_config`（复用 `aux_model_resolver`）。旧的独立 json（`config/auto_approval.json`/`goal_review.json`/`workflow_review.json.example`）与 `sub_agent_models.json` 库均已彻底废除，**无向后兼容**。
 - 调试开关：`modules/approval_agent.py` 的 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`，开启后写 `logs/approval_agent/`。
 
@@ -593,7 +594,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ## 22) 主／子智能体 API 花费（2026-10-08）
 
-- **范围**：总花费 = 主 + 每个子智能体 + 思考摘要请求，**三个审核智能体暂不计入**。按非缓存输入、缓存命中输入、输出三项计价，不单列缓存写入；缓存命中率的冷启动豁免不减免费用。原有 token 五项和 tokens/s 保持主智能体口径，目标模式 Token 上限保持主／子口径，思考摘要只增加费用；摘要明细独立显示，详见 `docs/conversation_api_costs.md`。
+- **范围**：总花费 = 主 + 每个子智能体 + 思考摘要 + 三个审核智能体请求（审核自 2026-11-06 起计入，之前的审核请求不补算）。按非缓存输入、缓存命中输入、输出三项计价，不单列缓存写入；缓存命中率的冷启动豁免不减免费用。原有 token 五项和 tokens/s 保持主智能体口径，目标模式 Token 上限保持主／子口径，思考摘要与审核只增加费用；明细按执行者独立显示（审核 `actor_id=review_agent:<key>`、`kind=review_agent`），详见 `docs/conversation_api_costs.md`。
 - **价格与账本**：`modules/api_pricing.py` 捕获请求当时的精确提供商/模型价格；`modelsdev_registry.py` 版本 2 缓存保留 `cost.input/cache_read/output` 及来源时间，**不借其它提供商价格**。`modules/conversation_costs.py` 在 `<工作区 data_dir>/api_costs/<conversation_id>.json` 原子保存，以请求 UUID 防重、Decimal 累加。**旧历史、缺单价或缺 usage 标记为未计价，禁止当免费。**
 - **子恢复**：`modules/sub_agent/usage.py` 统一归一化、保存 `token_usage.cached_input`、继承累计统计；两个恢复入口都调用。压缩只清上下文、**不清历史累计**。
 - **币种**：外观 `display_currency` = USD/CNY，默认 USD。**人民币只转换显示，不改账本**；`modules/exchange_rates.py` 每 UTC 日后台更新 Frankfurter 参考汇率，失败保留缓存，**无首次缓存不虚构汇率**。
@@ -630,3 +631,11 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **重试与并发**：网络耗尽后通过 RuntimeService 在同一对话派发新 user 输入；额度／认证／配置错误阻塞。Timer 绑定 run_id + task_id + next_retry_at，不能因用量更新 revision 而丢失重试。显示发布锁序固定 VIEW_LOCK → 目标状态锁，禁止反向获取。
 - **审核与限制**：以原目标和真实执行证据判断，不用“没有工具调用”代替审核；审核取证强制只读沙箱，不继承主对话 direct。轮数／Token 限制在目标弹窗可选，继续保留累计统计并重置本次限制基线，Token 来自同对话主／子新请求。
 - 详细契约：`docs/agents_details/goal_mode.md`；回归目录：`test/2026-10-17_目标模式重构/`。视觉和真实模型／网络恢复由用户运行验收。
+
+## 26) 用量统计页（2026-11-06）
+
+- **入口**：设置页「账户 → 用量统计」（`/settings/usage`，内容列放宽到 1040px）；个人空间「账户」卡片保留并新增跳转按钮。前端 `settings/tabs/UsageStatsTab.vue` + `tabs/usage/`，文案命名空间 `usageStats`，图表色用新增的 `--heat-*`／`--series-*` token（三主题＋首屏回退已补齐）。
+- **唯一数据源 = 对话费用账本**（`<data_dir>/api_costs/`），只读；`modules/usage_stats/` 维护可重建的派生缓存 `<data_dir>/usage_stats_rollup.json`（按账本 mtime/size 增量，UTC 小时 × 模型 × 执行者分桶）。**禁止**为统计另写一份用量计数或改写账本；未计价请求单列，不当免费。
+- **来源归集**：工作区与 Chat 目录一律经可信身份解析，查询**不创建执行实例、不选择工作区**；host 共享 `DATA_DIR/api_costs` 时按各工作区 `conv_*.json` 归属，归属不到的进「其它对话」。
+- **接口**：`GET /api/usage-stats`（source / tz / tz_offset），时区换算在后端出报表时完成；粒度、指标、时间范围在前端切换。
+- 细则、口径与回归见 `docs/agents_details/usage_stats.md`；回归目录 `test/2026-11-06_用量统计页/`。视觉与真实数据量下的性能由用户验收。

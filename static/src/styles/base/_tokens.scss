@@ -152,6 +152,17 @@
   --diff-del-text: #ff1a1a;
   --diff-add-bg: rgba(22, 163, 74, 0.12);
   --diff-del-bg: rgba(220, 38, 38, 0.12);
+  /* 数据可视化（用量统计热力图/图表）：heat 由浅到深 5 档 + 空格/无记录两种底；series 为分类色 */
+  --heat-void: #f3eee5;
+  --heat-0: #ebe4d8;
+  --heat-1: #ecc7b6;
+  --heat-2: #df9e84;
+  --heat-3: #cc785c;
+  --heat-4: #94472f;
+  --series-1: #cc785c;
+  --series-2: #5d8a9e;
+  --series-3: #c9a24a;
+  --series-4: #8a8f6a;
 }
 
 :root[data-theme='light'] {
@@ -221,6 +232,17 @@
   --diff-del-text: #ff1a1a;
   --diff-add-bg: rgba(22, 163, 74, 0.12);
   --diff-del-bg: rgba(220, 38, 38, 0.12);
+  /* 数据可视化（用量统计热力图/图表）：heat 由浅到深 5 档 + 空格/无记录两种底；series 为分类色 */
+  --heat-void: #f7f7f7;
+  --heat-0: #ededed;
+  --heat-1: #cfe3fd;
+  --heat-2: #8ec0fb;
+  --heat-3: #3d8ef5;
+  --heat-4: #1f4f9c;
+  --series-1: #3d8ef5;
+  --series-2: #1f4f9c;
+  --series-3: #9ac4f8;
+  --series-4: #8f8f8f;
 }
 
 :root[data-theme='dark'] {
@@ -291,6 +313,17 @@
   --diff-del-text: #ff1a1a;
   --diff-add-bg: rgba(22, 163, 74, 0.12);
   --diff-del-bg: rgba(220, 38, 38, 0.12);
+  /* 数据可视化（用量统计热力图/图表）：深色下用量越多越亮；series 为分类色 */
+  --heat-void: #1f1f1f;
+  --heat-0: #2a2a2a;
+  --heat-1: #1e3a5f;
+  --heat-2: #2d5f9a;
+  --heat-3: #4b8fe0;
+  --heat-4: #93c2fb;
+  --series-1: #4b8fe0;
+  --series-2: #93c2fb;
+  --series-3: #2d5f9a;
+  --series-4: #707070;
 }
 
 /* 首屏（JS 设置 data-theme 之前）回退到 classic 取值 */
@@ -360,6 +393,17 @@
   --diff-del-text: #ff1a1a;
   --diff-add-bg: rgba(22, 163, 74, 0.12);
   --diff-del-bg: rgba(220, 38, 38, 0.12);
+  /* 数据可视化（用量统计热力图/图表）：heat 由浅到深 5 档 + 空格/无记录两种底；series 为分类色 */
+  --heat-void: #f3eee5;
+  --heat-0: #ebe4d8;
+  --heat-1: #ecc7b6;
+  --heat-2: #df9e84;
+  --heat-3: #cc785c;
+  --heat-4: #94472f;
+  --series-1: #cc785c;
+  --series-2: #5d8a9e;
+  --series-3: #c9a24a;
+  --series-4: #8a8f6a;
 }
 
 // Quick entry uses its own approved silver palette, independent of app themes.

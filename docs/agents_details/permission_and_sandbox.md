@@ -65,7 +65,10 @@
 
 - 审核智能体配置：统一在设置页「审核智能体」分区设置（2026-08 起在个人空间，2026-09 迁设置页），存于 personalization.json 的 `review_agents` 键
   - 三个审核智能体：`auto_approval`（自动审批）/ `goal_review`（目标审核）/ `workflow_review`（工作流审核）
-  - 字段：`model`（主模型注册表 key，留空=自动规则：第一个可见模型，纯 Codex 环境优先 -luna）/ `thinking` / `timeout_seconds` / `max_rounds` / `max_command_timeout`
+  - 字段：`model`（主模型注册表 key，留空=自动规则：第一个可见模型，纯 Codex 环境优先 -luna）/ `timeout_seconds` / `max_rounds` / `max_command_timeout`
+  - **思考固定开启、推理强度走默认（2026-11-06）**：删除 `thinking` 设置项与字段（旧值保存时被清洗丢弃），不提供推理强度设置；模型无独立思考段时沿用 fast 段配置
+  - **调用通道唯一**：`modules/review_model_caller.py::call_review_model` 统一经 `APIClient` 流式调用（Chat Completions 与 Responses 共用，思考段 `extra_params` 由 APIClient 注入）；已删除裸 HTTP 分支及其 `temperature=0`、去掉 extra_params 降级重试。`timeout_seconds` 以 `asyncio.wait_for` 约束整次请求，两种协议一致；超时 `error_type=timeout`（目标恢复按可重试）
+  - **计费**：每次请求写入所属对话账本（`kind=review_agent`），见 `docs/conversation_api_costs.md`
   - 解析入口：`modules/review_agent_config.py::resolve_review_agent_config`（复用 `modules/aux_model_resolver.py` 统一解析主注册表；独立 `sub_agent_models.json` 库已于 2026-09 彻底废弃无兼容，子智能体/审核/标题生成模型同源）
   - 旧的独立 json 配置（`config/auto_approval.json` / `goal_review.json` / `workflow_review.json.example`）已彻底废除，无向后兼容
 - 调试开关（代码变量）：`modules/approval_agent.py` 中 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`

@@ -34,11 +34,13 @@ import quickEntry from './en-US/quickEntry';
 import git from './en-US/git';
 
 import goal from './en-US/goal';
+import usageStats from './en-US/usageStats';
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
 
 const enUS: DeepString<typeof zhCN> = {
   goal,
+  usageStats,
   git,
   quickEntry,
   common,

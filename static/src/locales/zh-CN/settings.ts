@@ -13,6 +13,7 @@ export default {
   groupSystem: '系统',
   groupAgents: '智能体',
   groupInterface: '界面',
+  groupAccount: '账户',
   groupAdmin: '管理',
 
   // ── 导航项 ──
@@ -31,6 +32,7 @@ export default {
   navVoice: '语音',
   navSubAgents: '子智能体',
   navReviewAgents: '审核智能体',
+  navUsage: '用量统计',
   navAppearance: '外观',
   navAdmin: '管理员',
 
@@ -108,6 +110,8 @@ export default {
   subAgentsDesc: '子智能体模型、压缩阈值与角色管理。',
   reviewAgentsTitle: '审核智能体',
   reviewAgentsDesc: '审核智能体的模型与运行参数。',
+  usageTitle: '用量统计',
+  usageDesc: '按天统计各工作区与 Chat 的模型请求用量和花费，数据来自对话费用账本。',
   appearanceTitle: '外观',
   appearanceDesc: '主题、界面语言与界面显示。',
   adminTitle: '管理员',

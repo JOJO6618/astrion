@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject } from 'vue';
 import { TUTORIAL_ENABLED } from '@/stores/tutorial';
+import { useConversationTabsStore } from '@/stores/conversationTabs';
 
 defineOptions({ name: 'AccountTab' });
 
@@ -20,6 +21,16 @@ const {
   usageSummary,
   usageUpdatedText
 } = ctx;
+
+/** 完整的按日统计在设置页「用量统计」分区；桌面标签模式走标签页导航，其余整页跳转 */
+function openUsageStats() {
+  const tabs = useConversationTabsStore();
+  if (tabs.enabled) {
+    void tabs.openPage('/settings/usage').catch(() => {});
+    return;
+  }
+  window.location.assign('/settings/usage');
+}
 </script>
 
 <template>
@@ -72,7 +83,8 @@ const {
           <span v-if="usageError" class="usage-summary-error">{{ usageError }}</span
           ><span v-else-if="usageLoading">{{ $t('personalization.usageSyncing') }}</span
           ><span v-else>{{ $t('personalization.usageUpdated', { time: usageUpdatedText }) }}</span
-          ><button
+          ><span class="usage-summary-actions"
+            ><button
             type="button"
             class="usage-summary-refresh"
             @click="fetchUsageSummary"
@@ -84,6 +96,10 @@ const {
                 : $t('personalization.usageRefresh')
             }}
           </button>
+          <button type="button" class="usage-summary-refresh" @click="openUsageStats">
+            {{ $t('personalization.usageOpenStats') }}
+          </button></span
+          >
         </div>
       </div>
     </div>
@@ -176,6 +192,12 @@ const {
 
 .usage-summary-item .value--warning {
   color: var(--state-warning);
+}
+
+.usage-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .usage-summary-meta {

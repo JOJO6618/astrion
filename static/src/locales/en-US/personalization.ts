@@ -474,6 +474,7 @@ export default {
   usageUpdated: 'Updated {time}',
   usageRefreshing: 'Refreshing...',
   usageRefresh: 'Refresh',
+  usageOpenStats: 'View usage',
   usageNeverRefreshed: 'Not refreshed yet',
   usageUnknownTime: 'Unknown time',
   usageFetchFailed: 'Failed to fetch usage statistics',
@@ -543,10 +544,7 @@ export default {
   roleNamePlaceholder: 'e.g. API Designer',
   roleDescTitle: 'Description',
   roleDescPlaceholder: 'One sentence describing the role',
-  thinkingModeTitle: 'Thinking mode',
   roleThinkingDesc: 'fast = quick responses, thinking = reasoning',
-  fastResponseMode: 'Quick response mode',
-  thinkingReasoningMode: 'Reasoning mode',
   modelTitle: 'Model',
   roleModelEmptyDesc: 'Leave empty for automatic selection',
   defaultModelOption: 'Auto',
@@ -589,8 +587,6 @@ export default {
     'Send a stable per-conversation x-opencode-session header to OpenCode endpoints for session routing and cache optimization; disabled means no header is sent',
   titleDefaultModelDesc:
     'First available model in the registry; prefers a -luna fast model when only Codex models exist',
-  reviewThinkingDesc:
-    'Falls back to fast mode automatically when the model does not support thinking',
   timeoutTitle: 'Review request timeout',
   timeoutDesc: 'Single model request timeout (5-3600 seconds)',
   maxRoundsTitle: 'Max review rounds',
