@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { t } from '@/locales';
 import UsageTooltip from './UsageTooltip.vue';
 import { addDays, formatDate, formatPercent, formatTokens, isoDay, parseDay } from './format';
-import { emptyTooltip } from './types';
+import { useUsageTooltip } from './useUsageTooltip';
 import type { UsageDay, UsageRange, UsageReport } from './types';
 
 defineOptions({ name: 'UsageCacheChart' });
@@ -12,7 +12,7 @@ const props = defineProps<{ report: UsageReport; range: UsageRange }>();
 
 const box = ref<HTMLElement | null>(null);
 const width = ref(360);
-const tip = reactive(emptyTooltip());
+const { tip, hide, showAtRect } = useUsageTooltip();
 let observer: ResizeObserver | null = null;
 
 onMounted(() => {
@@ -102,23 +102,19 @@ function onMove(event: MouseEvent) {
   if (!point) return;
   const anchorX = rect.left + (x(index) / svgWidth.value) * rect.width;
   const anchorY = rect.top + ((point.rate === null ? y(LOW) : y(point.rate)) / H) * rect.height;
-  Object.assign(tip, {
-    visible: true,
-    title: formatDate(point.date),
-    main: point.rate === null ? t('usageStats.tipIdle') : `${Math.round(point.rate * 100)}%`,
-    rows: point.day
+  showAtRect(
+    { left: anchorX, top: anchorY, width: 0, bottom: anchorY },
+    formatDate(point.date),
+    point.rate === null ? t('usageStats.tipIdle') : `${Math.round(point.rate * 100)}%`,
+    point.day
       ? [
           [t('usageStats.tipInput'), formatTokens(point.day.input_tokens)],
           [t('usageStats.tipCached'), formatTokens(point.day.cached_tokens)]
         ]
-      : [],
-    anchor: { left: anchorX, top: anchorY, width: 0, bottom: anchorY }
-  });
+      : []
+  );
 }
 
-function hide() {
-  tip.visible = false;
-}
 </script>
 
 <template>

@@ -73,7 +73,7 @@ watch(
   display: grid;
   grid-template-columns: auto auto;
   column-gap: 14px;
-  color: var(--text-tertiary);
+  color: var(--text-primary);
 }
 
 .usage-tooltip-rows b {

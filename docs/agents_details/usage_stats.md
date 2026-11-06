@@ -9,6 +9,7 @@
 - 个人空间抽屉「账户」页的原用量卡片保留（当前工作区、主智能体口径），新增「查看用量统计」按钮：桌面标签模式走 `conversationTabs.openPage('/settings/usage')`，其余整页跳转。
 - 组件：`static/src/components/settings/tabs/UsageStatsTab.vue`（容器）+ `tabs/usage/`（`UsageActivity` 热力图/每周/累计、`UsageModelTable`、`UsageComposition`、`UsageCacheChart`、`UsagePunchCard`、`UsageTooltip`、`useUsageStats.ts`、`format.ts`、`types.ts`）。文案命名空间 `usageStats`（双语聚合器已注册）；日期、月份、星期用 `Intl` 按界面语言格式化，紧凑计数用 `Intl` compact（zh-CN 输出万／亿）。
 - 配色：`_tokens.scss` 三主题＋首屏回退新增 `--heat-void`／`--heat-0..4`（经典陶土色阶，浅色/深色蓝色阶，深色越多越亮）与分类色 `--series-1..4`。热力图分档按非零值 25/50/80 分位，不用线性。
+- 悬浮提示统一经 `tabs/usage/useUsageTooltip.ts`：文字一律主文字色（不用次要文字色）；任何滚动（设置页内容区、热力图横向滚动、窗口，捕获阶段监听）或窗口尺寸变化立即收起，并清除高亮格／柱／累计十字线。热力图键盘移动引起的滚动在下一帧按新位置重新显示。
 - 视图偏好（粒度、指标、时间范围）只存本机 `localStorage`（`astrion_usage_stats_view`），读写失败回落默认；统计范围每次进入默认「全部工作区」。
 
 ## 数据来源与口径

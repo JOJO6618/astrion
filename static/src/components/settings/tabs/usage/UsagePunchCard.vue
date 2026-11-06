@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue';
+import { computed } from 'vue';
 import { t } from '@/locales';
 import UsageTooltip from './UsageTooltip.vue';
 import { formatTokens, quantileLevels, weekdayName } from './format';
-import { emptyTooltip } from './types';
+import { useUsageTooltip } from './useUsageTooltip';
 
 defineOptions({ name: 'UsagePunchCard' });
 
 const props = defineProps<{ punch: number[][]; timezone: string }>();
 
-const tip = reactive(emptyTooltip());
+const { tip, hide, show } = useUsageTooltip();
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const levelOf = computed(() => quantileLevels(props.punch.flat()));
@@ -36,19 +36,13 @@ function onOver(event: Event) {
   const day = Number(target.getAttribute('data-day'));
   const hour = Number(target.getAttribute('data-hour'));
   const value = props.punch[day]?.[hour] || 0;
-  const rect = target.getBoundingClientRect();
-  Object.assign(tip, {
-    visible: true,
-    title: `${weekdayName(day)} ${hour}:00–${hour + 1}:00`,
-    main: value > 0 ? t('usageStats.valueTokens', { value: formatTokens(value) }) : t('usageStats.punchIdle'),
-    rows: [],
-    anchor: { left: rect.left, top: rect.top, width: rect.width, bottom: rect.bottom }
-  });
+  show(
+    target,
+    `${weekdayName(day)} ${hour}:00–${hour + 1}:00`,
+    value > 0 ? t('usageStats.valueTokens', { value: formatTokens(value) }) : t('usageStats.punchIdle')
+  );
 }
 
-function hide() {
-  tip.visible = false;
-}
 
 </script>
 

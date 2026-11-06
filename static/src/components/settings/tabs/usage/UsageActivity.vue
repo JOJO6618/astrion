@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { t } from '@/locales';
 import UsageTooltip from './UsageTooltip.vue';
 import {
@@ -19,7 +19,7 @@ import {
   splitModelKey,
   weekdayName
 } from './format';
-import { emptyTooltip } from './types';
+import { useUsageTooltip } from './useUsageTooltip';
 import type { UsageDay, UsageGranularity, UsageMetric, UsageReport } from './types';
 
 defineOptions({ name: 'UsageActivity' });
@@ -36,7 +36,7 @@ const CELL = 12;
 const GAP = 3;
 const STEP = CELL + GAP;
 
-const tip = reactive(emptyTooltip());
+const { tip, hide, show: showAt } = useUsageTooltip();
 const box = ref<HTMLElement | null>(null);
 const scroller = ref<HTMLElement | null>(null);
 const width = ref(720);
@@ -73,21 +73,6 @@ const METRIC_KEYS: Record<UsageMetric, string> = {
   requests: 'usageStats.metricRequests'
 };
 const gridLabel = computed(() => t('usageStats.heatmapAria', { metric: t(METRIC_KEYS[props.metric]) }));
-
-function hide() {
-  tip.visible = false;
-}
-
-function showAt(target: Element, title: string, main: string, rows: [string, string][] = []) {
-  const rect = target.getBoundingClientRect();
-  Object.assign(tip, {
-    visible: true,
-    title,
-    main,
-    rows,
-    anchor: { left: rect.left, top: rect.top, width: rect.width, bottom: rect.bottom }
-  });
-}
 
 // ── 每天：53 周热力图 ──
 interface Cell {
@@ -184,6 +169,8 @@ function onGridFocus() {
   focusCell(cells.value.findIndex((cell) => cell.iso === props.report.today));
 }
 
+let keyTarget = -1;
+
 function onGridKey(event: KeyboardEvent) {
   const delta = ({ ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7 } as Record<string, number>)[
     event.key
@@ -191,12 +178,20 @@ function onGridKey(event: KeyboardEvent) {
   if (event.key === 'Escape') return focusCell(-1);
   if (!delta) return;
   event.preventDefault();
-  const next = hotIndex.value + delta;
+  const grid = event.currentTarget;
+  // 滚动收起提示会清空 hotIndex，此时以上一次键盘目标为基准继续移动
+  const next = (hotIndex.value >= 0 ? hotIndex.value : keyTarget) + delta;
   const cell = cells.value[next];
-  if (!cell || cell.future) return;
+  if (!cell || cell.future || next < 0) return;
   const element = scroller.value?.querySelector(`[data-idx="${next}"]`);
-  element?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  // 键盘移动可能触发横向滚动：滚动事件会先收起提示，下一帧再按新位置重新显示
+  element?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   focusCell(next);
+  keyTarget = next;
+  requestAnimationFrame(() => {
+    // 期间又按了别的键、或焦点已离开网格，则不再补显示
+    if (keyTarget === next && document.activeElement === grid) focusCell(next);
+  });
 }
 
 /** 打开时滚动到最近的周（窄屏只能看到一部分时） */
@@ -326,6 +321,17 @@ const cumDotIndex = computed(() =>
 const gridTicks = (max: number) => [0, 0.5, 1].map((f) => ({ y: PAD_TOP + plotHeight * (1 - f), value: max * f }));
 
 watch(() => [props.granularity, props.metric], hide);
+
+/** 提示被收起（含滚动）时一并清掉高亮格、高亮柱与累计十字线，避免残留在错误位置 */
+watch(
+  () => tip.visible,
+  (visible) => {
+    if (visible) return;
+    hotIndex.value = -1;
+    hotWeek.value = -1;
+    cumHot.value = -1;
+  }
+);
 </script>
 
 <template>
