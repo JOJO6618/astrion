@@ -69,6 +69,7 @@
 设计目标：运行态数据（对话、用户工作区、日志）默认在 `~/.astrion/astrion/`，**不落在源码树内**。实现见 `config/paths.py`。
 
 - 数据根默认 `~/.astrion/astrion`，可用 `ASTRION_DATA_ROOT` 整体搬迁；其下按 `TERMINAL_SANDBOX_MODE` 分流：host → `host/`，其它 → `web/`
+- **桌面端默认数据根（三平台通用）**：macOS/Linux 为 `~/.astrion/astrion-desktop`，Windows 为 `%USERPROFILE%\.astrion\astrion-desktop`；后端运行数据默认在 `<数据根>/host/data/`，日志在 `<数据根>/host/logs/`。桌面壳的数据根设置文件位于用户主目录的 `.astrion/rundata_settings.json`；桌面端可在应用内迁移数据目录，开发/调试环境也可通过 `ASTRION_DESKTOP_DATA_ROOT` 覆盖。实现见 `desktop-electron/src/rundata.js`、`desktop/src-tauri/src/rundata.rs`。
 - 路径解析优先级：具体目录变量（`DATA_DIR`/`LOGS_DIR`/`USER_SPACE_DIR`/`API_USER_SPACE_DIR`）> `ASTRION_DATA_ROOT` > 兜底 `~/.astrion/astrion/<mode>`
 - **`config/*.json` 分两类**：程序能力类（`docker_risk_markers`/`skill_hints`/`command_blocking_recommended`）锚定源码树；部署级配置（`custom_models`/`host_workspaces`/`auto_approval`/`goal_review`/`host_sandbox_policy`）外置到 `DEPLOY_CONFIG_DIR`，读取走 `config.resolve_deploy_config(name)`
 - host 模式同时加载 `host/` 与 `web/` 的用户/工作区（`IS_HOST_MODE`/`WEB_DATA_DIR`/`WEB_USER_SPACE_DIR`），写操作一律落 host
