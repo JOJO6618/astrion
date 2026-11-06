@@ -2291,16 +2291,62 @@ function handleMinimalGroupCollapseFinished(payload: { groupId: string }) {
   });
 }
 
+// 折叠内容的展开高度：观察 content-inner 的真实高度（图片等后加载内容撑高时同步更新），
+// 用 getBoundingClientRect 向上取整，避免 scrollHeight/offsetHeight 取整偏小导致
+// 外层出现不到 1px 的隐形滚动。工具块不封顶：其内部各段自带限高与滚动，外层只做裁切
+// （见 _chat-area.scss 的 .tool-block 规则），保证同一块内只有一层滚动。
+const COLLAPSE_MAX_HEIGHT = 600;
+const collapseEntries = new Map<string, HTMLElement>();
+const collapseInnerOwner = new WeakMap<Element, HTMLElement>();
+
+const applyCollapseHeight = (el: HTMLElement) => {
+  const inner = el.firstElementChild as HTMLElement | null;
+  const h = Math.ceil((inner || el).getBoundingClientRect().height);
+  // 折叠态 content-visibility:hidden 下测得 0，保留上次的展开高度
+  if (h <= 0) return;
+  const capped = el.closest('.tool-block') ? h : Math.min(h, COLLAPSE_MAX_HEIGHT);
+  el.style.setProperty('--collapse-max', `${capped}px`);
+};
+
+const collapseResizeObserver =
+  typeof ResizeObserver !== 'undefined'
+    ? new ResizeObserver((entries) => {
+        entries.forEach((entry) => {
+          const owner = collapseInnerOwner.get(entry.target);
+          if (owner) applyCollapseHeight(owner);
+        });
+      })
+    : null;
+
+const releaseCollapseEntry = (key: string) => {
+  const previous = collapseEntries.get(key);
+  if (!previous) return;
+  const inner = previous.firstElementChild;
+  if (inner) collapseResizeObserver?.unobserve(inner);
+  collapseEntries.delete(key);
+};
+
 const registerCollapseContent = (key: string, el: Element | null) => {
   if (!(el instanceof HTMLElement)) {
+    // 内联函数 ref 每次更新都会先传 null 再传同一元素；只有元素真正卸载后才释放观察
+    queueMicrotask(() => {
+      const current = collapseEntries.get(key);
+      if (current && !current.isConnected) releaseCollapseEntry(key);
+    });
     return;
   }
-  const COLLAPSE_MAX_HEIGHT = 600;
-  requestAnimationFrame(() => {
-    const h = el.scrollHeight || el.offsetHeight || 0;
-    if (h > 0) {
-      el.style.setProperty('--collapse-max', `${Math.min(h, COLLAPSE_MAX_HEIGHT)}px`);
+  const previous = collapseEntries.get(key);
+  if (previous !== el) {
+    if (previous) releaseCollapseEntry(key);
+    collapseEntries.set(key, el);
+    const inner = el.firstElementChild;
+    if (inner && collapseResizeObserver) {
+      collapseInnerOwner.set(inner, el);
+      collapseResizeObserver.observe(inner);
     }
+  }
+  requestAnimationFrame(() => {
+    if (el.isConnected) applyCollapseHeight(el);
   });
 };
 
@@ -2827,6 +2873,8 @@ onBeforeUnmount(() => {
     if (element) disposeThinkingScrollFollow(element);
   });
   thinkingRefs.clear();
+  collapseResizeObserver?.disconnect();
+  collapseEntries.clear();
   pendingMinimalCollapses.clear();
   detachBounceListener();
   stopBlockExpansionAnchors();

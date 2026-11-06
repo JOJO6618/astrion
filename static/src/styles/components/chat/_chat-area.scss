@@ -1752,6 +1752,14 @@ body[data-theme='dark'] .collapsible-header:hover {
   opacity: 1;
 }
 
+/* 工具块外层只裁切不滚动：展开高度按内容真实高度测量（不封顶），长内容由结果内部
+   限高区域滚动。外层若也可滚动（且滚动条隐藏），内层滚到底后滚轮会链式带动外层，
+   整块上移几像素并裁掉结果框的边框圆角。 */
+.collapsible-block.tool-block.expanded .collapsible-content {
+  max-height: var(--collapse-max, none);
+  overflow: hidden;
+}
+
 .content-inner {
   padding: 13px 13px 13px 37px;
   font-size: 13px;

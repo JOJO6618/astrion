@@ -322,9 +322,14 @@ const measureAndCompute = (expandedOverride?: Record<string, boolean>) => {
     const header = el.querySelector('.collapsible-header') as HTMLElement | null;
     const innerC = el.querySelector('.content-inner') as HTMLElement | null;
     const headerH = header ? Math.ceil(header.offsetHeight) : HEADER_FALLBACK;
-    // 展开后内容可见高度（封顶 600）；content-inner 自身高度稳定（思考块被自己的
+    // 展开后内容可见高度；content-inner 自身高度稳定（思考块被自己的
     // max-height:240 限制，工具块为内容自然高），不受 collapsible-content 过渡影响。
-    const fullContent = innerC ? Math.min(Math.ceil(innerC.offsetHeight), COLLAPSE_MAX_HEIGHT) : 0;
+    // 用 getBoundingClientRect 向上取整：offsetHeight 四舍五入偏小时外层会出现
+    // 不到 1px 的隐形滚动。工具块不封顶——内部各段自带限高与滚动，外层只裁切。
+    const naturalContent = innerC ? Math.ceil(innerC.getBoundingClientRect().height) : 0;
+    const fullContent = el.classList.contains('tool-block')
+      ? naturalContent
+      : Math.min(naturalContent, COLLAPSE_MAX_HEIGHT);
     nextContentHeights[key] = fullContent;
     const expanded =
       expandedOverride && key in expandedOverride ? expandedOverride[key] : isExpandedById(key);
