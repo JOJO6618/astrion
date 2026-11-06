@@ -66,14 +66,16 @@ export default {
     pending: '等待自动审核',
     reviewing: '自动审核中',
     approved: '自动审核通过',
-    rejected: '自动审核拒绝'
+    rejected: '自动审核拒绝',
+    error: '自动审核失败'
   },
   finalDecision: {
     approved: '已允许执行',
     rejected: '已拒绝执行',
     expired: '已过期',
     cancelled: '已取消',
-    timeout: '已超时'
+    timeout: '已超时',
+    error: '审核失败，未执行'
   },
   humanDecision: {
     approved: '人工已允许',

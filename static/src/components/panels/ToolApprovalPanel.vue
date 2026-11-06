@@ -135,7 +135,9 @@ const historyRecord = computed(() => props.reviewRecords[props.reviewRecords.len
 const current = computed(() => props.approvals[0] || historyRecord.value?.approval || null);
 const historyStatus = computed(() => {
   const status = String(current.value?.status || '');
-  return ['approved', 'rejected', 'expired', 'cancelled', 'timeout'].includes(status) ? status : '';
+  return ['approved', 'rejected', 'expired', 'cancelled', 'timeout', 'error'].includes(status)
+    ? status
+    : '';
 });
 const automatic = computed(() => !!current.value?.auto_review_required);
 const record = computed(() =>

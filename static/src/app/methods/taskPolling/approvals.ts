@@ -224,7 +224,9 @@ export const approvalMethods = {
     if (!approvalId || !Array.isArray(this.pendingToolApprovals)) return;
     if (data.conversation_id && data.conversation_id !== this.currentConversationId) return;
     if (
-      !['approved', 'rejected', 'expired', 'cancelled', 'timeout'].includes(String(data.decision))
+      !['approved', 'rejected', 'expired', 'cancelled', 'timeout', 'error'].includes(
+        String(data.decision)
+      )
     )
       return;
     if ((this.resolvedToolApprovalIds || []).includes(approvalId)) return;
@@ -244,7 +246,7 @@ export const approvalMethods = {
         kind: 'auto',
         approval_id: approvalId,
         progress: previous?.progress || approval.auto_review_progress || [],
-        final_decision: ['approved', 'rejected'].includes(data.decision)
+        final_decision: ['approved', 'rejected', 'error'].includes(data.decision)
           ? data.decision
           : undefined,
         reason: String(data.reason || approval.reason || ''),

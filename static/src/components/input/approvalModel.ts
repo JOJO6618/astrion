@@ -1,12 +1,14 @@
-export type ReviewStatus = 'pending' | 'reviewing' | 'approved' | 'rejected';
+export type ReviewStatus = 'pending' | 'reviewing' | 'approved' | 'rejected' | 'error';
 export type ApprovalDecision = 'approved' | 'rejected';
+export type ReviewDecision = ApprovalDecision | 'error';
 export type ReviewKind = 'auto' | 'goal' | 'workflow';
 
 export interface ApprovalProgress {
   stage?: string;
   message?: string;
   command?: string;
-  decision?: ApprovalDecision;
+  decision?: ReviewDecision;
+  code?: string;
 }
 
 export interface ToolApproval {
@@ -19,6 +21,7 @@ export interface ToolApproval {
   reason?: string;
   auto_review_required?: boolean;
   auto_review_status?: ReviewStatus;
+  human_approval_required?: boolean;
   human_decision?: ApprovalDecision | null;
   auto_review_progress?: ApprovalProgress[];
   [key: string]: unknown;
@@ -29,8 +32,8 @@ export interface ApprovalReviewRecord {
   kind: ReviewKind;
   approval_id?: string;
   progress: ApprovalProgress[];
-  decision?: ApprovalDecision;
-  final_decision?: ApprovalDecision;
+  decision?: ReviewDecision;
+  final_decision?: ReviewDecision;
   reason?: string;
   tool_name?: string;
   approval?: ToolApproval;
@@ -63,6 +66,7 @@ export const normalizeApproval = (
   auto_review_status:
     previous?.auto_review_status === 'approved' ||
     previous?.auto_review_status === 'rejected' ||
+    previous?.auto_review_status === 'error' ||
     (previous?.auto_review_status === 'reviewing' && incoming.auto_review_status === 'pending')
       ? previous.auto_review_status
       : (incoming.auto_review_status ?? previous?.auto_review_status),
@@ -72,7 +76,11 @@ export const normalizeApproval = (
 });
 
 export const needsHumanDecision = (item?: ToolApproval | null) =>
-  !!item && !item.human_decision && item.auto_review_status !== 'rejected';
+  !!item &&
+  !['approved', 'rejected', 'expired'].includes(item.status || '') &&
+  item.human_approval_required !== false &&
+  !item.human_decision &&
+  item.auto_review_status !== 'rejected';
 
 export const progressText = (progress: ApprovalProgress) =>
   [progress.message, progress.command].filter(Boolean).join('\n') || progress.stage || '';
@@ -97,10 +105,15 @@ export const statusFromProgress = (
   progress: ApprovalProgress,
   previous?: ReviewStatus
 ): ReviewStatus => {
-  if (progress.decision === 'approved' || progress.decision === 'rejected')
+  if (
+    progress.decision === 'approved' ||
+    progress.decision === 'rejected' ||
+    progress.decision === 'error'
+  )
     return progress.decision;
-  if (progress.stage === 'approved' || progress.stage === 'rejected') return progress.stage;
-  if (previous === 'approved' || previous === 'rejected') return previous;
+  if (progress.stage === 'approved' || progress.stage === 'rejected' || progress.stage === 'error')
+    return progress.stage;
+  if (previous === 'approved' || previous === 'rejected' || previous === 'error') return previous;
   return progress.stage === 'pending' ? 'pending' : 'reviewing';
 };
 
@@ -126,7 +139,11 @@ export const updateReviewRecords = (
         } as ApprovalReviewRecord);
   record.progress.push({ ...progress });
   record.progress = record.progress.slice(-100);
-  if (progress.decision === 'approved' || progress.decision === 'rejected')
+  if (
+    progress.decision === 'approved' ||
+    progress.decision === 'rejected' ||
+    progress.decision === 'error'
+  )
     record.decision = progress.decision;
   return (
     last && record.id === last.id

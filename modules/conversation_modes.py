@@ -24,7 +24,7 @@ def resolve_conversation_modes(metadata, defaults=None, *, host_mode=True):
                     _mode(defaults.get("network_permission"), NETWORK_MODES, "restricted"))
     if work == "plan":
         permission = "readonly"
-    if not host_mode or permission != "unrestricted" or work == "plan":
+    if not host_mode or permission == "readonly" or work == "plan":
         execution = "sandbox"
     return {"work_mode": work, "permission_mode": permission,
             "execution_mode": execution, "network_permission": network}

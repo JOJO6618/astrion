@@ -194,6 +194,8 @@ interface PersonalForm {
   goal_end_conditions: string[];
   goal_max_turns: number;
   goal_max_tokens: number | null;
+  full_access_warning_dismissed: boolean;
+  allow_auto_approve_full_access: boolean;
   review_agents: Record<ReviewAgentKey, ReviewAgentSetting>;
 }
 
@@ -430,6 +432,8 @@ const defaultForm = (): PersonalForm => ({
   goal_end_conditions: ['max_turns'],
   goal_max_turns: 5,
   goal_max_tokens: null,
+  full_access_warning_dismissed: false,
+  allow_auto_approve_full_access: false,
   review_agents: defaultReviewAgents()
 });
 
@@ -786,6 +790,8 @@ export const usePersonalizationStore = defineStore('personalization', {
           typeof data.goal_max_tokens === 'number' && data.goal_max_tokens > 0
             ? data.goal_max_tokens
             : null,
+        full_access_warning_dismissed: data.full_access_warning_dismissed === true,
+        allow_auto_approve_full_access: data.allow_auto_approve_full_access === true,
         review_agents: sanitizeReviewAgents(data.review_agents)
       };
       // 如果theme发生变化，应用到界面

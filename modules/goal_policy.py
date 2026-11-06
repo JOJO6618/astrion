@@ -42,9 +42,7 @@ def enforce_goal_modes(terminal, conversation_id: str) -> None:
     if getattr(terminal, "pending_permission_mode", None) not in {None, "", "auto_approval", "unrestricted"}:
         terminal.pending_permission_mode = None
         updates["pending_permission_mode"] = None
-    if terminal.get_permission_mode() == "auto_approval" and getattr(terminal, "pending_execution_mode", None) == "direct":
-        terminal.pending_execution_mode = None
-        updates["pending_execution_mode"] = None
+    # 自动审核已支持完全访问，保留用户显式排队的执行环境选择。
     if updates:
         terminal._persist_runtime_mode_metadata(updates)
 

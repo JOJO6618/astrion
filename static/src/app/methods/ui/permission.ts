@@ -112,6 +112,30 @@ export const permissionMethods = {
     if (!this.executionModeEnabled || !['sandbox', 'direct'].includes(target)) {
       return;
     }
+    const personalization = usePersonalizationStore();
+    if (
+      target === 'direct' &&
+      this.currentExecutionMode !== 'direct' &&
+      !personalization.form.full_access_warning_dismissed
+    ) {
+      let dismissWarning = false;
+      const confirmed = await this.uiRequestConfirm({
+        title: t('appUi.fullAccessWarningTitle'),
+        message: t('appUi.fullAccessWarningMessage'),
+        confirmText: t('appUi.fullAccessWarningConfirm'),
+        cancelText: t('appUi.fullAccessWarningCancel'),
+        confirmVariant: 'danger',
+        checkboxLabel: t('appUi.fullAccessWarningRemember'),
+        onCheckboxChange: (checked) => {
+          dismissWarning = checked;
+        }
+      });
+      if (!owns() || !confirmed) return;
+      if (dismissWarning) {
+        personalization.updateField({ key: 'full_access_warning_dismissed', value: true });
+      }
+    }
+    if (!owns()) return;
     if (!this.currentConversationId) {
       this.setNewConversationMode('execution', target);
       return;

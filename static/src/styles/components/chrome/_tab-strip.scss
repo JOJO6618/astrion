@@ -241,6 +241,9 @@
   background: var(--tab-status-running);
   animation: chrome-tab-pulse 1.6s ease-in-out infinite;
 }
+.chrome-tab-strip .tab-status.awaiting {
+  background: var(--state-warning);
+}
 .chrome-tab-strip .tab-status.done {
   background: var(--state-success);
 }

@@ -103,6 +103,13 @@ export default {
   permissionUpdated: 'Permission updated',
   switchExecutionModeFailed: 'Failed to switch execution environment',
   executionModeUpdated: 'Execution environment updated',
+  fullAccessWarningTitle: 'Switch to full access?',
+  fullAccessWarningMessage:
+    'With full access, agent operations run outside the Astrion sandbox and authorized path boundaries, using the permissions of the system account running Astrion. They can access files outside the workspace, modify or delete data, run programs, and access the network. Manual or automatic approval still follows the selected permission mode.',
+  fullAccessWarningConfirm: 'I understand, switch',
+  fullAccessWarningCancel: 'Return to sandbox',
+  fullAccessWarningRemember: 'Do not show again',
+  tabStripAwaitingApproval: 'Waiting for manual approval',
   switchNetworkPermissionFailed: 'Failed to switch network permission',
   networkPermissionUpdated: 'Network permission updated',
   networkRestricted: 'Restricted',

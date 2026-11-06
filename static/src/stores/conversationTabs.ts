@@ -12,6 +12,7 @@ export interface ConversationTab {
   title: string;
   error: string;
   running: boolean;
+  awaitingHumanApproval: boolean;
 }
 
 export interface DesktopNavigation {
@@ -44,7 +45,8 @@ function normalizeTab(raw: any): ConversationTab {
     workspaceLabel: String(raw.workspace_label || ''),
     title: String(raw.title || ''),
     error: String(raw.error || ''),
-    running: Boolean(raw.running)
+    running: Boolean(raw.running),
+    awaitingHumanApproval: Boolean(raw.awaiting_human_approval)
   };
 }
 

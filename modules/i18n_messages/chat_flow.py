@@ -108,6 +108,22 @@ MESSAGES = {
         "zh-CN": "检测到权限受限，等待用户审批",
         "en-US": "Permission restricted; waiting for user approval",
     },
+    "tool_loop.rejected_by_review": {
+        "zh-CN": "操作未通过自动审核",
+        "en-US": "Operation denied by automatic review",
+    },
+    "tool_loop.review_failed": {
+        "zh-CN": "自动审核失败，操作未执行",
+        "en-US": "Automatic review failed; the operation was not executed",
+    },
+    "tool_loop.review_failed_detail": {
+        "zh-CN": "自动审核未完成，当前调用未执行。\n原因：{reason}\n这不代表操作已被判定危险。可在故障解决后重新审核；不要自动转人工审批。",
+        "en-US": "Automatic review did not complete; this call was not executed.\nReason: {reason}\nThis is not a finding that the action is unsafe. Review again after resolving the failure; do not automatically request manual approval.",
+    },
+    "tool_loop.auto_rejected_guidance": {
+        "zh-CN": "请根据上述原因改用实质更安全且符合用户要求的方案，不要仅改写命令或间接执行来绕过拒绝，也不要反复要求人工批准。无法继续时说明具体阻塞原因。",
+        "en-US": "Use a materially safer approach consistent with the user's request. Do not bypass this denial through rewording or indirect execution, or repeatedly seek manual approval. Explain the specific blocker if progress is impossible.",
+    },
     "tool_loop.rejected_by_user": {
         "zh-CN": "操作被用户拒绝",
         "en-US": "Operation rejected by the user",

@@ -62,14 +62,16 @@ export default {
     pending: 'Waiting for automatic review',
     reviewing: 'Automatic review in progress',
     approved: 'Automatic review approved',
-    rejected: 'Automatic review rejected'
+    rejected: 'Automatic review rejected',
+    error: 'Automatic review failed'
   },
   finalDecision: {
     approved: 'Execution allowed',
     rejected: 'Execution rejected',
     expired: 'Expired',
     cancelled: 'Cancelled',
-    timeout: 'Timed out'
+    timeout: 'Timed out',
+    error: 'Review failed; not executed'
   },
   humanDecision: {
     approved: 'Approved by you',

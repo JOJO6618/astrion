@@ -119,12 +119,13 @@ class AsyncBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def run_rejected_batch(self, approval_type, *, compress=False, stopped=False):
         history, events = [], []
         cm = SimpleNamespace(project_path=ROOT, add_conversation=lambda *a, **k: history.append((a, k)))
-        terminal = SimpleNamespace(context_manager=cm, define_tools=lambda: [],
+        terminal = SimpleNamespace(context_manager=cm, define_tools=lambda: [], data_dir=ROOT,
                                    evaluate_tool_permission=lambda name, args: (
                                        {"allowed": True, "requires_approval": True,
                                         "mode": "unrestricted", "approval_type": approval_type}
                                        if name == "run_command" else {"allowed": False}),
-                                   get_work_mode=lambda: "execute")
+                                   get_work_mode=lambda: "execute",
+                                   get_execution_mode=lambda: "sandbox")
         calls = [{"id": "first", "function": {"name": "run_command", "arguments": "{}"}},
                  {"id": "second", "function": {"name": "read_file", "arguments": "{}"}}]
         messages = [{"role": "assistant", "tool_calls": calls, "content": ""}]
@@ -135,6 +136,7 @@ class AsyncBoundaryTests(unittest.IsolatedAsyncioTestCase):
         with patch("server.chat_flow_tool_loop.tool_approval_manager", ToolApprovalManager()), \
              patch("server.chat_flow_tool_loop._wait_for_tool_approval", AsyncMock(return_value={"decision": "rejected"})), \
              patch("server.chat_flow_tool_loop._build_tool_approval_preview", return_value={}), \
+             patch("server.chat_flow_tool_loop.load_personalization_config", return_value={}), \
              patch("server.chat_flow_tool_loop.TOOL_CALL_COOLDOWN", 0), \
              patch("server.tasks.compression_requests.run_requested_compression", side_effect=boundary) as consume:
             result = await execute_tool_calls(

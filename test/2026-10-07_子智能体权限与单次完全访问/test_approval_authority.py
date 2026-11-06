@@ -188,8 +188,9 @@ class ApprovalTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
         result = await run_full_access_review(manager=self.manager, approval_id=self.id, username="user",
                                               reviewer=reviewer, sender=lambda *_: None, timeout_seconds=0.01)
-        self.assertEqual(result["decision"], "rejected")
-        self.assertEqual(self.manager.get(self.id)["auto_review_status"], "rejected")
+        self.assertEqual(result["decision"], "error")
+        self.assertEqual(self.manager.get(self.id)["auto_review_status"], "error")
+        self.assertEqual(self.manager.get(self.id)["status"], "expired")
 
     def test_child_access_and_request_validation(self):
         self.terminal.get_permission_mode = lambda: "readonly"

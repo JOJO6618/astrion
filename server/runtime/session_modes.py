@@ -17,7 +17,7 @@ def session_mode_overrides(
         raise ValueError("Invalid execution_mode")
     if work == "plan":
         permission, execution = "readonly", "sandbox"
-    if permission != "unrestricted":
+    if permission == "readonly":
         execution = "sandbox"
     if execution == "direct" and not (principal and principal.host_mode):
         raise PermissionError("Direct execution is only available in host mode")

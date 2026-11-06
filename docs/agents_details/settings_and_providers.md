@@ -64,3 +64,7 @@
 - `/api/codex/usage` 返回显式 `account_id`、`account_hash` 和 `usage`；`refresh=1` 为手动刷新。后端 `utils/api_client/codex/usage.py` 按账号合并查询，缓存 30 秒，凭证文件元数据变化即失效；成功兑换限额重置后失效缓存。HTTP 客户端按账号复用，代理变化时换连接，connect=5 秒／read=10 秒；只读 GET 连接失败重试一次，不重试兑换 POST。
 - `CodexAuthManager.get_access_token_sync()` 与异步模型请求共用同一刷新锁并做二次检查，防止设置页同时查询 usage/reset-credits 导致重复轮换 refresh token。网络刷新使用 connect=5 秒／read=10 秒。
 - 离线回归：`test/2026-10-31_ChatGPT额度/`；真实代理网络、订阅服务稳定性与移动端视觉仍需实机确认。
+
+### 完全访问审核设置（2026-11-05，2026-11-07扩展）
+
+设置 → 审核智能体 → 自动审批的「允许自动审核通过单次完全访问请求」绑定用户级 `allow_auto_approve_full_access`，默认 false。auto_approval 与 unrestricted 模式下，新建单次 full_access 请求读取同一开关，开启时由审核智能体批准即可执行，无需人工；关闭时 auto_approval 保持自动＋人工双批准，unrestricted 保留人工审批。approval 模式始终人工审批；普通 unrestricted 操作和已在 direct 环境的命令不受此开关影响。条件在请求创建时快照，设置中途变化不修改 pending 请求。审核智能体的取证命令始终使用只读沙箱。风险提示的用户级 `full_access_warning_dismissed` 同样默认 false，两字段均在后端默认配置和 sanitize、前端表单默认值及加载映射注册。

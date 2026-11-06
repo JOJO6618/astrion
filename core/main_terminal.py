@@ -482,13 +482,10 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                         raise ValueError(tr("main_terminal.plan_mode_locks_sandbox"))
                 except AttributeError:
                     pass
-            # 受限权限档（只读/批准/自动审核）执行环境同样锁死为沙箱（与 plan 锁并列）：
-            # 切到受限档时由 set_permission_mode 联动强制沙箱，这里拦直接调用（API/队列）
-            # 防止受限档期间切回 direct——direct 下无沙箱，只读形同虚设、审批承诺被架空
-            # （启发式漏判的写命令无 EPERM 兜底）。仅 unrestricted 可选 direct。
+            # 只读依赖 OS 沙箱；人工审批和自动审核允许 direct，执行前审核参数。
             if normalized == "direct" and getattr(self, "get_permission_mode", None):
                 try:
-                    if self.get_permission_mode() != "unrestricted":
+                    if self.get_permission_mode() == "readonly":
                         raise ValueError(tr("main_terminal.restricted_mode_locks_sandbox"))
                 except AttributeError:
                     pass

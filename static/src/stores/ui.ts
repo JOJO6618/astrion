@@ -35,10 +35,13 @@ interface ConfirmDialogOptions {
   closeOnBackdrop?: boolean;
   confirmVariant?: 'primary' | 'danger';
   confirmOnLeft?: boolean;
+  checkboxLabel?: string;
+  onCheckboxChange?: (checked: boolean) => void;
 }
 
 interface ConfirmDialogState extends ConfirmDialogOptions {
   visible: boolean;
+  checkboxChecked: boolean;
 }
 
 interface EasterEggState {
@@ -267,7 +270,10 @@ export const useUiStore = defineStore('ui', {
           warningText: options.warningText || '',
           closeOnBackdrop: options.closeOnBackdrop !== false,
           confirmVariant: options.confirmVariant === 'danger' ? 'danger' : 'primary',
-          confirmOnLeft: options.confirmOnLeft === true
+          confirmOnLeft: options.confirmOnLeft === true,
+          checkboxLabel: options.checkboxLabel,
+          checkboxChecked: false,
+          onCheckboxChange: options.onCheckboxChange
         };
         this.pendingConfirmResolver = resolve;
       });

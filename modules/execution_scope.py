@@ -71,6 +71,8 @@ class ExecutionScope:
     network_granted: bool = False
     full_access_grant: Optional[FullAccessGrant] = None
     working_dir: Optional[Path] = None
+    review_input_fingerprint: Optional[str] = None
+    review_username: Optional[str] = None
 
     @property
     def is_sub_agent(self) -> bool:
@@ -141,7 +143,7 @@ def child_access_prompt(access_level: str) -> str:
 
 
 def validate_full_access_request(terminal: Any, arguments: Mapping[str, Any]) -> bool:
-    """Return whether explicit human authorization is needed, or fail closed."""
+    """Return whether one-time full-access approval is needed, or fail closed."""
     request = arguments.get("request_full_access", False)
     if not isinstance(request, bool):
         raise ValueError("request_full_access 必须是布尔值。")

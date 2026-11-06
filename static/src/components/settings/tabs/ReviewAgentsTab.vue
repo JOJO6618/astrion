@@ -49,6 +49,26 @@ const defaultExtraOptions = computed(() => [
         {{ $t(agent.descKey) }}
       </div>
 
+      <label v-if="agent.key === 'auto_approval'" class="settings-toggle-row">
+        <span class="settings-row-copy">
+          <span class="settings-row-title">{{
+            $t('personalization.allowAutoFullAccessTitle')
+          }}</span>
+          <span class="settings-row-desc">{{ $t('personalization.allowAutoFullAccessDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="form.allow_auto_approve_full_access"
+          @change="
+            personalization.updateField({
+              key: 'allow_auto_approve_full_access',
+              value: ($event.target as HTMLInputElement).checked
+            })
+          "
+        />
+        <FancyCheck :checked="form.allow_auto_approve_full_access" />
+      </label>
+
       <div class="settings-select-row">
         <span class="settings-row-copy">
           <span class="settings-row-title">{{ $t('personalization.modelTitle') }}</span>

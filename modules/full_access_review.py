@@ -49,7 +49,9 @@ async def run_full_access_review(
             "item": row,
             "source": source,
         }
-        if status == "expired":
+        if (row or {}).get("review_error_code"):
+            result.update(decision="error", code=row["review_error_code"], reason=row.get("reason"))
+        elif status == "expired":
             result["code"] = "approval_expired"
         elif not row:
             result["code"] = "approval_missing"
@@ -74,7 +76,8 @@ async def run_full_access_review(
         row = out.get("item")
         if row:
             sender("tool_approval_required", {"approval": row, "conversation_id": conversation_id})
-        _progress({"stage": "done", "message": tr("auto_approval.done"), "decision": out.get("decision")})
+        _progress({"stage": "done", "message": tr("auto_approval.done"),
+                   "decision": out.get("decision"), "code": out.get("code")})
         return out
 
     _progress({"stage": "start", "message": tr("auto_approval.start")})
@@ -110,9 +113,11 @@ async def run_full_access_review(
         expired = manager.mark_expired(approval_id)
         _finish(_out(expired, "system"))
         raise
+    except asyncio.TimeoutError:
+        result = {"decision": "error", "code": "review_timeout", "reason": "自动审核等待超时，当前调用未执行。"}
     except Exception as exc:
         result = {
-            "decision": "rejected",
+            "decision": "error", "code": "review_request_failed",
             "reason": tr("approval_agent.request_failed", status=str(exc) or type(exc).__name__),
         }
 
@@ -123,9 +128,11 @@ async def run_full_access_review(
         result = {}
     decision = str(result.get("decision") or "").strip().lower()
     if decision not in {"approved", "rejected"}:
-        decision = "rejected"
-        reason = tr("approval_agent.invalid_decision")
-    else:
-        reason = str(result.get("reason") or "").strip() or tr("approval_agent.no_reason")
+        failed = manager.mark_review_failed(
+            approval_id, code=str(result.get("code") or "review_invalid_decision"),
+            reason=str(result.get("reason") or tr("approval_agent.invalid_decision")),
+        )
+        return _finish(_out(failed, "approval_agent"))
+    reason = str(result.get("reason") or "").strip() or tr("approval_agent.no_reason")
     decided = manager.record_auto_review(approval_id, decision=decision, reason=reason)
     return _finish(_out(decided, "approval_agent"))

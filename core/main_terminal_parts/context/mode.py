@@ -154,8 +154,17 @@ class ModeMixin:
         _session = getattr(self, "container_session", None)
         docker_runtime = bool(_session and getattr(_session, "mode", None) == "docker")
 
-        # 根据模式生成详细规则
-        if mode == "unrestricted":
+        direct = getattr(self, "get_execution_mode", lambda: "sandbox")() == "direct"
+        # 沙箱分支保持现有执行方式；完全访问在执行前审核。
+        if direct and mode in {"approval", "auto_approval"}:
+            detailed_rules = (
+                "- 当前为完全访问环境，命令脱离沙箱执行，拥有运行 Astrion 的系统账户权限\n"
+                "- run_command 和 terminal_input 每次均先审核完整参数；批准后直接执行，不进行沙箱试运行\n"
+                "- 人工审批等待用户批准；自动审核由审核智能体判断危险性和越权风险，通过后直接执行\n"
+                "- 文件工具沿用权限规则：人工审批需批准修改；自动审核允许工作区内 write_file/edit_file，区外修改仍需审核\n"
+                "- 拒绝或超时的操作不执行，不得通过更换工具或命令规避决定"
+            )
+        elif mode == "unrestricted":
             detailed_rules = (
                 "- 所有命令和工具均可直接使用，无需用户批准\n"
                 "- run_command：支持任意命令，包括管道、重定向、子shell等\n"
@@ -182,7 +191,6 @@ class ModeMixin:
                 "- 读取授权范围外的路径：审批无法放行，需用户在「路径授权」中添加\n"
                 "- 需要用户批准：write_file、edit_file、save_webpage 及其他会修改工作区的操作\n"
                 "- 被拒绝或超时：本次操作不会执行写入\n"
-                "- 执行环境已锁定为沙箱（完全访问仅在无限制模式下可选）\n"
                 "- 终端会话（terminal_*）可直接创建与输入（无需批准），但以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
             )
         elif mode == "auto_approval":
@@ -193,8 +201,7 @@ class ModeMixin:
                 "- 自动审批由后台审批智能体执行，默认只判断危险性与越权风险，不判断任务必要性\n"
                 "- 自动审批拒绝：本次工具调用会返回“拒绝+理由”，主循环继续；人工拒绝可随时接管\n"
                 "- 普通自动审批支持人工接管：用户在审批面板提交人工决定后，停止自动审批并以人工决策为准\n"
-                "- 单次完全访问申请采用双重授权：自动审核与人工审批独立裁决，两项均通过才执行，任一拒绝即结束本次申请；人工先允许不能中止或替代自动审核\n"
-                "- 执行环境已锁定为沙箱（完全访问仅在无限制模式下可选）\n"
+                "- 单次完全访问默认需要自动审核与人工审批均通过；用户开启允许自动审核通过单次完全访问请求后，自动审核通过即执行，无需人工批准；任一拒绝均不得规避\n"
                 "- 终端会话（terminal_*）以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
             )
         else:
@@ -296,7 +303,7 @@ class ModeMixin:
                 "- 遇到权限问题时，先核对命令、路径和执行环境。确认属于沙箱限制后，向用户说明具体原因；完成用户已授权的任务确实需要超出沙箱权限时，可通过 run_command 设置 request_full_access=true，并填写非空 full_access_reason，申请本次命令的完全访问权限\n"
                 "- 申请前简短说明执行目的、受限原因和所需访问范围，然后直接发起工具申请，由审批面板获取授权，无需先在聊天中重复询问是否申请\n"
                 "- 仅本次命令在审批通过后于宿主机执行，不改变对话的全局权限或执行环境，也不扩大其他工具或持久终端的权限\n"
-                "- 单次完全访问仅对主智能体的 run_command 开放；计划模式、只读模式和子智能体不可申请。开启自动审核时，必须同时获得自动审核通过与人工批准\n"
+                "- 单次完全访问仅对主智能体的 run_command 开放；计划模式、只读模式和子智能体不可申请。默认需要人工批准，自动审核模式默认还须自动审核；自动审核或无限制模式下，用户开启允许自动审核通过单次完全访问后，由审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准\n"
                 "- 禁止通过未经授权的方式规避沙箱限制。申请被拒绝后，应说明结果，不得换命令、换工具或重复申请来规避该决定\n"
                 "- 需要持续扩大访问范围时，可请用户调整路径授权或执行环境"
             )
@@ -374,7 +381,7 @@ class ModeMixin:
                 "- 申请前简短说明执行目的、受限原因和所需访问范围，然后直接发起工具申请，由审批面板获取授权，无需先在聊天中重复询问是否申请\n"
                 "- 单次完全访问使用 Windows cmd.exe，申请时必须重新编写适用于 cmd 的命令和 Windows 路径，不能原样提交失败的 bash 命令\n"
                 "- 仅本次命令在审批通过后于宿主机执行，不改变对话的全局权限或执行环境，也不扩大其他工具或持久终端的权限；该次执行结束后，后续普通命令仍按 WSL2 沙箱环境编写\n"
-                "- 单次完全访问仅对主智能体的 run_command 开放；计划模式、只读模式和子智能体不可申请。开启自动审核时，必须同时获得自动审核通过与人工批准\n"
+                "- 单次完全访问仅对主智能体的 run_command 开放；计划模式、只读模式和子智能体不可申请。默认需要人工批准，自动审核模式默认还须自动审核；自动审核或无限制模式下，用户开启允许自动审核通过单次完全访问后，由审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准\n"
                 "- 禁止通过未经授权的方式规避沙箱限制。申请被拒绝后，应说明结果，不得换命令、换工具或重复申请来规避该决定\n"
                 "- 命令报 command not found：先检查命令写法、是否误用了 Windows 程序及工具是否已安装，不将普通命令错误直接视为权限问题\n"
                 "- 需要持续扩大访问范围或持续使用 Windows 原生工具链时，可请用户调整工作区或执行环境"
@@ -391,7 +398,7 @@ class ModeMixin:
         label = self._EXECUTION_MODE_LABEL.get(mode, mode)
         import platform
         if platform.system() != "Windows":
-            return f"执行环境被用户修改为 {label}"
+            return f"执行环境被用户修改为 {label}。以本次规则为准。\n{self._build_permission_mode_message() or ''}"
         ws_win = self._workspace_win_path() or "<工作区>"
         if mode == "sandbox":
             ws_wsl = self._workspace_wsl_path() or "<工作区 WSL 路径>"
@@ -410,7 +417,7 @@ class ModeMixin:
                 f"{network_part}"
                 f"{final_no}. 遇到权限拒绝或区外路径不存在时，先核对命令和路径。确认属于沙箱限制，且完成已授权任务确需宿主机访问或 Windows 原生工具链时，可通过 run_command 设置 request_full_access=true，并填写 full_access_reason，直接发起本次命令的授权申请，无需在聊天中重复询问是否申请\n"
                 f"{final_no + 1}. 单次完全访问使用 Windows cmd.exe，申请时须改写为 Windows 命令和路径；仅本次命令经审批后在宿主机执行，后续普通命令仍使用 WSL2 bash，不改变全局权限或执行环境\n"
-                f"{final_no + 2}. 计划模式、只读模式和子智能体不可申请；开启自动审核时须自动与人工双重批准。禁止未经授权规避沙箱限制，也不得规避拒绝决定\n"
+                f"{final_no + 2}. 计划模式、只读模式和子智能体不可申请；默认需要人工批准，自动审核模式默认还须自动审核。自动审核或无限制模式下，用户开启允许自动审核通过单次完全访问后，由审核智能体批准即可执行，无需人工批准；人工审批模式始终需要人工批准。禁止未经授权规避沙箱限制，也不得规避拒绝决定\n"
                 "\n"
                 "此前的命令如果是按 Windows 环境编写的，请按上述规则改写后重新执行。"
             )
@@ -423,7 +430,8 @@ class ModeMixin:
             f"2. 路径恢复 Windows 风格：当前工作区为 {ws_win}，不要再使用 /mnt/ 形式的 WSL 路径\n"
             "3. 你不再处于沙箱边界内：请保持最小化命令范围，操作尽量限制在工作区内；涉及删除/覆盖/系统级变更前，先向用户说明风险\n"
             "\n"
-            "此前的命令如果是按 Linux 沙箱环境编写的，请按上述规则改写后重新执行。"
+            "此前的命令如果是按 Linux 沙箱环境编写的，请按上述规则改写后重新执行。\n"
+            f"{self._build_permission_mode_message() or ''}"
         )
 
     # ---- 运行期模式基线（权限/执行环境/网络权限的「智能体已知晓」状态） ----
@@ -501,7 +509,8 @@ class ModeMixin:
         """构建运行期模式切换通知文本（运行期注入与空闲期补注共用，保证两处一致）。"""
         if kind == "permission_mode":
             label = self._PERMISSION_MODE_LABEL.get(mode, mode)
-            return f"权限模式被用户修改为 {label}"
+            rules = self._build_permission_mode_message() or ""
+            return f"权限模式被用户修改为 {label}。以本次规则为准。\n{rules}"
         if kind == "network_permission":
             label = self._NETWORK_PERMISSION_LABEL.get(mode, mode)
             return f"网络权限被用户修改为 {label}"

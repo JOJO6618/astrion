@@ -25,6 +25,7 @@ from config import TOOL_CALL_COOLDOWN
 from modules.personalization_manager import load_personalization_config, resolve_context_compression_settings
 from modules.auto_approval_service import run_auto_approval
 from modules.execution_scope import command_fingerprint
+from modules.tool_approval_manager import resolve_approval_requirements
 from .tool_execution_authority import resolve_approval_authority, execute_with_authority, DeniedExecution
 from modules.user_question_manager import format_user_question_answer
 from .deep_compression import run_deep_compression
@@ -227,9 +228,12 @@ def _inject_runtime_mode_notice(
     )
 
 
-def _format_rejected_tool_text(reason: str) -> str:
+def _format_rejected_tool_text(reason: str, *, automatic: bool = False, failed: bool = False) -> str:
     clean_reason = str(reason or "").strip() or tr("tool_loop.reason_not_provided")
-    return tr("tool_loop.tool_call_rejected", reason=clean_reason)
+    if failed:
+        return tr("tool_loop.review_failed_detail", reason=clean_reason)
+    text = tr("tool_loop.tool_call_rejected", reason=clean_reason)
+    return text + "\n" + tr("tool_loop.auto_rejected_guidance") if automatic else text
 
 
 def _approval_timeout_for(web_terminal) -> Optional[float]:
@@ -542,7 +546,7 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
         if comment:
             message += tr("tool_loop.plan_approved_comment", comment=comment)
         return _payload(success=True, status="approved", message=message,
-                        comment=comment, plan_file=plan_file)
+                        comment=comment, plan_file=plan_file, plan_content=approval.get("plan_content") or plan_content)
 
     if status == "rejected":
         message = tr("tool_loop.plan_rejected")
@@ -659,6 +663,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
     recent_tool_actions = list(getattr(web_terminal, "_recent_tool_actions", []) or [])
 
     user_question_results_by_tool_call_id: Dict[str, str] = {}
+    user_question_status_by_tool_call_id: Dict[str, str] = {}
     user_question_id_by_tool_call_id: Dict[str, str] = {}
     ask_user_items: List[Dict[str, Any]] = []
     for idx, pending_tool_call in enumerate(tool_calls or []):
@@ -732,6 +737,10 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             tool_call_id = str(question.get("tool_call_id") or "")
             if tool_call_id:
                 user_question_results_by_tool_call_id[tool_call_id] = answer_text
+                answer_status = str(answer_row.get("status") or "missing")
+                if isinstance(answer_row.get("answer"), dict) and answer_row["answer"].get("type") == "dismissed":
+                    answer_status = "dismissed"
+                user_question_status_by_tool_call_id[tool_call_id] = answer_status
         sender('user_questions_resolved', {
             'batch_id': batch_id,
             'question_ids': [q.get("question_id") for q in created_questions],
@@ -992,7 +1001,16 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 arguments=arguments,
                 preview=approval_preview,
                 approval_type=permission_eval.get("approval_type", "sandbox_write"),
-                auto_review_required=permission_eval.get("mode") == "auto_approval",
+                execution_mode=web_terminal.get_execution_mode(),
+                **resolve_approval_requirements(
+                    permission_eval.get("mode"),
+                    permission_eval.get("approval_type", "sandbox_write"),
+                    allow_auto_approve_full_access=(
+                        permission_eval.get("approval_type") == "full_access"
+                        and permission_eval.get("mode") in {"auto_approval", "unrestricted"}
+                        and load_personalization_config(web_terminal.data_dir).get("allow_auto_approve_full_access", False)
+                    ),
+                ),
             )
             sender('tool_approval_required', {
                 'approval': approval_item,
@@ -1014,7 +1032,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             })
             wait_result = None
             permission_mode = str(permission_eval.get("mode") or "")
-            if permission_mode == "auto_approval":
+            if approval_item.get("auto_review_required"):
                 approval_id = approval_item.get("approval_id")
                 wait_result = await run_auto_approval(
                     web_terminal=web_terminal,
@@ -1050,10 +1068,15 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 'approval_id': approval_item.get("approval_id"),
                 'decision': wait_result.get("decision"),
                 'reason': ((wait_result.get("item") or {}).get("reason") or wait_result.get("reason")),
+                'code': wait_result.get("code"),
                 'conversation_id': conversation_id,
             })
             if wait_result.get("decision") != "approved":
-                reject_message = tr("tool_loop.rejected_by_user")
+                review_failed = wait_result.get("decision") == "error"
+                automatic_decision = wait_result.get("source") == "approval_agent"
+                reject_message = tr("tool_loop.review_failed" if review_failed else (
+                    "tool_loop.rejected_by_review" if automatic_decision else "tool_loop.rejected_by_user"
+                ))
                 if wait_result.get("code") == "approval_timeout":
                     reject_message = tr("tool_loop.rejected_timeout")
                 reason = ((wait_result.get("item") or {}).get("reason") or wait_result.get("reason") or "").strip()
@@ -1061,8 +1084,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     reject_message = f"{reject_message}：{reason}"
                 reject_payload = {
                     "success": False,
-                    "status": "rejected",
-                    "code": "approval_rejected",
+                    "status": "error" if review_failed else "rejected",
+                    "code": (wait_result.get("code") or "review_failed") if review_failed else "approval_rejected",
                     "tool": function_name,
                     "message": reject_message,
                     "approval_id": approval_item.get("approval_id"),
@@ -1074,12 +1097,15 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     'message': reject_message,
                     'conversation_id': conversation_id
                 })
-                reject_content = _format_rejected_tool_text(reason or reject_message)
+                reject_content = _format_rejected_tool_text(
+                    reason or reject_message, automatic=automatic_decision, failed=review_failed,
+                )
                 web_terminal.context_manager.add_conversation(
                     "tool",
                     reject_content,
                     tool_call_id=tool_call_id,
-                    name=function_name
+                    name=function_name,
+                    metadata={"tool_payload": reject_payload, "status": reject_payload["status"]},
                 )
                 messages.append({
                     "role": "tool",
@@ -1151,11 +1177,13 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         if function_name == "ask_user" and str(tool_call_id) in user_question_results_by_tool_call_id:
             answer_text = user_question_results_by_tool_call_id.get(str(tool_call_id)) or tr("tool_loop.user_no_answer")
             qid = user_question_id_by_tool_call_id.get(str(tool_call_id))
+            answer_status = user_question_status_by_tool_call_id.get(str(tool_call_id), "missing")
             tool_result = json.dumps({
-                "success": True,
-                "status": "answered",
+                "success": answer_status == "answered",
+                "status": answer_status,
+                "answer_status": answer_status,
                 "message": answer_text,
-                "answer_text": answer_text,
+                "answer_text": answer_text if answer_status == "answered" else "",
                 "question_id": qid,
             }, ensure_ascii=False)
         elif function_name == "submit_plan":
@@ -1292,7 +1320,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 tool_name=function_name,
                 arguments=arguments,
                 preview=approval_preview,
-                auto_review_required=permission_eval.get("mode") == "auto_approval",
+                execution_mode=web_terminal.get_execution_mode(),
+                **resolve_approval_requirements(permission_eval.get("mode"), "sandbox_write"),
             )
             sender('tool_approval_required', {
                 'approval': approval_item,
@@ -1312,7 +1341,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
             })
             wait_result = None
             permission_mode = str(permission_eval.get("mode") or "")
-            if permission_mode == "auto_approval":
+            if approval_item.get("auto_review_required"):
                 approval_id = approval_item.get("approval_id")
                 wait_result = await run_auto_approval(
                     web_terminal=web_terminal,
@@ -1337,10 +1366,15 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 'approval_id': approval_item.get("approval_id"),
                 'decision': wait_result.get("decision"),
                 'reason': ((wait_result.get("item") or {}).get("reason") or wait_result.get("reason")),
+                'code': wait_result.get("code"),
                 'conversation_id': conversation_id,
             })
             if wait_result.get("decision") != "approved":
-                reject_message = tr("tool_loop.rejected_by_user")
+                review_failed = wait_result.get("decision") == "error"
+                automatic_decision = wait_result.get("source") == "approval_agent"
+                reject_message = tr("tool_loop.review_failed" if review_failed else (
+                    "tool_loop.rejected_by_review" if automatic_decision else "tool_loop.rejected_by_user"
+                ))
                 if wait_result.get("code") == "approval_timeout":
                     reject_message = tr("tool_loop.rejected_timeout")
                 reason = ((wait_result.get("item") or {}).get("reason") or wait_result.get("reason") or "").strip()
@@ -1348,8 +1382,8 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     reject_message = f"{reject_message}：{reason}"
                 reject_payload = {
                     "success": False,
-                    "status": "rejected",
-                    "code": "approval_rejected",
+                    "status": "error" if review_failed else "rejected",
+                    "code": (wait_result.get("code") or "review_failed") if review_failed else "approval_rejected",
                     "tool": function_name,
                     "message": reject_message,
                     "approval_id": approval_item.get("approval_id"),
@@ -1361,12 +1395,15 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                     'message': reject_message,
                     'conversation_id': conversation_id
                 })
-                reject_content = _format_rejected_tool_text(reason or reject_message)
+                reject_content = _format_rejected_tool_text(
+                    reason or reject_message, automatic=automatic_decision, failed=review_failed,
+                )
                 web_terminal.context_manager.add_conversation(
                     "tool",
                     reject_content,
                     tool_call_id=tool_call_id,
-                    name=function_name
+                    name=function_name,
+                    metadata={"tool_payload": reject_payload, "status": reject_payload["status"]},
                 )
                 messages.append({
                     "role": "tool",

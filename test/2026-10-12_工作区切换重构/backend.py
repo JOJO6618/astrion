@@ -193,6 +193,8 @@ class DisplayTests(unittest.TestCase):
                 api_login_required=identity_decorator, with_workspace_data=identity_decorator, timed=identity_decorator,
                 task_manager=SimpleNamespace(capture_display=captured), effective_modes=lambda *a: {'execution_mode': 'sandbox'},
                 pending_modes=lambda *a: {}, background_status=lambda *a, **k: {'has_running_sub_agents': False}, ACTIVE={'running'},
+                _context_baseline_tokens=lambda meta: 0, _compress_limit_tokens=lambda meta: None,
+                _compress_limit_source=lambda meta: None,
                 FileManager=lambda *a, **k: SimpleNamespace(set_host_execution_mode=lambda _: None),
                 is_preview_enabled=lambda: False, jsonify=lambda value=None, **kw: value if value is not None else kw,
                 timing_note=lambda *a, **k: None, timed_call=lambda name, fn, *a, **k: fn(*a, **k),
@@ -221,7 +223,7 @@ class DisplayTests(unittest.TestCase):
         planned = rules.resolve_conversation_modes({'work_mode': 'plan', 'permission_mode': 'unrestricted', 'execution_mode': 'direct'})
         self.assertEqual(planned['permission_mode'], 'readonly'); self.assertEqual(planned['execution_mode'], 'sandbox')
         restricted = rules.resolve_conversation_modes({'work_mode': 'execute', 'permission_mode': 'approval', 'execution_mode': 'direct'})
-        self.assertEqual(restricted['execution_mode'], 'sandbox')
+        self.assertEqual(restricted['execution_mode'], 'direct')
         hosted = rules.resolve_conversation_modes({'work_mode': 'execute', 'permission_mode': 'unrestricted', 'execution_mode': 'direct'})
         self.assertEqual(hosted['execution_mode'], 'direct')
 

@@ -138,12 +138,19 @@ class WorkflowReviewAgent:
         work_path = Path(getattr(self.web_terminal.context_manager, "project_path", "."))
         timeout = int(self.cfg.get("max_command_timeout") or DEFAULT_MAX_COMMAND_TIMEOUT)
         try:
-            result = await self.web_terminal.terminal_ops.run_command(
-                command=command,
-                working_dir=str(work_path),
-                timeout=timeout,
-                sandbox_write_access=False,
+            from modules.execution_scope import ExecutionScope, bind_execution_scope
+            scope = ExecutionScope(
+                executor_kind="review", actor_id="workflow_review",
+                workspace_root=work_path.resolve(), access_level="sandbox_write",
             )
+            with bind_execution_scope(scope):
+                result = await self.web_terminal.terminal_ops.run_command(
+                    command=command,
+                    working_dir=str(work_path),
+                    timeout=timeout,
+                    sandbox_write_access=False,
+                    network_permission="restricted",
+                )
             return result if isinstance(result, dict) else {"success": False, "error": "run_command 返回格式异常"}
         except Exception as exc:
             return {"success": False, "error": str(exc)}

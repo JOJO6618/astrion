@@ -129,7 +129,8 @@ export default {
   codexManageInProviders: '前往「提供商」连接',
   codexAccountLine: '账号 {account}',
   codexAccountSelectorTitle: '查看账号',
-  codexAccountSelectorHint: '仅切换本页查看的账号，不影响正在运行的对话；连接、断开与刷新模型请在「提供商」操作。',
+  codexAccountSelectorHint:
+    '仅切换本页查看的账号，不影响正在运行的对话；连接、断开与刷新模型请在「提供商」操作。',
   codexAccountPrimaryBadge: '主账号',
   codexAccountHashLabel: '哈希 {hash}',
   codexLoginInProgress: '已有登录流程正在进行，请先完成或取消当前登录。',
@@ -521,6 +522,9 @@ export default {
   reviewIntro:
     '统一配置三个审核智能体的模型与运行参数。模型来源与主模型注册表一致（含 Codex），留空则自动选择。',
   reviewAgentAutoApproval: '自动审批智能体',
+  allowAutoFullAccessTitle: '允许自动审核通过单次完全访问请求',
+  allowAutoFullAccessDesc:
+    '在自动审核或无限制模式下，审核智能体批准单次完全访问请求后立即执行，无需人工批准。默认关闭；人工审批模式不受影响。',
   reviewAgentAutoApprovalDesc: '自动审批模式下判断工具调用是否越权/危险',
   reviewAgentGoalReview: '目标审核智能体',
   reviewAgentGoalReviewDesc: '目标模式下判断长期目标是否真正达成',

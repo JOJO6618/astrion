@@ -282,14 +282,15 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 ### 10.1 权限模式
 
 - **`readonly`**：`run_command` 只能在只读沙箱执行，写入由系统拒绝；读取同样受限（可读边界见 §10.8），**读不到属预期边界不是故障**；`write_file`/`edit_file` 直接拒绝；持久终端可创建与输入但以只读身份运行（写入 EPERM 由系统强制）；权限跨界切换时现有终端直接销毁重开。
-- **`approval`**：`run_command` 先走只读沙箱 → 出现权限拒绝（`Operation not permitted`/`Permission denied`）触发前端审批 → 通过后仅该次命令以可写沙箱重试，工具结果返回重试后的最终结果。**审批只授予该次命令的工作区内写权限，不放大读取**；重试后仍被文件权限拒绝时工具结果附 `read_scope_hint`。**执行环境锁定为沙箱**（direct 下无沙箱兜底会让审批承诺被架空，故与 direct 硬互斥）。
-- **`auto_approval`**：`write_file`/`edit_file` 工作区内直接执行、工作区外进审批；`run_command` 先只读沙箱→权限拒绝后由后台审批智能体自动审核；拒绝时返回「被拒绝+理由」并继续主循环（不强制结束任务）；执行环境同样锁定沙箱。
+- **`approval`**：沙箱逻辑不变：命令按既有规则预审批，或先只读执行、遇权限拒绝后审批并以可写沙箱重试（不放大读边界）。完全访问下每次 `run_command` / `terminal_input` 均执行前人工审批，通过后直接在宿主机执行，不做沙箱试运行。
+- **`auto_approval`**：工作区内 `write_file` / `edit_file` 直接执行、区外修改进审核；沙箱命令保留现有逻辑。完全访问下每次命令／终端输入先自动审核，通过后直接执行；拒绝回填失败结果并继续模型循环。
 - **`unrestricted`**：权限层不拦截（工作区内读写自由、命令免批准）；是否沙箱由执行环境决定。**「无限制」只管工作区内**——宿主机沙箱下读边界仍是白名单，范围外读取需路径授权；只有 direct 才真正无边界。
 
 ### 10.2 执行环境
 
 - `sandbox`（默认）：OS 沙箱执行（macOS `sandbox-exec`／Linux `bwrap+seccomp`／Windows `WSL2`）。
-- `direct`：宿主机直接执行（高风险），**仅 `unrestricted` 可选**；受限权限档与 plan 模式下后端 `set_execution_mode` 硬锁拒绝 direct，进入受限档时若已是 direct 会被联动压回沙箱（记录 `pre_readonly_execution_mode`，切回 unrestricted 恢复）；存量「受限档+direct」对话加载时自愈矫正。
+- `direct`：宿主机直接执行，支持 `approval` / `auto_approval` / `unrestricted`；仅只读与计划模式强制沙箱。首次显式切入弹出风险确认，红色「我明白，切换」、返回沙箱及「不再提示」；用户级 `full_access_warning_dismissed` 默认 false，仅确认后保存勾选，恢复已有 direct 对话不反复弹窗。
+- 审批记录绑定创建时执行环境、完整参数和任务身份，执行前核对并单次领取；`direct_execution` 使用完全访问作用域，不借用单次提权 grant。审核智能体取证独立绑定只读沙箱，不继承主对话 direct。
 - 切换后一直生效，**无自动回退机制**（2026-07 已移除原 TTL 自动回退）。
 
 ### 10.3 路径授权语义
@@ -306,6 +307,8 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 - 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段 `model`（留空=自动规则）/`timeout_seconds`/`max_rounds`/`max_command_timeout`。**思考固定开启、推理强度走模型默认，均无设置项（2026-11-06）**；三者统一经 `modules/review_model_caller.py` 走 `APIClient`（两种协议同一通道，`timeout_seconds` 对整次请求生效），每次请求计入对话账本（见 §22）。
 - 解析入口 `modules/review_agent_config.py::resolve_review_agent_config`（复用 `aux_model_resolver`）。旧的独立 json（`config/auto_approval.json`/`goal_review.json`/`workflow_review.json.example`）与 `sub_agent_models.json` 库均已彻底废除，**无向后兼容**。
+- **自动审核上下文（2026-11-06）**：送审user为紧凑纯文本；直接输入／运行引导／ask问答合计最近5条、普通调用＋结果最近5个，固定附已批准计划／当前目标／工作触发消息并去重。`guidance`的自动注入标记不代表非用户；工具须按结果配对，不能用执行前的_recent_tool_actions。审核专用历史补查使用本次冻结快照。政策与完整契约见 `docs/auto_approval_review.md`。
+- **裁决与故障**：正常approved／rejected，不加needs_human；审核失败独立error、有限重试、不执行且不自动转人工。单次完全访问的免人工开关关闭时仍保留原人工批准条件。已受理新引导／执行条件变化使旧审核失效，领取批准及启动工具前再次核对。
 - 调试开关：`modules/approval_agent.py` 的 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`，开启后写 `logs/approval_agent/`。
 
 ### 10.6) 运行模式（work_mode）系统（2026-08-13 新增）
@@ -318,7 +321,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 **实现要点（改代码必须知道）**：
 
-- 后端核心 `core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁、`RESTRICTED_PERMISSION_MODES` 与受限档⇄沙箱联动）；执行环境锁在 `core/main_terminal.py::set_execution_mode`（只拦 direct）。
+- 后端核心 `core/main_terminal_parts/tools_policy.py`（WORK_MODES、`get/set/switch_work_mode`、plan 锁、`RESTRICTED_PERMISSION_MODES={readonly}` 与只读⇄沙箱联动）；执行环境锁在 `core/main_terminal.py::set_execution_mode`（只读／plan 禁止 direct）。
 - **Web 新对话初始化（2026-10-16）**：所有新建按钮只进入 `/new`，删除立即创建空文件的个人选项；首条消息才创建。工作区 terminal 独立缓存个人默认模型、思考模式、推理强度、工作模式、权限模式；进入 `/new` 经 `POST /api/new-conversation/settings` 装配。执行环境/网络只继承**刚离开的同工作区正在查看的对话**；跨工作区、直接打开或来源缺失固定 `sandbox + restricted`，禁止扫描最近对话。推理强度 `null` 是有效默认。空页切换只改前端，首消息提交完整 `settings`，统一由 `server/context/new_conversation.py` 校验创建；创建时不再覆盖个人默认。状态轮询不得覆盖空页选择。CLI/Gateway 与工作流创建尚保留各自入口，不据此宣称已统一。**任何创建路径不得在 plan 锁之前调用非只读 set**（曾因此 500）。
 - 提示词：`prompts/work_mode.txt` + `mode.py::_build_work_mode_rules`（三档规则唯一来源）；冻结注入在 `messages.py`；切换走 drift 机制（`_RUNTIME_MODE_KINDS` 第四种）。
 - API：`GET/POST /api/work-mode`；**仅空闲可切换，运行中 409**。
@@ -548,7 +551,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - `working_dir_write`仅子工作目录可写，`workspace_write`为原工作区可写；workspace_root始终是原项目身份，相对路径和默认cwd使用working_dir。macOS临时目录位于对应固定写根内，不附带宿主`/tmp`写授权。原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入。工作目录按路径组件检查并安全新建，**不用字符串 startswith**。
 - **Docker 不支持 `full_access`**；最低档经 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，**不使用 DAC 降级或宿主机回退**。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`）。
 - 主 `run_command` 的 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，Docker/远端替身后端不伪装支持。已处于 direct 时无需额外申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
-- 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。**开启自动审核时自动与人工独立裁决**，任一拒绝即终结该次申请，两项通过才执行；**拒绝完全访问只回填工具失败结果并继续智能体循环，不触发 task_stopped；用户主动停止仍正常取消**。**人工先允许不能取消自动审核**。授权记录保存执行者/根/对话/任务/工具调用/完整参数，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 在原生命令入口再次核对。授权失效返回正常工具失败结果，**不中断历史消息配对**。内置工具名禁止被自定义注册或分派覆盖。
+- 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。用户级 `allow_auto_approve_full_access` 默认 false：关闭时自动审核模式需自动与人工独立通过，无限制模式仅需人工；开启时两种模式的新请求均由审核智能体批准即可执行（记录 `auto_review_required=true`、`human_approval_required=false`）。人工审批模式始终人工审批；普通无限制操作和已在 direct 环境的命令继续免审。条件在请求创建时快照，派发按请求字段决定；审核明确告知脱离沙箱且批准后立即执行。人工先允许不能取消必需的自动审核。拒绝、故障和输入过期均不执行；任一拒绝仅结束申请并回填工具失败结果，不触发 task_stopped；主动停止正常取消。授权记录绑定执行环境／完整参数／任务身份，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 再核对，失效不破坏消息配对。
 - 前台、后台均绑定该次权限，不改变主对话全局状态；后台创建经 `asyncio.to_thread`，Popen 与取消在相同锁内握手。**正常后台完成不等于取消全部后台任务。**
 - Web 审批 UI 在输入栏 `ComposerApprovalDock.vue`（人工模式：上方滚动内容 + 左下固定拒绝/允许；自动审核时才加右侧进度区）。同对话串行审批、不加翻页；完成后不自动展示记录卡片或恢复入口，`/` 与 `+` 的手动入口始终能打开。视觉由用户验收。
 - 回归目录：`test/2026-10-07_子智能体权限与单次完全访问/`、`test/2026-10-07_审批面板交互/`。

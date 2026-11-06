@@ -88,10 +88,8 @@ from modules.i18n import tr
 logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 PERMISSION_MODES = {"readonly", "approval", "auto_approval", "unrestricted"}
-# 受限权限档：只读 / 批准 / 自动审核。三档都依赖宿主机 OS 沙箱硬限制兜底
-# （批准后仍是沙箱可写+白名单读，direct 下启发式漏判的写命令无任何兜底），
-# 执行环境统一锁定为沙箱；direct（完全访问）是无限制档的专属搭配。
-RESTRICTED_PERMISSION_MODES = {"readonly", "approval", "auto_approval"}
+# 仅只读权限依赖 OS 沙箱强制；审批权限在 direct 下先审批再执行。
+RESTRICTED_PERMISSION_MODES = {"readonly"}
 # 运行模式（交互方式档）：计划 / 询问 / 执行。
 # 与权限模式（能力档）正交；plan 档会联动锁死权限为只读。
 WORK_MODES = {"plan", "ask", "execute"}
@@ -240,18 +238,15 @@ class MainTerminalToolsPolicyMixin:
                 return mode
 
     def terminal_readonly_enabled(self) -> bool:
-                """持久终端是否以只读身份创建（docker 与宿主机沙箱通用）。
+                """只读权限及沙箱中的审批权限使用只读终端身份。
 
-                readonly / approval / auto_approval 模式下为 True：新建的终端
-                会话与只读 run_command 同一身份——docker 容器内为非特权 uid
-                （内核 DAC 强制只读，见 modules/docker_readonly_exec.py），
-                宿主机沙箱为只读 profile（macOS Seatbelt 白名单只读 / Linux ro-bind
-                / Windows WSL 只读挂载，见 host_sandbox_runner 的 shell plan
-                readonly 参数）；unrestricted 保持可写身份（docker root /
-                宿主机可写 profile）。权限跨界切换（受限档⇄unrestricted）时
-                现有终端会被销毁，下次以新身份重建。
+                完全访问的审批权限使用普通宿主 shell，每次输入由执行前审批控制。
+                身份或执行环境改变时关闭已有终端，下次以新身份创建。
                 """
-                return self.get_permission_mode() != "unrestricted"
+                return self.get_permission_mode() == "readonly" or (
+                    self.get_permission_mode() in {"approval", "auto_approval"}
+                    and self.get_execution_mode() != "direct"
+                )
 
     def get_work_mode(self) -> str:
                 mode = str(getattr(self, "current_work_mode", None) or WORK_MODE_DEFAULT).strip().lower()
@@ -385,11 +380,15 @@ class MainTerminalToolsPolicyMixin:
                     except AttributeError:
                         pass
                 previous = self.get_permission_mode()
-                # 受限档集合边界判定：readonly⇄approval 互切不动执行环境；
-                # 仅 unrestricted⇄受限档 跨界时才强制沙箱 / 恢复进入前环境。
+                # 只有进入/离开 readonly 时联动沙箱；审批权限保持所选环境。
                 entering_restricted = normalized in RESTRICTED_PERMISSION_MODES and previous not in RESTRICTED_PERMISSION_MODES
                 leaving_restricted = previous in RESTRICTED_PERMISSION_MODES and normalized not in RESTRICTED_PERMISSION_MODES
+                previous_terminal_readonly = self.terminal_readonly_enabled()
                 self.current_permission_mode = normalized
+                if previous_terminal_readonly != self.terminal_readonly_enabled():
+                    manager = getattr(self, "terminal_manager", None)
+                    if manager is not None:
+                        manager.close_all()
                 if not persist:
                     # 受限档联动不依赖持久化：运行中 pending 切换路径（apply_pending_runtime_mode_changes）
                     # 也要内存级强制沙箱，只是不落 metadata（无记录则切离时保持沙箱，安全默认）。
@@ -410,27 +409,12 @@ class MainTerminalToolsPolicyMixin:
                 return normalized
 
     def _apply_restricted_execution_mode_link(self, entering: bool, leaving: bool, *, persist: bool) -> None:
-                """受限权限档（只读/批准/自动审核）⇄ 执行环境联动：进入受限档强制切沙箱，切离恢复进入前执行环境。
+                """只读权限强制沙箱，离开时恢复明确记录的原执行环境。
 
-                与 plan ⇄ readonly+sandbox 双锁逻辑对称：受限档都依赖宿主机 OS 沙箱硬限制兜底
-                （批准后重试仍是可写沙箱+白名单读），direct（完全访问）下无沙箱，审批承诺会被架空
-                （启发式漏判的写命令直接执行成功、无 EPERM 触发审批），必须一并锁回沙箱。
-                进入受限档时若执行环境为 direct，先存 pre_readonly_execution_mode 供切离时恢复；
-                切离受限档（到 unrestricted）时仅当有明确进入前记录才恢复（无记录保持 sandbox，安全默认）。
-                注意：metadata 键名保留 pre_readonly_execution_mode 不改（语义已泛化为受限档共用），
-                存量对话的恢复记录不受影响。
-
-                终端身份联动：终端读写身份在创建时钉死（受限档=只读身份，unrestricted=可写/root），
-                跨界切换时销毁现有终端会话，强制下次以新身份重建；readonly⇄approval
-                互切身份不变，不销毁。与执行环境切换销毁（terminal_manager.set_host_execution_mode）同策略。
+                保留 pre_readonly_execution_mode 存储键；无记录保持沙箱。
+                终端读写身份由 set_permission_mode 检测，环境变化由终端管理器处理。
                 """
-                if entering or leaving:
-                    try:
-                        tm = getattr(self, "terminal_manager", None)
-                        if tm is not None and hasattr(tm, "close_all"):
-                            tm.close_all()
-                    except Exception:
-                        pass
+                # 终端仅在读写身份或执行环境改变时关闭；沙箱 readonly↔approval 不重建。
                 if entering:
                     try:
                         if hasattr(self, "get_execution_mode") and self.get_execution_mode() == "direct":

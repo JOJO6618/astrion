@@ -129,7 +129,8 @@ export default {
   codexManageInProviders: 'Connect in Providers',
   codexAccountLine: 'Account {account}',
   codexAccountSelectorTitle: 'Viewing account',
-  codexAccountSelectorHint: 'Switches the account shown on this page only; running conversations are unaffected. Connect, disconnect and model refresh live in Providers.',
+  codexAccountSelectorHint:
+    'Switches the account shown on this page only; running conversations are unaffected. Connect, disconnect and model refresh live in Providers.',
   codexAccountPrimaryBadge: 'Primary',
   codexAccountHashLabel: 'Hash {hash}',
   codexLoginInProgress: 'A sign-in flow is already in progress. Finish or cancel it first.',
@@ -559,6 +560,9 @@ export default {
   reviewIntro:
     'Configure models and run parameters for the three review agents. Models come from the main model registry (including Codex); leave empty for automatic selection.',
   reviewAgentAutoApproval: 'Auto-approval agent',
+  allowAutoFullAccessTitle: 'Allow automatic approval of one-time full access',
+  allowAutoFullAccessDesc:
+    'In auto-approval or unrestricted mode, one-time full-access requests execute immediately after approval by the review agent, without manual approval. Off by default; manual-approval mode is unaffected.',
   reviewAgentAutoApprovalDesc:
     'Judges whether a tool call is out of scope or dangerous in auto-approval mode',
   reviewAgentGoalReview: 'Goal review agent',

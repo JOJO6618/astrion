@@ -27,23 +27,26 @@
   - 若出现权限拒绝（例如 `Operation not permitted` / `Permission denied`），触发前端审批
   - 审批通过后，仅该次命令以可写沙箱重试；工具结果返回“重试后的最终结果”
   - **审批只授予该次命令的工作区内写权限，不放大读取**（2026-08-30 方案一）：可写沙箱读边界与只读同一白名单，读越界唯一途径是「路径授权」；重试后仍为文件权限拒绝时，工具结果附带 `read_scope_hint` 引导模型说明
-  - **执行环境锁定为沙箱**（2026-08-30 起）：direct 下无沙箱兜底，启发式漏判的写命令会直接执行成功、审批承诺被架空，故批准/自动审核与 direct 硬互斥（锁定机制同 plan/只读，见 §10.6）
-  - 持久终端以只读身份运行（同 readonly 条目）：终端内写入永远 EPERM，需审批的写入走 `run_command` 两段式通道
+  - 以上先只读执行／权限拒绝重试规则仅适用于 sandbox。direct 下每次 `run_command` / `terminal_input` 均先人工审核参数，通过后直接执行，不进行沙箱试运行。
+  - sandbox 的持久终端保持只读身份；direct 的终端为普通宿主 shell，所有输入先审批。
 - `auto_approval`
   - `write_file` / `edit_file`：工作区内路径直接执行，工作区外路径进入审批流程
   - `run_command` 先走只读沙箱（可读边界见 §10.8）；触发权限拒绝后由后台审批智能体自动审核
   - 自动审核拒绝时，工具返回“被拒绝+理由”并继续主循环（不强制结束任务）
   - 批准后的读取边界与 approval 相同（不放大）
-  - 执行环境同样锁定为沙箱（同 approval 条目）
+  - 沙箱分支保持原逻辑；direct 下每次命令与终端输入先自动审核，通过后直接执行。区外文件修改仍审核，工作区内编辑沿用免审规则。
 - `unrestricted`
-  - 权限层不做拦截：工作区内读写自由、命令免批准；是否沙箱由执行环境决定
+  - 普通操作权限层不做拦截：工作区内读写自由、命令免批准；是否沙箱由执行环境决定
+  - 沙箱中的显式单次 full_access 申请默认人工审批；用户开启 `allow_auto_approve_full_access` 后改由审核智能体批准即可执行，无需人工。仅改变本次申请的审批方式，普通无限制操作及已在 direct 环境的命令继续免审；审批条件创建时快照。
   - 注意「无限制」只管工作区内：宿主机沙箱执行时读边界仍是白名单（见 §10.8），授权范围外读取需路径授权；direct 模式才真正无边界
 
 ### 10.2 执行环境
 
 - `sandbox`（默认）：使用 OS 沙箱执行（macOS: `sandbox-exec`，Linux: `bwrap + seccomp`，Windows: `WSL2`）
-- `direct`：宿主机直接执行（高风险），**仅 `unrestricted` 权限可选**：受限权限档（只读/批准/自动审核）与 plan 模式下后端 `set_execution_mode` 硬锁拒绝 direct（i18n 键 `main_terminal.restricted_mode_locks_sandbox` / `plan_mode_locks_sandbox`）；进入受限档时若已是 direct 会被联动压回沙箱（记录 `pre_readonly_execution_mode`，切回 unrestricted 时恢复）；存量「受限档+direct」对话在加载时自愈矫正回沙箱
-- 切换后一直生效，无自动回退机制（2026-07 已移除原 TTL 自动回退）
+- `direct`：支持人工审批、自动审核、无限制三种权限。只有 readonly / plan 强制沙箱，恢复／空页／Gateway 使用同一约束。只读切换继续使用 `pre_readonly_execution_mode` 恢复明确记录的原环境。
+- 切换后一直生效，无自动回退机制（2026-07 已移除原 TTL 自动回退）。首次显式切入风险弹窗按用户偏好 `full_access_warning_dismissed`（默认 false）控制；确认且勾选后才保存，不按对话保存，不在恢复 direct 时重复提示。
+- 审批类型 `direct_execution` 绑定执行环境、任务身份和完整参数；批准后单次原子领取完全访问作用域。`full_access` 仍专用于沙箱中的单次提权，两者不混用 grant。
+- 审核智能体自己的命令绑定独立只读 sandbox scope；主对话 direct 不改变审核取证权限。下文平台终端的审批只读身份说明均限定 sandbox 环境。
 
 ### 10.3 路径授权语义
 
@@ -71,6 +74,9 @@
   - **计费**：每次请求写入所属对话账本（`kind=review_agent`），见 `docs/conversation_api_costs.md`
   - 解析入口：`modules/review_agent_config.py::resolve_review_agent_config`（复用 `modules/aux_model_resolver.py` 统一解析主注册表；独立 `sub_agent_models.json` 库已于 2026-09 彻底废弃无兼容，子智能体/审核/标题生成模型同源）
   - 旧的独立 json 配置（`config/auto_approval.json` / `goal_review.json` / `workflow_review.json.example`）已彻底废除，无向后兼容
+- 自动审核送审内容为紧凑纯文本：真实直接输入／引导／ask问答合计最近5条，调用＋结果最近5个，固定附已批准计划、用户目标和工作触发消息并去重；支持本次冻结快照的只读历史补查。不能按is_auto_generated一刀切，也不能将同批未执行调用当历史执行。
+- 正常裁决approved／rejected；调用或解析故障独立error、有限重试且不执行，不新增needs_human或自动转人工。单次完全访问开关默认关闭时，仍允许申请：auto_approval保留双批准条件，unrestricted仅人工；两种模式开启同一开关后均自动审核通过即执行。approval始终人工审批。
+- 审核绑定用户输入与执行条件；新引导导致重审，批准领取和工具启动前再次核对。完整来源、分页、文本与状态契约见 `docs/auto_approval_review.md`，回归 `test/2026-11-06_自动审核上下文/`。
 - 调试开关（代码变量）：`modules/approval_agent.py` 中 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`
   - 开启后写入：`logs/approval_agent/`
   - 记录以累积 `messages` 为主，便于对齐主/子智能体会话格式

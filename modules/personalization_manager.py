@@ -206,6 +206,8 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "sub_agent_max_instances": DEFAULT_MAX_INSTANCES,
     "sub_agent_compress_threshold_tokens": 250000,  # 子智能体上下文压缩阈值，最小 10000
     "sub_agent_max_turns": None,  # 子智能体最大执行轮次：None-默认 50 / 0-无上限 / 正整数-该值
+    "full_access_warning_dismissed": False,
+    "allow_auto_approve_full_access": False,
     # 审核智能体统一配置（个人空间-审核智能体页）：模型留空走自动规则（注册表第一个可见模型；纯 codex 时选 -luna）
     # 思考模式固定开启、推理强度走模型默认，不再存 thinking 字段（旧值保存时被清洗丢弃）
     "review_agents": {
@@ -443,6 +445,8 @@ def sanitize_personalization_payload(
         return _sanitize_short_field(base.get(key))
 
     base["enabled"] = bool(data.get("enabled", base["enabled"]))
+    for key in ("full_access_warning_dismissed", "allow_auto_approve_full_access"):
+        base[key] = data.get(key, base.get(key, False)) is True
     # 交流风格: default / human_like / auto
     _comm_style = data.get("communication_style", base.get("communication_style", "default"))
     base["communication_style"] = _comm_style if _comm_style in ALLOWED_COMMUNICATION_STYLES else "default"

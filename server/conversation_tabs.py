@@ -137,7 +137,25 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
     ws_ids = sorted({t["workspace_id"] for t in tabs if t.get("kind") == "conv" and t.get("workspace_id")})
     title_maps = {ws: _load_index_titles(ws) for ws in ws_ids}
     active_runs = _active_run_conversation_ids(username, ws_ids)
+    from pathlib import Path
+    from server.state import tool_approval_manager
+    pending_human = {
+        (str(row.get("workspace_root") or ""), conv_id)
+        for row in tool_approval_manager.list_pending(username)
+        if row.get("human_approval_required", not row.get("auto_review_required"))
+        and not row.get("human_decision")
+        for conv_id in _normalized_conversation_ids(row.get("conversation_id"))
+    }
+    roots = {}
+    if pending_human:
+        for ws_id in ws_ids:
+            try:
+                workspace = resolve_workspace(username, ws_id, identity=request_identity())
+                roots[ws_id] = str(Path(workspace.project_path).resolve())
+            except (OSError, ValueError, KeyError, RuntimeError):
+                continue
     for tab in tabs:
+        tab["awaiting_human_approval"] = False
         if tab.get("kind") != "conv":
             tab["running"] = False
             continue
@@ -152,6 +170,10 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 tab["error"] = str(exc)
             continue
+        tab["awaiting_human_approval"] = any(
+            (roots.get(tab.get("workspace_id")), candidate) in pending_human
+            for candidate in _normalized_conversation_ids(conv_id)
+        )
         fresh = title_maps.get(tab.get("workspace_id") or "", {}).get(conv_id)
         if fresh:
             tab["title"] = fresh[:200]

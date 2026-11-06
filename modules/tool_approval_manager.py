@@ -14,6 +14,25 @@ from modules.i18n import tr
 RESOLVED_TTL_SECONDS = 3600.0
 
 
+def resolve_approval_requirements(
+    permission_mode: str, approval_type: str, *,
+    allow_auto_approve_full_access: bool = False,
+) -> Dict[str, bool]:
+    """Resolve approval conditions once, before creating the request snapshot."""
+    auto_full_access = (
+        approval_type == "full_access"
+        and permission_mode in {"auto_approval", "unrestricted"}
+        and allow_auto_approve_full_access is True
+    )
+    automatic = permission_mode == "auto_approval" or auto_full_access
+    return {
+        "auto_review_required": automatic,
+        "human_approval_required": (
+            not automatic or (approval_type == "full_access" and not auto_full_access)
+        ),
+    }
+
+
 class ToolApprovalManager:
     def __init__(self):
         self._items: Dict[str, Dict[str, Any]] = {}
@@ -45,9 +64,17 @@ class ToolApprovalManager:
         auto_review_required: bool = False,
         executor_id: Optional[int] = None,
         workspace_root: Optional[str] = None,
+        execution_mode: str = "sandbox",
+        human_approval_required: bool = True,
     ) -> Dict[str, Any]:
-        if approval_type not in {"sandbox_write", "full_access"}:
-            raise ValueError("approval_type must be sandbox_write or full_access")
+        if approval_type not in {"sandbox_write", "full_access", "direct_execution"}:
+            raise ValueError("Invalid approval_type")
+        if execution_mode not in {"sandbox", "direct"}:
+            raise ValueError("Invalid execution_mode")
+        if not isinstance(human_approval_required, bool) or (
+            not human_approval_required and not auto_review_required
+        ):
+            raise ValueError("Automatic-only approval requires automatic review")
         if not isinstance(auto_review_required, bool):
             raise ValueError("auto_review_required must be a bool")
         approval_id = f"approval_{uuid.uuid4().hex}"
@@ -68,6 +95,8 @@ class ToolApprovalManager:
             "auto_review_required": auto_review_required,
             "executor_id": executor_id,
             "workspace_root": workspace_root,
+            "execution_mode": execution_mode,
+            "human_approval_required": human_approval_required,
         }
         if approval_type == "full_access":
             item.update({
@@ -84,6 +113,22 @@ class ToolApprovalManager:
             self._items[approval_id] = item
         return deepcopy(item)
 
+    def bind_review_context(self, approval_id: str, fingerprint: str) -> None:
+        """Bind the reviewed user inputs before publishing the automatic decision."""
+        with self._lock:
+            item = self._items.get(approval_id)
+            if item and item.get("status") == "pending":
+                item["review_input_fingerprint"] = fingerprint
+
+    def mark_review_failed(self, approval_id: str, *, code: str, reason: str) -> Optional[Dict[str, Any]]:
+        """Close a failed review without mislabelling it as a risk rejection."""
+        with self._lock:
+            item = self._items.get(approval_id)
+            if item and item.get("status") == "pending":
+                item.update(status="expired", auto_review_status="error", review_error_code=code,
+                            reason=reason, auto_review_reason=reason, decided_at=time.time())
+            return deepcopy(item) if item else None
+
     def claim_execution(self, approval_id: str, expected: Dict[str, Any]) -> Dict[str, Any]:
         """原子领取可信批准记录；每个审批最多颁发一次执行权限。"""
         with self._lock:
@@ -91,11 +136,11 @@ class ToolApprovalManager:
             item = self._items.get(approval_id)
             if not item or item.get("status") != "approved" or item.get("execution_claimed_at"):
                 raise ValueError("审批未通过、已过期或执行授权已领取。")
-            keys = ("username", "conversation_id", "task_id", "tool_call_id", "tool_name", "arguments", "approval_type", "executor_id", "workspace_root")
+            keys = ("username", "conversation_id", "task_id", "tool_call_id", "tool_name", "arguments", "approval_type", "executor_id", "workspace_root", "execution_mode", "human_approval_required", "auto_review_required", "review_input_fingerprint")
             if any(item.get(key) != expected.get(key) for key in keys):
                 raise ValueError("执行请求与可信审批记录不一致。")
             if item.get("approval_type") == "full_access" and (
-                item.get("human_decision") != "approved"
+                (item.get("human_approval_required", True) and item.get("human_decision") != "approved")
                 or (item.get("auto_review_required") and item.get("auto_review_status") != "approved")
             ):
                 raise ValueError("单次完全访问尚未满足全部审批条件。")
@@ -189,7 +234,10 @@ class ToolApprovalManager:
             item["reason"] = (
                 item.get("human_reason") if human == "rejected" else item.get("auto_review_reason")
             )
-        elif human == "approved" and (not item.get("auto_review_required") or auto == "approved"):
+        elif (
+            (not item.get("human_approval_required", True) or human == "approved")
+            and (not item.get("auto_review_required") or auto == "approved")
+        ):
             status = "approved"
         else:
             return

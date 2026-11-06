@@ -441,6 +441,18 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
             rec.runtime_pending_queue = queue
             return self._runtime_pending_public(queue)
 
+    def snapshot_review_inputs(self, username: str, task_id: str, conversation_id: str) -> Dict[str, Any]:
+        """Read accepted, unconsumed guidance without draining draft recovery queues."""
+        from copy import deepcopy
+        with self._lock:
+            rec = self._tasks.get(task_id)
+            if not rec or rec.username != username or rec.conversation_id != conversation_id:
+                return {}
+            return {
+                "trigger_message_id": rec.trigger_message_id,
+                "guidance": deepcopy(getattr(rec, "runtime_guidance_queue", None) or []),
+            }
+
     def enqueue_runtime_guidance(
         self,
         username: str,

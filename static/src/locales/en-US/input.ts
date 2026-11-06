@@ -19,11 +19,11 @@ export default {
   permissionLockedByPlanTitle:
     'In plan mode, permission and execution environment are locked; network access can still be adjusted',
   executionLockedRestrictedTitle:
-    'In readonly/approval/auto-approval mode, the execution environment is locked to sandbox',
+    'In read-only mode, the execution environment is locked to sandbox',
   permissionGroup: 'Permission',
   planModeLocked: 'Locked by plan mode',
   executionEnv: 'Execution Environment',
-  restrictedModeLocked: 'Locked by restricted mode',
+  restrictedModeLocked: 'Locked by read-only mode',
   networkPermission: 'Network Access',
   usedPercent: '{n} used',
 

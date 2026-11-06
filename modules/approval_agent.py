@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional
 from config import LOGS_DIR
 from modules.review_agent_config import resolve_review_agent_config
 from modules.review_model_caller import ReviewModelCallError, call_review_model, review_billing_for
+from modules.approval_policy import APPROVAL_SYSTEM_PROMPT
 from modules.i18n import tr
 
 
@@ -34,31 +35,29 @@ class ApprovalAgent:
         self.cfg = load_approval_agent_config()
         # 审核请求计入所属对话账本（kind=review_agent）；对话身份缺失时不计费
         self.billing = review_billing_for(web_terminal, conversation_id, "auto_approval")
+        self.review_history = None
 
     @staticmethod
     def _system_prompt() -> str:
-        return (
-            "你是审批智能体，只负责风险与越权判断，不判断任务必要性。"
-            "审批模式允许正常文件修改，因此“写入/删除”不能一概拒绝，应结合用户输入意图判断。"
-            "若操作涉及凭据读取（如 .env、密钥文件、token）、越权访问（工作区外敏感目录）、"
-            "危险破坏（如 rm -rf、权限变更、系统级配置修改、可疑网络外传），"
-            "且用户输入并未明确要求这些行为，则应拒绝。"
-            "需要特别注意：提权命令、删除系统文件、批量破坏性 git 操作、访问 SSH/GPG/AWS 凭据目录。"
-            "你可最多使用少量只读检查（尽量在3轮内完成），然后必须调用 approve_decision 给出 approved/rejected + reason。"
-            "严禁直接在普通文本中输出“允许/禁止/同意/拒绝”这类最终结论；"
-            "最终结论只能通过工具调用 approve_decision 返回。"
-        )
+        return APPROVAL_SYSTEM_PROMPT
 
     async def _run_readonly_command(self, command: str) -> Dict[str, Any]:
         work_path = Path(getattr(self.web_terminal.context_manager, "project_path", "."))
         timeout = int(self.cfg.get("max_command_timeout") or DEFAULT_MAX_COMMAND_TIMEOUT)
         try:
-            result = await self.web_terminal.terminal_ops.run_command(
-                command=command,
-                working_dir=str(work_path),
-                timeout=timeout,
-                sandbox_write_access=False,
+            from modules.execution_scope import ExecutionScope, bind_execution_scope
+            scope = ExecutionScope(
+                executor_kind="review", actor_id="auto_approval",
+                workspace_root=work_path.resolve(), access_level="sandbox_write",
             )
+            with bind_execution_scope(scope):
+                result = await self.web_terminal.terminal_ops.run_command(
+                    command=command,
+                    working_dir=str(work_path),
+                    timeout=timeout,
+                    sandbox_write_access=False,
+                    network_permission="restricted",
+                )
             return result if isinstance(result, dict) else {"success": False, "error": "run_command 返回格式异常"}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -71,6 +70,10 @@ class ApprovalAgent:
         cancel_check: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
     ) -> Dict[str, Any]:
         debug_transcript: List[Dict[str, Any]] = []
+        messages: List[Dict[str, Any]] = []
+
+        def _error(code: str, reason: str) -> Dict[str, Any]:
+            return {"decision": "error", "code": code, "reason": reason, "source": "approval_agent"}
 
         def _trace(event: str, payload: Dict[str, Any]) -> None:
             if not DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT:
@@ -99,7 +102,7 @@ class ApprovalAgent:
 
         profile = self.cfg.get("profile")
         if not isinstance(profile, dict):
-            out = {"decision": "rejected", "reason": tr("approval_agent.config_missing"), "source": "approval_agent"}
+            out = _error("review_config_missing", tr("approval_agent.config_missing"))
             _flush_trace(out)
             return out
         max_rounds = int(self.cfg.get("max_rounds") or DEFAULT_MAX_ROUNDS)
@@ -112,7 +115,6 @@ class ApprovalAgent:
                     "description": (
                         "在终端中执行只读指令。可用于查看文件内容、搜索代码/文本、检查目录结构、"
                         "查看 git 状态与差异、确认路径是否存在、收集审批判断所需证据。"
-                        "禁止用于写入、删除、改权限或其他修改性操作。"
                     ),
                     "parameters": {
                         "type": "object",
@@ -158,7 +160,17 @@ class ApprovalAgent:
                 },
             },
         ]
-        messages: List[Dict[str, Any]] = [
+        if self.review_history is not None:
+            tools.append({"type": "function", "function": {
+                "name": "read_review_history",
+                "description": "只读补查本次审核冻结的同一对话历史；由近及远分页，可按原文关键词筛选。",
+                "parameters": {"type": "object", "properties": {
+                    "offset": {"type": "integer", "minimum": 0, "description": "跳过的记录数，默认0。"},
+                    "count": {"type": "integer", "minimum": 1, "maximum": 20, "description": "返回条数，默认10。"},
+                    "query": {"type": "string", "description": "可选的原文关键词。"},
+                }, "additionalProperties": False},
+            }})
+        messages = [
             {"role": "system", "content": self._system_prompt()},
             {"role": "user", "content": payload_text},
         ]
@@ -173,17 +185,24 @@ class ApprovalAgent:
             if progress_cb:
                 progress_cb({"stage": "model_call", "round": rounds, "message": tr("approval_agent.round_progress", rounds=rounds)})
             _trace("request", {"round": rounds, "messages": messages, "tools": tools})
-            try:
-                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds, billing=self.billing)
-            except ReviewModelCallError as exc:
-                _trace("http_error", {"round": rounds, "error": str(exc)})
-                out = {
-                    "decision": "rejected",
-                    "reason": tr("approval_agent.request_failed", status=str(exc)),
-                    "source": "approval_agent",
-                }
-                _flush_trace(out)
-                return out
+            for attempt in range(2):
+                try:
+                    choice = await call_review_model(self.cfg, messages, tools, timeout_seconds, billing=self.billing)
+                    break
+                except ReviewModelCallError as exc:
+                    _trace("http_error", {"round": rounds, "attempt": attempt, "error": str(exc)})
+                    details = getattr(exc, "details", {}) or {}
+                    error_type = str(details.get("error_type") or "request_failed")
+                    retryable = error_type in {"timeout", "network", "network_error", "connection_error", "server_error", "rate_limit"}
+                    if attempt == 0 and retryable:
+                        continue
+                    out = _error("review_" + error_type, tr("approval_agent.request_failed", status=str(exc)))
+                    _flush_trace(out)
+                    return out
+                except Exception as exc:
+                    out = _error("review_request_failed", tr("approval_agent.request_failed", status=type(exc).__name__))
+                    _flush_trace(out)
+                    return out
             reasoning_content = str(choice.get("reasoning_content") or "")
             _trace(
                 "response",
@@ -221,7 +240,7 @@ class ApprovalAgent:
                         }
                     )
                     continue
-                out = {"decision": "rejected", "reason": tr("approval_agent.no_decision"), "source": "approval_agent"}
+                out = _error("review_no_decision", tr("approval_agent.no_decision"))
                 _flush_trace(out)
                 return out
             # 有 tool_calls 时追加一条完整 assistant 消息（与主智能体结构对齐）
@@ -238,7 +257,11 @@ class ApprovalAgent:
                 try:
                     args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
                 except Exception:
-                    args = {}
+                    args = None
+                if not isinstance(args, dict):
+                    out = _error("review_invalid_arguments", tr("approval_agent.invalid_decision"))
+                    _flush_trace(out)
+                    return out
                 if fn == "approve_decision":
                     decision = str(args.get("decision") or "").strip().lower()
                     reason = str(args.get("reason") or "").strip() or tr("approval_agent.no_reason")
@@ -246,10 +269,20 @@ class ApprovalAgent:
                         out = {"decision": decision, "reason": reason, "source": "approval_agent"}
                         _flush_trace(out)
                         return out
-                    out = {"decision": "rejected", "reason": tr("approval_agent.invalid_decision"), "source": "approval_agent"}
+                    out = _error("review_invalid_decision", tr("approval_agent.invalid_decision"))
                     _flush_trace(out)
                     return out
-                if fn == "run_command":
+                if fn == "read_review_history" and self.review_history is not None:
+                    try:
+                        history_text = self.review_history.read(
+                            offset=int(args.get("offset", 0)), count=int(args.get("count", 10)),
+                            query=str(args.get("query") or ""),
+                        )
+                    except (ValueError, TypeError):
+                        history_text = "参数错误：offset和count须为整数。"
+                    messages.append({"role": "tool", "tool_call_id": call.get("id"),
+                                     "name": fn, "content": history_text})
+                elif fn == "run_command":
                     cmd = str(args.get("command") or "").strip()
                     if progress_cb:
                         progress_cb({"stage": "run_command", "round": rounds, "command": cmd})
@@ -264,6 +297,9 @@ class ApprovalAgent:
                         "tool_call_id": call.get("id"),
                         "name": "run_command",
                     })
-        out = {"decision": "rejected", "reason": tr("approval_agent.max_rounds"), "source": "approval_agent"}
+                else:
+                    messages.append({"role": "tool", "tool_call_id": call.get("id"),
+                                     "name": str(fn or "unknown"), "content": "该审核工具不可用。"})
+        out = _error("review_budget_exhausted", tr("approval_agent.max_rounds"))
         _flush_trace(out)
         return out

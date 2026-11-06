@@ -32,11 +32,23 @@ def approval_execution_scope(
     ):
         raise ValueError("审批不属于当前工作区、任务或工具参数。")
     full = item.get("approval_type") == "full_access"
+    direct = item.get("approval_type") == "direct_execution"
+    current_mode = terminal.get_execution_mode() if hasattr(terminal, "get_execution_mode") else "sandbox"
+    if item.get("execution_mode", "sandbox") != current_mode:
+        raise ValueError("执行环境已改变，请重新审批。")
+    if direct and current_mode != "direct":
+        raise ValueError("完全访问执行审批与当前环境不一致。")
     if full and (
         tool_name != "run_command" or not fingerprint
         or command_fingerprint(arguments) != fingerprint
     ):
         raise ValueError("单次完全访问的命令与审批快照不一致。")
+    reviewed_inputs = item.get("review_input_fingerprint")
+    if reviewed_inputs:
+        from modules.approval_request import capture_inputs, input_fingerprint
+        current_inputs = capture_inputs(terminal, item.get("username") or "", item)
+        if reviewed_inputs != input_fingerprint(current_inputs):
+            raise ValueError("审核后用户要求或执行条件已变化，当前调用未执行，请按最新输入重新审核。")
     # The manager validates both decisions and claims the persisted snapshot
     # under one lock. An approved dict alone cannot mint execution authority.
     manager.claim_execution(item.get("approval_id"), item)
@@ -49,10 +61,12 @@ def approval_execution_scope(
         )
     return ExecutionScope(
         executor_kind="main", actor_id=str(id(terminal)), workspace_root=root,
-        access_level="full_access" if full else "sandbox_write",
+        access_level="full_access" if full or direct else "sandbox_write",
         conversation_id=cm.current_conversation_id, task_id=task_id,
         tool_call_id=tool_call_id, write_granted=True,
         network_granted=full, full_access_grant=grant,
+        review_input_fingerprint=reviewed_inputs,
+        review_username=item.get("username"),
     )
 
 
@@ -78,5 +92,13 @@ async def execute_with_authority(
         return json.dumps({"success": False, "code": "approval_authority_denied", "error": scope.error}, ensure_ascii=False)
     if scope and scope.full_access_grant and tool_name != "run_command":
         return json.dumps({"success": False, "code": "full_access_denied", "error": "单次完全访问仅可用于已审批命令。"}, ensure_ascii=False)
+    if scope and scope.review_input_fingerprint:
+        from modules.approval_request import capture_inputs, input_fingerprint
+        current_inputs = capture_inputs(terminal, scope.review_username or "", {
+            "task_id": scope.task_id, "conversation_id": scope.conversation_id,
+        })
+        if scope.review_input_fingerprint != input_fingerprint(current_inputs):
+            return json.dumps({"success": False, "code": "review_context_changed",
+                               "error": "工具启动前用户要求或执行条件已变化，当前调用未执行，请重新审核。"}, ensure_ascii=False)
     with bind_execution_scope(scope):
         return await terminal.handle_tool_call(tool_name, arguments)

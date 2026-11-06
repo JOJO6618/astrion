@@ -77,14 +77,14 @@ export const newConversationMethods = {
       if (target === 'plan' && this.currentWorkMode !== 'plan') {
         restore.pre_plan_permission_mode = this.currentPermissionMode;
         restore.pre_plan_execution_mode = this.currentExecutionMode;
-        // Preserve the execution choice across plan -> unrestricted as well.
-        if (this.currentPermissionMode === 'unrestricted')
+        // Only readonly requires a sandbox; retain the prior environment for other modes.
+        if (this.currentPermissionMode !== 'readonly')
           restore.pre_readonly_execution_mode = this.currentExecutionMode;
         this.currentPermissionMode = 'readonly';
         this.currentExecutionMode = 'sandbox';
       } else if (this.currentWorkMode === 'plan' && target !== 'plan') {
         this.currentPermissionMode = restore.pre_plan_permission_mode || 'approval';
-        if (this.currentPermissionMode === 'unrestricted')
+        if (this.currentPermissionMode !== 'readonly')
           this.currentExecutionMode = restore.pre_plan_execution_mode || 'sandbox';
         else this.currentExecutionMode = 'sandbox';
         restore.pre_plan_permission_mode = null;
@@ -93,16 +93,16 @@ export const newConversationMethods = {
       this.currentWorkMode = target;
     } else if (kind === 'permission') {
       if (this.currentWorkMode === 'plan') return;
-      if (target !== 'unrestricted' && this.currentPermissionMode === 'unrestricted') {
+      if (target === 'readonly' && this.currentPermissionMode !== 'readonly') {
         restore.pre_readonly_execution_mode = this.currentExecutionMode;
         this.currentExecutionMode = 'sandbox';
-      } else if (target === 'unrestricted' && this.currentPermissionMode !== 'unrestricted') {
+      } else if (target !== 'readonly' && this.currentPermissionMode === 'readonly') {
         if (restore.pre_readonly_execution_mode === 'direct') this.currentExecutionMode = 'direct';
         restore.pre_readonly_execution_mode = null;
       }
       this.currentPermissionMode = target;
     } else if (kind === 'execution') {
-      if (this.currentWorkMode === 'plan' || this.currentPermissionMode !== 'unrestricted') return;
+      if (this.currentWorkMode === 'plan' || this.currentPermissionMode === 'readonly') return;
       this.currentExecutionMode = target;
     } else if (kind === 'network') {
       this.currentNetworkPermission = target;

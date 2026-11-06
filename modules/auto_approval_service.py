@@ -1,94 +1,37 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, List, Optional
 
 from modules.approval_agent import ApprovalAgent
+from modules.approval_request import ApprovalRequest
 from modules.full_access_review import run_full_access_review
 from server.state import tool_approval_manager
 from modules.i18n import tr
 
 
 def build_auto_approval_payload(
-    *,
-    web_terminal: Any,
-    recent_tool_actions: List[Dict[str, Any]],
-    function_name: str,
-    arguments: Dict[str, Any],
+    *, web_terminal: Any, recent_tool_actions: List[Dict[str, Any]],
+    function_name: str, arguments: Dict[str, Any],
     risk_markers: Optional[List[str]] = None,
+    approval_item: Optional[dict] = None, username: str = "",
 ) -> str:
-    history = list(getattr(getattr(web_terminal, "context_manager", None), "conversation_history", []) or [])
-    user_input = ""
-    for msg in reversed(history):
-        if not isinstance(msg, dict) or msg.get("role") != "user":
-            continue
-        metadata = msg.get("metadata") or {}
-        if bool(metadata.get("is_auto_generated")):
-            continue
-        content = msg.get("content")
-        if isinstance(content, str) and content.strip():
-            user_input = content.strip()
-            break
-
-    recent = recent_tool_actions[-3:] if isinstance(recent_tool_actions, list) else []
-    lines = [
-        "请按照流程审批：",
-        f"用户输入：{user_input or '（空）'}",
-        "AI运行的前三步操作：",
-    ]
-    if recent:
-        for idx, row in enumerate(recent, start=1):
-            lines.append(f"{idx}. {row.get('tool_name')}: {json.dumps(row.get('arguments') or {}, ensure_ascii=False)}")
-    else:
-        lines.append("（无）")
-    lines += [
-        f"当前工作目录：{('/workspace' if bool(getattr(getattr(web_terminal, 'container_session', None), 'mode', None) == 'docker') else str(getattr(getattr(web_terminal, 'context_manager', None), 'project_path', '')))}",
-    ]
-    if risk_markers:
-        lines.append(f"当前操作中触发风险特征的内容：{', '.join([str(x) for x in risk_markers if str(x).strip()])}")
-    lines += [
-        "请审核当前操作：",
-        f"{function_name}: {json.dumps(arguments or {}, ensure_ascii=False)}",
-        "仅判断危险性和越权风险，不判断任务必要性。",
-    ]
-    return "\n".join(lines)
+    """Compatibility entry point; execution history comes from paired messages."""
+    item = approval_item or {
+        "conversation_id": getattr(web_terminal.context_manager, "current_conversation_id", None),
+        "approval_type": "full_access" if arguments.get("request_full_access") else "sandbox_write",
+    }
+    return ApprovalRequest.capture(web_terminal, username, item).render(function_name, arguments, risk_markers)
 
 
 async def run_auto_approval(
-    *,
-    web_terminal: Any,
-    username: str,
-    approval_id: str,
-    conversation_id: Optional[str],
-    recent_tool_actions: List[Dict[str, Any]],
-    function_name: str,
-    arguments: Dict[str, Any],
-    risk_markers: Optional[List[str]],
-    sender,
-    stop_check=None,
+    *, web_terminal: Any, username: str, approval_id: str,
+    conversation_id: Optional[str], recent_tool_actions: List[Dict[str, Any]],
+    function_name: str, arguments: Dict[str, Any], risk_markers: Optional[List[str]],
+    sender, stop_check=None,
 ) -> Dict[str, Any]:
     item = tool_approval_manager.get(approval_id)
-    if (item or {}).get("approval_type") == "full_access":
-        async def _review_full_access(*, progress_cb, cancel_check) -> Dict[str, Any]:
-            payload = build_auto_approval_payload(
-                web_terminal=web_terminal,
-                recent_tool_actions=recent_tool_actions,
-                function_name=function_name,
-                arguments=arguments,
-                risk_markers=risk_markers,
-            )
-            payload += "\n本次申请仅针对当前工具调用的单次完全访问权限，请审核该权限提升的危险性和越权风险。"
-            agent = ApprovalAgent(web_terminal=web_terminal, conversation_id=conversation_id)
-            return await agent.review(payload_text=payload, progress_cb=progress_cb, cancel_check=cancel_check)
-
-        return await run_full_access_review(
-            manager=tool_approval_manager,
-            approval_id=approval_id,
-            username=username,
-            reviewer=_review_full_access,
-            sender=sender,
-            stop_check=stop_check,
-        )
+    if not item:
+        return {"decision": "error", "code": "approval_missing", "reason": "审批请求不存在。"}
 
     def _progress(evt: Dict[str, Any]) -> None:
         sender("auto_approval_progress", {"approval_id": approval_id, "progress": evt, "conversation_id": conversation_id})
@@ -104,32 +47,60 @@ async def run_auto_approval(
             return {"decision": status, "item": row, "source": "manual"}
         return None
 
+    async def _review(*, progress_cb, cancel_check) -> dict:
+        # One automatic re-review handles an instruction arriving during review.
+        # Continuous changes fail closed rather than looping or asking the user.
+        for attempt in range(2):
+            try:
+                request = ApprovalRequest.capture(web_terminal, username, item)
+            except Exception:
+                return {"decision": "error", "code": "review_context_failed", "reason": "审核上下文读取失败，当前调用未执行。"}
+            agent = ApprovalAgent(web_terminal=web_terminal, conversation_id=conversation_id)
+            agent.review_history = request.history
+            result = await agent.review(
+                payload_text=request.render(function_name, arguments, risk_markers),
+                progress_cb=progress_cb, cancel_check=cancel_check,
+            )
+            if cancel_check and cancel_check():
+                return result
+            try:
+                current = request.is_current()
+            except Exception:
+                return {"decision": "error", "code": "review_context_failed", "reason": "审核上下文校验失败，当前调用未执行。"}
+            if not current:
+                if attempt == 0:
+                    progress_cb({"stage": "context_changed", "message": "用户要求或执行条件已变化，重新审核。"})
+                    continue
+                return {"decision": "error", "code": "review_context_changed", "reason": "审核期间输入持续变化，当前调用未执行，请按最新要求重新审核。"}
+            tool_approval_manager.bind_review_context(approval_id, request.fingerprint)
+            return result
+        raise AssertionError("unreachable review loop")
+
+    if item.get("approval_type") == "full_access":
+        return await run_full_access_review(
+            manager=tool_approval_manager, approval_id=approval_id, username=username,
+            reviewer=_review, sender=sender, stop_check=stop_check,
+        )
+
     _progress({"stage": "start", "message": tr("auto_approval.start")})
-    payload = build_auto_approval_payload(
-        web_terminal=web_terminal,
-        recent_tool_actions=recent_tool_actions,
-        function_name=function_name,
-        arguments=arguments,
-        risk_markers=risk_markers,
-    )
-    agent = ApprovalAgent(web_terminal=web_terminal, conversation_id=conversation_id)
-    result = await agent.review(payload_text=payload, progress_cb=_progress, cancel_check=_manual_takeover)
-    if not _manual_takeover():
+    result = await _review(progress_cb=_progress, cancel_check=_manual_takeover)
+    takeover = _manual_takeover()
+    if takeover:
+        out = takeover
+    elif result.get("decision") not in {"approved", "rejected"}:
+        code = str(result.get("code") or "review_invalid_decision")
+        reason = str(result.get("reason") or "审核未返回有效裁决，当前调用未执行。")
+        row = tool_approval_manager.mark_review_failed(approval_id, code=code, reason=reason)
+        out = {"decision": "error", "code": code, "reason": reason, "item": row, "source": "approval_agent"}
+    else:
         decided = tool_approval_manager.decide(
-            approval_id=approval_id,
-            username=username,
-            decision=str(result.get("decision") or "rejected"),
-            reason=str(result.get("reason") or "").strip(),
-            decider="approval_agent",
+            approval_id=approval_id, username=username, decision=result["decision"],
+            reason=str(result.get("reason") or "").strip(), decider="approval_agent",
         )
         out = {"decision": decided.get("status"), "item": decided, "source": "approval_agent"}
-    else:
-        out = _manual_takeover() or {"decision": "rejected", "reason": tr("auto_approval.takeover_failed")}
-    source = (out or {}).get("source")
     _progress({
-        "stage": "done",
-        "message": tr("auto_approval.done"),
-        "source": source,
-        "decision": (out or {}).get("decision") if source == "approval_agent" else None,
+        "stage": "done", "message": tr("auto_approval.done"), "source": out.get("source"),
+        "decision": out.get("decision") if out.get("source") == "approval_agent" else None,
+        "code": out.get("code"),
     })
     return out

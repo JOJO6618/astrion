@@ -443,6 +443,17 @@ class MainTerminalToolsExecutionMixin:
                         }
                     return {"allowed": True, "mode": mode}
 
+                if mode in {"approval", "auto_approval"} and self.get_execution_mode() == "direct":
+                    if tool_name in {"run_command", "terminal_input"} or (
+                        tool_name in self._APPROVAL_REQUIRED_TOOLS
+                        and not (mode == "auto_approval" and tool_name in {"write_file", "edit_file"})
+                    ):
+                        return {
+                            "allowed": True, "mode": mode, "requires_approval": True,
+                            "approval_type": "direct_execution",
+                            "risk_markers": self._extract_command_risk_markers(args.get("command")),
+                        }
+
                 if mode == "approval":
                     if tool_name == "run_command":
                         command_text = args.get("command")
@@ -476,7 +487,10 @@ class MainTerminalToolsExecutionMixin:
                                     return {"allowed": True, "mode": mode, "requires_approval": False}
                         except Exception:
                             pass
-                        return {"allowed": True, "mode": mode, "requires_approval": True}
+                        return {
+                            "allowed": True, "mode": mode, "requires_approval": True,
+                            "approval_type": "direct_execution" if self.get_execution_mode() == "direct" else "sandbox_write",
+                        }
                     if tool_name == "run_command":
                         command_text = args.get("command")
                         readonly_ok = self._is_readonly_run_command_allowed(command_text)
@@ -1118,14 +1132,21 @@ class MainTerminalToolsExecutionMixin:
                 if tool_name == "run_command":
                     try:
                         needs_full_access = validate_full_access_request(self, arguments)
-                        if scope is not None and not scope.is_sub_agent and scope.access_level == "full_access":
-                            grant = scope.full_access_grant
-                            if grant is None or not grant.consume(self, arguments):
+                        if scope is not None and not scope.is_sub_agent and scope.full_access_grant is not None:
+                            if not scope.full_access_grant.consume(self, arguments):
                                 raise ValueError("本次完全访问授权无效、已使用或执行参数已改变。")
                         elif needs_full_access:
                             raise ValueError("单次完全访问申请尚未获批，不能执行。")
                     except ValueError as exc:
                         return json.dumps({"success": False, "code": "full_access_denied", "error": str(exc)}, ensure_ascii=False)
+                if (
+                    tool_name in {"run_command", "terminal_input"}
+                    and not (scope and scope.is_sub_agent)
+                    and self.get_execution_mode() == "direct"
+                    and self.get_permission_mode() in {"approval", "auto_approval"}
+                    and not (scope and scope.write_granted and scope.execution_mode == "direct")
+                ):
+                    return json.dumps({"success": False, "code": "approval_required", "error": "完全访问命令必须先通过审批。"}, ensure_ascii=False)
                 try:
                     if scope is None and hasattr(self, "_apply_execution_mode_to_runtime"):
                         self._apply_execution_mode_to_runtime()

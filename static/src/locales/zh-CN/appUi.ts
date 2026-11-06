@@ -98,6 +98,13 @@ export default {
   permissionUpdated: '权限已更新',
   switchExecutionModeFailed: '切换执行环境失败',
   executionModeUpdated: '执行环境已更新',
+  fullAccessWarningTitle: '切换到完全访问？',
+  fullAccessWarningMessage:
+    '完全访问下，智能体执行的操作将不受 Astrion 沙箱和路径授权范围限制，可使用运行 Astrion 的系统账户权限，访问工作区外文件、修改或删除数据、执行程序及访问网络。人工审批或自动审核仍按所选权限模式生效。',
+  fullAccessWarningConfirm: '我明白，切换',
+  fullAccessWarningCancel: '返回沙箱模式',
+  fullAccessWarningRemember: '不再提示',
+  tabStripAwaitingApproval: '等待人工审批',
   switchNetworkPermissionFailed: '切换网络权限失败',
   networkPermissionUpdated: '网络权限已更新',
   networkRestricted: '受限',

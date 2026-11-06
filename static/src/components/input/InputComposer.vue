@@ -3202,10 +3202,10 @@ const workModeLabel = computed(() => {
 /** 计划模式下权限被锁定为只读（UI 禁用 + 后端强制） */
 const permissionLockedByPlan = computed(() => props.currentWorkMode === 'plan');
 
-/** 受限权限档（只读/批准/自动审核）执行环境锁定为沙箱（UI 禁用 + 后端强制）；仅无限制可选完全访问 */
-const executionLockedByRestricted = computed(() => props.currentPermissionMode !== 'unrestricted');
+/** 只读权限依赖沙箱强制；审批和自动审核允许完全访问。 */
+const executionLockedByRestricted = computed(() => props.currentPermissionMode === 'readonly');
 
-/** 执行环境组禁用条件：plan 全锁 或 受限权限档锁执行环境（权限组仅受 plan 锁） */
+/** 执行环境组禁用条件：计划模式或只读权限。 */
 const executionModeLocked = computed(
   () => permissionLockedByPlan.value || executionLockedByRestricted.value
 );

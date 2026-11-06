@@ -170,7 +170,7 @@ class ToolsDefinitionTerminalToolsMixin:
                         "type": "function",
 	                "function": {
 	                    "name": "run_command",
-	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。完成用户已授权的任务确实需要超出沙箱权限或使用宿主机原生工具链时，可设置 request_full_access=true，并填写非空 full_access_reason，申请本次命令的完全访问权限。申请前简短说明原因，然后直接发起工具申请，由审批面板获取授权，无需先在聊天中重复询问是否申请。仅本次命令经人工批准后在宿主机执行，不改变全局权限或执行环境，也不扩大其他工具或持久终端的权限。开启自动审核时必须同时获得自动审核通过与人工批准，人工允许不能中止或替代自动审核。计划模式、只读模式及子智能体不可申请，Docker 不支持；当前已处于宿主机直接执行环境时无需申请。Windows 沙箱使用 Linux bash，单次完全访问使用 Windows cmd.exe，申请时必须重新编写适用于 cmd 的命令和 Windows 路径。申请被拒绝后不得通过换命令、换工具或重复申请规避该决定。",
+	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。完成已授权任务确需超出沙箱权限或使用宿主机原生工具链时，可设置 request_full_access=true，并填写非空 full_access_reason。申请前简短说明原因，然后直接发起工具申请，无需在聊天中重复询问。单次完全访问默认需要人工批准，自动审核模式下默认还须自动审核通过；自动审核或无限制模式下，用户开启允许自动审核通过单次完全访问请求后，审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准。仅本次命令脱离沙箱，不改变全局权限或执行环境。计划模式、只读模式及子智能体不可申请，Docker 不支持。已处于完全访问环境无需单次申请，但人工审批或自动审核模式下每条命令仍先审核再执行。Windows 沙箱使用 Linux bash，完全访问使用 Windows cmd.exe，须使用对应命令和路径。拒绝后不得通过换命令、换工具或重复申请规避决定。",
 	                    "parameters": {
 	                        "type": "object",
 	                        "properties": self._inject_intent({
@@ -180,7 +180,7 @@ class ToolsDefinitionTerminalToolsMixin:
                                     },
                                     "request_full_access": {
                                         "type": "boolean", "default": False,
-                                        "description": "是否申请本次命令完全访问，必须经人工批准；自动审核开启时两项均通过才执行。"
+                                        "description": "是否申请本次命令完全访问。默认需要人工批准；自动审核或无限制模式下用户开启允许自动审核通过单次完全访问后，由审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准。"
                                     },
                                     "full_access_reason": {
                                         "type": "string",

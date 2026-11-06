@@ -80,10 +80,10 @@ def prepare_draft_settings(terminal: Any, workspace: Any, previous_id: str | Non
     if requested["work_mode"] == "plan":
         restore["pre_plan_permission_mode"] = requested["permission_mode"]
         if requested["execution_mode"] == "direct":
-            key = ("pre_plan_execution_mode" if requested["permission_mode"] == "unrestricted"
-                   else "pre_readonly_execution_mode")
+            key = ("pre_readonly_execution_mode" if requested["permission_mode"] == "readonly"
+                   else "pre_plan_execution_mode")
             restore[key] = "direct"
-    elif requested["permission_mode"] != "unrestricted" and requested["execution_mode"] == "direct":
+    elif requested["permission_mode"] == "readonly" and requested["execution_mode"] == "direct":
         restore["pre_readonly_execution_mode"] = "direct"
     context = terminal.context_manager
     context.current_conversation_id = None

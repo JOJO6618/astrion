@@ -143,7 +143,7 @@ class StateTests(unittest.TestCase):
         terminal.pending_execution_mode = "direct"
         enforce_goal_modes(terminal, "conv_A")
         self.assertIsNone(terminal.pending_permission_mode)
-        self.assertIsNone(terminal.pending_execution_mode)
+        self.assertEqual(terminal.pending_execution_mode, "direct")
         self.assertEqual(terminal.get_work_mode(), "execute")
         self.assertEqual(terminal.get_permission_mode(), "auto_approval")
         self.assertEqual(terminal.context_manager.conversation_metadata["work_mode"], "execute")
