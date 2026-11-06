@@ -13,6 +13,8 @@ import { useResourceStore } from './resource';
 
 /** 设置页分区 ID（与 SettingsShell 左导航一致） */
 export type SettingsSection =
+  // 账户
+  | 'usage'
   // 模型
   | 'providers'
   | 'models'

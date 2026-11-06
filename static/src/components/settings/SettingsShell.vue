@@ -21,6 +21,7 @@ import SubAgentsTab from './tabs/SubAgentsTab.vue';
 import ReviewAgentsTab from './tabs/ReviewAgentsTab.vue';
 import AppearanceTab from './tabs/AppearanceTab.vue';
 import AdminTab from './tabs/AdminTab.vue';
+import UsageStatsTab from './tabs/UsageStatsTab.vue';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useSettingsStore } from '@/stores/settings';
 import type { SettingsSection } from '@/stores/settings';
@@ -64,6 +65,11 @@ interface NavGroup {
 }
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    id: 'account',
+    titleKey: 'settings.groupAccount',
+    items: [{ id: 'usage', labelKey: 'settings.navUsage', icon: 'usage' }]
+  },
   {
     id: 'model',
     titleKey: 'settings.groupModel',
@@ -138,6 +144,7 @@ watch(isAdmin, () => {
 
 // ── 分区元信息（页标题/说明文案 key + 组件映射） ──
 const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string }> = {
+  usage: { titleKey: 'settings.usageTitle', descKey: 'settings.usageDesc' },
   providers: { titleKey: 'settings.providersTitle', descKey: 'settings.providersDesc' },
   models: { titleKey: 'settings.modelsTitle', descKey: 'settings.modelsDesc' },
   'model-pref': { titleKey: 'settings.modelPrefTitle', descKey: 'settings.modelPrefDesc' },
@@ -158,6 +165,7 @@ const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string 
 };
 
 const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
+  usage: UsageStatsTab,
   providers: ProvidersTab,
   models: ModelsTab,
   'model-pref': ModelPrefTab,
@@ -272,7 +280,11 @@ onMounted(() => {
 
       <!-- 右内容区（独立滚动，760px 居中） -->
       <main class="settings-shell-content" ref="contentEl">
-        <div class="settings-shell-content-inner" v-if="loaded">
+        <div
+          class="settings-shell-content-inner"
+          :class="{ 'settings-shell-content-inner--wide': activeSection === 'usage' }"
+          v-if="loaded"
+        >
           <div class="settings-shell-page-title">{{ $t(activeMeta.titleKey) }}</div>
           <div class="settings-shell-page-desc">{{ $t(activeMeta.descKey) }}</div>
           <QuickEntrySettings v-if="quickChatSupported" v-show="activeSection === 'quick-chat'" />
@@ -471,6 +483,11 @@ onMounted(() => {
   max-width: 760px;
   margin: 0 auto;
   padding: 36px 48px 80px;
+}
+
+/* 用量统计：一年热力图约 830px，需要更宽的内容列（其余分区保持 760px） */
+.settings-shell-content-inner--wide {
+  max-width: 1040px;
 }
 
 .settings-shell-page-title {

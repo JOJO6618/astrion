@@ -474,6 +474,7 @@ export default {
   usageUpdated: 'Updated {time}',
   usageRefreshing: 'Refreshing...',
   usageRefresh: 'Refresh',
+  usageOpenStats: 'View usage',
   usageNeverRefreshed: 'Not refreshed yet',
   usageUnknownTime: 'Unknown time',
   usageFetchFailed: 'Failed to fetch usage statistics',

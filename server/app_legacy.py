@@ -37,6 +37,7 @@ from server.chat import chat_bp
 from server.chat_mode import chat_mode_bp
 from server.chat.approval import approval_bp
 from server.usage import usage_bp
+from server.usage_stats import usage_stats_bp
 from server.status import status_bp
 from server.tasks.web import get_tasks_blueprint
 from server.api_v1 import api_v1_bp
@@ -309,6 +310,7 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(chat_mode_bp)
 app.register_blueprint(approval_bp)
 app.register_blueprint(usage_bp)
+app.register_blueprint(usage_stats_bp)
 app.register_blueprint(status_bp)
 app.register_blueprint(get_tasks_blueprint())
 app.register_blueprint(api_v1_bp)

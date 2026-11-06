@@ -445,6 +445,7 @@ export default {
   usageUpdated: '最近更新：{time}',
   usageRefreshing: '刷新中...',
   usageRefresh: '刷新数据',
+  usageOpenStats: '查看用量统计',
   usageNeverRefreshed: '尚未刷新',
   usageUnknownTime: '时间未知',
   usageFetchFailed: '获取用量统计失败',
