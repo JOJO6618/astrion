@@ -15,7 +15,7 @@
 ## 数据来源与口径
 
 - **唯一权威是对话费用账本** `<data_dir>/api_costs/<conversation_id>.json`（见 `docs/conversation_api_costs.md`）。统计覆盖账本里的全部执行者（主、子、思考摘要、审核智能体 `review_agent`，及后续计入账本的其它 kind），按 `actor.kind` 拆分；审核请求自 2026-11-06 起才入账。账本上线（2026-10-08）之前的请求没有时间戳，不补算；热力图以「无记录」底色区分。
-- 总 Token = 输入（含缓存命中）+ 输出；「非缓存 Token」= 输入 − 缓存命中 + 输出。花费只累加 `status=priced` 的请求，未计价请求单独统计条数与 token，界面标注「另有 … 未计价」，**不按 0 计**。人民币只做显示换算（复用 `exchange_rates.get_rate()`），缺汇率显示「—」。
+- 总 Token = 输入（含缓存命中）+ 输出；「非缓存 Token」= 输入 − 缓存命中 + 输出。花费只累加 `status=priced` 的请求，未计价请求单独统计条数与 token，仅在确有未计价请求时用次要文字色（`--text-secondary`，不用警示黄）标注「另有 … 未计价」，全部已计价时不显示，**不按 0 计**。人民币只做显示换算（复用 `exchange_rates.get_rate()`），缺汇率显示「—」。
 - 速度与首包只统计主智能体，口径同工作段 tokens/s：有 `speed_sample` 用样本（空对象跳过、不回退），否则用 `output_tokens / duration_ms`；模型级取 Σtoken/Σ毫秒，首包取平均 `ttft_ms`。
 
 ## 来源归集（`modules/usage_stats/sources.py` + `server/usage_stats.py`）

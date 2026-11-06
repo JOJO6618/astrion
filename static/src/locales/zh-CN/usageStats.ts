@@ -25,7 +25,6 @@ export default {
   ovCacheHit: '缓存命中 {pct}%',
   ovCost: '花费',
   ovUnpriced: '另有 {tokens} Token 未计价',
-  ovAllPriced: '全部已计价',
   ovActive: '活跃天数',
   ovFirstDate: '首条记录 {date}',
   ovStreak: '连续活跃',

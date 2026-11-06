@@ -25,7 +25,6 @@ export default {
   ovCacheHit: '{pct}% cache hits',
   ovCost: 'Cost',
   ovUnpriced: '{tokens} more tokens unpriced',
-  ovAllPriced: 'All priced',
   ovActive: 'Active days',
   ovFirstDate: 'First record {date}',
   ovStreak: 'Current streak',

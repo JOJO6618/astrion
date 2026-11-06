@@ -54,10 +54,10 @@ const rows = computed(() =>
             {{ formatTokens(row.tokens) }} <span class="usage-muted">{{ row.share }}%</span>
           </td>
           <td class="is-num">
-            <span v-if="!row.priced_requests" class="usage-warn">{{ $t('usageStats.unpriced') }}</span>
+            <span v-if="!row.priced_requests" class="usage-note">{{ $t('usageStats.unpriced') }}</span>
             <template v-else>
               {{ formatMoney(row.cost_usd, currency, rate) }}
-              <span v-if="row.unpriced_requests" class="usage-warn">*</span>
+              <span v-if="row.unpriced_requests" class="usage-note">*</span>
             </template>
           </td>
           <td class="is-num is-optional">{{ formatInt(row.requests) }}</td>
@@ -157,15 +157,15 @@ const rows = computed(() =>
 .usage-footnote {
   margin: 6px 0 0;
   font-size: 12px;
-  color: var(--state-warning);
+  color: var(--text-secondary);
 }
 
 .usage-muted {
   color: var(--text-tertiary);
 }
 
-.usage-warn {
-  color: var(--state-warning);
+.usage-note {
+  color: var(--text-secondary);
 }
 
 @media (max-width: 760px) {

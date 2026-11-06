@@ -98,37 +98,38 @@ const overviewItems = computed(() => {
       label: t('usageStats.ovTotal'),
       value: formatTokens(ov.total_tokens),
       sub: t('usageStats.ovCacheHit', { pct: formatPercent(ov.cached_tokens, ov.input_tokens) }),
-      warn: false
+      note: false
     },
     {
       key: 'cost',
       label: t('usageStats.ovCost'),
       value: formatMoney(ov.cost_usd, currency.value, rate.value),
+      // 只在确有未计价请求时提示；全部已计价时留空，不额外占用注意力
       sub: ov.unpriced_requests
         ? t('usageStats.ovUnpriced', { tokens: formatTokens(ov.unpriced_tokens) })
-        : t('usageStats.ovAllPriced'),
-      warn: ov.unpriced_requests > 0
+        : '',
+      note: ov.unpriced_requests > 0
     },
     {
       key: 'active',
       label: t('usageStats.ovActive'),
       value: t('usageStats.days', { n: ov.active_days }),
       sub: data.first_date ? t('usageStats.ovFirstDate', { date: formatDate(parseDay(data.first_date)) }) : '—',
-      warn: false
+      note: false
     },
     {
       key: 'streak',
       label: t('usageStats.ovStreak'),
       value: t('usageStats.days', { n: ov.current_streak }),
       sub: t('usageStats.ovLongest', { n: ov.longest_streak }),
-      warn: false
+      note: false
     },
     {
       key: 'best',
       label: t('usageStats.ovBest'),
       value: ov.best_day ? formatTokens(ov.best_day.tokens) : '—',
       sub: ov.best_day ? formatDate(parseDay(ov.best_day.date)) : '—',
-      warn: false
+      note: false
     }
   ];
 });
@@ -198,7 +199,7 @@ const updatedText = computed(() =>
         <div v-for="item in overviewItems" :key="item.key" class="usage-stat">
           <span class="usage-stat-label">{{ item.label }}</span>
           <span class="usage-stat-value">{{ item.value }}</span>
-          <span class="usage-stat-sub" :class="{ 'is-warn': item.warn }">{{ item.sub }}</span>
+          <span class="usage-stat-sub" :class="{ 'is-note': item.note }">{{ item.sub }}</span>
         </div>
       </div>
 
@@ -371,8 +372,8 @@ const updatedText = computed(() =>
   color: var(--text-tertiary);
 }
 
-.usage-stat-sub.is-warn {
-  color: var(--state-warning);
+.usage-stat-sub.is-note {
+  color: var(--text-secondary);
 }
 
 .usage-stat-value {
