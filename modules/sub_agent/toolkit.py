@@ -189,7 +189,7 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "search_project_memory",
-            "description": "在项目记忆文件（.astrion/memory/*.md）的正文和描述中全文检索，返回匹配的记忆文件与片段。【硬性要求】开始处理与本项目相关的任务前（修改代码、调试报错、配置部署，或任务可能涉及项目约定/历史决策/已知问题时），必须先调用本工具检索；根据任务内容和项目记忆索引中的描述，提取2~5个清晰精确的关键词（优先使用项目术语、模块名、文件名、报错文本，中英文均可）。与本项目无关的通用问题不要调用。未命中时会明确返回无结果，此时不要更换同义词重复尝试；命中后如需完整内容，用 recall_project_memory 读取。",
+            "description": "检索索引式项目记忆（.astrion/memory/*.md）。需要补充项目约定、历史决策或已知问题的专题背景时调用；MEMORY.md 已全文注入的内容无需再次检索。用2~5个精确关键词，未命中不换同义词重试，命中后用 recall_project_memory 读取全文。",
             "parameters": {
                 "type": "object",
                 "properties": {

@@ -450,6 +450,12 @@ class MessagesMixin:
             if memory_prompt:
                 messages.append({"role": "system", "content": memory_prompt})
 
+            # Private workspace memory: snapshot only at creation/compression.
+            from modules.workspace_memory_context import main_prompt
+            workspace_memory_prompt = main_prompt(self)
+            if workspace_memory_prompt:
+                messages.append({"role": "system", "content": workspace_memory_prompt})
+
             # API 自定义 system prompt
             custom_system_prompt = self._get_or_init_frozen_prompt(
                 "frozen_custom_system_prompt",

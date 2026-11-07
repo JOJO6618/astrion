@@ -92,7 +92,7 @@ class ToolsDefinitionContextToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "update_memory",
-                            "description": "按条目管理总体长期记忆（自动编号，跨项目通用）。append/replace/delete。当用户提到个人信息、偏好、跨项目习惯，或用户主动要求「记住xxx」时，应积极主动地调用本工具。不记录密钥、隐私、未确认猜测。与特定项目绑定的技术约定用 update_project_memory。",
+                            "description": "按条目管理总体长期记忆（自动编号，跨项目通用）。append/replace/delete。保存跨项目个人偏好或用户明确指定的全局记忆。不记录密钥、隐私、未确认猜测。当前项目的私人约定与重要决定优先维护已注入的 MEMORY.md；专题细节用 update_project_memory。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -127,7 +127,7 @@ class ToolsDefinitionContextToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "search_project_memory",
-                            "description": "在项目记忆文件（.astrion/memory/*.md）的正文和描述中全文检索，返回匹配的记忆文件与片段。【硬性要求】开始处理与本项目相关的任务前（修改代码、调试报错、配置部署，或任务可能涉及项目约定/历史决策/已知问题时），必须先调用本工具检索；根据任务内容、用户要求和项目记忆索引中的描述，提取2~5个清晰精确的关键词（优先使用项目术语、模块名、文件名、报错文本，中英文均可）。纯闲聊、与项目无关的通用问题不要调用。未命中时会明确返回无结果，此时不要更换同义词重复尝试；命中后如需完整内容，用 recall_project_memory 读取。",
+                            "description": "检索索引式项目记忆（.astrion/memory/*.md）的正文和描述。涉及项目约定、历史决策或已知问题且需要补充专题背景时调用；MEMORY.md 已全文注入的内容无需再次检索。提取2~5个精确关键词，优先模块名、文件名、报错文本。与项目无关的问题不要调用；未命中不要更换同义词重复尝试。命中后用 recall_project_memory 读取全文。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -152,7 +152,7 @@ class ToolsDefinitionContextToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "update_project_memory",
-                            "description": "创建或覆盖项目记忆文件。当你发现有关当前项目的重要约定/决策/坑、用户表现出对项目的偏好，或用户主动要求「在当前项目里，下次要xxx/记住xxx」时，应积极主动地调用本工具。记忆名称用英文下划线，描述格式为'当xxxx时，应该索引本记忆'。不记录可从代码直接推断的或一次性信息。",
+                            "description": "创建或覆盖索引式项目专题记忆，保存长篇背景、专题细节和排查经验。项目常驻的私人约定、重要决定和偏好优先维护已注入的 MEMORY.md；可公开共享的规范放 AGENTS.md。无 MEMORY.md 时仍可用本工具保存项目记忆。名称用英文下划线，描述为'当xxxx时，应该索引本记忆'。不记录可从代码直接推断的或一次性信息。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({

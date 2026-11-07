@@ -226,6 +226,15 @@ def get_macos_writable_paths(workspace_path: Optional[str] = None) -> List[str]:
         for raw in get_workspace_entry(workspace_path).get("writable", []):
             if raw and raw not in merged:
                 merged.append(raw)
+        # Runtime-owned capability, not a user/global policy entry. Narrow child
+        # write roots remain enforced by their platform plans and native IO.
+        from modules.workspace_memory import host_memory_roots
+        from modules.execution_scope import current_execution_scope
+        scope = current_execution_scope()
+        if not (scope and scope.is_sub_agent):
+            for raw in host_memory_roots(workspace_path):
+                if raw not in merged:
+                    merged.append(raw)
     return merged
 
 
@@ -240,6 +249,10 @@ def get_macos_readable_paths(workspace_path: Optional[str] = None) -> List[str]:
     if workspace_path:
         for raw in get_workspace_entry(workspace_path).get("readable_extra", []):
             if raw and raw not in merged:
+                merged.append(raw)
+        from modules.workspace_memory import host_memory_roots
+        for raw in host_memory_roots(workspace_path):
+            if raw not in merged:
                 merged.append(raw)
     return merged
 

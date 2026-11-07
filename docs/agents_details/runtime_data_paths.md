@@ -68,3 +68,7 @@
 ### 思考摘要显示文件（2026-10-29）
 
 `modules/thinking_summary/storage.py` 以真实 manager 的 `_get_conversation_file_path` 解析所在目录，独立写入 `<实际对话目录>/thinking_summaries/<conversation_id>.json`，沿用 Agent／Studio namespace、工作区及 Chat 账号隔离。每次发布原子保存最新摘要、版本、代次和该思考块摘要序列，不写原对话文件或模型上下文；读取缺文件不创建目录。完整生成与显示契约见 `docs/thinking_summaries.md`，本次仅语法验证。
+
+### 私有项目常驻记忆（2026-11-07）
+
+新增 `modules/workspace_memory.py` 统一解析源码树外的 MEMORY.md。Host 使用当前数据目录的 `memory/<目录名>-<规范化项目路径摘要>/MEMORY.md`；Docker 使用每用户每工作区独立 `data_dir/memory/MEMORY.md`，将该目录挂载到容器项目根的 `.astrion/astrion-memory/`。主子只在新建和压缩时全文加载，不在恢复／普通请求中刷新；具体冻结元数据、授权与迁移边界见 `docs/workspace_memory.md`。

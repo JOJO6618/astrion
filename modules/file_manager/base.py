@@ -62,6 +62,9 @@ class FileManagerBase:
         # direct 时与 run_command 对齐：不走路径授权检查（不套沙箱语义）。
         self.host_execution_mode: str = "sandbox"
         self.set_container_session(container_session)
+        if data_dir and not self._is_docker_mode():
+            from modules.workspace_memory import register_host_memory
+            register_host_memory(str(self.project_path), str(data_dir))
 
     def set_host_execution_mode(self, mode: str) -> None:
         normalized = str(mode or "").strip().lower()

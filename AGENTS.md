@@ -16,6 +16,7 @@
 |------|---------|------------|
 | 项目结构 | `docs/agents_details/project_structure.md` | 加/改目录、模块 |
 | 运行态数据目录与路径变量 | `docs/agents_details/runtime_data_paths.md` | 路径解析、数据根、日志轮转 |
+| 私有项目常驻记忆 | `docs/workspace_memory.md` | MEMORY.md 存储、全文注入、压缩刷新、Docker 挂载与免预读 |
 | 启动 / 构建 / 打包命令 | `docs/agents_details/commands.md` | 启动入口、打包链路 |
 | 测试现状与执行方式 | `docs/agents_details/testing.md` | 写测试、跑回归 |
 | 公共执行层 | `docs/execution_contract.md` | 执行后端、文件／进程／终端、环境、媒体、后台通知及远程执行边界 |
@@ -78,6 +79,7 @@
 - host 模式同时加载 `host/` 与 `web/` 的用户/工作区（`IS_HOST_MODE`/`WEB_DATA_DIR`/`WEB_USER_SPACE_DIR`），写操作一律落 host
 - 日志：API dump 默认关闭（`AGENT_API_DUMP_ENABLED`）；混合轮转见 `utils/log_rotation.py`
 - 迁移脚本 `scripts/migrate_runtime_data.py`（先 `--dry-run`）
+- **私有项目常驻记忆（2026-11-07）**：Host 存 `<DATA_DIR>/memory/<目录名>-<路径摘要>/MEMORY.md`；Docker 存当前工作区 `data/memory/MEMORY.md`，目录独立挂载到项目内 `.astrion/astrion-memory/`，附专用 Git 忽略。主／子只在新建和压缩后全文加载，正常发送与恢复沿用持久快照；老主对话下次压缩才启用。只对已注入的那个文件免预读，普通文件守门及 readonly/plan 不变；同进程工具写入检测版本冲突。Host 当前工作区专属目录自动授权，不回写用户路径设置；子默认向主汇报记忆变更。完整契约与验证范围见 `docs/workspace_memory.md`。
 
 > 细节（含个人指令拦截 `command_blocking` 语义）见 `docs/agents_details/runtime_data_paths.md`。
 

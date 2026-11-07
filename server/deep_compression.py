@@ -578,6 +578,7 @@ async def run_deep_compression(
         "frozen_skills_prompt",
         "frozen_tool_loading_prompt",
         "frozen_memory_prompt",
+        "frozen_workspace_memory_prompt",
         "frozen_custom_system_prompt",
         "frozen_disabled_tools_prompt",
     )
@@ -585,6 +586,9 @@ async def run_deep_compression(
         "compression_count": target_count,
         "deep_compression_records": all_records,
         "last_deep_compression_record": current_record,
+        "workspace_memory_enabled": True,
+        "workspace_memory_snapshot": None,
+        "workspace_memory_write_version": None,
         # 上下文被重写后固定开销发生变化：下一个请求完成后重测基线，
         # 在此之前沿用旧基线（避免阈值瞬间回落到裸配置值）。
         "context_baseline_pending": True,

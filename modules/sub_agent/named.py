@@ -101,6 +101,8 @@ def create_named(manager: Any, terminal: Any, arguments: dict) -> dict:
         working_dir = manager._resolve_working_dir(arguments.get("working_dir"), agent_id=agent_id)
         prompt = build_system_prompt(str(manager.project_path), "direct" if access == "full_access" else "sandbox")
         prompt += f"\n你的名称：{name}\n默认工作目录：{working_dir}\n"
+        from modules.workspace_memory_context import child_prompt
+        prompt += "\n" + child_prompt(terminal)
         result = manager.create_sub_agent(
             agent_id=agent_id, summary=summary, task=task,
             conversation_id=conversation_id, access_level=access,

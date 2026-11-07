@@ -49,15 +49,20 @@ class SubAgentHistoryMixin:
             logger.exception('Sub-agent usage/cost commit failed: %s', self.task_id)
 
 
-    def _rebuild_system_prompt(self) -> str:
-        """从冻结的 system_prompt.txt 重新读取 system prompt（压缩后重建用）。"""
+    def _rebuild_system_prompt(self, *, refresh_memory: bool = False) -> str:
+        """Keep the frozen prompt; only compression refreshes private memory."""
+        prompt = self.system_prompt
         try:
             if self.system_prompt_file.exists():
-                return self.system_prompt_file.read_text(encoding="utf-8")
+                prompt = self.system_prompt_file.read_text(encoding="utf-8")
         except Exception as exc:
             logger.warning(f"[SubAgentTask] 重建 system prompt 失败: {exc}")
-        # 兜底用内存中的
-        return self.system_prompt
+        if refresh_memory:
+            from modules.workspace_memory_context import replace_child_memory, save_child_prompt
+            prompt = replace_child_memory(prompt, self.manager.terminal)
+            save_child_prompt(self.system_prompt_file, prompt)
+            self.system_prompt = prompt
+        return prompt
 
 
     def _deep_compress_messages(self) -> bool:
@@ -171,7 +176,7 @@ class SubAgentHistoryMixin:
         # 注意：_rebuild_system_prompt 返回裸字符串，必须包装为标准消息 dict；
         # 否则下游 API 客户端（_merge_system_messages 的 msg.get("role")）会在
         # 压缩后的首次模型调用崩溃（'str' object has no attribute 'get'）。
-        frozen_system = {"role": "system", "content": self._rebuild_system_prompt()}
+        frozen_system = {"role": "system", "content": self._rebuild_system_prompt(refresh_memory=True)}
         compressed_system = {
             "role": "system",
             "content": summary_text,

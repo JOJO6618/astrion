@@ -483,6 +483,9 @@ class MainTerminalToolsExecutionMixin:
                             info = get_execution_backend(self).files.resolve_path(str(path), access="write")
                             if info.get("success") and info.get("within_workspace"):
                                 return {"allowed": True, "mode": mode, "requires_approval": False}
+                            from modules.workspace_memory_tools import injected_memory
+                            if injected_memory(self, path) is not None:
+                                return {"allowed": True, "mode": mode, "requires_approval": False}
                         except Exception:
                             pass
                         return {
@@ -999,6 +1002,9 @@ class MainTerminalToolsExecutionMixin:
                 target_path = arguments.get("file_path")
                 if not target_path:
                     return None
+                from modules.workspace_memory_tools import injected_memory
+                if injected_memory(self, target_path) is not None:
+                    return None
 
                 if tool_name == "write_file":
                     append_mode = bool(arguments.get("append", False))
@@ -1488,7 +1494,10 @@ class MainTerminalToolsExecutionMixin:
                             backend = get_execution_backend(self)
                             self._track_shallow_versioning(path)
                             mode = "a" if append_flag else "w"
-                            result = backend.write_file(path, content, mode=mode)
+                            from modules.workspace_memory_tools import write_injected_memory
+                            result = write_injected_memory(self, tool_name, arguments)
+                            if result is None:
+                                result = backend.write_file(path, content, mode=mode)
                             if isinstance(result, dict) and result.get("success"):
                                 # write_file 成功后，该文件视作当前会话已“接触”，
                                 # 允许后续继续 write/edit 而不再触发先读拦截。
@@ -1515,7 +1524,10 @@ class MainTerminalToolsExecutionMixin:
                         else:
                             backend = get_execution_backend(self)
                             self._track_shallow_versioning(path)
-                            result = backend.edit_file(path, replacements)
+                            from modules.workspace_memory_tools import write_injected_memory
+                            result = write_injected_memory(self, tool_name, arguments)
+                            if result is None:
+                                result = backend.edit_file(path, replacements)
                             if isinstance(result, dict) and result.get("success"):
                                 self._mark_file_as_read_visited(result.get("path") or path)
                                 # 快捷窗口：记录本次对话编辑过的文件

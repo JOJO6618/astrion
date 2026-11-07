@@ -159,6 +159,7 @@ def get_user_resources(username=None, workspace_id=None, update_session=True,
             owner, str(workspace.project_path),
             container_key=_make_terminal_key(owner, workspace.workspace_id),
             preferred_mode="host" if host else "docker",
+            data_dir=str(workspace.data_dir),
         )
         if terminal is None:
             run_mode = identity.preferred_run_mode

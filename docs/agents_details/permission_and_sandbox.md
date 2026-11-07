@@ -108,3 +108,7 @@
   - 原生文件工具对齐（`file_manager/path_mixin.py`）：读 roots 与沙箱白名单同源（系统路径 + 工作区 + 授权）+ 叠加同一禁读清单——至此 host+sandbox 下全部读通道（只读/可写沙箱命令、原生 read_file）共享同一边界
 - **Linux 宿主机（2026-10）= 管理员安装的受限助手**：bwrap 最小文件系统 + seccomp + AppArmor + systemd/cgroup IP 过滤；不再挂载宿主 `/`。共享 host 网络保证双向 localhost；restricted 允许回环和授权路径 Unix socket、阻断抽象 Unix socket；none 保留匿名 stream/seqpacket socketpair。最后降到真实普通 UID 并清能力。首批 Ubuntu 24.04/kernel 6.8 隔离实验通过，系统全局安装和其它发行版仍待验收。原生 IO 与精确系统白名单同源，不给实际宿主 `/tmp` 隐式授权。具体约束见 §20。
 - **Windows = WSL2 最小根文件系统（白名单）**——命名空间内只有系统目录+工作区，天然符合。
+
+### 私有工作区记忆的内置路径能力（2026-11-07）
+
+用户配置来源仍为环境变量与路径授权文件；此外，受信任的 FileManager 资源装配会注册当前工作区对应的外置记忆目录。`get_macos_readable_paths`／`get_macos_writable_paths` 动态并入该精确目录，复用三平台沙箱与原生 IO 的共同入口，不写回用户配置、不授权共享数据根。子实例只追加此隐式读根，固定窄写根和 readonly/plan 限制不变。Docker 通过项目内独立 bind 暴露文件，继续服从原有容器和子实例权限；“主写子读”是默认维护策略，不声称缩小 full_access 等既有能力。已全文注入的主对话文件免工具预读、auto_approval 下按内置工作区资源放行，人工审批仍沿用原规则。完整说明见 `docs/workspace_memory.md`。

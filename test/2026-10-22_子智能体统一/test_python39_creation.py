@@ -13,6 +13,7 @@ from modules.sub_agent.intelligence import resolve_intelligence_model
 from modules.sub_agent.manager import SubAgentManager
 from modules.sub_agent.named import handle_named_tool
 from modules.sub_agent.task import SubAgentTask
+from modules.file_manager import FileManager
 
 
 class PublicCreationTests(unittest.TestCase):
@@ -33,7 +34,10 @@ class PublicCreationTests(unittest.TestCase):
             data.mkdir()
             manager = SubAgentManager(str(root), str(data), owner_conversation_id="parent")
             terminal = SimpleNamespace(
-                sub_agent_manager=manager, data_dir=data,
+                sub_agent_manager=manager, data_dir=data, project_path=str(root),
+                container_session=SimpleNamespace(mode="host"),
+                file_manager=FileManager(str(root), data_dir=str(data),
+                                         container_session=SimpleNamespace(mode="host")),
                 context_manager=SimpleNamespace(current_conversation_id="parent"),
                 api_client=SimpleNamespace(model_key="fake", reasoning_effort="high"),
                 get_permission_mode=lambda: "unrestricted",

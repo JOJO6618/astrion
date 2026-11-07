@@ -48,6 +48,7 @@ class ContainerHandle:
     container_name: Optional[str] = None
     container_id: Optional[str] = None
     sandbox_bin: Optional[str] = None
+    memory_directory: Optional[str] = None
     created_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
 
@@ -123,6 +124,7 @@ class UserContainerManager:
         workspace_path: str,
         container_key: Optional[str] = None,
         preferred_mode: Optional[str] = None,
+        data_dir: Optional[str] = None,
     ) -> ContainerHandle:
         """为指定“容器键”确保一个容器。
 
@@ -139,6 +141,12 @@ class UserContainerManager:
         # 安全模式：当 LINUX_SAFETY 开启且要求 host 时，强制回退 docker
         if mode == "host" and LINUX_SAFETY:
             mode = "docker"
+        memory_directory = None
+        if mode == "docker":
+            from modules.workspace_memory import location, prepare_directory
+            target = location(workspace, data_dir or str(Path(workspace).parent / "data"), docker=True)
+            prepare_directory(target)
+            memory_directory = str(target.directory)
 
         with self._lock:
             handle = self._containers.get(key)
@@ -154,6 +162,11 @@ class UserContainerManager:
                     self._kill_container(handle.container_name, handle.sandbox_bin)
                     handle = None
                 else:
+                    if mode == "docker" and (
+                        handle.workspace_path != workspace
+                        or handle.memory_directory != memory_directory
+                    ):
+                        raise RuntimeError("现有容器的工作区或私有记忆挂载不匹配；请在任务空闲后重建该工作区容器。")
                     handle.workspace_path = workspace
                     handle.touch()
                     return handle
@@ -176,7 +189,8 @@ class UserContainerManager:
                         raise RuntimeError(tr("container_mgr.per_user_quota_exhausted", limit=per_user_limit))
 
             # Important: create container using the cache key so each workspace gets its own container name.
-            handle = self._create_handle(key, workspace, mode)
+            handle = (self._create_handle(key, workspace, mode, memory_directory=memory_directory)
+                      if mode == "docker" else self._create_handle(key, workspace, mode))
             self._containers[key] = handle
             return handle
 
@@ -304,7 +318,8 @@ class UserContainerManager:
         existing = 1 if (existing_handle and existing_handle.mode == "docker") else 0
         return (docker_total - existing) < self.max_containers
 
-    def _create_handle(self, username: str, workspace: str, mode: str) -> ContainerHandle:
+    def _create_handle(self, username: str, workspace: str, mode: str,
+                       memory_directory: Optional[str] = None) -> ContainerHandle:
         if mode != "docker":
             return self._host_handle(username, workspace)
 
@@ -342,6 +357,15 @@ class UserContainerManager:
             f"{workspace}:{self.mount_path}",
         ]
 
+        if memory_directory:
+            from modules.workspace_memory import RELATIVE_DIRECTORY
+            # Mount the directory, so atomic file replacement stays possible.
+            marker = Path(workspace) / RELATIVE_DIRECTORY
+            for component in (marker.parent, marker):
+                if component.is_symlink():
+                    raise PermissionError("私有记忆挂载点不能是符号链接")
+                component.mkdir(parents=True, exist_ok=True)
+            cmd += ["-v", f"{memory_directory}:{self.mount_path.rstrip('/')}/{RELATIVE_DIRECTORY}"]
         if self.network:
             cmd += ["--network", self.network]
         if self.cpus:
@@ -393,6 +417,7 @@ class UserContainerManager:
             container_name=container_name,
             container_id=container_id,
             sandbox_bin=docker_path,
+            memory_directory=memory_directory,
         )
 
     def _host_handle(self, username: str, workspace: str) -> ContainerHandle:

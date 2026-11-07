@@ -274,6 +274,18 @@ class CompressionMixin:
             msg["metadata"] = metadata
             history[idx] = msg
         self.conversation_history = history
+        # Refresh private memory at compression boundaries, not ordinary turns.
+        memory_updates = {
+            "workspace_memory_enabled": True,
+            "frozen_workspace_memory_prompt": None,
+            "workspace_memory_snapshot": None,
+            "workspace_memory_write_version": None,
+        }
+        self.conversation_metadata.update(memory_updates)
+        if self.current_conversation_id:
+            memory_manager = (self._get_conversation_manager_for_id(self.current_conversation_id)
+                              if hasattr(self, "_get_conversation_manager_for_id") else self.conversation_manager)
+            memory_manager.update_conversation_metadata(self.current_conversation_id, memory_updates)
         # 工具动态加载：被标记的消息在构建时会被替换内容，load_tools 返回的
         # 工具定义随之从上下文消失，loaded 状态必须回滚（pending 回满）。
         try:
