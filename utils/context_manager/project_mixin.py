@@ -55,11 +55,35 @@ except ImportError:
         model_supports_video,
     )
 from utils.conversation_manager import ConversationManager
+from utils.context_manager.fs_access import (
+    execution_environment,
+    files_for_context,
+    inspect_meta,
+    list_dir,
+    workspace_identity,
+)
 from utils.host_workspace_debug import write_host_workspace_debug
+from utils.logger import setup_logger
 from utils.media_store import MediaStore
 from utils.token_usage import normalize_usage_payload
 
 from modules.i18n import tr
+
+logger = setup_logger(__name__)
+
+
+def _lexical_path(value: Any) -> str:
+    """路径词法归一化：只用 expanduser/normpath/normcase，不触碰文件系统。
+
+    控制侧不允许对（可能属于远端的）路径做 ``Path.resolve()``/``exists()``。
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        return os.path.normcase(os.path.normpath(os.path.expanduser(text)))
+    except Exception:
+        return text
 
 AUTO_SHALLOW_PLACEHOLDER = "过早的工具结果已经被自动压缩"
 AUTO_SHALLOW_TOOL_WHITELIST = {
@@ -94,18 +118,14 @@ class ProjectMixin:
             use_stored_snapshot = True
             stored_path = meta.get("project_path")
             if isinstance(stored_path, str) and stored_path.strip():
-                try:
-                    stored_path_obj = Path(stored_path.strip()).expanduser().resolve()
-                    if stored_path_obj != Path(self.project_path).resolve():
-                        use_stored_snapshot = False
-                        write_host_workspace_debug(
-                            "context_manager.project_snapshot.discard_stale_snapshot",
-                            conversation_id=self.current_conversation_id,
-                            metadata_project_path=str(stored_path_obj),
-                            current_project_path=str(Path(self.project_path).resolve()),
-                        )
-                except Exception:
-                    pass
+                if not self._stored_project_path_matches(stored_path):
+                    use_stored_snapshot = False
+                    write_host_workspace_debug(
+                        "context_manager.project_snapshot.discard_stale_snapshot",
+                        conversation_id=self.current_conversation_id,
+                        metadata_project_path=_lexical_path(stored_path),
+                        current_project_path=self._workspace_identity_hint(),
+                    )
             if use_stored_snapshot:
                 self.project_snapshot = {
                     "file_tree": stored_tree,
@@ -135,7 +155,12 @@ class ProjectMixin:
             conversation_id=self.current_conversation_id,
             project_path=str(self.project_path),
             total_files=snapshot.get("statistics", {}).get("total_files"),
+            listing_unavailable=bool(structure.get("listing_unavailable")),
         )
+        if structure.get("listing_unavailable"):
+            # 执行后端元数据能力缺口（如容器代理暂无 stat/list）：本次不把空树
+            # 写进对话历史，保持原有 freeze 语义——“不做任务间重写历史”。
+            return snapshot
         if self.current_conversation_id:
             self.conversation_manager.update_project_snapshot(
                 self.current_conversation_id,
@@ -149,8 +174,36 @@ class ProjectMixin:
             self.conversation_metadata["project_snapshot_at"] = snapshot["snapshot_at"]
         return snapshot
 
+    def _workspace_identity_hint(self) -> str:
+        """当前工作区身份文案（仅用于日志/对比）：后端身份优先，其次词法路径。"""
+        identity = workspace_identity(self)
+        if identity:
+            return _lexical_path(identity)
+        return _lexical_path(self.project_path)
+
+    def _stored_project_path_matches(self, stored_path: str) -> bool:
+        """metadata 里的 project_path 是否指向当前工作区。
+
+    优先用执行后端声明的身份（远端=节点路径），其次与当前工作区做纯词法比较；
+    控制侧不对任何候选路径做 ``Path.resolve()``/``exists()``。
+    """
+        stored = _lexical_path(stored_path)
+        if not stored:
+            return True
+        candidates = {_lexical_path(self.project_path)}
+        identity = workspace_identity(self)
+        if identity:
+            candidates.add(_lexical_path(identity))
+        candidates.discard("")
+        return stored in candidates
+
     def _get_project_structure_for_prompt(self, limit: int = 20) -> Dict:
-        """获取用于 prompt 的浅层文件结构（仅根目录，优先文件夹）。"""
+        """获取用于 prompt 的浅层文件结构（仅根目录，优先文件夹）。
+
+        目录列举与文件大小经执行后端（本机后端 = FileManager，远端 = 节点
+        元数据）；控制端不再对本机 Path 做 iterdir/stat。元数据能力缺口时
+        设 ``listing_unavailable``，调用方据此不把空树写进对话历史。
+        """
         structure = {
             "path": str(self.project_path),
             "files": [],
@@ -159,76 +212,102 @@ class ProjectMixin:
             "total_size": 0,
             "tree": {}
         }
-        if not self.project_path.exists():
-            return structure
         try:
-            entries = [p for p in self.project_path.iterdir() if not p.name.startswith('.')]
-        except PermissionError:
+            files_access = files_for_context(self)
+            listing = list_dir(files_access, "")
+        except Exception as exc:
+            logger.warning(f"[project] 工作区根目录列举失败: {exc}")
+            structure["listing_unavailable"] = True
+            return structure
+        if not listing.get("success"):
+            logger.warning(
+                "[project] 工作区根目录列举失败: %s",
+                listing.get("error") or listing.get("code"),
+            )
+            structure["listing_unavailable"] = True
             return structure
 
-        folders = [p for p in entries if p.is_dir()]
-        files = [p for p in entries if p.is_file()]
-        folders.sort(key=lambda p: p.name.lower())
-        files.sort(key=lambda p: p.name.lower())
-        selected = (folders + files)[:max(0, limit)]
+        folder_entries = [
+            {
+                "kind": "folder",
+                "name": str(item.get("name") or ""),
+                "path": str(item.get("path") or item.get("name") or ""),
+            }
+            for item in (listing.get("folders") or [])
+            if item.get("name")
+        ]
+        file_entries = [
+            {
+                "kind": "file",
+                "name": str(item.get("name") or ""),
+                "path": str(item.get("path") or item.get("name") or ""),
+                "size": int(item.get("size") or 0),
+            }
+            for item in (listing.get("files") or [])
+            if item.get("name")
+        ]
+        folder_entries.sort(key=lambda item: item["name"].lower())
+        file_entries.sort(key=lambda item: item["name"].lower())
+        selected = (folder_entries + file_entries)[: max(0, limit)]
 
-        def add_entry(entry: Path, *, display_path: Optional[str] = None):
-            relative_path = str(entry.relative_to(self.project_path))
-            if display_path:
-                relative_path = display_path
-            if entry.is_dir():
-                structure["folders"].append({
-                    "name": entry.name,
-                    "path": relative_path
+        def add_folder(name: str, display_path: str):
+            structure["folders"].append({
+                "name": name,
+                "path": display_path
+            })
+            parts = display_path.split("/")
+            parent = structure["tree"]
+            for idx, part in enumerate(parts):
+                is_leaf = idx == len(parts) - 1
+                node = parent.setdefault(part, {
+                    "type": "folder",
+                    "path": "/".join(parts[:idx + 1]),
+                    "children": {}
                 })
-                parts = relative_path.split("/")
-                parent = structure["tree"]
-                for idx, part in enumerate(parts):
-                    is_leaf = idx == len(parts) - 1
-                    parent.setdefault(part, {
-                        "type": "folder",
-                        "path": "/".join(parts[:idx + 1]),
-                        "children": {}
-                    })
-                    if is_leaf:
-                        parent[part]["type"] = "folder"
-                        parent[part]["path"] = relative_path
-                        parent[part].setdefault("children", {})
-                    parent = parent[part].setdefault("children", {})
-            else:
-                try:
-                    size = entry.stat().st_size
-                except OSError:
-                    size = 0
-                file_info = {
-                    "name": entry.name,
-                    "path": relative_path,
-                    "size": size,
-                    "annotation": self.file_annotations.get(relative_path, "")
-                }
-                structure["files"].append(file_info)
-                structure["total_files"] += 1
-                structure["total_size"] += size
-                structure["tree"][entry.name] = {
-                    "type": "file",
-                    "path": relative_path,
-                    "size": size,
-                    "annotation": file_info["annotation"]
-                }
+                if is_leaf:
+                    node["type"] = "folder"
+                    node["path"] = display_path
+                    node.setdefault("children", {})
+                parent = node.setdefault("children", {})
+
+        def add_file(name: str, display_path: str, size: int):
+            annotation = self.file_annotations.get(display_path, "")
+            file_info = {
+                "name": name,
+                "path": display_path,
+                "size": size,
+                "annotation": annotation
+            }
+            structure["files"].append(file_info)
+            structure["total_files"] += 1
+            structure["total_size"] += size
+            structure["tree"][name] = {
+                "type": "file",
+                "path": display_path,
+                "size": size,
+                "annotation": annotation
+            }
 
         for entry in selected:
-            add_entry(entry)
+            if entry["kind"] == "folder":
+                add_folder(entry["name"], entry["path"])
+            else:
+                add_file(entry["name"], entry["path"], entry["size"])
 
-        # 根目录浅扫会跳过点目录；内部文件迁移到 .agents 后，单独展示这几个对模型有意义的目录。
-        agents_dir = self.project_path / ".astrion"
+        # 根目录浅扫会跳过点目录；内部文件迁移到 .astrion 后，单独展示这几个对模型有意义的目录。
         for internal_name in ("skills", "user_upload", "compact_result", "review"):
-            internal_dir = agents_dir / internal_name
-            if internal_dir.exists() and internal_dir.is_dir():
-                add_entry(internal_dir, display_path=f".astrion/{internal_name}")
+            display_path = f".astrion/{internal_name}"
+            meta = inspect_meta(files_access, display_path)
+            if meta.get("success") and meta.get("is_dir"):
+                add_folder(internal_name, display_path)
         return structure
 
     def get_project_structure(self) -> Dict:
-        """获取项目文件结构"""
+        """获取项目文件结构（递归，最深 5 层）。
+
+        目录列举与文件大小/时间全部经执行后端（``list_files`` +
+        ``inspect_path``），控制侧不再对工作区做 ``iterdir/stat``。
+        """
         structure = {
             "path": str(self.project_path),
             "files": [],
@@ -242,101 +321,171 @@ class ProjectMixin:
             structure["unavailable"] = True
             structure["message"] = tr("project_mixin.host_mode_tree_unavailable")
             return structure
-        
+
+        try:
+            files_access = files_for_context(self)
+        except Exception as exc:
+            logger.warning("[project] 文件树无法取得执行后端: %s", exc)
+            return structure
+
         # 记录实际存在的文件
         existing_files = set()
-        
-        def scan_directory(path: Path, level: int = 0, max_level: int = 5, parent_tree: Dict = None):
+
+        def list_children(relative_path: str):
+            """列出一层目录：文件夹在前、名称排序（隐藏项不返回）。"""
+            listing = list_dir(files_access, relative_path)
+            if not listing.get("success"):
+                logger.warning(
+                    "[project] 目录列举失败 %s: %s",
+                    relative_path or ".",
+                    listing.get("error") or listing.get("code"),
+                )
+                return []
+            folders = [
+                {
+                    "kind": "folder",
+                    "name": str(item.get("name") or ""),
+                    "path": str(item.get("path") or item.get("name") or ""),
+                }
+                for item in (listing.get("folders") or [])
+                if item.get("name") and not str(item.get("name")).startswith(".")
+            ]
+            files = [
+                {
+                    "kind": "file",
+                    "name": str(item.get("name") or ""),
+                    "path": str(item.get("path") or item.get("name") or ""),
+                    "size": int(item.get("size") or 0),
+                    "modified": str(item.get("modified") or ""),
+                }
+                for item in (listing.get("files") or [])
+                if item.get("name") and not str(item.get("name")).startswith(".")
+            ]
+            folders.sort(key=lambda item: item["name"].lower())
+            files.sort(key=lambda item: item["name"].lower())
+            return folders + files
+
+        def scan_directory(relative_path: str, level: int = 0, max_level: int = 5, parent_tree: Dict = None):
             if level > max_level:
                 return
-            
+
             if parent_tree is None:
                 parent_tree = structure["tree"]
-            
-            try:
-                # 获取目录内容并排序（文件夹在前，文件在后）
-                items = sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
-                
-                for item in items:
-                    if item.name.startswith('.'):
-                        continue
-                    
-                    relative_path = str(item.relative_to(self.project_path))
-                    
-                    if item.is_file():
-                        existing_files.add(relative_path)  # 记录存在的文件
-                        file_info = {
-                            "name": item.name,
-                            "path": relative_path,
-                            "size": item.stat().st_size,
-                            "modified": datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
-                            "annotation": self.file_annotations.get(relative_path, "")
-                        }
-                        structure["files"].append(file_info)
-                        structure["total_files"] += 1
-                        structure["total_size"] += file_info["size"]
-                        
-                        # 添加到树形结构
-                        parent_tree[item.name] = {
-                            "type": "file",
-                            "path": relative_path,
-                            "size": file_info["size"],
-                            "annotation": file_info["annotation"]
-                        }
-                    
-                    elif item.is_dir():
-                        folder_info = {
-                            "name": item.name,
-                            "path": relative_path
-                        }
-                        structure["folders"].append(folder_info)
-                        
-                        # 创建文件夹节点
-                        parent_tree[item.name] = {
-                            "type": "folder",
-                            "path": relative_path,
-                            "children": {}
-                        }
-                        
-                        # 递归扫描子目录
-                        scan_directory(item, level + 1, max_level, parent_tree[item.name]["children"])
-            except PermissionError:
-                pass
-        
-        scan_directory(self.project_path)
-        
+
+            for entry in list_children(relative_path):
+                name = entry["name"]
+                relative_entry = entry["path"] or name
+
+                if entry["kind"] == "file":
+                    existing_files.add(relative_entry)  # 记录存在的文件
+                    file_info = {
+                        "name": name,
+                        "path": relative_entry,
+                        "size": entry["size"],
+                        "modified": entry["modified"],
+                        "annotation": self.file_annotations.get(relative_entry, ""),
+                    }
+                    structure["files"].append(file_info)
+                    structure["total_files"] += 1
+                    structure["total_size"] += file_info["size"]
+
+                    # 添加到树形结构
+                    parent_tree[name] = {
+                        "type": "file",
+                        "path": relative_entry,
+                        "size": file_info["size"],
+                        "annotation": file_info["annotation"],
+                    }
+                    continue
+
+                structure["folders"].append({
+                    "name": name,
+                    "path": relative_entry,
+                })
+
+                # 创建文件夹节点
+                parent_tree[name] = {
+                    "type": "folder",
+                    "path": relative_entry,
+                    "children": {},
+                }
+
+                # 递归扫描子目录
+                scan_directory(
+                    relative_entry,
+                    level + 1,
+                    max_level,
+                    parent_tree[name]["children"],
+                )
+
+        scan_directory("")
+
         # 清理不存在文件的备注
         invalid_annotations = []
         for annotation_path in self.file_annotations.keys():
             if annotation_path not in existing_files:
                 invalid_annotations.append(annotation_path)
-        
+
         if invalid_annotations:
             for path in invalid_annotations:
                 del self.file_annotations[path]
                 print(f"🧹 清理无效备注: {path}")
             self.save_annotations()
-        
+
         return structure
+
+    def _file_tree_root_path(self, structure: Dict) -> str:
+        """文件树根路径：绑定后端时只用后端上报路径，缺失则明确未知。
+
+        ``execution_environment`` 返回 ``None`` 说明完全没有绑定后端，才允许
+        沿用控制端结构里的路径（纯 ContextManager 场景）。
+        """
+        env = execution_environment(self)
+        if env is None:
+            return str(structure.get("path") or "")
+        container = env.get("container") if isinstance(env.get("container"), dict) else {}
+        container_root = str(container.get("mount_path") or "").strip()
+        workspace = str(env.get("workspace_root") or env.get("cwd") or "").strip()
+        target = str(env.get("execution_target") or "").strip().lower()
+        if target == "docker" and container_root:
+            return container_root.rstrip("/") or "/"
+        return workspace or container_root or "（执行后端未上报工作区路径）"
+
+    def _container_root_label(self, structure: Dict, project_name: str, container_root: str) -> str:
+        """容器挂载根标签。"""
+        container_root = (container_root or "").strip().rstrip("/") or "/"
+        if container_root == "/":
+            return "/ (项目根)"
+        if container_root.endswith(project_name):
+            return f"{container_root} (项目根)"
+        return f"{container_root} (映射自 {project_name})"
 
     def _build_file_tree(self, structure: Dict) -> str:
         """构建文件树字符串（修复版：正确显示树形结构）"""
+        if structure.get("listing_unavailable"):
+            return "（文件树暂不可用：执行后端未返回目录元数据）"
         if not structure.get("tree"):
-            return f"📁 {structure['path']}/\n(空项目)"
+            return f"📁 {self._file_tree_root_path(structure)}/\n(空项目)"
         
         lines = []
-        project_name = Path(structure['path']).name
-        if self._is_host_mode_without_safety():
-            root_label = f"{structure['path']} (项目根)"
-        else:
-            container_root = (self.container_mount_path or "").strip() or "/workspace"
-            container_root = container_root.rstrip("/") or "/"
-            if container_root == "/":
-                root_label = f"/ (项目根)"
-            elif container_root.endswith(project_name):
-                root_label = f"{container_root} (项目根)"
+        project_name = Path(str(structure.get('path') or '')).name
+        # 绑定执行后端时，平台/路径/模式一律用后端事实（get_environment），
+        # 不用控制端配置或控制端 OS 冒充执行目标。
+        env = execution_environment(self)
+        env_target = str((env or {}).get("execution_target") or "").strip().lower()
+        if env is None:
+            if self._is_host_mode_without_safety():
+                root_label = f"{structure['path']} (项目根)"
             else:
-                root_label = f"{container_root} (映射自 {project_name})"
+                root_label = self._container_root_label(
+                    structure, project_name, self.container_mount_path or "/workspace"
+                )
+        elif env_target != "docker":
+            root_label = f"{self._file_tree_root_path(structure)} (项目根)"
+        else:
+            root_label = self._container_root_label(
+                structure, project_name, self._file_tree_root_path(structure)
+            )
         lines.append(f"{root_label}/")
         
         ROOT_FOLDER_CHILD_LIMIT = 20

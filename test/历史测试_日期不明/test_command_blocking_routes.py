@@ -44,12 +44,25 @@ class TestCommandBlockingApi(_CommandBlockingCase):
         # 注入工作区：data_dir 指向本用例的隔离目录（与 personalization 路由同模式）。
         # with_terminal 要求 terminal/workspace 均真值，否则 503；terminal 用空壳即可，
         # 被测视图只读取 workspace.data_dir。
+        #
+        # 替身签名必须与生产 get_user_resources 保持一致（workspace_id /
+        # update_session / conversation_id 都是真实 kwargs，丢失任一即 TypeError）。
         workspace = SimpleNamespace(data_dir=str(self.data_dir),
                                     project_path=str(self.tmp))
         terminal_stub = SimpleNamespace()
+
+        def _fake_get_user_resources(
+            username=None,
+            workspace_id=None,
+            conversation_id=None,
+            update_session=True,
+            **_unused,
+        ):
+            """只解析会话/工作区，不碰真实目录与登录态。"""
+            return terminal_stub, workspace
+
         patcher = mock.patch.object(
-            ctx_decorators, "get_user_resources",
-            lambda _username, conversation_id=None: (terminal_stub, workspace),
+            ctx_decorators, "get_user_resources", _fake_get_user_resources
         )
         patcher.start()
         self.addCleanup(patcher.stop)

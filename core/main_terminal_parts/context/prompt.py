@@ -74,6 +74,13 @@ from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager, AUTO_SHALLOW_PLACEHOLDER
+from utils.context_manager.fs_access import (
+    files_for_owner,
+    inspect_meta,
+    list_dir,
+    path_mtime,
+    read_text,
+)
 from utils.host_workspace_debug import write_host_workspace_debug
 from utils.tool_result_formatter import format_tool_result_for_context
 from utils.logger import setup_logger
@@ -102,56 +109,70 @@ class PromptMixin:
     """MainTerminalContextMixin prompt 能力 mixin。"""
 
     def _load_root_md_content(self, filename: str) -> Optional[str]:
-        """加载工作区根目录的指定指令文件内容（仅根目录，子目录的不注入）。"""
+        """加载工作区根目录的指定指令文件内容（仅根目录，子目录的不注入）。
+
+        内容经执行后端读取（主机模式即本地 FileManager，远端为节点内容），
+        控制端不再对本机 Path 做 exists/read。
+        """
         try:
-            project_path = Path(self.project_path)
-            root_file = project_path / filename
-            if not root_file.is_file():
-                return None
-            content = root_file.read_text(encoding='utf-8')
-            return content.strip() if content else None
+            content = read_text(files_for_owner(self), filename)
         except Exception as exc:
             logger.warning(f"[{filename}] 读取失败: {exc}")
             return None
+        if not content:
+            return None
+        stripped = content.strip()
+        return stripped or None
 
     def _load_root_md_updated_at(self, filename: str) -> str:
         """返回根目录指定指令文件的最后修改时间文案（如「（最后修改：2026-08-12 17:54）」，失败返回空串）。"""
         try:
-            root_file = Path(self.project_path) / filename
-            if not root_file.is_file():
-                return ""
-            mtime = root_file.stat().st_mtime
-            return f"（最后修改：{datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')}）"
+            mtime = path_mtime(files_for_owner(self), filename)
         except Exception:
+            return ""
+        if mtime is None:
+            return ""
+        try:
+            return f"（最后修改：{datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')}）"
+        except (OSError, OverflowError, ValueError):
             return ""
 
     def _load_sub_md_paths(self, filename: str, max_notice: int = 20, timeout_seconds: float = 30.0) -> tuple:
         """扫描工作区一级子目录中的指定指令文件，返回 (相对路径列表, 实际总数)。
 
         - 仅扫描根目录与一级子目录，不递归；跳过通用非源码目录（_AGENTS_MD_SKIP_DIRS）。
+        - 目录列举与文件判定经执行后端（不读控制端本机目录）。
         - 列表最多 max_notice 个（超出截断，总数仍在第二项返回）。
         - 扫描超过 timeout_seconds 秒时停止，返回已扫描到的结果。
         """
         found: List[str] = []
         total = 0
         try:
-            project_path = Path(self.project_path)
-            if not project_path.is_dir():
-                return found, total
-            start = time.monotonic()
-            for sub in project_path.iterdir():
-                if time.monotonic() - start >= timeout_seconds:
-                    logger.warning(f"[{filename}] 子目录扫描超过 {timeout_seconds}s，返回已扫描到的 {len(found)} 个")
-                    break
-                if not sub.is_dir() or sub.name in _AGENTS_MD_SKIP_DIRS:
-                    continue
-                candidate = sub / filename
-                if candidate.is_file():
-                    total += 1
-                    if len(found) < max_notice:
-                        found.append(candidate.relative_to(project_path).as_posix())
+            files_access = files_for_owner(self)
+            listing = list_dir(files_access, "")
         except Exception as exc:
             logger.warning(f"[{filename}] 子目录扫描失败: {exc}")
+            return found, total
+        if not listing.get("success"):
+            logger.warning(
+                f"[{filename}] 子目录扫描失败: {listing.get('error') or listing.get('code')}"
+            )
+            return found, total
+
+        start = time.monotonic()
+        for folder in listing.get("folders") or []:
+            if time.monotonic() - start >= timeout_seconds:
+                logger.warning(f"[{filename}] 子目录扫描超过 {timeout_seconds}s，返回已扫描到的 {len(found)} 个")
+                break
+            name = str(folder.get("name") or "")
+            if not name or name in _AGENTS_MD_SKIP_DIRS:
+                continue
+            candidate = f"{name}/{filename}"
+            meta = inspect_meta(files_access, candidate)
+            if meta.get("success") and meta.get("is_file"):
+                total += 1
+                if len(found) < max_notice:
+                    found.append(candidate)
         return found, total
 
     def _load_agents_md_content(self) -> Optional[str]:

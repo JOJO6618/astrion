@@ -160,47 +160,147 @@ class LifecycleMixin:
             "echo_loop_detected": self.echo_loop_detected
         }
 
-    def close(self) -> bool:
-        """关闭终端"""
-        if not self.is_running:
+    @staticmethod
+    def _close_owned_process_streams(process) -> None:
+        """只关闭本实例自己经过 ``PIPE`` 持有的 stdin/stdout/stderr。
+
+        ``Popen`` 仅在对应参数为 ``PIPE`` 时才把句柄放到 ``process.stdin`` /
+        ``process.stdout`` / ``process.stderr``；属性为 ``None``（例如
+        ``stderr=STDOUT`` 或调用方传入共享文件对象）说明句柄不属于本实例，
+        绝不能关闭。关闭本身幂等，重复调用不会报错。
+        """
+        if process is None:
+            return
+        for stream in (
+            getattr(process, "stdin", None),
+            getattr(process, "stdout", None),
+            getattr(process, "stderr", None),
+        ):
+            if stream is None:
+                continue
+            try:
+                stream.close()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _process_is_alive(process) -> bool:
+        """鸭子类型安全的存活判断：拿不到 poll 就不当成存活。"""
+        poll = getattr(process, "poll", None)
+        if not callable(poll):
             return False
-        
         try:
-            # 停止读取线程
+            return poll() is None
+        except Exception:
+            return False
+
+    def _stop_owned_process(self, process) -> None:
+        """结束并回收本实例 spawn 的 shell（不碰外部进程）。
+
+        先发 ``exit`` 让交互 shell 正常结束，读线程才能收到 EOF 并排空剩余输出；
+        超时后 terminate → kill，且无论如何都 ``wait`` 到进程被回收。
+        """
+        if process is None:
+            return
+        if not self._process_is_alive(process):
+            return
+        stdin = getattr(process, "stdin", None)
+        if stdin is not None and not getattr(stdin, "closed", False):
+            try:
+                stdin.write("exit\n".encode("utf-8"))
+                stdin.flush()
+            except Exception:
+                pass
+        try:
+            process.wait(timeout=2)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            process.terminate()
+        except Exception:
+            pass
+        try:
+            process.wait(timeout=0.5)
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            process.kill()
+        except Exception:
+            pass
+        try:
+            process.wait(timeout=2)
+        except Exception:
+            pass
+
+    def _close_streams_after_reader(self, process, reader) -> None:
+        """只在 reader 已经退出后关闭 PIPE；否则推迟到 reader 退出后。
+
+        reader 还活着说明它阻塞在 ``readline``（孙进程继承了写端，EOF 未到）。
+        此时从本线程 close 会去抢 reader 的内部锁，可能永久阻塞；
+        所以这里只登记一个后台收口线程（daemon，不阻塞 close）。
+        """
+        if reader is not None and reader.is_alive():
+            self._defer_close_streams(process, reader)
+            return
+        self._close_owned_process_streams(process)
+
+    def _defer_close_streams(self, process, reader) -> None:
+        """reader 退出后再关句柄：保证不丢尾部输出，也不让 close 阻塞。"""
+        def _reap() -> None:
+            try:
+                reader.join()
+            except Exception:
+                pass
+            self._close_owned_process_streams(process)
+
+        threading.Thread(
+            target=_reap,
+            name=f"terminal-close-{self.session_name}",
+            daemon=True,
+        ).start()
+
+    def close(self) -> bool:
+        """关闭终端。
+
+        幂等：重复调用只做句柄收口（不再重复广播/打印），返回 False。
+        资源顺序固定为「结束并 wait 自己的进程 → 等 reader 读到 EOF 排空尾部输出
+        → 关自己持有的 PIPE 句柄」。
+
+        注意：不能在结束进程前就置 ``is_reading = False``——io.py::_read_output
+        的循环条件是 ``while self.is_reading``，提前置假会让 reader 读完当前块就
+        退出循环，丢掉管道里尚未读出的尾部输出（与“等 reader 排空”矛盾）。
+        """
+        process = getattr(self, "process", None)
+        reader = getattr(self, "reader_thread", None)
+        if not self.is_running:
+            # 已经关闭过（或启动中途失败）：仍要幂等收口，防止 Popen 的管道泄漏。
+            self._stop_owned_process(process)
             self.is_reading = False
-            
-            # 发送退出命令
-            if self.process and self.process.poll() is None:
-                exit_cmd = "exit\n"
-                try:
-                    self.process.stdin.write(exit_cmd.encode('utf-8'))
-                    self.process.stdin.flush()
-                except:
-                    pass
-                
-                # 等待进程结束
-                try:
-                    self.process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    # 强制终止
-                    self.process.terminate()
-                    time.sleep(0.5)
-                    if self.process.poll() is None:
-                        self.process.kill()
-            
+            self._close_streams_after_reader(process, reader)
+            return False
+
+        try:
+            # 结束并回收自己的 shell；此后 stdout 才会到达 EOF。
+            self._stop_owned_process(process)
+
             self.is_running = False
-            
-            # 等待读取线程结束
-            if self.reader_thread and self.reader_thread.is_alive():
-                self.reader_thread.join(timeout=1)
-            
+
+            # 等待 reader 读到 EOF 并排空剩余输出（不是“清空循环条件”）。
+            if reader is not None and reader.is_alive() and reader is not threading.current_thread():
+                reader.join(timeout=2)
+
+            self.is_reading = False
+            self._close_streams_after_reader(process, reader)
+
             # 广播终端关闭事件
             if self.broadcast:
                 self.broadcast('terminal_closed', {
                     'session': self.session_name,
                     'time': datetime.now().isoformat()
                 })
-            
+
             if self.using_container:
                 # 终端经 docker exec 附着到 UserContainerManager 拥有的用户容器，
                 # 关闭终端只结束 exec 进程，绝不停容器本身（容器生命周期由容器
@@ -211,7 +311,9 @@ class LifecycleMixin:
 
             print(f"{OUTPUT_FORMATS['info']} 终端会话关闭: {self.session_name}")
             return True
-            
+
         except Exception as e:
             print(f"{OUTPUT_FORMATS['error']} 关闭终端失败: {e}")
+            self.is_reading = False
+            self._close_streams_after_reader(process, reader)
             return False

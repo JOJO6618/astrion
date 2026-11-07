@@ -25,8 +25,10 @@ def policy_class():
     nodes = source_nodes(path, {'evaluate_tool_permission'}, class_name='MainTerminalToolsExecutionMixin')
     body = ast.ClassDef(name='Policy', bases=[], keywords=[], body=nodes, decorator_list=[])
     from modules.execution_scope import current_execution_scope, validate_full_access_request
+    from modules.execution_plane import get_execution_backend
     namespace = dict(Dict=dict, Any=object, Optional=__import__('typing').Optional, Path=Path,
                      current_execution_scope=current_execution_scope,
+                     get_execution_backend=get_execution_backend,
                      validate_full_access_request=validate_full_access_request, tr=lambda key: key)
     exec(compile(ast.fix_missing_locations(ast.Module(body=[body], type_ignores=[])), path, 'exec'), namespace)
     return namespace['Policy']
@@ -47,7 +49,8 @@ class PolicyTests(unittest.TestCase):
         self.policy._is_docker_runtime = lambda: False
         self.policy._APPROVAL_REQUIRED_TOOLS = {'run_command', 'terminal_session', 'write_file', 'edit_file'}
         self.policy.context_manager = SimpleNamespace(project_path=ROOT)
-        self.policy.file_manager = SimpleNamespace(_validate_path=lambda path: (True, '', ROOT / path))
+        from modules.execution_plane import FakeExecutionBackend
+        self.policy.execution_backend = FakeExecutionBackend(workspace_root=str(ROOT))
 
     def test_every_direct_command_is_reviewed_even_readonly_or_control_input(self):
         for mode in ('approval', 'auto_approval'):

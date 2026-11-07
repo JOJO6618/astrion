@@ -9,6 +9,14 @@ from typing import Any, Callable, Dict, List, Optional
 from modules.sub_agent import TERMINAL_STATUSES
 from modules.i18n import tr
 from modules.multi_agent.debug_logger import ma_debug
+from modules.execution_plane import get_execution_backend
+
+
+def _background_processes(terminal: Any):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 _VALID_SOURCES = {
@@ -248,7 +256,7 @@ async def process_workflow_updates(
 
 async def process_background_command_updates(*, messages: List[Dict], inline: bool = False, after_tool_call_id: Optional[str] = None, web_terminal, sender, debug_log):
     """轮询后台 run_command 完成状态并发送 system 消息通知。"""
-    manager = getattr(web_terminal, "background_command_manager", None)
+    manager = _background_processes(web_terminal)
     if not manager:
         debug_log("[BgCmdDebug] process_background_command_updates skipped: manager 不存在")
         return

@@ -1,13 +1,26 @@
-"""Execution Plane：Runtime ↔ 执行环境分层（docs/execution_contract.md）。
+"""Shared execution resources for Agent/Chat and independent executor hosts.
 
-- base.ExecutionBackend：执行环境后端协议（E1-E4 首版接口面）
-- fake.FakeExecutionBackend：内存替身执行器（Runtime 独立测试用）
-
-接入方式：MainTerminal/WebTerminal 实例的 ``execution_backend`` 属性
-（默认 None = 现有 Host/Docker 真实链路；注入实现后工具编排层
-handle_tool_call 的 E1-E4 分支改走该后端）。
+Imports stay lightweight: local process/file implementations are loaded only
+when an owner actually needs execution resources.
 """
-from modules.execution_plane.base import ExecutionBackend
-from modules.execution_plane.fake import FakeExecutionBackend
+from .access import get_execution_backend, is_local_backend
+from .base import ExecutionBackend
 
-__all__ = ["ExecutionBackend", "FakeExecutionBackend"]
+__all__ = [
+    "ExecutionBackend", "LocalExecutionBackend", "FakeExecutionBackend",
+    "ExecutionResources", "create_local_resources", "get_execution_backend",
+    "is_local_backend",
+]
+
+
+def __getattr__(name):
+    if name == "LocalExecutionBackend":
+        from .local import LocalExecutionBackend
+        return LocalExecutionBackend
+    if name in {"ExecutionResources", "create_local_resources"}:
+        from . import resources
+        return getattr(resources, name)
+    if name == "FakeExecutionBackend":
+        from .fake import FakeExecutionBackend
+        return FakeExecutionBackend
+    raise AttributeError(name)

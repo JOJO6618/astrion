@@ -413,7 +413,7 @@ def check_fake_exec():
     ops = [c["op"] for c in backend.calls]
     assert ops == ["run_command", "run_command_background", "write_file", "edit_file"], ops
 
-    # 默认路径回归：新建对话级 terminal 的 execution_backend 应为 None（真实链路）
+    # 默认路径回归：新对话统一装配真实本地后端，而非旧的 None 旁路。
     cm = terminal.context_manager.conversation_manager
     conv_id2 = cm.create_conversation(
         project_path=str(workspace.project_path), run_mode="fast",
@@ -423,7 +423,9 @@ def check_fake_exec():
         "gw_smoke_user", workspace_id="gwsmoke", update_session=False,
         conversation_id=conv_id2, identity=identity,
     )
-    assert getattr(terminal2, "execution_backend", "MISSING") is None, "默认应为 None（真实链路）"
+    from modules.execution_plane import LocalExecutionBackend
+    assert type(terminal2.execution_backend) is LocalExecutionBackend, "默认应为真实本地后端"
+    assert terminal2.execution_backend.owner is terminal2, "后端资源必须归属当前终端"
 
 
 def check_approval_wait():
@@ -492,7 +494,7 @@ def check_approval_wait():
                 iteration=1,
                 conversation_id=conv_id,
                 last_tool_call_time=time.time(),
-                process_sub_agent_updates=_noop_process,
+                process_multi_agent_master_messages=_noop_process,
                 process_background_command_updates=_noop_process,
                 get_stop_flag=_get_stop_flag,
                 clear_stop_flag=_clear_stop_flag,

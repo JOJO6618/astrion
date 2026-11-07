@@ -12,6 +12,14 @@ from .chat_flow_notice_idle import _dispatch_multi_agent_idle_messages_sync
 from .chat_flow_notice_state import _has_pending_completion_work
 from .chat_flow_notice_state import _has_pending_workflow_notices
 from .chat_flow_notice_state import _rollback_completion_notice_marks
+from modules.execution_plane import get_execution_backend
+
+
+def _background_processes(terminal: Any):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 async def poll_completion_notifications(*, web_terminal, workspace, conversation_id, client_sid, username):
@@ -28,7 +36,7 @@ async def poll_completion_notifications(*, web_terminal, workspace, conversation
     """
 
     sub_manager = getattr(web_terminal, "sub_agent_manager", None)
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
+    bg_manager = _background_processes(web_terminal)
     if not sub_manager and not bg_manager:
         return
     if not hasattr(web_terminal, "_announced_sub_agent_tasks"):

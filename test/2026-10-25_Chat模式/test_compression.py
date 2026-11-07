@@ -10,18 +10,29 @@ from unittest.mock import patch
 from modules.chat_mode.storage import ChatStorage
 from modules.chat_mode.tree import MessageTree
 from modules.chat_mode.compression import maybe_compress, api_history
+from modules.conversation_compress_limit import limit_tokens, source
+from modules.personalization_manager import save_personalization_config
 
 
 class CompressionTests(unittest.IsolatedAsyncioTestCase):
+    CHAT_TRIGGER_TOKENS = 16000
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        preferences = patch("modules.chat_mode.compression.load_personalization_config",
-                            return_value={"chat_deep_compress_trigger_tokens": 16000})
-        preferences.start()
-        self.addCleanup(preferences.stop)
+        # 阈值以对话文件快照为准：先写个人配置，再创建对话，让创建链路
+        # （ConversationManager.create_conversation → configured_for → snapshot_update）
+        # 真实写入 16000 快照，而不是只在压缩模块里打补丁。
+        save_personalization_config(
+            Path(self.temp.name),
+            {"chat_deep_compress_trigger_tokens": self.CHAT_TRIGGER_TOKENS},
+        )
         self.store = ChatStorage(Path(self.temp.name))
         self.cid = self.store.create()
+        created_metadata = self.store.read(self.cid)["metadata"]
+        self.assertEqual(limit_tokens(created_metadata), self.CHAT_TRIGGER_TOKENS,
+                         created_metadata)
+        self.assertEqual(source(created_metadata), "snapshot", created_metadata)
         turn = self.store.begin(self.cid, "first", message={"message_id": "u1", "role": "user", "content": "中" * 20000})["value"]["id"]
         self.store.append(self.cid, turn, {"message_id": "a1", "role": "assistant", "content": "before tools", "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "web_search", "arguments": "{}"}}]})
         self.store.append(self.cid, turn, {"message_id": "t1", "role": "tool", "tool_call_id": "c1", "content": "found"})

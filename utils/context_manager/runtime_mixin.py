@@ -249,3 +249,105 @@ class RuntimeMixin:
             f"  Git: {base.get('git', 'unknown')}",
         ]
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # 执行环境显示（绑定后端时用后端事实，不拿控制端 OS/路径冒充）
+    # ------------------------------------------------------------------
+    def _build_remote_runtime_environment(self, env: Dict[str, Any]) -> str:
+        """非本地后端的环境文本：只用 ``get_environment`` 上报的事实。
+
+        字段缺失时写“未知”，绝不回退到控制端 ``platform``/``sys.platform``。
+        """
+        host = env.get("host") if isinstance(env.get("host"), dict) else {}
+        system = str(host.get("system") or host.get("platform") or "").strip()
+        release = str(host.get("release") or "").strip()
+        os_text = " ".join(part for part in (system, release) if part)
+        if not os_text:
+            os_text = "未知（执行后端未上报平台）"
+        arch = str(host.get("machine") or "").strip() or "未知"
+        python_version = str(host.get("python") or "").strip() or "未知"
+        backend_name = str(env.get("backend") or "remote").strip() or "remote"
+        mode = str(env.get("execution_mode") or "").strip() or "未知"
+        network = str(env.get("network_permission") or "").strip() or "未知"
+        workspace_root = str(env.get("workspace_root") or env.get("cwd") or "").strip()
+        lines = [
+            f"远端执行后端（{backend_name}）",
+            f"  OS: {os_text} | Arch: {arch} | Python: {python_version}",
+            f"  执行模式: {mode} | 网络: {network}",
+        ]
+        if workspace_root:
+            lines.append(f"  工作区: {workspace_root}")
+        return "\n".join(lines)
+
+    def _resolve_runtime_display(self) -> Dict[str, str]:
+        """统一执行环境显示：runtime_environment / resource_limit / container_path。
+
+        - 无绑定后端：完全保留既有本地表现（含 ``_host_runtime_cache`` 复用）；
+        - 本地后端：目标就是本机，宿主机文本继续走缓存；
+        - 非本地（含 docker）后端：平台/路径/模式只用 ``get_environment``，
+          缺失就写“未知”，不拿控制端 OS/路径充当目标。
+        """
+        from utils.context_manager.fs_access import execution_environment
+
+        env = execution_environment(self)
+        container_path = self.container_mount_path or "/workspace"
+
+        if env is None:
+            if self._is_host_mode_without_safety() and getattr(self, "project_path", None) is not None:
+                return {
+                    "runtime_environment": self._build_host_runtime_environment(),
+                    "resource_limit": "宿主机模式无限制",
+                    "container_path": container_path,
+                }
+            return {
+                "runtime_environment": (
+                    f"隔离容器中（挂载目录 {container_path}），宿主机路径已隐藏"
+                ),
+                "resource_limit": (
+                    f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，"
+                    f"磁盘配额 {self.project_storage_limit}"
+                ),
+                "container_path": container_path,
+            }
+
+        container = env.get("container") if isinstance(env.get("container"), dict) else {}
+        reported_container_path = str(
+            container.get("mount_path") or env.get("cwd") or ""
+        ).strip()
+        if reported_container_path:
+            container_path = reported_container_path
+
+        target = str(env.get("execution_target") or "").strip().lower()
+        is_local = bool(env.get("is_local"))
+        backend_name = str(env.get("backend") or "").strip()
+
+        if target == "docker":
+            os_text = str(container.get("os") or "").strip()
+            if not os_text or os_text.lower() in {"unknown", "none"}:
+                os_text = "未知（容器内系统未探测）"
+            label = f"隔离容器中（挂载目录 {container_path}）"
+            if not is_local and backend_name:
+                label = f"隔离容器中（挂载目录 {container_path}，后端 {backend_name}）"
+            return {
+                "runtime_environment": f"{label}\n  OS: {os_text}",
+                "resource_limit": (
+                    f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，"
+                    f"磁盘配额 {self.project_storage_limit}"
+                    if is_local
+                    else "由执行后端决定（未上报资源配额）"
+                ),
+                "container_path": container_path,
+            }
+
+        if is_local:
+            return {
+                "runtime_environment": self._build_host_runtime_environment(),
+                "resource_limit": "宿主机模式无限制",
+                "container_path": container_path,
+            }
+
+        return {
+            "runtime_environment": self._build_remote_runtime_environment(env),
+            "resource_limit": "由执行后端决定（未上报资源配额）",
+            "container_path": container_path,
+        }

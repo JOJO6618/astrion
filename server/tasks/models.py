@@ -23,7 +23,7 @@ from utils.host_workspace_debug import write_host_workspace_debug
 from config import DATA_DIR, WORKSPACE_SKILLS_DIRNAME
 from modules.goal_state_manager import GoalStateManager, REASON_USER_CANCEL
 from modules.sub_agent.state import TERMINAL_STATUSES as SUB_AGENT_TERMINAL_STATUSES
-from modules.background_command_manager import BackgroundCommandManager, TERMINAL_STATUSES as BG_COMMAND_TERMINAL_STATUSES
+from modules.execution_plane import get_execution_backend
 from modules.i18n import tr
 from server.tasks.queue_state import (
     initialize_queue, load_queue, save_queue, finish_queue, consume_selected_message,
@@ -37,6 +37,12 @@ from server.tasks.chat_mode import ChatModeTaskMixin
 SKILL_FRONTMATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n?", re.S)
 SKILL_FIELD_RE = re.compile(r"^(?P<key>name|description)\s*:\s*(?P<value>.*)$")
 
+
+def _background_processes(terminal: Optional[Any]):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 class TaskRecord:
@@ -615,7 +621,7 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
             except Exception as exc:
                 debug_log(f"[TaskCancel] 检查后台子智能体失败: {exc}")
 
-        bg_manager = getattr(terminal, 'background_command_manager', None)
+        bg_manager = _background_processes(terminal)
         if bg_manager:
             try:
                 bg_manager.reconcile_stale_records(conversation_id=rec.conversation_id)
@@ -626,15 +632,10 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
                         bg_manager.cancel_command(item.get('command_id'))
                     except Exception as exc:
                         debug_log(f"[TaskCancel] 取消后台命令失败: {exc}")
-                # 把该对话下所有未通知的终态记录也标为已通知，避免后续幽灵通知
+                # 把该对话下所有未通知的终态记录也标为已通知，避免后续幽灵通知。
+                # 契约显式能力：一次全量扫描，不按条数截断。
                 try:
-                    with bg_manager._lock:
-                        for record in bg_manager._records.values():
-                            if record.get('conversation_id') != rec.conversation_id:
-                                continue
-                            if record.get('status') in BG_COMMAND_TERMINAL_STATUSES and not record.get('notified'):
-                                record['notified'] = True
-                                record['updated_at'] = time.time()
+                    bg_manager.mark_all_notified(rec.conversation_id)
                 except Exception as exc:
                     debug_log(f"[TaskCancel] 标记后台通知状态失败: {exc}")
             except Exception as exc:
@@ -678,7 +679,7 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
             except Exception as exc:
                 debug_log(f"[Task] 对账检查多智能体状态失败: {exc}")
 
-        bg_manager = getattr(terminal, 'background_command_manager', None)
+        bg_manager = _background_processes(terminal)
         if bg_manager:
             try:
                 bg_manager.reconcile_stale_records(conversation_id=conversation_id)

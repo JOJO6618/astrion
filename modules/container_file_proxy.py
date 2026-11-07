@@ -12,15 +12,21 @@ from modules.i18n import tr
 
 CONTAINER_FILE_SCRIPT = r"""
 import json
+import os
+import stat
 import sys
 import pathlib
 import shutil
+from datetime import datetime
 
 def _resolve(root: pathlib.Path, rel: str) -> pathlib.Path:
     base = root.resolve()
-    target = (base / rel).resolve()
+    try:
+        target = (base / rel).resolve()
+    except RuntimeError as exc:  # 符号链接环等无法安全解析的路径
+        raise ValueError("路径无法解析: %s" % rel) from exc
     # 带分隔符边界的包含判断，防 startswith 前缀碰撞（如 /workspace-evil）
-    if target != base and not str(target).startswith(str(base) + __import__('os').sep):
+    if target != base and not str(target).startswith(str(base) + os.sep):
         raise ValueError("路径越界: %s" % rel)
     return target
 
@@ -30,6 +36,9 @@ def _read_text(target: pathlib.Path):
     lines = data.splitlines(keepends=True)
     return data, lines
 
+# TODO(TOCTOU): 文本读写 helper 目前仍是 _resolve 后再按路径 open；若最终组件
+# 在两步之间被替换为指向工作区外的链接，open 会跟随。彻底修复需统一改为
+# 目录句柄 + O_NOFOLLOW openat，本轮仅记录，不在元数据拆分中扩大改动。
 def _ensure_file(target: pathlib.Path):
     if not target.exists():
         return {"success": False, "error": "文件不存在"}
@@ -258,6 +267,51 @@ def _write_file(root, payload):
         "mode": mode
     }
 
+def _write_binary(root, payload):
+    import base64
+    rel = payload.get("path")
+    target = _resolve(root, rel)
+    raw = payload.get("b64")
+    if not isinstance(raw, str):
+        return {"success": False, "error": "write_binary 需要 base64 字符串"}
+    try:
+        data = base64.b64decode(raw, validate=True)
+    except Exception:
+        return {"success": False, "error": "write_binary base64 无效"}
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        parent_fd = _open_abs_dir(target.parent)
+        fd = -1
+        try:
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_NOFOLLOW
+                | getattr(os, "O_NONBLOCK", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            fd = os.open(target.name, flags, 0o666, dir_fd=parent_fd)
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise PermissionError("二进制写入仅允许普通文件且不能有硬链接")
+            os.ftruncate(fd, 0)
+            stream = os.fdopen(fd, "wb")
+            fd = -1
+            with stream:
+                stream.write(data)
+        finally:
+            if fd >= 0:
+                os.close(fd)
+            os.close(parent_fd)
+        return {
+            "success": True,
+            "path": rel,
+            "size": len(data),
+            "mode": "wb",
+        }
+    except (ValueError, OSError, RuntimeError) as exc:
+        return {"success": False, "error": str(exc)}
+
 def _apply_modify_blocks(root, payload):
     rel = payload.get("path")
     blocks = payload.get("blocks") or []
@@ -405,6 +459,214 @@ def _edit_lines(root, payload):
         "affected_lines": affected
     }
 
+def _dir_flags():
+    return os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+
+def _open_abs_dir(path: pathlib.Path):
+    # 从 / 逐段 O_NOFOLLOW 打开目录；任一段是符号链接/非目录即失败。
+    target = pathlib.Path(path)
+    fd = os.open("/", _dir_flags())
+    try:
+        for part in target.parts[1:]:
+            child = os.open(part, _dir_flags(), dir_fd=fd)
+            os.close(fd)
+            fd = child
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd
+
+def _stat_abs(path: pathlib.Path):
+    # 对已 resolve 的绝对路径做 no-follow 元数据读取。
+    # 父目录逐段 O_NOFOLLOW；若最终组件在读取瞬间变成符号链接则 fail closed，
+    # 避免被替换到工作区外后跟随。
+    target = pathlib.Path(path)
+    if str(target) == "/":
+        return os.stat("/", follow_symlinks=False)
+    fd = _open_abs_dir(target.parent)
+    try:
+        info = os.stat(target.name, dir_fd=fd, follow_symlinks=False)
+    finally:
+        os.close(fd)
+    if stat.S_ISLNK(info.st_mode):
+        raise PermissionError("路径在元数据读取时发生变化")
+    return info
+
+def _lstat_child(parent: pathlib.Path, name: str):
+    fd = _open_abs_dir(parent)
+    try:
+        return os.stat(name, dir_fd=fd, follow_symlinks=False)
+    finally:
+        os.close(fd)
+
+def _display_path(base: pathlib.Path, target: pathlib.Path) -> str:
+    return "." if target == base else str(target.relative_to(base))
+
+def _iso(ts: float) -> str:
+    return datetime.fromtimestamp(ts).isoformat()
+
+def _normal_rel(payload) -> str:
+    raw = str(payload.get("path") or "").strip()
+    return raw or "."
+
+def _access_of(payload):
+    access = str(payload.get("access") or "read").strip().lower()
+    if access not in ("read", "write"):
+        raise ValueError("access 仅支持 'read' 或 'write'")
+    return access
+
+def _inspect_path(root, payload):
+    # 授权后返回路径元数据；只有合法路径真实不存在时 exists=False。
+    try:
+        _access_of(payload)  # 容器内以路径策略为准；access 仅做取值校验
+        rel = _normal_rel(payload)
+        base = root.resolve()
+        resolved = _resolve(base, rel)
+        pure = pathlib.PurePosixPath(rel)
+        name = pure.name
+        parent_rel = str(pure.parent)
+        if name in ("", "."):
+            target_stat = _stat_abs(resolved)
+            link_stat = target_stat
+            is_symlink = False
+            exists = True
+        else:
+            parent_resolved = base if parent_rel in ("", ".") else _resolve(base, parent_rel)
+            try:
+                link_stat = _lstat_child(parent_resolved, name)
+            except (FileNotFoundError, NotADirectoryError):
+                link_stat = None
+            exists = link_stat is not None
+            is_symlink = bool(exists and stat.S_ISLNK(link_stat.st_mode))
+            target_stat = None
+            if exists:
+                if is_symlink:
+                    try:
+                        target_stat = _stat_abs(resolved)
+                    except FileNotFoundError:
+                        target_stat = None
+                else:
+                    target_stat = link_stat
+        is_file = bool(target_stat and stat.S_ISREG(target_stat.st_mode))
+        is_dir = bool(target_stat and stat.S_ISDIR(target_stat.st_mode))
+        size = int(target_stat.st_size) if is_file else None
+        # exists 跟随目标：悬空链接 exists=False，但 is_symlink=True。
+        exists = target_stat is not None
+        stamp = target_stat or link_stat
+        mtime = float(stamp.st_mtime) if stamp is not None else None
+        display = _display_path(base, resolved)
+        return {
+            "success": True,
+            "path": display,
+            "relative_path": display,
+            "exists": bool(exists),
+            "is_file": is_file,
+            "is_dir": is_dir,
+            "is_symlink": is_symlink,
+            "within_workspace": True,
+            "suffix": pure.suffix,
+            "size": size,
+            "mtime": mtime,
+        }
+    except (ValueError, OSError, RuntimeError) as exc:
+        return {"success": False, "error": str(exc)}
+
+def _get_file_info(root, payload):
+    try:
+        rel = _normal_rel(payload)
+        base = root.resolve()
+        resolved = _resolve(base, rel)
+        info = _stat_abs(resolved)
+        is_file = stat.S_ISREG(info.st_mode)
+        return {
+            "success": True,
+            "path": _display_path(base, resolved),
+            "name": resolved.name,
+            "type": "file" if is_file else "folder",
+            "size": int(info.st_size),
+            "created": _iso(info.st_ctime),
+            "modified": _iso(info.st_mtime),
+            "extension": resolved.suffix if is_file else None,
+        }
+    except FileNotFoundError:
+        return {"success": False, "error": "文件不存在"}
+    except (ValueError, OSError, RuntimeError) as exc:
+        return {"success": False, "error": str(exc)}
+
+def _list_files(root, payload):
+    try:
+        rel = _normal_rel(payload)
+        base = root.resolve()
+        resolved = _resolve(base, rel)
+        info = _stat_abs(resolved)
+        if not stat.S_ISDIR(info.st_mode):
+            return {"success": False, "error": "不是目录"}
+        display_dir = _display_path(base, resolved)
+        files = []
+        folders = []
+        fd = _open_abs_dir(resolved)
+        try:
+            with os.scandir(fd) as entries:
+                for entry in entries:
+                    if entry.name.startswith("."):
+                        continue
+                    child_rel = entry.name if display_dir == "." else display_dir + "/" + entry.name
+                    # 子项先做容器内包含校验；指向工作区外的链接直接跳过，不泄露信息。
+                    try:
+                        child_resolved = _resolve(base, child_rel)
+                    except (ValueError, OSError, RuntimeError):
+                        continue
+                    try:
+                        link_stat = entry.stat(follow_symlinks=False)
+                    except OSError:
+                        continue
+                    target_stat = link_stat
+                    if stat.S_ISLNK(link_stat.st_mode):
+                        try:
+                            target_stat = _stat_abs(child_resolved)
+                        except (FileNotFoundError, NotADirectoryError):
+                            continue
+                        except OSError:
+                            continue
+                    if stat.S_ISREG(target_stat.st_mode):
+                        files.append({
+                            "name": entry.name,
+                            "path": child_rel,
+                            "size": int(target_stat.st_size),
+                            "modified": _iso(target_stat.st_mtime),
+                        })
+                    elif stat.S_ISDIR(target_stat.st_mode):
+                        folders.append({"name": entry.name, "path": child_rel})
+        finally:
+            os.close(fd)
+        return {
+            "success": True,
+            "path": display_dir,
+            "files": sorted(files, key=lambda item: item["name"]),
+            "folders": sorted(folders, key=lambda item: item["name"]),
+        }
+    except FileNotFoundError:
+        return {"success": False, "error": "目录不存在"}
+    except (ValueError, OSError, RuntimeError) as exc:
+        return {"success": False, "error": str(exc)}
+
+def _resolve_path(root, payload):
+    try:
+        access = _access_of(payload)
+        rel = _normal_rel(payload)
+        base = root.resolve()
+        resolved = _resolve(base, rel)
+        display = _display_path(base, resolved)
+        return {
+            "success": True,
+            "path": display,
+            "relative_path": display,
+            "access": access,
+            "within_workspace": True,
+        }
+    except (ValueError, OSError, RuntimeError) as exc:
+        return {"success": False, "error": str(exc)}
+
 def _read_binary(root, payload):
     import os
     import stat
@@ -427,7 +689,12 @@ def _read_binary(root, payload):
         os.close(parent)
 
 HANDLERS = {
+    "inspect_path": _inspect_path,
+    "get_file_info": _get_file_info,
+    "list_files": _list_files,
+    "resolve_path": _resolve_path,
     "read_binary": _read_binary,
+    "write_binary": _write_binary,
     "create_file": _create_file,
     "delete_file": _delete_file,
     "rename_file": _rename_file,

@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import stat
 from pathlib import Path
 import re
 from bisect import bisect_right
@@ -111,9 +112,93 @@ class FileManagerBase:
         if not ok:
             raise PermissionError(error)
         if scoped_io.sandbox_scope():
+            if mode == "wb":
+                return self._native_open_binary_write(path)
             create_roots = self._host_allowed_roots("write") if access == "write" else None
             return scoped_io.open_checked(path, mode, encoding, create_roots=create_roots)
         return open(path, mode, **({} if "b" in mode else {"encoding": encoding}))
+
+    def _native_open_binary_write(self, path):
+        """作用域内二进制写：目录句柄 + O_NOFOLLOW，先校验再截断。"""
+        with scoped_io.checked_parent(
+            path,
+            create=True,
+            create_roots=self._host_allowed_roots("write"),
+        ) as (parent_fd, name):
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_NOFOLLOW
+                | getattr(os, "O_NONBLOCK", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            fd = os.open(name, flags, 0o666, dir_fd=parent_fd)
+            try:
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise PermissionError(
+                        "Scoped binary write refuses special files and multiply linked files"
+                    )
+                os.ftruncate(fd, 0)
+                return os.fdopen(fd, "wb")
+            except BaseException:
+                os.close(fd)
+                raise
+
+    def write_binary(self, path: str, content: bytes) -> Dict:
+        """精确写入二进制内容；仅接受 bytes-like，绝不文本编码/解码回退。"""
+        if not isinstance(content, (bytes, bytearray, memoryview)):
+            return {
+                "success": False,
+                "error": "write_binary 仅接受 bytes，不做文本编码回退",
+            }
+        data = bytes(content)
+        valid, error, full_path = self._validate_path(path)
+        if not valid:
+            return {"success": False, "error": error}
+        ok, msg = self._ensure_host_access(full_path, "write")
+        if not ok:
+            return {"success": False, "error": msg}
+        if self._is_docker_mode() and not self._use_container():
+            return {
+                "success": False,
+                "error": "工具箱未就绪，不能回退到宿主机写入。",
+            }
+        try:
+            relative_path = self._relative_path(full_path)
+            if PROJECT_MAX_STORAGE_BYTES and self._is_docker_mode():
+                current_size = self._get_project_size()
+                existing_size = full_path.stat().st_size if full_path.exists() else 0
+                projected_total = current_size - existing_size + len(data)
+                if projected_total > PROJECT_MAX_STORAGE_BYTES:
+                    return {
+                        "success": False,
+                        "error": tr("file_manager.storage_quota_exceeded"),
+                        "limit_bytes": PROJECT_MAX_STORAGE_BYTES,
+                        "project_size_bytes": current_size,
+                        "attempt_size_bytes": len(data),
+                    }
+            if self._use_container():
+                import base64
+
+                return self._container_call(
+                    "write_binary",
+                    {
+                        "path": relative_path,
+                        "b64": base64.b64encode(data).decode("ascii"),
+                    },
+                )
+            self._native_mkdir(full_path.parent)
+            with self._native_open(full_path, "wb") as stream:
+                stream.write(data)
+            return {
+                "success": True,
+                "path": relative_path,
+                "size": len(data),
+                "mode": "wb",
+            }
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
 
     def read_binary(self, path):
         if self._is_docker_mode() and not self._use_container():

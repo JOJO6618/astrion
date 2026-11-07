@@ -215,6 +215,7 @@ class BackgroundCommandManager:
     ) -> None:
         start_ts = time.time()
         process: Optional[subprocess.Popen] = None
+        readers: List[threading.Thread] = []
         stdout_buf: List[str] = []
         stderr_buf: List[str] = []
         status = "failed"
@@ -352,10 +353,20 @@ class BackgroundCommandManager:
                                 rec[rec_key].append(line)
                                 rec["updated_at"] = time.time()
                 except Exception:
+                    # 读端被 finally 收口关闭时 readline 可能抛错，已读到的行都已收藏，
+                    # 这里直接退出，不再把错误当成命令失败。
                     return
+                finally:
+                    # 读到 EOF（进程结束后必然出现）由 reader 自己关闭读端：
+                    # 句柄由持有并阻塞读取的线程关闭最安全，也不会提前丢掉尾部输出。
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
 
             t_out = threading.Thread(target=_reader, args=(process.stdout, stdout_buf, "stdout_chunks"), daemon=True)
             t_err = threading.Thread(target=_reader, args=(process.stderr, stderr_buf, "stderr_chunks"), daemon=True)
+            readers.extend((t_out, t_err))
             t_out.start()
             t_err.start()
 
@@ -385,13 +396,18 @@ class BackgroundCommandManager:
                         pass
                 return_code = process.returncode if process.returncode is not None else -1
 
-            t_out.join(timeout=1)
-            t_err.join(timeout=1)
+            # reader 的等待/收口统一放在 finally 的 _release_process_resources：
+            # 那里有总时长预算，不会因为孙进程继承写端而无限期 join。
 
         except Exception as exc:
             status = "failed"
             message = tr("terminal.exec_failed_generic", error=exc)
         finally:
+            # 资源收口（只处理本线程自己 spawn 的进程与 PIPE）：
+            # 顺序固定为「确保进程被回收 → 等 reader 排空 → 关自己持有的句柄」，
+            # 这样结束/异常/超时/取消都不会留下未 wait 的进程或未关闭的管道，
+            # 也不会因为提前关读端而丢掉尚未读出的输出。
+            self._release_process_resources(process, readers)
             combined_output = "".join(stdout_buf + stderr_buf)
             truncated = False
             if MAX_RUN_COMMAND_CHARS and len(combined_output) > MAX_RUN_COMMAND_CHARS:
@@ -437,6 +453,123 @@ class BackgroundCommandManager:
                         rec["finished_at"] = time.time()
                 self._processes.pop(command_id, None)
                 self._cv.notify_all()
+
+    def _release_process_resources(
+        self, process: Optional[subprocess.Popen], readers: List[threading.Thread]
+    ) -> None:
+        """收口后台 run 线程自己 spawn 的子进程与管道句柄。
+
+        顺序与边界：
+        1. 先确保进程被 wait（回收），不留孤儿；
+        2. reader 正常情况下读到 EOF 自行退出（并在 finally 里关自己的读端）；
+        3. 孙进程继承了 PIPE 写端时 EOF 永远不到：先有期限 join，再 SIGKILL
+           **本任务自己的进程组**（spawn 时 start_new_session=True，pgid == pid，
+           绝不会波及其他任务/控制端），让写端关闭；
+        4. 若 reader 仍然活着（信号被拒或孙进程 setsid 逃出进程组），**绝不**
+           在本线程 close：`TextIOWrapper.close()` 会去抢 reader 阻塞在
+           `readline()` 时持有的内部锁，可能永久阻塞。此时直接返回，交给
+           reader 读到 EOF 后的 finally 收口。
+        """
+        if process is None:
+            return
+
+        poll = getattr(process, "poll", None)
+
+        def _alive() -> bool:
+            # 兼容测试注入的鸭子类型进程（可能没有 poll）；拿不到存活证据就不终止，
+            # 只做等 reader / 关句柄这类无破坏性的收口。
+            if not callable(poll):
+                return False
+            try:
+                return poll() is None
+            except Exception:
+                return False
+
+        if _alive():
+            # 正常结束路径不会走到这里；异常/取消竞态下进程可能还活着，
+            # 先给它一个自然退出的窗口，再兜底终止，避免留下孤儿进程。
+            try:
+                process.wait(timeout=0.2)
+            except Exception:
+                pass
+        if _alive():
+            try:
+                self._terminate_pid(process.pid)
+            except Exception:
+                pass
+            try:
+                process.wait(timeout=2)
+            except Exception:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+                try:
+                    process.wait(timeout=2)
+                except Exception:
+                    pass
+
+        current = threading.current_thread()
+        live_readers = [reader for reader in readers if reader is not current]
+        # 总时长预算：正常 EOF 排空 1s；孙进程占着写端时再给 0.5s 等信号后 EOF。
+        # 超过预算就不再等、也不 close（交由 reader 自己收口）。
+        drain_deadline = time.time() + 1.0
+        for reader in live_readers:
+            if not reader.is_alive():
+                continue
+            try:
+                reader.join(timeout=max(0.05, drain_deadline - time.time()))
+            except RuntimeError:
+                pass
+
+        still_blocked = [reader for reader in live_readers if reader.is_alive()]
+        if still_blocked:
+            # 主进程已结束但读不到 EOF ⇒ 写端被孙进程继承着，结束本任务进程组。
+            self._kill_own_process_group(process)
+            kill_deadline = time.time() + 0.5
+            for reader in still_blocked:
+                try:
+                    reader.join(timeout=max(0.05, kill_deadline - time.time()))
+                except RuntimeError:
+                    pass
+
+        if any(reader.is_alive() for reader in live_readers):
+            # reader 持有 stream：本线程 close 会阻塞在其内部锁上，交由 reader 收口。
+            return
+
+        for stream in (
+            getattr(process, "stdin", None),
+            getattr(process, "stdout", None),
+            getattr(process, "stderr", None),
+        ):
+            if stream is None:
+                continue
+            try:
+                stream.close()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _kill_own_process_group(process: Optional[subprocess.Popen]) -> None:
+        """SIGKILL 本任务自己的进程组（pgid == pid）。
+
+        ``_spawn_and_register`` 的三条路径都以 ``start_new_session=True``
+        启动，进程组独立于控制端；这里只对这一个任务组发信号，用于关掉
+        孙进程继承的 PIPE 写端。Windows 不提供等价语义，直接不做（由调用方
+        “reader 还活着就不 close”）兜底。
+        """
+        if os.name == "nt":
+            return
+        try:
+            pid = int(getattr(process, "pid", 0) or 0)
+        except (TypeError, ValueError):
+            return
+        if pid <= 0:
+            return
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except Exception:
+            pass
 
     def _spawn_and_register(self, command_id, cancel_event, *args, **kwargs):
         # Cancellation and spawn share a lock. There is never a live but
@@ -732,6 +865,36 @@ class BackgroundCommandManager:
             if rec:
                 rec["notified"] = True
                 rec["updated_at"] = time.time()
+
+    def unmark_notified(self, command_id: str):
+        """清除单条记录的已通知水位（派发失败回滚用）。"""
+        with self._lock:
+            rec = self._records.get(command_id)
+            if rec:
+                rec["notified"] = False
+                rec["updated_at"] = time.time()
+
+    def mark_all_notified(self, conversation_id: Optional[str]) -> int:
+        """把该对话下所有未通知的终态记录标为已通知，返回标记条数。
+
+        任务取消清理用：一次全量扫描，不按条数截断，避免尾部记录变成幽灵通知。
+        """
+        if not conversation_id:
+            return 0
+        self.reconcile_stale_records(conversation_id=conversation_id)
+        marked = 0
+        with self._lock:
+            for rec in self._records.values():
+                if rec.get("conversation_id") != conversation_id:
+                    continue
+                if rec.get("status") not in TERMINAL_STATUSES:
+                    continue
+                if rec.get("notified"):
+                    continue
+                rec["notified"] = True
+                rec["updated_at"] = time.time()
+                marked += 1
+        return marked
 
     def mark_claimed(self, command_id: str):
         with self._lock:

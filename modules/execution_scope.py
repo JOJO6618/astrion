@@ -142,6 +142,31 @@ def child_access_prompt(access_level: str) -> str:
     return "\n\n[固定执行权限]\n" + descriptions[access_level] + "主智能体后续切换权限或执行环境不会改变你的档位。"
 
 
+def is_trusted_local_backend(terminal: Any) -> bool:
+    """Whether the terminal's execution backend is the trusted local adapter.
+
+    判定只认 `modules.execution_plane.is_local_backend`（精确类型
+    `LocalExecutionBackend`，未绑定 backend 视为旧本地默认链路）。任何自称
+    `is_local=True` 的远端/替身对象或子类都不算本地后端；本地后端还必须声明
+    `supports_full_access=True` 且不处于 Docker 容器会话。
+    """
+    from modules.execution_plane import is_local_backend
+
+    if not is_local_backend(terminal):
+        return False
+    backend = getattr(terminal, "execution_backend", None)
+    if backend is None:
+        return True
+    if getattr(backend, "supports_full_access", False) is not True:
+        return False
+    if getattr(backend, "is_local", False) is not True:
+        return False
+    session = getattr(backend, "container_session", None)
+    if session is not None and getattr(session, "mode", None) == "docker":
+        return False
+    return True
+
+
 def validate_full_access_request(terminal: Any, arguments: Mapping[str, Any]) -> bool:
     """Return whether one-time full-access approval is needed, or fail closed."""
     request = arguments.get("request_full_access", False)
@@ -165,6 +190,6 @@ def validate_full_access_request(terminal: Any, arguments: Mapping[str, Any]) ->
         raise ValueError("run_in_background 必须是布尔值。")
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 0 < timeout <= (3600 if background else 120):
         raise ValueError("请提供有效的命令超时时间：前台不超过120秒，后台不超过3600秒。")
-    if uses_docker(terminal) or getattr(terminal, "execution_backend", None) is not None:
+    if uses_docker(terminal) or not is_trusted_local_backend(terminal):
         raise ValueError("当前执行环境不支持宿主机单次完全访问。")
     return terminal.get_execution_mode() != "direct"

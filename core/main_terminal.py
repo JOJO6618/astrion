@@ -134,7 +134,11 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.terminal_ops = TerminalOperator(
                 project_path, container_session=container_session, data_dir=str(self.data_dir)
             )
-            self.ocr_client = OCRClient(project_path, self.file_manager)
+            from modules.execution_plane import get_execution_backend
+            self.ocr_client = OCRClient(
+                project_path, self.file_manager,
+                backend_getter=lambda: get_execution_backend(self),
+            )
             self.pending_image_view = None  # 供 view_image 工具使用，保存一次性图片附加请求
             self.pending_video_view = None  # 供 view_video 工具使用，保存一次性视频附加请求
 
@@ -154,11 +158,10 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.terminal_ops.attach_terminal_manager(self.terminal_manager)
             self._apply_container_session(container_session)
 
-            # Execution Plane 后端（docs/execution_contract.md）：None = 现有
-            # Host/Docker 真实链路；注入 ExecutionBackend 实现（如替身执行器）后，
-            # handle_tool_call 的 E1-E4 分支（run_command/后台/write_file/edit_file）
-            # 改走该后端。测试或未来远端执行装配点注入。
-            self.execution_backend = None
+            # All environment-bound operations share the same backend. The local
+            # adapter resolves resources dynamically, including later mode/session changes.
+            from modules.execution_plane import LocalExecutionBackend
+            self.execution_backend = LocalExecutionBackend(self)
 
             self.todo_manager = TodoManager(self.context_manager)
             self.sub_agent_manager = SubAgentManager(

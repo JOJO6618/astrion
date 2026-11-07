@@ -10,6 +10,14 @@ from datetime import datetime
 from typing import Any, Optional, Set
 
 from modules.sub_agent import TERMINAL_STATUSES as SUB_AGENT_TERMINAL_STATUSES
+from modules.execution_plane import get_execution_backend
+
+
+def _background_processes(terminal: Any):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 def has_running_background_work(terminal: Any, conversation_id: Optional[str]) -> bool:
@@ -33,7 +41,7 @@ def has_running_background_work(terminal: Any, conversation_id: Optional[str]) -
         except Exception:
             pass
 
-    bg_manager = getattr(terminal, "background_command_manager", None)
+    bg_manager = _background_processes(terminal)
     if bg_manager:
         try:
             bg_manager.reconcile_stale_records(conversation_id=conversation_id)

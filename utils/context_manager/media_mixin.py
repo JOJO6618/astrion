@@ -77,20 +77,66 @@ AUTO_SHALLOW_TOOL_WHITELIST = {
 class MediaMixin:
     """ContextManager media mixin 能力 mixin。"""
 
-    def _resolve_media_input_path(self, raw_path: str) -> Optional[Path]:
+    # -- 媒体读取统一经 selected backend.files（不碰控制端 Path.resolve/exists） --
+    def _media_files_access(self) -> Any:
+        """当前上下文选中的执行后端文件视图（主终端后端 > 绑定后端 > 明确本机）。"""
+        from utils.context_manager.fs_access import files_for_context
+
+        try:
+            return files_for_context(self)
+        except Exception:
+            return None
+
+    def _mapped_media_path_text(self, raw_path: Any) -> Optional[str]:
+        """对话迁移映射后的路径文本；纯字符串映射，不做本地 resolve/exists。
+
+        别名只允许导入材料目录下的相对路径；最终是否可读、是否是普通文件、
+        是否有符号链接全部交给执行后端（FileManager 的校验/no-follow）。
+        """
         path_text = str(raw_path or "").strip()
         if not path_text:
             return None
-        try:
-            from modules.conversation_transfer.assets import mapped_path
-            path_text = mapped_path(getattr(self, "conversation_metadata", {}) or {},
-                                    Path(self.project_path), path_text)
-            candidate = Path(path_text).expanduser()
-            if candidate.is_absolute():
-                return candidate.resolve()
-            return (Path(self.project_path) / candidate).resolve()
-        except Exception:
-            return None
+        metadata = getattr(self, "conversation_metadata", {}) or {}
+        aliases = (metadata.get("conversation_transfer") or {}).get("paths") or {}
+        relative = aliases.get(path_text)
+        if isinstance(relative, str):
+            if (
+                not relative.startswith(".astrion/conversation_assets/")
+                or ".." in relative.split("/")
+                or "\\" in relative
+            ):
+                return None
+            project_path = getattr(self, "project_path", None)
+            if project_path is None:
+                return None
+            return str(Path(project_path) / relative)
+        return path_text
+
+    @staticmethod
+    def _media_mime(meta: Dict[str, Any], path_text: str) -> str:
+        """从后端元数据/路径后缀推断 MIME；纯字符串推断，不读本地文件。"""
+        candidates: List[str] = []
+        suffix = str(meta.get("suffix") or "").strip()
+        if suffix:
+            candidates.append(f"file{suffix if suffix.startswith('.') else '.' + suffix}")
+        candidates.append(str(meta.get("path") or ""))
+        candidates.append(str(path_text or ""))
+        for candidate in candidates:
+            if not candidate:
+                continue
+            mime, _ = mimetypes.guess_type(candidate)
+            if mime:
+                return mime
+        return ""
+
+    @staticmethod
+    def _media_meta_readable(meta: Dict[str, Any]) -> bool:
+        """后端元数据是否允许继续读取；容器元数据缺口交给 read_binary 判定。"""
+        if not isinstance(meta, dict):
+            return False
+        if meta.get("code") == "metadata_unsupported_in_container":
+            return True
+        return bool(meta.get("success") and meta.get("exists") and meta.get("is_file"))
 
     def _store_media_item_from_candidate(self, candidate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not isinstance(candidate, dict):
@@ -131,15 +177,24 @@ class MediaMixin:
                     )
                     base_ref = dict(stored)
             elif candidate.get("path"):
-                abs_path = self._resolve_media_input_path(str(candidate.get("path")))
-                if abs_path and abs_path.exists() and abs_path.is_file():
-                    stored = self.media_store.store_file(
-                        abs_path,
-                        kind=kind,
-                        mime_type=mime_type,
-                        source_path=source_path or str(candidate.get("path")),
-                    )
-                    base_ref = dict(stored)
+                path_text = self._mapped_media_path_text(candidate.get("path"))
+                files_access = self._media_files_access()
+                if path_text and files_access is not None:
+                    from utils.context_manager.fs_access import inspect_meta
+
+                    meta = inspect_meta(files_access, path_text)
+                    if self._media_meta_readable(meta):
+                        # 内容从执行后端读取，持久 blob 缓存仍写控制端明确可信目录
+                        # （MediaStore 自己的 data_dir），不做任何本地路径回退。
+                        payload = files_access.read_binary(path_text)
+                        if isinstance(payload, (bytes, bytearray)) and payload:
+                            stored = self.media_store.store_bytes(
+                                bytes(payload),
+                                kind=kind,
+                                mime_type=mime_type or self._media_mime(meta, path_text) or None,
+                                source_path=source_path or str(candidate.get("path")),
+                            )
+                            base_ref = dict(stored)
         except Exception:
             base_ref = None
         if not base_ref:
@@ -259,8 +314,11 @@ class MediaMixin:
             deduped.append(item)
         return deduped
 
-    def _compress_image_if_needed(self, path: Path) -> Optional[str]:
-        """根据个性化设置压缩图片，返回 data URL（若压缩失败则返回 None 表示使用原图）。"""
+    def _compress_image_if_needed(self, data: bytes, name: str = "") -> Optional[str]:
+        """根据个性化设置压缩图片，返回 data URL（若压缩失败则返回 None 表示使用原图）。
+
+        输入是执行后端读到的字节，不是控制端本地路径。
+        """
         mode = getattr(self, "image_compression_mode", "original") or "original"
         if mode == "original":
             return None
@@ -277,7 +335,7 @@ class MediaMixin:
         except Exception:
             return None
         try:
-            with Image.open(path) as im:
+            with Image.open(io.BytesIO(bytes(data))) as im:
                 w, h = im.size
                 max_w, max_h = target
                 if w <= max_w and h <= max_h:
@@ -286,11 +344,11 @@ class MediaMixin:
                 im_copy.thumbnail((max_w, max_h))
                 buf = io.BytesIO()
                 im_copy.save(buf, format="PNG", optimize=True)
-                data = buf.getvalue()
-                mime, _ = mimetypes.guess_type(path.name)
+                compressed = buf.getvalue()
+                mime, _ = mimetypes.guess_type(str(name or ""))
                 if not mime:
                     mime = "image/png"
-                b64 = base64.b64encode(data).decode("utf-8")
+                b64 = base64.b64encode(compressed).decode("utf-8")
                 return f"data:{mime};base64,{b64}"
         except Exception:
             return None
@@ -350,29 +408,35 @@ class MediaMixin:
         should_use_legacy_paths = not media_payload_attached
 
         if should_use_legacy_paths:
+            from utils.context_manager.fs_access import inspect_meta
+
+            files_access = self._media_files_access()
             for item in images:
                 try:
                     if isinstance(item, dict):
-                        path = str(item.get("path") or "").strip()
+                        raw_path = item.get("path") or ""
                     else:
-                        path = str(item or "").strip()
-                    if not path:
+                        raw_path = item
+                    path_text = self._mapped_media_path_text(raw_path)
+                    if not path_text or files_access is None:
                         continue
-                    abs_path = self._resolve_media_input_path(path)
-                    if not abs_path or not abs_path.exists() or not abs_path.is_file():
+                    meta = inspect_meta(files_access, path_text)
+                    if not self._media_meta_readable(meta):
                         continue
-                    mime, _ = mimetypes.guess_type(abs_path.name)
-                    if mime and mime.startswith("video/"):
+                    mime = self._media_mime(meta, path_text)
+                    if mime.startswith("video/"):
                         extra_videos.append(item)
                         continue
                     if mime and not mime.startswith("image/"):
                         continue
-                    data_url = self._compress_image_if_needed(abs_path)
+                    data = files_access.read_binary(path_text)
+                    if not isinstance(data, (bytes, bytearray)) or not data:
+                        continue
+                    data_url = self._compress_image_if_needed(bytes(data), Path(path_text).name)
                     if not data_url:
                         if not mime:
                             mime = "image/png"
-                        data = abs_path.read_bytes()
-                        b64 = base64.b64encode(data).decode("utf-8")
+                        b64 = base64.b64encode(bytes(data)).decode("utf-8")
                         data_url = f"data:{mime};base64,{b64}"
                     parts.append({"type": "image_url", "image_url": {"url": data_url}})
                 except Exception:
@@ -381,22 +445,23 @@ class MediaMixin:
             for item in [*videos, *extra_videos]:
                 try:
                     if isinstance(item, dict):
-                        path = item.get("path") or ""
+                        raw_path = item.get("path") or ""
                     else:
-                        path = item
-                    path_text = str(path or "").strip()
-                    if not path_text:
+                        raw_path = item
+                    path_text = self._mapped_media_path_text(raw_path)
+                    if not path_text or files_access is None:
                         continue
-                    abs_path = self._resolve_media_input_path(path_text)
-                    if not abs_path or not abs_path.exists() or not abs_path.is_file():
+                    meta = inspect_meta(files_access, path_text)
+                    if not self._media_meta_readable(meta):
                         continue
-                    if abs_path.stat().st_size > 50 * 1024 * 1024:
+                    size = meta.get("size")
+                    if isinstance(size, int) and size > 50 * 1024 * 1024:
                         continue
-                    mime, _ = mimetypes.guess_type(abs_path.name)
-                    if not mime:
-                        mime = "video/mp4"
-                    data = abs_path.read_bytes()
-                    b64 = base64.b64encode(data).decode("utf-8")
+                    mime = self._media_mime(meta, path_text) or "video/mp4"
+                    data = files_access.read_binary(path_text)
+                    if not isinstance(data, (bytes, bytearray)) or not data:
+                        continue
+                    b64 = base64.b64encode(bytes(data)).decode("utf-8")
                     data_url = f"data:{mime};base64,{b64}"
                     payload = {"type": "video_url", "video_url": {"url": data_url}}
                     fps_value = item.get("fps") if isinstance(item, dict) else None

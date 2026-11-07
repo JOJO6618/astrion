@@ -18,6 +18,7 @@
 | 运行态数据目录与路径变量 | `docs/agents_details/runtime_data_paths.md` | 路径解析、数据根、日志轮转 |
 | 启动 / 构建 / 打包命令 | `docs/agents_details/commands.md` | 启动入口、打包链路 |
 | 测试现状与执行方式 | `docs/agents_details/testing.md` | 写测试、跑回归 |
+| 公共执行层 | `docs/execution_contract.md` | 执行后端、文件／进程／终端、环境、媒体、后台通知及远程执行边界 |
 | 前端设计风格统一规范 | `docs/agents_details/frontend_design_style.md` | 写/改任何 UI |
 | 独立 Chat 与消息树 | `docs/chat_mode.md` | Chat 页面、分支、九工具、无工作区运行、媒体记忆或 Agent 交接；前端必须复用 Agent 组件 |
 | 对话导出／导入与迁移 | `docs/conversation_transfer.md` | 内部直接迁移、跨机器 ZIP、历史不改写、媒体／摘要映射、迁移回执及默认交接工作区 |
@@ -59,6 +60,7 @@
 - **`server/runtime/`**：RuntimeContext 三层模型 + RuntimeService（create_task/cancel/guidance/queue/get_task_events），契约 `docs/runtime_contract.md`
 - **`core/`**：终端与工具编排；`main_terminal_parts/` 已拆 base + mixin 子包
 - **`modules/`**：可复用能力模块（terminal / file / memory / sub_agent / upload_security / user 等；多个子包已拆分）
+- **`modules/execution_plane/`**：公共执行协议、真实 Local 后端和独立资源工厂；默认本地执行也走此边界，已绑定后端失败不得回退控制端。核心文件／命令／终端／上下文已接线，完整 Git、跨机归档及外围工作区查询仍需 Remote 适配；契约 `docs/execution_contract.md`。
 - **`config/`**：配置拆分（api/limits/terminal/paths…），由 `config/__init__.py` 聚合并加载 `.env`
 - **`utils/`**：api_client、日志、上下文与对话工具（多个子包，原入口保留兼容）
 - **前端**：`static/src/`（Vue 3 + TS）；`cli/src/`（opentui + React 19，2026-09-11 起替代 Ink 版；旧实现存档 `cli/legacy-ink-src/`）

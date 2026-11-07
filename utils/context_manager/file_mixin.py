@@ -55,6 +55,7 @@ except ImportError:
         model_supports_video,
     )
 from utils.conversation_manager import ConversationManager
+from utils.context_manager.fs_access import files_for_context
 from utils.host_workspace_debug import write_host_workspace_debug
 from utils.media_store import MediaStore
 from utils.token_usage import normalize_usage_payload
@@ -77,23 +78,27 @@ AUTO_SHALLOW_TOOL_WHITELIST = {
 class FileMixin:
     """ContextManager file mixin 能力 mixin。"""
 
-    def load_file(self, file_path: str) -> bool:
-        """加载文件到临时上下文"""
-        full_path = self.project_path / file_path
-        
-        if not full_path.exists():
-            return False
-        
-        if not full_path.is_file():
-            return False
-        
-        try:
-            with open(full_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                self.temp_files[file_path] = content
-                return True
-        except Exception:
-            return False
+    def load_file(self, file_path: str, content: Optional[str] = None) -> bool:
+        """加载文件到临时上下文。
+
+        内容经执行后端读取（有主终端则用其执行后端，纯 ContextManager 用明确
+        的本机实例），不再自己 ``open()`` 本机文件；调用方已持有原文时传
+        ``content``，避免重复读取。
+        """
+        if content is None:
+            try:
+                files_access = files_for_context(self)
+                result = files_access.read_file(file_path)
+            except Exception:
+                return False
+            if not isinstance(result, dict) or not result.get("success"):
+                return False
+            content = result.get("content")
+            if not isinstance(content, str):
+                return False
+
+        self.temp_files[file_path] = content
+        return True
 
     def unload_file(self, file_path: str) -> bool:
         """从临时上下文移除文件"""

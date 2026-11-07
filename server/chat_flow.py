@@ -105,6 +105,14 @@ from .chat_flow_helpers import (
 from .chat_flow_runner import handle_task_with_sender
 
 from modules.i18n import tr
+from modules.execution_plane import get_execution_backend
+
+
+def _background_processes(terminal: Any):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 conversation_bp = Blueprint('conversation', __name__)
@@ -212,7 +220,7 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
                                 break
                     except Exception as exc:
                         debug_log(f"[Task] 取消时检查后台子智能体失败: {exc}")
-                bg_manager = getattr(terminal, 'background_command_manager', None)
+                bg_manager = _background_processes(terminal)
                 if bg_manager:
                     try:
                         bg_manager.reconcile_stale_records(conversation_id=conversation_id)

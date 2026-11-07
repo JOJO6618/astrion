@@ -65,6 +65,7 @@ except ImportError:
     )
 
 from modules.file_manager import FileManager
+from modules.execution_plane import get_execution_backend
 from modules.search_engine import SearchEngine
 from modules.terminal_ops import TerminalOperator
 from modules.memory_manager import MemoryManager
@@ -479,12 +480,9 @@ class MainTerminalToolsExecutionMixin:
                             return {"allowed": True, "mode": mode, "requires_approval": False}
                         path = args.get("file_path") or args.get("path") or ""
                         try:
-                            valid, _, full_path = self.file_manager._validate_path(str(path))
-                            if valid and full_path is not None:
-                                project_root = Path(self.context_manager.project_path).resolve()
-                                resolved = Path(full_path).resolve()
-                                if resolved == project_root or project_root in resolved.parents:
-                                    return {"allowed": True, "mode": mode, "requires_approval": False}
+                            info = get_execution_backend(self).files.resolve_path(str(path), access="write")
+                            if info.get("success") and info.get("within_workspace"):
+                                return {"allowed": True, "mode": mode, "requires_approval": False}
                         except Exception:
                             pass
                         return {
@@ -525,15 +523,11 @@ class MainTerminalToolsExecutionMixin:
                     path = (args or {}).get("file_path") or (args or {}).get("path") or ""
                     if not path:
                         return False
-                    valid, _, full_path = self.file_manager._validate_path(str(path))
-                    if not valid or full_path is None:
+                    info = get_execution_backend(self).files.resolve_path(str(path), access="write")
+                    if not info.get("success") or not info.get("within_workspace"):
                         return False
-                    project_root = Path(self.context_manager.project_path).resolve()
-                    plan_dir = (project_root / ".astrion" / "plan").resolve()
-                    resolved = Path(full_path).resolve()
-                    if resolved != plan_dir and plan_dir not in resolved.parents:
-                        return False
-                    return resolved.suffix.lower() == ".md"
+                    relative = str(info.get("relative_path") or "").replace("\\", "/")
+                    return relative.startswith(".astrion/plan/") and relative.lower().endswith(".md")
                 except Exception:
                     return False
 
@@ -552,19 +546,13 @@ class MainTerminalToolsExecutionMixin:
                 if raw.startswith("/workspace/"):
                     raw = raw.split("/workspace/", 1)[1]
                 try:
-                    raw_path = Path(raw)
-                    if raw_path.is_absolute():
-                        abs_path = raw_path.expanduser().resolve()
-                    else:
-                        abs_path = (Path(self.context_manager.project_path).resolve() / raw_path).resolve()
-                    project_root = Path(self.context_manager.project_path).resolve()
-                    try:
-                        rel = abs_path.relative_to(project_root)
-                        return str(rel).replace("\\", "/").lstrip("./").lower()
-                    except Exception:
-                        return str(abs_path).replace("\\", "/").lower()
+                    info = get_execution_backend(self).files.resolve_path(raw)
+                    if info.get("success"):
+                        normalized = info.get("relative_path") if info.get("within_workspace") else info.get("path")
+                        return str(normalized or raw).replace("\\", "/").lower()
                 except Exception:
-                    return raw.lstrip("./").lower()
+                    pass
+                return raw.removeprefix("./").lower()
 
     def _resolve_create_skill_source_dir(self, source_dir: Any) -> Optional[Path]:
                 raw = str(source_dir or "").strip()
@@ -723,27 +711,25 @@ class MainTerminalToolsExecutionMixin:
                 if not safe_name or "/" in safe_name or "\\" in safe_name:
                     return {"success": False, "error": tr("tools_exec.memory_name_invalid", name=name)}
 
-                # 确保 .astrion/memory/ 目录存在
-                memory_dir = Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME
-                try:
-                    memory_dir.mkdir(parents=True, exist_ok=True)
-                except Exception as exc:
-                    return {"success": False, "error": tr("tools_exec.memory_dir_create_failed", error=str(exc))}
-
-                # 拼接完整文件内容（YAML frontmatter + markdown）
+                from .workspace_output import write_workspace_text
+                files = get_execution_backend(self).files
+                directory = str(WORKSPACE_MEMORY_DIRNAME).replace("\\", "/")
+                target = f"{directory}/{safe_name}.md"
+                before = files.inspect_path(target, access="write")
+                if not before.get("success"):
+                    return before
                 full_content = f"---\nname: {safe_name}\ndescription: {description}\n---\n\n{content}\n"
-                file_path = memory_dir / f"{safe_name}.md"
-
                 try:
-                    file_path.write_text(full_content, encoding="utf-8")
+                    written = write_workspace_text(files, directory, f"{safe_name}.md", full_content)
                 except Exception as exc:
                     return {"success": False, "error": tr("tools_exec.memory_file_write_failed", error=str(exc))}
-
+                if not written.get("success"):
+                    return written
                 return {
                     "success": True,
                     "memory_name": safe_name,
-                    "path": str(file_path),
-                    "summary": tr("tools_exec.memory_updated" if file_path.exists() else "tools_exec.memory_created", safe_name=safe_name),
+                    "path": written.get("path") or target,
+                    "summary": tr("tools_exec.memory_updated" if before.get("exists") else "tools_exec.memory_created", safe_name=safe_name),
                 }
 
     def _mark_skill_read_from_result(self, tool_name: str, arguments: Dict[str, Any], result: Dict[str, Any]) -> None:
@@ -936,7 +922,7 @@ class MainTerminalToolsExecutionMixin:
             if not isinstance(current_text, str):
                 # 容器模式 write_file 不返回 new_file：回读文件获取当前内容
                 try:
-                    read_result = self.file_manager.read_file(str(path))
+                    read_result = get_execution_backend(self).files.read_file(str(path))
                     if isinstance(read_result, dict) and read_result.get("success"):
                         current_text = read_result.get("content")
                 except Exception:
@@ -989,24 +975,13 @@ class MainTerminalToolsExecutionMixin:
             perf_log("_track_shallow_versioning skipped", extra={"reason": "missing_required"})
             return
         try:
-            valid, _, checked_path = self.file_manager._validate_path(str(file_path))
-            if not valid:
-                return
-            can_read, _ = self.file_manager._ensure_host_access(checked_path, "read")
-            can_write, _ = self.file_manager._ensure_host_access(checked_path, "write")
-            if not can_read or not can_write:
-                return
-            manager = ShallowVersioningManager(
-                project_path=self.project_path,
-                data_dir=self.data_dir,
-                conversation_id=conversation_id,
+            get_execution_backend(self).track_file_edit(
+                str(file_path), conversation_id=conversation_id, message_id=message_id,
             )
-            manager.track_edit(str(checked_path), message_id)
             perf_log("_track_shallow_versioning done", extra={
                 "conversation_id": conversation_id,
                 "message_id": message_id,
                 "file_path": str(file_path),
-                "tracked_files_count": len(getattr(manager, "_tracked_files", set())),
             })
         except Exception as exc:
             perf_log("_track_shallow_versioning error", extra={"error": str(exc)})
@@ -1014,13 +989,11 @@ class MainTerminalToolsExecutionMixin:
             pass
 
     def _target_file_exists(self, path: Any) -> bool:
-                try:
-                    valid, _, full_path = self.file_manager._validate_path(str(path or ""))
-                    if not valid or full_path is None:
-                        return False
-                    return full_path.exists() and full_path.is_file()
-                except Exception:
-                    return False
+                info = get_execution_backend(self).files.inspect_path(str(path or ""))
+                if not info.get("success"):
+                    # A denied/unreachable executor is not evidence of a new file.
+                    raise PermissionError(info.get("error") or "Unable to inspect execution path")
+                return bool(info.get("exists") and info.get("is_file"))
 
     def _check_read_before_edit_prerequisite(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 target_path = arguments.get("file_path")
@@ -1249,87 +1222,14 @@ class MainTerminalToolsExecutionMixin:
 
                 try:
                     if tool_name == "list_mcp_servers":
-                        manager = getattr(self, "mcp_client_manager", None)
-                        registry = getattr(self, "mcp_server_registry", None)
-                        if manager is None or registry is None:
-                            result = {"success": False, "error": tr("tools_exec.mcp_module_unavailable")}
-                        else:
-                            refresh = bool(arguments.get("refresh", False))
-                            include_disabled = bool(arguments.get("include_disabled", False))
-                            server_id = str(arguments.get("server_id") or "").strip() or None
-                            sync_result = None
-                            if refresh:
-                                sync_result = await asyncio.to_thread(
-                                    manager.sync_servers,
-                                    server_id=server_id,
-                                )
-                            await asyncio.to_thread(registry.reload)
-                            servers = registry.list_servers(include_disabled=include_disabled)
-                            if server_id:
-                                servers = [item for item in servers if item.get("id") == server_id]
-
-                            # 读取当前 alias 映射（不强制再次发现）
-                            _, alias_map = manager.build_llm_tools(ensure_discovery=False)
-                            aliases_by_server = {}
-                            for alias, binding in (alias_map or {}).items():
-                                sid = getattr(binding, "server_id", "")
-                                if not sid:
-                                    continue
-                                aliases_by_server.setdefault(sid, []).append(alias)
-
-                            items = []
-                            for item in servers:
-                                sid = str(item.get("id") or "")
-                                cache_tools = item.get("tools_cache") or []
-                                cache_names = [
-                                    str((tool or {}).get("name") or "").strip()
-                                    for tool in cache_tools
-                                    if isinstance(tool, dict)
-                                ]
-                                cache_names = [name for name in cache_names if name]
-                                aliases = sorted(aliases_by_server.get(sid, []))
-                                items.append(
-                                    {
-                                        "id": sid,
-                                        "name": item.get("name") or sid,
-                                        "enabled": bool(item.get("enabled", True)),
-                                        "transport": item.get("transport"),
-                                        "timeout_seconds": item.get("timeout_seconds"),
-                                        "tools_cache_count": len(cache_names),
-                                        "tools_cache_names": cache_names,
-                                        "tool_aliases": aliases,
-                                        "tools_cache_updated_at": item.get("tools_cache_updated_at"),
-                                        "last_error": item.get("last_error") or "",
-                                    }
-                                )
-
-                            result = {
-                                "success": True,
-                                "count": len(items),
-                                "servers": items,
-                                "sync_result": sync_result,
-                            }
+                        result = await get_execution_backend(self).list_mcp_servers(arguments)
                     elif is_mcp_tool_alias:
                         if not getattr(self, "mcp_tools_enabled", False):
                             result = {"success": False, "error": tr("tools_exec.mcp_not_enabled")}
                             return json.dumps(result, ensure_ascii=False)
-                        manager = getattr(self, "mcp_client_manager", None)
-                        if manager is None:
-                            result = {"success": False, "error": tr("tools_exec.mcp_manager_unavailable")}
-                        else:
-                            # intent 仅用于原生工具的人类可读展示，不应透传给 MCP 远端工具
-                            mcp_arguments = arguments
-                            if isinstance(arguments, dict) and "intent" in arguments:
-                                mcp_arguments = dict(arguments)
-                                mcp_arguments.pop("intent", None)
-                            result = await asyncio.to_thread(
-                                manager.call_tool_by_alias,
-                                tool_name,
-                                mcp_arguments,
-                                alias_map=getattr(self, "mcp_tool_alias_map", None),
-                            )
+                        result = await get_execution_backend(self).execute_mcp_tool(tool_name, arguments)
                     elif custom_tool:
-                        result = await self.custom_tool_executor.run(tool_name, arguments)
+                        result = await get_execution_backend(self).execute_custom_tool(tool_name, arguments)
                     elif tool_name == "read_file":
                         from modules.conversation_transfer.assets import tool_path
                         arguments = {**arguments, "path": tool_path(
@@ -1364,81 +1264,23 @@ class MainTerminalToolsExecutionMixin:
                             Path(self.context_manager.project_path), (arguments.get("path") or "").strip())
                         if not path:
                             return json.dumps({"success": False, "error": tr("tools_exec.path_empty")}, ensure_ascii=False)
-                        host_unrestricted = self._is_host_mode()
-                        if path.startswith("/workspace"):
-                            if host_unrestricted:
-                                path = path.split("/workspace", 1)[1].lstrip("/")
-                            else:
-                                return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_no_workspace")}, ensure_ascii=False)
-                        if host_unrestricted and (Path(path).is_absolute() or (len(path) > 1 and path[1] == ":")):
-                            abs_path = Path(path).expanduser().resolve()
-                        else:
-                            abs_path = (Path(self.context_manager.project_path) / path).resolve()
-                            if not host_unrestricted:
-                                try:
-                                    abs_path.relative_to(Path(self.context_manager.project_path).resolve())
-                                except Exception:
-                                    return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_no_workspace")}, ensure_ascii=False)
-                        if not abs_path.exists() or not abs_path.is_file():
-                            return json.dumps({"success": False, "error": tr("tools_exec.image_not_found", path=path)}, ensure_ascii=False)
-                        if abs_path.stat().st_size > 10 * 1024 * 1024:
-                            return json.dumps({"success": False, "error": tr("tools_exec.image_too_large")}, ensure_ascii=False)
-                        allowed_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
-                        if abs_path.suffix.lower() not in allowed_ext:
-                            return json.dumps({"success": False, "error": tr("tools_exec.image_unsupported_format", suffix=abs_path.suffix)}, ensure_ascii=False)
-                        # 记录待附加图片，供上层将图片附加到工具结果
-                        self.pending_image_view = {
-                            "path": str(path)
-                        }
-                        # size 供前端美化展示（工具结果 meta 区）；
-                        # 原图由前端按 path 走 /api/file/content 加载，不在结果里内联
-                        result = {
-                            "success": True,
-                            "message": tr("tools_exec.image_attached"),
-                            "path": path,
-                            "size": abs_path.stat().st_size,
-                        }
+                        from .execution_media import prepare_media_view
+                        result = prepare_media_view(self, path, "image")
                     elif tool_name == "view_video":
                         from modules.conversation_transfer.assets import tool_path
                         path = tool_path(self.context_manager.conversation_metadata,
                             Path(self.context_manager.project_path), (arguments.get("path") or "").strip())
                         if not path:
                             return json.dumps({"success": False, "error": tr("tools_exec.path_empty")}, ensure_ascii=False)
-                        host_unrestricted = self._is_host_mode()
-                        if path.startswith("/workspace"):
-                            if host_unrestricted:
-                                path = path.split("/workspace", 1)[1].lstrip("/")
-                            else:
-                                return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_relative")}, ensure_ascii=False)
-                        if host_unrestricted and (Path(path).is_absolute() or (len(path) > 1 and path[1] == ":")):
-                            abs_path = Path(path).expanduser().resolve()
-                        else:
-                            abs_path = (Path(self.context_manager.project_path) / path).resolve()
-                            if not host_unrestricted:
-                                try:
-                                    abs_path.relative_to(Path(self.context_manager.project_path).resolve())
-                                except Exception:
-                                    return json.dumps({"success": False, "error": tr("tools_exec.invalid_path_relative")}, ensure_ascii=False)
-                        if not abs_path.exists() or not abs_path.is_file():
-                            return json.dumps({"success": False, "error": tr("tools_exec.video_not_found", path=path)}, ensure_ascii=False)
-                        allowed_ext = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
-                        if abs_path.suffix.lower() not in allowed_ext:
-                            return json.dumps({"success": False, "error": tr("tools_exec.video_unsupported_format", suffix=abs_path.suffix)}, ensure_ascii=False)
-                        if abs_path.stat().st_size > 50 * 1024 * 1024:
-                            return json.dumps({"success": False, "error": tr("tools_exec.video_too_large")}, ensure_ascii=False)
-                        self.pending_video_view = {"path": str(path)}
-                        result = {
-                            "success": True,
-                            "message": tr("tools_exec.video_attached"),
-                            "path": path
-                        }
+                        from .execution_media import prepare_media_view
+                        result = prepare_media_view(self, path, "video")
 
                     # 终端会话管理工具
                     elif tool_name == "terminal_session":
                         action = arguments["action"]
 
                         if action == "open":
-                            result = self.terminal_manager.open_terminal(
+                            result = get_execution_backend(self).terminals.open_terminal(
                                 session_name=arguments.get("session_name", "default"),
                                 working_dir=arguments.get("working_dir"),
                                 make_active=True
@@ -1447,17 +1289,17 @@ class MainTerminalToolsExecutionMixin:
                                 print(f"{OUTPUT_FORMATS['session']} 终端会话已打开: {arguments.get('session_name', 'default')}")
 
                         elif action == "close":
-                            result = self.terminal_manager.close_terminal(
+                            result = get_execution_backend(self).terminals.close_terminal(
                                 session_name=arguments.get("session_name", "default")
                             )
                             if result["success"]:
                                 print(f"{OUTPUT_FORMATS['session']} 终端会话已关闭: {arguments.get('session_name', 'default')}")
 
                         elif action == "list":
-                            result = self.terminal_manager.list_terminals()
+                            result = get_execution_backend(self).terminals.list_terminals()
 
                         elif action == "reset":
-                            result = self.terminal_manager.reset_terminal(
+                            result = get_execution_backend(self).terminals.reset_terminal(
                                 session_name=arguments.get("session_name")
                             )
                             if result["success"]:
@@ -1479,7 +1321,7 @@ class MainTerminalToolsExecutionMixin:
                         # 注意：协程被取消时线程内的等待无法强杀，会读完队列自然
                         # 结束，无副作用（不触碰共享状态，仅读终端输出队列）。
                         result = await asyncio.to_thread(
-                            self.terminal_manager.send_to_terminal,
+                            get_execution_backend(self).terminals.send_to_terminal,
                             arguments["command"],
                             arguments.get("session_name"),
                             output_wait,
@@ -1490,7 +1332,7 @@ class MainTerminalToolsExecutionMixin:
                         #  只保留模型输出 + 文件编辑两源，见 modules/preview_targets.py）
 
                     elif tool_name == "terminal_snapshot":
-                        result = self.terminal_manager.get_terminal_snapshot(
+                        result = get_execution_backend(self).terminals.get_terminal_snapshot(
                             session_name=arguments.get("session_name"),
                             lines=arguments.get("lines"),
                             max_chars=arguments.get("max_chars")
@@ -1518,7 +1360,7 @@ class MainTerminalToolsExecutionMixin:
                                 "error": tr("tools_exec.sleep_params_exclusive")
                             }
                         elif wait_runcommand_id:
-                            bg_manager = getattr(self, "background_command_manager", None)
+                            bg_manager = get_execution_backend(self).background
                             if not bg_manager:
                                 result = {"success": False, "error": tr("tools_exec.background_manager_unavailable")}
                             else:
@@ -1577,7 +1419,7 @@ class MainTerminalToolsExecutionMixin:
                                     print(f"{OUTPUT_FORMATS['success']} 等待完成")
 
                     elif tool_name == "create_file":
-                        result = self.file_manager.create_file(
+                        result = get_execution_backend(self).files.create_file(
                             path=arguments["path"],
                             file_type=arguments["file_type"]
                         )
@@ -1597,7 +1439,7 @@ class MainTerminalToolsExecutionMixin:
                             )
 
                     elif tool_name == "delete_file":
-                        result = self.file_manager.delete_file(arguments["path"])
+                        result = get_execution_backend(self).files.delete_file(arguments["path"])
                         # 如果删除成功，同时删除备注
                         if result.get("success") and result.get("action") == "deleted":
                             deleted_path = result.get("path")
@@ -1612,7 +1454,7 @@ class MainTerminalToolsExecutionMixin:
                                 print(f"🧹 已删除文件备注: {deleted_path}")
 
                     elif tool_name == "rename_file":
-                        result = self.file_manager.rename_file(
+                        result = get_execution_backend(self).files.rename_file(
                             arguments["old_path"],
                             arguments["new_path"]
                         )
@@ -1643,16 +1485,10 @@ class MainTerminalToolsExecutionMixin:
                         if not path:
                             result = {"success": False, "error": tr("tools_exec.missing_file_path")}
                         else:
-                            backend = getattr(self, "execution_backend", None)
-                            if backend is not None:
-                                # Execution Plane 后端（替身/远端）：不触真实磁盘，跳过浅备份
-                                mode = "a" if append_flag else "w"
-                                result = backend.write_file(path, content, mode=mode)
-                            else:
-                                # 在写入前先备份当前内容（浅备份）。
-                                self._track_shallow_versioning(path)
-                                mode = "a" if append_flag else "w"
-                                result = self.file_manager.write_file(path, content, mode=mode)
+                            backend = get_execution_backend(self)
+                            self._track_shallow_versioning(path)
+                            mode = "a" if append_flag else "w"
+                            result = backend.write_file(path, content, mode=mode)
                             if isinstance(result, dict) and result.get("success"):
                                 # write_file 成功后，该文件视作当前会话已“接触”，
                                 # 允许后续继续 write/edit 而不再触发先读拦截。
@@ -1677,14 +1513,9 @@ class MainTerminalToolsExecutionMixin:
                         elif not isinstance(replacements, list) or not replacements:
                             result = {"success": False, "error": tr("tools_exec.missing_replacements")}
                         else:
-                            backend = getattr(self, "execution_backend", None)
-                            if backend is not None:
-                                # Execution Plane 后端（替身/远端）：不触真实磁盘，跳过浅备份
-                                result = backend.edit_file(path, replacements)
-                            else:
-                                # 在替换前先备份当前内容（浅备份）。
-                                self._track_shallow_versioning(path)
-                                result = self.file_manager.replace_many_in_file(path, replacements)
+                            backend = get_execution_backend(self)
+                            self._track_shallow_versioning(path)
+                            result = backend.edit_file(path, replacements)
                             if isinstance(result, dict) and result.get("success"):
                                 self._mark_file_as_read_visited(result.get("path") or path)
                                 # 快捷窗口：记录本次对话编辑过的文件
@@ -1696,7 +1527,7 @@ class MainTerminalToolsExecutionMixin:
                                     result.get("new_file"),
                                 )
                     elif tool_name == "create_folder":
-                        result = self.file_manager.create_folder(arguments["path"])
+                        result = get_execution_backend(self).files.create_folder(arguments["path"])
 
                     elif tool_name == "web_search":
                         allowed, quota_info = self.record_search_call()
@@ -1834,7 +1665,7 @@ class MainTerminalToolsExecutionMixin:
                                 }
                             else:
                                 content_to_save = extract_one.get("content") or ""
-                                write_result = self.file_manager.write_file(target_path, content_to_save, mode="w")
+                                write_result = get_execution_backend(self).files.write_file(target_path, content_to_save, mode="w")
 
                                 if not write_result.get("success"):
                                     result = {
@@ -1898,32 +1729,15 @@ class MainTerminalToolsExecutionMixin:
                                     "error": tr("tools_exec.bg_timeout_max")
                                 }
                             else:
-                                bg_manager = getattr(self, "background_command_manager", None)
-                                backend = getattr(self, "execution_backend", None)
-                                if backend is not None:
-                                    # Execution Plane 后端（替身/远端）：不走真实后台命令线程
-                                    result = backend.run_command_background(
-                                        arguments["command"],
-                                        timeout=float(timeout_value),
-                                        conversation_id=getattr(self.context_manager, "current_conversation_id", None),
-                                        wait_seconds=5.0,
-                                        network_permission=network_permission,
-                                        sandbox_write_access=sandbox_write_access,
-                                    )
-                                elif not bg_manager:
-                                    result = {"success": False, "error": tr("tools_exec.background_manager_unavailable")}
-                                else:
-                                    from modules.background_command_start import start_background_command
-                                    result = await start_background_command(
-                                        bg_manager, terminal_ops=self.terminal_ops,
-                                        command=arguments["command"],
-                                        working_dir=arguments.get("working_dir"),
-                                        timeout=timeout_value,
-                                        conversation_id=getattr(self.context_manager, "current_conversation_id", None),
-                                        wait_seconds=5.0,
-                                        network_permission=network_permission,
-                                        sandbox_write_access=sandbox_write_access,
-                                    )
+                                result = await get_execution_backend(self).run_command_background(
+                                    arguments["command"],
+                                    working_dir=arguments.get("working_dir"),
+                                    timeout=float(timeout_value),
+                                    conversation_id=getattr(self.context_manager, "current_conversation_id", None),
+                                    wait_seconds=5.0,
+                                    network_permission=network_permission,
+                                    sandbox_write_access=sandbox_write_access,
+                                )
                         else:
                             if timeout_value is None or float(timeout_value) <= 0:
                                 result = {
@@ -1936,23 +1750,13 @@ class MainTerminalToolsExecutionMixin:
                                     "error": tr("tools_exec.fg_timeout_max")
                                 }
                             else:
-                                backend = getattr(self, "execution_backend", None)
-                                if backend is not None:
-                                    # Execution Plane 后端（替身/远端）：不起真实子进程
-                                    result = await backend.run_command(
-                                        arguments["command"],
-                                        timeout=float(timeout_value),
-                                        sandbox_write_access=sandbox_write_access,
-                                        network_permission=network_permission,
-                                    )
-                                else:
-                                    result = await self.terminal_ops.run_command(
-                                        arguments["command"],
-                                        working_dir=arguments.get("working_dir"),
-                                        timeout=timeout_value,
-                                        sandbox_write_access=sandbox_write_access,
-                                        network_permission=network_permission,
-                                    )
+                                result = await get_execution_backend(self).run_command(
+                                    arguments["command"],
+                                    working_dir=arguments.get("working_dir"),
+                                    timeout=float(timeout_value),
+                                    sandbox_write_access=sandbox_write_access,
+                                    network_permission=network_permission,
+                                )
 
                                 # 字符数检查
                                 if result.get("success") and "output" in result:
@@ -2114,16 +1918,20 @@ class MainTerminalToolsExecutionMixin:
                                 def save_review_file() -> str:
                                     safe_title = _sanitize_filename_component(title)
                                     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                                    review_dir = Path(self.project_path) / WORKSPACE_REVIEW_DIRNAME
-                                    review_dir.mkdir(parents=True, exist_ok=True)
+                                    from .workspace_output import write_workspace_text
                                     filename = f"review_{safe_title}_{timestamp}.md"
-                                    target = review_dir / filename
                                     annotation = tr(
                                         "conversation.review_annotation_dialogue"
                                         if content_mode == "dialogue"
                                         else "conversation.review_annotation_full"
                                     )
-                                    target.write_text(f"> {annotation}\n\n" + content, encoding="utf-8")
+                                    written = write_workspace_text(
+                                        get_execution_backend(self).files,
+                                        str(WORKSPACE_REVIEW_DIRNAME).replace("\\", "/"),
+                                        filename, f"> {annotation}\n\n" + content,
+                                    )
+                                    if not written.get("success"):
+                                        raise OSError(written.get("error") or "Unable to save review")
                                     return f"{WORKSPACE_REVIEW_DIRNAME}/{filename}"
 
                                 if review_mode == "read" and char_count <= 50000:

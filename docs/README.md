@@ -56,6 +56,7 @@
 | 文件 | 内容 | 被谁引用 |
 |------|------|---------|
 | `runtime_contract.md` | RuntimeContext 三层模型 + RuntimeService 契约 | `AGENTS.md` §1 |
+| `execution_contract.md` | 公共文件／进程／终端后端、所有权与 Remote 剩余边界 | `AGENTS.md` §1、文档地图 |
 | `providers_api.md` | 提供商后端 API 契约 | `AGENTS.md` §15 |
 | `dynamic_tool_loading_plan.md` | 工具动态加载设计文档 | `AGENTS.md` §13 |
 | `运行对话显示快照契约.md` | 运行中对话显示快照契约 | `AGENTS.md` §19 |

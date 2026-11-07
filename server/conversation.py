@@ -108,9 +108,16 @@ from .conversation_stats import (
     summarize_upload_events,
 )
 from .deep_compression import run_deep_compression, heal_stale_compression_flag
+from modules.execution_plane import get_execution_backend
 
 conversation_bp = Blueprint('conversation', __name__)
 
+
+def _background_processes(terminal):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 def _cancel_running_tasks(username: str, workspace_id: str, timeout_seconds: float = 4.0) -> Tuple[int, bool]:
@@ -1219,6 +1226,9 @@ def _restore_checkpoint_to_conversation(
                 project_path=workspace.project_path,
                 data_dir=workspace.data_dir,
                 conversation_id=source_conversation_id,
+                # 执行侧文件后端：回滚写回/删除必须落在目标执行环境，
+                # 不能默认控制端本机磁盘（Docker/远端会写宿主镜像）。
+                filesystem=get_execution_backend(terminal).files,
             )
             rewind_result = shallow_manager.rewind(str(shallow_message_id))
             debug_log(
@@ -1701,7 +1711,7 @@ def list_background_commands(data_context, workspace: UserWorkspace, username: s
     """返回当前对话的后台 run_command 列表。"""
     conversation_id = (request.args.get("conversation_id") or "").strip() or None
     terminal = find_runtime(username, workspace, conversation_id)
-    manager = getattr(terminal, "background_command_manager", None)
+    manager = _background_processes(terminal)
     if not manager:
         return jsonify({"success": True, "data": []})
     try:
@@ -1747,7 +1757,7 @@ def list_background_commands(data_context, workspace: UserWorkspace, username: s
 @with_terminal
 def get_background_command_detail(command_id: str, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """返回指定后台 run_command 的详情（含实时输出）。"""
-    manager = getattr(terminal, "background_command_manager", None)
+    manager = _background_processes(terminal)
     if not manager:
         return jsonify({"success": False, "error": tr("conversation.background_command_manager_unavailable")}), 404
     try:
@@ -1785,7 +1795,7 @@ def get_background_command_detail(command_id: str, terminal: WebTerminal, worksp
 @with_terminal
 def cancel_background_command(command_id: str, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """手动停止指定后台 run_command。"""
-    manager = getattr(terminal, "background_command_manager", None)
+    manager = _background_processes(terminal)
     if not manager:
         return jsonify({"success": False, "error": tr("conversation.background_command_manager_unavailable")}), 404
     try:

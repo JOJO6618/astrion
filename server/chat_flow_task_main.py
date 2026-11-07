@@ -10,6 +10,7 @@ from modules.skill_hint_manager import SkillHintManager
 from modules.i18n import tr
 from modules.user_manager import UserWorkspace
 from modules.multi_agent.debug_logger import ma_debug
+from modules.execution_plane import get_execution_backend
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_default_model_key, get_model_context_window, get_model_profile
 from .work_timer import finalize_conversation_work_timer
@@ -40,6 +41,13 @@ from .chat_flow_notice_dispatch import _persist_and_echo_preceding_notice, _disp
 from .chat_flow_notice_state import _build_shared_waiting_payload, _build_sub_agent_notice_text, _collect_pending_completion_notices, _rollback_completion_notice_marks, _has_pending_completion_work, _has_pending_workflow_notices
 from .chat_flow_notice_poll import poll_completion_notifications, poll_multi_agent_notifications
 from .chat_flow_notice_idle import _dispatch_multi_agent_idle_messages, _dispatch_multi_agent_idle_messages_sync
+
+
+def _background_processes(terminal: Any):
+    """后台任务统一出口：执行后端的 background 视图；保留原空值防御。"""
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 async def handle_task_with_sender(
@@ -757,7 +765,7 @@ async def handle_task_with_sender(
                     _state = _manager.get_multi_agent_state(conversation_id)
                     if _state:
                         _stopped_has_ma = any(a.status == "running" for a in _state.list_all())
-            _bg_mgr = getattr(web_terminal, "background_command_manager", None)
+            _bg_mgr = _background_processes(web_terminal)
             if _bg_mgr and conversation_id:
                 try:
                     _bg_mgr.reconcile_stale_records(conversation_id=conversation_id)
@@ -1247,7 +1255,7 @@ async def handle_task_with_sender(
     has_running_sub_agents = False
     has_running_multi_agent = False
     has_pending_ma_messages = False
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
+    bg_manager = _background_processes(web_terminal)
     has_running_background_commands = False
     if manager:
         try:

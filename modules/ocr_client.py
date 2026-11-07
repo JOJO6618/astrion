@@ -1,9 +1,16 @@
-"""视觉语言模型客户端（主智能体专用）。"""
+"""视觉语言模型客户端（主智能体专用）。
+
+图片读取统一经“当前选中的执行后端”（`backend.files.inspect_path` + `read_binary`），
+不再假设工作区文件在控制端本机磁盘上。可选装配方式：
+- `backend_getter=lambda: get_execution_backend(terminal)`（完整 App 推荐）；
+- `owner=terminal`（内部等价于 `get_execution_backend(owner)`）；
+- 仅 `file_manager`（历史/轻量调用方，明确按本机 `LocalFileSystem` 适配）。
+"""
 
 import base64
 import mimetypes
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 from openai import OpenAI
@@ -13,13 +20,24 @@ from modules.file_manager import FileManager
 
 from modules.i18n import tr
 
+_METADATA_UNSUPPORTED = "metadata_unsupported_in_container"
+
 
 class OCRClient:
     """封装外部 VLM 调用逻辑。"""
 
-    def __init__(self, project_path: str, file_manager: FileManager):
+    def __init__(
+        self,
+        project_path: str,
+        file_manager: Optional[FileManager] = None,
+        *,
+        backend_getter: Optional[Callable[[], Any]] = None,
+        owner: Any = None,
+    ):
         self.project_path = Path(project_path).resolve()
         self.file_manager = file_manager
+        self.backend_getter = backend_getter
+        self.owner = owner
 
         # 懒加载：httpx.Client() 构造会加载 CA 证书并初始化 SSL 上下文，
         # 在 Windows（Defender 实时扫描）下可耗时数秒；每个对话级 terminal
@@ -52,22 +70,63 @@ class OCRClient:
             )
         self._client_ready = True
 
-    def _validate_image_path(self, path: str):
-        """复用 FileManager 的路径校验，确保在项目内。"""
-        valid, error, full_path = self.file_manager._validate_path(path)
-        if not valid:
-            return False, error, None
-        if not full_path.exists():
-            return False, tr("ocr.file_not_exists"), None
-        if not full_path.is_file():
-            return False, tr("ocr.not_a_file"), None
-        return True, "", full_path
+    def _files_access(self) -> Any:
+        """返回文件读取视图：显式 getter > owner 后端 > 明确本机适配。"""
+        if self.backend_getter is not None:
+            backend = self.backend_getter()
+            if backend is None:
+                return None
+            return backend.files
+        if self.owner is not None:
+            from modules.execution_plane import get_execution_backend
+
+            return get_execution_backend(self.owner).files
+        if self.file_manager is not None:
+            from modules.execution_plane.files import LocalFileSystem
+
+            return LocalFileSystem(self.file_manager)
+        return None
+
+    def _inspect_image_path(self, path: str):
+        """经执行后端取元数据（先授权再 stat），不触碰控制端 Path.exists。"""
+        files = self._files_access()
+        if files is None:
+            return False, "媒体读取需要可信执行后端（backend.files）。", None, None
+        try:
+            info = files.inspect_path(path)
+        except Exception as exc:
+            return False, str(exc), None, files
+        if not isinstance(info, dict) or not info.get("success"):
+            error = info.get("error") if isinstance(info, dict) else None
+            return False, error or tr("ocr.file_not_exists"), None, files
+        if info.get("code") != _METADATA_UNSUPPORTED:
+            if not info.get("exists"):
+                return False, tr("ocr.file_not_exists"), info, files
+            if not info.get("is_file"):
+                return False, tr("ocr.not_a_file"), info, files
+        return True, "", info, files
+
+    @staticmethod
+    def _mime_for(meta: Optional[Dict[str, Any]], path: str) -> str:
+        candidates: List[str] = []
+        suffix = str((meta or {}).get("suffix") or "").strip()
+        if suffix:
+            candidates.append(f"file{suffix if suffix.startswith('.') else '.' + suffix}")
+        candidates.append(str((meta or {}).get("path") or ""))
+        candidates.append(str(path or ""))
+        for candidate in candidates:
+            if not candidate:
+                continue
+            mime, _ = mimetypes.guess_type(candidate)
+            if mime:
+                return mime
+        return ""
 
     def vlm_analyze(self, path: str, prompt: str) -> Dict:
         """使用大参数视觉语言模型分析图片：文字、物体、布局等。"""
         warnings: List[str] = []
 
-        valid, error, full_path = self._validate_image_path(path)
+        valid, error, info, files = self._inspect_image_path(path)
         if not valid:
             return {"success": False, "error": error, "warnings": warnings}
 
@@ -80,9 +139,16 @@ class OCRClient:
             return {"success": False, "error": tr("ocr.client_init_failed"), "warnings": warnings}
 
         try:
-            data = full_path.read_bytes()
+            data = files.read_binary(path)
         except Exception as exc:
             return {"success": False, "error": tr("ocr.read_failed", error=str(exc)), "warnings": warnings}
+        if not isinstance(data, (bytes, bytearray)):
+            return {
+                "success": False,
+                "error": tr("ocr.read_failed", error="执行后端返回了非二进制结果"),
+                "warnings": warnings,
+            }
+        data = bytes(data)
 
         size = len(data)
         if size <= 0:
@@ -95,7 +161,7 @@ class OCRClient:
                 "warnings": warnings,
             }
 
-        mime_type, _ = mimetypes.guess_type(str(full_path))
+        mime_type = self._mime_for(info, path)
         if not mime_type or not mime_type.startswith("image/"):
             warnings.append(tr("ocr.unknown_image_type"))
             mime_type = "image/jpeg"

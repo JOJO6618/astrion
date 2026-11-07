@@ -25,6 +25,7 @@ from config import TOOL_CALL_COOLDOWN
 from modules.personalization_manager import load_personalization_config, resolve_context_compression_settings
 from modules.auto_approval_service import run_auto_approval
 from modules.execution_scope import command_fingerprint
+from modules.execution_plane import get_execution_backend
 from modules.tool_approval_manager import resolve_approval_requirements
 from .tool_execution_authority import resolve_approval_authority, execute_with_authority, DeniedExecution
 from modules.user_question_manager import format_user_question_answer
@@ -62,16 +63,17 @@ def _build_tool_approval_preview(web_terminal, function_name: str, arguments: Di
             return preview
         preview["replacement_groups"] = len(replacements)
         try:
-            valid, err, full_path = web_terminal.file_manager._validate_path(str(file_path))
-            if not valid or full_path is None:
-                preview["summary"] = err or tr("tool_loop.preview_path_invalid")
+            files = get_execution_backend(web_terminal).files
+            inspected = files.inspect_path(str(file_path), access="read")
+            if not inspected.get("success"):
+                preview["summary"] = inspected.get("error") or tr("tool_loop.preview_path_invalid")
                 return preview
-            resolved_path = str(Path(full_path))
-            preview["resolved_path"] = resolved_path
-            if not full_path.exists() or not full_path.is_file():
+            preview["resolved_path"] = inspected.get("path") or str(file_path)
+            if not inspected.get("exists") or not inspected.get("is_file"):
                 preview["summary"] = tr("tool_loop.preview_file_not_found")
                 return preview
-            content = web_terminal.file_manager.read_binary(full_path).decode("utf-8", errors="ignore")
+            # 预览保持原「尽力读取」语义：二进制读入后忽略无法解码的字节。
+            content = files.read_binary(str(file_path)).decode("utf-8", errors="ignore")
             first = replacements[0] if isinstance(replacements[0], dict) else {}
             old_text = str(first.get("old_string") or "")
             new_text = str(first.get("new_string") or "")
@@ -457,26 +459,36 @@ async def _handle_submit_plan(*, web_terminal, arguments: Dict[str, Any], sender
         return _payload(success=False, status="invalid_plan_file",
                         message=tr("tool_loop.submit_plan_missing_file"))
     try:
-        valid, err, full_path = web_terminal.file_manager._validate_path(plan_file)
+        files = get_execution_backend(web_terminal).files
+        resolved = files.resolve_path(plan_file, access="read")
     except Exception as exc:
-        valid, err, full_path = False, str(exc), None
-    if not valid or not full_path:
         return _payload(success=False, status="invalid_plan_file",
-                        message=tr("tool_loop.submit_plan_invalid_path", error=err or plan_file))
+                        message=tr("tool_loop.submit_plan_invalid_path", error=exc))
+    if not resolved.get("success"):
+        return _payload(success=False, status="invalid_plan_file",
+                        message=tr("tool_loop.submit_plan_invalid_path",
+                                   error=resolved.get("error") or plan_file))
+    relative = str(resolved.get("relative_path") or "").replace("\\", "/")
+    if not resolved.get("within_workspace") or not relative.startswith(".astrion/plan/"):
+        return _payload(success=False, status="invalid_plan_file",
+                        message=tr("tool_loop.submit_plan_wrong_dir"))
+    if not relative.lower().endswith(".md"):
+        return _payload(success=False, status="invalid_plan_file",
+                        message=tr("tool_loop.submit_plan_not_md"))
     try:
-        project_root = Path(web_terminal.context_manager.project_path).resolve()
-        plan_dir = (project_root / ".astrion" / "plan").resolve()
-        resolved = Path(full_path).resolve()
-        if resolved != plan_dir and plan_dir not in resolved.parents:
-            return _payload(success=False, status="invalid_plan_file",
-                            message=tr("tool_loop.submit_plan_wrong_dir"))
-        if resolved.suffix.lower() != ".md":
-            return _payload(success=False, status="invalid_plan_file",
-                            message=tr("tool_loop.submit_plan_not_md"))
-        if not resolved.is_file():
-            return _payload(success=False, status="plan_file_missing",
-                            message=tr("tool_loop.submit_plan_file_missing", plan_file=plan_file))
-        plan_content = resolved.read_text(encoding="utf-8", errors="replace")
+        inspected = files.inspect_path(plan_file, access="read")
+    except Exception as exc:
+        return _payload(success=False, status="plan_file_error",
+                        message=tr("tool_loop.submit_plan_read_failed", error=exc))
+    if not inspected.get("success"):
+        return _payload(success=False, status="plan_file_error",
+                        message=tr("tool_loop.submit_plan_read_failed",
+                                   error=inspected.get("error") or plan_file))
+    if not inspected.get("exists") or not inspected.get("is_file"):
+        return _payload(success=False, status="plan_file_missing",
+                        message=tr("tool_loop.submit_plan_file_missing", plan_file=plan_file))
+    try:
+        plan_content = files.read_binary(plan_file).decode("utf-8", errors="replace")
     except Exception as exc:
         return _payload(success=False, status="plan_file_error",
                         message=tr("tool_loop.submit_plan_read_failed", error=exc))

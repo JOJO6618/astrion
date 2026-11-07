@@ -18,6 +18,7 @@
   - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/get_task_events）；契约见 `docs/runtime_contract.md`
   - `core/`: 终端与工具编排（`main_terminal.py`、`web_terminal.py`、`main_terminal_parts/*`；其中 `main_terminal_parts/context/` 和 `main_terminal_parts/tools_definition` 已拆分为 base + mixin 子包）
   - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）；`composer_drafts.py` 负责原子草稿、CAS revision 与保存水位；`server/composer_drafts.py` 负责对话身份、字段校验和恢复确认，`server/attachment_paths.py` 共用附件路径通知，`server/runtime_guidance.py` 在安全边界注入引导，`conversation_modes.py` 共用生效模式规则，`skills_revision.py`／`skills_sync.py` 负责工作区技能版本与准备。`utils/conversation_manager/preparation.py` 合并执行侧存储准备。
+  - `modules/execution_plane/`（2026-11-07）：`base/files/protocols` 定义显式执行接口，`access` 选择后端，`local/resources` 复用 Host/Docker 能力并支持脱离模型／Flask装配；`files_metadata/processes/terminals/environment/integrations` 提供元数据、后台、终端、环境和插件入口，`fake*` 为内存替身。默认 MainTerminal 同样绑定 Local，已绑定后端失败不得回落控制端。当前不是生产 Remote 协议，剩余本机假设与验证范围见 `docs/execution_contract.md`。
   - `config/`: 配置拆分（`api.py`, `limits.py`, `terminal.py`, `paths.py` ...），由 `config/__init__.py` 聚合并加载 `.env`
   - `utils/`: API client、日志、上下文与对话工具等公共函数（`api_client`、`tool_result_formatter`、`context_manager`、`conversation_manager` 已拆分为子包；原入口文件保留为兼容入口）
 - **桌面标签导航（2026-10-23）**

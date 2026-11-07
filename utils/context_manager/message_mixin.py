@@ -317,17 +317,27 @@ class MessageMixin:
                 "- **长期记忆**：{memory}"
             )
 
-        is_host = self._is_host_mode_without_safety()
-        runtime_environment = (
-            self._build_host_runtime_environment()
-            if is_host
-            else f"隔离容器中（挂载目录 {self.container_mount_path or '/workspace'}），宿主机路径已隐藏"
-        )
-        resource_limit = (
-            "宿主机模式无限制"
-            if is_host
-            else f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，磁盘配额 {self.project_storage_limit}"
-        )
+        # 执行环境显示：绑定后端时用后端事实（get_environment），
+        # 无后端时保留原有本地表现（宿主机文本继续复用 _host_runtime_cache）。
+        resolve_display = getattr(self, "_resolve_runtime_display", None)
+        if callable(resolve_display):
+            display = resolve_display()
+            runtime_environment = display["runtime_environment"]
+            resource_limit = display["resource_limit"]
+            container_path = display["container_path"]
+        else:
+            is_host = self._is_host_mode_without_safety()
+            runtime_environment = (
+                self._build_host_runtime_environment()
+                if is_host
+                else f"隔离容器中（挂载目录 {self.container_mount_path or '/workspace'}），宿主机路径已隐藏"
+            )
+            resource_limit = (
+                "宿主机模式无限制"
+                if is_host
+                else f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，磁盘配额 {self.project_storage_limit}"
+            )
+            container_path = self.container_mount_path or "/workspace"
 
         now = datetime.now()
         current_time_text = f"{now.year}年{now.month}月{now.day}日 {now.hour}点（24小时制）"
@@ -343,7 +353,7 @@ class MessageMixin:
             project_name=project_name,
             runtime_environment=runtime_environment,
             resource_limit=resource_limit,
-            container_path=self.container_mount_path or "/workspace",
+            container_path=container_path,
             container_cpus=self.container_cpu_limit,
             container_memory=self.container_memory_limit,
             project_storage=self.project_storage_limit,

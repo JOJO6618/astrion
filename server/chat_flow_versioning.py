@@ -161,10 +161,15 @@ def _record_hidden_versioning_checkpoint_after_run(
             shallow_insertions = 0
             shallow_deletions = 0
             if message_id:
+                # 执行侧权威：Docker/远端下宿主镜像不是内容源，make_snapshot
+                # 必须经 backend.files 读“当前内容”，否则 v2 备份/diff 会拿错源。
+                from modules.execution_plane import get_execution_backend
+
                 shallow_manager = ShallowVersioningManager(
                     project_path=workspace.project_path,
                     data_dir=workspace.data_dir,
                     conversation_id=conversation_id,
+                    filesystem=get_execution_backend(web_terminal).files,
                 )
                 snapshot = shallow_manager.make_snapshot(str(message_id))
                 shallow_files = shallow_manager.get_file_diff_stats(str(message_id))

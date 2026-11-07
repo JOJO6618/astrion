@@ -2,6 +2,18 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 from modules.i18n import tr
+from modules.execution_plane import get_execution_backend
+
+
+def _background_processes(terminal: Any):
+    """后台任务统一出口：执行后端的 background 视图。
+
+    保留原空值防御：terminal 缺失或后端没有 background 时返回 None。
+    已显式配置的后端失败时直接暴露错误，不回退本机 manager。
+    """
+    if terminal is None:
+        return None
+    return getattr(get_execution_backend(terminal), "background", None)
 
 
 def _build_shared_waiting_payload(items: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -55,7 +67,7 @@ def _collect_pending_completion_notices(*, web_terminal, conversation_id: str) -
     notices: List[Dict[str, Any]] = []
 
     # 2) 后台 run_command
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
+    bg_manager = _background_processes(web_terminal)
     if bg_manager:
         try:
             bg_updates = bg_manager.poll_updates(conversation_id=conversation_id)
@@ -123,7 +135,7 @@ def _rollback_completion_notice_marks(*, web_terminal, notices: List[Dict[str, A
     """派发失败时回滚 _collect_pending_completion_notices 的就地标记，
     避免通知被标记为已消费却从未派发（静默丢失）。
     """
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
+    bg_manager = _background_processes(web_terminal)
     wf_restore: List[Dict[str, Any]] = []
     for item in notices or []:
         payload = item.get("payload") or {}
@@ -131,11 +143,9 @@ def _rollback_completion_notice_marks(*, web_terminal, notices: List[Dict[str, A
             command_id = payload.get("command_id")
             if not command_id or not bg_manager:
                 continue
+            # 契约显式能力：清除已通知水位，供下一轮重新收集。
             try:
-                with bg_manager._lock:
-                    rec = bg_manager._records.get(str(command_id))
-                    if rec:
-                        rec["notified"] = False
+                bg_manager.unmark_notified(str(command_id))
             except Exception:
                 pass
         elif item.get("kind") == "workflow":
@@ -166,7 +176,7 @@ def _has_pending_completion_work(*, web_terminal, conversation_id: str) -> bool:
     多智能体模式下的 pending 消息由独立的 poll_multi_agent_notifications 处理，
     不再混入本函数。
     """
-    bg_manager = getattr(web_terminal, "background_command_manager", None)
+    bg_manager = _background_processes(web_terminal)
     if bg_manager:
         try:
             if bg_manager.has_pending_for_conversation(conversation_id):

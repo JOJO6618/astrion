@@ -232,12 +232,13 @@ class ListMixin:
         if not valid:
             return {"success": False, "error": error}
         
-        if not full_path.exists():
-            return {"success": False, "error": tr("file_manager.file_not_found")}
-        
         ok, msg = self._ensure_host_access(full_path, "read")
         if not ok:
             return {"success": False, "error": msg}
+
+        if not full_path.exists():
+            return {"success": False, "error": tr("file_manager.file_not_found")}
+
         try:
             stat = full_path.stat()
             relative_path = self._relative_path(full_path)

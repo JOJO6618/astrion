@@ -76,6 +76,13 @@ from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
+from utils.context_manager.fs_access import (
+    build_skills_catalog,
+    files_for_owner,
+    inspect_meta,
+    list_dir,
+    read_text,
+)
 from utils.tool_result_formatter import format_tool_result_for_context
 from utils.logger import setup_logger
 from config.model_profiles import (
@@ -118,11 +125,18 @@ class MainTerminalToolsReadMixin:
                     if isinstance(personalization, dict)
                     else True
                 )
-                catalog = get_skills_catalog(
-                    private_dir=infer_private_skills_dir(self.data_dir),
-                    project_path=self.project_path,
-                    scan_project_agents=scan_project_agents,
+                # 技能目录的“读侧遍历”经执行后端：工作区 .astrion/skills 与
+                # .agents/skills 由节点提供；启用过滤仍在控制端（merge_enabled_skills）。
+                # 读取失败按失败处理，不回退控制端本机遍历。
+                files_access = files_for_owner(self)
+                catalog = build_skills_catalog(
+                    files_access, scan_project_agents=scan_project_agents
                 )
+                if catalog is None:
+                    return {
+                        "success": False,
+                        "error": "无法通过执行后端读取技能目录，请改用 read_file 按具体路径查看",
+                    }
                 enabled_skills = merge_enabled_skills(
                     personalization.get("enabled_skills") if isinstance(personalization, dict) else None,
                     catalog,
@@ -222,11 +236,16 @@ class MainTerminalToolsReadMixin:
                     return {"success": False, "error": tr("tools_read.search_memory_needs_keywords")}
 
                 max_results = self._clamp_int(max_results, 5, 1, 10)
-                memory_dir = Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME
-                readable, access_error = self.file_manager._ensure_host_access(memory_dir.resolve(), "read")
-                if not readable:
-                    return {"success": False, "error": access_error}
-                if not memory_dir.exists() or not memory_dir.is_dir():
+                # 项目记忆目录的列举与内容读取均经执行后端（不再对本机 Path 做
+                # resolve/exists/glob）。
+                files_access = files_for_owner(self)
+                memory_meta = inspect_meta(files_access, WORKSPACE_MEMORY_DIRNAME)
+                if not memory_meta.get("success"):
+                    return {
+                        "success": False,
+                        "error": memory_meta.get("error") or "无法读取项目记忆目录",
+                    }
+                if not memory_meta.get("exists") or not memory_meta.get("is_dir"):
                     empty_text = tr("tools_read.memory_dir_not_exists")
                     return {
                         "success": True,
@@ -237,19 +256,33 @@ class MainTerminalToolsReadMixin:
                         "summary": empty_text,
                     }
 
+                listing = list_dir(files_access, WORKSPACE_MEMORY_DIRNAME)
+                if not listing.get("success"):
+                    return {
+                        "success": False,
+                        "error": listing.get("error") or "无法列出项目记忆目录",
+                    }
+                memory_files = [
+                    item for item in (listing.get("files") or [])
+                    if str(item.get("name") or "").endswith(".md")
+                ]
+
                 lowered = [(kw, kw.lower()) for kw in clean_keywords]
                 scored: List[Dict[str, Any]] = []
-                for md_file in sorted(memory_dir.glob("*.md")):
-                    try:
-                        read_result = self.file_manager.read_file(str(md_file))
-                        if not read_result.get("success"):
-                            continue
-                        text = str(read_result.get("content") or "")
-                    except Exception:
+                for memory_file in sorted(
+                    memory_files, key=lambda item: str(item.get("name") or "")
+                ):
+                    file_name = str(memory_file.get("name") or "")
+                    file_path = str(
+                        memory_file.get("path")
+                        or f"{WORKSPACE_MEMORY_DIRNAME}/{file_name}"
+                    )
+                    text = read_text(files_access, file_path)
+                    if text is None:
                         continue
 
                     lines = text.split("\n")
-                    name = md_file.stem
+                    name = file_name[:-3] if file_name.endswith(".md") else file_name
                     description = ""
                     body_start_idx = 0  # 0-based，正文起始行（跳过 frontmatter）
                     if lines and lines[0].strip() == "---":
@@ -298,7 +331,7 @@ class MainTerminalToolsReadMixin:
                             break
 
                     scored.append({
-                        "file": md_file.name,
+                        "file": file_name,
                         "name": name,
                         "description": description,
                         "score": score,
@@ -461,7 +494,8 @@ class MainTerminalToolsReadMixin:
                         if start_line and end_line < start_line:
                             return {"success": False, "error": tr("tools_read.end_line_ge_start_line")}
 
-                    read_result = self.file_manager.read_text_segment(
+                    files_access = files_for_owner(self)
+                    read_result = files_access.read_text_segment(
                         file_path,
                         start_line=start_line,
                         end_line=end_line,
@@ -487,7 +521,14 @@ class MainTerminalToolsReadMixin:
                         )
                     })
                     base_result["truncated"] = truncated
-                    self.context_manager.load_file(read_result["path"])
+                    # 整文件读取已持有原文，直接交给上下文缓存，避免隐式再读一次；
+                    # 分段读取才让 load_file 经同一执行后端补读整文件。
+                    if start_line is None and end_line is None:
+                        self.context_manager.load_file(
+                            read_result["path"], content=read_result["content"]
+                        )
+                    else:
+                        self.context_manager.load_file(read_result["path"])
                     return base_result
 
                 if read_type == "search":
@@ -515,7 +556,8 @@ class MainTerminalToolsReadMixin:
                     )
                     case_sensitive = bool(arguments.get("case_sensitive"))
 
-                    search_result = self.file_manager.search_text(
+                    files_access = files_for_owner(self)
+                    search_result = files_access.search_text(
                         file_path,
                         query=query,
                         max_matches=max_matches,
@@ -557,7 +599,8 @@ class MainTerminalToolsReadMixin:
                 if not isinstance(segments, list) or not segments:
                     return {"success": False, "error": tr("tools_read.extract_requires_segments")}
 
-                extract_result = self.file_manager.extract_segments(
+                files_access = files_for_owner(self)
+                extract_result = files_access.extract_segments(
                     file_path,
                     segments=segments,
                     size_limit=READ_TOOL_MAX_FILE_SIZE

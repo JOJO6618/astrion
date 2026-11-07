@@ -1,66 +1,69 @@
-"""Execution Plane 契约：Runtime ↔ 执行环境分层接口（docs/execution_contract.md §3）。
+"""Shared execution boundary used by local adapters and future remote workers.
 
-定位：工具编排层（core/main_terminal_parts/tools_execution.py）通过本接口触达
-执行环境；现有 Host/Docker 实现仍由 terminal_ops/file_manager 等承载（默认路径），
-本接口是「替身执行器 / 未来远端执行后端」的统一接入点。
-
-首版接口面（E1-E4，归纳自现状调用点，未发明新能力）：
-- E1 run_command（前台命令）
-- E2 run_command_background（后台命令登记）
-- E3 write_file / E4 edit_file（文件写）
-
-结果结构与现有真实后端保持一致（调用方按同一结构消费）：
-- run_command: {success, status, output, return_code, truncated, elapsed_ms}
-  status ∈ {"completed", "timeout", "error", "cancelled"}
-- run_command_background: {success, command_id, status}（status="running_background"）
-- write_file/edit_file: {success, path, original_file, new_file}
-  （original_file/new_file 为写前/后全文，编辑摘要链路依赖）
+Agent decisions, approval waits and conversation history stay in the caller.
+Implementations own filesystem/process/terminal resources and enforce their
+actual path and OS sandbox policy. An injected backend must never fall back to
+resources on the controller when an operation is unavailable or fails.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from .files import FileSystemBackend
+    from .protocols import BackgroundBackend, TerminalBackend
 
 
 @runtime_checkable
 class ExecutionBackend(Protocol):
-    """执行环境后端协议。实现方：FakeExecutionBackend（替身）、未来 Host/Docker 适配器。
+    """Environment-bound operations, independent of model and web runtimes.
 
-    注意：本协议只承诺「执行语义」，不承诺安全边界。权限裁决（permission mode）
-    与审批介入在 Runtime 编排层完成；个人指令规则也在 handle_tool_call 入口前置校验，
-    因而包括本接口注入的命令后端。真实 terminal_ops/后台/终端输入链路另做临执行校验。
-    路径授权（_validate_path/禁读清单）仍由 file_manager 链路承担，注入的文件后端
-    不会自动获得这些校验。未来接入真实后端时须保留相应边界；OS 层强制力
-    （Seatbelt/bwrap/DAC+Landlock）仍是最终边界。
+    ``files`` returns policy-checked operations and JSON metadata; paths belong
+    to the executor and must not be resolved against the controller filesystem.
+    Binary reads return bytes (a transport must explicitly encode them).
+    Process coroutine cancellation must stop its owned process, not merely stop
+    waiting for a response. Background records and terminals belong to this
+    backend and are queried/cancelled through these same resources.
     """
 
+    @property
+    def files(self) -> FileSystemBackend: ...
+
+    @property
+    def terminals(self) -> TerminalBackend: ...
+
+    @property
+    def background(self) -> Optional[BackgroundBackend]: ...
+
+    def get_environment(self) -> Dict[str, Any]:
+        """Return serializable executor identity, workspace and capabilities."""
+        ...
+
+    def track_file_edit(
+        self, path: str, *, conversation_id: Optional[str] = None,
+        message_id: Optional[str] = None,
+    ) -> None:
+        """Capture execution-side content for conversation-scoped undo."""
+        ...
+
     async def run_command(
-        self,
-        command: str,
-        *,
-        timeout: float,
-        sandbox_write_access: bool,
-        network_permission: str,
-    ) -> Dict[str, Any]:
-        """E1 前台命令执行。"""
-        ...
+        self, command: str, *, timeout: float, sandbox_write_access: bool,
+        network_permission: str, working_dir: Optional[str] = None,
+    ) -> Dict[str, Any]: ...
 
-    def run_command_background(
-        self,
-        command: str,
-        *,
-        timeout: float,
-        conversation_id: Optional[str],
-        wait_seconds: float,
-        network_permission: str,
-        sandbox_write_access: bool,
-    ) -> Dict[str, Any]:
-        """E2 后台命令登记（立即返回 command_id，执行异步进行）。"""
-        ...
+    async def run_command_background(
+        self, command: str, *, timeout: float,
+        conversation_id: Optional[str], wait_seconds: float,
+        network_permission: str, sandbox_write_access: bool,
+        working_dir: Optional[str] = None,
+    ) -> Dict[str, Any]: ...
 
-    def write_file(self, path: str, content: str, *, mode: str = "w") -> Dict[str, Any]:
-        """E3 文件写入（mode "w" 覆盖 / "a" 追加）。"""
-        ...
+    def write_file(self, path: str, content: str, *, mode: str = "w") -> Dict[str, Any]: ...
 
-    def edit_file(self, path: str, replacements: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """E4 文件精确替换（replacements 元素含 old_string/new_string/replace_all）。"""
-        ...
+    def edit_file(self, path: str, replacements: List[Dict[str, Any]]) -> Dict[str, Any]: ...
+
+    async def execute_mcp_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any: ...
+
+    async def execute_custom_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any: ...
+
+    async def list_mcp_servers(self, arguments: Dict[str, Any]) -> Dict[str, Any]: ...
