@@ -81,7 +81,7 @@ npm run build --silent 2>&1 | tail -n 5
 
 - **账本身份**：`actor_id=review_agent:<agent_key>`、`kind=review_agent`、`name=<agent_key>`（`auto_approval`／`goal_review`／`workflow_review`），三个审核智能体各自独立累计；前端按 key 本地化为「自动审核／目标审核／工作流审核」，未知 key 原样显示。
 - **逐轮计费**：每一轮模型请求一个独立 UUID，发起前捕获审核模型（注册表 key）的精确价格，不借主模型价格。入账口径与思考摘要一致：成功响应、或已拿到 usage／部分输出的请求入账；无 usage 记未计价；完全没有响应的认证／网络失败不登记。`record_request(count_goal_usage=False)`，不占用目标模式 Token 上限。
-- **超时**：`timeout_seconds` 以 `asyncio.wait_for` 约束整次请求（含 Responses），超时抛 `ReviewModelCallError(error_type=timeout)`，目标模式恢复按可重试处理；超时前已收到部分输出的请求按未计价入账。
+- **超时与重试**：无产品层请求超时（2026-11-07 取消 `timeout_seconds`，不再用 `asyncio.wait_for` 包裹）；HTTP 层与主智能体一致（`APIClient(request_timeout=300)`），流式响应连续 300s 无数据块即断流。失败按 `modules/retry_policy.py` 分类，网络/超时/429/5xx 最多尝试 5 次（固定 10s 间隔），认证、配置、额度与未知错误立即上抛；每次尝试独立入账，部分输出后失败同样记账。
 - **刷新**：入账后仅当该对话正是 ContextManager 当前对话时复用 `safe_broadcast_token_update`；费用面板的定时读取兜底。
 - **历史**：此前的审核请求没有 usage 记录，不补算。
 

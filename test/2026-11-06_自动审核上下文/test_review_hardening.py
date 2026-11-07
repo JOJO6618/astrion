@@ -307,7 +307,7 @@ class ContextOverflowTests(unittest.TestCase):
         payload_text = "历史：\n1 工具\n  输出：\n" + huge
         seen = {}
 
-        async def fake_call(cfg, messages, tools, timeout, billing=None):
+        async def fake_call(cfg, messages, tools, billing=None):
             seen["messages"] = messages
             raise approval_agent.ReviewModelCallError(
                 "maximum context length exceeded", details={"error_type": "context_length_exceeded"})

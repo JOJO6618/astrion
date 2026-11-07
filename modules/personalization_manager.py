@@ -209,11 +209,11 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "full_access_warning_dismissed": False,
     "allow_auto_approve_full_access": False,
     # 审核智能体统一配置（个人空间-审核智能体页）：模型留空走自动规则（注册表第一个可见模型；纯 codex 时选 -luna）
-    # 思考模式固定开启、推理强度走模型默认，不再存 thinking 字段（旧值保存时被清洗丢弃）
+    # 思考模式固定开启、推理强度走模型默认；无产品层请求超时（HTTP 层 300s）、取证命令超时固定 60 秒，均不存设置（2026-11-07）
     "review_agents": {
-        "auto_approval": {"model": "", "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 20},
-        "goal_review": {"model": "", "timeout_seconds": 60, "max_rounds": 3, "max_command_timeout": 60},
-        "workflow_review": {"model": "", "timeout_seconds": 120, "max_rounds": 6, "max_command_timeout": 60},
+        "auto_approval": {"model": "", "max_rounds": 10},
+        "goal_review": {"model": "", "max_rounds": 10},
+        "workflow_review": {"model": "", "max_rounds": 10},
     },
 }
 
@@ -1047,9 +1047,7 @@ def _sanitize_review_agents(value: Any) -> Dict[str, Dict[str, Any]]:
         item = src.get(key) if isinstance(src.get(key), dict) else {}
         out[key] = {
             "model": str(item.get("model") or "").strip()[:100],
-            "timeout_seconds": _clamp_int(item.get("timeout_seconds"), d["timeout_seconds"], 5, 3600),
             "max_rounds": _clamp_int(item.get("max_rounds"), d["max_rounds"], 1, 50),
-            "max_command_timeout": _clamp_int(item.get("max_command_timeout"), d["max_command_timeout"], 1, 600),
         }
     return out
 

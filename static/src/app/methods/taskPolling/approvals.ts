@@ -15,6 +15,11 @@ export const approvalMethods = {
     const approval = data?.approval;
     if (!approval?.approval_id) return;
     if (data.conversation_id && data.conversation_id !== this.currentConversationId) return;
+    // 审核失败/过期后后端会重发带终态的 required；终态只由 resolved 处理，不能再入待审批。
+    const incomingStatus = String(approval.status || '')
+      .trim()
+      .toLowerCase();
+    if (incomingStatus && incomingStatus !== 'pending') return;
     if ((this.resolvedToolApprovalIds || []).includes(approval.approval_id)) return;
     this.approvalSnapshotVersion += 1;
     if (!Array.isArray(this.pendingToolApprovals)) this.pendingToolApprovals = [];

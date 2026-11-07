@@ -310,10 +310,10 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ### 10.5 审核智能体配置与调试
 
-- 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段 `model`（留空=自动规则）/`timeout_seconds`/`max_rounds`/`max_command_timeout`。**思考固定开启、推理强度走模型默认，均无设置项（2026-11-06）**；三者统一经 `modules/review_model_caller.py` 走 `APIClient`（两种协议同一通道，`timeout_seconds` 对整次请求生效），每次请求计入对话账本（见 §22）。
+- 统一在设置页「审核智能体」分区配置，存 `personalization.json` 的 `review_agents` 键。三个审核智能体：`auto_approval`／`goal_review`／`workflow_review`；字段只剩 `model`（留空=自动规则）与 `max_rounds`（默认 10）。**思考固定开启、推理强度走模型默认，均无设置项（2026-11-06）**；**无产品层请求超时**（2026-11-07 取消 `timeout_seconds`），**HTTP 层与主智能体一致：`APIClient(request_timeout=300)`，流式响应连续 300s 无数据块即断流并进入重试**；**取证命令超时固定 60 秒、不可设置**（2026-11-07 取消 `max_command_timeout`）。三者统一经 `modules/review_model_caller.py` 走 `APIClient`（两种协议同一通道），失败按 `modules/retry_policy.py` 分类重试（与主流式循环同口径：最多 5 次尝试、固定 10s 间隔，只有网络/超时/429/5xx 重试；认证、配置、额度与未知错误立即上抛），每次请求计入对话账本（见 §22）。
 - 解析入口 `modules/review_agent_config.py::resolve_review_agent_config`（复用 `aux_model_resolver`）。旧的独立 json（`config/auto_approval.json`/`goal_review.json`/`workflow_review.json.example`）与 `sub_agent_models.json` 库均已彻底废除，**无向后兼容**。
 - **自动审核上下文（2026-11-06）**：送审user为紧凑纯文本；直接输入／运行引导／ask问答合计最近5条、普通调用＋结果最近5个，固定附已批准计划／当前目标／工作触发消息并去重。`guidance`的自动注入标记不代表非用户；工具须按结果配对，不能用执行前的_recent_tool_actions。审核专用历史补查使用本次冻结快照。政策与完整契约见 `docs/auto_approval_review.md`。
-- **裁决与故障**：正常approved／rejected，不加needs_human；审核失败独立error、有限重试、不执行且不自动转人工。单次完全访问的免人工开关关闭时仍保留原人工批准条件。已受理新引导／执行条件变化使旧审核失效，领取批准及启动工具前再次核对。
+- **裁决与故障**：正常approved／rejected，不加needs_human；审核失败独立error、不执行且不自动转人工；可重试错误在审核调用器内自动重试（最多 5 次），耗尽后仍以 error 终结。单次完全访问的免人工开关关闭时仍保留原人工批准条件。已受理新引导／执行条件变化使旧审核失效，领取批准及启动工具前再次核对。
 - 调试开关：`modules/approval_agent.py` 的 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`，开启后写 `logs/approval_agent/`。
 
 ### 10.6) 运行模式（work_mode）系统（2026-08-13 新增）
@@ -558,7 +558,8 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - 主 `run_command` 的 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，Docker/远端替身后端不伪装支持。已处于 direct 时无需额外申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
 - 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。用户级 `allow_auto_approve_full_access` 默认 false：关闭时自动审核模式需自动与人工独立通过，无限制模式仅需人工；开启时两种模式的新请求均由审核智能体批准即可执行（记录 `auto_review_required=true`、`human_approval_required=false`）。人工审批模式始终人工审批；普通无限制操作和已在 direct 环境的命令继续免审。条件在请求创建时快照，派发按请求字段决定；审核明确告知脱离沙箱且批准后立即执行。人工先允许不能取消必需的自动审核。拒绝、故障和输入过期均不执行；任一拒绝仅结束申请并回填工具失败结果，不触发 task_stopped；主动停止正常取消。授权记录绑定执行环境／完整参数／任务身份，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 再核对，失效不破坏消息配对。
 - 前台、后台均绑定该次权限，不改变主对话全局状态；后台创建经 `asyncio.to_thread`，Popen 与取消在相同锁内握手。**正常后台完成不等于取消全部后台任务。**
-- Web 审批 UI 在输入栏 `ComposerApprovalDock.vue`（人工模式：上方滚动内容 + 左下固定拒绝/允许；自动审核时才加右侧进度区）。同对话串行审批、不加翻页；完成后不自动展示记录卡片或恢复入口，`/` 与 `+` 的手动入口始终能打开。视觉由用户验收。
+- Web 审批 UI 在输入栏 `ComposerApprovalDock.vue`（人工模式：上方滚动内容 + 左下固定拒绝/允许；自动审核时才加右侧进度区）。同对话串行审批、不加翻页；完成后不自动展示记录卡片或恢复入口，`/` 与 `+` 的手动入口始终能打开。**面板收起后的「待审批操作」入口（2026-11-07）内嵌在 git 状态栏「N 个终端」之后、`+/-` 之前，纯文字无边框图标**；状态栏因此把「收起且有待审批」当成可见条件，关闭 git 状态栏或无 git 项目时仍单独显示这一行。视觉由用户验收。
+- 审核失败终态（`decision=error`）必须由显示投影当终态处理：projector 的 resolved 白名单包含 `error`，`tool_approval_required` 遇到非 `pending` 终态直接跳过（full_access 的 `_finish` 会重发带 `expired` 的 required）；前端同样跳过终态、切换对话/新建页时清空审批本地状态。否则重新加载快照会把已失败请求塞回待审批列表。
 - 回归目录：`test/2026-10-07_子智能体权限与单次完全访问/`、`test/2026-10-07_审批面板交互/`。
 
 > **改子权限 / 审批前必读**：`docs/agents_details/sub_agent_access.md`（含 UI 细节与逐条约束，与本文同级）。

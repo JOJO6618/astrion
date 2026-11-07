@@ -84,29 +84,6 @@ const defaultExtraOptions = computed(() => [
 
       <div class="settings-select-row">
         <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.timeoutTitle') }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.timeoutDesc') }}</span>
-        </span>
-        <input
-          type="number"
-          class="settings-number-input"
-          min="5"
-          max="3600"
-          :value="reviewAgentOf(agent.key).timeout_seconds"
-          @change="
-            updateReviewAgentInt(
-              agent.key,
-              'timeout_seconds',
-              ($event.target as HTMLInputElement).value,
-              5,
-              3600
-            )
-          "
-        />
-      </div>
-
-      <div class="settings-select-row">
-        <span class="settings-row-copy">
           <span class="settings-row-title">{{ $t('personalization.maxRoundsTitle') }}</span>
           <span class="settings-row-desc">{{ $t('personalization.maxRoundsDesc') }}</span>
         </span>
@@ -123,29 +100,6 @@ const defaultExtraOptions = computed(() => [
               ($event.target as HTMLInputElement).value,
               1,
               50
-            )
-          "
-        />
-      </div>
-
-      <div class="settings-select-row" style="margin-bottom: 8px">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.commandTimeoutTitle') }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.commandTimeoutDesc') }}</span>
-        </span>
-        <input
-          type="number"
-          class="settings-number-input"
-          min="1"
-          max="600"
-          :value="reviewAgentOf(agent.key).max_command_timeout"
-          @change="
-            updateReviewAgentInt(
-              agent.key,
-              'max_command_timeout',
-              ($event.target as HTMLInputElement).value,
-              1,
-              600
             )
           "
         />

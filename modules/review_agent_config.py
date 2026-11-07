@@ -6,7 +6,8 @@
   （custom_models + codex 动态发现，见 modules/aux_model_resolver.py），留空走自动规则；
 - 思考模式固定开启、推理强度走模型默认（2026-11-06 起不再提供设置项，
   见 modules/review_model_caller.py）；
-- timeout_seconds / max_rounds / max_command_timeout：审核请求超时、最大轮次、只读命令超时。
+- 请求不限时、取证命令超时固定 60 秒（2026-11-07 起取消 timeout_seconds /
+  max_command_timeout 设置）；max_rounds：最大审核轮次。
 
 历史上三个智能体各自读取独立的部署级 json 配置（auto_approval.json / goal_review.json /
 workflow_review.json），该方式已彻底废弃；此前的「子智能体独立模型库
@@ -25,18 +26,17 @@ __all__ = ["resolve_review_agent_config", "REVIEW_AGENT_KEYS"]
 def resolve_review_agent_config(agent_key: str) -> Dict[str, Any]:
     """解析指定审核智能体的完整运行配置。
 
-    返回字段：name / agent_key / profile / timeout_seconds / max_rounds /
-    max_command_timeout。
+    返回字段：name / agent_key / profile / max_rounds / max_command_timeout。
     - profile：APIClient.apply_profile 同形的模型配置（name 为注册表 key），
       模型未配置或注册表不可用时为 None，由各审核智能体走既有的
       「配置缺失」兜底行为。
+    - 模型请求不限时；max_command_timeout 固定 60 秒，不从个人配置读取。
     """
     base: Dict[str, Any] = {
         "name": f"{agent_key}-agent",
         "agent_key": agent_key,
         "profile": None,
-        "timeout_seconds": 60,
-        "max_rounds": 3,
+        "max_rounds": 10,
         "max_command_timeout": 60,
     }
     if agent_key not in REVIEW_AGENT_KEYS:
@@ -52,9 +52,8 @@ def resolve_review_agent_config(agent_key: str) -> Dict[str, Any]:
     if not isinstance(settings, dict):
         return base
 
-    base["timeout_seconds"] = int(settings.get("timeout_seconds") or base["timeout_seconds"])
     base["max_rounds"] = max(1, int(settings.get("max_rounds") or base["max_rounds"]))
-    base["max_command_timeout"] = max(1, int(settings.get("max_command_timeout") or base["max_command_timeout"]))
+    base["max_command_timeout"] = 60
 
     model_key = str(settings.get("model") or "").strip()
     profile = resolve_aux_model_profile(model_key)

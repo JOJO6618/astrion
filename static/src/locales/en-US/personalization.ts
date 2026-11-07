@@ -591,13 +591,9 @@ export default {
     'Send a stable per-conversation x-opencode-session header to OpenCode endpoints for session routing and cache optimization; disabled means no header is sent',
   titleDefaultModelDesc:
     'First available model in the registry; prefers a -luna fast model when only Codex models exist',
-  timeoutTitle: 'Review request timeout',
-  timeoutDesc: 'Single model request timeout (5-3600 seconds)',
   maxRoundsTitle: 'Max review rounds',
   maxRoundsDesc:
     'Applies the fallback when no conclusion is reached within this many rounds (1-50)',
-  commandTimeoutTitle: 'Evidence command timeout',
-  commandTimeoutDesc: 'Single timeout for read-only evidence commands (1-600 seconds)',
 
   // ── Admin ──
   mcpConfigTitle: 'MCP server management',

@@ -11,8 +11,7 @@ import re
 
 _SHOW_HTML = re.compile(r"<show_html\b[\s\S]*?</show_html>", re.I)
 _TERMINAL = {"task_complete", "task_stopped", "error", "quota_exceeded"}
-_RESPONSE = {"thinking_start", "thinking_chunk", "text_start", "text_chunk",
-             "tool_preparing", "tool_start"}
+_RESPONSE = {"thinking_start", "thinking_chunk", "text_start", "text_chunk", "tool_preparing", "tool_start"}
 
 
 class RuntimeProjection:
@@ -319,7 +318,7 @@ class RuntimeProjection:
             for row in rows or []:
                 if not isinstance(row, dict) or not row.get(id_key):
                     continue
-                if not questions and not plan and row[id_key] in self.state["resolved_tool_approval_ids"]:
+                if not questions and not plan and (row[id_key] in self.state["resolved_tool_approval_ids"] or (row.get("status") or "pending") != "pending"):
                     continue
                 previous = next((r for r in pending if r[id_key] == row[id_key]), None)
                 if previous is not None:
@@ -339,7 +338,7 @@ class RuntimeProjection:
             ids = data.get("question_ids", [data.get(id_key)]) if questions else [data.get(id_key)]
             ids = {str(i) for i in ids or [] if i is not None}
             if not questions and not plan:
-                if data.get("decision") not in {"approved", "rejected", "expired", "cancelled", "timeout"}:
+                if data.get("decision") not in {"approved", "rejected", "expired", "cancelled", "timeout", "error"}:
                     return
                 for row in pending:
                     if str(row[id_key]) in ids:

@@ -13,8 +13,7 @@ from modules.approval_policy import APPROVAL_SYSTEM_PROMPT
 from modules.i18n import tr
 
 
-DEFAULT_MAX_ROUNDS = 3
-DEFAULT_TIMEOUT_SECONDS = 60
+DEFAULT_MAX_ROUNDS = 10
 DEFAULT_MAX_COMMAND_TIMEOUT = 20
 # 审批 transcript 含完整 messages / 命令 / 结果，最容易接触敏感动作与路径，
 # 默认关闭（防 Secret Sink）；仅在调试审批链路时临时改回 True，用完恢复。
@@ -106,7 +105,6 @@ class ApprovalAgent:
             _flush_trace(out)
             return out
         max_rounds = int(self.cfg.get("max_rounds") or DEFAULT_MAX_ROUNDS)
-        timeout_seconds = int(self.cfg.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
         tools = [
             {
                 "type": "function",
@@ -185,24 +183,19 @@ class ApprovalAgent:
             if progress_cb:
                 progress_cb({"stage": "model_call", "round": rounds, "message": tr("approval_agent.round_progress", rounds=rounds)})
             _trace("request", {"round": rounds, "messages": messages, "tools": tools})
-            for attempt in range(2):
-                try:
-                    choice = await call_review_model(self.cfg, messages, tools, timeout_seconds, billing=self.billing)
-                    break
-                except ReviewModelCallError as exc:
-                    _trace("http_error", {"round": rounds, "attempt": attempt, "error": str(exc)})
-                    details = getattr(exc, "details", {}) or {}
-                    error_type = str(details.get("error_type") or "request_failed")
-                    retryable = error_type in {"timeout", "network", "network_error", "connection_error", "server_error", "rate_limit"}
-                    if attempt == 0 and retryable:
-                        continue
-                    out = _error("review_" + error_type, tr("approval_agent.request_failed", status=str(exc)))
-                    _flush_trace(out)
-                    return out
-                except Exception as exc:
-                    out = _error("review_request_failed", tr("approval_agent.request_failed", status=type(exc).__name__))
-                    _flush_trace(out)
-                    return out
+            try:
+                choice = await call_review_model(self.cfg, messages, tools, billing=self.billing)
+            except ReviewModelCallError as exc:
+                _trace("http_error", {"round": rounds, "error": str(exc)})
+                details = getattr(exc, "details", {}) or {}
+                error_type = str(details.get("error_type") or "request_failed")
+                out = _error("review_" + error_type, tr("approval_agent.request_failed", status=str(exc)))
+                _flush_trace(out)
+                return out
+            except Exception as exc:
+                out = _error("review_request_failed", tr("approval_agent.request_failed", status=type(exc).__name__))
+                _flush_trace(out)
+                return out
             reasoning_content = str(choice.get("reasoning_content") or "")
             _trace(
                 "response",

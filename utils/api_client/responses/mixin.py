@@ -254,9 +254,9 @@ class APIClientResponsesMixin:
                 if codex_oauth:
                     from utils.api_client.codex.settings import resolve_proxy
 
-                    client_ctx = httpx.AsyncClient(proxy=resolve_proxy(), timeout=300)
+                    client_ctx = httpx.AsyncClient(proxy=resolve_proxy(), timeout=self.request_timeout)
                 else:
-                    client_ctx = httpx.AsyncClient(http2=True, timeout=300)
+                    client_ctx = httpx.AsyncClient(http2=True, timeout=self.request_timeout)
                 async with client_ctx as client:
                     async with client.stream(
                         "POST", url, json=body, headers=headers

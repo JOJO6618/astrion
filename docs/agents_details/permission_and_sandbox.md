@@ -68,14 +68,14 @@
 
 - 审核智能体配置：统一在设置页「审核智能体」分区设置（2026-08 起在个人空间，2026-09 迁设置页），存于 personalization.json 的 `review_agents` 键
   - 三个审核智能体：`auto_approval`（自动审批）/ `goal_review`（目标审核）/ `workflow_review`（工作流审核）
-  - 字段：`model`（主模型注册表 key，留空=自动规则：第一个可见模型，纯 Codex 环境优先 -luna）/ `timeout_seconds` / `max_rounds` / `max_command_timeout`
+  - 字段：`model`（主模型注册表 key，留空=自动规则：第一个可见模型，纯 Codex 环境优先 -luna）/ `max_rounds`（默认 10）。**无产品层请求超时（2026-11-07 取消 `timeout_seconds`），HTTP 层 300s；取证命令超时固定 60 秒（取消 `max_command_timeout`）**
   - **思考固定开启、推理强度走默认（2026-11-06）**：删除 `thinking` 设置项与字段（旧值保存时被清洗丢弃），不提供推理强度设置；模型无独立思考段时沿用 fast 段配置
-  - **调用通道唯一**：`modules/review_model_caller.py::call_review_model` 统一经 `APIClient` 流式调用（Chat Completions 与 Responses 共用，思考段 `extra_params` 由 APIClient 注入）；已删除裸 HTTP 分支及其 `temperature=0`、去掉 extra_params 降级重试。`timeout_seconds` 以 `asyncio.wait_for` 约束整次请求，两种协议一致；超时 `error_type=timeout`（目标恢复按可重试）
+  - **调用通道唯一**：`modules/review_model_caller.py::call_review_model` 统一经 `APIClient` 流式调用（Chat Completions 与 Responses 共用，思考段 `extra_params` 由 APIClient 注入）；已删除裸 HTTP 分支及其 `temperature=0`、去掉 extra_params 降级重试。无产品层超时，`APIClient(request_timeout=300)` 与主智能体一致（连续 300s 无数据块断流）；失败按 `modules/retry_policy.py` 分类重试（最多 5 次、固定 10s，只重试网络/超时/429/5xx）
   - **计费**：每次请求写入所属对话账本（`kind=review_agent`），见 `docs/conversation_api_costs.md`
   - 解析入口：`modules/review_agent_config.py::resolve_review_agent_config`（复用 `modules/aux_model_resolver.py` 统一解析主注册表；独立 `sub_agent_models.json` 库已于 2026-09 彻底废弃无兼容，子智能体/审核/标题生成模型同源）
   - 旧的独立 json 配置（`config/auto_approval.json` / `goal_review.json` / `workflow_review.json.example`）已彻底废除，无向后兼容
 - 自动审核送审内容为紧凑纯文本：真实直接输入／引导／ask问答合计最近5条，调用＋结果最近5个，固定附已批准计划、用户目标和工作触发消息并去重；支持本次冻结快照的只读历史补查。不能按is_auto_generated一刀切，也不能将同批未执行调用当历史执行。
-- 正常裁决approved／rejected；调用或解析故障独立error、有限重试且不执行，不新增needs_human或自动转人工。单次完全访问开关默认关闭时，仍允许申请：auto_approval保留双批准条件，unrestricted仅人工；两种模式开启同一开关后均自动审核通过即执行。approval始终人工审批。
+- 正常裁决approved／rejected；调用或解析故障独立error、不执行且不自动转人工；可重试错误在审核调用器内自动重试（最多 5 次），耗尽后仍以 error 终结。单次完全访问开关默认关闭时，仍允许申请：auto_approval保留双批准条件，unrestricted仅人工；两种模式开启同一开关后均自动审核通过即执行。approval始终人工审批。
 - 审核绑定用户输入与执行条件；新引导导致重审，批准领取和工具启动前再次核对。完整来源、分页、文本与状态契约见 `docs/auto_approval_review.md`，回归 `test/2026-11-06_自动审核上下文/`。
 - 调试开关（代码变量）：`modules/approval_agent.py` 中 `DEBUG_SAVE_APPROVAL_AGENT_TRANSCRIPT`
   - 开启后写入：`logs/approval_agent/`

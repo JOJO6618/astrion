@@ -29,8 +29,7 @@ from modules.review_model_caller import ReviewModelCallError, call_review_model,
 from modules.i18n import tr
 
 PROMPT_NAME = "workflow_review_agent.txt"
-DEFAULT_TIMEOUT_SECONDS = 120
-DEFAULT_MAX_ROUNDS = 6
+DEFAULT_MAX_ROUNDS = 10
 DEFAULT_MAX_COMMAND_TIMEOUT = 60
 DEBUG_SAVE_WORKFLOW_REVIEW_TRANSCRIPT = True
 DEBUG_TRANSCRIPT_DIR = Path(LOGS_DIR) / "workflow_review_agent"
@@ -196,7 +195,6 @@ class WorkflowReviewAgent:
             out = _reject(tr("workflow_review.config_missing"))
             _flush_trace(out)
             return out
-        timeout_seconds = int(self.cfg.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
         max_rounds = max(1, int(self.cfg.get("max_rounds") or DEFAULT_MAX_ROUNDS))
         tools = self._build_tools(review_mode)
 
@@ -221,7 +219,7 @@ class WorkflowReviewAgent:
                 progress_cb({"stage": "model_call", "round": rounds, "message": tr("workflow_review.round_progress", round=rounds)})
             _trace("request", {"round": rounds, "messages": messages, "tools": tools})
             try:
-                choice = await call_review_model(self.cfg, messages, tools, timeout_seconds, billing=self.billing)
+                choice = await call_review_model(self.cfg, messages, tools, billing=self.billing)
             except ReviewModelCallError as exc:
                 _trace("http_error", {"round": rounds, "error": str(exc)})
                 out = _reject(tr("workflow_review.request_failed", code=str(exc)))

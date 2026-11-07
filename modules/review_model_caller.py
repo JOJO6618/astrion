@@ -6,7 +6,9 @@
 
 - 思考：固定 thinking_mode=True；模型没有独立思考段时 APIClient 沿用 fast 段配置。
 - 推理强度：不设置 reasoning_effort，走模型／服务商默认档位（codex 按模型默认档）。
-- 超时：整次请求受 asyncio.wait_for(timeout_seconds) 约束，两种协议一致。
+- 超时：不设产品层的请求超时（2026-11-07 取消 `timeout_seconds`），但 HTTP 层与主智能体
+  保持一致（`request_timeout=300`）：流式响应连续 300s 无数据块即断流并进入重试。
+  可重试错误最多尝试 5 次、固定 10s 间隔（口径见 modules/retry_policy.py）。
 - 计费：传入 ReviewBilling 时，每次请求用独立 UUID 写入所属对话账本
   （actor_id=review_agent:<agent_key>，kind=review_agent），不计入目标模式 Token 上限。
 
@@ -25,6 +27,7 @@ from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 from modules.external_session import resolve_ephemeral_headers
+from modules.retry_policy import RETRY_DELAY_SECONDS, RETRY_MAX_ATTEMPTS, classify_error
 
 __all__ = [
     "ReviewModelCallError",
@@ -100,15 +103,15 @@ def _record_cost(billing: ReviewBilling, request_id: str, usage, price, started_
         billing.on_committed()
 
 
-async def call_review_model(
+async def _call_review_once(
     cfg: Dict[str, Any],
     messages: List[Dict[str, Any]],
     tools: List[Dict[str, Any]],
-    timeout_seconds: int,
     *,
     billing: Optional[ReviewBilling] = None,
+    price: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """按配置调一次审核模型，返回 message 形状；失败抛 ReviewModelCallError。"""
+    """单次审核模型请求（不限时），返回 message 形状；失败抛 ReviewModelCallError。"""
     from utils.api_client import APIClient
     from utils.token_usage import extract_usage_payload
 
@@ -118,17 +121,8 @@ async def call_review_model(
     _check_profile(profile)
     model_key = str(profile.get("name") or "")
 
-    price = None
-    if billing is not None:
-        from modules.api_pricing import capture_price
-        try:
-            price = await asyncio.to_thread(capture_price, model_key)
-        except Exception:
-            logger.warning("review agent price capture failed for %s", model_key, exc_info=True)
-            price = {"model_key": model_key, "provider_id": profile.get("provider_id"),
-                     "rates": {}, "source": None, "fetched_at": None}
-
-    client = APIClient(thinking_mode=True, web_mode=True)
+    # 审核请求无产品层超时；HTTP 层与主智能体一致（默认 300s 连接/读超时）。
+    client = APIClient(thinking_mode=True, web_mode=True, request_timeout=300)
     client.model_key = model_key
     # 审核调用无对话连续性：每次请求生成一次性 session 头（需在 apply_profile 前设置，
     # 以便与 profile 静态头链式合并）
@@ -194,13 +188,7 @@ async def call_review_model(
                     pass
 
     try:
-        try:
-            await asyncio.wait_for(_consume(), timeout=max(1, int(timeout_seconds or 60)))
-        except asyncio.TimeoutError as exc:
-            raise ReviewModelCallError(
-                f"review model request timed out after {int(timeout_seconds or 60)}s",
-                details={"error_type": "timeout"},
-            ) from exc
+        await _consume()
         if not state["chunks"]:
             raise ReviewModelCallError("review model returned no response", details={"error_type": "empty_response"})
         succeeded = True
@@ -219,3 +207,57 @@ async def call_review_model(
         "reasoning_content": "".join(reasoning_parts),
         "tool_calls": tool_calls,
     }
+
+
+async def call_review_model(
+    cfg: Dict[str, Any],
+    messages: List[Dict[str, Any]],
+    tools: List[Dict[str, Any]],
+    *,
+    billing: Optional[ReviewBilling] = None,
+) -> Dict[str, Any]:
+    """按配置调审核模型（不限时），可重试错误自动重试。
+
+    与主智能体流式循环同口径：最多 RETRY_MAX_ATTEMPTS 次尝试（1 次原始 + 4 次重试）、
+    固定 RETRY_DELAY_SECONDS 间隔；错误分类走 modules/retry_policy.classify_error，
+    只有 retryable（网络/超时/429/5xx）才重试，认证、配置、额度与未知错误立即上抛。
+    每次尝试独立记入对话账本（已拿到 usage／部分输出的失败请求不丢费用）。
+    """
+    profile = cfg.get("profile")
+    if not isinstance(profile, dict):
+        raise ReviewModelCallError("review agent model not configured")
+    _check_profile(profile)
+    model_key = str(profile.get("name") or "")
+
+    price = None
+    if billing is not None:
+        from modules.api_pricing import capture_price
+        try:
+            price = await asyncio.to_thread(capture_price, model_key)
+        except Exception:
+            logger.warning("review agent price capture failed for %s", model_key, exc_info=True)
+            price = {"model_key": model_key, "provider_id": profile.get("provider_id"),
+                     "rates": {}, "source": None, "fetched_at": None}
+
+    last_error: Optional[ReviewModelCallError] = None
+    for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
+        try:
+            return await _call_review_once(cfg, messages, tools, billing=billing, price=price)
+        except ReviewModelCallError as exc:
+            last_error = exc
+            details = getattr(exc, "details", {}) or {}
+            category = classify_error({
+                "status_code": details.get("status_code"),
+                "error_code": details.get("error_code") or details.get("code"),
+                "error_type": details.get("error_type") or details.get("type"),
+                "message": str(exc),
+            })
+            if category != "retryable" or attempt >= RETRY_MAX_ATTEMPTS:
+                raise
+            logger.warning(
+                "review agent request failed (attempt %d/%d, %s): %s; retrying in %ds",
+                attempt, RETRY_MAX_ATTEMPTS, category, exc, RETRY_DELAY_SECONDS,
+            )
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+    assert last_error is not None
+    raise last_error

@@ -781,10 +781,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     return (
       agents?.[key] || {
         model: '',
-        thinking: false,
-        timeout_seconds: 60,
-        max_rounds: 3,
-        max_command_timeout: 60
+        max_rounds: 10
       }
     );
   };
@@ -797,7 +794,7 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
 
   const updateReviewAgentInt = (
     key: ReviewAgentKey,
-    field: 'timeout_seconds' | 'max_rounds' | 'max_command_timeout',
+    field: 'max_rounds',
     raw: string,
     lo: number,
     hi: number

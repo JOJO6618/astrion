@@ -25,6 +25,17 @@ export const scrollMethods = {
     this.waitingForSubAgent = false;
     this.waitingForBackgroundCommand = false;
     this.dropToolEvents = false;
+    // 审批/问答状态只属于当前对话视图；切到 /new 或另一对话时不能残留。
+    this.pendingToolApprovals = [];
+    this.decidingApprovalIds = [];
+    this.approvalReviewRecords = [];
+    this.resolvedToolApprovalIds = [];
+    this.approvalPanelCollapsed = true;
+    this.approvalSnapshotVersion = (this.approvalSnapshotVersion || 0) + 1;
+    if (this.approvalAutoCloseTimer) {
+      clearTimeout(this.approvalAutoCloseTimer);
+      this.approvalAutoCloseTimer = null;
+    }
     this.goalModeArmed = false;
     this.goalRunning = false;
     this.goalProgress = null;

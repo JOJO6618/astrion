@@ -160,7 +160,7 @@ class APIClientChatMixin:
         dump_path = self._dump_request_payload(payload, api_config, headers)
 
         try:
-            async with httpx.AsyncClient(http2=True, timeout=300) as client:
+            async with httpx.AsyncClient(http2=True, timeout=self.request_timeout) as client:
                 if stream:
                     async with client.stream(
                         "POST",

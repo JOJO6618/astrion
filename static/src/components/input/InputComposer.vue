@@ -9,13 +9,11 @@
         v-if="!chatMode"
         :visible="approvalDockVisible"
         :collapsed="!!approvalPanelCollapsed"
-        :status-visible="floatingStatusVisible"
         :approvals="toolApprovals || []"
         :deciding-approval-ids="decidingApprovalIds"
         :review-records="approvalReviewRecords"
         @layout-change="emitComposerHeight"
         @transitioning="approvalPanelTransitioning = $event"
-        @restore="$emit('restore-tool-approval')"
         @collapse="$emit('collapse-tool-approval')"
         @approve="$emit('approve-tool-approval', $event)"
         @reject="$emit('reject-tool-approval', $event)"
@@ -192,6 +190,15 @@
                 @click.stop="$emit('realtime-terminal')"
               >
                 {{ $t('input.terminalsRunning', { n: terminalCount }) }}
+              </button>
+              <button
+                v-if="approvalRestoreVisible"
+                type="button"
+                class="floating-project-status__notice floating-project-status__notice--button"
+                :aria-label="$t('shell.restoreApprovalPanel')"
+                @click.stop="$emit('restore-tool-approval')"
+              >
+                {{ $t('shell.pendingApproval') }}
               </button>
               <button
                 v-if="projectGitSummaryForRender"
@@ -1199,6 +1206,10 @@ const approvalDockVisible = computed(
     (!props.approvalPanelCollapsed || !!props.toolApprovals?.length)
 );
 const approvalExpanded = computed(() => approvalDockVisible.value && !props.approvalPanelCollapsed);
+// 审批面板收起且仍有待审批：按钮内嵌在状态栏里，状态栏因此单独出现（无 git 时也一样）。
+const approvalRestoreVisible = computed(
+  () => !props.chatMode && !!props.approvalPanelCollapsed && (props.toolApprovals?.length || 0) > 0
+);
 
 const floatingStatusVisible = computed(() => {
   if (
@@ -1213,6 +1224,7 @@ const floatingStatusVisible = computed(() => {
     !!projectGitSummaryForRender.value ||
     !!props.goalRunning ||
     !!props.goalModeArmed ||
+    approvalRestoreVisible.value ||
     Number(props.pendingUserQuestionCount || 0) > 0 ||
     (!!props.planApprovalMinimized && Number(props.pendingPlanApprovalCount || 0) > 0) ||
     Number(props.subAgentCount || 0) > 0;

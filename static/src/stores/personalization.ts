@@ -32,21 +32,15 @@ type VersioningBackupMode = 'shallow' | 'full';
 const defaultReviewAgents = (): Record<ReviewAgentKey, ReviewAgentSetting> => ({
   auto_approval: {
     model: '',
-    timeout_seconds: 60,
-    max_rounds: 3,
-    max_command_timeout: 20
+    max_rounds: 10
   },
   goal_review: {
     model: '',
-    timeout_seconds: 60,
-    max_rounds: 3,
-    max_command_timeout: 60
+    max_rounds: 10
   },
   workflow_review: {
     model: '',
-    timeout_seconds: 120,
-    max_rounds: 6,
-    max_command_timeout: 60
+    max_rounds: 10
   }
 });
 
@@ -66,9 +60,7 @@ const sanitizeReviewAgents = (raw: any): Record<ReviewAgentKey, ReviewAgentSetti
     const item = src[key] && typeof src[key] === 'object' ? src[key] : {};
     out[key] = {
       model: typeof item.model === 'string' ? item.model : '',
-      timeout_seconds: clamp(item.timeout_seconds, d.timeout_seconds, 5, 3600),
-      max_rounds: clamp(item.max_rounds, d.max_rounds, 1, 50),
-      max_command_timeout: clamp(item.max_command_timeout, d.max_command_timeout, 1, 600)
+      max_rounds: clamp(item.max_rounds, d.max_rounds, 1, 50)
     };
   }
   return out;
@@ -80,12 +72,8 @@ export type ReviewAgentKey = 'auto_approval' | 'goal_review' | 'workflow_review'
 export interface ReviewAgentSetting {
   /** 注册表模型 key（与主模型选择器同源，含 openai-codex/ 前缀）；留空 = 自动规则 */
   model: string;
-  /** 审核请求超时（秒） */
-  timeout_seconds: number;
   /** 审核最大轮次 */
   max_rounds: number;
-  /** 只读取证命令超时（秒） */
-  max_command_timeout: number;
 }
 
 interface PersonalForm {

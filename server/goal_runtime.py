@@ -11,6 +11,7 @@ from typing import Any
 
 from modules.goal_policy import validate_limits
 from modules.goal_state_manager import ACTIVE_STATUSES, GoalStateManager
+from modules.retry_policy import classify_error
 
 _TIMERS: dict[tuple, threading.Timer] = {}
 _TIMER_LOCK = threading.Lock()
@@ -58,36 +59,6 @@ def prepare_goal_task(rec) -> None:
     else:
         raise ValueError("Invalid goal action")
     rec.goal_run_id = state["run_id"]
-
-
-def classify_error(error: Any) -> str:
-    """Provider code/type first; message fallback for providers without codes."""
-    data = error if isinstance(error, dict) else {"message": str(error)}
-    code = " ".join(str(data.get(k) or "").lower() for k in ("error_code", "error_type", "code", "type"))
-    text = code + " " + " ".join(str(data.get(k) or "").lower()
-                                  for k in ("message", "error_message", "error_text"))
-    quota = ("insufficient_quota", "usage_limit", "usage limit", "out_of_usage", "out of usage",
-             "outof usage", "outofusage", "credit balance", "insufficient balance", "quota_exceeded",
-             "quota exceeded", "billing_hard_limit", "额度不足", "额度已用", "余额不足", "用量上限")
-    if any(word in text for word in quota):
-        return "quota_exhausted"
-    status = data.get("status_code")
-    try:
-        status = int(status) if status is not None else None
-    except (TypeError, ValueError):
-        status = None
-    if status in (401, 403) or any(word in text for word in ("authentication", "invalid_api_key", "unauthorized", "http 401", "http 403")):
-        return "authentication"
-    if status in (400, 404, 405, 413, 422) or any(word in text for word in ("invalid_request", "context_overflow", "no_model", "not configured", "profile incomplete")):
-        return "configuration"
-    if status == 429 or any(word in text for word in ("rate_limit", "rate limit", "http 429")):
-        return "retryable"
-    if status in (408, 409, 425) or (isinstance(status, int) and status >= 500):
-        return "retryable"
-    if any(word in text for word in ("timeout", "timed out", "connection", "connecterror", "readerror", "writeerror", "protocolerror", "network", "disconnect", "断流", "超时", "连接", "网络")):
-        return "retryable"
-    # Unknown failures must remain visible and manually resumable, not spin forever.
-    return "unknown_error"
 
 
 def emit_state(task_manager, rec, gsm):

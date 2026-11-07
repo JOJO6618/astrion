@@ -45,8 +45,9 @@ class FakeClient:
     script = []
     delay = 0.0
 
-    def __init__(self, thinking_mode=False, web_mode=False):
+    def __init__(self, thinking_mode=False, web_mode=False, request_timeout=300):
         self.thinking_mode = thinking_mode
+        self.request_timeout = request_timeout
         self.reasoning_effort = None
         self.extra_headers_resolver = None
         self.profile = None
@@ -101,7 +102,7 @@ class ReviewCallerTests(unittest.TestCase):
         return json.loads((self.data_dir / 'api_costs' / f'{conv}.json').read_text(encoding='utf-8'))
 
     def test_always_thinking_default_effort_and_aggregation(self):
-        out = run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
+        out = run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
         client = FakeClient.instances[0]
         self.assertTrue(client.thinking_mode)
         self.assertIsNone(client.reasoning_effort)
@@ -111,7 +112,7 @@ class ReviewCallerTests(unittest.TestCase):
         self.assertEqual(out['tool_calls'][0]['function'], {'name': 'approve_decision', 'arguments': '{"decision":"approved"}'})
 
     def test_priced_request_recorded_as_review_actor(self):
-        run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
+        run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
         data = self.ledger()
         actor = data['actors']['review_agent:auto_approval']
         self.assertEqual((actor['kind'], actor['name'], actor['requests'], actor['priced_requests']),
@@ -126,52 +127,52 @@ class ReviewCallerTests(unittest.TestCase):
         self.assertFalse(total['partial'])
 
     def test_each_round_new_request_and_agents_separate(self):
-        run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
-        run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
-        run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing(key='goal_review')))
+        run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
+        run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
+        run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing(key='goal_review')))
         actors = self.ledger()['actors']
         self.assertEqual(actors['review_agent:auto_approval']['requests'], 2)
         self.assertEqual(actors['review_agent:goal_review']['requests'], 1)
 
     def test_missing_usage_is_unpriced_not_free(self):
         FakeClient.script = FakeClient.script[:-1]
-        run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
+        run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
         actor = self.ledger()['actors']['review_agent:auto_approval']
         self.assertEqual((actor['priced_requests'], actor['unpriced_requests']), (0, 1))
         self.assertTrue(summarize(self.data_dir, 'conv_1')['partial'])
 
     def test_error_before_output_raises_with_details_and_not_billed(self):
         FakeClient.script = [{'error': {'status_code': 429, 'error_type': 'rate_limit', 'error_message': 'slow down'}}]
-        with self.assertRaises(ReviewModelCallError) as ctx:
-            run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
+        with patch('modules.review_model_caller.asyncio.sleep'):
+            with self.assertRaises(ReviewModelCallError) as ctx:
+                run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
         self.assertEqual(ctx.exception.details['status_code'], 429)
         self.assertFalse((self.data_dir / 'api_costs' / 'conv_1.json').exists())
 
-    def test_timeout_applies_to_every_protocol(self):
-        FakeClient.delay = 0.5
+    def test_request_timeout_matches_main_agent_for_every_protocol(self):
+        FakeClient.delay = 0.01
         profile = dict(CHAT_PROFILE, api_protocol='responses')
-        with self.assertRaises(ReviewModelCallError) as ctx:
-            run(call_review_model({'profile': profile}, [], [], 0.05))
-        self.assertEqual(ctx.exception.details['error_type'], 'timeout')
-        self.assertIn('timed out', str(ctx.exception))
+        out = run(call_review_model({'profile': profile}, [], []))
+        self.assertEqual(out['tool_calls'][0]['id'], 'c1')
+        self.assertEqual(FakeClient.instances[0].request_timeout, 300)
 
     def test_incomplete_chat_profile_fails_before_request(self):
         profile = dict(CHAT_PROFILE, thinking=None, fast={'base_url': '', 'api_key': 'k', 'model_id': 'm'})
         with self.assertRaises(ReviewModelCallError) as ctx:
-            run(call_review_model({'profile': profile}, [], [], 30))
+            run(call_review_model({'profile': profile}, [], [],))
         self.assertIn('profile incomplete', str(ctx.exception))
         self.assertEqual(FakeClient.instances, [])
 
     def test_responses_profile_without_static_key_allowed(self):
         profile = {'name': 'openai-codex/gpt', 'api_protocol': 'responses', 'responses_auth': 'codex_oauth',
                    'fast': {'model_id': 'gpt'}, 'thinking': None}
-        out = run(call_review_model({'profile': profile}, [], [], 30))
+        out = run(call_review_model({'profile': profile}, [], [],))
         self.assertEqual(out['tool_calls'][0]['id'], 'c1')
 
     def test_empty_stream_is_error(self):
         FakeClient.script = []
         with self.assertRaises(ReviewModelCallError):
-            run(call_review_model({'profile': CHAT_PROFILE}, [], [], 30, billing=self.billing()))
+            run(call_review_model({'profile': CHAT_PROFILE}, [], [], billing=self.billing()))
 
 
 class BillingIdentityTests(unittest.TestCase):

@@ -37,7 +37,14 @@ from utils.log_rotation import append_line, prune_dir
 from utils.api_client.utils import _api_dump_enabled
 
 class APIClientBaseMixin:
-    def __init__(self, thinking_mode: bool = True, web_mode: bool = False):
+    def __init__(
+        self,
+        thinking_mode: bool = True,
+        web_mode: bool = False,
+        request_timeout: Optional[float] = 300,
+    ):
+        # HTTP 层读超时（秒）；None = 不限时（审核智能体使用，请求不因时长被中断）。
+        self.request_timeout = request_timeout
         # 模型 API 配置（端点 / 密钥 / 模型 ID）由 apply_profile 从 custom_models 注入；
         # 这里仅初始化为空，未应用任何模型档案前不可直接发请求。
         self.fast_api_config = {

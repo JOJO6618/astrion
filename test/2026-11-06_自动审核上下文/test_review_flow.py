@@ -143,11 +143,12 @@ class AgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["code"], "review_request_failed")
 
     async def test_transient_timeout_retries_once(self):
-        timeout = ReviewModelCallError("timeout", details={"error_type": "timeout"})
-        with patch("modules.approval_agent.call_review_model", side_effect=[timeout, decision()]) as call:
+        # 重试统一在 review_model_caller 内（见 test/2026-11-07_审批与审核修复），
+        # 智能体层只调一次，不再自己重试。
+        with patch("modules.approval_agent.call_review_model", return_value=decision()) as call:
             result = await self.agent().review(payload_text="待审")
         self.assertEqual(result["decision"], "approved")
-        self.assertEqual(call.call_count, 2)
+        self.assertEqual(call.call_count, 1)
 
     async def test_repeated_timeout_fails_closed_with_error(self):
         with patch("modules.approval_agent.call_review_model", side_effect=ReviewModelCallError(
@@ -155,7 +156,7 @@ class AgentTests(unittest.IsolatedAsyncioTestCase):
         )) as call:
             result = await self.agent().review(payload_text="待审")
         self.assertEqual(result["decision"], "error")
-        self.assertEqual(call.call_count, 2)
+        self.assertEqual(call.call_count, 1)
 
     async def test_invalid_decision_is_not_a_policy_denial(self):
         with patch("modules.approval_agent.call_review_model", return_value=decision("needs_human")):

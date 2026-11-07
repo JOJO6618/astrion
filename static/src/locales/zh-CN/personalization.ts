@@ -545,12 +545,8 @@ export default {
   externalSessionHeaderDesc:
     '向 OpenCode 端点发送每个对话稳定的 x-opencode-session 请求头，用于会话路由与缓存优化；关闭则不发送',
   titleDefaultModelDesc: '注册表第一个可用模型；仅 Codex 模型时选 -luna 快速款',
-  timeoutTitle: '审核请求超时',
-  timeoutDesc: '单次模型请求超时（5-3600 秒）',
   maxRoundsTitle: '最大审核轮次',
   maxRoundsDesc: '超过该轮次未产出结论时按兜底处理（1-50 轮）',
-  commandTimeoutTitle: '取证命令超时',
-  commandTimeoutDesc: '只读取证命令的单次超时（1-600 秒）',
 
   // ── 管理员 ──
   mcpConfigTitle: 'MCP 服务器管理',
