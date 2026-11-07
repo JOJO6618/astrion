@@ -1264,6 +1264,8 @@ body[data-theme='light'] .summary-content-wrapper {
   font-size: 13px;
   max-height: 200px; /* 约为原来卡片的三分之一 */
   overflow-y: auto;
+  /* 卡片是极简模式下唯一的滚动层：滚到底不带动外层步骤列表 */
+  overscroll-behavior: contain;
   /* 隐藏滚动条 */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
@@ -1273,14 +1275,16 @@ body[data-theme='light'] .summary-content-wrapper {
   display: none; /* Chrome, Safari, Opera */
 }
 
-.tool-result * {
-  /* 隐藏所有子元素的滚动条 */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.tool-result *::-webkit-scrollbar {
-  display: none;
+/* 结果内容经 v-html 注入，scoped 选择器需 :deep 才能命中。
+   卡片已限高滚动，内部的结果框/diff/长参数块不再各自限高滚动，避免双层滚动。
+   （内部元素本身已无底色/描边框，见 ToolAction.vue 样式注释。） */
+.tool-result :deep(.tool-result-content.scrollable),
+.tool-result :deep(.tool-result-diff.scrollable),
+.tool-result :deep(.tool-param-text),
+.tool-result :deep(.tool-result-error),
+.tool-result :deep(.tool-result-warning) {
+  max-height: none;
+  overflow: visible;
 }
 
 .tool-result pre {

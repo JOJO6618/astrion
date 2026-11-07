@@ -136,7 +136,14 @@ export default {
     backgroundCommandOutput: 'Background command output:',
     reviewContent: 'Review content:',
     rename: 'Renamed:',
-    waitedSubAgents: 'Waited for {n} sub-agents:'
+    waitedSubAgents: 'Waited for {n} sub-agents:',
+    background: 'Background:',
+    fullAccessRequest: 'Full access request:',
+    message: 'Message:',
+    summary: 'Summary:',
+    answer: 'Answer:',
+    names: 'Agents:',
+    intelligence: 'Intelligence:'
   },
 
   // —— Search engine names (provider badge in web_search result meta) ——
@@ -165,7 +172,15 @@ export default {
     targetDisplayName: 'Target sub-agent',
     question: 'Question',
     roleId: 'Role ID',
-    url: 'URL'
+    url: 'URL',
+    name: 'Name'
+  },
+
+  terminalActions: {
+    open: 'Open',
+    close: 'Close',
+    list: 'List',
+    reset: 'Reset'
   },
 
   // —— Personalization fields ——
@@ -232,6 +247,7 @@ export default {
     queryFailed: 'Query failed',
     noWorkflows: 'No workflows available.',
     noSubAgentStatus: 'No sub-agent status returned.',
+    noTerminals: 'No terminal sessions.',
     noRoles: 'No roles available.',
     noActiveSubAgents: 'No active sub-agents in this session.',
     noMatchesMemory: 'No matching project memories found.',
@@ -274,7 +290,8 @@ export default {
     optionLabel: 'Option {n}',
     line: 'Line {line}',
     reviewContentModeDialogue: 'Clean dialogue',
-    reviewContentModeFull: 'Full record'
+    reviewContentModeFull: 'Full record',
+    activeMark: 'active'
   },
 
   // —— Search topic / time range / domain limits ——

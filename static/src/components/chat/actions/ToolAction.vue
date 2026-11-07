@@ -79,40 +79,103 @@ function renderToolResult(): string {
 </script>
 
 <style>
-/* 工具增强显示样式 - 不使用 scoped 以便应用到 v-html 内容 */
+/* 工具增强显示样式 - 不使用 scoped 以便应用到 v-html 内容。
+   结构（见 toolResultHtml.ts）：
+   - .tool-result-body 纵向排列，子块间距统一由 gap 控制，子块自身不带外边距；
+   - .tool-result-meta 只放参数，长参数进 .tool-param-text 限高小块；
+   - .tool-result-content.scrollable 是一个工具结果里唯一的大块滚动区域；
+   - 所有滚动区域 overscroll-behavior: contain，滚到底不会带动外层；
+   - 容器层级保持扁平：工具块内部不再有任何底色/描边/圆角框，参数、结果、错误
+     全部从同一左边缘起排，参数与结果之间只用一条分隔线区分；结果内的列表项同样
+     只用分隔线。新增结果元素不得自带内边距框，否则会与其余内容左右错位。 */
+.tool-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tool-result-body > * {
+  margin: 0;
+  min-width: 0;
+}
+
+/* 说明区（参数）：平铺，后面还有结果时用分隔线隔开 */
 .tool-result-meta {
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: var(--hover-bg);
-  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: 13px;
   line-height: 1.6;
 }
 
-.tool-result-meta > div {
-  margin: 4px 0;
-  /* 参数值中的换行符（如多行 command/content）需要真实渲染，
-     否则多行内容会挤成一行仅靠容器宽度被动折行 */
+.tool-result-body > .tool-result-meta:not(:last-child) {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.tool-param {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tool-param-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tool-param--mono .tool-param-value,
+.tool-param--mono .tool-param-text,
+.tool-result-content pre,
+.tool-result-diff,
+.search-match-snippet {
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+.tool-param--mono .tool-param-value {
+  font-size: 12px;
+}
+
+.tool-param--block .tool-param-text {
+  margin-top: 2px;
+  max-height: calc(1.6em * 6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
-.tool-result-content {
-  margin-top: 12px;
+.tool-param--mono .tool-param-text {
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: calc(1.5em * 8);
 }
 
-.tool-result-content.scrollable {
+/* 结果框 */
+.tool-result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tool-result-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tool-result-content.scrollable,
+.tool-result-diff.scrollable {
   max-height: 400px;
   overflow-y: auto;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  padding: 8px;
-  background: color-mix(in srgb, transparent 99%, var(--text-primary));
+  overscroll-behavior: contain;
 }
 
 /* 结构化显示滚动条样式（参考 git 状态侧边栏文件列表，滚动槽透明贴合灰色底色） */
 .tool-result-content.scrollable,
 .tool-result-diff.scrollable,
+.tool-param-text,
 .code-block pre,
 .output-block pre {
   scrollbar-width: thin; /* Firefox */
@@ -121,6 +184,7 @@ function renderToolResult(): string {
 
 .tool-result-content.scrollable::-webkit-scrollbar,
 .tool-result-diff.scrollable::-webkit-scrollbar,
+.tool-param-text::-webkit-scrollbar,
 .code-block pre::-webkit-scrollbar,
 .output-block pre::-webkit-scrollbar {
   width: 10px;
@@ -129,15 +193,17 @@ function renderToolResult(): string {
 
 .tool-result-content.scrollable::-webkit-scrollbar-track,
 .tool-result-diff.scrollable::-webkit-scrollbar-track,
+.tool-param-text::-webkit-scrollbar-track,
 .code-block pre::-webkit-scrollbar-track,
 .output-block pre::-webkit-scrollbar-track {
   background: transparent;
   border-radius: 999px;
-  margin: 8px;
+  margin: 6px;
 }
 
 .tool-result-content.scrollable::-webkit-scrollbar-thumb,
 .tool-result-diff.scrollable::-webkit-scrollbar-thumb,
+.tool-param-text::-webkit-scrollbar-thumb,
 .code-block pre::-webkit-scrollbar-thumb,
 .output-block pre::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--text-secondary) 55%, transparent);
@@ -149,56 +215,104 @@ function renderToolResult(): string {
 .tool-result-content pre {
   margin: 0;
   white-space: pre-wrap;
-  word-wrap: break-word;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  overflow-wrap: anywhere;
   font-size: 12px;
   line-height: 1.5;
 }
 
-.content-label {
-  font-weight: 600;
-  margin-bottom: 8px;
+/* 摘要行（执行统计）、纯文本结果、空结果 */
+.tool-result-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
   font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.tool-result-summary-sep {
+  color: var(--text-tertiary);
+}
+
+.tool-result-text {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .tool-result-empty {
-  color: var(--text-secondary);
-  font-style: italic;
-  padding: 8px;
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
-/* 搜索结果 */
-.search-result-list {
-  margin-top: 12px;
+/* 回答等结果侧的键值行（不带说明区底色） */
+.tool-result-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
+/* 错误与提醒：只用文字颜色区分，不加底色块（保持与其余内容同一左边缘） */
+.tool-result-error,
+.tool-result-warning {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(1.6em * 8);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tool-result-error {
+  color: var(--state-danger);
+}
+
+.tool-result-warning {
+  color: var(--state-warning);
+}
+
+/* 列表型结果（搜索、记忆、对话、工作流、加载的工具）：扁平条目 + 分隔线 */
 .search-result-item {
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: color-mix(in srgb, transparent 99%, var(--text-primary));
+  padding: 8px 0;
+  border-top: 1px solid var(--border-default);
+  min-width: 0;
 }
 
-/* 暗色模式下的搜索结果 */
-:root[data-theme='dark'] .search-result-item {
-  background: var(--badge-bg);
-  border: 1px solid var(--border-default);
+.search-result-item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.search-result-item:last-child {
+  padding-bottom: 0;
 }
 
 .search-result-title {
   font-weight: 600;
-  margin-bottom: 4px;
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
-.search-result-url {
+.search-result-url,
+.search-result-detail {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
-:root[data-theme='dark'] .search-result-url {
-  color: var(--text-secondary);
+.search-result-detail--clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .search-result-url a {
@@ -206,29 +320,41 @@ function renderToolResult(): string {
   text-decoration: none;
 }
 
-:root[data-theme='dark'] .search-result-url a {
-  color: var(--state-info);
-}
-
 .search-result-url a:hover {
   text-decoration: underline;
 }
 
-/* 文件差异 */
-.tool-result-diff {
-  margin-top: 12px;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+/* 记忆搜索匹配片段：单行展示，过长不折行直接省略号截断 */
+.search-match-snippet {
   font-size: 12px;
   line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tool-result-diff.scrollable {
-  max-height: 400px;
-  overflow-y: auto;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  padding: 8px;
-  background: color-mix(in srgb, transparent 99%, var(--text-primary));
+/* 文件内搜索命中 / 提取片段：扁平条目，用 ⋯ 分隔 */
+.search-match-line,
+.segment-range {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.search-match-separator,
+.segment-separator {
+  text-align: center;
+  color: var(--text-tertiary);
+  margin: 6px 0;
+  line-height: 1;
+}
+
+/* 文件差异 */
+.tool-result-diff {
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .diff-line {
@@ -255,7 +381,7 @@ function renderToolResult(): string {
 .diff-content {
   min-width: 0;
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .diff-remove {
@@ -280,32 +406,129 @@ function renderToolResult(): string {
   line-height: 1.1;
 }
 
-.diff-operation {
-  font-weight: 600;
-  margin: 8px 0 4px;
-  color: var(--text-secondary);
-}
-
 /* 图片 */
 .tool-result-image {
-  margin-top: 12px;
-  text-align: center;
+  text-align: left;
 }
 
 .tool-result-image img {
   max-width: 100%;
-  /* 限高防止长截图占满对话区；点击可经外层链接打开原图 */
+  /* 限高防止长截图占满对话区；点击由聊天区事件委托打开灯箱 */
   max-height: 480px;
   height: auto;
   border-radius: 6px;
   border: 1px solid var(--border-default);
 }
 
-.tool-result-image a {
-  cursor: zoom-in;
+/* 子智能体状态列表：扁平条目 + 分隔线 */
+.sub-agent-status-item {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-default);
+  min-width: 0;
 }
 
-/* 代码块 */
+.sub-agent-status-item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.sub-agent-status-item:last-child {
+  padding-bottom: 0;
+}
+
+.sub-agent-status-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sub-agent-status-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sub-agent-status-state {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sub-agent-status-detail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.tool-result-content pre.sub-agent-status-result {
+  margin-top: 4px;
+}
+
+.tool-result-content pre.sub-agent-status-result.is-error {
+  color: var(--state-danger);
+}
+
+/* 待办事项：自绘复选标记（禁止原生 checkbox） */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.todo-check {
+  position: relative;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  /* 与首行文字视觉居中：(行高 1.6em - 14px) / 2 */
+  margin-top: calc((1.6em - 14px) / 2);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+.todo-item.is-done .todo-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.todo-item.is-done .todo-check::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--on-accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.todo-item.is-done .todo-text {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.todo-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 代码块（Markdown 代码块共用，保持原样） */
 .code-block {
   margin-top: 12px;
 }
@@ -352,7 +575,7 @@ function renderToolResult(): string {
   margin-top: 12px;
 }
 
-/* 记忆 */
+/* 记忆条目（虚拟监视器 .memory-item 依赖这组全局样式，保持原样） */
 .memory-section {
   margin-bottom: 12px;
 }
@@ -380,178 +603,11 @@ function renderToolResult(): string {
   color: var(--state-danger);
 }
 
-/* 待办事项 */
-.todo-list {
-  padding: 8px;
-}
-
-.todo-item {
-  padding: 6px 0;
-  font-size: 13px;
-  line-height: 1.5;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.todo-item input[type='checkbox'] {
-  margin: 0;
-}
-
 /* 彩蛋 */
 .easter-egg-content {
-  padding: 12px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--decorative-gold) 10%, transparent),
-    color-mix(in srgb, var(--decorative-pink) 10%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--decorative-gold) 30%, transparent);
-  border-radius: 8px;
   font-size: 14px;
   line-height: 1.6;
-}
-
-/* 搜索匹配项 */
-.search-match-separator {
-  text-align: center;
-  color: var(--text-tertiary);
-  margin: 12px 0;
-  font-size: 16px;
-}
-
-.search-match-item {
-  margin-bottom: 12px;
-  padding: 8px;
-  background: var(--hover-bg);
-  border-radius: 6px;
-}
-
-:root[data-theme='dark'] .search-match-item {
-  background: var(--hover-bg);
-}
-
-.search-match-line {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-  font-weight: 600;
-}
-
-:root[data-theme='dark'] .search-match-line {
-  color: var(--text-secondary);
-}
-
-.search-match-item pre {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* 记忆搜索匹配片段：单行展示，过长不折行直接省略号截断（hover title 看全文） */
-.search-match-snippet {
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 提取片段 */
-.segment-separator {
-  text-align: center;
-  color: var(--text-tertiary);
-  margin: 12px 0;
-  font-size: 16px;
-}
-
-.segment-item {
-  margin-bottom: 12px;
-  padding: 8px;
-  background: var(--hover-bg);
-  border-radius: 6px;
-}
-
-:root[data-theme='dark'] .segment-item {
-  background: var(--hover-bg);
-}
-
-.segment-range {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-  font-weight: 600;
-}
-
-:root[data-theme='dark'] .segment-range {
-  color: var(--text-secondary);
-}
-
-.segment-item pre {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* 个性化管理 */
-.personalization-message {
-  padding: 12px;
-  background: var(--hover-bg);
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.6;
   white-space: pre-wrap;
-}
-
-:root[data-theme='dark'] .personalization-message {
-  background: var(--hover-bg);
-}
-
-.personalization-config-title {
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-}
-
-:root[data-theme='dark'] .personalization-config-title {
-  color: var(--text-primary);
-}
-
-.personalization-config-list {
-  display: grid;
-  gap: 6px;
-}
-
-.config-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 10px;
-  background: var(--hover-bg);
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-:root[data-theme='dark'] .config-item {
-  background: var(--hover-bg);
-}
-
-.config-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-:root[data-theme='dark'] .config-label {
-  color: var(--text-secondary);
-}
-
-.config-value {
-  color: var(--text-primary);
-  font-weight: 400;
-}
-
-:root[data-theme='dark'] .config-value {
-  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 </style>

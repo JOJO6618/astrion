@@ -143,7 +143,14 @@ export default {
     backgroundCommandOutput: '后台命令输出：',
     reviewContent: '回顾内容：',
     rename: '重命名：',
-    waitedSubAgents: '已等待 {n} 个子智能体：'
+    waitedSubAgents: '已等待 {n} 个子智能体：',
+    background: '后台运行：',
+    fullAccessRequest: '申请完全访问：',
+    message: '消息：',
+    summary: '概要：',
+    answer: '回答：',
+    names: '查询对象：',
+    intelligence: '智能程度：'
   },
 
   // —— 搜索引擎名称（web_search 结果 meta 的服务商标识）——
@@ -172,7 +179,15 @@ export default {
     targetDisplayName: '目标子智能体',
     question: '问题',
     roleId: '角色 ID',
-    url: 'URL'
+    url: 'URL',
+    name: '名称'
+  },
+
+  terminalActions: {
+    open: '打开',
+    close: '关闭',
+    list: '列出',
+    reset: '重置'
   },
 
   // —— 个性化管理字段 ——
@@ -239,6 +254,7 @@ export default {
     queryFailed: '查询失败',
     noWorkflows: '当前没有可用工作流。',
     noSubAgentStatus: '未返回子智能体状态。',
+    noTerminals: '当前没有终端会话。',
     noRoles: '当前没有可用角色。',
     noActiveSubAgents: '当前会话没有活跃子智能体。',
     noMatchesMemory: '未找到匹配的项目记忆。',
@@ -281,7 +297,8 @@ export default {
     optionLabel: '选项 {n}',
     line: '行 {line}',
     reviewContentModeDialogue: '纯净对话',
-    reviewContentModeFull: '完整记录'
+    reviewContentModeFull: '完整记录',
+    activeMark: '当前'
   },
 
   // —— 搜索主题 / 时间范围 / 网站限定 ——

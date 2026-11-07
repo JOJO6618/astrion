@@ -183,6 +183,9 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 1. **meta 只放参数**：状态、ID、路径、任务描述、超时等元信息。**禁止**在 meta 放执行结果、统计摘要、输出内容。
 2. **content 只放结果**：文件内容、命令输出、搜索命中、执行统计、最终回复摘要等。**禁止**在 content 重复展示工具参数。
+3. **统一拼装件（2026-11-06）**：渲染器一律用 `static/src/components/chat/actions/toolResultHtml.ts`（`meta`/`param`/`summary`/`box`/`preBox`…）拼 HTML，不手写 `<div><strong>`；长参数/多行参数由 `param` 自动进限高小块。失败原因由 `renderEnhancedToolResult` 统一追加 `.tool-result-error`，渲染器不再各自输出 `result.error`；普通成功/失败不加「状态」行（头部已表达），只有待审批／等待回答／已拒绝／已取消才用 `pendingStatus`。
+4. **单层滚动**：一个工具块内只有结果框（`.tool-result-content.scrollable`／`.tool-result-diff.scrollable`）与长参数小块可滚动，均 `overscroll-behavior: contain`；工具块外层 `.collapsible-content` 只裁切不滚动、展开高度不封顶（`ChatArea.vue` 与 `StackedBlocks.vue` 用 `getBoundingClientRect` 向上取整测量）。结果框内列表条目用分隔线区分，不再套圆角底色块。
+5. **工具块内部全平铺（2026-11-06）**：参数、结果、错误／提醒等全部无底色、无描边、无圆角、无内边距，从同一左边缘起排；参数与结果之间只有一条分隔线（`.tool-result-meta:not(:last-child)`），错误／提醒只用文字颜色。新增结果元素**不得**自带内边距框，否则必然左右错位；极简模式与普通模式同一套规则。
 
 ## 5.7) 调试输出规范（强制）
 
