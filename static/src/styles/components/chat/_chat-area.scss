@@ -1159,15 +1159,14 @@
   margin-bottom: 0;
 }
 
+/* 末尾元素贴底不留白。注意 Markdown 已改为按顶层块分块渲染（每块一个 .md-html-chunk，
+   虽 display: contents 但仍是 DOM 父节点），因此不能对 .md-table-scroll、卡片这类元素
+   直接写 :last-child——它们通常是自己 chunk 的唯一子节点，会在消息后面还有内容时被误清零。
+   统一按「最后一个分块里的最后一个元素」判定。 */
 .message-block--last .assistant-message .text-content > :last-child,
 .message-block--last .assistant-message .markdown-renderer > :last-child,
 .message-block--last .assistant-message .markdown-text-segment > :last-child,
-.message-block--last .assistant-message .md-table-scroll:last-child,
-.message-block--last .assistant-message [data-md-table-scroll='1']:last-child,
-.message-block--last .assistant-message .chat-inline-card:last-child,
-.message-block--last .assistant-message .chat-inline-card--image:last-child,
-.message-block--last .assistant-message .show-file-card:last-child,
-.message-block--last .assistant-message .show-file-card-root:last-child {
+.message-block--last .assistant-message .md-html-chunk:last-child > :last-child {
   margin-bottom: 0 !important;
 }
 
@@ -2493,7 +2492,7 @@ show-html[data-rendered='1'] {
   display: block;
   width: auto;
   max-width: none;
-  margin: 12px calc(var(--chat-content-x) * -1);
+  margin: 16px calc(var(--chat-content-x) * -1);
   padding: 0 var(--chat-content-x);
   overflow: hidden;
 }
