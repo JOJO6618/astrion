@@ -1276,8 +1276,8 @@ body[data-theme='light'] .summary-content-wrapper {
 }
 
 /* 结果内容经 v-html 注入，scoped 选择器需 :deep 才能命中。
-   卡片已限高滚动，内部的结果框/diff/长参数块不再各自限高滚动，
-   也去掉结果框描边，避免「卡片套圆角框」与双层滚动。 */
+   卡片已限高滚动，内部的结果框/diff/长参数块不再各自限高滚动，避免双层滚动。
+   （内部元素本身已无底色/描边框，见 ToolAction.vue 样式注释。） */
 .tool-result :deep(.tool-result-content.scrollable),
 .tool-result :deep(.tool-result-diff.scrollable),
 .tool-result :deep(.tool-param-text),
@@ -1285,13 +1285,6 @@ body[data-theme='light'] .summary-content-wrapper {
 .tool-result :deep(.tool-result-warning) {
   max-height: none;
   overflow: visible;
-}
-
-.tool-result :deep(.tool-result-content.scrollable),
-.tool-result :deep(.tool-result-diff.scrollable) {
-  border: none;
-  border-radius: 0;
-  padding: 0;
 }
 
 .tool-result pre {

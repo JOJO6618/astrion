@@ -85,7 +85,9 @@ function renderToolResult(): string {
    - .tool-result-meta 只放参数，长参数进 .tool-param-text 限高小块；
    - .tool-result-content.scrollable 是一个工具结果里唯一的大块滚动区域；
    - 所有滚动区域 overscroll-behavior: contain，滚到底不会带动外层；
-   - 容器层级保持扁平：结果框内的列表项只用分隔线区分，不再套圆角底色块。 */
+   - 容器层级保持扁平：工具块内部不再有任何底色/描边/圆角框，参数、结果、错误
+     全部从同一左边缘起排，参数与结果之间只用一条分隔线区分；结果内的列表项同样
+     只用分隔线。新增结果元素不得自带内边距框，否则会与其余内容左右错位。 */
 .tool-result-body {
   display: flex;
   flex-direction: column;
@@ -98,16 +100,18 @@ function renderToolResult(): string {
   min-width: 0;
 }
 
-/* 说明区（参数） */
+/* 说明区（参数）：平铺，后面还有结果时用分隔线隔开 */
 .tool-result-meta {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 12px;
-  background: var(--hover-bg);
-  border-radius: 6px;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.tool-result-body > .tool-result-meta:not(:last-child) {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .tool-param {
@@ -166,9 +170,6 @@ function renderToolResult(): string {
   max-height: 400px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  padding: 8px 10px;
 }
 
 /* 结构化显示滚动条样式（参考 git 状态侧边栏文件列表，滚动槽透明贴合灰色底色） */
@@ -256,28 +257,24 @@ function renderToolResult(): string {
   line-height: 1.6;
 }
 
-/* 错误与提醒 */
+/* 错误与提醒：只用文字颜色区分，不加底色块（保持与其余内容同一左边缘） */
 .tool-result-error,
 .tool-result-warning {
-  padding: 8px 12px;
-  border-radius: 6px;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: calc(1.6em * 8 + 16px);
+  max-height: calc(1.6em * 8);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .tool-result-error {
   color: var(--state-danger);
-  background: color-mix(in srgb, var(--state-danger) 8%, transparent);
 }
 
 .tool-result-warning {
   color: var(--state-warning);
-  background: color-mix(in srgb, var(--state-warning) 10%, transparent);
 }
 
 /* 列表型结果（搜索、记忆、对话、工作流、加载的工具）：扁平条目 + 分隔线 */
@@ -411,7 +408,7 @@ function renderToolResult(): string {
 
 /* 图片 */
 .tool-result-image {
-  text-align: center;
+  text-align: left;
 }
 
 .tool-result-image img {
@@ -608,15 +605,9 @@ function renderToolResult(): string {
 
 /* 彩蛋 */
 .easter-egg-content {
-  padding: 12px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--decorative-gold) 10%, transparent),
-    color-mix(in srgb, var(--decorative-pink) 10%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--decorative-gold) 30%, transparent);
-  border-radius: 8px;
   font-size: 14px;
   line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 </style>
