@@ -21,6 +21,7 @@ import { loadLoginShellPath } from './shell_env.js';
 import { createMigrationWindow } from './migration-window.js';
 import { setMainWindowBackend, focusMainWindow, getMainView } from './window.js';
 import { startQuickEntry } from './quick/controller.js';
+import { setBrowserDataRoot } from './browser/index.js';
 
 export { shutdownBackend };
 
@@ -97,6 +98,7 @@ export async function startBackendAndCreateWindow() {
   });
 
   await waitBackendReady(port);
+  setBrowserDataRoot(desktopDataRoot);
   await startQuickEntry({ port, dataRoot: desktopDataRoot, getMainView, openMain: route => focusMainWindow(route) });
   setMainWindowBackend(port);
   // An explicit desktop launch always opens its main window, including when

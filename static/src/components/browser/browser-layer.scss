@@ -1,0 +1,19 @@
+html.nb-native-overlay,
+html.nb-native-overlay body,
+html.nb-native-overlay #app,
+html.nb-native-overlay .app-root,
+html.nb-native-overlay .native-browser-panel,
+html.nb-native-overlay .nb-surface {
+  background: transparent;
+}
+.nb-native-underlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.nb-native-underlay > span {
+  position: absolute;
+  display: block;
+  background: var(--surface-base);
+}

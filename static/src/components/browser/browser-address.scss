@@ -1,0 +1,67 @@
+.nb-address {
+  position: relative;
+}
+.nb-address-suggestions {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 7px);
+  left: -1px;
+  right: -1px;
+  max-height: 330px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--surface-base);
+  box-shadow: none;
+}
+.nb-address-suggestions > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 54px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+}
+.nb-address-suggestions > button:hover,
+.nb-address-suggestions > button[aria-selected='true'] {
+  background: var(--hover-bg);
+}
+.nb-address-suggestions > button > .nb-icon {
+  flex: none;
+  width: 15px;
+  color: var(--text-secondary);
+}
+.nb-address-suggestions > button > span {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.nb-address-suggestions strong,
+.nb-address-suggestions small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-address-suggestions strong {
+  font-size: 12px;
+  font-weight: 400;
+}
+.nb-address-suggestions small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.nb-address-suggestions::-webkit-scrollbar {
+  width: 4px;
+}
+.nb-address-suggestions::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 2px;
+}

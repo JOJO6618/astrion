@@ -1,0 +1,128 @@
+.nb-internal {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 34px 28px 55px;
+}
+.nb-internal-header {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 25px;
+}
+.nb-internal-header h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-data-row {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 0 3px;
+  border-bottom: 1px solid var(--border-default);
+}
+.nb-data-row > .nb-icon {
+  width: 18px;
+  color: var(--text-secondary);
+}
+.nb-data-row time {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+.nb-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  padding: 0;
+}
+.nb-row-main span {
+  font-size: 12px;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nb-row-main small {
+  font-size: 10px;
+  width: 100%;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nb-internal > .nb-search {
+  margin-bottom: 15px;
+}
+.nb-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  height: 68px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-default);
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  font-size: 12px;
+}
+.nb-setting > small {
+  max-width: 54%;
+  text-align: right;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+.nb-setting-link:hover {
+  background: var(--surface-soft);
+}
+.nb-setting-link .nb-icon {
+  width: 13px;
+  color: var(--text-tertiary);
+  transform: rotate(-90deg);
+}
+.nb-theme-options {
+  display: flex;
+  gap: 3px;
+}
+.nb-theme-options button {
+  height: 29px;
+  padding: 0 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.nb-theme-options button[aria-pressed='true'] {
+  background: var(--surface-soft);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+.nb-description {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--text-secondary);
+  margin: 0 0 22px;
+}
+.nb-page-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 25px;
+}

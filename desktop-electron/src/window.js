@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quickEnabled } from './quick/controller.js';
 import { isUpdaterInstalling } from './updater-state.js';
+import { NativeBrowser } from './browser/index.js';
 
 let appQuitting = false;
 app.on('before-quit', () => { appQuitting = true; });
@@ -33,6 +34,7 @@ let mainWindow = null;
 let mainView = null;
 /** @type {WebContentsView | null} */
 let chromeView = null;
+let nativeBrowser = null;
 let backendPort = null;
 let pendingMainRoute = null;
 
@@ -112,6 +114,7 @@ function layoutViews() {
     width,
     height: Math.max(0, height - CHROME_STRIP_HEIGHT)
   });
+  nativeBrowser?.resize();
 }
 
 export function createMainWindow(port, route = '/') {
@@ -158,6 +161,7 @@ export function createMainWindow(port, route = '/') {
   mainWindow.contentView.addChildView(mainView);
   mainWindow.contentView.addChildView(chromeView);
   layoutViews();
+  if (process.platform === 'darwin') nativeBrowser = new NativeBrowser(mainWindow, mainView, `http://127.0.0.1:${port}`);
 
   installNavigationGuards(mainView);
   installNavigationGuards(chromeView);
@@ -183,6 +187,8 @@ export function createMainWindow(port, route = '/') {
   });
 
   mainWindow.on('closed', () => {
+    nativeBrowser?.dispose();
+    nativeBrowser = null;
     mainWindow = null;
     mainView = null;
     chromeView = null;

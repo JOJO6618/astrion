@@ -127,6 +127,21 @@
           <span class="sidebar-nav-label">{{ $t('sidebar.git') }}</span>
         </button>
 
+        <button
+          v-if="browserAvailable"
+          type="button"
+          class="sidebar-nav-row"
+          :class="{ active: nativeBrowser.open }"
+          :aria-label="$t('browser.title')"
+          :aria-pressed="nativeBrowser.open"
+          @click="nativeBrowser.toggle()"
+        >
+          <span class="sidebar-nav-icon" aria-hidden="true"
+            ><span class="icon" :style="{ '--icon-src': `url(${ICONS.globe})` }"></span
+          ></span>
+          <span class="sidebar-nav-label">{{ $t('browser.title') }}</span>
+        </button>
+
         <!-- 刷新页面：仅移动端 App 壳内由父级开启（浏览器有自带刷新，不显示） -->
         <button
           v-if="showRefreshButton"
@@ -1050,6 +1065,9 @@ import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 import SoftwareUpdateDialog from './SoftwareUpdateDialog.vue';
 import ConversationTransferDialog from './ConversationTransferDialog.vue';
 import ConversationTransferMenu from './ConversationTransferMenu.vue';
+import { useNativeBrowserStore, nativeBrowserAvailable } from '@/stores/nativeBrowser';
+const nativeBrowser = useNativeBrowserStore();
+const browserAvailable = nativeBrowserAvailable();
 
 const transferDialog = ref<InstanceType<typeof ConversationTransferDialog>>();
 const props = withDefaults(

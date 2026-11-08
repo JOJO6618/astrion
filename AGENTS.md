@@ -39,6 +39,7 @@
 | 子智能体固定权限 / 单次完全访问 | `docs/agents_details/sub_agent_access.md` | 子权限、审批面板 |
 | 运行中对话显示快照 | `docs/agents_details/display_snapshot.md` | 会话显示、恢复链路 |
 | 桌面标签导航 | `docs/desktop_navigation.md` | 标签身份、关闭、恢复、页面往返及命令协议 |
+| macOS 内置浏览器 | `docs/native_browser.md` | 原生网页、浏览器 IPC、资料与标签作用域、DOM 遮挡及持久化 |
 | Linux host 沙箱 | `docs/agents_details/linux_host_sandbox.md` | Linux 沙箱 |
 | Host 网页密码 | `docs/agents_details/host_password.md` | 认证/密码 |
 | 主／子 API 花费 | `docs/agents_details/api_costs.md` | 费用统计、定价 |

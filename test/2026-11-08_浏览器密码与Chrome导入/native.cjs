@@ -1,0 +1,163 @@
+const { app, BaseWindow, WebContentsView } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const http = require('node:http');
+const { pathToFileURL } = require('node:url');
+const crypto = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
+const interactionChecks = process.argv.includes('--interaction-fixes') ? require('../2026-11-08_浏览器密码交互修正/checks.cjs') : null;
+const internalChecks = process.argv.includes('--internal-tabs') ? require('../2026-11-08_浏览器内部独立标签/checks.cjs') : null;
+const root = path.resolve(__dirname, '../..');
+const evidence = path.join(root, '_experiments/browser-native-integration', `credentials-${Date.now()}`);
+fs.mkdirSync(evidence, { recursive: true });
+app.setPath('userData', path.join(evidence, 'electron'));
+app.setPath('sessionData', path.join(evidence, 'electron'));
+app.disableHardwareAcceleration();
+const checks = [], signals = [];
+function check(name, condition) { if (!condition) throw new Error(name); checks.push(name); }
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function until(test, label) { for (let i = 0; i < 100; i++) { if (await test()) return; await wait(30); } throw new Error(label); }
+const load = file => import(pathToFileURL(path.join(root, file)).href);
+const encryptionKey = crypto.randomBytes(32);
+const encryption = {
+  isEncryptionAvailable: () => true,
+  encryptString(value) { const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv); return Buffer.concat([iv, c.getAuthTag ? Buffer.alloc(0) : Buffer.alloc(0), c.update(value), c.final(), c.getAuthTag()]); },
+  decryptString(value) { const d = crypto.createDecipheriv('aes-256-gcm', encryptionKey, value.subarray(0, 12)); d.setAuthTag(value.subarray(-16)); return Buffer.concat([d.update(value.subarray(12, -16)), d.final()]).toString(); }
+};
+let manager, window, server;
+(async () => {
+  await app.whenReady();
+  const { NativeBrowser, setBrowserDataRoot } = await load('desktop-electron/src/browser/index.js');
+  const { deriveChromeKey } = await load('desktop-electron/src/browser/chrome/crypto.js');
+  const { ImportCookieStore } = await load('desktop-electron/src/browser/chrome/cookie-store.js');
+  server = http.createServer((request, response) => {
+    if (request.url === '/api/session-status') { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({success:true,session:{logged_in:true,username:'synthetic-user'}})); return; }
+    if (interactionChecks?.route(request,response)) return;
+    if(request.url==='/site-icon.png'){response.setHeader('Content-Type','image/png');response.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aEtcAAAAASUVORK5CYII=','base64'));return;}
+    response.setHeader('Content-Type', 'text/html');
+    if (request.url.startsWith('/login')) response.end('<title>Login fixture</title><form><input name="username" autocomplete="username"><input name="password" type="password" autocomplete="current-password"><button>Sign in</button></form><script>document.querySelector("form").addEventListener("submit",e=>e.preventDefault())</script>');
+    else response.end('<title>Trusted fixture</title><link rel="icon" href="/site-icon.png">');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  window = new BaseWindow({ show:false, width:1100, height:760 });
+  const main = new WebContentsView({ webPreferences:{ preload:path.join(root,'desktop-electron/src/preload-main.cjs'), contextIsolation:true, sandbox:true, nodeIntegration:false } });
+  window.contentView.addChildView(main); main.setBounds({x:0,y:0,width:1100,height:760});
+  await main.webContents.loadURL(`${origin}/new`);
+  setBrowserDataRoot(path.join(evidence,'data'));
+  manager = new NativeBrowser(window, main, origin); manager.credentials.dependencies.encryption = encryption;
+  const onForm = manager.credentials.onForm.bind(manager.credentials);
+  manager.credentials.onForm = (event,input) => { signals.push({kind:input?.kind,reason:input?.reason,hasPassword:input?.hasPassword,allowFill:input?.allowFill,mainFrame:event.senderFrame===event.sender.mainFrame}); return onForm(event,input); };
+  const run = code => main.webContents.executeJavaScript(code, true);
+  const connected = await run('window.astrionBrowser.connect({mode:"agent",workspace:"synthetic",conversation:"stable-tab"})');
+  const lease = connected.lease;
+  const command = payload => run(`window.astrionBrowser.credentials(${JSON.stringify({...payload,lease})})`);
+  if (process.argv.includes('--internal-tabs-only')) {
+    manager.geometry={x:600,y:40,width:480,height:680}; manager.visible=true; window.show();
+    manager.registry.load(manager.active(),`${origin}/original-page`);
+    await until(()=>!manager.active().pendingURL && !manager.active().view.webContents.isLoading(),'original webpage loaded');
+    await internalChecks.verify({manager,browserCommand:payload=>run(`window.astrionBrowser.command(${JSON.stringify({...payload,lease})})`),origin,check,until});
+    fs.writeFileSync(path.join(evidence,'results.json'),JSON.stringify({passed:checks.length,checks,real_chrome_read:false,real_keychain_read:false},null,2));
+    console.log(JSON.stringify({passed:checks.length,evidence:path.relative(root,evidence)})); return;
+  }
+  const vault = manager.credentials.vault(manager.profile);
+  await command({ action:'save',value:{origin,username:'single',password:'synthetic-original'} });
+  const list = await command({action:'list'});
+  check('password list contains metadata only', list.records.length === 1 && !JSON.stringify(list).includes('synthetic-original'));
+  check('vault file is encrypted and private', !fs.readFileSync(vault.file).includes(Buffer.from('synthetic-original')) && (fs.statSync(vault.file).mode & 0o777) === 0o600);
+  let duplicate = false;
+  try { await command({action:'save',value:{origin,username:'single',password:'synthetic-overwrite'}}); } catch { duplicate=true; }
+  check('adding a duplicate never silently replaces the password', duplicate && vault.find(origin,'single').password === 'synthetic-original');
+  const { PasswordVault } = await load('desktop-electron/src/browser/passwords/vault.js');
+  check('encrypted vault reopens independently', new PasswordVault(manager.profile.directory,encryption).get(list.records[0].id).password === 'synthetic-original');
+  await command({action:'save',id:list.records[0].id,value:{origin,username:'single',password:''}});
+  check('editing metadata with empty password preserves existing secret', vault.find(origin,'single').password === 'synthetic-original');
+  const tab = manager.registry.create(`${origin}/login`);
+  manager.geometry = { x:600, y:40, width:480, height:680 }; manager.visible = true; manager.layout(); window.show(); tab.view.webContents.focus();
+  await until(() => !tab.pendingURL && tab.view.webContents.getURL().includes('/login'), 'login navigation');
+  await until(() => tab.view.webContents.executeJavaScript('document.querySelector("[name=password]")?.value === "synthetic-original"'), 'single-account autofill');
+  check('one account autofills through isolated production preload', true);
+  check('untrusted page receives no privileged bridge', await tab.view.webContents.executeJavaScript('typeof window.astrionBrowser === "undefined" && typeof require === "undefined"'));
+  await command({action:'save',value:{origin,username:'second',password:'synthetic-second'}});
+  await tab.view.webContents.executeJavaScript('document.querySelector("[name=username]").blur(); document.querySelector("[name=password]").focus(); document.querySelector("[name=username]").focus()');
+  await until(() => manager.credentials.snapshot().fill?.accounts.length === 2, 'multi-account picker');
+  const fill = manager.credentials.snapshot().fill;
+  const second = fill.accounts.find(row=>row.username==='second');
+  await command({action:'fill',tabId:tab.id,fillId:fill.id,id:second.id});
+  await until(() => tab.view.webContents.executeJavaScript('document.querySelector("[name=password]").value === "synthetic-second"'), 'manual account fill');
+  check('multiple accounts require explicit selection', true);
+  await tab.view.webContents.executeJavaScript('document.querySelector("[name=password]").value="synthetic-updated";document.querySelector("[name=password]").focus()');
+  app.focus({ steal:true }); window.focus(); tab.view.webContents.focus(); await wait(100);
+  const submitPoint = await tab.view.webContents.executeJavaScript('(()=>{const r=document.querySelector("button").getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()');
+  tab.view.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...submitPoint}); tab.view.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...submitPoint});
+  await until(() => manager.credentials.snapshot().prompt?.update, 'trusted submission update prompt');
+  const prompt = manager.credentials.snapshot().prompt;
+  check('save/update snapshot never contains plaintext', !JSON.stringify(manager.snapshot()).includes('synthetic-updated'));
+  await command({action:'accept',id:prompt.id});
+  check('accepted update changes the encrypted vault', vault.find(origin,'second').password === 'synthetic-updated');
+  manager.credentials.reset(tab);
+  check('navigation retires form and fill tokens', !manager.credentials.forms.has(tab.id) && !manager.credentials.snapshot().fill);
+  if(internalChecks) await internalChecks.verify({manager,browserCommand:payload=>run(`window.astrionBrowser.command(${JSON.stringify({...payload,lease})})`),origin,check,until});
+  if(interactionChecks) await interactionChecks.verify({manager,command,origin,check,until});
+  const sourceRoot=path.join(evidence,'chrome'), profileDir=path.join(sourceRoot,'Default');
+  fs.mkdirSync(profileDir,{recursive:true}); fs.writeFileSync(path.join(sourceRoot,'Local State'),JSON.stringify({profile:{info_cache:{Default:{name:'Synthetic'}}}}));
+  const key = deriveChromeKey(Buffer.from('synthetic-chrome-key'));
+  const encrypt = (value,domain) => { const cipher=crypto.createCipheriv('aes-128-cbc',key,Buffer.alloc(16,0x20)); const plain=domain?Buffer.concat([crypto.createHash('sha256').update(domain).digest(),Buffer.from(value)]):Buffer.from(value); return Buffer.concat([Buffer.from('v10'),cipher.update(plain),cipher.final()]); };
+  const loginDB = new DatabaseSync(path.join(profileDir,'Login Data'));
+  loginDB.exec('CREATE TABLE logins(origin_url TEXT, username_value TEXT,password_value BLOB,blacklisted_by_user INTEGER,date_created INTEGER)');
+  const insertLogin=loginDB.prepare('INSERT INTO logins VALUES(?,?,?,?,?)');
+  insertLogin.run('https://login.example.test/a','same-user',encrypt('synthetic-candidate-one'),0,13400000000000000n);
+  insertLogin.run('https://login.example.test/b','same-user',encrypt('synthetic-candidate-two'),0,13400000001000000n);
+  insertLogin.run('https://blocked.example.test/','',Buffer.alloc(0),1,0); loginDB.close();
+  const cookieDB = new DatabaseSync(path.join(profileDir,'Cookies'));
+  cookieDB.exec("CREATE TABLE meta(key TEXT,value TEXT); INSERT INTO meta VALUES('version','24'); CREATE TABLE cookies(host_key TEXT,name TEXT,path TEXT,value TEXT,encrypted_value BLOB,is_secure INTEGER,is_httponly INTEGER,expires_utc INTEGER,has_expires INTEGER,samesite INTEGER,top_frame_site_key TEXT,has_cross_site_ancestor INTEGER)");
+  const insertCookie=cookieDB.prepare('INSERT INTO cookies VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
+  for (const [site,ancestor] of [['',0],['https://top-a.test',1],['https://top-b.test',0]]) insertCookie.run('cookie.example.test','synthetic-session','/','',encrypt('synthetic-cookie','cookie.example.test'),1,1,0,0,0,site,ancestor);
+  insertCookie.run('.cookie.example.test','empty','/','',encrypt('','.cookie.example.test'),1,0,0,0,-1,'',0);
+  cookieDB.close();
+  const historyDB = new DatabaseSync(path.join(profileDir,'History'));
+  historyDB.exec('CREATE TABLE urls(url TEXT,title TEXT,last_visit_time INTEGER)');
+  const insertHistory=historyDB.prepare('INSERT INTO urls VALUES(?,?,?)');
+  historyDB.exec('BEGIN'); for(let i=0;i<1005;i++) insertHistory.run(`https://history.example.test/${i}`,'Synthetic history',13400000000000000n+BigInt(i*1000)); historyDB.exec('COMMIT'); historyDB.close();
+  manager.credentials.importer.dependencies={root:sourceRoot,keySecret:async()=>Buffer.from('synthetic-chrome-key')};
+  const preview=(await command({action:'preview',value:{source:'Default',selected:{passwords:true,cookies:true,history:true}}})).preview;
+  check('source password differences become explicit choices', preview.conflicts.length===1 && preview.conflicts[0].candidates.length===2);
+  check('import preview contains no decrypted secrets', !JSON.stringify(preview).includes('synthetic-candidate') && !JSON.stringify(preview).includes('synthetic-cookie'));
+  check('partitioned cookies remain eligible for import', preview.stats.cookies.ready===4 && preview.stats.cookies.failed===0);
+  let conflictBlocked=false; try { await command({action:'import',value:{id:preview.id,choices:{},replaceCookies:false}}); } catch { conflictBlocked=true; }
+  check('commit rejects unchosen password conflicts',conflictBlocked);
+  const choices={[preview.conflicts[0].id]:preview.conflicts[0].candidates[1].id};
+  const report=(await command({action:'import',value:{id:preview.id,choices,replaceCookies:false}})).report;
+  check('chosen password commits without losing an unselected alternative silently',report.stats.passwords.imported===1 && report.stats.passwords.skipped===2);
+  check('ordinary and partitioned cookies all write successfully',report.stats.cookies.imported===4 && report.stats.cookies.failed===0);
+  const cookieStore=new ImportCookieStore(manager.profile);
+  const stored=await cookieStore.open(); cookieStore.close();
+  const sessions=stored.filter(row=>row.name==='synthetic-session');
+  check('partition keys are preserved alongside the ordinary cookie',sessions.length===3 && sessions.filter(row=>row.partitionKey).length===2);
+  check('partition cross-site ancestor flag is preserved',sessions.some(row=>row.partitionKey?.topLevelSite==='https://top-b.test' && row.partitionKey.hasCrossSiteAncestor===false));
+  check('empty cookie values are retained',stored.some(row=>row.name==='empty' && row.value===''));
+  check('all eligible imported history is retained beyond 1000 records',report.stats.history.imported===1005 && manager.profile.data.history.length>=1005);
+  const readDB=manager.credentials.importer.dependencies.readDatabase;
+  manager.credentials.importer.dependencies.readDatabase=async(file,read,signal)=>{if(file.endsWith('History'))throw new Error('database_busy');return (await load('desktop-electron/src/browser/chrome/source.js')).readDatabase(file,read,signal);};
+  const partial=(await command({action:'preview',value:{source:'Default',selected:{passwords:true,cookies:false,history:true}}})).preview;
+  check('busy history does not block reading passwords',partial.stats.history.reasons.database_busy===1 && partial.stats.passwords.read===3);
+  await command({action:'cancel-import',id:partial.id});
+  check('cancelling drops decrypted preview data',manager.credentials.importer.jobs.size===0);
+  manager.credentials.importer.dependencies.readDatabase=readDB;
+  let waitingKey=false;
+  manager.credentials.importer.dependencies.keySecret=signal=>new Promise((_resolve,reject)=>{waitingKey=true;signal.addEventListener('abort',()=>reject(new Error('import_cancelled')),{once:true});});
+  const pending=command({action:'preview',value:{source:'Default',selected:{passwords:true,cookies:false,history:false}}}).catch(()=>null);
+  await until(()=>waitingKey,'cancellable keychain fixture');
+  await command({action:'cancel-import'}); await pending;
+  check('cancel waits for the pending reader and clears its lock',!manager.credentials.operation && manager.credentials.importer.jobs.size===0);
+  manager.credentials.importer.dependencies.keySecret=async()=>Buffer.from('synthetic-chrome-key');
+  manager.credentials.importer.dependencies.cookieStore=()=>({open:async()=>[],set:async()=>{},flush:async()=>{throw new Error('synthetic-flush-failure');},close:()=>{}});
+  const flushPreview=(await command({action:'preview',value:{source:'Default',selected:{passwords:false,cookies:true,history:false}}})).preview;
+  const flushReport=(await command({action:'import',value:{id:flushPreview.id,choices:{},replaceCookies:true}})).report;
+  check('unconfirmed cookie persistence is reported as failed rather than success',flushReport.stats.cookies.imported===0 && flushReport.stats.cookies.reasons.cookie_flush_failed===4);
+  let stale=false; try {await run(`window.astrionBrowser.credentials({action:"list",lease:"obsolete"})`);}catch{stale=true;}
+  check('retired leases cannot read credentials',stale);
+  key.fill(0);
+  fs.writeFileSync(path.join(evidence,'results.json'),JSON.stringify({passed:checks.length,checks,real_chrome_read:false,real_keychain_read:false},null,2));
+  console.log(JSON.stringify({passed:checks.length,evidence:path.relative(root,evidence)}));
+})().catch(error=>{fs.writeFileSync(path.join(evidence,'results.json'),JSON.stringify({passed:checks.length,checks,error:error.message,signals},null,2));console.error(JSON.stringify({failed:error.message,passed:checks.length,signals,evidence:path.relative(root,evidence)}));process.exitCode=1;}).finally(async()=>{manager?.dispose();if(window&&!window.isDestroyed())window.destroy();if(server)server.close();encryptionKey.fill(0);app.exit(process.exitCode||0);});
