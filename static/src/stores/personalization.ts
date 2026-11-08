@@ -125,7 +125,6 @@ interface PersonalForm {
   skill_strict_run_command_foreground_enabled: boolean;
   skill_strict_run_command_background_enabled: boolean;
   silent_tool_disable: boolean;
-  hide_tool_approval_panel: boolean;
   enhanced_tool_display: boolean;
   compact_message_display: CompactMessageDisplay;
   block_display_mode: BlockDisplayMode;
@@ -364,7 +363,6 @@ const defaultForm = (): PersonalForm => ({
   skill_strict_run_command_foreground_enabled: false,
   skill_strict_run_command_background_enabled: false,
   silent_tool_disable: false,
-  hide_tool_approval_panel: true,
   enhanced_tool_display: true,
   compact_message_display: 'full',
   block_display_mode: loadCachedBlockDisplayMode(),
@@ -650,7 +648,6 @@ export const usePersonalizationStore = defineStore('personalization', {
         skill_strict_run_command_background_enabled:
           !!data.skill_strict_run_command_background_enabled,
         silent_tool_disable: !!data.silent_tool_disable,
-        hide_tool_approval_panel: data.hide_tool_approval_panel !== false,
         enhanced_tool_display: data.enhanced_tool_display !== false,
         compact_message_display:
           data.compact_message_display === 'brief' || data.compact_message_display === 'hidden'

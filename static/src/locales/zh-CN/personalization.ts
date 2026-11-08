@@ -334,8 +334,6 @@ export default {
   // ── 工具与 Skills ──
   silentToolDisableTitle: '静默禁用工具',
   silentToolDisableDesc: '禁用工具时不再注入提示消息，模型不会感知被禁用项',
-  hideToolApprovalTitle: '隐藏工具审核面板',
-  hideToolApprovalDesc: '自动审核模式下，后台审核工具时不再自动展开审核面板',
   toolIntentTitle: '工具意图提示',
   toolIntentDesc: '调用工具时先用简短文字告诉你要做什么',
   skillHintsTitle: 'Skill 提示系统',

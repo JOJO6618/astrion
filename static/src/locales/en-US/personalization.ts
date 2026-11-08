@@ -355,9 +355,6 @@ export default {
   silentToolDisableTitle: 'Silently disable tools',
   silentToolDisableDesc:
     "No hint message when disabling tools; the model won't notice disabled items",
-  hideToolApprovalTitle: 'Hide tool approval panel',
-  hideToolApprovalDesc:
-    'In auto-approval mode, the approval panel no longer expands while tools are being reviewed in the background',
   toolIntentTitle: 'Tool intent hints',
   toolIntentDesc: 'State briefly what a tool will do before calling it',
   skillHintsTitle: 'Skill hint system',

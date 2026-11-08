@@ -1,9 +1,7 @@
 // @ts-nocheck
 import { t } from '@/locales';
-import { usePersonalizationStore } from '../../../stores/personalization';
 import { invalidateAuxiliaryRequest } from '../auxiliaryOwnership';
 import {
-  isFullAccessApproval,
   needsHumanDecision,
   normalizeApproval,
   statusFromProgress,
@@ -47,15 +45,11 @@ export const approvalMethods = {
       clearTimeout(this.approvalAutoCloseTimer);
       this.approvalAutoCloseTimer = null;
     }
-    const hideApprovalPanel =
-      this.currentPermissionMode === 'auto_approval' &&
-      usePersonalizationStore().form.hide_tool_approval_panel !== false;
-    const mandatory = isFullAccessApproval(normalized) && needsHumanDecision(normalized);
+    // 只有真正需要人工决定的审批才自动展开；AI 可自动审核完成的场景一律不弹窗。
+    const needsHuman = needsHumanDecision(normalized);
+    const previousNeedsHuman = needsHumanDecision(previous);
     // Updates to the current id preserve an intentional manual collapse.
-    if (
-      (idx < 0 || (mandatory && !isFullAccessApproval(previous))) &&
-      (!hideApprovalPanel || mandatory)
-    ) {
+    if ((idx < 0 && needsHuman) || (idx >= 0 && needsHuman && !previousNeedsHuman)) {
       this.restoreToolApprovalPanel();
     }
     this.$forceUpdate();

@@ -81,22 +81,6 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
     /></label>
     <label class="settings-toggle-row"
       ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.hideToolApprovalTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.hideToolApprovalDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.hide_tool_approval_panel"
-        @change="
-          personalization.updateField({
-            key: 'hide_tool_approval_panel',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.hide_tool_approval_panel"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
         ><span class="settings-row-title">{{ $t('personalization.toolIntentTitle') }}</span
         ><span class="settings-row-desc">{{ $t('personalization.toolIntentDesc') }}</span></span
       ><input

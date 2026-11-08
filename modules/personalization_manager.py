@@ -170,7 +170,6 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "shallow_compress_keep_user_turn_tools": None,  # 保留最近N次用户输入后的工具不压缩（默认3）
     "deep_compress_trigger_tokens": None,
     "silent_tool_disable": True,  # 禁用工具时不向模型插入提示（默认开启）
-    "hide_tool_approval_panel": True,  # 自动审核模式下不自动打开工具审核面板（默认开启）
     "enhanced_tool_display": True,  # 增强工具显示
     "compact_message_display": "full",  # 简略消息显示：full-完整 / brief-概要 / hidden-不显示
     "block_display_mode": "minimal",  # 堆叠块显示模式：traditional-传统列表 / stacked-堆叠动画 / minimal-极简模式
@@ -714,12 +713,6 @@ def sanitize_personalization_payload(
         base["silent_tool_disable"] = bool(data.get("silent_tool_disable"))
     else:
         base["silent_tool_disable"] = bool(base.get("silent_tool_disable"))
-
-    # 隐藏工具审核面板（自动审核模式下不自动展开）
-    if "hide_tool_approval_panel" in data:
-        base["hide_tool_approval_panel"] = bool(data.get("hide_tool_approval_panel"))
-    else:
-        base["hide_tool_approval_panel"] = bool(base.get("hide_tool_approval_panel", True))
 
     # 增强工具显示
     if "enhanced_tool_display" in data:

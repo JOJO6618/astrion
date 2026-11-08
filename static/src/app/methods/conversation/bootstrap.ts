@@ -9,15 +9,10 @@ import { usePreviewStore } from '../../../stores/preview';
 import { useConversationStore } from '../../../stores/conversation';
 import { useWorkflowStore } from '../../../stores/workflow';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
-import { usePersonalizationStore } from '../../../stores/personalization';
 import { useFileStore } from '../../../stores/file';
 import { useResourceStore } from '../../../stores/resource';
 import { commitWorkspaceIdentity } from '../ui/workspaceNavigation';
-import {
-  isFullAccessApproval,
-  needsHumanDecision,
-  normalizeApproval
-} from '@/components/input/approvalModel';
+import { needsHumanDecision, normalizeApproval } from '@/components/input/approvalModel';
 import { bindAuxiliaryConversationHost } from '../auxiliaryOwnership';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import {
@@ -288,13 +283,8 @@ export const bootstrapMethods = {
     this.approvalAutoCloseTimer = null;
     this.restoreUserQuestionTitle?.();
     if (!preserveInteraction) {
-      const hideAutomatic =
-        this.currentPermissionMode === 'auto_approval' &&
-        usePersonalizationStore().form.hide_tool_approval_panel !== false;
-      this.approvalPanelCollapsed = !this.pendingToolApprovals.some(
-        (approval) =>
-          !hideAutomatic || (isFullAccessApproval(approval) && needsHumanDecision(approval))
-      );
+      // 只有真正需要人工决定的审批才自动展开；AI 可自动审核完成的场景一律不弹窗。
+      this.approvalPanelCollapsed = !this.pendingToolApprovals.some(needsHumanDecision);
       this.userQuestionActiveIndex = 0;
       this.userQuestionMinimized = false;
       this.planApprovalMinimized = false;
@@ -302,11 +292,7 @@ export const bootstrapMethods = {
     if (
       preserveInteraction &&
       this.pendingToolApprovals.some(
-        (approval) =>
-          !previousApprovalIds.has(approval.approval_id) &&
-          (this.currentPermissionMode !== 'auto_approval' ||
-            usePersonalizationStore().form.hide_tool_approval_panel === false ||
-            (isFullAccessApproval(approval) && needsHumanDecision(approval)))
+        (approval) => !previousApprovalIds.has(approval.approval_id) && needsHumanDecision(approval)
       )
     )
       this.approvalPanelCollapsed = false;

@@ -1,10 +1,6 @@
 // @ts-nocheck
 import { t, currentLocale } from '@/locales';
-import {
-  isFullAccessApproval,
-  needsHumanDecision,
-  normalizeApproval
-} from '@/components/input/approvalModel';
+import { needsHumanDecision, normalizeApproval } from '@/components/input/approvalModel';
 import { usePolicyStore } from '../../../stores/policy';
 import { usePersonalizationStore } from '../../../stores/personalization';
 
@@ -496,19 +492,15 @@ export const permissionMethods = {
           this.currentPermissionMode === 'auto_approval'
         )
       );
-      const hideApprovalPanel =
-        this.currentPermissionMode === 'auto_approval' &&
-        usePersonalizationStore().form.hide_tool_approval_panel !== false;
-      const mandatory = this.pendingToolApprovals.some(
-        (item) => isFullAccessApproval(item) && needsHumanDecision(item)
-      );
-      const isNewRequest = items.some(
-        (item) => !previous.some((entry) => entry.approval_id === item.approval_id)
-      );
-      const newlyMandatory =
-        mandatory &&
-        !previous.some((item) => isFullAccessApproval(item) && needsHumanDecision(item));
-      if (items.length && (isNewRequest || newlyMandatory) && (!hideApprovalPanel || mandatory)) {
+      // 只有真正需要人工决定的审批才自动展开；AI 可自动审核完成的场景一律不弹窗。
+      const isNewHumanRequest = items.some((item) => {
+        const currentItem = this.pendingToolApprovals.find(
+          (entry) => entry.approval_id === item.approval_id
+        );
+        const previousItem = previous.find((entry) => entry.approval_id === item.approval_id);
+        return needsHumanDecision(currentItem) && !needsHumanDecision(previousItem);
+      });
+      if (items.length && isNewHumanRequest) {
         this.restoreToolApprovalPanel();
       }
     } catch (_error) {

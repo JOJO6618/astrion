@@ -62,7 +62,7 @@ function fixture() {
     '../ui/workspaceNavigation': { commitWorkspaceIdentity: noop },
     '../../../stores/workflow': { useWorkflowStore: () => ({ setWorkflow: (...args) => workflowWrites.push(args) }) },
     '../../../stores/conversationTabs': { useConversationTabsStore: () => ({ enabled: false }) },
-    '../../../stores/personalization': { usePersonalizationStore: () => ({ form: { hide_tool_approval_panel: true } }) },
+    '../../../stores/personalization': { usePersonalizationStore: () => ({ form: {} }) },
     '@/components/input/approvalModel': approval
   }).bootstrapMethods;
   const host = {
