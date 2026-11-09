@@ -14,6 +14,13 @@ from modules.native_browser.state import BROWSER_ENABLED_META_KEY, BROWSER_PENDI
 from modules.native_browser import site_permissions
 
 
+@chat_bp.route('/api/browser-retention', methods=['GET'])
+@api_login_required
+def get_browser_retention():
+    from server.browser_retention import retention_response
+    return retention_response()
+
+
 def _conversation_running(username: str, conversation_id: str) -> bool:
     try:
         from server.tasks import task_manager

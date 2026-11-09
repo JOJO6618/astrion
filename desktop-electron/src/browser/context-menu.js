@@ -66,7 +66,7 @@ export class BrowserContextMenu {
       const navigate = isLocalFile(wc.getURL()) ? manualNavigationURL : navigationURL;
       try { navigate(params.linkURL); navigable = true; } catch { /* Copy remains available for other URL schemes. */ }
       groups.push([
-        item('openLinkNewTab', () => manager.registry.create(navigate(params.linkURL)), navigable && manager.tabs.size < 48),
+        item('openLinkNewTab', () => manager.registry.create(navigate(params.linkURL)), navigable && [...manager.tabs.values()].filter(row => row.owner === tab.owner).length < 48),
         item('copyLink', () => clipboard.writeText(params.linkURL)),
         item('saveLink', () => wc.downloadURL(params.linkURL), downloadable(params.linkURL))
       ]);

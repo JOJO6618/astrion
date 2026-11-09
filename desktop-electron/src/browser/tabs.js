@@ -13,8 +13,8 @@ export class BrowserTabs {
     const owner = options.owner || manager.owner, profile = options.profile || manager.profile;
     let tab = !options.duplicate && [...manager.tabs.values()].find(row => row.owner === owner && row.section === section);
     if (!tab) {
-      if (manager.tabs.size >= 48) throw new Error('browser_tab_limit');
-      tab = { id: randomUUID(), owner, profile, section, url, title: '', previousId: manager.selected.get(owner) };
+      if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48) throw new Error('browser_tab_limit');
+      tab = { id: randomUUID(), owner, profile, section, url, title: '', lastActive: Date.now(), previousId: manager.selected.get(owner) };
       manager.tabs.set(tab.id, tab);
     }
     manager.selected.set(owner, tab.id);
@@ -22,7 +22,7 @@ export class BrowserTabs {
     return tab;
   }
   close(tab) {
-    if (tab.section) this.remove(tab);
+    if (tab.section || tab.suspended) this.remove(tab);
     else tab.view.webContents.close({ waitForBeforeUnload: false });
   }
   remove(tab) {
@@ -45,8 +45,8 @@ export class BrowserTabs {
     const manager = this.manager;
     const section = internalSection(url);
     if (section) return this.createInternal(section, options);
-    if (manager.tabs.size >= 48 && !options.id) throw new Error('browser_tab_limit');
     const owner = options.owner || manager.owner, profile = options.profile || manager.profile;
+    if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48 && !options.id) throw new Error('browser_tab_limit');
     const view = new WebContentsView({
       ...(options.nativeOptions?.webContents ? { webContents: options.nativeOptions.webContents } : {}),
       webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload }
@@ -56,13 +56,14 @@ export class BrowserTabs {
     view.setVisible(false);
     view.setBackgroundColor(manager.surfaceColor);
     const tab = { id: options.id || randomUUID(), owner, profile, view, title: '', favicon: '', url: url || options.targetURL || 'about:blank', error: '', find: null,
+      lastActive: Date.now(), lastAi: 0, suspended: false,
       pendingURL: options.targetURL || '', committedDocument: false, retiredDownload: false,
       closeOnDownload: !!options.nativeOptions || (!!url && url !== 'about:blank'),
       previousId: manager.selected.get(owner) };
     const wc = view.webContents;
     manager.tabs.set(tab.id, tab); manager.window.contentView.addChildView(view);
     view.setBounds(browserBounds(manager) || { x: 0, y: 0, width: 1280, height: 800 });
-    manager.selected.set(owner, tab.id);
+    if (options.select !== false) manager.selected.set(owner, tab.id);
     const update = () => {
       if (wc.isDestroyed() || manager.disposed || tab.retiredDownload) return;
       tab.url = tab.pendingURL || wc.getURL() || tab.url; tab.title = wc.getTitle() || '';
@@ -120,12 +121,12 @@ export class BrowserTabs {
     });
     wc.setWindowOpenHandler(({ url: destination }) => {
       try { if (isLocalFile(wc.getURL())) manualNavigationURL(destination); else navigationURL(destination); } catch { return { action: 'deny' }; }
-      if ((tab.owner !== manager.owner && !manager.ai?.drivers.has(tab.id)) || manager.tabs.size >= 48) return { action: 'deny' };
+      if ((tab.owner !== manager.owner && !manager.ai?.drivers.has(tab.id)) || [...manager.tabs.values()].filter(row => row.owner === owner).length >= 48) return { action: 'deny' };
       // Adopted popups are browser tabs: keep their lifetime independent of the opener.
       return { action: 'allow', outlivesOpener: true, overrideBrowserWindowOptions: { webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload } },
         createWindow: nativeOptions => this.create(null, { owner, profile, nativeOptions, targetURL: destination }).view.webContents };
     });
-    wc.once('destroyed', () => { manager.ai?.release(tab); this.remove(tab); });
+    wc.once('destroyed', () => { if (tab.view !== view) return; manager.ai?.release(tab); this.remove(tab); });
     this.persist(owner); manager.layout(); manager.publish();
     if (url && url !== 'about:blank') this.load(tab, url);
     return tab;
@@ -133,10 +134,11 @@ export class BrowserTabs {
   load(tab, value) {
     const url = manualNavigationURL(value, tab.profile.searchEngine());
     if (tab.section) return this.create(url, { id: tab.id, owner: tab.owner, profile: tab.profile });
+    if (tab.suspended) { tab.url = url; return this.manager.retention.resume(tab); }
     tab.error = ''; tab.url = url; tab.pendingURL = url;
     const sequence = tab.loadSequence = (tab.loadSequence || 0) + 1;
     tab.view.webContents.loadURL(url).catch(error => {
-      if (tab.view.webContents.isDestroyed() || tab.retiredDownload || tab.loadSequence !== sequence) return;
+      if (!tab.view || tab.view.webContents.isDestroyed() || tab.retiredDownload || tab.loadSequence !== sequence) return;
       if (error.code === 'ERR_ABORTED' && (tab.view.webContents.isLoading() || tab.pendingURL !== url)) return;
       tab.pendingURL = '';
       if (error.code === 'ERR_ABORTED') tab.url = tab.view.webContents.getURL() || 'about:blank';

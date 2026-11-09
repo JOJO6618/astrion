@@ -2,13 +2,15 @@ use super::{manager::Browser, policy, views, *};
 use serde_json::{json, Value};
 use windows::core::HSTRING;
 
-fn allowed_file(payload: &Value, input: &str) -> bool {
+pub(super) fn allowed_file(payload: &Value, input: &str) -> bool {
     let path = policy::manual_navigation(input, false)
         .ok()
         .and_then(|value| tauri::Url::parse(&value).ok())
         .filter(|url| url.scheme() == "file")
         .and_then(|url| url.to_file_path().ok());
-    let Some(path) = path else { return false; };
+    let Some(path) = path else {
+        return false;
+    };
     payload["file_urls"].as_array().is_some_and(|items| {
         items.iter().any(|item| {
             item.as_str()
@@ -49,6 +51,12 @@ impl Browser {
         if self.ai.subscribed.contains(id) {
             return Ok(());
         }
+        let generation = self
+            .tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .ok_or("unknown_browser_tab")?
+            .generation;
         unsafe {
             let mut token = 0;
             for method in EVENTS {
@@ -63,8 +71,10 @@ impl Browser {
                             let raw = text(|out| args.ParameterObjectAsJson(out))?;
                             if raw.len() <= 4 * 1024 * 1024 {
                                 if let Ok(value) = serde_json::from_str(&raw) {
-                                    enqueue(
+                                    enqueue_page(
                                         &app,
+                                        &tab,
+                                        generation,
                                         Event::AiProtocol(tab.clone(), method.clone(), value),
                                     );
                                 }
@@ -134,6 +144,10 @@ impl Browser {
             .ok_or("browser_owner_mismatch")?;
         if request["owner"] != call.owner {
             return Err("browser_owner_mismatch".into());
+        }
+        if kind == "close" && self.tabs[index].suspended {
+            self.close_tab(id)?;
+            return Ok(Some(json!({})));
         }
         let wc = self.tabs[index]
             .webview

@@ -39,7 +39,7 @@
 | 子智能体固定权限 / 单次完全访问 | `docs/agents_details/sub_agent_access.md` | 子权限、审批面板 |
 | 运行中对话显示快照 | `docs/agents_details/display_snapshot.md` | 会话显示、恢复链路 |
 | 桌面标签导航 | `docs/desktop_navigation.md` | 标签身份、关闭、恢复、页面往返及命令协议 |
-| 桌面内置浏览器（macOS/Windows） | `docs/native_browser.md` | 原生网页、file 手动浏览与模型边界、浏览器 IPC、资料作用域、Chrome CSV/Cookie 授权迁移、DOM 遮挡及持久化；AI 浏览器操作工具 |
+| 桌面内置浏览器（macOS/Windows） | `docs/native_browser.md` | 原生网页、file 与模型边界、IPC、资料／授权迁移、DOM 遮挡；AI 工具；前台＋三个后台、30 分钟闲置与 AI 一小时保护的实例回收 |
 | Linux host 沙箱 | `docs/agents_details/linux_host_sandbox.md` | Linux 沙箱 |
 | Host 网页密码 | `docs/agents_details/host_password.md` | 认证/密码 |
 | 主／子 API 花费 | `docs/agents_details/api_costs.md` | 费用统计、定价 |

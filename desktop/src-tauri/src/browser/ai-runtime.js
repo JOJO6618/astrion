@@ -38,6 +38,9 @@ async function execute(message) {
       if (ai.drivers.get(tab.id)?.dialog?.type !== 'alert') ai.guardSite(tab, payload);
     }
     const result = await ai.call(payload);
+    const state = ai.ownerState(owner);
+    post({ type: 'residency', call_id: payload.call_id, current: state.current,
+      ids: Object.fromEntries([...state.ids].map(([id, short]) => [short, id])) });
     await Promise.allSettled([...outgoing]);
     return result;
   } finally { activeCalls.delete(owner); }

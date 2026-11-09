@@ -18,6 +18,7 @@ mod owner;
 mod page_features;
 mod password_adapter;
 mod policy;
+mod retention;
 mod storage;
 mod vault;
 mod view_hooks;
@@ -45,6 +46,8 @@ pub enum Event {
     Request(String, Value),
     Invalidate,
     Tick,
+    Retention(u64, Result<Value, String>),
+    Page(String, u64, Box<Event>),
     ImportCookies(String, Result<Vec<Value>, String>),
     ImportCookieWritten(String, Result<Value, String>),
     ImportVerified(String, Result<Vec<Value>, String>),
@@ -100,6 +103,9 @@ pub enum Event {
         lease: String,
         result: Result<(), String>,
     },
+}
+pub fn enqueue_page(app: &AppHandle, id: &str, generation: u64, event: Event) {
+    enqueue(app, Event::Page(id.to_owned(), generation, Box::new(event)));
 }
 // COM callbacks are STA-only. Queue COM objects locally; only the wakeup crosses threads.
 // This also prevents synchronous WebView2 callbacks from recursively borrowing Browser.

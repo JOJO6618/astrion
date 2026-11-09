@@ -43,19 +43,19 @@ export class BrowserAI {
     if (!state.ids.has(tab.id)) state.ids.set(tab.id, `t${++state.seq}`);
     return state.ids.get(tab.id);
   }
-  ownerTabs(owner) { return [...this.manager.tabs.values()].filter(tab => tab.owner === owner && tab.view && !tab.view.webContents.isDestroyed()); }
+  ownerTabs(owner) { return [...this.manager.tabs.values()].filter(tab => tab.owner === owner && !tab.section && (tab.suspended || (tab.view && !tab.view.webContents.isDestroyed()))); }
   tabByShort(owner, short) {
     const state = this.ownerState(owner);
     const id = [...state.ids].find(([, value]) => value === short)?.[0];
     const tab = id && this.manager.tabs.get(id);
-    if (!tab || tab.owner !== owner || !tab.view || tab.view.webContents.isDestroyed()) throw new BrowserToolError('unknown_tab', `本对话没有标签 ${short}。用 browser_tabs action=list 查看。`);
+    if (!tab || tab.owner !== owner || (!tab.suspended && (!tab.view || tab.view.webContents.isDestroyed()))) throw new BrowserToolError('unknown_tab', `本对话没有标签 ${short}。用 browser_tabs action=list 查看。`);
     return tab;
   }
   current(owner, short) {
     if (short) return this.tabByShort(owner, short);
     const state = this.ownerState(owner);
     const tab = this.manager.tabs.get(state.current);
-    if (tab && tab.owner === owner && tab.view && !tab.view.webContents.isDestroyed()) return tab;
+    if (tab && tab.owner === owner && (tab.suspended || (tab.view && !tab.view.webContents.isDestroyed()))) return tab;
     const fallback = this.ownerTabs(owner).at(-1);
     if (!fallback) throw new BrowserToolError('no_tab', '本对话还没有浏览器标签。先用 browser_navigate 打开网址或 browser_tabs action=new。');
     state.current = fallback.id;
@@ -87,9 +87,13 @@ export class BrowserAI {
     this.drivers.clear();
   }
   cancel(callId) { this.calls.get(callId)?.abort(); return this.calls.has(callId); }
+  deleteOwner(owner) {
+    for (const controller of this.calls.values()) if (controller.owner === owner) controller.abort();
+    this.state.delete(owner);
+  }
   tabInfo(owner, tab) {
-    const wc = tab.view.webContents;
-    return { id: this.shortId(owner, tab), url: wc.getURL() || tab.url || 'about:blank', title: wc.getTitle() || tab.title || '', loading: wc.isLoading() };
+    const wc = tab.view?.webContents;
+    return { id: this.shortId(owner, tab), url: wc?.getURL() || tab.url || 'about:blank', title: wc?.getTitle() || tab.title || '', loading: wc?.isLoading() || false, suspended: !!tab.suspended };
   }
   reveal(owner, tab, payload) {
     if (payload.reveal !== true) return;
@@ -100,12 +104,13 @@ export class BrowserAI {
   site(payload) {
     const { owner } = aiOwner(payload.identity);
     const tab = this.current(owner, payload.args?.tab_id);
-    const url = tab.view.webContents.getURL() || tab.url;
+    const url = tab.view?.webContents.getURL() || tab.url;
     return { success: true, site: siteOf(url), url, tab: this.tabInfo(owner, tab) };
   }
   async call(payload) {
     if (typeof payload?.call_id !== 'string' || !payload.call_id) throw new BrowserToolError('invalid_call', '缺少调用 ID。');
     const controller = new AbortController();
+    controller.owner = aiOwner(payload.identity).owner;
     this.calls.set(payload.call_id, controller);
     try { return await this.dispatch(payload, controller.signal); }
     finally { this.calls.delete(payload.call_id); }
@@ -129,8 +134,13 @@ export class BrowserAI {
       const tab = manager.registry.create('about:blank', { owner, profile, ai: true });
       this.ownerState(owner).current = tab.id;
     }
-    const tab = this.current(owner, args.tab_id);
+    let tab = this.current(owner, args.tab_id);
     if (tab.section) throw new BrowserToolError('internal_page', '该标签是浏览器管理页，不能由 AI 操作。');
+    if (tab.suspended) TabDriver.checkFileURL(tab.url, payload.file_urls);
+    tab = manager.retention?.resume(tab) || tab;
+    const restored = !!tab.restored;
+    if (restored && tab.view.webContents.isLoading()) await this.waitLoad(tab, signal, () => {});
+    tab.lastActive = tab.lastAi = Date.now();
     const driver = this.driver(tab);
     return driver.run(async () => {
       await driver.attach();
@@ -140,7 +150,11 @@ export class BrowserAI {
       this.reveal(owner, tab, payload);
       if (ACTION_OPS.has(op)) this.guardSite(tab, payload);
       tab.aiDownload = payload.download_dir ? { dir: payload.download_dir, until: Infinity, items: [] } : null;
-      const result = await this.operate(op, args, { owner, profile, tab, driver, payload, signal });
+      tab.aiBusy = true;
+      let result;
+      try { result = await this.operate(op, args, { owner, profile, tab, driver, payload, signal }); }
+      finally { tab.aiBusy = false; tab.lastActive = tab.lastAi = Date.now(); }
+      if (restored) { result.notes = [...(result.notes || []), '该标签已在内存回收后重新加载，原页面运行状态已丢失。']; tab.restored = false; }
       if (tab.aiDownload) { tab.aiDownload.until = Date.now() + 5000; if (tab.aiDownload.items.length) result.downloads = tab.aiDownload.items.slice(); }
       if (driver.fileChooser && op !== 'file_upload') result.notes = [...(result.notes || []), '页面打开了文件选择框，请调用 browser_file_upload 提供文件（paths 为空数组表示取消）。'];
       result.tab = result.tab || this.tabInfo(owner, tab);
@@ -166,15 +180,19 @@ export class BrowserAI {
       return { success: true, tabs };
     }
     if (action === 'new') {
-      if (manager.tabs.size >= 48) throw new BrowserToolError('tab_limit', '浏览器标签数量已达上限（48），请先关闭不用的标签。');
+      if (this.ownerTabs(owner).length >= 48) throw new BrowserToolError('tab_limit', '本对话浏览器标签数量已达上限（48），请先关闭不用的标签。');
       const url = args.url ? this.navigationTarget(args.url, payload, profile) : 'about:blank';
       const tab = manager.registry.create('about:blank', { owner, profile, ai: true });
       state.current = tab.id;
       if (url === 'about:blank') return { success: true, tab: this.tabInfo(owner, tab), message: '已新建空白标签。' };
       return this.dispatch({ ...payload, op: 'navigate', args: { url, tab_id: this.shortId(owner, tab) } }, signal);
     }
-    const tab = this.tabByShort(owner, args.tab_id || '');
+    let tab = this.tabByShort(owner, args.tab_id || '');
     if (action === 'select') {
+      if (tab.suspended) TabDriver.checkFileURL(tab.url, payload.file_urls);
+      tab = manager.retention?.resume(tab) || tab;
+      if (tab.restored && tab.view.webContents.isLoading()) await this.waitLoad(tab, signal, () => {});
+      tab.lastActive = tab.lastAi = Date.now();
       state.current = tab.id;
       const driver = this.driver(tab);
       return driver.run(async () => {

@@ -9,6 +9,12 @@ impl Browser {
         wc: &ICoreWebView2,
         controller: &ICoreWebView2Controller,
     ) -> Result<(), String> {
+        let generation = self
+            .tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .ok_or("unknown_browser_tab")?
+            .generation;
         unsafe {
             let mut token = 0;
             let app = self.app.clone();
@@ -48,7 +54,7 @@ impl Browser {
                         if !local && policy::navigation(&url, false).is_err() {
                             args.SetCancel(true)?;
                         } else {
-                            enqueue(&app, Event::Navigate(tab.clone(), url));
+                            enqueue_page(&app, &tab, generation, Event::Navigate(tab.clone(), url));
                         }
                     }
                     Ok(())
@@ -64,8 +70,10 @@ impl Browser {
                         let mut status = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
                         args.IsSuccess(&mut success)?;
                         args.WebErrorStatus(&mut status)?;
-                        enqueue(
+                        enqueue_page(
                             &app,
+                            &tab,
+                            generation,
                             Event::Loaded(tab.clone(), success.as_bool(), status.0),
                         );
                     }
@@ -77,7 +85,7 @@ impl Browser {
             let tab = id.to_owned();
             native_error(wc.add_DocumentTitleChanged(
                 &DocumentTitleChangedEventHandler::create(Box::new(move |_, _| {
-                    enqueue(&app, Event::Update(tab.clone()));
+                    enqueue_page(&app, &tab, generation, Event::Update(tab.clone()));
                     Ok(())
                 })),
                 &mut token,
@@ -86,7 +94,7 @@ impl Browser {
             let tab = id.to_owned();
             native_error(wc.add_HistoryChanged(
                 &HistoryChangedEventHandler::create(Box::new(move |_, _| {
-                    enqueue(&app, Event::Update(tab.clone()));
+                    enqueue_page(&app, &tab, generation, Event::Update(tab.clone()));
                     Ok(())
                 })),
                 &mut token,
@@ -98,7 +106,12 @@ impl Browser {
                     if let Some(args) = args {
                         let deferral = args.GetDeferral()?;
                         args.SetHandled(true)?;
-                        enqueue(&app, Event::Popup(tab.clone(), args.clone(), deferral));
+                        enqueue_page(
+                            &app,
+                            &tab,
+                            generation,
+                            Event::Popup(tab.clone(), args.clone(), deferral),
+                        );
                     }
                     Ok(())
                 })),
@@ -108,7 +121,7 @@ impl Browser {
             let tab = id.to_owned();
             native_error(wc.add_WindowCloseRequested(
                 &WindowCloseRequestedEventHandler::create(Box::new(move |_, _| {
-                    enqueue(&app, Event::Close(tab.clone()));
+                    enqueue_page(&app, &tab, generation, Event::Close(tab.clone()));
                     Ok(())
                 })),
                 &mut token,
@@ -118,8 +131,10 @@ impl Browser {
             native_error(wc.add_PermissionRequested(
                 &PermissionRequestedEventHandler::create(Box::new(move |_, args| {
                     if let Some(args) = args {
-                        enqueue(
+                        enqueue_page(
                             &app,
+                            &tab,
+                            generation,
                             Event::Permission(tab.clone(), args.clone(), args.GetDeferral()?),
                         );
                     }
@@ -133,8 +148,10 @@ impl Browser {
                 native_error(view.add_DownloadStarting(
                     &DownloadStartingEventHandler::create(Box::new(move |_, args| {
                         if let Some(args) = args {
-                            enqueue(
+                            enqueue_page(
                                 &app,
+                                &tab,
+                                generation,
                                 Event::Download(tab.clone(), args.clone(), args.GetDeferral()?),
                             );
                         }
@@ -150,8 +167,10 @@ impl Browser {
                 native_error(view.add_ContextMenuRequested(
                     &ContextMenuRequestedEventHandler::create(Box::new(move |_, args| {
                         if let Some(args) = args {
-                            enqueue(
+                            enqueue_page(
                                 &app,
+                                &tab,
+                                generation,
                                 Event::Context(tab.clone(), args.clone(), args.GetDeferral()?),
                             );
                         }
@@ -189,7 +208,12 @@ impl Browser {
                             };
                             if !name.is_empty() {
                                 args.SetHandled(true)?;
-                                enqueue(&app, Event::Shortcut(tab.clone(), name.into()));
+                                enqueue_page(
+                                    &app,
+                                    &tab,
+                                    generation,
+                                    Event::Shortcut(tab.clone(), name.into()),
+                                );
                             }
                         }
                     }
@@ -208,8 +232,10 @@ impl Browser {
                         let raw = text(|out| args.ParameterObjectAsJson(out))?;
                         if raw.len() < 100000 {
                             if let Ok(value) = serde_json::from_str(&raw) {
-                                enqueue(
+                                enqueue_page(
                                     &app,
+                                    &tab,
+                                    generation,
                                     Event::Cdp(tab.clone(), "Runtime.bindingCalled".into(), value),
                                 );
                             }

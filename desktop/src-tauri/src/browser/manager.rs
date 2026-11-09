@@ -39,6 +39,7 @@ pub struct Browser {
     pub credentials: credentials::Credentials,
     pub imports: imports::Imports,
     pub ai: ai::AI,
+    pub retention: retention::Retention,
 }
 impl Browser {
     pub fn new(
@@ -77,6 +78,7 @@ impl Browser {
             credentials: credentials::Credentials::default(),
             imports: imports::Imports::default(),
             ai: ai::AI::default(),
+            retention: retention::Retention::default(),
         })
     }
     pub fn active_id(&self) -> String {
@@ -319,8 +321,14 @@ impl Browser {
             self.start_environment(&key)?;
         }
         self.adopt_scope(&key, &request["data"]["scope"])?;
+        self.retention
+            .visits
+            .insert(self.owner.clone(), policy::now());
         self.profile = key.clone();
         self.owner = format!("{key}:{}", policy::scope(&request["data"]["scope"])?);
+        self.retention
+            .visits
+            .insert(self.owner.clone(), policy::now());
         self.lease = policy::id();
         self.layout_sequence = 0;
         self.labels = request["data"]["labels"].clone();
@@ -332,7 +340,13 @@ impl Browser {
                 .cloned()
                 .unwrap_or_default();
             for url in saved.urls.iter().take(12) {
-                if self.tabs.len() >= 48 {
+                if self
+                    .tabs
+                    .iter()
+                    .filter(|tab| tab.owner == self.owner)
+                    .count()
+                    >= 48
+                {
                     break;
                 }
                 if policy::internal(url).is_some() || policy::manual_navigation(url, false).is_ok()
@@ -355,11 +369,46 @@ impl Browser {
                 );
             }
         }
+        let id = self.active_id();
+        self.resume_tab(&id)?;
         self.layout();
         Ok(self.snapshot())
     }
     pub fn event(&mut self, event: Event) {
         match event {
+            Event::Retention(ticket, result) => self.retention_result(ticket, result),
+            Event::Page(id, generation, event) => {
+                if self
+                    .tabs
+                    .iter()
+                    .any(|tab| tab.id == id && tab.generation == generation && !tab.suspended)
+                {
+                    self.event(*event);
+                } else {
+                    match *event {
+                        Event::Created(_, Ok(controller)) => unsafe {
+                            let _ = controller.Close();
+                        },
+                        Event::Popup(_, args, deferral) => unsafe {
+                            let _ = args.SetHandled(true);
+                            let _ = deferral.Complete();
+                        },
+                        Event::Permission(_, args, deferral) => unsafe {
+                            let _ = args.SetState(COREWEBVIEW2_PERMISSION_STATE_DENY);
+                            let _ = deferral.Complete();
+                        },
+                        Event::Context(_, args, deferral) => unsafe {
+                            let _ = args.SetHandled(true);
+                            let _ = deferral.Complete();
+                        },
+                        Event::Download(_, args, deferral) => unsafe {
+                            let _ = args.SetCancel(true);
+                            let _ = deferral.Complete();
+                        },
+                        _ => {}
+                    }
+                }
+            }
             Event::AiCall(payload, cancel, response) => self.ai_call(payload, cancel, response),
             Event::AiRuntime(result) => self.ai_runtime(result),
             Event::AiMessage(value) => self.ai_message(value),
@@ -370,6 +419,7 @@ impl Browser {
                 self.expire();
                 self.ai_poll();
                 self.expire_import();
+                self.retention_tick();
             }
             Event::ImportCookies(id, result) => self.import_cookies(id, result),
             Event::ImportCookieWritten(id, result) => self.import_cookie_written(id, result),

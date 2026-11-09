@@ -64,7 +64,12 @@ impl Browser {
                 let ids: Vec<_> = self
                     .tabs
                     .iter()
-                    .filter(|t| t.profile == key && t.section.is_none() && t.controller.is_none())
+                    .filter(|t| {
+                        t.profile == key
+                            && t.section.is_none()
+                            && t.controller.is_none()
+                            && !t.suspended
+                    })
                     .map(|t| t.id.clone())
                     .collect();
                 for id in ids {
@@ -88,7 +93,13 @@ impl Browser {
         self.publish();
     }
     pub fn create_tab(&mut self, url: &str) -> Result<String, String> {
-        if self.tabs.len() >= 48 {
+        if self
+            .tabs
+            .iter()
+            .filter(|tab| tab.owner == self.owner && !tab.retired)
+            .count()
+            >= 48
+        {
             return Err("browser_tab_limit".into());
         }
         let url = if policy::internal(url).is_some() {
@@ -146,6 +157,8 @@ impl Browser {
             .environment
             .clone()
             .ok_or("browser_environment_not_ready")?;
+        self.tabs[index].generation += 1;
+        let generation = self.tabs[index].generation;
         let app = self.app.clone();
         let id = id.to_owned();
         unsafe {
@@ -153,10 +166,12 @@ impl Browser {
                 host,
                 &CreateCoreWebView2ControllerCompletedHandler::create(Box::new(
                     move |status, controller| {
-                        enqueue(
+                        enqueue_page(
                             &app,
+                            &id,
+                            generation,
                             Event::Created(
-                                id,
+                                id.clone(),
                                 status.map_err(|e| e.to_string()).and_then(|_| {
                                     controller.ok_or("browser_controller_missing".into())
                                 }),
@@ -260,7 +275,14 @@ impl Browser {
                     && call.owner == self.tabs[index].owner
                     && call.origins.contains_key(parent)
             });
-            if (parent != self.active_id() && !ai_active) || self.tabs.len() >= 48 {
+            if (parent != self.active_id() && !ai_active)
+                || self
+                    .tabs
+                    .iter()
+                    .filter(|tab| tab.owner == self.tabs[index].owner && !tab.retired)
+                    .count()
+                    >= 48
+            {
                 return Err("browser_popup_inactive".into());
             }
             let url = unsafe { native_error(text(|out| args.Uri(out)))? };

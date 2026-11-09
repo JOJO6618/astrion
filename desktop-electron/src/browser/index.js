@@ -5,6 +5,7 @@ import { app, ipcMain, dialog } from 'electron';
 import { BrowserProfile } from './profile.js';
 import { BrowserFeatures } from './features.js';
 import { BrowserTabs } from './tabs.js';
+import { BrowserRetention } from './retention.js';
 import { internalSection, internalSnapshot } from './internal-pages.js';
 import { BrowserCredentials } from './passwords/service.js';
 import { BrowserContextMenu, contextMenuLabels } from './context-menu.js';
@@ -27,6 +28,7 @@ export class NativeBrowser {
     this.stacking = new BrowserStacking(this);
     this.downloadViews = new Set();
     this.ai = new BrowserAI(this);
+    this.retention = new BrowserRetention(this);
     this.surfaceColor = window.getBackgroundColor();
     mainView.setBackgroundColor(this.surfaceColor);
     this.invalidate = () => { this.contextMenu.close(); this.credentials.invalidate(); this.connectSequence++; this.lease = ''; this.visible = false; this.overlayRaised = false; this.layout(); this.features.forEach(feature => feature.denyStale()); };
@@ -72,9 +74,9 @@ export class NativeBrowser {
     return { lease: this.lease, revision: ++this.revision, activeId: active?.id || '',
       tabs: [...this.tabs.values()].filter(tab => tab.owner === this.owner).map(tab => {
         if (tab.section) return internalSnapshot(tab);
-        const wc = tab.view.webContents;
-        return { id: tab.id, url: tab.url, title: tab.title, favicon: tab.favicon || '', loading: wc.isLoading() || !!tab.pendingURL, pending: !!tab.pendingURL, error: tab.error,
-          canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward(), zoom: Math.round(wc.getZoomFactor() * 100), find: tab.find };
+        const wc = tab.view?.webContents;
+        return { id: tab.id, url: tab.url, title: tab.title, favicon: tab.favicon || '', loading: (wc?.isLoading() || false) || !!tab.pendingURL, pending: !!tab.pendingURL, error: tab.error,
+          canGoBack: wc?.navigationHistory.canGoBack() || false, canGoForward: wc?.navigationHistory.canGoForward() || false, zoom: Math.round((wc?.getZoomFactor() || tab.zoom || 1) * 100), find: tab.find };
       }),
       history: this.profile?.data.history || [],
       settings: { searchEngine: this.profile?.data.settings.searchEngine || '' },
@@ -101,18 +103,26 @@ export class NativeBrowser {
     this.credentials.invalidate();
     const alias = scopeAlias(scope);
     if (alias) this.adoptOwner(profile, `${profile.key}:${alias}`, `${profile.key}:${scopeId}`);
+    this.retention.visit(this.owner);
     this.profile = profile; this.owner = `${profile.key}:${scopeId}`; this.lease = randomUUID(); this.layoutSequence = 0;
+    this.retention.visit(this.owner);
     this.menuLabels = contextMenuLabels(labels);
     this.features.forEach(feature => feature.denyStale());
-    this.registry.restore(); this.layout(); return this.snapshot();
+    this.registry.restore(); this.retention.resume(this.active()); this.layout(); void this.retention.poll(); return this.snapshot();
   }
   tab(id) {
     const tab = this.tabs.get(id || this.selected.get(this.owner));
-    if (!tab || tab.owner !== this.owner || tab.profile !== this.profile || (!tab.section && tab.view.webContents.isDestroyed())) throw new Error('unknown_browser_tab');
+    if (!tab || tab.owner !== this.owner || tab.profile !== this.profile || (!tab.section && !tab.suspended && tab.view.webContents.isDestroyed())) throw new Error('unknown_browser_tab');
     return tab;
   }
   async command(payload) {
     const { action, id, value } = payload;
+    const previous = this.active();
+    if (previous) previous.lastActive = Date.now();
+    if (!['close', 'reorder', 'duplicate'].includes(action)) {
+      const target = this.tabs.get(id || this.selected.get(this.owner));
+      if (target?.owner === this.owner) this.retention.resume(target);
+    }
     const features = this.profileFeatures(this.profile);
     if (action === 'new') this.registry.create(value || 'about:blank');
     else if (action === 'internal') this.registry.createInternal(value);
@@ -211,7 +221,7 @@ export class NativeBrowser {
   }
   dispose() {
     if (this.disposed) return;
-    this.ai.dispose(); setActiveBrowser(null, this);
+    this.retention.dispose(); this.ai.dispose(); setActiveBrowser(null, this);
     for (const owner of this.selected.keys()) this.registry.persist(owner);
     this.contextMenu.close();
     this.disposed = true; this.connectSequence++; this.lease = '';

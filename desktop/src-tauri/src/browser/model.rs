@@ -282,6 +282,11 @@ pub struct Tab {
     pub frame: String,
     pub committed: bool,
     pub retired: bool,
+    pub suspended: bool,
+    pub restored: bool,
+    pub generation: u64,
+    pub last_active: u64,
+    pub last_ai: u64,
     pub local_target: std::rc::Rc<std::cell::RefCell<Option<String>>>,
 }
 impl Tab {
@@ -308,6 +313,11 @@ impl Tab {
             frame: String::new(),
             committed: false,
             retired: false,
+            suspended: false,
+            restored: false,
+            generation: 0,
+            last_active: policy::now(),
+            last_ai: 0,
             local_target: Default::default(),
         }
     }

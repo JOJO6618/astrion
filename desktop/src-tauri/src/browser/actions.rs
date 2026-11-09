@@ -75,6 +75,15 @@ impl Browser {
             .map(str::to_owned)
             .unwrap_or_else(|| self.active_id());
         let value = &input["value"];
+        let previous = self.active_id();
+        for tab in &mut self.tabs {
+            if tab.id == previous || tab.id == id {
+                tab.last_active = policy::now();
+            }
+        }
+        if !["close", "reorder", "duplicate"].contains(&action) {
+            self.resume_tab(&id)?;
+        }
         match action {
             "new" => {
                 self.create_tab(value.as_str().unwrap_or("about:blank"))?;

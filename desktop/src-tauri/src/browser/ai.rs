@@ -27,6 +27,8 @@ pub struct AI {
     pub calls: HashMap<String, Pending>,
     pub subscribed: HashSet<String>,
     pub download_dirs: HashMap<String, (std::path::PathBuf, u64)>,
+    pub short_ids: HashMap<String, HashMap<String, String>>,
+    pub current: HashMap<String, String>,
 }
 impl Drop for AI {
     fn drop(&mut self) {
@@ -266,14 +268,66 @@ impl Browser {
                     continue;
                 }
             }
-            let ready = self.ai.ready
-                && self
-                    .tabs
-                    .iter()
-                    .filter(|tab| tab.owner == call.owner && tab.section.is_none() && !tab.retired)
-                    .all(|tab| tab.webview.is_some());
+            let op = call.payload["op"].as_str().unwrap_or("");
+            let metadata_only = op == "site"
+                || (op == "tabs"
+                    && matches!(
+                        call.payload["args"]["action"].as_str(),
+                        Some("list" | "close")
+                    ));
+            let target = call.reserved.clone().or_else(|| {
+                if let Some(short) = call.payload["args"]["tab_id"].as_str() {
+                    self.ai
+                        .short_ids
+                        .get(&call.owner)
+                        .and_then(|ids| ids.get(short))
+                        .cloned()
+                } else {
+                    self.ai.current.get(&call.owner).cloned().or_else(|| {
+                        self.tabs
+                            .iter()
+                            .filter(|tab| {
+                                tab.owner == call.owner && tab.section.is_none() && !tab.retired
+                            })
+                            .last()
+                            .map(|tab| tab.id.clone())
+                    })
+                }
+            });
+            let mut page_ready = true;
+            if !metadata_only && !call.sent {
+                if let Some(target) = &target {
+                    if self.tabs.iter().any(|tab| {
+                        tab.id == *target
+                            && tab.suspended
+                            && policy::local_file(&tab.url)
+                            && !super::ai_native::allowed_file(&call.payload, &tab.url)
+                    }) {
+                        let _=call.response.send(json!({"success":false,"code":"path_not_allowed","error":"恢复本地网页前需要重新校验文件读取权限。"}));
+                        continue;
+                    }
+                    if let Err(error) = self.resume_tab(target) {
+                        let _ = call
+                            .response
+                            .send(json!({"success":false,"code":"browser_error","error":error}));
+                        continue;
+                    }
+                    if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == *target) {
+                        tab.last_active = policy::now();
+                        tab.last_ai = policy::now();
+                        page_ready = tab.webview.is_some()
+                            && (!tab.restored || (!tab.pending && !tab.loading));
+                    }
+                }
+            }
+            let ready = self.ai.ready && page_ready;
             if ready && !call.sent {
                 let rows = self.ai_rows(&call.owner);
+                if let Some(target) = &target {
+                    if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == *target) {
+                        tab.restored = false;
+                    }
+                }
                 for row in rows.as_array().unwrap() {
                     let tab = row["id"].as_str().unwrap().to_owned();
                     call.origins.insert(
@@ -311,7 +365,7 @@ impl Browser {
                 let _ = controller.IsVisible(&mut visible);
             }
         }
-        json!({"id":tab.id,"owner":tab.owner,"profile":tab.profile,"url":tab.url,"title":tab.title,"loading":tab.loading,"section":tab.section,"zoom":tab.zoom,"visible":visible.as_bool(),"back":snapshot["canGoBack"],"forward":snapshot["canGoForward"]})
+        json!({"id":tab.id,"owner":tab.owner,"profile":tab.profile,"url":tab.url,"title":tab.title,"loading":tab.loading || tab.pending,"section":tab.section,"zoom":tab.zoom,"visible":visible.as_bool(),"back":snapshot["canGoBack"],"forward":snapshot["canGoForward"],"suspended":tab.suspended,"restored":tab.restored})
     }
     fn ai_rows(&self, owner: &str) -> Value {
         json!(self
@@ -328,6 +382,19 @@ impl Browser {
     }
     pub fn ai_message(&mut self, value: Value) {
         match value["type"].as_str().unwrap_or("") {
+            "residency" => {
+                if let Some(call) = self.ai.calls.get(value["call_id"].as_str().unwrap_or("")) {
+                    let owner = call.owner.clone();
+                    if let Some(current) = value["current"].as_str() {
+                        self.ai.current.insert(owner.clone(), current.to_owned());
+                    }
+                    if let Ok(ids) =
+                        serde_json::from_value::<HashMap<String, String>>(value["ids"].clone())
+                    {
+                        self.ai.short_ids.insert(owner, ids);
+                    }
+                }
+            }
             "ready" => {
                 self.ai.ready = true;
                 self.ai_poll();
