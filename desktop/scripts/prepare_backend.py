@@ -86,10 +86,49 @@ def dir_size_mb(path: Path) -> float:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file()) / 1024 / 1024
 
 
+# 内嵌运行时依赖核对：本脚本只 staging 源码、不装依赖，运行时是手工准备的。
+# requirements.lock.txt 新增/升级依赖后若忘了同步，打包产物会在特定环境才暴露
+# （如 2026-11 的 socksio：仅在继承 SOCKS 代理变量时 httpx 才报缺包）。
+_CHECK_DEPS = r"""
+import re, sys, importlib.metadata as md
+bad = []
+for line in open(sys.argv[1], encoding="utf-8"):
+    line = line.split("#")[0].strip()
+    m = re.match(r"([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?==([^\s;]+)", line)
+    if not m:
+        continue
+    name, want = m.groups()
+    try:
+        have = md.version(name)
+    except md.PackageNotFoundError:
+        have = None
+    if have != want:
+        bad.append(f"{name}=={want}（当前 {have or '未安装'}）")
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+"""
+
+
+def check_runtime_dependencies() -> bool:
+    lock = REPO_ROOT / "requirements.lock.txt"
+    if not lock.is_file():
+        return True
+    result = subprocess.run([str(PYBIN), "-c", _CHECK_DEPS, str(lock)], capture_output=True, text=True)
+    if result.returncode == 0:
+        print("[prepare-backend] 内嵌运行时依赖与 requirements.lock.txt 一致")
+        return True
+    print("[prepare-backend] 内嵌运行时依赖与 requirements.lock.txt 不一致：", file=sys.stderr)
+    print(result.stdout.strip() or result.stderr.strip(), file=sys.stderr)
+    print(f"[prepare-backend] 请用 {PYBIN} -m pip install <包>==<版本> 补齐后重新打包", file=sys.stderr)
+    return False
+
+
 def main() -> int:
     if not PYBIN.is_file():
         print(f"[prepare-backend] 内嵌 Python 不存在: {PYBIN}", file=sys.stderr)
         print("[prepare-backend] 请先完成 python-build-standalone 运行时就位", file=sys.stderr)
+        return 1
+    if not check_runtime_dependencies():
         return 1
 
     # 0) Windows：后端解释器改名副本（astrion-backend.exe，与本体同目录）
