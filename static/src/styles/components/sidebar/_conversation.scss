@@ -186,6 +186,10 @@
   height: 18px;
 }
 
+.browser-icon .icon {
+  --icon-size: 18px;
+}
+
 .git-brand-icon::before {
   content: '';
   width: 17px;

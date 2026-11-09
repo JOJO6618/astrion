@@ -136,9 +136,9 @@
           :aria-pressed="nativeBrowser.open"
           @click="nativeBrowser.toggle()"
         >
-          <span class="sidebar-nav-icon" aria-hidden="true"
-            ><span class="icon" :style="{ '--icon-src': `url(${ICONS.globe})` }"></span
-          ></span>
+          <span class="sidebar-nav-icon browser-icon" aria-hidden="true">
+            <span class="icon" :style="{ '--icon-src': `url(${ICONS.globe})` }"></span>
+          </span>
           <span class="sidebar-nav-label">{{ $t('browser.title') }}</span>
         </button>
 
