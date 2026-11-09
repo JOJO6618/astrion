@@ -42,6 +42,17 @@ onMounted(() => {
     })
   );
   subscriptions.push(
+    bridge.onAiActivity((event) => {
+      // Only the visible conversation's own model activity opens the panel.
+      if (
+        scope.value &&
+        scope.value.workspace === event.workspace &&
+        scope.value.conversation === event.conversation
+      )
+        store.open = true;
+    })
+  );
+  subscriptions.push(
     bridge.onMessage((event) => {
       if (event.lease === store.snapshot?.lease) store.error = event.message || '';
     })

@@ -25,6 +25,9 @@
               $t(`shell.finalDecision.${historyStatus}`)
             }}</span>
           </div>
+          <div v-if="browserSite" class="approval-path">
+            {{ $t('browser.aiApprovalSite') }}: {{ browserSite }}
+          </div>
           <div v-if="filePath" class="approval-path">{{ filePath }}</div>
           <div v-if="editLines.length" class="approval-preview approval-diff">
             <div
@@ -54,6 +57,15 @@
             @click="$emit('reject', current.approval_id)"
           >
             {{ $t('shell.reject') }}
+          </button>
+          <button
+            v-if="canRememberSite"
+            type="button"
+            class="approval-btn"
+            :disabled="busy || terminalStatus || humanApproved"
+            @click="$emit('approve', current.approval_id, true)"
+          >
+            {{ $t('browser.aiApprovalAlways') }}
           </button>
           <button
             type="button"
@@ -125,7 +137,7 @@ const props = withDefaults(
   { decidingApprovalIds: () => [], reviewRecords: () => [] }
 );
 defineEmits<{
-  (event: 'approve', approvalId: string): void;
+  (event: 'approve', approvalId: string, rememberSite?: boolean): void;
   (event: 'reject', approvalId: string): void;
   (event: 'close'): void;
 }>();
@@ -196,6 +208,17 @@ const previewText = computed(() => {
       ''
   );
 });
+const browserSite = computed(() =>
+  current.value?.approval_type === 'browser_action' ? String(current.value?.browser_site || '') : ''
+);
+// 「以后都允许」只在人工审批（非自动审核）、且不是 browser_evaluate 时提供。
+const canRememberSite = computed(
+  () =>
+    !!browserSite.value &&
+    !automatic.value &&
+    !['browser_evaluate', 'browser_fill_saved_login'].includes(String(current.value?.tool_name)) &&
+    current.value?.human_approval_required !== false
+);
 const requestReason = computed(() => String(current.value?.arguments?.full_access_reason || ''));
 const extraArguments = computed(() => {
   const hidden = new Set([

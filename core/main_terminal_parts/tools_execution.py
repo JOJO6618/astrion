@@ -66,6 +66,7 @@ except ImportError:
 
 from modules.file_manager import FileManager
 from modules.execution_plane import get_execution_backend
+from modules.native_browser.tools import is_browser_tool
 from modules.search_engine import SearchEngine
 from modules.terminal_ops import TerminalOperator
 from modules.memory_manager import MemoryManager
@@ -411,6 +412,11 @@ class MainTerminalToolsExecutionMixin:
                     return {"allowed": False, "mode": mode, "code": "goal_interaction_denied", "message": DENIED_MESSAGE}
                 if any(key.startswith(("_approval_", "_execution_")) for key in args):
                     return {"allowed": False, "mode": mode, "code": "untrusted_authority", "message": "工具参数不能携带内部执行授权。"}
+                from modules.native_browser.tools import is_browser_tool
+                if is_browser_tool(tool_name):
+                    # 浏览器工具自成一套：读取类不审批，动作类按站点审批（含 plan 只读锁）。
+                    from modules.native_browser.executor import evaluate_permission as _browser_permission
+                    return _browser_permission(self, tool_name, args, mode)
                 if tool_name == "run_command":
                     try:
                         full_access_required = validate_full_access_request(self, args)
@@ -2088,6 +2094,9 @@ class MainTerminalToolsExecutionMixin:
                                                 ),
                                             }
 
+                    elif tool_name.startswith("browser_") and is_browser_tool(tool_name):
+                        from modules.native_browser.executor import execute as _execute_browser_tool
+                        result = await _execute_browser_tool(self, tool_name, arguments)
                     elif tool_name == "manage_personalization":
                         logger.info("[handle_tool_call] 进入manage_personalization分支")
                         result = await self._execute_manage_personalization(arguments)

@@ -29,7 +29,9 @@ export class BrowserFeatures {
   download(item, wc) {
     const tab = this.manager.byContents(wc);
     if (!tab || tab.profile !== this.profile) { item.cancel(); return; }
-    const directory = path.join(app.getPath('downloads'), 'Astrion');
+    // 模型操作触发的下载进入工作区目录（设置可改）；用户手动下载仍进 ~/Downloads/Astrion。
+    const ai = tab.aiDownload && Date.now() < tab.aiDownload.until ? tab.aiDownload : null;
+    const directory = ai ? ai.dir : path.join(app.getPath('downloads'), 'Astrion');
     const id = randomUUID(), name = safeFilename(item.getFilename());
     let target;
     try {
@@ -44,6 +46,7 @@ export class BrowserFeatures {
       item.setSavePath(target);
     } catch (error) { item.cancel(); this.manager.message(error.message); return; }
     const row = { id, name: path.basename(target), path: target, received: 0, total: item.getTotalBytes(), state: 'progressing', at: Date.now() };
+    if (ai) ai.items.push({ name: row.name, path: target });
     this.items.set(id, item); this.profile.data.downloads.unshift(row);
     this.profile.data.downloads = this.profile.data.downloads.slice(0, 100); this.profile.save(); this.manager.publish();
     let lastUpdate = 0;

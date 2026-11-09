@@ -147,6 +147,8 @@ function renderByTool(
     case 'load_tools':
       return renderLoadTools(result, args);
     default:
+      if (typeof name === 'string' && name.startsWith('browser_'))
+        return renderBrowserTool(name, result, args);
       // 默认回退：显示重要参数 + 结果
       return renderDefaultResult(result, args);
   }
@@ -228,6 +230,72 @@ function renderWebSearch(
     })
     .join('');
   return html + box(`<div class="search-result-list">${items}</div>`);
+}
+
+// 浏览器工具：meta 只放参数；快照、查找、网络等结果放 content。
+function renderBrowserTool(name: string, result: any, args: any): string {
+  const B = (key: string) => t(`toolResults.browser.${key}`);
+  const fields = Array.isArray(args.fields)
+    ? args.fields.map((f: any) => `${f?.element || f?.target || ''} = ${f?.value ?? ''}`).join('\n')
+    : '';
+  const params = meta(
+    param(B('action'), args.action),
+    param(L('url'), args.url),
+    param(B('element'), args.element || args.start_element),
+    param(B('target'), args.target || args.start_target),
+    param(B('text'), args.text ?? args.regex ?? args.text_gone),
+    param(B('key'), args.key),
+    param(B('account'), args.username),
+    param(B('direction'), args.direction),
+    param(B('level'), args.level),
+    param(B('fields'), fields),
+    param(B('paths'), Array.isArray(args.paths) ? args.paths.join('\n') : ''),
+    param(B('function'), args.function, { mono: true }),
+    param(B('tab'), args.tab_id),
+    pendingStatus(result)
+  );
+  const parts: string[] = [];
+  const add = (label: string, text: unknown) => {
+    const value = String(text ?? '').trim();
+    if (value) parts.push(label ? `${label}\n${value}` : value);
+  };
+  if (result.tab)
+    add(B('tab'), `${result.tab.id}  ${result.tab.title || ''}  ${result.tab.url || ''}`);
+  (result.notes || []).forEach((note: string) => add('', note));
+  if (result.message) add('', result.message);
+  if (result.dialog) add(B('dialog'), `${result.dialog.type}: ${result.dialog.message}`);
+  (result.downloads || []).forEach((d: any) => add(B('downloads'), d.path));
+  if (Array.isArray(result.tabs))
+    add(
+      '',
+      result.tabs
+        .map((t0: any) => `${t0.id}${t0.current ? ' *' : ''}  ${t0.title || ''}  ${t0.url}`)
+        .join('\n')
+    );
+  if (Array.isArray(result.matches)) add('', result.matches.map((m: any) => m.line).join('\n'));
+  if (Array.isArray(result.messages))
+    add('', result.messages.map((m: any) => `[${m.level}] ${m.message}`).join('\n'));
+  if (Array.isArray(result.requests))
+    add(
+      '',
+      result.requests
+        .map((r: any) => `#${r.id} ${r.method} ${r.status || r.failed || ''} ${r.url}`)
+        .join('\n')
+    );
+  if (result.request)
+    add(
+      '',
+      `#${result.request.seq} ${result.request.method} ${result.request.url}\n${result.request.body || ''}`
+    );
+  if (result.result !== undefined && name === 'browser_evaluate') add('', result.result);
+  if (result.screenshot_path) add(B('screenshot'), result.screenshot_path);
+  const snap = result.snapshot;
+  if (snap)
+    add(
+      snap.kind === 'none' ? '' : snap.kind === 'diff' ? B('changed') : B('full'),
+      snap.kind === 'none' ? B('unchanged') : snap.text
+    );
+  return params + (parts.length ? preBox(parts.join('\n\n')) : '');
 }
 
 function renderExtractWebpage(result: any, args: any): string {

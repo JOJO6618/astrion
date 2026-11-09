@@ -66,8 +66,9 @@ class ToolApprovalManager:
         workspace_root: Optional[str] = None,
         execution_mode: str = "sandbox",
         human_approval_required: bool = True,
+        browser_site: Optional[str] = None,
     ) -> Dict[str, Any]:
-        if approval_type not in {"sandbox_write", "full_access", "direct_execution"}:
+        if approval_type not in {"sandbox_write", "full_access", "direct_execution", "browser_action"}:
             raise ValueError("Invalid approval_type")
         if execution_mode not in {"sandbox", "direct"}:
             raise ValueError("Invalid execution_mode")
@@ -98,6 +99,11 @@ class ToolApprovalManager:
             "execution_mode": execution_mode,
             "human_approval_required": human_approval_required,
         }
+        if approval_type == "browser_action":
+            if not isinstance(browser_site, str) or not browser_site:
+                raise ValueError("Browser approvals require a site")
+            item["browser_site"] = browser_site
+            item["remember_site"] = False
         if approval_type == "full_access":
             item.update({
                 "auto_review_status": "pending",
@@ -191,6 +197,7 @@ class ToolApprovalManager:
         *,
         reason: Optional[str] = None,
         decider: Optional[str] = None,
+        remember_site: bool = False,
     ) -> Dict[str, Any]:
         normalized = str(decision or "").strip().lower()
         if normalized not in {"approved", "rejected"}:
@@ -215,6 +222,11 @@ class ToolApprovalManager:
                     item["decider"] = decider.strip()
                 self._resolve_full_access(item)
                 return deepcopy(item)
+            if remember_site is True and normalized == "approved":
+                # 「以后都允许」只对人工批准的浏览器站点审批有效；自动审核不能写入。
+                if item.get("approval_type") != "browser_action" or not item.get("human_approval_required", True):
+                    raise ValueError(tr("tool_approval.decision_invalid"))
+                item["remember_site"] = True
             item["status"] = normalized
             item["decision"] = normalized
             item["decided_at"] = time.time()

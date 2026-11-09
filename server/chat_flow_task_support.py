@@ -38,6 +38,7 @@ _VALID_SOURCES = {
     "execution_change",
     "network_change",
     "work_mode_change",
+    "browser_change",
     "file_paths",
     "media_paths",
     "workflow",
@@ -52,7 +53,7 @@ def _runtime_message_ui_defaults(src: str, *, inline: bool = False) -> Dict[str,
     if normalized in {"guidance", "notify"}:
         return {"visibility": "compact", "starts_work": False}
     # 运行期模式（权限/执行环境/网络权限/运行模式）切换通知：仅通知，不开启新一轮工作。
-    if normalized in {"permission_change", "execution_change", "network_change", "work_mode_change"}:
+    if normalized in {"permission_change", "execution_change", "network_change", "work_mode_change", "browser_change"}:
         return {"visibility": "compact", "starts_work": False}
     # 后台完成通知 / 运行期压缩续接：属于当前这轮工作的延续，不开启新的工作头与计时器，
     # 也不暂停上一轮计时器。与 task_main 的 _user_message_ui_defaults 保持一致，

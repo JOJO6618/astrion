@@ -415,6 +415,21 @@ class MessagesMixin:
             if preview_panel_prompt:
                 messages.append({"role": "system", "content": preview_panel_prompt})
 
+            # macOS 内置浏览器：与工具同条件注入（桌面版 Agent 主对话），开关关闭也注入。
+            try:
+                from modules.native_browser.availability import native_browser_supported
+                browser_supported = native_browser_supported() and getattr(self, "conversation_kind", "agent") != "chat"
+            except Exception:
+                browser_supported = False
+            if browser_supported:
+                from modules.native_browser.prompt import build_frozen_prompt
+                native_browser_prompt = self._get_or_init_frozen_prompt(
+                    "frozen_native_browser_prompt",
+                    lambda: build_frozen_prompt(self),
+                )
+                if native_browser_prompt:
+                    messages.append({"role": "system", "content": native_browser_prompt})
+
             # show_ui/show_html 两份独立文件共享此冻结段；已有快照不追溯改写。
             from modules.inline_ui_prompt import load_inline_ui_prompt
             inline_ui_prompt = self._get_or_init_frozen_prompt(

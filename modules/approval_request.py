@@ -109,6 +109,9 @@ class ApprovalRequest:
             lines.append("自动审核通过即可执行。")
         directory = arguments.get("working_dir") or self.inputs["workspace"]
         lines.append("待审工作目录：" + str(directory))
+        if self.item.get("approval_type") == "browser_action":
+            url = (self.item.get("preview") or {}).get("browser_url") or ""
+            lines.append(f"浏览器操作站点：{self.item.get('browser_site')}" + (f"（当前网址 {url}）" if url else "") + "；在用户已登录的真实网页上执行，批准仅限本次。")
         if self.inputs["goal"]:
             lines.extend(["当前用户目标：", self.inputs["goal"]])
         lines.append(self.history.initial_text())

@@ -17,6 +17,7 @@ import SearchTab from './tabs/SearchTab.vue';
 import ContextTab from './tabs/ContextTab.vue';
 import FilesTab from './tabs/FilesTab.vue';
 import VoiceTab from './tabs/VoiceTab.vue';
+import BrowserTab from './tabs/BrowserTab.vue';
 import SubAgentsTab from './tabs/SubAgentsTab.vue';
 import ReviewAgentsTab from './tabs/ReviewAgentsTab.vue';
 import AppearanceTab from './tabs/AppearanceTab.vue';
@@ -92,7 +93,8 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'tools', labelKey: 'settings.navTools', icon: 'tools' },
       { id: 'context', labelKey: 'settings.navContext', icon: 'context' },
       { id: 'files', labelKey: 'settings.navFiles', icon: 'files' },
-      { id: 'voice', labelKey: 'settings.navVoice', icon: 'voice' }
+      { id: 'voice', labelKey: 'settings.navVoice', icon: 'voice' },
+      { id: 'browser', labelKey: 'settings.navBrowser', icon: 'tools' }
     ]
   },
   {
@@ -158,6 +160,7 @@ const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string 
   context: { titleKey: 'settings.contextTitle', descKey: 'settings.contextDesc' },
   files: { titleKey: 'settings.filesTitle', descKey: 'settings.filesDesc' },
   voice: { titleKey: 'settings.voiceTitle', descKey: 'settings.voiceDesc' },
+  browser: { titleKey: 'settings.browserTitle', descKey: 'settings.browserDesc' },
   'sub-agents': { titleKey: 'settings.subAgentsTitle', descKey: 'settings.subAgentsDesc' },
   'review-agents': { titleKey: 'settings.reviewAgentsTitle', descKey: 'settings.reviewAgentsDesc' },
   appearance: { titleKey: 'settings.appearanceTitle', descKey: 'settings.appearanceDesc' },
@@ -179,6 +182,7 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   context: ContextTab,
   files: FilesTab,
   voice: VoiceTab,
+  browser: BrowserTab,
   'sub-agents': SubAgentsTab,
   'review-agents': ReviewAgentsTab,
   appearance: AppearanceTab,

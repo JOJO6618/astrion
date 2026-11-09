@@ -15,7 +15,7 @@
         @layout-change="emitComposerHeight"
         @transitioning="approvalPanelTransitioning = $event"
         @collapse="$emit('collapse-tool-approval')"
-        @approve="$emit('approve-tool-approval', $event)"
+        @approve="(id, remember) => $emit('approve-tool-approval', id, remember)"
         @reject="$emit('reject-tool-approval', $event)"
       />
       <transition

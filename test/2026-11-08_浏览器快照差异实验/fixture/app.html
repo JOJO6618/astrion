@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>快照差异夹具</title>
+<style>
+  body { font-family: sans-serif; display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
+  .menu, .modal, .toast, .suggest { border: 1px solid #999; padding: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header style="grid-column: 1 / -1">
+  <nav aria-label="主导航">
+    <a href="/app.html">首页</a> <a href="/page2.html">文档</a> <a href="#">定价</a> <a href="#">博客</a> <a href="#">关于</a>
+  </nav>
+</header>
+<aside><nav aria-label="侧栏" id="sidebar"></nav></aside>
+<main id="main">
+  <h1>控制台</h1>
+  <section aria-label="操作区">
+    <button id="noop">无效按钮</button>
+    <button id="counter">已点击 0 次</button>
+    <button id="menuBtn" aria-haspopup="menu" aria-expanded="false">更多操作</button>
+    <ul role="menu" class="menu" id="menu" hidden></ul>
+    <label>搜索 <input id="search" type="search" placeholder="搜索文档"></label>
+    <ul role="listbox" class="suggest" id="suggest" hidden></ul>
+    <button id="modalBtn">新建项目</button>
+    <button id="toastBtn">保存（延迟提示）</button>
+    <button id="loadBtn">加载更多</button>
+    <button id="routeBtn">进入设置（SPA 路由）</button>
+    <button id="rerenderBtn">刷新价格（整体重渲染）</button>
+    <button id="keyedBtn">刷新价格（局部更新）</button>
+    <button id="bigBtn">更新大列表第 250 项</button>
+    <button id="clockBtn">启动实时时钟</button>
+    <span id="clock"></span>
+  </section>
+  <form id="form" novalidate aria-label="注册表单">
+    <label>用户名 <input name="user"></label><span class="err" id="e1"></span>
+    <label>邮箱 <input name="mail" type="email"></label><span class="err" id="e2"></span>
+    <label>密码 <input name="pass" type="password"></label><span class="err" id="e3"></span>
+    <button type="submit">注册</button>
+  </form>
+  <div role="tablist" aria-label="面板">
+    <button role="tab" id="tabA" aria-selected="true">概览</button>
+    <button role="tab" id="tabB" aria-selected="false">日志</button>
+  </div>
+  <section role="tabpanel" id="panel"></section>
+  <h2>商品</h2>
+  <ul id="products" aria-label="商品列表"></ul>
+  <h2>动态</h2>
+  <ul id="feed" aria-label="动态列表"></ul>
+  <h2>大列表</h2>
+  <ul id="big" aria-label="大列表"></ul>
+</main>
+<div class="modal" role="dialog" aria-modal="true" aria-label="新建项目" id="modal" hidden>
+  <label>项目名 <input></label>
+  <label>描述 <textarea></textarea></label>
+  <button id="modalClose">取消</button><button>创建</button>
+</div>
+<div class="toast" role="status" id="toast" hidden></div>
+<script>
+const $ = s => document.querySelector(s);
+$('#sidebar').innerHTML = Array.from({ length: 40 }, (_, i) => `<a href="#">文档 ${i + 1}</a><br>`).join('');
+const panelA = () => Array.from({ length: 12 }, (_, i) => `<p>概览段落 ${i + 1}：系统运行正常，指标 ${i * 7}。</p>`).join('');
+const panelB = () => Array.from({ length: 12 }, (_, i) => `<p>日志 ${i + 1}：请求 /api/v${i} 返回 200。</p>`).join('');
+$('#panel').innerHTML = panelA();
+let prices = Array.from({ length: 20 }, (_, i) => 100 + i);
+const renderProducts = () => { $('#products').innerHTML = prices.map((p, i) => `<li>商品 ${i + 1} <span>¥${p}</span> <button>加入购物车</button></li>`).join(''); };
+renderProducts();
+const feed = n => Array.from({ length: n }, (_, i) => `<li>动态 ${$('#feed').children.length + i + 1}</li>`).join('');
+$('#feed').innerHTML = feed(10);
+$('#big').innerHTML = Array.from({ length: 500 }, (_, i) => `<li>条目 ${i + 1}</li>`).join('');
+let count = 0;
+$('#counter').onclick = () => { count++; $('#counter').textContent = `已点击 ${count} 次`; };
+$('#menuBtn').onclick = () => {
+  const open = $('#menu').hidden;
+  $('#menu').innerHTML = ['复制', '重命名', '移动到', '导出', '归档', '删除'].map(t => `<li role="menuitem">${t}</li>`).join('');
+  $('#menu').hidden = !open; $('#menuBtn').setAttribute('aria-expanded', String(open));
+};
+let timer;
+$('#search').oninput = e => {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    const q = e.target.value;
+    $('#suggest').innerHTML = Array.from({ length: 8 }, (_, i) => `<li role="option">${q} 结果 ${i + 1}</li>`).join('');
+    $('#suggest').hidden = !q;
+  }, 150);
+};
+$('#modalBtn').onclick = () => { $('#modal').hidden = false; };
+$('#modalClose').onclick = () => { $('#modal').hidden = true; };
+$('#toastBtn').onclick = () => setTimeout(() => {
+  $('#toast').textContent = '已保存'; $('#toast').hidden = false;
+  setTimeout(() => { $('#toast').hidden = true; }, 3000);
+}, 800);
+$('#loadBtn').onclick = async () => { await fetch('/api/delay?ms=500'); $('#feed').insertAdjacentHTML('beforeend', feed(20)); };
+$('#form').onsubmit = e => {
+  e.preventDefault();
+  $('#e1').textContent = '用户名不能为空'; $('#e2').textContent = '邮箱格式错误'; $('#e3').textContent = '密码至少 8 位';
+};
+$('#tabB').onclick = () => { $('#tabA').setAttribute('aria-selected', 'false'); $('#tabB').setAttribute('aria-selected', 'true'); $('#panel').innerHTML = panelB(); };
+$('#tabA').onclick = () => { $('#tabB').setAttribute('aria-selected', 'false'); $('#tabA').setAttribute('aria-selected', 'true'); $('#panel').innerHTML = panelA(); };
+$('#routeBtn').onclick = () => {
+  history.pushState({}, '', '/settings');
+  $('#main').innerHTML = '<h1>设置</h1>' + Array.from({ length: 15 }, (_, i) => `<label>选项 ${i + 1} <input type="checkbox"></label>`).join('');
+};
+$('#rerenderBtn').onclick = () => { prices = prices.map((p, i) => i === 3 ? p + 1 : p); renderProducts(); };
+$('#keyedBtn').onclick = () => { prices[3] += 1; $('#products').children[3].querySelector('span').textContent = `¥${prices[3]}`; };
+$('#bigBtn').onclick = () => { $('#big').children[249].textContent = '条目 250（已更新）'; };
+$('#clockBtn').onclick = () => setInterval(() => { $('#clock').textContent = new Date().toISOString(); }, 200);
+</script>
+</body>
+</html>

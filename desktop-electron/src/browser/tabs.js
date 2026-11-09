@@ -51,6 +51,8 @@ export class BrowserTabs {
       ...(options.nativeOptions?.webContents ? { webContents: options.nativeOptions.webContents } : {}),
       webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload }
     });
+    // 先给出真实尺寸再隐藏：隐藏后再 setBounds 不会传到渲染进程，后台标签（AI 操作）的视口会是 0×0。
+    view.setBounds(browserBounds(manager) || { x: 0, y: 0, width: 1280, height: 800 });
     view.setVisible(false);
     view.setBackgroundColor(manager.surfaceColor);
     const tab = { id: options.id || randomUUID(), owner, profile, view, title: '', favicon: '', url: url || options.targetURL || 'about:blank', error: '', find: null,
@@ -59,6 +61,7 @@ export class BrowserTabs {
       previousId: manager.selected.get(owner) };
     const wc = view.webContents;
     manager.tabs.set(tab.id, tab); manager.window.contentView.addChildView(view);
+    view.setBounds(browserBounds(manager) || { x: 0, y: 0, width: 1280, height: 800 });
     manager.selected.set(owner, tab.id);
     const update = () => {
       if (wc.isDestroyed() || manager.disposed || tab.retiredDownload) return;
@@ -115,12 +118,12 @@ export class BrowserTabs {
     });
     wc.setWindowOpenHandler(({ url: destination }) => {
       try { navigationURL(destination); } catch { return { action: 'deny' }; }
-      if (tab.owner !== manager.owner || manager.tabs.size >= 48) return { action: 'deny' };
+      if ((tab.owner !== manager.owner && !manager.ai?.drivers.has(tab.id)) || manager.tabs.size >= 48) return { action: 'deny' };
       // Adopted popups are browser tabs: keep their lifetime independent of the opener.
       return { action: 'allow', outlivesOpener: true, overrideBrowserWindowOptions: { webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload } },
         createWindow: nativeOptions => this.create(null, { owner, profile, nativeOptions, targetURL: destination }).view.webContents };
     });
-    wc.once('destroyed', () => this.remove(tab));
+    wc.once('destroyed', () => { manager.ai?.release(tab); this.remove(tab); });
     this.persist(owner); manager.layout(); manager.publish();
     if (url && url !== 'about:blank') this.load(tab, url);
     return tab;
@@ -204,7 +207,11 @@ export class BrowserTabs {
       const visible = tab === active && manager.visible && !!bounds && tab.url !== 'about:blank' && !tab.pendingURL && !tab.error;
       if (!visible && tab.view.webContents.isFocused()) manager.mainView.webContents.focus();
       tab.view.setVisible(visible);
-      if (visible) tab.view.setBounds(bounds);
+      if (visible) {
+        tab.view.setBounds(bounds);
+        // AI 在后台操作时可能设置了视口尺寸模拟；显示后必须立即交还真实尺寸。
+        void manager.ai?.drivers.get(tab.id)?.clearViewport();
+      }
     }
     manager.stacking.apply(active);
   }

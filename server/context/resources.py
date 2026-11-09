@@ -181,6 +181,7 @@ def get_user_resources(username=None, workspace_id=None, update_session=True,
             created = False
         record = None if identity.is_api_user else state.user_manager.get_user(username)
         terminal.username = owner
+        terminal.workspace_id = workspace.workspace_id
         terminal.user_role = "admin" if host else ("api" if identity.is_api_user else _resolve_user_role(identity, record))
         terminal.quota_update_callback = None
         _set_terminal_workspace_label(terminal, getattr(workspace, "label", None) or workspace.workspace_id)

@@ -73,6 +73,8 @@ class ExecutionScope:
     working_dir: Optional[Path] = None
     review_input_fingerprint: Optional[str] = None
     review_username: Optional[str] = None
+    # 浏览器动作审批：本次批准的站点（Electron 发输入前核对页面仍在该站点）
+    browser_site: Optional[str] = None
 
     @property
     def is_sub_agent(self) -> bool:

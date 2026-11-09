@@ -3,6 +3,8 @@ export interface BrowserScope {
   mode: 'agent' | 'chat';
   workspace: string;
   conversation: string;
+  /** Stable desktop tab key; lets the main process migrate /new tabs to the conversation owner. */
+  key?: string;
 }
 export type BrowserInternalSection =
   | 'history'
@@ -113,6 +115,9 @@ export interface BrowserBridge {
   onShortcut: (callback: (event: BrowserEvent) => void) => () => void;
   onContextMenu: (callback: (event: BrowserEvent) => void) => () => void;
   onMessage: (callback: (event: BrowserEvent) => void) => () => void;
+  onAiActivity: (
+    callback: (event: { workspace: string; conversation: string }) => void
+  ) => () => void;
   onGeometryRequest: (callback: () => void) => () => void;
 }
 export function browserBridge(): BrowserBridge | undefined {

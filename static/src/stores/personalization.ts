@@ -133,6 +133,9 @@ interface PersonalForm {
   auto_open_terminal_panel: boolean;
   quick_dock_auto_expand: boolean;
   preview_auto_open: boolean;
+  browser_tools_default: boolean;
+  browser_auto_open: boolean;
+  browser_download_dir: string;
   file_preview_auto_wrap: boolean;
   edit_summary_live_display: boolean;
   modify_history_enabled: boolean;
@@ -371,6 +374,9 @@ const defaultForm = (): PersonalForm => ({
   auto_open_terminal_panel: true,
   quick_dock_auto_expand: loadCachedQuickDockAutoExpand(),
   preview_auto_open: false,
+  browser_tools_default: false,
+  browser_auto_open: true,
+  browser_download_dir: '',
   file_preview_auto_wrap: false,
   edit_summary_live_display: false,
   modify_history_enabled: true,
@@ -664,6 +670,9 @@ export const usePersonalizationStore = defineStore('personalization', {
         auto_open_terminal_panel: data.auto_open_terminal_panel !== false,
         quick_dock_auto_expand: data.quick_dock_auto_expand !== false,
         preview_auto_open: !!data.preview_auto_open,
+        browser_tools_default: data.browser_tools_default === true,
+        browser_auto_open: data.browser_auto_open !== false,
+        browser_download_dir: typeof data.browser_download_dir === 'string' ? data.browser_download_dir : '',
         file_preview_auto_wrap: !!data.file_preview_auto_wrap,
         edit_summary_live_display: !!data.edit_summary_live_display,
         modify_history_enabled: data.modify_history_enabled !== false,

@@ -106,6 +106,8 @@ class ToolsDefinitionMainMixin:
                 tools.extend(self._build_context_tools())
                 tools.extend(self._build_misc_tools())
                 tools.extend(self._build_workflow_tools())
+                # macOS 内置浏览器：仅桌面版 Agent 主对话；开关关闭时也注入（保持工具数组稳定）。
+                tools.extend(self._build_browser_tools())
                 # 多模态模型自带能力，不再暴露 vlm_analyze，改为 view_image / view_video
                 model_key = getattr(self, "model_key", None)
                 if model_key and (model_supports_image(model_key) or model_supports_video(model_key)):

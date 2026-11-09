@@ -163,6 +163,27 @@ export default {
   },
 
   // —— Structural field-name map (renderDefaultResult labelMap etc., nouns without colon) ——
+  browser: {
+    element: 'Element:',
+    target: 'Target:',
+    tab: 'Tab:',
+    text: 'Text:',
+    key: 'Key:',
+    account: 'Account:',
+    action: 'Action:',
+    value: 'Value:',
+    fields: 'Fields:',
+    function: 'Function:',
+    paths: 'Files:',
+    direction: 'Direction:',
+    level: 'Level:',
+    changed: 'Page changes',
+    full: 'Page snapshot',
+    unchanged: 'No page change',
+    screenshot: 'Screenshot:',
+    downloads: 'Downloads:',
+    dialog: 'Dialog:'
+  },
   fields: {
     path: 'Path',
     filePath: 'Path',

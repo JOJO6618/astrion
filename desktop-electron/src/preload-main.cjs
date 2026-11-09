@@ -33,6 +33,7 @@ if (process.platform === 'darwin') {
     onShortcut: callback => subscribe('browser:shortcut', callback),
     onContextMenu: callback => subscribe('browser:context-menu', callback),
     onMessage: callback => subscribe('browser:message', callback),
+    onAiActivity: callback => subscribe('browser:ai-activity', callback),
     onGeometryRequest: callback => subscribe('browser:geometry-request', callback)
   });
 }

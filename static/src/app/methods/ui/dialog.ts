@@ -61,8 +61,8 @@ export const dialogMethods = {
       // ignore
     }
   },
-  approveToolApproval(approvalId) {
-    return this.decideToolApproval(approvalId, 'approved');
+  approveToolApproval(approvalId, rememberSite = false) {
+    return this.decideToolApproval(approvalId, 'approved', rememberSite === true);
   },
   async fetchPendingPlanApprovals() {
     const owns = beginAuxiliaryRequest(this, 'plan-approvals');
@@ -293,7 +293,7 @@ export const dialogMethods = {
     }
     return true;
   },
-  async decideToolApproval(approvalId, decision) {
+  async decideToolApproval(approvalId, decision, rememberSite = false) {
     const owns = beginAuxiliaryRequest(this, 'tool-decision');
     const id = String(approvalId || '').trim();
     if (!id) {
@@ -310,7 +310,7 @@ export const dialogMethods = {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ decision })
+        body: JSON.stringify({ decision, ...(rememberSite ? { remember_site: true } : {}) })
       });
       const payload = await response.json().catch(() => ({}));
       if (!owns()) return;

@@ -187,6 +187,10 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "hide_quick_dock": False,  # 隐藏快捷窗口（对话区右侧的待办/子智能体/后台指令/文件窗口列）
     "quick_dock_auto_expand": True,  # 快捷窗口自动展开：True-有内容时自动展开 / False-只能手动点击按钮展开
     "preview_auto_open": False,  # 预览面板：检测到新预览目标时自动展开（默认关闭，仅亮徽章）
+    # macOS 内置浏览器（AI 操作）：新对话默认开关、模型操作时自动打开面板、模型下载目录
+    "browser_tools_default": False,
+    "browser_auto_open": True,
+    "browser_download_dir": "",
     "file_preview_auto_wrap": False,  # 文件预览窗口自动换行：True-按面板宽度换行显示 / False-长行横向滚动
     "edit_summary_live_display": False,  # 编辑摘要卡片显示时机：False-一次工作完成后才显示（默认） / True-工作运行期间实时显示
     "modify_history_enabled": True,  # 修改留痕：True-任务完成时把本轮净修改落盘到工作区 .astrion/modify_history/（默认开启） / False-不落盘也不注入 prompt
@@ -821,6 +825,16 @@ def sanitize_personalization_payload(
         base["preview_auto_open"] = bool(data.get("preview_auto_open"))
     else:
         base["preview_auto_open"] = bool(base.get("preview_auto_open", False))
+
+    # 内置浏览器（AI 操作）
+    for _key, _default in (("browser_tools_default", False), ("browser_auto_open", True)):
+        if _key in data:
+            base[_key] = bool(data.get(_key))
+        else:
+            base[_key] = bool(base.get(_key, _default))
+    _dir = data.get("browser_download_dir", base.get("browser_download_dir", ""))
+    _dir = str(_dir or "").strip()
+    base["browser_download_dir"] = _dir if len(_dir) <= 1024 and "\x00" not in _dir else ""
 
     # 文件预览窗口自动换行
     if "file_preview_auto_wrap" in data:

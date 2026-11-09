@@ -58,5 +58,12 @@ export function browserScopeForNavigation(
       return null;
     tab = target;
   }
-  return { mode: tab.conversationKind, workspace: tab.workspaceId, conversation: tab.key };
+  // The conversation id owns browser tabs so the model's tabs follow the conversation;
+  // /new tabs use the stable key until the first message creates the conversation.
+  return {
+    mode: tab.conversationKind,
+    workspace: tab.workspaceId,
+    conversation: tab.conversationId || tab.key,
+    key: tab.key
+  };
 }

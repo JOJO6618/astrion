@@ -77,6 +77,12 @@ def format_tool_result_for_context(function_name: str, result_data: Any, raw_tex
             return text
         return ""
 
+    if isinstance(function_name, str) and function_name.startswith("browser_") and isinstance(result_data, dict):
+        from modules.native_browser.tools import is_browser_tool
+        if is_browser_tool(function_name):
+            from modules.native_browser.formatter import format_for_model
+            return format_for_model(result_data)
+
     if function_name in {"read_file", "read_skill", "recall_project_memory"} and isinstance(result_data, dict):
         return format_read_file_result(result_data)
 

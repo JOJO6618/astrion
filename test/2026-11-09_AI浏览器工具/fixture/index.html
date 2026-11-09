@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><title>AI 浏览器测试页</title>
+<style>#cover{position:fixed;inset:0;background:#fff;display:none}#cover.on{display:block}</style></head>
+<body>
+<h1>测试页</h1>
+<button id="count" onclick="this.textContent='已点击 '+(++window.n||(window.n=1))">点击计数</button>
+<button onclick="document.getElementById('out').textContent=confirm('确定删除？')?'确认':'取消'">删除</button>
+<button onclick="alert('你好')">提示</button>
+<button onclick="setTimeout(()=>{const p=document.createElement('p');p.textContent='延迟出现';document.body.append(p)},700)">延迟</button>
+<button onclick="fetch('/api/delay?ms=600').then(r=>r.text()).then(t=>{document.getElementById('out').textContent='加载:'+t})">请求</button>
+<label>名字 <input id="name"></label>
+<label>密码 <input id="pw" type="password"></label>
+<label>颜色 <select id="color"><option value="r">红</option><option value="g">绿</option></select></label>
+<label><input type="checkbox" id="agree">同意</label>
+<input type="file" id="file" onchange="document.getElementById('out').textContent='文件:'+this.files[0].name">
+<a href="/page2.html">去第二页</a>
+<button onclick="document.getElementById('cover').classList.add('on')">遮挡</button>
+<p id="out">无</p>
+<div id="cover"></div>
+<script>console.error('fixture error message');document.getElementById('name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('out').textContent='提交:'+e.target.value})</script>
+</body></html>

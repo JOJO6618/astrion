@@ -8,6 +8,7 @@ from core.main_terminal_parts.tools_definition.agent_tools import ToolsDefinitio
 from core.main_terminal_parts.tools_definition.context_tools import ToolsDefinitionContextToolsMixin
 from core.main_terminal_parts.tools_definition.misc_tools import ToolsDefinitionMiscToolsMixin
 from core.main_terminal_parts.tools_definition.workflow_tools import ToolsDefinitionWorkflowToolsMixin
+from core.main_terminal_parts.tools_definition.browser_tools import ToolsDefinitionBrowserToolsMixin
 from core.main_terminal_parts.tools_definition.main import ToolsDefinitionMainMixin
 
 class MainTerminalToolsDefinitionMixin(
@@ -21,6 +22,7 @@ class MainTerminalToolsDefinitionMixin(
     ToolsDefinitionContextToolsMixin,
     ToolsDefinitionMiscToolsMixin,
     ToolsDefinitionWorkflowToolsMixin,
+    ToolsDefinitionBrowserToolsMixin,
     ToolsDefinitionMainMixin,
 ):
     pass

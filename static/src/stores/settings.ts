@@ -30,6 +30,7 @@ export type SettingsSection =
   | 'context'
   | 'files'
   | 'voice'
+  | 'browser'
   // 智能体
   | 'sub-agents'
   | 'review-agents'

@@ -605,6 +605,9 @@ async def run_deep_compression(
     }
     for frozen_key in REBUILD_FROZEN_KEYS:
         meta_updates[frozen_key] = None
+    # 内置浏览器：压缩后模型已看不到旧快照，递增代次让下次动作返回完整快照。
+    from modules.native_browser.state import BROWSER_EPOCH_META_KEY, next_epoch
+    meta_updates[BROWSER_EPOCH_META_KEY] = next_epoch(metadata)
     # 工具动态加载：压缩丢弃了历史中的 load_tools 定义（tool result 被标记重写），
     # loaded 状态必须随之前滚回滚，否则守门会放行「上下文里已无定义」的工具调用。
     try:

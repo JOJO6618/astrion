@@ -120,6 +120,9 @@ def _load_dotenv():
 
 _load_dotenv()
 
+# 桌面壳 AI 浏览器凭据：须在任何子进程启动前读出并关闭管道。
+from . import desktop_browser as _desktop_browser  # noqa: E402,F401
+
 from . import api as _api
 from . import search as _search
 from . import paths as _paths

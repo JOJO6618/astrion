@@ -59,14 +59,16 @@ def approval_execution_scope(
             task_id=task_id, tool_call_id=tool_call_id, workspace_root=root,
             fingerprint=fingerprint,
         )
+    browser = item.get("approval_type") == "browser_action"
     return ExecutionScope(
         executor_kind="main", actor_id=str(id(terminal)), workspace_root=root,
         access_level="full_access" if full or direct else "sandbox_write",
         conversation_id=cm.current_conversation_id, task_id=task_id,
-        tool_call_id=tool_call_id, write_granted=True,
+        tool_call_id=tool_call_id, write_granted=not browser,
         network_granted=full, full_access_grant=grant,
         review_input_fingerprint=reviewed_inputs,
         review_username=item.get("username"),
+        browser_site=item.get("browser_site") if item.get("approval_type") == "browser_action" else None,
     )
 
 

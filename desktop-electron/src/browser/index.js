@@ -11,7 +11,9 @@ import { BrowserContextMenu, contextMenuLabels } from './context-menu.js';
 import { relayBrowserInput } from './input.js';
 import { BrowserStacking } from './stacking.js';
 import { browserViewport, setBrowserSurfaceColor } from './geometry.js';
-import { scopeKey, trustedFrame, safeFilename, browserRoute, navigationURL } from './policy.js';
+import { scopeKey, scopeAlias, trustedFrame, safeFilename, browserRoute, navigationURL } from './policy.js';
+import { BrowserAI } from './ai/controller.js';
+import { setActiveBrowser } from './ai/endpoint.js';
 
 let browserDataRoot;
 export function setBrowserDataRoot(root) { browserDataRoot = root; }
@@ -24,6 +26,7 @@ export class NativeBrowser {
     this.overlayRaised = false;
     this.stacking = new BrowserStacking(this);
     this.downloadViews = new Set();
+    this.ai = new BrowserAI(this);
     this.surfaceColor = window.getBackgroundColor();
     mainView.setBackgroundColor(this.surfaceColor);
     this.invalidate = () => { this.contextMenu.close(); this.credentials.invalidate(); this.connectSequence++; this.lease = ''; this.visible = false; this.overlayRaised = false; this.layout(); this.features.forEach(feature => feature.denyStale()); };
@@ -32,6 +35,28 @@ export class NativeBrowser {
     });
     mainView.webContents.on('render-process-gone', this.invalidate);
     this.register();
+    setActiveBrowser(this);
+  }
+  ensureProfile(username) {
+    const key = String(username).toLowerCase();
+    let profile = this.profiles.get(key);
+    if (!profile) {
+      profile = new BrowserProfile(browserDataRoot || app.getPath('userData'), key);
+      profile.onError = message => this.message(message);
+      this.profiles.set(key, profile); this.features.set(profile.key, new BrowserFeatures(this, profile));
+    }
+    return profile;
+  }
+  /** /new 阶段以稳定标签 key 为 owner；对话创建后把标签与恢复记录迁移到对话 owner。 */
+  adoptOwner(profile, from, to) {
+    if (!from || from === to) return;
+    if ([...this.tabs.values()].some(tab => tab.owner === to) || profile.data.owners[to]) return;
+    const moving = [...this.tabs.values()].filter(tab => tab.owner === from);
+    if (!moving.length && !profile.data.owners[from]) return;
+    for (const tab of moving) tab.owner = to;
+    if (this.selected.has(from)) { this.selected.set(to, this.selected.get(from)); this.selected.delete(from); }
+    if (profile.data.owners[from]) { profile.data.owners[to] = profile.data.owners[from]; delete profile.data.owners[from]; profile.save(); }
+    this.ai.migrateOwner(from, to);
   }
   send(channel, data) {
     if (!this.disposed && !this.mainView.webContents.isDestroyed()) this.mainView.webContents.send(channel, data);
@@ -70,14 +95,10 @@ export class NativeBrowser {
     const data = await response.json(); this.check(event);
     if (sequence !== this.connectSequence) throw new Error('stale_browser_connect');
     if (!data.success || !data.session?.logged_in || !data.session.username) throw new Error('browser_desktop_login_required');
-    const username = String(data.session.username).toLowerCase();
-    let profile = this.profiles.get(username);
-    if (!profile) {
-      profile = new BrowserProfile(browserDataRoot || app.getPath('userData'), username);
-      profile.onError = message => this.message(message);
-      this.profiles.set(username, profile); this.features.set(profile.key, new BrowserFeatures(this, profile));
-    }
+    const profile = this.ensureProfile(String(data.session.username));
     this.credentials.invalidate();
+    const alias = scopeAlias(scope);
+    if (alias) this.adoptOwner(profile, `${profile.key}:${alias}`, `${profile.key}:${scopeId}`);
     this.profile = profile; this.owner = `${profile.key}:${scopeId}`; this.lease = randomUUID(); this.layoutSequence = 0;
     this.menuLabels = contextMenuLabels(labels);
     this.features.forEach(feature => feature.denyStale());
@@ -186,6 +207,7 @@ export class NativeBrowser {
   }
   dispose() {
     if (this.disposed) return;
+    this.ai.dispose(); setActiveBrowser(null, this);
     for (const owner of this.selected.keys()) this.registry.persist(owner);
     this.contextMenu.close();
     this.disposed = true; this.connectSequence++; this.lease = '';

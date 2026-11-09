@@ -15,7 +15,7 @@
         :deciding-approval-ids="decidingApprovalIds"
         :review-records="displayRecords"
         @close="$emit('collapse')"
-        @approve="$emit('approve', $event)"
+        @approve="(id, remember) => $emit('approve', id, remember)"
         @reject="$emit('reject', $event)"
       />
     </div>
@@ -38,7 +38,7 @@ const emit = defineEmits<{
   (event: 'layout-change'): void;
   (event: 'transitioning', active: boolean): void;
   (event: 'collapse'): void;
-  (event: 'approve', approvalId: string): void;
+  (event: 'approve', approvalId: string, rememberSite?: boolean): void;
   (event: 'reject', approvalId: string): void;
 }>();
 const panelVisible = computed(() => props.visible && !props.collapsed);

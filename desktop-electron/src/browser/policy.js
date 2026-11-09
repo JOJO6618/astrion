@@ -15,6 +15,12 @@ export function scopeKey(scope) {
   if (values.some(value => typeof value !== 'string' || value.length > 256 || /[\x00-\x1f]/.test(value))) throw new Error('invalid_browser_scope');
   return JSON.stringify(values);
 }
+/** 已绑定对话时，旧的稳定标签 key 作为别名，用于把 /new 阶段的标签迁移过来。 */
+export function scopeAlias(scope) {
+  if (typeof scope?.key !== 'string' || !scope.key || scope.key === scope.conversation) return '';
+  if (scope.key.length > 256 || /[\x00-\x1f]/.test(scope.key)) throw new Error('invalid_browser_scope');
+  return JSON.stringify([scope.mode, scope.workspace || '', scope.key]);
+}
 export function navigationURL(value, search = false) {
   if (typeof value !== 'string' || value.length > 8192) throw new Error('invalid_browser_url');
   const input = value.trim();
@@ -34,8 +40,10 @@ export function clipBounds(rect, mainBounds) {
   if (width < 1 || height < 1) return null;
   return { x: mainBounds.x + x, y: mainBounds.y + y, width, height };
 }
+// 与后端对话路由一致（server/app_legacy.py ConversationIdConverter）：
+// 对话页是裸路径 /<id>，旧式 /conv_<id> 仍兼容。
 export function browserRoute(pathname) {
-  return /^\/(?:$|new\/?$|conv_[a-zA-Z0-9_-]+\/?$|chat(?:\/[^/]+)?\/?$)/.test(pathname);
+  return /^\/(?:$|new\/?$|(?:conv_)?\d{8}_\d{6}_\d{3}\/?$|chat(?:\/[^/]+)?\/?$)/.test(pathname);
 }
 export function trustedFrame(event, view, origin) {
   try {

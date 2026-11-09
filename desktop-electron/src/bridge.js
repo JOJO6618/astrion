@@ -4,8 +4,11 @@
 //   POST /update/install    触发检查 → 下载 → 安装 → 重启（无感更新）
 //   GET  /update/progress   查询更新进度（前端经后端代理轮询）
 //   POST /window/drag       Electron 下窗口拖拽走 app-region CSS，此端点兼容空操作
+//   POST /browser/call      AI 浏览器操作（macOS 内置浏览器），必须带 X-Astrion-Browser-Token
+//   POST /browser/cancel    中断某次浏览器调用的等待（已送达网页的输入不可撤销）
 // 标签导航由后端 /api/conversation-tabs/commands 管理，不经原生控制桥。
-// 仅绑定 loopback，不鉴权：同机进程本就在同一威胁域内。
+// 仅绑定 loopback；更新类端点不鉴权。浏览器端点能操作已登录网站，
+// 校验桌面壳启动后端时经环境变量下发的随机 token。
 
 import http from 'node:http';
 import { app, autoUpdater as nativeAutoUpdater, dialog } from 'electron';
@@ -14,6 +17,7 @@ import { createUpdateInstaller } from './updater-install.js';
 import { createUpdaterLogger } from './updater-log.js';
 import { migrationPageHtml } from './migration-window.js';
 import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
+import { handleBrowserRequest, setBrowserToken } from './browser/ai/endpoint.js';
 
 /** 更新状态机（字符串与 Tauri 版一致，后端/前端按此渲染） */
 const UpdateState = {
@@ -129,6 +133,7 @@ async function tryStartInstall(isPackaged) {
  * @returns {Promise<number>} 实际监听端口
  */
 export function startBridge(ctx) {
+  setBrowserToken(ctx.browserToken);
   const server = http.createServer((req, res) => {
     const send = (status, obj) => {
       const body = JSON.stringify(obj);
@@ -207,6 +212,28 @@ export function startBridge(ctx) {
         applyRunDataRoot(payload)
           .then((result) => send(200, result))
           .catch((err) => send(400, { success: false, error: String(err?.message || err) }));
+      });
+      return;
+    }
+    if (req.method === 'POST' && (pathname === '/browser/call' || pathname === '/browser/cancel')) {
+      let body = '';
+      let tooLarge = false;
+      req.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 2 * 1024 * 1024) { tooLarge = true; req.destroy(); }
+      });
+      req.on('end', () => {
+        if (tooLarge) return;
+        let payload;
+        try {
+          payload = JSON.parse(body || '{}');
+        } catch {
+          send(400, { success: false, error: 'invalid_json' });
+          return;
+        }
+        handleBrowserRequest(pathname, req.headers, payload)
+          .then(([status, result]) => send(status, result))
+          .catch((err) => send(500, { success: false, error: String(err?.message || err) }));
       });
       return;
     }

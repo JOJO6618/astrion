@@ -170,6 +170,27 @@ export default {
   },
 
   // —— 结构性字段名映射（renderDefaultResult 的 labelMap 等，名词不带冒号）——
+  browser: {
+    element: '元素：',
+    target: '目标：',
+    tab: '标签：',
+    text: '文字：',
+    key: '按键：',
+    account: '账号：',
+    action: '操作：',
+    value: '值：',
+    fields: '字段：',
+    function: '函数：',
+    paths: '文件：',
+    direction: '方向：',
+    level: '级别：',
+    changed: '页面变化',
+    full: '页面快照',
+    unchanged: '页面无变化',
+    screenshot: '截图：',
+    downloads: '下载：',
+    dialog: '对话框：'
+  },
   fields: {
     path: '路径',
     filePath: '路径',

@@ -127,7 +127,7 @@ const CHILD_ENV_SCRUB_PREFIXES = ['ASTRION_', 'AGENT_'];
  * spawn 后端：环境清洗 → 显式指定数据根/桌面身份/控制桥端口。
  * @param {{python: string, backendDir: string, port: number, bridgePort: number | null, version: string, shellPath?: string | null}} opts
  */
-export function spawnBackend({ python, backendDir, port, bridgePort, version, shellPath, desktopDataRoot }) {
+export function spawnBackend({ python, backendDir, port, bridgePort, browserToken, version, shellPath, desktopDataRoot }) {
   // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建
   const defaultWs = os.homedir() || path.join(backendDir, 'project');
 
@@ -159,6 +159,12 @@ export function spawnBackend({ python, backendDir, port, bridgePort, version, sh
   // 桌面应用身份与控制桥地址：后端据此判定「自己是桌面壳内嵌实例」并代理更新接口
   env.ASTRION_DESKTOP_VERSION = version;
   if (bridgePort) env.ASTRION_DESKTOP_BRIDGE_PORT = String(bridgePort);
+  // AI 浏览器端点凭据经 fd 3 管道交给后端（读完即关），不放环境变量：
+  // macOS 上同用户进程可用 ps -E 读到启动环境，模型执行的命令不能拿到它。
+  delete env.ASTRION_DESKTOP_BROWSER_TOKEN;
+  delete env.ASTRION_DESKTOP_BROWSER_TOKEN_FD;
+  const passToken = !!(bridgePort && browserToken);
+  if (passToken) env.ASTRION_DESKTOP_BROWSER_TOKEN_FD = '3';
 
   const child = spawn(
     python,
@@ -166,10 +172,14 @@ export function spawnBackend({ python, backendDir, port, bridgePort, version, sh
     {
       cwd: backendDir,
       env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: passToken ? ['ignore', 'pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
       windowsHide: true
     }
   );
+  if (passToken) {
+    child.stdio[3].on('error', () => {});
+    child.stdio[3].end(`${browserToken}\n`);
+  }
 
   // 后端 stdout/stderr 转发（dev 终端可见；release 无控制台，后端日志走自身 logs/ 文件）
   child.stdout?.on('data', (chunk) => {

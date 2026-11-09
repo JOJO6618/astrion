@@ -163,7 +163,8 @@ def decide_tool_approval(terminal: WebTerminal, workspace: UserWorkspace, userna
     decision = str(data.get("decision") or "").strip().lower()
     try:
         item = runtime_service.resolve_approval(
-            "tool", username=username, item_id=approval_id, decision=decision
+            "tool", username=username, item_id=approval_id, decision=decision,
+            remember_site=data.get("remember_site") is True,
         )
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400

@@ -286,6 +286,23 @@ class CompressionMixin:
             memory_manager = (self._get_conversation_manager_for_id(self.current_conversation_id)
                               if hasattr(self, "_get_conversation_manager_for_id") else self.conversation_manager)
             memory_manager.update_conversation_metadata(self.current_conversation_id, memory_updates)
+        # 内置浏览器：被标记的旧快照从上下文消失，递增代次使下次动作返回完整快照。
+        try:
+            from modules.native_browser.state import BROWSER_EPOCH_META_KEY, next_epoch
+            _nb_conv_id = getattr(self, "current_conversation_id", None)
+            if _nb_conv_id:
+                _nb_meta = getattr(self, "conversation_metadata", None)
+                _nb_epoch = next_epoch(_nb_meta)
+                _nb_mgr = (
+                    self._get_conversation_manager_for_id(_nb_conv_id)
+                    if hasattr(self, "_get_conversation_manager_for_id")
+                    else self.conversation_manager
+                )
+                _nb_mgr.update_conversation_metadata(_nb_conv_id, {BROWSER_EPOCH_META_KEY: _nb_epoch})
+                if isinstance(_nb_meta, dict):
+                    _nb_meta[BROWSER_EPOCH_META_KEY] = _nb_epoch
+        except Exception:
+            pass
         # 工具动态加载：被标记的消息在构建时会被替换内容，load_tools 返回的
         # 工具定义随之从上下文消失，loaded 状态必须回滚（pending 回满）。
         try:

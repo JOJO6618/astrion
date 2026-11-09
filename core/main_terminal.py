@@ -442,6 +442,26 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 updates["pending_network_permission"] = None
                 self.pending_network_permission = None
 
+            # 浏览器开关（对话 metadata）：运行中切换在完整工具批次后生效并通知。
+            try:
+                from modules.native_browser.state import (
+                    BROWSER_ENABLED_META_KEY, BROWSER_PENDING_META_KEY, browser_mode,
+                )
+                meta = getattr(getattr(self, "context_manager", None), "conversation_metadata", None) or {}
+                pending_browser = meta.get(BROWSER_PENDING_META_KEY)
+                if pending_browser in {"on", "off"}:
+                    if pending_browser != browser_mode(self):
+                        updates[BROWSER_ENABLED_META_KEY] = pending_browser == "on"
+                        notices.append({
+                            "text": self.build_runtime_mode_switch_notice("browser_tools", pending_browser),
+                            "source": "browser_change",
+                            "kind": "browser_tools",
+                            "mode": pending_browser,
+                        })
+                    updates[BROWSER_PENDING_META_KEY] = None
+            except Exception:
+                pass
+
             if updates:
                 self._persist_runtime_mode_metadata(updates)
 

@@ -2,6 +2,7 @@
 import { t } from '@/locales';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import { conversationViewEpoch } from '../conversation/session';
+import { useBrowserToolsStore } from '@/stores/browserTools';
 
 /** The caller owns navigation; this request never selects a conversation. */
 export async function requestNewConversationView(workspaceId, previousConversationId, signal) {
@@ -31,6 +32,7 @@ export function captureNewConversationSettings(host) {
     permission_mode: host.currentPermissionMode,
     execution_mode: host.currentExecutionMode,
     network_permission: host.currentNetworkPermission,
+    browser_tools: useBrowserToolsStore().draft,
     restore_modes: { ...host.newConversationRestoreModes }
   };
 }
@@ -48,6 +50,7 @@ export const newConversationMethods = {
     this.currentPermissionMode = settings.permission_mode;
     this.currentExecutionMode = settings.execution_mode;
     this.currentNetworkPermission = settings.network_permission;
+    useBrowserToolsStore().draft = settings.browser_tools === true;
     this.newConversationRestoreModes = { ...settings.restore_modes };
     this.pendingPermissionMode = '';
     this.pendingExecutionMode = '';

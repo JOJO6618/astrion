@@ -130,12 +130,13 @@ class ModeMixin:
 
     # 运行期模式（权限/执行环境/网络权限/运行模式）切换通知的 kind 与 source 映射。
     # source 需与 server/chat_flow_task_support.py 的 _VALID_SOURCES 保持一致。
-    _RUNTIME_MODE_KINDS = ("permission_mode", "execution_mode", "network_permission", "work_mode")
+    _RUNTIME_MODE_KINDS = ("permission_mode", "execution_mode", "network_permission", "work_mode", "browser_tools")
     _RUNTIME_MODE_SOURCE = {
         "permission_mode": "permission_change",
         "execution_mode": "execution_change",
         "network_permission": "network_change",
         "work_mode": "work_mode_change",
+        "browser_tools": "browser_change",
     }
     # conversation metadata key：本对话「智能体已知晓」的运行期模式基线。
     # 只在通知真正注入对话后更新；空闲期切换不改它，从而在下一条 user 消息时
@@ -459,6 +460,14 @@ class ModeMixin:
                 modes["work_mode"] = str(self.get_work_mode() or "")
         except Exception:
             pass
+        try:
+            # 浏览器开关只在 macOS 桌面版 Agent 主对话有意义（工具与冻结段同条件注入）。
+            from modules.native_browser.availability import native_browser_supported
+            from modules.native_browser.state import browser_mode
+            if native_browser_supported() and getattr(self, "conversation_kind", "agent") != "chat":
+                modes["browser_tools"] = browser_mode(self)
+        except Exception:
+            pass
         return modes
 
     def get_runtime_mode_baseline(self) -> Dict[str, str]:
@@ -497,6 +506,10 @@ class ModeMixin:
             cur = current.get(kind)
             if not cur:
                 continue
+            if kind not in baseline and kind == "browser_tools":
+                # 新加入的开关种类：冻结段按当前值生成，基线静默对齐，不补发通知。
+                self.update_runtime_mode_baseline({kind: cur})
+                continue
             if baseline.get(kind) != cur:
                 drift.append({
                     "kind": kind,
@@ -519,6 +532,9 @@ class ModeMixin:
                 return self._build_execution_mode_switch_notice(mode)
             label = self._EXECUTION_MODE_LABEL.get(mode, mode)
             return f"执行环境被用户修改为 {label}"
+        if kind == "browser_tools":
+            from modules.native_browser.prompt import build_switch_notice
+            return build_switch_notice(mode)
         if kind == "work_mode":
             # 运行模式的行为规则差异大，切换通知必须携带完整新模式规则
             # （冻结的系统提示词仍是旧模式，以此为准覆盖）。

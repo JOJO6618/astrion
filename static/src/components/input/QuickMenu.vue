@@ -51,6 +51,23 @@
           <span class="entry-arrow">›</span>
         </button>
         <button
+          v-if="browserTools.supported"
+          type="button"
+          class="menu-entry"
+          :class="{ 'goal-entry-active': browserEffective }"
+          @click.stop="browserTools.set(currentConversationId, !browserEffective)"
+          :disabled="!isConnected || browserTools.busy"
+        >
+          {{ $t('quickdock.browserTools') }}
+          <span class="entry-arrow">{{
+            browserTools.pending
+              ? $t('quickdock.browserPending')
+              : browserEffective
+                ? $t('quickdock.browserOn')
+                : $t('quickdock.browserOff')
+          }}</span>
+        </button>
+        <button
           type="button"
           class="menu-entry"
           :class="{
@@ -180,7 +197,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
+import { useBrowserToolsStore } from '@/stores/browserTools';
 
 defineOptions({ name: 'QuickMenu' });
 
@@ -242,6 +260,18 @@ defineEmits<{
   (event: 'open-command-blocking'): void;
   (event: 'toggle-goal-mode'): void;
 }>();
+
+const browserTools = useBrowserToolsStore();
+const browserEffective = computed(() =>
+  props.currentConversationId ? browserTools.effective : browserTools.draft
+);
+watch(
+  () => [props.open, props.currentConversationId] as const,
+  ([open, conversationId]) => {
+    if (open) void browserTools.refresh(conversationId);
+  },
+  { immediate: true }
+);
 
 const getIconStyle = (key: string) => (props.iconStyle ? props.iconStyle(key) : {});
 

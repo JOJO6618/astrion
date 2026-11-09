@@ -26,6 +26,7 @@ def remember_workspace_defaults(terminal: Any, config: dict) -> None:
         "reasoning_effort": config.get("default_reasoning_effort"),
         "work_mode": config.get("default_work_mode") or "plan",
         "permission_mode": config.get("default_permission_mode") or "approval",
+        "browser_tools": config.get("browser_tools_default") is True,
     }
 
 
@@ -53,6 +54,7 @@ def draft_settings(terminal: Any) -> dict:
         "permission_mode": terminal.get_permission_mode(),
         "execution_mode": terminal.get_execution_mode(),
         "network_permission": terminal.get_network_permission(),
+        "browser_tools": meta.get("browser_tools_enabled") is True,
         "restore_modes": {key: meta.get(key) for key in RESTORE_KEYS},
     }
 
@@ -108,6 +110,7 @@ def prepare_draft_settings(terminal: Any, workspace: Any, previous_id: str | Non
     # Applying runtime constraints must not replace the draft's restoration record.
     context.conversation_metadata = {
         **modes, **restore, "chatgpt_fast_mode": previous.get("chatgpt_fast_mode") is True,
+        "browser_tools_enabled": defaults.get("browser_tools") is True,
     }
     terminal.pending_permission_mode = None
     terminal.pending_execution_mode = None
@@ -158,7 +161,11 @@ def validate_creation_settings(settings: Any, *, host_mode: bool, can_manage: bo
             raise ValueError(f"Invalid {key}")
         if value == "direct" and not (host_mode and can_manage):
             raise PermissionError("Direct execution restoration requires a host administrator")
+    browser_tools = settings.get("browser_tools")
+    if browser_tools is not None and not isinstance(browser_tools, bool):
+        raise ValueError("Invalid browser_tools")
     return {**{key: settings[key] for key in SETTING_KEYS},
+            "browser_tools": browser_tools,
             "chatgpt_fast_mode": fast_mode,
             "restore_modes": {key: restore.get(key) for key in RESTORE_KEYS}}
 
@@ -183,6 +190,11 @@ def create_from_settings(terminal: Any, workspace: Any, settings: Any) -> dict:
     metadata.update(pending_permission_mode=None,
                     pending_execution_mode=None, pending_network_permission=None)
     metadata.update(snapshot_overrides_from_prefs(prefs))
+    # 浏览器开关按对话保存；旧客户端未提交时取个人默认值。
+    browser_tools = resolved.get("browser_tools")
+    metadata["browser_tools_enabled"] = (
+        browser_tools if isinstance(browser_tools, bool) else prefs.get("browser_tools_default") is True
+    )
     with manager._io_lock:
         previous_id = manager.current_conversation_id
         try:

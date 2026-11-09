@@ -187,6 +187,7 @@ class RuntimeService:
         selected_option_id: Optional[str] = None,
         text: Optional[str] = None,
         dismissed: bool = False,
+        remember_site: bool = False,
     ) -> Dict[str, Any]:
         """统一裁决入口（approval.resolve）。kind 路由：
         - tool: decision ∈ {"approved","rejected"}（锁内单次裁决，重复回答返回现状）
@@ -199,7 +200,9 @@ class RuntimeService:
         if kind == "tool":
             if decision is None:
                 raise ValueError("runtime_context: tool 审批需 decision")
-            return tool_approval_manager.decide(item_id, username, str(decision), reason=comment)
+            return tool_approval_manager.decide(
+                item_id, username, str(decision), reason=comment, remember_site=remember_site is True
+            )
         if kind == "plan":
             if approved is None:
                 raise ValueError("runtime_context: plan 审批需 approved")

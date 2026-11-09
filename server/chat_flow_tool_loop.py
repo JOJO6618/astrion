@@ -1002,6 +1002,9 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
 
         if permission_eval.get("requires_approval"):
             approval_preview = _build_tool_approval_preview(web_terminal, function_name, arguments)
+            if permission_eval.get("approval_type") == "browser_action":
+                approval_preview["browser_site"] = permission_eval.get("browser_site")
+                approval_preview["browser_url"] = permission_eval.get("browser_url")
             approval_item = tool_approval_manager.create_request(
                 username=username,
                 conversation_id=conversation_id,
@@ -1014,6 +1017,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                 preview=approval_preview,
                 approval_type=permission_eval.get("approval_type", "sandbox_write"),
                 execution_mode=web_terminal.get_execution_mode(),
+                browser_site=permission_eval.get("browser_site"),
                 **resolve_approval_requirements(
                     permission_eval.get("mode"),
                     permission_eval.get("approval_type", "sandbox_write"),
@@ -1135,6 +1139,17 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
                         "last_tool_call_time": last_tool_call_time
                     }
                 continue
+            approved_item = wait_result.get("item") or {}
+            if (
+                approved_item.get("approval_type") == "browser_action"
+                and approved_item.get("remember_site") is True
+                and approved_item.get("browser_site")
+            ):
+                try:
+                    from modules.native_browser.site_permissions import grant_site
+                    grant_site(web_terminal.data_dir, approved_item["browser_site"])
+                except Exception as exc:
+                    debug_log(f"[Browser] 保存站点授权失败: {exc}")
             execution_scope = resolve_approval_authority(
                 web_terminal, arguments, wait_result.get("item") or {},
                 task_id=client_sid, tool_call_id=tool_call_id,
@@ -1588,7 +1603,7 @@ async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages
         tool_message_content = tool_result_content
 
         # view_image: 将图片直接附加到 tool 结果中（不再插入 user 消息）
-        if function_name == "view_image" and getattr(web_terminal, "pending_image_view", None):
+        if function_name in {"view_image", "browser_take_screenshot"} and getattr(web_terminal, "pending_image_view", None):
             inj = web_terminal.pending_image_view
             web_terminal.pending_image_view = None
             if (

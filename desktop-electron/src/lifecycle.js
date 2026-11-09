@@ -2,6 +2,7 @@
 // 迁移必须在后端启动前完成，避免运行中的日志与任务数据在复制/校验期间继续变化。
 
 import { app, dialog } from 'electron';
+import { randomBytes } from 'node:crypto';
 import {
   pickFreePort,
   spawnBackend,
@@ -32,8 +33,11 @@ export async function startBackendAndCreateWindow() {
   let migrationWindowClosed = false;
   let backendReady = false;
   let bridgePort = null;
+  // AI 浏览器端点的随机凭据：只经环境变量交给本次启动的后端，不落盘。
+  const browserToken = randomBytes(32).toString('hex');
   try {
     bridgePort = await startBridge({
+      browserToken,
       version: app.getVersion(),
       isPackaged: app.isPackaged,
       getMigrationProgress,
@@ -92,6 +96,7 @@ export async function startBackendAndCreateWindow() {
     backendDir,
     port,
     bridgePort,
+    browserToken: process.platform === 'darwin' ? browserToken : null,
     version: app.getVersion(),
     shellPath: shellEnvironment.path,
     desktopDataRoot
