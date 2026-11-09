@@ -22,12 +22,23 @@ export function scopeAlias(scope) {
   if (scope.key.length > 256 || /[\x00-\x1f]/.test(scope.key)) throw new Error('invalid_browser_scope');
   return JSON.stringify([scope.mode, scope.workspace || '', scope.key]);
 }
+// Keep in sync with desktop/src-tauri/src/browser/policy.rs SEARCH_ENGINES.
+export const SEARCH_ENGINES = {
+  google: 'https://www.google.com/search?q=',
+  bing_cn: 'https://cn.bing.com/search?q=',
+  bing: 'https://www.bing.com/search?q=',
+  baidu: 'https://www.baidu.com/s?wd='
+};
+export function searchURL(engine, query) {
+  return `${SEARCH_ENGINES[engine] || SEARCH_ENGINES.google}${encodeURIComponent(query)}`;
+}
+/** search: false, or a search engine key (true means the default engine). Keywords become a search URL. */
 export function navigationURL(value, search = false) {
   if (typeof value !== 'string' || value.length > 8192) throw new Error('invalid_browser_url');
   const input = value.trim();
   if (!input || input === 'about:blank') return 'about:blank';
   if (search && !/^https?:\/\//i.test(input) && !/^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(input) && !/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(input)) {
-    return `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+    return searchURL(search === true ? 'google' : search, input);
   }
   const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(input) && !/^[\w.-]+:\d/.test(input) ? input : `${/^(localhost|127\.0\.0\.1|\[::1\])/.test(input) ? 'http' : 'https'}://${input}`);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('unsupported_browser_url');

@@ -1,5 +1,5 @@
 import { Menu, clipboard } from 'electron';
-import { navigationURL, manualNavigationURL, isLocalFile } from './policy.js';
+import { navigationURL, manualNavigationURL, isLocalFile, searchURL } from './policy.js';
 
 const DEFAULT_LABELS = {
   back: 'Back', forward: 'Forward', reload: 'Reload', find: 'Find in page',
@@ -58,7 +58,7 @@ export class BrowserContextMenu {
     } else if (params.selectionText) {
       groups.push([
         item('copy', () => wc.copy(), params.editFlags?.canCopy !== false),
-        item('searchSelection', () => manager.registry.create(`https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`))
+        item('searchSelection', () => manager.registry.create(searchURL(tab.profile.searchEngine(), params.selectionText)))
       ]);
     }
     if (params.linkURL) {

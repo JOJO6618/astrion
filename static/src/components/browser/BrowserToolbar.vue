@@ -43,6 +43,7 @@
             : undefined
         "
         @focus="focusAddress"
+        @click="reopenSuggestions"
         @blur="blurSuggestions"
         @input="inputSuggestions"
         @keydown="suggestionKeys"
@@ -152,6 +153,7 @@ const {
   open: suggestionsOpen,
   selected: suggestionIndex,
   input: inputSuggestions,
+  reopen: reopenSuggestions,
   blur: blurSuggestions,
   keydown: suggestionKeys
 } = addressSuggestions;

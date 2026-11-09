@@ -94,7 +94,7 @@ impl Browser {
         let url = if policy::internal(url).is_some() {
             url.to_owned()
         } else {
-            policy::manual_navigation(url, true)?
+            policy::manual_navigation_with(url, Some(&self.search_engine()))?
         };
         let tab = Tab::new(&self.owner, &self.profile, &url, self.active_id());
         let id = tab.id.clone();
@@ -218,7 +218,30 @@ impl Browser {
             self.fail_tab(id, &error);
         }
         self.layout();
+        self.reclaim_focus_after_create();
         self.publish();
+    }
+    /// WebView2 grabs keyboard focus while a controller is being created, even for a hidden
+    /// tab. When no page is on screen the app UI (address bar, new-tab page, composer) owns
+    /// typing, so give focus back — but only while Astrion is the foreground window.
+    fn reclaim_focus_after_create(&self) {
+        unsafe {
+            if self
+                .tabs
+                .iter()
+                .any(|tab| !tab.host.is_invalid() && IsWindowVisible(tab.host).as_bool())
+            {
+                return;
+            }
+            let Some(window) = self.app.get_window("main") else {
+                return;
+            };
+            let Ok(parent) = window.hwnd() else { return };
+            if GetForegroundWindow() != HWND(parent.0) {
+                return;
+            }
+        }
+        self.focus_main();
     }
     pub fn popup(
         &mut self,
@@ -302,7 +325,6 @@ impl Browser {
         let previous = self.tabs[index].previous.clone();
         self.credentials.remove(id);
         self.deny_tab_permissions(id);
-        self.reject_page_dialog(id);
         self.ai.subscribed.remove(id);
         if let Some((args, deferral)) = self.popups.remove(id) {
             unsafe {

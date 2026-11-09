@@ -99,15 +99,24 @@ impl Browser {
             .clone()
             .ok_or("browser_page_not_ready".into())
     }
+    /// Search engine of the active profile; keywords typed or sent by the model search here.
+    pub fn search_engine(&self) -> String {
+        self.profiles
+            .get(&self.profile)
+            .map(|p| p.search_engine().to_owned())
+            .unwrap_or_else(|| "google".into())
+    }
     pub fn snapshot(&mut self) -> Value {
         self.revision += 1;
         let profile = self.profiles.get(&self.profile);
         json!({"lease":self.lease,"revision":self.revision,"activeId":self.active_id(),
             "tabs":self.tabs.iter().filter(|tab|tab.owner==self.owner && !tab.retired).map(Tab::snapshot).collect::<Vec<_>>(),
             "history":profile.map(|p|p.data.history.clone()).unwrap_or_default(),
+            "settings":profile.map(|p|json!(p.data.settings)).unwrap_or_else(|| json!({"searchEngine":""})),
+            "shortcuts":profile.map(|p|json!(p.data.shortcuts)).unwrap_or_else(|| json!({"pinned":[],"hidden":[]})),
             "downloads":profile.map(|p|p.data.downloads.iter().map(|row|{let mut row=row.clone();row.as_object_mut().unwrap().remove("path");row}).collect::<Vec<_>>()).unwrap_or_default(),
             "permissions":self.permissions.iter().filter(|(_,p)|p.owner==self.owner).map(|(id,p)|json!({"id":id,"tabId":p.tab,"permission":p.kind,"origin":p.origin})).collect::<Vec<_>>(),
-            "credentials":self.credential_snapshot(),"dialog":self.page_dialog_snapshot()})
+            "credentials":self.credential_snapshot()})
     }
     pub fn send(&self, event: &str, value: Value) {
         if self.document.is_empty() {
@@ -356,7 +365,6 @@ impl Browser {
             Event::AiMessage(value) => self.ai_message(value),
             Event::AiReply(id, result) => self.ai_reply(&id, result),
             Event::AiProtocol(id, method, value) => self.ai_event(&id, &method, value),
-            Event::AiDialog(id, args, deferral) => self.ai_dialog(id, args, deferral),
             Event::Request(source, value) => self.request(&source, &value),
             Event::Tick => {
                 self.expire();

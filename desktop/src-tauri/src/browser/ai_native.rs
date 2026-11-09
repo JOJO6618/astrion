@@ -75,24 +75,9 @@ impl Browser {
                     &mut token,
                 ))?;
             }
-            native_error(
-                wc.Settings()
-                    .and_then(|settings| settings.SetAreDefaultScriptDialogsEnabled(false)),
-            )?;
-            let app = self.app.clone();
-            let tab = id.to_owned();
-            native_error(wc.add_ScriptDialogOpening(
-                &ScriptDialogOpeningEventHandler::create(Box::new(move |_, args| {
-                    if let Some(args) = args {
-                        enqueue(
-                            &app,
-                            Event::AiDialog(tab.clone(), args.clone(), args.GetDeferral()?),
-                        );
-                    }
-                    Ok(())
-                })),
-                &mut token,
-            ))?;
+            // Script dialogs stay WebView2's native UI (same as Electron on macOS). The model
+            // sees them through Page.javascriptDialogOpening and answers with
+            // Page.handleJavaScriptDialog, which closes the native dialog.
         }
         self.ai.subscribed.insert(id.to_owned());
         if let Some(controller) = self
@@ -115,26 +100,6 @@ impl Browser {
             }
         }
         Ok(())
-    }
-    pub fn ai_dialog(
-        &mut self,
-        id: String,
-        args: ICoreWebView2ScriptDialogOpeningEventArgs,
-        deferral: ICoreWebView2Deferral,
-    ) {
-        let value = unsafe {
-            let mut kind = COREWEBVIEW2_SCRIPT_DIALOG_KIND_ALERT;
-            let _ = args.Kind(&mut kind);
-            json!({"type":match kind {COREWEBVIEW2_SCRIPT_DIALOG_KIND_CONFIRM=>"confirm",COREWEBVIEW2_SCRIPT_DIALOG_KIND_PROMPT=>"prompt",COREWEBVIEW2_SCRIPT_DIALOG_KIND_BEFOREUNLOAD=>"beforeunload",_=>"alert"},"message":text(|out|args.Message(out)).unwrap_or_default(),"defaultPrompt":text(|out|args.DefaultText(out)).unwrap_or_default(),"url":text(|out|args.Uri(out)).unwrap_or_default()})
-        };
-        if let Some((_, old)) = self.ai.dialogs.insert(id.clone(), (args, deferral)) {
-            unsafe {
-                let _ = old.Complete();
-            }
-        }
-        self.new_dialog_id(&id);
-        self.ai_event(&id, "Page.javascriptDialogOpening", value);
-        self.publish();
     }
     pub fn ai_native(&mut self, request: &Value) {
         let result = self.ai_native_checked(request);
@@ -234,15 +199,6 @@ impl Browser {
                         }
                     }
                 }
-                if method == "Page.handleJavaScriptDialog" {
-                    self.resolve_page_dialog(
-                        id,
-                        None,
-                        params["accept"] == true,
-                        params["promptText"].as_str(),
-                    )?;
-                    return Ok(Some(json!({})));
-                }
                 self.ai_subscribe(id, &wc)?;
                 let app = self.app.clone();
                 let reply = request["id"].clone();
@@ -258,6 +214,7 @@ impl Browser {
                         Some("back") => native_error(wc.GoBack())?,
                         Some("forward") => native_error(wc.GoForward())?,
                         _ => {
+                            // The shared controller already turned keywords into a search URL.
                             let url = policy::manual_navigation(
                                 data["url"].as_str().ok_or("invalid_browser_url")?,
                                 false,

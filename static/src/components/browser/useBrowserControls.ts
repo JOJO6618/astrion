@@ -129,9 +129,11 @@ export function useBrowserControls() {
     closePopovers();
     downloadsOpen.value = show;
   }
+  let quietAddressFocus = false;
   function focusAddress(event: FocusEvent) {
     closePopovers();
-    addressSuggestions.focus();
+    addressSuggestions.focus(quietAddressFocus);
+    quietAddressFocus = false;
     (event.target as HTMLInputElement).select();
   }
   function chooseAddress(url: string) {
@@ -160,7 +162,18 @@ export function useBrowserControls() {
     closePopovers();
     await store.command('new');
     await nextTick();
-    address.value?.focus();
+    const input = address.value;
+    if (!input) return;
+    // New tabs land in the address bar like other browsers, without popping recent visits.
+    if (document.activeElement === input) {
+      addressSuggestions.focus(true);
+      input.select();
+    } else {
+      // Kept until the focus event consumes it: if the window regains OS focus later,
+      // the deferred focus event must still stay quiet.
+      quietAddressFocus = true;
+      input.focus();
+    }
   }
   function selectTab(id: string) {
     closePopovers();

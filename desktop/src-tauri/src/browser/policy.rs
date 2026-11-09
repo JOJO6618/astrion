@@ -81,7 +81,27 @@ pub fn trusted(source: &str, current: &str, origin: &str) -> bool {
         && Url::parse(source)
             .is_ok_and(|url| url.origin().ascii_serialization() == origin && route(url.path()))
 }
+/// Keep in sync with desktop-electron/src/browser/policy.js SEARCH_ENGINES.
+pub const SEARCH_ENGINES: [(&str, &str, &str); 4] = [
+    ("google", "https://www.google.com/search", "q"),
+    ("bing_cn", "https://cn.bing.com/search", "q"),
+    ("bing", "https://www.bing.com/search", "q"),
+    ("baidu", "https://www.baidu.com/s", "wd"),
+];
+pub fn search_url(engine: &str, query: &str) -> String {
+    let (_, base, key) = SEARCH_ENGINES
+        .iter()
+        .find(|(name, _, _)| *name == engine)
+        .unwrap_or(&SEARCH_ENGINES[0]);
+    let mut url = Url::parse(base).unwrap();
+    url.query_pairs_mut().append_pair(key, query);
+    url.into()
+}
 pub fn navigation(input: &str, search: bool) -> Result<String, String> {
+    navigation_with(input, search.then_some("google"))
+}
+/// `engine`: turn keywords into a search on that engine; None rejects non-URL input.
+pub fn navigation_with(input: &str, engine: Option<&str>) -> Result<String, String> {
     let input = input.trim();
     if input.len() > 8192 {
         return Err("invalid_browser_url".into());
@@ -100,10 +120,8 @@ pub fn navigation(input: &str, search: bool) -> Result<String, String> {
     let head = input.split('/').next().unwrap_or("");
     let looks_like_host = !input.chars().any(char::is_whitespace)
         && (head.contains('.') || head.starts_with("localhost") || head.starts_with("[::1]"));
-    if search && !looks_like_host {
-        let mut url = Url::parse("https://www.google.com/search").unwrap();
-        url.query_pairs_mut().append_pair("q", input);
-        return Ok(url.into());
+    if let Some(engine) = engine.filter(|_| !looks_like_host) {
+        return Ok(search_url(engine, input));
     }
     let local =
         head.starts_with("localhost") || head.starts_with("127.0.0.1") || head.starts_with("[::1]");
@@ -125,8 +143,11 @@ fn validated(input: &str) -> Result<String, String> {
 }
 /// Local file syntax; AI additionally requires a backend grant, credential origins stay web-only.
 pub fn manual_navigation(input: &str, search: bool) -> Result<String, String> {
+    manual_navigation_with(input, search.then_some("google"))
+}
+pub fn manual_navigation_with(input: &str, engine: Option<&str>) -> Result<String, String> {
     if !input.trim().to_ascii_lowercase().starts_with("file:") {
-        return navigation(input, search);
+        return navigation_with(input, engine);
     }
     let url = Url::parse(input.trim()).map_err(|_| "invalid_browser_url")?;
     if input.len() > 8192

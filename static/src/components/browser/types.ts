@@ -57,13 +57,19 @@ export interface BrowserSnapshot {
   downloads: BrowserDownload[];
   permissions: BrowserPermission[];
   credentials?: CredentialSnapshot;
-  dialog?: {
-    id: string;
-    tabId: string;
-    kind: 'alert' | 'confirm' | 'prompt' | 'beforeunload';
-    message: string;
-    defaultPrompt: string;
-  } | null;
+  /** Empty searchEngine means "not chosen yet"; the panel fills a language-based default. */
+  settings?: { searchEngine?: BrowserSearchEngine | '' };
+  shortcuts?: BrowserShortcuts;
+}
+export type BrowserSearchEngine = 'google' | 'bing_cn' | 'bing' | 'baidu';
+export interface BrowserShortcut {
+  url: string;
+  title: string;
+}
+/** pinned: user-added or pinned tiles, in order. hidden: site keys removed from "most visited". */
+export interface BrowserShortcuts {
+  pinned: BrowserShortcut[];
+  hidden: string[];
 }
 export interface BrowserRect {
   x: number;

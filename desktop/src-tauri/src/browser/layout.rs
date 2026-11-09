@@ -86,6 +86,7 @@ impl Browser {
             .floor()
             .max(0.)
             .min((main_bounds.bottom - top).max(0) as f64) as i32;
+        let mut refocus_main = false;
         for tab in &self.tabs {
             let Some(controller) = &tab.controller else {
                 continue;
@@ -101,6 +102,9 @@ impl Browser {
                 && height > 0;
             unsafe {
                 if !show {
+                    // A hidden child HWND keeps keyboard focus on Windows; hand it back to the
+                    // app UI so the address bar / new-tab page can receive typing.
+                    refocus_main |= IsWindowVisible(tab.host).as_bool();
                     let _ = controller.SetIsVisible(false);
                     let _ = ShowWindow(tab.host, SW_HIDE);
                     continue;
@@ -145,10 +149,13 @@ impl Browser {
                 let _ = controller.SetIsVisible(true);
             }
         }
-        if self.geometry["focusFind"] == true {
-            if let Some(main) = self.app.get_webview("main") {
-                let _ = main.set_focus();
-            }
+        if refocus_main || self.geometry["focusFind"] == true {
+            self.focus_main();
+        }
+    }
+    pub fn focus_main(&self) {
+        if let Some(main) = self.app.get_webview("main") {
+            let _ = main.set_focus();
         }
     }
     pub fn apply_layout(&mut self, value: &Value) -> Result<(), String> {

@@ -105,6 +105,9 @@
   font-size: 12px;
 }
 .nb-newtab {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -139,34 +142,82 @@
 }
 .nb-quicklinks {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 17px;
+  gap: 8px 12px;
+  max-width: 470px;
   margin-top: 32px;
 }
-.nb-quicklinks button {
-  width: 78px;
-  height: 83px;
-  padding: 8px 3px;
+.nb-shortcut {
+  position: relative;
+  width: 84px;
+}
+.nb-shortcut-open {
+  width: 100%;
+  height: 86px;
+  padding: 10px 4px 6px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   font-size: 11px;
 }
-.nb-quicklinks button:hover {
+.nb-shortcut-open:hover,
+.nb-shortcut.menu-open .nb-shortcut-open {
   background: var(--surface-soft);
 }
-.nb-shortcut-icon,
-.nb-quicklinks > button > .nb-icon {
+.nb-shortcut-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-shortcut-more {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  opacity: 0;
+}
+.nb-shortcut-more .nb-icon {
+  width: 14px;
+  height: 14px;
+}
+.nb-shortcut:hover .nb-shortcut-more,
+.nb-shortcut.menu-open .nb-shortcut-more,
+.nb-shortcut-more:focus-visible {
+  opacity: 1;
+}
+.nb-shortcut-more:hover {
+  background: var(--surface-muted);
+}
+/* Must beat .nb-popover (declared later), whose max-height is relative to the 86px tile. */
+.nb-popover.nb-shortcut-menu {
+  top: 26px;
+  left: 60px;
+  width: 132px;
+  max-height: none;
+}
+.nb-shortcut-menu .nb-menu-row:disabled {
+  color: var(--text-tertiary);
+  background: transparent;
+}
+.nb-shortcut-icon {
   box-sizing: border-box;
   width: 38px;
   height: 38px;
   border-radius: 50%;
-}
-.nb-shortcut-icon {
   display: grid;
   place-items: center;
   background: var(--surface-muted);
@@ -175,10 +226,63 @@
   width: 20px;
   height: 20px;
 }
-.nb-quicklinks > button > .nb-icon {
-  border: 10px solid var(--surface-muted);
-  background: var(--text-primary);
-  mask-size: 18px;
+.nb-shortcut-add .nb-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+.nb-shortcut-editor-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--overlay-scrim);
+}
+.nb-shortcut-editor {
+  box-sizing: border-box;
+  width: 340px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+.nb-shortcut-editor strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.nb-shortcut-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.nb-shortcut-editor input {
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.nb-shortcut-editor input[aria-invalid='true'] {
+  border-color: var(--state-danger);
+}
+.nb-shortcut-error {
+  color: var(--state-danger);
+  font-size: 11px;
+}
+.nb-shortcut-editor footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .nb-load-error {
   display: flex;

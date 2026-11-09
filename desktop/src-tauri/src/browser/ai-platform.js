@@ -103,14 +103,25 @@ function synchronize(rows, owner, reserved) {
     else manager.tabs.set(tab.id, tab);
   }
 }
+// Keep in sync with policy.rs SEARCH_ENGINES and desktop-electron policy.js.
+const SEARCH_ENGINES = {
+  google: 'https://www.google.com/search?q=',
+  bing_cn: 'https://cn.bing.com/search?q=',
+  bing: 'https://www.bing.com/search?q=',
+  baidu: 'https://www.baidu.com/s?wd='
+};
 const platform = {
   path: { resolve: value => value },
   // Paths were canonicalized by the shared backend and are rechecked natively at use.
   fs: { statSync: () => ({ isFile: () => true }) },
   profileKey: username => manager.ensureProfile(username).key,
-  manualNavigationURL(value) {
+  // search: false or the profile's engine key. Mirrors navigationURL in desktop-electron policy.js.
+  manualNavigationURL(value, search = false) {
     if (value === 'about:blank') return value;
-    const url = new URL(value);
+    const input = String(value).trim();
+    if (search && input.length <= 8192 && !/^[a-z][a-z\d+.-]*:/i.test(input) && !/^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(input) && !/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(input))
+      return `${SEARCH_ENGINES[search] || SEARCH_ENGINES.google}${encodeURIComponent(input)}`;
+    const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(input) && !/^[\w.-]+:\d/.test(input) ? input : `${/^(localhost|127\.0\.0\.1|\[::1\])/.test(input) ? 'http' : 'https'}://${input}`);
     if (!['http:', 'https:', 'file:'].includes(url.protocol) || url.username || url.password) throw new Error('invalid_browser_url');
     if (url.protocol === 'file:' && ((url.hostname && url.hostname !== 'localhost') || !/^\/[a-z]:\//i.test(url.pathname))) throw new Error('invalid_browser_url');
     return url.href;

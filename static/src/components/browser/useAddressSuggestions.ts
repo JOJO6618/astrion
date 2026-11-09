@@ -32,11 +32,16 @@ export function useAddressSuggestions(text: Ref<string>) {
     recentAddresses(store.snapshot?.history || [], edited.value ? text.value : '')
   );
   const open = computed(() => focused.value && !dismissed.value && items.value.length > 0);
-  function focus() {
+  /** quiet: focus without showing recent visits until the user types or presses an arrow key. */
+  function focus(quiet = false) {
     focused.value = true;
     edited.value = false;
-    dismissed.value = false;
+    dismissed.value = quiet;
     selected.value = -1;
+  }
+  /** Clicking an already focused, quiet address bar brings the list back. */
+  function reopen() {
+    if (focused.value) dismissed.value = false;
   }
   function close() {
     dismissed.value = true;
@@ -85,6 +90,7 @@ export function useAddressSuggestions(text: Ref<string>) {
     open,
     selected,
     focus,
+    reopen,
     close,
     input,
     keydown,

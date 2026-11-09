@@ -27,10 +27,13 @@ export function browserViewport(value) {
 }
 
 export function setBrowserSurfaceColor(manager, color) {
-  if (typeof color !== 'string' || !/^#[a-f\d]{6}$/i.test(color) || color === manager.surfaceColor) return;
-  manager.surfaceColor = color;
+  if (typeof color !== 'string' || !/^#[a-f\d]{6}$/i.test(color)) return;
+  color = color.toLowerCase();
+  // 初始主题可能与缓存相同，但窗口根 View 仍需要明确的不透明背景。
   manager.window.setBackgroundColor(color);
   manager.window.contentView.setBackgroundColor(color);
+  if (color === manager.surfaceColor) return;
+  manager.surfaceColor = color;
   for (const tab of manager.tabs.values()) {
     if (!tab.view.webContents.isDestroyed()) tab.view.setBackgroundColor(color);
   }

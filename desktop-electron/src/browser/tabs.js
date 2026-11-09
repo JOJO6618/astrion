@@ -131,7 +131,7 @@ export class BrowserTabs {
     return tab;
   }
   load(tab, value) {
-    const url = manualNavigationURL(value, true);
+    const url = manualNavigationURL(value, tab.profile.searchEngine());
     if (tab.section) return this.create(url, { id: tab.id, owner: tab.owner, profile: tab.profile });
     tab.error = ''; tab.url = url; tab.pendingURL = url;
     const sequence = tab.loadSequence = (tab.loadSequence || 0) + 1;

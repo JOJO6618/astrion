@@ -98,7 +98,18 @@
 }
 .nb-theme-options {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 3px;
+}
+.nb-setting-wrap {
+  height: auto;
+  min-height: 68px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.nb-setting-wrap > span {
+  flex: none;
 }
 .nb-theme-options button {
   height: 29px;

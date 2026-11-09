@@ -76,15 +76,6 @@ impl Browser {
             .unwrap_or_else(|| self.active_id());
         let value = &input["value"];
         match action {
-            "dialog" => {
-                self.index(&id)?;
-                self.resolve_page_dialog(
-                    &id,
-                    Some(value["id"].as_str().ok_or("invalid_browser_dialog")?),
-                    value["accept"] == true,
-                    value["prompt"].as_str(),
-                )?;
-            }
             "new" => {
                 self.create_tab(value.as_str().unwrap_or("about:blank"))?;
             }
@@ -124,7 +115,7 @@ impl Browser {
                 if policy::internal(target).is_some() {
                     self.create_tab(target)?;
                 } else {
-                    let url = policy::manual_navigation(target, true)?;
+                    let url = policy::manual_navigation_with(target, Some(&self.search_engine()))?;
                     if id.is_empty() {
                         self.create_tab(&url)?;
                     } else {
@@ -172,6 +163,30 @@ impl Browser {
             "permission" => self.resolve_permission(&id, value == true)?,
             "download-cancel" | "download-reveal" | "download-remove" => {
                 self.download_command(action, &id)?
+            }
+            "search-engine" => {
+                let engine = value.as_str().ok_or("invalid_browser_search_engine")?;
+                if !policy::SEARCH_ENGINES
+                    .iter()
+                    .any(|(name, _, _)| *name == engine)
+                {
+                    return Err("invalid_browser_search_engine".into());
+                }
+                let p = self
+                    .profiles
+                    .get_mut(&self.profile)
+                    .ok_or("browser_profile_missing")?;
+                p.data.settings.search_engine = engine.to_owned();
+                p.save()?;
+            }
+            "shortcuts" => {
+                let shortcuts = super::model::Shortcuts::normalize(value, true)?;
+                let p = self
+                    .profiles
+                    .get_mut(&self.profile)
+                    .ok_or("browser_profile_missing")?;
+                p.data.shortcuts = shortcuts;
+                p.save()?;
             }
             "history-remove" => {
                 let p = self

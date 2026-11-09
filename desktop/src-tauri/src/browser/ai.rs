@@ -26,14 +26,6 @@ pub struct AI {
     pub ready: bool,
     pub calls: HashMap<String, Pending>,
     pub subscribed: HashSet<String>,
-    pub dialogs: HashMap<
-        String,
-        (
-            ICoreWebView2ScriptDialogOpeningEventArgs,
-            ICoreWebView2Deferral,
-        ),
-    >,
-    pub dialog_ids: HashMap<String, String>,
     pub download_dirs: HashMap<String, (std::path::PathBuf, u64)>,
 }
 impl Drop for AI {
@@ -42,11 +34,6 @@ impl Drop for AI {
             let _ = call
                 .response
                 .send(json!({"success":false,"code":"browser_closed","error":"浏览器已关闭。"}));
-        }
-        for (_, (_, deferral)) in self.dialogs.drain() {
-            unsafe {
-                let _ = deferral.Complete();
-            }
         }
         if let Some(controller) = self.controller.take() {
             unsafe {
@@ -300,7 +287,12 @@ impl Browser {
                     }
                 }
                 call.sent = true;
-                let message = json!({"type":"call","payload":call.payload,"owner":call.owner,"profile":call.profile,"rows":rows,"reserved":call.reserved});
+                let search_engine = self
+                    .profiles
+                    .get(&call.profile)
+                    .map(|p| p.search_engine().to_owned())
+                    .unwrap_or_else(|| "google".into());
+                let message = json!({"type":"call","payload":call.payload,"owner":call.owner,"profile":call.profile,"searchEngine":search_engine,"rows":rows,"reserved":call.reserved});
                 self.ai.calls.insert(id.clone(), call);
                 self.ai_post(message);
             } else {

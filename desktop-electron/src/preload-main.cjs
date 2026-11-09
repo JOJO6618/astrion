@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('astrionQuickSettings', {
   open: () => ipcRenderer.invoke('quick:open')
 });
 contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);
+// 前端主题底色 → 窗口底色（启动与拉伸时未绘制区域的颜色）。
+contextBridge.exposeInMainWorld('astrionWindow', {
+  surface: color => ipcRenderer.send('window:surface', color)
+});
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
 
 // Only the trusted main renderer receives this bridge. Web pages use no preload.

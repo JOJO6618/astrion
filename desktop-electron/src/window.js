@@ -13,12 +13,14 @@
 //   - window.open 一律拦截：http(s) 转系统浏览器（预览面板「外部打开」按钮由此
 //     在桌面端真正可用，Tauri 壳下是静默失败的）。
 
-import { app, BaseWindow, shell, WebContentsView } from 'electron';
+import { app, BaseWindow, ipcMain, shell, WebContentsView } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quickEnabled } from './quick/controller.js';
 import { isUpdaterInstalling } from './updater-state.js';
 import { NativeBrowser } from './browser/index.js';
+import { setBrowserSurfaceColor } from './browser/geometry.js';
 
 let appQuitting = false;
 app.on('before-quit', () => { appQuitting = true; });
@@ -36,6 +38,38 @@ let mainView = null;
 let chromeView = null;
 let nativeBrowser = null;
 let backendPort = null;
+
+// 窗口底色跟随前端主题（--surface-base），并记住上次的值：
+// 启动/拉伸窗口时页面还没画出来的区域显示主题底色，而不是透出系统默认色。
+const DEFAULT_SURFACE = '#faf9f5';
+const SURFACE_PATTERN = /^#[a-f\d]{6}$/i;
+const surfaceFile = () => path.join(app.getPath('userData'), 'window-surface.json');
+let surfaceColor = DEFAULT_SURFACE;
+function loadSurfaceColor() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(surfaceFile(), 'utf8')).color;
+    if (typeof saved === 'string' && SURFACE_PATTERN.test(saved)) return saved.toLowerCase();
+  } catch { /* First launch or unreadable file: use the classic theme color. */ }
+  return DEFAULT_SURFACE;
+}
+function applySurfaceColor(color) {
+  if (typeof color !== 'string' || !SURFACE_PATTERN.test(color)) return;
+  color = color.toLowerCase();
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.setBackgroundColor(color);
+  chromeView?.setBackgroundColor(color);
+  // 内置浏览器管理主视图的透明叠层（网页显示时主视图必须透明），交给它统一设置。
+  if (nativeBrowser) { setBrowserSurfaceColor(nativeBrowser, color); nativeBrowser.layout(); }
+  else mainView?.setBackgroundColor(color);
+  if (color === surfaceColor) return;
+  surfaceColor = color;
+  fs.promises.writeFile(surfaceFile(), JSON.stringify({ color }), { mode: 0o600 }).catch(() => {});
+}
+ipcMain.on('window:surface', (event, color) => {
+  // 只接受主视图（应用自身页面）的上报；网页与 chrome 条都没有这个通道。
+  if (!mainView || event.sender !== mainView.webContents) return;
+  applySurfaceColor(color);
+});
 let pendingMainRoute = null;
 
 export function setMainWindowBackend(port) {
@@ -122,7 +156,9 @@ export function createMainWindow(port, route = '/') {
   const url = `http://127.0.0.1:${port}${route}`;
   const chromeUrl = `http://127.0.0.1:${port}/chrome`;
 
+  surfaceColor = loadSurfaceColor();
   mainWindow = new BaseWindow({
+    backgroundColor: surfaceColor,
     width: 1280,
     height: 800,
     minWidth: 960,
@@ -136,6 +172,8 @@ export function createMainWindow(port, route = '/') {
         }
       : {})
   });
+  // BaseWindow 的背景不等于其根 View 的背景；首帧和拉伸露出的底层也必须显式着色。
+  mainWindow.contentView.setBackgroundColor(surfaceColor);
 
   const baseWebPreferences = {
     contextIsolation: true,
@@ -156,6 +194,9 @@ export function createMainWindow(port, route = '/') {
       preload: path.join(__dirname, 'preload-chrome.cjs')
     }
   });
+
+  mainView.setBackgroundColor(surfaceColor);
+  chromeView.setBackgroundColor(surfaceColor);
 
   // 添加顺序 = 视觉层级：chrome 在后添加，位于 main 之上（顶部区域不重叠，仅保险）
   mainWindow.contentView.addChildView(mainView);

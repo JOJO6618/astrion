@@ -27,9 +27,9 @@ ai.fillSavedLogin = async function(tab, driver, args, ref, settle) {
   finally { records.splice(0); }
 };
 async function execute(message) {
-  const { payload, owner, profile, rows, reserved } = message;
+  const { payload, owner, profile, searchEngine, rows, reserved } = message;
   if (cancelled.delete(payload.call_id)) throw new driver.BrowserToolError('cancelled', '已取消。');
-  manager.profiles.set(payload.identity.username.trim().toLowerCase(), { key: profile });
+  manager.profiles.set(payload.identity.username.trim().toLowerCase(), { key: profile, searchEngine: () => searchEngine || 'google' });
   synchronize(rows, owner, reserved);
   activeCalls.set(owner, payload);
   try {

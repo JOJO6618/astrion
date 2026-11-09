@@ -110,9 +110,9 @@ export class BrowserAI {
     try { return await this.dispatch(payload, controller.signal); }
     finally { this.calls.delete(payload.call_id); }
   }
-  navigationTarget(value, payload) {
+  navigationTarget(value, payload, profile) {
     let url;
-    try { url = manualNavigationURL(value, true); }
+    try { url = manualNavigationURL(value, profile.searchEngine()); }
     catch { throw new BrowserToolError('unsupported_url', '支持 http/https 网址和可读范围内的本机 file:// 文件地址（不能包含用户名密码）。'); }
     TabDriver.checkFileURL(url, payload.file_urls);
     return url;
@@ -140,7 +140,7 @@ export class BrowserAI {
       this.reveal(owner, tab, payload);
       if (ACTION_OPS.has(op)) this.guardSite(tab, payload);
       tab.aiDownload = payload.download_dir ? { dir: payload.download_dir, until: Infinity, items: [] } : null;
-      const result = await this.operate(op, args, { owner, tab, driver, payload, signal });
+      const result = await this.operate(op, args, { owner, profile, tab, driver, payload, signal });
       if (tab.aiDownload) { tab.aiDownload.until = Date.now() + 5000; if (tab.aiDownload.items.length) result.downloads = tab.aiDownload.items.slice(); }
       if (driver.fileChooser && op !== 'file_upload') result.notes = [...(result.notes || []), '页面打开了文件选择框，请调用 browser_file_upload 提供文件（paths 为空数组表示取消）。'];
       result.tab = result.tab || this.tabInfo(owner, tab);
@@ -167,7 +167,7 @@ export class BrowserAI {
     }
     if (action === 'new') {
       if (manager.tabs.size >= 48) throw new BrowserToolError('tab_limit', '浏览器标签数量已达上限（48），请先关闭不用的标签。');
-      const url = args.url ? this.navigationTarget(args.url, payload) : 'about:blank';
+      const url = args.url ? this.navigationTarget(args.url, payload, profile) : 'about:blank';
       const tab = manager.registry.create('about:blank', { owner, profile, ai: true });
       state.current = tab.id;
       if (url === 'about:blank') return { success: true, tab: this.tabInfo(owner, tab), message: '已新建空白标签。' };
@@ -205,7 +205,7 @@ export class BrowserAI {
     }), 30000, 'navigation_timeout').catch(error => { if (error.code !== 'navigation_timeout') throw error; });
   }
   async operate(op, args, context) {
-    const { tab, driver, payload, signal } = context;
+    const { tab, driver, payload, signal, profile } = context;
     const wc = tab.view.webContents, manager = this.manager;
     const settleAndSnap = async (options = {}) => {
       const settled = await driver.settle(signal);
@@ -226,7 +226,7 @@ export class BrowserAI {
         const action = args.action || (args.url ? 'goto' : '');
         if (action === 'goto') {
           if (typeof args.url !== 'string' || !args.url.trim()) throw new BrowserToolError('invalid_argument', '缺少 url。');
-          const url = this.navigationTarget(args.url, payload);
+          const url = this.navigationTarget(args.url, payload, profile);
           await this.waitLoad(tab, signal, () => manager.registry.load(tab, url));
         } else if (action === 'back' || action === 'forward') {
           const history = wc.navigationHistory;

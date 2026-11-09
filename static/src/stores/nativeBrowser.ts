@@ -7,6 +7,7 @@ import {
   type BrowserSurfaceMetadata
 } from '@/components/browser/types';
 import { isDesktopShell } from '@/utils/desktopPlatform';
+import { currentLocale } from '@/locales';
 import { browserContextMenuLabels } from '@/components/browser/contextMenuLabels';
 
 export type BrowserSection =
@@ -84,6 +85,12 @@ export const useNativeBrowserStore = defineStore('nativeBrowser', {
         if (epoch !== connectEpoch) return;
         this.snapshot = snapshot;
         layoutSequence = 0;
+        // First use: pick a default engine from the app language (China-friendly for zh-CN).
+        if (snapshot.settings && !snapshot.settings.searchEngine)
+          void this.command(
+            'search-engine',
+            currentLocale.value === 'zh-CN' ? 'bing_cn' : 'google'
+          );
       } catch (error) {
         if (epoch === connectEpoch) this.error = String((error as Error).message || error);
       } finally {

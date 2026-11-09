@@ -112,7 +112,8 @@ export function useBrowserSurface(
         ? {
             occlusions: browserOcclusions(
               node,
-              `${floatingSelector}, .nb-popover, .nb-menu, .nb-floating-status, .nb-credential-floating, .nb-permission-scrim`
+              // Cut only the modal box: a scrim-sized hole would remove the whole page behind it.
+              `${floatingSelector}, .nb-popover, .nb-menu, .nb-floating-status, .nb-credential-floating, .nb-permission`
             )
           }
         : {}),

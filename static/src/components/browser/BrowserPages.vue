@@ -45,15 +45,18 @@
           </button>
         </div>
       </div>
-      <div class="nb-setting">
-        <span>{{ $t('browser.profileScope') }}</span
-        ><small>{{ $t('browser.shared') }}</small>
-      </div>
-      <div class="nb-setting">
-        <span>{{ $t('browser.browsingEngine') }}</span
-        ><small>{{
-          $t(isWindowsDesktopShell() ? 'browser.engineWindows' : 'browser.engineValue')
-        }}</small>
+      <div class="nb-setting nb-setting-wrap">
+        <span>{{ $t('browser.searchEngine') }}</span>
+        <div class="nb-theme-options">
+          <button
+            v-for="engine in searchEngines"
+            :key="engine.key"
+            :aria-pressed="currentEngine === engine.key"
+            @click="store.command('search-engine', engine.key)"
+          >
+            {{ $t(`browser.${engine.label}`) }}
+          </button>
+        </div>
       </div>
       <button class="nb-setting nb-setting-link" @click="store.showSection('import')">
         <span>{{ $t('browser.importTitle') }}</span
@@ -100,7 +103,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { t } from '@/locales';
-import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import { useTheme, type ThemeKey } from '@/utils/theme';
 import FancyCheck from '@/components/common/FancyCheck.vue';
@@ -110,6 +112,7 @@ import BrowserSiteIcon from './BrowserSiteIcon.vue';
 import BrowserDownloadList from './BrowserDownloadList.vue';
 import BrowserImport from './BrowserImport.vue';
 import BrowserPasswords from './BrowserPasswords.vue';
+import type { BrowserSearchEngine } from './types';
 const store = useNativeBrowserStore();
 const query = ref('');
 const heading = computed(() =>
@@ -121,6 +124,13 @@ const history = computed(() =>
   )
 );
 const themes: ThemeKey[] = ['classic', 'light', 'dark'];
+const searchEngines: { key: BrowserSearchEngine; label: string }[] = [
+  { key: 'google', label: 'searchEngineGoogle' },
+  { key: 'bing_cn', label: 'searchEngineBingCn' },
+  { key: 'bing', label: 'searchEngineBing' },
+  { key: 'baidu', label: 'searchEngineBaidu' }
+];
+const currentEngine = computed(() => store.snapshot?.settings?.searchEngine || 'google');
 const { setTheme, loadTheme } = useTheme();
 const currentTheme = ref(loadTheme());
 function chooseTheme(theme: ThemeKey) {

@@ -41,6 +41,9 @@ skills/
 # 本地实验残留与历史文档归档（不进仓库）
 _experiments/
 
+# 本地组件阅览室（保留使用，不纳入仓库）
+/design-library/
+
 # 本地代码索引（codegraph：机器特定索引库，不入仓库）
 .codegraph/
 

@@ -17,11 +17,129 @@ pub struct SavedOwner {
 }
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
+pub struct Settings {
+    /// Empty means "not chosen yet"; navigation falls back to Google and the panel stores a
+    /// language-based default on first connect.
+    #[serde(rename = "searchEngine")]
+    pub search_engine: String,
+}
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Shortcut {
+    pub url: String,
+    pub title: String,
+}
+/// New-tab shortcuts: pinned tiles (user-added or pinned) and site keys hidden from
+/// "most visited". Same contract as desktop-electron/src/browser/profile.js.
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Shortcuts {
+    pub pinned: Vec<Shortcut>,
+    pub hidden: Vec<String>,
+}
+const MAX_PINNED: usize = 10;
+const MAX_HIDDEN: usize = 200;
+impl Shortcuts {
+    /// strict: reject the whole value on any invalid entry (UI commands); otherwise drop
+    /// invalid entries (data loaded from disk).
+    pub fn normalize(value: &Value, strict: bool) -> Result<Self, String> {
+        let fail = |out: Self| {
+            if strict {
+                Err("invalid_browser_shortcuts".to_string())
+            } else {
+                Ok(out)
+            }
+        };
+        let mut out = Self::default();
+        if !value.is_object() {
+            return fail(out);
+        }
+        match &value["pinned"] {
+            Value::Null => {}
+            Value::Array(rows) => {
+                if strict && rows.len() > MAX_PINNED {
+                    return fail(out);
+                }
+                for row in rows.iter().take(MAX_PINNED) {
+                    let raw = row["url"].as_str().unwrap_or("").trim();
+                    let lower = raw.to_ascii_lowercase();
+                    let url = (lower.starts_with("http://") || lower.starts_with("https://"))
+                        .then(|| policy::navigation(raw, false).ok())
+                        .flatten();
+                    let Some(url) = url else {
+                        if strict {
+                            return fail(out);
+                        }
+                        continue;
+                    };
+                    if out.pinned.iter().any(|item| item.url == url) {
+                        continue;
+                    }
+                    let title: String = row["title"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .map(|c| if c.is_control() { ' ' } else { c })
+                        .collect::<String>()
+                        .trim()
+                        .chars()
+                        .take(60)
+                        .collect();
+                    let title = if title.is_empty() {
+                        tauri::Url::parse(&url)
+                            .ok()
+                            .and_then(|u| {
+                                u.host_str()
+                                    .map(|h| h.trim_start_matches("www.").to_owned())
+                            })
+                            .unwrap_or_default()
+                    } else {
+                        title
+                    };
+                    out.pinned.push(Shortcut { url, title });
+                }
+            }
+            _ => return fail(out),
+        }
+        match &value["hidden"] {
+            Value::Null => {}
+            Value::Array(keys) => {
+                if strict && keys.len() > MAX_HIDDEN {
+                    return fail(out);
+                }
+                for key in keys.iter().take(MAX_HIDDEN) {
+                    let valid = key.as_str().filter(|k| {
+                        !k.is_empty()
+                            && k.len() <= 260
+                            && k.chars()
+                                .all(|c| c.is_ascii_alphanumeric() || ".:[]-".contains(c))
+                    });
+                    match valid {
+                        Some(k) => {
+                            let k = k.to_ascii_lowercase();
+                            if !out.hidden.contains(&k) {
+                                out.hidden.push(k);
+                            }
+                        }
+                        None if strict => return fail(out),
+                        None => {}
+                    }
+                }
+            }
+            _ => return fail(out),
+        }
+        Ok(out)
+    }
+}
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Data {
     pub version: u32,
     pub history: Vec<Value>,
     pub downloads: Vec<Value>,
     pub owners: HashMap<String, SavedOwner>,
+    pub settings: Settings,
+    pub shortcuts: Shortcuts,
 }
 pub struct Profile {
     pub directory: PathBuf,
@@ -44,6 +162,17 @@ impl Profile {
         };
         data.version = 1;
         data.downloads.truncate(100);
+        if !policy::SEARCH_ENGINES
+            .iter()
+            .any(|(name, _, _)| *name == data.settings.search_engine)
+        {
+            data.settings.search_engine.clear();
+        }
+        data.shortcuts = Shortcuts::normalize(
+            &serde_json::to_value(&data.shortcuts).unwrap_or_default(),
+            false,
+        )
+        .unwrap_or_default();
         for row in &mut data.downloads {
             if row["state"] == "progressing" {
                 row["state"] = json!("interrupted");
@@ -63,6 +192,13 @@ impl Profile {
             &self.directory.join("metadata.json"),
             &serde_json::to_vec(&self.data).map_err(|e| e.to_string())?,
         )
+    }
+    pub fn search_engine(&self) -> &str {
+        if self.data.settings.search_engine.is_empty() {
+            "google"
+        } else {
+            self.data.settings.search_engine.as_str()
+        }
     }
     pub fn record(&mut self, url: &str, title: &str) {
         if !url.starts_with("http") {

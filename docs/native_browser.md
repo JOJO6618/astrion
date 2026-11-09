@@ -41,7 +41,7 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 
 | 资料 | 位置 |
 | --- | --- |
-| 历史、标签恢复和下载元数据 | `<desktopDataRoot>/browser/<profileHash>/metadata.json` |
+| 历史、标签恢复、下载元数据、默认搜索引擎（`settings.searchEngine`）、新标签页快捷方式（`shortcuts`） | `<desktopDataRoot>/browser/<profileHash>/metadata.json` |
 | Chromium Cookie、cache 和网站存储 | `<app.getPath('sessionData')>/browser/<profileHash>/chromium/` |
 | 实际下载文件 | `~/Downloads/Astrion/`，重名自动追加编号 |
 
@@ -61,6 +61,9 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 
 - 多标签、新建、关闭、切换、拖动排序和标签搜索；每个 owner 最多恢复 12 个标签，最多 48 个活跃标签。
 - 地址输入与搜索、前进后退、刷新/停止、页面查找、独立缩放、设备尺寸模拟。
+- 默认搜索引擎：谷歌、必应（国内 `cn.bing.com`）、必应（国际 `www.bing.com`）、百度，存于资料的 `settings.searchEngine`。未设置时原生回退谷歌，面板首次连接按界面语言写入（zh-CN→必应国内，其他→谷歌）。地址栏、新标签页搜索框、右键「搜索选中文字」和模型的 `browser_navigate` 关键词都走它；引擎表在 Electron `policy.js`、Windows `policy.rs` 与 `ai-platform.js` 三处，需同步修改。
+- 新标签页（`BrowserNewTab.vue`，面板 DOM，不是网页，模型看不到）：最多 10 个快捷方式，固定项在前，余位按历史统计最常访问站点（按主机合并 `www.`，排除搜索结果页和 accounts./auth./login. 等登录跳转域名，只看最近 5000 条）。可手动添加/编辑、固定/取消固定、移除；移除会把站点键记入 `shortcuts.hidden`，重新手动添加则撤销隐藏。原生 `shortcuts` 命令整体校验（≤10 个 http/https 固定项、≤200 个站点键），非法输入整体拒绝。
+- 新建标签页聚焦顶部地址栏但不弹出最近访问列表，开始输入或再次点击地址栏才显示。
 - 真实历史与下载管理、下载取消、访达定位、页面打印和保存截图。
 - geolocation、notifications、media、clipboard-read 的自定义许可交互；其他权限默认拒绝。许可只保留在本次运行，过期或归属变化时拒绝待处理请求，系统级授权仍由 macOS 决定。
 - 三主题、自定义面板宽度和当前用户浏览资料清理。
@@ -88,7 +91,8 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 - 控制桥 token 经 fd 3 管道交给后端（`config/desktop_browser.py` 读完即关），不放环境变量：macOS 上同用户进程可用 `ps -E` 读到启动环境，模型执行的命令会因此绕过审批。
 - 隐藏（后台）标签：视口可能为 0×0，驱动用 `Emulation.setDeviceMetricsOverride`（1280×800）兜底，标签显示时撤销；隐藏标签的 CDP 截图会挂起，改用 `capturePage`，整页截图在标签未显示时退化为可视区域。
 - 网页同步弹出 alert/confirm 时输入事件不返回，驱动以对话框事件视为已送达。Windows 有对话框时跳过视口脚本求值，避免处理工具被同步脚本阻塞。
-- 暂未做：全局存活网页上限与 LRU 释放（沿用 48 标签上限）、iframe 内容（快照只覆盖主文档）。macOS 手动触发的网页对话框自绘仍未接入；Windows 已通过共享 BrowserPageDialog 显示 native deferral，关闭标签或退出时完成回收。
+- 暂未做：全局存活网页上限与 LRU 释放（沿用 48 标签上限）、iframe 内容（快照只覆盖主文档）。
+- 网页 alert/confirm/prompt/beforeunload 两端都用浏览器原生对话框（Electron 默认对话框、WebView2 默认脚本对话框），模型经 CDP `Page.javascriptDialogOpening`/`Page.handleJavaScriptDialog` 感知与回答；不再有前端自绘对话框。
 - 站点「以后都允许」只在人工审批可选（自动审核不能写入）；`browser_evaluate` 无此选项。
 
 ### 范围与开关
@@ -110,7 +114,7 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 - 执行底层已定（用户在「整套接入 Playwright／每标签单独 CDP」中选后者）：每个标签用 `webContents.debugger`（CDP）单独控制，注入 Playwright 无障碍快照脚本（Apache-2.0）到隔离环境生成 `[ref=eN]` 快照，输入用 CDP `Input.*` 真实事件；不开放远程调试端口、不向模型透传原始 CDP、不使用 `connectOverCDP` 控制整个应用（2026-11-07 实验已证明其可触达可信主界面）。
 - 后端 → `bridge.js` 控制桥 → Electron 浏览器管理器。浏览器端点必须校验桌面壳启动后端时经环境变量下发的随机 token（现有更新类端点不变）。每次调用带调用 ID，停止时中断等待／稳定检测；已送达 Chromium 的输入不可撤销。
 - 审批与执行之间页面可能跳转：执行时携带批准时的站点，Electron 发输入前核对，不一致则拒绝并提示重新操作。
-- 网页 `alert`／`confirm`／`prompt`／`beforeunload` 统一经 CDP 接管：模型触发的交给 `browser_handle_dialog`，用户手动触发的在面板内自绘显示。
+- 网页 `alert`／`confirm`／`prompt`／`beforeunload` 显示为浏览器原生对话框；模型经 CDP 事件感知，用 `browser_handle_dialog` 回答（CDP 关闭原生对话框）。
 
 ### 归属、隔离与并发
 
@@ -210,6 +214,9 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 - 原生操作再次核对 call_id、owner、profile、网页类型与取消/超时。动作另外固定派发时实际 origin，审批后跨来源跳转即拒绝。路径在共用后端规范化后，原生文件使用点再次核对可读白名单与普通文件；有文件字段但类型错误必须拒绝。
 - `/new` stable key 在对话绑定时迁移到 conversation owner。每 owner 串行，不同 owner 可并行；模型当前标签独立于界面选择。可信主文档订阅 AI 活动时发送 hello 握手，以便面板尚未打开时也能接收自动展开通知；hello 不读取用户资料、不授予 profile lease。
 - 隐藏标签的 CDP 截图与直接对不可见 controller 的 CapturePreview 均在本机发生等待。Windows capturePage 代理使用原生 CapturePreview + 内存流，并在截图期间启用 controller 合成，网页宿主仍隐藏，回调后恢复可见性。元素裁剪在私有脚本宿主内按真实 PNG/视口尺寸换算，避免 Electron 的 zoom 坐标语义直接用于 CDP。整页截图沿用共享驱动失败时注明回退视口的规则。
+- 网页脚本对话框保持 WebView2 默认原生 UI（不关闭 `AreDefaultScriptDialogsEnabled`、不接 ScriptDialogOpening），模型经 CDP 事件与 `Page.handleJavaScriptDialog` 处理，和 Electron 一致。待 Windows 实机确认 CDP 能关闭原生对话框。
+- WebView2 创建 controller 会抢键盘焦点，网页子窗口隐藏时焦点也会留在隐藏窗口：`layout.rs` 隐藏可见网页时、`views.rs` 新 controller 创建后（无网页显示且 Astrion 在前台）把焦点交回主页面。
+- 共享控制器的 profile 在 Windows 只是代理对象，`searchEngine` 由原生调用消息的 `searchEngine` 字段提供；关键词转搜索地址在 `ai-platform.js` 的 `manualNavigationURL` 完成。
 - 模型触发下载跟随已绑定调用的 download_dir，结束后保留 5 秒接收窗口；用户手动下载仍用系统 Downloads/Astrion。已保存密码只进入私有原生/脚本通道用于填充，不进入工具返回与快照。
 
 最终本机合成工具回归通过 29 项断言，覆盖 23 工具主要行为；共享后端权限 10 项、启动管道及平台门控 3 项、Rust 单测在 r2 为 12 项。证据入口 `_experiments/windows-browser-20261109/ai-latest.json`；这些结果不代表真实模型、外部网站、所有 DPI 或全平台均已验收。

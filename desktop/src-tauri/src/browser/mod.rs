@@ -15,7 +15,6 @@ mod layout;
 mod manager;
 mod model;
 mod owner;
-mod page_dialog;
 mod page_features;
 mod password_adapter;
 mod policy;
@@ -43,11 +42,6 @@ pub enum Event {
     AiMessage(Value),
     AiReply(Value, Result<Value, String>),
     AiProtocol(String, String, Value),
-    AiDialog(
-        String,
-        ICoreWebView2ScriptDialogOpeningEventArgs,
-        ICoreWebView2Deferral,
-    ),
     Request(String, Value),
     Invalidate,
     Tick,

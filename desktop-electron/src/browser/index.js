@@ -77,6 +77,8 @@ export class NativeBrowser {
           canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward(), zoom: Math.round(wc.getZoomFactor() * 100), find: tab.find };
       }),
       history: this.profile?.data.history || [],
+      settings: { searchEngine: this.profile?.data.settings.searchEngine || '' },
+      shortcuts: this.profile?.data.shortcuts || { pinned: [], hidden: [] },
       downloads: (this.profile?.data.downloads || []).map(({ path: _path, ...row }) => row),
       credentials: this.credentials.snapshot(),
       permissions: this.profile ? this.profileFeatures(this.profile).snapshot() : [] };
@@ -119,7 +121,7 @@ export class NativeBrowser {
     else if (action === 'navigate') {
       const section = internalSection(value);
       if (section) this.registry.createInternal(section);
-      else if (!id && !this.active()) this.registry.create(manualNavigationURL(value, true));
+      else if (!id && !this.active()) this.registry.create(manualNavigationURL(value, this.profile.searchEngine()));
       else this.registry.load(this.tab(id), value);
     }
     else if (action === 'duplicate') this.registry.create(this.tab(id).url, { duplicate: true });
@@ -133,7 +135,9 @@ export class NativeBrowser {
     else if (action.startsWith('download-')) {
       if (!['download-cancel', 'download-reveal', 'download-remove'].includes(action)) throw new Error('unsupported_browser_action');
       await features.command(action, id);
-    } else if (action === 'history-remove') { this.profile.data.history = this.profile.data.history.filter(row => row.id !== id); this.profile.save(); }
+    } else if (action === 'search-engine') this.profile.setSearchEngine(value);
+    else if (action === 'shortcuts') this.profile.setShortcuts(value);
+    else if (action === 'history-remove') { this.profile.data.history = this.profile.data.history.filter(row => row.id !== id); this.profile.save(); }
     else if (action === 'clear') {
       const profile = this.profile;
       if (!value || !['history', 'cookies', 'cache'].every(key => typeof value[key] === 'boolean')) throw new Error('invalid_browser_clear');
