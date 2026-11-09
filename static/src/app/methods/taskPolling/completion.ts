@@ -42,6 +42,8 @@ export const completionMethods = {
     const hasRunningSubAgents = !!data?.has_running_sub_agents;
     const hasRunningBackgroundCommands = !!data?.has_running_background_commands;
     const hasRunningMultiAgent = !!data?.has_running_multi_agent;
+    // 主任务已终态：后端不会再有针对本对话的人工审批，兜底清除事件丢失导致的残留。
+    this.clearResidualToolApprovals?.();
     if (hasRunningSubAgents || hasRunningMultiAgent) {
       debugLog('[TaskPolling] 任务完成，但仍有后台子智能体/多智能体运行');
     } else {
@@ -168,6 +170,7 @@ export const completionMethods = {
     const hasRunningSubAgents = !!data?.has_running_sub_agents;
     const hasRunningBackgroundCommands = !!data?.has_running_background_commands;
     const hasRunningBackground = hasRunningSubAgents || hasRunningBackgroundCommands;
+    this.clearResidualToolApprovals?.();
 
     goalModeDebugLog('handleTaskStopped', {
       taskInProgress: this.taskInProgress,
@@ -291,6 +294,7 @@ export const completionMethods = {
 
     console.error('[TaskPolling] 任务错误:', data.message);
     this.uiPushToast(taskErrorToast(data));
+    this.clearResidualToolApprovals?.();
 
     // 清理状态（顺序：先清依赖 awaitingFirstContent 判定的空占位，再清残留流式字段）
     this.cleanupTrailingEmptyAssistantPlaceholder?.('task_error');

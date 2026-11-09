@@ -60,7 +60,8 @@ test('unrestricted auto-only request retains explicit flags and review progress'
   assert.equal(row.auto_review_required, true);
   assert.equal(row.auto_review_status, 'reviewing');
   assert.equal(row.auto_review_progress.length, 1);
-  assert.equal(ctx.approvalPanelCollapsed, false);
+  // 2026-11-09 拍板：AI 可自动审核的请求不自动展开面板，进度仅手动查看。
+  assert.equal(ctx.approvalPanelCollapsed, true);
 });
 
 test('unrestricted closed switch retains manual controls and no automatic review', () => {

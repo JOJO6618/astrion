@@ -223,8 +223,10 @@ class ApprovalScopeBindingTests(unittest.TestCase):
         options.update(overrides)
         item = self.manager.create_request(**options)
         if item["approval_type"] == "full_access":
-            # full_access 走双审批：人工与自动各自记录，两项都到齐才 approved
-            self.manager.decide(item["approval_id"], "user", "approved")
+            # full_access 走双审批：人工与自动各自记录，两项都到齐才 approved；
+            # human_approval_required=False 时只由自动审核决定，人工裁决会被拒绝。
+            if item.get("human_approval_required", True):
+                self.manager.decide(item["approval_id"], "user", "approved")
             return self.manager.record_auto_review(item["approval_id"], "approved")
         # direct_execution 由自动审核直接裁决（record_auto_review 仅接受 full_access）
         return self.manager.decide(

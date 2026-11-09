@@ -190,4 +190,8 @@ MESSAGES = {
         "zh-CN": "无权限操作该审批请求",
         "en-US": "No permission to operate on this approval request",
     },
+    "tool_approval.human_not_required": {
+        "zh-CN": "该请求由 AI 自动审核，无需人工审批",
+        "en-US": "This request is reviewed automatically; no human decision is required",
+    },
 }

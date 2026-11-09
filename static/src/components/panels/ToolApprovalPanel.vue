@@ -49,7 +49,7 @@
             <pre>{{ extraArguments }}</pre>
           </div>
         </div>
-        <div v-if="!historical" class="approval-actions">
+        <div v-if="!historical && humanDecisionRequired" class="approval-actions">
           <button
             type="button"
             class="approval-btn"
@@ -159,6 +159,9 @@ const reviewStatus = computed(
   () => current.value?.auto_review_status || record.value?.decision || 'reviewing'
 );
 const humanApproved = computed(() => current.value?.human_decision === 'approved');
+// 服务端决定该请求是否需要人工参与：开启「允许 AI 自动审核单次完全访问」时
+// human_approval_required=false，整体批准只取决于自动审核，不能给出允许/拒绝按钮。
+const humanDecisionRequired = computed(() => current.value?.human_approval_required !== false);
 const terminalStatus = computed(() =>
   ['approved', 'rejected', 'expired'].includes(String(current.value?.status || ''))
 );

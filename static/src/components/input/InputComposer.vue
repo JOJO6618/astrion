@@ -762,7 +762,11 @@ import { TextSelection } from 'prosemirror-state';
 import QuickMenu from '@/components/input/QuickMenu.vue';
 import ComposerApprovalDock from '@/components/input/ComposerApprovalDock.vue';
 import CompressLimitDialog from '@/components/input/CompressLimitDialog.vue';
-import type { ToolApproval, ApprovalReviewRecord } from '@/components/input/approvalModel';
+import {
+  needsHumanDecision,
+  type ToolApproval,
+  type ApprovalReviewRecord
+} from '@/components/input/approvalModel';
 import FileAtMenu, { type FileAtItem } from '@/components/input/FileAtMenu.vue';
 import FileChips from '@/components/chat/FileChips.vue';
 import RollingNumber from '@/components/input/RollingNumber.vue';
@@ -1206,9 +1210,13 @@ const approvalDockVisible = computed(
     (!props.approvalPanelCollapsed || !!props.toolApprovals?.length)
 );
 const approvalExpanded = computed(() => approvalDockVisible.value && !props.approvalPanelCollapsed);
-// 审批面板收起且仍有待审批：按钮内嵌在状态栏里，状态栏因此单独出现（无 git 时也一样）。
+// 审批面板收起且仍有待人工决定的请求：按钮内嵌在状态栏里，状态栏因此单独出现（无 git 时也一样）。
+// AI 审核中、人工已批准等待自动审核、自动单闸等无需人工的条目不再常驻入口。
 const approvalRestoreVisible = computed(
-  () => !props.chatMode && !!props.approvalPanelCollapsed && (props.toolApprovals?.length || 0) > 0
+  () =>
+    !props.chatMode &&
+    !!props.approvalPanelCollapsed &&
+    (props.toolApprovals || []).some((item) => needsHumanDecision(item))
 );
 
 const floatingStatusVisible = computed(() => {

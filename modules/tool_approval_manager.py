@@ -211,6 +211,10 @@ class ToolApprovalManager:
             if item.get("status") != "pending":
                 return deepcopy(item)
             if item.get("approval_type") == "full_access":
+                # human_approval_required=false 表示该请求只由自动审核决定（单闸），
+                # 人工裁决既不能提前放行也不能阻止，接受它只会误导用户以为已人工通过。
+                if item.get("human_approval_required") is False:
+                    raise ValueError(tr("tool_approval.human_not_required"))
                 if item.get("human_decision") == normalized:
                     return deepcopy(item)
                 item["human_decision"] = normalized

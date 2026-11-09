@@ -267,6 +267,20 @@ export const approvalMethods = {
     }
     this.$forceUpdate();
   },
+  // 主任务终结（完成/停止/报错）后不可能再有人工裁决：清掉可能因 resolved
+  // 事件丢失而残留的条目，避免状态栏「待审批操作」永久常驻。审核记录保留供手动查看。
+  clearResidualToolApprovals() {
+    if (!Array.isArray(this.pendingToolApprovals) || !this.pendingToolApprovals.length) return;
+    this.approvalSnapshotVersion += 1;
+    this.pendingToolApprovals = [];
+    this.decidingApprovalIds = [];
+    if (this.approvalAutoCloseTimer) {
+      clearTimeout(this.approvalAutoCloseTimer);
+      this.approvalAutoCloseTimer = null;
+    }
+    this.approvalPanelCollapsed = true;
+    this.$forceUpdate();
+  },
   handleAutoApprovalProgress(data: any) {
     const progress = data?.progress;
     if (!progress || typeof progress !== 'object') return;
