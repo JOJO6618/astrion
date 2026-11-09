@@ -1,0 +1,8 @@
+{
+  "productName": "Astrion browser production probe",
+  "version": "0.1.0",
+  "identifier": "com.astrion.browser-production-probe",
+  "build": { "frontendDist": "web" },
+  "app": { "windows": [] },
+  "bundle": { "active": false }
+}

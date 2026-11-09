@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Astrion Cookie 迁移</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Cookie 迁移</h1>
+    <p>填写要迁移的网站，每行一个域名或网址。授权范围包括该域名及其子域名。</p>
+    <label for="sites">网站范围</label>
+    <textarea id="sites" rows="5" placeholder="example.com&#10;accounts.example.org" spellcheck="false"></textarea>
+    <p>导出文件包含网站登录凭据。只在本机导入 Astrion，迁移后删除文件。不会导出密码，也不会连接网络。</p>
+    <button id="consent" type="button" role="checkbox" aria-checked="false"><span aria-hidden="true" id="mark">□</span> 我同意导出上述网站的 Cookie</button>
+    <button id="export" type="button" disabled>授权并导出</button>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

@@ -1,12 +1,36 @@
 <template>
-  <button type="button" class="nb-button" :aria-label="label" :data-tooltip="label">
+  <button
+    type="button"
+    class="nb-button"
+    :aria-label="label"
+    :data-tooltip="label"
+    @pointerenter="schedule"
+    @pointerleave="hide"
+    @blur="hide"
+    @pointerdown="hide"
+  >
     <BrowserIcon :name="name" />
+    <span v-if="tooltip" class="nb-tooltip" role="tooltip">{{ label }}</span>
   </button>
 </template>
 <script setup lang="ts">
+import { ref, onBeforeUnmount } from 'vue';
 import { ICONS } from '@/utils/icons';
 import BrowserIcon from './BrowserIcon.vue';
 defineProps<{ name: keyof typeof ICONS; label: string }>();
+const tooltip = ref(false);
+let timer: ReturnType<typeof setTimeout> | undefined;
+function hide() {
+  clearTimeout(timer);
+  tooltip.value = false;
+}
+function schedule() {
+  hide();
+  timer = setTimeout(() => {
+    tooltip.value = true;
+  }, 650);
+}
+onBeforeUnmount(hide);
 </script>
 <style scoped>
 .nb-button {
@@ -36,8 +60,7 @@ defineProps<{ name: keyof typeof ICONS; label: string }>();
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-.nb-button:hover::after {
-  content: attr(data-tooltip);
+.nb-tooltip {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -53,19 +76,5 @@ defineProps<{ name: keyof typeof ICONS; label: string }>();
   white-space: nowrap;
   font-size: 11px;
   pointer-events: none;
-  animation: nb-tooltip 0s 0.65s both;
-}
-@keyframes nb-tooltip {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nb-button:hover::after {
-    animation: none;
-  }
 }
 </style>

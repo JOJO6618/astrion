@@ -2,9 +2,11 @@ import { onMounted, onBeforeUnmount, watch, type Ref } from 'vue';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import { browserBridge } from './types';
 import { useBrowserLayer } from './useBrowserLayer';
+import { browserOcclusions } from './browserOcclusions';
 
 const floatingSelector = [
   '[data-native-browser-obscures]',
+  '[role="tooltip"]',
   '[role="dialog"]',
   '[role="menu"]',
   '[aria-modal="true"]',
@@ -79,7 +81,7 @@ export function useBrowserSurface(
         if (
           style.visibility === 'hidden' ||
           style.display === 'none' ||
-          style.pointerEvents === 'none'
+          (style.pointerEvents === 'none' && !candidate.matches('[role="tooltip"]'))
         )
           continue;
         const rect = candidate.getBoundingClientRect();
@@ -106,6 +108,14 @@ export function useBrowserSurface(
     const panelBounds = node?.closest('.native-browser-panel')?.getBoundingClientRect();
     const metadata = {
       surfaceColor,
+      ...(node && visible && browserBridge()?.surfaceMode === 'regions'
+        ? {
+            occlusions: browserOcclusions(
+              node,
+              `${floatingSelector}, .nb-popover, .nb-menu, .nb-floating-status, .nb-credential-floating, .nb-permission-scrim`
+            )
+          }
+        : {}),
       focusFind: store.findOpen,
       viewport: {
         width: innerWidth,

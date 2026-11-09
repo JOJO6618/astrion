@@ -1,6 +1,7 @@
 // Isolated-world DOM adapter; no API, IPC object or password is exposed globally.
 const { ipcRenderer } = require('electron');
 if (process.isMainFrame) {
+  if (!['http:', 'https:'].includes(location.protocol)) return;
   const random = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
   const documentToken = random(), groups = new Map(), containers = new WeakMap();
   let timer, lastSubmit = '', lastSubmitAt = 0;

@@ -57,6 +57,13 @@ export interface BrowserSnapshot {
   downloads: BrowserDownload[];
   permissions: BrowserPermission[];
   credentials?: CredentialSnapshot;
+  dialog?: {
+    id: string;
+    tabId: string;
+    kind: 'alert' | 'confirm' | 'prompt' | 'beforeunload';
+    message: string;
+    defaultPrompt: string;
+  } | null;
 }
 export interface BrowserRect {
   x: number;
@@ -66,6 +73,7 @@ export interface BrowserRect {
 }
 export interface BrowserSurfaceMetadata {
   surfaceColor?: string;
+  occlusions?: BrowserRect[];
   focusFind?: boolean;
   viewport?: { width: number; height: number; panelWidth: number; surfaceInset: number };
 }
@@ -90,6 +98,8 @@ export interface BrowserInput {
   modifiers: string[];
 }
 export interface BrowserBridge {
+  surfaceMode?: 'regions';
+  credentialFileImport?: boolean;
   connect: (scope: BrowserScope, labels?: Record<string, string>) => Promise<BrowserSnapshot>;
   theme: (surfaceColor: string) => void;
   credentials: (payload: CredentialRequest & { lease: string }) => Promise<CredentialResponse>;

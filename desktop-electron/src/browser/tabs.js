@@ -1,7 +1,7 @@
 import { WebContentsView } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { SECURE_WEB_PREFERENCES, navigationURL } from './policy.js';
+import { SECURE_WEB_PREFERENCES, navigationURL, manualNavigationURL, isLocalFile } from './policy.js';
 import { browserBounds } from './geometry.js';
 import { internalSection, internalURL } from './internal-pages.js';
 const passwordPreload = fileURLToPath(new URL('./passwords/page-preload.cjs', import.meta.url));
@@ -102,7 +102,9 @@ export class BrowserTabs {
     });
     wc.on('render-process-gone', (_event, details) => { tab.pendingURL = ''; tab.error = details.reason; manager.layout(); manager.publish(); });
     wc.on('found-in-page', (_event, result) => { tab.find = { matches: result.matches, active: result.activeMatchOrdinal }; manager.publish(); });
-    wc.on('will-navigate', (event, destination) => { try { navigationURL(destination); } catch { event.preventDefault(); manager.message('unsupported_browser_url'); } });
+    wc.on('will-navigate', (event, destination) => { try {
+      if (isLocalFile(wc.getURL())) manualNavigationURL(destination); else navigationURL(destination);
+    } catch { event.preventDefault(); manager.message('unsupported_browser_url'); } });
     wc.on('will-redirect', (event, destination) => { try { navigationURL(destination); } catch { event.preventDefault(); } });
     wc.on('will-attach-webview', event => event.preventDefault());
     wc.on('before-input-event', (event, input) => {
@@ -117,7 +119,7 @@ export class BrowserTabs {
       manager.contextMenu.show(tab, params);
     });
     wc.setWindowOpenHandler(({ url: destination }) => {
-      try { navigationURL(destination); } catch { return { action: 'deny' }; }
+      try { if (isLocalFile(wc.getURL())) manualNavigationURL(destination); else navigationURL(destination); } catch { return { action: 'deny' }; }
       if ((tab.owner !== manager.owner && !manager.ai?.drivers.has(tab.id)) || manager.tabs.size >= 48) return { action: 'deny' };
       // Adopted popups are browser tabs: keep their lifetime independent of the opener.
       return { action: 'allow', outlivesOpener: true, overrideBrowserWindowOptions: { webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload } },
@@ -129,7 +131,7 @@ export class BrowserTabs {
     return tab;
   }
   load(tab, value) {
-    const url = navigationURL(value, true);
+    const url = manualNavigationURL(value, true);
     if (tab.section) return this.create(url, { id: tab.id, owner: tab.owner, profile: tab.profile });
     tab.error = ''; tab.url = url; tab.pendingURL = url;
     const sequence = tab.loadSequence = (tab.loadSequence || 0) + 1;
@@ -193,7 +195,7 @@ export class BrowserTabs {
     const urls = Array.isArray(saved?.urls) ? saved.urls.slice(0, Math.min(12, 48 - manager.tabs.size)) : [];
     if (!urls.length) { this.create(); return; }
     const created = [];
-    for (const url of urls) { try { created.push(this.create(internalSection(url) ? url : navigationURL(url))); } catch { /* Invalid saved URLs never become navigable. */ } }
+    for (const url of urls) { try { created.push(this.create(internalSection(url) ? url : manualNavigationURL(url))); } catch { /* Invalid saved URLs never become navigable. */ } }
     if (!created.length) this.create();
     else { manager.selected.set(manager.owner, created[Math.max(0, Math.min(saved.active || 0, created.length - 1))].id); this.persist(manager.owner); }
   }

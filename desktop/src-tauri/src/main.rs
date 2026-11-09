@@ -7,12 +7,14 @@
 //      cookie 会话 / CSRF / 相对路径 API 全部零改动复用 Web 版行为
 //   4. 主窗口关闭 → 退出进程 → RunEvent::Exit 时 kill 后端子进程
 
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(any(not(debug_assertions), feature = "browser-test"), windows_subsystem = "windows")]
 
 mod backend;
 mod bridge;
 mod rundata;
 mod shell_env;
+#[cfg(windows)]
+mod browser;
 #[cfg(windows)]
 mod quick;
 #[cfg(windows)]
@@ -47,6 +49,8 @@ fn main() {
                 // 双 webview 手动布局：chrome 条钉顶部固定 46px，主 webview 占剩余
                 tauri::WindowEvent::Resized(_) if window.label() == "main" => {
                     backend::layout_webviews(window);
+                    #[cfg(windows)]
+                    browser::resized(window.app_handle());
                     // AppKit 在缩放/全屏切换时会重排红绿灯，需重新定位（tauri #14072 绕行）
                     #[cfg(target_os = "macos")]
                     backend::position_traffic_lights(window);
@@ -75,6 +79,8 @@ fn main() {
         .expect("error while building Astrion desktop")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                #[cfg(windows)]
+                browser::dispose();
                 #[cfg(windows)]
                 quick::stop(app);
                 backend::shutdown_backend(app);

@@ -6,7 +6,7 @@ import {
   type BrowserRect,
   type BrowserSurfaceMetadata
 } from '@/components/browser/types';
-import { isMacDesktopShell } from '@/utils/desktopPlatform';
+import { isDesktopShell } from '@/utils/desktopPlatform';
 import { browserContextMenuLabels } from '@/components/browser/contextMenuLabels';
 
 export type BrowserSection =
@@ -17,7 +17,7 @@ export type BrowserSection =
   | 'passwords'
   | 'import'
   | 'clear';
-export const nativeBrowserAvailable = () => isMacDesktopShell() && !!browserBridge();
+export const nativeBrowserAvailable = () => isDesktopShell() && !!browserBridge();
 let connectEpoch = 0;
 let layoutSequence = 0;
 let navigationSequence = 0;

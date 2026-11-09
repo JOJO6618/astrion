@@ -54,7 +54,7 @@ def get_browser_tools(data_context, workspace, username: str):
 @rate_limited("browser_tools_switch", 30, 60, scope="user")
 def update_browser_tools(terminal, workspace, username: str):
     if not native_browser_supported() or getattr(terminal, "conversation_kind", "agent") == "chat":
-        return jsonify({"success": False, "error": "内置浏览器工具仅在 macOS 桌面版 Agent 对话中可用"}), 400
+        return jsonify({"success": False, "error": "内置浏览器工具仅在 macOS/Windows 桌面版 Agent 对话中可用"}), 400
     data = request.get_json() or {}
     if not isinstance(data.get("enabled"), bool):
         return jsonify({"success": False, "error": "enabled 必须是布尔值"}), 400

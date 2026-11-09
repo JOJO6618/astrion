@@ -22,9 +22,29 @@ export class TabDriver {
     this.listeners = [];
     this.queue = Promise.resolve();
   }
-  /** 同一标签的 AI 调用串行执行。 */
-  run(task) {
-    const next = this.queue.then(task, task);
+  static fileKey(value) {
+    const url = new URL(value);
+    if (url.protocol !== 'file:' || (url.hostname && url.hostname !== 'localhost') || url.username || url.password) throw new BrowserToolError('path_not_allowed', '只允许已校验的本机文件。');
+    url.hostname = ''; url.search = ''; url.hash = '';
+    url.pathname = url.pathname.replace(/%[0-9a-f]{2}/gi, part => part.toUpperCase());
+    return url.href;
+  }
+  static checkFileURL(value, fileURLs = []) {
+    if (!/^file:/i.test(value || '')) return;
+    const key = TabDriver.fileKey(value);
+    if (!Array.isArray(fileURLs) || !fileURLs.some(item => TabDriver.fileKey(item) === key)) throw new BrowserToolError('path_not_allowed', '本地文件尚未通过当前调用的可读路径校验，请使用 browser_navigate 提供文件 URL。');
+  }
+  /** 同一标签串行执行；文件授权仅在本次调用内有效。 */
+  assertWebPage() {
+    TabDriver.checkFileURL(this.wc.getURL(), this.fileURLs);
+  }
+  run(task, fileURLs = []) {
+    const guarded = async () => {
+      this.fileURLs = fileURLs;
+      try { this.assertWebPage(); const result = await task(); this.assertWebPage(); return result; }
+      finally { this.fileURLs = []; }
+    };
+    const next = this.queue.then(guarded, guarded);
     this.queue = next.catch(() => {});
     return next;
   }
@@ -62,8 +82,8 @@ export class TabDriver {
   }
   cdp(method, params = {}) {
     if (this.wc.isDestroyed()) return Promise.reject(new BrowserToolError('tab_closed', '标签已关闭。'));
-    const p = this.wc.debugger.sendCommand(method, params);
-    return p;
+    this.assertWebPage();
+    return this.wc.debugger.sendCommand(method, params).then(value => { this.assertWebPage(); return value; });
   }
   onEvent(method, params) {
     if (method === 'Page.javascriptDialogOpening') {
@@ -335,9 +355,11 @@ export class TabDriver {
     return { data: await this.capture(rect), truncated: false };
   }
   async capture(rect) {
+    this.assertWebPage();
     const zoom = this.zoom();
     const area = rect ? { x: Math.floor(rect.x * zoom), y: Math.floor(rect.y * zoom), width: Math.ceil(rect.width * zoom), height: Math.ceil(rect.height * zoom) } : undefined;
     const image = await withTimeout(area ? this.wc.capturePage(area) : this.wc.capturePage(), 15000, 'screenshot_timeout');
+    this.assertWebPage();
     if (image.isEmpty()) throw new BrowserToolError('screenshot_empty', '截图为空（页面可能还没有渲染）。');
     return image.toPNG().toString('base64');
   }

@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import url2pathname
 
 from modules.native_browser import client
 from modules.native_browser.availability import native_browser_supported
@@ -18,7 +21,7 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 DISABLED_MESSAGE = "浏览器未开启：用户可在输入栏「+」菜单中打开「浏览器」后再使用浏览器工具。现在不要重试，如确有需要可请用户开启。"
-UNSUPPORTED_MESSAGE = "内置浏览器工具仅在 macOS 桌面版的 Agent 主对话中可用。"
+UNSUPPORTED_MESSAGE = "内置浏览器工具仅在 macOS/Windows 桌面版的 Agent 主对话中可用。"
 READONLY_MESSAGE = "当前为只读（或计划）模式：浏览器只能使用读取类工具（导航、快照、查找、截图、滚动、悬停等），不能点击、输入或执行脚本。"
 
 
@@ -109,6 +112,23 @@ def _readable_paths(terminal: Any, paths: Any) -> List[str]:
     return result
 
 
+def _file_navigation(terminal: Any, value: str) -> tuple[str, List[str]]:
+    """Grant only files checked by the execution backend, for this bridge call."""
+    if len(value) > 8192 or any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValueError("本地文件 URL 包含无效字符。")
+    url = urlsplit(value)
+    if (url.scheme.lower() != "file" or url.netloc.lower() not in {"", "localhost"}
+            or "\\" in url.path or re.search(r"%(?:2f|5c)|%(?![0-9a-f]{2})", url.path, re.I)):
+        raise ValueError("只允许本机 file:// 文件地址，不支持远程主机或 UNC 路径。")
+    path = Path(url2pathname(url.path))
+    if (not path.is_absolute() or str(path).startswith(("\\\\", "//"))
+            or any(ord(char) < 32 or ord(char) == 127 for char in str(path))):
+        raise ValueError("file:// 必须指向有效的本机绝对路径。")
+    resolved = Path(_readable_paths(terminal, [str(path)])[0])
+    target = urlsplit(resolved.as_uri())
+    return urlunsplit((target.scheme, target.netloc, target.path, url.query, url.fragment)), [path.as_uri(), resolved.as_uri()]
+
+
 def _save_screenshot(terminal: Any, data: str) -> str:
     project = Path(str(terminal.context_manager.project_path)).resolve()
     folder = project / ".astrion" / "browser_screenshots"
@@ -152,6 +172,22 @@ async def execute(terminal: Any, tool_name: str, arguments: Dict[str, Any]) -> D
         payload["allowed_sites"] = [approved] if approved else []
     else:
         payload["allowed_sites"] = sorted(set(allowed_sites(_data_dir(terminal))) | ({approved} if approved else set()))
+    try:
+        file_urls: List[str] = []
+        if op == "navigate" or (op == "tabs" and args.get("action") == "new"):
+            target = args.get("url")
+            if isinstance(target, str) and target.strip().lower().startswith("file:"):
+                args["url"], granted = _file_navigation(terminal, target.strip())
+                file_urls.extend(granted)
+        if op != "tabs" or args.get("action") == "select":
+            current = await asyncio.to_thread(preflight, terminal, args)
+            current_url = current.get("url")
+            if isinstance(current_url, str) and current_url.lower().startswith("file:"):
+                _, granted = _file_navigation(terminal, current_url)
+                file_urls.extend(granted)
+        payload["file_urls"] = sorted(set(file_urls))
+    except (ValueError, OSError) as exc:
+        return {"success": False, "code": "path_not_allowed", "error": str(exc)}
     if op in {"file_upload", "drop"}:
         try:
             readable = _readable_paths(terminal, args.get("paths"))

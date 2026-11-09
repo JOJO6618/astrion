@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Astrion Browser Probe",
+  "version": "0.1.0",
+  "identifier": "com.astrion.browser-probe",
+  "build": { "frontendDist": "web" },
+  "app": { "windows": [], "security": { "csp": null } },
+  "bundle": { "active": false }
+}

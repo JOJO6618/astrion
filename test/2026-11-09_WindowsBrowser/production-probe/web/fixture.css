@@ -1,0 +1,4 @@
+body { margin:0; background:#22c55e; font:16px sans-serif; min-height:800px; }
+.page { background:#3b82f6; }
+input, button { margin:4px; padding:8px; }
+#status { padding:16px; }

@@ -1,6 +1,6 @@
-# macOS 内置浏览器集成验证版
+# 桌面内置浏览器集成验证版
 
-本轮将已确认的 `demo/browser-component/` 设计接入 Astrion macOS Electron 桌面壳，验证用户手动浏览真实网页。Agent / Chat 共用侧栏入口、组件与状态。当前没有智能体操作、MCP 或 Playwright 控制通道；Windows、Docker 和普通网页端尚不提供此能力。
+共享浏览器界面已接入 macOS Electron 与 Windows Tauri/WebView2 桌面壳。Agent / Chat 共用侧栏入口、组件与状态；Agent 主对话的 AI 工具复用同一控制器与驱动，详见后文。Docker 和普通网页端不提供此能力。Windows 适配、授权导入与 file 原生验证见本文末尾及 `test/2026-11-09_WindowsBrowser/`、`test/2026-11-09_浏览器授权迁移/`。
 
 ## 结构和职责
 
@@ -12,9 +12,10 @@
 - `preload-main.cjs`：只向可信主 renderer 暴露最小 `astrionBrowser` 桥。
 - `static/src/components/browser/`：标签栏、导航栏、管理页、菜单、权限弹窗和原生表面同步。
 - `static/src/stores/nativeBrowser.ts`：共享界面状态、连接与布局序号。
-- `AppShell.vue` 共用挂载；`ConversationSidebar.vue` 仅在 macOS 桌面桥存在时显示入口。
+- `AppShell.vue` 共用挂载；`ConversationSidebar.vue` 在桌面浏览器桥存在时显示入口。
+- `desktop/src-tauri/src/browser/`：Windows 原生 manager、策略、WebView2 controller、事件队列、裁剪、下载/权限、DPAPI 密码库和 Chrome 导入。
 
-网页使用同一 `BaseWindow` 的原生视图，不使用 iframe、截图或视频流替代。网页无 Node、无可信 preload，开启 sandbox、contextIsolation 和 webSecurity。
+macOS 网页使用同一 `BaseWindow` 的原生 `WebContentsView`，开启 sandbox、contextIsolation 和 webSecurity。Windows 网页使用同一主窗口中的原生 WebView2 controller；网页不注册为 Tauri WebView，不注入 Tauri API 或可信应用桥。两平台均不使用 iframe、截图或视频流替代真实网页。
 
 ## 身份、标签和生命周期
 
@@ -28,7 +29,11 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 
 **等值快照不能触发重连或重置（2026-11-08 稳定性修正）**：连接侦听使用 Vue 多来源 `watch([() => open, () => serializedScope], ...)`，菜单/地址/查找重置使用 `watch([() => activeId, () => activeUrl], ...)`。禁止写成返回新数组的单来源 getter；轮询会替换对象，即使字段值相同，单来源新数组仍触发回调。保持完整 patch 后消费，不能用停用桌面轮询掩盖问题。真实归属/网址变化仍应重新连接或更新页面状态。用户要求“…”菜单无阴影，`BrowserMenu.vue` 本体不设 box-shadow。复现及持续更新回归见 `test/2026-11-08_浏览器轮询稳定性/README.md`。
 
-普通地址导航仅允许 HTTP、HTTPS 和 `about:blank`，禁止带用户名密码的 URL。搜索输入转成搜索地址。网页新窗口进入浏览器标签，保留 Chromium opener / noopener 语义，不给新网页附加可信桥。
+普通网站导航允许 HTTP、HTTPS 和 `about:blank`，禁止带用户名密码的 URL。两平台另外用 `manual_navigation` / `manualNavigationURL` 允许用户手动打开本机 `file://` 网页，支持相对资源、相对文档链接、已访问页面的前进/后退及标签恢复。拒绝远程 file 主机/UNC、控制字符与非法编码；远程网页不能通过新导航、重定向或 popup 任意打开本地文件，本地页可打开本地 popup。密码 origin 解析仍只允许 HTTP(S)。
+
+`browser_navigate` 与 `browser_tabs action=new` 支持本机 `file://`：后端先通过执行后端 `files.resolve_path(access="read")` 校验文件，把本次允许的文件 URL 交给可信桥。已有 file 标签的读取和切换同样先查询真实当前地址并重新校验；共享驱动在串行调用及 CDP/截图前后核对本次文件清单，Windows 原生入口再复核，导航同时登记本次本地目标。文件授权不留在缓存驱动中，不把所有本地文件视为同一个已批准站点；动作仍遵守原权限策略。本次按用户要求仅改源码，未测试或重新构建。
+
+本地页仍是无可信桥的原生网页，不安装密码 DOM 适配器，不给它伪造 HTTP origin。手动浏览不扩大模型的本地文件可读范围。保留 Chromium 原有 file 安全限制，不开启 file-access-from-files 或关闭 webSecurity；依赖跨源 fetch、ES modules 或服务端路由的页面仍可能需要 HTTP 服务。搜索输入转成搜索地址。网页新窗口保留 Chromium opener / noopener 语义，不给新网页附加可信桥。
 
 ## 资料路径与持久化边界
 
@@ -48,9 +53,9 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 
 ## 原生网页与 DOM 浮层
 
-原生网页层高于主 renderer 的 DOM。浏览器菜单、内部管理页、站点权限弹窗、调宽，以及与网页矩形相交的应用浮层打开时，隐藏原生网页；关闭后恢复同一网页实例。查找和设备工具栏占布局行，网页矩形相应缩小。
+原生网页层高于主 renderer 的 DOM。macOS 通过 `stacking.js` 的透明主视图叠层和 `input.js` 的输入转发显示 DOM 浮层，内部页及不应显示网页的状态由原生布局隐藏。Windows 桥声明 `surfaceMode: 'regions'`，共享前端上报 `occlusions`，原生 `SetWindowRgn` 从网页子窗口扣除相交区域，露出主应用 DOM；孔外直接接收原生输入，不使用 macOS underlay 或事件转发。查找和设备工具栏占布局行，网页矩形相应缩小。
 
-**验证版打开 DOM 菜单时网页会暂时隐藏。** 后续新增浮层应标记 `data-native-browser-obscures`，或纳入 `useBrowserSurface.ts` 的遮挡选择器；不能只调 DOM z-index。
+新增浮层应标记 `data-native-browser-obscures`，或纳入 `useBrowserSurface.ts` 的遮挡选择器；不能只调 DOM z-index。浏览器 tooltip 使用实际 DOM 元素，使 Windows 可获得准确矩形。矩形始终为主页面 CSS 视口坐标，原生负责 DPI、主页面缩放和顶部独立标签条的偏移。
 
 ## 当前能力
 
@@ -60,7 +65,18 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 - geolocation、notifications、media、clipboard-read 的自定义许可交互；其他权限默认拒绝。许可只保留在本次运行，过期或归属变化时拒绝待处理请求，系统级授权仍由 macOS 决定。
 - 三主题、自定义面板宽度和当前用户浏览资料清理。
 
-密码保存、密码自动填充、从本机浏览器导入密码/Cookie/历史尚未接入。管理页如实显示此状态，不模拟导入成功。设备模式是 Chromium 尺寸模拟，不代表真实手机、网络或传感器环境。
+密码保存、自动填充与 Chrome 密码/Cookie/历史导入已有实现。macOS 密码库使用 Electron safeStorage，Windows 使用当前用户 DPAPI；共享 DOM 适配器在各自隔离世界运行。Windows 先启用 CDP Runtime，创建顶层 frame 的隔离世界，再以返回的实际 context ID 注册绑定；不能假设按 world 名称注册在 WebView2 中等价可用。适配器转换与换行归一化有守护单测，修改 Electron 源适配器时必须同步跑 Windows 回归。Chrome 导入必须预览、明确冲突选择再提交，预览不落明文文件；Windows 不绕过 v20 应用绑定加密，不支持的记录如实计数。
+
+### Windows Chrome 授权导入（2026-11-09 r2）
+
+- 真实用户回报密码/Cookie 全为 v20 时，旧版 DPAPI/AES-GCM 合成回归不代表这些记录可迁移。直接读库保留作历史及旧格式来源，不尝试绕过 Chrome 应用绑定加密。
+- Windows 可信桥声明 `credentialFileImport`，共享 `BrowserImportFile.vue` 让用户选择 UTF-8 密码 CSV 或版本化 Cookie JSON；仅传文件内容，不接受文件路径，不增加原生任意文件读取能力。其它壳未声明能力时保持已有来源。
+- `chrome_worker.py::file_preview` 在独立 Python 子进程解析，限制 4 MiB/10,000 条，CSV 正确处理 BOM/引号/逗号/换行。只回内存预览的计数及不含密码的冲突元数据，复用同一 preview id/lease/profile、300s TTL、vault 版本校验、冲突选择与明确提交；密码最终一次 DPAPI 原子写入。不把文件或 Cookie 值传给模型、写日志或临时明文文件。
+- `desktop/browser-migration-extension/` 是用户手动加载的 Chrome MV3 扩展：在用户点击并授予指定网站权限后，通过 Chrome Cookie API 导出本地 `astrion-cookie-export` v1 JSON。包括普通与分区 Cookie，保留 hostOnly、session、SameSite、HttpOnly、过期时间、topLevelSite 和 hasCrossSiteAncestor；不连接网络、不直连 Astrion、不读密码。权限默认不全站授予，网站范围变化需重新明确同意；扩展权限可由用户撤销或移除扩展。
+- Cookie JSON 复用同一预览与提交。目标是当前用户 profile 的隐藏 storage controller；原生用 CDP `Network.getAllCookies` / `Network.setCookie` 保留分区键及 host-only，不把分区 Cookie 降成普通 Cookie。冲突身份包含 domain/name/path/partitionKey 两字段。每条写入后异步推进，结束回读核对身份、值、Secure/HttpOnly/SameSite/session 后才计成功；回调绑定本次 preview id 及租约/资料身份，旧回调不能影响新导入，超时明确提示可能部分写入。
+- 用户主动导出的 CSV/JSON 是明文敏感文件，导入后需删除。迁移不含 localStorage/IndexedDB/设备密钥，Cookie 写入成功不保证网站登录仍有效。历史读取把非 HTTP(S)、无效 URL、无效访问时间分开统计。
+
+设备模式是 Chromium 尺寸模拟，不代表真实手机、网络或传感器环境。无移动端 viewport 声明的网站可能仍使用 980px 布局视口，不得把它误判为设备屏幕参数没有生效。
 
 ## AI 浏览器操作工具（2026-11-08 设计定稿，2026-11-09 首版已实现）
 
@@ -71,13 +87,13 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 **与设计的差异与已知限制（首版）**：
 - 控制桥 token 经 fd 3 管道交给后端（`config/desktop_browser.py` 读完即关），不放环境变量：macOS 上同用户进程可用 `ps -E` 读到启动环境，模型执行的命令会因此绕过审批。
 - 隐藏（后台）标签：视口可能为 0×0，驱动用 `Emulation.setDeviceMetricsOverride`（1280×800）兜底，标签显示时撤销；隐藏标签的 CDP 截图会挂起，改用 `capturePage`，整页截图在标签未显示时退化为可视区域。
-- 网页同步弹出 alert/confirm 时输入事件不返回，驱动以对话框事件视为已送达。
-- 暂未做：全局存活网页上限与 LRU 释放（沿用 48 个标签上限）；用户手动触发的网页对话框面板内自绘；iframe 内容（快照只覆盖主文档）。
+- 网页同步弹出 alert/confirm 时输入事件不返回，驱动以对话框事件视为已送达。Windows 有对话框时跳过视口脚本求值，避免处理工具被同步脚本阻塞。
+- 暂未做：全局存活网页上限与 LRU 释放（沿用 48 标签上限）、iframe 内容（快照只覆盖主文档）。macOS 手动触发的网页对话框自绘仍未接入；Windows 已通过共享 BrowserPageDialog 显示 native deferral，关闭标签或退出时完成回收。
 - 站点「以后都允许」只在人工审批可选（自动审核不能写入）；`browser_evaluate` 无此选项。
 
 ### 范围与开关
 
-- 仅 macOS 桌面版后端创建的 Agent 主对话注入工具与提示词；网页端、Docker、Chat、子智能体不注入、不开放。Windows 以后再做。与 Playwright MCP 的关系后续再定，届时同步 `prompts/preview_panel.txt` 中「自我验证走 Playwright」。
+- macOS 与 Windows 桌面壳启动的 host 后端，在收到私有管道凭据后，向 Agent 主对话注入同一套工具与提示词；网页端、Docker、Chat、子智能体不开放。Windows 复用共享控制器、驱动、快照与审批，仅适配原生通道。与 Playwright MCP 的关系后续再定。
 - 输入栏 `+` 菜单的「浏览器」开关按对话保存（metadata）。工具定义与提示词始终注入（保持工具数组与前缀缓存稳定），关闭时调用返回「浏览器未开启」错误；切换沿用运行模式切换的同一套机制，运行中可切，并插入 user 通知消息。开关只约束模型调用，用户随时可手动浏览；关闭后模型已开的标签保留。
 - 设置页新增「浏览器」分区，仅含：新对话默认开关（默认关闭）、模型在当前可见对话操作时自动打开面板（默认开启）、模型触发下载的目录（默认工作区 `.astrion/browser_downloads/`，用户手动下载仍进 `~/Downloads/Astrion/`）、AI 站点权限列表（查看／撤销）。不开放快照上限等参数。
 
@@ -169,3 +185,31 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 若直接双击 `Astrion.app`，会使用现有 Astrion 的默认/已设置运行数据根与默认 Electron 资料目录。先退出旧桌面版，以免单实例锁只激活旧应用。直接打开 app 并不会自动隔离真实资料。
 
 界面视觉、真实网站登录、鼠标键盘、输入法、长期运行、打印和系统媒体权限仍需实机验收；本轮自动回归不等于完整浏览器产品验收。
+
+## Windows WebView2（2026-11-09）
+
+- 每个用户名独立 `ICoreWebView2Environment`；网站资料位于 `<desktopDataRoot>/browser/<profileHash>/webview2/`，元数据仍为同目录 `metadata.json`，密码为 `passwords.dpapi`。隐藏资料 controller 使只有内部管理页时也能清理 Cookie/缓存或导入 Cookie。
+- 可信主视图只安装 `main-bridge.js`；顶层 WebMessageReceived 校验来源与当前主页面 URL、精确后端 origin、聊天路由、文档 ID 和 lease。消息必须是 JSON 字符串，与 Wry 自身监听器兼容。网页 controller 不挂这条通道。
+- COM 对象保留 STA 线程，回调只入队，批量调度定期让出 Windows 消息循环。异步身份连接与回包检查 ticket/document/lease/profile；关闭回收 popup/permission deferral 和 controller。
+- popup 必须在同一 Environment 中创建未导航的 controller，`SetNewWindow` 后才完成 deferral，保留原生 WindowProxy/opener 语义。不得用重新打开 URL 代替承接。
+- 布局裁剪保持网页实例；DOM 的 128 个矩形上限由前端超限时上报整块遮挡兜底。网页鼠标、滚轮及输入法走真实原生输入。
+- 指定 `ASTRION_DESKTOP_DATA_ROOT` 时，主页面与 chrome 标签条使用 `<dataRoot>/shell-webview2/`，与网站 profile 分离。`ASTRION_DESKTOP_INITIAL_WORKSPACE` 可显式指定首启默认工作区，未设置时沿用用户主目录。便携测试脚本还指定独立 `ASTRION_DESKTOP_SETTINGS_FILE` 和 `ASTRION_QUICK_SETTINGS_FILE`，后者避免读取正式版全局快捷对话设置；正式版本号不因测试包改变。
+- 单独的测试配置 `test/2026-11-09_WindowsBrowser/windows-test.conf.json` 使用不同 identifier、关闭安装包与 updater endpoints；`browser-test` Cargo feature 仅让 debug 验证包采用 GUI 子系统。必须通过包内启动脚本启用全部资料隔离。
+
+本机 WebView2 157.0.4341.42 上，r2 生产模块写入/恢复两个独立进程的回归分别通过 39/43 项检查，包含既有隔离自动填充/刷新重装、查找/缩放/设备参数、popup/opener、旧 lease 与 owner 隔离、导入预览/取消/冲突、内部页清理及 Cookie/localStorage 恢复，并新增 CSV 特殊字符、分区 Cookie 回读/覆盖/重启恢复、中文空格路径的 file 相对 JS/CSS/文档导航、file↔HTTP 历史前进后退和远程 file 跳转/popup 拒绝。WGC 同时断言裁剪孔中心为主页面颜色、孔外为网页颜色。证据入口 `_experiments/windows-browser-20261109/production-latest.json`；完整命令和限制见测试 README。
+
+独立 Chromium 149 扩展真实 API 7 项、导出文件解析 9 项、Electron 原生视图替身策略 9 项通过；真实 Chrome 权限确认及 Mac 原生/视觉仍需用户验收。r2 Windows 便携包实际启动与关闭回收 11 项通过，未包含烟测 profile。
+
+这些原生合成回归不代替真实网站登录、系统对话框、输入法、多 DPI/多显示器和长期使用验收。打印、截图另存、实际下载与系统媒体授权仍交用户实机确认。Windows DPAPI 绑定当前 Windows 用户，不能把密码库当跨用户/跨机可移植文件。
+
+### Windows AI 原生通道
+
+- `browser/ai_script.rs` 编译期装入 Electron 目录内同一份 BrowserAI、TabDriver、world、keys、site、snapshot-text 与 Playwright 注入脚本，不维护第二套工具逻辑，也不要求包内 Node。只有 Windows 按键别名、原生对象代理和密码库传输做平台适配。
+- 共享 JS 在专用隐藏 WebView2 controller 中执行，只允许 about:blank；该 controller 不加载网站或应用 UI，不安装 Tauri API。其专属 WebMessage 接收器承接 CDP RPC。网站 controller 无可信桥；模型不拿原始 CDP 或远程调试端口。
+- `ai_http.rs` 只监听 127.0.0.1，拒绝缺失/重复 token、网页 Origin、错误路径和超限输入。后端通过 `ASTRION_DESKTOP_BROWSER_PORT` 定位端点；随机凭据经一次性 stdin 管道传递，`config/desktop_browser.py` 读取后移除 FD 环境变量并把 Windows stdin/STD_INPUT_HANDLE 换为 NUL，后续子进程不继承凭据。
+- 原生操作再次核对 call_id、owner、profile、网页类型与取消/超时。动作另外固定派发时实际 origin，审批后跨来源跳转即拒绝。路径在共用后端规范化后，原生文件使用点再次核对可读白名单与普通文件；有文件字段但类型错误必须拒绝。
+- `/new` stable key 在对话绑定时迁移到 conversation owner。每 owner 串行，不同 owner 可并行；模型当前标签独立于界面选择。可信主文档订阅 AI 活动时发送 hello 握手，以便面板尚未打开时也能接收自动展开通知；hello 不读取用户资料、不授予 profile lease。
+- 隐藏标签的 CDP 截图与直接对不可见 controller 的 CapturePreview 均在本机发生等待。Windows capturePage 代理使用原生 CapturePreview + 内存流，并在截图期间启用 controller 合成，网页宿主仍隐藏，回调后恢复可见性。元素裁剪在私有脚本宿主内按真实 PNG/视口尺寸换算，避免 Electron 的 zoom 坐标语义直接用于 CDP。整页截图沿用共享驱动失败时注明回退视口的规则。
+- 模型触发下载跟随已绑定调用的 download_dir，结束后保留 5 秒接收窗口；用户手动下载仍用系统 Downloads/Astrion。已保存密码只进入私有原生/脚本通道用于填充，不进入工具返回与快照。
+
+最终本机合成工具回归通过 29 项断言，覆盖 23 工具主要行为；共享后端权限 10 项、启动管道及平台门控 3 项、Rust 单测在 r2 为 12 项。证据入口 `_experiments/windows-browser-20261109/ai-latest.json`；这些结果不代表真实模型、外部网站、所有 DPI 或全平台均已验收。

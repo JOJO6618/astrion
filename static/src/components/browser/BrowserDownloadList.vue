@@ -23,7 +23,7 @@
       <BrowserButton
         v-if="row.state === 'completed'"
         name="folderOpen"
-        :label="$t('browser.reveal')"
+        :label="$t(isWindowsDesktopShell() ? 'browser.revealWindows' : 'browser.reveal')"
         @click="store.command('download-reveal', undefined, row.id)"
       />
       <BrowserButton
@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { t } from '@/locales';
+import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import BrowserButton from './BrowserButton.vue';
 import BrowserIcon from './BrowserIcon.vue';

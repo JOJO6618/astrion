@@ -67,13 +67,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
+import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import BrowserIcon from './BrowserIcon.vue';
 const store = useNativeBrowserStore();
 defineEmits<{ action: [action: string] }>();
 const devices = ref(false);
+const modifier = isWindowsDesktopShell() ? 'Ctrl+' : '⌘';
 const topItems = [
-  { action: 'find', label: 'find', icon: 'search', key: '⌘F' },
-  { action: 'print', label: 'print', icon: 'file', key: '⌘P' }
+  { action: 'find', label: 'find', icon: 'search', key: `${modifier}F` },
+  { action: 'print', label: 'print', icon: 'file', key: `${modifier}P` }
 ] as const;
 const sections = [
   { action: 'import', label: 'import', icon: 'folderOpen' },

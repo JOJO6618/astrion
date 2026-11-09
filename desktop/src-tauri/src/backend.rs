@@ -165,6 +165,7 @@ fn spawn_backend_and_wait(
     let port = pick_free_port()?;
     let (python, backend_dir) = resolve_runtime(app)?;
     let child = spawn_backend(
+        app,
         &python,
         &backend_dir,
         port,
@@ -347,6 +348,7 @@ fn python_has_deps(python: &Path) -> bool {
 const CHILD_ENV_SCRUB_PREFIXES: [&str; 2] = ["ASTRION_", "AGENT_"];
 
 fn spawn_backend(
+    app: &AppHandle,
     python: &Path,
     backend_dir: &Path,
     port: u16,
@@ -358,8 +360,9 @@ fn spawn_backend(
     // 生产形态下 backend_dir 在 .app 内（只读），兜底路径给用户主目录；
     // 开发形态给源码树的 project/（原行为）。
     // Windows 无 HOME 变量，走 USERPROFILE 兜底。
-    let default_ws = std::env::var_os("HOME")
+    let default_ws = std::env::var_os("ASTRION_DESKTOP_INITIAL_WORKSPACE")
         .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
         .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
         .unwrap_or_else(|| backend_dir.join("project"));
     let mut cmd = Command::new(python);
@@ -410,6 +413,14 @@ fn spawn_backend(
     if let Some(bp) = bridge_port {
         cmd.env("ASTRION_DESKTOP_BRIDGE_PORT", bp.to_string());
     }
+    #[cfg(windows)]
+    let browser_channel = crate::browser::start_ai_service(app)?;
+    #[cfg(windows)]
+    {
+        cmd.env("ASTRION_DESKTOP_BROWSER_PORT", browser_channel.0.to_string());
+        cmd.env("ASTRION_DESKTOP_BROWSER_TOKEN_FD", "0");
+        cmd.stdin(Stdio::piped());
+    }
 
     // Windows 桌面壳是 GUI 子系统进程（release 下 windows_subsystem），
     // 若不加 CREATE_NO_WINDOW，spawn 控制台子进程（python.exe）会弹出黑框终端窗口。
@@ -427,6 +438,13 @@ fn spawn_backend(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("spawn 后端失败: {e}"))?;
+    #[cfg(windows)]
+    {
+        use std::io::Write;
+        let result = child.stdin.take().ok_or("browser_token_pipe_missing")
+            .and_then(|mut pipe| writeln!(pipe, "{}", browser_channel.1).map_err(|_| "browser_token_pipe_failed"));
+        if let Err(error) = result { let _ = child.kill(); let _ = child.wait(); return Err(error.into()); }
+    }
 
     // Windows：后端挂入 KILL_ON_JOB_CLOSE 的 Job Object。壳任何方式退出
     // （正常关窗 / 崩溃 / 被 taskkill / updater 启动安装器后 process::exit 自杀）
@@ -505,12 +523,16 @@ const PLATFORM_MARKER: &str = "window.__ASTRION_PLATFORM__ = 'linux';";
 const QUICK_SETTINGS_SCRIPT: &str = include_str!("../../../static/quick-capture/windows-settings.js");
 #[cfg(not(windows))]
 const QUICK_SETTINGS_SCRIPT: &str = "";
+#[cfg(windows)]
+const BROWSER_SCRIPT: &str = crate::browser::BRIDGE_SCRIPT;
+#[cfg(not(windows))]
+const BROWSER_SCRIPT: &str = "";
 
 fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     let url = format!("http://127.0.0.1:{port}/");
     let chrome_url = format!("http://127.0.0.1:{port}/chrome");
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse().expect("valid url")))
-        .title("Astrion")
+        .title(app.config().product_name.as_deref().unwrap_or("Astrion"))
         .inner_size(1280.0, 800.0)
         .min_inner_size(960.0, 600.0);
     // macOS 顶部浏览器式对话标签条：标题栏 Overlay（红绿灯悬浮在 chrome webview 之上），
@@ -530,13 +552,16 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     #[cfg(windows)]
     {
         builder = builder.decorations(false).shadow(true);
+        if std::env::var_os("ASTRION_DESKTOP_DATA_ROOT").is_some() {
+            builder = builder.data_directory(crate::rundata::resolve_data_root().join("shell-webview2"));
+        }
     }
     let window = builder
         // 桌面壳环境标记：页面在任意脚本执行前可读到（登录页据此自动免登录）。
         // 不用 withGlobalTauri——它对 External URL 页面不注入，且语义过重。
         // 平台标记供 chrome 标签条做平台差异化 UI（Windows 左侧设置按钮）。
         .initialization_script(&format!(
-            "window.__ASTRION_DESKTOP__ = true; {PLATFORM_MARKER} {QUICK_SETTINGS_SCRIPT}"
+            "window.__ASTRION_DESKTOP__ = true; {PLATFORM_MARKER} {QUICK_SETTINGS_SCRIPT} {BROWSER_SCRIPT}"
         ))
         // 恢复 HTML5 文件拖放：Tauri 2 默认 dragDropEnabled=true，壳会拦截系统拖放
         // 改发 tauri://drag-drop 事件、吃掉页面自身的 drop 事件；而 External URL
@@ -580,6 +605,12 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     ))
     // 不抢键盘焦点（输入主权始终在主页面）
     .focused(false);
+    #[cfg(windows)]
+    let chrome_builder = if std::env::var_os("ASTRION_DESKTOP_DATA_ROOT").is_some() {
+        chrome_builder.data_directory(crate::rundata::resolve_data_root().join("shell-webview2"))
+    } else {
+        chrome_builder
+    };
     // add_child 定义在 Window 上（unstable）；窗口与主 webview 同 label（main），
     // WebviewWindow 无 Deref 到 Webview，经 Manager::get_window 取宿主 Window。
     let host_window = window
@@ -591,6 +622,12 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
         tauri::LogicalSize::new(1280.0, CHROME_STRIP_HEIGHT),
     )?;
     layout_webviews(&host_window);
+    #[cfg(windows)]
+    {
+        let (python, backend) = resolve_runtime(app).map_err(|error| tauri::Error::Anyhow(std::io::Error::other(error).into()))?;
+        crate::browser::initialize(app, format!("http://127.0.0.1:{port}"), crate::rundata::resolve_data_root(), python, backend)
+            .map_err(|error| tauri::Error::Anyhow(std::io::Error::other(error).into()))?;
+    }
     #[cfg(windows)]
     crate::single_instance::main_window_ready(app);
     #[cfg(target_os = "macos")]

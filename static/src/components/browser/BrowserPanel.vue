@@ -73,6 +73,7 @@
       </div>
       <BrowserFloatingStatus />
       <BrowserPasswordPrompt />
+      <BrowserPageDialog />
     </div>
     <BrowserMenu v-if="store.menu" @action="menuAction" />
     <BrowserPopovers />
@@ -85,6 +86,7 @@ import BrowserIcon from './BrowserIcon.vue';
 import BrowserSiteIcon from './BrowserSiteIcon.vue';
 import BrowserFloatingStatus from './BrowserFloatingStatus.vue';
 import BrowserPasswordPrompt from './BrowserPasswordPrompt.vue';
+import BrowserPageDialog from './BrowserPageDialog.vue';
 import BrowserMenu from './BrowserMenu.vue';
 import BrowserPages from './BrowserPages.vue';
 import BrowserTabStrip from './BrowserTabStrip.vue';

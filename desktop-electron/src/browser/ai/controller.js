@@ -2,7 +2,7 @@
 // 执行 22 个工具对应的操作。只由控制桥（随机 token 鉴权）调用。
 import path from 'node:path';
 import fs from 'node:fs';
-import { profileKey, navigationURL } from '../policy.js';
+import { profileKey, manualNavigationURL } from '../policy.js';
 import { browserBounds } from '../geometry.js';
 import { TabDriver, BrowserToolError, withTimeout } from './driver.js';
 import { chooseSnapshot, truncate, ACTION_SNAPSHOT_LIMIT, EXPLICIT_SNAPSHOT_LIMIT } from './snapshot-text.js';
@@ -110,6 +110,13 @@ export class BrowserAI {
     try { return await this.dispatch(payload, controller.signal); }
     finally { this.calls.delete(payload.call_id); }
   }
+  navigationTarget(value, payload) {
+    let url;
+    try { url = manualNavigationURL(value, true); }
+    catch { throw new BrowserToolError('unsupported_url', '支持 http/https 网址和可读范围内的本机 file:// 文件地址（不能包含用户名密码）。'); }
+    TabDriver.checkFileURL(url, payload.file_urls);
+    return url;
+  }
   async dispatch(payload, signal) {
     const op = String(payload.op || ''), args = payload.args && typeof payload.args === 'object' ? payload.args : {};
     if (op === 'site') return this.site(payload);
@@ -138,7 +145,7 @@ export class BrowserAI {
       if (driver.fileChooser && op !== 'file_upload') result.notes = [...(result.notes || []), '页面打开了文件选择框，请调用 browser_file_upload 提供文件（paths 为空数组表示取消）。'];
       result.tab = result.tab || this.tabInfo(owner, tab);
       return { success: true, ...result };
-    });
+    }, payload.file_urls);
   }
   guardSite(tab, payload) {
     const allowed = payload.allowed_sites;
@@ -160,7 +167,7 @@ export class BrowserAI {
     }
     if (action === 'new') {
       if (manager.tabs.size >= 48) throw new BrowserToolError('tab_limit', '浏览器标签数量已达上限（48），请先关闭不用的标签。');
-      const url = args.url ? navigationURL(args.url, true) : 'about:blank';
+      const url = args.url ? this.navigationTarget(args.url, payload) : 'about:blank';
       const tab = manager.registry.create('about:blank', { owner, profile, ai: true });
       state.current = tab.id;
       if (url === 'about:blank') return { success: true, tab: this.tabInfo(owner, tab), message: '已新建空白标签。' };
@@ -174,7 +181,7 @@ export class BrowserAI {
         await driver.attach();
         const snapshot = await this.snapshotFor(tab, driver, payload, { explicit: false });
         return { success: true, tab: this.tabInfo(owner, tab), snapshot, message: '已切换当前标签。' };
-      });
+      }, payload.file_urls);
     }
     if (action === 'close') {
       const info = this.tabInfo(owner, tab);
@@ -219,8 +226,7 @@ export class BrowserAI {
         const action = args.action || (args.url ? 'goto' : '');
         if (action === 'goto') {
           if (typeof args.url !== 'string' || !args.url.trim()) throw new BrowserToolError('invalid_argument', '缺少 url。');
-          let url;
-          try { url = navigationURL(args.url, true); } catch { throw new BrowserToolError('unsupported_url', '只支持 http/https 网址（不能包含用户名密码）。'); }
+          const url = this.navigationTarget(args.url, payload);
           await this.waitLoad(tab, signal, () => manager.registry.load(tab, url));
         } else if (action === 'back' || action === 'forward') {
           const history = wc.navigationHistory;

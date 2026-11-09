@@ -51,7 +51,9 @@
       </div>
       <div class="nb-setting">
         <span>{{ $t('browser.browsingEngine') }}</span
-        ><small>{{ $t('browser.engineValue') }}</small>
+        ><small>{{
+          $t(isWindowsDesktopShell() ? 'browser.engineWindows' : 'browser.engineValue')
+        }}</small>
       </div>
       <button class="nb-setting nb-setting-link" @click="store.showSection('import')">
         <span>{{ $t('browser.importTitle') }}</span
@@ -98,6 +100,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { t } from '@/locales';
+import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import { useTheme, type ThemeKey } from '@/utils/theme';
 import FancyCheck from '@/components/common/FancyCheck.vue';

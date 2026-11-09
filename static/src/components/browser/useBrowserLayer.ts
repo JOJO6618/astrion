@@ -8,6 +8,7 @@ export function useBrowserLayer(surface: Ref<HTMLElement | null>, inputAllowed: 
   let raised = false;
   let dragging = false;
   function set(bounds: DOMRect | undefined, visible: boolean, elevated = false) {
+    if (browserBridge()?.surfaceMode === 'regions') return;
     raised = visible && elevated && !!bounds;
     document.documentElement.classList.toggle('nb-native-overlay', visible && !!bounds);
     if (!visible || !bounds) {
@@ -86,6 +87,7 @@ export function useBrowserLayer(surface: Ref<HTMLElement | null>, inputAllowed: 
   const up = (event: PointerEvent) => send(event, 'mouseUp');
   const wheel = (event: WheelEvent) => send(event, 'mouseWheel');
   function start() {
+    if (browserBridge()?.surfaceMode === 'regions') return;
     document.addEventListener('pointerdown', down, true);
     document.addEventListener('pointermove', move, true);
     document.addEventListener('pointerup', up, true);

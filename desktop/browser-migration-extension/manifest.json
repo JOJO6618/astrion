@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Astrion Cookie Migration",
+  "version": "1.0.0",
+  "description": "在用户主动授权后，将指定网站的 Cookie 导出为本地 Astrion 迁移文件。",
+  "permissions": ["cookies", "activeTab"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "action": {"default_title": "迁移 Cookie 到 Astrion", "default_popup": "index.html"},
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'"}
+}

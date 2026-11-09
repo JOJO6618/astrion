@@ -24,9 +24,11 @@
 - **桌面标签导航（2026-10-23）**
   - `modules/desktop_navigation/model.py` 定义稳定标签身份、迁移和关闭选后继；`service.py` 串行处理幂等命令及版本化持久化，`server/conversation_tabs.py` 做可信工作区解析、HTTP 装配与运行态富化，不创建执行实例。
   - `static/src/stores/conversationTabs.ts` 是服务端快照投影，`desktopNavigationTransport.ts` 负责串行命令及不重叠轮询；`app/methods/ui/desktopNavigation.ts` 是主页面唯一目标协调器，复用原 bootstrap/session 与工作区导航。完整契约见 `docs/desktop_navigation.md`。
-- **macOS 内置浏览器验证版（2026-11-08）**
-  - `desktop-electron/src/browser/` 按管理器、策略、用户资料、原生标签和下载/权限分工，网页为独立安全 `WebContentsView`；`preload-main.cjs` 仅向主应用暴露可信桥。
-  - `static/src/components/browser/` 与 `stores/nativeBrowser.ts` 由 Agent / Chat 共用，通过 AppShell 挂载和 ConversationSidebar 进入。资料按用户共享，标签按稳定桌面对话标签 key 归属；Chromium 资料必须在 Electron sessionData 内，DOM 浮层通过隐藏原生网页避让。边界和验证见 `docs/native_browser.md`。
+- **桌面内置浏览器验证版（macOS 2026-11-08 / Windows 2026-11-09）**
+  - `desktop-electron/src/browser/` 按管理器、策略、用户资料、原生标签和下载/权限分工，网页为独立安全 `WebContentsView`；`preload-main.cjs` 仅向主应用暴露可信桥。Electron 网站资料必须位于 sessionData 内，DOM 浮层走透明叠层与输入转发。
+  - `desktop/src-tauri/src/browser/` 按 manager/model、策略/可信入口、原生 controller/事件、裁剪、权限/下载、DPAPI 密码库、隔离世界 DOM 适配及 Chrome 导入拆分；网页为不带 Tauri 桥的 raw WebView2 controller。Windows 网站资料位于运行数据根，DOM 浮层走原生区域裁剪。
+  - `static/src/components/browser/` 与 `stores/nativeBrowser.ts` 由 Agent / Chat、macOS / Windows 共用，通过 AppShell 挂载和 ConversationSidebar 进入。资料按用户共享，标签按稳定桌面对话标签 key 归属。边界和验证见 `docs/native_browser.md`。
+  - `desktop/browser-migration-extension/` 是用户主动加载的 Chrome Cookie 授权导出扩展，HTML/CSS/JS 分离，不连接网络；Windows 通过共享导入界面选择 CSV/JSON 并复用原生预览/提交。两平台手动 file 网址入口独立于 AI 的网页网址与密码 origin 校验。
 - **前端目录**
   - `static/src/`: Vue 3 + TS 前端；`app/methods/ui/workspaceNavigation.ts` 统一导航，`workspaceSelection.ts` 排序选择写入，`workspaceStartup.ts` 解析初始真实身份，`composerDrafts.ts` 绑定可见对话草稿，`draftStorage.ts` 管理本地持久化和远端重试，`message/guidance.ts` 提交运行中引导，`navigationRefresh.ts` 负责一次辅助刷新。`workspaceRequestScope.ts` 为同源API捕获派发身份，`stores/workspaceConversationCache.ts` 按工作区维护单份列表缓存及请求身份，不分对话类型。
   - `cli/src/`: opentui（Zig 内核 + Yoga）+ React 19 CLI 前端（2026-09-11 起正式替代 Ink 版；旧 Ink 实现存档于 `cli/legacy-ink-src/` 仅作字段参考）

@@ -11,7 +11,7 @@ import { BrowserContextMenu, contextMenuLabels } from './context-menu.js';
 import { relayBrowserInput } from './input.js';
 import { BrowserStacking } from './stacking.js';
 import { browserViewport, setBrowserSurfaceColor } from './geometry.js';
-import { scopeKey, scopeAlias, trustedFrame, safeFilename, browserRoute, navigationURL } from './policy.js';
+import { scopeKey, scopeAlias, trustedFrame, safeFilename, browserRoute, manualNavigationURL } from './policy.js';
 import { BrowserAI } from './ai/controller.js';
 import { setActiveBrowser } from './ai/endpoint.js';
 
@@ -119,7 +119,7 @@ export class NativeBrowser {
     else if (action === 'navigate') {
       const section = internalSection(value);
       if (section) this.registry.createInternal(section);
-      else if (!id && !this.active()) this.registry.create(navigationURL(value, true));
+      else if (!id && !this.active()) this.registry.create(manualNavigationURL(value, true));
       else this.registry.load(this.tab(id), value);
     }
     else if (action === 'duplicate') this.registry.create(this.tab(id).url, { duplicate: true });

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 export const SECURE_WEB_PREFERENCES = Object.freeze({
   sandbox: true, contextIsolation: true, nodeIntegration: false,
@@ -31,6 +32,18 @@ export function navigationURL(value, search = false) {
   const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(input) && !/^[\w.-]+:\d/.test(input) ? input : `${/^(localhost|127\.0\.0\.1|\[::1\])/.test(input) ? 'http' : 'https'}://${input}`);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('unsupported_browser_url');
   return url.href;
+}
+export function manualNavigationURL(value, search = false) {
+  if (typeof value !== 'string' || !/^file:/i.test(value.trim())) return navigationURL(value, search);
+  if (value.length > 8192 || /[\x00-\x1f\x7f]/.test(value)) throw new Error('invalid_browser_url');
+  const url = new URL(value.trim());
+  if (url.protocol !== 'file:' || (url.hostname && url.hostname !== 'localhost') || url.username || url.password) throw new Error('unsupported_browser_url');
+  const path = fileURLToPath(url);
+  if (/^[\\/]{2}/.test(path) || /[\x00-\x1f\x7f]/.test(path)) throw new Error('unsupported_browser_url');
+  return url.href;
+}
+export function isLocalFile(value) {
+  try { return /^file:/i.test(value || '') && !!manualNavigationURL(value); } catch { return false; }
 }
 export function clipBounds(rect, mainBounds) {
   if (!rect || !['x', 'y', 'width', 'height'].every(key => Number.isFinite(rect[key]))) return null;

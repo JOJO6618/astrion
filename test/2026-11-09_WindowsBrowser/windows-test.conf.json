@@ -1,0 +1,10 @@
+{
+  "productName": "Astrion Browser Test r3",
+  "version": "0.8.0-browser-test.20261109.3",
+  "identifier": "com.astrion.desktop.browser-test-20261109-r3",
+  "plugins": { "updater": { "endpoints": [] } },
+  "bundle": {
+    "active": false,
+    "createUpdaterArtifacts": false
+  }
+}

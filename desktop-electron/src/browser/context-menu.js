@@ -1,5 +1,5 @@
 import { Menu, clipboard } from 'electron';
-import { navigationURL } from './policy.js';
+import { navigationURL, manualNavigationURL, isLocalFile } from './policy.js';
 
 const DEFAULT_LABELS = {
   back: 'Back', forward: 'Forward', reload: 'Reload', find: 'Find in page',
@@ -63,9 +63,10 @@ export class BrowserContextMenu {
     }
     if (params.linkURL) {
       let navigable = false;
-      try { navigationURL(params.linkURL); navigable = true; } catch { /* Copy remains available for other URL schemes. */ }
+      const navigate = isLocalFile(wc.getURL()) ? manualNavigationURL : navigationURL;
+      try { navigate(params.linkURL); navigable = true; } catch { /* Copy remains available for other URL schemes. */ }
       groups.push([
-        item('openLinkNewTab', () => manager.registry.create(navigationURL(params.linkURL)), navigable && manager.tabs.size < 48),
+        item('openLinkNewTab', () => manager.registry.create(navigate(params.linkURL)), navigable && manager.tabs.size < 48),
         item('copyLink', () => clipboard.writeText(params.linkURL)),
         item('saveLink', () => wc.downloadURL(params.linkURL), downloadable(params.linkURL))
       ]);

@@ -1,5 +1,7 @@
 export default {
   title: 'Browser',
+  pageDialog: 'Website dialog',
+  pageDialogReply: 'Reply to website',
   newTab: 'New tab',
   close: 'Close browser',
   closeTab: 'Close tab',
@@ -64,6 +66,9 @@ export default {
   shared: 'Shared across this user’s workspaces and conversations',
   browsingEngine: 'Web engine',
   engineValue: 'Electron / Chromium',
+  engineWindows: 'WebView2 / Chromium',
+  revealWindows: 'Show in File Explorer',
+  importWindowsDecryptFailed: 'This record cannot be decrypted by the current Windows user',
   credentialsChanged: 'The browser profile has changed. Please try again.',
   offerSave: 'Offer to save passwords',
   autoFill: 'Autofill usernames and passwords',
@@ -92,6 +97,29 @@ export default {
     'Reads local Google Chrome profiles without changing them. If history is locked, quit Chrome completely and read again.',
   chromeProfile: 'Chrome profile',
   noChromeProfiles: 'No Chrome profiles found',
+  importExportedFile: 'Import an export file',
+  importChromeDatabase: 'History / legacy data',
+  fileImportHint:
+    'For current Chrome passwords and cookies, export them explicitly. Preview the selected file before confirming the import.',
+  passwordCsvHelp:
+    'Passwords: Chrome → Google Password Manager → Settings → Export passwords. Download the CSV file.',
+  choosePasswordCsv: 'Choose password CSV',
+  cookieMigrationHelp:
+    'Cookies: load the extension using the chrome-cookie-migration instructions in the test package. Authorize specific sites, export, then select the migration file. Other sites are not read automatically.',
+  chooseCookieExport: 'Choose cookie migration file',
+  exportFileSensitive:
+    'Export files contain passwords or site login credentials. Keep them private and delete them after migration. Maximum 4 MiB and 10,000 records per file.',
+  invalidImportFile:
+    'Invalid file format. Choose a UTF-8 password CSV exported by Chrome, or cookie JSON exported by the Astrion extension.',
+  importFileTooLarge: 'The file exceeds 4 MiB. Split it before importing.',
+  importFileTooManyRecords: 'The file exceeds 10,000 records. Split it before importing.',
+  importPartialTimeout:
+    'Import timed out. Some records may already have been written. Preview again and check before retrying.',
+  importHistoryNonWeb: 'Non-HTTP/HTTPS URL (internal pages, local files, etc.)',
+  importHistoryInvalidUrl: 'Invalid web address',
+  importHistoryInvalidTime: 'Missing or invalid visit time',
+  importPartitionWriteFailed: 'Partitioned cookie write failed; it was not made unpartitioned',
+  importCookieVerifyFailed: 'Cookie readback did not match; it was not counted as imported',
   passwordRecords: 'Passwords',
   cookieRecords: 'Cookies',
   importContent: 'Content',
@@ -184,9 +212,11 @@ export default {
   aiAutoOpen: 'Open the browser panel when the agent operates it',
   aiAutoOpenDesc: 'Only for the conversation you are viewing.',
   aiDownloadDir: 'Agent download folder',
-  aiDownloadDirDesc: 'Empty uses .astrion/browser_downloads/ in the workspace; relative paths are relative to the workspace. Downloads you start yourself still go to Downloads/Astrion.',
+  aiDownloadDirDesc:
+    'Empty uses .astrion/browser_downloads/ in the workspace; relative paths are relative to the workspace. Downloads you start yourself still go to Downloads/Astrion.',
   aiSites: 'Allowed sites',
-  aiSitesDesc: 'On these sites the agent no longer asks before clicking, typing and similar actions.',
+  aiSitesDesc:
+    'On these sites the agent no longer asks before clicking, typing and similar actions.',
   aiSitesEmpty: 'No sites allowed yet',
   aiSiteRevoke: 'Revoke',
   permissionHint: 'Permission lasts only for this app session'

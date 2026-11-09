@@ -1,8 +1,22 @@
 <template>
   <div class="nb-credentials">
-    <p class="nb-credential-note">{{ $t('browser.chromeImportHint') }}</p>
+    <p v-if="!fileMode" class="nb-credential-note">{{ $t('browser.chromeImportHint') }}</p>
     <p v-if="error" class="nb-credential-error" role="alert">{{ error }}</p>
-    <template v-if="!preview && !report">
+    <div v-if="fileSupported && !preview && !report" class="nb-choice-options">
+      <button role="radio" :aria-checked="fileMode" :disabled="busy" @click="fileMode = true">
+        <FancyCheck :checked="fileMode" :size="16" />{{ $t('browser.importExportedFile') }}
+      </button>
+      <button role="radio" :aria-checked="!fileMode" :disabled="busy" @click="fileMode = false">
+        <FancyCheck :checked="!fileMode" :size="16" />{{ $t('browser.importChromeDatabase') }}
+      </button>
+    </div>
+    <BrowserImportFile
+      v-if="fileMode && !preview && !report"
+      :disabled="busy"
+      @preview="readFile"
+      @error="error = $event"
+    />
+    <template v-if="!fileMode && !preview && !report">
       <label class="nb-credential-label">{{ $t('browser.chromeProfile') }}</label>
       <button
         class="nb-source-button"
@@ -76,7 +90,7 @@
       </div>
     </template>
     <template v-if="preview && !report">
-      <template v-if="selection.cookies && preview.stats.cookies.ready">
+      <template v-if="selectedKinds.includes('cookies') && preview.stats.cookies.ready">
         <label class="nb-credential-label">{{ $t('browser.cookieConflicts') }}</label>
         <div class="nb-choice-options">
           <button
@@ -156,7 +170,7 @@
         {{ $t('browser.importAvailable') }}
       </button>
       <button
-        v-else-if="!report"
+        v-else-if="!report && !fileMode"
         class="nb-text-button primary"
         :disabled="busy || !source || !selectedKinds.length"
         @click="read"
@@ -171,7 +185,9 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import BrowserIcon from './BrowserIcon.vue';
+import BrowserImportFile from './BrowserImportFile.vue';
 import { browserBridge } from './types';
+import { t } from '@/locales';
 import { credentialError, useCredentialRequest } from './useCredentialRequest';
 import type { ChromePreview, CredentialResponse, ImportKind } from './credentialTypes';
 const store = useNativeBrowserStore(),
@@ -180,13 +196,18 @@ const sources = ref<{ id: string; name: string }[]>([]),
   source = ref(''),
   sourceOpen = ref(false);
 const selection = ref({ passwords: true, cookies: true, history: true });
+const fileSupported = browserBridge()?.credentialFileImport === true;
+const fileMode = ref(fileSupported);
+const fileKind = ref<ImportKind>('passwords');
 const kinds: ImportKind[] = ['passwords', 'cookies', 'history'];
 const labels = {
   passwords: 'browser.passwordRecords',
   cookies: 'browser.cookieRecords',
   history: 'browser.clearHistory'
 };
-const selectedKinds = computed(() => kinds.filter((type) => selection.value[type]));
+const selectedKinds = computed(() =>
+  fileMode.value ? [fileKind.value] : kinds.filter((type) => selection.value[type])
+);
 const selectedSource = computed(() => sources.value.find((item) => item.id === source.value));
 const error = ref(''),
   busy = ref(false),
@@ -220,6 +241,7 @@ const reasonKeys: Record<string, string> = {
   missing_database: 'browser.importDatabaseMissing',
   keychain_timeout: 'browser.importKeychainTimeout',
   keychain_denied: 'browser.importKeychainDenied',
+  windows_decryption_failed: 'browser.importWindowsDecryptFailed',
   unsupported_encryption: 'browser.importEncryptionUnsupported',
   unsupported_partition: 'browser.importPartitionUnsupported',
   conflicting_cookie_storage: 'browser.importCookieConflict',
@@ -230,7 +252,12 @@ const reasonKeys: Record<string, string> = {
   cookie_store_unavailable: 'browser.importCookieStoreUnavailable',
   cookie_flush_failed: 'browser.importCookieFlushFailed',
   vault_unavailable: 'browser.importVaultUnavailable',
-  history_write_failed: 'browser.importHistoryWriteFailed'
+  history_write_failed: 'browser.importHistoryWriteFailed',
+  history_non_web_url: 'browser.importHistoryNonWeb',
+  history_invalid_url: 'browser.importHistoryInvalidUrl',
+  history_invalid_time: 'browser.importHistoryInvalidTime',
+  cookie_partition_write_failed: 'browser.importPartitionWriteFailed',
+  cookie_verify_failed: 'browser.importCookieVerifyFailed'
 };
 const reasons = computed(() =>
   selectedKinds.value.flatMap((type) =>
@@ -269,6 +296,37 @@ async function restart() {
   choices.value = {};
   error.value = '';
 }
+function importError(failure: unknown) {
+  const code = credentialError(failure);
+  const keys: Record<string, string> = {
+    invalid_import_file: 'browser.invalidImportFile',
+    import_file_too_large: 'browser.importFileTooLarge',
+    import_file_too_many_records: 'browser.importFileTooManyRecords',
+    browser_import_timed_out_partial: 'browser.importPartialTimeout'
+  };
+  return keys[code] ? t(keys[code]) : code;
+}
+async function readFile(value: { format: 'password-csv' | 'cookie-json'; content: string }) {
+  if (busy.value) return;
+  const ticket = ++sequence;
+  const lease = ownedLease;
+  fileKind.value = value.format === 'password-csv' ? 'passwords' : 'cookies';
+  busy.value = true;
+  error.value = '';
+  stage.value = 'decrypt';
+  try {
+    const result = await request({ action: 'preview-file', value });
+    if (ticket !== sequence || lease !== ownedLease) return;
+    preview.value = result.preview;
+    previewId = result.preview?.id || '';
+    choices.value = {};
+  } catch (failure) {
+    if (ticket === sequence && valid()) error.value = importError(failure);
+  } finally {
+    value.content = '';
+    if (ticket === sequence && valid()) busy.value = false;
+  }
+}
 async function read() {
   if (busy.value) return;
   const ticket = ++sequence;
@@ -285,7 +343,7 @@ async function read() {
     previewId = result.preview?.id || '';
     choices.value = {};
   } catch (failure) {
-    if (ticket === sequence && valid()) error.value = credentialError(failure);
+    if (ticket === sequence && valid()) error.value = importError(failure);
   } finally {
     if (ticket === sequence && valid()) busy.value = false;
   }
@@ -310,7 +368,7 @@ async function commit() {
     preview.value = undefined;
     previewId = '';
   } catch (failure) {
-    if (ticket === sequence && valid()) error.value = credentialError(failure);
+    if (ticket === sequence && valid()) error.value = importError(failure);
   } finally {
     if (ticket === sequence && valid()) {
       busy.value = committing.value = false;
@@ -321,8 +379,8 @@ const unsubscribe = browserBridge()?.onCredentialProgress((event) => {
   if (event.lease === ownedLease && busy.value) stage.value = event.stage;
 });
 watch(
-  () => store.snapshot?.lease,
-  async (lease) => {
+  [() => store.snapshot?.lease, () => fileMode.value],
+  async ([lease]) => {
     await cancel();
     if (!valid() || store.snapshot?.lease !== lease) return;
     ownedLease = lease || '';
@@ -330,7 +388,7 @@ watch(
     sources.value = [];
     source.value = '';
     error.value = '';
-    if (!lease) return;
+    if (!lease || fileMode.value) return;
     try {
       const result = await request({ action: 'sources' });
       sources.value = result.sources || [];
