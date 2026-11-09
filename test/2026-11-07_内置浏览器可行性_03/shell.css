@@ -1,0 +1,45 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 13px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text-primary); background: var(--surface-base); overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+button { height: 30px; padding: 0 10px; border: 0; background: transparent; border-radius: 4px; white-space: nowrap; cursor: pointer; }
+button:hover { background: var(--surface-muted); }
+button:disabled { color: var(--text-tertiary); cursor: default; }
+button:focus-visible, input:focus-visible, .divider:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.app-header { height: 46px; display: flex; align-items: center; padding: 0 20px; gap: 20px; border-bottom: 1px solid var(--border-default); }
+.app-header > span { color: var(--text-secondary); }
+.themes { margin-left: auto; display: flex; gap: 2px; }
+.workspace { --left-width: 40%; display: grid; grid-template-columns: minmax(260px, var(--left-width)) 5px minmax(350px, 1fr); height: calc(100vh - 46px); }
+.conversation { padding: 12px 18px; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--surface-soft); }
+.conversation nav { display: flex; gap: 4px; align-items: center; height: 36px; flex-shrink: 0; }
+.conversation button[aria-pressed='true'] { background: var(--surface-muted); }
+#collapse { margin-left: auto; }
+.event-heading { margin-top: 24px; padding-bottom: 8px; border-bottom: 1px solid var(--border-default); font-weight: 600; }
+#events { padding: 0; min-height: 0; flex: 1; list-style: none; overflow-y: auto; scrollbar-width: thin; margin: 8px 0; }
+#events li { height: 30px; display: flex; gap: 12px; align-items: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#events time { color: var(--text-tertiary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+#error { color: var(--state-danger); min-height: 30px; margin-top: auto; }
+.divider { background: var(--surface-soft); border-left: 1px solid var(--border-default); cursor: col-resize; touch-action: none; }
+.browser-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.tab-strip { display: flex; height: 40px; flex-shrink: 0; align-items: center; border-bottom: 1px solid var(--border-default); background: var(--surface-soft); }
+#tabs { display: flex; gap: 1px; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.tab { display: flex; align-items: center; min-width: 100px; max-width: 200px; height: 40px; border-right: 1px solid var(--border-default); }
+.tab[aria-selected='true'] { background: var(--surface-base); }
+.tab .tab-select { overflow: hidden; text-overflow: ellipsis; border-radius: 0; min-width: 0; text-align: left; flex: 1; }
+.tab .tab-close { padding: 0; width: 28px; flex-shrink: 0; color: var(--text-secondary); }
+#new-tab { width: 34px; padding: 0; flex-shrink: 0; }
+.navigation { height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border-default); }
+#address { height: 30px; min-width: 60px; flex: 1; background: var(--surface-soft); border: 1px solid var(--border-default); border-radius: 4px; padding: 0 8px; }
+.viewport { flex: 1; min-height: 1px; }
+.status { height: 24px; flex-shrink: 0; padding: 0 12px; display: flex; align-items: center; gap: 12px; color: var(--text-secondary); border-top: 1px solid var(--border-default); }
+.status span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#native-status { margin-left: auto; }
+.workspace.collapsed { grid-template-columns: 1fr; }
+.workspace.collapsed .browser-panel, .workspace.collapsed .divider { display: none; }
+.overlay { position: fixed; top: 144px; right: 20px; width: min(560px, calc(100vw - 40px)); max-height: calc(100vh - 180px); overflow-y: auto; padding: 20px; background: var(--surface-base); border: 1px solid var(--border-default); }
+.overlay[hidden] { display: none; }
+.overlay header { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: 14px; }
+.download-row { min-height: 44px; padding: 8px 0; border-top: 1px solid var(--border-default); display: flex; align-items: center; gap: 12px; }
+.download-row span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.download-row small { color: var(--text-secondary); }
+.permission-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }

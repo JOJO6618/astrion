@@ -1,0 +1,375 @@
+{
+  "method": "Actual MinimalBlocks/StackedBlocks and descendants mounted standalone, cold page per case. Settings/model/localization/workspace-link adapters are inert. No complete ChatArea/navigation, no actual Electron shell, external network blocked.",
+  "engines": {
+    "chromium": [
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": true,
+        "actions": 158,
+        "mount_ms": 92.4,
+        "next_tick_ms": 95.2,
+        "two_frames_ms": 109.5,
+        "dom_nodes": 8866,
+        "long_tasks": [
+          153
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": false,
+        "actions": 158,
+        "mount_ms": 56.1,
+        "next_tick_ms": 57.9,
+        "two_frames_ms": 85.6,
+        "dom_nodes": 8866,
+        "long_tasks": [
+          116
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": true,
+        "actions": 158,
+        "mount_ms": 39.5,
+        "next_tick_ms": 41.6,
+        "two_frames_ms": 293.3,
+        "dom_nodes": 8934,
+        "long_tasks": [
+          96,
+          216
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": false,
+        "actions": 158,
+        "mount_ms": 39.6,
+        "next_tick_ms": 41.2,
+        "two_frames_ms": 257.7,
+        "dom_nodes": 8934,
+        "long_tasks": [
+          98,
+          211
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": true,
+        "actions": 93,
+        "mount_ms": 52.9,
+        "next_tick_ms": 54.5,
+        "two_frames_ms": 62.2,
+        "dom_nodes": 3434,
+        "long_tasks": [
+          88
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": false,
+        "actions": 93,
+        "mount_ms": 36.3,
+        "next_tick_ms": 37.5,
+        "two_frames_ms": 56.5,
+        "dom_nodes": 3431,
+        "long_tasks": [
+          68
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": true,
+        "actions": 93,
+        "mount_ms": 30.6,
+        "next_tick_ms": 31.8,
+        "two_frames_ms": 195.9,
+        "dom_nodes": 3517,
+        "long_tasks": [
+          64,
+          145
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": false,
+        "actions": 93,
+        "mount_ms": 29.2,
+        "next_tick_ms": 30.4,
+        "two_frames_ms": 192.7,
+        "dom_nodes": 3517,
+        "long_tasks": [
+          62,
+          159
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": true,
+        "actions": 416,
+        "mount_ms": 131.3,
+        "next_tick_ms": 134.4,
+        "two_frames_ms": 159.2,
+        "dom_nodes": 28985,
+        "long_tasks": [
+          509
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": false,
+        "actions": 416,
+        "mount_ms": 109.6,
+        "next_tick_ms": 111.9,
+        "two_frames_ms": 152.9,
+        "dom_nodes": 28983,
+        "long_tasks": [
+          480
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": true,
+        "actions": 416,
+        "mount_ms": 81.8,
+        "next_tick_ms": 83.4,
+        "two_frames_ms": 874.3,
+        "dom_nodes": 29407,
+        "long_tasks": [
+          454,
+          693
+        ],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": false,
+        "actions": 416,
+        "mount_ms": 81.4,
+        "next_tick_ms": 83.1,
+        "two_frames_ms": 844.8,
+        "dom_nodes": 29407,
+        "long_tasks": [
+          469,
+          744
+        ],
+        "errors": [],
+        "page_errors": []
+      }
+    ],
+    "webkit": [
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": true,
+        "actions": 158,
+        "mount_ms": 287,
+        "next_tick_ms": 291,
+        "two_frames_ms": 409,
+        "dom_nodes": 8866,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": false,
+        "actions": 158,
+        "mount_ms": 140,
+        "next_tick_ms": 143,
+        "two_frames_ms": 407,
+        "dom_nodes": 8866,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": true,
+        "actions": 158,
+        "mount_ms": 96,
+        "next_tick_ms": 99,
+        "two_frames_ms": 474,
+        "dom_nodes": 8934,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261107_025348_451",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": false,
+        "actions": 158,
+        "mount_ms": 93,
+        "next_tick_ms": 96,
+        "two_frames_ms": 475,
+        "dom_nodes": 8934,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": true,
+        "actions": 93,
+        "mount_ms": 148,
+        "next_tick_ms": 150,
+        "two_frames_ms": 267,
+        "dom_nodes": 3434,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": false,
+        "actions": 93,
+        "mount_ms": 74,
+        "next_tick_ms": 76,
+        "two_frames_ms": 242,
+        "dom_nodes": 3431,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": true,
+        "actions": 93,
+        "mount_ms": 57,
+        "next_tick_ms": 58,
+        "two_frames_ms": 253,
+        "dom_nodes": 3517,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261031_170429_608",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": false,
+        "actions": 93,
+        "mount_ms": 58,
+        "next_tick_ms": 60,
+        "two_frames_ms": 260,
+        "dom_nodes": 3517,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": true,
+        "actions": 416,
+        "mount_ms": 775,
+        "next_tick_ms": 789,
+        "two_frames_ms": 1102,
+        "dom_nodes": 28987,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "minimal",
+        "running": false,
+        "actions": 416,
+        "mount_ms": 289,
+        "next_tick_ms": 293,
+        "two_frames_ms": 1057,
+        "dom_nodes": 28983,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": true,
+        "actions": 416,
+        "mount_ms": 223,
+        "next_tick_ms": 226,
+        "two_frames_ms": 1431,
+        "dom_nodes": 29407,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      },
+      {
+        "id": "conv_20261021_211531_333",
+        "case": "most-actions-hidden",
+        "mode": "stacked",
+        "running": false,
+        "actions": 416,
+        "mount_ms": 236,
+        "next_tick_ms": 238,
+        "two_frames_ms": 1507,
+        "dom_nodes": 29407,
+        "long_tasks": [],
+        "errors": [],
+        "page_errors": []
+      }
+    ]
+  }
+}

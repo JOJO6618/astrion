@@ -1,0 +1,134 @@
+[
+  {
+    "id": "conv_20261107_025348_451",
+    "input_messages": 2397,
+    "ui_messages": 261,
+    "assistant_messages": 126,
+    "total_actions": 2085,
+    "largest_action_message": {
+      "actions": 134,
+      "summary_groups": 7,
+      "utf8_mib": 1.063
+    },
+    "largest_byte_message": {
+      "actions": 134,
+      "utf8_mib": 1.063
+    },
+    "build_history": {
+      "count": 3,
+      "median_ms": 22.92,
+      "max_ms": 25.697
+    },
+    "three_summary_checks_per_group_running": {
+      "count": 3,
+      "median_ms": 0.313,
+      "max_ms": 0.599
+    },
+    "three_summary_checks_per_group_old": {
+      "count": 3,
+      "median_ms": 0.005,
+      "max_ms": 0.006
+    },
+    "initial_deep_watch": {
+      "count": 3,
+      "median_ms": 3.803,
+      "max_ms": 4.858
+    },
+    "compact_hidden": {
+      "filter_ms": 2.494,
+      "visible_messages": 120,
+      "max_actions": 158,
+      "summary_groups": 11,
+      "max_action_message_mib": 2.272,
+      "three_summary_checks_ms": 0.705
+    }
+  },
+  {
+    "id": "conv_20261031_170429_608",
+    "input_messages": 1907,
+    "ui_messages": 273,
+    "assistant_messages": 111,
+    "total_actions": 1671,
+    "largest_action_message": {
+      "actions": 91,
+      "summary_groups": 4,
+      "utf8_mib": 0.445
+    },
+    "largest_byte_message": {
+      "actions": 88,
+      "utf8_mib": 0.507
+    },
+    "build_history": {
+      "count": 3,
+      "median_ms": 13.977,
+      "max_ms": 15.177
+    },
+    "three_summary_checks_per_group_running": {
+      "count": 3,
+      "median_ms": 0.087,
+      "max_ms": 0.093
+    },
+    "three_summary_checks_per_group_old": {
+      "count": 3,
+      "median_ms": 0.002,
+      "max_ms": 0.002
+    },
+    "initial_deep_watch": {
+      "count": 3,
+      "median_ms": 2.822,
+      "max_ms": 3.468
+    },
+    "compact_hidden": {
+      "filter_ms": 1.211,
+      "visible_messages": 247,
+      "max_actions": 93,
+      "summary_groups": 5,
+      "max_action_message_mib": 1.025,
+      "three_summary_checks_ms": 0.11
+    }
+  },
+  {
+    "id": "conv_20261021_211531_333",
+    "input_messages": 1286,
+    "ui_messages": 73,
+    "assistant_messages": 35,
+    "total_actions": 984,
+    "largest_action_message": {
+      "actions": 107,
+      "summary_groups": 4,
+      "utf8_mib": 1.83
+    },
+    "largest_byte_message": {
+      "actions": 87,
+      "utf8_mib": 2.733
+    },
+    "build_history": {
+      "count": 3,
+      "median_ms": 8.516,
+      "max_ms": 9.41
+    },
+    "three_summary_checks_per_group_running": {
+      "count": 3,
+      "median_ms": 0.109,
+      "max_ms": 0.112
+    },
+    "three_summary_checks_per_group_old": {
+      "count": 3,
+      "median_ms": 0.002,
+      "max_ms": 0.002
+    },
+    "initial_deep_watch": {
+      "count": 3,
+      "median_ms": 4.249,
+      "max_ms": 4.693
+    },
+    "compact_hidden": {
+      "filter_ms": 0.97,
+      "visible_messages": 40,
+      "max_actions": 416,
+      "summary_groups": 17,
+      "max_action_message_mib": 13.726,
+      "three_summary_checks_ms": 3.286
+    }
+  }
+]

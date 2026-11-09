@@ -1,0 +1,20 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const root = path.resolve(__dirname, '../..');
+const lab = path.join(root, '_experiments/native-browser-feasibility-20261107');
+const sdk = path.join(lab, 'sdk', fs.readdirSync(path.join(lab, 'sdk')).find(x => x.endsWith('_minimal')));
+const client = path.join(lab, 'cef-client', fs.readdirSync(path.join(lab, 'cef-client')).find(x => x.endsWith('_client')), 'Release/cefclient.app');
+const build = path.join(lab, 'mixed-views');
+const contents = path.join(build, 'MixedViewsLab.app/Contents');
+fs.mkdirSync(path.join(contents, 'MacOS'), { recursive: true });
+const frameworks = path.join(contents, 'Frameworks');
+// CEF sandbox/helper paths require a coherent bundle, not cross-bundle symlinks.
+if (fs.existsSync(frameworks) && fs.lstatSync(frameworks).isSymbolicLink()) fs.unlinkSync(frameworks);
+if (!fs.existsSync(frameworks)) fs.cpSync(path.join(client, 'Contents/Frameworks'), frameworks, { recursive: true, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE });
+fs.writeFileSync(path.join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>MixedViewsLab</string><key>CFBundleIdentifier</key><string>org.cef.cefclient</string><key>CFBundleName</key><string>Astrion Browser Lab</string><key>CFBundlePackageType</key><string>APPL</string><key>NSHighResolutionCapable</key><true/></dict></plist>`);
+const executable = path.join(contents, 'MacOS/MixedViewsLab');
+const loaderSources = ['libcef_dll/wrapper/libcef_dll_dylib.cc', 'libcef_dll/wrapper/cef_scoped_library_loader_mac.mm'].map(file => path.join(sdk, file));
+execFileSync('/usr/bin/clang++', ['-std=c++20', '-DWRAPPING_CEF_SHARED', '-fobjc-arc', '-I', sdk, '-framework', 'Cocoa', path.join(__dirname, 'mixed-host.mm'), ...loaderSources, '-o', executable], { stdio: 'inherit', timeout: 120000 });
+fs.writeFileSync(path.join(build, 'build.json'), JSON.stringify({ sdk, executable, framework: fs.realpathSync(path.join(frameworks, 'Chromium Embedded Framework.framework')), helper: path.join(frameworks, 'cefclient Helper.app/Contents/MacOS/cefclient Helper') }, null, 2));
+console.log(JSON.stringify({ executable, compiled: true }));

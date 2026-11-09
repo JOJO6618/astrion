@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="classic">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原生浏览器实验</title><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/shell.css"></head>
+<body>
+<header class="app-header"><strong>原生浏览器实验</strong><span id="owner"></span><div class="themes" aria-label="主题"><button data-theme="classic">经典</button><button data-theme="light">浅色</button><button data-theme="dark">深色</button></div></header>
+<main class="workspace" id="workspace">
+  <section class="conversation" aria-label="实验控制与事件">
+    <nav aria-label="对话"><button id="conversation-a" data-conversation="A">对话 A</button><button id="conversation-b" data-conversation="B">对话 B</button><button id="collapse" aria-expanded="true">收起浏览器</button></nav>
+    <div class="event-heading">交互记录</div><ol id="events" aria-live="polite"></ol>
+    <div id="error" role="status"></div>
+  </section>
+  <div class="divider" id="divider" role="separator" tabindex="0" aria-label="调整浏览器宽度" aria-orientation="vertical"></div>
+  <section class="browser-panel" aria-label="浏览器">
+    <div class="tab-strip"><div id="tabs" role="tablist" aria-label="浏览器标签"></div><button id="new-tab" aria-label="新建浏览器标签">＋</button></div>
+    <form id="navigation" class="navigation"><button type="button" id="back">后退</button><button type="button" id="forward">前进</button><button type="button" id="reload">刷新</button><input id="address" aria-label="网址" autocomplete="off" spellcheck="false"><button type="submit">前往</button><button type="button" id="downloads-toggle">下载</button></form>
+    <div class="viewport" id="viewport" aria-label="原生网页区域"></div>
+    <div class="status"><span id="page-status"></span><span id="native-status"></span></div>
+  </section>
+</main>
+<section class="overlay" id="downloads-panel" aria-label="下载记录" hidden><header><strong>下载记录</strong><button id="downloads-close">关闭下载记录</button></header><div id="download-list"></div></section>
+<section class="overlay" id="permission-panel" role="dialog" aria-modal="true" aria-label="网页位置权限" hidden><strong>网页请求获取位置</strong><p id="permission-origin"></p><div class="permission-actions"><button id="permission-deny">拒绝位置权限</button><button id="permission-allow">允许本次位置请求</button></div></section>
+<script src="/shell.js"></script>
+</body></html>

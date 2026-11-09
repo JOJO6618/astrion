@@ -1,0 +1,494 @@
+{
+  "method": "Current production methods; original files read-only, sandboxed copies writable. Three baseline repetitions; bounded concurrent stress, not measured production duty cycle.",
+  "projection_limit": "Reconstructed from persisted semantic messages in the work segment with most tools; original SSE timing and monitor snapshots are unavailable.",
+  "baseline": [
+    {
+      "id": "conv_20261107_025348_451",
+      "file_mib": 26.637,
+      "messages": 2397,
+      "roles": {
+        "user": 135,
+        "assistant": 1028,
+        "tool": 1234
+      },
+      "tool_calls": 1234,
+      "reconstructed_segment": {
+        "start": 788,
+        "end": 1153,
+        "messages": 365,
+        "projected_messages": 16,
+        "actions": 321,
+        "max_actions_in_one_message": 134
+      },
+      "response_mib": 10.441,
+      "timings": {
+        "read": {
+          "count": 3,
+          "median_ms": 168.593,
+          "max_ms": 179.532,
+          "min_ms": 165.204
+        },
+        "history_deepcopy": {
+          "count": 3,
+          "median_ms": 73.312,
+          "max_ms": 92.501,
+          "min_ms": 65.128
+        },
+        "history_json": {
+          "count": 3,
+          "median_ms": 90.474,
+          "max_ms": 91.56,
+          "min_ms": 89.356
+        },
+        "projection_deepcopy": {
+          "count": 3,
+          "median_ms": 8.813,
+          "max_ms": 25.323,
+          "min_ms": 8.674
+        },
+        "projection_json": {
+          "count": 3,
+          "median_ms": 12.318,
+          "max_ms": 13.322,
+          "min_ms": 11.875
+        },
+        "capture": {
+          "count": 3,
+          "median_ms": 281.394,
+          "max_ms": 447.98,
+          "min_ms": 277.27
+        },
+        "capture_json": {
+          "count": 3,
+          "median_ms": 42.908,
+          "max_ms": 43.348,
+          "min_ms": 38.377
+        },
+        "save": {
+          "count": 3,
+          "median_ms": 461.252,
+          "max_ms": 984.585,
+          "min_ms": 431.201
+        }
+      }
+    },
+    {
+      "id": "conv_20261031_170429_608",
+      "file_mib": 29.361,
+      "messages": 1907,
+      "roles": {
+        "user": 162,
+        "assistant": 633,
+        "tool": 1112
+      },
+      "tool_calls": 1112,
+      "reconstructed_segment": {
+        "start": 839,
+        "end": 1507,
+        "messages": 668,
+        "projected_messages": 84,
+        "actions": 588,
+        "max_actions_in_one_message": 91
+      },
+      "response_mib": 16.609,
+      "timings": {
+        "read": {
+          "count": 3,
+          "median_ms": 199.867,
+          "max_ms": 200.955,
+          "min_ms": 195.537
+        },
+        "history_deepcopy": {
+          "count": 3,
+          "median_ms": 167.101,
+          "max_ms": 171.079,
+          "min_ms": 164.729
+        },
+        "history_json": {
+          "count": 3,
+          "median_ms": 88.054,
+          "max_ms": 91.837,
+          "min_ms": 85.774
+        },
+        "projection_deepcopy": {
+          "count": 3,
+          "median_ms": 49.969,
+          "max_ms": 50.887,
+          "min_ms": 49.429
+        },
+        "projection_json": {
+          "count": 3,
+          "median_ms": 25.976,
+          "max_ms": 26.456,
+          "min_ms": 25.642
+        },
+        "capture": {
+          "count": 3,
+          "median_ms": 659.068,
+          "max_ms": 682.649,
+          "min_ms": 640.295
+        },
+        "capture_json": {
+          "count": 3,
+          "median_ms": 71.803,
+          "max_ms": 75.005,
+          "min_ms": 71.121
+        },
+        "save": {
+          "count": 3,
+          "median_ms": 710.378,
+          "max_ms": 750.7,
+          "min_ms": 707.466
+        }
+      }
+    },
+    {
+      "id": "conv_20261021_211531_333",
+      "file_mib": 25.883,
+      "messages": 1286,
+      "roles": {
+        "user": 38,
+        "assistant": 416,
+        "tool": 832
+      },
+      "tool_calls": 833,
+      "reconstructed_segment": {
+        "start": 89,
+        "end": 653,
+        "messages": 564,
+        "projected_messages": 23,
+        "actions": 416,
+        "max_actions_in_one_message": 87
+      },
+      "response_mib": 11.35,
+      "timings": {
+        "read": {
+          "count": 3,
+          "median_ms": 164.232,
+          "max_ms": 171.999,
+          "min_ms": 164.129
+        },
+        "history_deepcopy": {
+          "count": 3,
+          "median_ms": 45.156,
+          "max_ms": 46.523,
+          "min_ms": 44.685
+        },
+        "history_json": {
+          "count": 3,
+          "median_ms": 89.72,
+          "max_ms": 90.549,
+          "min_ms": 86.711
+        },
+        "projection_deepcopy": {
+          "count": 3,
+          "median_ms": 28.093,
+          "max_ms": 40.979,
+          "min_ms": 26.799
+        },
+        "projection_json": {
+          "count": 3,
+          "median_ms": 41.607,
+          "max_ms": 43.522,
+          "min_ms": 41.128
+        },
+        "capture": {
+          "count": 3,
+          "median_ms": 268.505,
+          "max_ms": 280.477,
+          "min_ms": 247.45
+        },
+        "capture_json": {
+          "count": 3,
+          "median_ms": 45.467,
+          "max_ms": 46.593,
+          "min_ms": 44.701
+        },
+        "save": {
+          "count": 3,
+          "median_ms": 391.367,
+          "max_ms": 393.802,
+          "min_ms": 388.938
+        }
+      }
+    }
+  ],
+  "contention": [
+    {
+      "writer_count": 0,
+      "saves_per_writer": 3,
+      "capture_threads": 2,
+      "captures_per_thread": 3,
+      "poll_threads": 2,
+      "polls_per_thread": 8,
+      "save_ms": {
+        "count": 0
+      },
+      "capture_ms": {
+        "count": 6,
+        "median_ms": 602.636,
+        "max_ms": 629.339,
+        "min_ms": 292.745
+      },
+      "empty_poll_ms": {
+        "count": 16,
+        "median_ms": 0.086,
+        "max_ms": 543.373,
+        "min_ms": 0.015
+      },
+      "errors": [],
+      "elapsed_ms": 2085.697,
+      "heartbeat_overshoot": {
+        "count": 50,
+        "median_ms": 11.281,
+        "max_ms": 80.091,
+        "min_ms": 0.484
+      },
+      "locks": {
+        "view": {
+          "poll": {
+            "wait": {
+              "count": 16,
+              "median_ms": 0.017,
+              "max_ms": 543.357,
+              "min_ms": 0.004
+            },
+            "hold": {
+              "count": 16,
+              "median_ms": 0.015,
+              "max_ms": 0.048,
+              "min_ms": 0.003
+            }
+          },
+          "capture": {
+            "wait": {
+              "count": 6,
+              "median_ms": 301.887,
+              "max_ms": 323.676,
+              "min_ms": 0.002
+            },
+            "hold": {
+              "count": 6,
+              "median_ms": 300.743,
+              "max_ms": 319.67,
+              "min_ms": 275.123
+            }
+          }
+        },
+        "io": {
+          "capture": {
+            "wait": {
+              "count": 6,
+              "median_ms": 0.001,
+              "max_ms": 0.001,
+              "min_ms": 0.001
+            },
+            "hold": {
+              "count": 6,
+              "median_ms": 169.58,
+              "max_ms": 172.863,
+              "min_ms": 160.959
+            }
+          }
+        }
+      }
+    },
+    {
+      "writer_count": 1,
+      "saves_per_writer": 3,
+      "capture_threads": 2,
+      "captures_per_thread": 3,
+      "poll_threads": 2,
+      "polls_per_thread": 8,
+      "save_ms": {
+        "count": 3,
+        "median_ms": 440.7,
+        "max_ms": 738.756,
+        "min_ms": 435.04
+      },
+      "capture_ms": {
+        "count": 6,
+        "median_ms": 901.538,
+        "max_ms": 1922.992,
+        "min_ms": 569.143
+      },
+      "empty_poll_ms": {
+        "count": 16,
+        "median_ms": 0.069,
+        "max_ms": 1927.322,
+        "min_ms": 0.018
+      },
+      "errors": [],
+      "elapsed_ms": 3417.873,
+      "heartbeat_overshoot": {
+        "count": 93,
+        "median_ms": 5.148,
+        "max_ms": 82.929,
+        "min_ms": 0
+      },
+      "locks": {
+        "view": {
+          "capture": {
+            "wait": {
+              "count": 6,
+              "median_ms": 301.004,
+              "max_ms": 1022.171,
+              "min_ms": 0.004
+            },
+            "hold": {
+              "count": 6,
+              "median_ms": 297.079,
+              "max_ms": 1017.307,
+              "min_ms": 277.425
+            }
+          },
+          "poll": {
+            "wait": {
+              "count": 16,
+              "median_ms": 0.012,
+              "max_ms": 1927.309,
+              "min_ms": 0.003
+            },
+            "hold": {
+              "count": 16,
+              "median_ms": 0.017,
+              "max_ms": 0.04,
+              "min_ms": 0.006
+            }
+          }
+        },
+        "io": {
+          "writer": {
+            "wait": {
+              "count": 3,
+              "median_ms": 0.005,
+              "max_ms": 170.241,
+              "min_ms": 0.002
+            },
+            "hold": {
+              "count": 3,
+              "median_ms": 440.69,
+              "max_ms": 568.508,
+              "min_ms": 435.028
+            }
+          },
+          "capture": {
+            "wait": {
+              "count": 6,
+              "median_ms": 0.002,
+              "max_ms": 708.754,
+              "min_ms": 0.001
+            },
+            "hold": {
+              "count": 6,
+              "median_ms": 167.823,
+              "max_ms": 169.438,
+              "min_ms": 161.967
+            }
+          }
+        }
+      }
+    },
+    {
+      "writer_count": 3,
+      "saves_per_writer": 3,
+      "capture_threads": 2,
+      "captures_per_thread": 3,
+      "poll_threads": 2,
+      "polls_per_thread": 8,
+      "save_ms": {
+        "count": 9,
+        "median_ms": 455.905,
+        "max_ms": 2766.018,
+        "min_ms": 393.917
+      },
+      "capture_ms": {
+        "count": 6,
+        "median_ms": 1854.969,
+        "max_ms": 4071.459,
+        "min_ms": 576.578
+      },
+      "empty_poll_ms": {
+        "count": 16,
+        "median_ms": 193.518,
+        "max_ms": 3714.656,
+        "min_ms": 0.011
+      },
+      "errors": [],
+      "elapsed_ms": 6771.508,
+      "heartbeat_overshoot": {
+        "count": 199,
+        "median_ms": 5.099,
+        "max_ms": 98.98,
+        "min_ms": 0
+      },
+      "locks": {
+        "view": {
+          "capture": {
+            "wait": {
+              "count": 6,
+              "median_ms": 1549.638,
+              "max_ms": 2217.657,
+              "min_ms": 0.003
+            },
+            "hold": {
+              "count": 6,
+              "median_ms": 1545.887,
+              "max_ms": 2212.728,
+              "min_ms": 279.651
+            }
+          },
+          "poll": {
+            "wait": {
+              "count": 16,
+              "median_ms": 193.498,
+              "max_ms": 3714.642,
+              "min_ms": 0.002
+            },
+            "hold": {
+              "count": 16,
+              "median_ms": 0.013,
+              "max_ms": 0.035,
+              "min_ms": 0.003
+            }
+          }
+        },
+        "io": {
+          "writer": {
+            "wait": {
+              "count": 9,
+              "median_ms": 0.002,
+              "max_ms": 2374.425,
+              "min_ms": 0.001
+            },
+            "hold": {
+              "count": 9,
+              "median_ms": 441.466,
+              "max_ms": 880.094,
+              "min_ms": 391.587
+            }
+          },
+          "capture": {
+            "wait": {
+              "count": 6,
+              "median_ms": 1270.083,
+              "max_ms": 1706.633,
+              "min_ms": 0.001
+            },
+            "hold": {
+              "count": 6,
+              "median_ms": 162.943,
+              "max_ms": 169.434,
+              "min_ms": 161.966
+            }
+          }
+        }
+      }
+    }
+  ],
+  "originals_unchanged": {
+    "conv_20261107_025348_451": true,
+    "conv_20261031_170429_608": true,
+    "conv_20261021_211531_333": true
+  }
+}

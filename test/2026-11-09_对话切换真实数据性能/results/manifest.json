@@ -1,0 +1,40 @@
+{
+  "python": "3.12.13",
+  "platform": "macOS-15.6.1-arm64-arm-64bit",
+  "source_sha256": {
+    "server/conversation_view/projector.py": "d83231cc8c07ce6e8ef8361ff373c9342dd085718d7599430d2cb1776ee8d989",
+    "server/conversation_view/snapshots.py": "da3cf998deb9fca251484819c2e50029cd148bf0d12a83bbdf7f0742d8959cae",
+    "utils/conversation_manager/crud_mixin.py": "3f0114bf441ade55905ceb33815e113356f54dbae04d7216f6621a40dbee8fb2",
+    "static/src/app/methods/history.ts": "b138f3c51c1df2f096430233b484bb41b8e1a5fb8e169b71183fe7b1705a87e0",
+    "static/src/components/chat/MinimalBlocks.vue": "02a4df453dddcb6fa05ec5edf94b4c245692c421f2e42e4c659b259d2cf15160",
+    "static/src/components/chat/StackedBlocks.vue": "24195f97e5f74dd2a8f5d04bfa983ba54c99f3a286b4460ea78490c9c982e976",
+    "static/src/components/chat/ChatArea.vue": "22e3923376c22e69f365e784db0431d994680fc30b0d8eb2fec4e94a0df9898e"
+  },
+  "browser_cases": {
+    "browser-results.json": {
+      "chromium": {
+        "count": 16,
+        "errors": 0,
+        "max_two_frames_ms": 293.5
+      },
+      "webkit": {
+        "count": 16,
+        "errors": 0,
+        "max_two_frames_ms": 420
+      }
+    },
+    "browser-hidden-results.json": {
+      "chromium": {
+        "count": 12,
+        "errors": 0,
+        "max_two_frames_ms": 874.3
+      },
+      "webkit": {
+        "count": 12,
+        "errors": 0,
+        "max_two_frames_ms": 1507
+      }
+    }
+  },
+  "fixture_policy": "Only aggregate timings copied to results; real conversation text stays in ignored _experiments scratch."
+}
