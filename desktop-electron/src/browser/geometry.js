@@ -35,6 +35,9 @@ export function setBrowserSurfaceColor(manager, color) {
   if (color === manager.surfaceColor) return;
   manager.surfaceColor = color;
   for (const tab of manager.tabs.values()) {
-    if (!tab.view.webContents.isDestroyed()) tab.view.setBackgroundColor(color);
+    // 页面回收会把标签挂起（view 置空），背景同步跳过而不是抛错。
+    const view = tab.view;
+    if (!view || view.webContents.isDestroyed()) continue;
+    view.setBackgroundColor(color);
   }
 }

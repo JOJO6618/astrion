@@ -59,11 +59,13 @@ function applySurfaceColor(color) {
   mainWindow.setBackgroundColor(color);
   chromeView?.setBackgroundColor(color);
   // 内置浏览器管理主视图的透明叠层（网页显示时主视图必须透明），交给它统一设置。
+  // 先记录并落盘，再给各视图着色：视图异常不得让窗口底色缓存停在旧值。
+  if (color !== surfaceColor) {
+    surfaceColor = color;
+    fs.promises.writeFile(surfaceFile(), JSON.stringify({ color }), { mode: 0o600 }).catch(() => {});
+  }
   if (nativeBrowser) { setBrowserSurfaceColor(nativeBrowser, color); nativeBrowser.layout(); }
   else mainView?.setBackgroundColor(color);
-  if (color === surfaceColor) return;
-  surfaceColor = color;
-  fs.promises.writeFile(surfaceFile(), JSON.stringify({ color }), { mode: 0o600 }).catch(() => {});
 }
 ipcMain.on('window:surface', (event, color) => {
   // 只接受主视图（应用自身页面）的上报；网页与 chrome 条都没有这个通道。
