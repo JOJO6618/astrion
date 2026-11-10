@@ -21,6 +21,8 @@
 
 全部使用隔离 profile 和合成账号，未读取真实 Chrome 资料。工具回归不等于真实模型、外部网站、DPI、输入法和系统交互已经验收。
 
+**2026-11-10 复核（拉取 main `fe9c1040` 后重跑）**：`check-native` 6m 通过、`test-native` 12 项通过、`build-production-probe` 45.56s 通过、`run-production-probe`（write 39 / read 42）与 `test-ai-native`（29 项，含改成真实断言的 `dialogDismissed`）全过。`host.py` 的 `lint-ui`/`format-ui` 文件清单改为枚举 `static/src/components/browser` 目录：原清单还写着已删除的 `BrowserPageDialog.vue`，会让 ESLint 以 “No files matching the pattern” 直接退出。回收本身的休眠/重建路径仍未被探针覆盖。
+
 ## Windows 原生执行命令
 
 在仓库根目录的 Windows cmd 中执行（Python 和 Node 已就位，Cargo 由脚本补 PATH）：

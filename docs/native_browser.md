@@ -244,7 +244,7 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 - 原生操作再次核对 call_id、owner、profile、网页类型与取消/超时。动作另外固定派发时实际 origin，审批后跨来源跳转即拒绝。路径在共用后端规范化后，原生文件使用点再次核对可读白名单与普通文件；有文件字段但类型错误必须拒绝。
 - `/new` stable key 在对话绑定时迁移到 conversation owner。每 owner 串行，不同 owner 可并行；模型当前标签独立于界面选择。可信主文档订阅 AI 活动时发送 hello 握手，以便面板尚未打开时也能接收自动展开通知；hello 不读取用户资料、不授予 profile lease。
 - 隐藏标签的 CDP 截图与直接对不可见 controller 的 CapturePreview 均在本机发生等待。Windows capturePage 代理使用原生 CapturePreview + 内存流，并在截图期间启用 controller 合成，网页宿主仍隐藏，回调后恢复可见性。元素裁剪在私有脚本宿主内按真实 PNG/视口尺寸换算，避免 Electron 的 zoom 坐标语义直接用于 CDP。整页截图沿用共享驱动失败时注明回退视口的规则。
-- 网页脚本对话框保持 WebView2 默认原生 UI（不关闭 `AreDefaultScriptDialogsEnabled`、不接 ScriptDialogOpening），模型经 CDP 事件与 `Page.handleJavaScriptDialog` 处理，和 Electron 一致。待 Windows 实机确认 CDP 能关闭原生对话框。
+- 网页脚本对话框保持 WebView2 默认原生 UI（不关闭 `AreDefaultScriptDialogsEnabled`、不接 ScriptDialogOpening），模型经 CDP 事件与 `Page.handleJavaScriptDialog` 处理，和 Electron 一致。**已在 Windows 实机确认（2026-11-10）**：`test-ai-native` 的 `dialogCaptured` 与 `dialogDismissed` 两项通过，后者断言 CDP 关闭后页面立刻可求值，不再是原先硬编码的 `true`。
 - WebView2 创建 controller 会抢键盘焦点，网页子窗口隐藏时焦点也会留在隐藏窗口：`layout.rs` 隐藏可见网页时、`views.rs` 新 controller 创建后（无网页显示且 Astrion 在前台）把焦点交回主页面。
 - 共享控制器的 profile 在 Windows 只是代理对象，`searchEngine` 由原生调用消息的 `searchEngine` 字段提供；关键词转搜索地址在 `ai-platform.js` 的 `manualNavigationURL` 完成。
 - 模型触发下载跟随已绑定调用的 download_dir，结束后保留 5 秒接收窗口；用户手动下载仍用系统 Downloads/Astrion。已保存密码只进入私有原生/脚本通道用于填充，不进入工具返回与快照。

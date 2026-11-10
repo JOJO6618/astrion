@@ -42,7 +42,7 @@ impl Harness {
         self.call("network_request",json!({"id":request["id"]}))?;self.check("networkRequestsAndDetail",true)?;
         self.call("evaluate",json!({"function":"()=>{setTimeout(()=>confirm('synthetic-confirm'),100);return 'scheduled';}"}))?;
         let dialog=self.call("wait_for",json!({"time":0.3}))?;self.check("dialogCaptured",dialog["dialog"]["type"]=="confirm")?;
-        self.call("handle_dialog",json!({"accept":false}))?;self.check("dialogDismissed",true)?;
+        self.call("handle_dialog",json!({"accept":false}))?;let value=self.call("evaluate",json!({"function":"()=>document.getElementById('status').textContent"}))?;self.check("dialogDismissed",value["result"].as_str().is_some_and(|s|s.starts_with("Count: ")))?;
         let file=self.root.join("synthetic-upload.txt");std::fs::write(&file,"synthetic upload").map_err(|e|e.to_string())?;
         let upload=self.target("Upload fixture")?;self.call("click",json!({"target":upload}))?;
         let mut payload=self.payload("file_upload",json!({"paths":[file]}));payload["readable_paths"]=json!([file]);let upload=self.send(&payload)?;self.check("fileUpload",upload["success"]==true)?;

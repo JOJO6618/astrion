@@ -18,7 +18,13 @@ desktop-electron/node_modules/.bin/electron test/2026-11-10_浏览器回收/elec
 
 Electron ESM 测试入口用 `app.whenReady().then(...)`，不能在入口顶层 await ready，否则 Electron 可能等待模块装载而无法发出 ready。macOS OS 沙箱无法启动本测试的 GUI 进程时，使用已批准的单次宿主执行，不更改 Electron 安全选项。
 
-前端：`npm run build --silent 2>&1 | tail -n 5`（完整命令启用 pipefail）。Windows Rust 代码经 rustfmt 解析与格式检查；当前 Mac 仅安装 aarch64-apple-darwin 目标，未做 Windows 编译或原生运行，不将这些结果当成 Windows 实机验收。
+前端：`npm run build --silent 2>&1 | tail -n 5`（完整命令启用 pipefail）。
+
+Windows（2026-11-10 在 Windows 实机复核）：
+
+- `python test\2026-11-09_WindowsBrowser\host.py build-production-probe` 编译通过（`retention.rs`、`views/layout/ai` 改动、`page_dialog.rs` 删除全部随生产模块一起编译）。
+- `run-production-probe`：write 阶段 39 项、read 阶段 42 项全过；`test-ai-native` 29 项全过（含真实断言后的 `dialogDismissed`）。
+- **仍未覆盖**：探针没有构造 `/api/browser-retention` 响应，回收本身的“休眠/按需重建”只是编译通过，需在应用内手动验证（切走对话 30 分钟看标签是否休眠、再点标签能否重建并提示页面已重载）。
 
 ## 启动源码最新版
 

@@ -1,0 +1,14 @@
+{
+  "productName": "Astrion Shared Data Test",
+  "version": "0.8.0-shared-test.20261110.1",
+  "identifier": "com.astrion.desktop.shared-test-20261110",
+  "plugins": {
+    "updater": {
+      "endpoints": []
+    }
+  },
+  "bundle": {
+    "active": false,
+    "createUpdaterArtifacts": false
+  }
+}

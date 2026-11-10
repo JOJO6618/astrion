@@ -94,7 +94,10 @@ elif sys.argv[1] == 'test-import':
 elif sys.argv[1] == 'test-ui':
     sys.exit(run(['node', TEST / 'test_ui.cjs'], ARTIFACTS / 'ui-tests.log', 120))
 elif sys.argv[1] in ('format-ui', 'lint-ui'):
-    files = [ROOT / 'static/src/components/browser' / name for name in ('BrowserButton.vue', 'BrowserDownloadList.vue', 'BrowserImport.vue', 'BrowserImportFile.vue', 'BrowserMenu.vue', 'BrowserPages.vue', 'BrowserPanel.vue', 'BrowserPageDialog.vue', 'types.ts', 'useBrowserLayer.ts', 'useBrowserSurface.ts', 'browserOcclusions.ts')]
+    # Enumerate the directory instead of a hand-kept list: a removed or added component used to
+    # leave a stale entry here (BrowserPageDialog.vue was deleted when dialogs became native UI).
+    browser = ROOT / 'static/src/components/browser'
+    files = sorted(path for path in browser.iterdir() if path.suffix in ('.vue', '.ts'))
     files += [ROOT / 'static/src/stores/nativeBrowser.ts', ROOT / 'static/src/locales/zh-CN/browser.ts', ROOT / 'static/src/locales/en-US/browser.ts']
     if sys.argv[1] == 'format-ui':
         command = ['node', ROOT / 'node_modules/prettier/bin/prettier.cjs', '--write', *files]

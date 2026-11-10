@@ -29,7 +29,7 @@ let code = fs.readFileSync(filename, 'utf8')
   .replace(/from '(\.\/[^']+)'/g, (_, target) => `from '${new URL(target, moduleURL).href}'`)
   .replaceAll('import.meta.url', JSON.stringify(moduleURL));
 const { BrowserTabs } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
-const profile = { data: { owners: {}, history: [] }, save() {}, record() {} };
+const profile = { data: { owners: {}, history: [] }, save() {}, record() {}, searchEngine: () => 'google' };
 const manager = {
   tabs: new Map(), selected: new Map(), owner: 'synthetic', profile, surfaceColor: 'white',
   window: { isDestroyed: () => false, contentView: { addChildView() {}, removeChildView() {} } },
