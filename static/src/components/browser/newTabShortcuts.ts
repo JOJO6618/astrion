@@ -1,7 +1,10 @@
 import type { BrowserHistory, BrowserShortcut, BrowserShortcuts } from './types';
 
-/** Tiles on the new-tab page: pinned first, then the most visited sites. */
-export const MAX_SHORTCUTS = 10;
+/**
+ * Site tiles on the new-tab page: pinned first, then the most visited sites.
+ * The grid is 2 rows × 5 columns, so 9 sites leave the last cell for "add shortcut".
+ */
+export const MAX_SHORTCUTS = 9;
 /** Only recent history counts; keeps the computation cheap on a 20k-entry history. */
 const HISTORY_WINDOW = 5000;
 const SEARCH_HOSTS = new Set(['google.com', 'cn.bing.com', 'bing.com', 'baidu.com']);

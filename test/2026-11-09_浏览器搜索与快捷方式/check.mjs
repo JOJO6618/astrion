@@ -35,7 +35,7 @@ app.whenReady().then(async () => {
     profile.setShortcuts({ pinned: [{ url: 'https://github.com/', title: ' GitHub ' }, { url: 'https://github.com/', title: 'dup' }], hidden: ['Example.COM'] });
     check('快捷方式去重与清洗', JSON.stringify(profile.data.shortcuts) === JSON.stringify({ pinned: [{ url: 'https://github.com/', title: 'GitHub' }], hidden: ['example.com'] }), JSON.stringify(profile.data.shortcuts));
     check('拒绝 javascript: 快捷方式', throws(() => profile.setShortcuts({ pinned: [{ url: 'javascript:alert(1)', title: 'x' }], hidden: [] })));
-    check('拒绝超过 10 个固定项', throws(() => profile.setShortcuts({ pinned: Array.from({ length: 11 }, (_, i) => ({ url: `https://s${i}.com/`, title: '' })), hidden: [] })));
+    check('拒绝超过 9 个固定项', throws(() => profile.setShortcuts({ pinned: Array.from({ length: 10 }, (_, i) => ({ url: `https://s${i}.com/`, title: '' })), hidden: [] })));
     check('空标题回退为主机名', normalizeShortcuts({ pinned: [{ url: 'https://www.zhihu.com/', title: '' }] }).pinned[0].title === 'zhihu.com');
     profile.flush(true);
     const reloaded = new BrowserProfile(path.join(temp, 'data'), 'host');
@@ -64,7 +64,7 @@ app.whenReady().then(async () => {
     check('固定项在前，隐藏项不出现', tiles.map(t => t.key).join() === 'zhihu.com,github.com,news.ycombinator.com', tiles.map(t => t.key).join());
     tiles = nt.shortcutTiles(history, { pinned: [{ url: 'https://github.com/x', title: 'gh' }], hidden: [] });
     check('已固定站点不在最常访问中重复', tiles.filter(t => t.key === 'github.com').length === 1);
-    check('最多 10 个', nt.shortcutTiles(Array.from({ length: 30 }, (_, i) => ({ id: String(i), url: `https://s${i}.com/`, title: '', at: now - i })), { pinned: [], hidden: [] }).length === nt.MAX_SHORTCUTS);
+    check('最多 9 个（第 10 格留给添加快捷方式）', nt.shortcutTiles(Array.from({ length: 30 }, (_, i) => ({ id: String(i), url: `https://s${i}.com/`, title: '', at: now - i })), { pinned: [], hidden: [] }).length === nt.MAX_SHORTCUTS);
     check('输入网址补全 https', nt.shortcutURL('github.com') === 'https://github.com/' && nt.shortcutURL('localhost:3000') === 'http://localhost:3000/');
     check('拒绝无效网址', nt.shortcutURL('hello world') === '' && nt.shortcutURL('javascript:alert(1)') === '' && nt.shortcutURL('intranet') === '');
   } catch (error) {

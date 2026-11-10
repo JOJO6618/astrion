@@ -66,6 +66,7 @@ export default {
   searchEngineBing: 'Bing (International)',
   searchEngineBaidu: 'Baidu',
   addShortcut: 'Add shortcut',
+  shortcutLimit: 'Shortcut limit reached',
   editShortcut: 'Edit shortcut',
   shortcutName: 'Name',
   shortcutUrl: 'URL',

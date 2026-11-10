@@ -175,6 +175,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The add tile is the only fixed label: width follows the text so it never clips to
+   "添加快捷..."; the 12px column gap absorbs a couple of overflowing pixels. */
+.nb-shortcut-add-tile .nb-shortcut-title {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+.nb-shortcut-add-tile .nb-shortcut-open:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+.nb-shortcut-add-tile .nb-shortcut-open:disabled:hover {
+  background: transparent;
+}
+.nb-shortcut-add-tile .nb-shortcut-open:disabled .nb-icon {
+  color: var(--text-tertiary);
+}
 .nb-shortcut-more {
   position: absolute;
   top: 3px;

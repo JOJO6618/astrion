@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { app, session } from 'electron';
 import { profileKey, navigationURL, SEARCH_ENGINES } from './policy.js';
 
-const MAX_PINNED = 10, MAX_HIDDEN = 200;
+/** 9 site tiles + the "add shortcut" cell fill the 2×5 new-tab grid. */
+const MAX_PINNED = 9, MAX_HIDDEN = 200;
 /** New-tab shortcuts: pinned tiles (user-added or pinned) and site keys hidden from "most visited". */
 export function normalizeShortcuts(value, strict = false) {
   const fail = () => { if (strict) throw new Error('invalid_browser_shortcuts'); };

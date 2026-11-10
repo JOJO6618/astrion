@@ -58,8 +58,14 @@
           </button>
         </div>
       </div>
-      <div v-if="!pinnedFull" class="nb-shortcut">
-        <button class="nb-shortcut-open" @click="startAdd">
+      <div class="nb-shortcut nb-shortcut-add-tile">
+        <button
+          class="nb-shortcut-open"
+          type="button"
+          :disabled="pinnedFull"
+          :title="pinnedFull ? $t('browser.shortcutLimit') : undefined"
+          @click="startAdd"
+        >
           <span class="nb-shortcut-icon nb-shortcut-add"><BrowserIcon name="plus" /></span
           ><span class="nb-shortcut-title">{{ $t('browser.addShortcut') }}</span>
         </button>
@@ -134,7 +140,12 @@ const urlInput = ref<HTMLInputElement | null>(null);
 
 function save(next: BrowserShortcuts) {
   menuFor.value = '';
-  void store.command('shortcuts', next);
+  // Snapshot rows live in pinia state, so they are Vue proxies. Electron IPC
+  // structured-clones command payloads and refuses proxies ("could not be cloned").
+  void store.command('shortcuts', {
+    pinned: next.pinned.map((row) => ({ url: row.url, title: row.title })),
+    hidden: [...next.hidden]
+  });
 }
 function pin(tile: ShortcutTile) {
   if (pinnedFull.value) return;

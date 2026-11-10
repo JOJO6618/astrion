@@ -66,6 +66,7 @@ export default {
   searchEngineBing: '必应（国际）',
   searchEngineBaidu: '百度',
   addShortcut: '添加快捷方式',
+  shortcutLimit: '快捷方式已达上限',
   editShortcut: '编辑快捷方式',
   shortcutName: '名称',
   shortcutUrl: '网址',

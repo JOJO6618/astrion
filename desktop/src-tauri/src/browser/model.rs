@@ -37,7 +37,8 @@ pub struct Shortcuts {
     pub pinned: Vec<Shortcut>,
     pub hidden: Vec<String>,
 }
-const MAX_PINNED: usize = 10;
+/// 9 site tiles + the "add shortcut" cell fill the 2×5 new-tab grid.
+const MAX_PINNED: usize = 9;
 const MAX_HIDDEN: usize = 200;
 impl Shortcuts {
     /// strict: reject the whole value on any invalid entry (UI commands); otherwise drop
