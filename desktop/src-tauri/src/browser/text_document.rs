@@ -16,7 +16,9 @@ pub fn is_color(value: &str) -> bool {
 fn is_dark(color: &str) -> bool {
     let value = u32::from_str_radix(color.trim_start_matches('#'), 16).unwrap_or(0xfaf9f5);
     let (r, g, b) = ((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff);
-    0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64 < 128.0
+    // 括号是必须的：不包住整个表达式时 Rust 会把 `b as f64 < 128.0` 当成泛型参数
+    // （`<` 被当作泛型起始），Windows 侧编译直接失败。
+    (0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64) < 128.0
 }
 
 /// 在页面里执行的注入脚本：只对文本渲染的文档生效。
