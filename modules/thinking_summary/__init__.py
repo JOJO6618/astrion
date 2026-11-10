@@ -89,7 +89,19 @@ class SummaryWork:
         return [text for block, text in self.published if not block.cancelled]
 
     def block(self, response_id, conversation_id, sender):
-        if not self.profile or getattr(self.terminal.api_client, "api_protocol", None) == "responses":
+        protocol = getattr(self.terminal.api_client, "api_protocol", None)
+        if protocol == "responses":
+            # Responses 原生 reasoning summary 直接展示最新小节：不请求辅助
+            # 模型、不产生费用，也不依赖「思考内容摘要」开关与摘要模型配置。
+            try:
+                manager = self.terminal.context_manager._get_conversation_manager_for_id(conversation_id)
+                block = NativeSummaryBlock(self, manager, conversation_id, response_id, sender)
+                self.blocks.append(block)
+                return block
+            except Exception:
+                log_failure("prepare_block")
+                return None
+        if not self.profile:
             return None
         try:
             manager = self.terminal.context_manager._get_conversation_manager_for_id(conversation_id)
@@ -111,6 +123,72 @@ class SummaryWork:
         if tasks:
             # Requests are bounded individually. No model/tool streaming waits here.
             await asyncio.gather(*tasks, return_exceptions=True)
+
+
+class NativeSummaryBlock:
+    """Responses 原生 reasoning summary：展示最新一条小节，不请求辅助模型。
+
+    与 SummaryBlock 共用 generation/revision、独立显示存储与事件发布语义，
+    但没有模型请求任务：``feed`` 不消费思考正文，只由 ``feed_native`` 在原生
+    摘要小节到达时发布。因此不产生费用，也不受摘要开关和摘要模型影响。
+    """
+
+    def __init__(self, work, manager, conversation_id, response_id, sender):
+        self.work = work
+        self.manager = manager
+        self.conversation_id = conversation_id
+        self.response_id = response_id
+        self.sender = sender
+        self.generation = uuid4().hex
+        self.text = ""
+        self.revision = 0
+        self.entries = []
+        self.cancelled = False
+        self.task = None
+
+    def feed(self, text):
+        # 原生摘要来自 Responses 事件本身，不从思考正文生成。
+        return
+
+    def feed_native(self, text):
+        if self.cancelled:
+            return
+        summary = " ".join(str(text or "").split())
+        if not summary or summary == self.text:
+            return
+        self.text = summary
+        self.revision += 1
+        self.entries.append(summary)
+        entry = {
+            "text": summary, "revision": self.revision, "generation": self.generation,
+            "summaries": list(self.entries),
+        }
+        try:
+            # 与辅助摘要一致：先原子保存再发布显示事件。
+            save_summary(self.manager, self.conversation_id, self.response_id, entry)
+            self.work.published.append((self, summary))
+            self.sender("thinking_summary", {
+                "response_message_id": self.response_id,
+                "generation": self.generation,
+                "summary": summary, "revision": self.revision,
+            })
+        except Exception:
+            log_failure("native_publish")
+
+    def end(self):
+        return
+
+    def cancel(self):
+        self.cancelled = True
+
+    def clear_saved(self):
+        if self.entries:
+            try:
+                save_summary(self.manager, self.conversation_id, self.response_id, {
+                    "text": "", "revision": 0, "generation": "", "summaries": [],
+                })
+            except Exception:
+                log_failure("clear_retry")
 
 
 class SummaryBlock:

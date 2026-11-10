@@ -8,7 +8,9 @@
 
 开启后可修改「摘要生成间隔（秒）」，配置键 `thinking_summary_interval_seconds` 在后端默认与sanitize、前端表单类型／默认／读取均注册；默认20秒，整数范围1–3600秒，支持恢复默认。每个工作段开始读取一次，保存后从下一次任务生效；首次摘要固定3秒，不受此项影响。
 
-Agent、Studio、Chat 共用 `server/chat_flow_stream_loop.py` 的接入层；主模型 `api_protocol == responses` 时跳过辅助摘要，保留原生摘要。辅助客户端使用关闭思考的快速配置，凭证及协议仍由统一 APIClient 处理，外部会话头沿用原对话和账号偏好。
+Agent、Studio、Chat 共用 `server/chat_flow_stream_loop.py` 的接入层。辅助客户端使用关闭思考的快速配置，凭证及协议仍由统一 APIClient 处理，外部会话头沿用原对话和账号偏好。
+
+主模型 `api_protocol == responses` 时**不发起任何辅助摘要请求**，直接使用 Responses 原生 reasoning summary（2026-11-10）：`utils/api_client/responses/translate.py` 在每个 `response.reasoning_summary_text.done` 小节的 chunk 顶层附带内部字段 `_reasoning_summary`（该小节清洗后的原文）；`server/chat_flow_stream_loop.py` 从 `thinking_chunk` 的 `_native_summary` 内部字段取出交给 `NativeSummaryBlock.feed_native`，并在透传前端前 pop 掉该字段。这条路径**不受**「思考内容摘要」开关、摘要模型和间隔设置影响，零费用，也不写入模型请求上下文。`reasoning_content` 正文仍是完整拼装文本（多小节间空行分隔），不受影响。
 
 ## 生成规则
 
@@ -37,6 +39,8 @@ Agent、Studio、Chat 共用 `server/chat_flow_stream_loop.py` 的接入层；�
 统一 bootstrap 在脱离模型上下文的显示副本上装配独立摘要；运行投影按回复与 generation 定位思考动作，不只查找当前活动思考。Chat 整树显示副本同样装配，以便旧分支展示。
 
 极简行在首个摘要前显示原始首行，之后显示摘要并复用扫动替换动画；相同文字不重播。只有思考的组结束后保留最新摘要；已进入工具阶段的组继续显示工具。展开区域始终使用完整原始思考。
+
+Responses 原生摘要（`NativeSummaryBlock`）的发布粒度是**每个原生小节完成一次**：小节文本折成单行后作为最新摘要发布，revision 递增；与上一条文字相同则跳过，不重复写盘和发事件。取消、重试与辅助摘要同一套语义（`api_request_start` 时 cancel + `clear_saved`，新块使用新 generation）。因此历史装配、扫动动画、持久化路径完全复用，不新增前端逻辑。
 
 ## 费用统计
 

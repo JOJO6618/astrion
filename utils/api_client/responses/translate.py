@@ -424,9 +424,12 @@ async def responses_sse_to_chat_chunks(
     与 ``chat()`` 产出的 chunk 完全同形；遇到 response.failed/error 事件
     抛 :class:`ResponsesAPIError`（由 mixin 统一转 error chunk）。
 
-    两处非逐字直通的刻意设计：
+    三处非逐字直通的刻意设计：
     - 推理摘要按 part 缓冲，text.done 时剥 markdown 加粗后整段下发，
       多段间补空行（前端思考块是纯文本渲染 + pre-wrap）；
+    - 上述摘要 chunk 顶层另带 ``_reasoning_summary``（当前 part 清洗后的
+      原文），供流式循环把「最新一条原生摘要」交给极简行展示；该字段不进入
+      reasoning_content，正文仍是完整拼装文本，也不下发给前端；
     - function_call 参数 delta 只缓冲不转发，output_item.done 时取完整
       arguments 清洗（剥 null 填充）后一次性下发，避免约束解码的填充值
       在流式累加中固化。
@@ -487,14 +490,18 @@ async def responses_sse_to_chat_chunks(
             summary_buffers.pop(key, None)
             text = _clean_summary_text(text)
             if text:
+                native_part = text
                 if summary_emitted:
                     text = "\n\n" + text
                 summary_emitted = True
-                yield {
+                chunk = {
                     "choices": [
                         {"index": 0, "delta": {"reasoning_content": text}}
-                    ]
+                    ],
+                    # 内部标记：正文保持完整拼装，另附本条小节供极简行替换显示
+                    "_reasoning_summary": native_part,
                 }
+                yield chunk
 
         elif event == "response.reasoning_text.delta":
             delta_text = data.get("delta") or ""
@@ -586,14 +593,17 @@ async def responses_sse_to_chat_chunks(
             for key in sorted(summary_buffers.keys()):
                 text = _clean_summary_text("".join(summary_buffers.pop(key)))
                 if text:
+                    native_part = text
                     if summary_emitted:
                         text = "\n\n" + text
                     summary_emitted = True
-                    yield {
+                    chunk = {
                         "choices": [
                             {"index": 0, "delta": {"reasoning_content": text}}
-                        ]
+                        ],
+                        "_reasoning_summary": native_part,
                     }
+                    yield chunk
             # 兜底冲刷：未等到 output_item.done 的 function_call 参数缓冲
             for index in sorted(arg_buffers.keys()):
                 raw_args = "".join(arg_buffers.pop(index))

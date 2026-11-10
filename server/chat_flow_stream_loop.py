@@ -41,12 +41,20 @@ async def run_streaming_attempts(**kwargs):
             summary_block = work.block(message_id, kwargs.get("conversation_id"), original_sender)
         if event.startswith(("text_", "thinking_")):
             data = {**(data or {}), "response_message_id": message_id}
+        # Responses 原生摘要小节只用于极简行，属于后端内部字段，不向前端透传。
+        native_summary = None
+        if event == "thinking_chunk" and isinstance(data, dict):
+            native_summary = data.pop("_native_summary", None)
         if event == "thinking_start" and summary_block:
             data["thinking_generation"] = summary_block.generation
         original_sender(event, data)
         if summary_block:
             if event == "thinking_chunk":
                 summary_block.feed((data or {}).get("content", ""))
+                if native_summary:
+                    feed_native = getattr(summary_block, "feed_native", None)
+                    if feed_native:
+                        feed_native(native_summary)
             elif event in {"thinking_end", "text_start", "tool_preparing"}:
                 summary_block.end()
             elif event in {"task_stopped", "quota_exceeded"}:
@@ -226,7 +234,12 @@ async def _run_streaming_attempts_impl(*, web_terminal, messages, tools, sender,
 
                 current_thinking += reasoning_content
                 web_terminal._stream_partial.thinking = current_thinking
-                sender('thinking_chunk', {'content': reasoning_content})
+                thinking_payload: Dict[str, Any] = {"content": reasoning_content}
+                # Responses 原生摘要：每个小节完成时另附一条，供极简行替换显示。
+                native_summary = chunk.get("_reasoning_summary")
+                if isinstance(native_summary, str) and native_summary:
+                    thinking_payload["_native_summary"] = native_summary
+                sender('thinking_chunk', thinking_payload)
 
             # 收集工具调用 - 实时发送准备状态
             delta_tool_calls = delta.get("tool_calls")
