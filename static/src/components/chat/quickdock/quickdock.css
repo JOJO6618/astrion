@@ -16,8 +16,9 @@
 /* ---------------- 占位列容器 ---------------- */
 
 .quick-dock {
+  --qd-expanded-width: 294px; /* 完整占位列宽，自动展开空间判定复用 */
   flex: none;
-  width: 294px; /* 270 + 左右 12 padding */
+  width: var(--qd-expanded-width);
   /* top 44px：避开右上角展开/收起悬浮按钮（top 8 + 高 28 + 8 间距） */
   padding: 44px 12px 20px 0;
   box-sizing: border-box;

@@ -1,5 +1,6 @@
 <template>
   <aside
+    ref="dockRef"
     class="quick-dock"
     :class="{
       'quick-dock--empty': !settingsReady || !hasContent || userCollapsed,
@@ -67,6 +68,7 @@ import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
 import { downloadWorkspaceFile } from '@/utils/downloadFile';
 import { scrollToSubAgentCard } from './navigation';
+import { canAutoExpandQuickDock } from './autoExpansion';
 import {
   useQuickDockStore,
   persistQuickDockHadContent,
@@ -114,6 +116,7 @@ const personalizationStore = usePersonalizationStore();
 
 // hasContent / userCollapsed 提升到 store：App.vue 的展开收起按钮共用同一判定
 const { menu, hasContent, userCollapsed } = storeToRefs(quickDock);
+const dockRef = ref<HTMLElement | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
 defineExpose({ scrollToSubAgents: () => scrollToSubAgentCard(scrollRef.value) });
 
@@ -240,24 +243,19 @@ function releaseNoAnim(force = false) {
   });
 }
 
-// 内容集合变化（出现/清空）时按模式校正展开状态：
-// - 自动展开（默认）：重置手动标记，新内容到达自动展开
-//   （按钮常显后，无内容时也可能被点击置为收起；不重置会导致新内容到达不展开）
-// - 仅手动展开：保持/恢复收起态，等用户点击按钮；
-//   用户手动展开后只要内容不完全清空（hasContent 不再变化），dock 保持展开
-watch(
-  hasContent,
-  () => {
-    quickDock.userCollapsed = !autoExpand.value;
-  },
-  // immediate：挂载时即校正（手动模式下刷新恢复对话，已有内容不应自动展开）
-  { immediate: true }
-);
+function syncAutoExpansion(preserveOpen = false) {
+  if (autoExpand.value && preserveOpen && !userCollapsed.value) return;
+  // 移动端整层由用户点击打开，不占用对话宽度；这里只约束桌面占位列。
+  const hasRoom = isMobileViewport.value || canAutoExpandQuickDock(dockRef.value);
+  quickDock.userCollapsed = !settingsReady.value || !autoExpand.value || !hasRoom;
+}
 
-// 设置切换立即生效：切到「否」收起等手动展开；切回「是」有内容即展开
-watch(autoExpand, (enabled) => {
-  quickDock.userCollapsed = !enabled;
-});
+// 新内容、切换回填和首次挂载统一检查实际空间；挂载前测不到宽度时先收起。
+// 用户手动展开后，内容集合不清空就保持展开，不因宽度变化强制关闭。
+watch(hasContent, () => syncAutoExpansion(), { immediate: true });
+
+// 设置开启与设置首次就绪也必须通过宽度检查，已经展开的面板保持原状。
+watch([autoExpand, settingsReady], () => syncAutoExpansion(true));
 
 // 持续维护「dock 是否有内容」缓存（全局 + 按对话两条）：
 // 下次进入页面/切换对话时即可按最终状态静态渲染。
@@ -505,6 +503,7 @@ function refreshAll() {
 }
 
 onMounted(() => {
+  syncAutoExpansion(true);
   // 首批内容拉取（同时作为初始无过渡窗口的关闭条件之一）
   const initialRefresh = Promise.allSettled([
     subAgentStore.fetchSubAgents(),

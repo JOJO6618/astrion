@@ -2,6 +2,7 @@
 .chat-container {
   --chat-surface-color: var(--surface-panel);
   --chat-rail-max: 900px;
+  --user-bubble-max-ratio: 60%;
   /* 流式宽度：两侧空白固定（消息侧 ≈49px / 输入栏侧 ≈53px），窗口变窄只压缩轨宽；
      57px 的取值与旧 94% 公式在轨宽 900px 临界点处连续，移动端仍覆盖为 100% */
   --chat-rail-fluid: calc(100% - 57px);
@@ -115,6 +116,7 @@
   line-height: 1.4;
   letter-spacing: 0.02em;
   font-family: 'Iowan Old Style', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  min-width: 0;
   max-width: 60%;
   color: var(--text-primary);
   text-shadow: 0 1px 6px var(--shadow-color);
@@ -454,6 +456,7 @@
 @media (max-width: 768px) {
   .chat-container {
     --chat-rail-fluid: 100%;
+    --user-bubble-max-ratio: 80%;
     --composer-base-height: calc(90px + var(--app-bottom-inset));
     --composer-reserved-height: var(--composer-base-height);
   }
@@ -471,10 +474,6 @@
   /* 窗口化后每个 message-block 都是包装项的首子，:first-child 会匹配所有块，改用显式 class */
   .message-block--first {
     margin-top: 0;
-  }
-
-  .user-message .message-text {
-    max-width: 80% !important;
   }
 
   .assistant-message .message-text {
@@ -495,6 +494,11 @@
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: calc(100% - 12px); /* 留出与标题的间距，标题先收缩 */
+  height: 28px;
+  white-space: nowrap;
   gap: 6px;
   padding: 0;
   border-radius: 0;
@@ -526,14 +530,20 @@
 .selector-label {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  white-space: nowrap;
   gap: 6px;
 }
 
 .selector-model {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 700;
 }
 
 .selector-mode {
+  flex-shrink: 0;
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -541,6 +551,7 @@
 .selector-caret {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
   stroke: currentColor;
 }
 
@@ -1241,7 +1252,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 60%; /* 最大宽度 60% */
+  /* 窄轨道给长消息至少 320px 可用宽度；轨道更窄时占满，短消息仍按内容收缩。 */
+  max-width: min(100%, max(320px, var(--user-bubble-max-ratio)));
   width: fit-content; /* 根据内容自适应宽度 */
   align-self: flex-end; /* 确保靠右 */
 }

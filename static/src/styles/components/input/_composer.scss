@@ -316,15 +316,25 @@ body[data-theme='light'] {
   --composer-side-control-offset: 20px;
   position: absolute;
   left: var(--composer-side-control-offset);
+  /* 右侧为上下文圆环及间距留位，权限控件只使用剩余宽度。 */
+  right: calc(var(--composer-side-control-offset) - 5px + 28px + 8px);
   bottom: -28px;
   z-index: 35;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  height: 28px;
+  min-width: 0;
   gap: 6px;
+  container: composer-controls / inline-size;
+}
+
+.permission-switcher > .permission-switcher__btn {
+  flex-shrink: 0;
 }
 
 .permission-switcher__block {
   position: relative;
+  min-width: 0;
 }
 
 .context-usage-switcher {
@@ -479,14 +489,43 @@ body[data-theme='light'] {
   color: var(--text-primary);
   border-radius: 999px;
   padding: 4px 12px;
+  height: 28px;
+  min-width: 0;
+  max-width: 100%;
   font-size: 14px;
   line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: none;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.permission-switcher__btn > span:not(.permission-switcher__exec) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.permission-switcher__lock {
+  flex-shrink: 0;
+}
+
+/* 按底部控件的实际宽度收紧，不依赖浏览器窗口断点。 */
+@container composer-controls (max-width: 320px) {
+  .permission-switcher__btn {
+    padding-inline: 6px;
+    gap: 4px;
+  }
+}
+
+@container composer-controls (max-width: 240px) {
+  .permission-switcher__btn {
+    padding-inline: 3px;
+    gap: 3px;
+  }
 }
 
 .permission-switcher__btn:hover:not(:disabled) {
@@ -566,6 +605,7 @@ body[data-theme='light'] {
 }
 
 .permission-switcher__exec {
+  flex-shrink: 0;
   color: var(--text-secondary);
 }
 
