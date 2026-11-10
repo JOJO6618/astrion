@@ -33,7 +33,10 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[2]
 TEST = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / "_experiments/windows-shared-test-20261110"
-PACKAGE = ROOT / "output/Astrion-Windows-Shared-Test-20261110"
+# 可选第二个参数给输出目录加后缀，避免覆盖上一份包：
+#   python package.py build r2  ->  output/Astrion-Windows-Shared-Test-20261110-r2
+TAG = f"-{sys.argv[2]}" if len(sys.argv) > 2 else ""
+PACKAGE = ROOT / f"output/Astrion-Windows-Shared-Test-20261110{TAG}"
 CONF = TEST / "windows-shared.conf.json"
 CARGO = Path.home() / ".cargo/bin/cargo.exe"
 RUNTIME = ROOT / "desktop/src-tauri/runtime"
