@@ -45,18 +45,26 @@ export function useBrowserSurface(
     previous = '',
     stopped = false,
     capturesInput = false,
-    previousColor = '';
+    previousColor = '',
+    previousText = '';
   let resize: ResizeObserver, mutations: MutationObserver, unsubscribe: (() => void) | undefined;
   const layer = useBrowserLayer(surface, () => !popups() && !capturesInput);
   function sync() {
     frame = 0;
     if (stopped) return;
-    const surfaceColor = getComputedStyle(document.documentElement)
-      .getPropertyValue('--surface-base')
-      .trim();
-    if (surfaceColor !== previousColor && /^#[a-f\d]{6}$/i.test(surfaceColor)) {
+    const styles = getComputedStyle(document.documentElement);
+    const surfaceColor = styles.getPropertyValue('--surface-base').trim();
+    const textColor = styles.getPropertyValue('--text-primary').trim();
+    if (
+      /^#[a-f\d]{6}$/i.test(surfaceColor) &&
+      (surfaceColor !== previousColor || textColor !== previousText)
+    ) {
       previousColor = surfaceColor;
-      browserBridge()?.theme(surfaceColor);
+      previousText = textColor;
+      browserBridge()?.theme({
+        surfaceColor,
+        textColor: /^#[a-f\d]{6}$/i.test(textColor) ? textColor : ''
+      });
     }
     if (!store.snapshot) {
       layer.set(undefined, false);
@@ -108,6 +116,7 @@ export function useBrowserSurface(
     const panelBounds = node?.closest('.native-browser-panel')?.getBoundingClientRect();
     const metadata = {
       surfaceColor,
+      textColor: /^#[a-f\d]{6}$/i.test(textColor) ? textColor : '',
       ...(node && visible && browserBridge()?.surfaceMode === 'regions'
         ? {
             occlusions: browserOcclusions(

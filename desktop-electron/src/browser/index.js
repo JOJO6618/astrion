@@ -30,6 +30,8 @@ export class NativeBrowser {
     this.ai = new BrowserAI(this);
     this.retention = new BrowserRetention(this);
     this.surfaceColor = window.getBackgroundColor();
+    // 纯文本类文档（text-documents.js）的文字色，由前端主题上报；空值按背景明暗兜底。
+    this.textColor = '';
     mainView.setBackgroundColor(this.surfaceColor);
     this.invalidate = () => { this.contextMenu.close(); this.credentials.invalidate(); this.connectSequence++; this.lease = ''; this.visible = false; this.overlayRaised = false; this.layout(); this.features.forEach(feature => feature.denyStale()); };
     mainView.webContents.on('did-start-navigation', this.onNavigation = (_e, url, sameDocument, isMainFrame) => {
@@ -188,8 +190,8 @@ export class NativeBrowser {
   }
   register() {
     ipcMain.handle('browser:connect', async (event, scope, labels) => this.connect(event, scope, labels));
-    ipcMain.on('browser:theme', this.themeHandler = (event, color) => {
-      try { this.check(event); setBrowserSurfaceColor(this, color); this.layout(); } catch { /* Only the trusted main renderer owns the theme. */ }
+    ipcMain.on('browser:theme', this.themeHandler = (event, theme) => {
+      try { this.check(event); setBrowserSurfaceColor(this, theme); this.layout(); } catch { /* Only the trusted main renderer owns the theme. */ }
     });
     ipcMain.on('browser:input', this.inputHandler = (event, payload) => {
       try { this.check(event, payload?.lease); relayBrowserInput(this, payload); } catch { /* Retired input cannot reach another owner. */ }
@@ -211,7 +213,7 @@ export class NativeBrowser {
         }
         this.geometry = payload.rect; this.visible = payload.visible === true;
         this.geometryViewport = viewport;
-        setBrowserSurfaceColor(this, payload.surfaceColor);
+        setBrowserSurfaceColor(this, { surfaceColor: payload.surfaceColor, textColor: payload.textColor });
         this.overlayRaised = payload.elevated === true;
         this.overlayCapturesInput = payload.capturesInput !== false;
         this.focusFind = payload.focusFind === true;

@@ -175,15 +175,32 @@ impl Browser {
         }
         self.layout_sequence = sequence;
         self.geometry = value.clone();
-        self.apply_theme(&value["surfaceColor"]);
+        self.apply_theme(value);
         self.layout();
         Ok(())
     }
-    pub fn apply_theme(&mut self, color: &Value) {
-        if let Some(color) = color.as_str().filter(|s| {
-            s.len() == 7 && s.starts_with('#') && s[1..].chars().all(|c| c.is_ascii_hexdigit())
-        }) {
-            self.surface = color.into();
+    /// 接受完整主题对象（layout 载荷）或单独的 surfaceColor 字符串。
+    pub fn apply_theme(&mut self, value: &Value) {
+        let (surface, text) = match value.as_str() {
+            Some(color) => (color, ""),
+            None => (value["surfaceColor"].as_str().unwrap_or(""), value["textColor"].as_str().unwrap_or("")),
+        };
+        let mut changed = false;
+        if super::text_document::is_color(surface) {
+            if surface != self.surface {
+                self.surface = surface.into();
+                changed = true;
+            }
+        }
+        if super::text_document::is_color(text) {
+            if text != self.text {
+                self.text = text.into();
+                changed = true;
+            }
+        }
+        // 主题真正变化时重刷已加载的纯文本类文档（普通网页脚本自行退出）。
+        if changed {
+            self.refresh_text_documents();
         }
     }
 }

@@ -40,7 +40,7 @@
     surfaceMode: 'regions',
     credentialFileImport: true,
     connect: (scope, labels) => call('connect', { scope, labels }),
-    theme: surfaceColor => call('theme', { surfaceColor }, false),
+    theme: value => call('theme', value, false),
     command: value => call('command', value),
     credentials: value => call('credentials', value),
     layout: value => call('layout', value, false),

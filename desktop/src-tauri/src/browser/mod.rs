@@ -20,6 +20,7 @@ mod password_adapter;
 mod policy;
 mod retention;
 mod storage;
+mod text_document;
 mod vault;
 mod view_hooks;
 mod views;

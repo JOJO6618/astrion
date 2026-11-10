@@ -27,7 +27,7 @@ if (process.platform === 'darwin') {
   };
   contextBridge.exposeInMainWorld('astrionBrowser', {
     connect: (scope, labels) => ipcRenderer.invoke('browser:connect', scope, labels),
-    theme: surfaceColor => ipcRenderer.send('browser:theme', surfaceColor),
+    theme: theme => ipcRenderer.send('browser:theme', theme),
     command: payload => ipcRenderer.invoke('browser:command', payload),
     credentials: payload => ipcRenderer.invoke('browser:credentials', payload),
     onCredentialProgress: callback => subscribe('browser:credentials-progress', callback),

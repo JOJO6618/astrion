@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { SECURE_WEB_PREFERENCES, navigationURL, manualNavigationURL, isLocalFile } from './policy.js';
 import { browserBounds } from './geometry.js';
+import { applyTextDocumentTheme } from './text-documents.js';
 import { internalSection, internalURL } from './internal-pages.js';
 const passwordPreload = fileURLToPath(new URL('./passwords/page-preload.cjs', import.meta.url));
 
@@ -56,7 +57,7 @@ export class BrowserTabs {
     view.setVisible(false);
     view.setBackgroundColor(manager.surfaceColor);
     const tab = { id: options.id || randomUUID(), owner, profile, view, title: '', favicon: '', url: url || options.targetURL || 'about:blank', error: '', find: null,
-      lastActive: Date.now(), lastAi: 0, suspended: false,
+      lastActive: Date.now(), lastAi: 0, suspended: false, textDocument: false,
       pendingURL: options.targetURL || '', committedDocument: false, retiredDownload: false,
       closeOnDownload: !!options.nativeOptions || (!!url && url !== 'about:blank'),
       previousId: manager.selected.get(owner) };
@@ -81,7 +82,7 @@ export class BrowserTabs {
     const navigating = (_event, destination, inPlace, isMain) => {
       if (!isMain || inPlace || tab.retiredDownload) return;
       manager.credentials?.navigating(tab, destination);
-      tab.pendingURL = destination; tab.url = destination; tab.error = '';
+      tab.pendingURL = destination; tab.url = destination; tab.error = ''; tab.textDocument = false;
       update();
     };
     wc.on('did-start-navigation', navigating);
@@ -102,6 +103,8 @@ export class BrowserTabs {
       manager.layout(); manager.publish();
     });
     wc.on('render-process-gone', (_event, details) => { tab.pendingURL = ''; tab.error = details.reason; manager.layout(); manager.publish(); });
+    // 纯文本类响应（text/plain、json、源码等）背景透明且默认黑字，深色主题下需要补样式。
+    wc.on('dom-ready', () => { void applyTextDocumentTheme(manager, tab); });
     wc.on('found-in-page', (_event, result) => { tab.find = { matches: result.matches, active: result.activeMatchOrdinal }; manager.publish(); });
     wc.on('will-navigate', (event, destination) => { try {
       if (isLocalFile(wc.getURL())) manualNavigationURL(destination); else navigationURL(destination);

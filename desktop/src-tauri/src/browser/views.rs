@@ -432,7 +432,33 @@ impl Browser {
         self.update(id, success);
         self.layout();
         if success {
+            // 纯文本类响应（text/plain、json、源码等）背景透明且默认黑字，深色主题下需要补样式。
+            self.apply_text_document_theme(id);
             self.cdp_event(id, "installAdapter", &json!({}));
+        }
+    }
+    /// 对指定标签补/刷新纯文本类文档的主题样式（普通网页脚本自行退出）。
+    pub fn apply_text_document_theme(&self, id: &str) {
+        for tab in self.tabs.iter().filter(|tab| tab.id == id) {
+            Self::inject_text_document_theme(tab, &self.surface, &self.text);
+        }
+    }
+    pub fn refresh_text_documents(&self) {
+        for tab in &self.tabs {
+            Self::inject_text_document_theme(tab, &self.surface, &self.text);
+        }
+    }
+    fn inject_text_document_theme(tab: &Tab, surface: &str, text: &str) {
+        if tab.retired || tab.suspended {
+            return;
+        }
+        let Some(wc) = &tab.webview else { return };
+        let script = super::text_document::script(surface, text);
+        unsafe {
+            let _ = wc.ExecuteScript(
+                &HSTRING::from(script.as_str()),
+                &ExecuteScriptCompletedHandler::create(Box::new(|_, _| Ok(()))),
+            );
         }
     }
     pub fn update(&mut self, id: &str, record: bool) {

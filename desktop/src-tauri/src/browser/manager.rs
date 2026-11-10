@@ -24,6 +24,8 @@ pub struct Browser {
     pub connect_sequence: u64,
     pub geometry: Value,
     pub surface: String,
+    /// 主题文字色，只用于纯文本类文档（text_document.rs）；前端上报前用兜底值。
+    pub text: String,
     pub labels: Value,
     pub grants: std::collections::HashSet<String>,
     pub download_published: u64,
@@ -69,6 +71,7 @@ impl Browser {
             connect_sequence: 0,
             geometry: json!({}),
             surface: "#faf9f5".into(),
+            text: "#141413".into(),
             labels: json!({}),
             grants: Default::default(),
             download_published: 0,

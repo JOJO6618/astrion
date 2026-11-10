@@ -49,7 +49,7 @@ impl Browser {
             }
             "layout" => self.apply_layout(&request["data"]).map(|_| json!({})),
             "theme" => {
-                self.apply_theme(&request["data"]["surfaceColor"]);
+                self.apply_theme(&request["data"]);
                 self.layout();
                 Ok(json!({}))
             }

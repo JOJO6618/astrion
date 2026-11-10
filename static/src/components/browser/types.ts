@@ -79,6 +79,8 @@ export interface BrowserRect {
 }
 export interface BrowserSurfaceMetadata {
   surfaceColor?: string;
+  /** 主题文字色：只用于纯文本类文档（背景透明 + 默认黑字）的可读性。 */
+  textColor?: string;
   occlusions?: BrowserRect[];
   focusFind?: boolean;
   viewport?: { width: number; height: number; panelWidth: number; surfaceInset: number };
@@ -103,11 +105,15 @@ export interface BrowserInput {
   deltaY?: number;
   modifiers: string[];
 }
+export interface BrowserTheme {
+  surfaceColor: string;
+  textColor?: string;
+}
 export interface BrowserBridge {
   surfaceMode?: 'regions';
   credentialFileImport?: boolean;
   connect: (scope: BrowserScope, labels?: Record<string, string>) => Promise<BrowserSnapshot>;
-  theme: (surfaceColor: string) => void;
+  theme: (theme: BrowserTheme) => void;
   credentials: (payload: CredentialRequest & { lease: string }) => Promise<CredentialResponse>;
   onCredentialProgress: (callback: (event: { lease: string; stage: string }) => void) => () => void;
   command: (payload: {

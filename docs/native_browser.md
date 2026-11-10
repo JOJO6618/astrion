@@ -77,6 +77,16 @@ IPC 只接受指定主 webContents 的顶层可信来源及聊天路由。每次
 
 随后用户在浏览器设置页切换颜色时发现主进程 `undefined.webContents` 异常：前端更新漏同步了源码已有的 shell 保护。内部设置标签无 `view`，回收标签也可能为 null；`setBrowserSurfaceColor` 必须跳过两者，`applySurfaceColor` 先保存主题再更新视图。现已仅把 `geometry.js` 与 `window.js` 两处已有修复同步到原测试包。包内回归4项通过；真实设置页/网页两场景经IPC切色8次，异常0，根底色和落盘一致；同轮绿色回归24采样与471录制帧通过。该旧包无新版retention，回收形态由包内模块单测覆盖，没有整套替换浏览器管理器。更新测试包后需退出旧进程再启动。
 
+### 纯文本类文档的主题可读性（2026-11-10）
+
+深色主题下打开 `text/plain`、`application/json`、脚本源码等响应会出现「深底黑字」不可读。根因已用真实 Electron 探针确认：Chromium 把这类响应渲染成「只有一个 `<pre>`、没有任何样式」的空文档，`html`/`body` 背景是 `rgba(0,0,0,0)`、默认文字色是黑色；而标签视图底色是应用主题的 `--surface-base`（深色为深灰），于是背景透出深色、文字仍为黑色。`prefers-color-scheme` 也跟随系统而非应用主题，不会自动修正。
+
+修复只作用于文本渲染的文档：`dom-ready`（Windows 为 `NavigationCompleted`）后执行一段自守卫脚本，判定 `document.contentType` 不在 `text/html`／`application/xhtml+xml`／`image/svg+xml`／`application/pdf` 内，且 `body` 子元素含 `<pre>`（Chromium 文本查看器结构），才向文档注入 `<style id="__astrion_text_document_theme">`：`html{background:<--surface-base> !important;color-scheme:dark|light}` + `body{color:<--text-primary> !important}`。普通 HTML 页面、`prefers-color-scheme`、页面自身样式均不受影响；主题切换时对已命中过的标签重新执行一次。
+
+主题上报载荷随之扩展：`astrionBrowser.theme()` 由「surfaceColor 字符串」改为 `{ surfaceColor, textColor }`（`useBrowserSurface.ts` 同时读 `--surface-base` 与 `--text-primary`），layout 载荷的 `surfaceColor`/`textColor` 同义。macOS 实现在 `desktop-electron/src/browser/text-documents.js`（`geometry.js` 在主题变化时刷新），Windows 在 `desktop/src-tauri/src/browser/text_document.rs`（`views.rs::loaded` 注入、`layout.rs::apply_theme` 变化时刷新）。**两端的判定条件与 CSS 必须同步修改**。
+
+验证：`test/2026-11-10_内置浏览器纯文本主题/text_document_theme.mjs`（真实 Electron 隐藏窗口，7 项：三类文本响应命中、`text/html` 不受影响、浅色跟随、缺文字色兜底、脚本模板完整）。Windows 侧代码本机无 Rust 工具链，未编译、未实机验证。
+
 ## 当前能力
 
 - 多标签、新建、关闭、切换、拖动排序和标签搜索；启动恢复每个 owner 最多 12 个标签，每个 owner 最多 48 个标签；原生网页按前述前台／后台与闲置规则回收。

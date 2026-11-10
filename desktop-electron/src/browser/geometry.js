@@ -1,4 +1,5 @@
 import { clipBounds } from './policy.js';
+import { refreshTextDocuments } from './text-documents.js';
 
 // Project the right-docked surface immediately while the renderer catches up.
 // The authoritative CSS rectangle replaces this projection on its next layout.
@@ -26,18 +27,27 @@ export function browserViewport(value) {
   return { width: value.width, height: value.height, panelWidth: value.panelWidth, surfaceInset: value.surfaceInset };
 }
 
-export function setBrowserSurfaceColor(manager, color) {
-  if (typeof color !== 'string' || !/^#[a-f\d]{6}$/i.test(color)) return;
-  color = color.toLowerCase();
+const COLOR = /^#[a-f\d]{6}$/i;
+const themeColor = value => (typeof value === 'string' && COLOR.test(value) ? value.toLowerCase() : '');
+
+/** 应用主题：接受 '#rrggbb' 或 { surfaceColor, textColor }。
+ *  文字色只用于纯文本类文档（text-documents.js），普通网页不受影响。 */
+export function setBrowserSurfaceColor(manager, payload) {
+  const surface = themeColor(typeof payload === 'string' ? payload : payload?.surfaceColor);
+  const text = themeColor(typeof payload === 'object' && payload ? payload.textColor : '');
+  if (!surface) return;
   // 初始主题可能与缓存相同，但窗口根 View 仍需要明确的不透明背景。
-  manager.window.setBackgroundColor(color);
-  manager.window.contentView.setBackgroundColor(color);
-  if (color === manager.surfaceColor) return;
-  manager.surfaceColor = color;
+  manager.window.setBackgroundColor(surface);
+  manager.window.contentView.setBackgroundColor(surface);
+  const changed = surface !== manager.surfaceColor || (!!text && text !== manager.textColor);
+  if (text) manager.textColor = text;
+  if (!changed) return;
+  manager.surfaceColor = surface;
   for (const tab of manager.tabs.values()) {
     // 页面回收会把标签挂起（view 置空），背景同步跳过而不是抛错。
     const view = tab.view;
     if (!view || view.webContents.isDestroyed()) continue;
-    view.setBackgroundColor(color);
+    view.setBackgroundColor(surface);
   }
+  refreshTextDocuments(manager);
 }
