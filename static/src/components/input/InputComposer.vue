@@ -4054,20 +4054,20 @@ onBeforeUnmount(() => {
   border-color: var(--state-success);
   background: color-mix(in srgb, var(--theme-surface-soft) 82%, var(--state-success) 18%);
 }
-:global(:root[data-theme='dark']) .goal-mode-banner,
-:global(body[data-theme='dark']) .goal-mode-banner {
+:root[data-theme='dark'] .goal-mode-banner,
+body[data-theme='dark'] .goal-mode-banner {
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--theme-surface-muted) 82%, var(--text-tertiary) 18%);
   border-color: var(--theme-control-border-strong);
 }
-:global(:root[data-theme='dark']) .goal-mode-banner--running,
-:global(body[data-theme='dark']) .goal-mode-banner--running {
+:root[data-theme='dark'] .goal-mode-banner--running,
+body[data-theme='dark'] .goal-mode-banner--running {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--theme-surface-muted) 72%, var(--accent) 28%);
   border-color: color-mix(in srgb, var(--accent) 70%, white 30%);
 }
-:global(:root[data-theme='dark']) .goal-mode-banner--done,
-:global(body[data-theme='dark']) .goal-mode-banner--done {
+:root[data-theme='dark'] .goal-mode-banner--done,
+body[data-theme='dark'] .goal-mode-banner--done {
   color: color-mix(in srgb, var(--state-success) 30%, white);
   background: color-mix(in srgb, var(--theme-surface-muted) 72%, var(--state-success) 28%);
   border-color: color-mix(in srgb, var(--state-success) 70%, white 30%);

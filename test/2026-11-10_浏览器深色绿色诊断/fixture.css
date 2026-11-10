@@ -1,0 +1,5 @@
+html, body { margin: 0; height: 100%; }
+.app-root { min-height: 100%; color: var(--text-primary); }
+.fixture-copy { padding: 42px; max-width: 420px; }
+.fixture-copy h1 { font: 24px/1.3 system-ui; }
+.fixture-copy p { font: 15px/1.7 system-ui; color: var(--text-secondary); }
