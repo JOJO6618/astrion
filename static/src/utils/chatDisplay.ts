@@ -328,6 +328,41 @@ function getMcpToolDisplayName(tool: any): string {
   return name || t('toolResults.mcpTool');
 }
 
+// 浏览器工具（browser_*）数量会持续增长，按动作分组后共用统一四态文案；
+// 未归类的新工具回退到通用「使用浏览器」，不用逐条补表。
+const BROWSER_STATUS_GROUPS: Record<string, string> = {
+  browser_navigate: 'browserNavigate',
+  browser_tabs: 'browserTabs',
+  browser_snapshot: 'browserRead',
+  browser_find: 'browserRead',
+  browser_console_messages: 'browserRead',
+  browser_network_requests: 'browserRead',
+  browser_network_request: 'browserRead',
+  browser_click: 'browserInteract',
+  browser_type: 'browserInteract',
+  browser_fill_form: 'browserInteract',
+  browser_select_option: 'browserInteract',
+  browser_hover: 'browserInteract',
+  browser_drag: 'browserInteract',
+  browser_press_key: 'browserInteract',
+  browser_scroll: 'browserInteract',
+  browser_file_upload: 'browserInteract',
+  browser_drop: 'browserInteract',
+  browser_handle_dialog: 'browserInteract',
+  browser_fill_saved_login: 'browserInteract',
+  browser_take_screenshot: 'browserCapture',
+  browser_emulate_media: 'browserCapture',
+  browser_evaluate: 'browserScript',
+  browser_wait_for: 'browserWait'
+};
+
+function resolveStatusKey(toolName: string): string {
+  if (toolName.startsWith('browser_')) {
+    return BROWSER_STATUS_GROUPS[toolName] || 'browser';
+  }
+  return toolName;
+}
+
 // 状态文案取值（不含 intent 优先级）：完整视图与极简摘要共用同一套四态文案，
 // 调用方自行决定 intent 是否优先。MCP 工具名不可穷举，走 mcpTool/fallback 兜底。
 export function getToolStateText(tool: any): string {
@@ -336,7 +371,7 @@ export function getToolStateText(tool: any): string {
   }
   const status = String(tool.status || '').toLowerCase();
   const texts = getToolStatusTexts();
-  const key = isMcpTool(tool) ? 'mcpTool' : String(tool.name || '');
+  const key = isMcpTool(tool) ? 'mcpTool' : resolveStatusKey(String(tool.name || ''));
 
   if (status === 'hinted') {
     return t('toolResults.sentences.hinted', { name: tool.name });
@@ -462,6 +497,9 @@ export function buildToolLabel(args: any): string {
   }
   if (args.command) {
     return args.command;
+  }
+  if (args.url) {
+    return String(args.url);
   }
   if (args.path) {
     return String(args.path).split('/').pop() || '';

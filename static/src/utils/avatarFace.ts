@@ -41,5 +41,9 @@ export function toolFaceKey(toolName: string | undefined | null): string {
   if (name.startsWith('mcp__')) {
     return 'mcp';
   }
+  // 浏览器工具名无法穷举（browser_* 持续增加），按前缀统一归到浏览器窗口形象
+  if (name.startsWith('browser_')) {
+    return 'browser';
+  }
   return TOOL_FACE_MAP[name] || 'command';
 }

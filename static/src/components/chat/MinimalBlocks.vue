@@ -429,6 +429,7 @@ type ToolCategory =
   | 'edit'
   | 'search'
   | 'webpage'
+  | 'browser'
   | 'mcp'
   | 'workflow_activate'
   | 'workflow_advance'
@@ -472,6 +473,8 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   // 查看网页
   extract_webpage: 'webpage',
   save_webpage: 'webpage',
+
+  // 浏览器操作（browser_* 由 getToolCategory 前缀判定，不在此逐条登记）
 
   // MCP（list_mcp_servers 归入此类；mcp__ 前缀由 getToolCategory 动态判定）
   list_mcp_servers: 'mcp',
@@ -525,6 +528,7 @@ const CATEGORY_LABEL_KEYS: Record<ToolCategory, string> = {
   edit: 'chat.summaryEdit',
   search: 'chat.summarySearch',
   webpage: 'chat.summaryWebpage',
+  browser: 'chat.summaryBrowser',
   mcp: 'chat.summaryMcp',
   workflow_activate: 'chat.summaryWorkflowActivate',
   workflow_advance: 'chat.summaryWorkflowAdvance',
@@ -553,6 +557,7 @@ const CATEGORY_ORDER: ToolCategory[] = [
   'edit',
   'search',
   'webpage',
+  'browser',
   'mcp',
   'workflow_activate',
   'workflow_advance',
@@ -578,6 +583,8 @@ const getToolCategory = (action: Action): ToolCategory => {
   if (typeof name !== 'string') return 'other';
   // MCP 工具名动态生成（mcp__<服务>__<工具>），无法穷举，按前缀归类
   if (name.startsWith('mcp__')) return 'mcp';
+  // 浏览器工具名同为动态增长（browser_*），按前缀统一归到浏览器类别
+  if (name.startsWith('browser_')) return 'browser';
   return TOOL_CATEGORY_MAP[name] || 'other';
 };
 

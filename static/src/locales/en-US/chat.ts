@@ -72,6 +72,7 @@ export default {
   summaryEdit: 'Edited files {n} times',
   summarySearch: 'Searched {n} times',
   summaryWebpage: 'Viewed {n} webpages',
+  summaryBrowser: 'Operated the browser {n} times',
   summaryMcp: 'Ran MCP tools {n} times',
   summaryWorkflowActivate: 'Activated {n} workflows',
   summaryWorkflowAdvance: 'Advanced workflow {n} times',

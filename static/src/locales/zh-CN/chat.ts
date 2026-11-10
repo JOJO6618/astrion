@@ -82,6 +82,7 @@ export default {
   summaryEdit: '编辑了 {n} 次文件',
   summarySearch: '搜索了 {n} 次',
   summaryWebpage: '查看了 {n} 次网页',
+  summaryBrowser: '操作了 {n} 次浏览器',
   summaryMcp: '执行了 {n} 次 MCP 工具',
   summaryWorkflowActivate: '激活了 {n} 个工作流',
   summaryWorkflowAdvance: '推进了 {n} 次工作流进度',

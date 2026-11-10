@@ -159,6 +159,11 @@ const TOOLS: ToolDef[] = [
     svg: '<circle class="sa-inner" cx="12" cy="12" r="10"/><path class="sa-inner" d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><line class="sa-inner" x1="2" x2="22" y1="12" y2="12"/>'
   },
   {
+    key: 'browser',
+    motion: 'bob',
+    svg: '<rect class="sa-inner" width="20" height="16" x="2" y="4" rx="2"/><path class="sa-inner" d="M10 4v4M2 8h20M6 4v4"/>'
+  },
+  {
     key: 'write',
     motion: 'wiggle',
     svg: '<path class="sa-inner" d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path class="sa-inner" d="m15 5 4 4"/>'
