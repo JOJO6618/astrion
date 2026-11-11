@@ -72,7 +72,7 @@ export default {
   quickSendImageDesc: 'Send images to the AI for analysis when the model supports it.',
   quickSendVideoTitle: 'Send a video',
   quickSendVideoDesc: 'Send videos to the AI for analysis when the model supports it.',
-  quickToolDisableTitle: 'Disable tools',
+  quickToolDisableTitle: 'Tools',
   quickToolDisableDesc: 'Temporarily disable tool categories to control model behavior.',
   quickSettingsTitle: 'Settings menu',
   quickSettingsDesc: 'Quick access to frequently used features.',

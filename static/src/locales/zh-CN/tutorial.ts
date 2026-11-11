@@ -71,7 +71,7 @@ export default {
   quickSendImageDesc: '当前模型支持时，可发送图片给 AI 分析。',
   quickSendVideoTitle: '发送视频',
   quickSendVideoDesc: '当前模型支持时，可发送视频给 AI 分析。',
-  quickToolDisableTitle: '工具禁用',
+  quickToolDisableTitle: '工具',
   quickToolDisableDesc: '临时禁用工具分类，控制模型行为范围。',
   quickSettingsTitle: '设置菜单',
   quickSettingsDesc: '这里可快速访问常用功能。',

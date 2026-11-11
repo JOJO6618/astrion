@@ -8,6 +8,7 @@ export const ICONS = Object.freeze({
   brainCog: '/static/icons/brain-cog.svg',
   camera: '/static/icons/camera.svg',
   check: '/static/icons/check.svg',
+  chartColumn: '/static/icons/chart-column.svg',
   chatBubble: '/static/icons/chat-bubble.svg',
   messageQuestion: '/static/icons/message-circle-question-mark.svg',
   checkbox: '/static/icons/checkbox.svg',

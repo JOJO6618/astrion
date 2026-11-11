@@ -143,6 +143,13 @@
   --shadow-mid: 0 20px 45px rgba(16, 24, 40, 0.08);
   --shadow-strong: 0 28px 60px rgba(38, 28, 18, 0.25);
   --shadow-color: rgba(0, 0, 0, 0.1);
+  /* Popover 浮层菜单（输入栏 + 菜单等）：不透明底 + 中性轻投影 */
+  --popover-surface: #ffffff;
+  --popover-border: #e6dfd8;
+  --popover-shadow: 0 6px 20px rgba(38, 28, 18, 0.08), 0 1px 3px rgba(38, 28, 18, 0.06);
+  --popover-switch-track: #d8cfc4;
+  --popover-switch-on: #cc785c;
+  --popover-switch-knob: #ffffff;
   /* Overlay / 移动端 */
   --overlay-scrim: rgba(33, 24, 14, 0.55);
   --mobile-menu: #f5f0e8;
@@ -223,6 +230,13 @@
   --shadow-mid: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.08);
   --shadow-color: rgba(0, 0, 0, 0.1);
+  /* Popover 浮层菜单（输入栏 + 菜单等）：不透明底 + 中性轻投影 */
+  --popover-surface: #ffffff;
+  --popover-border: rgba(13, 13, 13, 0.1);
+  --popover-shadow: 0 6px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --popover-switch-track: #ececec;
+  --popover-switch-on: #181818;
+  --popover-switch-knob: #ffffff;
   /* Overlay / 移动端 */
   --overlay-scrim: rgba(0, 0, 0, 0.5);
   --mobile-menu: #ffffff;
@@ -304,6 +318,13 @@
   --shadow-mid: 0 3px 8px rgba(0, 0, 0, 0.5);
   --shadow-strong: 0 4px 12px rgba(0, 0, 0, 0.6);
   --shadow-color: rgba(0, 0, 0, 0.4);
+  /* Popover 浮层菜单（输入栏 + 菜单等）：比对话底提一档的灰，开关用白色 tint 拉层次 */
+  --popover-surface: #262626;
+  --popover-border: rgba(255, 255, 255, 0.1);
+  --popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --popover-switch-track: rgba(255, 255, 255, 0.16);
+  --popover-switch-on: rgba(255, 255, 255, 0.55);
+  --popover-switch-knob: #262626;
   /* Overlay / 移动端 */
   --overlay-scrim: rgba(0, 0, 0, 0.8);
   --mobile-menu: rgba(10, 10, 10, 0.95);
@@ -384,6 +405,13 @@
   --shadow-mid: 0 20px 45px rgba(16, 24, 40, 0.08);
   --shadow-strong: 0 28px 60px rgba(38, 28, 18, 0.25);
   --shadow-color: rgba(0, 0, 0, 0.1);
+  /* Popover 浮层菜单（输入栏 + 菜单等）：不透明底 + 中性轻投影 */
+  --popover-surface: #ffffff;
+  --popover-border: #e6dfd8;
+  --popover-shadow: 0 6px 20px rgba(38, 28, 18, 0.08), 0 1px 3px rgba(38, 28, 18, 0.06);
+  --popover-switch-track: #d8cfc4;
+  --popover-switch-on: #cc785c;
+  --popover-switch-knob: #ffffff;
   /* Overlay / 移动端 */
   --overlay-scrim: rgba(33, 24, 14, 0.55);
   --mobile-menu: #f5f0e8;

@@ -252,17 +252,10 @@ body[data-theme='dark'] {
     background-color: var(--surface-raised);
   }
 
-  /* 快捷菜单/子菜单/对话类型菜单 - 与输入栏同一灰黑色 */
-  .quick-menu,
-  .quick-submenu,
+  /* 对话类型菜单 - 与输入栏同一灰黑色 */
   .agent-type-switcher__menu {
     background: var(--badge-bg);
     border-color: var(--border-card-strong);
-  }
-
-  .menu-entry:hover:not(:disabled),
-  .menu-entry.active {
-    background: var(--tab-active);
   }
 }
 
@@ -301,14 +294,6 @@ body[data-theme='light'] {
 
   .stadium-btn.send-btn .stop-icon {
     background-color: var(--surface-raised);
-  }
-
-  .menu-entry:hover:not(:disabled) {
-    background: var(--chip-bg);
-  }
-
-  .menu-entry.active {
-    background: var(--surface-muted);
   }
 }
 
@@ -1047,92 +1032,7 @@ body[data-theme='light'] {
   pointer-events: none;
 }
 
-.quick-menu {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 14px);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 230px;
-  padding: 12px;
-  background: var(--surface-soft);
-  border: 1px solid var(--border-default);
-  border-radius: 18px;
-  box-shadow: none;
-  z-index: 30;
-  pointer-events: auto;
-}
-
-.menu-entry {
-  border: none;
-  background: transparent;
-  -webkit-appearance: none;
-  appearance: none;
-  -webkit-tap-highlight-color: transparent;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 14px;
-  text-align: left;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  min-height: 44px;
-}
-
-.menu-entry:focus,
-.menu-entry:focus-visible {
-  outline: none;
-}
-
-.menu-entry:hover:not(:disabled) {
-  background: var(--hover-bg);
-}
-
-.menu-entry.active {
-  background: var(--chip-bg);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.menu-entry:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.menu-entry.has-submenu .entry-arrow {
-  margin-left: 10px;
-  color: var(--text-secondary);
-}
-
-.quick-submenu {
-  position: absolute;
-  top: 0;
-  left: calc(100% + 12px);
-  width: 230px;
-  min-width: 0;
-  padding: 12px;
-  border-radius: 18px;
-  border: 1px solid var(--border-default);
-  background: var(--surface-soft);
-  box-shadow: none;
-  z-index: 31;
-}
-
-.submenu-status,
-.submenu-empty {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.submenu-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+/* + 菜单（.quick-menu / .quick-submenu）样式已收进 components/input/QuickMenu.vue，颜色走 --popover-* token */
 
 /* Blank conversation hero */
 .blank-hero-overlay {
@@ -1193,71 +1093,6 @@ body[data-theme='light'] {
   .blank-hero-overlay {
     padding-bottom: 160px;
   }
-}
-
-.quick-submenu.tool-submenu {
-  top: auto;
-  bottom: 0;
-}
-
-.quick-submenu.settings-submenu {
-  top: auto;
-  bottom: 0;
-}
-
-.menu-entry.submenu-entry {
-  width: 100%;
-  justify-content: space-between;
-}
-
-.menu-entry.submenu-entry .entry-arrow {
-  color: var(--text-secondary);
-}
-
-.tool-submenu-list {
-  // 显示约 5 条工具项，其余通过滚动查看
-  max-height: calc(44px * 5 + 6px * 4);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 2px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.tool-submenu-list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
-}
-
-.menu-entry.disabled {
-  opacity: 0.5;
-}
-
-.quick-menu-enter-active,
-.quick-menu-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.quick-menu-enter-from,
-.quick-menu-leave-to {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.submenu-slide-enter-active,
-.submenu-slide-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.submenu-slide-enter-from,
-.submenu-slide-leave-to {
-  opacity: 0;
-  transform: translateX(10px);
 }
 
 /* 适应折叠屏/矮屏幕，保证输入区完整可见 */
@@ -1499,7 +1334,7 @@ body[data-theme='light'] {
   transform: rotate(180deg);
 }
 
-/* 菜单底色/边框/圆角与 + 菜单（.quick-menu）一致 */
+/* 对话类型菜单 */
 .agent-type-switcher__menu {
   position: absolute;
   left: 0;
