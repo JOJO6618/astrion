@@ -14,7 +14,6 @@ from types import SimpleNamespace
 try:
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
@@ -24,7 +23,6 @@ except ImportError:
         sys.path.insert(0, str(project_root))
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
-        OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
         HOST_SANDBOX_NETWORK_PERMISSION,
     )
@@ -53,12 +51,6 @@ class TerminalOperatorBase:
         self.project_path = Path(project_path).resolve()
         self.data_dir = Path(data_dir).expanduser() if data_dir is not None else None
         self.process = None
-        # 自动检测Python命令，并记录虚拟环境变量（仅宿主机使用）
-        self._python_env: Dict[str, str] = {}
-        self.python_cmd = self._detect_python_runtime()
-        # Docker 容器内的 Python 命令（默认指向预装 venv）
-        self.container_python_cmd = os.environ.get("CONTAINER_PYTHON_CMD", "/opt/agent-venv/bin/python3")
-        print(f"{OUTPUT_FORMATS['info']} 检测到Python命令: {self.python_cmd}")
         self.container_session: Optional["ContainerHandle"] = container_session
         # 记录 TerminalManager 引用，便于 CLI 场景复用同一容器
         self._terminal_manager: Optional["TerminalManager"] = None

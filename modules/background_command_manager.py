@@ -128,7 +128,6 @@ class BackgroundCommandManager:
                 "work_path": work_path,
                 "timeout": timeout_value,
                 "session": session_override or getattr(terminal_ops, "container_session", None),
-                "python_env": getattr(terminal_ops, "_python_env", None) or {},
                 "host_execution_mode": scope.execution_mode if scope else getattr(terminal_ops, "host_execution_mode", "sandbox"),
                 "execution_scope": scope,
                 # 网络权限必须按调用方（对话级 terminal）快照传入，不能读进程级
@@ -207,7 +206,6 @@ class BackgroundCommandManager:
         work_path: Path,
         timeout: int,
         session,
-        python_env: Dict[str, str],
         host_execution_mode: str = "sandbox",
         network_permission: Optional[str] = None,
         sandbox_write_access: bool = True,
@@ -232,8 +230,6 @@ class BackgroundCommandManager:
             use_shell = True
             env = os.environ.copy()
             env.setdefault("PYTHONUNBUFFERED", "1")
-            if python_env:
-                env.update(python_env)
 
             if session and getattr(session, "mode", None) == "docker":
                 require_scoped_docker_support(scope)

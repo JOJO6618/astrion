@@ -108,54 +108,6 @@ class RunMixin:
             except Exception:
                 pass
 
-    async def check_environment(self) -> Dict:
-        """检查Python环境"""
-        print(f"{OUTPUT_FORMATS['info']} 检查Python环境...")
-        
-        env_info = {
-            "python_command": self.python_cmd,
-            "python_version": "",
-            "pip_version": "",
-            "installed_packages": [],
-            "working_directory": str(self.project_path)
-        }
-        
-        # 获取Python版本（使用已检测到的 python 命令，Windows 上通常为 python/py 而非 python3）
-        version_result = await self.run_command(
-            f'{self.python_cmd} --version',
-            timeout=5
-        )
-        if version_result["success"]:
-            env_info["python_version"] = version_result["output"].strip()
-        
-        # 获取pip版本
-        pip_result = await self.run_command(
-            f'{self.python_cmd} -m pip --version',
-            timeout=5
-        )
-        if pip_result["success"]:
-            env_info["pip_version"] = pip_result["output"].strip()
-        
-        # 获取已安装的包
-        packages_result = await self.run_command(
-            f'{self.python_cmd} -m pip list --format=json',
-            timeout=10
-        )
-        if packages_result["success"]:
-            try:
-                import json
-                packages = json.loads(packages_result["output"])
-                env_info["installed_packages"] = [
-                    f"{p['name']}=={p['version']}" for p in packages
-                ]
-            except:
-                pass
-        
-        return {
-            "success": True,
-            "environment": env_info
-        }
-
     async def _run_command_subprocess(
         self,
         command: str,
@@ -217,8 +169,6 @@ class RunMixin:
             # 统一环境，确保 Python 输出无缓冲
             env = os.environ.copy()
             env.setdefault("PYTHONUNBUFFERED", "1")
-            if self._python_env:
-                env.update(self._python_env)
 
             if use_shell:
                 use_host_sandbox = (scope.execution_mode if scope else self.host_execution_mode) != "direct"
@@ -414,30 +364,6 @@ class RunMixin:
                 "timeout": timeout,
                 "elapsed_ms": int((time.time() - start_ts) * 1000)
             }
-
-    async def install_package(self, package: str) -> Dict:
-        """
-        安装Python包
-        
-        Args:
-            package: 包名
-        
-        Returns:
-            安装结果
-        """
-        print(f"{OUTPUT_FORMATS['terminal']} 安装包: {package}")
-        
-        # 使用已检测到的 python 命令（Windows 上通常为 python/py 而非 python3）
-        command = f'{self.python_cmd} -m pip install {package}'
-        
-        result = await self.run_command(command, timeout=120)
-        
-        if result["success"]:
-            print(f"{OUTPUT_FORMATS['success']} 包安装成功: {package}")
-        else:
-            print(f"{OUTPUT_FORMATS['error']} 包安装失败: {package}")
-        
-        return result
 
     async def run_command(
         self,

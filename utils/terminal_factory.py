@@ -131,33 +131,6 @@ class TerminalFactory:
         """获取切换目录命令"""
         return f"cd {path}"
     
-    def get_python_command(self) -> str:
-        """获取Python命令"""
-        # Windows优先顺序调整
-        if self.platform == "win32":
-            # Windows: 优先python，然后py，最后python3
-            if shutil.which("python"):
-                return "python"
-            elif shutil.which("py"):
-                return "py"
-            elif shutil.which("python3"):
-                return "python3"
-            else:
-                return "python"
-        else:
-            # Unix-like: 优先python3
-            if shutil.which("python3"):
-                return "python3"
-            elif shutil.which("python"):
-                return "python"
-            else:
-                return "python3"
-    
-    def get_pip_command(self) -> str:
-        """获取pip命令"""
-        python_cmd = self.get_python_command()
-        return f"{python_cmd} -m pip"
-    
     def get_env_activation_command(self, venv_path: str) -> str:
         """
         获取虚拟环境激活命令
@@ -238,9 +211,7 @@ class TerminalFactory:
             "platform": self.platform,
             "platform_name": self._get_platform_name(),
             "available_shells": list(self.available_shells.keys()),
-            "default_shell": self.get_shell_command(),
-            "python_command": self.get_python_command(),
-            "pip_command": self.get_pip_command()
+            "default_shell": self.get_shell_command()
         }
         
         # 添加系统版本信息
