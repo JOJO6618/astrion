@@ -83,6 +83,14 @@
       </div>
     </form>
     <BrowserButton
+      v-if="followAiAvailable"
+      name="crosshair"
+      :active="store.followAi"
+      :label="store.followAi ? $t('browser.followAiOn') : $t('browser.followAiOff')"
+      :disabled="!store.snapshot"
+      @click="store.toggleFollow()"
+    />
+    <BrowserButton
       name="download"
       class="nb-download-button"
       :label="$t('browser.downloads')"
@@ -133,6 +141,9 @@ import { browserControlsKey } from './useBrowserControls';
 import BrowserButton from './BrowserButton.vue';
 import BrowserSiteIcon from './BrowserSiteIcon.vue';
 import { displayBrowserAddress } from './address';
+import { browserBridge } from './types';
+// 只在本壳实现「跟随智能体」时显示按钮，避免其他壳出现按不动的开关。
+const followAiAvailable = browserBridge()?.followAi === true;
 const {
   store,
   address,

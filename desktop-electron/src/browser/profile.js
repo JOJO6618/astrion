@@ -44,7 +44,7 @@ export class BrowserProfile {
     const chromium = path.join(app.getPath('sessionData'), 'browser', this.key, 'chromium');
     fs.mkdirSync(chromium, { recursive: true, mode: 0o700 });
     this.session = session.fromPath(chromium, { cache: true });
-    this.data = { version: 1, history: [], downloads: [], owners: {}, settings: { searchEngine: '' }, shortcuts: { pinned: [], hidden: [] } };
+    this.data = { version: 1, history: [], downloads: [], owners: {}, settings: { searchEngine: '', followAi: true }, shortcuts: { pinned: [], hidden: [] } };
     try {
       const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       if (saved.version === 1) {
@@ -52,7 +52,11 @@ export class BrowserProfile {
         this.data.downloads = Array.isArray(saved.downloads) ? saved.downloads.slice(0, 100).map(row => ({ ...row, state: row.state === 'progressing' ? 'interrupted' : row.state })) : [];
         this.data.owners = saved.owners && typeof saved.owners === 'object' && !Array.isArray(saved.owners) ? saved.owners : {};
         const engine = saved.settings?.searchEngine;
-        this.data.settings = { searchEngine: Object.hasOwn(SEARCH_ENGINES, engine) ? engine : '' };
+        this.data.settings = {
+          searchEngine: Object.hasOwn(SEARCH_ENGINES, engine) ? engine : '',
+          // 旧资料没有该字段：按默认开启处理，不做迁移写回。
+          followAi: saved.settings?.followAi !== false
+        };
         this.data.shortcuts = normalizeShortcuts(saved.shortcuts);
       }
     } catch (error) {
@@ -65,6 +69,9 @@ export class BrowserProfile {
     if (typeof engine !== 'string' || !Object.hasOwn(SEARCH_ENGINES, engine)) throw new Error('invalid_browser_search_engine');
     this.data.settings.searchEngine = engine; this.save();
   }
+  /** 跟随智能体：AI 操作哪个标签，用户视图就跟到哪个（默认开启，与自动打开面板相互独立）。 */
+  followAi() { return this.data.settings.followAi !== false; }
+  setFollowAi(value) { this.data.settings.followAi = value === true; this.save(); }
   setShortcuts(value) { this.data.shortcuts = normalizeShortcuts(value, true); this.save(); }
   record(url, title) {
     if (!/^https?:/.test(url)) return;

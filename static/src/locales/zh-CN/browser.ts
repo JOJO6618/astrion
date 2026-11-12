@@ -33,6 +33,8 @@ export default {
   importTitle: '从浏览器导入',
   passwords: '密码和自动填充',
   downloads: '下载内容',
+  followAiOn: '正在跟随智能体（点击停止跟随）',
+  followAiOff: '已停止跟随（点击跟随智能体）',
   allDownloads: '全部下载',
   history: '历史记录',
   clear: '清除浏览数据…',

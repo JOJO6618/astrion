@@ -2,7 +2,9 @@
   <button
     type="button"
     class="nb-button"
+    :class="{ 'nb-button--active': active }"
     :aria-label="label"
+    :aria-pressed="active === undefined ? undefined : active"
     :data-tooltip="label"
     @pointerenter="schedule"
     @pointerleave="hide"
@@ -17,7 +19,7 @@
 import { ref, onBeforeUnmount } from 'vue';
 import { ICONS } from '@/utils/icons';
 import BrowserIcon from './BrowserIcon.vue';
-defineProps<{ name: keyof typeof ICONS; label: string }>();
+defineProps<{ name: keyof typeof ICONS; label: string; active?: boolean }>();
 const tooltip = ref(false);
 let timer: ReturnType<typeof setTimeout> | undefined;
 function hide() {
@@ -51,6 +53,12 @@ onBeforeUnmount(hide);
 .nb-button:hover:not(:disabled) {
   background: var(--surface-muted);
   color: var(--text-primary);
+}
+.nb-button--active,
+.nb-button--active:hover:not(:disabled) {
+  /* 激活态只提亮图标，不铺底色（悬停也不铺）：关闭后与普通按钮完全一致。 */
+  color: var(--accent);
+  background: transparent;
 }
 .nb-button:disabled {
   opacity: 0.35;

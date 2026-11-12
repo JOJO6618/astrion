@@ -335,6 +335,7 @@ export default {
   media: {
     ocrImgAlt: 'OCR image',
     viewImgAlt: 'View image',
+    browserShotAlt: 'Page screenshot',
     viewImgTitle: 'Open original in new window'
   },
 

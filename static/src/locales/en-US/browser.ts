@@ -33,6 +33,8 @@ export default {
   importTitle: 'Import from a browser',
   passwords: 'Passwords and autofill',
   downloads: 'Downloads',
+  followAiOn: 'Following the agent (click to stop)',
+  followAiOff: 'Not following (click to follow the agent)',
   allDownloads: 'All downloads',
   history: 'History',
   clear: 'Clear browsing data…',

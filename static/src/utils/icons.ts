@@ -18,6 +18,7 @@ export const ICONS = Object.freeze({
   codex: '/static/icons/codex.svg',
   copy: '/static/icons/copy.svg',
   clock: '/static/icons/clock.svg',
+  crosshair: '/static/icons/crosshair.svg',
   download: '/static/icons/download.svg',
   ellipsis: '/static/icons/ellipsis.svg',
   eye: '/static/icons/eye.svg',

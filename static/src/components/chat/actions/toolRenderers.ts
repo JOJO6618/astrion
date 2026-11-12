@@ -289,13 +289,24 @@ function renderBrowserTool(name: string, result: any, args: any): string {
     );
   if (result.result !== undefined && name === 'browser_evaluate') add('', result.result);
   if (result.screenshot_path) add(B('screenshot'), result.screenshot_path);
+  // 与 view_image 一致：结果里直接显示截图原图（点击由消息区事件委托开灯箱）。
+  const shotUrl =
+    result.screenshot_path && result.success !== false
+      ? withWorkspaceScope(
+          `/api/file/content?path=${encodeURIComponent(result.screenshot_path)}`
+        )
+      : '';
   const snap = result.snapshot;
   if (snap)
     add(
       snap.kind === 'none' ? '' : snap.kind === 'diff' ? B('changed') : B('full'),
       snap.kind === 'none' ? B('unchanged') : snap.text
     );
-  return params + (parts.length ? preBox(parts.join('\n\n')) : '');
+  return (
+    params +
+    (parts.length ? preBox(parts.join('\n\n')) : '') +
+    imageBlock(shotUrl, t('toolResults.media.browserShotAlt'))
+  );
 }
 
 function renderExtractWebpage(result: any, args: any): string {

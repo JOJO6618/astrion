@@ -13,12 +13,13 @@ import { relayBrowserInput } from './input.js';
 import { browserBounds, browserViewport, setBrowserSurfaceColor } from './geometry.js';
 import { scopeKey, scopeAlias, safeFilename, manualNavigationURL } from './policy.js';
 import { BrowserHost } from './host.js';
+import { followAiTarget } from './follow.js';
 import { createPopoutWindow, focusPopoutWindow } from './popout-window.js';
 import { BrowserAI } from './ai/controller.js';
 import { setActiveBrowser } from './ai/endpoint.js';
 
 // 主窗口当前对话已弹出时，主窗口仍可执行的资料级命令（不涉及该对话的标签）。
-const PROFILE_ACTIONS = new Set(['search-engine', 'shortcuts', 'history-remove', 'clear', 'download-cancel', 'download-reveal', 'download-remove']);
+const PROFILE_ACTIONS = new Set(['search-engine', 'follow-ai', 'shortcuts', 'history-remove', 'clear', 'download-cancel', 'download-reveal', 'download-remove']);
 const WINDOW_ACTIONS = new Set(['popout', 'dock', 'show-popout']);
 
 let browserDataRoot;
@@ -78,6 +79,8 @@ export class NativeBrowser {
     if (tab.window === window) return;
     this.detach(tab);
     window.contentView.addChildView(tab.view);
+    // 挂载后再藏：未挂载时的 setVisible 对独立视图不生效，不藏就会在 layout 前露出一帧。
+    tab.view.setVisible(false);
     tab.window = window;
   }
   detach(tab, view = tab.view) {
@@ -118,6 +121,15 @@ export class NativeBrowser {
   byContents(wc) { return [...this.tabs.values()].find(tab => tab.view?.webContents === wc); }
   profileFeatures(profile) { return this.features.get(profile.key); }
   layout() { this.registry.layout(); }
+  /** 跟随智能体：AI 每操作一个标签就把用户视图交给它。跟随关闭时整条链路都不写 selected。 */
+  follow(owner, tab) {
+    if (this.disposed || tab?.owner !== owner) return;
+    const target = followAiTarget(tab, this.selected.get(owner));
+    if (!target) return;
+    this.selected.set(owner, target);
+    this.registry.persist(owner);
+    this.layout(); this.publish();
+  }
   resize(host = this.main) { this.layout(); host.send('browser:geometry-request', {}); }
   snapshot(host) {
     const active = host.active(), profile = host.profile, detached = host.detached;
@@ -129,7 +141,7 @@ export class NativeBrowser {
           canGoBack: wc?.navigationHistory.canGoBack() || false, canGoForward: wc?.navigationHistory.canGoForward() || false, zoom: Math.round((wc?.getZoomFactor() || tab.zoom || 1) * 100), find: tab.find };
       }),
       history: profile?.data.history || [],
-      settings: { searchEngine: profile?.data.settings.searchEngine || '' },
+      settings: { searchEngine: profile?.data.settings.searchEngine || '', followAi: profile?.data.settings.followAi !== false },
       shortcuts: profile?.data.shortcuts || { pinned: [], hidden: [] },
       downloads: (profile?.data.downloads || []).map(({ path: _path, ...row }) => row),
       credentials: this.credentials.snapshot(host),
@@ -212,6 +224,7 @@ export class NativeBrowser {
       if (!['download-cancel', 'download-reveal', 'download-remove'].includes(action)) throw new Error('unsupported_browser_action');
       await features.command(action, id);
     } else if (action === 'search-engine') profile.setSearchEngine(value);
+    else if (action === 'follow-ai') profile.setFollowAi(value === true);
     else if (action === 'shortcuts') profile.setShortcuts(value);
     else if (action === 'history-remove') { profile.data.history = profile.data.history.filter(row => row.id !== id); profile.save(); }
     else if (action === 'clear') {

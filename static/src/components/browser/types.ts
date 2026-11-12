@@ -58,7 +58,7 @@ export interface BrowserSnapshot {
   permissions: BrowserPermission[];
   credentials?: CredentialSnapshot;
   /** Empty searchEngine means "not chosen yet"; the panel fills a language-based default. */
-  settings?: { searchEngine?: BrowserSearchEngine | '' };
+  settings?: { searchEngine?: BrowserSearchEngine | ''; followAi?: boolean };
   shortcuts?: BrowserShortcuts;
   /** macOS：快照所属界面（主窗口面板或对话独立窗口）。 */
   window?: 'main' | 'popout';
@@ -118,6 +118,8 @@ export interface BrowserBridge {
   credentialFileImport?: boolean;
   /** 主窗口桥：支持把对话浏览器弹出到独立窗口。 */
   popout?: boolean;
+  /** 桥能力：本壳支持「跟随智能体」（AI 操作哪个标签，用户视图就跟到哪个）。 */
+  followAi?: boolean;
   /** 独立窗口桥：本页就是对话浏览器的独立窗口。 */
   window?: 'popout';
   connect: (scope: BrowserScope, labels?: Record<string, string>) => Promise<BrowserSnapshot>;

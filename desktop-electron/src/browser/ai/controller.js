@@ -135,8 +135,9 @@ export class BrowserAI {
     if (op === 'tabs') return this.tabsOp(owner, profile, args, payload, signal);
     if (op === 'navigate' && !args.tab_id && !this.ownerTabs(owner).length) {
       if (!args.url) throw new BrowserToolError('no_tab', '本对话还没有浏览器标签，请提供 url。');
-      const tab = manager.registry.create('about:blank', { owner, profile, ai: true });
+      const tab = manager.registry.create('about:blank', { owner, profile, ai: true, select: false });
       this.ownerState(owner).current = tab.id;
+      manager.follow(owner, tab);
     }
     let tab = this.current(owner, args.tab_id);
     if (tab.section) throw new BrowserToolError('internal_page', '该标签是浏览器管理页，不能由 AI 操作。');
@@ -148,9 +149,12 @@ export class BrowserAI {
     const driver = this.driver(tab);
     return driver.run(async () => {
       await driver.attach();
+      this.ownerState(owner).current = tab.id;
+      // 跟随开启时，任何一次操作都把用户视图带到这次操作的标签；关闭时这里不写 selected。
+      // 先跟随再修正视口：标签已可见时 fixViewport 直接用真实尺寸，不再反复设置/清除模拟视口。
+      manager.follow(owner, tab);
       const panel = this.panelBounds(owner), zoom = tab.view.webContents.getZoomFactor() || 1;
       await driver.fixViewport(panel ? { width: panel.width / zoom, height: panel.height / zoom } : null);
-      this.ownerState(owner).current = tab.id;
       this.reveal(owner, tab, payload);
       if (ACTION_OPS.has(op)) this.guardSite(tab, payload);
       tab.aiDownload = payload.download_dir ? { dir: payload.download_dir, until: Infinity, items: [] } : null;
@@ -186,8 +190,9 @@ export class BrowserAI {
     if (action === 'new') {
       if (this.ownerTabs(owner).length >= 48) throw new BrowserToolError('tab_limit', '本对话浏览器标签数量已达上限（48），请先关闭不用的标签。');
       const url = args.url ? this.navigationTarget(args.url, payload, profile) : 'about:blank';
-      const tab = manager.registry.create('about:blank', { owner, profile, ai: true });
+      const tab = manager.registry.create('about:blank', { owner, profile, ai: true, select: false });
       state.current = tab.id;
+      manager.follow(owner, tab);
       if (url === 'about:blank') return { success: true, tab: this.tabInfo(owner, tab), message: '已新建空白标签。' };
       return this.dispatch({ ...payload, op: 'navigate', args: { url, tab_id: this.shortId(owner, tab) } }, signal);
     }
@@ -198,6 +203,7 @@ export class BrowserAI {
       if (tab.restored && tab.view.webContents.isLoading()) await this.waitLoad(tab, signal, () => {});
       tab.lastActive = tab.lastAi = Date.now();
       state.current = tab.id;
+      manager.follow(owner, tab);
       const driver = this.driver(tab);
       return driver.run(async () => {
         await driver.attach();

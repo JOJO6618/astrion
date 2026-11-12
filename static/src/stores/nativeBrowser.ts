@@ -45,11 +45,16 @@ export const useNativeBrowserStore = defineStore('nativeBrowser', {
     active: (state) => state.snapshot?.tabs.find((tab) => tab.id === state.snapshot?.activeId),
     tabs: (state) => state.snapshot?.tabs || [],
     section: (state): BrowserSection =>
-      state.snapshot?.tabs.find((tab) => tab.id === state.snapshot?.activeId)?.section || ''
+      state.snapshot?.tabs.find((tab) => tab.id === state.snapshot?.activeId)?.section || '',
+    // 跟随智能体：默认开启（快照缺字段时视为开启）。
+    followAi: (state) => state.snapshot?.settings?.followAi !== false
   },
   actions: {
     toggle() {
       this.open = !this.open;
+    },
+    toggleFollow() {
+      void this.command('follow-ai', !this.followAi);
     },
     hide() {
       this.open = false;

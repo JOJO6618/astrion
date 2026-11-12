@@ -28,6 +28,8 @@ if (process.platform === 'darwin') {
   contextBridge.exposeInMainWorld('astrionBrowser', {
     // 能力标记：本壳支持把对话浏览器弹出到独立窗口（preload-browser-window.cjs 为窗口侧）。
     popout: true,
+    // 能力标记：本壳支持「跟随智能体」（AI 操作哪个标签，用户视图就跟到哪个）。
+    followAi: true,
     connect: (scope, labels) => ipcRenderer.invoke('browser:connect', scope, labels),
     theme: theme => ipcRenderer.send('browser:theme', theme),
     command: payload => ipcRenderer.invoke('browser:command', payload),

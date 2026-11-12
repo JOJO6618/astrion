@@ -342,6 +342,7 @@ export default {
   media: {
     ocrImgAlt: 'OCR图片',
     viewImgAlt: '查看图片',
+    browserShotAlt: '网页截图',
     viewImgTitle: '在新窗口查看原图'
   },
 
