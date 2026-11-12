@@ -39,6 +39,15 @@
           @click.stop
         >
           <template v-if="effectiveMenu?.type === 'runner'">
+            <!-- 子智能体：软停止（取消当前轮次，保留实例与上下文，可继续发消息） -->
+            <button
+              v-if="effectiveMenu.kind === 'agent'"
+              class="qd-menu__item"
+              :disabled="!menuTargetStoppable"
+              @click="stopRunner"
+            >
+              {{ $t('quickdock.menuStop') }}
+            </button>
             <button
               class="qd-menu__item qd-menu__item--danger"
               :disabled="!menuTargetRunning"
@@ -82,6 +91,7 @@ import { useUiStore } from '@/stores/ui';
 import { usePersonalizationStore, hasCachedQuickDockAutoExpand } from '@/stores/personalization';
 import { useFileStore } from '@/stores/file';
 import { useWorkflowStore } from '@/stores/workflow';
+import { usePreviewStore } from '@/stores/preview';
 import TodoWindow from './TodoWindow.vue';
 import WorkflowWindow from './WorkflowWindow.vue';
 import RunnerWindow from './RunnerWindow.vue';
@@ -120,10 +130,12 @@ const dockRef = ref<HTMLElement | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
 defineExpose({ scrollToSubAgents: () => scrollToSubAgentCard(scrollRef.value) });
 
-// 手动收起时关掉所有瞬态面板（详情/预览/菜单），避免固定定位的详情面板悬空
+// 收起时关掉所有瞬态面板（详情/文件预览/菜单），避免固定定位的详情面板悬空；
+// 预览窗口与快捷面板绑定，一并关闭（联动关闭不抑制后续自动展开）
 watch(userCollapsed, (collapsed) => {
   if (collapsed) {
     quickDock.resetTransient();
+    usePreviewStore().closeWithQuickDock();
   }
 });
 
@@ -301,7 +313,7 @@ const menuEstimatedHeight = computed(() => {
     return 0;
   }
   if (m.type === 'runner') {
-    return MENU_ITEM_HEIGHT + MENU_CHROME;
+    return (m.kind === 'agent' ? 2 : 1) * MENU_ITEM_HEIGHT + MENU_CHROME;
   }
   return (props.hostMode ? 3 : 2) * MENU_ITEM_HEIGHT + MENU_CHROME;
 });
@@ -333,6 +345,16 @@ const menuStyle = computed(() => {
   return { left: `${m.left}px`, top: `${top}px` };
 });
 
+/** 仅正在执行本轮的子智能体可软停止（idle/终态没有可取消的执行） */
+const menuTargetStoppable = computed(() => {
+  const m = menu.value;
+  if (!m || m.type !== 'runner' || m.kind !== 'agent') {
+    return false;
+  }
+  const agent = subAgentStore.subAgents.find((a) => a.task_id === m.key);
+  return (agent?.status || '').toString().toLowerCase() === 'running';
+});
+
 const menuTargetRunning = computed(() => {
   const m = menu.value;
   if (!m || m.type !== 'runner') {
@@ -349,6 +371,21 @@ const menuTargetRunning = computed(() => {
 });
 
 /* ---------------- 菜单动作 ---------------- */
+
+async function stopRunner() {
+  const m = menu.value;
+  if (!m || m.type !== 'runner' || m.kind !== 'agent') {
+    return;
+  }
+  quickDock.closeMenu();
+  const result = await subAgentStore.stopSubAgent(m.key);
+  if (!result?.success) {
+    uiStore.pushToast({
+      message: result?.error || t('quickdock.stopFailed'),
+      type: 'error'
+    });
+  }
+}
 
 async function killRunner() {
   const m = menu.value;

@@ -231,6 +231,38 @@ export const useSubAgentStore = defineStore('subAgent', {
         this.stoppingTaskIds = next;
       }
     },
+    /** 软停止单个子智能体：取消当前轮次、保留实例与上下文（对应 stop_sub_agent，来源=用户）。
+     *  后端会把“被用户取消”作为本轮结果通知主智能体。 */
+    async stopSubAgent(taskId: string) {
+      const normalizedId = (taskId || '').toString().trim();
+      if (!normalizedId) {
+        return { success: false, error: t('stores.taskIdRequired') };
+      }
+      this.stoppingTaskIds = { ...this.stoppingTaskIds, [normalizedId]: true };
+      try {
+        const conversationStore = useConversationStore();
+        const convId = conversationStore.currentConversationId;
+        const query = convId ? `?conversation_id=${encodeURIComponent(convId)}` : '';
+        const resp = await fetch(
+          `/api/sub_agents/${encodeURIComponent(normalizedId)}/stop${query}`,
+          {
+            method: 'POST'
+          }
+        );
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data?.success) {
+          throw new Error(data?.error || `HTTP ${resp.status}`);
+        }
+        await this.fetchSubAgents();
+        return { success: true, data: data?.data || null };
+      } catch (error: any) {
+        return { success: false, error: error?.message || String(error) };
+      } finally {
+        const next = { ...this.stoppingTaskIds };
+        delete next[normalizedId];
+        this.stoppingTaskIds = next;
+      }
+    },
     async stopAllAgents(
       mode: 'terminate' | 'soft_stop'
     ): Promise<{ success: boolean; stoppedCount?: number; error?: string }> {

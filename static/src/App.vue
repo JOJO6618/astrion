@@ -355,7 +355,7 @@
               qdExpanded ? $t('appCore.collapseQuickDock') : $t('appCore.expandQuickDock')
             "
             :aria-pressed="qdExpanded"
-            @click="qdUserCollapsed = !qdUserCollapsed"
+            @click="toggleQuickDock"
           >
             <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true">
               <line x1="2" y1="3.5" x2="16" y2="3.5" />

@@ -291,7 +291,7 @@ export const modeMethods = {
   async handleShowSubAgents() {
     const owns = beginAuxiliaryRequest(this, 'show-sub-agents');
     const quickDock = useQuickDockStore();
-    quickDock.userCollapsed = false;
+    quickDock.manualExpand();
     if (this.isMobileViewport && this.activeMobileOverlay !== 'quickdock') {
       this.openMobileOverlay('quickdock');
     }

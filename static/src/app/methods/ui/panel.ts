@@ -31,6 +31,7 @@ export const panelMethods = {
     this.approvalPanelCollapsed = true;
   },
   toggleTerminalPanel() {
+    if (!this.terminalPanelOpen) this.markRightPanelsManualOpen();
     this.terminalPanelOpen = !this.terminalPanelOpen;
   },
   closeTerminalPanel() {

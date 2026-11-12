@@ -70,6 +70,7 @@ import { storeToRefs } from 'pinia';
 import { t, currentLocale } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
 import { useSubAgentStore } from '@/stores/subAgent';
+import { buildSubAgentToolText } from '@/components/chat/quickdock/subAgentToolText';
 
 type ActivityEntry = {
   type?: string;
@@ -99,44 +100,6 @@ const normalizeStatus = (status?: string) => {
   if (status === 'completed' || status === 'done' || status === 'success') return 'completed';
   if (status === 'failed' || status === 'error') return 'failed';
   return status || 'running';
-};
-
-const buildText = (entry: ActivityEntry) => {
-  const tool = entry.tool || '';
-  const args = entry.args || {};
-  if (tool === 'read_file') {
-    const path = args.path || args.file_path || '';
-    return t('overlay.toolReadFile', { path });
-  }
-  if (tool === 'write_file') {
-    const path = args.file_path || args.path || '';
-    return t('overlay.toolWriteFile', { path });
-  }
-  if (tool === 'read_skill') {
-    const skillName = args.skill_name || '';
-    return t('overlay.toolReadSkill', { name: skillName });
-  }
-  if (tool === 'web_search') {
-    const query = args.query || args.q || '';
-    return t('overlay.toolWebSearch', { query });
-  }
-  if (tool === 'extract_webpage') {
-    const url = args.url || '';
-    return t('overlay.toolExtractWebpage', { url });
-  }
-  if (tool === 'run_command') {
-    const command = args.command || '';
-    return t('overlay.toolRunCommand', { command });
-  }
-  if (tool === 'edit_file') {
-    const path = args.path || args.file_path || '';
-    return t('overlay.toolEditFile', { path });
-  }
-  if (tool === 'read_mediafile') {
-    const path = args.path || args.file_path || '';
-    return t('overlay.toolReadMedia', { path });
-  }
-  return tool || t('overlay.toolGeneric');
 };
 
 const canStop = computed(() => {
@@ -277,7 +240,7 @@ const timelineItems = computed(() => {
             : state === 'calling'
               ? t('overlay.stateCalling')
               : t('overlay.stateInProgress'),
-      text: buildText(item.entry)
+      text: buildSubAgentToolText(item.entry)
     };
   });
 });

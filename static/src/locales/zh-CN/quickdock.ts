@@ -20,9 +20,11 @@ export default {
 
   // —— QuickDock 全局 ⋯ 菜单 ——
   menuForceStop: '强制关闭',
+  menuStop: '停止',
   menuRevealInManager: '在文件管理器中打开',
   menuCopyPath: '复制路径',
   killForceStopFailed: '强制关闭失败',
+  stopFailed: '停止失败',
   revealDetectAppsFailed: '检测可用应用失败',
   revealNoAppsFound: '未找到可用应用',
   revealOpenFileFailed: '打开文件失败',
@@ -39,15 +41,27 @@ export default {
   statusEnded: '已结束',
   contextTokensTitle: '上下文 {tokens} tokens',
 
-  // —— 工具时间线（动作描述走整句插值） ——
-  toolReadFile: '阅读 {path}',
-  toolWriteFile: '写入文件 {path}',
-  toolReadSkill: '阅读技能 {name}',
-  toolSearch: '搜索 {query}',
-  toolExtract: '提取 {url}',
-  toolRunCommand: '运行命令 {command}',
-  toolEditFile: '编辑 {path}',
-  toolReadMedia: '读取媒体文件 {path}',
+  // —— 工具时间线（动作 + 关键参数，见 subAgentToolText.ts） ——
+  toolReadFile: '读取文件',
+  toolSearchFile: '搜索文件',
+  toolExtractFile: '提取文件片段',
+  toolWriteFile: '写入文件',
+  toolAppendFile: '追加文件',
+  toolReadSkill: '读取技能',
+  toolSearch: '搜索网页',
+  toolExtract: '提取网页',
+  toolSaveWebpage: '保存网页',
+  toolRunCommand: '运行指令',
+  toolEditFile: '编辑文件',
+  toolReadMedia: '读取媒体',
+  toolRecallMemory: '读取记忆',
+  toolSearchMemory: '搜索记忆',
+  toolTodoCreate: '创建待办',
+  toolTodoUpdate: '更新待办',
+  toolAskMaster: '询问主智能体',
+  toolAskOther: '询问子智能体',
+  toolAnswerOther: '回答子智能体',
+  toolSubAgentStatus: '查询子智能体状态',
 
   // —— 子智能体详情面板：上下文压缩提示 ——
   contextCompressed: '上下文已压缩（第 {round} 轮）',

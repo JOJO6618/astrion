@@ -75,7 +75,8 @@ class SubAgentRuntimeMixin:
                 inst.last_output = text
         # Publishing happens after the idle state and history have been committed.
         if reason != "completed":
-            text = f"[子智能体 {self.display_name} 本轮{reason}]\n{text}"
+            label = {"stopped": "已停止"}.get(reason, reason)
+            text = f"[子智能体 {self.display_name} 本轮{label}]\n{text}"
         self._forward_output_to_master(text, is_final=True)
         self.manager._save_state()
 

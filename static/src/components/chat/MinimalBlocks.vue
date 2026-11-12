@@ -508,6 +508,9 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   create_sub_agent: 'sub_agent',
   terminate_sub_agent: 'sub_agent_manage',
   get_sub_agent_status: 'sub_agent_manage',
+  send_message_to_sub_agent: 'sub_agent_manage',
+  stop_sub_agent: 'sub_agent_manage',
+  answer_sub_agent_question: 'sub_agent_manage',
 
   // 其他原生工具
   sleep: 'wait',

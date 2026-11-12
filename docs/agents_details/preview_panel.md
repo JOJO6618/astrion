@@ -41,7 +41,8 @@
 ### 16.3 前端
 
 - store：`stores/preview.ts`（targets/activeKey/自动展开抑制）；dock 第六窗 `PreviewWindow.vue`；展开面板 `PreviewPanel.vue`（与 FilePreviewPanel 同位、共享宽度存储键）。
-- 自动展开：personalization `preview_auto_open`（默认 false）；规则=最新目标优先、同目标更新不重弹、用户手动关闭后本次任务内不再自动展开（`sendMessage` 时重置抑制）。
+- 自动展开：personalization `preview_auto_open`（默认 false）；规则=最新目标优先、同目标更新不重弹、用户手动关闭后本次任务内不再自动展开（`sendMessage` 时重置抑制）；对话区放不下（<300px）时不自动展开。
+- **窄布局联动（2026-11-12）**：预览窗口与快捷面板绑定，快捷面板折叠（手动或窄布局自动）时一并关闭（联动关闭不抑制后续自动展开）；对话区<300px 时自动折叠，手动在空间不足时打开则强制保留至关闭。见 `test/2026-11-12_窄布局自动折叠/README.md`。
 - 事件处理：`taskPolling/lifecycle.ts` 的 `preview_targets_updated` 分支；切换对话清空走 `watchers.ts` + `bootstrap.ts` 回填。
 - **桌面端 localhost 链接拦截（2026-09-27）**：桌面壳的 `on_navigation` 会把一切非后端同源导航拦去系统浏览器，聊天里的 localhost 链接也不例外——与「窗口内预览」语义冲突。App.vue 注册 document 级 capture 点击拦截（仅 `__ASTRION_DESKTOP__`）：回环 http(s) 链接 `preventDefault` 后走 `preview store 的 openServerUrl()` 开面板；已登记目标直接激活，未登记的进 `ephemeralTargets`（不写后端、不进 dock 列表、随对话切换清除，`setTargets` 的关面板检查对它豁免）。同源（后端端口）链接必须放行，否则会断应用内导航。PreviewPanel 的「外部打开」按钮走 `utils/openExternal`（桌面壳 window.open 静默失败）。
   - **文件目标 = 打开真实文件（2026-10-29）**：`openWorkspaceFile()` → `POST /api/system/open-file`（仅 host 模式，`file_manager._validate_path` 校验后由宿主 `open`/`startfile`/`xdg-open` 打开，即 `file://` 真身），不再打开预览服务器代理地址（随机端口 + 对话 token，复制出去无意义）。该接口失败时才退回 `openExternal(iframeSrc)`，兼顾远端域名访问等宿主通道缺失场景。

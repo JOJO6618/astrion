@@ -43,7 +43,12 @@ export const terminalMethods = {
         const prevCount = this.previousTerminalCount ?? 0;
         if (autoOpen) {
           // 终端从无到有 → 如果面板没开，打开一次
-          if (prevCount === 0 && count > 0 && !this.terminalPanelOpen) {
+          if (
+            prevCount === 0 &&
+            count > 0 &&
+            !this.terminalPanelOpen &&
+            this.canAutoOpenRightPanels()
+          ) {
             this.toggleTerminalPanel();
           }
           // 终端从有到无 → 如果面板开着，关闭一次

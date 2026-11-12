@@ -122,6 +122,41 @@ class ImmediateStopTests(StopCase):
         self.assertEqual(len(self.state.drain_master_messages()), 1)
         self.assert_persisted_pairs()
 
+    async def test_manual_user_stop_notifies_master_with_user_cancellation(self):
+        started = asyncio.Event()
+        self.agent._call_model = lambda *_: self.return_response([self.call("running")])
+
+        async def execute(*_):
+            started.set()
+            await asyncio.Event().wait()
+
+        self.agent._execute_tool = execute
+        self.start()
+        await asyncio.wait_for(started.wait(), 1)
+        result = SubAgentManager.stop_sub_agent(self.manager, task_id="child", stopped_by="user")
+        self.assertTrue(result["success"])
+        await self.wait_until(lambda: self.agent._idle)
+        notices = self.state.drain_master_messages()
+        self.assertEqual(len(notices), 1)
+        self.assertIn("被用户取消", notices[0])
+        self.assertIn("本轮已停止", notices[0])
+        self.assertNotIn("本轮stopped", notices[0])
+
+    async def test_manual_user_stop_without_live_instance_still_notifies_master(self):
+        self.manager._sub_agent_instances.clear()
+        result = SubAgentManager.stop_sub_agent(self.manager, task_id="child", stopped_by="user")
+        self.assertTrue(result["success"])
+        self.assertEqual(self.record["status"], "idle")
+        self.assertTrue(self.record["work_paused"])
+        notices = self.state.drain_master_messages()
+        self.assertEqual(len(notices), 1)
+        self.assertIn("被用户取消", notices[0])
+
+    async def test_master_stop_without_live_instance_does_not_echo_notice(self):
+        self.manager._sub_agent_instances.clear()
+        SubAgentManager.stop_sub_agent(self.manager, task_id="child", stopped_by="master")
+        self.assertEqual(self.state.drain_master_messages(), [])
+
     async def return_response(self, calls):
         return self.response(calls=calls)
 

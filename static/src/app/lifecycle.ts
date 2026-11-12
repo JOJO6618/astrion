@@ -39,6 +39,8 @@ export async function mounted() {
   // 移动端视口判断必须在路由/对话加载前生效，
   // 否则加载期间移动端会按桌面布局渲染（QuickDock 挤压页面）。
   this.setupMobileViewportWatcher();
+  // 对话区过窄时自动折叠快捷面板组与终端/Git 面板（见 components/chat/quickdock/narrowLayout.ts）
+  this.setupNarrowLayoutGuard();
   // 并行启动路由解析与初始化数据，网页端不再依赖 WebSocket 初始化
   const routePromise = this.bootstrapRoute();
   await routePromise;
@@ -134,6 +136,7 @@ export function beforeUnmount() {
   window.removeEventListener('keydown', this.handleGlobalTabShortcut);
   window.removeEventListener('beforeunload', this.handleBeforeUnloadDraftPersist);
   this.teardownMobileViewportWatcher();
+  this.teardownNarrowLayoutGuard();
   this.stopProjectGitSummaryIdleRefresh?.();
   this.stopTerminalCountIdleRefresh?.();
   this.stopStatusIdleRefresh?.();

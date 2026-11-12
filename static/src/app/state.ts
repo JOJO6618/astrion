@@ -73,6 +73,8 @@ export function dataState() {
     gitChangesDiff: null,
     // 实时终端面板
     terminalPanelOpen: false,
+    // 窄对话区下用户手动打开的终端/Git 面板组强制保留，直到整组关闭
+    rightPanelsForced: false,
     terminalSessions: {} as Record<string, { working_dir?: string; shell?: string }>,
     terminalActiveSession: '',
     terminalSessionLogs: {} as Record<string, string>,

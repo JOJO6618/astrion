@@ -23,8 +23,10 @@ import { systemMethods } from './system';
 import { resizeMethods } from './resize';
 import { newConversationMethods } from './newConversation';
 import { chatgptFastModeMethods } from './chatgptFastMode';
+import { narrowLayoutMethods } from './narrowLayout';
 
 export const uiMethods = {
+  ...narrowLayoutMethods,
   ...chatgptFastModeMethods,
   ...newConversationMethods,
   ...gitMethods,

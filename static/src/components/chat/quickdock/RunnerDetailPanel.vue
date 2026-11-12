@@ -40,8 +40,10 @@
             ]"
           >
             <template v-if="item.kind === 'tool'">
-              <span class="tool-name">{{ item.toolName }}</span>
-              <span class="tool-param" :title="item.text">{{ item.text }}</span>
+              <span class="tool-name">{{ item.label }}</span>
+              <span v-if="item.detail" class="tool-param" :title="item.detail">{{
+                item.detail
+              }}</span>
               <span class="tool-status" :class="{ 'is-error': item.state === 'failed' }">
                 <span
                   v-if="item.state === 'running' || item.state === 'calling'"
@@ -107,6 +109,7 @@ import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 import { useUiStore } from '@/stores/ui';
 import CloseButton from '@/components/common/CloseButton.vue';
+import { buildSubAgentToolParts } from './subAgentToolText';
 
 /**
  * 详情面板（fixed 浮在快捷窗口列左侧）
@@ -365,31 +368,12 @@ function isEntryTerminal(status?: string) {
   ].includes(normalized);
 }
 
-function buildText(entry: any): string {
-  const tool = entry.tool || '';
-  const args = entry.args || {};
-  if (tool === 'read_file')
-    return t('quickdock.toolReadFile', { path: args.path || args.file_path || '' });
-  if (tool === 'write_file')
-    return t('quickdock.toolWriteFile', { path: args.file_path || args.path || '' });
-  if (tool === 'read_skill') return t('quickdock.toolReadSkill', { name: args.skill_name || '' });
-  if (tool === 'web_search')
-    return t('quickdock.toolSearch', { query: args.query || args.q || '' });
-  if (tool === 'extract_webpage') return t('quickdock.toolExtract', { url: args.url || '' });
-  if (tool === 'run_command') return t('quickdock.toolRunCommand', { command: args.command || '' });
-  if (tool === 'edit_file')
-    return t('quickdock.toolEditFile', { path: args.path || args.file_path || '' });
-  if (tool === 'read_mediafile')
-    return t('quickdock.toolReadMedia', { path: args.path || args.file_path || '' });
-  return tool || t('common.tool');
-}
-
 interface ToolTimelineItem {
   kind: 'tool';
   key: string;
   state: string;
-  toolName: string;
-  text: string;
+  label: string;
+  detail: string;
 }
 
 interface OutputTimelineItem {
@@ -511,8 +495,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
         kind: 'tool' as const,
         key: item.key,
         state,
-        toolName: item.entry.tool || t('common.tool'),
-        text: buildText(item.entry)
+        ...buildSubAgentToolParts(item.entry)
       };
     });
   }

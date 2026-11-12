@@ -278,6 +278,12 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
             state = self.get_multi_agent_state(record["conversation_id"])
             if state:
                 state.mark_status(record["agent_id"], "idle")
+                if requested and stopped_by == "user":
+                    # 无存活实例时没有执行器替它汇报，用户手动停止也必须通知主智能体。
+                    from modules.multi_agent.state import build_sub_agent_output_text
+                    state.push_master_message(build_sub_agent_output_text(
+                        record["name"], f"[子智能体 {record['name']} 本轮已停止]\n被用户取消，本轮已停止；"
+                        "保留上下文，可发送消息继续。", is_final=True))
             self._save_state()
         message = "已请求立即取消当前工作；停止后保留上下文，可发送消息继续。" if requested else "子智能体当前已空闲，可发送消息继续。"
         return {"success": True, "name": record["name"], "message": message}

@@ -1677,6 +1677,38 @@ def stop_all_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, usernam
 @api_login_required
 @with_terminal
 def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWorkspace, username: str):
+@conversation_bp.route('/api/sub_agents/<task_id>/stop', methods=['POST'])
+@api_login_required
+@with_terminal
+def stop_sub_agent_route(task_id: str, terminal: WebTerminal, workspace: UserWorkspace, username: str):
+    """用户手动停止指定子智能体的当前轮次（软停止）：保留实例与上下文，进入 idle，
+    可继续发送消息；停止结果以“被用户取消”通知主智能体。与 terminate 不同，不释放名额。"""
+    manager = getattr(terminal, "sub_agent_manager", None)
+    if not manager:
+        return jsonify({"success": False, "error": tr("conversation.sub_agent_manager_unavailable")}), 404
+    try:
+        try:
+            manager._load_state()
+        except Exception:
+            pass
+
+        task = manager.tasks.get(task_id)
+        if not task:
+            return jsonify({"success": False, "error": tr("conversation.sub_agent_task_not_found")}), 404
+
+        current_conv_id = terminal.context_manager.current_conversation_id
+        task_conv_id = task.get("conversation_id")
+        if current_conv_id and task_conv_id and task_conv_id != current_conv_id:
+            return jsonify({"success": False, "error": tr("conversation.sub_agent_stop_forbidden")}), 403
+
+        result = manager.stop_sub_agent(task_id=task_id, stopped_by="user")
+        if not result.get("success"):
+            return jsonify({"success": False, "error": result.get("error") or tr("conversation.sub_agent_stop_failed")}), 400
+        return jsonify({"success": True, "data": result})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
     """手动停止指定子智能体。"""
     manager = getattr(terminal, "sub_agent_manager", None)
     if not manager:

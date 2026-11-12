@@ -5,6 +5,7 @@ import { useBackgroundCommandStore } from './backgroundCommand';
 import { useWorkflowStore } from './workflow';
 import { usePreviewStore } from './preview';
 import { useInputStore } from './input';
+import { getStoredPreviewWidth, hasRoomFor } from '../components/chat/quickdock/narrowLayout';
 
 /**
  * 快捷窗口（Quick Dock）状态
@@ -125,6 +126,8 @@ interface QuickDockState {
   menu: QuickDockMenuState | null;
   /** 用户通过顶部悬浮按钮手动收起（与「无内容自动收起」相互独立） */
   userCollapsed: boolean;
+  /** 窄对话区下用户手动展开的快捷面板组（快捷面板/文件预览/预览窗口）被强制保留，直到整组关闭 */
+  quickGroupForced: boolean;
   /** 乐观假定的内容状态（来源：上次离开的全局缓存 / 目标对话的按对话缓存） */
   assumedContent: boolean;
   /** 乐观掩码是否生效（三态）：生效时 hasContent 完全由 assumedContent 决定——
@@ -161,6 +164,7 @@ export const useQuickDockStore = defineStore('quickDock', {
     previewPath: null,
     menu: null,
     userCollapsed: false,
+    quickGroupForced: false,
     assumedContent: loadInitialAssumedContent(),
     assumedActive: loadInitialAssumedContent(),
     filesSyncSeq: 0
@@ -250,6 +254,18 @@ export const useQuickDockStore = defineStore('quickDock', {
         return;
       }
       this.previewPath = path;
+      // 空间不足时用户手动打开文件预览：整组强制保留，直到关闭
+      if (!hasRoomFor(getStoredPreviewWidth())) {
+        this.quickGroupForced = true;
+      }
+    },
+    /** 手动展开快捷面板：放不下时标记强制保留（宽度预算见 narrowLayout.ts） */
+    manualExpand(expandedWidth = 294) {
+      const forced = !hasRoomFor(expandedWidth);
+      this.userCollapsed = false;
+      if (forced) {
+        this.quickGroupForced = true;
+      }
     },
     closePreview() {
       this.previewPath = null;

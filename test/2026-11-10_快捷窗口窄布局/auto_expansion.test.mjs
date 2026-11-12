@@ -27,7 +27,7 @@ function withLayout(t, fixture) {
   return fixture.dock;
 }
 
-for (const [width, allowed] of [[893, false], [894, true], [895, true]]) {
+for (const [width, allowed] of [[593, false], [594, true], [595, true]]) {
   test(`收起时对话宽 ${width}px，自动展开许可为 ${allowed}`, t => {
     const dock = withLayout(t, layout(width));
     assert.equal(canAutoExpandQuickDock(dock), allowed);
@@ -35,23 +35,23 @@ for (const [width, allowed] of [[893, false], [894, true], [895, true]]) {
 }
 
 for (const occupied of [0, 80, 147, 294]) {
-  test(`过渡中 dock 占 ${occupied}px，600px 边界不受动画影响`, t => {
-    const dock = withLayout(t, layout(894 - occupied, occupied));
+  test(`过渡中 dock 占 ${occupied}px，300px 边界不受动画影响`, t => {
+    const dock = withLayout(t, layout(594 - occupied, occupied));
     assert.equal(canAutoExpandQuickDock(dock), true);
   });
-  test(`过渡中 dock 占 ${occupied}px，599px 剩余宽度仍阻止展开`, t => {
-    const dock = withLayout(t, layout(893 - occupied, occupied));
+  test(`过渡中 dock 占 ${occupied}px，299px 剩余宽度仍阻止展开`, t => {
+    const dock = withLayout(t, layout(593 - occupied, occupied));
     assert.equal(canAutoExpandQuickDock(dock), false);
   });
 }
 
 test('侧栏或浏览器占位后读取实际对话宽度，忽略整个窗口宽度', t => {
-  const dock = withLayout(t, layout(650));
+  const dock = withLayout(t, layout(350));
   assert.equal(canAutoExpandQuickDock(dock), false);
 });
 
 test('完整列宽跟随 CSS 参数，避免列宽修改后判定失准', t => {
-  const dock = withLayout(t, layout(950, 0, '360px'));
+  const dock = withLayout(t, layout(640, 0, '360px'));
   assert.equal(canAutoExpandQuickDock(dock), false);
 });
 
@@ -88,7 +88,7 @@ const syncCode = ts.transpileModule(syncFunction.getText(parsed), {
 }).outputText;
 
 function stateFixture({ enabled = true, ready = true, collapsed = true, mobile = false,
-  chatWidth = 650, dockWidth = 0 } = {}) {
+  chatWidth = 350, dockWidth = 0 } = {}) {
   const fixture = layout(chatWidth, dockWidth);
   const context = {
     autoExpand: { value: enabled },
@@ -127,13 +127,13 @@ test('设置首次就绪仍检查宽度', t => {
   state.sync();
   assert.equal(state.context.userCollapsed.value, true);
   state.context.settingsReady.value = true;
-  state.context.dockRef.value = layout(650).dock;
+  state.context.dockRef.value = layout(350).dock;
   state.sync(true);
   assert.equal(state.context.userCollapsed.value, true);
 });
 
 test('宽布局且自动展开已开启时允许展开', t => {
-  const state = stateFixture({ chatWidth: 894 });
+  const state = stateFixture({ chatWidth: 594 });
   withLayout(t, state);
   state.sync();
   assert.equal(state.context.userCollapsed.value, false);

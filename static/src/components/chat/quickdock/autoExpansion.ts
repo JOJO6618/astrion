@@ -1,5 +1,5 @@
 /** 自动展开快捷窗口后，对话区至少保留的宽度。 */
-export const QUICK_DOCK_MIN_CHAT_WIDTH = 600;
+export const QUICK_DOCK_MIN_CHAT_WIDTH = 300;
 
 /**
  * 只在自动展开入口调用；手动点击不受此限制。

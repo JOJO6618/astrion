@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia';
 import { usePersonalizationStore } from './personalization';
+import { useQuickDockStore } from './quickDock';
+import { getStoredPreviewWidth, hasRoomFor } from '../components/chat/quickdock/narrowLayout';
 
 /**
  * 预览面板状态（2026-09-27 新增）
@@ -101,6 +103,8 @@ export const usePreviewStore = defineStore('preview', {
       if (this.autoOpenSuppressed) return;
       const key = previewTargetKey(target);
       if (!key || key === this.lastAutoOpenedKey) return;
+      // 对话区放不下预览面板时不自动展开（手动打开不受此限制）
+      if (!hasRoomFor(getStoredPreviewWidth())) return;
       this.lastAutoOpenedKey = key;
       this.activeKey = key;
     },
@@ -108,6 +112,17 @@ export const usePreviewStore = defineStore('preview', {
       if (!key) return;
       // 再点同一目标 = 收起
       this.activeKey = this.activeKey === key ? null : key;
+      if (this.activeKey) this.markManualOpen();
+    },
+    /** 空间不足时用户手动打开预览窗口：快捷面板组强制保留，直到关闭 */
+    markManualOpen() {
+      if (!hasRoomFor(getStoredPreviewWidth())) {
+        useQuickDockStore().quickGroupForced = true;
+      }
+    },
+    /** 快捷面板折叠时联动关闭预览窗口：不算用户主动关闭，不抑制后续自动展开 */
+    closeWithQuickDock() {
+      this.activeKey = null;
     },
     /** 桌面端点击聊天中的 localhost 链接：打开窗口内预览面板（而不是让壳拦去系统浏览器）。
      *  已登记的目标直接激活；未登记的记为临时目标（不写后端 metadata）。 */
@@ -129,6 +144,7 @@ export const usePreviewStore = defineStore('preview', {
         });
       }
       this.activeKey = key;
+      this.markManualOpen();
     },
     /** 记录预览运行时（独立预览服务器基址 + 对话 token），由 targets/bootstrap/messages 响应下发 */
     setRuntime(base: unknown, token: unknown) {

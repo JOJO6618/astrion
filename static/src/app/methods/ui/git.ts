@@ -97,6 +97,7 @@ export const gitMethods = {
   },
   openGitChangesPanel() {
     if (!this.projectGitSummary?.has_git) return;
+    if (!this.gitChangesPanelOpen) this.markRightPanelsManualOpen();
     this.gitChangesPanelOpen = !this.gitChangesPanelOpen;
     if (this.gitChangesPanelOpen) {
       this.gitChangesContext = 3;

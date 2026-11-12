@@ -142,7 +142,10 @@ export const TOOL_ICON_MAP = Object.freeze({
   save_workflow: 'workflow',
   // 补齐原先回落到默认齿轮的原生工具
   submit_plan: 'clipboard',
-  terminate_sub_agent: 'bot'
+  terminate_sub_agent: 'bot',
+  send_message_to_sub_agent: 'bot',
+  stop_sub_agent: 'bot',
+  answer_sub_agent_question: 'bot'
 });
 
 export const TOOL_CATEGORY_ICON_MAP = Object.freeze({
