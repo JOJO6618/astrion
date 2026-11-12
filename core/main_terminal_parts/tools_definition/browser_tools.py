@@ -1,7 +1,7 @@
-"""macOS 内置浏览器操作工具定义（22 个）。
+"""macOS/Windows 内置浏览器操作工具定义。
 
 通用规则（标签范围、ref、快照差异格式、审批与安全）在冻结提示词 prompts/native_browser.txt，
-这里只写各工具自身的参数与规则。仅 macOS 桌面版 Agent 主对话注入；浏览器开关关闭时
+这里只写各工具自身的参数与规则。仅受支持的桌面版 Agent 主对话注入；浏览器开关关闭时
 工具仍在列表中（保持工具数组与前缀缓存稳定），调用会返回「浏览器未开启」。
 """
 from typing import Any, Dict, List
@@ -26,10 +26,10 @@ class ToolsDefinitionBrowserToolsMixin:
             _tool("browser_tabs", "管理本对话的浏览器标签：list 列出（含 ID、网址、标题、当前标签）；new 新建并设为当前（可带 url）；select 切换当前标签；close 关闭。", intent({
                 "action": {"type": "string", "enum": ["list", "new", "select", "close"], "description": "操作"},
                 "tab_id": {"type": "string", "description": "select/close 的目标标签 ID"},
-                "url": {"type": "string", "description": "new 时要打开的网址或搜索关键词（可选）"},
+                "url": {"type": "string", "description": "new 时要打开的 http/https 网址、本机绝对路径的 file:// 地址或搜索关键词（可选）；本地文件须在可读范围内，不支持远程 file 主机或 UNC 路径"},
             }), ["action"]),
             _tool("browser_navigate", "在标签中打开网址，或后退/前进/刷新。加载完成后返回完整快照。本对话没有标签时自动新建。", intent({
-                "url": {"type": "string", "description": "http/https 网址；也可以直接传搜索关键词，会用用户设置的默认搜索引擎打开结果页"},
+                "url": {"type": "string", "description": "http/https 网址或本机绝对路径的 file:// 地址；本地文件须在可读范围内，不支持远程 file 主机或 UNC 路径。也可传搜索关键词，使用用户设置的默认搜索引擎"},
                 "action": {"type": "string", "enum": ["back", "forward", "reload"], "description": "不提供 url 时使用"},
                 "tab_id": _TAB,
             }), []),

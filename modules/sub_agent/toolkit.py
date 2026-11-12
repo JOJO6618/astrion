@@ -49,7 +49,7 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "创建或覆盖文件；append=true 时追加内容。",
+            "description": "创建或覆盖文件；append=true 时追加内容。覆盖已有文件前必须先读取目标文件（可用 read_file）；本对话已读取或写入的文件无需重复预读。新建文件或追加内容无需预读。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -65,14 +65,14 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "edit_file",
-            "description": "在文件中执行一处或多处精确字符串替换；建议先用 read_file 精确复制 old_string。",
+            "description": "在文件中执行一处或多处精确字符串替换。修改前必须先读取目标文件（可用 read_file）；本对话已读取或写入的文件无需重复预读。每组 old_string 均须至少 3 行并与文件内容精确匹配，包含目标行及上下文；任意一组失败时不会写入文件。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "file_path": {"type": "string", "description": "文件路径：工作区内请用相对路径。"},
                     "replacements": {
                         "type": "array",
-                        "description": "替换组列表，每组包含 old_string/new_string/replace_all。",
+                        "description": "替换组列表，每组包含 old_string/new_string；replace_all 可选，默认 false。",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -93,12 +93,12 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "run_command",
-            "description": "在当前终端环境执行一次性命令（非交互式）。",
+            "description": "在当前终端环境执行一次性命令（非交互式），超时上限 120 秒。子智能体不支持后台命令模式。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "要执行的命令。"},
-                    "timeout": {"type": "number", "description": "超时时间（秒），必填。"},
+                    "timeout": {"type": "number", "description": "超时时间（秒），必填，须大于 0 且不超过 120。"},
                     "working_dir": {"type": "string", "description": "工作目录：工作区内请用相对路径。"},
                 },
                 "required": ["command", "timeout"],
@@ -131,15 +131,13 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "extract_webpage",
-            "description": "网页内容提取。mode=read 直接返回内容，mode=save 保存为文件。",
+            "description": "提取网页正文并直接返回内容；需要保存为文件时使用 save_webpage。正文超过 80000 字符将被拒绝。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "mode": {"type": "string", "enum": ["read", "save"]},
-                    "url": {"type": "string"},
-                    "target_path": {"type": "string", "description": "[save] 保存路径，必须是 .md 文件。"},
+                    "url": {"type": "string", "description": "要提取内容的网页 URL。"},
                 },
-                "required": ["mode", "url"],
+                "required": ["url"],
             },
         },
     },

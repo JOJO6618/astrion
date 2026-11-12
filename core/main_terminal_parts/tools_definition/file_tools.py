@@ -92,7 +92,7 @@ class ToolsDefinitionFileToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "write_file",
-                            "description": "将内容写入本地文件系统；append 为 False 时覆盖原文件，True 时追加到末尾。",
+                            "description": "将内容写入本地文件系统；append 为 False 时覆盖原文件，True 时追加到末尾。覆盖已有文件前必须先读取目标文件（可用 read_file）；本对话已读取或写入的文件无需重复预读，已全文注入的私有项目 MEMORY.md 视为已读。新建文件或追加内容无需预读。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -230,7 +230,7 @@ class ToolsDefinitionFileToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "edit_file",
-                            "description": "在文件中按顺序执行一组或多组精确字符串替换；建议先使用 read_file 获取最新内容以确保精确匹配。任意一组失败时不会写入文件。",
+                            "description": "在文件中按顺序执行一组或多组精确字符串替换。修改前必须先读取目标文件（可用 read_file）；本对话已读取或写入的文件无需重复预读，已全文注入的私有项目 MEMORY.md 视为已读。old_string 必须与当前文件内容精确匹配；任意一组失败时不会写入文件。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
