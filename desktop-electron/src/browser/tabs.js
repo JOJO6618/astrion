@@ -11,7 +11,7 @@ export class BrowserTabs {
   constructor(manager) { this.manager = manager; }
   createInternal(section, options = {}) {
     const manager = this.manager, url = internalURL(section);
-    const owner = options.owner || manager.owner, profile = options.profile || manager.profile;
+    const owner = options.owner || manager.main.owner, profile = options.profile || manager.main.profile;
     let tab = !options.duplicate && [...manager.tabs.values()].find(row => row.owner === owner && row.section === section);
     if (!tab) {
       if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48) throw new Error('browser_tab_limit');
@@ -38,7 +38,7 @@ export class BrowserTabs {
       if (next) manager.selected.set(tab.owner, next.id); else manager.selected.delete(tab.owner);
     }
     if (!manager.disposed && !manager.window.isDestroyed()) {
-      if (tab.view) manager.window.contentView.removeChildView(tab.view);
+      manager.detach(tab);
       this.persist(tab.owner, tab.profile); manager.profileFeatures(tab.profile).denyStale(); manager.layout(); manager.publish();
     }
   }
@@ -46,14 +46,14 @@ export class BrowserTabs {
     const manager = this.manager;
     const section = internalSection(url);
     if (section) return this.createInternal(section, options);
-    const owner = options.owner || manager.owner, profile = options.profile || manager.profile;
+    const owner = options.owner || manager.main.owner, profile = options.profile || manager.main.profile;
     if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48 && !options.id) throw new Error('browser_tab_limit');
     const view = new WebContentsView({
       ...(options.nativeOptions?.webContents ? { webContents: options.nativeOptions.webContents } : {}),
       webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload }
     });
     // 先给出真实尺寸再隐藏：隐藏后再 setBounds 不会传到渲染进程，后台标签（AI 操作）的视口会是 0×0。
-    view.setBounds(browserBounds(manager) || { x: 0, y: 0, width: 1280, height: 800 });
+    view.setBounds(manager.boundsFor(owner) || { x: 0, y: 0, width: 1280, height: 800 });
     view.setVisible(false);
     view.setBackgroundColor(manager.surfaceColor);
     const tab = { id: options.id || randomUUID(), owner, profile, view, title: '', favicon: '', url: url || options.targetURL || 'about:blank', error: '', find: null,
@@ -62,8 +62,8 @@ export class BrowserTabs {
       closeOnDownload: !!options.nativeOptions || (!!url && url !== 'about:blank'),
       previousId: manager.selected.get(owner) };
     const wc = view.webContents;
-    manager.tabs.set(tab.id, tab); manager.window.contentView.addChildView(view);
-    view.setBounds(browserBounds(manager) || { x: 0, y: 0, width: 1280, height: 800 });
+    manager.tabs.set(tab.id, tab); manager.attach(tab);
+    view.setBounds(manager.boundsFor(owner) || { x: 0, y: 0, width: 1280, height: 800 });
     if (options.select !== false) manager.selected.set(owner, tab.id);
     const update = () => {
       if (wc.isDestroyed() || manager.disposed || tab.retiredDownload) return;
@@ -108,15 +108,16 @@ export class BrowserTabs {
     wc.on('found-in-page', (_event, result) => { tab.find = { matches: result.matches, active: result.activeMatchOrdinal }; manager.publish(); });
     wc.on('will-navigate', (event, destination) => { try {
       if (isLocalFile(wc.getURL())) manualNavigationURL(destination); else navigationURL(destination);
-    } catch { event.preventDefault(); manager.message('unsupported_browser_url'); } });
+    } catch { event.preventDefault(); manager.message('unsupported_browser_url', tab.owner); } });
     wc.on('will-redirect', (event, destination) => { try { navigationURL(destination); } catch { event.preventDefault(); } });
     wc.on('will-attach-webview', event => event.preventDefault());
     wc.on('before-input-event', (event, input) => {
-      if (input.type !== 'keyDown' || !(input.meta || input.control) || tab.owner !== manager.owner) return;
+      const host = manager.hostFor(tab.owner);
+      if (input.type !== 'keyDown' || !(input.meta || input.control) || !host) return;
       const key = input.key.toLowerCase();
       if (['l', 'f', 't', 'w', '+', '=', '-', '0'].includes(key)) {
         event.preventDefault();
-        manager.send('browser:shortcut', { lease: manager.lease, key });
+        host.send('browser:shortcut', { lease: host.lease, key });
       }
     });
     wc.on('context-menu', (_event, params) => {
@@ -124,7 +125,7 @@ export class BrowserTabs {
     });
     wc.setWindowOpenHandler(({ url: destination }) => {
       try { if (isLocalFile(wc.getURL())) manualNavigationURL(destination); else navigationURL(destination); } catch { return { action: 'deny' }; }
-      if ((tab.owner !== manager.owner && !manager.ai?.drivers.has(tab.id)) || [...manager.tabs.values()].filter(row => row.owner === owner).length >= 48) return { action: 'deny' };
+      if ((!manager.hostFor(tab.owner) && !manager.ai?.drivers.has(tab.id)) || [...manager.tabs.values()].filter(row => row.owner === owner).length >= 48) return { action: 'deny' };
       // Adopted popups are browser tabs: keep their lifetime independent of the opener.
       return { action: 'allow', outlivesOpener: true, overrideBrowserWindowOptions: { webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload } },
         createWindow: nativeOptions => this.create(null, { owner, profile, nativeOptions, targetURL: destination }).view.webContents };
@@ -163,7 +164,7 @@ export class BrowserTabs {
     tab.retiredDownload = true;
     manager.tabs.delete(tab.id);
     tab.view.setVisible(false);
-    manager.window.contentView.removeChildView(tab.view);
+    manager.detach(tab);
     manager.downloadViews.add(tab.view);
     if (manager.selected.get(tab.owner) === tab.id) {
       const previous = manager.tabs.get(tab.previousId);
@@ -183,7 +184,7 @@ export class BrowserTabs {
     item.once('done', release);
     this.persist(tab.owner); manager.layout(); manager.publish();
   }
-  persist(owner, fallbackProfile = this.manager.profile) {
+  persist(owner, fallbackProfile = this.manager.main.profile) {
     const manager = this.manager;
     if (manager.disposed) return;
     const tabs = [...manager.tabs.values()].filter(tab => tab.owner === owner);
@@ -193,33 +194,37 @@ export class BrowserTabs {
     const owners = Object.keys(profile.data.owners).sort((a, b) => profile.data.owners[b].at - profile.data.owners[a].at);
     owners.slice(100).forEach(key => { delete profile.data.owners[key]; }); profile.save();
   }
-  restore() {
-    const manager = this.manager;
-    if ([...manager.tabs.values()].some(tab => tab.owner === manager.owner)) return;
-    const saved = manager.profile.data.owners[manager.owner];
+  restore(host) {
+    const manager = this.manager, owner = host.owner, profile = host.profile;
+    if ([...manager.tabs.values()].some(tab => tab.owner === owner)) return;
+    const saved = profile.data.owners[owner];
     const urls = Array.isArray(saved?.urls) ? saved.urls.slice(0, Math.min(12, 48 - manager.tabs.size)) : [];
-    if (!urls.length) { this.create(); return; }
+    if (!urls.length) { this.create('about:blank', { owner, profile }); return; }
     const created = [];
-    for (const url of urls) { try { created.push(this.create(internalSection(url) ? url : manualNavigationURL(url))); } catch { /* Invalid saved URLs never become navigable. */ } }
-    if (!created.length) this.create();
-    else { manager.selected.set(manager.owner, created[Math.max(0, Math.min(saved.active || 0, created.length - 1))].id); this.persist(manager.owner); }
+    for (const url of urls) { try { created.push(this.create(internalSection(url) ? url : manualNavigationURL(url), { owner, profile })); } catch { /* Invalid saved URLs never become navigable. */ } }
+    if (!created.length) this.create('about:blank', { owner, profile });
+    else { manager.selected.set(owner, created[Math.max(0, Math.min(saved.active || 0, created.length - 1))].id); this.persist(owner); }
   }
   layout() {
     const manager = this.manager;
     if (manager.disposed || manager.window.isDestroyed()) return;
-    const bounds = browserBounds(manager);
-    const active = manager.active();
+    const hosts = manager.hosts();
+    const bounds = new Map(hosts.map(host => [host, browserBounds(host)]));
+    const actives = new Map(hosts.map(host => [host, host.active()]));
     for (const tab of manager.tabs.values()) {
       if (!tab.view || tab.view.webContents.isDestroyed()) continue;
-      const visible = tab === active && manager.visible && !!bounds && tab.url !== 'about:blank' && !tab.pendingURL && !tab.error;
-      if (!visible && tab.view.webContents.isFocused()) manager.mainView.webContents.focus();
+      manager.attach(tab);
+      const host = manager.hostFor(tab.owner), rect = host && bounds.get(host);
+      const visible = !!host && tab === actives.get(host) && host.visible && !!rect && tab.url !== 'about:blank' && !tab.pendingURL && !tab.error;
+      if (!visible && tab.view.webContents.isFocused()) (manager.popouts.get(tab.owner) || manager.main).view.webContents.focus();
       tab.view.setVisible(visible);
       if (visible) {
-        tab.view.setBounds(bounds);
+        tab.view.setBounds(rect);
         // AI 在后台操作时可能设置了视口尺寸模拟；显示后必须立即交还真实尺寸。
         void manager.ai?.drivers.get(tab.id)?.clearViewport();
       }
     }
-    manager.stacking.apply(active);
+    for (const host of hosts) host.stacking.apply(actives.get(host));
+    manager.contextMenu.closeStale();
   }
 }

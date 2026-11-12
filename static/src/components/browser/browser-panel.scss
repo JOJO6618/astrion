@@ -19,6 +19,55 @@
   border-left: 1px solid var(--border-default);
   font-size: 13px;
 }
+// macOS 对话浏览器独立窗口：面板铺满窗口，红绿灯悬浮在标签栏左侧，标签栏空白处拖动窗口。
+.native-browser-panel--window {
+  left: 0;
+  max-width: none;
+  min-width: 0;
+  border-left: 0;
+}
+.native-browser-panel--window .nb-tabbar {
+  padding-left: 80px;
+  -webkit-app-region: drag;
+}
+:root.nb-window-fullscreen .native-browser-panel--window .nb-tabbar {
+  padding-left: 9px;
+}
+.native-browser-panel--window .nb-tabbar .nb-tab,
+.native-browser-panel--window .nb-tabbar button {
+  -webkit-app-region: no-drag;
+}
+// 主窗口占位：本对话浏览器已弹出到独立窗口。
+.nb-detached-title {
+  padding-left: 6px;
+  font-weight: 600;
+}
+.nb-detached {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  overflow: auto;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.nb-detached > .nb-icon {
+  width: 28px;
+  height: 28px;
+}
+.nb-detached p {
+  margin: 0;
+}
+.nb-detached-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
 .native-browser-panel button,
 .native-browser-panel input {
   font: inherit;

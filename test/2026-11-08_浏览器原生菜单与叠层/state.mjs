@@ -7,7 +7,7 @@ const colors = [], inputs = [];
 let focused = true, mainFocuses = 0, pageFocuses = 0;
 const main = {
   setBackgroundColor: value => colors.push(value),
-  webContents: { focus: () => { mainFocuses++; focused = false; }, getZoomFactor: () => 1 },
+  webContents: { focus: () => { mainFocuses++; focused = false; }, getZoomFactor: () => 1, isDestroyed: () => false },
   getBounds: () => ({ x: 0, y: 46, width: 1200, height: 754 })
 };
 const page = {
@@ -22,12 +22,12 @@ const page = {
 };
 const children = [main, page];
 const tab = { id: 'fixture-tab', owner: 'fixture-owner', view: page };
+// 2026-11-11 起叠层与输入转发按宿主（主窗口/对话独立窗口）计算，夹具即一个宿主。
 const manager = {
-  mainView: main, window: { contentView: { children, addChildView(view) { children.splice(children.indexOf(view), 1); children.push(view); } } },
-  owner: tab.owner, active: () => tab, visible: true, surfaceColor: '#ffffffff',
+  view: main, window: { isDestroyed: () => false, contentView: { children, addChildView(view) { children.splice(children.indexOf(view), 1); children.push(view); } } },
+  owner: tab.owner, active: () => tab, visible: true, manager: { surfaceColor: '#ffffffff' },
   geometry: { x: 600, y: 84, width: 600, height: 670 },
-  overlayRaised: false, overlayCapturesInput: true,
-  contextMenu: { closeStale() {} }
+  overlayRaised: false, overlayCapturesInput: true
 };
 const stack = new BrowserStacking(manager);
 stack.apply(tab);

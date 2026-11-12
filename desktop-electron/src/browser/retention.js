@@ -25,8 +25,10 @@ export class BrowserRetention {
         return { id: tab.id, owner: this.scope(tab.owner), selected: manager.selected.get(tab.owner) === tab.id,
           lastActive: tab.lastActive || Date.now(), lastAi: tab.lastAi || 0, busy: !!tab.aiBusy };
       });
+      // 已弹出到独立窗口的对话正在被查看，与主窗口当前对话同样算前台。
+      const presented = [...manager.popouts.keys()].map(owner => this.scope(owner)).filter(scope => owners.has(scope));
       const response = await manager.mainView.webContents.session.fetch(`${manager.origin}/api/browser-retention`, {
-        headers: { 'X-Astrion-Browser-State': JSON.stringify({ owners: [...owners].map(key => JSON.parse(key)), tabs, visits: Object.fromEntries(this.visits) }) },
+        headers: { 'X-Astrion-Browser-State': JSON.stringify({ owners: [...owners].map(key => JSON.parse(key)), tabs, visits: Object.fromEntries(this.visits), presented: presented.map(key => JSON.parse(key)) }) },
         credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(5000)
       });
       if (!response.ok) return;
@@ -41,6 +43,9 @@ export class BrowserRetention {
     const manager = this.manager;
     const deleted = new Set(result.deleted.map(scope => `${profile}:${scope}`));
     for (const owner of deleted) {
+      // 对话已删除：先关掉它的独立窗口（视图挪回主窗口），再移除标签。
+      const popout = manager.popouts.get(owner);
+      if (popout && !popout.window.isDestroyed()) popout.window.close();
       manager.ai.deleteOwner(owner);
       for (const tab of [...manager.tabs.values()]) if (tab.owner === owner) this.remove(tab);
       for (const value of manager.profiles.values()) if (value.key === profile) { delete value.data.owners[owner]; value.save(); }
@@ -61,7 +66,7 @@ export class BrowserRetention {
     tab.zoom = view.webContents.getZoomFactor();
     tab.view = null; tab.suspended = true; tab.pendingURL = ''; tab.find = null; tab.ai = undefined;
     manager.credentials.remove(tab); manager.ai.release(tab);
-    manager.window.contentView.removeChildView(view);
+    manager.detach(tab, view);
     view.webContents.close({ waitForBeforeUnload: false });
     manager.profileFeatures(tab.profile).denyStale();
   }
@@ -80,7 +85,7 @@ export class BrowserRetention {
     manager.tabs.delete(tab.id);
     manager.credentials.remove(tab); manager.ai.release(tab);
     if (tab.view && !tab.view.webContents.isDestroyed()) {
-      manager.window.contentView.removeChildView(tab.view);
+      manager.detach(tab);
       tab.view.webContents.close({ waitForBeforeUnload: false });
     }
   }

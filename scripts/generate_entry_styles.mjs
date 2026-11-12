@@ -42,6 +42,12 @@ const ENTRIES = [
     refPath: '/static/style.css',
     outputName: 'style',
     manifestKey: 'static/src/main.ts'
+  },
+  {
+    // macOS 对话浏览器独立窗口：共享 BrowserPanel 的样式在公共 chunk 里，需随入口一起装配。
+    refPath: '/static/browser-window.css',
+    outputName: 'browser-window',
+    manifestKey: 'static/src/browserWindow.ts'
   }
 ];
 

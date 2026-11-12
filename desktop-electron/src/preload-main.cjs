@@ -26,6 +26,8 @@ if (process.platform === 'darwin') {
     return () => ipcRenderer.removeListener(channel, listener);
   };
   contextBridge.exposeInMainWorld('astrionBrowser', {
+    // 能力标记：本壳支持把对话浏览器弹出到独立窗口（preload-browser-window.cjs 为窗口侧）。
+    popout: true,
     connect: (scope, labels) => ipcRenderer.invoke('browser:connect', scope, labels),
     theme: theme => ipcRenderer.send('browser:theme', theme),
     command: payload => ipcRenderer.invoke('browser:command', payload),

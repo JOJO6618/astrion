@@ -3,7 +3,7 @@ const path = require('node:path');
 
 module.exports = async function pollingRegression({ run, inspect, manager, calls, check, delay, until, output }) {
   const observations = {};
-  const page = manager.active().view.webContents;
+  const page = manager.main.active().view.webContents;
   let navigations = 0;
   const onNavigate = (_event, _url, _sameDocument, isMainFrame) => { if (isMainFrame) navigations++; };
   page.on('did-start-navigation', onNavigate);

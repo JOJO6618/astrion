@@ -1,0 +1,18 @@
+// 桌面壳对话浏览器独立窗口样式入口：reset + token + 全局基础，
+// 浏览器组件样式随 BrowserPanel 自带，不引入主应用组件样式全量。
+@use './base/reset';
+@use './base/tokens';
+@use './base/global';
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-base);
+}
+
+#browser-window-app {
+  height: 100%;
+}

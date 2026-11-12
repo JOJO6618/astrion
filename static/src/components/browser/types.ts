@@ -60,6 +60,10 @@ export interface BrowserSnapshot {
   /** Empty searchEngine means "not chosen yet"; the panel fills a language-based default. */
   settings?: { searchEngine?: BrowserSearchEngine | '' };
   shortcuts?: BrowserShortcuts;
+  /** macOS：快照所属界面（主窗口面板或对话独立窗口）。 */
+  window?: 'main' | 'popout';
+  /** macOS：主窗口当前对话的浏览器已弹出到独立窗口，主窗口只显示占位。 */
+  detached?: boolean;
 }
 export type BrowserSearchEngine = 'google' | 'bing_cn' | 'bing' | 'baidu';
 export interface BrowserShortcut {
@@ -112,6 +116,10 @@ export interface BrowserTheme {
 export interface BrowserBridge {
   surfaceMode?: 'regions';
   credentialFileImport?: boolean;
+  /** 主窗口桥：支持把对话浏览器弹出到独立窗口。 */
+  popout?: boolean;
+  /** 独立窗口桥：本页就是对话浏览器的独立窗口。 */
+  window?: 'popout';
   connect: (scope: BrowserScope, labels?: Record<string, string>) => Promise<BrowserSnapshot>;
   theme: (theme: BrowserTheme) => void;
   credentials: (payload: CredentialRequest & { lease: string }) => Promise<CredentialResponse>;
@@ -141,7 +149,13 @@ export interface BrowserBridge {
     callback: (event: { workspace: string; conversation: string }) => void
   ) => () => void;
   onGeometryRequest: (callback: () => void) => () => void;
+  /** 独立窗口桥：窗口全屏状态（全屏时不为红绿灯留白）。 */
+  onWindowState?: (callback: (state: { fullScreen: boolean }) => void) => () => void;
 }
 export function browserBridge(): BrowserBridge | undefined {
   return (window as unknown as { astrionBrowser?: BrowserBridge }).astrionBrowser;
 }
+/** 当前页是对话浏览器的独立窗口。 */
+export const browserPopoutWindow = () => browserBridge()?.window === 'popout';
+/** 主窗口面板可把对话浏览器弹出到独立窗口（仅 macOS Electron 壳声明）。 */
+export const browserCanPopout = () => browserBridge()?.popout === true;

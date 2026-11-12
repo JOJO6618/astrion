@@ -47,15 +47,15 @@ app.whenReady().then(async () => {
     const snapshot = await run(`window.astrionBrowser.connect({mode:'agent',workspace:'fixture',conversation:'lifetime'})`);
     const command = (action, value, id) => run(`window.astrionBrowser.command(${JSON.stringify({ lease: snapshot.lease, action, value, id })})`);
     for (const mode of ['blank', 'opener', 'noopener', 'script']) {
-      if (!manager.active()) await command('new');
-      const a = manager.active(), awc = a.view.webContents;
+      if (!manager.main.active()) await command('new');
+      const a = manager.main.active(), awc = a.view.webContents;
       await command('navigate', `${origin}/a`, a.id);
       await until(() => awc.getTitle() === '/a' && !awc.isLoading(), 'A loaded');
       await awc.executeJavaScript('window.messages=[];addEventListener("message",event=>window.messages.push(event.data))');
       const open = mode === 'script' ? "window.open('/b','_blank');void 0" : `document.getElementById(${JSON.stringify(mode)}).click()`;
       await awc.executeJavaScript(open, true);
-      await until(() => manager.tabs.size === 2 && manager.active() !== a && manager.active().view.webContents.getTitle() === '/b', 'B opened as a real tab');
-      const b = manager.active(), bwc = b.view.webContents;
+      await until(() => manager.tabs.size === 2 && manager.main.active() !== a && manager.main.active().view.webContents.getTitle() === '/b', 'B opened as a real tab');
+      const b = manager.main.active(), bwc = b.view.webContents;
       const expectsOpener = mode === 'opener' || mode === 'script';
       check(`${mode}: normal opener/noopener semantics remain intact`, await bwc.executeJavaScript('window.opener !== null') === expectsOpener);
       if (expectsOpener) {
@@ -64,8 +64,8 @@ app.whenReady().then(async () => {
         check(`${mode}: B can message its opener before A closes`, true);
       }
       await bwc.executeJavaScript("window.liveToken='B-survives';window.ticks=0;setInterval(()=>window.ticks++,20);window.open('/c','_blank');void 0", true);
-      await until(() => manager.tabs.size === 3 && manager.active() !== b && manager.active().view.webContents.getTitle() === '/c', 'B opens C');
-      const c = manager.active(), cwc = c.view.webContents;
+      await until(() => manager.tabs.size === 3 && manager.main.active() !== b && manager.main.active().view.webContents.getTitle() === '/c', 'B opens C');
+      const c = manager.main.active(), cwc = c.view.webContents;
       await cwc.executeJavaScript("window.liveToken='C-survives'");
       check(`${mode}: website child keeps sandbox and no trusted bridge`, await bwc.executeJavaScript("typeof require==='undefined'&&typeof window.astrionBrowser==='undefined'") && bwc.getLastWebPreferences().sandbox);
       // Close A through the exact trusted command used by the tab close button.
@@ -81,7 +81,7 @@ app.whenReady().then(async () => {
         await delay(70);
         check(`${mode}: B retains the same running document`, await bwc.executeJavaScript("window.liveToken==='B-survives'") && await bwc.executeJavaScript('window.ticks') > previousTicks);
         await command('select', undefined, b.id);
-        check(`${mode}: surviving B can be selected normally`, manager.active() === b);
+        check(`${mode}: surviving B can be selected normally`, manager.main.active() === b);
         await command('close', undefined, b.id);
         await until(() => bwc.isDestroyed(), 'B closed');
         await delay(100);

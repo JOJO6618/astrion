@@ -159,11 +159,11 @@ app.whenReady().then(async () => {
       const tab = [...nb.tabs.values()].find(row => row.view && nb.ai.drivers.has(row.id));
       const driver = nb.ai.drivers.get(tab.id);
       const before = (await driver.cdp('Runtime.evaluate', { expression: 'innerWidth', returnByValue: true })).result.value;
-      nb.geometry = { x: 0, y: 0, width: 600, height: 500 }; nb.visible = true; nb.owner = tab.owner; nb.selected.set(tab.owner, tab.id);
+      nb.main.geometry = { x: 0, y: 0, width: 600, height: 500 }; nb.main.visible = true; nb.main.owner = tab.owner; nb.selected.set(tab.owner, tab.id);
       nb.layout(); await sleep(400);
       const after = (await driver.cdp('Runtime.evaluate', { expression: 'innerWidth', returnByValue: true })).result.value;
       check('标签显示后立即使用面板宽度', after === 600 && !driver.metricsOverride, `before=${before} after=${after} override=${driver.metricsOverride}`);
-      nb.visible = false; nb.layout();
+      nb.main.visible = false; nb.layout();
     }
     nb.ai.call({ call_id: 'cancel-me', op: 'wait_for', args: { time: 10 }, identity, epoch: 2, any_site: true }).then(x => { check('取消等待', !x.success || x.code === 'cancelled', JSON.stringify(x)); }, e => check('取消等待', e.code === 'cancelled', e.message));
     await sleep(300); nb.ai.cancel('cancel-me'); await sleep(500);

@@ -20,10 +20,10 @@ exports.verify = async ({ manager, command, origin, check, until }) => {
   }
   for (const [selector, username] of [['#login','new-spa-button'],['#custom','new-spa-role']]) {
     await fill(username); await click(selector);
-    await until(()=>manager.credentials.snapshot().prompt?.username===username, 'SPA save prompt');
-    const prompt=manager.credentials.snapshot().prompt;
+    await until(()=>manager.credentials.snapshot(manager.main).prompt?.username===username, 'SPA save prompt');
+    const prompt=manager.credentials.snapshot(manager.main).prompt;
     await command({action:'accept',id:prompt.id});
-    check(`new login saves from ${selector}`,manager.credentials.vault(manager.profile).find(origin,username)?.password==='synthetic-new-login');
+    check(`new login saves from ${selector}`,manager.credentials.vault(manager.main.profile).find(origin,username)?.password==='synthetic-new-login');
   }
   const auth = http.createServer((request,response)=>{
     request.resume();
@@ -37,10 +37,10 @@ exports.verify = async ({ manager, command, origin, check, until }) => {
     await until(()=>!tab.pendingURL && !wc.isLoading(),'cross-origin login form loaded'); wc.focus();
     await fill('new-redirect-login'); await click('button');
     await until(()=>wc.getURL()===target+'/welcome' && !wc.isLoading(),'login redirect completed');
-    await until(()=>manager.credentials.snapshot().prompt?.username==='new-redirect-login','save prompt survives redirect');
-    const prompt=manager.credentials.snapshot().prompt;
+    await until(()=>manager.credentials.snapshot(manager.main).prompt?.username==='new-redirect-login','save prompt survives redirect');
+    const prompt=manager.credentials.snapshot(manager.main).prompt;
     check('redirected login retains the original password site',prompt.origin===origin);
     await command({action:'accept',id:prompt.id});
-    check('new login can be saved after cross-origin navigation',manager.credentials.vault(manager.profile).find(origin,'new-redirect-login')?.password==='synthetic-new-login');
+    check('new login can be saved after cross-origin navigation',manager.credentials.vault(manager.main.profile).find(origin,'new-redirect-login')?.password==='synthetic-new-login');
   } finally { auth.closeAllConnections();auth.close(); }
 };

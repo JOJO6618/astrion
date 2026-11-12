@@ -49,6 +49,7 @@ export const ICONS = Object.freeze({
   panelRight: '/static/icons/panel-right.svg',
   pencil: '/static/icons/pencil.svg',
   play: '/static/icons/play.svg',
+  popOut: '/static/icons/square-arrow-out-up-right.svg',
   plus: '/static/icons/plus.svg',
   python: '/static/icons/python.svg',
   recycle: '/static/icons/recycle.svg',

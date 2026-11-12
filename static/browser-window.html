@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title></title>
+        <script>
+        // 首屏防白闪：与 static/chrome.html 同段——样式表生效前把持久化主题写到
+        // <html data-theme>，否则深色用户打开独立浏览器窗口时闪白。
+        (function () {
+            try {
+                var t = window.localStorage.getItem('agents_ui_theme');
+                if (t === 'classic' || t === 'light' || t === 'dark') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) { /* localStorage 不可用时按默认浅色回退 */ }
+        })();
+        </script>
+        <link rel="stylesheet" href="/static/browser-window.css">
+    </head>
+    <body>
+        <div id="browser-window-app"></div>
+        <script src="/static/security.js"></script>
+        <script type="module" src="/static/dist/assets/browserWindow.js"></script>
+    </body>
+</html>

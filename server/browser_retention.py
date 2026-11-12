@@ -34,6 +34,12 @@ def retention_response():
                or any(not isinstance(tab.get(key, 0), (int, float)) for key in ("lastActive", "lastAi"))
                for tab in tabs):
             raise ValueError("invalid_browser_retention_tabs")
+        # 已弹出到独立窗口的对话（桌面壳上报）与主窗口当前对话同样算前台；未知 owner 忽略。
+        presented = payload.get("presented") or []
+        if not isinstance(presented, list) or len(presented) > 200:
+            raise ValueError("invalid_browser_presented")
+        presented_keys = {json.dumps(scope, ensure_ascii=False, separators=(",", ":"))
+                          for scope in presented if isinstance(scope, list)} & set(owners)
     except (ValueError, KeyError, TypeError):
         return jsonify(success=False, error="invalid_browser_retention_state"), 400
 
@@ -49,7 +55,7 @@ def retention_response():
     chat = chat_identity = None
     for key, (mode, workspace, conversation) in owners.items():
         viewed = payload.get("visits", {}).get(key, 0)
-        info = {"exists": True, "front": owners[key] == visible,
+        info = {"exists": True, "front": owners[key] == visible or key in presented_keys,
                 "viewed": viewed if isinstance(viewed, (int, float)) else 0}
         try:
             if conversation.startswith("conv_"):

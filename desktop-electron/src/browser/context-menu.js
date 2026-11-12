@@ -27,27 +27,27 @@ export class BrowserContextMenu {
   close() {
     const current = this.current;
     this.current = null;
-    if (current && !this.manager.window.isDestroyed()) {
-      try { current.menu.closePopup(this.manager.window); } catch { /* A closing window may already have dismissed the menu. */ }
+    if (current && !current.window.isDestroyed()) {
+      try { current.menu.closePopup(current.window); } catch { /* A closing window may already have dismissed the menu. */ }
     }
   }
   closeStale() { if (this.current && !this.current.valid()) this.close(); }
-  build(tab, params) {
+  build(tab, params, host) {
     const manager = this.manager, wc = tab.view.webContents;
-    const lease = manager.lease, url = wc.getURL(), frame = params.frame;
+    const lease = host.lease, url = wc.getURL(), frame = params.frame;
     let frameURL;
     try { frameURL = frame?.url; } catch { /* A detached frame makes this menu invalid. */ }
     const valid = () => {
       try {
-        return !manager.disposed && !manager.window.isDestroyed() && manager.visible && manager.lease === lease && manager.active() === tab &&
-          tab.owner === manager.owner && !tab.pendingURL && !wc.isDestroyed() && tab.view.getVisible() && wc.getURL() === url &&
+        return !manager.disposed && !host.window.isDestroyed() && manager.hostFor(tab.owner) === host && host.visible && host.lease === lease && host.active() === tab &&
+          !tab.pendingURL && !wc.isDestroyed() && tab.view.getVisible() && wc.getURL() === url &&
           (!frame || (frameURL !== undefined && !frame.detached && frame.url === frameURL));
       } catch { return false; }
     };
-    const labels = contextMenuLabels(manager.menuLabels);
+    const labels = contextMenuLabels(host.menuLabels);
     const invoke = action => () => {
       if (!valid()) return;
-      try { wc.focus(); action(); } catch (error) { manager.message(error.message); }
+      try { wc.focus(); action(); } catch (error) { host.message(error.message); }
     };
     const item = (id, action, enabled = true) => ({ id, label: labels[id], enabled, click: invoke(action) });
     const groups = [];
@@ -58,7 +58,7 @@ export class BrowserContextMenu {
     } else if (params.selectionText) {
       groups.push([
         item('copy', () => wc.copy(), params.editFlags?.canCopy !== false),
-        item('searchSelection', () => manager.registry.create(searchURL(tab.profile.searchEngine(), params.selectionText)))
+        item('searchSelection', () => manager.registry.create(searchURL(tab.profile.searchEngine(), params.selectionText), { owner: tab.owner, profile: tab.profile }))
       ]);
     }
     if (params.linkURL) {
@@ -66,7 +66,7 @@ export class BrowserContextMenu {
       const navigate = isLocalFile(wc.getURL()) ? manualNavigationURL : navigationURL;
       try { navigate(params.linkURL); navigable = true; } catch { /* Copy remains available for other URL schemes. */ }
       groups.push([
-        item('openLinkNewTab', () => manager.registry.create(navigate(params.linkURL)), navigable && [...manager.tabs.values()].filter(row => row.owner === tab.owner).length < 48),
+        item('openLinkNewTab', () => manager.registry.create(navigate(params.linkURL), { owner: tab.owner, profile: tab.profile }), navigable && [...manager.tabs.values()].filter(row => row.owner === tab.owner).length < 48),
         item('copyLink', () => clipboard.writeText(params.linkURL)),
         item('saveLink', () => wc.downloadURL(params.linkURL), downloadable(params.linkURL))
       ]);
@@ -89,22 +89,23 @@ export class BrowserContextMenu {
       item('back', () => wc.navigationHistory.goBack(), wc.navigationHistory.canGoBack()),
       item('forward', () => wc.navigationHistory.goForward(), wc.navigationHistory.canGoForward()),
       item('reload', () => wc.reload()),
-      item('find', () => manager.send('browser:shortcut', { lease, key: 'f' }))
+      item('find', () => host.send('browser:shortcut', { lease, key: 'f' }))
     ]);
     const template = groups.filter(group => group.length).flatMap((group, index) => index ? [{ type: 'separator' }, ...group] : group);
-    return { menu: Menu.buildFromTemplate(template), valid };
+    return { menu: Menu.buildFromTemplate(template), valid, window: host.window };
   }
   show(tab, params) {
-    if (!this.manager.lease || tab !== this.manager.active() || tab.owner !== this.manager.owner) return;
+    const host = this.manager.hostFor(tab.owner);
+    if (!host?.lease || tab !== host.active()) return;
     this.close();
-    const current = this.build(tab, params);
+    const current = this.build(tab, params, host);
     if (!current.valid()) return;
     this.current = current;
     try {
-      current.menu.popup({ window: this.manager.window, callback: () => { if (this.current === current) this.current = null; } });
+      current.menu.popup({ window: host.window, callback: () => { if (this.current === current) this.current = null; } });
     } catch (error) {
       if (this.current === current) this.current = null;
-      this.manager.message(error.message);
+      host.message(error.message);
     }
   }
 }

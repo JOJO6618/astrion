@@ -15,7 +15,7 @@ export class BrowserFeatures {
     });
     ses.setPermissionRequestHandler((wc, permission, callback, details) => {
       const tab = manager.byContents(wc);
-      if (!tab || tab.profile !== profile || tab.owner !== manager.owner || !['geolocation', 'notifications', 'media', 'clipboard-read'].includes(permission)) { callback(false); return; }
+      if (!tab || tab.profile !== profile || !manager.hostFor(tab.owner) || !['geolocation', 'notifications', 'media', 'clipboard-read'].includes(permission)) { callback(false); return; }
       let origin;
       try { origin = new URL(details.requestingUrl || wc.getURL()).origin; } catch { callback(false); return; }
       const id = randomUUID();
@@ -44,7 +44,7 @@ export class BrowserFeatures {
       }
       if (!target) throw new Error('download_name_exhausted');
       item.setSavePath(target);
-    } catch (error) { item.cancel(); this.manager.message(error.message); return; }
+    } catch (error) { item.cancel(); this.manager.message(error.message, tab.owner); return; }
     const row = { id, name: path.basename(target), path: target, received: 0, total: item.getTotalBytes(), state: 'progressing', at: Date.now() };
     if (ai) ai.items.push({ name: row.name, path: target });
     this.items.set(id, item); this.profile.data.downloads.unshift(row);
@@ -64,7 +64,7 @@ export class BrowserFeatures {
     const request = this.pending.get(id); if (!request) return;
     this.pending.delete(id); clearTimeout(request.timer);
     const tab = this.manager.tabs.get(request.tabId);
-    const valid = tab && tab.owner === this.manager.owner && tab.profile === this.profile;
+    const valid = tab && !!this.manager.hostFor(tab.owner) && tab.profile === this.profile;
     let sameOrigin = false;
     try { sameOrigin = new URL(tab?.view.webContents.getURL()).origin === request.origin; } catch { /* Navigation invalidates permission requests. */ }
     const grant = allowed === true && valid && sameOrigin;
@@ -76,11 +76,11 @@ export class BrowserFeatures {
       const tab = this.manager.tabs.get(request.tabId);
       let sameOrigin = false;
       try { sameOrigin = new URL(tab?.view.webContents.getURL()).origin === request.origin; } catch { /* No active origin. */ }
-      if (!tab || tab.owner !== this.manager.owner || !sameOrigin) this.resolve(request.id, false);
+      if (!tab || !this.manager.hostFor(tab.owner) || !sameOrigin) this.resolve(request.id, false);
     }
   }
-  snapshot() {
-    return [...this.pending.values()].filter(row => row.owner === this.manager.owner).map(({ id, tabId, permission, origin }) => ({ id, tabId, permission, origin }));
+  snapshot(owner) {
+    return [...this.pending.values()].filter(row => row.owner === owner).map(({ id, tabId, permission, origin }) => ({ id, tabId, permission, origin }));
   }
   async command(action, id) {
     const row = this.profile.data.downloads.find(item => item.id === id);

@@ -67,16 +67,16 @@ app.whenReady().then(async () => {
     await until(async () => (await inspect()).lease, 'manual browser connects despite model setup error');
     state = await inspect();
     check('no-model error shows real tab strip, address bar and new-tab page', state.panel && state.tabbar && state.address && state.newtab && !state.error);
-    check('explicit failed new target owns native tabs without desktop commit', manager.owner.includes('tab-no-model'));
+    check('explicit failed new target owns native tabs without desktop commit', manager.main.owner.includes('tab-no-model'));
     await run(`window.browserRegression.navigate(${JSON.stringify(`${origin}/fixture-page`)})`);
-    await until(() => manager.active()?.view.webContents.getTitle() === 'Manual browser without a model', 'real address-form navigation');
-    await until(() => manager.active()?.view.getVisible(), 'native view receives Vue surface layout');
-    check('Vue address form opens the actual native website without any model', manager.active().view.getVisible());
-    await until(() => !manager.active().view.webContents.isLoading(), 'page load events settled');
+    await until(() => manager.main.active()?.view.webContents.getTitle() === 'Manual browser without a model', 'real address-form navigation');
+    await until(() => manager.main.active()?.view.getVisible(), 'native view receives Vue surface layout');
+    check('Vue address form opens the actual native website without any model', manager.main.active().view.getVisible());
+    await until(() => !manager.main.active().view.webContents.isLoading(), 'page load events settled');
     await delay(100);
     await run('window.browserRegression.menu()');
-    await until(() => manager.overlayRaised && window.contentView.children.at(-1) === main, 'Vue menu rises above live website');
-    check('real Vue menu overlays a still-visible native website', (await inspect()).menu && manager.active().view.getVisible());
+    await until(() => manager.main.overlayRaised && window.contentView.children.at(-1) === main, 'Vue menu rises above live website');
+    check('real Vue menu overlays a still-visible native website', (await inspect()).menu && manager.main.active().view.getVisible());
     await require('../2026-11-08_浏览器原生菜单与叠层/check.cjs').verify({ run, inspect, manager, window, main, origin, check, delay, until });
     if (process.argv.includes('--theme-icons')) await require('../2026-11-08_浏览器主题图标与浮层/check.cjs').verify({ run, inspect, manager, main, origin, check, delay, until });
     if (process.argv.includes('--polling-stability')) {
@@ -85,10 +85,10 @@ app.whenReady().then(async () => {
     await run("window.browserRegression.state('pending')");
     await until(async () => !(await inspect()).lease, 'pending navigation suspends browser ownership');
     state = await inspect();
-    check('pending navigation preserves browser chrome but suspends native commands', state.panel && state.address && !manager.active().view.getVisible());
+    check('pending navigation preserves browser chrome but suspends native commands', state.panel && state.address && !manager.main.active().view.getVisible());
     await run("window.browserRegression.state('committed')");
     await until(async () => (await inspect()).lease, 'committed target connects');
-    check('committed navigation switches to its own stable browser owner', manager.owner.includes('tab-committed'));
+    check('committed navigation switches to its own stable browser owner', manager.main.owner.includes('tab-committed'));
     await run("window.browserRegression.state('foreign')");
     await until(async () => !(await inspect()).lease, 'foreign renderer suspended');
     check('foreign renderer cannot borrow the failed new target', !(await inspect()).lease);

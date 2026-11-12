@@ -69,12 +69,12 @@ export function clipBounds(rect, mainBounds) {
 export function browserRoute(pathname) {
   return /^\/(?:$|new\/?$|(?:conv_)?\d{8}_\d{6}_\d{3}\/?$|chat(?:\/[^/]+)?\/?$)/.test(pathname);
 }
-export function trustedFrame(event, view, origin) {
+export function trustedFrame(event, view, origin, route = browserRoute) {
   try {
     const frame = event.senderFrame;
     const url = new URL(frame.url);
     return event.sender === view.webContents && frame === view.webContents.mainFrame && url.origin === origin
-      && browserRoute(url.pathname);
+      && route(url.pathname);
   } catch { return false; }
 }
 export function safeFilename(value) {

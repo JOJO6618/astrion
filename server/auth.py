@@ -471,6 +471,14 @@ def chrome_page():
     return serve_entry_html('chrome.html')
 
 
+@auth_bp.route('/browser-window')
+def browser_window_page():
+    # 桌面壳（macOS）对话浏览器独立窗口的界面页，复用共享 BrowserPanel。
+    # 与 /chrome 同理不加 login_required：页面本身无数据，身份由原生侧
+    # /api/session-status 校验；登录重定向会让窗口离开可信路由。
+    return serve_entry_html('browser-window.html')
+
+
 @auth_bp.route('/settings')
 @auth_bp.route('/settings/<path:section>')
 @login_required

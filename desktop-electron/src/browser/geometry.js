@@ -1,21 +1,27 @@
 import { clipBounds } from './policy.js';
 import { refreshTextDocuments } from './text-documents.js';
 
-// Project the right-docked surface immediately while the renderer catches up.
+// Project the host's surface immediately while the renderer catches up.
 // The authoritative CSS rectangle replaces this projection on its next layout.
-export function browserBounds(manager) {
-  if (!manager.geometry) return null;
-  const zoom = manager.mainView.webContents.getZoomFactor();
-  const main = manager.mainView.getBounds();
-  let rect = manager.geometry;
-  const viewport = manager.geometryViewport;
+// 主窗口面板贴右侧、宽度固定；独立窗口面板铺满，网页区随窗口向右下伸缩。
+export function browserBounds(host) {
+  if (!host?.geometry) return null;
+  const zoom = host.view.webContents.getZoomFactor();
+  const main = host.view.getBounds();
+  let rect = host.geometry;
+  const viewport = host.geometryViewport;
   if (viewport) {
     const width = main.width / zoom, height = main.height / zoom;
-    const panelWidth = Math.max(380, Math.min(viewport.panelWidth, width - 360));
-    const surfaceWidth = Math.max(0, panelWidth - viewport.surfaceInset);
-    const right = viewport.width - rect.x - rect.width;
-    rect = { x: width - right - surfaceWidth, y: rect.y, width: surfaceWidth,
-      height: Math.max(0, rect.height + height - viewport.height) };
+    if (host.popout) {
+      rect = { x: rect.x, y: rect.y, width: Math.max(0, rect.width + width - viewport.width),
+        height: Math.max(0, rect.height + height - viewport.height) };
+    } else {
+      const panelWidth = Math.max(380, Math.min(viewport.panelWidth, width - 360));
+      const surfaceWidth = Math.max(0, panelWidth - viewport.surfaceInset);
+      const right = viewport.width - rect.x - rect.width;
+      rect = { x: width - right - surfaceWidth, y: rect.y, width: surfaceWidth,
+        height: Math.max(0, rect.height + height - viewport.height) };
+    }
   }
   return clipBounds(Object.fromEntries(Object.entries(rect).map(([key, value]) => [key, value * zoom])), main);
 }
@@ -32,13 +38,13 @@ const themeColor = value => (typeof value === 'string' && COLOR.test(value) ? va
 
 /** 应用主题：接受 '#rrggbb' 或 { surfaceColor, textColor }。
  *  文字色只用于纯文本类文档（text-documents.js），普通网页不受影响。 */
-export function setBrowserSurfaceColor(manager, payload) {
+export function setBrowserSurfaceColor(manager, payload, window = manager.window) {
   const surface = themeColor(typeof payload === 'string' ? payload : payload?.surfaceColor);
   const text = themeColor(typeof payload === 'object' && payload ? payload.textColor : '');
   if (!surface) return;
   // 初始主题可能与缓存相同，但窗口根 View 仍需要明确的不透明背景。
-  manager.window.setBackgroundColor(surface);
-  manager.window.contentView.setBackgroundColor(surface);
+  window.setBackgroundColor(surface);
+  window.contentView.setBackgroundColor(surface);
   const changed = surface !== manager.surfaceColor || (!!text && text !== manager.textColor);
   if (text) manager.textColor = text;
   if (!changed) return;

@@ -64,7 +64,9 @@ export default defineConfig({
         login: loginEntry,
         register: registerEntry,
         quick: fileURLToPath(new URL('./static/src/quick.ts', import.meta.url)),
-        chrome: chromeEntry
+        chrome: chromeEntry,
+        // macOS 桌面壳对话浏览器独立窗口（/browser-window）
+        browserWindow: fileURLToPath(new URL('./static/src/browserWindow.ts', import.meta.url))
       },
       output: {
         // 产物名带内容哈希：URL 本身即版本，避免 CDN/浏览器各自独立缓存与

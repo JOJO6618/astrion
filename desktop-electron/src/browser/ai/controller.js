@@ -65,6 +65,8 @@ export class BrowserAI {
     const manager = this.manager;
     return manager.ensureProfile(username);
   }
+  /** 网页应有的尺寸：显示该对话的宿主面板（Windows 共享脚本的 manager 代理没有宿主，回退原逻辑）。 */
+  panelBounds(owner) { return this.manager.boundsFor ? this.manager.boundsFor(owner) : browserBounds(this.manager); }
   driver(tab) {
     let driver = this.drivers.get(tab.id);
     if (!driver) {
@@ -73,7 +75,8 @@ export class BrowserAI {
       tab.view.webContents.once('destroyed', () => { this.drivers.delete(tab.id); });
     }
     const bounds = tab.view.getBounds();
-    if (bounds.width < 50 || bounds.height < 50) tab.view.setBounds({ x: 0, y: 0, ...(browserBounds(this.manager) ? { width: browserBounds(this.manager).width, height: browserBounds(this.manager).height } : DEFAULT_SIZE) });
+    const panel = this.panelBounds(tab.owner);
+    if (bounds.width < 50 || bounds.height < 50) tab.view.setBounds({ x: 0, y: 0, ...(panel ? { width: panel.width, height: panel.height } : DEFAULT_SIZE) });
     tab.ai = tab.ai || { modelFull: undefined, modelDocGen: -1, modelEpoch: -1 };
     return driver;
   }
@@ -96,7 +99,8 @@ export class BrowserAI {
     return { id: this.shortId(owner, tab), url: wc?.getURL() || tab.url || 'about:blank', title: wc?.getTitle() || tab.title || '', loading: wc?.isLoading() || false, suspended: !!tab.suspended };
   }
   reveal(owner, tab, payload) {
-    if (payload.reveal !== true) return;
+    // 已弹出到独立窗口的对话无需展开主窗口面板。
+    if (payload.reveal !== true || this.manager.popouts?.has(owner)) return;
     const { workspace_id: workspace, conversation_id: conversation } = payload.identity || {};
     this.manager.send('browser:ai-activity', { workspace, conversation });
   }
@@ -144,7 +148,7 @@ export class BrowserAI {
     const driver = this.driver(tab);
     return driver.run(async () => {
       await driver.attach();
-      const panel = browserBounds(this.manager), zoom = tab.view.webContents.getZoomFactor() || 1;
+      const panel = this.panelBounds(owner), zoom = tab.view.webContents.getZoomFactor() || 1;
       await driver.fixViewport(panel ? { width: panel.width / zoom, height: panel.height / zoom } : null);
       this.ownerState(owner).current = tab.id;
       this.reveal(owner, tab, payload);

@@ -44,7 +44,22 @@
       name="chevronDown"
       :label="$t('browser.tabSearch')"
       @click="togglePicker"
-    /><BrowserButton name="x" :label="$t('browser.close')" @click="store.hide()" />
+    /><BrowserButton
+      v-if="popoutWindow"
+      name="panelRight"
+      :label="$t('browser.dock')"
+      @click="store.command('dock')"
+    /><template v-else
+      ><BrowserButton
+        v-if="canPopout"
+        name="popOut"
+        :label="$t('browser.popOut')"
+        :disabled="!store.snapshot"
+        @click="store.command('popout')" /><BrowserButton
+        name="x"
+        :label="$t('browser.close')"
+        @click="store.hide()"
+    /></template>
   </header>
 </template>
 <script setup lang="ts">
@@ -54,6 +69,9 @@ import BrowserIcon from './BrowserIcon.vue';
 import BrowserButton from './BrowserButton.vue';
 import BrowserSiteIcon from './BrowserSiteIcon.vue';
 import { browserTabLabel, internalPageIcons } from './internalPages';
+import { browserCanPopout, browserPopoutWindow } from './types';
 const { store, dragged, selectTab, tabContext, dragStart, drop, tabKeys, newTab, togglePicker } =
   inject(browserControlsKey)!;
+const popoutWindow = browserPopoutWindow();
+const canPopout = browserCanPopout();
 </script>

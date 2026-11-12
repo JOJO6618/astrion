@@ -32,23 +32,36 @@ export class BrowserCredentials {
     // A captured submission belongs to the source document, even after a login redirect.
     // Confirmation still shows that exact origin and expires independently after two minutes.
   }
-  invalidate() {
-    this.operation?.controller.abort(); this.importer.dispose();
-    for (const id of this.prompts.keys()) this.dismissPrompt(id);
-    this.forms.clear(); this.fills.clear(); this.autofilled.clear(); this.documents.clear(); this.vaultErrors.clear();
+  /** 不带宿主时全部清理；带宿主时只结束该宿主的导入，并清理它正在显示的对话的表单状态。 */
+  invalidate(host) {
+    if (!host) {
+      this.operation?.controller.abort(); this.importer.dispose();
+      for (const id of [...this.prompts.keys()]) this.dismissPrompt(id);
+      this.forms.clear(); this.fills.clear(); this.autofilled.clear(); this.documents.clear(); this.vaultErrors.clear();
+      return;
+    }
+    if (this.operation && this.operation.lease === host.lease) { this.operation.controller.abort(); this.importer.dispose(); }
+    // 主窗口当前对话已弹出时，表单状态属于独立窗口，主窗口切走不能清掉它。
+    if (!host.owner || this.manager.hostFor(host.owner) !== host) return;
+    const owned = id => this.manager.tabs.get(id)?.owner === host.owner;
+    for (const [id, prompt] of [...this.prompts]) if (prompt.owner === host.owner) this.dismissPrompt(id);
+    for (const [id, form] of [...this.forms]) if (form.owner === host.owner) this.forms.delete(id);
+    for (const id of [...this.fills.keys()]) if (owned(id)) this.fills.delete(id);
+    for (const value of [...this.autofilled]) if (owned(value.slice(0, value.indexOf(':')))) this.autofilled.delete(value);
+    for (const id of [...this.documents.keys()]) if (owned(id)) this.documents.delete(id);
   }
-  snapshot() {
-    const tab = this.manager.active();
+  snapshot(host) {
+    const tab = host.active();
     if (!tab) return { prompt: null, fill: null };
     const prompt = this.prompts.get(tab.id);
     return {
-      prompt: prompt && prompt.owner === this.manager.owner ? { id: prompt.id, tabId: tab.id, origin: prompt.origin, username: prompt.username, update: !!prompt.existingId } : null,
+      prompt: prompt && prompt.owner === host.owner ? { id: prompt.id, tabId: tab.id, origin: prompt.origin, username: prompt.username, update: !!prompt.existingId } : null,
       fill: this.fills.get(tab.id) || null
     };
   }
   onForm(event, input) {
-    const manager = this.manager, tab = manager.byContents(event.sender);
-    if (!manager.lease || !tab || manager.active() !== tab || tab.owner !== manager.owner || event.senderFrame !== tab.view.webContents.mainFrame) return;
+    const manager = this.manager, tab = manager.byContents(event.sender), host = tab && manager.hostFor(tab.owner);
+    if (!host?.lease || host.active() !== tab || event.senderFrame !== tab.view.webContents.mainFrame) return;
     if (!input || !['form', 'submitted'].includes(input.kind) || !/^[a-f\d]{32}$/.test(input.documentToken) || !/^[a-f\d]{32}$/.test(input.formToken)) return;
     if (typeof input.url !== 'string' || input.url.length > 8192 || typeof input.action !== 'string' || input.action.length > 8192) return;
     const url = input.url, origin = passwordOrigin(url), actionOrigin = passwordOrigin(input.action);
@@ -67,7 +80,7 @@ export class BrowserCredentials {
     let settings;
     try { settings = vault.load().settings; this.vaultErrors.delete(tab.profile.key); }
     catch {
-      if (!this.vaultErrors.has(tab.profile.key)) { this.vaultErrors.add(tab.profile.key); manager.message('密码库暂时无法解锁，请在密码管理中检查钥匙串授权。'); }
+      if (!this.vaultErrors.has(tab.profile.key)) { this.vaultErrors.add(tab.profile.key); manager.message('密码库暂时无法解锁，请在密码管理中检查钥匙串授权。', tab.owner); }
       return;
     }
     if (input.kind === 'submitted') {
@@ -92,7 +105,7 @@ export class BrowserCredentials {
   }
   sendFill(tab, form, account, replace = true) {
     const wc = tab.view.webContents;
-    if (this.manager.active() !== tab || tab.owner !== this.manager.owner || form?.owner !== tab.owner || !form?.allowFill || tab.pendingURL || wc.isDestroyed() || wc.getURL() !== form.url || account.origin !== form.origin) throw new Error('网页已变化，请重新选择登录表单。');
+    if (this.manager.hostFor(tab.owner)?.active() !== tab || form?.owner !== tab.owner || !form?.allowFill || tab.pendingURL || wc.isDestroyed() || wc.getURL() !== form.url || account.origin !== form.origin) throw new Error('网页已变化，请重新选择登录表单。');
     wc.send('browser:password-fill', { ...form, username: account.username, password: account.password, replace });
   }
   async authenticate() {
@@ -101,9 +114,9 @@ export class BrowserCredentials {
   }
   async command(event, input) {
     const manager = this.manager;
-    manager.check(event, input?.lease);
-    const lease = manager.lease, profile = manager.profile, owner = manager.owner;
-    const ensure = () => { manager.check(event, lease); if (manager.profile !== profile || manager.owner !== owner) throw new Error('浏览器资料已切换。'); };
+    const host = manager.check(event, input?.lease);
+    const lease = host.lease, profile = host.profile, owner = host.owner;
+    const ensure = () => { if (manager.check(event, lease) !== host || host.profile !== profile || host.owner !== owner) throw new Error('浏览器资料已切换。'); };
     const action = input?.action;
     if (action === 'cancel-import') {
       const operation = this.operation;
@@ -137,19 +150,19 @@ export class BrowserCredentials {
       const checked = () => { operation.controller.signal.throwIfAborted(); ensure(); };
       try {
         result = action === 'preview'
-          ? { preview: await this.importer.preview(profile, vault, input.value, checked, operation.controller.signal, stage => manager.send('browser:credentials-progress', { lease, stage })) }
+          ? { preview: await this.importer.preview(profile, vault, input.value, checked, operation.controller.signal, stage => host.send('browser:credentials-progress', { lease, stage })) }
           : { report: await this.importer.commit(profile, vault, input.value, checked) };
       } finally { if (this.operation === operation) this.operation = null; finish(); }
     } else if (action === 'fill') {
-      const tab = manager.tab(input.tabId), fill = this.fills.get(tab.id);
+      const tab = manager.tab(host, input.tabId), fill = this.fills.get(tab.id);
       if (!fill || fill.id !== input.fillId || !fill.accounts.some(row => row.id === input.id)) throw new Error('账号选择已过期，请重新点击登录输入框。');
       this.sendFill(tab, this.forms.get(tab.id), vault.get(input.id)); this.fills.delete(tab.id);
     } else if (action === 'dismiss') {
-      const tab = manager.active();
+      const tab = host.active();
       if (tab) { this.dismissPrompt(tab.id); this.fills.delete(tab.id); }
     } else if (action === 'accept') {
-      const tab = manager.active(), prompt = tab && this.prompts.get(tab.id);
-      if (!prompt || prompt.id !== input.id || prompt.owner !== manager.owner) throw new Error('保存密码提示已过期。');
+      const tab = host.active(), prompt = tab && this.prompts.get(tab.id);
+      if (!prompt || prompt.id !== input.id || prompt.owner !== host.owner) throw new Error('保存密码提示已过期。');
       // Prompt origin was authenticated at capture; a successful login may now show another site.
       const existing = vault.find(prompt.origin, prompt.username);
       if ((existing?.id || '') !== prompt.existingId || (existing?.updatedAt || 0) !== prompt.existingUpdated) throw new Error('密码库已变化，请在密码管理中确认。');
