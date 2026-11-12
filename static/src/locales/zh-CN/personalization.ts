@@ -522,7 +522,7 @@ export default {
   reviewAgentAutoApproval: '自动审批智能体',
   allowAutoFullAccessTitle: '允许自动审核通过单次完全访问请求',
   allowAutoFullAccessDesc:
-    '在自动审核或无限制模式下，审核智能体批准单次完全访问请求后立即执行，无需人工批准。默认关闭；人工审批模式不受影响。',
+    '在自动审核或无限制模式下，审核智能体批准单次完全访问请求后立即执行，无需人工批准；目标模式同样生效。默认关闭；人工审批模式不受影响。',
   reviewAgentAutoApprovalDesc: '自动审批模式下判断工具调用是否越权/危险',
   reviewAgentGoalReview: '目标审核智能体',
   reviewAgentGoalReviewDesc: '目标模式下判断长期目标是否真正达成',

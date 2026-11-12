@@ -30,9 +30,11 @@
 
 ## 无人工交互
 
-- 活动目标的执行层拒绝 ask_user、submit_plan 和 request_full_access=true；Web ask_user 批处理在创建问题前跳过，常规工具结果仍保持 tool_call 配对。
+- 活动目标的执行层拒绝 ask_user、submit_plan 和需要人工确认的工具；Web ask_user 批处理在创建问题前跳过，常规工具结果仍保持 tool_call 配对。
+- 单次完全访问申请例外（2026-11-13）：仅在「允许自动审核通过单次完全访问请求」开启且权限为 auto_approval／unrestricted 时放行——该组合与 `resolve_approval_requirements` 的 auto_full_access 完全一致，即审核智能体单独裁决、没有人工闸；开关关闭或人工审批／只读状态仍按 `goal_interaction_denied` 拒绝。判定在 `modules/goal_policy.py::auto_review_covers_full_access`，配置读取失败按未开启处理。
 - 直接 handle_tool_call 入口再次拒绝上述工具与 NEED_CONFIRMATION 中需要询问的工具。目标活动期间不能切到 ask/plan 或人工审批／只读权限。
 - 正常自动审核允许；审核拒绝交还模型调整方案，不要求人工批准。智能体间 ask_master/ask_other_agent 是内部通信，不按人工交互禁用。
+- 目标注入语（`server/goal_flow.py::goal_mode_prompt`）与目标审核提示词（`prompts/goal_review_agent.txt`）按同一放行条件切换措辞：允许时说明申请由审核智能体自动裁决、拒绝后不得反复申请；不允许时保持禁止。
 - 目标规则同时禁止等待人工登录／回答／批准。MCP 客户端目前不支持 elicitation/create；任意外部工具内部自行打开登录网页或等待输入无法靠工具名完整识别，不能宣称已对所有第三方工具行为做静态判定。
 
 ## 故障、调度和审核

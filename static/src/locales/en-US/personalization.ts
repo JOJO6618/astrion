@@ -559,7 +559,7 @@ export default {
   reviewAgentAutoApproval: 'Auto-approval agent',
   allowAutoFullAccessTitle: 'Allow automatic approval of one-time full access',
   allowAutoFullAccessDesc:
-    'In auto-approval or unrestricted mode, one-time full-access requests execute immediately after approval by the review agent, without manual approval. Off by default; manual-approval mode is unaffected.',
+    'In auto-approval or unrestricted mode, one-time full-access requests execute immediately after approval by the review agent, without manual approval; goal mode also applies. Off by default; manual-approval mode is unaffected.',
   reviewAgentAutoApprovalDesc:
     'Judges whether a tool call is out of scope or dangerous in auto-approval mode',
   reviewAgentGoalReview: 'Goal review agent',

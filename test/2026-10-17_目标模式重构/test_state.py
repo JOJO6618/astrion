@@ -88,6 +88,29 @@ class StateTests(unittest.TestCase):
         self.assertFalse(interaction_denied(terminal, "ask_master"))
         self.assertFalse(interaction_denied(terminal, "run_command", {"request_full_access": False}))
 
+    def test_full_access_allowed_only_when_auto_review_covers_it(self):
+        from modules.personalization_manager import (
+            load_personalization_config, save_personalization_config)
+        args = {"request_full_access": True, "full_access_reason": "need host path", "command": "ls /"}
+        terminal = SimpleNamespace(data_dir=self.tmp.name,
+            context_manager=SimpleNamespace(current_conversation_id="conv_A"),
+            get_permission_mode=lambda: "auto_approval")
+        # 默认关闭：目标模式仍按人工交互禁止申请
+        self.assertTrue(interaction_denied(terminal, "run_command", args))
+        config = load_personalization_config(self.tmp.name)
+        config["allow_auto_approve_full_access"] = True
+        save_personalization_config(self.tmp.name, config)
+        # 开启且自动审核模式：审核智能体单独裁决，放行申请
+        self.assertFalse(interaction_denied(terminal, "run_command", args))
+        # 人工审批模式即使开启开关也需要人工，仍禁止
+        terminal.get_permission_mode = lambda: "approval"
+        self.assertTrue(interaction_denied(terminal, "run_command", args))
+        # 无目标状态的对话不受影响
+        idle = SimpleNamespace(data_dir=self.tmp.name,
+            context_manager=SimpleNamespace(current_conversation_id="conv_idle"),
+            get_permission_mode=lambda: "auto_approval")
+        self.assertFalse(interaction_denied(idle, "run_command", args))
+
     def test_mode_transition_order_and_preserved_permissions(self):
         for permission in ("readonly", "approval", "auto_approval", "unrestricted"):
             calls = []

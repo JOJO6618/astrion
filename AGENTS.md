@@ -642,7 +642,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 - **文件唯一权威**：`<工作区 data_dir>/goal_states/<conversation_id>.json`，全部续接保留对话 ID。入口弹窗填写后显式开始；禁止恢复输入栏 armed／下一条消息自动变目标的旧行为。
 - **生命周期**：关闭目标不取消当前任务；停止主任务持久暂停目标。paused / blocked 均能手动继续，进程重启只恢复暂停显示，不自动续跑。自动后台通知不得解除暂停／阻塞。
-- **执行与交互**：开始／继续设 execute；权限已有 auto_approval / unrestricted 则保留，其余变 auto_approval。活动目标禁止 ask_user、submit_plan、人工确认工具和单次完全访问申请；正常自动审核与智能体内部通信保留。
+- **执行与交互**：开始／继续设 execute；权限已有 auto_approval / unrestricted 则保留，其余变 auto_approval。活动目标禁止 ask_user、submit_plan、人工确认工具；单次完全访问申请仅在「允许自动审核通过单次完全访问请求」开启且权限为 auto_approval / unrestricted 时放行（2026-11-13，条件与 `resolve_approval_requirements` 的 auto_full_access 一致，即审核智能体单独裁决、无人工闸），其余情况仍拒绝；正常自动审核与智能体内部通信保留。
 - **重试与并发**：网络耗尽后通过 RuntimeService 在同一对话派发新 user 输入；额度／认证／配置错误阻塞。Timer 绑定 run_id + task_id + next_retry_at，不能因用量更新 revision 而丢失重试。显示发布锁序固定 VIEW_LOCK → 目标状态锁，禁止反向获取。
 - **审核与限制**：以原目标和真实执行证据判断，不用“没有工具调用”代替审核；审核取证强制只读沙箱，不继承主对话 direct。轮数／Token 限制在目标弹窗可选，继续保留累计统计并重置本次限制基线，Token 来自同对话主／子新请求。
 - 详细契约：`docs/agents_details/goal_mode.md`；回归目录：`test/2026-10-17_目标模式重构/`。视觉和真实模型／网络恢复由用户运行验收。

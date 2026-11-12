@@ -13,18 +13,36 @@ from .chat_flow_task_support import inject_runtime_user_message
 
 GOAL_MODE_PROMPT = (
     "【目标模式已开启】请持续推进下述目标，工作模式为执行。"
-    "禁止 ask_user、submit_plan、申请完全访问权限或任何需要人工回答、批准、登录的交互。"
+    "禁止 ask_user、submit_plan 或任何需要人工回答、批准、登录的交互。"
     "在当前权限内自主决定常规细节，自动审核拒绝后应调整做法，不得转人工确认。"
     "以用户目标为范围，不擅自扩大任务。无法推进时明确说明阻塞原因；"
     "完成时给出成果和必要验证证据，由独立审核方判断是否达成。\n"
 )
+# 单次完全访问在目标模式下是否可用，取决于自动审核是否单独覆盖它（见 goal_policy）。
+GOAL_FULL_ACCESS_BLOCKED_PROMPT = (
+    "禁止申请完全访问权限：当前申请仍需要人工批准。"
+    "沙箱内无法完成时说明具体限制。\n"
+)
+GOAL_FULL_ACCESS_ALLOWED_PROMPT = (
+    "单次完全访问申请由审核智能体自动裁决，不需要人工批准："
+    "目标确需脱离沙箱时，可用 run_command 的 request_full_access=true 与 full_access_reason 发起申请，"
+    "说明具体命令、原因和访问范围；审核拒绝后调整做法，不得反复申请或绕过决定。\n"
+)
 CONTINUE_PREFIX = "审核智能体对于你的工作结束给出了以下内容："
+
+
+def goal_mode_prompt(web_terminal) -> str:
+    """目标模式注入语：完全访问申请按自动审核是否覆盖它区分。"""
+    from modules.goal_policy import auto_review_covers_full_access
+    suffix = (GOAL_FULL_ACCESS_ALLOWED_PROMPT if auto_review_covers_full_access(web_terminal)
+              else GOAL_FULL_ACCESS_BLOCKED_PROMPT)
+    return GOAL_MODE_PROMPT + suffix
 
 
 def inject_goal_prompt(*, web_terminal, messages, sender, conversation_id):
     gsm = GoalStateManager(web_terminal.data_dir, conversation_id)
     inject_runtime_user_message(web_terminal=web_terminal, messages=messages,
-        text=GOAL_MODE_PROMPT + gsm.get_goal(), source="goal_prompt", sender=sender,
+        text=goal_mode_prompt(web_terminal) + gsm.get_goal(), source="goal_prompt", sender=sender,
         conversation_id=conversation_id, inline=False, persist=True)
 
 
