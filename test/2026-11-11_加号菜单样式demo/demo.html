@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="classic">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>+ 菜单改版 demo（旧 / 新对比）</title>
+<style>
+/* ===== 三主题 token：取自 static/src/styles/base/_tokens.scss 实值 ===== */
+:root[data-theme='classic'] {
+  --surface-base: #faf9f5; --surface-soft: #f5f0e8; --surface-card: #efe9de;
+  --surface-muted: #e8e0d2; --surface-raised: #ffffff;
+  --text-primary: #141413; --text-secondary: #3d3d3a; --text-tertiary: #6c6a64;
+  --border-default: #e6dfd8; --border-strong: #d8cfc4; --border-card-strong: #e6dfd8;
+  --accent: #cc785c; --state-success: #10b981;
+  --tab-active: rgba(20, 20, 19, 0.07); --chip-bg: #f5f0e8; --badge-bg: #efe9de;
+  --hover-bg: rgba(20, 20, 19, 0.05); --shadow-color: rgba(0, 0, 0, 0.1);
+  --switch-track: #d8cfc4;
+  /* —— 新菜单专用（落地时补进 _tokens.scss 三主题 + 首屏回退）—— */
+  --popover-surface: var(--surface-raised);
+  --popover-border: var(--border-default);
+  --popover-shadow: 0 6px 20px rgba(38, 28, 18, 0.08), 0 1px 3px rgba(38, 28, 18, 0.06);
+  --switch-knob: var(--surface-raised);
+}
+:root[data-theme='light'] {
+  --surface-base: #ffffff; --surface-soft: #f9f9f9; --surface-card: #ffffff;
+  --surface-muted: #f3f3f3; --surface-raised: #ffffff;
+  --text-primary: #0d0d0d; --text-secondary: #5d5d5d; --text-tertiary: #8f8f8f;
+  --border-default: rgba(13, 13, 13, 0.1); --border-strong: rgba(13, 13, 13, 0.15);
+  --border-card-strong: rgba(13, 13, 13, 0.1);
+  --accent: #181818; --state-success: #10b981;
+  --tab-active: rgba(13, 13, 13, 0.05); --chip-bg: #f3f3f3; --badge-bg: #f3f3f3;
+  --hover-bg: rgba(13, 13, 13, 0.05); --shadow-color: rgba(0, 0, 0, 0.1);
+  --switch-track: #ececec;
+  --popover-surface: var(--surface-raised);
+  --popover-border: rgba(13, 13, 13, 0.1);
+  --popover-shadow: 0 6px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --switch-knob: var(--surface-raised);
+}
+:root[data-theme='dark'] {
+  --surface-base: #1a1a1a; --surface-soft: #212121; --surface-card: #262626;
+  --surface-muted: #2b2b2b; --surface-raised: #1a1a1a;
+  --text-primary: #ffffff; --text-secondary: #a0a0a0; --text-tertiary: #707070;
+  --border-default: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.12);
+  --border-card-strong: rgba(255, 255, 255, 0.1);
+  --accent: #606060; --state-success: #10b981;
+  --tab-active: rgba(255, 255, 255, 0.05); --chip-bg: #2a2a2a; --badge-bg: #2a2a2a;
+  --hover-bg: rgba(255, 255, 255, 0.06); --shadow-color: rgba(0, 0, 0, 0.4);
+  --switch-track: #2a2a2a;
+  --popover-surface: var(--surface-card);
+  --popover-border: rgba(255, 255, 255, 0.1);
+  --popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --switch-knob: var(--text-primary);
+}
+:root[data-theme='dark'] .qm-switch:not(.on) { background: color-mix(in srgb, var(--text-primary) 16%, transparent); }
+:root[data-theme='dark'] .qm-switch.on { background: color-mix(in srgb, var(--text-primary) 55%, transparent); }
+:root[data-theme='dark'] .qm-switch.on::after { background: var(--surface-card); }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--surface-base); color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; }
+
+/* ===== demo 外壳 ===== */
+.toolbar {
+  height: 52px; display: flex; align-items: center; gap: 18px; padding: 0 20px;
+  border-bottom: 1px solid var(--border-default); font-size: 13px; color: var(--text-secondary);
+}
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--hover-bg); gap: 2px; }
+.seg button {
+  border: 0; background: transparent; color: var(--text-secondary); height: 26px; padding: 0 10px;
+  border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.seg button.on { background: var(--surface-raised); color: var(--text-primary); box-shadow: 0 1px 2px var(--shadow-color); }
+:root[data-theme='dark'] .seg button.on { background: var(--surface-muted); }
+.toolbar .hint { margin-left: auto; color: var(--text-tertiary); font-size: 12px; }
+
+.stages { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 52px); }
+.stages.mobile { grid-template-columns: 390px 390px; justify-content: center; gap: 40px; }
+.stage {
+  position: relative; display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0 28px 44px; overflow: hidden; border-right: 1px solid var(--border-default);
+}
+.stages.mobile .stage { padding: 0 12px 28px; border: 1px solid var(--border-default); border-top: 0; border-bottom: 0; }
+.stage:last-child { border-right: 0; }
+.stages.mobile .stage:last-child { border-right: 1px solid var(--border-default); }
+.stage-title { position: absolute; top: 18px; left: 28px; font-size: 13px; color: var(--text-tertiary); }
+.stage-title b { color: var(--text-primary); font-weight: 600; margin-right: 6px; }
+
+.composer { position: relative; width: 100%; max-width: 680px; margin: 0 auto; }
+.stadium {
+  height: 56px; border-radius: 28px; background: var(--surface-raised);
+  border: 1px solid var(--border-default); display: flex; align-items: center; gap: 8px; padding: 0 10px;
+}
+:root[data-theme='light'] .stadium { background: var(--surface-soft); }
+:root[data-theme='dark'] .stadium { background: var(--surface-card); }
+.plus-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: 0; background: transparent;
+  color: var(--text-secondary); cursor: pointer; display: grid; place-items: center; flex: none;
+}
+.plus-btn:hover, .plus-btn.on { background: var(--hover-bg); color: var(--text-primary); }
+.plus-btn svg { width: 20px; height: 20px; transition: transform 0.15s ease; }
+.plus-btn.on svg { transform: rotate(45deg); }
+.placeholder { flex: 1; color: var(--text-tertiary); font-size: 14px; }
+.send-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--text-primary); opacity: 0.85; flex: none; }
+
+/* =====================================================================
+   旧版（原样复刻 _composer.scss:1050-1261 + QuickMenu.vue scoped）
+   ===================================================================== */
+.old-menu {
+  position: absolute; left: 0; bottom: calc(100% + 14px);
+  display: flex; flex-direction: column; gap: 6px; width: 230px; padding: 12px;
+  background: var(--surface-soft); border: 1px solid var(--border-default); border-radius: 18px; z-index: 30;
+}
+.old-list {
+  display: flex; flex-direction: column; gap: 6px; max-height: 194px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-primary) 22%, transparent) transparent;
+}
+.old-entry {
+  border: none; background: transparent; padding: 10px 12px; border-radius: 12px; font-size: 14px;
+  text-align: left; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; min-height: 44px; flex: none;
+}
+.old-entry:hover:not(:disabled) { background: var(--hover-bg); }
+.old-entry:disabled { opacity: 0.45; cursor: not-allowed; }
+.old-entry .arrow { margin-left: 10px; color: var(--text-secondary); }
+.old-entry.active-accent, .old-entry.active-accent .arrow { color: var(--accent); }
+.old-entry.active-accent .arrow { font-size: 12px; }
+.old-entry .lbl { display: inline-flex; align-items: center; gap: 8px; }
+.old-entry .lbl svg { width: 16px; height: 16px; }
+.old-entry.dim { opacity: 0.5; }
+.old-sub {
+  position: absolute; bottom: 0; left: calc(100% + 12px); width: 230px; padding: 12px;
+  border-radius: 18px; border: 1px solid var(--border-default); background: var(--surface-soft); z-index: 31;
+}
+.old-sub-list { display: flex; flex-direction: column; gap: 6px; }
+.old-sub-list.tools { max-height: calc(44px * 5 + 6px * 4); overflow-y: auto; scrollbar-width: none; }
+.old-sub-list.tools::-webkit-scrollbar { display: none; }
+:root[data-theme='dark'] .old-menu, :root[data-theme='dark'] .old-sub { background: var(--badge-bg); border-color: var(--border-card-strong); }
+:root[data-theme='dark'] .old-entry:hover:not(:disabled) { background: var(--tab-active); }
+:root[data-theme='light'] .old-entry:hover:not(:disabled) { background: var(--chip-bg); }
+
+/* =====================================================================
+   新版
+   ===================================================================== */
+.qm, .qm-sub {
+  position: absolute; z-index: 30; width: 224px; padding: 4px;
+  background: var(--popover-surface); border: 1px solid var(--popover-border); border-radius: 12px;
+  box-shadow: var(--popover-shadow);
+}
+/* 行间留 2px 缝，相邻 hover 底色不粘连 */
+.qm, .qm-sub, .qm-scroll { display: flex; flex-direction: column; gap: 2px; }
+.qm.is-mobile { display: block; }
+.qm { left: 0; bottom: calc(100% + 8px); transform-origin: left bottom; }
+.qm-sub { z-index: 31; max-height: calc(100vh - 16px); overflow-y: auto; scrollbar-width: none; }
+.qm-sub::-webkit-scrollbar { display: none; }
+/* 出现 / 收起互为反向：一级从下方升起、收起时落回；二级从一级一侧滑出、收起时滑回一级 */
+.qm.anim-in { animation: qm-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.qm.anim-out { animation: qm-out 0.1s cubic-bezier(0.4, 0, 1, 1) forwards; }
+.qm-sub.anim-in { animation: qm-sub-in 0.12s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.qm-sub.anim-out { animation: qm-sub-out 0.1s cubic-bezier(0.4, 0, 1, 1) forwards; }
+@keyframes qm-in { from { opacity: 0; transform: translateY(4px) scale(0.98); } }
+@keyframes qm-out { to { opacity: 0; transform: translateY(4px) scale(0.98); } }
+@keyframes qm-sub-in { from { opacity: 0; transform: translateX(-6px); } }
+@keyframes qm-sub-out { to { opacity: 0; transform: translateX(-6px); } }
+
+.qm-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 8px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--text-primary);
+  font-size: 13px; line-height: 1; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.qm-item:focus-visible { outline: none; background: var(--hover-bg); }
+.qm-item:hover:not(:disabled), .qm-item.is-open { background: var(--hover-bg); }
+.qm-item:disabled { cursor: not-allowed; }
+.qm-item:disabled > * { opacity: 0.4; }
+.qm-icon { width: 16px; height: 16px; flex: none; color: var(--text-secondary); }
+.qm-item:hover:not(:disabled) .qm-icon, .qm-item.is-open .qm-icon { color: var(--text-primary); }
+.qm-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qm-meta { flex: none; font-size: 12px; color: var(--text-tertiary); display: inline-flex; align-items: center; gap: 5px; }
+.qm-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--state-success); }
+.qm-chevron { width: 14px; height: 14px; flex: none; color: var(--text-tertiary); transform: rotate(-90deg); }
+.qm-sep { height: 1px; flex: none; margin: 2px 8px; background: var(--popover-border); }
+
+.qm-switch {
+  position: relative; width: 26px; height: 16px; flex: none; border-radius: 999px;
+  background: var(--switch-track); transition: background 0.15s ease;
+}
+.qm-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--switch-knob); box-shadow: 0 1px 2px var(--shadow-color); transition: transform 0.15s ease;
+}
+.qm-switch.on { background: var(--accent); }
+.qm-switch.on::after { transform: translateX(10px); }
+
+/* 手机端：二级替换一级 */
+.qm-back { color: var(--text-secondary); }
+.qm-back .qm-label { color: var(--text-primary); font-weight: 600; }
+.qm-back .qm-icon { width: 15px; height: 15px; }
+.qm.is-mobile { width: min(260px, calc(100% - 0px)); }
+.qm.is-mobile .qm-item { height: 36px; }   /* 触屏热区略放大，仍固定高度 */
+.qm-scroll { max-height: calc(100vh - 220px); overflow-y: auto; scrollbar-width: none; }
+.qm-scroll::-webkit-scrollbar { display: none; }
+/* 手机端视图切换：进入二级从右侧推入，返回一级从左侧推回 */
+.qm-scroll.swap-fwd { animation: qm-view-fwd 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.qm-scroll.swap-back { animation: qm-view-back 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes qm-view-fwd { from { opacity: 0; transform: translateX(12px); } }
+@keyframes qm-view-back { from { opacity: 0; transform: translateX(-12px); } }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span>主题</span>
+  <div class="seg" id="seg-theme">
+    <button data-v="classic" class="on">经典</button><button data-v="light">浅色</button><button data-v="dark">深色</button>
+  </div>
+  <span>视口</span>
+  <div class="seg" id="seg-view">
+    <button data-v="desktop" class="on">桌面</button><button data-v="mobile">手机 390</button>
+  </div>
+  <span>模拟</span>
+  <div class="seg" id="seg-stream">
+    <button data-v="idle" class="on">空闲</button><button data-v="streaming">对话运行中</button>
+  </div>
+  <span class="hint">新版：悬停或点击「工具 / 设置」展开二级；点 + 或空白处开关菜单</span>
+</div>
+
+<div class="stages" id="stages">
+  <section class="stage" id="stage-old">
+    <div class="stage-title"><b>旧版</b>大圆角 · 44px 选项 · 内部滚动</div>
+    <div class="composer">
+      <div class="menu-root" data-root="old"></div>
+      <div class="stadium">
+        <button class="plus-btn" data-plus="old"></button>
+        <span class="placeholder">输入消息…</span>
+        <span class="send-btn"></span>
+      </div>
+    </div>
+  </section>
+  <section class="stage" id="stage-new">
+    <div class="stage-title"><b>新版</b>紧凑 · 32px 固定行高 · 分组 · 无滚动</div>
+    <div class="composer">
+      <div class="menu-root" data-root="new"></div>
+      <div class="stadium">
+        <button class="plus-btn" data-plus="new"></button>
+        <span class="placeholder">输入消息…</span>
+        <span class="send-btn"></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------- 图标：内联自 static/icons/*.svg（lucide） ---------- */
+const ICONS = {
+  file: ['0 0 24 24', '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/>'],
+  camera: ['0 0 24 24', '<path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>'],
+  play: ['0 0 24 24', '<polygon points="6 3 20 12 6 21 6 3"/>'],
+  flag: ['0 0 24 24', '<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/>'],
+  browser: ['0 0 24 24', '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="M10 4v4M2 8h20M6 4v4"/>'],
+  globe: ['0 0 24 24', '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'],
+  wrench: ['0 0 24 24', '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/>'],
+  'notebook-search': ['0 0 24 24', '<path d="M2 6h4m-4 4h4m-4 4h4m-4 4h4"/><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6"/><path d="M20 11V4a2 2 0 0 0-2-2"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="m21 21-2-2"/>'],
+  settings: ['0 0 24 24', '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>'],
+  monitor: ['0 0 24 24', '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>'],
+  'chart-column': ['0 0 24 24', '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'],
+  layers: ['0 0 24 24', '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>'],
+  clipboard: ['0 0 24 24', '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'],
+  'folder-open': ['0 0 24 24', '<path d="m6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>'],
+  octagon: ['0 0 24 24', '<path d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z"/>'],
+  'mcp-logo': ['0 0 180 180', '<g stroke-width="14"><path d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706V16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177"/><path d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52"/><path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822"/></g>'],
+  pencil: ['0 0 24 24', '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'],
+  'user-pen': ['0 0 24 24', '<path d="M11.5 15H7a4 4 0 0 0-4 4v2m18.378-4.374a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle cx="10" cy="7" r="4"/>'],
+  'message-circle-question-mark': ['0 0 24 24', '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092a10 10 0 1 0-4.777-4.719"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m.08 4h.01"/>'],
+  eye: ['0 0 24 24', '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>'],
+  sparkles: ['0 0 24 24', '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>'],
+  terminal: ['0 0 24 24', '<path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>'],
+  brain: ['0 0 24 24', '<path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>'],
+  'sticky-note': ['0 0 24 24', '<path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path d="M15 3v5a1 1 0 0 0 1 1h5"/>'],
+  bot: ['0 0 24 24', '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>'],
+  'chevron-down': ['0 0 24 24', '<path d="m6 9 6 6 6-6"/>'],
+  'arrow-left': ['0 0 24 24', '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>'],
+  plus: ['0 0 24 24', '<path d="M5 12h14"/><path d="M12 5v14"/>']
+};
+const icon = (name, cls = 'qm-icon') => {
+  const [vb, body] = ICONS[name];
+  return `<svg class="${cls}" viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+};
+
+/* ---------- 数据（文案取自 locales/zh-CN/quickdock.ts 与 core/tool_config.py） ---------- */
+const TOOL_CATS = [
+  ['network', '网络检索', 'globe'], ['file_edit', '文件编辑', 'pencil'], ['read_focus', '阅读聚焦', 'eye'],
+  ['skills', 'Skills', 'sparkles'], ['terminal_realtime', '实时终端', 'monitor'], ['terminal_command', '终端指令', 'terminal'],
+  ['memory', '记忆', 'brain'], ['todo', '待办事项', 'sticky-note'], ['sub_agent', '子智能体', 'bot'],
+  ['personalization', '个性化设置', 'user-pen'], ['communication', '用户沟通', 'message-circle-question-mark'],
+  ['easter_egg', '彩蛋实验', 'sparkles'], ['mcp', 'MCP 工具', 'mcp-logo'],
+  ['mcp_server__playwright', 'MCP · playwright', 'mcp-logo'], ['mcp_server__github', 'MCP · github', 'mcp-logo']
+];
+const SETTINGS = [
+  ['realtime', '实时终端', 'monitor'], ['usage', '用量统计', 'chart-column'],
+  ['approval', '审批面板', 'clipboard'], ['path', '路径授权', 'folder-open'], ['blocking', '指令拦截', 'octagon']
+];
+
+const S = {
+  streaming: false, mobile: false,
+  browser: false, browserPending: false,
+  goal: 'none', // none | running | done | resumable
+  tools: Object.fromEntries(TOOL_CATS.map(([id]) => [id, !['easter_egg', 'mcp_server__github'].includes(id)])),
+  locked: { personalization: true },
+  old: { open: true, sub: null },
+  nw: { open: true, sub: null, swap: null } // swap: 'fwd' | 'back'（手机端视图切换方向）
+};
+const GOAL_META = { none: '', running: '运行中', done: '完成', resumable: '继续' };
+const GOAL_NEXT = { none: 'running', running: 'done', done: 'resumable', resumable: 'none' };
+
+/* =================== 旧版渲染 =================== */
+function renderOld() {
+  const root = document.querySelector('[data-root="old"]');
+  const plus = document.querySelector('[data-plus="old"]');
+  plus.classList.toggle('on', S.old.open);
+  if (!S.old.open) { root.innerHTML = ''; return; }
+  const dis = S.streaming ? 'disabled' : '';
+  const goalActive = S.goal === 'running' || S.goal === 'resumable';
+  const browserTxt = S.browserPending ? '本轮结束后生效' : S.browser ? '已开启' : '已关闭';
+  let sub = '';
+  if (S.old.sub === 'tools') {
+    sub = `<div class="old-sub" style="bottom:0"><div class="old-sub-list tools">${TOOL_CATS.map(([id, label, ic]) => {
+      const locked = S.locked[id]; const on = S.tools[id];
+      return `<button class="old-entry ${(!on || locked) ? 'dim' : ''}" data-old-tool="${id}" ${dis}>
+        <span class="lbl">${icon(ic, '')}<span>${label}</span></span>
+        <span class="arrow">${locked ? '被管理员锁定' : on ? '禁用' : '启用'}</span></button>`;
+    }).join('')}</div></div>`;
+  } else if (S.old.sub === 'settings') {
+    sub = `<div class="old-sub"><div class="old-sub-list">${['实时终端', '用量统计', '压缩对话', '审批面板', '路径授权', '指令拦截'].map((l) => `<button class="old-entry">${l}</button>`).join('')}</div></div>`;
+  }
+  root.innerHTML = `<div class="old-menu"><div class="old-list">
+    <button class="old-entry">上传文件</button>
+    <button class="old-entry" ${dis}>对话回顾</button>
+    <button class="old-entry" ${dis}>发送图片</button>
+    <button class="old-entry" ${dis}>发送视频</button>
+    <button class="old-entry" data-old-sub="tools">工具禁用<span class="arrow">›</span></button>
+    <button class="old-entry ${S.browser ? 'active-accent' : ''}" data-act="browser">浏览器<span class="arrow">${browserTxt}</span></button>
+    <button class="old-entry ${goalActive ? 'active-accent' : ''}" data-act="goal">目标模式<span class="arrow">${GOAL_META[S.goal] === '继续' ? '继续' : GOAL_META[S.goal]}</span></button>
+    <button class="old-entry" data-old-sub="settings">设置<span class="arrow">›</span></button>
+  </div>${sub}</div>`;
+}
+
+/* =================== 新版渲染 =================== */
+const row = ({ id = '', ic, label, meta = '', trail = '', attrs = '', cls = '' }) =>
+  `<button type="button" class="qm-item ${cls}" ${id ? `data-id="${id}"` : ''} ${attrs}>
+    ${icon(ic)}<span class="qm-label">${label}</span>${meta}${trail}</button>`;
+const chevron = () => icon('chevron-down', 'qm-chevron');
+const sw = (on) => `<span class="qm-switch ${on ? 'on' : ''}"></span>`;
+
+function mainRows() {
+  const dis = S.streaming ? 'disabled' : '';
+  const goalMeta = S.goal === 'none' ? '' :
+    `<span class="qm-meta">${S.goal === 'running' ? '<span class="qm-dot"></span>' : ''}${GOAL_META[S.goal]}</span>`;
+  const browserMeta = S.browserPending ? `<span class="qm-meta">本轮结束后生效</span>` : '';
+  const open = (id) => (S.nw.sub === id ? 'is-open' : '');
+  return [
+    row({ ic: 'file', label: '上传文件' }),
+    row({ ic: 'camera', label: '发送图片', attrs: dis }),
+    row({ ic: 'play', label: '发送视频', attrs: dis }),
+    '<div class="qm-sep"></div>',
+    row({ id: 'goal', ic: 'flag', label: '目标模式', meta: goalMeta }),
+    row({ id: 'browser', ic: 'browser', label: '浏览器', meta: browserMeta, trail: sw(S.browser) }),
+    row({ id: 'tools', ic: 'wrench', label: '工具', trail: chevron(), attrs: 'data-sub="tools"', cls: open('tools') }),
+    '<div class="qm-sep"></div>',
+    row({ ic: 'notebook-search', label: '对话回顾', attrs: dis }),
+    row({ ic: 'layers', label: '压缩对话' }),
+    row({ id: 'settings', ic: 'settings', label: '设置', trail: chevron(), attrs: 'data-sub="settings"', cls: open('settings') })
+  ].join('');
+}
+function subRows(which) {
+  if (which === 'tools') {
+    const dis = S.streaming ? 'disabled' : '';
+    return TOOL_CATS.map(([id, label, ic]) => {
+      const locked = S.locked[id];
+      return row({
+        ic, label, attrs: `data-tool="${id}" ${locked ? 'disabled' : dis}`,
+        meta: locked ? '<span class="qm-meta">已锁定</span>' : '',
+        trail: sw(S.tools[id])
+      });
+    }).join('');
+  }
+  return SETTINGS.map(([id, label, ic]) => row({ ic, label })).join('');
+}
+
+/* 收起：保留节点播放反向动画，结束后再移除（对应 Vue <transition> 的 leave 阶段） */
+function leave(el) {
+  el.dataset.leaving = '1';
+  el.classList.remove('anim-in');
+  el.classList.add('anim-out');
+  el.style.pointerEvents = 'none';
+  const done = () => el.remove();
+  el.addEventListener('animationend', done, { once: true });
+  setTimeout(done, 300);
+}
+const live = (root, sel) => root.querySelector(`${sel}:not([data-leaving])`);
+
+function renderNew() {
+  const root = document.querySelector('[data-root="new"]');
+  const plus = document.querySelector('[data-plus="new"]');
+  plus.classList.toggle('on', S.nw.open);
+  const mode = S.mobile ? 'mobile' : 'desktop';
+  let main = live(root, '.qm');
+  let sub = live(root, '.qm-sub');
+  if (main && main.dataset.mode !== mode) { root.innerHTML = ''; main = null; sub = null; }
+
+  if (!S.nw.open) {
+    if (sub) leave(sub);
+    if (main) leave(main);
+    S.nw.swap = null;
+    return;
+  }
+  if (!main) {
+    main = document.createElement('div');
+    main.className = `qm anim-in${S.mobile ? ' is-mobile' : ''}`;
+    main.dataset.mode = mode;
+    root.appendChild(main);
+  }
+
+  if (S.mobile) {
+    const title = S.nw.sub === 'tools' ? '工具' : '设置';
+    const body = S.nw.sub
+      ? `${row({ ic: 'arrow-left', label: title, cls: 'qm-back', attrs: 'data-back' })}<div class="qm-sep"></div>${subRows(S.nw.sub)}`
+      : mainRows();
+    main.innerHTML = `<div class="qm-scroll ${S.nw.swap ? `swap-${S.nw.swap}` : ''}">${body}</div>`;
+  } else {
+    main.innerHTML = mainRows();
+    if ((sub?.dataset.key || null) !== S.nw.sub) {
+      if (sub) leave(sub);
+      sub = null;
+      if (S.nw.sub) {
+        sub = document.createElement('div');
+        sub.className = 'qm-sub anim-in';
+        sub.dataset.key = S.nw.sub;
+        root.appendChild(sub);
+      }
+    }
+    if (sub) { sub.innerHTML = subRows(S.nw.sub); positionSub(); }
+  }
+  S.nw.swap = null;
+}
+
+/* 二级菜单：左缘贴一级右侧 6px，首行与触发项对齐，超出视口时向上收 */
+function positionSub() {
+  const root = document.querySelector('[data-root="new"]');
+  const sub = live(root, '.qm-sub');
+  const main = live(root, '.qm');
+  if (!sub || !main) return;
+  const trigger = main.querySelector(`[data-sub="${S.nw.sub}"]`);
+  const rootRect = root.getBoundingClientRect();
+  const mainRect = main.getBoundingClientRect();
+  const trigRect = trigger.getBoundingClientRect();
+  sub.style.left = `${mainRect.right - rootRect.left + 6}px`;
+  let top = trigRect.top - 5; // 5 = 边框 1 + 内边距 4，让首行与触发项重合
+  const h = sub.offsetHeight;
+  const maxBottom = window.innerHeight - 8;
+  if (top + h > maxBottom) top = maxBottom - h;
+  if (top < 8) top = 8;
+  sub.style.top = `${top - rootRect.top}px`;
+}
+
+/* =================== 交互 =================== */
+let hoverTimer = null;
+function setSub(id, viaHover) {
+  clearTimeout(hoverTimer);
+  if (S.nw.sub === id) return;
+  S.nw.sub = id;
+  renderNew();
+}
+const newRoot = document.querySelector('[data-root="new"]');
+newRoot.addEventListener('mouseover', (e) => {
+  if (S.mobile) return;
+  if (e.target.closest('.qm-sub')) { clearTimeout(hoverTimer); return; }
+  const item = e.target.closest('.qm .qm-item');
+  if (!item) return;
+  const target = item.dataset.sub || null;
+  clearTimeout(hoverTimer);
+  if (target === S.nw.sub) return;
+  // 进入带二级的项：短延迟展开；进入普通项：稍长延迟收起（给斜向移入二级留时间）
+  hoverTimer = setTimeout(() => setSub(target, true), target ? 90 : 200);
+});
+newRoot.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+newRoot.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const item = e.target.closest('.qm-item');
+  if (!item || item.disabled) return;
+  if (item.hasAttribute('data-back')) { S.nw.sub = null; S.nw.swap = 'back'; renderNew(); return; }
+  if (item.dataset.sub) {
+    if (S.mobile) { S.nw.sub = item.dataset.sub; S.nw.swap = 'fwd'; renderNew(); }
+    else setSub(S.nw.sub === item.dataset.sub ? null : item.dataset.sub);
+    return;
+  }
+  if (item.dataset.tool) { S.tools[item.dataset.tool] = !S.tools[item.dataset.tool]; renderAll(); return; }
+  if (item.dataset.id === 'browser') { toggleBrowser(); return; }
+  if (item.dataset.id === 'goal') { S.goal = GOAL_NEXT[S.goal]; renderAll(); return; }
+  // 普通动作：真实实现里执行动作并关闭菜单
+  S.nw.open = false; S.nw.sub = null; renderNew();
+});
+
+const oldRoot = document.querySelector('[data-root="old"]');
+oldRoot.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const b = e.target.closest('.old-entry');
+  if (!b || b.disabled) return;
+  if (b.dataset.oldSub) { S.old.sub = S.old.sub === b.dataset.oldSub ? null : b.dataset.oldSub; renderOld(); return; }
+  if (b.dataset.oldTool) { if (!S.locked[b.dataset.oldTool]) S.tools[b.dataset.oldTool] = !S.tools[b.dataset.oldTool]; renderAll(); return; }
+  if (b.dataset.act === 'browser') { toggleBrowser(); return; }
+  if (b.dataset.act === 'goal') { S.goal = GOAL_NEXT[S.goal]; renderAll(); return; }
+});
+
+function toggleBrowser() {
+  S.browser = !S.browser;
+  S.browserPending = S.streaming; // 运行中切换：本轮结束后生效
+  renderAll();
+}
+
+document.querySelectorAll('.plus-btn').forEach((btn) => {
+  btn.innerHTML = icon('plus', '');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const k = btn.dataset.plus;
+    if (k === 'old') { S.old.open = !S.old.open; S.old.sub = null; renderOld(); }
+    else { S.nw.open = !S.nw.open; S.nw.sub = null; renderNew(); }
+  });
+});
+document.addEventListener('click', () => {
+  if (S.old.open) { S.old.open = false; S.old.sub = null; renderOld(); }
+  if (S.nw.open) { S.nw.open = false; S.nw.sub = null; renderNew(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !S.nw.open) return;
+  if (S.nw.sub) { S.nw.sub = null; renderNew(); } else { S.nw.open = false; renderNew(); }
+});
+window.addEventListener('resize', () => positionSub());
+
+function bindSeg(id, fn) {
+  const seg = document.getElementById(id);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    e.stopPropagation();
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    fn(b.dataset.v);
+  });
+}
+bindSeg('seg-theme', (v) => { document.documentElement.dataset.theme = v; });
+bindSeg('seg-view', (v) => {
+  S.mobile = v === 'mobile';
+  document.getElementById('stages').classList.toggle('mobile', S.mobile);
+  S.nw.sub = null; S.old.sub = null; renderAll();
+});
+bindSeg('seg-stream', (v) => { S.streaming = v === 'streaming'; if (!S.streaming) S.browserPending = false; renderAll(); });
+
+function renderAll() { renderOld(); renderNew(); }
+renderAll();
+</script>
+</body>
+</html>

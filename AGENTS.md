@@ -366,8 +366,8 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **显示契约**：`auto_message_type=multi_agent_*`、visibility=chat、starts_work=false仍是协作消息协议。持久化和事件共用message_id，恢复只走显示快照。传输字段has_running_multi_agent表示running子实例／待消费消息，不是对话类型；后台命令／工作流另用通知池。禁止恢复子任务waiting阻塞输入。
 - **MCP与权限**：每子实例独立MCPClientManager，复用父注册表及可见映射，不共享活动客户端。默认Playwright profile加入稳定actor_id；未配置cwd时使用子working_dir，显式配置优先。MCP不套内置目录写权限沙箱。四档内置权限见§18。
 - **显示和分类**：主formatter在agent_context.py并注册dispatch；子formatter在toolkit.py；前端toolRenderers.ts委派subAgentResults.ts，备用ToolAction同用。meta只参数、content只结果。新增工具同步tool_config类别、工具系列／只读清单和动态加载注册。
-- **调试与验证**：ma_debug沿用multi_agent_loop.log，记录轮次／恢复／pending／门闸／跨循环问答。统一回归`test/2026-10-22_子智能体统一/`；相关快照、工作区、固定权限、MCP回归按影响执行。真实模型、UI和各原生平台另需实机验收。
 - **快捷面板单实例停止与工具文案（2026-11-12）**：快捷面板子智能体⋯菜单新增“停止”（仅running可点），走`POST /api/sub_agents/<task_id>/stop`→`manager.stop_sub_agent(stopped_by="user")`，软停止后idle、保留实例／名额／上下文，与“强制关闭”(terminate)区分；结果以“被用户取消”通知主智能体（有存活实例由执行器`_finish_round`汇报，无存活实例由manager补推；主智能体自己的停止不回显）。`/api/sub_agents/stop_all`后端保留、前端已无入口。详情时间线与活动弹窗统一用`components/chat/quickdock/subAgentToolText.ts`输出“自然语言动作＋关键参数”（edit_file显示`+增 -删`行数，未知工具原样显示工具名），新增子工具时在此补一条。主侧`send_message_to_sub_agent/stop_sub_agent/answer_sub_agent_question`补绑`bot`图标、形象、摘要分类与四态文案；子侧不显示图标。
+- **调试与验证**：ma_debug沿用multi_agent_loop.log，记录轮次／恢复／pending／门闸／跨循环问答。统一回归`test/2026-10-22_子智能体统一/`；相关快照、工作区、固定权限、MCP回归按影响执行。真实模型、UI和各原生平台另需实机验收。
 
 > 完整契约及执行器职责拆分见 `docs/agents_details/multi_agent.md`。
 
