@@ -68,3 +68,7 @@
 ### 完全访问审核设置（2026-11-05，2026-11-07扩展）
 
 设置 → 审核智能体 → 自动审批的「允许自动审核通过单次完全访问请求」绑定用户级 `allow_auto_approve_full_access`，默认 false。auto_approval 与 unrestricted 模式下，新建单次 full_access 请求读取同一开关，开启时由审核智能体批准即可执行，无需人工；关闭时 auto_approval 保持自动＋人工双批准，unrestricted 保留人工审批。approval 模式始终人工审批；普通 unrestricted 操作和已在 direct 环境的命令不受此开关影响。条件在请求创建时快照，设置中途变化不修改 pending 请求。审核智能体的取证命令始终使用只读沙箱。风险提示的用户级 `full_access_warning_dismissed` 同样默认 false，两字段均在后端默认配置和 sanitize、前端表单默认值及加载映射注册。
+
+## 主 Agent 完整 system 冻结（2026-11-12）
+
+主 Agent 在应用当前模型配置后，首次构建时将提供商基础指令和 Codex 桥接纳入 `frozen_system_prompt`。Responses 通过内部消息标记识别已有完整快照，不在每轮请求中重新加载或重复前置指令；该标记不外发。辅助模型、独立 Chat、子智能体维持原有路径。压缩允许整体重建，普通运行禁止改写。见 `docs/system_prompt_snapshot.md`。

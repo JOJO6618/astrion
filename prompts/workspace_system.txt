@@ -3,7 +3,7 @@
 - **项目名称**：{project_name}
 - **运行环境**：{runtime_environment}
 - **资源限制**：{resource_limit}
-- **当前时间**：{current_time}
+- **当前对话开始时间**：{conversation_start_time}
 - **项目结构**：
 
 ```

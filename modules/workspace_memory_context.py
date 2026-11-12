@@ -56,6 +56,19 @@ def render_snapshot(snapshot: dict, template: str, *, child: bool = False) -> st
     return f"{BEGIN}\n{text.strip()}\n{END}"
 
 
+def prepare_main_prompt(owner, *, template_name: str) -> tuple[str, dict]:
+    """Prepare content and version data for the complete system's atomic commit."""
+    if not owner.context_manager.conversation_metadata.get(ENABLED_KEY):
+        return "", {}
+    snapshot = read_snapshot(owner)
+    text = render_snapshot(snapshot, owner.load_prompt(template_name))
+    record = {key: value for key, value in snapshot.items() if key != "content"}
+    return text, {
+        SNAPSHOT_KEY: record,
+        "workspace_memory_write_version": snapshot["version"],
+    }
+
+
 def main_prompt(owner) -> str:
     cm = owner.context_manager
     metadata = cm.conversation_metadata

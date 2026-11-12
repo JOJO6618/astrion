@@ -396,7 +396,7 @@ async def _handle_workflow_tool(*, function_name: str, web_terminal, arguments, 
     与 submit_plan 一样在工具循环层处理而非 tools_execution 常规链。
     审核在工具内同步 await（handler 支持长阻塞，submit_plan 已验证该模式）。
     deactivate 摘牌后需要 sender 广播 {active: False} 快照（前端实时摘卡片）。
-    推进成功后同步刷新 messages 里的工作流 system 段（当前位置不滞后）。
+    推进成功后通过原有工具结果通知当前位置；不改写冻结的 system。
     """
     from server import workflow_flow
 
@@ -425,10 +425,8 @@ async def _handle_workflow_tool(*, function_name: str, web_terminal, arguments, 
                 reason=str(args.get("reason") or ""),
                 sender=sender,
             )
-        if isinstance(result, dict) and result.get("success"):
-            workflow_flow.refresh_workflow_system_segment(
-                messages, data_dir=workspace.data_dir, conversation_id=conversation_id
-            )
+        # Stage/branch/exit information remains in the unchanged tool result.
+        # Never refresh the frozen main Agent system during execution.
     except Exception as exc:
         # 柔性原则：任何工作流异常不得掐断智能体工作
         result = {"success": False, "error": tr("tool_loop.workflow_tool_error", error=exc)}

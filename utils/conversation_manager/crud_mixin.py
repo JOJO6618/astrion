@@ -92,10 +92,8 @@ class CrudMixin:
             "execution_mode": "sandbox",
             "pending_permission_mode": None,
             "pending_execution_mode": None,
-            "frozen_permission_prompt": None,
-            "frozen_execution_prompt": None,
+            "frozen_system_prompt": None,
             "workspace_memory_enabled": True,
-            "frozen_workspace_memory_prompt": None,
             "has_images": has_images,
             "has_videos": has_videos,
             # 首次对话尚未生成文件树快照，待首次用户消息时填充

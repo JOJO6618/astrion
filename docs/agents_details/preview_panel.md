@@ -50,7 +50,7 @@
 
 ### 16.4 Prompt
 
-- `prompts/preview_panel.txt`：冻结段注入（`messages.py` `frozen_preview_panel_prompt`，与 tool_loading 目录同模式）。核心要求：启动服务器后在回复中写完整地址、不要引导用户手动开浏览器、自我验证仍走 Playwright。
+- 主 Agent 的固定预览规则集中 `prompts/main_agent/static.txt`，明确仅在初始化功能状态表明可用时适用；`main_agent/dynamic/features.txt` 记录初始可用性，整体保存进 `frozen_system_prompt`。旧 `frozen_preview_panel_prompt` 只用于原序迁移。核心要求仍为：启动服务器后写完整地址、不要引导用户手动开浏览器。
 
 ---
 

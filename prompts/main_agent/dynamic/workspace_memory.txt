@@ -1,0 +1,9 @@
+### 私有项目常驻记忆（MEMORY.md）
+
+当前工作区的记忆文件：{workspace_memory_path}
+
+- {workspace_memory_maintenance}
+
+以下是当前快照的完整正文：
+
+{workspace_memory_content}

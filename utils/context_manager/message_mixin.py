@@ -77,6 +77,21 @@ AUTO_SHALLOW_TOOL_WHITELIST = {
 MAX_RECENT_UPLOADS = 10
 
 
+def _format_conversation_start_time(created_at: Any) -> str:
+    """Format the saved creation time; legacy naive timestamps use local time."""
+    if not isinstance(created_at, str) or not created_at.strip():
+        return "未记录（时区未知）"
+    try:
+        started_at = datetime.fromisoformat(created_at.strip().replace("Z", "+00:00"))
+        if started_at.tzinfo is None:
+            started_at = started_at.astimezone()
+        offset = started_at.strftime("%z")
+        timezone_text = f"UTC{offset[:3]}:{offset[3:]}"
+        return f"{started_at:%Y/%m/%d %H:%M:%S}（时区：{timezone_text}）"
+    except (ValueError, OverflowError, OSError):
+        return "未记录（时区未知）"
+
+
 class MessageMixin:
     """ContextManager message mixin 能力 mixin。"""
 
@@ -311,7 +326,7 @@ class MessageMixin:
                 "- **项目名称**：{project_name}\n"
                 "- **运行环境**：{runtime_environment}\n"
                 "- **资源限制**：{resource_limit}\n"
-                "- **当前时间**：{current_time}\n"
+                "- **当前对话开始时间**：{conversation_start_time}\n"
                 "- **项目结构**：\n\n{file_tree}\n\n"
                 "{recent_uploads}"
                 "- **长期记忆**：{memory}"
@@ -339,8 +354,19 @@ class MessageMixin:
             )
             container_path = self.container_mount_path or "/workspace"
 
-        now = datetime.now()
-        current_time_text = f"{now.year}年{now.month}月{now.day}日 {now.hour}点（24小时制）"
+        conversation_data = None
+        conversation_id = getattr(self, "current_conversation_id", None)
+        if conversation_id:
+            resolve_manager = getattr(self, "_get_conversation_manager_for_id", None)
+            manager = (
+                resolve_manager(conversation_id)
+                if callable(resolve_manager)
+                else getattr(self, "conversation_manager", None)
+            )
+            if manager is not None:
+                conversation_data = manager.read_conversation(conversation_id)
+        created_at = conversation_data.get("created_at") if isinstance(conversation_data, dict) else None
+        conversation_start_time = _format_conversation_start_time(created_at)
         project_name = (
             str(getattr(self, "workspace_label", "") or "").strip()
             or str(getattr(self, "project_label", "") or "").strip()
@@ -357,7 +383,7 @@ class MessageMixin:
             container_cpus=self.container_cpu_limit,
             container_memory=self.container_memory_limit,
             project_storage=self.project_storage_limit,
-            current_time=current_time_text,
+            conversation_start_time=conversation_start_time,
             file_tree=(
                 "（以下为工作区根目录的部分文件和文件夹）\n" + context["project_info"]["file_tree"]
                 if context["project_info"].get("file_tree")

@@ -274,10 +274,11 @@ class CompressionMixin:
             msg["metadata"] = metadata
             history[idx] = msg
         self.conversation_history = history
-        # Refresh private memory at compression boundaries, not ordinary turns.
+        # Rebuild the complete system, including private memory, only here.
+        from modules.system_prompt_snapshot import reset_system_prompt_updates
         memory_updates = {
+            **reset_system_prompt_updates(),
             "workspace_memory_enabled": True,
-            "frozen_workspace_memory_prompt": None,
             "workspace_memory_snapshot": None,
             "workspace_memory_write_version": None,
         }

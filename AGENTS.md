@@ -120,6 +120,7 @@
 
 ## 4) 代码修改约定（实用版）
 
+- **主 Agent 系统提示词（强制，2026-11-12）**：固定规则集中 `prompts/main_agent/static.txt`，各类动态初始化资料独立模板；完整初始 system（包括提供商基础指令与桥接）一次性保存为 `metadata.frozen_system_prompt`，两次压缩之间只能读取、禁止重组。旧对话恢复执行前按原顺序合并旧冻结字段，压缩后才用新布局；普通查询不迁移回写。工作流状态只走既有工具结果，运行期间通知保持原样。视觉动态说明区分图片／图片＋视频。不处理运行中切模型。改相关机制前必读 `docs/system_prompt_snapshot.md`。
 - **Chat / Agent 尽可能共用代码（强制）**：两者是功能和设计不同的两种模式，尽可能复用前后端代码、组件、样式与通用机制，禁止因为模式不同就维护两套通用实现。已确认的差异通过模式配置、能力边界和必要的专属适配表达；共有 UI 使用同一组件与同一份样式，共有智能体／工具循环使用同一套逻辑，通用修复应同时作用于两种模式。具体差异与共享边界见 `docs/chat_mode.md`。
 - **根治优先**：能根治的应告知用户方案与影响范围并询问是否执行；一定范围内的重构可接受，尽量避免打补丁式临时修改。
 - **精确读取**：**禁止整文件通读**。先用搜索工具（grep / 符号查找 / 关键字定位）锁定行段，只精确提取相关片段。
@@ -427,7 +428,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 1. **对话文件是唯一权威**：`metadata.tool_loading` 在**创建对话时快照一次**（所有新主对话统一快照，无类型例外）。之后个人空间改动只影响新建对话；执行链路**禁止**为该功能读 personalization／Flask session。
 2. **老对话无字段 = 未启用**：读侧一律走 `get_tool_loading_state()` 防御性解析，**不做迁移**；字段损坏同样按未启用处理。
 3. **tools 数组对话级稳定（stub 常驻）**：deferred 工具不整个剔除，而是替换为 stub——模型只敢调用「出现在工具列表里」的工具，纯 tool result 塞定义曾导致所有测试模型反复 load 死循环。stub 只由完整定义决定、与加载状态无关，数组每轮逐字节一致（前缀缓存不受影响）。**禁止**把 loaded 工具追加回 tools 数组。
-4. **prompt 目录走现有冻结机制**（key=`frozen_tool_loading_prompt`），目录**不**随 loaded 状态变化（system prompt 是缓存首段，动了全破）。
+4. **prompt 目录进入完整 system 冻结快照**（主 Agent 权威 key=`frozen_system_prompt`；旧 `frozen_tool_loading_prompt` 仅供一次性迁移），目录**不**随 loaded 状态变化。
 5. **压缩必须重置**：深压缩、浅压缩、手动压缩三处钩子统一 `reset_state_after_compression`（loaded 清空、pending 回满）；不回滚守门会放行无定义调用。
 6. **守门**：`tools_execution.py` 分发链前置，`deferred_set − loaded` 的工具被调用时返回引导错误（不执行）；`load_tools` 本身在 `_READONLY_ALLOWED_TOOLS` 中。
 7. **`load_tools` 的 formatter 必须保留完整 JSON 定义**（`agent_context.py::_format_load_tools`），只做摘要会导致历史重建后模型失去参数结构。

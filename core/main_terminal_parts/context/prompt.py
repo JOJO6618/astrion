@@ -193,4 +193,6 @@ class PromptMixin:
             if prompt_file.exists():
                 with open(prompt_file, 'r', encoding='utf-8') as f:
                     return f.read()
+            if name.startswith("main_agent/"):
+                raise FileNotFoundError(f"主 Agent 提示词模板缺失：{prompt_file}")
             return "你是 Astrion，一个智能助手。"

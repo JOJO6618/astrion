@@ -1,6 +1,6 @@
 # 私有项目常驻记忆 MEMORY.md
 
-2026-11-07。与全局记忆、公开 AGENTS.md、`.astrion/memory/` 专题索引并存。正文全文注入，不自动摘要或按行截断。规则模板为 `prompts/workspace_memory.txt`；四类记忆的保存分工由 `prompts/memory_system.txt` 统一说明，工具描述保持一致。
+2026-11-07。与全局记忆、公开 AGENTS.md、`.astrion/memory/` 专题索引并存。正文全文注入，不自动摘要或按行截断。主 Agent 固定维护规则集中在 `prompts/main_agent/static.txt`，实际正文由 `main_agent/dynamic/memory.txt`、`workspace_memory.txt` 渲染；子智能体仍使用原 `prompts/workspace_memory.txt`／`memory_system.txt` 模板。四类记忆的保存分工和工具描述保持一致。
 
 ## 存储与身份
 
@@ -12,9 +12,9 @@
 
 ## 快照生命周期（方案 A）
 
-- 新 Agent 对话带 `workspace_memory_enabled=true`，首个模型请求前读取文件并原子保存 `frozen_workspace_memory_prompt`、`workspace_memory_snapshot`（路径、版本、是否存在）及写入版本。
+- 新 Agent 对话带 `workspace_memory_enabled=true`，首个模型请求前读取文件，正文作为完整 `frozen_system_prompt` 的一部分，与 `workspace_memory_snapshot`（路径、版本、是否存在）及写入版本一次性原子保存；主 Agent 不再单独保存正文段。旧 `frozen_workspace_memory_prompt` 仅在恢复执行前原序合并迁移。见 `docs/system_prompt_snapshot.md`。
 - 正常发送、恢复、重启后的继续均使用持久化快照，不检查正文变化、不追加实时更新通知。即使文件原先为空，提示词仍为非空冻结段，不会因空字符串而反复加载。
-- 主对话深压缩／手动压缩清除私有快照；自动浅压缩提交时也清除，下一次构建重新加载。不因失败或取消的深压缩提前清除已提交快照。
+- 主对话深压缩／手动压缩成功提交时失效完整 system 及私有记忆快照；实际发生自动浅压缩时同样失效，下一次构建整体重建。不因失败或取消的深压缩提前清除已提交快照，没有发生浅压缩时保持冻结。
 - 已有老对话不在恢复时补注入；下一次压缩后启用。
 - 子实例新建时注入所属工作区的最新正文，复用、idle 唤醒和恢复沿用原 `system_prompt.txt`。子压缩仅替换私有记忆段并保存新系统提示词，不重建其他冻结内容。
 - 主子实例、不同对话可在同一时刻持有不同版本，这是按各自新建／压缩边界快照的预期行为。

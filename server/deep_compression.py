@@ -567,21 +567,7 @@ async def run_deep_compression(
 
     # 更新对话 metadata：压缩记录 + 清理压缩状态标记（同一对话，无切换）。
     # 同时清除 frozen prompt 缓存，使压缩后下一次请求自动重新加载动态内容。
-    REBUILD_FROZEN_KEYS = (
-        "frozen_main_system_prompt",
-        "frozen_permission_prompt",
-        "frozen_execution_prompt",
-        "frozen_recent_conversations_prompt",
-        "frozen_personalization_prompt",
-        "frozen_workspace_prompt",
-        "frozen_agents_md_prompt",
-        "frozen_skills_prompt",
-        "frozen_tool_loading_prompt",
-        "frozen_memory_prompt",
-        "frozen_workspace_memory_prompt",
-        "frozen_custom_system_prompt",
-        "frozen_disabled_tools_prompt",
-    )
+    from modules.system_prompt_snapshot import reset_system_prompt_updates
     meta_updates = {
         "compression_count": target_count,
         "deep_compression_records": all_records,
@@ -603,8 +589,7 @@ async def run_deep_compression(
         # （与 frozen prompt 一样随压缩周期重建；开关关闭时该值不会被发送）
         "external_session_id": new_external_session_id(),
     }
-    for frozen_key in REBUILD_FROZEN_KEYS:
-        meta_updates[frozen_key] = None
+    meta_updates.update(reset_system_prompt_updates())
     # 内置浏览器：压缩后模型已看不到旧快照，递增代次让下次动作返回完整快照。
     from modules.native_browser.state import BROWSER_EPOCH_META_KEY, next_epoch
     meta_updates[BROWSER_EPOCH_META_KEY] = next_epoch(metadata)

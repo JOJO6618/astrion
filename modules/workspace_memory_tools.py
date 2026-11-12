@@ -4,6 +4,7 @@ from __future__ import annotations
 import threading
 from modules.execution_plane.access import get_execution_backend
 from modules.workspace_memory import SNAPSHOT_KEY, PROMPT_KEY, content_version
+from modules.system_prompt_snapshot import SYSTEM_PROMPT_KEY
 
 _LOCKS: dict[str, threading.RLock] = {}
 _LOCK = threading.Lock()
@@ -13,7 +14,8 @@ def injected_memory(owner, path) -> dict | None:
     cm = getattr(owner, "context_manager", None)
     metadata = getattr(cm, "conversation_metadata", {}) or {}
     snapshot = metadata.get(SNAPSHOT_KEY)
-    if not isinstance(snapshot, dict) or not metadata.get(PROMPT_KEY):
+    frozen = metadata.get(SYSTEM_PROMPT_KEY) or metadata.get(PROMPT_KEY)
+    if not isinstance(snapshot, dict) or not frozen:
         return None
     if (not path or not isinstance(snapshot.get("path"), str)
             or not snapshot["path"] or not isinstance(snapshot.get("version"), str)):

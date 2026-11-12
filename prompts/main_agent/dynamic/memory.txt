@@ -1,0 +1,8 @@
+### 总体长期记忆
+{global_memory}[global_memory_empty]暂无总体长期记忆[/global_memory_empty]
+
+### 索引式项目记忆（.astrion/memory/）
+[project_memory_truncated]共 {project_memory_total} 条记忆，按最近修改排序，仅注入前 {project_memory_limit} 条索引：
+[/project_memory_truncated]{project_memory_list}[project_memory_empty]暂无项目记忆[/project_memory_empty]
+[project_memory_truncated]其余 {project_memory_remaining} 条未注入（可用 search_project_memory 按关键词检索）。
+[/project_memory_truncated]

@@ -1,6 +1,6 @@
 # 工具动态加载（Deferred Tool Loading）实施方案
 
-> 状态：设计已定稿（2026-09-10 讨论结论），待实施。
+> 本文保留历史设计讨论；工具机制的已实现契约以 `docs/agents_details/tool_loading.md` 为准。2026-11-12 起，主 Agent 的目录说明统一进入 `frozen_system_prompt`，旧分段 key 仅供原序迁移，见 `docs/system_prompt_snapshot.md`。
 > 关联：`docs/runtime_contract.md`（状态责任 S1、默认值解析优先级）、`core/tool_config.py`、`prompts/` 冻结机制。
 
 ## 1. 背景与目标

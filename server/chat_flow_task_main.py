@@ -575,6 +575,36 @@ async def handle_task_with_sender(
     
     # === 移除：不在这里计算输入token，改为在每次API调用前计算 ===
     
+    # Apply the selected model before freezing provider-specific system text.
+    try:
+        profile = get_model_profile(getattr(web_terminal, "model_key", None))
+        web_terminal.apply_model_profile(profile)
+    except Exception as exc:
+        debug_log(f"更新模型配置失败: {exc}")
+
+    # === 空模型注册表守卫：终端未持有模型（全新部署/未配置提供商，构造时
+    # 注册表为空置 None）时，发消息应得到干净的引导错误并终止任务，而不是让
+    # 后续 get_model_context_window 抛未处理 ValueError 变成任务级 500。
+    # 若终端构造后用户已新配模型（注册表非空），这里顺手补上默认模型继续任务。
+    if not getattr(web_terminal, "model_key", None):
+        try:
+            resolved_key = get_default_model_key()
+            resolved_profile = get_model_profile(resolved_key)
+        except ValueError as exc:
+            err_msg = str(exc)
+            web_terminal.context_manager.add_conversation("system", err_msg)
+            sender('error', {
+                'message': err_msg,
+                'status_code': 400,
+                'error_type': 'no_model_configured'
+            })
+            finalize_user_work_timer()
+            finalize_run_versioning_checkpoint("no_model_configured")
+            return
+        web_terminal.model_key = resolved_key
+        web_terminal.model_profile = resolved_profile
+        web_terminal.apply_model_profile(resolved_profile)
+
     # 构建上下文和消息（用于API调用）
     context = web_terminal.build_context()
     messages = web_terminal.build_messages(context, message)
@@ -618,35 +648,6 @@ async def handle_task_with_sender(
             )
     except Exception as exc:
         debug_log(f"[Goal] 启动/注入失败: {exc}")
-
-    try:
-        profile = get_model_profile(getattr(web_terminal, "model_key", None))
-        web_terminal.apply_model_profile(profile)
-    except Exception as exc:
-        debug_log(f"更新模型配置失败: {exc}")
-
-    # === 空模型注册表守卫：终端未持有模型（全新部署/未配置提供商，构造时
-    # 注册表为空置 None）时，发消息应得到干净的引导错误并终止任务，而不是让
-    # 后续 get_model_context_window 抛未处理 ValueError 变成任务级 500。
-    # 若终端构造后用户已新配模型（注册表非空），这里顺手补上默认模型继续任务。
-    if not getattr(web_terminal, "model_key", None):
-        try:
-            resolved_key = get_default_model_key()
-            resolved_profile = get_model_profile(resolved_key)
-        except ValueError as exc:
-            err_msg = str(exc)
-            web_terminal.context_manager.add_conversation("system", err_msg)
-            sender('error', {
-                'message': err_msg,
-                'status_code': 400,
-                'error_type': 'no_model_configured'
-            })
-            finalize_user_work_timer()
-            finalize_run_versioning_checkpoint("no_model_configured")
-            return
-        web_terminal.model_key = resolved_key
-        web_terminal.model_profile = resolved_profile
-        web_terminal.apply_model_profile(resolved_profile)
 
     # === 上下文预算与安全校验（避免超出模型上下文） ===
     max_context_tokens = get_model_context_window(getattr(web_terminal, "model_key", None))

@@ -138,9 +138,9 @@ class MemoryMixin:
             results.sort(key=lambda item: item.get("mtime", 0), reverse=True)
             return results
 
-    def _build_memory_system_content(self) -> str:
-            """构建记忆系统的 prompt 内容"""
-            template = self.load_prompt("memory_system").strip()
+    def _build_memory_system_content(self, template_name: str = "memory_system") -> str:
+            """构建记忆内容；主 Agent 的固定规则集中在静态模板。"""
+            template = self.load_prompt(template_name).strip()
             if not template:
                 return ""
 

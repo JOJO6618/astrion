@@ -338,7 +338,8 @@ def build_responses_body(
     """组装 Responses 请求体（含全部强制约束）。"""
     system_text, rest = split_system_messages(messages)
     if system_text:
-        instructions = f"{instructions}\n\n{system_text}"
+        from modules.system_prompt_snapshot import has_frozen_system
+        instructions = system_text if has_frozen_system(messages) else f"{instructions}\n\n{system_text}"
 
     body: Dict[str, Any] = {
         "model": model_id,

@@ -1,0 +1,10 @@
+【{filename} 项目规范】
+
+以下是工作区根目录 {filename} 文件的内容{updated_at}：
+
+{content}
+
+---
+注意：以上规范来自工作区根目录的 {filename} 文件；若与实际代码冲突，以代码为准并及时更新规范。
+
+{sub_notice}

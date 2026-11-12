@@ -26,7 +26,8 @@ class LifecycleTest(unittest.TestCase):
         conversation = manager.create_conversation(str(self.project))
         metadata = manager.read_conversation(conversation)["metadata"]
         self.assertTrue(metadata[ENABLED_KEY])
-        self.assertIsNone(metadata[PROMPT_KEY])
+        self.assertIsNone(metadata["frozen_system_prompt"])
+        self.assertNotIn(PROMPT_KEY, metadata)
         self.assertFalse(self.target.file.exists())
 
     def test_chat_creation_does_not_get_agent_project_memory(self):

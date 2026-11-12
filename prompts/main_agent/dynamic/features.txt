@@ -1,0 +1,4 @@
+## 当前功能状态
+
+- 预览面板：{preview_state}
+- 内置浏览器：{browser_state}

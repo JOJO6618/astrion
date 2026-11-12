@@ -2,7 +2,7 @@
 
 职责集中在此，尽量减少对主循环/工具循环的侵入：
 - 激活（工具与 REST 共用）：幂等规则 + 快照复制 + 激活上下文文本
-- system 段构建（不冻结，每次 build_messages 现生成）
+- 当前位置通过工具结果通知，不构建运行期 system 段
 - report_workflow_stage / choose_workflow_branch 的推进矩阵（_arrive_at 递归消解）
 - 审核调用（payload 构建 + 消息游标痕迹截取 + WorkflowReviewAgent）
 - 柔性通知文本构造（用户退出 / maxRejects / max_stage_rounds）
@@ -228,68 +228,7 @@ def _current_node_brief(*, wsm: WorkflowStateManager, current: Dict[str, Any]) -
     return f"【当前位置】{name}"
 
 
-# ---------------------------------------------------------------- system 段（不冻结，每次现生成）
-
-WORKFLOW_SYSTEM_PREFIX = "【工作流进行中】"
-
-
-def refresh_workflow_system_segment(messages, *, data_dir, conversation_id: Optional[str]) -> None:
-    """阶段推进/退出后同步刷新 messages 里的工作流 system 段。
-
-    单任务内 messages 只在入口构建一次，阶段推进后后续迭代会看到滞后的当前位置；
-    推进工具（report/choose）执行成功后由工具循环层调用本函数刷新。
-    工作流已退出（新内容为空）时移除该段。
-    """
-    if not isinstance(messages, list):
-        return
-    for idx, msg in enumerate(messages):
-        if not isinstance(msg, dict) or msg.get("role") != "system":
-            continue
-        content = str(msg.get("content") or "")
-        if not content.startswith(WORKFLOW_SYSTEM_PREFIX):
-            continue
-        try:
-            new_content = build_workflow_system_prompt(data_dir=data_dir, conversation_id=conversation_id)
-        except Exception:
-            return
-        if new_content:
-            msg["content"] = new_content
-        else:
-            messages.pop(idx)
-        return
-
-
-def build_workflow_system_prompt(*, data_dir, conversation_id: Optional[str]) -> str:
-    """工作流进行中的 system 上下文段。无激活工作流时返回空串（不注入）。"""
-    wsm = get_active_manager(data_dir, conversation_id)
-    if wsm is None:
-        return ""
-    definition = wsm.load_definition() or {}
-    current = wsm.get_node(wsm.get_current_node_id()) or {}
-    lines: List[str] = [
-        f"【工作流进行中】{definition.get('name')}：{definition.get('description')}",
-        "【节点目录】（完整定义见激活时的上下文；迷失时可调用 get_workflow_status 自查）",
-    ]
-    for node in definition.get("nodes") or []:
-        if not isinstance(node, dict) or node.get("kind") in ("start", "end"):
-            continue
-        kind = node.get("kind")
-        label = _KIND_LABELS.get(kind, kind or "?")
-        if kind == "stage":
-            desc = str(node.get("goal") or "")
-        elif kind == "review":
-            desc = f"把关：{node.get('prompt') or '阶段产出审核'}"
-        else:
-            desc = "按条件选择路径"
-        marker = " ← 当前" if node.get("id") == current.get("id") else ""
-        lines.append(f"- [{label}] {node.get('name')}：{desc}{marker}")
-    lines.append("")
-    lines.append(_current_node_brief(wsm=wsm, current=current))
-    lines.append(
-        "工作流只是辅助流程：期间可以正常与用户讨论其他内容；"
-        "阶段完成必须显式调用 report_workflow_stage 汇报，不要在没有汇报的情况下宣称阶段完成。"
-    )
-    return "\n".join(lines)
+# Current workflow position is delivered by tool results, never a live system segment.
 
 
 # ---------------------------------------------------------------- 推进矩阵

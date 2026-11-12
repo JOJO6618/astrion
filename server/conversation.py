@@ -1283,6 +1283,10 @@ def _restore_checkpoint_to_conversation(
     restore_meta = dict(conv_meta or {})
     if snapshot_meta:
         restore_meta.update(snapshot_meta)
+    from modules.system_prompt_snapshot import preserve_system_snapshot
+    target_meta = (conv_meta if target_conversation_id == source_conversation_id
+                   else (cm.read_conversation(target_conversation_id) or {}).get("metadata", {}))
+    preserve_system_snapshot(target_meta, restore_meta)
 
     restore_project_path = restore_meta.get("project_path") or str(workspace.project_path)
     restore_thinking_mode = bool(restore_meta.get("thinking_mode", False))
@@ -1673,10 +1677,6 @@ def stop_all_sub_agents(terminal: WebTerminal, workspace: UserWorkspace, usernam
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
-@conversation_bp.route('/api/sub_agents/<task_id>/terminate', methods=['POST'])
-@api_login_required
-@with_terminal
-def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWorkspace, username: str):
 @conversation_bp.route('/api/sub_agents/<task_id>/stop', methods=['POST'])
 @api_login_required
 @with_terminal
@@ -1709,6 +1709,10 @@ def stop_sub_agent_route(task_id: str, terminal: WebTerminal, workspace: UserWor
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@conversation_bp.route('/api/sub_agents/<task_id>/terminate', methods=['POST'])
+@api_login_required
+@with_terminal
+def terminate_sub_agent(task_id: str, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """手动停止指定子智能体。"""
     manager = getattr(terminal, "sub_agent_manager", None)
     if not manager:

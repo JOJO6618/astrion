@@ -175,7 +175,9 @@ class APIClientResponsesMixin:
                 max_tokens = min(max_tokens, available)
 
         effort = self._resolve_responses_effort(model_id)
-        instructions = self._build_responses_instructions(model_id)
+        # Main Agent snapshots already include provider base and bridge.
+        from modules.system_prompt_snapshot import has_frozen_system
+        instructions = "" if has_frozen_system(messages) else self._build_responses_instructions(model_id)
 
         body = build_responses_body(
             messages=messages,
