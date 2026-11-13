@@ -139,6 +139,12 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         if (error instanceof NavigationError && error.status === 409) {
           await this.refreshSnapshot().catch(() => {});
         }
+        // 零工作区（新装 host）是正常空态，不是同步故障：静默降级到 /new 引导页。
+        if (error instanceof NavigationError && error.code === 'no_workspace') {
+          this.commandError = '';
+          if (window.location.pathname !== '/new') window.location.assign('/new');
+          return null;
+        }
         this.commandError = String((error as Error)?.message || error);
         throw error;
       }
@@ -182,6 +188,8 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       } = {}
     ) {
       const kind = payload.conversationKind || this.activeTab?.conversationKind || 'agent';
+      // 工作区以导航快照为准（设置页等独立路由没有组件级 currentHostWorkspaceId）；
+      // 真正零工作区时由后端返回 code=no_workspace，command 静默回 /new。
       return this.command('create', {
         key: `tab_${navigationId()}`,
         conversation_kind: kind,

@@ -17,6 +17,8 @@ from modules.i18n import tr
 _WORKSPACE_ID_RE = re.compile(r"^[a-zA-Z0-9._-]{1,64}$")
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _HOST_WORKSPACE_LOCK = threading.RLock()
+# 写过这个标记后即使 catalog 被删空也不再自动重建（尊重用户主动删除）
+AUTO_DEFAULT_WORKSPACE_MARKER = "auto_default_workspace"
 
 
 def _resolve_config_path(config_path: Optional[Union[str, Path]] = None) -> Path:
@@ -30,7 +32,7 @@ def _resolve_config_path(config_path: Optional[Union[str, Path]] = None) -> Path
 
 
 def _default_payload() -> Dict[str, Any]:
-    """空配置：不在启动时自动创建任何工作区，等待用户手动创建。"""
+    """空配置：由 ``ensure_default_host_workspace`` 在首次启动时补一个默认工作区。"""
     return {
         "default_workspace_id": "",
         "workspaces": [],
@@ -102,6 +104,62 @@ def _normalize_workspace_path(raw: Any) -> Path:
     else:
         path = path.resolve()
     return path
+
+
+def default_workspace_path() -> Path:
+    """首次启动默认工作区路径：桌面优先，桌面不存在时回退主目录。
+
+    与 chat→agent 交接使用同一路径，避免出现两个「默认工作区」。
+    """
+    home = Path.home()
+    desktop = home / "Desktop"
+    if not desktop.is_dir():
+        # Windows 桌面可能被 OneDrive 重定向（目录名仍是 Desktop，仅显示为「桌面」）。
+        for candidate in (home / "OneDrive" / "Desktop", home / "OneDrive" / "桌面"):
+            if candidate.is_dir():
+                desktop = candidate
+                break
+        else:
+            return home / "Astrion" / "Default"
+    return desktop / "Astrion" / "Default"
+
+
+def ensure_default_host_workspace(
+    config_path: Optional[Union[str, Path]] = None,
+) -> Optional[Dict[str, str]]:
+    """host 模式首次启动自动创建默认工作区（幂等、只创建一次）。
+
+    - catalog 已有工作区：不动作。
+    - 已经自动创建过（``auto_default_workspace`` 标记）：不动作，用户删空后不再强行重建。
+    - 任何异常都不抛出：创建失败只退回「无工作区」空态，由前端引导用户手动创建。
+    """
+    cfg_path = _resolve_config_path(config_path)
+    with _HOST_WORKSPACE_LOCK:
+        try:
+            payload = _ensure_config_file(cfg_path, strict=False)
+        except Exception:
+            return None
+        if isinstance(payload.get("workspaces"), list) and payload["workspaces"]:
+            return None
+        if payload.get(AUTO_DEFAULT_WORKSPACE_MARKER) is True:
+            return None
+        try:
+            result = create_host_workspace(
+                str(default_workspace_path()),
+                label=tr("host_ws.default_workspace_label"),
+                set_default=True,
+                config_path=cfg_path,
+            )
+        except Exception:
+            return None
+        try:
+            payload = _ensure_config_file(cfg_path, strict=False)
+            payload[AUTO_DEFAULT_WORKSPACE_MARKER] = True
+            _atomic_write_json(cfg_path, payload)
+        except Exception:
+            # 标记写失败不影响本次创建，最坏情况是下次启动再走一次幂等创建。
+            pass
+        return result.get("workspace")
 
 
 def _normalize_entry(raw: Any, index: int) -> Optional[Dict[str, str]]:

@@ -573,6 +573,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 ## 19) 运行中对话显示快照（2026-10-08）
 
 - **桌面标签导航（2026-10-23）**：标签唯一写者为 `modules/desktop_navigation/`，双 WebView 仅提交幂等命令及消费版本快照；稳定 key 不随新对话绑定改变，去重与运行态按工作区＋对话识别。`ui/desktopNavigation.ts` 在完整状态更新后消费目标，加载仍走唯一 bootstrap，显示提交前校验 renderer/navigation 所有权；禁止恢复 eval 标签桥、全列表 PUT 或双页本地生成身份。关闭不停止任务，删除清理标签，刷新继承 pending 目标。完整约束及回归见 `docs/desktop_navigation.md`。
+- **零工作区与默认工作区（2026-11-13，仅 host 模式）**：首次启动且 catalog 为空时 `modules/host_workspace_manager.ensure_default_host_workspace` 在桌面创建默认工作区（`~/Desktop/Astrion/Default`，无桌面回退 `~/Astrion/Default`）；写过 `auto_default_workspace` 标记后即使删空也不再重建，chat→agent 交接复用同一路径函数（禁止另写一套路径）。零工作区是正常空态：桌面导航不 attach，新标签/恢复由后端按导航快照解析、真正无工作区时返回 `code=no_workspace` 后前端静默回 `/new`（**禁止用组件级 `currentHostWorkspaceId` 判断，设置页等独立路由下为空**）；后端 `attach` 在文档已离开独立页面时恢复对话标签、不把页面拉回设置；GET 快照不得 503（不得渲染「同步失败」）；无模型时 `/new` 装配不报错（默认模型回落到空串），只在发送消息时给 `no_model_configured` 引导错误。Docker/项目模式不适用。
 - **显示加载唯一入口**：`server/conversation_bootstrap.py` + `static/src/app/methods/conversation/bootstrap.ts`；契约见 `docs/运行对话显示快照契约.md`。服务端 `conversation_view/` 冻结已提交历史前缀并增量维护当前任务显示投影，同一显示事务捕获投影、主任务摘要与绝对 `next_event_idx`；前端离线构造后一次提交，再用 `attachSnapshot` 从该游标续接。**有限事件 deque 只用于增量，不用于重建全部显示。**
 - **禁止恢复旁路**：不要恢复 `restoreTaskState`、从事件 0 重放、末条角色/工具猜边界、文本匹配去重、全历史扫描补工具注册、mounted/watcher 第二次恢复、对账独立写消息/归零游标或全局 task handler。
 - **所有权**：导航使用 `conversation/session.ts` 的 session 身份与 epoch（空页面也推进 epoch）；轮询独立使用 generation/request owner。**所有异步响应、catch/finally、timer 在写状态前检查归属，不能只比较 conversation/task 字符串 ID。**

@@ -1079,6 +1079,15 @@ def initialize_system(path: str, thinking_mode: bool = False):
                 print(f"{OUTPUT_FORMATS['success']} Host API token 已就绪（CLI Bearer 通道）")
         except Exception as _e:
             print(f"{OUTPUT_FORMATS['warning']} Host API token 生成失败: {_e}")
+        # 首次启动（catalog 为空）自动建一个桌面默认工作区：无工作区会让桌面标签条、
+        # /new 路由进入「引导态」，用户必须手动建一个才能开始对话。
+        try:
+            from modules.host_workspace_manager import ensure_default_host_workspace
+            created = ensure_default_host_workspace()
+            if created:
+                print(f"{OUTPUT_FORMATS['success']} 已创建默认工作区: {created.get('path')}")
+        except Exception as _e:
+            print(f"{OUTPUT_FORMATS['warning']} 默认工作区创建失败: {_e}")
     _mode_label = "宿主机模式（单用户）" if TERMINAL_SANDBOX_MODE == "host" else "多用户模式（Web）"
     print(f"{OUTPUT_FORMATS['success']} Web 系统初始化完成（{_mode_label}）")
 

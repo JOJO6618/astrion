@@ -19,6 +19,14 @@ class NavigationConflict(ValueError):
     """A command no longer owns the target or renderer document."""
 
 
+class WorkspaceRequired(ValueError):
+    """Zero-workspace host install: agent tabs need a workspace, not a failure.
+
+    新装宿主机模式（尚未创建任何工作区）是正常初始空态，调用方据此返回
+    code=no_workspace 让前端静默降级，而不是渲染「同步失败」。
+    """
+
+
 class DesktopNavigation:
     def __init__(self, path: str):
         self.path = Path(path)
@@ -67,6 +75,10 @@ class DesktopNavigation:
             except Exception:
                 tab["error"] = "workspace_unavailable"
                 continue
+            if info.get("no_workspace"):
+                # 零工作区：标签保留但标为暂不可用，不删除、不抛错
+                tab["error"] = "workspace_unavailable"
+                continue
             if info.get("exists") is False:
                 missing.add(tab["key"])
             else:
@@ -111,7 +123,7 @@ class DesktopNavigation:
         info = lookup(workspace, "") if lookup else {}
         workspace = str(info.get("workspace_id") or workspace)
         if not workspace:
-            raise ValueError("A workspace is required")
+            raise WorkspaceRequired("A workspace is required")
         return workspace, str(info.get("label") or payload.get("workspace_label") or "")
 
     def _open(self, state: dict, payload: dict, lookup: Callable | None) -> dict:
@@ -257,7 +269,22 @@ class DesktopNavigation:
                 # Reloads must reacquire the selected document even after a previous commit.
                 navigate(state, nav["key"])
             elif nav.get("page"):
-                navigate(state, page=nav["page"])
+                if page:
+                    # 文档仍是该独立页面（刷新/重进）：保持原页面。
+                    navigate(state, page=nav["page"])
+                else:
+                    # 文档已离开该页面（当前是对话页）：这就是用户主动返回，
+                    # 不能把页面再拉回设置（否则表现为“返回后又被弹回”）。
+                    tab = (find_tab(state, state["resume_key"]) or
+                           find_tab(state, state["active_key"]))
+                    if tab is not None and \
+                            tab.get("conversation_kind", "agent") != declared_kind:
+                        tab = None
+                    if tab is None:
+                        tab = (self._blank_target(state, payload, lookup, nav_tab) or
+                               self._open(state, payload, lookup))
+                    navigate(state, tab["key"])
+                    self._commit(state, state["navigation"])
             else:
                 tab = find_tab(state, state["active_key"]) or find_tab(state, state["resume_key"])
                 if tab is not None and \

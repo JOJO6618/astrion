@@ -2,6 +2,7 @@
 // Only this coordinator consumes desktop targets. The existing snapshot remains the display loader.
 import { watch } from 'vue';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
+import { NavigationError } from '../../../stores/desktopNavigationTransport';
 import { currentConversationSession } from '../conversation/session';
 import { t } from '@/locales';
 
@@ -64,6 +65,13 @@ async function applyTarget(host, control) {
   if (host.isConversationIndependentRoute?.()) {
     host.leaveConversationView();
     if (owns()) window.location.assign(pathFor(tab));
+    return;
+  }
+  if (!tab.workspaceId) {
+    // 零工作区标签（新建或工作区已被删空）：没有可展示的执行身份，
+    // 回空对话引导页，不走工作区切换与失败标记。
+    host.leaveConversationView();
+    if (owns() && window.location.pathname !== '/new') window.location.assign('/new');
     return;
   }
   // A deleted/closed visible tab must not remain sendable while its successor loads.
@@ -142,9 +150,19 @@ export async function startDesktopNavigation(host) {
     handled: '',
     stop: null,
     retryTimer: 0,
-    attachErrorShown: false
+    attachErrorShown: false,
+    // 零工作区（新装 host）：标签导航依赖工作区身份，此时不发任何命令，
+    // 避免标签条常驻「同步失败」，等工作区就绪再由 watch 重新启动。
+    awaitingWorkspace: false,
+    workspaceStop: null
   };
   controllers.set(host, control);
+  // 判断零工作区只能用导航快照（host.currentHostWorkspaceId 在设置页等独立路由上
+  // 恒为空，但实际有工作区）。快照里的 workspace_id 由后端维护。
+  const workspaceReady = () =>
+    Boolean(
+      host.isChatMode || host.currentHostWorkspaceId || useConversationTabsStore().workspaceId
+    );
   const observe = () => {
     void applyTarget(host, control).catch((error) => {
       if (!control.disposed) errorToast(host, error);
@@ -154,6 +172,7 @@ export async function startDesktopNavigation(host) {
   // otherwise a new navigation id can still be paired with the previous target key.
   control.stop = watch(() => [tabs.navigation?.id, tabs.rendererId], observe, { flush: 'post' });
   const attach = async () => {
+    if (control.disposed) return;
     try {
       await tabs.hydrate();
       if (control.disposed) return;
@@ -161,7 +180,7 @@ export async function startDesktopNavigation(host) {
         ? window.location.pathname + window.location.search
         : '';
       await tabs.attach({
-        workspace_id: host.isChatMode ? '' : host.currentHostWorkspaceId || '',
+        workspace_id: host.isChatMode ? '' : host.currentHostWorkspaceId || tabs.workspaceId || '',
         conversation_kind: host.isChatMode ? 'chat' : 'agent',
         conversation_id: page ? '' : host.currentConversationId || '',
         page
@@ -179,15 +198,34 @@ export async function startDesktopNavigation(host) {
       }
       observe();
     } catch (error) {
-      if (!control.disposed) {
-        if (!control.attachErrorShown) errorToast(host, error);
-        control.attachErrorShown = true;
-        control.retryTimer = window.setTimeout(attach, 2000);
+      if (control.disposed) return;
+      // 零工作区是正常空态（新装 host）：不弹错、不显示同步失败，
+      // 只标记等待工作区，创建后由下方 watch 重新 attach。
+      if (error instanceof NavigationError && error.code === 'no_workspace') {
+        control.awaitingWorkspace = true;
+        return;
       }
+      control.awaitingWorkspace = false;
+      if (!control.attachErrorShown) errorToast(host, error);
+      control.attachErrorShown = true;
+      control.retryTimer = window.setTimeout(attach, 2000);
     }
   };
+  control.workspaceStop = watch(
+    () => [Boolean(host.isChatMode), String(host.currentHostWorkspaceId || ''), tabs.workspaceId],
+    () => {
+      if (control.disposed || !control.awaitingWorkspace || !workspaceReady()) return;
+      control.awaitingWorkspace = false;
+      void attach()
+        .then(() => {
+          if (!control.disposed) tabs.startPolling();
+        })
+        .catch(() => {});
+    },
+    { flush: 'post' }
+  );
   await attach();
-  if (!control.disposed) tabs.startPolling();
+  if (!control.disposed && !control.awaitingWorkspace) tabs.startPolling();
 }
 
 export function stopDesktopNavigation(host) {
@@ -195,6 +233,7 @@ export function stopDesktopNavigation(host) {
   if (control) {
     control.disposed = true;
     control.stop?.();
+    control.workspaceStop?.();
     if (control.retryTimer) window.clearTimeout(control.retryTimer);
     controllers.delete(host);
   }

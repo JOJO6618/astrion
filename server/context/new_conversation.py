@@ -16,12 +16,27 @@ SETTING_KEYS = ("model_key", "run_mode", "thinking_mode", "reasoning_effort",
                "work_mode", "permission_mode", "execution_mode", "network_permission")
 
 
+def _default_model_key(config: dict) -> str:
+    """默认模型解析容错：全新部署尚未配置任何模型时返回空串。
+
+    零模型不应该让 /new 装配直接失败（前端会弹「尚未配置任何模型」错误），
+    空模型照常打开页面，用户发送消息时再由主任务给出干净的引导错误。
+    """
+    configured = str(config.get("default_model") or "").strip()
+    if configured:
+        return configured
+    try:
+        return get_default_model_key()
+    except ValueError:
+        return ""
+
+
 def remember_workspace_defaults(terminal: Any, config: dict) -> None:
     """Keep defaults separate from mutable /new selections on workspace runtimes."""
     if getattr(terminal, "_bound_conversation_id", None):
         return
     terminal.new_conversation_defaults = {
-        "model_key": config.get("default_model") or get_default_model_key(),
+        "model_key": _default_model_key(config),
         "run_mode": config.get("default_run_mode") or "fast",
         "reasoning_effort": config.get("default_reasoning_effort"),
         "work_mode": config.get("default_work_mode") or "plan",
@@ -141,7 +156,11 @@ def validate_creation_settings(settings: Any, *, host_mode: bool, can_manage: bo
     if any(modes[key] != settings[key] for key in modes):
         raise ValueError("Conversation settings violate plan or permission sandbox rules")
     model = settings["model_key"]
-    if not isinstance(model, str) or model not in get_registered_model_keys():
+    registered = get_registered_model_keys()
+    if not model or model not in registered:
+        if not registered:
+            # 全新部署尚未配置任何模型：与 config/model_profiles 同文案，可直接照做
+            raise ValueError("尚未配置任何模型，请先在设置页的「提供商」中添加")
         raise ValueError("Selected model is unavailable")
     profile = get_model_profile(model)
     if not profile:

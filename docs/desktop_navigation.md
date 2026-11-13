@@ -52,6 +52,16 @@
 
 **启动顺序（2026-10-24 白屏修复）**：`bootstrapRoute` 完成后先执行 `loadInitialData`，待其成功或失败收尾后再恢复桌面导航。禁止在初始化尚未完成时触发标签恢复：恢复会推进 conversation epoch，使初始化的所有权检查直接退出，跳过个性化设置与工作区目录；`ChatArea` 等待个性化设置就绪，因而持续隐藏历史内容。卸载时撤销页面存活标记，迟到的路由或初始化不能再次 attach。回归：`node test/2026-10-24_桌面启动白屏/startup.cjs`。
 
+**零工作区（新装 host）是正常空态，不是同步故障（2026-11-13）**：
+
+- `startDesktopNavigation` 在 `currentHostWorkspaceId` 为空且非 Chat 时**不 attach、不轮询**，只注册工作区就绪侦听；工作区出现后用同一 control 重新 attach 并启动轮询，避免标签条常驻「同步失败，重试」。
+- `addNewTab` / `resume` / `handleTabNew` / `resumeDesktopTab` 只负责发命令，由后端根据导航快照解析工作区；真正零工作区时后端返回 `code=no_workspace`，前端静默回 `/new`。
+- **判断零工作区只能用导航快照，不能用组件级 `currentHostWorkspaceId`**：设置页等独立路由不执行 `prepareInitialWorkspaceIdentity`，组件级值为空但实际有工作区。曾因此在 `addNewTab`/`resume` 里提前 `location.assign('/new')` 而不发命令，导致导航仍停在 `page=/settings`，文档回到 `/new` 后被 attach 拉回设置页。
+- 后端 `attach` 在文档自报 `page` 为空但导航仍是独立页面时视为「用户已离开」，恢复 `resume_key`/`active_key` 标签（或建空标签）并 commit；只有文档仍在该页面（刷新/重进）才保持 `page`。
+- 后端 `DesktopNavigation._workspace` 抛 `WorkspaceRequired`，命令端点返回 `400 + code=no_workspace`；前端 `command` 对该 code 静默降级（清空 `commandError`、回 `/new`），不当作同步失败。
+- `_lookup` 捕获 `NoWorkspaceError` 返回 `{no_workspace: true, exists: true}`，`_reconcile` 据此把标签标为 `workspace_unavailable` 且保留，禁止让 GET 快照 503。
+- host 模式首次启动（catalog 为空）由 `modules/host_workspace_manager.ensure_default_host_workspace` 在桌面创建默认工作区（桌面不存在回退 `~/Astrion/Default`），写过 `auto_default_workspace` 标记后不再重建；chat→agent 交接复用同一路径函数。
+
 1. 主页面 hydrate 后 attach 文档，注册最新目标观察。
 2. 目标复用 `workspaceNavigation.ts` 与 `conversation/bootstrap.ts`，并行准备工作区选择、草稿和显示快照。
 3. 内容准备好后请求 commit；后端拒绝被关闭、删除、替换或旧 renderer 的提交。

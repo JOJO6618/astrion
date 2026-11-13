@@ -187,12 +187,39 @@ export function useQuickRuntime() {
     images.value = saved.images || [];
     await loadSessions();
     if (ticket !== generation) return;
-    if (conversation.value) await restoreConversation(conversation.value);
+    if (conversation.value) {
+      const known = sessions.value.some(
+        (item: any) => (item.conversation_id || item.id) === conversation.value
+      );
+      if (known) await restoreConversation(conversation.value);
+      else {
+        // 保存的会话不在当前数据目录（换了目录、已被删除）：静默清空，
+        // 不发出一次注定失败的 history 请求（主进程会把它打成 IPC 错误日志）。
+        conversation.value = '';
+        await save();
+      }
+    }
   }
   async function restoreConversation(id: string) {
     resetPresentation();
     const ticket = generation;
-    const history = await request(`/api/runtime/sessions/${encodeURIComponent(id)}/history`);
+    let history;
+    try {
+      history = await request(`/api/runtime/sessions/${encodeURIComponent(id)}/history`);
+    } catch {
+      // 本地记住的会话已不存在（换了数据目录、会话被删等）：清掉指针，不报错
+      conversation.value = '';
+      task.value = '';
+      running.value = false;
+      streaming.value = false;
+      reply.value = '';
+      error.value = '';
+      tools.value = [];
+      approvals.value = [];
+      offset = 0;
+      await save();
+      return;
+    }
     if (ticket !== generation) return;
     if (history.conversation?.metadata?.quick_entry !== true) {
       conversation.value = '';
@@ -429,17 +456,22 @@ export function useQuickRuntime() {
       ) {
         let finalReply = '';
         if (hadGap && data.status === 'succeeded') {
-          const history = await request(
-            `/api/runtime/sessions/${encodeURIComponent(conversation.value)}/history`
-          );
-          const messages = history.conversation?.messages || history.messages || [];
-          finalReply =
-            [...messages]
-              .reverse()
-              .find(
-                (item: any) =>
-                  item.role === 'assistant' && typeof item.content === 'string' && item.content
-              )?.content || '';
+          try {
+            const history = await request(
+              `/api/runtime/sessions/${encodeURIComponent(conversation.value)}/history`
+            );
+            const messages = history.conversation?.messages || history.messages || [];
+            finalReply =
+              [...messages]
+                .reverse()
+                .find(
+                  (item: any) =>
+                    item.role === 'assistant' && typeof item.content === 'string' && item.content
+                )?.content || '';
+          } catch {
+            // 会话已被删除/数据目录已切换：保留事件流里的回复，不把补拉失败当成任务失败
+            finalReply = '';
+          }
         }
         if (ticket !== generation) return;
         const failure = ['failed', 'error'].includes(data.status) ? data.error : '';

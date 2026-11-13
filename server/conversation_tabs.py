@@ -16,8 +16,9 @@ from flask import Blueprint, jsonify, request
 
 from config import DATA_DIR, IS_HOST_MODE
 from server.auth_helpers import api_login_required, get_current_username
-from modules.desktop_navigation import DesktopNavigation, NavigationConflict
+from modules.desktop_navigation import DesktopNavigation, NavigationConflict, WorkspaceRequired
 from server.context.data import get_workspace_data
+from server.context.identity import NoWorkspaceError
 from server.context.workspace import request_identity, resolve_workspace
 
 conversation_tabs_bp = Blueprint("conversation_tabs", __name__)
@@ -197,7 +198,12 @@ def _lookup(username: str, *, with_activity: bool = False):
                 return {"exists": False}
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 return {"workspace_id": "", "exists": True, "error": str(exc)}
-        workspace = resolve_workspace(username, workspace_id or None, identity=identity)
+        try:
+            workspace = resolve_workspace(username, workspace_id or None, identity=identity)
+        except NoWorkspaceError:
+            # 零工作区是新装应用的正常空态：按“暂时不可用”返回，不让整份快照 503
+            # （前端标签条会把它当成一次同步失败并常驻提示）。
+            return {"workspace_id": "", "label": "", "exists": True, "no_workspace": True}
         info = {"workspace_id": workspace.workspace_id,
                 "label": str(getattr(workspace, "label", "") or workspace.workspace_id)}
         if conversation_id:
@@ -265,6 +271,9 @@ def command_conversation_tabs():
         return jsonify(success=True, **result)
     except NavigationConflict as exc:
         return jsonify(success=False, error=str(exc), code="navigation_superseded"), 409
+    except WorkspaceRequired as exc:
+        # 零工作区是新装应用的正常空态：前端按 code 静默降级到 /new 引导页。
+        return jsonify(success=False, error=str(exc), code="no_workspace"), 400
     except ValueError as exc:
         return jsonify(success=False, error=str(exc)), 400
     except Exception as exc:

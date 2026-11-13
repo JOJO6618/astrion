@@ -63,6 +63,8 @@ export const conversationTabsMethods = {
     return request(this, 'page', { page });
   },
   resumeDesktopTab() {
+    // 设置页等独立路由没有组件级工作区身份，统一交给后端按导航快照解析；
+    // 真正零工作区时后端返回 code=no_workspace，由 store 静默回 /new。
     return request(this, 'resume', { workspace_id: this.currentHostWorkspaceId || '' });
   },
   handleTabActivate(tab) {

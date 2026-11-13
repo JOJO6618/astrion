@@ -118,6 +118,10 @@ MESSAGES = {
         "zh-CN": "工作区不存在",
         "en-US": "Workspace not found",
     },
+    "host_ws.default_workspace_label": {
+        "zh-CN": "默认工作区",
+        "en-US": "Default workspace",
+    },
 
     # ── modules/api_user_manager.py ──
     "api_user_mgr.user_exists": {

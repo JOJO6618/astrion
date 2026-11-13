@@ -1,6 +1,5 @@
 """The only handoff stage allowed to create/select an execution workspace."""
 from dataclasses import replace
-from pathlib import Path
 from threading import RLock
 
 from server.context.identity import RuntimeIdentity
@@ -34,9 +33,14 @@ def default_target(principal):
     """Resolve the handoff target without changing the user's project selection."""
     with _DEFAULT_LOCK:
         if principal.host_mode:
-            from modules.host_workspace_manager import create_host_workspace
-            path = Path.home() / "Desktop" / "Astrion" / "Default"
-            workspace_id = create_host_workspace(str(path), label="默认工作区")["workspace"]["workspace_id"]
+            from modules.host_workspace_manager import create_host_workspace, default_workspace_path
+            from modules.i18n import tr
+
+            # 与首次启动自动创建的默认工作区同源，避免出现两个「默认工作区」。
+            workspace_id = create_host_workspace(
+                str(default_workspace_path()),
+                label=tr("host_ws.default_workspace_label"),
+            )["workspace"]["workspace_id"]
         else:
             workspace_id = _DEFAULT_WORKSPACE_ID
             if principal.is_api_user:
