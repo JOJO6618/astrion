@@ -6,6 +6,15 @@ export const cookieIdentity = row => JSON.stringify([
   row.partitionKey?.topLevelSite || '', row.partitionKey?.hasCrossSiteAncestor ?? null
 ]);
 
+export function cookieMatches(actual, expected) {
+  const domain = expected.domain || new URL(expected.url).hostname;
+  if (cookieIdentity(actual) !== cookieIdentity({ ...expected, domain })) return false;
+  if (actual.value !== expected.value || actual.secure !== expected.secure || actual.httpOnly !== expected.httpOnly) return false;
+  if (actual.session !== !Number.isFinite(expected.expires)) return false;
+  if (Number.isFinite(expected.expires) && Math.abs(actual.expires - expected.expires) > 1) return false;
+  return (actual.sameSite || '') === (expected.sameSite || '');
+}
+
 // A private target in the destination session supplies the Chromium cookie API.
 // Electron 35's public cookies.set omits CHIPS partition keys; never flatten them.
 export class ImportCookieStore {
@@ -18,13 +27,33 @@ export class ImportCookieStore {
     try {
       await this.contents.loadURL('about:blank');
       this.contents.debugger.attach('1.3');
-      const { cookies } = await this.contents.debugger.sendCommand('Network.getAllCookies');
+      const { cookies } = await this.send('Network.getAllCookies');
       return cookies;
     } catch { this.close(); throw new Error('cookie_store_unavailable'); }
   }
-  async set(cookie) {
-    const response = await this.contents.debugger.sendCommand('Network.setCookie', cookie);
-    if (!response.success) throw new Error('cookie_rejected');
+  async send(method, params) {
+    let timer;
+    try {
+      return await Promise.race([
+        this.contents.debugger.sendCommand(method, params),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('browser_import_timed_out_partial')), 15000); })
+      ]);
+    } finally { clearTimeout(timer); }
+  }
+  async set(cookie, ensure = () => {}) {
+    ensure();
+    try {
+      const response = await this.send('Network.setCookie', cookie);
+      ensure();
+      if (!response.success) throw new Error('cookie_rejected');
+    } catch (error) {
+      ensure();
+      if (error.message === 'browser_import_timed_out_partial') throw error;
+      throw new Error(cookie.partitionKey ? 'cookie_partition_write_failed' : 'cookie_rejected');
+    }
+    const { cookies } = await this.send('Network.getAllCookies');
+    ensure();
+    if (!cookies.some(row => cookieMatches(row, cookie))) throw new Error('cookie_verify_failed');
   }
   async flush() { await this.profile.session.cookies.flushStore(); }
   close() {
@@ -32,6 +61,7 @@ export class ImportCookieStore {
       if (this.contents.debugger.isAttached()) this.contents.debugger.detach();
       this.contents.close({ waitForBeforeUnload: false });
     }
+    this.view = null;
   }
 }
 

@@ -1,6 +1,8 @@
 # 桌面内置浏览器集成验证版
 
-共享浏览器界面已接入 macOS Electron 与 Windows Tauri/WebView2 桌面壳。Agent / Chat 共用侧栏入口、组件与状态；Agent 主对话的 AI 工具复用同一控制器与驱动，详见后文。Docker 和普通网页端不提供此能力。Windows 适配、授权导入与 file 原生验证见本文末尾及 `test/2026-11-09_WindowsBrowser/`、`test/2026-11-09_浏览器授权迁移/`。
+当前迁移分支的 macOS 与 Windows 共用 Electron 浏览器。Agent / Chat 共用侧栏入口、组件与状态；Agent 主对话的 AI 工具复用同一控制器与驱动。Docker 和普通网页端不提供此能力。Windows Electron 构建、Job 回收、资料隔离与测试见 `docs/windows_electron.md`、`test/2026-11-13_WindowsElectron/`，本轮尚未正式发布。
+
+**2026-11-13 Windows 迁移边界**：新壳复用以下 Electron 宿主、叠层/输入转发、AI 与独立窗口实现；Windows 独立窗口用 Window Controls Overlay，支持 `popout: true`。Windows 元数据/密码库根为 `<desktopDataRoot>/electron/browser/`，Chromium 网站资料放 sessionData；旧 `<desktopDataRoot>/browser/` 不动。不自动迁移旧 WebView2 或 Chrome 浏览器资料；0.10.3 起按用户要求接入 Chrome 手动导入，见下方 Electron 适配说明。后文标明 Windows WebView2、原生裁剪等章节仍为旧壳记录，不能当作 Electron 版已迁移旧资料的证据。
 
 ## 结构和职责
 
@@ -13,18 +15,18 @@
 - `static/src/components/browser/`：标签栏、导航栏、管理页、菜单、权限弹窗和原生表面同步。
 - `static/src/stores/nativeBrowser.ts`：共享界面状态、连接与布局序号。
 - `AppShell.vue` 共用挂载；`ConversationSidebar.vue` 在桌面浏览器桥存在时显示入口。
-- `desktop/src-tauri/src/browser/`：Windows 原生 manager、策略、WebView2 controller、事件队列、裁剪、下载/权限、DPAPI 密码库和 Chrome 导入。
+- `desktop/src-tauri/src/browser/`：保留的旧 Windows WebView2 manager、事件、裁剪、DPAPI 与 Chrome 导入；当前 Electron 包不加载它。
 
-macOS 网页使用同一 `BaseWindow` 的原生 `WebContentsView`，开启 sandbox、contextIsolation 和 webSecurity。Windows 网页使用同一主窗口中的原生 WebView2 controller；网页不注册为 Tauri WebView，不注入 Tauri API 或可信应用桥。两平台均不使用 iframe、截图或视频流替代真实网页。
+macOS 与 Windows Electron 网页均使用同一 `BaseWindow` 的原生 `WebContentsView`，开启 sandbox、contextIsolation 和 webSecurity；网站不注入可信应用桥。旧 Windows 壳的 raw WebView2 实现保留作历史记录。两平台均不使用 iframe、截图或视频流替代真实网页。
 
-## 单独窗口显示（macOS，2026-11-11）
+## 单独窗口显示（macOS 2026-11-11，Windows Electron 2026-11-13）
 
 每个对话的浏览器可从主窗口面板弹出为一个独立窗口（标签栏右侧「在独立窗口中打开」按钮），用户确认的设计：整个浏览器（该对话全部标签）一起弹出；每个对话最多一个窗口，窗口固定属于弹出时的对话、不随主窗口切换；多个对话可同时各有一个；普通窗口（无 macOS `parent`）；记住大小和位置；窗口标题为对话标题。
 
 - **宿主模型**：`browser/host.js` 的 `BrowserHost` 表示一个承载浏览器界面的可信 renderer 及其连接状态（owner、profile、lease、几何、叠层、输入转发、菜单文案）。`NativeBrowser.main` 是主窗口宿主，`popouts: Map<owner, BrowserHost>` 是独立窗口宿主。标签、资料、AI、回收仍由 `NativeBrowser` 统一持有。`hostFor(owner)` 返回正在显示该对话的宿主（已弹出则为独立窗口）；`windowFor(owner)` 决定网页视图挂载的窗口；`attach/detach` 记录 `tab.window`，所有挂载/移除都经它们。
 - **IPC**：`check(event, lease)` 按发送方找宿主并返回它；主窗口只认聊天路由，独立窗口只认 `/browser-window`。独立窗口的 owner 由主进程在弹出时固定，`connect` 忽略其 renderer 自报的 scope，并要求登录用户与弹出时一致。`publish()` 给每个已连接宿主各发自己的快照；`message(msg, owner)` 只通知显示该对话的宿主。
 - **命令**：`popout`（主窗口；已弹出则前置）、`dock`（任一侧；关闭独立窗口）、`show-popout`（主窗口占位前置窗口）。主窗口当前对话已弹出时快照 `detached: true`、标签为空，前端显示占位；此时只放行资料级命令，其余返回 `browser_detached`。
-- **窗口**：`browser/popout-window.js` 创建 `BaseWindow`（`titleBarStyle: 'hidden'`，红绿灯悬浮在 46px 标签栏左侧，标签栏即窗口顶栏，空白处 `-webkit-app-region: drag`；全屏时 `browser:window-state` 通知前端去掉红绿灯留白）。界面页 `static/browser-window.html` → `static/src/browserWindow.ts` → `BrowserWindowApp.vue`，复用 `BrowserPanel`（`browserPopoutWindow()` 时铺满窗口、无宽度把手，收回按钮替代关闭按钮）；样式经 `scripts/generate_entry_styles.mjs` 装配为 `/static/browser-window.css`。preload `preload-browser-window.cjs` 与 `preload-main.cjs` 的桥形状同步手写（sandbox preload 不能 require 本地模块）；主窗口桥的 `popout: true` 是能力标记，Windows 壳不声明，按钮不出现。
+- **窗口**：`browser/popout-window.js` 创建 `BaseWindow`，经 `platform.js` 分流窗口装饰。macOS 红绿灯位于 46px 标签栏左侧；Windows Window Controls Overlay 在右侧保留三大键区域。空白处 `-webkit-app-region: drag`。界面页 `static/browser-window.html` → `static/src/browserWindow.ts` → `BrowserWindowApp.vue`，复用 `BrowserPanel`（铺满窗口、无宽度把手，收回按钮替代关闭按钮）；样式经 `scripts/generate_entry_styles.mjs` 装配。preload `preload-browser-window.cjs` 与 `preload-main.cjs` 的桥形状同步手写；两平台主窗口均声明 `popout: true`，旧 Tauri 壳不声明。
 - **标题**：独立窗口页每 3 秒读 `/api/conversation-tabs`，按 conversation_id 或稳定 key 找到对话标题写入 `document.title`，主进程 `page-title-updated` 同步到窗口标题；查不到时保留上次标题。
 - **生命周期**：关闭 `BaseWindow` 不会销毁子视图（实验已证实），所以独立窗口 `close` 时 `undock` 把该对话的网页视图挪回主窗口，标签保留；删除对话时回收先关窗；`dispose` 直接销毁所有独立窗口。`/new` 阶段弹出的窗口在对话创建时随 `adoptOwner` 迁移 owner。重启后不恢复弹出状态。
 - **大小位置**：所有独立窗口共用 `userData/browser-window.json`（`moved`/`resized`/关闭时写 `getNormalBounds()`）；新窗口与已开窗口重叠时错开 28px，并夹到所在屏幕工作区内。
@@ -97,7 +99,9 @@ IPC 只接受各宿主（主窗口 / 对话独立窗口）自身 webContents 的
 
 修复只作用于文本渲染的文档：`dom-ready`（Windows 为 `NavigationCompleted`）后执行一段自守卫脚本，判定 `document.contentType` 不在 `text/html`／`application/xhtml+xml`／`image/svg+xml`／`application/pdf` 内，且 `body` 子元素含 `<pre>`（Chromium 文本查看器结构），才向文档注入 `<style id="__astrion_text_document_theme">`：`html{background:<--surface-base> !important;color-scheme:dark|light}` + `body{color:<--text-primary> !important}`。普通 HTML 页面、`prefers-color-scheme`、页面自身样式均不受影响；主题切换时对已命中过的标签重新执行一次。
 
-主题上报载荷随之扩展：`astrionBrowser.theme()` 由「surfaceColor 字符串」改为 `{ surfaceColor, textColor }`（`useBrowserSurface.ts` 同时读 `--surface-base` 与 `--text-primary`），layout 载荷的 `surfaceColor`/`textColor` 同义。macOS 实现在 `desktop-electron/src/browser/text-documents.js`（`geometry.js` 在主题变化时刷新），Windows 在 `desktop/src-tauri/src/browser/text_document.rs`（`views.rs::loaded` 注入、`layout.rs::apply_theme` 变化时刷新）。**两端的判定条件与 CSS 必须同步修改**。
+主题上报载荷随之扩展：`astrionBrowser.theme()` 由「surfaceColor 字符串」改为 `{ surfaceColor, textColor }`（`useBrowserSurface.ts` 同时读 `--surface-base` 与 `--text-primary`），layout 载荷的 `surfaceColor`/`textColor` 同义。macOS 实现在 `desktop-electron/src/browser/text-documents.js`（`geometry.js` 在主题变化时刷新），旧 Windows WebView2 在 `desktop/src-tauri/src/browser/text_document.rs`（`views.rs::loaded` 注入、`layout.rs::apply_theme` 变化时刷新）。**两端的判定条件与 CSS 必须同步修改**；Windows Electron 复用上述 Electron 实现。
+
+**Windows Electron 0.10.2 标题栏主题修复**：theme 与 layout 载荷增加 `chromeColor`，来自 `--chrome-bar-bg`；`surfaceColor` 仍只表示内容表面。独立窗口创建时使用缓存的 `chromeColor`/`textColor` 设置 Window Controls Overlay，运行中主题变化通过 `BaseWindow.setTitleBarOverlay` 同步全部存活独立窗口（背景为标签栏色、图标为主题文字色）。标签栏色单独变化必须触发上报和原生更新，不得受 surfaceColor 相等的提前返回影响；无效颜色不覆盖已验证缓存。macOS 保持红绿灯，不调用 Windows API。回归位于 `test/2026-11-13_Windows浏览器标题栏配色/`，实际视觉由用户验收。
 
 验证：`test/2026-11-10_内置浏览器纯文本主题/text_document_theme.mjs`（真实 Electron 隐藏窗口，7 项：三类文本响应命中、`text/html` 不受影响、浅色跟随、缺文字色兜底、脚本模板完整）。Windows 侧代码本机无 Rust 工具链，未编译、未实机验证。
 
@@ -114,7 +118,17 @@ IPC 只接受各宿主（主窗口 / 对话独立窗口）自身 webContents 的
 
 密码保存、自动填充与 Chrome 密码/Cookie/历史导入已有实现。macOS 密码库使用 Electron safeStorage，Windows 使用当前用户 DPAPI；共享 DOM 适配器在各自隔离世界运行。Windows 先启用 CDP Runtime，创建顶层 frame 的隔离世界，再以返回的实际 context ID 注册绑定；不能假设按 world 名称注册在 WebView2 中等价可用。适配器转换与换行归一化有守护单测，修改 Electron 源适配器时必须同步跑 Windows 回归。Chrome 导入必须预览、明确冲突选择再提交，预览不落明文文件；Windows 不绕过 v20 应用绑定加密，不支持的记录如实计数。
 
-### Windows Chrome 授权导入（2026-11-09 r2）
+### Windows Electron Chrome 导入（0.10.3，2026-11-13）
+
+主窗口与独立窗口均声明 `credentialFileImport`（仅 win32），共享 `BrowserImport.vue` 默认提供主动导出文件入口。凭据服务的 sources、preview、preview-file、import 统一受操作锁、取消、lease/profile/owner 检查约束。
+
+- `browser/chrome/windows-source.js` 只调用固定的随包 Python 与 `resources/chrome-import/windows-worker.py`，输入/输出经私有管道，大小上限32MiB、读取预算60秒，不接受 renderer 传入路径、不打印秘密。worker 与旧壳共用 `desktop/src-tauri/src/browser/chrome_worker.py` 源文件，构建按 extraResources 复制并核对哈希，不维护第二套解析器。
+- Windows 读取 `%LOCALAPPDATA%/Google/Chrome/User Data`，旧 DPAPI 与 v10/v11 AES-GCM 使用当前用户解密；v20 如实计为 unsupported_encryption，不调用 macOS 钥匙串。CSV/JSON 沿用4MiB/10,000条、BOM/严格CSV、版本化Cookie包与属性校验。
+- 数据库预览由 Electron 主进程固定增加 preservePartitionCookies=true，安全有效的分区字段被保留；旧壳未声明时仍保留原行为。CSV/数据库的账号分组、去重、冲突、5分钟内存预览、vault快照校验及提交统一在 `import-preview.js`/`importer.js`，只向renderer返回统计和不含秘密的冲突元数据。macOS仍走原路径/钥匙串/AES-CBC读取，共用后续处理。
+- 目标密码库使用Electron safeStorage（Windows当前用户保护）。Cookie经隐藏WebContentsView的CDP写入当前profile，保留host-only/domain、session/expires、Secure/HttpOnly、SameSite及完整partitionKey；逐条写后回读匹配，校验失败不计成功，分区写入失败单独报告。提交前复查过期时间，保存失败与部分等待超时明确计数，始终关闭私有目标。
+- Windows合成原生回归见 `test/2026-11-13_WindowsElectron导入/`：真实DPAPI/AES-GCM、preload/IPC、CSV、分区Cookie、冲突/覆盖/取消、源文件不变、macOS读取替身及跨进程持久化。实际用户Chrome、扩展权限和网站登录保持仍需用户验收，不因合成测试通过宣称可解密v20或保留所有站点登录。
+
+### Windows Chrome 授权导入（2026-11-09 r2，旧 WebView2 实现）
 
 - 真实用户回报密码/Cookie 全为 v20 时，旧版 DPAPI/AES-GCM 合成回归不代表这些记录可迁移。直接读库保留作历史及旧格式来源，不尝试绕过 Chrome 应用绑定加密。
 - Windows 可信桥声明 `credentialFileImport`，共享 `BrowserImportFile.vue` 让用户选择 UTF-8 密码 CSV 或版本化 Cookie JSON；仅传文件内容，不接受文件路径，不增加原生任意文件读取能力。其它壳未声明能力时保持已有来源。

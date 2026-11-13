@@ -85,6 +85,8 @@ export interface BrowserSurfaceMetadata {
   surfaceColor?: string;
   /** 主题文字色：只用于纯文本类文档（背景透明 + 默认黑字）的可读性。 */
   textColor?: string;
+  /** 独立窗口原生控制区使用标签栏底色，与网页表面色分开。 */
+  chromeColor?: string;
   occlusions?: BrowserRect[];
   focusFind?: boolean;
   viewport?: { width: number; height: number; panelWidth: number; surfaceInset: number };
@@ -112,6 +114,7 @@ export interface BrowserInput {
 export interface BrowserTheme {
   surfaceColor: string;
   textColor?: string;
+  chromeColor?: string;
 }
 export interface BrowserBridge {
   surfaceMode?: 'regions';

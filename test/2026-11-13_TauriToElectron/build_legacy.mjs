@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const output = path.join(root, 'output/windows-electron/cross-shell');
+fs.mkdirSync(output, { recursive: true });
+const original = path.join(root, 'desktop/src-tauri/target/release/astrion-desktop.exe');
+const backup = path.join(output, 'previous-build-astrion-desktop.exe');
+if (fs.existsSync(original) && !fs.existsSync(backup)) fs.copyFileSync(original, backup);
+const buildTemp = path.join(root, 'output/windows-electron/nsis-build-temp');
+fs.mkdirSync(buildTemp, { recursive: true });
+const env = { ...process.env, CARGO_NET_OFFLINE: 'true', CARGO_BUILD_JOBS: '2', TEMP: buildTemp, TMP: buildTemp,
+  PATH: path.join(process.env.USERPROFILE, '.cargo/bin') + path.delimiter + process.env.PATH };
+delete env.TAURI_SIGNING_PRIVATE_KEY;
+delete env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD;
+const cli = path.join(root, 'desktop/node_modules/@tauri-apps/cli/tauri.js');
+const result = spawnSync(process.execPath, [cli, 'build', '--config', path.join(root, 'test/2026-11-13_TauriToElectron/tauri-test.json'), '--bundles', 'nsis', '--ci', '--no-sign'], { cwd: path.join(root, 'desktop'), env, stdio: 'inherit', windowsHide: true, timeout: 1800000 });
+if (fs.existsSync(backup)) fs.copyFileSync(backup, original);
+if (result.status !== 0) throw new Error(`Legacy test build failed: ${result.status} ${result.error?.message || ''}`);
+const installer = path.join(root, 'desktop/src-tauri/target/release/bundle/nsis/Astrion CrossShell Test_0.9.3_x64-setup.exe');
+fs.copyFileSync(installer, path.join(output, 'legacy-0.9.3-setup.exe'));
+console.log('Isolated legacy Tauri test installer built; production build exe preserved.');

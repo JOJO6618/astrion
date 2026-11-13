@@ -11,7 +11,9 @@
     "build:quick-native": "node scripts/build_quick_native.mjs",
     "prepare-backend": "python3 ../desktop/scripts/prepare_backend.py",
     "build": "npm run build:quick-native && npm run prepare-backend && electron-builder",
-    "build:dir": "npm run build:quick-native && electron-builder --dir"
+    "build:dir": "npm run build:quick-native && electron-builder --dir",
+    "build:win": "node scripts/build_windows.mjs",
+    "build:win:dir": "node scripts/build_windows.mjs --dir"
   },
   "dependencies": {
     "electron-updater": "^6.3.9"

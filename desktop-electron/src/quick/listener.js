@@ -4,11 +4,13 @@ import { existsSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { windowsHelper } from '../windows/native-helper.js';
 
 const execute = promisify(execFile);
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export function resolveListenerBinary() {
+  if (process.platform === 'win32') return windowsHelper();
   if (app.isPackaged) return path.join(process.resourcesPath, 'quick-entry-listener');
   const binary = path.join(desktop, '.cache/quick-entry-listener');
   const source = path.join(desktop, 'native/quick-entry.swift');
@@ -20,6 +22,7 @@ export function resolveListenerBinary() {
 }
 
 export async function inputPermission(request = false) {
+  if (process.platform === 'win32') { windowsHelper(); return 'granted'; }
   const { stdout } = await execute(resolveListenerBinary(), ['permission', request ? 'request' : 'check'], {
     encoding: 'utf8', maxBuffer: 8192, timeout: request ? 60000 : 4000
   });

@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { app, BaseWindow, WebContentsView, screen } from 'electron';
 import { BrowserHost, POPOUT_ROUTE } from './host.js';
+import { popoutChromeOptions } from '../platform.js';
 
 const preload = fileURLToPath(new URL('../preload-browser-window.cjs', import.meta.url));
 const DEFAULT_SIZE = { width: 1100, height: 780 };
@@ -56,8 +57,8 @@ export function createPopoutWindow(manager, { owner, profile }) {
   const window = new BaseWindow({
     ...bounds, minWidth: MIN_SIZE.width, minHeight: MIN_SIZE.height, show: false,
     backgroundColor: manager.surfaceColor,
-    // 红绿灯悬浮在 46px 标签栏左侧，垂直居中（按钮高 16）。
-    titleBarStyle: 'hidden', trafficLightPosition: { x: 15, y: 15 }
+    // Native Windows buttons use the tabbar theme, independently of the content surface.
+    ...popoutChromeOptions(process.platform, manager.chromeColor, manager.textColor)
   });
   window.contentView.setBackgroundColor(manager.surfaceColor);
   const view = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: true, preload } });

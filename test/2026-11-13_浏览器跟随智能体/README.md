@@ -37,7 +37,7 @@
 
 ## 平台范围
 
-只实现了 macOS Electron 壳。Windows Tauri 壳（`desktop/src-tauri`）的浏览器是独立 Rust 实现，本轮未同步；它的 bridge 不声明 `followAi`，所以界面上不会出现按不动的开关。Windows 端需要单独实现（settings、`follow-ai` 命令、AI 操作处切 selected）。
+合入 Windows Electron 迁移后，macOS 与 Windows 共用本实现，两边 preload 均声明 `followAi`；Windows 的文件导入能力标记同时保留。旧 Windows Tauri 壳（`desktop/src-tauri`）仍是独立 Rust 实现，未同步本功能，其 bridge 不声明 `followAi`。迁移范围与原生验证见 `docs/windows_electron.md`。
 
 ## 验证
 

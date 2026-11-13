@@ -33,8 +33,9 @@
 - 可执行命令名：`astrion`（已装到 `/opt/homebrew/bin/astrion` → `cli/bin/astrion` symlink，bun wrapper 支持 symlink 解析；`--version`/`--help` 快速退出不启 TUI；后续 `bun build --compile` 单文件分发）
 - 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
-### Desktop（`desktop-electron/`，Electron/Chromium 桌面壳，2026-09-28 起为 macOS 现行形态）
-- **2026-09-28 引擎迁移（用户拍板）**：macOS 壳从 Tauri/WKWebView 迁到 Electron/Chromium（commit b53e8c3a）——WKWebView 反复引擎级兼容问题（折叠动画瞬消、rAF 样式延迟、virtua 首项不挂载、拖放被吞、上滚估值补偿抖动），统一 Chromium 后与 Windows（WebView2）/ Chrome web 同引擎。**web 版只支持 Chromium 系浏览器**（Safari 不再兼容）。Windows 端仍沿用 Tauri+WebView2（本来就是 Chromium 内核）
+### Desktop（`desktop-electron/`，macOS 与 Windows 共用 Electron/Chromium）
+- **引擎迁移**：macOS 自 2026-09-28 起使用 Electron（commit b53e8c3a）；Windows 自 2026-11-13 在迁移分支使用相同壳，尚未正式发布。原 Tauri/WebView2 代码保留作旧版和原生模块来源。**web 版只支持 Chromium 系浏览器**（Safari 不再兼容）。
+- **Windows 构建**：Windows 原生环境执行 `node desktop-electron/scripts/build_windows.mjs`，`--dir` 仅生成目录包，已有本次前端/helper 可加 `--skip-frontend --skip-native`；固定 `--publish never`。版本/说明独立于 macOS，权威为 `desktop-electron/windows-release.json`。NSIS、Job 回收、一次性 stdin 凭据与隔离实验契约见 `docs/windows_electron.md`。
 - 形态：Electron 主进程 + 内嵌 Python 后端 sidecar；BaseWindow + **双 WebContentsView**（chrome 46px 独立标签条常驻不闪动 + main 加载 `http://127.0.0.1:<动态端口>/`，前后端同源）；原生控制桥只负责版本、更新、窗口及数据目录等能力，标签导航走后端命令与版本快照，见 `docs/desktop_navigation.md`；壳经 preload + contextBridge 注入 `window.__ASTRION_DESKTOP__`/`__ASTRION_CHROME__`
 - 开发：`cd desktop-electron && npm install && npm run dev`（装依赖需 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`）；前端需先 `npm run build`
 - 关键差异：窗口拖拽走 `app-region` CSS（_tab-strip.scss）；红绿灯 `trafficLightPosition` 一行配置；菜单不占 Cmd+W/Cmd+T（留给前端标签条，关窗=Cmd+Shift+W）；子进程 `ASTRION_IGNORE_DOTENV=1`（防仓库 .env 强制覆盖数据根）；Ctrl+Enter/拖放原生正常（WebKit 特有问题全消）
@@ -42,7 +43,10 @@
 - **macOS 快捷对话（0.5.0）**：独立设置分区 `/settings/quick-chat`，仅 macOS Electron 展示。快捷默认工作区/模型留空分别继承 host 工作区目录的 `default_workspace_id` 与个性化 `default_model`，每次唤起刷新；模型须支持图片，不可用时提示，不擅自换模型。启用后保留现有单一 `server.app` 后端与菜单栏；**显式启动应用自动打开主窗口，启动期间的程序坞激活意图保留到后端就绪**，关闭主窗口隐藏而不退出。macOS 快捷窗及截图覆盖层不设置 `skipTaskbar=true`，避免将整个应用转为 UIElement；主应用保持 regular 身份。当前必须先启动应用，登录自启动延后实现。原生 Swift 监听与截图辅助程序由 `build:quick-native` 编译并随包签名，快捷对话来源为 `metadata.quick_entry=true`，快捷菜单按工作区仅查询该来源且先过滤后分页。详细说明见 `desktop-electron/QUICK_ENTRY.md`。
 - **macOS 浮窗跨桌面身份（2026-10-05）**：快捷窗与截图覆盖层统一调用 `desktop-electron/src/quick/workspace-visibility.js`，`setVisibleOnAllWorkspaces` 必须同时设置 `visibleOnFullScreen: true` 和 `skipTransformProcessType: true`。只禁用 `skipTaskbar` 不足以阻止 Electron 将应用切换为 UIElement；默认全屏兼容变换也会隐藏程序坞并影响运行点。真实 Electron 的 Foreground 身份检查见 `test/2026-10-05_程序坞全屏浮窗/`。
 
-### Desktop（`desktop/`，Tauri 2 桌面壳，2026-09-25 新增；mac 已退役、Windows 沿用）
+### Desktop（`desktop/`，旧 Tauri 2 桌面壳及保留的原生模块）
+
+以下记录旧版实现与发布链，不作为新 Windows Electron 包的构建入口。`runtime/`、图标和 Rust 快捷键/WGC 模块仍由 Electron 构建复用；不得直接删除。Windows 迁移后的命令见上一节。
+
 - 形态：系统 WebView + 内嵌 Python 后端 sidecar；WebView 直接加载 `http://127.0.0.1:<动态端口>/`（前后端同源，cookie/CSRF/相对路径 API 零改动复用 Web 版）；壳注入 `window.__ASTRION_DESKTOP__` 标记（`initialization_script`），登录页据此自动免登录
 - 开发：`cd desktop && npm install && npm run dev`（= tauri dev；首次 cargo 编译 10-20 分钟）；前端需先 `npm run build`（壳加载的是后端 serve 的 dist 产物）
 - Python 探测顺序（要求 import yaml/flask/httpx/openai 可用）：项目 `.venv` → homebrew 3.13/3.12/3.11 → PATH python3；`ASTRION_DESKTOP_REPO` 可覆盖仓库根

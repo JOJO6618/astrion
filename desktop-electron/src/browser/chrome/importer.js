@@ -3,6 +3,8 @@ import { chromeProfiles, profileDirectory, readDatabase, tableColumns, existingD
 import { deriveChromeKey, decryptChromeValue, chromeTime } from './crypto.js';
 import { ImportCookieStore, cookieIdentity, cookieDetails } from './cookie-store.js';
 import { passwordOrigin } from '../passwords/vault.js';
+import { readWindowsChrome } from './windows-source.js';
+import { importedCookie, rememberImportPreview } from './import-preview.js';
 const TYPES = ['passwords', 'cookies', 'history'];
 const stat = () => ({ read: 0, ready: 0, skipped: 0, failed: 0, conflicts: 0, reasons: {} });
 const issue = (stats, reason, failed = true) => { stats[failed ? 'failed' : 'skipped']++; stats.reasons[reason] = (stats.reasons[reason] || 0) + 1; };
@@ -10,9 +12,34 @@ const column = (columns, name, fallback = "''") => columns.has(name) ? name : fa
 const reason = error => ['database_busy', 'keychain_timeout', 'keychain_denied', 'unsupported_encryption', 'unsupported_partition', 'conflicting_cookie_storage'].includes(error.message) ? error.message : 'invalid_record';
 
 export class ChromeImporter {
-  constructor(dependencies = {}) { this.dependencies = dependencies; this.jobs = new Map(); }
-  sources() { return chromeProfiles(this.dependencies.root); }
+  constructor(dependencies = {}) { this.dependencies = dependencies; this.jobs = new Map(); this.platform = dependencies.platform || process.platform; }
+  sources(signal) {
+    return this.platform === 'win32'
+      ? this.readWindows({ action: 'sources' }, signal).then(result => result.sources)
+      : chromeProfiles(this.dependencies.root);
+  }
+  readWindows(request, signal) {
+    return (this.dependencies.windowsRequest || readWindowsChrome)(request, { signal });
+  }
+  async windowsPreview(profile, vault, input, ensure, signal, action, progress) {
+    progress('decrypt');
+    const value = action === 'preview' ? { ...input, preservePartitionCookies: true } : input;
+    const rows = await this.readWindows({ action, value }, signal);
+    signal?.throwIfAborted(); ensure();
+    const cookies = [];
+    for (const row of rows.cookies) {
+      try { cookies.push(importedCookie(row)); }
+      catch { rows.stats.cookies.ready--; issue(rows.stats.cookies, 'invalid_record'); }
+    }
+    const selected = action === 'preview-file' ? { passwords: input.format === 'password-csv' } : input.selected;
+    return rememberImportPreview(this, profile, vault, { ...rows, cookies }, selected, ensure);
+  }
+  async previewFile(profile, vault, input, ensure, signal, progress = () => {}) {
+    if (this.platform !== 'win32') throw new Error('invalid_import_file');
+    return this.windowsPreview(profile, vault, input, ensure, signal, 'preview-file', progress);
+  }
   async preview(profile, vault, input, ensure, signal, progress = () => {}) {
+    if (this.platform === 'win32') return this.windowsPreview(profile, vault, input, ensure, signal, 'preview', progress);
     if (!input || !TYPES.every(type => typeof input.selected?.[type] === 'boolean') || !TYPES.some(type => input.selected[type])) throw new Error('请选择至少一项导入内容。');
     const directory = profileDirectory(input.source, this.dependencies.root);
     const stats = Object.fromEntries(TYPES.map(type => [type, stat()]));
@@ -61,21 +88,17 @@ export class ChromeImporter {
       catch (error) { checked(); keyError = ['keychain_timeout', 'keychain_denied'].includes(error.message) ? error.message : 'keychain_denied'; }
       finally { secret?.fill(0); }
     }
-    const groups = new Map(), cookies = [], history = [], conflicts = [];
+    const passwords = [], cookies = [], history = [];
     progress('decrypt');
     try {
       for (const row of raw.passwords) {
         if (row.blocked || row.federation || !row.encrypted) { issue(stats.passwords, 'not_password', false); continue; }
         try {
-          const origin = passwordOrigin(row.origin), identity = JSON.stringify([origin, row.username]);
+          const origin = passwordOrigin(row.origin);
           if (keyError) throw new Error(keyError);
           const password = decryptChromeValue(row.encrypted, key);
           if (!password) { issue(stats.passwords, 'not_password', false); continue; }
-          const current = vault.find(origin, row.username);
-          let group = groups.get(identity);
-          if (!group) { group = { id: randomUUID(), origin, username: row.username, existingId: current?.id || '', candidates: [] }; groups.set(identity, group); }
-          if (current?.password === password || group.candidates.some(item => item.password === password)) { issue(stats.passwords, 'duplicate', false); continue; }
-          group.candidates.push({ id: randomUUID(), origin, username: row.username, password, sourceURL: row.origin, modified: chromeTime(row.modified) });
+          passwords.push({ origin, username: row.username, password, sourceURL: row.origin, modified: chromeTime(row.modified) });
           stats.passwords.ready++;
         } catch (error) { issue(stats.passwords, reason(error)); }
       }
@@ -90,19 +113,7 @@ export class ChromeImporter {
       try { passwordOrigin(row.url); const at = chromeTime(row.visited); if (!at) throw new Error('time'); history.push({ id: randomUUID(), url: row.url, title: row.title || row.url, at }); stats.history.ready++; }
       catch { issue(stats.history, 'unsupported_record', false); }
     }
-    const passwords = [...groups.values()].filter(group => group.candidates.length);
-    for (const group of passwords) {
-      if (group.existingId || group.candidates.length > 1) {
-        stats.passwords.conflicts++;
-        conflicts.push({ id: group.id, origin: group.origin, username: group.username, hasExisting: !!group.existingId,
-          candidates: group.candidates.map(({ id, sourceURL, modified }) => ({ id, sourceURL, modified })) });
-      }
-    }
-    checked();
-    for (const [id, job] of this.jobs) if (job.profile === profile) this.cancel(id);
-    const id = randomUUID(), timer = setTimeout(() => this.cancel(id), 300000); timer.unref();
-    this.jobs.set(id, { id, profile, stats, passwords, cookies, history, conflicts, timer, vaultState: input.selected.passwords ? JSON.stringify(vault.list()) : null });
-    return { id, stats, conflicts };
+    return rememberImportPreview(this, profile, vault, { stats, passwords, cookies, history }, input.selected, checked);
   }
   async commit(profile, vault, input, ensure) {
     const job = this.jobs.get(input?.id);
@@ -130,8 +141,12 @@ export class ChromeImporter {
           ensure();
           const current = existing.get(identity);
           if (current && !input.replaceCookies) { result.cookies.skipped++; continue; }
-          try { await store.set(cookie); result.cookies.imported++; existing.set(identity, cookie); }
-          catch { issue(result.cookies, 'cookie_rejected'); }
+          if (cookie.expires && cookie.expires <= Date.now() / 1000) { issue(result.cookies, 'expired', false); continue; }
+          try { await store.set(cookie, ensure); ensure(); result.cookies.imported++; existing.set(identity, cookie); }
+          catch (error) {
+            ensure();
+            issue(result.cookies, ['cookie_verify_failed', 'cookie_partition_write_failed', 'browser_import_timed_out_partial'].includes(error.message) ? error.message : 'cookie_rejected');
+          }
         }
         ensure();
         try { await store.flush(); }

@@ -5,8 +5,9 @@ import { spawn } from 'node:child_process';
 import { resolveRuntime } from '../backend.js';
 
 export class QuickGateway {
-  constructor({ port = 8091, dataRoot = path.join(os.homedir(), '.astrion/astrion'), workspacePath = process.cwd() } = {}) {
+  constructor({ port = 8091, dataRoot = path.join(os.homedir(), '.astrion/astrion'), workspacePath = process.cwd(), managed = false } = {}) {
     this.port = port;
+    this.managed = managed;
     this.root = dataRoot;
     this.workspacePath = workspacePath;
     this.base = `http://127.0.0.1:${port}`;
@@ -29,6 +30,7 @@ export class QuickGateway {
     let alive = false;
     try { await fetch(`${this.base}/api/host/workspaces`, { signal: AbortSignal.timeout(1500) }); alive = true; } catch {}
     if (!alive) {
+      if (this.managed) throw new Error('Desktop backend is unavailable; restart the application.');
       const { python, backendDir } = resolveRuntime();
       const logDir = path.join(this.root, 'host/logs');
       await fs.mkdir(logDir, { recursive: true });

@@ -21,6 +21,7 @@ import { quickEnabled } from './quick/controller.js';
 import { isUpdaterInstalling } from './updater-state.js';
 import { NativeBrowser } from './browser/index.js';
 import { setBrowserSurfaceColor } from './browser/geometry.js';
+import { desktopSupported, windowChromeOptions } from './platform.js';
 
 let appQuitting = false;
 app.on('before-quit', () => { appQuitting = true; });
@@ -166,13 +167,7 @@ export function createMainWindow(port, route = '/') {
     minWidth: 960,
     minHeight: 600,
     // macOS：隐藏标题栏、红绿灯悬浮于 chrome 条上（替代 Tauri Overlay + objc2 手动定位）
-    ...(process.platform === 'darwin'
-      ? {
-          titleBarStyle: 'hidden',
-          // 对齐 Tauri  objc2 版实测值：按钮高 16 → spacing = (46-16)/2 = 15
-          trafficLightPosition: { x: 15, y: 15 }
-        }
-      : {})
+    ...windowChromeOptions()
   });
   // BaseWindow 的背景不等于其根 View 的背景；首帧和拉伸露出的底层也必须显式着色。
   mainWindow.contentView.setBackgroundColor(surfaceColor);
@@ -204,7 +199,7 @@ export function createMainWindow(port, route = '/') {
   mainWindow.contentView.addChildView(mainView);
   mainWindow.contentView.addChildView(chromeView);
   layoutViews();
-  if (process.platform === 'darwin') nativeBrowser = new NativeBrowser(mainWindow, mainView, `http://127.0.0.1:${port}`);
+  if (desktopSupported()) nativeBrowser = new NativeBrowser(mainWindow, mainView, `http://127.0.0.1:${port}`);
 
   installNavigationGuards(mainView);
   installNavigationGuards(chromeView);
@@ -232,6 +227,10 @@ export function createMainWindow(port, route = '/') {
   mainWindow.on('closed', () => {
     nativeBrowser?.dispose();
     nativeBrowser = null;
+    // BaseWindow does not own WebContentsView lifetimes.
+    for (const view of [mainView, chromeView]) {
+      if (view && !view.webContents.isDestroyed()) view.webContents.close();
+    }
     mainWindow = null;
     mainView = null;
     chromeView = null;
@@ -239,4 +238,22 @@ export function createMainWindow(port, route = '/') {
   });
 
   return mainWindow;
+}
+
+export function desktopWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('window_missing');
+  return { maximized: mainWindow.isMaximized() };
+}
+
+export function desktopWindowControl(action) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('window_missing');
+  switch (action) {
+    case 'minimize': mainWindow.minimize(); break;
+    case 'maximize-toggle':
+      if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize();
+      break;
+    case 'close': mainWindow.close(); break;
+    default: throw new Error('invalid_window_action');
+  }
+  return { success: true };
 }

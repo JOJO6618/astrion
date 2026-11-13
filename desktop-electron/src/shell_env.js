@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { loadWindowsPath } from './windows/shell-path.js';
 
 const LOGIN_SHELL_PATH_TIMEOUT_MS = 10_000;
 const LOGIN_SHELL_PATH_MAX_OUTPUT_BYTES = 256 * 1024;
@@ -30,6 +31,7 @@ function loginShellCommand(shellName) {
  * @returns {Promise<{path: string | null, status: string}>}
  */
 export function loadLoginShellPath() {
+  if (process.platform === 'win32') return loadWindowsPath();
   if (process.platform !== 'darwin') {
     return Promise.resolve({ path: null, status: 'unsupported-platform' });
   }

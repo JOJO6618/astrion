@@ -14,6 +14,8 @@ import http from 'node:http';
 import { app, autoUpdater as nativeAutoUpdater, dialog } from 'electron';
 import { shutdownBackend } from './backend.js';
 import { createUpdateInstaller } from './updater-install.js';
+import { createWindowsUpdateInstaller } from './updater-install-windows.js';
+import { desktopWindowControl, desktopWindowState } from './window.js';
 import { createUpdaterLogger } from './updater-log.js';
 import { migrationPageHtml } from './migration-window.js';
 import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
@@ -73,7 +75,8 @@ async function getAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.autoRunAppAfterInstall = true;
-  updateInstaller = createUpdateInstaller({
+  const createInstaller = process.platform === 'win32' ? createWindowsUpdateInstaller : createUpdateInstaller;
+  updateInstaller = createInstaller({
     updater: autoUpdater,
     nativeUpdater: nativeAutoUpdater,
     app,
@@ -168,6 +171,20 @@ export function startBridge(ctx) {
       send(200, { started: true });
       return;
     }
+    if (req.method === 'GET' && pathname === '/window/state') {
+      try { send(200, { success: true, ...desktopWindowState() }); }
+      catch (error) { send(409, { success: false, error: error.message }); }
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/window/control') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; if (body.length > 4096) req.destroy(); });
+      req.on('end', () => {
+        try { send(200, desktopWindowControl(JSON.parse(body || '{}').action)); }
+        catch (error) { send(400, { success: false, error: error.message }); }
+      });
+      return;
+    }
     if (req.method === 'GET' && pathname === '/rundata/info') {
       getRunDataInfo()
         .then((info) => send(200, info))
@@ -240,6 +257,7 @@ export function startBridge(ctx) {
     if (req.method === 'POST' && pathname === '/rundata/restart') {
       send(202, { success: true, restarting: true });
       setTimeout(() => {
+        shutdownBackend();
         app.relaunch();
         app.exit(0);
       }, 250);

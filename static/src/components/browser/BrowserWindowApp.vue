@@ -61,6 +61,10 @@ function syncTheme() {
 
 store.open = true;
 onMounted(() => {
+  document.documentElement.classList.toggle(
+    'nb-window-windows',
+    window.__ASTRION_PLATFORM__ === 'win32'
+  );
   const bridge = browserBridge();
   if (bridge) {
     subscriptions.push(bridge.onState((snapshot) => store.apply(snapshot)));

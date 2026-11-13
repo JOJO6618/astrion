@@ -2,7 +2,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { QuickGateway } from './gateway.js';
-const registry = path.join(os.homedir(), '.astrion/quick-entry-gateway.json');
+const registry = process.env.ASTRION_QUICK_DISCOVERY_FILE || (process.env.ASTRION_ELECTRON_USER_DATA
+  ? path.join(process.env.ASTRION_ELECTRON_USER_DATA, 'quick-entry-gateway.json')
+  : path.join(os.homedir(), '.astrion/quick-entry-gateway.json'));
 
 export async function advertiseGateway(port, dataRoot) {
   await fs.mkdir(path.dirname(registry), { recursive: true });

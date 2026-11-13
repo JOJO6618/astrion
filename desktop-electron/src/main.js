@@ -13,12 +13,22 @@
 // Windows（WebView2）/ Chrome web 同一引擎，测试矩阵塌缩。
 
 import { app, protocol } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 import { startBackendAndCreateWindow, shutdownBackend } from './lifecycle.js';
 import { installAppMenu } from './menu.js';
 import { startQuickEntry, quickEnabled, showQuickEntry } from './quick/controller.js';
 import { focusMainWindow } from './window.js';
 import { isUpdaterInstalling } from './updater-state.js';
 
+app.setName('Astrion');
+const isolatedUserData = process.env.ASTRION_ELECTRON_USER_DATA;
+if (isolatedUserData) {
+  const directory = path.resolve(isolatedUserData);
+  fs.mkdirSync(directory, { recursive: true });
+  app.setPath('userData', directory);
+  app.setPath('sessionData', directory);
+}
 const quickDebug = process.argv.includes('--quick-debug');
 if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
 protocol.registerSchemesAsPrivileged([{ scheme: 'astrion-quick', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);

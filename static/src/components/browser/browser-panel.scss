@@ -33,6 +33,13 @@
 :root.nb-window-fullscreen .native-browser-panel--window .nb-tabbar {
   padding-left: 9px;
 }
+:root.nb-window-windows .native-browser-panel--window .nb-tabbar {
+  padding-left: 9px;
+  padding-right: max(138px, calc(100vw - env(titlebar-area-width, 100vw)));
+}
+:root.nb-window-windows.nb-window-fullscreen .native-browser-panel--window .nb-tabbar {
+  padding-right: 9px;
+}
 .native-browser-panel--window .nb-tabbar .nb-tab,
 .native-browser-panel--window .nb-tabbar button {
   -webkit-app-region: no-drag;

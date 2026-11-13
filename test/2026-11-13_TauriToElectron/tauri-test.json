@@ -1,0 +1,22 @@
+{
+  "productName": "Astrion CrossShell Test",
+  "mainBinaryName": "astrion-crossshell-legacy",
+  "identifier": "com.astrion.crossshell-test",
+  "version": "0.9.3",
+  "plugins": {
+    "updater": {
+      "dangerousInsecureTransportProtocol": true,
+      "endpoints": ["http://127.0.0.1:19878/latest-windows-x86_64.json"]
+    }
+  },
+  "bundle": {
+    "publisher": "astrion",
+    "createUpdaterArtifacts": false,
+    "targets": ["nsis"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "E:/astrion/agent-Specialization/test/2026-11-13_TauriToElectron/legacy-test-hooks.nsh"
+      }
+    }
+  }
+}

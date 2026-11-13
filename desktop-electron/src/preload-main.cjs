@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('astrionWindow', {
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
 
 // Only the trusted main renderer receives this bridge. Web pages use no preload.
-if (process.platform === 'darwin') {
+if (['darwin', 'win32'].includes(process.platform)) {
   const subscribe = (channel, callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on(channel, listener);
@@ -30,6 +30,7 @@ if (process.platform === 'darwin') {
     popout: true,
     // 能力标记：本壳支持「跟随智能体」（AI 操作哪个标签，用户视图就跟到哪个）。
     followAi: true,
+    credentialFileImport: process.platform === 'win32',
     connect: (scope, labels) => ipcRenderer.invoke('browser:connect', scope, labels),
     theme: theme => ipcRenderer.send('browser:theme', theme),
     command: payload => ipcRenderer.invoke('browser:command', payload),

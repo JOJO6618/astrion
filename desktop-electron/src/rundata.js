@@ -4,7 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 const DEFAULT_DATA_ROOT = path.join(os.homedir(), '.astrion', 'astrion-desktop');
-const SETTINGS_FILE = path.join(os.homedir(), '.astrion', 'rundata_settings.json');
+const SETTINGS_FILE = process.env.ASTRION_DESKTOP_SETTINGS_FILE || path.join(os.homedir(), '.astrion', 'rundata_settings.json');
 
 function expandUserPath(value) {
   const raw = String(value || '').trim();

@@ -66,7 +66,7 @@
 - **`config/`**：配置拆分（api/limits/terminal/paths…），由 `config/__init__.py` 聚合并加载 `.env`
 - **`utils/`**：api_client、日志、上下文与对话工具（多个子包，原入口保留兼容）
 - **前端**：`static/src/`（Vue 3 + TS）；`cli/src/`（opentui + React 19，2026-09-11 起替代 Ink 版；旧实现存档 `cli/legacy-ink-src/`）
-- **子项目**：`android-webview-app/`、`desktop-electron/`（macOS 现行壳）、`desktop/`（Tauri，Windows 沿用）、`easyagent/`（旧版 Node 子智能体，已不用）、`_experiments/`（本地实验归档，不入 git，见 §7）
+- **子项目**：`android-webview-app/`、`desktop-electron/`（macOS 与 Windows 共用 Electron；Windows 迁移验证中，尚未正式发布）、`desktop/`（旧 Tauri 壳，保留 Windows 运行时 staging、图标及原生快捷键/WGC 模块供新壳复用）、`easyagent/`（旧版 Node 子智能体，已不用）、`_experiments/`（本地实验归档，不入 git，见 §7）
 - 完整目录职责与监控动画核心文件见细节文档 `project_structure.md`
 
 ## 1.5) 运行态数据目录与路径变量（2026-06 更新）
@@ -95,13 +95,13 @@
 | 前端 lint | `npm run lint` |
 | CLI 开发 | `bun cli/src/main.tsx`（需 bun ≥1.3）；类型检查 `cd cli && ./node_modules/.bin/tsc --noEmit` |
 | 桌面壳（macOS，现行） | `cd desktop-electron && npm install && npm run dev`；发布 `bash desktop-electron/scripts/release_mac.sh [版本]` |
-| 桌面壳（Windows，Tauri） | `cd desktop && npm install && npm run dev`；发布 `bash desktop/scripts/release_mac.sh [版本]` |
+| 桌面壳（Windows，Electron 迁移版） | Windows 原生环境：`node desktop-electron/scripts/build_windows.mjs`；仅目录包加 `--dir`，默认不发布 |
 
 **硬约束**：
 
 1. **绝不能 full 与 headless 双进程并存**——RuntimeService 单例、门闸、审批 Map 都是进程内单例，两者端口/数据目录相同，只是挂载的路由面不同。
 2. Desktop 依赖安装需 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`；壳加载的是后端 serve 的 `static/dist`，改前端必须先 `npm run build`。
-3. Windows 发布在 Win 机构建、需同一 minisign 私钥；mac/win 的更新说明与版本号自 0.4.2 起**按平台分开维护**（`desktop/` 一套、`desktop-electron/` 一套）。
+3. Windows 必须在 Win 机构建。Electron Windows 版本/说明在 `desktop-electron/windows-release.json`，macOS 仍用同目录 `package.json`/`DESKTOP_CHANGELOG.md`，独立维护。向旧 Tauri 提供跨壳更新时仍须原 minisign 签名；Electron NSIS 使用 `latest.yml`，不得混淆 Windows Authenticode 与旧更新签名。未授权不得发布。
 4. 构建/安装/lint 因沙箱权限失败时的处置见 §5「构建沙箱已知问题」，**禁止改构建配置绕过**。
 5. **前端产物带内容哈希（2026-10-15 起）**：`vite.config.ts` 输出 `assets/[name]-[hash:8].(js|css|ext)`；`static/*.html` 仍写固定名，由 `server/entry_assets.py` 在响应时按 `static/dist/.vite/manifest.json` 注入真实文件名（映射来自构建产物，`npm run build` 后才有）。**新增 HTML 出口必须用 `serve_entry_html`，不要再用 `send_static_file` 直发 HTML**；HTML 响应一律 `no-store`。装配样式 `static/dist/style-<token>.css` 由 `scripts/generate_entry_styles.mjs` 生成（**不再写回源码树的 `static/style.css`**）。桌面壳 quick 窗口各自读同一 manifest 注入（Electron `src/quick/entry-styles.js`、Tauri `src/quick/assets.rs`），改哈希规则时必须同步。部署注意 dist 要清理后解压，见 `test/2026-10-15_前端产物hash化/README.md`。
 

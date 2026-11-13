@@ -7,7 +7,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { app, BaseWindow, WebContentsView } from 'electron';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -44,7 +44,7 @@ let manager;
 async function run() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const { NativeBrowser, setBrowserDataRoot } = await import(path.join(root, 'desktop-electron/src/browser/index.js'));
+  const { NativeBrowser, setBrowserDataRoot } = await import(pathToFileURL(path.join(root, 'desktop-electron/src/browser/index.js')).href);
   setBrowserDataRoot(path.join(output, 'data'));
   const window = new BaseWindow({ x: 40, y: 40, width: 1200, height: 800, show: false });
   const main = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, preload: path.join(root, 'desktop-electron/src/preload-main.cjs') } });

@@ -1,5 +1,6 @@
 import { clipBounds } from './policy.js';
 import { refreshTextDocuments } from './text-documents.js';
+import { applyPopoutChromeTheme } from '../platform.js';
 
 // Project the host's surface immediately while the renderer catches up.
 // The authoritative CSS rectangle replaces this projection on its next layout.
@@ -36,17 +37,27 @@ export function browserViewport(value) {
 const COLOR = /^#[a-f\d]{6}$/i;
 const themeColor = value => (typeof value === 'string' && COLOR.test(value) ? value.toLowerCase() : '');
 
-/** 应用主题：接受 '#rrggbb' 或 { surfaceColor, textColor }。
- *  文字色只用于纯文本类文档（text-documents.js），普通网页不受影响。 */
+/** surfaceColor 用于内容表面，chromeColor 用于独立窗口标签栏的原生控制区。
+ *  textColor 用于纯文本类文档和原生按钮图标，普通网页不受影响。 */
 export function setBrowserSurfaceColor(manager, payload, window = manager.window) {
   const surface = themeColor(typeof payload === 'string' ? payload : payload?.surfaceColor);
   const text = themeColor(typeof payload === 'object' && payload ? payload.textColor : '');
+  const chrome = themeColor(typeof payload === 'object' && payload ? payload.chromeColor : '');
   if (!surface) return;
   // 初始主题可能与缓存相同，但窗口根 View 仍需要明确的不透明背景。
   window.setBackgroundColor(surface);
   window.contentView.setBackgroundColor(surface);
-  const changed = surface !== manager.surfaceColor || (!!text && text !== manager.textColor);
+  const textChanged = !!text && text !== manager.textColor;
+  const chromeChanged = !!chrome && chrome !== manager.chromeColor;
+  const changed = surface !== manager.surfaceColor || textChanged;
   if (text) manager.textColor = text;
+  if (chrome) manager.chromeColor = chrome;
+  // 标签栏颜色可以单独变化，不能受内容表面颜色的等值返回影响。
+  if (chromeChanged || textChanged) {
+    for (const host of manager.popouts.values()) {
+      applyPopoutChromeTheme(host.window, manager.chromeColor, manager.textColor);
+    }
+  }
   if (!changed) return;
   manager.surfaceColor = surface;
   for (const tab of manager.tabs.values()) {

@@ -23,7 +23,8 @@ const PROFILE_ACTIONS = new Set(['search-engine', 'follow-ai', 'shortcuts', 'his
 const WINDOW_ACTIONS = new Set(['popout', 'dock', 'show-popout']);
 
 let browserDataRoot;
-export function setBrowserDataRoot(root) { browserDataRoot = root; }
+// Windows migration deliberately leaves the former WebView2 profile untouched.
+export function setBrowserDataRoot(root) { browserDataRoot = process.platform === 'win32' ? path.join(root, 'electron') : root; }
 export class NativeBrowser {
   constructor(window, mainView, origin) {
     Object.assign(this, { window, mainView, origin, tabs: new Map(), selected: new Map(), profiles: new Map(), features: new Map(), popouts: new Map(), disposed: false, revision: 0, connectSequence: 0 });
@@ -35,8 +36,9 @@ export class NativeBrowser {
     this.ai = new BrowserAI(this);
     this.retention = new BrowserRetention(this);
     this.surfaceColor = window.getBackgroundColor();
-    // 纯文本类文档（text-documents.js）的文字色，由前端主题上报；空值按背景明暗兜底。
+    // 前端上报的文字色供纯文本文档与原生按钮使用；标签栏底色独立缓存。
     this.textColor = '';
+    this.chromeColor = '';
     mainView.setBackgroundColor(this.surfaceColor);
     this.watchHost(this.main);
     this.register();
@@ -329,7 +331,7 @@ export class NativeBrowser {
         }
         host.geometry = payload.rect; host.visible = payload.visible === true;
         host.geometryViewport = viewport;
-        setBrowserSurfaceColor(this, { surfaceColor: payload.surfaceColor, textColor: payload.textColor }, host.window);
+        setBrowserSurfaceColor(this, { surfaceColor: payload.surfaceColor, textColor: payload.textColor, chromeColor: payload.chromeColor }, host.window);
         host.overlayRaised = payload.elevated === true;
         host.overlayCapturesInput = payload.capturesInput !== false;
         host.focusFind = payload.focusFind === true;

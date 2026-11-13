@@ -12,6 +12,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { credentialTransport } from './backend-transport.js';
+import { backendLaunch } from './windows/backend-guardian.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -129,7 +131,7 @@ const CHILD_ENV_SCRUB_PREFIXES = ['ASTRION_', 'AGENT_'];
  */
 export function spawnBackend({ python, backendDir, port, bridgePort, browserToken, version, shellPath, desktopDataRoot }) {
   // --path 语义为「兜底默认工作区」，桌面首启由用户在引导流程中自行创建
-  const defaultWs = os.homedir() || path.join(backendDir, 'project');
+  const defaultWs = process.env.ASTRION_DESKTOP_INITIAL_WORKSPACE || os.homedir() || path.join(backendDir, 'project');
 
   /** @type {NodeJS.ProcessEnv} */
   const env = {};
@@ -163,23 +165,17 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
   // macOS 上同用户进程可用 ps -E 读到启动环境，模型执行的命令不能拿到它。
   delete env.ASTRION_DESKTOP_BROWSER_TOKEN;
   delete env.ASTRION_DESKTOP_BROWSER_TOKEN_FD;
-  const passToken = !!(bridgePort && browserToken);
-  if (passToken) env.ASTRION_DESKTOP_BROWSER_TOKEN_FD = '3';
-
-  const child = spawn(
+  const transport = credentialTransport({ bridgePort, browserToken });
+  Object.assign(env, transport.env);
+  const launch = backendLaunch({
     python,
-    ['-m', 'server.app', '--port', String(port), '--path', defaultWs],
-    {
-      cwd: backendDir,
-      env,
-      stdio: passToken ? ['ignore', 'pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
-      windowsHide: true
-    }
-  );
-  if (passToken) {
-    child.stdio[3].on('error', () => {});
-    child.stdio[3].end(`${browserToken}\n`);
-  }
+    args: ['-m', 'server.app', '--port', String(port), '--path', defaultWs],
+    helperPath: path.join(__dirname.replace(/app\.asar(?=[\\/])/, 'app.asar.unpacked'), 'windows/backend-guardian.py')
+  });
+  const child = spawn(launch.command, launch.args, {
+    cwd: backendDir, env, stdio: transport.stdio, windowsHide: true
+  });
+  transport.write(child);
 
   // 后端 stdout/stderr 转发（dev 终端可见；release 无控制台，后端日志走自身 logs/ 文件）
   child.stdout?.on('data', (chunk) => {
@@ -187,6 +183,10 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
   });
   child.stderr?.on('data', (chunk) => {
     process.stderr.write(`[astrion-backend] ${chunk}`);
+  });
+  child.on('error', error => {
+    console.error('[astrion-desktop] 后端进程启动失败:', error.message);
+    child.startupError = error;
   });
   child.on('exit', (code, signal) => {
     console.error(`[astrion-desktop] 后端进程退出: code=${code} signal=${signal}`);
@@ -198,10 +198,15 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
 }
 
 /** 轮询无鉴权端点直到后端就绪。 */
-export function waitBackendReady(port) {
+export function waitBackendReady(port, child = backendChild) {
   const deadline = Date.now() + BACKEND_READY_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     const poll = () => {
+      if (child?.startupError) { reject(child.startupError); return; }
+      if (child && (child.exitCode !== null || child.signalCode !== null)) {
+        reject(new Error(`后端在就绪前退出 (${child.exitCode ?? child.signalCode})`));
+        return;
+      }
       const req = http.get(
         { host: '127.0.0.1', port, path: '/api/host-mode-enabled', timeout: 800 },
         (res) => {

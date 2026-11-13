@@ -110,7 +110,9 @@ export class BrowserCredentials {
   }
   async authenticate() {
     if (this.dependencies.authenticate) return this.dependencies.authenticate();
-    if (systemPreferences.canPromptTouchID()) await systemPreferences.promptTouchID('查看保存的浏览器密码');
+    if (process.platform === 'darwin' && systemPreferences.canPromptTouchID()) {
+      await systemPreferences.promptTouchID('查看保存的浏览器密码');
+    }
   }
   async command(event, input) {
     const manager = this.manager;
@@ -142,16 +144,17 @@ export class BrowserCredentials {
         const secret = row.password;
         const timer = setTimeout(() => { if (clipboard.readText() === secret) clipboard.clear(); }, 30000); timer.unref();
       }
-    } else if (action === 'sources') result = { sources: this.importer.sources() };
-    else if (action === 'preview' || action === 'import') {
+    } else if (['sources', 'preview', 'preview-file', 'import'].includes(action)) {
       let finish;
       const done = new Promise(resolve => { finish = resolve; });
       const operation = { lease, controller: new AbortController(), done }; this.operation = operation;
       const checked = () => { operation.controller.signal.throwIfAborted(); ensure(); };
       try {
-        result = action === 'preview'
-          ? { preview: await this.importer.preview(profile, vault, input.value, checked, operation.controller.signal, stage => host.send('browser:credentials-progress', { lease, stage })) }
-          : { report: await this.importer.commit(profile, vault, input.value, checked) };
+        const progress = stage => host.send('browser:credentials-progress', { lease, stage });
+        if (action === 'sources') result = { sources: await this.importer.sources(operation.controller.signal) };
+        else if (action === 'preview-file') result = { preview: await this.importer.previewFile(profile, vault, input.value, checked, operation.controller.signal, progress) };
+        else if (action === 'preview') result = { preview: await this.importer.preview(profile, vault, input.value, checked, operation.controller.signal, progress) };
+        else result = { report: await this.importer.commit(profile, vault, input.value, checked) };
       } finally { if (this.operation === operation) this.operation = null; finish(); }
     } else if (action === 'fill') {
       const tab = manager.tab(host, input.tabId), fill = this.fills.get(tab.id);

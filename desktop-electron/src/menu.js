@@ -9,6 +9,7 @@ import { app, BaseWindow, Menu } from 'electron';
 export function installAppMenu() {
   const isDev = !app.isPackaged;
   const isMac = process.platform === 'darwin';
+  if (process.platform === 'win32') { Menu.setApplicationMenu(null); return; }
 
   /** @type {import('electron').MenuItemConstructorOptions[]} */
   const template = [];

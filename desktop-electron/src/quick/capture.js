@@ -46,6 +46,7 @@ export class CaptureController {
           hasShadow: false, resizable: false, alwaysOnTop: true, skipTaskbar: process.platform !== 'darwin',
           webPreferences: { preload: path.join(here, 'capture-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
         configureWorkspaceVisibility(overlay);
+        if (process.platform === 'win32') overlay.setContentProtection(true);
         overlay.setAlwaysOnTop(true, 'floating');
         this.overlays.push({ window: overlay, display, ready: false });
         await overlay.loadFile(path.join(here, 'capture.html'));
@@ -120,8 +121,10 @@ export class CaptureController {
   }
   async finishWindow(event, id) {
     if (!this.senderOverlay(event)) return;
-    if (!Number.isSafeInteger(id) || id <= 0
-      || !this.windows.some(item => item.id === id && item.candidate)) {
+    const validId = process.platform === 'win32'
+      ? typeof id === 'string' && /^\d+:\d+$/.test(id)
+      : Number.isSafeInteger(id) && id > 0;
+    if (!validId || !this.windows.some(item => item.id === id && item.candidate)) {
       this.updateExclusion();
       return;
     }
@@ -140,6 +143,8 @@ export class CaptureController {
       if (ticket !== this.generation || this.quick.isDestroyed()) return;
       const image = await capture(binary);
       if (ticket !== this.generation || this.quick.isDestroyed()) return;
+      this.quick.focus();
+      this.quick.webContents.focus();
       this.quick.webContents.send('quick:capture', image);
     } catch (error) {
       const detail = (Buffer.isBuffer(error.stderr) ? error.stderr.toString('utf8') : String(error.stderr || error.message)).trim().slice(0, 2500);

@@ -23,6 +23,7 @@ import { createMigrationWindow } from './migration-window.js';
 import { setMainWindowBackend, focusMainWindow, getMainView } from './window.js';
 import { startQuickEntry } from './quick/controller.js';
 import { setBrowserDataRoot } from './browser/index.js';
+import { desktopSupported } from './platform.js';
 
 export { shutdownBackend };
 
@@ -91,18 +92,18 @@ export async function startBackendAndCreateWindow() {
     console.warn(`[astrion-desktop] 登录 shell PATH 加载失败 (${shellEnvironment.status})，使用原始 PATH`);
   }
 
-  spawnBackend({
+  const child = spawnBackend({
     python,
     backendDir,
     port,
     bridgePort,
-    browserToken: process.platform === 'darwin' ? browserToken : null,
+    browserToken: desktopSupported() ? browserToken : null,
     version: app.getVersion(),
     shellPath: shellEnvironment.path,
     desktopDataRoot
   });
 
-  await waitBackendReady(port);
+  await waitBackendReady(port, child);
   setBrowserDataRoot(desktopDataRoot);
   await startQuickEntry({ port, dataRoot: desktopDataRoot, getMainView, openMain: route => focusMainWindow(route) });
   setMainWindowBackend(port);

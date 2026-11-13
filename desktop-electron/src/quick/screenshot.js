@@ -4,10 +4,13 @@ import { promisify } from 'node:util';
 import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { windowsHelper } from '../windows/native-helper.js';
+import { windowsCaptureList, windowsCaptureRegion, windowsCaptureWindow } from '../windows/capture.js';
 const execute = promisify(execFile);
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export async function prepareNativeCapture() {
+  if (process.platform === 'win32') return windowsHelper();
   const binary = app.isPackaged ? path.join(process.resourcesPath, 'quick-entry-capture') : path.join(desktop, '.cache/quick-entry-capture');
   if (!app.isPackaged) {
     const sources = ['quick-capture.swift', 'window-discovery-policy.swift'].map(name => path.join(desktop, 'native', name));
@@ -22,12 +25,14 @@ export async function prepareNativeCapture() {
 }
 
 export async function captureRegion(binary, display, rect) {
+  if (process.platform === 'win32') return windowsCaptureRegion(binary, display, rect);
   const { stdout } = await execute(binary, [display.id, process.pid, rect.x, rect.y, rect.width, rect.height].map(String),
     { encoding: 'buffer', maxBuffer: 50 * 1024 * 1024, timeout: 15000 });
   return `data:image/png;base64,${stdout.toString('base64')}`;
 }
 
 export async function listCaptureWindows(binary) {
+  if (process.platform === 'win32') return windowsCaptureList(binary);
   const { stdout } = await execute(binary, ['windows', String(process.pid)],
     { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 4000 });
   const windows = JSON.parse(stdout);
@@ -37,11 +42,12 @@ export async function listCaptureWindows(binary) {
 
 export async function capturePermission(binary, request = false) {
   const { stdout } = await execute(binary, ['permission', request ? 'request' : 'check'],
-    { encoding: 'utf8', maxBuffer: 8192, timeout: request ? 60000 : 4000 });
+    { encoding: 'utf8', maxBuffer: 8192, timeout: request ? 60000 : 4000, windowsHide: true });
   return JSON.parse(stdout).granted === true ? 'granted' : 'denied';
 }
 
 export async function captureWindow(binary, windowID) {
+  if (process.platform === 'win32') return windowsCaptureWindow(binary, windowID);
   const { stdout } = await execute(binary, ['window', String(windowID), String(process.pid)],
     { encoding: 'buffer', maxBuffer: 50 * 1024 * 1024, timeout: 15000 });
   return `data:image/png;base64,${stdout.toString('base64')}`;

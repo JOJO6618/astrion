@@ -4,12 +4,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
 
 const { followAiTarget } = await import(
-  path.join(root, 'desktop-electron/src/browser/follow.js')
+  pathToFileURL(path.join(root, 'desktop-electron/src/browser/follow.js')).href
 );
 
 const profile = (on) => ({ followAi: () => on });

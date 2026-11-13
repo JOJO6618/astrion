@@ -302,7 +302,8 @@ function importError(failure: unknown) {
     invalid_import_file: 'browser.invalidImportFile',
     import_file_too_large: 'browser.importFileTooLarge',
     import_file_too_many_records: 'browser.importFileTooManyRecords',
-    browser_import_timed_out_partial: 'browser.importPartialTimeout'
+    browser_import_timed_out_partial: 'browser.importPartialTimeout',
+    chrome_read_failed: 'browser.importDatabaseUnavailable'
   };
   return keys[code] ? t(keys[code]) : code;
 }

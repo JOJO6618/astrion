@@ -14,25 +14,26 @@ import { QuickVisibility } from './visibility.js';
 import { inputPermission, resolveListenerBinary } from './listener.js';
 import { configureWorkspaceVisibility } from './workspace-visibility.js';
 import { isUpdaterInstalling } from '../updater-state.js';
+import { defaultQuickConfig, patchQuickConfig, quickSettingsPath } from './config.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let quickWindow, tray, listener, capture;
 let quitting = false;
 let anchorDisplayId, inputRegions, visibility;
-let config = { enabled: false, modifier: 'option', workspace: '', model: '' };
+let config = defaultQuickConfig();
 let gateway;
 let quickRendererReady;
-const settingsPath = path.join(os.homedir(), '.astrion/quick-entry.json');
+const settingsPath = quickSettingsPath();
 
 export function quickEnabled() { return config.enabled; }
 export async function startQuickEntry({ debug = false, port, dataRoot, workspacePath, openMain, getMainView } = {}) {
-  try { config = { ...config, ...JSON.parse(await fs.readFile(settingsPath, 'utf8')) }; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  try { config = patchQuickConfig(config, JSON.parse(await fs.readFile(settingsPath, 'utf8'))); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (debug) config.enabled = true;
   if (debug && port === undefined && dataRoot === undefined) {
     const existing = await discoverGateway();
     port = existing.port; dataRoot = existing.dataRoot;
   }
-  gateway = new QuickGateway({ port, dataRoot, workspacePath });
+  gateway = new QuickGateway({ port, dataRoot, workspacePath, managed: !debug });
   if (!debug) await advertiseGateway(gateway.port, gateway.root);
   const openDesktop = route => { hideQuickEntry(); openMain?.(route); };
   const refreshTray = () => {
@@ -73,6 +74,7 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
     if (event.level === 'error') console.error('[astrion-quick] 快捷页面错误:', event.message);
   });
   configureWorkspaceVisibility(quickWindow);
+  if (process.platform === 'win32') quickWindow.setContentProtection(true);
   // Stay below system input-method candidates, above the selection overlays.
   quickWindow.setAlwaysOnTop(true, 'floating', 1);
   inputRegions = new InputRegions(quickWindow, screen);
@@ -128,16 +130,13 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
     hideQuickEntry();
     const status = await inputPermission(true);
     if (status === 'granted') installListener();
-    else await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
+    else if (process.platform === 'darwin') await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
     return status;
   });
   ipcMain.handle('quick:configure', async (event, patch) => {
     if (!trusted(event)) throw new Error('Untrusted sender');
     const previous = { ...config };
-    for (const key of ['enabled', 'modifier', 'workspace', 'model']) {
-      if (key in patch && (key === 'enabled' ? typeof patch[key] === 'boolean' : typeof patch[key] === 'string')) config[key] = patch[key];
-    }
-    if (!['option', 'command', 'control'].includes(config.modifier)) config.modifier = 'option';
+    config = patchQuickConfig(config, patch);
     await fs.mkdir(path.dirname(settingsPath), { recursive: true });
     const temporary = `${settingsPath}.${process.pid}.tmp`;
     await fs.writeFile(temporary, JSON.stringify(config, null, 2), { mode: 0o600 });
@@ -167,13 +166,15 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
     if (!trusted(event)) throw new Error('Untrusted sender');
     hideQuickEntry();
     const status = await capture.permission(true);
-    if (status !== 'granted') await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    if (status !== 'granted' && process.platform === 'darwin') await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
     return status;
   });
   await quickWindow.loadURL(assets.url);
-  const trayImage = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');
+  const trayImage = process.platform === 'win32'
+    ? nativeImage.createFromPath(app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.resolve(here, '../../../desktop/src-tauri/icons/icon.ico'))
+    : nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');
   tray = new Tray(trayImage);
-  tray.setTitle('⬡');
+  if (process.platform === 'darwin') tray.setTitle('⬡');
   tray.setToolTip('Astrion');
   refreshTray();
   tray.on('click', () => config.enabled ? void showQuickEntry() : openDesktop('/settings/quick-chat'));
@@ -181,19 +182,21 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
   installListener();
   if (config.enabled) globalShortcut.register('CommandOrControl+Shift+Space', showQuickEntry);
   app.on('before-quit', () => { quitting = true; visibility.dispose(); inputRegions.dispose(); capture.close(); listener?.kill(); globalShortcut.unregisterAll(); assets.close(); });
-  const modifierLabel = { option: 'Option', command: 'Command', control: 'Control' }[config.modifier];
-  console.info(`[astrion-quick] ${debug ? '源码调试入口' : '快捷模式客户端'}已就绪；双击 ${modifierLabel} 唤起，备用快捷键 Cmd+Shift+Space（启用快捷模式后生效）。`);
+  const modifierLabel = { option: 'Option', command: 'Command', control: 'Control', alt: 'Alt', 'left-control': 'Left Ctrl', 'right-control': 'Right Ctrl', shift: 'Shift' }[config.modifier];
+  console.info(`[astrion-quick] ${debug ? '源码调试入口' : '快捷模式客户端'}已就绪；双击 ${modifierLabel} 唤起，备用快捷键 ${process.platform === 'win32' ? 'Ctrl' : 'Cmd'}+Shift+Space（启用快捷模式后生效）。`);
   if (debug) void showQuickEntry();
 }
 
 function installListener() {
   listener?.kill(); listener = null;
-  if (!config.enabled || process.platform !== 'darwin') return;
+  if (!config.enabled || !['darwin', 'win32'].includes(process.platform)) return;
   let binary;
   try { binary = resolveListenerBinary(); }
   catch (error) { console.error('[astrion-quick] 原生快捷键监听编译失败:', error.message); return; }
-  listener = spawn(binary, [config.modifier], { stdio: ['ignore', 'pipe', 'pipe'] });
+  listener = spawn(binary, process.platform === 'win32' ? ['listen', config.modifier] : [config.modifier],
+    { stdio: [process.platform === 'win32' ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true });
   const activeListener = listener;
+  activeListener.stderr.on('data', chunk => console.warn('[astrion-quick] 原生监听:', chunk.toString('utf8').slice(0, 2000)));
   activeListener.on('exit', () => { if (listener === activeListener) listener = null; });
   let buffer = '';
   listener.stdout.on('data', (chunk) => {

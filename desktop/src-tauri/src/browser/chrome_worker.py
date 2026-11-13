@@ -173,8 +173,15 @@ def preview(root: Path, request: dict, dpapi=unprotect) -> dict:
             issue(stats['passwords'], str(error) if str(error) in ('unsupported_encryption', 'windows_decryption_failed') else 'invalid_record')
     for row in raw['cookies']:
         try:
+            partition = None
             if row.get('top_frame_site_key') or row.get('is_partitioned'):
-                raise ValueError('unsupported_partition')
+                site = row.get('top_frame_site_key')
+                ancestor = row.get('has_cross_site_ancestor', 1)
+                if (request.get('preservePartitionCookies') is not True
+                        or not isinstance(site, str) or origin(site) != site.rstrip('/')
+                        or not row.get('is_secure') or ancestor not in (0, 1)):
+                    raise ValueError('unsupported_partition')
+                partition = {'topLevelSite': site.rstrip('/'), 'hasCrossSiteAncestor': bool(ancestor)}
             domain, name, path = row['host_key'], row['name'], row['path']
             origin(('https://' if row.get('is_secure') else 'http://') + domain.lstrip('.'))
             encrypted = bytes(row.get('encrypted_value') or b'')
@@ -192,6 +199,8 @@ def preview(root: Path, request: dict, dpapi=unprotect) -> dict:
                       'httpOnly': bool(row.get('is_httponly')), 'expires': expires, 'sameSite': int(row.get('samesite', -1))}
             if any('\x00' in str(cookie[k]) for k in ('domain', 'name', 'path', 'value')):
                 raise ValueError('invalid_record')
+            if partition is not None:
+                cookie['partitionKey'] = partition
             cookies.append(cookie)
             stats['cookies']['ready'] += 1
         except Exception as error:
