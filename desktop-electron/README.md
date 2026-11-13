@@ -1,10 +1,12 @@
 # Astrion 桌面壳（Electron / Chromium）
 
-> 2026-09-28 起替代 `desktop/` 的 Tauri/WKWebView 壳。
+> macOS 自 2026-09-28 起替代 `desktop/` 的 Tauri/WKWebView 壳。
 > 换引擎动机：WKWebView 反复出现引擎级兼容问题（折叠动画 content-visibility 离散过渡
 > 不生效、rAF 写入样式延迟 1-2 帧、virtua 首项不挂载、HTML5 拖放被壳吞掉、上滚时
-> virtua 估值补偿可见抖动），逐个修成本高且无法预测下一个；统一 Chromium 后与
-> Windows（WebView2）/ Chrome web 同一引擎，测试矩阵塌缩到 1 个。
+> virtua 估值补偿可见抖动），改用 Chromium 后与 Chrome web 共用引擎。
+> Windows 从 Tauri/WebView2 迁移至共用 Electron 壳，已于 2026-11-14 合入 main。
+
+Windows 下一个正式版为 **0.10.0**，尚未发布；版本与更新说明在 `windows-release.json`，macOS 继续使用 `package.json` / `DESKTOP_CHANGELOG.md` 独立维护。此前 0.10.0–0.10.3 为迁移测试包编号。Windows 构建、升级、资料边界和验证范围见 [`docs/windows_electron.md`](../docs/windows_electron.md)；旧 Tauri 目录仍提供运行时 staging、图标与原生模块。
 
 ## 架构
 

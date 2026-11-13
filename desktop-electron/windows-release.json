@@ -1,8 +1,9 @@
 {
-  "version": "0.10.3",
+  "version": "0.10.0",
   "channel": "windows-electron",
   "notes": [
     "补齐 Windows Chrome 资料读取、密码 CSV 和授权 Cookie JSON 导入；保留预览与冲突选择，分区 Cookie 写后回读核验。",
+    "内置浏览器新增跟随智能体开关，修复后台标签闪现。",
     "修复 Windows 独立浏览器窗口右上角三大键配色，背景跟随标签栏，图标与已打开窗口同步切换主题。",
     "修复 Windows 独立顶部栏平台标记缺失，恢复左侧设置按钮和右侧窗口控制按钮。",
     "Windows 桌面端迁移到与 macOS 共用的 Electron 桌面壳。",

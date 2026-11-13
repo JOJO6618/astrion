@@ -1,6 +1,14 @@
-# Windows Electron 迁移版
+# Windows Electron 桌面版
 
-2026-11-13，分支 `feat/windows-electron-migration`。Windows 与 macOS 共用 `desktop-electron/` 主进程、双视图窗口、浏览器控制器与快捷对话；Windows 包尚未正式发布。旧 `desktop/` 保留作原生模块与运行时 staging 来源，不在本轮删除。
+Windows 与 macOS 共用 `desktop-electron/` 主进程、双视图窗口、浏览器控制器与快捷对话。迁移于 2026-11-14 以提交 `7cb8f769` 合入 `main`；Windows Electron 尚未正式发布。旧 `desktop/` 保留作原生模块与运行时 staging 来源，不在本轮删除。
+
+## 正式版与测试包编号
+
+Windows 下一个正式版为 **0.10.0**，版本与更新说明权威为 `desktop-electron/windows-release.json`；macOS 继续独立维护。此前迁移验证使用的 `0.10.0`、`0.10.1`、`0.10.2`、`0.10.3` 均为未正式发布的测试包编号，不代表正式版本递增。
+
+下文的 0.10.1 顶栏修复、0.10.2 标题栏配色、0.10.3 手动导入均指历史测试包，这些改动统一纳入正式版 0.10.0。历史报告、安装器和便携目录保留原编号，不能覆盖其中已有的试用资料；正式版应输出到独立交付目录。
+
+合入时已拉取浏览器跟随智能体功能，解决 preload 能力声明冲突，同时保留 `followAi` 与 Windows `credentialFileImport`。合并后前端构建通过，跟随回归 9 项、迁移/主题回归 29 项、导入/重启回归 35 项通过；此前交付的 0.10.3 测试包未重新构建，不包含本次拉取的新跟随功能。Git 合入证据见 `output/windows-electron/git-integration/final-result.json`。设置下一正式版版本号不等于已经打包或发布，发布仍需单独授权。
 
 ## 构建
 

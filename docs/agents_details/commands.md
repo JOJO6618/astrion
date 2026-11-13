@@ -34,7 +34,7 @@
 - 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
 ### Desktop（`desktop-electron/`，macOS 与 Windows 共用 Electron/Chromium）
-- **引擎迁移**：macOS 自 2026-09-28 起使用 Electron（commit b53e8c3a）；Windows 自 2026-11-13 在迁移分支使用相同壳，尚未正式发布。原 Tauri/WebView2 代码保留作旧版和原生模块来源。**web 版只支持 Chromium 系浏览器**（Safari 不再兼容）。
+- **引擎迁移**：macOS 自 2026-09-28 起使用 Electron（commit b53e8c3a）；Windows 迁移于 2026-11-14 以 `7cb8f769` 合入 main，使用相同壳，下一个正式版为 **0.10.0**，尚未正式发布。此前 0.10.0–0.10.3 是迁移测试包编号，历史产物与验证报告保留原编号。原 Tauri/WebView2 代码保留作旧版和原生模块来源。**web 版只支持 Chromium 系浏览器**（Safari 不再兼容）。
 - **Windows 构建**：Windows 原生环境执行 `node desktop-electron/scripts/build_windows.mjs`，`--dir` 仅生成目录包，已有本次前端/helper 可加 `--skip-frontend --skip-native`；固定 `--publish never`。版本/说明独立于 macOS，权威为 `desktop-electron/windows-release.json`。NSIS、Job 回收、一次性 stdin 凭据与隔离实验契约见 `docs/windows_electron.md`。
 - 形态：Electron 主进程 + 内嵌 Python 后端 sidecar；BaseWindow + **双 WebContentsView**（chrome 46px 独立标签条常驻不闪动 + main 加载 `http://127.0.0.1:<动态端口>/`，前后端同源）；原生控制桥只负责版本、更新、窗口及数据目录等能力，标签导航走后端命令与版本快照，见 `docs/desktop_navigation.md`；壳经 preload + contextBridge 注入 `window.__ASTRION_DESKTOP__`/`__ASTRION_CHROME__`
 - 开发：`cd desktop-electron && npm install && npm run dev`（装依赖需 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`）；前端需先 `npm run build`

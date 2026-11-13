@@ -1,8 +1,8 @@
 # 桌面内置浏览器集成验证版
 
-当前迁移分支的 macOS 与 Windows 共用 Electron 浏览器。Agent / Chat 共用侧栏入口、组件与状态；Agent 主对话的 AI 工具复用同一控制器与驱动。Docker 和普通网页端不提供此能力。Windows Electron 构建、Job 回收、资料隔离与测试见 `docs/windows_electron.md`、`test/2026-11-13_WindowsElectron/`，本轮尚未正式发布。
+main 分支的 macOS 与 Windows 共用 Electron 浏览器，Windows 迁移已于 2026-11-14 合入（`7cb8f769`）。Agent / Chat 共用侧栏入口、组件与状态；Agent 主对话的 AI 工具复用同一控制器与驱动。Docker 和普通网页端不提供此能力。Windows Electron 构建、Job 回收、资料隔离与测试见 `docs/windows_electron.md`、`test/2026-11-13_WindowsElectron/`。Windows 下一个正式版为 0.10.0，尚未发布；下文 0.10.1–0.10.3 均指迁移测试包编号，其改动纳入正式版 0.10.0。
 
-**2026-11-13 Windows 迁移边界**：新壳复用以下 Electron 宿主、叠层/输入转发、AI 与独立窗口实现；Windows 独立窗口用 Window Controls Overlay，支持 `popout: true`。Windows 元数据/密码库根为 `<desktopDataRoot>/electron/browser/`，Chromium 网站资料放 sessionData；旧 `<desktopDataRoot>/browser/` 不动。不自动迁移旧 WebView2 或 Chrome 浏览器资料；0.10.3 起按用户要求接入 Chrome 手动导入，见下方 Electron 适配说明。后文标明 Windows WebView2、原生裁剪等章节仍为旧壳记录，不能当作 Electron 版已迁移旧资料的证据。
+**2026-11-13 Windows 迁移边界**：新壳复用以下 Electron 宿主、叠层/输入转发、AI 与独立窗口实现；Windows 独立窗口用 Window Controls Overlay，支持 `popout: true`。Windows 元数据/密码库根为 `<desktopDataRoot>/electron/browser/`，Chromium 网站资料放 sessionData；旧 `<desktopDataRoot>/browser/` 不动。不自动迁移旧 WebView2 或 Chrome 浏览器资料；迁移测试包 0.10.3 按用户要求接入 Chrome 手动导入，见下方 Electron 适配说明。后文标明 Windows WebView2、原生裁剪等章节仍为旧壳记录，不能当作 Electron 版已迁移旧资料的证据。
 
 ## 结构和职责
 
