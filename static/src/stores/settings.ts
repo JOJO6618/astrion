@@ -15,6 +15,7 @@ import { useResourceStore } from './resource';
 export type SettingsSection =
   // 账户
   | 'usage'
+  | 'storage'
   // 模型
   | 'providers'
   | 'models'

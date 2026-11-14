@@ -13,6 +13,7 @@ const props = defineProps<{ name: string }>();
 /** 分区 id → /static/icons/ 文件名（不含扩展名） */
 const ICON_FILES: Record<string, string> = {
   usage: 'chart-column',
+  storage: 'hard-drive',
   providers: 'layers',
   models: 'layout-grid',
   'model-pref': 'brain-cog',

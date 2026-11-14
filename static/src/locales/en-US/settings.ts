@@ -34,6 +34,7 @@ export default {
   navSubAgents: 'Sub-agents',
   navReviewAgents: 'Review Agents',
   navUsage: 'Usage',
+  navStorage: 'Storage',
   navAppearance: 'Appearance',
   navAdmin: 'Admin',
 
@@ -124,6 +125,8 @@ export default {
   reviewAgentsDesc: 'Models and runtime parameters for review agents.',
   usageTitle: 'Usage',
   usageDesc: 'Daily model request usage and cost across workspaces and Chat, from the conversation cost ledgers.',
+  storageTitle: 'Storage',
+  storageDesc: 'Disk usage of the Astrion data directory, with cleanup for logs and old conversation backups.',
   appearanceTitle: 'Appearance',
   appearanceDesc: 'Theme, interface language, and display options.',
   adminTitle: 'Admin',

@@ -35,6 +35,7 @@ import git from './en-US/git';
 
 import goal from './en-US/goal';
 import usageStats from './en-US/usageStats';
+import storageStats from './en-US/storageStats';
 import browser from './en-US/browser';
 
 type DeepString<T> = { [K in keyof T]: T[K] extends string ? string : DeepString<T[K]> };
@@ -43,6 +44,7 @@ const enUS: DeepString<typeof zhCN> = {
   browser,
   goal,
   usageStats,
+  storageStats,
   git,
   quickEntry,
   common,

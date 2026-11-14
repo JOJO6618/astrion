@@ -170,6 +170,15 @@
   --series-2: #5d8a9e;
   --series-3: #c9a24a;
   --series-4: #8a8f6a;
+  /* 存储空间分类色（备份 / 日志 / 浏览器MCP / Agent 对话 / 对话媒体 / 子智能体 / Chat / 其他） */
+  --storage-1: #cc785c;
+  --storage-2: #8a8f6a;
+  --storage-3: #9b6b8f;
+  --storage-4: #5d8a9e;
+  --storage-5: #7ea8a0;
+  --storage-6: #c9a24a;
+  --storage-7: #b07a4f;
+  --storage-8: #a8a29a;
 }
 
 :root[data-theme='light'] {
@@ -257,6 +266,15 @@
   --series-2: #1f4f9c;
   --series-3: #9ac4f8;
   --series-4: #8f8f8f;
+  /* 存储空间分类色（备份 / 日志 / 浏览器MCP / Agent 对话 / 对话媒体 / 子智能体 / Chat / 其他） */
+  --storage-1: #e0734f;
+  --storage-2: #8f8f8f;
+  --storage-3: #7c5cf0;
+  --storage-4: #3d8ef5;
+  --storage-5: #10b981;
+  --storage-6: #f59e0b;
+  --storage-7: #ec4899;
+  --storage-8: #c4c4c4;
 }
 
 :root[data-theme='dark'] {
@@ -345,6 +363,15 @@
   --series-2: #93c2fb;
   --series-3: #2d5f9a;
   --series-4: #707070;
+  /* 存储空间分类色 */
+  --storage-1: #f0885f;
+  --storage-2: #8f8f8f;
+  --storage-3: #a78bfa;
+  --storage-4: #4b8fe0;
+  --storage-5: #34d399;
+  --storage-6: #fbbf24;
+  --storage-7: #f472b6;
+  --storage-8: #6f6f6f;
 }
 
 /* 首屏（JS 设置 data-theme 之前）回退到 classic 取值 */
@@ -432,6 +459,15 @@
   --series-2: #5d8a9e;
   --series-3: #c9a24a;
   --series-4: #8a8f6a;
+  /* 存储空间分类色（备份 / 日志 / 浏览器MCP / Agent 对话 / 对话媒体 / 子智能体 / Chat / 其他） */
+  --storage-1: #cc785c;
+  --storage-2: #8a8f6a;
+  --storage-3: #9b6b8f;
+  --storage-4: #5d8a9e;
+  --storage-5: #7ea8a0;
+  --storage-6: #c9a24a;
+  --storage-7: #b07a4f;
+  --storage-8: #a8a29a;
 }
 
 // Quick entry uses its own approved silver palette, independent of app themes.

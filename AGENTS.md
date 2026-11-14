@@ -661,3 +661,13 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 ## 27) 对话级 Git worktree（2026-11-14）
 
 完整已确认契约：`docs/git_worktree.md`，改工作树、执行根、主子切换通知和分支入口前必读。用户级启用默认关闭，创建新对话时快照 metadata，老对话不迁移。工作树放工作区 `.astrion/worktrees/`；workspace 身份与执行根分离。创建必传起始版本和是否携带未提交修改；进入／退出两个工具，不提供合并工具、不自动清理。用户只在主智能体空闲时切换；主／子初始环境进 system，后续切换以工具结果／既有 user 通知传达，冻结 system 不改。子运行中在完整工具批次边界同步，idle 等下次发消息同步。实现位于 `modules/git_worktree/`、`server/status/worktree.py` 与前端 `stores/gitWorktree.ts`／`WorktreeMenu.vue`。前台／后台命令及新终端都按当前执行根解析，既有进程保留原 cwd；技能与项目记忆归属原工作区。编辑记录／预览用 workspace-relative 路径，根偏移时模型工具结果用绝对路径，不得把 bootstrap 的文件资源改成执行根后重复拼接。失效绑定与损坏 Git 记录保留恢复入口，执行失败不得回退主目录；非 Local 后端明确拒绝。macOS 真实临时 Git、主子循环与前端离线回归已通过，详细数量及命令见 `test/2026-11-14_Git工作树/README.md`；Windows／WSL／Linux／Docker 原生执行与 UI 仍待实机验收，不把路径模拟当跨平台验收。
+
+## 28) 存储空间统计与清理（2026-11-15）
+
+- **入口**：设置页「账户 → 存储空间」（`/settings/storage`，与用量统计同宽列）；前端 `settings/tabs/StorageTab.vue` + `tabs/storage/`，文案命名空间 `storageStats`，分类色为新增 `--storage-1..8`（三主题＋首屏回退已补齐）。分区在 `SettingsShell` 的 NAV_GROUPS／SECTION_META／SECTION_COMPONENTS 与 `stores/settings.ts` 的 `SettingsSection` 同步登记。
+- **统计范围 = 数据根内**：`modules/storage_stats/scanner.py` 一次遍历 `DATA_DIR` + `LOGS_DIR`，按 `catalog.py` 的最长前缀规则归桶（8 类：备份与快照 / 日志 / 浏览器MCP / Agent 对话 / 对话媒体 / 子智能体 / Chat 对话 / 其他），未命中归「其他」，保证总和等于实际占用。**不遍历工作区项目目录里的 `.astrion/`**；沙箱不计（host 无持久目录，Windows WSL vhdx 属系统层）。符号链接跳过，字节数优先 `st_blocks`（与 du 同口径），Windows 回退 `st_size`。
+- **缓存 + 进入时刷新**：`<DATA_DIR>/storage_stats.json`（version 守卫）。`GET /api/storage-stats` 只读缓存（毫秒级）；无缓存时触发后台扫描。`POST /api/storage-stats/refresh` 启动单飞后台扫描（进程内锁，不排队）。前端进入页面先渲染缓存，再触发重扫并以 `scanned_at` 变化为轮询终点（30s 超时收口）。
+- **仅 host 模式开放**：统计口径是整个数据根，多用户部署会读到他人数据、清理会删他人文件；非 host 统一返回 `available=false`（前端显示不可用提示）。接口沿用 `@api_login_required`，前端 POST 依赖 `static/security.js` 的全局 CSRF 注入。
+- **清理只覆盖两类**：`POST /api/storage-stats/clean/logs`（活动 `*.log` 截断为 0 字节、归档与非日志文件删除、递归子目录）与 `POST /api/storage-stats/clean/backups`（`keep_days` 1–3650，按 `save/<conv_*>/meta.json.updated_at` 判定，缺失回退目录 mtime，整份删除）。前者用截断而非 unlink（活动句柄会让空间无法及时释放）；后者只处理 `save` 根的直接 `conv_*` 子目录并复校验父目录身份，符号链接与非 `conv_` 目录跳过。其余类别只统计不清理。
+- **前端确认与反馈**：清理前走 `uiStore.requestConfirm`（danger 变体），显示份数与预计释放；成功后 `pushToast` 并强制重载（先收口旧轮询，避免被 busy 拦截）。「保留最近」下拉为 7/30/90/自定义（自定义为行内数字输入，Enter 严格校验、Esc/失焦静默退出），预计删除量由扫描缓存里的 `backups` 明细在前端实时计算。
+- 回归目录 `test/2026-11-15_存储空间统计/`（11 个用例，全部临时目录）；Windows 数据根、三主题视觉与真实清理后的后端连续性仍需实机验收。

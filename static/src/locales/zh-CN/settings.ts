@@ -34,6 +34,7 @@ export default {
   navSubAgents: '子智能体',
   navReviewAgents: '审核智能体',
   navUsage: '用量统计',
+  navStorage: '存储空间',
   navAppearance: '外观',
   navAdmin: '管理员',
 
@@ -115,6 +116,8 @@ export default {
   reviewAgentsDesc: '审核智能体的模型与运行参数。',
   usageTitle: '用量统计',
   usageDesc: '按天统计各工作区与 Chat 的模型请求用量和花费，数据来自对话费用账本。',
+  storageTitle: '存储空间',
+  storageDesc: '统计 Astrion 数据目录的磁盘占用，并清理日志与旧对话备份。',
   appearanceTitle: '外观',
   appearanceDesc: '主题、界面语言与界面显示。',
   adminTitle: '管理员',

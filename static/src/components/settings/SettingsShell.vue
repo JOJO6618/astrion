@@ -23,6 +23,7 @@ import ReviewAgentsTab from './tabs/ReviewAgentsTab.vue';
 import AppearanceTab from './tabs/AppearanceTab.vue';
 import AdminTab from './tabs/AdminTab.vue';
 import UsageStatsTab from './tabs/UsageStatsTab.vue';
+import StorageTab from './tabs/StorageTab.vue';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useSettingsStore } from '@/stores/settings';
 import type { SettingsSection } from '@/stores/settings';
@@ -69,7 +70,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'account',
     titleKey: 'settings.groupAccount',
-    items: [{ id: 'usage', labelKey: 'settings.navUsage', icon: 'usage' }]
+    items: [
+      { id: 'usage', labelKey: 'settings.navUsage', icon: 'usage' },
+      { id: 'storage', labelKey: 'settings.navStorage', icon: 'storage' }
+    ]
   },
   {
     id: 'model',
@@ -147,6 +151,7 @@ watch(isAdmin, () => {
 // ── 分区元信息（页标题/说明文案 key + 组件映射） ──
 const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string }> = {
   usage: { titleKey: 'settings.usageTitle', descKey: 'settings.usageDesc' },
+  storage: { titleKey: 'settings.storageTitle', descKey: 'settings.storageDesc' },
   providers: { titleKey: 'settings.providersTitle', descKey: 'settings.providersDesc' },
   models: { titleKey: 'settings.modelsTitle', descKey: 'settings.modelsDesc' },
   'model-pref': { titleKey: 'settings.modelPrefTitle', descKey: 'settings.modelPrefDesc' },
@@ -169,6 +174,7 @@ const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string 
 
 const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   usage: UsageStatsTab,
+  storage: StorageTab,
   providers: ProvidersTab,
   models: ModelsTab,
   'model-pref': ModelPrefTab,
@@ -286,7 +292,10 @@ onMounted(() => {
       <main class="settings-shell-content" ref="contentEl">
         <div
           class="settings-shell-content-inner"
-          :class="{ 'settings-shell-content-inner--wide': activeSection === 'usage' }"
+          :class="{
+            'settings-shell-content-inner--wide':
+              activeSection === 'usage' || activeSection === 'storage'
+          }"
           v-if="loaded"
         >
           <div class="settings-shell-page-title">{{ $t(activeMeta.titleKey) }}</div>

@@ -34,12 +34,14 @@ import git from './zh-CN/git';
 
 import goal from './zh-CN/goal';
 import usageStats from './zh-CN/usageStats';
+import storageStats from './zh-CN/storageStats';
 import browser from './zh-CN/browser';
 
 export default {
   browser,
   goal,
   usageStats,
+  storageStats,
   git,
   quickEntry,
   common,
