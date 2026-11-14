@@ -151,6 +151,10 @@
                   <button type="button" @click.stop="copyProjectBranch">
                     {{ $t('input.copyBranchName') }}
                   </button>
+                  <WorktreeMenu
+                    :busy="streamingMessage || compressing"
+                    @open="openWorktreeDialog"
+                  />
                 </div>
               </span>
             </span>
@@ -201,7 +205,7 @@
                 {{ $t('shell.pendingApproval') }}
               </button>
               <button
-                v-if="projectGitSummaryForRender"
+                v-if="projectGitSummaryForRender && !props.projectGitSummary?.binding_error"
                 type="button"
                 class="floating-project-status__stats"
                 @click.stop="$emit('open-git-changes-panel')"
@@ -733,6 +737,15 @@
         />
       </div>
     </div>
+    <WorktreeDialog
+      v-if="!chatMode"
+      :open="worktreeDialogOpen"
+      :conversation-id="currentConversationId"
+      :workspace-id="currentHostWorkspaceId || ''"
+      :busy="streamingMessage || compressing"
+      @close="closeWorktreeDialog"
+      @changed="emit('worktree-changed')"
+    />
   </div>
 </template>
 
@@ -745,6 +758,9 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { TextSelection } from 'prosemirror-state';
 import QuickMenu from '@/components/input/QuickMenu.vue';
 import ComposerApprovalDock from '@/components/input/ComposerApprovalDock.vue';
+import WorktreeMenu from '@/components/input/WorktreeMenu.vue';
+import WorktreeDialog from '@/components/input/WorktreeDialog.vue';
+import { useGitWorktreeStore } from '@/stores/gitWorktree';
 import CompressLimitDialog from '@/components/input/CompressLimitDialog.vue';
 import {
   needsHumanDecision,
@@ -822,7 +838,8 @@ const emit = defineEmits([
   'new-conversation',
   'switch-host-workspace',
   'fetch-host-workspaces',
-  'show-sub-agents'
+  'show-sub-agents',
+  'worktree-changed'
 ]);
 
 const props = defineProps<{
@@ -898,6 +915,7 @@ const props = defineProps<{
     branch?: string;
     additions?: number;
     deletions?: number;
+    binding_error?: string;
   } | null;
   userQuestionMinimized?: boolean;
   pendingUserQuestionCount?: number;
@@ -1160,6 +1178,7 @@ const applyLineMetrics = (lines: number, multiline: boolean) => {
   inputStore.setInputMultiline(multiline);
 };
 
+const gitWorktreeStore = useGitWorktreeStore();
 const projectGitSummaryForRender = computed(() => {
   if (personalizationStore?.form?.show_git_status_bar === false) {
     return null;
@@ -1176,7 +1195,7 @@ const projectGitSummaryForRender = computed(() => {
   const result = {
     projectName,
     projectPath: String(summary.project_path || '').trim(),
-    branch,
+    branch: gitWorktreeStore.enabled && gitWorktreeStore.branch ? gitWorktreeStore.branch : branch,
     additions: Math.max(0, Number(summary.additions || 0)),
     deletions: Math.max(0, Number(summary.deletions || 0))
   };
@@ -1247,6 +1266,19 @@ const composerAvatarText = computed(() => {
 const composerAvatarTextKey = computed(() => `avatar-text-${composerAvatarText.value}`);
 
 const projectGitMenuOpen = ref<null | 'project' | 'branch'>(null);
+
+const worktreeDialogOpen = ref(false);
+const worktreeMenuRef = ref<{ focus: () => void } | null>(null);
+
+/** 弹窗常驻挂在输入栏根节点，不跟随项目/分支弹出菜单的存活。 */
+const openWorktreeDialog = () => {
+  worktreeDialogOpen.value = true;
+};
+
+const closeWorktreeDialog = () => {
+  worktreeDialogOpen.value = false;
+  nextTick(() => worktreeMenuRef.value?.focus());
+};
 
 const closeProjectGitMenu = () => {
   projectGitMenuOpen.value = null;

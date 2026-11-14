@@ -36,6 +36,21 @@ def fixed_working_dir(scope):
     return target
 
 
+def fixed_execution_root(scope):
+    raw = getattr(scope, 'execution_root', None)
+    if raw is None:
+        return fixed_working_dir(scope)
+    root = fixed_workspace_root(scope)
+    target = Path(raw)
+    if not target.is_absolute() or target.resolve() != target or not target.is_dir():
+        raise ScopedExecutionError('Execution root is unavailable or redirected')
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise ScopedExecutionError('Execution root is outside its fixed workspace') from exc
+    return target
+
+
 def fixed_write_root(scope):
     return fixed_working_dir(scope) if scope.access_level == "working_dir_write" else fixed_workspace_root(scope)
 
@@ -43,7 +58,7 @@ def fixed_write_root(scope):
 def scoped_work_path(project_path, working_dir=None, scope=None):
     scope = scope if scope is not None else current_execution_scope()
     root = fixed_workspace_root(scope) if scope else Path(project_path).resolve()
-    base = fixed_working_dir(scope) if scope and scope.is_sub_agent else root
+    base = fixed_execution_root(scope) if scope and scope.is_sub_agent else root
     try:
         target = (base / working_dir).resolve() if working_dir else base
         target.relative_to(root)
@@ -70,7 +85,7 @@ def same_scope_authority(left, right):
     if left is None or right is None:
         return left is right
     return (
-        left.executor_kind, left.actor_id, Path(left.workspace_root), left.access_level, left.conversation_id, left.working_dir
+        left.executor_kind, left.actor_id, Path(left.workspace_root), left.access_level, left.conversation_id, left.working_dir, getattr(left, 'execution_root', None)
     ) == (
-        right.executor_kind, right.actor_id, Path(right.workspace_root), right.access_level, right.conversation_id, right.working_dir
+        right.executor_kind, right.actor_id, Path(right.workspace_root), right.access_level, right.conversation_id, right.working_dir, getattr(right, 'execution_root', None)
     )

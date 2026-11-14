@@ -115,8 +115,13 @@ class SubAgentEngineMixin:
             )
 
             # 安全点：写入延迟的上下文通知（不触发新一轮工作，仅让下一轮模型调用看到）
+            from modules.git_worktree.children import sync_before_work
+            if not sync_before_work(self):
+                continue
             self._flush_pending_notifications()
             self._accept_work(new_round=False)
+            if self._idle or self._work_paused:
+                continue
             self._pending_answer_question_id = self._peek_pending_question_id()
 
             # 模型请求（带失败重试，与主智能体同构：最多 5 次尝试、重试间隔 10s）。

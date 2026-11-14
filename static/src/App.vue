@@ -257,6 +257,7 @@
               :current-context-tokens="currentContextTokens"
               :versioning-enabled="versioningEnabled"
               :project-git-summary="projectGitSummary"
+              @worktree-changed="refreshProjectGitSummary"
               :user-question-minimized="userQuestionMinimized"
               :pending-user-question-count="pendingUserQuestions.length"
               :plan-approval-minimized="planApprovalMinimized"

@@ -1,6 +1,13 @@
 // Locale namespace: input (en-US mirror, keys must match zh-CN/input.ts exactly).
 // Product-level concise English; see doc/frontend/i18n_spec.md §5.
 export default {
+  worktreeSwitch: 'Switch worktree',
+  worktreeTarget: 'Working environment',
+  worktreeMain: 'Main checkout',
+  worktreeCreate: 'Create a worktree',
+  worktreeBranch: 'New branch name',
+  worktreeStart: 'Starting branch or revision',
+  worktreeCarry: 'Include uncommitted changes',
   // ── Input bar template ──
   guide: 'Guide',
   openInFileManager: 'Open in File Manager',

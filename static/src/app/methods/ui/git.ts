@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { t } from '@/locales';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
+import { conversationViewEpoch } from '../conversation/session';
+import { useGitWorktreeStore } from '@/stores/gitWorktree';
 
 export const gitMethods = {
   startProjectGitSummaryIdleRefresh() {
@@ -33,31 +35,69 @@ export const gitMethods = {
     this.projectGitSummaryRefreshTimer = null;
   },
   async refreshProjectGitSummary() {
-    if (this.projectGitSummaryRefreshing) {
+    const epoch = conversationViewEpoch(this);
+    const cid = this.currentConversationId || '';
+    const workspaceId = String(this.currentHostWorkspaceId || '');
+    const scope = `${workspaceId}:${cid}`;
+    const worktreeStore = useGitWorktreeStore();
+    const worktreeGeneration = worktreeStore.generation;
+    if (
+      this.projectGitSummaryRefreshing &&
+      this._projectGitRequestScope === scope &&
+      this._projectGitRequestGeneration === worktreeGeneration
+    )
       return;
-    }
+    const owner = {};
+    this._projectGitRequestOwner = owner;
+    this._projectGitRequestScope = scope;
+    this._projectGitRequestGeneration = worktreeGeneration;
+    const owns = () =>
+      this._projectGitRequestOwner === owner &&
+      conversationViewEpoch(this) === epoch &&
+      worktreeStore.generation === worktreeGeneration;
     this.projectGitSummaryRefreshing = true;
     try {
-      const resp = await fetch('/api/project/git-summary');
+      const query = cid ? `?conversation_id=${encodeURIComponent(cid)}` : '';
+      const resp = await fetch(`/api/project/git-summary${query}`);
       const payload = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !payload?.success) {
         this.projectGitSummary = null;
         this.gitChangesDiff = null;
         return;
       }
       this.projectGitSummary = payload.data || null;
+      if (
+        cid &&
+        worktreeStore.scope === `${workspaceId}:${cid}` &&
+        worktreeStore.enabled &&
+        !worktreeStore.busy
+      ) {
+        worktreeStore.branch = payload.data?.branch || '';
+        worktreeStore.directory = payload.data?.project_path || '';
+        worktreeStore.active = payload.data?.git_worktree?.active === true;
+      }
       if (this.gitChangesPanelOpen) {
         this.loadGitChangesDiff?.();
       }
     } catch (_error) {
+      if (!owns()) return;
       this.projectGitSummary = null;
       this.gitChangesDiff = null;
     } finally {
-      this.projectGitSummaryRefreshing = false;
+      if (this._projectGitRequestOwner === owner) this.projectGitSummaryRefreshing = false;
     }
   },
   async loadGitChangesDiff() {
     if (!this.gitChangesPanelOpen) return;
+    const epoch = conversationViewEpoch(this);
+    const owner = {};
+    this._gitDiffRequestOwner = owner;
+    const worktreeGeneration = useGitWorktreeStore().generation;
+    const owns = () =>
+      this._gitDiffRequestOwner === owner &&
+      conversationViewEpoch(this) === epoch &&
+      useGitWorktreeStore().generation === worktreeGeneration;
     const hasExistingDiff = Boolean(this.gitChangesDiff?.has_git);
     this.gitChangesLoading = true;
     this.gitChangesError = '';
@@ -69,12 +109,14 @@ export const gitMethods = {
           : {};
       const params = new URLSearchParams();
       params.set('context', String(context));
+      if (this.currentConversationId) params.set('conversation_id', this.currentConversationId);
       params.set('_', String(Date.now()));
       if (Object.keys(foldContextMap).length > 0) {
         params.set('fold_context_map', JSON.stringify(foldContextMap));
       }
       const resp = await fetch(`/api/project/git-diff?${params.toString()}`, { cache: 'no-store' });
       const payload = await resp.json().catch(() => ({}));
+      if (!owns()) return;
       if (!resp.ok || !payload?.success) {
         this.gitChangesError = payload?.error || t('appUi.loadGitChangesFailed');
         if (!hasExistingDiff) {
@@ -87,12 +129,13 @@ export const gitMethods = {
         this.gitChangesPanelOpen = false;
       }
     } catch (error) {
+      if (!owns()) return;
       this.gitChangesError = t('appUi.loadGitChangesFailed');
       if (!hasExistingDiff) {
         this.gitChangesDiff = null;
       }
     } finally {
-      this.gitChangesLoading = false;
+      if (this._gitDiffRequestOwner === owner) this.gitChangesLoading = false;
     }
   },
   openGitChangesPanel() {

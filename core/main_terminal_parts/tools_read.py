@@ -193,8 +193,9 @@ class MainTerminalToolsReadMixin:
 
                 skill_id = resolved["skill_id"]
                 display_dir = str(resolved.get("display_dir") or WORKSPACE_SKILLS_DIRNAME).strip("/")
+                from modules.git_worktree.paths import result_path
                 read_args = {
-                    "path": f"{display_dir}/{skill_id}/SKILL.md",
+                    "path": result_path(self, f'{display_dir}/{skill_id}/SKILL.md'),
                     "type": "read",
                 }
                 result = self._handle_read_tool(read_args)
@@ -210,7 +211,8 @@ class MainTerminalToolsReadMixin:
                 safe_name = str(name).strip()
                 if not safe_name or "/" in safe_name or "\\" in safe_name:
                     return {"success": False, "error": tr("tools_read.memory_name_invalid", name=name)}
-                file_path = f"{WORKSPACE_MEMORY_DIRNAME}/{safe_name}.md"
+                from modules.git_worktree.paths import result_path
+                file_path = result_path(self, f'{WORKSPACE_MEMORY_DIRNAME}/{safe_name}.md')
                 read_args = {
                     "path": file_path,
                     "type": "read",
@@ -239,7 +241,9 @@ class MainTerminalToolsReadMixin:
                 # 项目记忆目录的列举与内容读取均经执行后端（不再对本机 Path 做
                 # resolve/exists/glob）。
                 files_access = files_for_owner(self)
-                memory_meta = inspect_meta(files_access, WORKSPACE_MEMORY_DIRNAME)
+                from modules.git_worktree.paths import result_path
+                memory_directory = result_path(self, WORKSPACE_MEMORY_DIRNAME)
+                memory_meta = inspect_meta(files_access, memory_directory)
                 if not memory_meta.get("success"):
                     return {
                         "success": False,
@@ -256,7 +260,7 @@ class MainTerminalToolsReadMixin:
                         "summary": empty_text,
                     }
 
-                listing = list_dir(files_access, WORKSPACE_MEMORY_DIRNAME)
+                listing = list_dir(files_access, memory_directory)
                 if not listing.get("success"):
                     return {
                         "success": False,
@@ -277,6 +281,7 @@ class MainTerminalToolsReadMixin:
                         memory_file.get("path")
                         or f"{WORKSPACE_MEMORY_DIRNAME}/{file_name}"
                     )
+                    file_path = result_path(self, file_path)
                     text = read_text(files_access, file_path)
                     if text is None:
                         continue
@@ -504,6 +509,8 @@ class MainTerminalToolsReadMixin:
                     if not read_result.get("success"):
                         return read_result
 
+                    from modules.git_worktree.paths import result_path
+                    read_result['path'] = result_path(self, read_result['path'])
                     content, truncated, char_count = self._truncate_text_block(read_result["content"], max_chars)
                     base_result.update({
                         "path": read_result["path"],
@@ -569,6 +576,8 @@ class MainTerminalToolsReadMixin:
                     if not search_result.get("success"):
                         return search_result
 
+                    from modules.git_worktree.paths import result_path
+                    search_result['path'] = result_path(self, search_result['path'])
                     matches = search_result["matches"]
                     limited_matches, truncated, char_count = self._limit_text_chunks(matches, "snippet", max_chars)
 
@@ -607,6 +616,8 @@ class MainTerminalToolsReadMixin:
                 )
                 if not extract_result.get("success"):
                     return extract_result
+                from modules.git_worktree.paths import result_path
+                extract_result['path'] = result_path(self, extract_result['path'])
 
                 limited_segments, truncated, char_count = self._limit_text_chunks(
                     extract_result["segments"],

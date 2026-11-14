@@ -248,7 +248,7 @@ class SubAgentHistoryMixin:
         self._finalize_task(False, message, elapsed, max_turns_exceeded=max_turns_exceeded, timeout=timeout, error=message)
 
 
-    def _persist_conversation(self, *, partial_summary: str = "") -> None:
+    def _persist_conversation(self, *, partial_summary: str = "", strict: bool = False) -> None:
         """每轮结束后立即落盘子智能体对话，避免跑完了才存一次导致中间状态丢失。"""
         try:
             runtime_seconds = int((time.time() * 1000 - self.stats["runtime_start"]) / 1000)
@@ -273,6 +273,8 @@ class SubAgentHistoryMixin:
                 "round_id": self._round_id,
                 "end_reason": self.task_record.get("end_reason"),
                 "working_dir": self.task_record.get("working_dir"),
+                'execution_root': self.task_record.get('execution_root'),
+                'worktree_revision': self.task_record.get('worktree_revision'),
                 "created_at": datetime.fromtimestamp(self.stats["runtime_start"] / 1000).isoformat(),
                 "updated_at": datetime.now().isoformat(),
                 "status": status,
@@ -296,6 +298,8 @@ class SubAgentHistoryMixin:
             atomic_json(self.output_file, output_data)
         except Exception as exc:
             logger.warning(f"[SubAgentTask] 增量保存失败: {exc}")
+            if strict:
+                raise
 
 
     def _finalize_task(self, success: bool, summary: str, elapsed: float, *, max_turns_exceeded: bool = False, timeout: bool = False, error: Optional[str] = None) -> None:

@@ -5,6 +5,7 @@ status_bp = Blueprint("status", __name__)
 
 from server.status.base import *
 from server.status.git import *
+from server.status.worktree import *
 from server.status.file_open import *
 from server.status.docker import *
 from server.status.host_workspace import *

@@ -130,6 +130,7 @@ interface PersonalForm {
   block_display_mode: BlockDisplayMode;
   show_status_avatar: boolean;
   show_git_status_bar: boolean;
+  git_worktree_enabled: boolean;
   auto_open_terminal_panel: boolean;
   quick_dock_auto_expand: boolean;
   preview_auto_open: boolean;
@@ -371,6 +372,7 @@ const defaultForm = (): PersonalForm => ({
   block_display_mode: loadCachedBlockDisplayMode(),
   show_status_avatar: true,
   show_git_status_bar: true,
+  git_worktree_enabled: false,
   auto_open_terminal_panel: true,
   quick_dock_auto_expand: loadCachedQuickDockAutoExpand(),
   preview_auto_open: false,
@@ -667,12 +669,14 @@ export const usePersonalizationStore = defineStore('personalization', {
             : 'minimal',
         show_status_avatar: data.show_status_avatar !== false,
         show_git_status_bar: data.show_git_status_bar !== false,
+        git_worktree_enabled: data.git_worktree_enabled === true,
         auto_open_terminal_panel: data.auto_open_terminal_panel !== false,
         quick_dock_auto_expand: data.quick_dock_auto_expand !== false,
         preview_auto_open: !!data.preview_auto_open,
         browser_tools_default: data.browser_tools_default === true,
         browser_auto_open: data.browser_auto_open !== false,
-        browser_download_dir: typeof data.browser_download_dir === 'string' ? data.browser_download_dir : '',
+        browser_download_dir:
+          typeof data.browser_download_dir === 'string' ? data.browser_download_dir : '',
         file_preview_auto_wrap: !!data.file_preview_auto_wrap,
         edit_summary_live_display: !!data.edit_summary_live_display,
         modify_history_enabled: data.modify_history_enabled !== false,

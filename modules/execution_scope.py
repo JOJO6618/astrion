@@ -71,6 +71,7 @@ class ExecutionScope:
     network_granted: bool = False
     full_access_grant: Optional[FullAccessGrant] = None
     working_dir: Optional[Path] = None
+    execution_root: Optional[Path] = None
     review_input_fingerprint: Optional[str] = None
     review_username: Optional[str] = None
     # 浏览器动作审批：本次批准的站点（Electron 发输入前核对页面仍在该站点）

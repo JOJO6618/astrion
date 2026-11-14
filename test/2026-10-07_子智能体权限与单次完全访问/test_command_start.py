@@ -70,7 +70,7 @@ class BackgroundStartTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(self.manager, "_spawn_and_register", side_effect=spawn):
             self.manager._run_command_thread_bound(
                 command_id="command", command="never-run", work_path=self.root,
-                timeout=1, session=None, python_env={}, host_execution_mode="direct",
+                timeout=1, session=None, host_execution_mode="direct",
             )
         record = self.manager.get_record("command")
         self.assertEqual(record["status"], "cancelled")

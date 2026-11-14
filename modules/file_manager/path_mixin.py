@@ -90,6 +90,8 @@ class PathMixin:
             (是否有效, 错误信息, 完整路径)
         """
         original_path = path
+        if getattr(self, 'execution_binding_error', None) and not Path(path or '.').is_absolute():
+            return False, self.execution_binding_error, None
         scope = current_execution_scope()
         try:
             project_root = fixed_workspace_root(scope) if scope else Path(self.project_path).resolve()
@@ -99,8 +101,8 @@ class PathMixin:
             self.project_path = project_root
 
         if (scope is not None and scope.is_sub_agent) or self._is_host_mode():
-            from modules.scoped_execution_policy import fixed_working_dir
-            base = fixed_working_dir(scope) if scope and scope.is_sub_agent else project_root
+            from modules.scoped_execution_policy import fixed_execution_root
+            base = fixed_execution_root(scope) if scope and scope.is_sub_agent else Path(getattr(self, 'execution_root', project_root))
             normalized = (path or "").strip()
             if normalized == "/workspace":
                 return True, "", project_root
@@ -117,6 +119,7 @@ class PathMixin:
                 return False, str(exc), None
             return True, "", full_path
         
+        base = Path(getattr(self, 'execution_root', project_root))
         # 不允许绝对路径（除非是在项目内的绝对路径）
         if path.startswith('/') or path.startswith('\\') or (len(path) > 1 and path[1] == ':'):
             # 如果是绝对路径，检查是否指向项目内
@@ -125,6 +128,7 @@ class PathMixin:
                 test_path.relative_to(project_root)
                 # 如果成功，说明绝对路径在项目内，转换为相对路径
                 path = str(test_path.relative_to(project_root))
+                base = project_root
             except ValueError:
                 if str(original_path).replace("\\", "/").startswith("/workspace"):
                     return False, tr("file_manager.path_outside_workspace_detailed"), None
@@ -135,7 +139,7 @@ class PathMixin:
             return False, tr("file_manager.path_traversal_blocked"), None
         
         # 构建完整路径
-        full_path = (project_root / path).resolve()
+        full_path = (base / path).resolve()
         
         # 检查是否在项目目录内
         try:

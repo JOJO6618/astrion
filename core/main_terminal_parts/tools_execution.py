@@ -428,6 +428,18 @@ class MainTerminalToolsExecutionMixin:
                 if scope is not None and scope.is_sub_agent:
                     return {"allowed": True, "mode": "unrestricted"}
 
+                if tool_name in {'enter_worktree', 'exit_worktree'}:
+                    from modules.git_worktree import enabled
+                    if not enabled(self.context_manager.conversation_metadata):
+                        return {'allowed': False, 'mode': mode, 'message': '当前对话未启用 Git worktree。'}
+                    creates = tool_name == 'enter_worktree' and (args.get('target') or {}).get('action') == 'create'
+                    if creates and (mode == 'readonly' or self._is_plan_work_mode()):
+                        return {'allowed': False, 'mode': mode, 'message': '只读或计划模式不能创建工作树。'}
+                    if creates and mode in {'approval', 'auto_approval'}:
+                        return {'allowed': True, 'mode': mode, 'requires_approval': True,
+                                'approval_type': 'direct_execution' if self.get_execution_mode() == 'direct' else 'sandbox_write'}
+                    return {'allowed': True, 'mode': mode}
+
                 if mode == "readonly":
                     if tool_name == "run_command":
                         return {"allowed": True, "mode": mode}
@@ -553,11 +565,11 @@ class MainTerminalToolsExecutionMixin:
                 if not raw:
                     return ""
                 if raw.startswith("/workspace/"):
-                    raw = raw.split("/workspace/", 1)[1]
+                    raw = str(Path(self.project_path) / raw.split("/workspace/", 1)[1])
                 try:
                     info = get_execution_backend(self).files.resolve_path(raw)
                     if info.get("success"):
-                        normalized = info.get("relative_path") if info.get("within_workspace") else info.get("path")
+                        normalized = info.get('relative_path') if info.get('within_workspace') else info.get('path')
                         return str(normalized or raw).replace("\\", "/").lower()
                 except Exception:
                     pass
@@ -722,7 +734,8 @@ class MainTerminalToolsExecutionMixin:
 
                 from .workspace_output import write_workspace_text
                 files = get_execution_backend(self).files
-                directory = str(WORKSPACE_MEMORY_DIRNAME).replace("\\", "/")
+                from modules.git_worktree.paths import result_path
+                directory = result_path(self, WORKSPACE_MEMORY_DIRNAME).replace("\\", "/")
                 target = f"{directory}/{safe_name}.md"
                 before = files.inspect_path(target, access="write")
                 if not before.get("success"):
@@ -768,8 +781,9 @@ class MainTerminalToolsExecutionMixin:
                     items = set()
 
                 visited: Set[str] = set()
+                from modules.git_worktree.paths import result_path
                 for item in items:
-                    normalized = self._normalize_tool_path(item)
+                    normalized = self._normalize_tool_path(result_path(self, item))
                     if normalized:
                         visited.add(normalized)
                 return visited
@@ -800,7 +814,8 @@ class MainTerminalToolsExecutionMixin:
                 return normalized in self._get_visited_read_files()
 
     def _mark_file_as_read_visited(self, path: Any) -> None:
-                normalized = self._normalize_tool_path(path)
+                from modules.git_worktree.paths import result_path
+                normalized = self._normalize_tool_path(result_path(self, path))
                 if not normalized:
                     return
                 visited = self._get_visited_read_files()
@@ -1101,6 +1116,12 @@ class MainTerminalToolsExecutionMixin:
                 """处理工具调用（添加参数预检查和改进错误处理）"""
                 logger.debug("[handle_tool_call] 工具调用开始: tool_name=%s, arguments=%s", tool_name, arguments)
                 scope = current_execution_scope()
+                if not (scope and scope.is_sub_agent) and tool_name not in {'enter_worktree', 'exit_worktree'}:
+                    from modules.git_worktree.binding import restore_binding
+                    try:
+                        restore_binding(self)
+                    except (ValueError, OSError, RuntimeError) as exc:
+                        return json.dumps({'success': False, 'error': str(exc)}, ensure_ascii=False)
                 from modules.goal_policy import interaction_denied, goal_for_terminal, DENIED_MESSAGE
                 if interaction_denied(self, tool_name, arguments) or (
                     tool_name in NEED_CONFIRMATION and goal_for_terminal(self)
@@ -1151,6 +1172,24 @@ class MainTerminalToolsExecutionMixin:
                         return json.dumps({
                             "success": False, "error": error, "output": "", "return_code": -1
                         }, ensure_ascii=False)
+
+                if tool_name in {'enter_worktree', 'exit_worktree'}:
+                    from core.tool_loading import get_tool_loading_state, is_deferred_not_loaded
+                    if tool_name in (getattr(self, 'disabled_tools', None) or []) or is_deferred_not_loaded(get_tool_loading_state(self.context_manager.conversation_metadata), tool_name):
+                        return json.dumps({'success': False, 'error': '工具未启用或尚未加载，请先检查工具配置并加载定义。'}, ensure_ascii=False)
+                    from modules.git_worktree import enabled
+                    if scope and scope.is_sub_agent:
+                        return json.dumps({'success': False, 'error': '子智能体跟随主对话的工作树，不能自行切换。'}, ensure_ascii=False)
+                    if not enabled(self.context_manager.conversation_metadata):
+                        return json.dumps({'success': False, 'error': '当前对话未启用 Git worktree。'}, ensure_ascii=False)
+                    if getattr(self, '_worktree_tool_batch_size', 1) != 1:
+                        return json.dumps({'success': False, 'error': '工作树切换必须单独调用；请在下一批工具中切换。'}, ensure_ascii=False)
+                    from modules.git_worktree.service import Worktrees
+                    try:
+                        result = await Worktrees(self).change(arguments.get('target'), exit=tool_name == 'exit_worktree')
+                    except (ValueError, OSError) as exc:
+                        result = {'success': False, 'error': str(exc)}
+                    return json.dumps(result, ensure_ascii=False)
 
                 # 检查是否需要确认
                 if tool_name in NEED_CONFIRMATION:
@@ -1438,7 +1477,7 @@ class MainTerminalToolsExecutionMixin:
                         if isinstance(result, dict) and result.get("success"):
                             # create_file 新建文件后，视为当前会话已“接触”该文件，
                             # 避免后续 write_file/edit_file 被“先 read_file 再编辑”误拦截。
-                            self._mark_file_as_read_visited(result.get("path") or arguments.get("path"))
+                            self._mark_file_as_read_visited(result.get('path') or arguments.get('path'))
                         # 添加备注
                         if result["success"] and arguments.get("annotation"):
                             self.context_manager.update_annotation(
@@ -1507,7 +1546,7 @@ class MainTerminalToolsExecutionMixin:
                             if isinstance(result, dict) and result.get("success"):
                                 # write_file 成功后，该文件视作当前会话已“接触”，
                                 # 允许后续继续 write/edit 而不再触发先读拦截。
-                                self._mark_file_as_read_visited(result.get("path") or path)
+                                self._mark_file_as_read_visited(result.get('path') or path)
                                 # 快捷窗口：记录本次对话写入过的文件
                                 self._record_edited_file(result.get("path") or path, "write")
                                 # 编辑摘要：写入合并 diff（original_file/new_file 为写前/后全文）
@@ -1535,7 +1574,7 @@ class MainTerminalToolsExecutionMixin:
                             if result is None:
                                 result = backend.edit_file(path, replacements)
                             if isinstance(result, dict) and result.get("success"):
-                                self._mark_file_as_read_visited(result.get("path") or path)
+                                self._mark_file_as_read_visited(result.get('path') or path)
                                 # 快捷窗口：记录本次对话编辑过的文件
                                 self._record_edited_file(result.get("path") or path, "edit")
                                 # 编辑摘要：写入合并 diff（original_file/new_file 为改前/后全文）
@@ -2113,6 +2152,11 @@ class MainTerminalToolsExecutionMixin:
                 if tool_name == "run_command" and arguments.get("request_full_access") and isinstance(result, dict):
                     result["full_access_granted"] = bool(scope and scope.full_access_grant)
                     result["full_access_already_active"] = not bool(scope and scope.full_access_grant)
+                if tool_name in {'write_file', 'edit_file', 'create_file', 'create_folder', 'delete_file', 'rename_file'} and isinstance(result, dict):
+                    from modules.git_worktree.paths import result_path
+                    for field in ('path', 'old_path', 'new_path'):
+                        if result.get(field):
+                            result[field] = result_path(self, result[field])
                 logger.debug("[handle_tool_call] 工具调用结束: tool_name=%s, result=%s", tool_name, result)
                 return json.dumps(result, ensure_ascii=False)
 

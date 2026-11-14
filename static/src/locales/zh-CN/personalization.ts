@@ -2,6 +2,8 @@
 // 规范见 doc/frontend/i18n_spec.md。由迁移任务填充，en-US 同名文件必须保持 key 完全一致（tsc 强制）。
 // 使用方：static/src/components/personalization/PersonalizationDrawer.vue
 export default {
+  gitWorktreeTitle: 'Git worktree 启用',
+  gitWorktreeDesc: '为新对话启用独立工作树工具与分支切换；不影响已有对话',
   // ── 个人空间抽屉：框架 ──
   closePersonalSpaceAriaLabel: '关闭个人空间',
   tabAriaLabel: '个人空间分组切换',
@@ -354,6 +356,7 @@ export default {
     '勾选的工具默认不注入上下文，模型需要时经 load_tools 按需获取完整定义，可省 token 并提高工具选择准确率；仅对新对话生效，已有对话以创建时的快照为准',
   toolLoadingEnabledTitle: '启用工具动态加载',
   toolLoadingCat: {
+    git_worktree: 'Git worktree',
     workflow: '工作流',
     sub_agent: '子智能体',
     conversation: '对话回顾',

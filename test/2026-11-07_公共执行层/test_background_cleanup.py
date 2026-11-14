@@ -211,7 +211,6 @@ class BackgroundCleanupTest(unittest.TestCase):
                 work_path=self.tmp,
                 timeout=10,
                 session=None,
-                python_env={},
                 host_execution_mode="direct",
                 network_permission=None,
                 sandbox_write_access=True,

@@ -352,6 +352,8 @@ async def handle_task_with_sender(
                 except Exception as exc:
                     debug_log(f"[RuntimeMode] 空闲期切换通知注入失败: {exc}")
     if is_agent:
+        from modules.git_worktree.notices import consume as consume_worktree_notice
+        consume_worktree_notice(web_terminal, sender=sender, conversation_id=conversation_id)
         _prepare_hidden_versioning_baseline_for_first_input(
             web_terminal=web_terminal,
             workspace=workspace,

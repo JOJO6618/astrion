@@ -90,6 +90,8 @@ def ensure_conversation_loaded(
                 conversation_id=conversation_id,
                 error=str(exc),
             )
+    from modules.git_worktree.binding import restore_binding
+    restore_binding(terminal, strict=False)
     # 应用对话级自定义 prompt / personalization（仅 API）。
     # 注意：ensure_conversation_loaded 在 WebSocket/后台任务等多处复用，有些调用点拿不到 workspace；
     #       因此这里允许 workspace 为空（仅跳过 override，不影响正常对话加载）。

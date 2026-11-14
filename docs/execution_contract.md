@@ -35,7 +35,7 @@
 
 ## 路径、元数据与内容
 
-1. 目标路径属于执行端。工作区归属及路径授权通过执行侧 `resolve_path`／`inspect_path` 判断，控制端不得以本机 `Path.resolve/exists/stat` 代替。
+1. 目标路径属于执行端。工作区归属及路径授权通过执行侧 `resolve_path`／`inspect_path` 判断，控制端不得以本机 `Path.resolve/exists/stat` 代替。对话级工作树另存 `execution_root` 作为相对文件路径、新前台／后台命令及新终端的默认基准；workspace 身份、存储与固定写根不变，既有进程不搬迁。当前工作树明确只接受本地适配器，见 `git_worktree.md`。
 2. `inspect_path` 成功且 `exists=False` 才表示合法的新路径；权限拒绝、不可达和后端错误不能当作文件不存在，尤其不能绕过覆盖前必须先读的守门。
 3. 元数据返回 `success/path/relative_path/within_workspace/exists/is_file/is_dir/is_symlink/suffix/size/mtime`；拒绝时返回失败。元数据不代替实际内容访问时的安全检查。
 4. Host 适配器复用 FileManager 的路径、授权和 scoped_io。Docker 元数据走容器脚本，容器不可用不回读宿主镜像。

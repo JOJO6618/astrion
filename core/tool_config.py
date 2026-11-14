@@ -68,6 +68,9 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
         label="终端指令",
         tools=["run_command"],
     ),
+    "git_worktree": ToolCategory(
+        label="Git worktree", tools=["enter_worktree", "exit_worktree"],
+    ),
     "memory": ToolCategory(
         label="记忆",
         tools=["update_memory", "conversation_search", "conversation_review"],

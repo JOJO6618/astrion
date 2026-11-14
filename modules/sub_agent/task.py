@@ -58,10 +58,14 @@ class SubAgentTask(SubAgentRuntimeMixin, SubAgentCancellationMixin, SubAgentEngi
             access_level=access_level, conversation_id=task_record.get("conversation_id"),
             task_id=self.task_id,
             working_dir=Path(task_record["working_dir"]) if task_record.get("working_dir") else None,
+            execution_root=Path((task_record.get('pending_worktree_binding') or {}).get('directory') or task_record.get('execution_root'))
+                if (task_record.get('pending_worktree_binding') or {}).get('directory') or task_record.get('execution_root') else None,
         )
         from modules.scoped_execution_policy import fixed_workspace_root, fixed_working_dir
         fixed_workspace_root(self.execution_scope)
         fixed_working_dir(self.execution_scope)
+        # Execution-root availability is checked at the safe model boundary so
+        # a missing worktree can retain new messages and report a recoverable pause.
         raw_timeout = task_record.get("timeout_seconds")
         self.timeout_seconds = int(raw_timeout) if raw_timeout is not None else None
         self.working_dir = Path(task_record["working_dir"])

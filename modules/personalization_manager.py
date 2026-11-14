@@ -140,6 +140,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     # 仅在创建对话时快照一次；已有对话以其对话文件中的快照为准，改这里不影响。
     "tool_loading_enabled": False,
     "tool_loading_deferred": None,
+    "git_worktree_enabled": False,
     # 网页提取白名单直提：命中白名单的域名用本机直提（GitHub 直链 / trafilatura），
     # 未命中才走 Tavily；开关默认开启，domains 为用户追加的白名单域名（内置 github.com 不在此列）。
     "webpage_direct_extract_enabled": True,
@@ -515,6 +516,10 @@ def sanitize_personalization_payload(
         base["tool_intent_enabled"] = bool(data.get("tool_intent_enabled"))
     else:
         base["tool_intent_enabled"] = bool(base.get("tool_intent_enabled"))
+
+    base["git_worktree_enabled"] = data.get(
+        "git_worktree_enabled", base.get("git_worktree_enabled", False)
+    ) is True
 
     # 工具动态加载（总开关 + 默认延迟集）
     if "tool_loading_enabled" in data:

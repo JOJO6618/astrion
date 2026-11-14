@@ -69,6 +69,7 @@ def build_child_terminal(manager: Any, record: Dict[str, Any]) -> Any:
     child.context_manager = copy.copy(parent.context_manager)
     child.context_manager.project_path = root
     child.context_manager.main_terminal = child
+    child.execution_root = record.get('execution_root') or record.get('working_dir') or str(root)
     # 专属执行资源：不复用父对象，避免父子共享终端/文件/后台进程状态。
     child.file_manager = FileManager(str(root), container_session=manager.container_session, data_dir=str(manager.data_dir))
     child.terminal_ops = TerminalOperator(str(root), container_session=manager.container_session, data_dir=str(manager.data_dir))
@@ -104,7 +105,8 @@ async def execute_child_tool(manager: Any, name: str, arguments: Dict[str, Any],
         raise ValueError("子智能体没有有效的固定权限身份，请重新创建。")
     record = {"task_id": instance.task_id, "access_level": scope.access_level,
               "workspace_root": str(scope.workspace_root),
-              "working_dir": str(scope.working_dir) if scope.working_dir else None}
+              "working_dir": str(scope.working_dir) if scope.working_dir else None,
+              'execution_root': str(scope.execution_root) if scope.execution_root else None}
     if name not in _ALLOWED_TOOLS:
         raise ValueError("该工具不属于此子智能体的工具集。")
     if "request_full_access" in arguments or "full_access_reason" in arguments:

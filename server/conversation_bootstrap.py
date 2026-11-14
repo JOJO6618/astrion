@@ -97,16 +97,22 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
         **background, "is_truly_active": is_main_running or any(background.values()),
     }
     files = FileManager(str(workspace.project_path), data_dir=str(workspace.data_dir))
+    from modules.git_worktree.query import directory_for
+    execution_available = True
+    try:
+        directory_for(workspace, meta)  # Stored edited/preview paths are workspace-relative.
+    except (ValueError, OSError):
+        execution_available = False
     files.set_host_execution_mode(modes["execution_mode"])
     edited_files = [
         {"path": item["path"], "op": item.get("op") or "edit", "ts": item.get("ts") or ""}
         for item in meta.get("edited_files", [])
-        if isinstance(item, dict) and item.get("path") and _existing_file(files, item["path"])
+        if execution_available and isinstance(item, dict) and item.get("path") and _existing_file(files, item["path"])
     ]
     preview_targets = []
     if is_preview_enabled():
         preview_targets = [item for item in normalize_preview(meta.get("preview_targets"))
-                           if item.get("type") != "file" or _existing_file(files, str(item.get("path") or ""))]
+                           if item.get("type") != "file" or (execution_available and _existing_file(files, str(item.get("path") or "")))]
     from server.chat.preview import build_preview_data_runtime
     preview_runtime = build_preview_data_runtime(manager, username, workspace, normalized_id, conversation)
     run_mode = meta.get("run_mode") or ("thinking" if meta.get("thinking_mode") else "fast")
@@ -125,6 +131,8 @@ def bootstrap_conversation(conversation_id: str, data_context, workspace, userna
             "run_mode": run_mode, "thinking_mode": bool(meta.get("thinking_mode", run_mode != "fast")),
             "reasoning_effort": meta.get("reasoning_effort"), "model_key": meta.get("model_key"),
             "chatgpt_fast_mode": meta.get("chatgpt_fast_mode") is True,
+            'git_worktree_enabled': meta.get('git_worktree_enabled') is True,
+            'git_worktree': meta.get('git_worktree') if meta.get('git_worktree_enabled') is True else None,
             **modes,
             "pending_runtime_modes": pending_modes(data_context, meta, normalized_id),
             "execution_mode_enabled": data_context.identity.host_mode and data_context.identity.role == 'admin',

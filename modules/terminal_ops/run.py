@@ -332,6 +332,8 @@ class RunMixin:
                 "status": status,
                 "command": command,
                 "output": combined_output,
+                "stdout": stdout_text[-MAX_RUN_COMMAND_CHARS:] if MAX_RUN_COMMAND_CHARS else stdout_text,
+                "stdout_truncated": bool(MAX_RUN_COMMAND_CHARS and len(stdout_text) > MAX_RUN_COMMAND_CHARS),
                 "return_code": process.returncode,
                 "truncated": truncated,
                 "timeout": timeout,

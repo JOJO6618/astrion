@@ -29,6 +29,11 @@ LOAD_TOOLS_NAME = "load_tools"
 #   1. 在此注册类目/工具；2. 评估是否进默认延迟集（DEFAULT_DEFERRED 由注册表全集
 #      构成，默认即全延迟，无需另配）；3. 确认 formatter / 前端 renderer 已覆盖。
 DEFERRABLE_REGISTRY: Dict[str, Dict[str, Any]] = {
+    'git_worktree': {
+        'label': 'Git worktree',
+        'when_to_use': '创建、进入任务工作树，或返回主目录时',
+        'tools': ['enter_worktree', 'exit_worktree'],
+    },
     "workflow": {
         "label": "工作流",
         "when_to_use": "按既定流程执行任务、创建/调整工作流、推进或查询已激活的工作流时",

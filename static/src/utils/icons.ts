@@ -74,6 +74,8 @@ export const ICONS = Object.freeze({
 
 export const TOOL_ICON_MAP = Object.freeze({
   load_tools: 'wrench',
+  enter_worktree: 'gitBranch',
+  exit_worktree: 'gitBranch',
   create_file: 'file',
   create_skill: 'sparkles',
   manage_personalization: 'userPen',

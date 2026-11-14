@@ -7,13 +7,13 @@ from pathlib import Path
 class SubAgentCreationMixin:
     project_path: Path
 
-    def _resolve_working_dir(self, value: str | None, *, agent_id: int) -> Path:
+    def _resolve_working_dir(self, value: str | None, *, agent_id: int, execution_root=None) -> Path:
         if value is None or value == "":
             return self._new_working_dir(agent_id)
         if not isinstance(value, str):
             raise ValueError("working_dir必须为目录路径。")
         root = self.project_path
-        candidate = root / value
+        candidate = Path(execution_root or root) / value
         resolved = candidate.resolve()
         try:
             resolved.relative_to(root)

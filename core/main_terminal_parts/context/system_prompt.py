@@ -72,7 +72,11 @@ def _tool_catalog(owner: Any) -> str:
     state = get_tool_loading_state(owner.context_manager.conversation_metadata)
     if not state or not state["deferred_set"]:
         return ""
-    catalog = render_catalog(state["deferred_set"], unavailable=set(getattr(owner, "disabled_tools", None) or ()))
+    from modules.git_worktree import TOOLS, enabled
+    unavailable = set(getattr(owner, 'disabled_tools', None) or ())
+    if not enabled(owner.context_manager.conversation_metadata):
+        unavailable.update(TOOLS)
+    catalog = render_catalog(state['deferred_set'], unavailable=unavailable)
     return _render(owner, "tool_loading", tool_catalog=catalog) if catalog else ""
 
 
@@ -103,6 +107,7 @@ def _modify_history(owner: Any) -> str:
 
 def build_system_prompt(owner: Any, context: dict) -> tuple[str, dict]:
     """The static file is verbatim; interpolation is confined to dynamic parts."""
+    from modules.git_worktree import prompt as worktree_prompt
     cm = owner.context_manager
     prefs = getattr(cm, "custom_personalization_config", None) or load_personalization_config(owner.data_dir)
     prefs = prefs if isinstance(prefs, dict) else {}
@@ -132,6 +137,7 @@ def build_system_prompt(owner: Any, context: dict) -> tuple[str, dict]:
         owner._build_execution_mode_message() or "",
         owner._build_work_mode_message() or "",
         _features(owner),
+        worktree_prompt(cm.conversation_metadata, owner.project_path),
         _tool_catalog(owner),
         _render(owner, "disabled_tools", disabled_notice=disabled_notice) if disabled_notice else "",
         _recent_conversations(owner, prefs),

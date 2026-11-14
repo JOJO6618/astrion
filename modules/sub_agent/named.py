@@ -98,9 +98,21 @@ def create_named(manager: Any, terminal: Any, arguments: dict) -> dict:
                for item in manager.tasks.values()):
             raise ValueError(f"名称「{name}」已经使用；继续工作请发送消息，不要重复创建。")
         agent_id = manager.next_free_agent_id(conversation_id)
-        working_dir = manager._resolve_working_dir(arguments.get("working_dir"), agent_id=agent_id)
+        from modules.git_worktree import enabled, current_state
+        metadata = getattr(terminal.context_manager, 'conversation_metadata', None) or {}
+        execution_base = current_state(metadata).get('directory') if enabled(metadata) else None
+        working_dir = manager._resolve_working_dir(arguments.get("working_dir"), agent_id=agent_id, execution_root=execution_base)
         prompt = build_system_prompt(str(manager.project_path), "direct" if access == "full_access" else "sandbox")
         prompt += f"\n你的名称：{name}\n默认工作目录：{working_dir}\n"
+        from modules.git_worktree import enabled, current_state, child_environment
+        metadata = getattr(terminal.context_manager, 'conversation_metadata', None) or {}
+        binding = current_state(metadata)
+        child_execution_root = str(binding.get('directory') or terminal.project_path) if enabled(metadata) else None
+        if child_execution_root:
+            from modules.git_worktree.binding import checked_root
+            child_execution_root = str(checked_root(terminal, binding))
+            prompt += '\n' + child_environment(child_execution_root, binding.get('branch'),
+                                               access_level=access, working_dir=working_dir)
         from modules.workspace_memory_context import child_prompt
         prompt += "\n" + child_prompt(terminal)
         result = manager.create_sub_agent(
@@ -110,6 +122,7 @@ def create_named(manager: Any, terminal: Any, arguments: dict) -> dict:
             reasoning_effort=getattr(terminal.api_client, "reasoning_effort", None),
             thinking_mode="thinking", display_name=name,
             timeout_seconds=timeout, working_dir=str(working_dir),
+            execution_root=child_execution_root, worktree_revision=binding.get('revision', 0),
             system_prompt=prompt,
             task_message=f"任务：{summary}\n\n{task}\n\n默认工作目录：{working_dir}",
             compress_threshold_tokens=int(prefs.get("sub_agent_compress_threshold_tokens") or 250000),

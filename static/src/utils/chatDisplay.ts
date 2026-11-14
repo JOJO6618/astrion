@@ -62,6 +62,8 @@ function getToolStatusTexts(): {
       search_project_memory: t('toolResults.preparingStatus.searchProjectMemory'),
       conversation_search: t('toolResults.preparingStatus.conversationSearch'),
       conversation_review: t('toolResults.preparingStatus.conversationReview'),
+      enter_worktree: t('toolResults.preparingStatus.enterWorktree'),
+      exit_worktree: t('toolResults.preparingStatus.exitWorktree'),
       create_sub_agent: t('toolResults.preparingStatus.createSubAgent'),
       terminate_sub_agent: t('toolResults.preparingStatus.terminateSubAgent'),
       get_sub_agent_status: t('toolResults.preparingStatus.getSubAgentStatus'),
@@ -109,6 +111,8 @@ function getToolStatusTexts(): {
       search_project_memory: t('toolResults.runningStatus.searchProjectMemory'),
       conversation_search: t('toolResults.runningStatus.conversationSearch'),
       conversation_review: t('toolResults.runningStatus.conversationReview'),
+      enter_worktree: t('toolResults.runningStatus.enterWorktree'),
+      exit_worktree: t('toolResults.runningStatus.exitWorktree'),
       create_sub_agent: t('toolResults.runningStatus.createSubAgent'),
       terminate_sub_agent: t('toolResults.runningStatus.terminateSubAgent'),
       get_sub_agent_status: t('toolResults.runningStatus.getSubAgentStatus'),
@@ -156,6 +160,8 @@ function getToolStatusTexts(): {
       search_project_memory: t('toolResults.completedStatus.searchProjectMemory'),
       conversation_search: t('toolResults.completedStatus.conversationSearch'),
       conversation_review: t('toolResults.completedStatus.conversationReview'),
+      enter_worktree: t('toolResults.completedStatus.enterWorktree'),
+      exit_worktree: t('toolResults.completedStatus.exitWorktree'),
       create_sub_agent: t('toolResults.completedStatus.createSubAgent'),
       terminate_sub_agent: t('toolResults.completedStatus.terminateSubAgent'),
       get_sub_agent_status: t('toolResults.completedStatus.getSubAgentStatus'),
@@ -203,6 +209,8 @@ function getToolStatusTexts(): {
       search_project_memory: t('toolResults.failedStatus.searchProjectMemory'),
       conversation_search: t('toolResults.failedStatus.conversationSearch'),
       conversation_review: t('toolResults.failedStatus.conversationReview'),
+      enter_worktree: t('toolResults.failedStatus.enterWorktree'),
+      exit_worktree: t('toolResults.failedStatus.exitWorktree'),
       create_sub_agent: t('toolResults.failedStatus.createSubAgent'),
       terminate_sub_agent: t('toolResults.failedStatus.terminateSubAgent'),
       get_sub_agent_status: t('toolResults.failedStatus.getSubAgentStatus'),
@@ -408,11 +416,7 @@ export function getToolStateText(tool: any): string {
   if (status === 'awaiting_user_answer') {
     return t('toolResults.status.awaitingUserAnswer');
   }
-  if (
-    status === 'awaiting_approval' ||
-    status === 'pending_approval' ||
-    status === 'pending'
-  ) {
+  if (status === 'awaiting_approval' || status === 'pending_approval' || status === 'pending') {
     return t('toolResults.status.awaitingApprovalDots');
   }
   if (status === 'completed') {

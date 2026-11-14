@@ -56,6 +56,12 @@ export default {
   // —— html 片段中的 <strong>字段标签：</strong>（含冒号）——
   labels: {
     workingDir: '工作目录：',
+    branch: '分支：',
+    worktreeTarget: '工作环境：',
+    worktreeStart: '起始版本：',
+    worktreeCarry: '携带未提交修改：',
+    worktreeDirectory: '执行目录：',
+    worktreeRetained: '保留的工作树：',
     tool: '工具：',
     status: '状态：',
     path: '路径：',
@@ -351,6 +357,8 @@ export default {
 
   // —— 工具状态文案（chatDisplay 动作标签映射）：工具名 → 准备 / 正在 / 完成 / 失败 四态 ——
   preparingStatus: {
+    enterWorktree: '准备进入工作树',
+    exitWorktree: '准备返回主目录',
     readFile: '准备阅读文件',
     readSkill: '准备查阅技能',
     viewImage: '准备查看图片',
@@ -407,6 +415,8 @@ export default {
   },
 
   runningStatus: {
+    enterWorktree: '正在进入工作树',
+    exitWorktree: '正在返回主目录',
     readFile: '正在阅读文件',
     readSearch: '正在执行搜索',
     readExtract: '正在提取内容',
@@ -465,6 +475,8 @@ export default {
   },
 
   completedStatus: {
+    enterWorktree: '已进入工作树',
+    exitWorktree: '已返回主目录',
     readFile: '阅读了文件',
     readSkill: '查阅了技能',
     viewImage: '查看了图片',
@@ -521,6 +533,8 @@ export default {
   },
 
   failedStatus: {
+    enterWorktree: '进入工作树失败',
+    exitWorktree: '返回主目录失败',
     readFile: '阅读文件失败',
     readSkill: '查阅技能失败',
     viewImage: '查看图片失败',

@@ -131,6 +131,9 @@ class CrudMixin:
                 metadata.update(snapshot_update(initial_limit))
         except Exception:
             pass
+        if conversation_kind != "chat":
+            from modules.personalization_manager import load_personalization_config
+            metadata['git_worktree_enabled'] = load_personalization_config(self.base_dir).get('git_worktree_enabled') is True
         if conversation_kind == "chat":
             # Keep the shared document shape without Agent execution settings.
             metadata = {key: value for key, value in metadata.items() if key in {

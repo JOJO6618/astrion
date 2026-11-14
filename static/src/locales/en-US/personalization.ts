@@ -1,6 +1,9 @@
 // Locale namespace: personalization (en-US mirror, keys must match zh-CN/personalization.ts exactly).
 // Used by: static/src/components/personalization/PersonalizationDrawer.vue
 export default {
+  gitWorktreeTitle: 'Enable Git worktree',
+  gitWorktreeDesc:
+    'Enable worktree tools and switching for new conversations; existing conversations keep their settings',
   // ── Personal space drawer: chrome ──
   closePersonalSpaceAriaLabel: 'Close personal space',
   tabAriaLabel: 'Switch personal space sections',
@@ -377,6 +380,7 @@ export default {
     'Checked tools are not injected into context by default; the model fetches their full definitions on demand via load_tools, saving tokens and improving tool selection accuracy. Only affects new conversations; existing conversations keep the snapshot taken at creation',
   toolLoadingEnabledTitle: 'Enable dynamic tool loading',
   toolLoadingCat: {
+    git_worktree: 'Git worktree',
     workflow: 'Workflows',
     sub_agent: 'Sub-agents',
     conversation: 'Conversation review',

@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import GitIcon from './GitIcon.vue';
-const props = defineProps<{
-  modelValue: string;
-  options: Array<{ value: string; label: string; secondary?: string }>;
-  label: string;
-  open?: boolean;
-  disabled?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    options: Array<{ value: string; label: string; secondary?: string }>;
+    label: string;
+    /** 受控展开态；不传（null）时由组件自己管理。缺省必须给 null，
+     *  否则 Boolean 类型 prop 缺失会被 Vue 转成 false，内部展开永远打不开。 */
+    open?: boolean | null;
+    disabled?: boolean;
+  }>(),
+  { open: null, disabled: false }
+);
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void;
   (event: 'update:open', value: boolean): void;

@@ -89,6 +89,7 @@ def inject_runtime_user_message(
     inline: bool,
     extra_metadata: Optional[Dict[str, Any]] = None,
     persist: bool = True,
+    require_persist: bool = False,
     images: Optional[List[Any]] = None,
     videos: Optional[List[Any]] = None,
 ) -> Optional[str]:
@@ -138,8 +139,18 @@ def inject_runtime_user_message(
                     message_id=message_id,
                 )
         except Exception:
-            if images or videos:
+            if images or videos or require_persist:
                 raise
+        if require_persist:
+            if ctx_manager is None or not saved_message:
+                raise RuntimeError('运行时通知未能持久化。')
+            manager = ctx_manager._get_conversation_manager_for_id(conversation_id)
+            document = manager.read_conversation(conversation_id) or {}
+            if not any(item.get('message_id') == message_id for item in document.get('messages', [])):
+                history = getattr(ctx_manager, 'conversation_history', None)
+                if isinstance(history, list):
+                    history[:] = [item for item in history if item.get('message_id') != message_id]
+                raise RuntimeError('运行时通知未能持久化，保留待重试记录。')
     content = formatted
     if ctx_manager is not None and (images or videos) and not metadata.get("media_paths_only"):
         content = ctx_manager._build_content_with_images(

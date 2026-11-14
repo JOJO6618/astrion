@@ -298,6 +298,21 @@ const {
         </div>
       </div>
     </div>
+
+    <label class="settings-toggle-row"
+      ><span class="settings-row-copy"
+        ><span class="settings-row-title">{{ $t('personalization.gitWorktreeTitle') }}</span
+        ><span class="settings-row-desc">{{ $t('personalization.gitWorktreeDesc') }}</span></span
+      ><input
+        type="checkbox"
+        :checked="form.git_worktree_enabled"
+        @change="
+          personalization.updateField({
+            key: 'git_worktree_enabled',
+            value: $event.target.checked
+          })
+        " /><FancyCheck :checked="form.git_worktree_enabled"
+    /></label>
   </section>
 </template>
 

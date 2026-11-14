@@ -1,6 +1,13 @@
 // 文案命名空间：input（zh-CN 源语言）
 // 规范见 doc/frontend/i18n_spec.md。由迁移任务填充，en-US 同名文件必须保持 key 完全一致（tsc 强制）。
 export default {
+  worktreeSwitch: '切换工作树',
+  worktreeTarget: '工作环境',
+  worktreeMain: '主目录',
+  worktreeCreate: '创建新工作树',
+  worktreeBranch: '新分支名称',
+  worktreeStart: '起始分支或版本',
+  worktreeCarry: '携带未提交修改',
   // ── 输入栏模板 ──
   guide: '引导',
   openInFileManager: '在文件管理器中打开',

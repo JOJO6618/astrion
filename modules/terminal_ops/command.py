@@ -37,6 +37,7 @@ from modules.host_sandbox_runner import (
 )
 from modules.i18n import tr
 from modules.scoped_execution_policy import scoped_work_path
+from modules.execution_scope import current_execution_scope
 
 if TYPE_CHECKING:
     from modules.user_container_manager import ContainerHandle
@@ -60,4 +61,10 @@ class CommandMixin:
         return min(int(requested), max_limit)
 
     def _resolve_work_path(self, working_dir: Optional[str]) -> Path:
+        if getattr(self, 'execution_binding_error', None) and not working_dir:
+            raise ValueError(self.execution_binding_error)
+        scope = current_execution_scope()
+        if scope is None or not scope.is_sub_agent:
+            base = Path(getattr(self, 'execution_root', self.project_path))
+            working_dir = str((base / working_dir).resolve()) if working_dir else str(base)
         return scoped_work_path(self.project_path, working_dir)

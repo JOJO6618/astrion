@@ -38,8 +38,9 @@ def _run_project_git(project_path: Path, args: list[str]) -> tuple[bool, str]:
     if not git_bin:
         return False, ""
     try:
+        from modules.git_worktree.query import query_args
         proc = subprocess.run(
-            [git_bin, "-c", "core.quotePath=false", "-C", str(project_path), *args],
+            [git_bin, "-c", "core.quotePath=false", "-C", str(project_path), *query_args(project_path, args)],
             cwd=str(project_path),
             # git 输出固定为 UTF-8（core.quotePath=false 时中文路径亦为 UTF-8 字节）；
             # Windows text=True 默认按 GBK 解码会让 _readerthread 抛 UnicodeDecodeError，
@@ -61,8 +62,9 @@ def _run_project_git_raw(project_path: Path, args: list[str], timeout: int = 4) 
     if not git_bin:
         return False, ""
     try:
+        from modules.git_worktree.query import query_args
         proc = subprocess.run(
-            [git_bin, "-c", "core.quotePath=false", "-C", str(project_path), *args],
+            [git_bin, "-c", "core.quotePath=false", "-C", str(project_path), *query_args(project_path, args)],
             cwd=str(project_path),
             # 同上：固定按 UTF-8 解码；git show 出的文件内容可能是 GBK 等旧编码，
             # errors=replace 保证个别坏字节不会炸掉整个读取线程。
@@ -279,18 +281,41 @@ def _parse_git_diff(repo_root: Path, diff_text: str, fold_context_map: dict[str,
     finish_file()
     return [item for item in files if item.get("path") and item.get("hunks")]
 
+def _unavailable_worktree_summary(workspace, metadata, error):
+    from modules.git_worktree import enabled, current_state
+    binding = current_state(metadata)
+    if not enabled(metadata) or not binding.get('active'):
+        return None
+    return {
+        'has_git': True, 'project_name': Path(workspace.project_path).name,
+        'project_path': binding.get('directory'), 'branch': binding.get('branch') or 'HEAD',
+        'git_worktree_enabled': True, 'git_worktree': binding, 'binding_error': str(error),
+    }
+
+
 @status_bp.route('/api/project/git-summary')
 @api_login_required
 @with_workspace_data
 def get_project_git_summary(data_context, workspace, username):
-    """返回当前项目自身 git 仓库概览（不使用隐藏版本管理 git）。"""
-    project_path = Path(getattr(workspace, "project_path", "") or "").expanduser().resolve()
+    """返回当前对话执行目录的 Git 概览。"""
+    from server.status.worktree import metadata_for
+    from modules.git_worktree.query import directory_for
+    worktree_meta = {}
+    try:
+        worktree_meta = metadata_for(data_context, request.args.get('conversation_id')) or {}
+        project_path = directory_for(workspace, worktree_meta)
+    except (ValueError, OSError) as exc:
+        summary = _unavailable_worktree_summary(workspace, worktree_meta, exc)
+        if summary:
+            return jsonify(success=True, data=summary)
+        return jsonify(success=False, error=str(exc)), 400
     if not project_path.exists():
         return jsonify({"success": True, "data": {"has_git": False}})
 
     ok, root_text = _run_project_git(project_path, ["rev-parse", "--show-toplevel"])
     if not ok or not root_text:
-        return jsonify({"success": True, "data": {"has_git": False}})
+        summary = _unavailable_worktree_summary(workspace, worktree_meta, '工作树 Git 记录已失效，请返回主目录或选择有效工作树。')
+        return jsonify(success=True, data=summary or {'has_git': False})
 
     repo_root = Path(root_text).expanduser().resolve()
     ok, branch = _run_project_git(repo_root, ["branch", "--show-current"])
@@ -306,7 +331,9 @@ def get_project_git_summary(data_context, workspace, username):
         "success": True,
         "data": {
             "has_git": True,
-            "project_name": repo_root.name,
+            "project_name": Path(workspace.project_path).name,
+            'git_worktree_enabled': worktree_meta.get('git_worktree_enabled') is True,
+            'git_worktree': worktree_meta.get('git_worktree'),
             "project_path": str(repo_root),
             "branch": branch,
             "upstream": upstream,
@@ -319,8 +346,13 @@ def get_project_git_summary(data_context, workspace, username):
 @api_login_required
 @with_workspace_data
 def get_project_git_diff(data_context, workspace, username):
-    """返回当前项目自身 git 工作区 diff，用于前端侧边栏展示。"""
-    project_path = Path(getattr(workspace, "project_path", "") or "").expanduser().resolve()
+    """返回当前对话执行目录的 Git 差异。"""
+    from server.status.worktree import metadata_for
+    from modules.git_worktree.query import directory_for
+    try:
+        project_path = directory_for(workspace, metadata_for(data_context, request.args.get('conversation_id')) or {})
+    except (ValueError, OSError) as exc:
+        return jsonify(success=False, error=str(exc)), 400
     if not project_path.exists():
         return jsonify({"success": True, "data": {"has_git": False, "files": []}})
 

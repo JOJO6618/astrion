@@ -11,6 +11,7 @@ import { useWorkflowStore } from '../../../stores/workflow';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { useFileStore } from '../../../stores/file';
 import { useResourceStore } from '../../../stores/resource';
+import { useGitWorktreeStore } from '@/stores/gitWorktree';
 import { commitWorkspaceIdentity } from '../ui/workspaceNavigation';
 import { needsHumanDecision, normalizeApproval } from '@/components/input/approvalModel';
 import { bindAuxiliaryConversationHost } from '../auxiliaryOwnership';
@@ -184,6 +185,8 @@ export const bootstrapMethods = {
       this.chatgptFastModeSaving = false;
       this.currentConversationId = normalizedId;
       useConversationStore().setCurrentConversationId(normalizedId);
+      useGitWorktreeStore().hydrate(meta, normalizedId, String(this.currentHostWorkspaceId || ''));
+      this.projectGitSummary = null;
       this.messages = messages;
       this.conversationHasImages = historyState.hasImages || live.some((m) => m.images?.length);
       this.conversationHasVideos = historyState.hasVideos || live.some((m) => m.videos?.length);

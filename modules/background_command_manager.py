@@ -86,6 +86,11 @@ class BackgroundCommandManager:
             }
 
         try:
+            if getattr(terminal_ops, 'execution_binding_error', None):
+                raise ValueError(terminal_ops.execution_binding_error)
+            base = getattr(terminal_ops, 'execution_root', None)
+            if base is not None and not (scope and scope.is_sub_agent):
+                working_dir = str(Path(base) / (working_dir or ''))
             work_path = scoped_work_path(terminal_ops.project_path, working_dir, scope)
         except ValueError:
             return {

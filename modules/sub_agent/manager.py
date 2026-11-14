@@ -11,7 +11,7 @@ from typing import Any
 
 from modules.sub_agent_settings import resolve_max_instances
 from modules.execution_scope import ExecutionScope, child_access_prompt
-from modules.scoped_execution_policy import fixed_workspace_root, fixed_working_dir
+from modules.scoped_execution_policy import fixed_workspace_root, fixed_working_dir, fixed_execution_root
 from modules.sub_agent.creation import SubAgentCreationMixin
 from modules.sub_agent.persistence import atomic_json, get_registry, save_registry, STATE_FILENAME
 from modules.sub_agent.stats import SubAgentStatsMixin
@@ -91,7 +91,8 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
     def create_sub_agent(self, *, agent_id, summary, task, conversation_id, access_level,
                          model_key, intelligence, reasoning_effort, thinking_mode,
                          display_name, working_dir, system_prompt, task_message,
-                         timeout_seconds=None, compress_threshold_tokens=250000):
+                         timeout_seconds=None, compress_threshold_tokens=250000,
+                         execution_root=None, worktree_revision=0):
         from modules.aux_model_resolver import resolve_locked_model_profile
         from modules.multi_agent.state import AgentInstance
         from modules.personalization_manager import load_personalization_config
@@ -107,6 +108,9 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
                     "请继续使用已有实例，或终结不再需要的实例后再创建。"
                 )}
             directory = self._resolve_working_dir(working_dir, agent_id=agent_id)
+            fixed_execution_root(ExecutionScope(executor_kind='sub_agent', actor_id='creating',
+                workspace_root=self.project_path, access_level=access_level, working_dir=directory,
+                execution_root=Path(execution_root) if execution_root else None))
             task_id = "sub_" + uuid.uuid4().hex
             task_root = self.base_dir / task_id
             task_root.mkdir(parents=True)
@@ -117,6 +121,7 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
                           display_name=display_name, summary=summary, task=task,
                           conversation_id=conversation_id, access_level=access_level,
                           workspace_root=str(self.project_path), working_dir=str(directory),
+                          execution_root=execution_root, worktree_revision=worktree_revision,
                           task_root=str(task_root),
                           timeout_seconds=timeout_seconds, model_key=model_key,
                           intelligence=intelligence, reasoning_effort=reasoning_effort,
@@ -138,6 +143,10 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
             self._mark_task_done(task_id, False, str(exc), 0)
             return {"success": False, "error": str(exc)}
         return {"success": True, "task_id": task_id}
+
+    def sync_worktree_binding(self, state):
+        from modules.git_worktree.children import queue_binding
+        queue_binding(self, state)
 
     def _launch(self, instance):
         task_id, agent_id = instance.task_id, instance.agent_id
@@ -179,7 +188,9 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
                 return False
             scope = ExecutionScope(executor_kind="sub_agent", actor_id=record["task_id"],
                 workspace_root=Path(record["workspace_root"]), access_level=record["access_level"],
-                working_dir=Path(record["working_dir"]))
+                working_dir=Path(record["working_dir"]),
+                execution_root=Path((record.get('pending_worktree_binding') or {}).get('directory') or record.get('execution_root'))
+                    if (record.get('pending_worktree_binding') or {}).get('directory') or record.get('execution_root') else None)
             fixed_workspace_root(scope)
             fixed_working_dir(scope)
             return True

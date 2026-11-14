@@ -29,6 +29,8 @@ const TOOL_FACE_MAP: Record<string, string> = {
   todo_update_task: 'check',
   create_sub_agent: 'subagent',
   load_tools: 'search',
+  enter_worktree: 'command',
+  exit_worktree: 'command',
   terminate_sub_agent: 'subagent',
   send_message_to_sub_agent: 'subagent',
   stop_sub_agent: 'subagent',

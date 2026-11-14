@@ -115,6 +115,7 @@ class CheckpointRestoreRoutingTests(unittest.TestCase):
         terminal = make_terminal(SpyBackend(files=files))
         cm = SimpleNamespace(
             load_conversation=Mock(return_value={"messages": [{"role": "user", "content": "x"}], "metadata": {}}),
+            read_conversation=Mock(return_value={"messages": [{"role": "user", "content": "x"}], "metadata": {}}),
             save_conversation=Mock(return_value=True),
             update_conversation_metadata=Mock(),
         )

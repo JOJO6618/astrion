@@ -48,6 +48,9 @@ class SubAgentRuntimeMixin:
                 self._continue_event.clear()
             if self._work_paused or not self._pending_work:
                 return False
+            from modules.git_worktree.children import sync_before_work
+            if not sync_before_work(self):
+                return False
             pending, self._pending_work = self._pending_work, []
             self.task_record["pending_work"] = []
         if new_round:

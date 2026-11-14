@@ -70,6 +70,7 @@ def draft_settings(terminal: Any) -> dict:
         "execution_mode": terminal.get_execution_mode(),
         "network_permission": terminal.get_network_permission(),
         "browser_tools": meta.get("browser_tools_enabled") is True,
+        'git_worktree_enabled': meta.get('git_worktree_enabled') is True,
         "restore_modes": {key: meta.get(key) for key in RESTORE_KEYS},
     }
 
@@ -126,6 +127,7 @@ def prepare_draft_settings(terminal: Any, workspace: Any, previous_id: str | Non
     context.conversation_metadata = {
         **modes, **restore, "chatgpt_fast_mode": previous.get("chatgpt_fast_mode") is True,
         "browser_tools_enabled": defaults.get("browser_tools") is True,
+        'git_worktree_enabled': load_personalization_config(workspace.data_dir).get('git_worktree_enabled') is True,
     }
     terminal.pending_permission_mode = None
     terminal.pending_execution_mode = None
@@ -209,6 +211,13 @@ def create_from_settings(terminal: Any, workspace: Any, settings: Any) -> dict:
     metadata.update(pending_permission_mode=None,
                     pending_execution_mode=None, pending_network_permission=None)
     metadata.update(snapshot_overrides_from_prefs(prefs))
+    metadata['git_worktree_enabled'] = prefs.get('git_worktree_enabled') is True
+    target = settings.get('git_worktree_target')
+    if target is not None:
+        if not metadata['git_worktree_enabled']:
+            raise ValueError('当前新对话未启用 Git worktree。')
+        from modules.git_worktree.creation import prepare
+        metadata['git_worktree'] = prepare(terminal, resolved, target)
     # 浏览器开关按对话保存；旧客户端未提交时取个人默认值。
     browser_tools = resolved.get("browser_tools")
     metadata["browser_tools_enabled"] = (
@@ -222,6 +231,11 @@ def create_from_settings(terminal: Any, workspace: Any, settings: Any) -> dict:
                 run_mode=resolved["run_mode"], thinking_mode=resolved["thinking_mode"],
                 initial_messages=[], metadata_overrides=metadata,
             )
+        except Exception as exc:
+            binding = metadata.get('git_worktree') or {}
+            if binding.get('directory'):
+                raise ValueError(f"对话创建失败：{exc}；已保留工作树分支 {binding.get('branch')}，目录 {binding['directory']}，可重新选择进入已有工作树。") from exc
+            raise
         finally:
             manager.current_conversation_id = previous_id
     if prefs.get("versioning_enabled_by_default", True):

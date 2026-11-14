@@ -25,7 +25,6 @@ from core.main_terminal_parts.commands import MainTerminalCommandMixin
 from server.conversation_bootstrap import prepare_new_conversation_settings
 from server.context import new_conversation as service
 from server.conversation import create_conversation
-from server.multi_agent import create_multi_agent_conversation
 from utils.conversation_manager import ConversationManager
 
 
@@ -38,9 +37,9 @@ class Terminal(MainTerminalToolsPolicyMixin):
     set_run_mode = MainTerminalCommandMixin.set_run_mode
     set_reasoning_effort = MainTerminalCommandMixin.set_reasoning_effort
 
-    def __init__(self, normal, multi):
+    def __init__(self, normal):
         self.context_manager = SimpleNamespace(conversation_manager=normal,
-            multi_agent_conversation_manager=multi, current_conversation_id=None,
+            current_conversation_id=None,
             conversation_metadata={}, has_images=False, has_videos=False)
         self.api_client = SimpleNamespace()
         self.model_key = "old-model"
@@ -75,8 +74,7 @@ class InitializationTests(unittest.TestCase):
         project.mkdir()
         self.workspace = SimpleNamespace(project_path=project, data_dir=path / "data")
         self.normal = ConversationManager(str(path / "normal"), str(project))
-        self.multi = ConversationManager(str(path / "multi"), str(project))
-        self.terminal = Terminal(self.normal, self.multi)
+        self.terminal = Terminal(self.normal)
         self.prefs = {"default_model": "selected", "default_run_mode": "thinking",
             "default_reasoning_effort": None, "default_work_mode": "ask",
             "default_permission_mode": "unrestricted", "versioning_enabled_by_default": False}
@@ -108,7 +106,7 @@ class InitializationTests(unittest.TestCase):
         self.assertEqual(list(self.normal.conversations_dir.glob("conv_*.json")), before)
 
     def test_explicit_departed_conversation_inherits_only_nondefault_fields(self):
-        for manager in (self.normal, self.multi):
+        for manager in (self.normal,):
             cid = self.previous(manager)
             value = service.prepare_draft_settings(self.terminal, self.workspace, cid)
             self.assertEqual(value["execution_mode"], "direct")
@@ -126,7 +124,7 @@ class InitializationTests(unittest.TestCase):
 
     def test_plan_and_restricted_modes_lock_sandbox_with_restoration(self):
         cid = self.previous()
-        for work, permission in (("plan", "unrestricted"), ("ask", "approval"),
+        for work, permission in (("plan", "unrestricted"), ("ask", "readonly"),
                                  ("plan", "approval")):
             service.remember_workspace_defaults(self.terminal, {**self.prefs,
                 "default_work_mode": work, "default_permission_mode": permission})
@@ -144,12 +142,11 @@ class InitializationTests(unittest.TestCase):
         self.assertEqual(value["work_mode"], "ask")
         self.assertEqual(service.prepare_draft_settings(self.terminal, self.workspace)["work_mode"], "execute")
 
-    def test_both_creation_routes_persist_full_snapshot_without_changing_focus(self):
+    def test_unified_creation_persists_full_snapshot_without_changing_focus(self):
         settings = service.prepare_draft_settings(self.terminal, self.workspace)
         settings.update(work_mode="execute", execution_mode="direct", network_permission="full")
         app = Flask("new-conversation-test")
-        for route, manager, is_multi in ((create_conversation, self.normal, False),
-                                        (create_multi_agent_conversation, self.multi, True)):
+        for route, manager in ((create_conversation, self.normal),):
             old = self.previous(manager)
             with app.test_request_context("/", method="POST", json={"settings": settings}):
                 response, code = inspect.unwrap(route)(self.terminal, self.workspace, "host")
@@ -158,7 +155,7 @@ class InitializationTests(unittest.TestCase):
             meta = manager.read_conversation(cid)["metadata"]
             for key in service.SETTING_KEYS:
                 self.assertEqual(meta[key], settings[key], key)
-            self.assertEqual(meta["multi_agent_mode"], is_multi)
+            self.assertNotIn("multi_agent_mode", meta)
             self.assertEqual(manager.current_conversation_id, old)
             self.assertIsNone(self.terminal.context_manager.current_conversation_id)
 
@@ -204,7 +201,7 @@ class InitializationTests(unittest.TestCase):
         invalid = [{}, {**valid, "thinking_mode": False},
                    {**valid, "model_key": "missing"},
                    {**valid, "work_mode": "plan", "permission_mode": "unrestricted"},
-                   {**valid, "permission_mode": "approval", "execution_mode": "direct"},
+                   {**valid, "permission_mode": "readonly", "execution_mode": "direct"},
                    {**valid, "reasoning_effort": "unknown"}]
         for settings in invalid:
             with self.assertRaises(ValueError):

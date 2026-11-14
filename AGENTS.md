@@ -20,6 +20,7 @@
 | 启动 / 构建 / 打包命令 | `docs/agents_details/commands.md` | 启动入口、打包链路 |
 | 测试现状与执行方式 | `docs/agents_details/testing.md` | 写测试、跑回归 |
 | 公共执行层 | `docs/execution_contract.md` | 执行后端、文件／进程／终端、环境、媒体、后台通知及远程执行边界 |
+| 对话级 Git worktree | `docs/git_worktree.md` | 工作树、执行根、主子环境通知、分支入口与新对话预选 |
 | 前端设计风格统一规范 | `docs/agents_details/frontend_design_style.md` | 写/改任何 UI |
 | 独立 Chat 与消息树 | `docs/chat_mode.md` | Chat 页面、分支、九工具、无工作区运行、媒体记忆或 Agent 交接；前端必须复用 Agent 组件 |
 | 对话导出／导入与迁移 | `docs/conversation_transfer.md` | 内部直接迁移、跨机器 ZIP、历史不改写、媒体／摘要映射、迁移回执及默认交接工作区 |
@@ -559,7 +560,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 - **`create_sub_agent` 必填 `access_level`**：`working_dir_write`/`workspace_write`/`sandbox_write`/`full_access`，创建时校验主权限上限；plan/readonly 可创建两个窄档。sandbox_write口径=工作区＋沙箱授权可写路径。每个实例保存创建时规范化的 `workspace_root`、`working_dir` 与固定档位，恢复时核对原路径身份，**不重新 resolve 后扩大授权**。旧记录缺档位不迁移、不恢复。
 - **可信权限唯一入口 = `modules/execution_scope.py` 的 ContextVar**；子工具通过 `modules/sub_agent/execution.py` 使用独立 FileManager/TerminalOperator/TerminalManager，**不修改父对象再恢复**。父权限/执行环境切换不改变已有子档位；子工具只开放自身白名单，不继承父自定义分派，**不开放后台命令或单次升级参数**。
-- `working_dir_write`仅子工作目录可写，`workspace_write`为原工作区可写；workspace_root始终是原项目身份，相对路径和默认cwd使用working_dir。macOS临时目录位于对应固定写根内，不附带宿主`/tmp`写授权。原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入。工作目录按路径组件检查并安全新建，**不用字符串 startswith**。
+- `working_dir_write`仅子工作目录可写，`workspace_write`为原工作区可写；workspace_root始终是原项目身份；未绑定工作树时相对路径和默认cwd使用working_dir，已绑定时使用独立execution_root，固定写根仍不变（见§27）。macOS临时目录位于对应固定写根内，不附带宿主`/tmp`写授权。原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入。工作目录按路径组件检查并安全新建，**不用字符串 startswith**。
 - **Docker 不支持 `full_access`**；最低档经 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，**不使用 DAC 降级或宿主机回退**。系统工具目录可读、持久写根仅容器工作区（另允许 `/dev/null`）。
 - 主 `run_command` 的 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，Docker/远端替身后端不伪装支持。已处于 direct 时无需额外申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
 - 单次申请复用 `ToolApprovalManager` 的 `approval_type=full_access`。用户级 `allow_auto_approve_full_access` 默认 false：关闭时自动审核模式需自动与人工独立通过，无限制模式仅需人工；开启时两种模式的新请求均由审核智能体批准即可执行（记录 `auto_review_required=true`、`human_approval_required=false`）。**`human_approval_required=false` 是单闸语义（2026-11-09）**：审批面板不渲染允许/拒绝按钮（`ToolApprovalPanel.humanDecisionRequired`），`decide()` 抛 `tool_approval.human_not_required` 拒绝人工裁决，避免“人工点了仍要等审核”的误导；双闸场景人工先允许不能取消必需的自动审核。人工审批模式始终人工审批；普通无限制操作和已在 direct 环境的命令继续免审。条件在请求创建时快照，派发按请求字段决定；审核明确告知脱离沙箱且批准后立即执行。人工先允许不能取消必需的自动审核。拒绝、故障和输入过期均不执行；任一拒绝仅结束申请并回填工具失败结果，不触发 task_stopped；主动停止正常取消。授权记录绑定执行环境／完整参数／任务身份，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 再核对，失效不破坏消息配对。
@@ -655,3 +656,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **来源归集**：工作区与 Chat 目录一律经可信身份解析，查询**不创建执行实例、不选择工作区**；host 共享 `DATA_DIR/api_costs` 时按各工作区 `conv_*.json` 归属，归属不到的进「其它对话」。
 - **接口**：`GET /api/usage-stats`（source / tz / tz_offset），时区换算在后端出报表时完成；粒度、指标、时间范围在前端切换。
 - 细则、口径与回归见 `docs/agents_details/usage_stats.md`；回归目录 `test/2026-11-06_用量统计页/`。视觉与真实数据量下的性能由用户验收。
+
+## 27) 对话级 Git worktree（2026-11-14）
+
+完整已确认契约：`docs/git_worktree.md`，改工作树、执行根、主子切换通知和分支入口前必读。用户级启用默认关闭，创建新对话时快照 metadata，老对话不迁移。工作树放工作区 `.astrion/worktrees/`；workspace 身份与执行根分离。创建必传起始版本和是否携带未提交修改；进入／退出两个工具，不提供合并工具、不自动清理。用户只在主智能体空闲时切换；主／子初始环境进 system，后续切换以工具结果／既有 user 通知传达，冻结 system 不改。子运行中在完整工具批次边界同步，idle 等下次发消息同步。实现位于 `modules/git_worktree/`、`server/status/worktree.py` 与前端 `stores/gitWorktree.ts`／`WorktreeMenu.vue`。前台／后台命令及新终端都按当前执行根解析，既有进程保留原 cwd；技能与项目记忆归属原工作区。编辑记录／预览用 workspace-relative 路径，根偏移时模型工具结果用绝对路径，不得把 bootstrap 的文件资源改成执行根后重复拼接。失效绑定与损坏 Git 记录保留恢复入口，执行失败不得回退主目录；非 Local 后端明确拒绝。macOS 真实临时 Git、主子循环与前端离线回归已通过，详细数量及命令见 `test/2026-11-14_Git工作树/README.md`；Windows／WSL／Linux／Docker 原生执行与 UI 仍待实机验收，不把路径模拟当跨平台验收。

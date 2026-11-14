@@ -83,6 +83,19 @@ def format_tool_result_for_context(function_name: str, result_data: Any, raw_tex
             from modules.native_browser.formatter import format_for_model
             return format_for_model(result_data)
 
+    if function_name in {'enter_worktree', 'exit_worktree'} and isinstance(result_data, dict):
+        parts = [str(result_data.get('message') or result_data.get('error') or '')]
+        state = result_data.get('state') or {}
+        parts.extend(str(item) for item in result_data.get('warnings', []))
+        if state.get('directory'):
+            from modules.git_worktree import notification
+            parts.append(notification(state))
+        if state.get('sync_warning'):
+            parts.append(str(state['sync_warning']))
+        if result_data.get('retained_directory'):
+            parts.append(f"保留工作树：{result_data['retained_directory']}\n分支：{result_data.get('retained_branch')}\n{result_data.get('recovery') or ''}")
+        return '\n'.join(parts)
+
     if function_name in {"read_file", "read_skill", "recall_project_memory"} and isinstance(result_data, dict):
         return format_read_file_result(result_data)
 

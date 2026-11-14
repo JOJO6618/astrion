@@ -245,15 +245,16 @@ class TerminalManager:
         旧行为，允许工作区外路径。
         """
         root = Path(self.project_path).resolve()
+        base = Path(getattr(self, 'execution_root', root))
         if self._main_terminal_is_direct():
-            target = root / str(working_dir)
+            target = base / str(working_dir)
             if not target.exists():
                 target.mkdir(parents=True, exist_ok=True)
             return target
         candidate = Path(str(working_dir))
         if candidate.is_absolute():
             raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
-        target = (root / candidate).resolve()
+        target = (base / candidate).resolve()
         try:
             target.relative_to(root)
         except ValueError as exc:
@@ -317,11 +318,15 @@ class TerminalManager:
         
         # Validate child cwd before any directory creation or process launch.
         try:
+            if getattr(self, 'execution_binding_error', None):
+                raise ValueError(self.execution_binding_error)
             scope = self._resolve_execution_scope()
             if self.sandbox_mode == "docker":
                 require_scoped_docker_support(scope)
             if scope:
-                work_path = scoped_work_path(self.project_path, working_dir, scope)
+                base = Path(getattr(self, 'execution_root', self.project_path))
+                requested = working_dir if scope.is_sub_agent else str(base / (working_dir or ''))
+                work_path = scoped_work_path(self.project_path, requested, scope)
                 if not work_path.is_dir():
                     # A missing cwd must first be created with the scoped file tool;
                     # mkdir here would run with the server's unsandboxed authority.
@@ -329,7 +334,7 @@ class TerminalManager:
             elif working_dir:
                 work_path = self._resolve_main_work_path(working_dir)
             else:
-                work_path = self.project_path
+                work_path = Path(getattr(self, 'execution_root', self.project_path))
         except ValueError as exc:
             return {"success": False, "error": str(exc)}
         

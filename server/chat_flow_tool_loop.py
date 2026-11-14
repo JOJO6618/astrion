@@ -641,6 +641,8 @@ async def execute_tool_calls(**kwargs):
     if web_terminal is None:
         return await _execute_tool_calls_impl(**kwargs)
     previous_tool_loop_active = getattr(web_terminal, "_tool_loop_active", False)
+    previous_batch_size = getattr(web_terminal, '_worktree_tool_batch_size', 1)
+    web_terminal._worktree_tool_batch_size = len(kwargs.get('tool_calls') or [])
     try:
         return await _execute_tool_calls_impl(**kwargs)
     except asyncio.CancelledError:
@@ -656,6 +658,7 @@ async def execute_tool_calls(**kwargs):
         raise
     finally:
         web_terminal._tool_loop_active = previous_tool_loop_active
+        web_terminal._worktree_tool_batch_size = previous_batch_size
 
 
 async def _execute_tool_calls_impl(*, web_terminal, tool_calls, sender, messages, client_sid: str, username: str, iteration: int, conversation_id: Optional[str], last_tool_call_time: float, process_background_command_updates, process_multi_agent_master_messages=process_multi_agent_master_messages, get_stop_flag, clear_stop_flag, workspace=None):

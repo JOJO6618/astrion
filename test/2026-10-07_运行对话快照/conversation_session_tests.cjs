@@ -58,11 +58,12 @@ function fixture() {
     '../../../stores/preview': { usePreviewStore: () => ({ setRuntime: noop, setTargets: noop }) },
     '../../../stores/conversation': { useConversationStore: () => ({ $patch: noop, setCurrentConversationId: noop }) },
     '../../../stores/file': { useFileStore: () => ({ setTodoList: noop }) },
-    '../../../stores/resource': { useResourceStore: () => ({ setCurrentContextTokens: noop }) },
+    '../../../stores/resource': { useResourceStore: () => ({ setCurrentContextTokens: noop, setContextBaselineTokens: noop, setCompressLimit: noop }) },
     '../ui/workspaceNavigation': { commitWorkspaceIdentity: noop },
     '../../../stores/workflow': { useWorkflowStore: () => ({ setWorkflow: (...args) => workflowWrites.push(args) }) },
     '../../../stores/conversationTabs': { useConversationTabsStore: () => ({ enabled: false }) },
     '../../../stores/personalization': { usePersonalizationStore: () => ({ form: {} }) },
+    '@/stores/gitWorktree': { useGitWorktreeStore: () => ({ hydrate: noop }) },
     '@/components/input/approvalModel': approval
   }).bootstrapMethods;
   const host = {

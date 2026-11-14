@@ -49,6 +49,12 @@ export default {
   // —— Field labels in HTML fragments (with colon) ——
   labels: {
     workingDir: 'Working directory:',
+    branch: 'Branch:',
+    worktreeTarget: 'Working environment:',
+    worktreeStart: 'Starting revision:',
+    worktreeCarry: 'Include uncommitted changes:',
+    worktreeDirectory: 'Execution directory:',
+    worktreeRetained: 'Retained worktree:',
     tool: 'Tool:',
     status: 'Status:',
     path: 'Path:',
@@ -344,6 +350,8 @@ export default {
 
   // —— Tool status texts (chatDisplay action label map): tool name → preparing / running / completed / failed ——
   preparingStatus: {
+    enterWorktree: 'Preparing to enter worktree',
+    exitWorktree: 'Preparing to return to main directory',
     readFile: 'Preparing to read file',
     readSkill: 'Preparing to read skill',
     viewImage: 'Preparing to view image',
@@ -401,6 +409,8 @@ export default {
 
   // —— Tool running status texts (chatDisplay action label map) ——
   runningStatus: {
+    enterWorktree: 'Entering worktree',
+    exitWorktree: 'Returning to main directory',
     readFile: 'Reading file...',
     readSearch: 'Searching...',
     readExtract: 'Extracting content...',
@@ -460,6 +470,8 @@ export default {
 
   // —— Tool completed status texts (chatDisplay action label map) ——
   completedStatus: {
+    enterWorktree: 'Entered worktree',
+    exitWorktree: 'Returned to main directory',
     readFile: 'File read',
     readSkill: 'Skill read',
     viewImage: 'Image viewed',
@@ -517,6 +529,8 @@ export default {
 
   // —— Tool failed status texts (chatDisplay action label map) ——
   failedStatus: {
+    enterWorktree: 'Failed to enter worktree',
+    exitWorktree: 'Failed to return to main directory',
     readFile: 'Failed to read file',
     readSkill: 'Failed to read skill',
     viewImage: 'Failed to view image',

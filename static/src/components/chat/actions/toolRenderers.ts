@@ -146,6 +146,9 @@ function renderByTool(
       return renderEasterEgg(result, args);
     case 'load_tools':
       return renderLoadTools(result, args);
+    case 'enter_worktree':
+    case 'exit_worktree':
+      return renderWorktreeResult(result, args);
     default:
       if (typeof name === 'string' && name.startsWith('browser_'))
         return renderBrowserTool(name, result, args);
@@ -292,9 +295,7 @@ function renderBrowserTool(name: string, result: any, args: any): string {
   // 与 view_image 一致：结果里直接显示截图原图（点击由消息区事件委托开灯箱）。
   const shotUrl =
     result.screenshot_path && result.success !== false
-      ? withWorkspaceScope(
-          `/api/file/content?path=${encodeURIComponent(result.screenshot_path)}`
-        )
+      ? withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(result.screenshot_path)}`)
       : '';
   const snap = result.snapshot;
   if (snap)
@@ -730,6 +731,40 @@ function renderConversationReview(result: any, args: any): string {
     html += warning(t('toolResults.sentences.tooLongSaved'));
   }
   return html + preBox(result.content);
+}
+
+function renderWorktreeResult(result: any, args: any): string {
+  const target = args?.target && typeof args.target === 'object' ? args.target : {};
+  const create = target.action === 'create';
+  const state = result?.state && typeof result.state === 'object' ? result.state : null;
+  const lines = [
+    state?.directory ? lv(L('worktreeDirectory'), state.directory) : '',
+    state?.branch ? lv(L('branch'), state.branch) : '',
+    result?.message,
+    result?.retained_directory ? lv(L('worktreeRetained'), result.retained_directory) : '',
+    result?.recovery
+  ].filter(Boolean);
+  const warnings = Array.isArray(result?.warnings)
+    ? result.warnings.map((item: unknown) => warning(item)).join('')
+    : '';
+  return (
+    meta(
+      param(
+        L('operation'),
+        create
+          ? t('input.worktreeCreate')
+          : target.action === 'enter'
+            ? t('input.worktreeSwitch')
+            : ''
+      ),
+      param(L('branch'), target.branch_name),
+      param(L('worktreeStart'), create ? target.start_ref : ''),
+      param(L('worktreeCarry'), create ? yesNo(target.include_uncommitted) : ''),
+      pendingStatus(result)
+    ) +
+    preBox(lines.join('\n')) +
+    warnings
+  );
 }
 
 function renderCreateSkill(result: any, args: any): string {

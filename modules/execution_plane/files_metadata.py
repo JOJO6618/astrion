@@ -238,10 +238,11 @@ class MetadataFileSystemMixin:
         scope = _current_scope()
         if scope is not None and getattr(scope, "is_sub_agent", False):
             try:
-                return Path(_fixed_working_dir(scope))
+                from modules.scoped_execution_policy import fixed_execution_root
+                return Path(fixed_execution_root(scope))
             except Exception:
                 pass
-        return self._workspace_root()
+        return Path(getattr(self._file_manager, 'execution_root', self._workspace_root()))
 
     def _relative_info(self, full_path: Path) -> Tuple[bool, Optional[str]]:
         try:

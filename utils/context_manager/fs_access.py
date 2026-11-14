@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from config import PROJECT_AGENTS_SKILLS_DIRNAME, WORKSPACE_SKILLS_DIRNAME
@@ -304,6 +305,16 @@ def _parse_skill_frontmatter(text: str) -> Dict[str, str]:
         return {}
 
 
+def workspace_path(files_access, path):
+    """Workspace-owned artifacts keep their identity across execution-root changes."""
+    owner = getattr(files_access, 'owner', None)
+    root = getattr(owner, 'project_path', None)
+    if root is None:
+        return str(path)
+    from modules.git_worktree.paths import result_path
+    return result_path(owner, path)
+
+
 def _scan_skills_root(
     files_access: FilesAccess, display_dir: str
 ) -> Optional[List[Dict[str, str]]]:
@@ -312,7 +323,8 @@ def _scan_skills_root(
     返回 None 表示目录元数据不可用（调用方按失败处理，不回退控制端遍历）；
     目录不存在视为空列表。
     """
-    meta = inspect_meta(files_access, display_dir)
+    root_path = workspace_path(files_access, display_dir)
+    meta = inspect_meta(files_access, root_path)
     if not meta.get("success"):
         logger.info(
             "[fs_access] 技能目录元数据不可用 %s: %s",
@@ -323,7 +335,7 @@ def _scan_skills_root(
     if not meta.get("exists") or not meta.get("is_dir"):
         return []
 
-    listing = list_dir(files_access, display_dir)
+    listing = list_dir(files_access, root_path)
     if not listing.get("success"):
         logger.info(
             "[fs_access] 技能目录无法列举 %s: %s",
@@ -339,7 +351,7 @@ def _scan_skills_root(
         if not name or not SKILL_ID_PATTERN.match(name):
             continue
         meta_text = read_text(
-            files_access, f"{display_dir}/{name}/{SKILL_FILE_NAME}"
+            files_access, f"{root_path}/{name}/{SKILL_FILE_NAME}"
         ) or ""
         frontmatter = _parse_skill_frontmatter(meta_text)
         items.append(
