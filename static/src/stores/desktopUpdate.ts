@@ -9,11 +9,21 @@
 //
 // 后端链路：/api/desktop/update/* → 壳控制桥 / 官网更新清单（见 server/status/desktop_update.py）
 import { defineStore } from 'pinia';
+import { openExternal } from '@/utils/openExternal';
 
 const PROGRESS_POLL_MS = 1000;
 
 export type UpdateCheckData = {
   current_version: string;
+  current_build_id?: string;
+  policy?: {
+    required?: boolean;
+    delivery?: 'auto' | 'manual';
+    reason?: string;
+    download_url?: string;
+    expires_at?: string;
+    source?: string;
+  };
   latest_version: string;
   update_available: boolean;
   notes: string;
@@ -69,6 +79,12 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
   }),
 
   getters: {
+    updateRequired(state): boolean {
+      return state.result?.policy?.required === true;
+    },
+    manualUpdateOnly(state): boolean {
+      return state.result?.policy?.delivery === 'manual';
+    },
     /** 有可用新版本（驱动侧边栏红点） */
     updateAvailable(state): boolean {
       return Boolean(state.result?.update_available);
@@ -104,6 +120,7 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
           this.result = payload.data as UpdateCheckData;
           this.checked = true;
           this.checkError = '';
+          if (this.result.policy?.required) this.dialogOpen = true;
         } else if (!opts.silent) {
           this.checkError = payload?.error || 'check_failed';
         }
@@ -121,13 +138,19 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
     },
 
     closeDialog() {
-      if (this.installBusy) return; // 安装中禁止关闭（重启前最后状态可见）
+      if (this.installBusy || this.updateRequired) return;
       this.dialogOpen = false;
+    },
+
+    async openDownload() {
+      const url = new URL(this.result?.policy?.download_url || 'https://astrion.cyjai.com/');
+      if (url.protocol !== 'https:' || url.hostname !== 'astrion.cyjai.com' || url.username || url.password || (url.port && url.port !== '443')) return;
+      await openExternal(url.href);
     },
 
     /** 触发无感更新：壳侧下载 → 验签 → 安装 → 自动重启。 */
     async startInstall() {
-      if (!this.isDesktop || this.installBusy) return;
+      if (!this.isDesktop || this.installBusy || this.manualUpdateOnly) return;
       this.progress = { state: 'checking', downloaded: 0, total: null, error: null };
       try {
         const resp = await fetch('/api/desktop/update/install', {
@@ -136,6 +159,8 @@ export const useDesktopUpdateStore = defineStore('desktopUpdate', {
         });
         const payload = await parseJson(resp);
         if (!payload?.success) {
+          await this.checkUpdate({ silent: true, force: true });
+          if (this.manualUpdateOnly) { this.progress = null; return; }
           this.progress = {
             state: 'error',
             downloaded: 0,

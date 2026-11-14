@@ -1,0 +1,17 @@
+{
+  "requiredTitle": "Update required to continue",
+  "manualTitle": "Download this update from the website",
+  "requiredMessage": "This version cannot be used until the update is completed.",
+  "manualMessage": "This version cannot update automatically. Download the new installer from the official website.",
+  "download": "Go to the official download page",
+  "exit": "Quit Astrion",
+  "recheck": "Check update policy again",
+  "autoUpdate": "Update and restart",
+  "checking": "Checking update policy…",
+  "downloading": "Downloading the update…",
+  "installing": "Installing. Astrion will restart automatically…",
+  "failed": "The update did not complete. Check again before retrying.",
+  "versionLine": "Current {current} · Target {latest}",
+  "cached": "The update server is unavailable. A saved, valid update requirement is being enforced.",
+  "requestFailed": "The action did not complete. Please try again."
+}

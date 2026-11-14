@@ -1,5 +1,6 @@
 // Keep Windows release metadata independent from macOS package.json.
 const release = require('./windows-release.json');
+const buildId = require('./build/build-id.cjs');
 module.exports = {
   appId: 'com.astrion.desktop',
   productName: 'Astrion',
@@ -7,8 +8,10 @@ module.exports = {
   directories: { output: '../output/windows-electron/build', buildResources: 'build' },
   files: ['src/**', 'package.json'],
   asarUnpack: ['src/windows/*.py'],
-  extraMetadata: { version: release.version },
+  extraMetadata: { version: release.version, astrionBuildId: buildId },
   extraResources: [
+    { from: '../static/src/locales/zh-CN/updatePolicy.json', to: 'update-policy-locales/zh-CN.json' },
+    { from: '../static/src/locales/en-US/updatePolicy.json', to: 'update-policy-locales/en-US.json' },
     { from: '../desktop/src-tauri/runtime', to: 'runtime' },
     { from: '.cache/astrion-windows-helper.exe', to: 'astrion-windows-helper.exe' },
     { from: '../desktop/src-tauri/icons/icon.ico', to: 'icon.ico' },

@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "ttl_seconds": 86400,
+  "rules": [
+    {
+      "id": "specific-build-manual-reinstall",
+      "enabled": false,
+      "platforms": ["win32"],
+      "architectures": ["x64"],
+      "versions": ["0.10.0"],
+      "build_ids": ["REPLACE_WITH_AFFECTED_BUILD_ID"],
+      "required": true,
+      "delivery": "manual",
+      "target_version": "0.10.1",
+      "reason": "此构建的自动更新存在兼容问题，请从官网下载并重新安装。",
+      "download_url": "https://astrion.cyjai.com/"
+    },
+    {
+      "id": "minimum-supported-windows-version",
+      "enabled": false,
+      "platforms": ["win32"],
+      "max_version_exclusive": "0.10.1",
+      "required": true,
+      "delivery": "auto",
+      "target_version": "0.10.1",
+      "reason": "当前版本已停止支持，请更新后继续使用。"
+    },
+    {
+      "id": "optional-manual-update",
+      "enabled": false,
+      "platforms": ["darwin"],
+      "versions": ["0.9.5"],
+      "required": false,
+      "delivery": "manual",
+      "reason": "此版本需要从官网下载新版安装。"
+    }
+  ]
+}

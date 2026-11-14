@@ -41,6 +41,7 @@
 | 运行中对话显示快照 | `docs/agents_details/display_snapshot.md` | 会话显示、恢复链路 |
 | 桌面标签导航 | `docs/desktop_navigation.md` | 标签身份、关闭、恢复、页面往返及命令协议 |
 | 桌面内置浏览器（macOS/Windows） | `docs/native_browser.md` | 原生网页、file 与模型边界、IPC、资料／授权迁移、DOM 遮挡；AI 工具；前台＋三个后台、30 分钟闲置与 AI 一小时保护的实例回收 |
+| 桌面更新策略 | `docs/desktop_update_policy.md` | 启动门槛、版本／构建匹配、强制／手动更新及策略缓存 |
 | Linux host 沙箱 | `docs/agents_details/linux_host_sandbox.md` | Linux 沙箱 |
 | Host 网页密码 | `docs/agents_details/host_password.md` | 认证/密码 |
 | 主／子 API 花费 | `docs/agents_details/api_costs.md` | 费用统计、定价 |
@@ -67,7 +68,7 @@
 - **`config/`**：配置拆分（api/limits/terminal/paths…），由 `config/__init__.py` 聚合并加载 `.env`
 - **`utils/`**：api_client、日志、上下文与对话工具（多个子包，原入口保留兼容）
 - **前端**：`static/src/`（Vue 3 + TS）；`cli/src/`（opentui + React 19，2026-09-11 起替代 Ink 版；旧实现存档 `cli/legacy-ink-src/`）
-- **子项目**：`android-webview-app/`、`desktop-electron/`（macOS 与 Windows 共用 Electron；Windows 迁移已合入 main，下一个正式版为 0.10.0，尚未发布）、`desktop/`（旧 Tauri 壳，保留 Windows 运行时 staging、图标及原生快捷键/WGC 模块供新壳复用）、`easyagent/`（旧版 Node 子智能体，已不用）、`_experiments/`（本地实验归档，不入 git，见 §7）
+- **子项目**：`android-webview-app/`、`desktop-electron/`（macOS 与 Windows 共用 Electron；Windows Electron 0.10.0 已于 2026-11-14 正式发布上线）、`desktop/`（旧 Tauri 壳，保留 Windows 运行时 staging、图标及原生快捷键/WGC 模块供新壳复用）、`easyagent/`（旧版 Node 子智能体，已不用）、`_experiments/`（本地实验归档，不入 git，见 §7）
 - 完整目录职责与监控动画核心文件见细节文档 `project_structure.md`
 
 ## 1.5) 运行态数据目录与路径变量（2026-06 更新）
@@ -102,7 +103,7 @@
 
 1. **绝不能 full 与 headless 双进程并存**——RuntimeService 单例、门闸、审批 Map 都是进程内单例，两者端口/数据目录相同，只是挂载的路由面不同。
 2. Desktop 依赖安装需 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`；壳加载的是后端 serve 的 `static/dist`，改前端必须先 `npm run build`。
-3. Windows 必须在 Win 机构建。Electron Windows 版本/说明在 `desktop-electron/windows-release.json`，macOS 仍用同目录 `package.json`/`DESKTOP_CHANGELOG.md`，独立维护。Windows 下一个正式版为 **0.10.0**；此前迁移测试包 0.10.0–0.10.3 未正式发布，历史证据保留原编号，不能按测试包编号推断正式版版本，见 `docs/windows_electron.md`。向旧 Tauri 提供跨壳更新时仍须原 minisign 签名；Electron NSIS 使用 `latest.yml`，不得混淆 Windows Authenticode 与旧更新签名。未授权不得发布。
+3. Windows 必须在 Win 机构建。Electron Windows 版本/说明在 `desktop-electron/windows-release.json`，macOS 仍用同目录 `package.json`/`DESKTOP_CHANGELOG.md`，独立维护。**Windows Electron 0.10.0 已于 2026-11-14 正式发布**（此前迁移测试包 0.10.0–0.10.3 未发布，历史证据保留原编号，不能按测试包编号推断正式版版本），见 `docs/windows_electron.md`。向旧 Tauri 提供跨壳更新时仍须原 minisign 签名；Electron NSIS 使用 `latest.yml`，不得混淆 Windows Authenticode 与旧更新签名。未授权不得发布。
 4. 构建/安装/lint 因沙箱权限失败时的处置见 §5「构建沙箱已知问题」，**禁止改构建配置绕过**。
 5. **前端产物带内容哈希（2026-10-15 起）**：`vite.config.ts` 输出 `assets/[name]-[hash:8].(js|css|ext)`；`static/*.html` 仍写固定名，由 `server/entry_assets.py` 在响应时按 `static/dist/.vite/manifest.json` 注入真实文件名（映射来自构建产物，`npm run build` 后才有）。**新增 HTML 出口必须用 `serve_entry_html`，不要再用 `send_static_file` 直发 HTML**；HTML 响应一律 `no-store`。装配样式 `static/dist/style-<token>.css` 由 `scripts/generate_entry_styles.mjs` 生成（**不再写回源码树的 `static/style.css`**）。桌面壳 quick 窗口各自读同一 manifest 注入（Electron `src/quick/entry-styles.js`、Tauri `src/quick/assets.rs`），改哈希规则时必须同步。部署注意 dist 要清理后解压，见 `test/2026-10-15_前端产物hash化/README.md`。
 

@@ -6,7 +6,7 @@
 > virtua 估值补偿可见抖动），改用 Chromium 后与 Chrome web 共用引擎。
 > Windows 从 Tauri/WebView2 迁移至共用 Electron 壳，已于 2026-11-14 合入 main。
 
-Windows 下一个正式版为 **0.10.0**，尚未发布；版本与更新说明在 `windows-release.json`，macOS 继续使用 `package.json` / `DESKTOP_CHANGELOG.md` 独立维护。此前 0.10.0–0.10.3 为迁移测试包编号。Windows 构建、升级、资料边界和验证范围见 [`docs/windows_electron.md`](../docs/windows_electron.md)；旧 Tauri 目录仍提供运行时 staging、图标与原生模块。
+Windows 线上正式版为 **0.10.0**，下一正式版本已设为 **0.10.1**，尚未构建或发布；版本与更新说明在 `windows-release.json`，macOS 继续使用 `package.json` / `DESKTOP_CHANGELOG.md` 独立维护。此前 0.10.0–0.10.3 为迁移测试包编号，历史产物保留原编号。Windows 构建、升级、资料边界和验证范围见 [`docs/windows_electron.md`](../docs/windows_electron.md)，两平台更新策略见 [`docs/desktop_update_policy.md`](../docs/desktop_update_policy.md)；旧 Tauri 目录仍提供运行时 staging、图标与原生模块。
 
 ## 架构
 

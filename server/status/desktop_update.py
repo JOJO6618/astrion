@@ -36,7 +36,13 @@ def _desktop_context() -> dict | None:
     if not version:
         return None
     bridge_port = (os.environ.get("ASTRION_DESKTOP_BRIDGE_PORT") or "").strip()
-    return {"version": version, "bridge_port": bridge_port or None}
+    return {
+        "version": version, "bridge_port": bridge_port or None,
+        "build_id": os.environ.get("ASTRION_DESKTOP_BUILD_ID", "legacy"),
+        "platform": os.environ.get("ASTRION_DESKTOP_PLATFORM", sys.platform),
+        "arch": os.environ.get("ASTRION_DESKTOP_ARCH", platform.machine()),
+        "policy_protocol": os.environ.get("ASTRION_DESKTOP_POLICY_PROTOCOL") == "1",
+    }
 
 
 @status_bp.route('/api/desktop/quick/<operation>', methods=['GET', 'POST'])
@@ -132,7 +138,8 @@ def _update_manifest_name(channel: str) -> str:
     regen_manifest.py 从 Electron 产物生成，与安装清单 latest-mac.yml 同源，
     版本必然一致）。Tauri 时代的 latest-darwin-aarch64.json 已停止生成
     （mac 无 Tauri 存量用户）——曾因该文件冻结在 Tauri 末版 0.3.9，导致 0.4.0
-    起 macOS 检查更新全部失效。Windows 仍是 Tauri 壳，沿用 latest-<channel>.json。
+    起 macOS 检查更新全部失效。Windows Electron 与旧 Tauri 的检查界面共用
+    latest-<channel>.json；Electron 原生下载安装另读 latest.yml。
     """
     if channel.startswith("darwin"):
         return "latest-mac.json"
@@ -203,28 +210,44 @@ def desktop_update_check():
             "error": tr("desktop_update.unsupported_platform"),
         }), 200
 
+    policy = {}
+    if ctx["policy_protocol"]:
+        policy_body, policy_error = _bridge_request(
+            ctx, "GET", "/update/policy" + ("?force=1" if force else ""), timeout=8.0,
+        )
+        if not policy_error and isinstance(policy_body, dict):
+            policy = policy_body.get("policy") or {}
     manifest_url = f"{_UPDATE_MANIFEST_BASE}/{_update_manifest_name(channel)}"
+    identity = {"current_version": ctx["version"], "build_id": ctx["build_id"],
+                "platform": ctx["platform"], "arch": ctx["arch"]}
     try:
-        resp = httpx.get(manifest_url, timeout=8.0, follow_redirects=True)
+        resp = httpx.get(manifest_url, params=identity, timeout=8.0, follow_redirects=True)
         resp.raise_for_status()
         manifest = resp.json()
-    except Exception as exc:  # noqa: BLE001 - 网络/解析失败统一包装，细节进 detail
-        return jsonify({
-            "success": False,
-            "code": "check_failed",
-            "error": tr("desktop_update.check_failed"),
-            "detail": str(exc)[:200],
-        }), 200
+    except Exception as exc:  # noqa: BLE001 - 已确认的有效策略不因静态清单失败被抹除
+        if policy.get("required") or policy.get("delivery") == "manual":
+            manifest = {}
+        else:
+            return jsonify({
+                "success": False,
+                "code": "check_failed",
+                "error": tr("desktop_update.check_failed"),
+                "detail": str(exc)[:200],
+            }), 200
 
-    latest = str(manifest.get("version") or "").strip()
+    # The static manifest is fresher than a cached policy's display version.
+    latest = str(manifest.get("version") or policy.get("latest_version") or "").strip()
     current = ctx["version"]
-    update_available = bool(latest) and _parse_version(latest) > _parse_version(current)
+    update_available = (bool(latest) and _parse_version(latest) > _parse_version(current)
+                        or policy.get("required") is True or policy.get("delivery") == "manual")
     payload = {
         "success": True,
         "data": {
             "current_version": current,
+            "current_build_id": ctx["build_id"],
             "latest_version": latest or current,
-            "update_available": update_available,
+            "update_available": bool(update_available),
+            "policy": policy,
             "notes": str(manifest.get("notes") or ""),
             "pub_date": str(manifest.get("pub_date") or ""),
             "channel": channel,
@@ -244,7 +267,8 @@ def desktop_update_install():
     ctx = _desktop_context()
     if not ctx:
         return _not_desktop()
-    body, err = _bridge_request(ctx, "POST", "/update/install", timeout=5.0)
+    # Native policy refresh can take five seconds before accepting the install.
+    body, err = _bridge_request(ctx, "POST", "/update/install", timeout=12.0)
     if err:
         return err
     started = bool(body.get("started"))

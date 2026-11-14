@@ -2,7 +2,9 @@
 // 规范见 doc/frontend/i18n_spec.md。zh-CN 与 en-US 的 key 结构必须完全一致（tsc 强校验）。
 // 使用方：static/src/stores/desktopUpdate.ts、
 //   static/src/components/sidebar/SoftwareUpdateDialog.vue、ConversationSidebar.vue
+import policy from './updatePolicy.json';
 export default {
+  policy,
   // 侧边栏入口
   entryTitle: '软件更新',
   newVersionBadge: '有新版本',

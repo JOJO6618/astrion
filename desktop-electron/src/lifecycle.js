@@ -24,6 +24,7 @@ import { setMainWindowBackend, focusMainWindow, getMainView } from './window.js'
 import { startQuickEntry } from './quick/controller.js';
 import { setBrowserDataRoot } from './browser/index.js';
 import { desktopSupported } from './platform.js';
+import { enforceStartupUpdatePolicy, finishUpdatePolicyTransition } from './update-policy-window.js';
 
 export { shutdownBackend };
 
@@ -55,6 +56,9 @@ export async function startBackendAndCreateWindow() {
     console.error('[astrion-desktop] 控制桥启动失败（更新功能不可用）:', err);
   }
 
+  // Handle required updates before migration, backend startup and Quick Chat.
+  if (!await enforceStartupUpdatePolicy(bridgePort)) return;
+
   let desktopDataRoot;
   if (await hasPendingMigration()) {
     if (!bridgePort) {
@@ -65,6 +69,7 @@ export async function startBackendAndCreateWindow() {
       throw new Error('migration_progress_unavailable');
     }
     migrationWindow = await createMigrationWindow(bridgePort);
+    finishUpdatePolicyTransition();
     migrationWindow.on('closed', () => {
       migrationWindowClosed = true;
     });
@@ -110,6 +115,7 @@ export async function startBackendAndCreateWindow() {
   // An explicit desktop launch always opens its main window, including when
   // Quick Chat is enabled. Closing it can still keep Quick Chat running.
   focusMainWindow();
+  finishUpdatePolicyTransition();
   backendReady = true;
 
   const migration = getMigrationProgress();

@@ -20,6 +20,7 @@ import { installAppMenu } from './menu.js';
 import { startQuickEntry, quickEnabled, showQuickEntry } from './quick/controller.js';
 import { focusMainWindow } from './window.js';
 import { isUpdaterInstalling } from './updater-state.js';
+import { focusUpdatePolicyWindow, updatePolicyTransitioning } from './update-policy-window.js';
 
 app.setName('Astrion');
 const isolatedUserData = process.env.ASTRION_ELECTRON_USER_DATA;
@@ -29,7 +30,7 @@ if (isolatedUserData) {
   app.setPath('userData', directory);
   app.setPath('sessionData', directory);
 }
-const quickDebug = process.argv.includes('--quick-debug');
+const quickDebug = !app.isPackaged && process.argv.includes('--quick-debug');
 if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
 protocol.registerSchemesAsPrivileged([{ scheme: 'astrion-quick', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
@@ -40,14 +41,14 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     // 安装更新期间忽略二次启动/激活意图：应用正在退出，任何建窗都会让 ShipIt
     // 判定“仍有实例在运行”并放弃本次安装。
-    if (isUpdaterInstalling()) return;
+    if (isUpdaterInstalling() || focusUpdatePolicyWindow()) return;
     if (quickDebug) showQuickEntry();
     else focusMainWindow();
   });
 
   app.on('activate', () => {
     // focusMainWindow queues the intent until the backend is ready.
-    if (isUpdaterInstalling()) return;
+    if (isUpdaterInstalling() || focusUpdatePolicyWindow()) return;
     if (!quickDebug) focusMainWindow();
   });
 
@@ -77,6 +78,8 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('window-all-closed', () => {
+    // Rechecking can release the update gate before the normal window exists.
+    if (updatePolicyTransitioning()) return;
     // macOS 惯例是关窗不退 app，但本壳单窗口 + 内嵌后端，关窗即退出（对齐 Tauri 行为）
     if (!quickDebug && !quickEnabled()) app.quit();
   });

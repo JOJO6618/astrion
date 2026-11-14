@@ -5,6 +5,9 @@ appId: com.astrion.desktop
 productName: Astrion
 copyright: Copyright © 2026
 
+extraMetadata:
+  astrionBuildId: ${env.ASTRION_BUILD_ID}
+
 directories:
   output: dist
   buildResources: build
@@ -17,6 +20,10 @@ files:
 # runtime/python = python-build-standalone + 预装依赖；runtime/backend = 源码）。
 # 主进程 backend.js::resolveEmbeddedRuntime 按 resourcesPath/runtime/... 解析。
 extraResources:
+  - from: ../static/src/locales/zh-CN/updatePolicy.json
+    to: update-policy-locales/zh-CN.json
+  - from: ../static/src/locales/en-US/updatePolicy.json
+    to: update-policy-locales/en-US.json
   - from: ../desktop/src-tauri/runtime
     to: runtime
   - from: .cache/quick-entry-listener

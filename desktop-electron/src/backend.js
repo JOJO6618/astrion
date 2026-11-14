@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { credentialTransport } from './backend-transport.js';
 import { backendLaunch } from './windows/backend-guardian.js';
+import { desktopUpdateIdentity } from './update-policy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -160,6 +161,11 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
   env.ASTRION_DATA_ROOT = desktopDataRoot || path.join(os.homedir(), '.astrion', 'astrion-desktop');
   // 桌面应用身份与控制桥地址：后端据此判定「自己是桌面壳内嵌实例」并代理更新接口
   env.ASTRION_DESKTOP_VERSION = version;
+  const updateIdentity = desktopUpdateIdentity();
+  env.ASTRION_DESKTOP_BUILD_ID = updateIdentity.build_id;
+  env.ASTRION_DESKTOP_PLATFORM = updateIdentity.platform;
+  env.ASTRION_DESKTOP_ARCH = updateIdentity.arch;
+  env.ASTRION_DESKTOP_POLICY_PROTOCOL = '1';
   if (bridgePort) env.ASTRION_DESKTOP_BRIDGE_PORT = String(bridgePort);
   // AI 浏览器端点凭据经 fd 3 管道交给后端（读完即关），不放环境变量：
   // macOS 上同用户进程可用 ps -E 读到启动环境，模型执行的命令不能拿到它。

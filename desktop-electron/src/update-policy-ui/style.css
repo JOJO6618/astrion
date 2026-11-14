@@ -1,0 +1,51 @@
+.update-gate-page {
+  color-scheme: light dark;
+  margin: 0;
+  color: CanvasText;
+  background: Canvas;
+}
+.update-gate {
+  --surface-base: Canvas;
+  --text-primary: CanvasText;
+  --text-secondary: GrayText;
+  --border-default: color-mix(in srgb, CanvasText 22%, Canvas);
+  --accent: Highlight;
+  --accent-text: HighlightText;
+  box-sizing: border-box;
+  max-width: 720px;
+  max-height: calc(100vh - 32px);
+  margin: 16px auto;
+  padding: 20px 26px;
+  overflow: auto;
+  color: var(--text-primary);
+  background: var(--surface-base);
+  font: 14px/1.65 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.update-gate__brand { color: var(--text-secondary); height: 28px; }
+.update-gate h1 { margin: 8px 0; font-size: 23px; line-height: 1.4; }
+.update-gate p { margin: 12px 0; }
+.update-gate__meta { color: var(--text-secondary); font-size: 12px; }
+.update-gate__reason { padding-top: 12px; border-top: 1px solid var(--border-default); white-space: pre-wrap; overflow-wrap: anywhere; }
+.update-gate__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.update-gate button {
+  height: 36px;
+  max-width: 100%;
+  padding: 0 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: inherit;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.update-gate button:disabled { opacity: .55; cursor: default; }
+.update-gate button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.update-gate button.update-gate__primary { border-color: var(--accent); color: var(--accent-text); background: var(--accent); }
+.update-gate [hidden] { display: none; }
+.update-gate__activity { height: 4px; overflow: hidden; background: var(--border-default); }
+.update-gate__activity span { display: block; width: 32%; height: 4px; background: var(--accent); animation: update-gate-slide 1.4s linear infinite; }
+@keyframes update-gate-slide { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+@media (prefers-reduced-motion: reduce) { .update-gate__activity span { animation: none; } }

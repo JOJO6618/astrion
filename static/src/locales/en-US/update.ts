@@ -1,7 +1,9 @@
 // Locale namespace: update (en-US mirror, keys must match zh-CN/update.ts exactly).
 // Used by: static/src/stores/desktopUpdate.ts,
 //   static/src/components/sidebar/SoftwareUpdateDialog.vue, ConversationSidebar.vue
+import policy from './updatePolicy.json';
 export default {
+  policy,
   // Sidebar entry
   entryTitle: 'Software Update',
   newVersionBadge: 'Update available',

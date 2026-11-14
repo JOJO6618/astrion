@@ -6,7 +6,7 @@
           <div class="update-dialog-header">
             <span class="update-dialog-title">{{ $t('update.dialogTitle') }}</span>
             <button
-              v-if="!store.installBusy"
+              v-if="!store.installBusy && !store.updateRequired"
               type="button"
               class="update-dialog-close"
               :title="$t('common.close')"
@@ -59,6 +59,7 @@
               <div class="update-error-detail">{{ store.progress.error }}</div>
               <div class="update-dialog-actions">
                 <button
+                  v-if="!store.updateRequired"
                   type="button"
                   class="update-btn update-btn--ghost"
                   @click="store.closeDialog()"
@@ -66,11 +67,15 @@
                   {{ $t('common.close') }}
                 </button>
                 <button
+                  v-if="!store.manualUpdateOnly"
                   type="button"
                   class="update-btn update-btn--primary"
                   @click="store.startInstall()"
                 >
                   {{ $t('common.retry') }}
+                </button>
+                <button v-else type="button" class="update-btn update-btn--primary" @click="store.openDownload()">
+                  {{ $t('update.policy.download') }}
                 </button>
               </div>
             </template>
@@ -115,6 +120,7 @@
             <div class="update-error-detail">{{ store.checkError }}</div>
             <div class="update-dialog-actions">
               <button
+                v-if="!store.updateRequired"
                 type="button"
                 class="update-btn update-btn--ghost"
                 @click="store.closeDialog()"
@@ -148,7 +154,7 @@
                   <path d="M10 3v9M6.5 8.5L10 12l3.5-3.5" />
                   <path d="M4 15.5h12" />
                 </svg>
-                <span class="update-status-text">{{ $t('update.newVersionAvailable') }}</span>
+                <span class="update-status-text">{{ store.manualUpdateOnly ? $t('update.policy.manualTitle') : store.updateRequired ? $t('update.policy.requiredTitle') : $t('update.newVersionAvailable') }}</span>
               </div>
               <div class="update-version-line">
                 <span class="update-version-item">
@@ -163,6 +169,10 @@
                   >
                 </span>
               </div>
+              <div v-if="store.updateRequired || store.manualUpdateOnly" class="update-hint">
+                {{ store.result.policy?.reason || (store.manualUpdateOnly ? $t('update.policy.manualMessage') : $t('update.policy.requiredMessage')) }}
+              </div>
+              <div v-if="store.result.policy?.source === 'cache'" class="update-hint">{{ $t('update.policy.cached') }}</div>
               <div class="update-notes-block">
                 <div class="update-notes-title">
                   {{ $t('update.releaseNotes') }}
@@ -176,18 +186,26 @@
               </div>
               <div class="update-dialog-actions">
                 <button
+                  v-if="!store.updateRequired"
                   type="button"
                   class="update-btn update-btn--ghost"
                   @click="store.closeDialog()"
                 >
                   {{ $t('update.later') }}
                 </button>
+                <button v-if="store.updateRequired || store.manualUpdateOnly" type="button" class="update-btn update-btn--ghost" @click="store.checkUpdate({ force: true })">
+                  {{ $t('update.recheck') }}
+                </button>
                 <button
+                  v-if="!store.manualUpdateOnly"
                   type="button"
                   class="update-btn update-btn--primary"
                   @click="store.startInstall()"
                 >
                   {{ $t('update.updateNow') }}
+                </button>
+                <button v-else type="button" class="update-btn update-btn--primary" @click="store.openDownload()">
+                  {{ $t('update.policy.download') }}
                 </button>
               </div>
             </template>
@@ -216,6 +234,7 @@
               </div>
               <div class="update-dialog-actions">
                 <button
+                  v-if="!store.updateRequired"
                   type="button"
                   class="update-btn update-btn--ghost"
                   @click="store.closeDialog()"

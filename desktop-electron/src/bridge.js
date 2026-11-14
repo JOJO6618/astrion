@@ -20,6 +20,8 @@ import { createUpdaterLogger } from './updater-log.js';
 import { migrationPageHtml } from './migration-window.js';
 import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
 import { handleBrowserRequest, setBrowserToken } from './browser/ai/endpoint.js';
+import { checkUpdatePolicy, currentUpdatePolicy, desktopUpdateIdentity, openPolicyDownload } from './update-policy.js';
+import { authorizeUpdatePolicyWindow, serveUpdatePolicyPage } from './update-policy-window.js';
 
 /** 更新状态机（字符串与 Tauri 版一致，后端/前端按此渲染） */
 const UpdateState = {
@@ -72,6 +74,14 @@ async function getAutoUpdater() {
     throw new Error('electron-updater: autoUpdater export not found (module shape changed?)');
   }
   autoUpdater = resolved;
+  const identity = desktopUpdateIdentity();
+  autoUpdater.requestHeaders = {
+    ...autoUpdater.requestHeaders,
+    'X-Astrion-Version': identity.version,
+    'X-Astrion-Build-Id': identity.build_id,
+    'X-Astrion-Platform': identity.platform,
+    'X-Astrion-Arch': identity.arch,
+  };
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.autoRunAppAfterInstall = true;
@@ -118,6 +128,12 @@ async function tryStartInstall(isPackaged) {
   setProgress(UpdateState.Checking);
   let updater;
   try {
+    const policy = await checkUpdatePolicy({ force: true });
+    if (policy.delivery === 'manual') {
+      const error = new Error('manual_update_required');
+      error.statusCode = 409;
+      throw error;
+    }
     updater = await getAutoUpdater();
     updateInstaller.assertCanStart();
     logUpdate('update-check-start');
@@ -140,12 +156,34 @@ export function startBridge(ctx) {
   const server = http.createServer((req, res) => {
     const send = (status, obj) => {
       const body = JSON.stringify(obj);
-      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(body);
     };
     const url = new URL(req.url || '/', 'http://127.0.0.1');
     const { pathname } = url;
 
+    try { if (serveUpdatePolicyPage(req, res, pathname)) return; }
+    catch { send(500, { error: 'update_page_unavailable' }); return; }
+    if (req.method === 'GET' && pathname === '/update/policy') {
+      checkUpdatePolicy({ force: url.searchParams.get('force') === '1' })
+        .then(policy => send(200, { policy, identity: desktopUpdateIdentity() }))
+        .catch(() => send(503, { error: 'policy_unavailable' }));
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/update/policy/status') {
+      send(200, { policy: currentUpdatePolicy(), identity: desktopUpdateIdentity() });
+      return;
+    }
+    if (req.method === 'POST' && ['/update/policy/download', '/update/policy/quit'].includes(pathname)) {
+      if (!authorizeUpdatePolicyWindow(req)) { send(403, { error: 'forbidden' }); return; }
+      if (pathname.endsWith('/download')) {
+        openPolicyDownload().then(() => send(200, { success: true })).catch(() => send(400, { error: 'download_unavailable' }));
+      } else {
+        send(200, { success: true });
+        setTimeout(() => app.quit(), 100);
+      }
+      return;
+    }
     if (req.method === 'GET' && pathname === '/version') {
       send(200, { version: ctx.version });
       return;

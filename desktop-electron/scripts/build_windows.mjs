@@ -3,7 +3,10 @@ import { existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+
+const buildId = createRequire(import.meta.url)('../build/build-id.cjs');
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.dirname(desktop);
@@ -11,7 +14,7 @@ const options = new Set(process.argv.slice(2));
 if (process.platform !== 'win32') throw new Error('Windows application builds require the Windows native toolchain.');
 const output = path.join(root, 'output/windows-electron');
 mkdirSync(output, { recursive: true });
-const env = { ...process.env, PYTHONUTF8: '1', ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/' };
+const env = { ...process.env, ASTRION_BUILD_ID: buildId, PYTHONUTF8: '1', ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/' };
 const node = process.execPath;
 function run(command, args, cwd = desktop) {
   console.info(`[windows-build] ${path.basename(command)} ${args.join(' ')}`);
@@ -33,6 +36,7 @@ if (!existsSync(executable)) throw new Error('Windows executable was not produce
 const release = JSON.parse(readFileSync(path.join(desktop, 'windows-release.json'), 'utf8'));
 const receipt = {
   version: release.version,
+  build_id: buildId,
   platform: process.platform,
   executable: path.relative(root, executable),
   executable_bytes: statSync(executable).size,
