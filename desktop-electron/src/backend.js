@@ -12,6 +12,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { app } from 'electron';
 import { credentialTransport } from './backend-transport.js';
 import { backendLaunch } from './windows/backend-guardian.js';
 import { desktopUpdateIdentity } from './update-policy.js';
@@ -25,6 +26,54 @@ const READY_POLL_INTERVAL_MS = 200;
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let backendChild = null;
+
+/** 上次成功使用的后端端口（userData 内落盘）。 */
+const PORT_FILE_NAME = 'backend-port.json';
+
+function portFile() {
+  return path.join(app.getPath('userData'), PORT_FILE_NAME);
+}
+
+/**
+ * 读取上次成功使用的端口；无记录或值非法返回 0。
+ *
+ * 端口稳定很重要：session cookie 名（agents_session_<port>）与 localStorage
+ * 都按 origin（含端口）隔离，每次启动换端口等于丢掉登录态、用户主题和前端本地缓存。
+ */
+export function loadPreferredPort() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(portFile(), 'utf8')).port;
+    return Number.isInteger(saved) && saved > 1024 && saved < 65536 ? saved : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 记录本次成功使用的端口；写盘失败不影响运行。 */
+export function savePreferredPort(port) {
+  if (!Number.isInteger(port) || port <= 0) return;
+  try {
+    fs.writeFileSync(portFile(), JSON.stringify({ port }), { mode: 0o600 });
+  } catch {
+    /* 只读或异常磁盘：下次启动回落到随机端口 */
+  }
+}
+
+/** 端口此刻能否 bind（探测后立即释放；到 spawn 之间仍有极小竞态，调用方负责回退）。 */
+export function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
+  });
+}
+
+/** 优先复用上次端口；不可用则随机。 */
+export async function resolveBackendPort() {
+  const preferred = loadPreferredPort();
+  if (preferred && (await isPortAvailable(preferred))) return preferred;
+  return pickFreePort();
+}
 
 /** 选取空闲端口：listen(0) 由系统分配后立即释放（理论竞态同 Tauri 版，本地可接受）。 */
 export function pickFreePort() {

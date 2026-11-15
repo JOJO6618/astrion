@@ -9,12 +9,15 @@
         // 否则 JS 加载前走 :root:not([data-theme)] 的浅色回退，深色用户整页重载会闪白。
         // 与 utils/theme.ts 的存储键/取值保持一致；body 上的同名属性由 theme.ts 启动时补齐。
         (function () {
+            var t = window.__ASTRION_INITIAL_THEME__;
             try {
-                var t = window.localStorage.getItem('agents_ui_theme');
-                if (t === 'classic' || t === 'light' || t === 'dark') {
-                    document.documentElement.setAttribute('data-theme', t);
+                if (t !== 'classic' && t !== 'light' && t !== 'dark') {
+                    t = window.localStorage.getItem('agents_ui_theme');
                 }
             } catch (e) { /* localStorage 不可用时按默认浅色回退 */ }
+            if (t === 'classic' || t === 'light' || t === 'dark') {
+                document.documentElement.setAttribute('data-theme', t);
+            }
         })();
         </script>
         <link rel="icon" type="image/svg+xml" href="/static/astrion-avatar.svg">

@@ -10,14 +10,16 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
     <script>
       (function () {
+        // 桌面壳 preload 注入的首帧主题优先：端口变化后新 origin 的 localStorage 是空的。
+        var theme = window.__ASTRION_INITIAL_THEME__;
         try {
-          var key = window.localStorage.getItem('agents_ui_theme');
-          var theme = key === 'light' || key === 'dark' || key === 'classic' ? key : 'classic';
-          document.documentElement.setAttribute('data-theme', theme);
-          document.body && document.body.setAttribute('data-theme', theme);
-        } catch (_e) {
-          document.documentElement.setAttribute('data-theme', 'classic');
-        }
+          if (theme !== 'light' && theme !== 'dark' && theme !== 'classic') {
+            theme = window.localStorage.getItem('agents_ui_theme');
+          }
+        } catch (_e) { /* localStorage 不可用时用默认值 */ }
+        if (theme !== 'light' && theme !== 'dark' && theme !== 'classic') theme = 'classic';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.body && document.body.setAttribute('data-theme', theme);
       })();
     </script>
     <link rel="stylesheet" href="/static/dist/assets/auth.css" />

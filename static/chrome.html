@@ -7,13 +7,17 @@
         <script>
         // 首屏防白闪：与 static/index.html 同段——样式表生效前把持久化主题写到
         // <html data-theme>，否则深色用户窗口创建时标签条区域闪白。
+        // 桌面壳下：后端端口可能变化，新 origin 的 localStorage 是空的，优先用 preload 注入的主题。
         (function () {
+            var t = window.__ASTRION_INITIAL_THEME__;
             try {
-                var t = window.localStorage.getItem('agents_ui_theme');
-                if (t === 'classic' || t === 'light' || t === 'dark') {
-                    document.documentElement.setAttribute('data-theme', t);
+                if (t !== 'classic' && t !== 'light' && t !== 'dark') {
+                    t = window.localStorage.getItem('agents_ui_theme');
                 }
             } catch (e) { /* localStorage 不可用时按默认浅色回退 */ }
+            if (t === 'classic' || t === 'light' || t === 'dark') {
+                document.documentElement.setAttribute('data-theme', t);
+            }
         })();
         </script>
         <link rel="stylesheet" href="/static/dist/assets/chrome.css">

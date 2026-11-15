@@ -4,16 +4,35 @@ type ThemeKey = 'classic' | 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'agents_ui_theme';
 
-/** Desktop shell: keep the native window background equal to the theme surface. */
-const syncDesktopSurface = () => {
-  const bridge = (window as { astrionWindow?: { surface: (color: string) => void } }).astrionWindow;
+/** 桌面壳注入的首帧主题（preload 经 shell:theme-get 取得，见 window.js）。 */
+const SHELL_THEME_KEY = '__ASTRION_INITIAL_THEME__';
+
+const isThemeKey = (value: unknown): value is ThemeKey =>
+  value === 'classic' || value === 'light' || value === 'dark';
+
+interface DesktopThemeBridge {
+  surface?: (color: string) => void;
+  theme?: (theme: ThemeKey) => void;
+}
+
+const desktopBridge = (): DesktopThemeBridge | undefined =>
+  (window as { astrionWindow?: DesktopThemeBridge }).astrionWindow;
+
+/** Desktop shell: 上报主题键（壳层记住，下次启动首帧直接用），并在下一帧同步窗口底色。 */
+const syncDesktopTheme = (theme: ThemeKey) => {
+  const bridge = desktopBridge();
   if (!bridge) return;
+  try {
+    bridge.theme?.(theme);
+  } catch {
+    // 壳层不可用时忽略：只影响下次启动首帧。
+  }
   // Stylesheets may still be loading on first paint; read after the next frame.
   requestAnimationFrame(() => {
     const color = getComputedStyle(document.documentElement)
       .getPropertyValue('--surface-base')
       .trim();
-    if (/^#[a-f\d]{6}$/i.test(color)) bridge.surface(color);
+    if (/^#[a-f\d]{6}$/i.test(color)) bridge.surface?.(color);
   });
 };
 
@@ -21,14 +40,17 @@ const applyTheme = (theme: ThemeKey) => {
   const root = document.documentElement;
   root.setAttribute('data-theme', theme);
   document.body.setAttribute('data-theme', theme);
-  syncDesktopSurface();
+  syncDesktopTheme(theme);
 };
 
 const loadTheme = (): ThemeKey => {
   if (typeof window === 'undefined') return 'classic';
-  const saved = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeKey | null;
-  if (saved === 'light' || saved === 'dark' || saved === 'classic') return saved;
-  return 'classic';
+  const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (isThemeKey(saved)) return saved;
+  // 桌面壳：后端端口变化后新 origin 的 localStorage 是空的，用壳层记住的上次主题兜底，
+  // 否则首帧会先按 classic 画一遍（顶部标签条与对话区颜色不一致）。
+  const shellTheme = (window as unknown as Record<string, unknown>)[SHELL_THEME_KEY];
+  return isThemeKey(shellTheme) ? shellTheme : 'classic';
 };
 
 const persistTheme = (theme: ThemeKey) => {

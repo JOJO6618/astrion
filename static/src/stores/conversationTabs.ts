@@ -52,6 +52,9 @@ export function shellBridge(): ShellBridge | null {
   return ((window as any).astrionShell as ShellBridge) || null;
 }
 
+/** 冷启动宽限期：这段时间内的会话未就绪/网络错误不显示成同步故障。 */
+const SYNC_FAILURE_QUIET_MS = 20_000;
+
 const transports = new WeakMap<object, NavigationTransport>();
 function transport(store: object) {
   if (!transports.has(store)) transports.set(store, new NavigationTransport());
@@ -107,7 +110,9 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     attached: false,
     pendingFail: '',
     syncError: '',
-    commandError: ''
+    commandError: '',
+    /** 本次文档开始同步的时间（冷启动宽限期的基准）。 */
+    bootAt: 0
   }),
   getters: {
     activeTab: (state): ConversationTab | null =>
@@ -130,10 +135,21 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       state.tabs.some((tab) => tab.key === state.viewKey)
   },
   actions: {
+    /**
+     * 冷启动宽限期：会话尚未建立（桌面壳刚起来、免密登录还没完成）时会拿到 401 或网络错误，
+     * 这不是同步故障，不能把启动过程报成「同步失败，重试」；超过宽限期仍失败就照常提示。
+     */
+    shouldSilenceSyncFailure(error: unknown): boolean {
+      if (this.hydrated) return false;
+      const startedAt = this.bootAt || (this.bootAt = Date.now());
+      if (Date.now() - startedAt > SYNC_FAILURE_QUIET_MS) return false;
+      return error instanceof NavigationError ? error.status === 401 : true;
+    },
     /** 记录壳层身份并订阅广播；legacy 兜底页（key 为空）整体降级为网页行为。 */
     async init() {
       if (!this.enabled || this.initialized) return;
       this.initialized = true;
+      this.bootAt = this.bootAt || Date.now();
       const shell = shellBridge();
       shell?.onTabsState?.((state) => this.applyServerSnapshot(state, this.responseSequence));
       if (this.role === 'chrome') return;
@@ -201,6 +217,8 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         if (this.applyServerSnapshot(result, sequence) && this.role === 'chrome')
           this.forward(result);
       } catch (error) {
+        // 启动宽限期内的 401/网络抖动不出错：登录一完成，下一次轮询就会恢复。
+        if (this.shouldSilenceSyncFailure(error)) return;
         this.syncError = String((error as Error)?.message || error);
         throw error;
       }
@@ -231,6 +249,10 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
           if (this.applyServerSnapshot(state, sequence)) this.forward(state);
         },
         (error) => {
+          if (this.shouldSilenceSyncFailure(error)) {
+            this.syncError = '';
+            return;
+          }
           this.syncError = String((error as Error)?.message || error);
         }
       );
@@ -263,7 +285,9 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
           this.commandError = '';
           return null;
         }
-        this.commandError = String((error as Error)?.message || error);
+        this.commandError = this.shouldSilenceSyncFailure(error)
+          ? ''
+          : String((error as Error)?.message || error);
         throw error;
       }
     },

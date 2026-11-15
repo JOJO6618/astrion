@@ -66,6 +66,24 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 新装 host 无工作区是正常空态：后端 `WorkspaceRequired` → `400 code=no_workspace`，前端 `command` 对该 code 静默返回（清 `commandError`，**不再跳转**）；`_lookup` 捕获 `NoWorkspaceError`，`_reconcile` 把标签标 `workspace_unavailable` 并保留，GET 不得 503。判断零工作区只用导航快照，不用组件级 `currentHostWorkspaceId`（设置页等独立路由为空）。host 首次启动由 `ensure_default_host_workspace` 建默认工作区。
 
+## 启动期会话预热、端口复用与首帧主题（2026-11-15，仍适用）
+
+**症状**：冷启动时顶部标签条先显示「同步失败，重试」且没有任何标签，几秒后自行恢复；同期顶部条是经典配色、对话区已是用户主题。
+
+**根因（两条独立链）**：
+
+1. 窗口在会话建立前就创建：`chrome` 视图 `onMounted` 立即请求 `/api/conversation-tabs`，而会话要等内容视图加载 `/login`、`LoginApp` 自动 `POST /host-login` 之后才有；这段窗口里 `api_login_required` 返回 401（`server/auth_helpers.py`），前端把任意非 2xx 统一显示成「同步失败，重试」。
+2. 后端端口每次启动随机（`pickFreePort` 的 `listen(0)`），而 `SESSION_COOKIE_NAME` 是 `agents_session_<port>`、`localStorage` 也按 origin 隔离：换端口等于全新空存储，首帧读不到主题回退 classic；内容视图随后从服务端 personalization 拿回主题写回 `localStorage`，chrome 条只能靠 `ChromeApp` 的 2s 定时器追上。
+
+**修复（壳层 + 前端兜底）**：
+
+- `desktop-electron/src/session-priming.js`：`waitBackendReady` 之后、任何视图创建之前，用 `session.defaultSession.fetch` 完成一次免密 `host-login`（先 `GET /api/csrf-token`，带 `X-CSRF-Token` 提交；已登录则跳过，避免重复 `session.clear()` 重置会话）。失败只告警，前端登录流程仍兜底。
+- `backend.js`：`loadPreferredPort` / `savePreferredPort` / `isPortAvailable` / `resolveBackendPort`，端口记在 `userData/backend-port.json`；`lifecycle.js` 在「探测通过但 spawn 后被抢占」时换随机端口重试一次。
+- `window.js`：`shell:theme`（受管视图上报主题键，存 `userData/theme.json`）与 `shell:theme-get`（同步读取，供 preload 在页面脚本执行前注入 `window.__ASTRION_INITIAL_THEME__`）；`preload-chrome.cjs` / `preload-view.cjs` 注入该值，`index.html` / `chrome.html` / `login.html` 的内联首屏脚本优先用它、其次 `localStorage`。
+- 前端兜底：`conversationTabs.shouldSilenceSyncFailure` —— 未 `hydrated` 且启动 20 秒内的 401/网络错误不显示成同步失败（`refreshSnapshot` 不抛、轮询只清提示、`command` 只清 `commandError` 但保持重试），超期照常提示。
+
+**验证**：后端 test_client 实测：未登录 `GET /api/conversation-tabs` → 401「登录状态已过期」；`GET /api/csrf-token` → 200；带 token `POST /host-login` → 200 `success`；再取快照 → 200。壳层 GUI（端口复用、首帧配色）需实机启动验收。
+
 ## 人工审批黄点（2026-11-05，仍适用）
 
 `conversation_tabs.py` 在快照中富化 `awaiting_human_approval`（只投影不落盘）：`human_approval_required=true` 且人工未裁决为等待态，终态/取消/过期下次快照清除；黄点优先于运行点。回归 `test/2026-11-05_完全访问审批/`。

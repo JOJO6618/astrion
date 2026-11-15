@@ -57,6 +57,28 @@ function loadSurfaceColor() {
   } catch { /* First launch or unreadable file: use the classic theme color. */ }
   return DEFAULT_SURFACE;
 }
+
+// 主题键的记忆：后端端口可能变，localStorage 按 origin（含端口）隔离，
+// 新 origin 读不到用户主题，首帧只能先按 classic 画（顶部条与对话区会短暂不一致）。
+// 壳层记住上次主题，preload 在页面脚本执行前同步取走，供首屏内联脚本使用。
+const THEME_KEYS = new Set(['classic', 'light', 'dark']);
+const themeFile = () => path.join(app.getPath('userData'), 'theme.json');
+let themeKey = '';
+function currentThemeKey() {
+  if (!themeKey) {
+    try {
+      const saved = JSON.parse(fs.readFileSync(themeFile(), 'utf8')).theme;
+      themeKey = THEME_KEYS.has(saved) ? saved : '';
+    } catch { /* 首次启动或文件损坏：交给页面默认值 */ }
+  }
+  return themeKey;
+}
+function saveThemeKey(next) {
+  if (!THEME_KEYS.has(next) || next === themeKey) return;
+  themeKey = next;
+  fs.promises.writeFile(themeFile(), JSON.stringify({ theme: next }), { mode: 0o600 }).catch(() => {});
+}
+
 function loadRecency() {
   try {
     const value = JSON.parse(fs.readFileSync(recencyFile(), 'utf8'));
@@ -104,6 +126,15 @@ const fromChrome = (event) => !!views && fromMainFrame(event) && views.isChrome(
 ipcMain.on('window:surface', (event, color) => {
   if (!fromContentView(event)) return;
   applySurfaceColor(color);
+});
+// 当前主题键 → 壳层记忆（页面 applyTheme 时上报），供下次启动首帧使用。
+ipcMain.on('shell:theme', (event, key) => {
+  if (!fromContentView(event) && !fromChrome(event)) return;
+  if (typeof key === 'string') saveThemeKey(key);
+});
+// preload 在页面脚本执行前同步取首帧主题；主题不是凭据，任一顶层 frame 可读。
+ipcMain.on('shell:theme-get', (event) => {
+  event.returnValue = fromMainFrame(event) ? currentThemeKey() : '';
 });
 // astrionShell 桥（设计 §4.2）。身份一律按 sender 返回，页面不得自报。
 ipcMain.handle('shell:identity', (event) => (fromContentView(event) ? views.identityFor(event.sender) : null));

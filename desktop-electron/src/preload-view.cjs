@@ -12,11 +12,31 @@ contextBridge.exposeInMainWorld('astrionQuickSettings', {
   open: () => ipcRenderer.invoke('quick:open')
 });
 contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);
-// 前端主题底色 → 窗口底色（启动与拉伸时未绘制区域的颜色）。
+// 前端主题底色/主题键 → 壳层（启动与拉伸时未绘制区域的颜色，兼下次启动的首帧主题）。
 contextBridge.exposeInMainWorld('astrionWindow', {
-  surface: color => ipcRenderer.send('window:surface', color)
+  surface: color => ipcRenderer.send('window:surface', color),
+  theme: key => ipcRenderer.send('shell:theme', key)
 });
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
+
+// 首帧主题：后端端口可能变，新 origin 的 localStorage 是空的，
+// 从壳层记忆同步取一次，让页面内联脚本在样式生效前就能画对颜色。
+{
+  let initialTheme = '';
+  try {
+    initialTheme = ipcRenderer.sendSync('shell:theme-get') || '';
+  } catch {
+    initialTheme = '';
+  }
+  if (initialTheme === 'classic' || initialTheme === 'light' || initialTheme === 'dark') {
+    contextBridge.exposeInMainWorld('__ASTRION_INITIAL_THEME__', initialTheme);
+    try {
+      if (document.documentElement) document.documentElement.setAttribute('data-theme', initialTheme);
+    } catch {
+      // 文档尚未就绪时由页面内联脚本处理。
+    }
+  }
+}
 
 // 壳层桥（设计 docs/desktop_multi_view.md §4.2）。身份由主进程按 sender 判定，页面不得自报。
 {

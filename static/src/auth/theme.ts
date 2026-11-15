@@ -8,7 +8,10 @@ export const isThemeKey = (value: unknown): value is ThemeKey =>
 export const loadTheme = (): ThemeKey => {
   if (typeof window === 'undefined') return 'classic';
   const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return isThemeKey(saved) ? saved : 'classic';
+  if (isThemeKey(saved)) return saved;
+  // 桌面壳：端口变化后新 origin 的 localStorage 是空的，用壳层记住的上次主题兜底。
+  const shellTheme = (window as unknown as Record<string, unknown>).__ASTRION_INITIAL_THEME__;
+  return isThemeKey(shellTheme) ? shellTheme : 'classic';
 };
 
 export const applyTheme = (theme: ThemeKey) => {

@@ -6,6 +6,25 @@ contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);
 contextBridge.exposeInMainWorld('__ASTRION_CHROME__', true);
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
 
+// 首帧主题：后端端口可能变，新 origin 的 localStorage 是空的，
+// 从壳层记忆同步取一次，让 chrome.html 的内联脚本在样式生效前就能画对颜色。
+{
+  let initialTheme = '';
+  try {
+    initialTheme = ipcRenderer.sendSync('shell:theme-get') || '';
+  } catch {
+    initialTheme = '';
+  }
+  if (initialTheme === 'classic' || initialTheme === 'light' || initialTheme === 'dark') {
+    contextBridge.exposeInMainWorld('__ASTRION_INITIAL_THEME__', initialTheme);
+    try {
+      if (document.documentElement) document.documentElement.setAttribute('data-theme', initialTheme);
+    } catch {
+      // 文档尚未就绪时由页面内联脚本处理。
+    }
+  }
+}
+
 const subscribe = (channel, callback) => {
   const listener = (_event, payload) => callback(payload);
   ipcRenderer.on(channel, listener);

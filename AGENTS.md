@@ -587,6 +587,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **工作区导航（2026-10-12）**：目标工作区与对话随快照一次提交，选择写入串行；同源 API 派发时捕获明确工作区，普通查询不选择工作区。首次路由先获取真实身份，**未知作用域不得猜为 default**。目录刷新不改写已提交的可见身份；草稿恢复失败反馈后继续页面初始化。具体约束见 `docs/agents_details/display_snapshot.md`。
 - **输入草稿与运行引导（2026-10-23）**：删除提前输入排队 UI、自动续发与公开队列接口；主任务运行中发送直接引导，失败保留输入。引导附件复用普通发送的 media_paths/file_paths 隐藏通知，主输入栏标记 media_paths_only，实时注入和历史重建均只传路径。草稿按认证用户／工作区／对话独立，空页每工作区一份；localStorage 同步保存，服务器后台重试，以 revision CAS 与 client/sequence 防旧写覆盖；不用无 CSRF beacon，导航不等待远端保存。未消费内容恢复草稿并去重，落盘后才确认来源。完整约束见 `docs/agents_details/display_snapshot.md`，回归 `test/2026-10-23_对话草稿与运行引导/`。
 - **查询／运行分层**：`context/workspace.py` 解析可信路径，`data.py` 提供轻量存储，`resources.py` 装配执行实例；bootstrap、列表、草稿、Token、模式及导航辅助查询不得为读取而创建 WebTerminal／容器或复制技能。必要后台恢复异步按完整身份合并；技能成功版本属于工作区，草稿按作用域排序并保留旧请求水位。
+- **启动期会话预热与端口复用（2026-11-15）**：壳层必须在 `waitBackendReady` 之后、**任何视图创建之前**用 `session.defaultSession.fetch` 完成一次免密 `host-login`（`session-priming.js`；已登录则跳过），否则 chrome 标签条首个 `/api/conversation-tabs` 拿到 401，界面显示「同步失败，重试」且没有标签。后端端口复用上次值（`userData/backend-port.json`，被占才随机），因为 `SESSION_COOKIE_NAME = agents_session_<port>` 与 localStorage 都按 origin 隔离。首帧主题经 `shell:theme-get` 注入 `window.__ASTRION_INITIAL_THEME__`，HTML 内联脚本优先读它、其次 localStorage。完整说明见 `docs/desktop_navigation.md`。
 - 回归：`python -B test/2026-10-07_运行对话快照/run_regressions.py` 与 `test/2026-10-12_工作区切换重构/README.md` 中的命令（需已安装依赖与 Node）。视觉由用户验收；**不将离线回归等同于实际速度达标或所有卡顿消失**。
 
 ## 20) Linux host 沙箱（2026-10-08 首批适配）

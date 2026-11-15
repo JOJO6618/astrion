@@ -40,7 +40,8 @@ export async function startDesktopView(host) {
     } catch (error) {
       if (control.disposed) return;
       // 标签尚未出现在后端快照或网络瞬断：静默重试，只提示一次。
-      if (!control.shown) errorToast(host, error);
+      // 401 = 会话尚未建立（桌面免密登录还在进行），属于启动过程，不提示。
+      if (!control.shown && error?.status !== 401) errorToast(host, error);
       control.shown = true;
       control.retryTimer = window.setTimeout(attach, 2000);
     }
