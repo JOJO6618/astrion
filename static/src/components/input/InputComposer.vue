@@ -670,7 +670,7 @@
       <div
         ref="quotaSwitcherEl"
         class="context-usage-switcher"
-        :class="{ 'context-usage-switcher--quota-open': quotaCardOpen && chatgptQuotaVisible }"
+        :class="{ 'context-usage-switcher--quota-open': quotaCardOpen && quotaVisible }"
         @click.stop
         @pointerenter="handleQuotaPointerEnter"
         @pointerleave="handleQuotaPointerLeave"
@@ -682,9 +682,9 @@
           type="button"
           class="context-usage-switcher__btn"
           :disabled="!isConnected"
-          :aria-haspopup="chatgptQuotaVisible ? 'dialog' : undefined"
-          :aria-expanded="chatgptQuotaVisible ? quotaCardOpen : undefined"
-          :aria-label="chatgptQuotaVisible ? $t('sidebar.chatgptQuota') : undefined"
+          :aria-haspopup="quotaVisible ? 'dialog' : undefined"
+          :aria-expanded="quotaVisible ? quotaCardOpen : undefined"
+          :aria-label="quotaVisible ? quotaTitle : undefined"
           @click="handleQuotaTriggerClick"
         >
           <span
@@ -699,16 +699,16 @@
           </span>
         </button>
         <div
-          v-if="chatgptQuotaVisible && quotaCardOpen"
+          v-if="quotaVisible && quotaCardOpen"
           class="context-usage-switcher__quota-popover"
           :class="{ 'context-usage-switcher__quota-popover--pinned': quotaCardPinned }"
         >
-          <ChatgptQuotaCard
-            :account-hash="quotaAccountHash"
+          <SubscriptionQuotaCard
+            :title="quotaTitle"
+            :account-label="quotaAccountLabel"
             :windows="quotaWindows"
             :loading="quotaLoading"
             :error="quotaError"
-            :applicable="quotaApplicable"
             :context-percent-label="contextUsagePercentLabel"
             :context-text="contextUsageCompactText"
             :show-bars="quotaCardPinned"
@@ -717,7 +717,7 @@
           />
         </div>
         <button
-          v-if="!chatgptQuotaVisible"
+          v-if="!quotaVisible"
           type="button"
           class="context-usage-switcher__tooltip"
           :class="{ 'context-usage-switcher__tooltip--editable': compressLimitEditable }"
@@ -771,8 +771,8 @@ import FileAtMenu, { type FileAtItem } from '@/components/input/FileAtMenu.vue';
 import FileChips from '@/components/chat/FileChips.vue';
 import RollingNumber from '@/components/input/RollingNumber.vue';
 import StatusAvatar from '@/components/avatar/StatusAvatar.vue';
-import ChatgptQuotaCard from '@/components/token/ChatgptQuotaCard.vue';
-import { useChatgptQuota } from '@/components/token/useChatgptQuota';
+import SubscriptionQuotaCard from '@/components/token/SubscriptionQuotaCard.vue';
+import { useSubscriptionQuota } from '@/components/token/useSubscriptionQuota';
 import type { ModelOption } from '@/stores/model';
 import { useInputStore } from '@/stores/input';
 import { usePersonalizationStore } from '@/stores/personalization';
@@ -3434,14 +3434,14 @@ const contextUsageCompactText = computed(() => {
 });
 
 /**
- * Token 圆环的 ChatGPT 订阅额度卡。
+ * Token 圆环的订阅额度卡（OpenCode Go / ChatGPT，来源由设置决定）。
  *
  * - 模型只从 props.modelOptions 里按 currentModelKey 精确查找，不用 store 的
  *   currentModel fallback：模型列表未加载完时不能误落到第一个模型上。
- * - 额度归属由共享 useChatgptQuota 按当前模型 OAuth provider / 第一个已登录
- *   订阅账号定位；这里不再限制当前模型必须是 ChatGPT，所有模型都可展开额度卡。
- * - applicable 仅表示「当前用户（管理员）有资格查询」：非管理员仍回落到原
- *   Token 上下文悬浮卡；无账号时 composable 返回空 windows。
+ * - 来源与账号归属由 useSubscriptionQuota 统一决定：自动模式跟随当前模型所属
+ *   提供商，固定选择时始终显示该家额度（不可用时卡片内直接写不可用）。
+ * - visible 为 false（开关关闭、或自动模式判定不出供应商）时回落到原来的
+ *   Token 上下文悬浮卡。
  * - active 只在卡片真正展开（hover / 键盘焦点 / 手机点击）时为 true，
  *   收起后 composable 立即停掉轮询。
  * - 手机没有 hover，用点击开关 + 外部点击关闭补齐；桌面保留圆环原有的
@@ -3460,19 +3460,16 @@ const currentComposerModel = computed<ModelOption | null>(() => {
 });
 
 const {
-  accountHash: quotaAccountHash,
+  visible: quotaVisible,
+  title: quotaTitle,
+  accountLabel: quotaAccountLabel,
   windows: quotaWindows,
   loading: quotaLoading,
-  error: quotaError,
-  applicable: quotaApplicable
-} = useChatgptQuota(
+  error: quotaError
+} = useSubscriptionQuota(
   () => currentComposerModel.value,
   () => quotaCardOpen.value
 );
-
-// applicable 只表示「管理员可查询订阅额度」，与当前模型无关：所有模型都可展开
-// 额度卡；非管理员 applicable=false，回落到原来的 Token 上下文悬浮卡。
-const chatgptQuotaVisible = computed(() => quotaApplicable.value);
 
 function isCoarsePointer() {
   return (
@@ -3490,7 +3487,7 @@ function clearQuotaHideTimer() {
 }
 
 function openQuotaCard(pin = false) {
-  if (!chatgptQuotaVisible.value) return;
+  if (!quotaVisible.value) return;
   clearQuotaHideTimer();
   quotaCardOpen.value = true;
   if (pin) quotaCardPinned.value = true;
@@ -3503,7 +3500,7 @@ function closeQuotaCard() {
 }
 
 function scheduleQuotaCardClose() {
-  if (!chatgptQuotaVisible.value || quotaCardPinned.value) return;
+  if (!quotaVisible.value || quotaCardPinned.value) return;
   // 键盘焦点仍在圆环上时不要因为鼠标移开就收走卡片。
   const focused = document.activeElement;
   if (focused && quotaSwitcherEl.value?.contains(focused)) return;
@@ -3534,7 +3531,7 @@ function handleQuotaFocusOut(event: FocusEvent) {
 }
 
 function handleQuotaTriggerClick() {
-  if (chatgptQuotaVisible.value && isCoarsePointer()) {
+  if (quotaVisible.value && isCoarsePointer()) {
     if (quotaCardOpen.value && quotaCardPinned.value) {
       closeQuotaCard();
     } else {
@@ -3562,7 +3559,7 @@ watch(quotaCardOpen, (open) => {
   }
 });
 
-watch(chatgptQuotaVisible, (visible) => {
+watch(quotaVisible, (visible) => {
   if (!visible) closeQuotaCard();
 });
 

@@ -201,6 +201,10 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "theme": "classic",  # 主题配色: classic-经典/light-明亮/dark-暗黑
     "ui_locale": "zh-CN",  # 界面语言: zh-CN / en-US（同时驱动后端用户可见消息语言）
     "display_currency": "USD",
+    # 订阅额度显示（输入栏 Token 圆环卡片与用量抽屉）：
+    # enabled=False 或所选来源不可用时回退旧的 Token 上下文提示。
+    "subscription_quota_enabled": True,
+    "subscription_quota_source": "auto",  # auto-跟随当前模型 / opencode-OpenCode Go / chatgpt-ChatGPT
     # 目标模式（Goal Mode）
     "goal_review_mode": "readonly",  # readonly-仅读对话判断 / active-允许审核智能体跑只读命令取证
     "goal_end_conditions": ["max_turns"],  # 结束方式，可多选：max_turns / max_tokens
@@ -901,6 +905,15 @@ def sanitize_personalization_payload(
 
     currency = data.get('display_currency', base.get('display_currency', 'USD'))
     base['display_currency'] = currency if currency in ('USD', 'CNY') else 'USD'
+
+    # 订阅额度显示：开关为布尔，来源限定三个枚举值；非法值回落 auto。
+    base["subscription_quota_enabled"] = bool(
+        data.get("subscription_quota_enabled", base.get("subscription_quota_enabled", True))
+    )
+    quota_source = data.get("subscription_quota_source", base.get("subscription_quota_source", "auto"))
+    base["subscription_quota_source"] = (
+        quota_source if quota_source in ("auto", "opencode", "chatgpt") else "auto"
+    )
 
     # 目标模式：审核模式
     goal_review_mode = data.get("goal_review_mode", base.get("goal_review_mode"))

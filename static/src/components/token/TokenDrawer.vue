@@ -129,8 +129,15 @@
               </div>
             </div>
           </template>
-          <!-- 宿主机模式：ChatGPT 订阅额度（跟随当前模型所属 OAuth 账号） -->
-          <ChatgptQuotaPanel v-else :active="visible && !collapsed" />
+          <!-- 宿主机模式：订阅额度（OpenCode Go / ChatGPT，来源由设置决定） -->
+          <SubscriptionQuotaPanel
+            v-else-if="quotaVisible"
+            :title="quotaTitle"
+            :account-label="quotaAccountLabel"
+            :windows="quotaWindows"
+            :loading="quotaLoading"
+            :error="quotaError"
+          />
         </div>
       </div>
     </div>
@@ -143,9 +150,11 @@ defineOptions({ name: 'TokenDrawer' });
 import { computed } from 'vue';
 import { t, currentLocale } from '@/locales';
 import { useSettingsStore } from '@/stores/settings';
+import { useModelStore } from '@/stores/model';
 import CloseButton from '@/components/common/CloseButton.vue';
 import CostSummary from './CostSummary.vue';
-import ChatgptQuotaPanel from './ChatgptQuotaPanel.vue';
+import SubscriptionQuotaPanel from './SubscriptionQuotaPanel.vue';
+import { useSubscriptionQuota } from './useSubscriptionQuota';
 import type { ConversationCosts } from './costTypes';
 
 const emit = defineEmits<{
@@ -191,6 +200,22 @@ const quotaTiers = computed(() => [
 // docker 模式保持原有四格布局不变。
 const settingsStore = useSettingsStore();
 const isHostMode = computed(() => settingsStore.isHostMode);
+
+// 订阅额度：来源与轮询由 useSubscriptionQuota 统一决定（宿主机模式才渲染该块）
+const modelStore = useModelStore();
+const resolveCurrentModel = () => {
+  const key = modelStore.currentModelKey;
+  if (!key) return null;
+  return modelStore.allModels.find((model) => model.key === key) || null;
+};
+const {
+  visible: quotaVisible,
+  title: quotaTitle,
+  accountLabel: quotaAccountLabel,
+  windows: quotaWindows,
+  loading: quotaLoading,
+  error: quotaError
+} = useSubscriptionQuota(resolveCurrentModel, () => props.visible && !props.collapsed);
 
 // 缓存命中率 = 累积缓存命中输入 / (累计总输入 - 冷启动豁免输入)；
 // 豁免值由后端累计：首轮及压缩后首轮若未命中缓存，其输入属于建立缓存的成本，不计入分母

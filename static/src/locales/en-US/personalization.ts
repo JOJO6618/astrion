@@ -550,6 +550,15 @@ export default {
   modelTitle: 'Model',
   roleModelEmptyDesc: 'Leave empty for automatic selection',
   defaultModelOption: 'Auto',
+  subscriptionQuotaTitle: 'Show subscription quota',
+  subscriptionQuotaDesc:
+    'Show subscription quota in the token ring hover card and the usage drawer; turning it off restores the context usage hint.',
+  subscriptionQuotaSourceTitle: 'Quota source',
+  subscriptionQuotaSourceDesc:
+    'Auto follows the provider of the current model; a fixed choice always shows only that provider and marks it unavailable when it cannot be queried.',
+  subscriptionQuotaAuto: 'Auto',
+  subscriptionQuotaOpencode: 'OpenCode Go',
+  subscriptionQuotaChatgpt: 'ChatGPT',
   roleDefaultModelDesc:
     'First available model in the registry; prefers a -luna fast model when only Codex models exist',
   textOnly: 'Text only',

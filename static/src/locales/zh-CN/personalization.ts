@@ -513,6 +513,15 @@ export default {
   modelTitle: '模型',
   roleModelEmptyDesc: '留空则自动选择模型',
   defaultModelOption: '自动',
+  subscriptionQuotaTitle: '显示订阅额度',
+  subscriptionQuotaDesc:
+    '在 Token 圆环悬停卡片与用量抽屉中显示订阅额度；关闭后恢复上下文用量提示。',
+  subscriptionQuotaSourceTitle: '额度来源',
+  subscriptionQuotaSourceDesc:
+    '自动模式跟随当前模型所属提供商；固定选择时始终只显示该家额度，不可用时卡片内直接标注。',
+  subscriptionQuotaAuto: '自动',
+  subscriptionQuotaOpencode: 'OpenCode Go',
+  subscriptionQuotaChatgpt: 'ChatGPT',
   roleDefaultModelDesc: '注册表第一个可用模型；仅 Codex 模型时选 -luna 快速款',
   textOnly: '纯文本',
   promptBodyTitle: 'Prompt Body（Markdown）',

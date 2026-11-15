@@ -181,6 +181,10 @@ interface PersonalForm {
   theme: 'classic' | 'light' | 'dark';
   ui_locale: 'zh-CN' | 'en-US';
   display_currency: 'USD' | 'CNY';
+  /** 输入栏 Token 圆环与用量抽屉是否显示订阅额度 */
+  subscription_quota_enabled: boolean;
+  /** auto-跟随当前模型 / opencode-OpenCode Go / chatgpt-ChatGPT */
+  subscription_quota_source: 'auto' | 'opencode' | 'chatgpt';
   goal_review_mode: 'readonly' | 'active';
   goal_end_conditions: string[];
   goal_max_turns: number;
@@ -422,6 +426,8 @@ const defaultForm = (): PersonalForm => ({
   theme: loadCachedTheme(),
   ui_locale: 'zh-CN' as 'zh-CN' | 'en-US',
   display_currency: 'USD' as 'USD' | 'CNY',
+  subscription_quota_enabled: true,
+  subscription_quota_source: 'auto' as 'auto' | 'opencode' | 'chatgpt',
   goal_review_mode: 'readonly',
   goal_end_conditions: ['max_turns'],
   goal_max_turns: 5,
@@ -776,6 +782,10 @@ export const usePersonalizationStore = defineStore('personalization', {
           ? data.ui_locale
           : this.form?.ui_locale || 'zh-CN',
         display_currency: data.display_currency === 'CNY' ? 'CNY' : 'USD',
+        subscription_quota_enabled: data.subscription_quota_enabled !== false,
+        subscription_quota_source: ['opencode', 'chatgpt'].includes(data.subscription_quota_source)
+          ? data.subscription_quota_source
+          : 'auto',
         goal_review_mode: data.goal_review_mode === 'active' ? 'active' : 'readonly',
         goal_end_conditions: Array.isArray(data.goal_end_conditions)
           ? data.goal_end_conditions.filter((x: any) => x === 'max_turns' || x === 'max_tokens')

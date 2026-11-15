@@ -50,6 +50,7 @@ from server.conversation_tabs import conversation_tabs_bp
 from server.conversation_transfer import conversation_transfer_bp
 from server.gateway_api import gateway_bp
 from server.codex_auth import codex_auth_bp
+from server.opencode_quota import opencode_quota_bp
 from server.providers import providers_bp
 from server.project_git import project_git_bp
 from server.security import attach_security_hooks
@@ -324,6 +325,7 @@ app.register_blueprint(conversation_tabs_bp)
 app.register_blueprint(conversation_transfer_bp)
 app.register_blueprint(gateway_bp)
 app.register_blueprint(codex_auth_bp)
+app.register_blueprint(opencode_quota_bp)
 app.register_blueprint(providers_bp)
 app.register_blueprint(project_git_bp)
 

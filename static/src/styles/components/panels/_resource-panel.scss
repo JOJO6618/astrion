@@ -172,11 +172,11 @@ body[data-theme='dark'] {
     color: var(--text-secondary);
 }
 
-/* 按钮本体样式在 common/CloseButton.vue（boxed 变体），此处仅保留抽屉左上角定位 */
+/* 按钮本体样式在 common/CloseButton.vue（boxed 变体），此处仅保留抽屉右上角定位 */
 .token-close-btn {
     position: absolute;
     top: 12px;
-    left: 12px;
+    right: 12px;
 }
 
 .sr-only {

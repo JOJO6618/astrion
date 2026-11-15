@@ -59,6 +59,13 @@ const defaultExtraOptions = computed(() => [
   { key: '', label: t('personalization.defaultModelOption') }
 ]);
 
+// 订阅额度来源：自动跟随当前模型所属提供商；也可固定只显示某一家的额度。
+const quotaSourceOptions = [
+  { id: 'auto', labelKey: 'personalization.subscriptionQuotaAuto' },
+  { id: 'opencode', labelKey: 'personalization.subscriptionQuotaOpencode' },
+  { id: 'chatgpt', labelKey: 'personalization.subscriptionQuotaChatgpt' }
+] as const;
+
 function updateThinkingSummaryInterval(event: Event) {
   const input = event.target as HTMLInputElement;
   const parsed = input.value.trim() ? Number(input.value) : NaN;
@@ -212,6 +219,49 @@ onMounted(() => {
   <section class="settings-page">
     <HostPasswordSettings />
     <CrossPetSettings />
+    <label class="settings-toggle-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.subscriptionQuotaTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.subscriptionQuotaDesc') }}</span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="form.subscription_quota_enabled"
+        @change="
+          personalization.updateField({
+            key: 'subscription_quota_enabled',
+            value: ($event.target as HTMLInputElement).checked
+          })
+        "
+      />
+      <FancyCheck :checked="form.subscription_quota_enabled" />
+    </label>
+
+    <div v-if="form.subscription_quota_enabled" class="settings-select-row">
+      <span class="settings-row-copy">
+        <span class="settings-row-title">{{ $t('personalization.subscriptionQuotaSourceTitle') }}</span>
+        <span class="settings-row-desc">{{ $t('personalization.subscriptionQuotaSourceDesc') }}</span>
+      </span>
+      <div
+        class="subscription-quota-choices"
+        role="radiogroup"
+        :aria-label="$t('personalization.subscriptionQuotaSourceTitle')"
+      >
+        <button
+          v-for="option in quotaSourceOptions"
+          :key="option.id"
+          type="button"
+          role="radio"
+          class="subscription-quota-choice"
+          :class="{ selected: form.subscription_quota_source === option.id }"
+          :aria-checked="form.subscription_quota_source === option.id"
+          @click="personalization.updateField({ key: 'subscription_quota_source', value: option.id })"
+        >
+          {{ $t(option.labelKey) }}
+        </button>
+      </div>
+    </div>
+
     <label class="settings-toggle-row">
       <span class="settings-row-copy">
         <span class="settings-row-title">{{ $t('personalization.autoTitleTitle') }}</span>
@@ -790,5 +840,40 @@ onMounted(() => {
   .run-data-dialog {
     padding: 18px;
   }
+}
+
+/* 订阅额度来源三选一：固定高度的分段按钮，避免文字撑高 */
+.subscription-quota-choices {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-default);
+  border-radius: 9px;
+  background: var(--surface-base);
+}
+
+.subscription-quota-choice {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 28px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.subscription-quota-choice.selected {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.subscription-quota-choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 </style>
