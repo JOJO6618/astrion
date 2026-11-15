@@ -159,7 +159,7 @@ async function onSaved(wf: WorkflowDef) {
 function exitDemo() {
   const tabs = useConversationTabsStore();
   if (tabs.enabled) {
-    void tabs.resume().catch((error) => showError(error, t('workflow.loadFailed')));
+    void tabs.leavePage().catch((error) => showError(error, t('workflow.loadFailed')));
     return;
   }
   window.location.assign('/new');

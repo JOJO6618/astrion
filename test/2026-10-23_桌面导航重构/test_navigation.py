@@ -33,17 +33,15 @@ class NavigationTests(unittest.TestCase):
     def create(self, key="tab_A", workspace="ws1"):
         return self.command("create", {"key": key, "workspace_id": workspace})["state"]
 
-    def attach(self, state, renderer="renderer-A", **extra):
-        return self.command("attach", {"renderer_id": renderer, "workspace_id": "ws1",
-                            "seen_navigation_id": (state.get("navigation") or {}).get("id", ""),
-                            **extra})["state"]
+    def attach(self, key="tab_A", renderer="renderer-A"):
+        return self.command("attach", {"key": key, "renderer_id": renderer})["state"]
 
-    def commit(self, state, renderer="renderer-A"):
-        return self.command("commit", {"renderer_id": renderer,
-                            "navigation_id": state["navigation"]["id"]})["state"]
+    # v3：删除 commit/resume/navigation 相关的 v2 用例（pending 目标、旧 renderer 提交、
+    # attach 自动判定页面/模式、刷新继承 pending 等）；其覆盖点由
+    # test/2026-11-14_桌面多视图/test_navigation_v3.py 的 v3 语义替代。
 
     def test_identity_survives_binding_and_close(self):
-        state = self.commit(self.attach(self.create()))
+        (self.create(), self.attach())
         result = self.command("bind", {"key": "tab_A", "workspace_id": "ws1",
                               "renderer_id": "renderer-A", "conversation_id": "abc"})
         self.assertTrue(result["result"]["bound"])
@@ -54,7 +52,7 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(closed["tabs"][0]["kind"], "new")
 
     def test_late_bind_cannot_recreate_closed_tab(self):
-        self.attach(self.create())
+        (self.create(), self.attach())
         self.command("close", {"key": "tab_A"})
         result = self.command("bind", {"key": "tab_A", "workspace_id": "ws1",
                               "renderer_id": "renderer-A", "conversation_id": "abc"})
@@ -82,33 +80,14 @@ class NavigationTests(unittest.TestCase):
         with self.assertRaises(NavigationConflict):
             self.create()
 
-    def test_latest_navigation_wins(self):
-        first = self.attach(self.create())
-        second = self.create("tab_B")
+    def test_stale_renderer_cannot_bind_or_fail(self):
+        (self.create(), self.attach())
+        self.attach(renderer="renderer-B")
         with self.assertRaises(NavigationConflict):
-            self.commit(first)
-        self.assertEqual(self.commit(second)["active_key"], "tab_B")
-
-    def test_close_pending_target_revokes_commit(self):
-        self.commit(self.attach(self.create()))
-        pending = self.create("tab_B")
-        closed = self.command("close", {"key": "tab_B"})["state"]
-        self.assertEqual(closed["navigation"]["key"], "tab_A")
+            self.command("bind", {"key": "tab_A", "workspace_id": "ws1",
+                                  "renderer_id": "renderer-A", "conversation_id": "abc"})
         with self.assertRaises(NavigationConflict):
-            self.commit(pending)
-
-    def test_reload_rejects_previous_renderer(self):
-        first = self.attach(self.create())
-        second = self.attach(first, renderer="renderer-B")
-        with self.assertRaises(NavigationConflict):
-            self.commit(first)
-        self.assertEqual(self.commit(second, "renderer-B")["active_key"], "tab_A")
-
-    def test_reload_retains_unconsumed_target(self):
-        state = self.create()
-        resumed = DesktopNavigation(str(self.path)).snapshot("user", self.lookup)
-        self.assertEqual(resumed["navigation"], state["navigation"])
-        self.assertEqual(resumed["tabs"], state["tabs"])
+            self.command("fail", {"key": "tab_A", "renderer_id": "renderer-A", "error": "x"})
 
     def test_opening_history_does_not_consume_blank_tab(self):
         self.create()
@@ -129,49 +108,7 @@ class NavigationTests(unittest.TestCase):
         key = state["tabs"][1]["key"]
         state = self.manager.deleted("user", "ws1", "conv_abc")
         self.assertEqual([tab["key"] for tab in state["tabs"]], [key])
-
-    def test_deletion_revokes_pending_target(self):
-        self.create()
-        pending = self.command("open", {"workspace_id": "ws1", "conversation_id": "abc"})["state"]
-        self.attach(pending)
-        self.manager.deleted("user", "ws1", "abc")
-        with self.assertRaises(NavigationConflict):
-            self.commit(pending)
-
-    def test_error_preserves_previous_active_and_is_closeable(self):
-        initial = self.commit(self.attach(self.create()))
-        target = self.create("tab_B")
-        failed = self.command("fail", {"renderer_id": "renderer-A",
-            "navigation_id": target["navigation"]["id"], "error": "network error"})["state"]
-        self.assertEqual(failed["active_key"], initial["active_key"])
-        self.assertEqual(failed["tabs"][1]["error"], "network error")
-        closed = self.command("close", {"key": "tab_B"})["state"]
-        self.assertEqual(closed["navigation"]["key"], "tab_A")
-
-    def test_page_roundtrip_and_resume(self):
-        self.commit(self.attach(self.create()))
-        state = self.command("page", {"page": "/settings/models"})["state"]
-        self.assertEqual(state["active_key"], "")
-        self.assertEqual(state["resume_key"], "tab_A")
-        self.assertEqual(self.command("resume", {"workspace_id": "ws1"})["state"]["navigation"]["key"], "tab_A")
-
-    def test_queued_click_during_bootstrap_beats_explicit_url(self):
-        initial = self.create()
-        target = self.create("tab_B")
-        attached = self.attach(initial, conversation_id="previous-url")
-        self.assertEqual(attached["navigation"]["key"], target["navigation"]["key"])
-        self.assertFalse(any(tab["conversation_id"] == "conv_previous-url" for tab in attached["tabs"]))
-
-    def test_migrate_legacy_order_and_selected_key(self):
-        self.path.write_text(json.dumps({"user": {"tabs": [
-            {"kind": "new", "key": "new:1", "workspace_id": "ws1"},
-            {"kind": "conv", "key": "conv:abc", "workspace_id": "ws1", "conversation_id": "abc"},
-            {"kind": "conv", "key": "dup", "workspace_id": "ws1", "conversation_id": "conv_abc"},
-        ], "active_key": "dup"}}))
-        state = self.manager.snapshot("user", self.lookup)
-        self.assertEqual([tab["kind"] for tab in state["tabs"]], ["new", "conv"])
-        self.assertEqual(state["active_key"], state["tabs"][1]["key"])
-        self.assertTrue(all(tab["key"].startswith("tab_") for tab in state["tabs"]))
+        self.assertEqual(state["active_key"], key)
 
     def test_restore_removes_confirmed_missing_but_preserves_unavailable(self):
         self.command("open", {"workspace_id": "ws1", "conversation_id": "abc"})
@@ -198,43 +135,26 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(len(state["tabs"]), 24)
         self.assertEqual(len({tab["key"] for tab in state["tabs"]}), 24)
 
-    def test_refresh_preserves_pending_target_over_old_address(self):
-        initial = self.commit(self.attach(self.create()))
-        target = self.create("tab_B")
-        refreshed = self.attach(target, renderer="renderer-B", conversation_id="old-address")
-        self.assertEqual(refreshed["navigation"]["key"], "tab_B")
-        self.assertFalse(any(tab["conversation_id"] == "conv_old-address"
-                             for tab in refreshed["tabs"]))
-        self.assertEqual(self.commit(refreshed, "renderer-B")["active_key"], "tab_B")
-
-    def test_failed_navigation_cannot_commit_without_retry(self):
-        state = self.attach(self.create())
-        failed = self.command("fail", {"renderer_id": "renderer-A",
-            "navigation_id": state["navigation"]["id"], "error": "network"})["state"]
-        with self.assertRaises(NavigationConflict):
-            self.commit(failed)
-        retried = self.command("activate", {"key": "tab_A"})["state"]
-        self.assertEqual(self.commit(retried)["active_key"], "tab_A")
-
     def test_load_failure_removes_confirmed_deleted_target(self):
-        self.commit(self.attach(self.create()))
+        (self.create(), self.attach())
         target = self.command("open", {"workspace_id": "ws1", "conversation_id": "abc"})["state"]
+        key = target["active_key"]
+        self.command("attach", {"key": key, "renderer_id": "renderer-B"})
         self.missing.add(("ws1", "conv_abc"))
-        failed = self.command("fail", {"renderer_id": "renderer-A",
-            "navigation_id": target["navigation"]["id"], "error": "not found"})
+        failed = self.command("fail", {"key": key, "renderer_id": "renderer-B", "error": "not found"})
         self.assertTrue(failed["result"]["removed"])
-        self.assertEqual(failed["state"]["navigation"]["key"], "tab_A")
+        self.assertEqual(failed["state"]["active_key"], "tab_A")
         self.assertEqual(len(failed["state"]["tabs"]), 1)
 
-    def test_last_tab_close_creates_committable_successor(self):
-        self.commit(self.attach(self.create()))
+    def test_last_tab_close_creates_active_successor(self):
+        (self.create(), self.attach())
         state = self.command("close", {"key": "tab_A"})["state"]
         successor = state["tabs"][0]["key"]
         self.assertNotEqual(successor, "tab_A")
-        self.assertEqual(self.commit(state)["active_key"], successor)
+        self.assertEqual(state["active_key"], successor)
 
     def test_invalid_schema_never_overwrites_storage(self):
-        for state in ({}, {"tabs": {}}, {"version": 2, "tabs": [], "revision": 0},
+        for state in ({}, {"tabs": {}}, {"version": 3, "tabs": [], "revision": 0},
                       {"version": 99, "tabs": []}):
             self.path.write_text(json.dumps({"user": state}))
             before = self.path.read_text()
@@ -246,86 +166,10 @@ class NavigationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.command("page", {"page": "https://example.invalid"})
 
-    def test_mode_switch_back_is_not_pulled_to_previous_mode(self):
-        """agent 空页 -> chat 空页 -> 回到 agent 文档：不能被旧导航目标拉回 chat。"""
-        agent = self.commit(self.attach(self.create()))
-        agent_key = agent["tabs"][0]["key"]
-        chat = self.commit(self.attach(
-            agent, renderer="renderer-B", workspace_id="",
-            conversation_kind="chat", conversation_id=""), "renderer-B")
-        self.assertEqual(chat["active_key"], chat["tabs"][-1]["key"])
-        self.assertEqual(chat["tabs"][-1]["conversation_kind"], "chat")
-        back = self.attach(chat, renderer="renderer-C", conversation_kind="agent",
-                           conversation_id="")
-        self.assertEqual(back["navigation"]["status"], "committed")
-        self.assertEqual(back["navigation"]["key"], agent_key)
-        self.assertEqual(back["active_key"], agent_key)
-
-    def test_mode_switch_back_reuses_one_blank_tab_per_mode(self):
-        agent = self.commit(self.attach(self.create()))
-        chat = self.commit(self.attach(
-            agent, renderer="renderer-B", workspace_id="", conversation_kind="chat",
-            conversation_id=""), "renderer-B")
-        back = self.commit(self.attach(
-            chat, renderer="renderer-C", conversation_kind="agent", conversation_id=""),
-            "renderer-C")
-        again = self.commit(self.attach(
-            back, renderer="renderer-D", workspace_id="", conversation_kind="chat",
-            conversation_id=""), "renderer-D")
-        self.assertEqual(len(again["tabs"]), 2)
-        self.assertEqual(sorted(tab["conversation_kind"] for tab in again["tabs"]),
-                         ["agent", "chat"])
-
-    def test_returning_from_page_is_not_pulled_back(self):
-        state = self.commit(self.attach(self.create()))
-        # 设置页已 attach 并提交（真实返回前的状态）
-        state = self.command("attach", {
-            "renderer_id": "renderer-S", "page": "/settings",
-            "seen_navigation_id": state["navigation"]["id"],
-        })["state"]
-        self.assertEqual(state["navigation"]["page"], "/settings")
-        self.assertEqual(state["navigation"]["status"], "committed")
-        back = self.attach(state, renderer="renderer-B", conversation_kind="agent",
-                           conversation_id="")
-        self.assertEqual(back["navigation"]["page"], "")
-        self.assertEqual(back["navigation"]["key"], "tab_A")
-        self.assertEqual(back["active_key"], "tab_A")
-
-    def test_reload_keeps_current_blank_tab_when_another_blank_exists(self):
-        self.commit(self.attach(self.create("tab_A")))
-        second = self.create("tab_B")
-        reloaded = self.attach(second, renderer="renderer-B", conversation_kind="agent",
-                               conversation_id="")
-        self.assertEqual(reloaded["navigation"]["key"], "tab_B")
-
-    def test_chat_conversation_attach_does_not_steal_agent_tab(self):
-        agent = self.commit(self.attach(self.create()))
-        chat = self.attach(agent, renderer="renderer-B", workspace_id="",
-                           conversation_kind="chat", conversation_id="abc")
-        target = next(tab for tab in chat["tabs"] if tab["key"] == chat["navigation"]["key"])
-        self.assertEqual(target["conversation_kind"], "chat")
-        self.assertEqual(target["conversation_id"], "conv_abc")
-        self.assertEqual(agent["active_key"], agent["tabs"][0]["key"])
-
-    def test_attach_without_navigation_ignores_other_mode_tab(self):
-        """持久化状态里只有 chat 标签时，无导航态的 agent 文档不能落到 chat 标签。"""
-        self.path.write_text(json.dumps({"user": {
-            "version": 2, "revision": 3, "tabs": [{
-                "conversation_kind": "chat", "key": "tab_chat", "kind": "new",
-                "conversation_id": "", "workspace_id": "", "workspace_label": "",
-                "title": "", "error": "",
-            }],
-            "active_key": "tab_chat", "resume_key": "tab_chat", "workspace_id": "",
-            "renderer_id": "", "navigation": None, "receipts": [], "closed_keys": [],
-        }}))
-        state = self.command("attach", {
-            "renderer_id": "renderer-A", "workspace_id": "ws1",
-            "conversation_kind": "agent", "conversation_id": "",
-            "seen_navigation_id": "",
-        })["state"]
-        target = next(tab for tab in state["tabs"] if tab["key"] == state["navigation"]["key"])
-        self.assertEqual(target["conversation_kind"], "agent")
-        self.assertEqual(target["workspace_id"], "ws1")
+    def test_removed_v2_commands_are_unknown(self):
+        for action in ("commit", "resume"):
+            with self.assertRaises(ValueError):
+                self.command(action, {})
 
 
 if __name__ == "__main__":

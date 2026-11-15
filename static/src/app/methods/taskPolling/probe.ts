@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isViewVisible } from '../ui/viewVisibility';
 import { debugLog } from '../common';
 import { useTaskStore } from '../../../stores/task';
 import { currentConversationSession, ownsConversationSession } from '../conversation/session';
@@ -21,6 +22,7 @@ export const probeMethods = {
   startRunningStateReconcile() {
     if (this.runningStateReconcileTimer) return;
     this.runningStateReconcileTimer = setInterval(() => {
+      if (!isViewVisible()) return;
       void this.reconcileRunningStateOnce();
     }, 2500);
     void this.reconcileRunningStateOnce();

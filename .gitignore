@@ -34,6 +34,7 @@ opencode_key_fix_output/
 node_modules/
 static/dist/
 desktop-electron/.cache/
+desktop-electron/dist-test*/
 *.tsbuildinfo
 user_upload/
 skills/

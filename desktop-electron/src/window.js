@@ -1,10 +1,12 @@
-// 主窗口与双 WebContentsView 管理（对齐 Tauri 壳的双 webview 架构）。
+// 主窗口与多内容视图管理（对齐 Tauri 壳的双 webview 架构，扩展为每标签一个内容视图）。
 //
 // 布局：BaseWindow（无标题栏，红绿灯悬浮于 chrome 条上）
 //   ├─ chrome 视图：顶部固定 46px 独立对话标签条（加载 /chrome，常驻——
-//   │   主页面导航/刷新/进设置页都不会让它重载或闪动，这是独立视图结构的
+//   │   内容视图切换/刷新/进设置页都不会让它重载或闪动，这是独立视图结构的
 //   │   存在理由，用户明确要求保留）
-//   └─ main 视图：加载 http://127.0.0.1:<port>/（前后端同源，cookie/CSRF 零改动）
+//   └─ 内容视图 × N：每个标签一个 WebContentsView，加载 http://127.0.0.1:<port>/…?tab=<key>
+//       （前后端同源，cookie/CSRF 零改动）。显示/隐藏/LRU/预热由 views/manager.js 的
+//       ViewManager 按后端导航快照收敛（设计见 docs/desktop_multi_view.md）。
 //
 // 导航规则（移植自 Tauri on_navigation）：
 //   - 回环地址（127.0.0.1/localhost/[::1]，任意端口）一律放行——预览面板 iframe
@@ -13,7 +15,7 @@
 //   - window.open 一律拦截：http(s) 转系统浏览器（预览面板「外部打开」按钮由此
 //     在桌面端真正可用，Tauri 壳下是静默失败的）。
 
-import { app, BaseWindow, ipcMain, shell, WebContentsView } from 'electron';
+import { app, BaseWindow, ipcMain, screen, shell, WebContentsView } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,19 +24,20 @@ import { isUpdaterInstalling } from './updater-state.js';
 import { NativeBrowser } from './browser/index.js';
 import { setBrowserSurfaceColor } from './browser/geometry.js';
 import { desktopSupported, windowChromeOptions } from './platform.js';
+import { ViewManager } from './views/manager.js';
+import { createDetachedWindow, applyDetachedChromeTheme } from './views/detached-window.js';
+import { CHROME_STRIP_HEIGHT } from './views/layout.js';
+
+export { CHROME_STRIP_HEIGHT };
 
 let appQuitting = false;
 app.on('before-quit', () => { appQuitting = true; });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** 顶部 chrome 标签条高度（CSS px）。前端 _tab-strip.scss 的 46px 与主页面
- *  预留空间都对齐这个值；改动需三处同步。 */
-export const CHROME_STRIP_HEIGHT = 46;
-
 /** @type {BaseWindow | null} */
 let mainWindow = null;
-/** @type {WebContentsView | null} */
-let mainView = null;
+/** @type {ViewManager | null} */
+let views = null;
 /** @type {WebContentsView | null} */
 let chromeView = null;
 let nativeBrowser = null;
@@ -45,6 +48,7 @@ let backendPort = null;
 const DEFAULT_SURFACE = '#faf9f5';
 const SURFACE_PATTERN = /^#[a-f\d]{6}$/i;
 const surfaceFile = () => path.join(app.getPath('userData'), 'window-surface.json');
+const recencyFile = () => path.join(app.getPath('userData'), 'view-recency.json');
 let surfaceColor = DEFAULT_SURFACE;
 function loadSurfaceColor() {
   try {
@@ -53,26 +57,86 @@ function loadSurfaceColor() {
   } catch { /* First launch or unreadable file: use the classic theme color. */ }
   return DEFAULT_SURFACE;
 }
+function loadRecency() {
+  try {
+    const value = JSON.parse(fs.readFileSync(recencyFile(), 'utf8'));
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.fromEntries(Object.entries(value).filter(([, at]) => Number.isFinite(at)));
+    }
+  } catch { /* 首次启动或文件损坏：按标签栏顺序预热 */ }
+  return {};
+}
+function saveRecency(value) {
+  fs.promises.writeFile(recencyFile(), JSON.stringify(value), { mode: 0o600 }).catch(() => {});
+}
 function applySurfaceColor(color) {
   if (typeof color !== 'string' || !SURFACE_PATTERN.test(color)) return;
   color = color.toLowerCase();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.setBackgroundColor(color);
   chromeView?.setBackgroundColor(color);
-  // 内置浏览器管理主视图的透明叠层（网页显示时主视图必须透明），交给它统一设置。
+  // 内置浏览器管理内容视图的透明叠层（网页显示时宿主视图必须透明），交给它统一设置。
   // 先记录并落盘，再给各视图着色：视图异常不得让窗口底色缓存停在旧值。
   if (color !== surfaceColor) {
     surfaceColor = color;
     fs.promises.writeFile(surfaceFile(), JSON.stringify({ color }), { mode: 0o600 }).catch(() => {});
   }
+  // 隐藏的内容视图不参与浏览器叠层（BrowserStacking 跳过），直接着色；没有浏览器时全部着色。
+  for (const entry of views?.entries.values() || []) {
+    if (!nativeBrowser || !entry.shown) entry.view.setBackgroundColor(color);
+  }
+  // 独立对话窗口同步着色（Windows 原生三大键走标签栏/文字色）。
+  for (const window of views?.detachedWindows.values() || []) {
+    if (window.isDestroyed()) continue;
+    window.setBackgroundColor(color);
+    window.contentView.setBackgroundColor(color);
+    applyDetachedChromeTheme(window, nativeBrowser?.chromeColor || color, nativeBrowser?.textColor || '');
+  }
   if (nativeBrowser) { setBrowserSurfaceColor(nativeBrowser, color); nativeBrowser.layout(); }
-  else mainView?.setBackgroundColor(color);
 }
+
+/** IPC 来源必须是受管视图的顶层 frame（预览 iframe 等子 frame 不可信）。 */
+const fromMainFrame = (event) => event.senderFrame === event.sender.mainFrame;
+const fromContentView = (event) => !!views && fromMainFrame(event) && views.isManagedView(event.sender);
+const fromChrome = (event) => !!views && fromMainFrame(event) && views.isChrome(event.sender);
+
+// 只接受受管内容视图（应用自身页面）的上报；网页与 chrome 条都没有这个通道。
 ipcMain.on('window:surface', (event, color) => {
-  // 只接受主视图（应用自身页面）的上报；网页与 chrome 条都没有这个通道。
-  if (!mainView || event.sender !== mainView.webContents) return;
+  if (!fromContentView(event)) return;
   applySurfaceColor(color);
 });
+// astrionShell 桥（设计 §4.2）。身份一律按 sender 返回，页面不得自报。
+ipcMain.handle('shell:identity', (event) => (fromContentView(event) ? views.identityFor(event.sender) : null));
+// 快照由 chrome（500ms 轮询）或任一受管内容视图（命令响应）转交；ViewManager 只接受更高 revision。
+ipcMain.on('shell:tabs-forward', (event, state) => {
+  if (!fromContentView(event) && !fromChrome(event)) return;
+  try { views.handleSnapshot(state, event.sender); } catch (err) { console.error('[astrion-desktop] 快照处理失败:', err); }
+});
+// 乐观切换：仅 chrome 标签条可用。
+ipcMain.on('shell:show', (event, key) => {
+  if (!fromChrome(event)) return;
+  try { views.show(key); } catch (err) { console.error('[astrion-desktop] show 失败:', err); }
+});
+ipcMain.on('shell:focus-main', (event) => {
+  if (!fromContentView(event)) return;
+  focusMainWindow();
+});
+// 拖出：chrome 决定要拖出时发 drop；壳层建窗迁入视图后经 'shell:request-detach' 请 chrome 发 detach 命令。
+ipcMain.on('shell:drag-tab', (event, payload) => {
+  if (!fromChrome(event) || !payload || typeof payload !== 'object') return;
+  try { views.dragTab(payload); } catch (err) { console.error('[astrion-desktop] 拖拽消息处理失败:', err); }
+});
+// 拖出前的显示器信息：标签条靠近屏幕上沿时据此计算向上拖出的余量（window.screen 在 macOS 菜单栏/叠放屏下不可靠）。
+ipcMain.handle('shell:drag-info', (event) => {
+  if (!fromChrome(event)) return null;
+  return { displays: screen.getAllDisplays().map(({ bounds }) => ({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height })) };
+});
+// 页面（open/workspace 返回 focus:"detached"）请求前置持有某标签的窗口。
+ipcMain.on('shell:focus-tab', (event, key) => {
+  if (!fromContentView(event) || typeof key !== 'string') return;
+  try { views.focusTab(key); } catch (err) { console.error('[astrion-desktop] focusTab 失败:', err); }
+});
+
 let pendingMainRoute = null;
 
 export function setMainWindowBackend(port) {
@@ -84,8 +148,14 @@ export function setMainWindowBackend(port) {
   }
 }
 
-export function getMainView() {
-  return mainView;
+/** 主窗口当前显示的内容视图（取代旧 getMainView）。 */
+export function getActiveView() {
+  return views?.getActiveView() || null;
+}
+
+/** webContents 是否是受管内容视图（快捷入口可信判定等）。 */
+export function isManagedView(webContents) {
+  return !!views && views.isManagedView(webContents);
 }
 
 export function focusMainWindow(route = '') {
@@ -96,10 +166,9 @@ export function focusMainWindow(route = '') {
   const target = route === '/settings/quick-chat' ? route : '';
   if (!backendPort) { pendingMainRoute = target; return; }
   if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(backendPort, target || '/');
-  else if (target && mainView && !mainView.webContents.isDestroyed()) {
-    void mainView.webContents.loadURL(`http://127.0.0.1:${backendPort}${target}`);
-  }
+  else if (target) views?.requestPage(target);
   if (mainWindow.isMinimized()) mainWindow.restore();
+  views?.showDetached();
   mainWindow.show();
   mainWindow.focus();
 }
@@ -140,24 +209,17 @@ function installNavigationGuards(view) {
   });
 }
 
-/** 双视图布局：chrome 条钉顶部（全宽 × 46px），main 视图占剩余区域。 */
+/** 布局：chrome 条钉顶部，内容视图占剩余区域（几何见 views/layout.js）。 */
 function layoutViews() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const { width, height } = mainWindow.getContentBounds();
-  chromeView?.setBounds({ x: 0, y: 0, width, height: CHROME_STRIP_HEIGHT });
-  mainView?.setBounds({
-    x: 0,
-    y: CHROME_STRIP_HEIGHT,
-    width,
-    height: Math.max(0, height - CHROME_STRIP_HEIGHT)
-  });
+  views?.layout();
   nativeBrowser?.resize();
 }
 
 export function createMainWindow(port, route = '/') {
   backendPort = port;
-  const url = `http://127.0.0.1:${port}${route}`;
-  const chromeUrl = `http://127.0.0.1:${port}/chrome`;
+  const origin = `http://127.0.0.1:${port}`;
+  const chromeUrl = `${origin}/chrome`;
 
   surfaceColor = loadSurfaceColor();
   mainWindow = new BaseWindow({
@@ -179,39 +241,68 @@ export function createMainWindow(port, route = '/') {
     spellcheck: true
   };
 
-  mainView = new WebContentsView({
-    webPreferences: {
-      ...baseWebPreferences,
-      preload: path.join(__dirname, 'preload-main.cjs')
-    }
-  });
   chromeView = new WebContentsView({
     webPreferences: {
       ...baseWebPreferences,
       preload: path.join(__dirname, 'preload-chrome.cjs')
     }
   });
-
-  mainView.setBackgroundColor(surfaceColor);
   chromeView.setBackgroundColor(surfaceColor);
-
-  // 添加顺序 = 视觉层级：chrome 在后添加，位于 main 之上（顶部区域不重叠，仅保险）
-  mainWindow.contentView.addChildView(mainView);
   mainWindow.contentView.addChildView(chromeView);
-  layoutViews();
-  if (desktopSupported()) nativeBrowser = new NativeBrowser(mainWindow, mainView, `http://127.0.0.1:${port}`);
 
-  installNavigationGuards(mainView);
-  installNavigationGuards(chromeView);
-
-  mainView.webContents.loadURL(url);
-  chromeView.webContents.loadURL(chromeUrl);
-
-  // 键盘输入主权始终在主页面
-  mainView.webContents.once('did-finish-load', () => {
-    mainView?.webContents.focus();
+  // 内容视图工厂：每个标签一个视图，默认 backgroundThrottling（隐藏视图自动降频，P0 实测 1Hz）。
+  const createView = ({ url }) => {
+    const view = new WebContentsView({
+      webPreferences: {
+        ...baseWebPreferences,
+        preload: path.join(__dirname, 'preload-view.cjs')
+      }
+    });
+    view.setBackgroundColor(surfaceColor);
+    installNavigationGuards(view);
+    // 窗口标题 = 页面 document.title（独立对话窗口用）。
+    view.webContents.on('page-title-updated', (_event, title) => { views?.titleChanged(view.webContents, title); });
+    void view.webContents.loadURL(url);
+    return view;
+  };
+  views = new ViewManager({
+    origin,
+    window: mainWindow,
+    chromeView,
+    createView,
+    getCursor: () => screen.getCursorScreenPoint(),
+    // quitAndInstall 先关窗口、后发 before-quit，故两者都要判断。
+    isQuitting: () => appQuitting || isUpdaterInstalling(),
+    createDetachedWindow: ({ key, point, offset, focus }, callbacks) => createDetachedWindow({
+      key, point, offset, focus,
+      occupied: [...views.detachedWindows.values()].filter((row) => !row.isDestroyed()).map((row) => row.getBounds()),
+      colors: { surface: surfaceColor, chrome: nativeBrowser?.chromeColor || surfaceColor, text: nativeBrowser?.textColor || '' }
+    }, callbacks),
+    loadRecency,
+    saveRecency,
+    hooks: {
+      onViewCreated: (entry) => { nativeBrowser?.addViewHost(entry.view, entry.window); },
+      onViewDestroyed: (entry) => { nativeBrowser?.removeViewHost(entry.view); },
+      onPresentationChanged: () => { nativeBrowser?.layout(); },
+      onViewMoved: (entry, window) => { nativeBrowser?.viewMoved(entry.view, window); },
+      onViewResized: (entry) => { nativeBrowser?.resize(nativeBrowser.viewHosts.get(entry.view)); }
+    }
   });
+  if (desktopSupported()) nativeBrowser = new NativeBrowser(mainWindow, origin, views);
+  layoutViews();
 
+  installNavigationGuards(chromeView);
+  chromeView.webContents.loadURL(chromeUrl);
+  // chrome 异常退出时若正在拖出：按 drop 处理（不丢标签）。
+  chromeView.webContents.on('render-process-gone', () => { views?.endDragAsDrop(); });
+  // 打开特定路由（快捷对话设置）：经 chrome 发 `page` 命令；首个快照前排队。
+  if (route && route !== '/') views.requestPage(route);
+
+  // 主窗口获得焦点：请 chrome 以当前 active 标签发 focus 命令（CrossPet 最近聚焦标签）。
+  mainWindow.on('focus', () => {
+    const key = views?.activeKey;
+    if (key) views.sendChrome('shell:window-focus', { key });
+  });
   mainWindow.on('resize', layoutViews);
   mainWindow.on('enter-full-screen', layoutViews);
   mainWindow.on('leave-full-screen', layoutViews);
@@ -221,18 +312,17 @@ export function createMainWindow(port, route = '/') {
     // 安装更新时必须放行关闭：quitAndInstall() 先关窗口、之后才发 before-quit，
     // 此刻 appQuitting 仍为 false；若这里 preventDefault，应用永远退不出去，
     // ShipIt 等不到「无运行实例」而放弃安装。
-    if (!appQuitting && !isUpdaterInstalling() && quickEnabled()) { event.preventDefault(); mainWindow.hide(); }
+    if (!appQuitting && !isUpdaterInstalling() && quickEnabled()) { event.preventDefault(); mainWindow.hide(); views?.hideDetached(); }
   });
 
   mainWindow.on('closed', () => {
     nativeBrowser?.dispose();
     nativeBrowser = null;
-    // BaseWindow does not own WebContentsView lifetimes.
-    for (const view of [mainView, chromeView]) {
-      if (view && !view.webContents.isDestroyed()) view.webContents.close();
-    }
+    // BaseWindow does not own WebContentsView lifetimes：内容视图与 chrome 由 ViewManager 逐个关闭。
+    // 独立对话窗口随 ViewManager.dispose 一并销毁（placement 已持久化，下次启动恢复）。
+    views?.dispose();
     mainWindow = null;
-    mainView = null;
+    views = null;
     chromeView = null;
     if (!appQuitting && !quickEnabled()) app.quit();
   });

@@ -101,8 +101,6 @@ export const bootstrapMethods = {
       ownsConversationSession(this, session) && snapshotRequests.get(this) === request;
     const owns = () =>
       ownsRequest() &&
-      (!options.desktopNavigation ||
-        useConversationTabsStore().ownsNavigation(options.desktopNavigation)) &&
       (!syncing || (!session.submission && session.submissionVersion === submissionVersion));
     this.historyLoading = true;
     this.historyLoadingFor = conversationId;
@@ -136,14 +134,6 @@ export const bootstrapMethods = {
         }
       }
       const messages = [...historyState.messages, ...live];
-      if (options.desktopNavigation) {
-        if (
-          !(await useConversationTabsStore().commitNavigation(options.desktopNavigation)) ||
-          !owns()
-        ) {
-          return { success: false, superseded: true };
-        }
-      }
       const preserveInteraction = syncing && this.currentConversationId === normalizedId;
       // Keep the existing subscription while fetching; replace it only at commit.
       useTaskStore().clearTask();

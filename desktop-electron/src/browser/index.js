@@ -26,9 +26,10 @@ let browserDataRoot;
 // Windows migration deliberately leaves the former WebView2 profile untouched.
 export function setBrowserDataRoot(root) { browserDataRoot = process.platform === 'win32' ? path.join(root, 'electron') : root; }
 export class NativeBrowser {
-  constructor(window, mainView, origin) {
-    Object.assign(this, { window, mainView, origin, tabs: new Map(), selected: new Map(), profiles: new Map(), features: new Map(), popouts: new Map(), disposed: false, revision: 0, connectSequence: 0 });
-    this.main = new BrowserHost(this, { kind: 'main', window, view: mainView });
+  // views：ViewManager（主窗口内多个内容视图）。每个内容视图各有一个 kind 'view' 的宿主，
+  // 由 ViewManager 在创建/销毁视图时经 addViewHost/removeViewHost 登记。
+  constructor(window, origin, views) {
+    Object.assign(this, { window, views, origin, tabs: new Map(), selected: new Map(), profiles: new Map(), features: new Map(), popouts: new Map(), viewHosts: new Map(), disposed: false, revision: 0, connectSequence: 0 });
     this.registry = new BrowserTabs(this);
     this.credentials = new BrowserCredentials(this);
     this.contextMenu = new BrowserContextMenu(this);
@@ -39,8 +40,6 @@ export class NativeBrowser {
     // 前端上报的文字色供纯文本文档与原生按钮使用；标签栏底色独立缓存。
     this.textColor = '';
     this.chromeColor = '';
-    mainView.setBackgroundColor(this.surfaceColor);
-    this.watchHost(this.main);
     this.register();
     setActiveBrowser(this);
   }
@@ -66,14 +65,66 @@ export class NativeBrowser {
     host.lease = ''; host.visible = false; host.overlayRaised = false;
     this.layout(); this.features.forEach(feature => feature.denyStale());
   }
-  hosts() { return [this.main, ...this.popouts.values()]; }
-  /** 正在显示该对话标签的宿主：已弹出则为它的独立窗口，否则是当前停在该对话的主窗口。 */
+  hosts() { return [...this.viewHosts.values(), ...this.popouts.values()]; }
+  /** 当前显示的内容视图的宿主（没有则退回任一视图宿主）；供“未指定对话”的默认值使用。 */
+  get main() {
+    const active = this.views?.getActiveView?.();
+    return (active && this.viewHosts.get(active)) || this.viewHosts.values().next().value;
+  }
+  /** ViewManager 创建内容视图后登记其宿主；owner 稍后由 browser:connect 的 scope 决定。 */
+  addViewHost(view, window = this.window) {
+    let host = this.viewHosts.get(view);
+    if (host) return host;
+    host = new BrowserHost(this, { kind: 'view', window, view });
+    this.viewHosts.set(view, host);
+    this.watchHost(host);
+    return host;
+  }
+  /** 内容视图被销毁（LRU 淘汰、标签关闭）：退役连接并解除监听；它的网页标签保留，停放在主窗口。 */
+  removeViewHost(view) {
+    const host = this.viewHosts.get(view);
+    if (!host) return;
+    this.viewHosts.delete(view);
+    this.unwatchHost(host);
+    host.lease = ''; host.visible = false; host.overlayRaised = false; host.connectSequence++;
+    if (this.disposed) return;
+    this.contextMenu.close(); this.credentials.invalidate(host);
+    for (const tab of this.tabs.values()) if (tab.owner === host.owner) this.attach(tab);
+    this.features.forEach(feature => feature.denyStale());
+    this.layout(); this.publish();
+  }
+  /** 视图迁移窗口后（拖出/放回/重启恢复）：更新宿主窗口并让该宿主的网页视图重新挂载。 */
+  viewMoved(view, window) {
+    const host = this.viewHosts.get(view);
+    if (!host) return;
+    host.window = window;
+    // 网页视图经 layout → attach 按 windowFor(owner) 重新挂到新窗口（不重载）；并让页面重报几何。
+    this.resize(host);
+  }
+  /** 某个内容视图当前是否显示给用户（隐藏的视图不得摆放网页视图）。 */
+  isViewPresented(view) { return this.views ? this.views.isShown(view) : true; }
+  /** 任一存活内容视图的 session（同一默认 session，供回收查询等主进程请求使用）。 */
+  anySession() {
+    for (const host of this.viewHosts.values()) if (!host.view.webContents.isDestroyed()) return host.view.webContents.session;
+    return null;
+  }
+  /** 正在显示该对话标签的宿主：已弹出则为它的独立窗口，否则是停在该对话的内容视图（优先当前显示的）。 */
   hostFor(owner) {
     if (!owner) return null;
-    return this.popouts.get(owner) || (this.main.owner === owner ? this.main : null);
+    const popout = this.popouts.get(owner);
+    if (popout) return popout;
+    const rows = [...this.viewHosts.values()].filter(host => host.owner === owner);
+    return rows.find(host => this.isViewPresented(host.view)) || rows[0] || null;
   }
-  /** 该对话网页视图应挂载的窗口；未弹出的对话（含后台对话）都挂在主窗口。 */
-  windowFor(owner) { return this.popouts.get(owner)?.window || this.window; }
+  /** 该对话网页视图应挂载的窗口：已弹出 → 弹出窗口；否则 → 持有该对话视图的窗口；
+   *  视图已被淘汰（或不在任何窗口）→ 主窗口，隐藏停放。 */
+  windowFor(owner) {
+    const popout = this.popouts.get(owner);
+    if (popout) return popout.window;
+    const host = this.hostFor(owner);
+    const window = host && this.views?.windowOf?.(host.view);
+    return window && !window.isDestroyed() ? window : this.window;
+  }
   boundsFor(owner) { return browserBounds(this.hostFor(owner) || this.main); }
   attach(tab) {
     if (!tab.view) return;
@@ -113,8 +164,8 @@ export class NativeBrowser {
     if (popout) { this.popouts.delete(from); popout.owner = to; this.popouts.set(to, popout); }
     this.ai.migrateOwner(from, to);
   }
-  /** 只发给主窗口（AI 活动通知等与对话面板展开相关的消息）。 */
-  send(channel, data) { this.main.send(channel, data); }
+  /** 发给所有内容视图宿主（AI 活动通知；页面按自己的对话过滤）。 */
+  send(channel, data) { for (const host of this.viewHosts.values()) host.send(channel, data); }
   /** 指定对话时只通知显示它的宿主；资料级错误通知所有宿主。 */
   message(message, owner) {
     const hosts = owner ? [this.hostFor(owner)].filter(Boolean) : this.hosts();
@@ -132,7 +183,7 @@ export class NativeBrowser {
     this.registry.persist(owner);
     this.layout(); this.publish();
   }
-  resize(host = this.main) { this.layout(); host.send('browser:geometry-request', {}); }
+  resize(host) { this.layout(); for (const row of host ? [host] : this.viewHosts.values()) row.send('browser:geometry-request', {}); }
   snapshot(host) {
     const active = host.active(), profile = host.profile, detached = host.detached;
     return { lease: host.lease, revision: ++this.revision, activeId: active?.id || '', window: host.kind, detached,
@@ -344,11 +395,12 @@ export class NativeBrowser {
     this.retention.dispose(); this.ai.dispose(); setActiveBrowser(null, this);
     for (const owner of this.selected.keys()) this.registry.persist(owner);
     this.contextMenu.close();
-    this.disposed = true; this.connectSequence++; this.main.lease = '';
+    this.disposed = true; this.connectSequence++;
+    for (const host of this.viewHosts.values()) host.lease = '';
     ipcMain.removeListener('browser:input', this.inputHandler);
     ipcMain.removeListener('browser:theme', this.themeHandler);
     ipcMain.removeHandler('browser:connect'); ipcMain.removeHandler('browser:command'); ipcMain.removeListener('browser:layout', this.layoutHandler);
-    this.unwatchHost(this.main);
+    for (const host of this.viewHosts.values()) this.unwatchHost(host);
     this.features.forEach(feature => feature.dispose());
     this.credentials.dispose();
     for (const tab of this.tabs.values()) { if (tab.view && !tab.view.webContents.isDestroyed()) tab.view.webContents.close({ waitForBeforeUnload: false }); }
@@ -359,7 +411,7 @@ export class NativeBrowser {
       this.popouts.delete(popout.owner); this.unwatchHost(popout); popout.lease = '';
       if (!popout.window.isDestroyed()) popout.window.destroy();
     }
-    if (!this.mainView.webContents.isDestroyed()) this.mainView.setBackgroundColor(this.surfaceColor);
+    this.viewHosts.clear();
     this.tabs.clear(); this.profiles.forEach(profile => { void profile.close().catch(() => {}); });
   }
 }

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isViewVisible } from './viewVisibility';
 import { t } from '@/locales';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import { conversationViewEpoch } from '../conversation/session';
@@ -10,7 +11,7 @@ export const gitMethods = {
       return;
     }
     this.projectGitSummaryRefreshTimer = window.setInterval(() => {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !isViewVisible()) return;
       if (typeof this.isOutputActive === 'function' && this.isOutputActive()) return;
       this.refreshProjectGitSummary?.({ idleFallback: true });
     }, 5000);
@@ -18,7 +19,7 @@ export const gitMethods = {
   startTerminalCountIdleRefresh() {
     if (this.terminalCountRefreshTimer) return;
     this.terminalCountRefreshTimer = window.setInterval(() => {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !isViewVisible()) return;
       this.fetchTerminalCount();
     }, 5000);
   },

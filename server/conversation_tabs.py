@@ -1,7 +1,7 @@
 """桌面导航命令与版本化快照接口，状态唯一写者在 modules/desktop_navigation。
 
-存 `{DATA_DIR}/conversation_tabs.json`（按用户名分键），双 WebView 提交幂等命令，
-主页面确认 renderer/navigation 后提交显示。非 host 模式不提供标签导航。
+存 `{DATA_DIR}/conversation_tabs.json`（按用户名分键），每个内容视图固定绑定一个标签，
+经 attach 登记 renderer 身份；命令幂等（v3，见 docs/desktop_multi_view.md）。非 host 模式不提供标签导航。
 
 下发给标签条的 `running` 是**对话级运行态**（主任务 + 后台子智能体/后台命令/
 多智能体），与对话记录侧边栏的运行中图标同一口径；不是"主智能体还在不在工作"。
@@ -25,6 +25,9 @@ conversation_tabs_bp = Blueprint("conversation_tabs", __name__)
 
 _TABS_PATH = os.path.join(DATA_DIR, "conversation_tabs.json")
 navigation = DesktopNavigation(_TABS_PATH)
+# 这些命令之后需向 CrossPet 报告聚焦标签
+_CROSSPET_ACTIONS = {"create", "open", "workspace", "activate", "page", "focus",
+                     "detach", "dock", "close"}
 
 
 def _load_index_titles(workspace_id: str) -> Dict[str, str]:
@@ -260,12 +263,11 @@ def command_conversation_tabs():
         result = navigation.command(username, body.get("command_id"), action, payload,
                                     lookup=_lookup(username, with_activity=action == "workspace"))
         result["state"] = _public(username, result["state"])
-        if action in {"commit", "attach", "page"}:
+        if action in _CROSSPET_ACTIONS:
             try:
                 from server.crosspet import focus_tab
-                state = result["state"]
-                focus_tab(username, next((tab for tab in state["tabs"]
-                                          if tab["key"] == state["active_key"]), None))
+                # 最近聚焦标签（独立窗口或主窗口）优先，其次主窗口 active
+                focus_tab(username, navigation.focused_tab(username, result["state"]))
             except Exception:
                 pass
         return jsonify(success=True, **result)

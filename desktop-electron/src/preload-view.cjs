@@ -1,4 +1,4 @@
-// main 视图 preload：桌面壳环境标记，页面在任意脚本执行前可读到
+// 内容视图 preload（每个标签一个视图；由原 preload-main.cjs 演化）：桌面壳环境标记，页面在任意脚本执行前可读到
 // （登录页据此自动免登录；App.vue 的桌面端链接拦截/软件更新入口同据此判定）。
 // contextIsolation 下页面主世界读不到 preload 变量，必须走 contextBridge。
 const { contextBridge, ipcRenderer } = require('electron');
@@ -17,6 +17,31 @@ contextBridge.exposeInMainWorld('astrionWindow', {
   surface: color => ipcRenderer.send('window:surface', color)
 });
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
+
+// 壳层桥（设计 docs/desktop_multi_view.md §4.2）。身份由主进程按 sender 判定，页面不得自报。
+{
+  const subscribe = (channel, callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  };
+  contextBridge.exposeInMainWorld('astrionShell', {
+    // → { key, placement: 'main'|'detached', visible, legacy, state }；legacy 兜底页 key 为空。
+    identity: () => ipcRenderer.invoke('shell:identity'),
+    // 壳层广播的导航快照（revision 更大者才会被广播；转发者自己不会收到回显）。
+    onTabsState: callback => subscribe('shell:tabs-state', callback),
+    // 页面执行命令拿到更新的快照后转交壳层（壳层只接受更高 revision）。
+    forwardTabsState: state => ipcRenderer.send('shell:tabs-forward', state),
+    // 壳层显示/隐藏本视图时通知：{ visible }。
+    onVisibility: callback => subscribe('shell:visibility', callback),
+    // 前置主窗口（P2 独立窗口里点设置等按钮后调用）。
+    focusMain: () => ipcRenderer.send('shell:focus-main'),
+    // 本视图的归属变化（拖出/放回）：{ key, placement }，页面据此即时切换独立窗口布局。
+    onPlacement: callback => subscribe('shell:placement', callback),
+    // 前置持有该标签的窗口（open/workspace 命令返回 focus:"detached" 后调用）；主窗口标签则切过去。
+    focusTab: key => ipcRenderer.send('shell:focus-tab', key)
+  });
+}
 
 // Only the trusted main renderer receives this bridge. Web pages use no preload.
 if (['darwin', 'win32'].includes(process.platform)) {

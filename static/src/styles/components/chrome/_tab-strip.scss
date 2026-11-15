@@ -362,3 +362,42 @@
   background: var(--state-danger);
   color: var(--on-accent);
 }
+
+// ─── 独立页面标签图标（设置/工作流/Git；mask 图标随 currentColor） ───
+.chrome-tab-strip .tab .tab-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  display: inline-block;
+  background-color: currentColor;
+  mask-image: var(--icon-src);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: var(--icon-src);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
+
+// ─── 拖拽排序：被拖标签跟随指针，其余标签让位（transform 过渡，不改布局） ───
+.chrome-tab-strip .tab.shifting {
+  transition: transform 0.15s cubic-bezier(0.3, 0.9, 0.35, 1);
+}
+.chrome-tab-strip .tab.dragging {
+  cursor: grabbing;
+}
+// 拖出态：标签已变成独立窗口跟随指针，条内该标签消失、其余标签合拢（元素保留以维持指针捕获）
+.chrome-tab-strip .tab.torn {
+  flex: 0 0 0;
+  min-width: 0;
+  max-width: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    flex-basis 0.16s ease,
+    max-width 0.16s ease,
+    opacity 0.1s ease;
+}

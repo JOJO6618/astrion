@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isViewVisible } from './viewVisibility';
 import { t } from '@/locales';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 
@@ -135,7 +136,8 @@ export const workspaceMethods = {
         const hasActiveTask = (this.runningWorkspaceTasks || []).some((task: any) =>
           activeStatuses.has(String(task?.status || ''))
         );
-        if (retry || hasActiveTask || waitingForTitle) {
+        // 隐藏视图暂停跨对话索引的后续轮询，重新可见时由 resumeOnVisible 补一次。
+        if ((retry || hasActiveTask || waitingForTitle) && isViewVisible()) {
           this.runningWorkspaceTasksRefreshTimer = window.setTimeout(
             () => {
               this.runningWorkspaceTasksRefreshTimer = null;

@@ -124,7 +124,7 @@ class TransferHttpTests(TransferFixture):
             self.assertEqual(len(final["tabs"]), 1)
             self.assertEqual(final["tabs"][0]["key"], initial["tabs"][0]["key"])
             self.assertEqual(final["tabs"][0]["workspace_id"], "b")
-            self.assertNotEqual(final["navigation"]["id"], initial["navigation"]["id"])
+            self.assertEqual(final["active_key"], initial["active_key"])  # v3：迁移保持标签身份与 active
 
     def _retry_interrupted_migration(self, failure):
         from server.context.identity import RuntimeIdentity

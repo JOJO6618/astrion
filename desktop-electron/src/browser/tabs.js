@@ -11,7 +11,7 @@ export class BrowserTabs {
   constructor(manager) { this.manager = manager; }
   createInternal(section, options = {}) {
     const manager = this.manager, url = internalURL(section);
-    const owner = options.owner || manager.main.owner, profile = options.profile || manager.main.profile;
+    const owner = options.owner || manager.main?.owner, profile = options.profile || manager.main?.profile;
     let tab = !options.duplicate && [...manager.tabs.values()].find(row => row.owner === owner && row.section === section);
     if (!tab) {
       if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48) throw new Error('browser_tab_limit');
@@ -46,7 +46,7 @@ export class BrowserTabs {
     const manager = this.manager;
     const section = internalSection(url);
     if (section) return this.createInternal(section, options);
-    const owner = options.owner || manager.main.owner, profile = options.profile || manager.main.profile;
+    const owner = options.owner || manager.main?.owner, profile = options.profile || manager.main?.profile;
     if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48 && !options.id) throw new Error('browser_tab_limit');
     const view = new WebContentsView({
       ...(options.nativeOptions?.webContents ? { webContents: options.nativeOptions.webContents } : {}),
@@ -184,7 +184,7 @@ export class BrowserTabs {
     item.once('done', release);
     this.persist(tab.owner); manager.layout(); manager.publish();
   }
-  persist(owner, fallbackProfile = this.manager.main.profile) {
+  persist(owner, fallbackProfile = this.manager.main?.profile) {
     const manager = this.manager;
     if (manager.disposed) return;
     const tabs = [...manager.tabs.values()].filter(tab => tab.owner === owner);
@@ -215,8 +215,12 @@ export class BrowserTabs {
       if (!tab.view || tab.view.webContents.isDestroyed()) continue;
       manager.attach(tab);
       const host = manager.hostFor(tab.owner), rect = host && bounds.get(host);
-      const visible = !!host && tab === actives.get(host) && host.visible && !!rect && tab.url !== 'about:blank' && !tab.pendingURL && !tab.error;
-      if (!visible && tab.view.webContents.isFocused()) (manager.popouts.get(tab.owner) || manager.main).view.webContents.focus();
+      const visible = !!host && host.presented && tab === actives.get(host) && host.visible && !!rect && tab.url !== 'about:blank' && !tab.pendingURL && !tab.error;
+      if (!visible && tab.view.webContents.isFocused()) {
+        // 仅在窗口已是焦点窗口时回收键盘焦点：WebContents.focus() 在 macOS 上会连带激活窗口/应用。
+        const owner = manager.hostFor(tab.owner) || manager.main;
+        if (owner && !owner.window.isDestroyed() && owner.window.isFocused()) owner.view.webContents.focus();
+      }
       tab.view.setVisible(visible);
       if (visible) {
         tab.view.setBounds(rect);

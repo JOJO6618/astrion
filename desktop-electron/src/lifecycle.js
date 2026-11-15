@@ -20,7 +20,7 @@ import {
 } from './rundata.js';
 import { loadLoginShellPath } from './shell_env.js';
 import { createMigrationWindow } from './migration-window.js';
-import { setMainWindowBackend, focusMainWindow, getMainView } from './window.js';
+import { setMainWindowBackend, focusMainWindow, isManagedView } from './window.js';
 import { startQuickEntry } from './quick/controller.js';
 import { setBrowserDataRoot } from './browser/index.js';
 import { desktopSupported } from './platform.js';
@@ -110,7 +110,7 @@ export async function startBackendAndCreateWindow() {
 
   await waitBackendReady(port, child);
   setBrowserDataRoot(desktopDataRoot);
-  await startQuickEntry({ port, dataRoot: desktopDataRoot, getMainView, openMain: route => focusMainWindow(route) });
+  await startQuickEntry({ port, dataRoot: desktopDataRoot, isManagedView, openMain: route => focusMainWindow(route) });
   setMainWindowBackend(port);
   // An explicit desktop launch always opens its main window, including when
   // Quick Chat is enabled. Closing it can still keep Quick Chat running.

@@ -53,26 +53,25 @@ async function choose(mode: 'chat' | 'agent') {
   open.value = false;
   if (mode === props.mode || switching.value) return;
   const tabs = useConversationTabsStore();
-  // 桌面端由标签导航统一加载：复用同类型空标签，没有才新建。
-  // 整页跳转会把旧导航目标留给新文档，attach 时需要靠标签身份重新定位。
-  const workspaceId = mode === 'agent' ? String(tabs.workspaceId || '') : '';
-  if (!tabs.enabled || !tabs.attached || (mode === 'agent' && !workspaceId)) {
+  if (!tabs.enabled) {
     fallback(mode);
     return;
   }
+  // 桌面多视图：模式切换 = 切到另一个视图。复用同类型主窗口空白标签，没有才新建
+  // （零工作区时 create 返回 no_workspace，保持当前页）。
+  const workspaceId = mode === 'agent' ? String(tabs.workspaceId || '') : '';
   switching.value = true;
   try {
-    const blank = tabs.tabs.find(
+    const blank = tabs.mainTabs.find(
       (tab) =>
         tab.kind === 'new' &&
         tab.conversationKind === mode &&
         (mode === 'chat' || tab.workspaceId === workspaceId)
     );
-    if (blank) await tabs.setActive(blank.key);
+    if (blank) await tabs.showTab(blank.key);
     else await tabs.addNewTab({ conversationKind: mode, workspaceId });
   } catch {
-    // 命令失败（网络/冲突）退回整页跳转；新文档会按自身身份重新定位标签。
-    fallback(mode);
+    // 命令失败（网络/冲突）：保持当前视图，标签条会显示同步状态。
   } finally {
     switching.value = false;
   }

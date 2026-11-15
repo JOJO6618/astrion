@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { isViewVisible } from './viewVisibility';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { debugLog } from '../common';
 import { t } from '@/locales';
 import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
@@ -30,7 +32,7 @@ export const socketMethods = {
       this.applyStatusSnapshot(status);
       // 桌面端标签条模式下禁用后端单槽位「当前对话」恢复：多标签各有自己的对话，
       // 恢复权威是持久化的标签列表（restoreConversationTabView），不是 status 快照
-      const desktopTabsEnabled = Boolean((window as any).__ASTRION_DESKTOP__);
+      const desktopTabsEnabled = useConversationTabsStore().enabled;
       // 显式新建路由（/new 等）与独立全屏路由不接管当前对话与运行模式
       const onExplicitNewRoute =
         typeof this.isExplicitNewConversationRoute === 'function' &&
@@ -70,7 +72,7 @@ export const socketMethods = {
   startStatusIdleRefresh() {
     if (this.statusRefreshTimer) return;
     this.statusRefreshTimer = window.setInterval(() => {
-      if (!this.isConnected) return;
+      if (!this.isConnected || !isViewVisible()) return;
       if (typeof this.isOutputActive === 'function' && this.isOutputActive()) return;
       this.fetchStatusSnapshot();
     }, 5000);
@@ -390,7 +392,7 @@ export const socketMethods = {
         !this.currentConversationId &&
         !isExplicitNewRoute &&
         !this.isConversationIndependentRoute() &&
-        !(window as any).__ASTRION_DESKTOP__
+        !useConversationTabsStore().enabled
       ) {
         await this.enterConversation(resumeConversationId, {
           workspaceId: this.currentHostWorkspaceId || '',

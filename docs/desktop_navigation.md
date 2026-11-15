@@ -1,110 +1,82 @@
-# 桌面标签导航契约
+# 桌面标签导航契约（v3 多视图）
 
-2026-10-23：适用于 Electron macOS 与 Tauri Windows。顶部独立 WebView 保留，导航状态移到后端。修改标签身份、关闭、恢复、绑定、页面往返前必读本文。
+2026-11-14：适用于 Electron 桌面壳（macOS + Windows）。每个标签一个独立 `WebContentsView`（完整前端页面），顶部 chrome 视图只画标签条。导航状态在后端。设计与取舍见 `docs/desktop_multi_view.md`；修改标签身份、关闭、恢复、绑定、页面标签、拖出/放回前必读本文。网页端与 Android 不启用，保持单页行为。
 
 ## 唯一写者与状态
 
-`modules/desktop_navigation/` 是唯一标签写者。`server/conversation_tabs.py` 装配认证用户、可信工作区、存在性查询及运行态；不得为标签查询创建 WebTerminal、容器或读取完整历史。
+`modules/desktop_navigation/` 是唯一标签写者（`model.py` 结构与迁移，`commands.py` 命令，`service.py` 存储/幂等/核验）。`server/conversation_tabs.py` 装配认证用户、可信工作区、存在性查询及运行态；不得为标签查询创建 WebTerminal、容器或读取完整历史。
 
-存储仍为 `<DATA_DIR>/conversation_tabs.json`，按用户名分键。version=2，单后端进程内 RLock 串行处理命令，以原子文件替换提交。每个成功命令递增 revision；GET 仅在迁移或核验导致持久状态变化时递增。
+存储 `<DATA_DIR>/conversation_tabs.json` 按用户名分键，version=3，单后端进程 RLock 串行，原子文件替换。每个成功命令递增 revision；GET 仅在迁移或核验导致状态变化时递增。
 
-- `tabs[]`：最多 100 个。`key=tab_*` 贯穿 new→conv 绑定及关闭，不能用对话 ID 或双页计数器作 key。
-- 对话唯一身份包含 `conversation_kind`（默认 `agent`）及 `(workspace_id, normalized conversation_id)`；相同 ID 的不同工作区分别显示与计算运行态。Chat 使用 `conversation_kind=chat` 和空工作区，不解析成 Agent 默认工作区，标签外观不添加模式标记。
-- `active_key`：已经确认提交的内容标签。`resume_key`：独立页面返回目标。
-- `navigation`：最新请求，含 `id/key/page/status/error`，status 为 pending、committed 或 error。加载期间可同时保留旧 active 和新目标；禁止把请求已受理当成内容已提交。
-- `renderer_id`：主页面当前文档身份。刷新后重新 attach，旧文档失去提交权。
-- `receipts`：最近 256 条命令的身份、参数指纹、结果，仅内部保存。
-- `closed_keys`：最近 2048 个关闭身份，仅内部保存；客户端每次新建都使用随机 UUID，不重复使用 key。
+- `tabs[]`（最多 100）：`key`（`tab_*`，贯穿 new→conv 绑定与关闭）、`kind`（`conv|new|page`）、`conversation_kind`（`agent|chat`，页面标签无）、`conversation_id`、`workspace_id`、`workspace_label`、`title`、`error`、`placement`（`main|detached`）；页面标签另有 `page_type`（`settings|workflows|git`）、`route`、`opener_key`。数组顺序即主窗口标签顺序，detached 标签留在数组中但不在标签栏。
+- 去重：conv 按 `(conversation_kind, workspace_id, normalized conversation_id)`；page 按 `page_type`（git 再加 `workspace_id`）。Chat 用空工作区。
+- `active_key`：主窗口当前标签（唯一权威，必须是 main 标签或空）。`workspace_id`：最近激活的 Agent 标签工作区。
+- `renderers {key: renderer_id}`：每个内容视图当前文档身份。`receipts`（256）与 `closed_keys`（2048）仅内部保存，不对外。
+- 已删除：`navigation`、`resume_key`、单一 `renderer_id`、`commit`、`resume`。每个视图一生只绑定一个标签，不再有「同一文档改指向另一目标」。
 
-旧 `{tabs, active_key}` 记录一次迁移，保留顺序、按工作区＋对话去重并映射 active。损坏 JSON、无效结构及未知版本明确报错，不当成空状态覆盖。
+迁移：v1/v2 一次迁到 v3（保留顺序、全部 `placement=main`；active 取 `active_key`→`resume_key`→首个标签；丢弃 navigation 与 renderer_id）。损坏 JSON、无效结构（含悬空 active、detached 的非对话标签、缺 workspace 的 git 页）与未知版本明确报错，不当空状态覆盖。
 
 ## HTTP 命令
 
-`GET /api/conversation-tabs` 返回带 revision 的权威快照。`POST /api/conversation-tabs/commands` 接收：
+`GET /api/conversation-tabs` 返回带 revision 的快照；`POST /api/conversation-tabs/commands` 接收 `{command_id, action, payload}`，响应 `{state, result}`。同 command_id＋同参数只执行一次，同 ID 异参 409；网络不确定只原样重试同一 envelope。
 
-```json
-{
-  "command_id": "unique-request-identity",
-  "action": "activate",
-  "payload": {"key": "tab_uuid"}
-}
-```
-
-响应含 `state` 与 `result`。同一 command_id、相同参数在 receipt 保留窗口内只执行一次，重试返回当前快照及原结果；同 ID 异参返回 409。客户端网络结果不确定时只重试同一个 envelope，不能重新生成 ID。业务失败不自动当成网络失败重试。
-
-| 动作 | 行为 |
+| 动作 | payload → 行为 |
 | --- | --- |
-| create/open/workspace | 新建空标签、打开历史或进入工作区的活动主任务/空页，生成导航代次 |
-| activate | 选择现存稳定 key，生成新代次，允许重新尝试加载错误目标 |
-| close | 立即移除目标并选择继任者；最后一个实际对话关闭后同事务补空标签 |
-| bind | 将发送前捕获的空标签绑定真实对话，不改变 key；源标签已关返回 bound=false，不复活 |
-| page/resume | 设置、工作流、Git 等独立页往返，共用导航身份 |
-| attach | 注册新 renderer；同模式刷新继承最新 pending 目标，旧地址不能覆盖尚未完成的切换；文档自报另一种模式（chat↔agent）或对话页时按自身身份定位标签，不复用旧目标 |
-| commit/fail | 必须匹配 renderer_id＋navigation_id；error 状态不能再 commit，需重新 activate |
-| title | 仅更新明确工作区＋对话的标题 |
-| deleted | 仅服务端删除成功钩子可调用，客户端不得伪造 |
+| create | `{conversation_kind?, workspace_id?, key?}` 新空白标签并激活 |
+| open | `{conversation_kind?, workspace_id, conversation_id, key?}` 已存在：main 则激活；detached 不改 active，返回 `{key, focus:"detached"}`；不存在则新建并激活 |
+| workspace | `{workspace_id}` 该工作区活动主任务或空页，之后同 open |
+| page | `{page: route}` 按 page_type（git 另按 route 查询中的 `workspace_id`，必填）找或建页面标签，更新 route，`opener_key`=当前 active（非自身），激活。路由仅 `/settings*`、`/workflows`、`/workflow*`、`/git` |
+| activate | `{key}` 仅 main 标签；detached 返回 409 |
+| close | `{key}` 移除并记入 closed_keys；active 的继任：页面标签先回仍在 main 的 opener，否则右侧相邻、无则左侧；主窗口无标签补空白新对话 |
+| reorder | `{key, before_key}` 只改 main 标签相对顺序（`""`=末尾），不改 active |
+| detach | `{key}` 仅 `conv`/`new`（页面标签不可）；`placement=detached`，不进 closed_keys；是 active 按右优先选继任；主窗口为空补空白标签 |
+| dock | `{key}` `placement=main`，移到数组末尾，active 不变；仍空白的 detached 新对话标签关闭时直接移除标签，不放回主窗口 |
+| attach | `{key, renderer_id}` 登记 `renderers[key]`（覆盖旧文档），清标签 error；标签不存在 409 |
+| bind | `{key, workspace_id, renderer_id, conversation_id, title?}` 要求 `renderers[key]==renderer_id`；源标签已关返回 `bound=false` |
+| fail | `{key, renderer_id, error}` 标记本标签 error；对话已删除则移除标签 |
+| title / deleted / relocated | title 客户端可发；deleted 仅服务端删除钩子，客户端发送 400；relocated 仅服务端，对 detached 标签同样生效 |
+| focus | `{key}` 只写内存「最近聚焦标签」，不落盘、不增 revision、不写 receipt |
 
-旧全列表 PUT 及 `/api/desktop/chrome-dispatch`、原生 `/chrome/dispatch`、`__astrionChromeDispatch` 队列已经移除。禁止恢复 eval 标签意图旁路、双页本地结构修改和乐观 TTL 覆盖。
+错误码：409 `navigation_superseded`（标签已关、detached 不可 activate/reorder、renderer 不匹配、attach 缺失标签、已删除对话）；400（非法页面、detach 非对话标签、git 无工作区）；400 `no_workspace`（零工作区）。GET 仅存储损坏时 503。
 
-## 主页面内容提交
+CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close 之后按「最近聚焦标签（仍存在）否则 active」上报。浏览器回收前台集合 = 主窗口 active 对话 + 所有 detached 对话（`server/browser_retention.py foreground_scopes`）。
 
-`static/src/app/methods/ui/desktopNavigation.ts` 是唯一桌面导航协调器，`conversationTabs.ts` 只投影权威状态，`desktopNavigationTransport.ts` 串行发送短命令。命令串行不等待完整历史加载，关闭和新目标不会被旧加载阻塞。
+## 壳层与视图角色（`desktop-electron/src/views/`）
 
-**启动顺序（2026-10-24 白屏修复）**：`bootstrapRoute` 完成后先执行 `loadInitialData`，待其成功或失败收尾后再恢复桌面导航。禁止在初始化尚未完成时触发标签恢复：恢复会推进 conversation epoch，使初始化的所有权检查直接退出，跳过个性化设置与工作区目录；`ChatArea` 等待个性化设置就绪，因而持续隐藏历史内容。卸载时撤销页面存活标记，迟到的路由或初始化不能再次 attach。回归：`node test/2026-10-24_桌面启动白屏/startup.cjs`。
+- ViewManager 持有每标签一个视图；只接受 revision 更大的快照并广播给 chrome 与所有视图（不回显给转发者）。最多 6 个 conv/new 视图常驻（LRU），page 与独立窗口视图不淘汰；淘汰视图再次激活冷加载。
+- **chrome 视图**：唯一轮询 `GET`（500ms）并转发每个更新快照；点击标签 `astrionShell.show(key)` 后发 `activate`；拖拽排序发 `reorder`；拖出对话标签或空白新对话标签在指针离开标签条 >40px 后发 `dragTab`（tear/move/drop），壳层建独立窗口并回调 `onRequestDetach`→`detach`；独立窗口关闭 `onRequestDock`→`dock`；窗口聚焦 `onWindowFocus`→`focus`；`onRequestPage`→`page`（快捷入口设置深链）。页面标签不可拖出，Esc 取消。
+- **内容视图**：`astrionShell.identity()` 取得固定 `key/placement/visible/state`，`attach {key, renderer_id}`，此后不再切换标签；不轮询标签快照，订阅 `onTabsState`；每个命令响应都 `forwardTabsState`。legacy 兜底页（key 为空）整体降级为网页行为。
+- 前端实现：`stores/conversationTabs.ts`（role chrome/view、`ownsView`、`installShellRequests`）、`app/methods/ui/desktopView.ts`、`conversationTabs.ts`（命令封装与发送守卫）、`components/chrome/ConversationTabStrip.vue`＋`tabReorder.ts`。
 
-**零工作区（新装 host）是正常空态，不是同步故障（2026-11-13）**：
+**所有权与发送守卫**：`isDesktopNavigationReady` = 已 attach ∧ `renderers[key]` 是本文档 ∧ 标签仍在 ∧ 标签身份等于可见 session（new↔无对话，conv↔同对话＋工作区）；页面标签不可发送。首条消息用本视图 key `bind`。侧边栏点击本视图已显示的对话为空操作，其余发 `open`/`workspace`/`create`；`focus:"detached"` 时调用 `astrionShell.focusTab(key)`。加载失败只 `fail` 本标签，不另开标签。
 
-- `startDesktopNavigation` 在 `currentHostWorkspaceId` 为空且非 Chat 时**不 attach、不轮询**，只注册工作区就绪侦听；工作区出现后用同一 control 重新 attach 并启动轮询，避免标签条常驻「同步失败，重试」。
-- `addNewTab` / `resume` / `handleTabNew` / `resumeDesktopTab` 只负责发命令，由后端根据导航快照解析工作区；真正零工作区时后端返回 `code=no_workspace`，前端静默回 `/new`。
-- **判断零工作区只能用导航快照，不能用组件级 `currentHostWorkspaceId`**：设置页等独立路由不执行 `prepareInitialWorkspaceIdentity`，组件级值为空但实际有工作区。曾因此在 `addNewTab`/`resume` 里提前 `location.assign('/new')` 而不发命令，导致导航仍停在 `page=/settings`，文档回到 `/new` 后被 attach 拉回设置页。
-- 后端 `attach` 在文档自报 `page` 为空但导航仍是独立页面时视为「用户已离开」，恢复 `resume_key`/`active_key` 标签（或建空标签）并 commit；只有文档仍在该页面（刷新/重进）才保持 `page`。
-- 后端 `DesktopNavigation._workspace` 抛 `WorkspaceRequired`，命令端点返回 `400 + code=no_workspace`；前端 `command` 对该 code 静默降级（清空 `commandError`、回 `/new`），不当作同步失败。
-- `_lookup` 捕获 `NoWorkspaceError` 返回 `{no_workspace: true, exists: true}`，`_reconcile` 据此把标签标为 `workspace_unavailable` 且保留，禁止让 GET 快照 503。
-- host 模式首次启动（catalog 为空）由 `modules/host_workspace_manager.ensure_default_host_workspace` 在桌面创建默认工作区（桌面不存在回退 `~/Astrion/Default`），写过 `auto_default_workspace` 标记后不再重建；chat→agent 交接复用同一路径函数。
+**工作区身份**：视图按 URL 中显式 `workspace_id` 与请求头自带身份启动，桌面下 `selectWorkspaceIdentity` 为空操作，不读写 session 选中工作区（多视图会互相覆盖）；隐藏视图不调用选择接口。
 
-1. 主页面 hydrate 后 attach 文档，注册最新目标观察。
-2. 目标复用 `workspaceNavigation.ts` 与 `conversation/bootstrap.ts`，并行准备工作区选择、草稿和显示快照。
-3. 内容准备好后请求 commit；后端拒绝被关闭、删除、替换或旧 renderer 的提交。
-4. 回填快照后再次检查本地 renderer/navigation 和 session/epoch，才提交显示及任务订阅。
-5. 失败标记目标错误，原 active 视图经原入口受控恢复，不新建标签；原 active 是空页时按其原工作区恢复空页。
+**页面标签**：设置/工作流/Git 页面作为标签常驻（Git 每工作区一个）；页内「返回」= `activate` opener（不在 main 则右侧/左侧相邻），不关闭页面标签；设置分区切换就地进行，`route` 仅在 `page` 命令时更新。
 
-**观察器必须在整次状态更新后消费。** Pinia 对嵌套 `$patch` 逐字段写入，`flush:'sync'` 曾使观察器拿到 B 的 navigation.id 与 A 的 key，把 B 提前标记 handled。当前使用 `flush:'post'`；不能因希望降低延迟改回同步监听。
+**独立对话窗口（placement=detached）**：`DetachedTopBar.vue` 随 `onPlacement`/快照就地切换（`html.desktop-detached`）：隐藏侧边栏，顶部 38px 栏（标题，`-webkit-app-region: drag`，macOS 左让红绿灯、Windows 右让窗口控制），无新建/切换对话入口；设置/Git/工作流按钮发 `page` 后 `focusMain()`。放回主窗口恢复正常布局，不重载。
 
-保持原唯一显示快照、任务事件游标和串行工作区选择机制。桌面 URL 在会话/空页路径保留 workspace_id，刷新不猜默认工作区。发送前校验标签、可见 session、工作区及对话一致；请求目标尚未提交时不能发送到旧内容。新建首消息使用发送前捕获的源 key 绑定，即使其间切到另一个标签也不改绑当前 active。
-
-主页面 attach 失败自动重试，单次生命周期只提示一次启动错误。卸载撤销观察、重连 timer、轮询 owner 和请求，迟到响应不得重新开始轮询。
-
-2026-10-26 Chat：URL 为 `/chat/new`、`/chat/<id>`，不携带假工作区；继续使用同一个 `startDesktopNavigation` 协调器。首消息捕获真正 `new/chat` 标签的 key 进行绑定，迟到受理不能改绑当前标签。Chat 空页刷新复用原标签，纯 Chat 设置页返回恢复原模式；查询坏 Chat 文档仅标记对应标签错误。跨模式导航整页切换，Chat 页面不会挂载 Agent 的工作区初始化。
-
-**跨模式 attach 不能拉回旧目标（2026-11-04 修复）**：`attach` 只在旧导航目标与文档自报身份同一模式时才继承它（刷新、重载）。当旧目标属于另一种模式（chat ↔ agent）或独立页面（`nav.page`），而当前文档是对话页时，按 `payload.conversation_kind` 定位标签：优先复用同类型空标签（agent 还要求同 `workspace_id`），没有才新建，然后 `navigate`＋`commit`。否则 agent 空页在 `loadInitialData` 之后才 attach，会被旧 Chat 目标重新导航回 `/chat/new`（切回 Agent 后几秒弹回 Chat 空对话页）。前端切换模式走标签命令（`ModeSwitcher.vue` 优先 `activate` 同类型空标签，没有才 `addNewTab`），整页跳转只作为未 attach／命令失败时的回退。回归：`test/2026-10-23_桌面导航重构/test_navigation.py` 的 `test_mode_switch_*` 与 `test_returning_from_page_is_not_pulled_back`。
+**隐藏视图降频**（`ui/viewVisibility.ts`，订阅 `onVisibility`，网页端恒可见）：隐藏时暂停 `/api/status` 空闲刷新、`/api/tasks` 索引后续轮询、运行态对账、Git 摘要与终端数刷新；任务事件轮询降到约 1s（从不完全停止）。重新可见立即各补一次并恢复 250ms。
 
 ## 关闭、删除与恢复
 
-关闭命令在点击时即提交，230ms 关闭动画只投影展示，不延迟操作。关闭标签不停止后台任务，也不删除真实对话。
+关闭命令在点击时即提交，230ms 动画只投影展示；关闭不停止任务。真实删除成功后服务端移除匹配标签（含 detached，壳层随快照关闭独立窗口）；标签同步失败不能把已成功的删除报告为失败。对话工作区迁移仅服务端 `relocated`，保留 key、顺序、placement。GET 启动时及最多每 5 秒轻量核验：确认对话文件不存在才移除；工作区不可访问保留 `workspace_unavailable`；页面标签跳过核验（Git 核验工作区）。
 
-真实删除成功后服务端移除匹配工作区＋对话的标签、撤销 pending 提交权。标签文件同步失败不能把已经成功的对话删除报告为失败；返回独立同步错误，前端保持发送守卫，由后续核验清理。
+## 零工作区（2026-11-13，仍适用）
 
-2026-10-27 对话工作区迁移：仅服务端调用 `DesktopNavigation.relocated`，原位更新匹配 Agent 标签的工作区和标签文字，保留 key、顺序及标签数；目标是当前导航时重新生成 navigation.id，独立设置页不被强制跳走。目标完整落盘及迁移回执持久化后，在导航锁内重定位并退役源文件，避免 GET 核验误把迁移当删除而补空标签；同 operation 重试可补完收尾。禁止通过 deleted＋open、客户端标签列表写回或新增公开 relocate 命令实现。详见 `docs/conversation_transfer.md`。
+新装 host 无工作区是正常空态：后端 `WorkspaceRequired` → `400 code=no_workspace`，前端 `command` 对该 code 静默返回（清 `commandError`，**不再跳转**）；`_lookup` 捕获 `NoWorkspaceError`，`_reconcile` 把标签标 `workspace_unavailable` 并保留，GET 不得 503。判断零工作区只用导航快照，不用组件级 `currentHostWorkspaceId`（设置页等独立路由为空）。host 首次启动由 `ensure_default_host_workspace` 建默认工作区。
 
-GET 启动时及最多每 5 秒轻量核验：确认对话文件不存在才移除；工作区不可访问或读取异常保留错误标签，禁止把权限/网络错误误判成已删除。运行态与标题富化沿用轻量查询，不借用其他工作区的实例。
+## 人工审批黄点（2026-11-05，仍适用）
 
-轮询为一次完成后再排下一次（间隔 500ms），不允许 setInterval 重叠请求；客户端同时比较服务端 revision 与本地响应序号，拒绝旧状态。请求超时 8 秒，网络不确定的命令重试一次相同 envelope。文件损坏或服务不可用时保留错误反馈，不上传空列表覆盖。
+`conversation_tabs.py` 在快照中富化 `awaiting_human_approval`（只投影不落盘）：`human_approval_required=true` 且人工未裁决为等待态，终态/取消/过期下次快照清除；黄点优先于运行点。回归 `test/2026-11-05_完全访问审批/`。
 
-## 验证与发布边界
-
-回归入口：
+## 验证
 
 ```bash
+/opt/homebrew/bin/python3.11 -B -m unittest discover -s test/2026-11-14_桌面多视图 -p "test_navigation_v3.py"
 /opt/homebrew/bin/python3.11 -B test/2026-10-23_桌面导航重构/run_regressions.py
+node test/2026-11-14_桌面多视图/frontend/v3.cjs
+node test/2026-11-14_桌面多视图/frontend/p2.cjs
 ```
 
-覆盖持久化命令、Flask handler 装配、真实 Vue/Pinia 与真实 bootstrap 导航竞态。API 测试使用合成身份替代认证装饰器，不等于认证或原生壳端到端验收。
-
-配套跑工作区、显示快照、草稿/运行引导及标签运行态回归，前端定向 ESLint 和生产 build。不得把离线验证等同于安装包已更新或 macOS/Windows 真机已验收；视觉交互由用户完成。此协议前后端需一起更新，旧前端的 PUT/桥派发不兼容新后端；发布时随同前端产物及 Python 模块打包。
-
-## 2026-11-05：人工审批黄点
-
-- `server/conversation_tabs.py` 在原标签快照中富化 `awaiting_human_approval`，只投影不落盘，不创建执行实例。按认证用户、工作区解析后的根目录及规范化对话 ID 匹配 pending 工具审批。
-- `human_approval_required=true` 且人工未裁决时为等待态；纯自动审核及人工已批准后仅等待自动审核不显示黄点。终态／取消／过期不属于 pending，下一次快照清除。
-- 标签黄点优先于运行标记，使用 `--state-warning` 并带“等待人工审批”无障碍文本；沿用既有轮询，切到其他对话或设置页仍更新。Chat 无工具审批时不显示。
-- 回归：`test/2026-11-05_完全访问审批/`。视觉由用户验收，不以离线状态测试代替原生桌面验收。
+离线回归不等同于真机验收；拖出、红绿灯、多显示器、输入法由用户验收。前端产物、后端模块与 Electron 壳同包发布，旧壳（无 `astrionShell`）加载新前端按网页端降级。

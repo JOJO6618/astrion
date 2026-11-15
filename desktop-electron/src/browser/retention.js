@@ -14,7 +14,7 @@ export class BrowserRetention {
   scope(owner) { return owner.slice(owner.indexOf(':') + 1); }
   async poll() {
     const manager = this.manager;
-    if (this.pending || manager.disposed || !manager.profiles.size || manager.mainView.webContents.isDestroyed()) return;
+    if (this.pending || manager.disposed || !manager.profiles.size || !manager.anySession()) return;
     this.pending = true;
     const sequence = manager.connectSequence;
     try {
@@ -27,7 +27,7 @@ export class BrowserRetention {
       });
       // 已弹出到独立窗口的对话正在被查看，与主窗口当前对话同样算前台。
       const presented = [...manager.popouts.keys()].map(owner => this.scope(owner)).filter(scope => owners.has(scope));
-      const response = await manager.mainView.webContents.session.fetch(`${manager.origin}/api/browser-retention`, {
+      const response = await manager.anySession().fetch(`${manager.origin}/api/browser-retention`, {
         headers: { 'X-Astrion-Browser-State': JSON.stringify({ owners: [...owners].map(key => JSON.parse(key)), tabs, visits: Object.fromEntries(this.visits), presented: presented.map(key => JSON.parse(key)) }) },
         credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(5000)
       });

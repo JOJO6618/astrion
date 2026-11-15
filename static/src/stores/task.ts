@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isViewVisible, HIDDEN_POLL_MS } from '../app/methods/ui/viewVisibility';
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
 import { debugLog, goalModeDebugLog } from '../app/methods/common';
@@ -313,8 +314,13 @@ export const useTaskStore = defineStore('task', {
         lastEventIndex: this.lastEventIndex,
         hasHandler: true
       });
+      // 隐藏视图（桌面多视图）降为约 1s 一次，可见后立即恢复 250ms；从不完全停止。
+      let lastTick = 0;
       const tick = () => {
         if (this.isPolling && this.pollGeneration === generation && this.currentTaskId === taskId) {
+          const now = Date.now();
+          if (!isViewVisible() && now - lastTick < HIDDEN_POLL_MS) return;
+          lastTick = now;
           void this.pollTaskEvents(handler);
         }
       };

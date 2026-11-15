@@ -1,3 +1,4 @@
+import { useConversationTabsStore } from '@/stores/conversationTabs';
 export interface Workspace {
   workspace_id: string;
   label: string;
@@ -102,6 +103,17 @@ export function comparisonQuery(compare: Comparison): Record<string, string> {
 }
 
 export function openReview(review: Pick<Review, 'conversation_id' | 'workspace_id'>) {
+  const tabs = useConversationTabsStore();
+  // 桌面多视图：Git 页面视图固定绑定其页面标签，打开对话 = 发 open 命令。
+  if (tabs.enabled) {
+    void tabs
+      .openConversationTab({
+        conversationId: review.conversation_id,
+        workspaceId: review.workspace_id
+      })
+      .catch(() => {});
+    return;
+  }
   const id = review.conversation_id.replace(/^conv_/, '');
   window.location.assign(
     `/${encodeURIComponent(id)}?workspace_id=${encodeURIComponent(review.workspace_id)}`

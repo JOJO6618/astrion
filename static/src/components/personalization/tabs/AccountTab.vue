@@ -22,10 +22,12 @@ const {
   usageUpdatedText
 } = ctx;
 
-/** 完整的按日统计在设置页「用量统计」分区；桌面标签模式走标签页导航，其余整页跳转 */
+/** 完整的按日统计在设置页「用量统计」分区。
+ * 桌面：本文档若不是设置页标签（如对话视图里的个人空间抽屉），发 page 命令打开/激活设置标签；
+ * 本文档就是设置页或非桌面时就地跳转。 */
 function openUsageStats() {
   const tabs = useConversationTabsStore();
-  if (tabs.enabled) {
+  if (tabs.enabled && !tabs.isSettingsView) {
     void tabs.openPage('/settings/usage').catch(() => {});
     return;
   }
@@ -85,20 +87,20 @@ function openUsageStats() {
           ><span v-else>{{ $t('personalization.usageUpdated', { time: usageUpdatedText }) }}</span
           ><span class="usage-summary-actions"
             ><button
-            type="button"
-            class="usage-summary-refresh"
-            @click="fetchUsageSummary"
-            :disabled="usageLoading"
-          >
-            {{
-              usageLoading
-                ? $t('personalization.usageRefreshing')
-                : $t('personalization.usageRefresh')
-            }}
-          </button>
-          <button type="button" class="usage-summary-refresh" @click="openUsageStats">
-            {{ $t('personalization.usageOpenStats') }}
-          </button></span
+              type="button"
+              class="usage-summary-refresh"
+              @click="fetchUsageSummary"
+              :disabled="usageLoading"
+            >
+              {{
+                usageLoading
+                  ? $t('personalization.usageRefreshing')
+                  : $t('personalization.usageRefresh')
+              }}
+            </button>
+            <button type="button" class="usage-summary-refresh" @click="openUsageStats">
+              {{ $t('personalization.usageOpenStats') }}
+            </button></span
           >
         </div>
       </div>
