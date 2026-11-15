@@ -96,7 +96,7 @@ class ToolsDefinitionBrowserToolsMixin:
                 "timeout": {"type": "number", "description": "等待文字的最长秒数，默认 10，最大 60"},
                 "tab_id": _TAB,
             }), []),
-            _tool("browser_take_screenshot", "截取页面图片，保存到工作区 .astrion/browser_screenshots/。只在需要看视觉效果（布局、样式、图片、图表）时使用；读取内容和操作页面用快照。", intent({
+            _tool("browser_take_screenshot", "截取页面图片，保存到工作区 .astrion/browser_screenshots/。只在需要看视觉效果（布局、样式、图片、图表）时使用；读取内容和操作页面用快照。截图已作为图片附在工具结果中，直接看图判断即可，不要再用 view_image 打开同一个文件。", intent({
                 "target": {"type": "string", "description": "只截该 ref 元素（可选）"},
                 "full_page": {"type": "boolean", "description": "截整页（可选）"},
                 "tab_id": _TAB,

@@ -441,6 +441,8 @@ type ToolCategory =
   | 'conversation'
   | 'sub_agent'
   | 'sub_agent_manage'
+  | 'worktree_enter'
+  | 'worktree_exit'
   | 'wait'
   | 'ask'
   | 'plan'
@@ -512,6 +514,10 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   stop_sub_agent: 'sub_agent_manage',
   answer_sub_agent_question: 'sub_agent_manage',
 
+  // Git 工作树：进入/创建 / 退出
+  enter_worktree: 'worktree_enter',
+  exit_worktree: 'worktree_exit',
+
   // 其他原生工具
   sleep: 'wait',
   ask_user: 'ask',
@@ -543,6 +549,8 @@ const CATEGORY_LABEL_KEYS: Record<ToolCategory, string> = {
   conversation: 'chat.summaryConversation',
   sub_agent: 'chat.summarySubAgent',
   sub_agent_manage: 'chat.summarySubAgentManage',
+  worktree_enter: 'chat.summaryWorktreeEnter',
+  worktree_exit: 'chat.summaryWorktreeExit',
   wait: 'chat.summaryWait',
   ask: 'chat.summaryAsk',
   plan: 'chat.summaryPlan',
@@ -572,6 +580,8 @@ const CATEGORY_ORDER: ToolCategory[] = [
   'conversation',
   'sub_agent',
   'sub_agent_manage',
+  'worktree_enter',
+  'worktree_exit',
   'wait',
   'ask',
   'plan',
