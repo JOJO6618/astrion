@@ -136,6 +136,24 @@ export class SummarySweepController {
     this.replace(input, now);
   }
 
+  /**
+   * Land on the given input immediately, without reveal/sweep/replacement.
+   * Used while the surface is off-screen (hidden tab, hidden desktop view,
+   * scrolled out of sight) so the summary is already static when it becomes
+   * visible again instead of replaying updates buffered in the meantime.
+   */
+  settle(input: SummarySweepInput, now: number): void {
+    this.finishingPass = false;
+    this.afterThinkingEntry = null;
+    this.desired = { ...input };
+    this.adopt(input, now);
+    this.committed = input.text;
+    this.nextSweepAt = now + SUMMARY_SWEEP_GAP_MS;
+    // A gated label has not settled yet; keep it pending so the reel/cache
+    // state is rebuilt by the next real input rather than faked here.
+    if (input.ready !== false) this.onSettled({ ...input });
+  }
+
   setReducedMotion(reduced: boolean, now: number): void {
     this.reducedMotion = reduced;
     if (!this.desired || this.desired.ready === false) return;

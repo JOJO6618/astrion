@@ -9,6 +9,7 @@ import {
   createReplacementMasks,
   EMPTY_SUMMARY_MASK
 } from '@/components/chat/summarySweepMotion';
+import { isViewVisible, onViewVisibilityChange } from '@/app/methods/ui/viewVisibility';
 
 export function useSummarySweep(
   root: Ref<HTMLElement | null>,
@@ -30,7 +31,14 @@ export function useSummarySweep(
   let lastFrame: number | null = null;
   let clock = 0;
   let visible = true;
+  let unsubscribeView: (() => void) | null = null;
   let outgoingWidth = 0;
+
+  // Off-screen (background tab, hidden desktop view, scrolled out of the
+  // viewport): never animate. Land on the latest label so switching back to
+  // the conversation shows the finished state directly instead of replaying
+  // every refresh that happened while it was not displayed.
+  const suppressed = () => !visible || document.hidden || !isViewVisible();
 
   const measure = () => {
     let textWidth = beam.value?.getBoundingClientRect().width || 0;
@@ -141,7 +149,7 @@ export function useSummarySweep(
   }
 
   function scheduleFrame(): void {
-    if (frameId !== null || !visible || document.hidden || !controller?.needsFrame) return;
+    if (frameId !== null || suppressed() || !controller?.needsFrame) return;
     frameId = window.requestAnimationFrame((timestamp) => {
       frameId = null;
       if (lastFrame !== null) clock += Math.min(64, timestamp - lastFrame);
@@ -152,15 +160,30 @@ export function useSummarySweep(
     });
   }
 
+  /** Drop any half-played pass and show the latest label as it is. */
+  function settleNow(): void {
+    if (!controller) return;
+    controller.settle(getInput(), clock);
+  }
+
   function update(): void {
     const input = getInput();
+    if (suppressed()) {
+      controller?.settle(input, clock);
+      return;
+    }
     controller?.setInput(input, clock);
     scheduleFrame();
   }
 
   function onVisibilityChange(): void {
-    if (document.hidden) stopFrame();
-    else scheduleFrame();
+    if (document.hidden) {
+      stopFrame();
+      settleNow();
+    } else {
+      settleNow();
+      scheduleFrame();
+    }
   }
 
   function onMotionChange(): void {
@@ -187,9 +210,16 @@ export function useSummarySweep(
     document.addEventListener('visibilitychange', onVisibilityChange);
     if (root.value) {
       observer = new IntersectionObserver(([entry]) => {
+        const wasVisible = visible;
         visible = entry.isIntersecting;
-        if (visible) scheduleFrame();
-        else stopFrame();
+        if (visible) {
+          // Anything that piled up while off-screen must appear as static.
+          if (!wasVisible) settleNow();
+          scheduleFrame();
+        } else {
+          stopFrame();
+          settleNow();
+        }
       });
       observer.observe(root.value);
       resizeObserver = new ResizeObserver(() => {
@@ -199,10 +229,23 @@ export function useSummarySweep(
       resizeObserver.observe(root.value);
     }
     update();
+    // Desktop multi-view: hidden views keep polling at a lower rate, and the
+    // sweep follows the same rule — settle instead of replaying on return.
+    unsubscribeView = onViewVisibilityChange((visibleNow) => {
+      if (visibleNow) {
+        settleNow();
+        scheduleFrame();
+      } else {
+        stopFrame();
+        settleNow();
+      }
+    });
   });
 
   onBeforeUnmount(() => {
     stopFrame();
+    unsubscribeView?.();
+    unsubscribeView = null;
     observer?.disconnect();
     resizeObserver?.disconnect();
     media?.removeEventListener('change', onMotionChange);
