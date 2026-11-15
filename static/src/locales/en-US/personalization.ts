@@ -166,6 +166,8 @@ export default {
   codexUsagePlan: 'Plan: {plan}',
   codexUsagePrimaryWindow: '5-hour window',
   codexUsageSecondaryWindow: 'Weekly window',
+  codexUsageHoursWindow: '{n}-hour window',
+  codexUsageDaysWindow: '{n}-day window',
   codexUsageResetIn: 'resets in ~{time}',
   codexUsageDaysHours: '{days}d {hours}h',
   codexUsageHoursMinutes: '{hours}h {minutes}m',

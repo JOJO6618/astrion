@@ -164,6 +164,8 @@ export default {
   codexUsagePlan: '套餐：{plan}',
   codexUsagePrimaryWindow: '5 小时窗口',
   codexUsageSecondaryWindow: '每周窗口',
+  codexUsageHoursWindow: '{n} 小时窗口',
+  codexUsageDaysWindow: '{n} 天窗口',
   codexUsageResetIn: '约 {time} 后重置',
   codexUsageDaysHours: '{days} 天 {hours} 小时',
   codexUsageHoursMinutes: '{hours} 小时 {minutes} 分钟',

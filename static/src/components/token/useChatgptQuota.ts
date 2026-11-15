@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { t, currentLocale } from '@/locales';
+import { currentLocale } from '@/locales';
 import type { ModelOption } from '@/stores/model';
+import { quotaWindowLabel } from './quotaWindow';
 import { useSettingsStore } from '@/stores/settings';
 import { useChatgptQuotaStore } from '@/stores/chatgptQuota';
 
@@ -50,11 +51,8 @@ export function useChatgptQuota(
       return [
         {
           key,
-          label: t(
-            key === 'primary_window'
-              ? 'personalization.codexUsagePrimaryWindow'
-              : 'personalization.codexUsageSecondaryWindow'
-          ),
+          // 标题按窗口时长决定：只有周限额的账号周窗口占 primary_window 槽位。
+          label: quotaWindowLabel(window.limit_window_seconds),
           percent: Math.min(100, Math.max(0, Math.round(window.used_percent))),
           resetText: Number.isFinite(resetAt)
             ? new Date(resetAt).toLocaleString(locale, {

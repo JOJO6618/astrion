@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { t } from '@/locales';
+import { t, currentLocale } from '@/locales';
 import { useSettingsStore } from '@/stores/settings';
 import { useUiStore } from '@/stores/ui';
 import { useChatgptQuotaStore } from '@/stores/chatgptQuota';
+import { quotaWindowLabel } from '@/components/token/quotaWindow';
 import CodexWeeklyValue from './CodexWeeklyValue.vue';
 
 defineOptions({ name: 'CodexTab' });
@@ -173,7 +174,8 @@ const formatResetDuration = (seconds: number): string => {
 };
 
 interface UsageWindowView {
-  labelKey: string;
+  key: string;
+  label: string;
   percent: number;
   resetText: string;
   level: 'normal' | 'warning' | 'danger';
@@ -182,20 +184,23 @@ interface UsageWindowView {
 const usageWindows = computed<UsageWindowView[]>(() => {
   const rl = usage.value?.rate_limit;
   if (!rl) return [];
+  // 标题按窗口时长取词：唯一依赖的响应式来源是当前语言。
+  void currentLocale.value;
   const out: UsageWindowView[] = [];
-  const push = (key: string, labelKey: string) => {
+  const push = (key: string) => {
     const w = rl[key];
     if (!w || typeof w.used_percent !== 'number') return;
     const percent = Math.min(100, Math.max(0, Math.round(w.used_percent)));
     out.push({
-      labelKey,
+      key,
+      label: quotaWindowLabel(w.limit_window_seconds),
       percent,
       resetText: formatResetDuration(w.reset_after_seconds),
       level: percent >= 95 ? 'danger' : percent >= 80 ? 'warning' : 'normal'
     });
   };
-  push('primary_window', 'personalization.codexUsagePrimaryWindow');
-  push('secondary_window', 'personalization.codexUsageSecondaryWindow');
+  push('primary_window');
+  push('secondary_window');
   return out;
 });
 
@@ -539,9 +544,9 @@ onMounted(async () => {
           </div>
         </div>
         <div v-if="usageWindows.length" class="codex-usage-windows">
-          <div v-for="w in usageWindows" :key="w.labelKey" class="codex-usage-window">
+          <div v-for="w in usageWindows" :key="w.key" class="codex-usage-window">
             <div class="codex-usage-window__head">
-              <span>{{ $t(w.labelKey) }}</span>
+              <span>{{ w.label }}</span>
               <span
                 >{{ w.percent }}% ·
                 {{ $t('personalization.codexUsageResetIn', { time: w.resetText }) }}</span
