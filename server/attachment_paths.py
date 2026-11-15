@@ -16,8 +16,13 @@ def build_media_paths_message(images: Optional[List[Any]], videos: Optional[List
             paths.append(path)
     if not paths:
         return None
-    return "\n".join(["[系统通知|media_paths]", "本次消息附带的媒体文件路径：",
-                      *(f"- `{path}`" for path in paths)])
+    return "\n".join([
+        "[系统通知|media_paths]",
+        "这些媒体已随本次消息一并发送，若你已能看到图片/视频内容，就不要再调用 view_image / view_video 重新打开；"
+        "下面的路径只用于后续裁切、局部放大或引用。",
+        "本次消息附带的媒体文件路径：",
+        *(f"- `{path}`" for path in paths),
+    ])
 
 
 def normalize_attached_files(files: Optional[List[Any]]) -> List[str]:
