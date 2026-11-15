@@ -662,6 +662,12 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 完整已确认契约：`docs/git_worktree.md`，改工作树、执行根、主子切换通知和分支入口前必读。用户级启用默认关闭，创建新对话时快照 metadata，老对话不迁移。工作树放工作区 `.astrion/worktrees/`；workspace 身份与执行根分离。创建必传起始版本和是否携带未提交修改；进入／退出两个工具，不提供合并工具、不自动清理。用户只在主智能体空闲时切换；主／子初始环境进 system，后续切换以工具结果／既有 user 通知传达，冻结 system 不改。子运行中在完整工具批次边界同步，idle 等下次发消息同步。实现位于 `modules/git_worktree/`、`server/status/worktree.py` 与前端 `stores/gitWorktree.ts`／`WorktreeMenu.vue`。前台／后台命令及新终端都按当前执行根解析，既有进程保留原 cwd；技能与项目记忆归属原工作区。编辑记录／预览用 workspace-relative 路径，根偏移时模型工具结果用绝对路径，不得把 bootstrap 的文件资源改成执行根后重复拼接。失效绑定与损坏 Git 记录保留恢复入口，执行失败不得回退主目录；非 Local 后端明确拒绝。macOS 真实临时 Git、主子循环与前端离线回归已通过，详细数量及命令见 `test/2026-11-14_Git工作树/README.md`；Windows／WSL／Linux／Docker 原生执行与 UI 仍待实机验收，不把路径模拟当跨平台验收。
 
+**外部／非托管工作树（2026-11-15）**：`enter` 的键是 `branch_name` 或 `directory`，**严格互斥**，同时提供或都不提供都直接报错；有分支名的工作树只能用 branch_name，detached HEAD 只能用 directory。create 仍只落 `.astrion/worktrees/`，不接受路径、不产生授权。工作区内任意已注册工作树可直接进入；工作区外需满足：模型侧必须在「路径授权」可读写集合内或 `execution_mode=direct`，用户手动切换不受限但仍须是本仓库已注册工作树（拒绝主工作树、符号链接、非工作树目录）。对话绑定外部根时写 `git_worktree.grant={path, added}`，运行期只由 `modules/git_worktree/grants.py` 的 ContextVar 经 `get_macos_writable_paths`／`get_macos_readable_paths` 单点并入沙箱边界（文件工具、前台／后台命令、`terminal_manager` cwd 守门同源），**禁止写用户级策略文件**；`threading.Thread` 不继承 ContextVar，后台命令必须显式快照并重绑。退出前置：该根下有运行中子智能体／后台命令／终端进程时拒绝退出；退出即清除绑定与临时放行。全新回归 `test/2026-11-15_工作树外部路径/`。
+
+**绑定点必须覆盖主任务全流程（2026-11-15 实机补全）**：除工具分发外，`server/chat_flow.py::process_message_task` 线程入口、`service.enter`（branch_name 分支）与 `service.change`（exit 前残留检查）也必须包 `bind_extra_roots`；只在工具层绑定会漏掉建对话、系统提示词里的 git 状态与分支校验，表现为「发送失败：工作目录必须在项目文件夹内」。
+
+**前端显示与草稿（2026-11-15 实机补全）**：`POST /api/git-worktree/inspect` 的预检结果就是状态栏分支权威值（`/tmp` 与 `/private/tmp` 这类符号链接路径不能靠字符串比对）；`/new` 草稿目标不得被 `hydrate()` 无条件清空（仅 `cid !== null` 时清）；`refresh`／`select` 以输入栏弹窗的对话身份为准，避免 `hydrate` 竞态导致 scope 不一致、点击静默无反应；i18n 文案禁止裸 `@`（vue-i18n 按 linked message 解析抛 `INVALID_LINKED_FORMAT`，会让整个下拉渲染中断）。
+
 ## 28) 存储空间统计与清理（2026-11-15）
 
 - **入口**：设置页「账户 → 存储空间」（`/settings/storage`，与用量统计同宽列）；前端 `settings/tabs/StorageTab.vue` + `tabs/storage/`，文案命名空间 `storageStats`，分类色为新增 `--storage-1..8`（三主题＋首屏回退已补齐）。分区在 `SettingsShell` 的 NAV_GROUPS／SECTION_META／SECTION_COMPONENTS 与 `stores/settings.ts` 的 `SettingsSection` 同步登记。

@@ -40,6 +40,22 @@ def get_worktree(data_context, workspace, username):
         return jsonify(success=False, error=str(exc)), 400
 
 
+@status_bp.post('/api/git-worktree/inspect')
+@api_login_required
+@with_terminal
+def inspect_worktree_path(terminal, workspace, username):
+    """只读：告知前端这个路径能否作为 enter 目标（不改绑定、不创建任何东西）。"""
+    payload = request.get_json(silent=True) or {}
+    path = payload.get('path')
+    if not isinstance(path, str) or not path.strip():
+        return jsonify(success=False, error='必须提供工作树路径。'), 400
+    try:
+        info = asyncio.run(Worktrees(terminal).describe(path.strip()))
+    except (ValueError, OSError, RuntimeError) as exc:
+        info = {'valid': False, 'error': str(exc)}
+    return jsonify(success=True, data=info)
+
+
 @status_bp.post('/api/git-worktree')
 @api_login_required
 @with_terminal
@@ -63,7 +79,7 @@ def change_worktree(terminal, workspace, username):
         if operation not in {'enter', 'exit'}:
             raise ValueError('无效的工作树操作。')
         result = asyncio.run(Worktrees(terminal).change(
-            payload.get('target'), exit=operation == 'exit', notify_user=True,
+            payload.get('target'), exit=operation == 'exit', notify_user=True, origin='user',
         ))
         return jsonify(result), 200 if result.get('success') else 400
     except (ValueError, OSError, RuntimeError) as exc:

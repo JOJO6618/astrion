@@ -131,12 +131,26 @@ def generate_conversation_title_background(web_terminal: WebTerminal, conversati
     )
 
 
+def conversation_external_roots(terminal):
+    """当前对话绑定了工作区外的工作树时，返回需要在主任务里放行的根。"""
+    try:
+        from modules.git_worktree.grants import external_roots
+        meta = getattr(getattr(terminal, 'context_manager', None), 'conversation_metadata', None) or {}
+        binding = meta.get('git_worktree') if isinstance(meta, dict) else None
+        directory = binding.get('directory') if isinstance(binding, dict) else None
+        return external_roots(directory, getattr(terminal, 'project_path', None))
+    except Exception:
+        return ()
+
+
 def detect_malformed_tool_call(text):
     return _detect_malformed_tool_call(text)
 
 
 def process_message_task(terminal: WebTerminal, message: str, images, sender, client_sid, workspace: UserWorkspace, username: str, videos=None, files=None, main_task_gate_token: Optional[str] = None, preceding_child_notices=None):
     """在后台处理消息任务"""
+    from modules.git_worktree.grants import bind_extra_roots
+
     videos = videos or []
     files = files or []
     auto_user_message_event = bool(getattr(terminal, "_auto_user_message_event", False))
@@ -157,6 +171,10 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         return
 
     loop = None
+    # 对话绑定到工作区外的工作树时，整个主任务（含内部命令与工具调用）都要放行该根；
+    # 只在工具分发处绑定会漏掉建对话、摘要与 git 状态等主任务内部命令。
+    _extra_roots_ctx = bind_extra_roots(conversation_external_roots(terminal))
+    _extra_roots_ctx.__enter__()
     try:
         # 受理成功且认领门闸后才写入前置子消息。
         from .chat_flow_task_support import inject_multi_agent_master_message
@@ -289,6 +307,10 @@ def process_message_task(terminal: WebTerminal, message: str, images, sender, cl
         clear_stop_flag(client_sid, username)
         # 释放对话级主任务门闸（仅持有者可释放，重复调用为无操作）
         release_main_task_gate(terminal, gate_token)
+        try:
+            _extra_roots_ctx.__exit__(None, None, None)
+        except Exception:
+            pass
 
 # === 统一对外入口 ===
 def start_chat_task(terminal, message: str, images: Any, sender, client_sid: str, workspace, username: str, videos: Any = None):

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from modules.scoped_execution_policy import fixed_execution_root
 from . import child_environment
+from .grants import bind_extra_roots, external_roots
 
 
 def queue_binding(manager, state):
@@ -35,9 +36,11 @@ def apply_pending(instance):
         if not directory:
             raise ValueError('待同步的工作树缺少执行目录。')
         scope = replace(instance.execution_scope, execution_root=Path(directory))
-        fixed_execution_root(scope)
+        with bind_extra_roots(external_roots(directory, scope.workspace_root)):
+            fixed_execution_root(scope)
         content = '[工作树环境变更]\n' + child_environment(
-            directory, state.get('branch'), access_level=scope.access_level, working_dir=scope.working_dir)
+            directory, state.get('branch'), access_level=scope.access_level,
+            working_dir=scope.working_dir, head=state.get('head'))
         revision = state.get('revision', 0)
         # A retry after registry-write failure must not duplicate a durable notice.
         if not any(message.get('name') == f'worktree_change_{revision}' for message in instance.messages if message.get('role') == 'user'):
@@ -62,7 +65,9 @@ def apply_pending(instance):
 def sync_before_work(instance):
     try:
         apply_pending(instance)
-        fixed_execution_root(instance.execution_scope)
+        scope = instance.execution_scope
+        with bind_extra_roots(external_roots(getattr(scope, 'execution_root', None), scope.workspace_root)):
+            fixed_execution_root(scope)
         return True
     except (ValueError, OSError, RuntimeError) as exc:
         # Do not consume queued messages or issue another model request on the old

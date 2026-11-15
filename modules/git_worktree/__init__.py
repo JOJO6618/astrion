@@ -18,19 +18,31 @@ def current_state(metadata: Any) -> dict:
     return dict(state) if isinstance(state, dict) else {}
 
 
+def branch_label(state: dict) -> str:
+    """工作树当前状态的显示名；detached 工作树没有分支名。"""
+    branch = str(state.get('branch') or '').strip()
+    if branch:
+        return branch
+    head = str(state.get('head') or '').strip()
+    if head:
+        return f'detached @ {head[:7]}'
+    return '主目录当前分支'
+
+
 def prompt(metadata: Any, workspace_root: str) -> str:
     if not enabled(metadata):
         return ''
     state = current_state(metadata)
     root = state.get('directory') or str(workspace_root)
-    branch = state.get('branch') or '主目录当前分支'
+    branch = branch_label(state)
     from config import PROMPTS_DIR
     template = (Path(PROMPTS_DIR) / 'main_agent/dynamic/git_worktree.txt').read_text(encoding='utf-8')
     return template.format(directory=root, branch=branch).strip()
 
 
-def child_environment(directory, branch, *, access_level, working_dir):
-    text = (f'当前执行目录：{directory}\n当前分支：{branch or "主目录当前分支"}\n'
+def child_environment(directory, branch, *, access_level, working_dir, head=None):
+    label = str(branch or '').strip() or (f'detached @ {str(head)[:7]}' if head else '主目录当前分支')
+    text = (f'当前执行目录：{directory}\n当前分支：{label}\n'
             '相对文件路径和新命令以当前执行目录为基准；跟随主对话切换，不能自行调用工作树工具。'
             'MCP 等外置工具继续使用自身配置的 cwd。')
     if access_level == 'working_dir_write':
@@ -44,7 +56,7 @@ def child_environment(directory, branch, *, access_level, working_dir):
 def notification(state: dict) -> str:
     return (
         '[工作树环境变更]\n'
-        f'当前分支：{state.get("branch") or "主目录当前分支"}\n'
+        f'当前分支：{branch_label(state)}\n'
         f'当前执行目录：{state["directory"]}\n'
         '后续文件操作和新命令使用该执行目录。已有进程保留原目录。'
         '环境选择已经明确，不要重复询问。MCP 等外置工具继续使用自身配置的 cwd。'
@@ -67,13 +79,17 @@ def definitions() -> list[dict]:
     }
     enter = {
         'type': 'object',
-        'properties': {'action': {'type': 'string', 'enum': ['enter']}, 'branch_name': branch},
-        'required': ['action', 'branch_name'], 'additionalProperties': False,
+        'properties': {
+            'action': {'type': 'string', 'enum': ['enter']},
+            'branch_name': branch,
+            'directory': {'type': 'string', 'description': '工作树的绝对路径。仅当目标工作树是 detached HEAD（没有分支名）时使用；与 branch_name 二选一。'},
+        },
+        'required': ['action'], 'additionalProperties': False,
     }
     return [
         {'type': 'function', 'function': {
             'name': 'enter_worktree',
-            'description': '为当前对话创建并进入 Git 工作树，或进入已有工作树。文件操作和命令执行跟随新的执行目录。工作树位于工作区 .astrion/worktrees/ 下。不提交、不合并；不得与其它工具并行调用。',
+            'description': '为当前对话创建并进入 Git 工作树，或进入已有工作树。文件操作和命令执行跟随新的执行目录。create 的落点在当前工作区 .astrion/worktrees/ 下；enter 可进入工作区内任意已注册工作树，工作区外的需在沙箱路径授权内。不提交、不合并；不得与其它工具并行调用。',
             'parameters': {'type': 'object', 'properties': {
                 'intent': intent, 'target': {'anyOf': [create, enter]},
             }, 'required': ['intent', 'target'], 'additionalProperties': False},

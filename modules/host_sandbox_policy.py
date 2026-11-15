@@ -205,6 +205,25 @@ def save_workspace_entry(workspace_path: str, writable: List[str], readable_extr
     return entry
 
 
+def _extra_execution_roots(write: bool) -> List[str]:
+    """当前工具调用上下文里额外放行的执行根（工作区外工作树）。
+
+    来源是 `modules/git_worktree/grants.py` 的对话级绑定，不写入任何策略文件；
+    没有活动绑定时恒为空，所以不影响普通路径授权的语义。子智能体的
+    working_dir_write / workspace_write 写根仍由各自计划与原生 IO 收窄。
+    """
+    try:
+        from modules.git_worktree.grants import current_extra_roots
+        from modules.execution_scope import current_execution_scope
+    except Exception:  # noqa: BLE001 - 授权读取失败时按无额外根处理
+        return []
+    if write:
+        scope = current_execution_scope()
+        if scope is not None and scope.workspace_only:
+            return []
+    return [str(path) for path in current_extra_roots()]
+
+
 def get_macos_writable_paths(workspace_path: Optional[str] = None) -> List[str]:
     """沙箱可写路径全集 = 部署环境变量 + policy 文件（合并去重）。
 
@@ -235,6 +254,9 @@ def get_macos_writable_paths(workspace_path: Optional[str] = None) -> List[str]:
             for raw in host_memory_roots(workspace_path):
                 if raw not in merged:
                     merged.append(raw)
+    for raw in _extra_execution_roots(write=True):
+        if raw not in merged:
+            merged.append(raw)
     return merged
 
 
@@ -254,6 +276,9 @@ def get_macos_readable_paths(workspace_path: Optional[str] = None) -> List[str]:
         for raw in host_memory_roots(workspace_path):
             if raw not in merged:
                 merged.append(raw)
+    for raw in _extra_execution_roots(write=False):
+        if raw not in merged:
+            merged.append(raw)
     return merged
 
 

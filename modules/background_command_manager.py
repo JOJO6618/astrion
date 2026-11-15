@@ -22,6 +22,7 @@ from modules.host_sandbox_runner import (
 from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
 from modules.execution_scope import current_execution_scope, bind_execution_scope
+from modules.git_worktree.grants import bind_extra_roots, current_extra_roots
 from modules.scoped_execution_policy import (
     require_scoped_docker_support, scoped_work_path, scoped_write_access,
 )
@@ -135,6 +136,9 @@ class BackgroundCommandManager:
                 "session": session_override or getattr(terminal_ops, "container_session", None),
                 "host_execution_mode": scope.execution_mode if scope else getattr(terminal_ops, "host_execution_mode", "sandbox"),
                 "execution_scope": scope,
+                # threading.Thread 不会继承 ContextVar；工作区外执行根的临时放行
+                # 必须在创建时快照、在线程内重新绑定，否则后台命令会被沙箱拒绝。
+                "extra_roots": current_extra_roots(),
                 # 网络权限必须按调用方（对话级 terminal）快照传入，不能读进程级
                 # 环境变量——env 会被其他 terminal 实例覆盖，导致权限不生效或跨工作区串扰。
                 "network_permission": network_permission,
@@ -198,9 +202,9 @@ class BackgroundCommandManager:
                 "background_task_created": True,
             }
 
-    def _run_command_thread(self, *, execution_scope=None, **kwargs) -> None:
+    def _run_command_thread(self, *, execution_scope=None, extra_roots=(), **kwargs) -> None:
         scope = execution_scope if execution_scope is not None else current_execution_scope()
-        with bind_execution_scope(scope):
+        with bind_extra_roots(extra_roots), bind_execution_scope(scope):
             self._run_command_thread_bound(**kwargs)
 
     def _run_command_thread_bound(

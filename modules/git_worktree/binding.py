@@ -1,14 +1,34 @@
 """Change execution defaults without moving workspace identity or live processes."""
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from . import current_state, enabled
+
+
+def granted_root(state: dict) -> Optional[Path]:
+    """对话绑定里记录的临时放行根（工作区外工作树），没有则 None。"""
+    grant = state.get('grant') if isinstance(state, dict) else None
+    if not isinstance(grant, dict):
+        return None
+    raw = str(grant.get('path') or '').strip()
+    if not raw:
+        return None
+    try:
+        return Path(raw).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
 
 
 def checked_root(owner: Any, state: dict) -> Path:
     raw = Path(state.get('directory') or owner.project_path)
     root = raw.resolve()
-    root.relative_to(Path(owner.project_path).resolve())
+    workspace = Path(owner.project_path).resolve()
+    try:
+        root.relative_to(workspace)
+    except ValueError:
+        # 工作区外只有本对话显式绑定的执行根可用；没有记录就拒绝，绝不回退主目录。
+        if granted_root(state) != root:
+            raise ValueError('工作树执行目录位于工作区外且未记录授权，请先返回主目录或选择有效工作树；拒绝回退执行。')
     if (state.get('directory') and raw != root) or not root.is_dir():
         raise ValueError('工作树执行目录已失效或被重定向，请先返回主目录或选择有效工作树；拒绝回退执行。')
     return root

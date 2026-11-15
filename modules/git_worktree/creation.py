@@ -27,7 +27,7 @@ def prepare(owner, settings, target):
     temporary.get_execution_mode = lambda: settings['execution_mode']
     temporary.get_network_permission = lambda: settings['network_permission']
     temporary.execution_backend = LocalExecutionBackend(temporary)
-    result = asyncio.run(Worktrees(temporary).change(target, persist=False))
+    result = asyncio.run(Worktrees(temporary).change(target, persist=False, origin='user'))
     if not result.get('success'):
         detail = result.get('error') or '工作树准备失败。'
         if result.get('retained_directory'):

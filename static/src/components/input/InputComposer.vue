@@ -1195,7 +1195,11 @@ const projectGitSummaryForRender = computed(() => {
   const result = {
     projectName,
     projectPath: String(summary.project_path || '').trim(),
-    branch: gitWorktreeStore.enabled && gitWorktreeStore.branch ? gitWorktreeStore.branch : branch,
+    // detached 工作树没有分支名，必须显式显示 HEAD，不能回退成主仓库分支。
+    branch:
+      gitWorktreeStore.enabled && (gitWorktreeStore.branch || gitWorktreeStore.head)
+        ? gitWorktreeStore.branch || `detached @ ${String(gitWorktreeStore.head).slice(0, 7)}`
+        : branch,
     additions: Math.max(0, Number(summary.additions || 0)),
     deletions: Math.max(0, Number(summary.deletions || 0))
   };

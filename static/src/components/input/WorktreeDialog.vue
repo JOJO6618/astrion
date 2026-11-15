@@ -25,25 +25,99 @@ const mode = ref('main');
 const branch = ref('');
 const startRef = ref('HEAD');
 const includeUncommitted = ref(false);
+const manualPath = ref('');
+const picking = ref(false);
+const pickError = ref('');
+const pathInfo = ref<{ valid: boolean; branch?: string; head?: string; error?: string } | null>(
+  null
+);
+const pathChecking = ref(false);
+let pathTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** 可作为切换目标的工作树：排除主目录和已失效记录。 */
+const treeOptions = computed(() =>
+  store.worktrees.filter((tree) => !tree.is_main && !tree.unavailable)
+);
+
+const treeLabel = (tree: { branch: string; head?: string }) =>
+  tree.branch || t('input.worktreeDetached', { sha: (tree.head || '').slice(0, 7) });
 
 const options = computed(() => [
   { value: 'main', label: t('input.worktreeMain') },
   { value: 'create', label: t('input.worktreeCreate') },
-  ...store.worktrees
-    .filter((tree) => !tree.is_main && !tree.unavailable && tree.branch)
-    .map((tree) => ({ value: `enter:${tree.branch}`, label: tree.branch }))
+  ...treeOptions.value.map((tree, index) => ({ value: `tree:${index}`, label: treeLabel(tree) })),
+  { value: 'path', label: t('input.worktreePickPath') }
 ]);
+
+const selectedTree = computed(() => {
+  const match = /^tree:(\d+)$/.exec(mode.value);
+  return match ? treeOptions.value[Number(match[1])] || null : null;
+});
 const disabled = computed(() => props.busy || store.busy);
-const valid = computed(
-  () => mode.value !== 'create' || (!!branch.value.trim() && !!startRef.value.trim())
-);
+const valid = computed(() => {
+  if (mode.value === 'create') return !!branch.value.trim() && !!startRef.value.trim();
+  if (mode.value === 'path') return !!manualPath.value.trim() && pathInfo.value?.valid === true;
+  return true;
+});
+
+/** 切换前先问后端：这个路径到底能不能进（不改绑定、不创建任何东西）。 */
+async function inspectPath(path: string) {
+  pathChecking.value = true;
+  try {
+    const resp = await fetch('/api/git-worktree/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Astrion-Workspace-Id': props.workspaceId },
+      body: JSON.stringify({ path })
+    });
+    const data = await resp.json().catch(() => ({}));
+    pathInfo.value = data?.success
+      ? data.data
+      : { valid: false, error: String(data?.error || t('input.worktreePickFolderFailed')) };
+  } catch (error) {
+    pathInfo.value = { valid: false, error: String((error as Error).message || error) };
+  } finally {
+    pathChecking.value = false;
+  }
+}
+
+watch(manualPath, (value) => {
+  pathInfo.value = null;
+  if (mode.value !== 'path') return;
+  if (pathTimer) clearTimeout(pathTimer);
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  pathTimer = setTimeout(() => void inspectPath(trimmed), 400);
+});
+
+function syncMode() {
+  // 工作树列表在 refresh 之后才可用；刷新前后各对一次，避免把当前工作树误显示为主目录。
+  if (store.draftTarget?.action === 'create') {
+    mode.value = 'create';
+    branch.value = store.draftTarget.branch_name;
+    startRef.value = store.draftTarget.start_ref;
+    includeUncommitted.value = store.draftTarget.include_uncommitted;
+    return;
+  }
+  if (mode.value === 'path' || mode.value === 'create') return;
+  if (!store.active || !store.directory) {
+    mode.value = 'main';
+    return;
+  }
+  const index = treeOptions.value.findIndex((tree) => tree.directory === store.directory);
+  mode.value = index >= 0 ? `tree:${index}` : 'main';
+}
 
 watch(
   () => props.open,
   async (open) => {
     if (!open) return;
     store.error = '';
-    mode.value = store.active && store.branch ? `enter:${store.branch}` : 'main';
+    manualPath.value = '';
+    pickError.value = '';
+    pathInfo.value = null;
+    pathChecking.value = false;
+    mode.value = 'main';
+    syncMode();
     if (store.draftTarget?.action === 'create') {
       mode.value = 'create';
       branch.value = store.draftTarget.branch_name;
@@ -53,6 +127,7 @@ watch(
     await nextTick();
     panel.value?.focus();
     await store.refresh(props.conversationId, props.workspaceId);
+    syncMode();
   }
 );
 
@@ -68,6 +143,29 @@ function close() {
   emit('close');
 }
 
+async function pickFolder() {
+  if (picking.value || disabled.value) return;
+  picking.value = true;
+  pickError.value = '';
+  try {
+    const resp = await fetch('/api/project/pick-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const result = await resp.json().catch(() => ({}));
+    if (!resp.ok || !result?.success)
+      throw new Error(result?.error || t('input.worktreePickFolderFailed'));
+    const picked = String(result?.data?.path || '').trim();
+    if (picked) manualPath.value = picked;
+  } catch (error) {
+    pickError.value =
+      error instanceof Error ? error.message : String(error || t('input.worktreePickFolderFailed'));
+  } finally {
+    picking.value = false;
+  }
+}
+
 async function save() {
   if (disabled.value || !valid.value) return;
   let target: WorktreeTarget | null = null;
@@ -78,9 +176,17 @@ async function save() {
       start_ref: startRef.value.trim(),
       include_uncommitted: includeUncommitted.value
     };
-  else if (mode.value.startsWith('enter:'))
-    target = { action: 'enter', branch_name: mode.value.slice(6) };
-  if (await store.select(target, props.conversationId, props.workspaceId)) {
+  else if (selectedTree.value)
+    target = selectedTree.value.branch
+      ? { action: 'enter', branch_name: selectedTree.value.branch }
+      : { action: 'enter', directory: selectedTree.value.directory };
+  else if (mode.value === 'path') target = { action: 'enter', directory: manualPath.value.trim() };
+  // 手输路径可能带符号链接（/tmp 与 /private/tmp），以预检结果作为分支／HEAD 权威值。
+  const hint =
+    mode.value === 'path' && pathInfo.value?.valid
+      ? { branch: pathInfo.value.branch || '', head: pathInfo.value.head || '' }
+      : undefined;
+  if (await store.select(target, props.conversationId, props.workspaceId, hint)) {
     emit('close');
     emit('changed');
   }
@@ -175,6 +281,46 @@ function trapFocus(event: KeyboardEvent) {
                 <FancyCheck :checked="includeUncommitted" :size="18" />
                 <span>{{ $t('input.worktreeCarry') }}</span>
               </button>
+            </template>
+            <template v-if="mode === 'path'">
+              <label class="worktree-field">
+                <span class="worktree-label">{{ $t('input.worktreePath') }}</span>
+                <input
+                  v-model="manualPath"
+                  type="text"
+                  :disabled="disabled"
+                  :placeholder="$t('input.worktreePathPlaceholder')"
+                  autocomplete="off"
+                  spellcheck="false"
+                  required
+                />
+              </label>
+              <button
+                type="button"
+                class="worktree-carry"
+                :disabled="disabled || picking"
+                @click="pickFolder"
+              >
+                <span>{{
+                  picking ? $t('input.worktreePickingFolder') : $t('input.worktreePickFolder')
+                }}</span>
+              </button>
+              <p v-if="pickError" class="worktree-error" role="alert">{{ pickError }}</p>
+              <p v-else-if="pathChecking" class="worktree-hint">
+                {{ $t('input.worktreeCheckingPath') }}
+              </p>
+              <p v-else-if="pathInfo && !pathInfo.valid" class="worktree-error" role="alert">
+                {{ pathInfo.error }}
+              </p>
+              <p v-else-if="pathInfo?.valid" class="worktree-hint">
+                {{
+                  $t('input.worktreePathReady', {
+                    target:
+                      pathInfo.branch ||
+                      $t('input.worktreeDetached', { sha: (pathInfo.head || '').slice(0, 7) })
+                  })
+                }}
+              </p>
             </template>
             <p v-if="store.error" class="worktree-error" role="alert">{{ store.error }}</p>
           </div>
@@ -311,6 +457,14 @@ function trapFocus(event: KeyboardEvent) {
   font-size: 11px;
   line-height: 1.5;
   color: var(--state-danger);
+  overflow-wrap: anywhere;
+}
+
+.worktree-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
 

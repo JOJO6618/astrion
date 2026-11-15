@@ -6,12 +6,14 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import stat
 import threading
 
 from modules.execution_plane import get_execution_backend, is_local_backend
 from . import current_state, enabled, execution_root
 from .binding import persist_binding
 from .commands import git_command
+from .grants import bind_extra_roots
 
 _LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
@@ -76,19 +78,125 @@ class Worktrees:
             raw = match[1].upper() + ':/' + (match[2] or '')
         return Path(raw).resolve()
 
+    # ------------------------------------------------------------------
+    # 授权判定
+    # ------------------------------------------------------------------
+    def inside_workspace(self, path: Path) -> bool:
+        try:
+            Path(path).relative_to(self.workspace)
+            return True
+        except ValueError:
+            return False
+
+    def writable_roots(self) -> list[Path]:
+        """沙箱可写授权根（部署环境变量 + 用户级/工作区级授权）。
+
+        只用于工作区外工作树的准入判定，不写回策略文件。
+        """
+        try:
+            from modules.host_sandbox_policy import get_macos_writable_paths
+            raw = get_macos_writable_paths(str(self.workspace))
+        except Exception:  # noqa: BLE001 - 读取失败按无授权处理（fail-closed）
+            return []
+        roots = []
+        for item in raw:
+            try:
+                roots.append(Path(str(item)).expanduser().resolve())
+            except (OSError, RuntimeError, ValueError):
+                continue
+        return roots
+
+    def authorized(self, path: Path) -> bool:
+        """工作区内恒可用；工作区外必须落在可写授权根内。"""
+        target = Path(path)
+        if self.inside_workspace(target):
+            return True
+        for root in self.writable_roots():
+            try:
+                target.relative_to(root)
+                return True
+            except ValueError:
+                continue
+        return False
+
+    def direct_mode(self) -> bool:
+        getter = getattr(self.owner, 'get_execution_mode', None)
+        try:
+            return (getter() if callable(getter) else None) == 'direct'
+        except Exception:  # noqa: BLE001 - 取不到执行环境按沙箱处理
+            return False
+
     def validate_directory(self, path: Path, *, managed=True) -> Path:
         info = self.backend.files.inspect_path(str(path))
         if not info.get('success'):
             raise WorktreeError(str(info.get('error') or '无法验证工作树目录。'))
         reported = Path(info.get('path') or path)
-        canonical = (self.workspace / reported).resolve()
-        try:
-            canonical.relative_to(self.root if managed else self.workspace)
-        except ValueError as exc:
-            raise WorktreeError('只能进入当前工作区 .astrion/worktrees/ 下的工作树。') from exc
+        canonical = reported.resolve() if reported.is_absolute() else (self.workspace / reported).resolve()
+        if managed:
+            try:
+                canonical.relative_to(self.root)
+            except ValueError as exc:
+                raise WorktreeError('只能在工作区 .astrion/worktrees/ 下创建工作树。') from exc
         if info.get('is_symlink'):
             raise WorktreeError('工作树目录不能是符号链接。')
         return canonical
+
+    def validate_target_path(self, raw: str) -> Path:
+        """校验 enter 传入的目录：绝对路径、非符号链接、存在且是目录。
+
+        用户手动切换可以先于任何授权发生，所以这里不能用 `FileManager.inspect_path`：
+        它会按砂箱可读边界拒绝工作区外目录，这里必须只做本机文件系统事实校验
+        （工作树本来就只支持 Local 后端）。
+        """
+        if not isinstance(raw, str) or not raw.strip():
+            raise WorktreeError('directory 必须是非空绝对路径。')
+        candidate = Path(raw.strip()).expanduser()
+        if not candidate.is_absolute():
+            raise WorktreeError('directory 必须是绝对路径。')
+        try:
+            info = os.lstat(candidate)
+        except OSError as exc:
+            raise WorktreeError(f'目标工作树目录无法访问：{exc}') from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise WorktreeError('工作树目录不能是符号链接。')
+        if not stat.S_ISDIR(info.st_mode):
+            raise WorktreeError('目标路径不是文件夹。')
+        return candidate.resolve()
+
+    async def common_dir(self, cwd: Path) -> Path:
+        """仓库公共 Git 目录（linked worktree 与主仓库相同），用于核对归属。"""
+        raw = (await self.git(['rev-parse', '--git-common-dir'], cwd=cwd)).strip()
+        path = Path(raw)
+        return path.resolve() if path.is_absolute() else (Path(cwd) / path).resolve()
+
+    async def inspect_worktree(self, directory: Path) -> dict:
+        """按 Git 事实确认它是本仓库的工作树，并返回当前分支与 HEAD。"""
+        shown = str(directory)
+        with bind_extra_roots([directory]):
+            try:
+                theirs = await self.common_dir(directory)
+            except WorktreeError as exc:
+                raise WorktreeError(f'该目录（{shown}）不是 Git 工作树：{exc}') from exc
+            mine = await self.common_dir(self.workspace)
+            if theirs != mine:
+                raise WorktreeError(f'该目录（{shown}）属于其它 Git 仓库，不是当前工作区的工作树。')
+            if not (directory / '.git').is_file():
+                raise WorktreeError(
+                    f'该目录（{shown}）是当前仓库的主工作目录，请用 exit_worktree 返回；enter 只接受工作树。')
+            branch = (await self.git(['branch', '--show-current'], cwd=directory)).strip()
+            head = (await self.git(['rev-parse', 'HEAD'], cwd=directory)).strip()
+        return {'branch': branch, 'head': head}
+
+    async def describe(self, raw: str) -> dict:
+        """只读描述一个候选目录（供前端在提交前提示）。"""
+        try:
+            directory = self.validate_target_path(raw)
+            info = await self.inspect_worktree(directory)
+        except WorktreeError as exc:
+            return {'valid': False, 'error': str(exc)}
+        return {'valid': True, 'directory': str(directory), 'branch': info['branch'],
+                'head': info['head'], 'inside_workspace': self.inside_workspace(directory),
+                'authorized': self.authorized(directory)}
 
     def ensure_folder(self, path):
         info = self.backend.files.inspect_path(str(path))
@@ -111,18 +219,63 @@ class Worktrees:
             if 'worktree' not in fields:
                 continue
             directory = self.host_path(fields['worktree'])
-            try:
-                directory.relative_to(self.workspace)
-            except ValueError:
-                continue
             branch = str(fields.get('branch') or '').removeprefix('refs/heads/')
             trees.append({'directory': str(directory), 'branch': branch,
                           'head': fields.get('HEAD'), 'is_main': directory == self.workspace,
-                          'managed': directory.is_relative_to(self.root)})
+                          'managed': directory.is_relative_to(self.root),
+                          'inside_workspace': self.inside_workspace(directory),
+                          'detached': 'detached' in fields,
+                          'authorized': self.authorized(directory)})
         return {'success': True, 'enabled': True, 'directory': execution_root(self.owner),
                 'state': current_state(self.owner.context_manager.conversation_metadata), 'worktrees': trees}
 
-    async def change(self, target: dict | None, *, exit=False, notify_user=False, persist=True) -> dict:
+    # ------------------------------------------------------------------
+    # 绑定切换
+    # ------------------------------------------------------------------
+    def busy_reasons(self, root: Path) -> list[str]:
+        """退出工作树前的忙碌检查：子智能体、后台命令、持久终端。"""
+        reasons = []
+        cm = getattr(self.owner, 'context_manager', None)
+        cid = getattr(cm, 'current_conversation_id', None)
+        children = getattr(self.owner, 'sub_agent_manager', None)
+        if children is not None:
+            lock = getattr(children, '_state_lock', None)
+            if lock is not None:
+                with lock:
+                    active = [rec for rec in getattr(children, 'tasks', {}).values()
+                              if rec.get('conversation_id') == cid and rec.get('status') == 'running']
+            else:
+                active = [rec for rec in getattr(children, 'tasks', {}).values()
+                          if rec.get('conversation_id') == cid and rec.get('status') == 'running']
+            if active:
+                reasons.append(f'还有 {len(active)} 个子智能体在运行')
+        background = getattr(self.owner, 'background_command_manager', None)
+        if background is not None:
+            try:
+                records = background.list_records(conversation_id=cid)
+            except Exception:  # noqa: BLE001 - 列表失败不阻塞退出判定
+                records = []
+            if any(rec.get('status') == 'running' for rec in records):
+                reasons.append('还有后台命令在运行')
+        terminals = getattr(self.owner, 'terminal_manager', None)
+        if terminals is not None:
+            try:
+                sessions = terminals.get_terminal_list()
+            except Exception:  # noqa: BLE001
+                sessions = []
+            for session in sessions:
+                if not session.get('is_running'):
+                    continue
+                try:
+                    Path(str(session.get('working_dir'))).resolve().relative_to(root)
+                except (ValueError, OSError, RuntimeError):
+                    continue
+                reasons.append(f"终端 {session.get('name')} 仍在当前执行目录运行")
+                break
+        return reasons
+
+    async def change(self, target: dict | None, *, exit=False, notify_user=False,
+                     persist=True, origin='model') -> dict:
         meta = self.owner.context_manager.conversation_metadata or {}
         if not enabled(meta):
             raise WorktreeError('当前对话未启用 Git worktree。')
@@ -139,24 +292,19 @@ class Worktrees:
             if top != self.workspace:
                 raise WorktreeError('当前工作区必须是 Git 仓库根目录。')
             if exit:
+                # 当前执行根可能在工作区外；检查残留工作前先放行它，否则读取会被拦。
+                current_root = Path(execution_root(self.owner)).resolve()
+                with bind_extra_roots([current_root]):
+                    reasons = self.busy_reasons(current_root)
+                if reasons:
+                    raise WorktreeError('当前执行目录仍有进行中的工作，暂不能退出：' + '；'.join(reasons) + '。')
                 directory = self.workspace
                 branch = (await self.git(['branch', '--show-current'], cwd=directory)).strip()
                 state = {'directory': str(directory), 'branch': branch, 'active': False}
             elif target['action'] == 'create':
                 state = await self.create(target)
             else:
-                info = await self.list()
-                matches = [tree for tree in info['worktrees'] if tree['branch'] == target['branch_name'] and tree['managed']]
-                if len(matches) != 1:
-                    raise WorktreeError('找不到唯一对应的托管工作树；不会自动创建或切换主目录分支。')
-                tree = matches[0]
-                self.validate_directory(Path(tree['directory']))
-                if not Path(tree['directory']).is_dir():
-                    raise WorktreeError('目标工作树目录已失效，请选择其它工作树或返回主目录。')
-                if (await self.git(['branch', '--show-current'], cwd=tree['directory'])).strip() != target['branch_name']:
-                    raise WorktreeError('目标工作树分支已变化，请重新选择。')
-                state = {key: tree[key] for key in ('directory', 'branch', 'head')}
-                state['active'] = True
+                state = await self.enter(target, origin=origin)
             if persist:
                 state = persist_binding(self.owner, state, notify_user=notify_user)
             return {'success': True, 'state': state, 'warnings': self.cleanup_warnings,
@@ -171,22 +319,71 @@ class Worktrees:
         finally:
             lock.release()
 
+    async def enter(self, target: dict, *, origin='model') -> dict:
+        """进入已注册工作树；键为 branch_name 或 directory（互斥）。"""
+        branch_name = target.get('branch_name')
+        raw_directory = target.get('directory')
+        if raw_directory is not None:
+            directory = self.validate_target_path(raw_directory)
+            info = await self.inspect_worktree(directory)
+            tree = {'directory': str(directory), 'branch': info['branch'], 'head': info['head']}
+        else:
+            trees = (await self.list())['worktrees']
+            matches = [item for item in trees if item['branch'] == branch_name]
+            if len(matches) != 1:
+                raise WorktreeError('找不到唯一对应的已注册工作树；不会自动创建或切换主目录分支。')
+            tree = matches[0]
+            directory = Path(tree['directory'])
+            if tree['is_main']:
+                raise WorktreeError('目标就是工作区主目录，请改用 exit_worktree。')
+            # 外部工作树：校验分支等 git 命令的 cwd 在工作区外，需要临时放行该根。
+            with bind_extra_roots([directory]):
+                if not directory.is_dir():
+                    raise WorktreeError('目标工作树目录已失效，请选择其它工作树或返回主目录。')
+                current = (await self.git(['branch', '--show-current'], cwd=directory)).strip()
+                if current != branch_name:
+                    raise WorktreeError('目标工作树分支已变化，请重新选择。')
+        branch = tree['branch'] or ''
+        inside = self.inside_workspace(directory)
+        if not inside and origin != 'user' and not self.direct_mode() and not self.authorized(directory):
+            raise WorktreeError(
+                '该工作树位于工作区外，且不在沙箱路径授权（可读写）范围内；'
+                '请在「路径授权」中放行该目录，或改由用户手动切换。')
+        state = {'directory': str(directory), 'branch': branch,
+                 'head': tree.get('head'), 'active': True}
+        if not inside:
+            # 对话级临时放行：写入对话绑定，重启恢复后可重建；退出绑定即失效，
+            # 不写任何用户级策略文件。`added` 表示它原本不在授权范围内。
+            state['grant'] = {'path': str(directory), 'added': not self.authorized(directory)}
+        return state
+
     @staticmethod
     def validate_target(target):
         if not isinstance(target, dict) or target.get('action') not in {'create', 'enter'}:
             raise WorktreeError('必须明确选择 create 或 enter。')
         action = target['action']
-        expected = {'action', 'branch_name'} | ({'start_ref', 'include_uncommitted'} if action == 'create' else set())
+        if action == 'enter':
+            keys = set(target) - {'action'}
+            if keys not in ({'branch_name'}, {'directory'}):
+                raise WorktreeError('enter 只能提供 branch_name 或 directory 其中一个。')
+            value = target.get('branch_name') if 'branch_name' in target else target.get('directory')
+            if not isinstance(value, str) or not value.strip():
+                raise WorktreeError('branch_name 或 directory 不能为空。')
+            if 'branch_name' in target and value.startswith('-'):
+                raise WorktreeError('必须提供合法的分支名。')
+            if 'directory' in target and not Path(value.strip()).is_absolute():
+                raise WorktreeError('directory 必须是绝对路径。')
+            return
+        expected = {'action', 'branch_name', 'start_ref', 'include_uncommitted'}
         if set(target) != expected:
             raise WorktreeError('工作树参数缺失或包含不适用字段。')
         branch = target['branch_name']
         if not isinstance(branch, str) or not branch.strip() or branch.startswith('-'):
             raise WorktreeError('必须提供合法的新分支名。')
-        if action == 'create':
-            if not isinstance(target['start_ref'], str) or not target['start_ref'].strip() or target['start_ref'].startswith('-'):
-                raise WorktreeError('必须明确提供起始分支或版本。')
-            if type(target['include_uncommitted']) is not bool:
-                raise WorktreeError('include_uncommitted 必须明确提供 true 或 false。')
+        if not isinstance(target['start_ref'], str) or not target['start_ref'].strip() or target['start_ref'].startswith('-'):
+            raise WorktreeError('必须明确提供起始分支或版本。')
+        if type(target['include_uncommitted']) is not bool:
+            raise WorktreeError('include_uncommitted 必须明确提供 true 或 false。')
 
     async def create(self, target):
         mode = getattr(self.owner, 'get_permission_mode', lambda: 'readonly')()
@@ -197,7 +394,7 @@ class Worktrees:
         await self.git(['check-ref-format', '--branch', branch])
         branches = (await self.git(['for-each-ref', '--count=1', '--format=%(refname)', 'refs/heads/' + branch], cwd=self.workspace)).splitlines()
         if 'refs/heads/' + branch in branches:
-            raise WorktreeError('分支已存在，请使用其它名称，或选择进入该分支已有的托管工作树。')
+            raise WorktreeError('分支已存在，请使用其它名称，或选择进入该分支已有的工作树。')
         source = execution_root(self.owner)
         head = (await self.git(['rev-parse', '--verify', '--end-of-options', target['start_ref'] + '^{commit}'], cwd=source)).strip()
         leaf = re.sub(r'[^A-Za-z0-9._-]+', '-', branch).strip('.-')[:64] or 'worktree'

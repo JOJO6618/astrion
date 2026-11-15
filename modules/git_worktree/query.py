@@ -4,6 +4,37 @@ import re
 
 from modules.project_git.runner import text
 from . import current_state, enabled
+from .binding import granted_root
+
+
+def _writable_roots(root: Path) -> list[Path]:
+    try:
+        from modules.host_sandbox_policy import get_macos_writable_paths
+        raw = get_macos_writable_paths(str(root))
+    except Exception:  # noqa: BLE001 - 授权读取失败按无额外根处理（fail-closed）
+        return []
+    roots = []
+    for item in raw:
+        try:
+            roots.append(Path(str(item)).expanduser().resolve())
+        except (OSError, RuntimeError, ValueError):
+            continue
+    return roots
+
+
+def authorized_path(path: Path, root: Path, roots: list[Path]) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        pass
+    for candidate in roots:
+        try:
+            path.relative_to(candidate)
+            return True
+        except ValueError:
+            continue
+    return False
 
 
 def directory_for(workspace, metadata):
@@ -14,7 +45,11 @@ def directory_for(workspace, metadata):
     directory = Path(state.get('directory') or root)
     if not directory.is_absolute() or directory.resolve() != directory or not directory.is_dir():
         raise ValueError('工作树执行目录已失效，请先返回主目录或选择有效工作树。')
-    directory.relative_to(root)
+    try:
+        directory.relative_to(root)
+    except ValueError:
+        if granted_root(state) != directory:
+            raise ValueError('工作树执行目录位于工作区外且未记录授权，请先返回主目录或选择有效工作树。')
     return directory
 
 
@@ -70,23 +105,27 @@ def view(workspace, metadata):
         directory = Path(current_state(metadata).get('directory') or root)
     trees = []
     raw = text(root, ['worktree', 'list', '--porcelain', '-z'])
-    managed_root = root / '.astrion' / 'worktrees'
+    roots = _writable_roots(root)
     for record in raw.split('\0\0'):
         fields = dict(line.split(' ', 1) if ' ' in line else (line, True)
                       for line in record.split('\0') if line)
         if 'worktree' not in fields:
             continue
         path = _display_path(fields['worktree'], root)
-        if path != root and not path.is_relative_to(managed_root):
-            continue
         trees.append({'branch': str(fields.get('branch') or '').removeprefix('refs/heads/'),
                       'directory': str(path), 'is_main': path == root,
+                      'head': fields.get('HEAD'), 'detached': 'detached' in fields,
+                      'inside_workspace': path == root or path.is_relative_to(root),
+                      'authorized': path == root or authorized_path(path, root, roots),
                       'unavailable': not path.is_dir() or ('prunable' in fields and path == Path(fields['worktree'])),
                       'current': path == directory})
     refs = text(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/tags']).splitlines()
     branch = next((tree['branch'] for tree in trees if tree['current']), '')
+    head = next((tree.get('head') or '' for tree in trees if tree['current']), '')
     if not branch:
         branch = current_state(metadata).get('branch') or ''
+    if not head:
+        head = current_state(metadata).get('head') or ''
     return {'enabled': enabled(metadata), 'directory': str(directory), 'branch': branch,
-            'active': directory != root, 'worktrees': trees, 'refs': refs,
+            'head': head, 'active': directory != root, 'worktrees': trees, 'refs': refs,
             'unavailable': unavailable}

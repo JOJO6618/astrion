@@ -1113,6 +1113,22 @@ class MainTerminalToolsExecutionMixin:
                 }
 
     async def handle_tool_call(self, tool_name: str, arguments: Dict) -> str:
+        """绑定本次调用的额外执行根后转交实现。
+
+        对话绑定到工作区外的工作树时，只有在这里把该执行根临时放行，后续的
+        沙箱计划、原生文件工具和终端 cwd 守门才会看到同一个根；根来自已校验的
+        对话绑定，不来自工具参数，退出绑定后自然失效。
+        """
+        from modules.git_worktree import current_state, enabled
+        from modules.git_worktree.grants import bind_extra_roots, external_roots
+        metadata = getattr(self.context_manager, 'conversation_metadata', None) or {}
+        bound = current_state(metadata).get('directory') if enabled(metadata) else None
+        root = bound or getattr(self, 'execution_root', None) or getattr(self, 'project_path', None)
+        workspace = getattr(self.context_manager, 'project_path', None) or getattr(self, 'project_path', None)
+        with bind_extra_roots(external_roots(root, workspace)):
+            return await self._handle_tool_call_impl(tool_name, arguments)
+
+    async def _handle_tool_call_impl(self, tool_name: str, arguments: Dict) -> str:
                 """处理工具调用（添加参数预检查和改进错误处理）"""
                 logger.debug("[handle_tool_call] 工具调用开始: tool_name=%s, arguments=%s", tool_name, arguments)
                 scope = current_execution_scope()

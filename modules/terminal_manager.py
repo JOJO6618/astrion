@@ -235,6 +235,32 @@ class TerminalManager:
         """主智能体终端是否跑在宿主机直接执行（完全访问）下。"""
         return self.sandbox_mode == "host" and self.host_execution_mode == "direct"
 
+    def _allowed_work_roots(self) -> List[Path]:
+        """终端 cwd 必须落在这些根之一。
+
+        默认只有工作区；对话绑定到工作区外工作树时，授予的额外执行根由
+        `modules/git_worktree/grants.py` 在工具调用上下文提供，不写策略文件。
+        """
+        roots = [Path(self.project_path).resolve()]
+        try:
+            from modules.git_worktree.grants import current_extra_roots
+        except Exception:  # noqa: BLE001 - 读取失败时仅保留工作区
+            return roots
+        for raw in current_extra_roots():
+            if raw not in roots:
+                roots.append(raw)
+        return roots
+
+    @staticmethod
+    def _path_within(target: Path, roots: List[Path]) -> bool:
+        for root in roots:
+            try:
+                target.relative_to(root)
+                return True
+            except ValueError:
+                continue
+        return False
+
     def _resolve_main_work_path(self, working_dir: str) -> Path:
         """解析主智能体终端的起始目录（无固定子作用域时的唯一守门点）。
 
@@ -255,10 +281,8 @@ class TerminalManager:
         if candidate.is_absolute():
             raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
         target = (base / candidate).resolve()
-        try:
-            target.relative_to(root)
-        except ValueError as exc:
-            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace")) from exc
+        if not self._path_within(target, self._allowed_work_roots()):
+            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
         if target.exists() and not target.is_dir():
             raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
         if not target.exists():
@@ -275,11 +299,11 @@ class TerminalManager:
         root = Path(self.project_path).resolve()
         if self._main_terminal_is_direct():
             return Path(work_path)
-        target = (root / str(work_path)).resolve()
-        try:
-            target.relative_to(root)
-        except ValueError as exc:
-            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace")) from exc
+        target = Path(work_path)
+        if not target.is_absolute():
+            target = (root / str(work_path)).resolve()
+        if not self._path_within(target, self._allowed_work_roots()):
+            raise ValueError(tr("terminal.working_dir_must_stay_in_workspace"))
         return target
 
     def open_terminal(
