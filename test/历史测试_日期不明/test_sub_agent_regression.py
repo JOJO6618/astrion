@@ -68,9 +68,8 @@ class FakeTerminal:
             import subprocess
             cmd = arguments["command"]
             timeout = arguments.get("timeout", 30)
-            cwd = arguments.get("working_dir")
-            if cwd:
-                cwd = self.project_path / cwd
+            # run_command 不再接受 working_dir 参数，默认在项目目录执行
+            cwd = self.project_path
             # mock 中不真正执行长时间 sleep，避免阻塞事件循环
             if cmd.strip().startswith("sleep "):
                 return json.dumps({"success": True, "output": f"mock: {cmd}"})

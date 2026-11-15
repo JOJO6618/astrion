@@ -23,7 +23,7 @@
 
 | 资源 | 入口与责任 |
 | --- | --- |
-| 命令 | `run_command` / `run_command_background`，显式 timeout、working_dir、sandbox_write_access、network_permission；后台同时绑定 conversation_id |
+| 命令 | `run_command` / `run_command_background`，显式 timeout、sandbox_write_access、network_permission；后台同时绑定 conversation_id |
 | 文件 | `files`：文本／二进制读写、分段／搜索／抽取、目录与文件增删改、inspect_path、resolve_path |
 | 持久终端 | `terminals`：打开、关闭、重置、列举、输入、快照及全部关闭 |
 | 后台 | `background`：查询、等待、取消、状态协调、通知、认领与回滚通知；精简 owner 未提供时允许为 None |
@@ -31,7 +31,7 @@
 | 编辑备份 | `track_file_edit(...)`：从执行侧获取原内容，关联当前对话与工作段 |
 | 插件 | `execute_mcp_tool` / `execute_custom_tool` / `list_mcp_servers`；能力不存在应明确报错或返回空发现结果 |
 
-这些是 Python 内部接口，不是网络 RPC 公共协议。未来传输必须显式编码 bytes、校验请求身份、执行设备与路径归属，处理取消、超时、乱序和幂等；不得直接暴露任意 Python 属性／方法。
+这些是 Python 内部接口，不是网络 RPC 公共协议。`working_dir` 仍保留在内部实现（供 Git 工作树、审核智能体等内部调用指定 cwd），但**不再作为模型可见工具参数**：模型侧命令默认在当前执行目录（工作区根或当前工作树）下运行。未来传输必须显式编码 bytes、校验请求身份、执行设备与路径归属，处理取消、超时、乱序和幂等；不得直接暴露任意 Python 属性／方法。
 
 ## 路径、元数据与内容
 

@@ -9,8 +9,8 @@
 4. 终端：terminal_session(open) / terminal_input / terminal_snapshot →
    ``backend.terminals``，working_dir 必须原样透传；
 5. 命令：run_command 前台/后台 → ``backend.run_command`` /
-   ``backend.run_command_background``，working_dir 透传；sleep(wait_runcommand_id)
-   → ``backend.background``；
+   ``backend.run_command_background``，不传 working_dir（用默认执行目录）；
+   sleep(wait_runcommand_id) → ``backend.background``；
 6. 媒体：view_image 经 ``backend.files.inspect_path`` 校验后再挂 pending；
 7. MCP：list_mcp_servers / mcp__ alias → ``backend.list_mcp_servers`` /
    ``backend.execute_mcp_tool``；
@@ -216,18 +216,18 @@ class TerminalRoutingTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("echo routed", snapshot["output"])
         self.assertIn("send_to_terminal", [c["op"] for c in backend.terminals.calls])
 
-    async def test_foreground_run_command_passes_working_dir(self) -> None:
+    async def test_foreground_run_command_uses_default_cwd(self) -> None:
         backend = make_seeded_backend()
         terminal = ToolDispatchTerminal(backend)
 
         result = await call_tool(
-            terminal, "run_command", {"command": "ls -la", "timeout": 10, "working_dir": "src"}
+            terminal, "run_command", {"command": "ls -la", "timeout": 10}
         )
         self.assertTrue(result["success"], result)
         self.assertEqual(result["output"], "[fake-exec] ls -la")
         calls = terminal.ops("run_command")
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0]["working_dir"], "src")
+        self.assertIsNone(calls[0]["working_dir"])
         self.assertEqual(calls[0]["command"], "ls -la")
 
     async def test_background_run_and_sleep_wait_route_to_backend(self) -> None:
@@ -241,7 +241,6 @@ class TerminalRoutingTest(unittest.IsolatedAsyncioTestCase):
                 "command": "sleep 1 && echo done",
                 "timeout": 30,
                 "run_in_background": True,
-                "working_dir": "jobs",
             },
         )
         self.assertTrue(started["success"], started)
@@ -249,7 +248,7 @@ class TerminalRoutingTest(unittest.IsolatedAsyncioTestCase):
         command_id = started["command_id"]
         bg_calls = terminal.ops("run_command_background")
         self.assertEqual(len(bg_calls), 1)
-        self.assertEqual(bg_calls[0]["working_dir"], "jobs")
+        self.assertIsNone(bg_calls[0]["working_dir"])
         self.assertEqual(bg_calls[0]["conversation_id"], "conv-dispatch")
 
         waited = await call_tool(terminal, "sleep", {"wait_runcommand_id": command_id})

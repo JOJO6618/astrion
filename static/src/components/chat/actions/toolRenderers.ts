@@ -570,7 +570,6 @@ function renderRunCommand(result: any, args: any): string {
 
   let html = meta(
     param(L('command'), args.command, { mono: true }),
-    param(L('workingDir'), args.working_dir),
     param(L('timeout'), seconds(args.timeout)),
     args.run_in_background === true ? param(L('background'), yesNo(true)) : '',
     param(L('fullAccessRequest'), fullAccess),

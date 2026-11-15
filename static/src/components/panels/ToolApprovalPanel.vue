@@ -232,7 +232,6 @@ const extraArguments = computed(() => {
     'replacements',
     'file_path',
     'path',
-    'working_dir',
     'request_full_access',
     'full_access_reason',
     'run_in_background'

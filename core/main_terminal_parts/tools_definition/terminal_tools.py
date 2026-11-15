@@ -175,9 +175,6 @@ class ToolsDefinitionTerminalToolsMixin:
 	                        "type": "object",
 	                        "properties": self._inject_intent({
 	                            "command": {"type": "string", "description": "终端命令"},
-                                    "working_dir": {
-                                        "type": "string", "description": "命令工作目录，须位于绑定工作区内；省略时使用工作区根目录。"
-                                    },
                                     "request_full_access": {
                                         "type": "boolean", "default": False,
                                         "description": "是否申请本次命令完全访问。默认需要人工批准；自动审核或无限制模式下用户开启允许自动审核通过单次完全访问后，由审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准。"

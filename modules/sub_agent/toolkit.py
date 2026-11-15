@@ -99,7 +99,6 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "command": {"type": "string", "description": "要执行的命令。"},
                     "timeout": {"type": "number", "description": "超时时间（秒），必填，须大于 0 且不超过 120。"},
-                    "working_dir": {"type": "string", "description": "工作目录：工作区内请用相对路径。"},
                 },
                 "required": ["command", "timeout"],
             },

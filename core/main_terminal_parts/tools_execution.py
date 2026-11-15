@@ -1804,7 +1804,6 @@ class MainTerminalToolsExecutionMixin:
                             else:
                                 result = await get_execution_backend(self).run_command_background(
                                     arguments["command"],
-                                    working_dir=arguments.get("working_dir"),
                                     timeout=float(timeout_value),
                                     conversation_id=getattr(self.context_manager, "current_conversation_id", None),
                                     wait_seconds=5.0,
@@ -1825,7 +1824,6 @@ class MainTerminalToolsExecutionMixin:
                             else:
                                 result = await get_execution_backend(self).run_command(
                                     arguments["command"],
-                                    working_dir=arguments.get("working_dir"),
                                     timeout=float(timeout_value),
                                     sandbox_write_access=sandbox_write_access,
                                     network_permission=network_permission,

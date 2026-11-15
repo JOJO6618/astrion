@@ -129,6 +129,7 @@
 - **编辑方式**：优先 `write_file`/`edit_file` 等原生编辑工具，不要用 bash/python 脚本批量改文件（除非原生工具明显不适合）。
 - **改动优先级**：后端先改 `modules/`、`server/` 内对应模块，最后才动入口；前端按 `static/src` 现有分层（`app/`、`stores/`、`components/`、`composables/`）；CLI 按 `cli/src/` 分层（入口编排 / 主界面 / Gateway 客户端 / 会话运行时 / 菜单状态机 / 渲染分发 / 通用件 / 数据层 / i18n），新交互先定归属层再动手。
 - 涉及 monitor 动画／事件联动时，至少同步检查 `static/src/components/chat/monitor/MonitorDirector.ts` 与 `static/src/stores/monitor.ts`。
+- **命令工具契约（2026-11-15）**：`run_command` **不再向模型暴露 `working_dir` 参数**（前台／后台都不透传），命令默认在执行根（工作区根或当前工作树）运行；子智能体 `run_command` 同步删除。内部执行接口（`execution_plane`／`terminal_ops`／`background_command_manager`）仍保留 `working_dir`，仅供 Git 工作树、审核智能体等内部调用指定 cwd，**不得再当作模型可见参数加回**。提示词侧统一要求「不要写 `cd <绝对路径> &&` 前缀」。契约见 `docs/execution_contract.md`。
 
 ## 5) 风格与质量
 

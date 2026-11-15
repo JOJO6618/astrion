@@ -107,8 +107,7 @@ class ApprovalRequest:
             lines.append("自动审核通过后仍需人工批准。")
         else:
             lines.append("自动审核通过即可执行。")
-        directory = arguments.get("working_dir") or self.inputs["workspace"]
-        lines.append("待审工作目录：" + str(directory))
+        lines.append("待审工作目录：" + str(self.inputs["workspace"]))
         if self.item.get("approval_type") == "browser_action":
             url = (self.item.get("preview") or {}).get("browser_url") or ""
             lines.append(f"浏览器操作站点：{self.item.get('browser_site')}" + (f"（当前网址 {url}）" if url else "") + "；在用户已登录的真实网页上执行，批准仅限本次。")
@@ -117,7 +116,5 @@ class ApprovalRequest:
         lines.append(self.history.initial_text())
         if risk_markers:
             lines.append("规则提示（不是裁决）：" + "、".join(str(value) for value in risk_markers))
-        # The same current directory appears once; histories retain their own directories.
-        params = {key: value for key, value in arguments.items() if key != "working_dir"}
-        lines.extend(["待审：" + function_name, value_text(params)])
+        lines.extend(["待审：" + function_name, value_text(arguments)])
         return "\n".join(lines)
