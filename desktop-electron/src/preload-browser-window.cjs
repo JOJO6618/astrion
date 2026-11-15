@@ -1,6 +1,6 @@
 // 对话浏览器独立窗口（/browser-window）的 preload：暴露与主窗口相同形状的 astrionBrowser 桥，
 // 让共享 BrowserPanel 原样工作。连接的对话由主进程在弹出时固定，renderer 传入的 scope 被忽略。
-// sandbox preload 不能 require 本地模块，因此与 preload-main.cjs 的桥定义保持同步手写。
+// sandbox preload 不能 require 本地模块，因此与 preload-view.cjs 的桥定义保持同步手写。
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);

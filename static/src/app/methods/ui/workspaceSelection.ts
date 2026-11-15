@@ -1,10 +1,15 @@
 // @ts-nocheck
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 
 const selections = new WeakMap<object, { tail: Promise<any>; selected: string }>();
 
 /** Selection cookies must complete in order, including superseded responses. */
 export function selectWorkspaceIdentity(host, workspaceId, owns) {
+  // 桌面多视图：每个视图按 URL 的显式工作区＋请求头自带身份，不读写 session 选中工作区，
+  // 否则多个（含隐藏）视图会互相覆盖同一份 session 选择。
+  if (useConversationTabsStore().enabled)
+    return Promise.resolve({ current_workspace_id: workspaceId });
   let state = selections.get(host);
   if (!state) {
     state = { tail: Promise.resolve(), selected: String(host.currentHostWorkspaceId || '') };

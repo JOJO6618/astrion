@@ -14,7 +14,7 @@ from flask import Blueprint, Flask, jsonify, request
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from modules.desktop_navigation import DesktopNavigation, NavigationConflict
+from modules.desktop_navigation import DesktopNavigation, NavigationConflict, WorkspaceRequired
 
 
 def handlers(path, names, bindings):
@@ -41,7 +41,8 @@ class ApiTests(unittest.TestCase):
                 "conversation_tabs_bp": bp, "api_login_required": lambda fn: fn,
                 "get_current_username": lambda: "synthetic", "IS_HOST_MODE": True,
                 "jsonify": jsonify, "request": request, "navigation": self.navigation,
-                "NavigationConflict": NavigationConflict,
+                "NavigationConflict": NavigationConflict, "WorkspaceRequired": WorkspaceRequired,
+                "_CROSSPET_ACTIONS": {"create", "activate", "page", "focus"},
                 "_lookup": lambda *args, **kwargs: self.lookup,
                 "_public": lambda user, state: state,
             })
@@ -60,7 +61,7 @@ class ApiTests(unittest.TestCase):
     def test_get_snapshot_and_reject_legacy_overwrite(self):
         response = self.client.get("/api/conversation-tabs")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["version"], 2)
+        self.assertEqual(response.json["version"], 3)
         self.assertEqual(response.json["tabs"], [])
         self.assertEqual(self.client.put("/api/conversation-tabs", json={"tabs": []}).status_code, 405)
 
@@ -72,11 +73,13 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(first.json["result"]["key"], "tab_A")
         self.assertEqual(len(retry.json["state"]["tabs"]), 1)
 
-    def test_stale_commit_returns_conflict(self):
-        self.command("create", {"workspace_id": "ws1"})
-        response = self.command("commit", {"renderer_id": "old", "navigation_id": "old"})
+    def test_stale_renderer_returns_conflict(self):
+        key = self.command("create", {"workspace_id": "ws1"}).json["result"]["key"]
+        self.command("attach", {"key": key, "renderer_id": "new"})
+        response = self.command("fail", {"key": key, "renderer_id": "old", "error": "x"})
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json["code"], "navigation_superseded")
+        self.assertEqual(self.command("attach", {"key": "missing", "renderer_id": "r"}).status_code, 409)
 
     def test_clients_cannot_forge_deletion(self):
         response = self.command("deleted", {"workspace_id": "ws1", "conversation_id": "abc"})

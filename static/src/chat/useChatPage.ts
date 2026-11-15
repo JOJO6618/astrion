@@ -13,7 +13,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useUiStore } from '@/stores/ui';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useModelStore } from '@/stores/model';
-import { startDesktopNavigation, stopDesktopNavigation } from '@/app/methods/ui/desktopNavigation';
+import { startDesktopView, stopDesktopView } from '@/app/methods/ui/desktopView';
 import { filterModelGroups, groupModelOptions } from '@/utils/modelGroups';
 
 export function useChatPage() {
@@ -153,6 +153,8 @@ export function useChatPage() {
   async function navigate(id: string) {
     if (tabs.enabled)
       await run(async () => {
+        // 点击本视图已显示的对话：空操作
+        if (id && id === chat.cid) return;
         if (id)
           await tabs.command('open', {
             conversation_kind: 'chat',
@@ -171,9 +173,10 @@ export function useChatPage() {
   async function send() {
     if (uploading.value || !draft.ready) return;
     const oldCid = chat.cid;
-    const tabKey = tabs.tabs.find(
-      (tab) => tab.key === tabs.activeKey && tab.kind === 'new' && tab.conversationKind === 'chat'
-    )?.key;
+    const tabKey =
+      tabs.viewTab?.kind === 'new' && tabs.viewTab.conversationKind === 'chat'
+        ? tabs.viewTab.key
+        : '';
     const owner = draft.identity;
     const text = draft.text;
     const media = JSON.stringify(draft.media);
@@ -302,31 +305,7 @@ export function useChatPage() {
     leaveConversationView: chat.leave,
     isConversationIndependentRoute: () => false,
     persistComposerDraftNow: draft.save,
-    uiPushToast: (value: { message: string }) => chat.report(value.message),
-    async handleChatNavigation(
-      tab: { conversationId: string },
-      owner: { navigationId: string; rendererId: string; key: string }
-    ) {
-      if (!tabs.ownsNavigation(owner)) return;
-      try {
-        await load(tab.conversationId, () => tabs.ownsNavigation(owner));
-        if (!tabs.ownsNavigation(owner)) return;
-        window.history.replaceState(
-          {},
-          '',
-          chat.cid ? `/chat/${chat.cid.replace(/^conv_/, '')}` : '/chat/new'
-        );
-        await tabs.commitNavigation(owner);
-      } catch (cause) {
-        if (tabs.ownsNavigation(owner))
-          await tabs.command('fail', {
-            renderer_id: owner.rendererId,
-            navigation_id: owner.navigationId,
-            error: String(cause)
-          });
-        chat.report(cause);
-      }
-    }
+    uiPushToast: (value: { message: string }) => chat.report(value.message)
   };
   function pop() {
     const id = window.location.pathname.split('/')[2];
@@ -345,7 +324,7 @@ export function useChatPage() {
       models.setModel(chat.model);
       const id = window.location.pathname.split('/')[2];
       await load(id && id !== 'new' ? `conv_${id.replace(/^conv_/, '')}` : '');
-      if (tabs.enabled) await startDesktopNavigation(desktopHost);
+      if (tabs.enabled) await startDesktopView(desktopHost);
     });
     conversations.conversationsLoading = false;
     window.addEventListener('popstate', pop);
@@ -356,7 +335,7 @@ export function useChatPage() {
     window.clearTimeout(searchTimer);
     window.removeEventListener('popstate', pop);
     window.removeEventListener('resize', resize);
-    if (tabs.enabled) stopDesktopNavigation(desktopHost);
+    if (tabs.enabled) stopDesktopView(desktopHost);
   });
   return {
     chat,

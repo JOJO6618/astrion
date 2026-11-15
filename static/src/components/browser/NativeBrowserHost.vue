@@ -10,12 +10,8 @@ const available = nativeBrowserAvailable();
 const store = useNativeBrowserStore(),
   navigation = useConversationTabsStore();
 const panel = ref<InstanceType<typeof BrowserPanel> | null>(null);
-const conversationPage = computed(() =>
-  browserConversationPage(window.location.pathname, navigation.navigation)
-);
-const scope = computed(() =>
-  browserScopeForNavigation(navigation, window.location.pathname, window.location.search)
-);
+const conversationPage = computed(() => browserConversationPage(window.location.pathname));
+const scope = computed(() => browserScopeForNavigation(navigation, window.location.pathname));
 watch(
   [() => store.open, () => JSON.stringify(scope.value)],
   () => {

@@ -26,7 +26,7 @@ let quickRendererReady;
 const settingsPath = quickSettingsPath();
 
 export function quickEnabled() { return config.enabled; }
-export async function startQuickEntry({ debug = false, port, dataRoot, workspacePath, openMain, getMainView } = {}) {
+export async function startQuickEntry({ debug = false, port, dataRoot, workspacePath, openMain, isManagedView } = {}) {
   try { config = patchQuickConfig(config, JSON.parse(await fs.readFile(settingsPath, 'utf8'))); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (debug) config.enabled = true;
   if (debug && port === undefined && dataRoot === undefined) {
@@ -93,7 +93,7 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
   visibility = new QuickVisibility(quickWindow, () => capture.dismissOverlays());
   const trusted = (event) => event.senderFrame === event.sender.mainFrame && (
     event.sender === quickWindow.webContents ||
-    (event.sender === getMainView?.()?.webContents && event.sender.getURL().startsWith(gateway.base + '/'))
+    (isManagedView?.(event.sender) && event.sender.getURL().startsWith(gateway.base + '/'))
   );
   ipcMain.handle('quick:open', async (event) => {
     if (!trusted(event)) throw new Error('Untrusted sender');

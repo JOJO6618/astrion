@@ -4,6 +4,7 @@
     :class="{ 'native-browser-visible': browserVisible }"
     :style="browserVisible ? { '--native-browser-width': `${browser.width}px` } : undefined"
   >
+    <DetachedTopBar />
     <QuotaToast />
     <ToastStack />
     <ConfirmDialog />
@@ -19,20 +20,16 @@ import { computed } from 'vue';
 import ConfirmDialog from '@/components/shell/ConfirmDialog.vue';
 import EasterEggOverlay from '@/components/shell/EasterEggOverlay.vue';
 import FileContextMenu from '@/components/shell/FileContextMenu.vue';
+import DetachedTopBar from '@/components/shell/DetachedTopBar.vue';
 import QuotaToast from '@/components/shell/QuotaToast.vue';
 import ToastStack from '@/components/shell/ToastStack.vue';
 import NativeBrowserHost from '@/components/browser/NativeBrowserHost.vue';
 import { useNativeBrowserStore, nativeBrowserAvailable } from '@/stores/nativeBrowser';
-import { useConversationTabsStore } from '@/stores/conversationTabs';
 import { browserConversationPage } from '@/components/browser/browserScope';
 const browser = useNativeBrowserStore();
-const navigation = useConversationTabsStore();
 const browserAvailable = nativeBrowserAvailable();
 const browserVisible = computed(
-  () =>
-    browser.open &&
-    browserAvailable &&
-    browserConversationPage(window.location.pathname, navigation.navigation)
+  () => browser.open && browserAvailable && browserConversationPage(window.location.pathname)
 );
 
 defineProps<{

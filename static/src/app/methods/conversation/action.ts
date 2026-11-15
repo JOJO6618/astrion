@@ -64,8 +64,10 @@ export const actionMethods = {
 
         const tabs = useConversationTabsStore();
         if (tabs.enabled) {
-          if (result.desktop_navigation) tabs.applyServerSnapshot(result.desktop_navigation);
-          else {
+          if (result.desktop_navigation) {
+            if (tabs.applyServerSnapshot(result.desktop_navigation))
+              tabs.forward(result.desktop_navigation);
+          } else {
             if (
               currentConversationSession(this)?.conversationId === conversationId &&
               (!workspaceId || currentConversationSession(this)?.workspaceId === workspaceId)

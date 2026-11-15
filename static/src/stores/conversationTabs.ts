@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia';
+import { setViewVisible } from '../app/methods/ui/viewVisibility';
 import { NavigationError, NavigationTransport, navigationId } from './desktopNavigationTransport';
 
 export interface ConversationTab {
   /** Immutable for the entire tab lifetime, including new -> conversation binding. */
   key: string;
-  kind: 'conv' | 'new';
+  kind: 'conv' | 'new' | 'page';
   conversationKind: 'chat' | 'agent';
   conversationId: string;
   workspaceId: string;
@@ -13,20 +14,42 @@ export interface ConversationTab {
   error: string;
   running: boolean;
   awaitingHumanApproval: boolean;
+  placement: 'main' | 'detached';
+  /** 仅 page 标签。 */
+  pageType: '' | 'settings' | 'workflows' | 'git';
+  route: string;
+  openerKey: string;
 }
 
-export interface DesktopNavigation {
-  id: string;
-  key: string;
-  page: string;
-  status: 'pending' | 'committed' | 'error';
-  error: string;
+/** 壳层桥（preload-view/preload-chrome 的 astrionShell 并集）；网页端不存在。 */
+export interface ShellBridge {
+  identity?: () => Promise<{
+    key: string;
+    placement: string;
+    visible: boolean;
+    legacy: boolean;
+    state: any;
+  } | null>;
+  onTabsState?: (callback: (state: any) => void) => () => void;
+  forwardTabsState?: (state: any) => void;
+  show?: (key: string) => void;
+  focusMain?: () => void;
+  focusTab?: (key: string) => void;
+  onPlacement?: (callback: (payload: { key: string; placement: string }) => void) => () => void;
+  dragTab?: (payload: {
+    key: string;
+    phase: 'start' | 'move' | 'drop' | 'cancel';
+    screenX: number;
+    screenY: number;
+  }) => void;
+  onRequestDetach?: (callback: (payload: { key: string }) => void) => () => void;
+  onRequestDock?: (callback: (payload: { key: string }) => void) => () => void;
+  onWindowFocus?: (callback: (payload: { key: string }) => void) => () => void;
+  onRequestPage?: (callback: (payload: { route: string }) => void) => () => void;
 }
 
-export interface NavigationOwner {
-  navigationId: string;
-  rendererId: string;
-  key: string;
+export function shellBridge(): ShellBridge | null {
+  return ((window as any).astrionShell as ShellBridge) || null;
 }
 
 const transports = new WeakMap<object, NavigationTransport>();
@@ -35,7 +58,7 @@ function transport(store: object) {
   return transports.get(store)!;
 }
 
-function normalizeTab(raw: any): ConversationTab {
+export function normalizeTab(raw: any): ConversationTab {
   return {
     key: String(raw.key),
     kind: raw.kind,
@@ -46,76 +69,167 @@ function normalizeTab(raw: any): ConversationTab {
     title: String(raw.title || ''),
     error: String(raw.error || ''),
     running: Boolean(raw.running),
-    awaitingHumanApproval: Boolean(raw.awaiting_human_approval)
+    awaitingHumanApproval: Boolean(raw.awaiting_human_approval),
+    placement: raw.placement === 'detached' ? 'detached' : 'main',
+    pageType: raw.kind === 'page' ? raw.page_type || '' : '',
+    route: String(raw.route || ''),
+    openerKey: String(raw.opener_key || '')
   };
+}
+
+/** 页面标签关闭/返回的目标：opener 仍在主窗口则回 opener，否则右侧相邻、无则左侧。 */
+export function pageReturnTarget(tabs: ConversationTab[], pageKey: string): ConversationTab | null {
+  const main = tabs.filter((tab) => tab.placement === 'main');
+  const page = main.find((tab) => tab.key === pageKey);
+  const opener = page && main.find((tab) => tab.key === page.openerKey && tab.key !== pageKey);
+  if (opener) return opener;
+  const index = main.findIndex((tab) => tab.key === pageKey);
+  return main[index + 1] || (index > 0 ? main[index - 1] : null) || null;
 }
 
 export const useConversationTabsStore = defineStore('conversationTabs', {
   state: () => ({
-    enabled: Boolean((window as any).__ASTRION_DESKTOP__),
+    // 仅桌面壳且存在 astrionShell 桥时启用；网页端/Android/旧壳保持单页行为。
+    enabled: Boolean((window as any).__ASTRION_DESKTOP__ && (window as any).astrionShell),
+    role: ((window as any).__ASTRION_CHROME__ ? 'chrome' : 'view') as 'chrome' | 'view',
+    /** 本文档固定绑定的标签 key（view 角色；legacy 兜底页为空并停用）。 */
+    viewKey: '',
+    placement: 'main' as 'main' | 'detached',
     tabs: [] as ConversationTab[],
     activeKey: '',
-    resumeKey: '',
     workspaceId: '',
-    navigation: null as DesktopNavigation | null,
+    renderers: {} as Record<string, string>,
     revision: -1,
     responseSequence: 0,
     hydrated: false,
-    rendererId: '',
+    initialized: false,
     localRendererId: navigationId(),
     attached: false,
-    startupNavigationId: '',
+    pendingFail: '',
     syncError: '',
     commandError: ''
   }),
   getters: {
     activeTab: (state): ConversationTab | null =>
       state.tabs.find((tab) => tab.key === state.activeKey) || null,
-    requestedKey: (state): string =>
-      state.navigation?.status === 'pending' ? state.navigation.key : ''
+    viewTab: (state): ConversationTab | null =>
+      (state.viewKey && state.tabs.find((tab) => tab.key === state.viewKey)) || null,
+    /** 本视图当前在独立对话窗口（P2）：隐藏侧边栏，顶部自绘标题栏。 */
+    detached: (state): boolean =>
+      state.enabled && state.role === 'view' && state.placement === 'detached',
+    /** 本文档就是设置页标签（页内跳转可就地进行；否则应发 page 命令）。 */
+    isSettingsView(): boolean {
+      return this.viewTab?.kind === 'page' && this.viewTab.pageType === 'settings';
+    },
+    mainTabs: (state): ConversationTab[] => state.tabs.filter((tab) => tab.placement === 'main'),
+    /** 已 attach 且本文档仍持有本标签的 renderer 写权。 */
+    ownsView: (state): boolean =>
+      state.attached &&
+      Boolean(state.viewKey) &&
+      state.renderers[state.viewKey] === state.localRendererId &&
+      state.tabs.some((tab) => tab.key === state.viewKey)
   },
   actions: {
-    applyServerSnapshot(raw: any, sequence = 0) {
-      if (!this.enabled || !raw || !Array.isArray(raw.tabs) || !Number.isInteger(raw.revision))
+    /** 记录壳层身份并订阅广播；legacy 兜底页（key 为空）整体降级为网页行为。 */
+    async init() {
+      if (!this.enabled || this.initialized) return;
+      this.initialized = true;
+      const shell = shellBridge();
+      shell?.onTabsState?.((state) => this.applyServerSnapshot(state, this.responseSequence));
+      if (this.role === 'chrome') return;
+      // 拖出/放回时壳层即时通知，页面就地切换布局（不重载）。
+      shell?.onPlacement?.((payload) => {
+        if (payload?.key === this.viewKey)
+          this.placement = payload.placement === 'detached' ? 'detached' : 'main';
+      });
+      let identity = null;
+      try {
+        identity = (await shell?.identity?.()) || null;
+      } catch {
+        identity = null;
+      }
+      if (!identity || identity.legacy || !identity.key) {
+        this.enabled = false;
         return;
+      }
+      this.viewKey = String(identity.key);
+      this.placement = identity.placement === 'detached' ? 'detached' : 'main';
+      setViewVisible(identity.visible !== false);
+      if (identity.state) this.applyServerSnapshot(identity.state, this.responseSequence);
+    },
+    applyServerSnapshot(raw: any, sequence = 0): boolean {
+      if (!this.enabled || !raw || !Array.isArray(raw.tabs) || !Number.isInteger(raw.revision))
+        return false;
       if (
         raw.revision < this.revision ||
         (raw.revision === this.revision && sequence < this.responseSequence)
       )
-        return;
+        return false;
       this.responseSequence = sequence;
-      // The coordinator observes after this patch; synchronous nested-field watchers are unsafe.
+      // Consumers observe after this patch; synchronous nested-field watchers are unsafe.
       this.$patch({
         tabs: raw.tabs.map(normalizeTab),
         activeKey: String(raw.active_key || ''),
-        resumeKey: String(raw.resume_key || ''),
         workspaceId: String(raw.workspace_id || ''),
-        rendererId: String(raw.renderer_id || ''),
-        navigation: raw.navigation || null,
+        renderers: { ...(raw.renderers || {}) },
         revision: raw.revision,
         hydrated: true,
         syncError: ''
       });
+      const own = this.viewKey && this.tabs.find((tab) => tab.key === this.viewKey);
+      if (own) this.placement = own.placement;
+      return true;
+    },
+    /** 把本文档拿到的更新快照转交壳层（壳层只接受更高 revision 并广播给其他视图）。 */
+    forward(raw: any) {
+      try {
+        shellBridge()?.forwardTabsState?.(raw);
+      } catch {
+        // 壳层转发失败不影响本页状态；chrome 轮询会兜底。
+      }
     },
     async hydrate() {
+      if (!this.enabled) return;
+      await this.init();
       if (!this.enabled || this.hydrated) return;
       await this.refreshSnapshot();
-      this.startupNavigationId = this.navigation?.id || '';
     },
     async refreshSnapshot() {
       if (!this.enabled) return;
       try {
         const { result, sequence } = await transport(this).snapshot();
-        this.applyServerSnapshot(result, sequence);
+        if (this.applyServerSnapshot(result, sequence) && this.role === 'chrome')
+          this.forward(result);
       } catch (error) {
         this.syncError = String((error as Error)?.message || error);
         throw error;
       }
     },
+    /**
+     * chrome 视图接收壳层请求并转成后端命令（同一 envelope，传输层网络不确定时原样重试一次）：
+     * 拖出完成→detach、独立窗口关闭→dock、窗口聚焦→focus、快捷入口深链→page。返回取消函数。
+     */
+    installShellRequests() {
+      const shell = shellBridge();
+      if (!this.enabled || this.role !== 'chrome' || !shell) return () => {};
+      const run = (action: string, payload: Record<string, unknown>) =>
+        void this.command(action, payload).catch(() => {});
+      const offs = [
+        shell.onRequestDetach?.((p) => p?.key && run('detach', { key: p.key })),
+        shell.onRequestDock?.((p) => p?.key && run('dock', { key: p.key })),
+        shell.onWindowFocus?.((p) => p?.key && run('focus', { key: p.key })),
+        shell.onRequestPage?.((p) => p?.route && run('page', { page: p.route }))
+      ];
+      return () => offs.forEach((off) => off?.());
+    },
+    /** 仅 chrome 视图轮询；内容视图靠壳层广播。 */
     startPolling() {
-      if (!this.enabled) return;
+      if (!this.enabled || this.role !== 'chrome') return;
+      void this.init();
       transport(this).start(
-        (state, sequence) => this.applyServerSnapshot(state, sequence),
+        (state, sequence) => {
+          if (this.applyServerSnapshot(state, sequence)) this.forward(state);
+        },
         (error) => {
           this.syncError = String((error as Error)?.message || error);
         }
@@ -133,51 +247,34 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
           action,
           payload
         });
-        this.applyServerSnapshot(result.state, sequence);
-        return result.result || {};
+        if (this.applyServerSnapshot(result.state, sequence)) this.forward(result.state);
+        const outcome = result.result || {};
+        // 目标对话在独立窗口：让壳层前置该窗口（不改 active）。
+        if (outcome.focus === 'detached' && outcome.key) shellBridge()?.focusTab?.(outcome.key);
+        // 独立窗口里点设置/Git/工作流：页面标签在主窗口打开，随后前置主窗口。
+        if (action === 'page' && this.placement === 'detached') shellBridge()?.focusMain?.();
+        return outcome;
       } catch (error) {
         if (error instanceof NavigationError && error.status === 409) {
           await this.refreshSnapshot().catch(() => {});
         }
-        // 零工作区（新装 host）是正常空态，不是同步故障：静默降级到 /new 引导页。
+        // 零工作区（新装 host）是正常空态，不是同步故障：保持当前页，不跳转。
         if (error instanceof NavigationError && error.code === 'no_workspace') {
           this.commandError = '';
-          if (window.location.pathname !== '/new') window.location.assign('/new');
           return null;
         }
         this.commandError = String((error as Error)?.message || error);
         throw error;
       }
     },
-    async attach(payload: Record<string, unknown>) {
-      await this.command('attach', {
-        ...payload,
-        renderer_id: this.localRendererId,
-        seen_navigation_id: this.startupNavigationId
-      });
+    async attach() {
+      if (!this.viewKey) return;
+      await this.command('attach', { key: this.viewKey, renderer_id: this.localRendererId });
       this.attached = true;
-    },
-    ownsNavigation(owner: NavigationOwner) {
-      return (
-        this.attached &&
-        this.rendererId === owner.rendererId &&
-        this.localRendererId === owner.rendererId &&
-        this.navigation?.id === owner.navigationId &&
-        this.navigation?.key === owner.key &&
-        (!owner.key || this.tabs.some((tab) => tab.key === owner.key))
-      );
-    },
-    async commitNavigation(owner: NavigationOwner) {
-      if (!this.ownsNavigation(owner)) return false;
-      try {
-        await this.command('commit', {
-          navigation_id: owner.navigationId,
-          renderer_id: owner.rendererId
-        });
-        return this.ownsNavigation(owner);
-      } catch (error) {
-        if (error instanceof NavigationError && error.status === 409) return false;
-        throw error;
+      if (this.pendingFail) {
+        const error = this.pendingFail;
+        this.pendingFail = '';
+        await this.failView(error);
       }
     },
     addNewTab(
@@ -187,9 +284,12 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         conversationKind?: 'chat' | 'agent';
       } = {}
     ) {
-      const kind = payload.conversationKind || this.activeTab?.conversationKind || 'agent';
-      // 工作区以导航快照为准（设置页等独立路由没有组件级 currentHostWorkspaceId）；
-      // 真正零工作区时由后端返回 code=no_workspace，command 静默回 /new。
+      let base = this.viewTab || this.activeTab;
+      // 页面标签没有对话模式：沿用其 opener 的模式。
+      if (base?.kind === 'page')
+        base = this.tabs.find((tab) => tab.key === base!.openerKey) || null;
+      const kind = payload.conversationKind || base?.conversationKind || 'agent';
+      // 工作区以导航快照为准；真正零工作区时后端返回 code=no_workspace，command 静默忽略。
       return this.command('create', {
         key: `tab_${navigationId()}`,
         conversation_kind: kind,
@@ -211,6 +311,18 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     setActive(key: string) {
       return this.command('activate', { key });
     },
+    /** 标签栏点击：先让壳层乐观显示，再发 activate（以后端快照为准）。 */
+    showTab(key: string) {
+      try {
+        shellBridge()?.show?.(key);
+      } catch {
+        // 乐观显示失败时仍以 activate 的快照为准。
+      }
+      return this.setActive(key);
+    },
+    reorderTab(key: string, beforeKey: string) {
+      return this.command('reorder', { key, before_key: beforeKey });
+    },
     bindConversation(key: string, workspaceId: string, conversationId: string, title: string) {
       return this.command('bind', {
         key,
@@ -220,18 +332,26 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         title
       });
     },
+    failView(error: string) {
+      if (!this.ownsView) {
+        // 路由启动早于 attach：登记后由 attach 补发。
+        this.pendingFail = error;
+        return Promise.resolve(null);
+      }
+      return this.command('fail', {
+        key: this.viewKey,
+        renderer_id: this.localRendererId,
+        error
+      });
+    },
     openPage(page: string) {
       return this.command('page', { page });
     },
-    resume() {
-      const chatPage =
-        window.location.pathname === '/settings/chat' ||
-        new URLSearchParams(window.location.search).get('from') === 'chat';
-      const kind = this.activeTab?.conversationKind || (chatPage ? 'chat' : 'agent');
-      return this.command('resume', {
-        workspace_id: kind === 'chat' ? '' : this.workspaceId,
-        conversation_kind: kind
-      });
+    /** 独立页面返回：激活 opener（仍在主窗口），否则右侧相邻/左侧；不关闭页面标签。 */
+    async leavePage() {
+      const target = pageReturnTarget(this.tabs, this.viewKey || this.activeKey);
+      if (target) return this.showTab(target.key);
+      return this.addNewTab();
     },
     updateTitle(conversationId: string, title: string, workspaceId: string) {
       if (!this.enabled || !title) return;

@@ -11,7 +11,7 @@ main 分支的 macOS 与 Windows 共用 Electron 浏览器，Windows 迁移已�
 - `profile.js`：用户资料、历史、下载元数据和持久存储。
 - `tabs.js`：真实 `WebContentsView` 标签、网页事件、popup 接管、快捷键与原生矩形。
 - `features.js`：下载、站点权限与待处理请求回收。
-- `preload-main.cjs`：只向可信主 renderer 暴露最小 `astrionBrowser` 桥。
+- `preload-view.cjs`：只向可信内容视图 renderer 暴露最小 `astrionBrowser` 桥（另含壳层桥 `astrionShell`，见 `docs/desktop_multi_view.md`）。
 - `static/src/components/browser/`：标签栏、导航栏、管理页、菜单、权限弹窗和原生表面同步。
 - `static/src/stores/nativeBrowser.ts`：共享界面状态、连接与布局序号。
 - `AppShell.vue` 共用挂载；`ConversationSidebar.vue` 在桌面浏览器桥存在时显示入口。
@@ -23,15 +23,19 @@ macOS 与 Windows Electron 网页均使用同一 `BaseWindow` 的原生 `WebCont
 
 每个对话的浏览器可从主窗口面板弹出为一个独立窗口（标签栏右侧「在独立窗口中打开」按钮），用户确认的设计：整个浏览器（该对话全部标签）一起弹出；每个对话最多一个窗口，窗口固定属于弹出时的对话、不随主窗口切换；多个对话可同时各有一个；普通窗口（无 macOS `parent`）；记住大小和位置；窗口标题为对话标题。
 
-- **宿主模型**：`browser/host.js` 的 `BrowserHost` 表示一个承载浏览器界面的可信 renderer 及其连接状态（owner、profile、lease、几何、叠层、输入转发、菜单文案）。`NativeBrowser.main` 是主窗口宿主，`popouts: Map<owner, BrowserHost>` 是独立窗口宿主。标签、资料、AI、回收仍由 `NativeBrowser` 统一持有。`hostFor(owner)` 返回正在显示该对话的宿主（已弹出则为独立窗口）；`windowFor(owner)` 决定网页视图挂载的窗口；`attach/detach` 记录 `tab.window`，所有挂载/移除都经它们。
-- **IPC**：`check(event, lease)` 按发送方找宿主并返回它；主窗口只认聊天路由，独立窗口只认 `/browser-window`。独立窗口的 owner 由主进程在弹出时固定，`connect` 忽略其 renderer 自报的 scope，并要求登录用户与弹出时一致。`publish()` 给每个已连接宿主各发自己的快照；`message(msg, owner)` 只通知显示该对话的宿主。
-- **命令**：`popout`（主窗口；已弹出则前置）、`dock`（任一侧；关闭独立窗口）、`show-popout`（主窗口占位前置窗口）。主窗口当前对话已弹出时快照 `detached: true`、标签为空，前端显示占位；此时只放行资料级命令，其余返回 `browser_detached`。
-- **窗口**：`browser/popout-window.js` 创建 `BaseWindow`，经 `platform.js` 分流窗口装饰。macOS 红绿灯位于 46px 标签栏左侧；Windows Window Controls Overlay 在右侧保留三大键区域。空白处 `-webkit-app-region: drag`。界面页 `static/browser-window.html` → `static/src/browserWindow.ts` → `BrowserWindowApp.vue`，复用 `BrowserPanel`（铺满窗口、无宽度把手，收回按钮替代关闭按钮）；样式经 `scripts/generate_entry_styles.mjs` 装配。preload `preload-browser-window.cjs` 与 `preload-main.cjs` 的桥形状同步手写；两平台主窗口均声明 `popout: true`，旧 Tauri 壳不声明。
+- **宿主模型**：`browser/host.js` 的 `BrowserHost` 表示一个承载浏览器界面的可信 renderer 及其连接状态（owner、profile、lease、几何、叠层、输入转发、菜单文案）。主窗口里每个对话标签各有一个内容视图（`views/manager.js` 的 ViewManager 管理），每个内容视图一个 kind `view` 宿主（`viewHosts: Map<view, BrowserHost>`，由 ViewManager 创建/销毁视图时经 `addViewHost/removeViewHost` 登记；owner 由该视图 `browser:connect` 的 scope 决定，`/new` 绑定时沿用 `adoptOwner`）；`popouts: Map<owner, BrowserHost>` 是浏览器独立窗口宿主；`hosts()` = 视图宿主 + 弹出宿主，`NativeBrowser.main` 只是“当前显示视图的宿主”的取值器。标签、资料、AI、回收仍由 `NativeBrowser` 统一持有。`hostFor(owner)` 返回正在显示该对话的宿主（已弹出则为独立窗口，否则优先当前显示的视图宿主）；`windowFor(owner)`：已弹出 → 弹出窗口；否则 → 持有该对话视图的窗口（主窗口或独立对话窗口）；视图已被 LRU 淘汰 → 主窗口隐藏停放。隐藏的内容视图宿主（`host.presented` 为 false）不摆放网页视图、不参与叠层。`attach/detach` 记录 `tab.window`，所有挂载/移除都经它们。
+- **IPC**：`check(event, lease)` 按发送方找宿主并返回它；内容视图只认应用路由，弹出窗口只认 `/browser-window`。独立窗口的 owner 由主进程在弹出时固定，`connect` 忽略其 renderer 自报的 scope，并要求登录用户与弹出时一致。`publish()` 给每个已连接宿主各发自己的快照；`message(msg, owner)` 只通知显示该对话的宿主。
+- **命令**：`popout`（内容视图宿主，含独立对话窗口里的视图；已弹出则前置）、`dock`（任一侧；关闭独立窗口）、`show-popout`（主窗口占位前置窗口）。主窗口当前对话已弹出时快照 `detached: true`、标签为空，前端显示占位；此时只放行资料级命令，其余返回 `browser_detached`。
+- **窗口**：`browser/popout-window.js` 创建 `BaseWindow`，经 `platform.js` 分流窗口装饰。macOS 红绿灯位于 46px 标签栏左侧；Windows Window Controls Overlay 在右侧保留三大键区域。空白处 `-webkit-app-region: drag`。界面页 `static/browser-window.html` → `static/src/browserWindow.ts` → `BrowserWindowApp.vue`，复用 `BrowserPanel`（铺满窗口、无宽度把手，收回按钮替代关闭按钮）；样式经 `scripts/generate_entry_styles.mjs` 装配。preload `preload-browser-window.cjs` 与 `preload-view.cjs` 的桥形状同步手写；两平台主窗口均声明 `popout: true`，旧 Tauri 壳不声明。
 - **标题**：独立窗口页每 3 秒读 `/api/conversation-tabs`，按 conversation_id 或稳定 key 找到对话标题写入 `document.title`，主进程 `page-title-updated` 同步到窗口标题；查不到时保留上次标题。
-- **生命周期**：关闭 `BaseWindow` 不会销毁子视图（实验已证实），所以独立窗口 `close` 时 `undock` 把该对话的网页视图挪回主窗口，标签保留；删除对话时回收先关窗；`dispose` 直接销毁所有独立窗口。`/new` 阶段弹出的窗口在对话创建时随 `adoptOwner` 迁移 owner。重启后不恢复弹出状态。
+- **生命周期**：关闭 `BaseWindow` 不会销毁子视图（实验已证实），所以独立窗口 `close` 时 `undock` 把该对话的网页视图挪回主窗口，标签保留；删除对话时回收先关窗；`dispose` 直接销毁所有独立窗口。`/new` 阶段弹出的窗口在对话创建时随 `adoptOwner` 迁移 owner。重启后不恢复浏览器弹出状态。
 - **大小位置**：所有独立窗口共用 `userData/browser-window.json`（`moved`/`resized`/关闭时写 `getNormalBounds()`）；新窗口与已开窗口重叠时错开 28px，并夹到所在屏幕工作区内。
 - **回收与 AI**：回收状态头增加 `presented`，后端 `server/browser_retention.py` 把已弹出的对话与主窗口当前对话同样计为前台。AI 驱动的视口兜底取 `boundsFor(owner)`（Windows 共享脚本的 manager 代理无此方法时回退原逻辑）；已弹出对话的 AI 操作不再请求展开主窗口面板。
 - **验证**：`test/2026-11-11_浏览器独立窗口/`（视图迁移实验 52 项、生产模块集成回归 27 项、真实前端视觉截图脚本）。系统红绿灯与整窗外观、拖动/双击缩放、多显示器、输入法仍需实机验收。
+
+## 独立对话窗口与收回目标（2026-11-14，设计见 `docs/desktop_multi_view.md`）
+
+对话标签可拖出主窗口成为独立对话窗口（`views/detached-window.js`，标签 `placement=detached`）：ViewManager 把该对话的内容视图 `removeChildView → addChildView` 迁入新窗口（不重载），并调用 `NativeBrowser.viewMoved(view, window)`，宿主窗口随之更新，该 owner 的网页视图经 `windowFor` 重新挂到新窗口并重新布局。浏览器面板跟随对话所在窗口；浏览器弹出窗口的 `dock`（收回到侧边栏）把网页视图挂回**该对话当前所在的窗口**（独立对话窗口或主窗口）。浏览器弹出期间关闭独立对话窗口，弹出窗口保持，之后收回进主窗口。
 
 ## 身份、标签和生命周期
 

@@ -29,29 +29,27 @@ Object.assign(window, {
     address: displayBrowserAddress,
     async state(kind: string) {
       browser.open = true;
-      const target = { ...original, key: kind === 'committed' ? 'tab-committed' : original.key };
+      // v3：视图固定绑定一个标签；无 pending/commit。pending 等价于「尚未 attach」。
+      const target = { ...original, key: kind === 'committed' ? 'tab-committed' : original.key,
+        placement: 'main' as const, pageType: '' as const, route: '', openerKey: '' };
+      const page = kind === 'settings';
       tabs.$patch({
-        hydrated: true,
-        attached: kind !== 'unattached',
-        rendererId: kind === 'foreign' ? 'another-renderer' : tabs.localRendererId,
-        tabs: [target], activeKey: kind === 'committed' ? target.key : '',
-        navigation: {
-          id: `nav-${kind}`, key: target.key, page: kind === 'settings' ? '/settings/general' : '',
-          status: kind === 'pending' ? 'pending' : kind === 'committed' ? 'committed' : 'error',
-          error: kind === 'committed' ? '' : '尚未配置任何模型'
-        }
+        hydrated: true, enabled: true, viewKey: target.key,
+        attached: kind !== 'unattached' && kind !== 'pending',
+        renderers: { [target.key]: kind === 'foreign' ? 'another-renderer' : tabs.localRendererId },
+        tabs: [page ? { ...target, kind: 'page' as const, pageType: 'settings' as const, route: '/settings' } : target],
+        activeKey: target.key
       });
       await nextTick();
     },
     async pollNavigation() {
       tabs.applyServerSnapshot({
-        revision: Math.max(0, tabs.revision),
+        revision: Math.max(0, tabs.revision) + 1,
         active_key: tabs.activeKey,
-        renderer_id: tabs.rendererId,
-        navigation: JSON.parse(JSON.stringify(tabs.navigation)),
+        renderers: JSON.parse(JSON.stringify(tabs.renderers)),
         tabs: tabs.tabs.map(tab => ({ ...tab, conversation_kind: tab.conversationKind,
           conversation_id: tab.conversationId, workspace_id: tab.workspaceId,
-          workspace_label: tab.workspaceLabel }))
+          workspace_label: tab.workspaceLabel, page_type: tab.pageType, opener_key: tab.openerKey }))
       }, tabs.responseSequence + 1);
       await nextTick();
     },
@@ -66,16 +64,13 @@ Object.assign(window, {
     history() { browser.showSection('history'); },
     async closeTabs() { for (const tab of [...browser.tabs]) await browser.command('close', undefined, tab.id); },
     guards() {
-      const state = { ...tabs, activeTab: null, activeKey: '', hydrated: true, attached: true,
-        rendererId: tabs.localRendererId, tabs: [original],
-        navigation: { id: 'error', key: original.key, page: '', status: 'error' as const, error: 'no model' } };
+      const state = { hydrated: true, ownsView: true, viewTab: original };
       return {
         rootNew: !!browserScopeForNavigation(state, '/'),
-        wrongWorkspace: browserScopeForNavigation(state, '/new', '?workspace_id=wrong') === null,
-        historicalRoute: browserScopeForNavigation(state, '/conv_old') === null,
-        closedTarget: browserScopeForNavigation({ ...state, tabs: [] }, '/new') === null,
-        staleActiveKey: browserScopeForNavigation({ ...state, activeKey: 'closed-key' }, '/new') === null,
-        wrongMode: browserScopeForNavigation(state, '/chat/new') === null
+        settingsRoute: browserScopeForNavigation(state, '/settings') === null,
+        closedTarget: browserScopeForNavigation({ ...state, viewTab: null }, '/new') === null,
+        foreignRenderer: browserScopeForNavigation({ ...state, ownsView: false }, '/new') === null,
+        pageTab: browserScopeForNavigation({ ...state, viewTab: { ...original, kind: 'page' as const } }, '/new') === null
       };
     },
     inspect() {

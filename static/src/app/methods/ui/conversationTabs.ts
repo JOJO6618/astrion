@@ -1,12 +1,17 @@
 // @ts-nocheck
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
-import {
-  startDesktopNavigation,
-  stopDesktopNavigation,
-  desktopCreationTab
-} from './desktopNavigation';
+import { startDesktopView, stopDesktopView, desktopCreationTab } from './desktopView';
 import { currentConversationSession } from '../conversation/session';
 import { t } from '@/locales';
+
+export function visibleSession(host) {
+  return (
+    currentConversationSession(host) || {
+      conversationId: String(host.currentConversationId || ''),
+      workspaceId: String(host.currentHostWorkspaceId || '')
+    }
+  );
+}
 
 async function request(host, action, payload = {}) {
   try {
@@ -26,18 +31,20 @@ export const conversationTabsMethods = {
   captureDesktopCreationTab() {
     return desktopCreationTab(this);
   },
+  /** 发送守卫：已 attach、持有本标签 renderer 写权、标签仍在且身份与可见会话一致。 */
   isDesktopNavigationReady() {
     const tabs = useConversationTabsStore();
-    const session = currentConversationSession(this);
-    const tab = tabs.activeTab;
+    // 刷新/冷启动的空白新对话视图没有 session（路由只 leaveConversationView）；
+    // 此时以页面可见身份判定，发送时 ensureMessageSession 才建立 session。
+    const session = visibleSession(this);
+    const tab = tabs.viewTab;
     if (
-      !tabs.attached ||
-      tabs.rendererId !== tabs.localRendererId ||
-      tabs.navigation?.status === 'pending' ||
+      !tabs.ownsView ||
       this.historyLoading ||
       this.hostWorkspaceSwitching ||
       !session ||
       !tab ||
+      tab.kind === 'page' ||
       tab.workspaceId !== session.workspaceId
     )
       return false;
@@ -62,14 +69,19 @@ export const conversationTabsMethods = {
   openDesktopPage(page) {
     return request(this, 'page', { page });
   },
-  resumeDesktopTab() {
-    // 设置页等独立路由没有组件级工作区身份，统一交给后端按导航快照解析；
-    // 真正零工作区时后端返回 code=no_workspace，由 store 静默回 /new。
-    return request(this, 'resume', { workspace_id: this.currentHostWorkspaceId || '' });
-  },
-  handleTabActivate(tab) {
-    if (!tab) return;
-    return request(this, 'activate', { key: tab.key });
+  /** 独立页面「返回」：回到 opener 标签（不关闭页面标签）。 */
+  leaveDesktopPage() {
+    return useConversationTabsStore()
+      .leavePage()
+      .then(() => ({ success: true }))
+      .catch((error) => {
+        this.uiPushToast?.({
+          title: t('appMessages.loadConversationErrorTitle'),
+          message: String(error?.message || error),
+          type: 'error'
+        });
+        return { success: false };
+      });
   },
   handleTabNew(options = {}) {
     return request(this, 'create', {
@@ -77,10 +89,10 @@ export const conversationTabsMethods = {
     });
   },
   restoreConversationTabView() {
-    return startDesktopNavigation(this);
+    return startDesktopView(this);
   },
   stopConversationTabView() {
-    stopDesktopNavigation(this);
+    stopDesktopView(this);
   },
   handleGlobalTabShortcut(event) {
     const tabs = useConversationTabsStore();
@@ -90,11 +102,10 @@ export const conversationTabsMethods = {
       event.preventDefault();
       void this.handleTabNew();
     } else if (key === 'w') {
-      const target = tabs.requestedKey || tabs.activeKey;
-      const tab = tabs.tabs.find((item) => item.key === target);
-      if (!tab || (tabs.tabs.length === 1 && tab.kind === 'new')) return;
+      const tab = tabs.viewTab;
+      if (!tab || (tabs.mainTabs.length === 1 && tab.kind === 'new')) return;
       event.preventDefault();
-      void request(this, 'close', { key: target });
+      void request(this, 'close', { key: tab.key });
     }
   },
   async enterNewConversationPage(options = {}) {

@@ -79,7 +79,15 @@ export const workspaceNavigationMethods = {
     const scoped = !!(this.versioningHostMode || this.dockerProjectMode);
     const workspaceId = String(payload?.workspaceId || this.currentHostWorkspaceId || '').trim();
     const tabs = useConversationTabsStore();
-    if (tabs.enabled && !options.desktopNavigation && !options.desktopRecovery) {
+    if (tabs.enabled) {
+      // 桌面多视图：本视图固定绑定一个标签，切换对话 = 发 open 命令，由壳层切视图。
+      const norm = (value) => String(value || '').replace(/^conv_/, '');
+      if (
+        norm(id) === norm(this.currentConversationId) &&
+        workspaceId === String(this.currentHostWorkspaceId || '') &&
+        !this.historyLoading
+      )
+        return { success: true, skipped: true };
       return this.openDesktopConversation({ conversationId: id, workspaceId });
     }
     const crossingWorkspace = workspaceId !== String(this.currentHostWorkspaceId || '');
@@ -96,9 +104,7 @@ export const workspaceNavigationMethods = {
     this.flushReasoningEffortSave?.();
     const draftSave = options.prepared ? Promise.resolve() : saveSourceDraft(this);
     const session = this.beginConversationView(id, workspaceId);
-    const owns = () =>
-      ownsConversationSession(this, session) &&
-      (!options.desktopNavigation || tabs.ownsNavigation(options.desktopNavigation));
+    const owns = () => ownsConversationSession(this, session);
     this.suppressTitleTyping = true;
     this.titleReady = false;
     this.hostWorkspaceSwitching =
@@ -119,7 +125,6 @@ export const workspaceNavigationMethods = {
         urlMode: 'push',
         source: 'workspace',
         preserveListPosition: !!options.preserveListPosition,
-        desktopNavigation: options.desktopNavigation,
         navigationReady: options.prepared || Promise.all([selection, draft, draftSave])
       });
       if (!owns() || result?.superseded) return result;
@@ -129,7 +134,6 @@ export const workspaceNavigationMethods = {
           void this.loadConversationsList({ background: true, autoEnter: false });
         }
       } else {
-        if (options.desktopNavigation) return result;
         this.suppressTitleTyping = false;
         this.titleReady = true;
         this.uiPushToast({
@@ -142,7 +146,6 @@ export const workspaceNavigationMethods = {
       return result;
     } catch (error) {
       if (!owns()) return { success: false, superseded: true };
-      if (options.desktopNavigation) throw error;
       this.suppressTitleTyping = false;
       this.titleReady = true;
       this.uiPushToast({
@@ -160,9 +163,7 @@ export const workspaceNavigationMethods = {
     const id = String(workspaceId || '').trim();
     if (!id) return;
     const tabs = useConversationTabsStore();
-    if (tabs.enabled && !options.desktopNavigation && !options.desktopRecovery) {
-      return this.requestDesktopWorkspace(id, options);
-    }
+    if (tabs.enabled) return this.requestDesktopWorkspace(id, options);
     const sameWorkspace = id === String(this.currentHostWorkspaceId || '');
     if (!options.newConversation && sameWorkspace && !this.historyLoading) return;
     const previousId =
@@ -170,9 +171,7 @@ export const workspaceNavigationMethods = {
     // Capture the departed view before navigation; other workspaces never inherit it.
     const save = saveSourceDraft(this);
     const session = this.beginConversationView('', id);
-    const owns = () =>
-      ownsConversationSession(this, session) &&
-      (!options.desktopNavigation || tabs.ownsNavigation(options.desktopNavigation));
+    const owns = () => ownsConversationSession(this, session);
     this.hostWorkspaceSwitching = true;
     try {
       const [selection, draft, response] = await Promise.all([
@@ -213,9 +212,6 @@ export const workspaceNavigationMethods = {
         view = await requestNewConversationView(id, null, session.controller.signal);
         if (!owns()) return;
       }
-      if (options.desktopNavigation) {
-        if (!(await tabs.commitNavigation(options.desktopNavigation)) || !owns()) return;
-      }
       if (this.composerDraftDirty) {
         void this.persistComposerDraftNow({ reason: 'navigation-edits', keepalive: true }).catch(
           () => {}
@@ -239,11 +235,7 @@ export const workspaceNavigationMethods = {
       this.historyLoadingFor = null;
       this.applyComposerDraftState(draft, id, null);
       this.refreshBlankHeroState();
-      history.replaceState(
-        {},
-        '',
-        tabs.enabled ? `/new?workspace_id=${encodeURIComponent(id)}` : '/new'
-      );
+      history.replaceState({}, '', '/new');
       void this.loadConversationsList({ background: true, autoEnter: false });
       void this.refreshRunningWorkspaceTasks?.();
       void this.refreshProjectGitSummary?.();
@@ -251,7 +243,6 @@ export const workspaceNavigationMethods = {
       this.hostWorkspaceSwitching = false;
     } catch (error) {
       if (!owns()) return;
-      if (options.desktopNavigation) throw error;
       this.uiPushToast({
         title: this.versioningHostMode
           ? t('appUi.switchWorkspaceFailed')

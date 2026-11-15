@@ -20,22 +20,27 @@ class LifecycleTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
 
     def test_chat_new_reload_keeps_one_stable_tab(self):
+        # v3：空白 Chat 标签由 create 建立，刷新只是重新 attach，不增标签
         service = DesktopNavigation(str(self.root / "navigation.json"))
-        payload = {"renderer_id": "renderer", "conversation_kind": "chat", "workspace_id": ""}
-        state = service.command("user", "attach1", "attach", payload)["state"]
+        state = service.command("user", "create1", "create", {"conversation_kind": "chat"})["state"]
         key = state["tabs"][0]["key"]
         for i in range(3):
-            state = service.command("user", f"attach{i+2}", "attach", {
-                **payload, "seen_navigation_id": state["navigation"]["id"]})["state"]
+            state = service.command("user", f"attach{i}", "attach", {
+                "key": key, "renderer_id": f"renderer{i}"})["state"]
             self.assertEqual(len(state["tabs"]), 1)
             self.assertEqual(state["tabs"][0]["key"], key)
             self.assertEqual(state["tabs"][0]["workspace_id"], "")
 
     def test_pure_chat_page_resume_and_empty_bind(self):
+        # v3：设置页是 page 标签；回到 Chat 即 activate opener；空绑定不生效
         service = DesktopNavigation(str(self.root / "navigation.json"))
-        service.command("user", "page", "attach", {"renderer_id": "renderer", "page": "/settings/chat"})
-        state = service.command("user", "resume", "resume", {"conversation_kind": "chat", "workspace_id": ""})["state"]
+        state = service.command("user", "create", "create", {"conversation_kind": "chat"})["state"]
         key = state["tabs"][0]["key"]
+        service.command("user", "attach", "attach", {"key": key, "renderer_id": "renderer"})
+        state = service.command("user", "page", "page", {"page": "/settings/chat"})["state"]
+        self.assertNotEqual(state["active_key"], key)
+        state = service.command("user", "back", "activate", {"key": key})["state"]
+        self.assertEqual(state["active_key"], key)
         result = service.command("user", "empty", "bind", {"renderer_id": "renderer", "workspace_id": "", "key": key})
         self.assertFalse(result["result"]["bound"])
         bound = service.command("user", "bind", "bind", {"renderer_id": "renderer", "workspace_id": "", "key": key,

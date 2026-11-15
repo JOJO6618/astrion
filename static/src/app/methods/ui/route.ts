@@ -32,14 +32,12 @@ export const routeMethods = {
     const epoch = conversationViewEpoch(this);
     const owns = () =>
       session ? ownsConversationSession(this, session) : conversationViewEpoch(this) === epoch;
-    // Capture the pending desktop target before loading a possibly stale address-bar URL.
-    let desktopTargetPending = false;
+    // 桌面视图：先确认壳层身份（legacy 兜底页会被降级为网页行为），再按 URL 启动。
     try {
       const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
       const tabsStore = useConversationTabsStore();
       if (tabsStore.enabled) {
         await tabsStore.hydrate();
-        desktopTargetPending = tabsStore.navigation?.status === 'pending';
       }
     } catch (_tabsErr) {
       // 恢复失败不阻断路由
@@ -94,13 +92,6 @@ export const routeMethods = {
       this.initialRouteResolved = true;
       return;
     }
-    if (desktopTargetPending) {
-      // The coordinator attaches after this route setup and loads the latest target.
-      // Do not let a failed stale URL create a new tab over the saved pending intent.
-      this.initialRouteResolved = true;
-      this.leaveConversationView();
-      return;
-    }
     if (!path || this.isExplicitNewConversationRoute()) {
       this.currentConversationId = null;
       this.currentConversationTitle = t('common.newConversation');
@@ -146,13 +137,13 @@ export const routeMethods = {
         this.updateCurrentContextTokens();
       } else {
         this.initialRouteResolved = true;
-        return this.enterNewConversationPage();
+        return this.failDesktopViewOrNew(result?.error);
       }
     } catch (error) {
       if (!owns()) return { success: false, superseded: true };
       this.initialRouteResolved = true;
       console.warn('初始化路由失败:', error);
-      return this.enterNewConversationPage();
+      return this.failDesktopViewOrNew(error);
     } finally {
       if (owns()) this.initialRouteResolved = true;
     }
@@ -160,6 +151,18 @@ export const routeMethods = {
     if (this.currentConversationId) {
       this.fetchPendingUserQuestions?.();
     }
+  },
+  /** 桌面视图固定绑定标签：加载失败只标记本标签错误（不另开标签）；网页端回空对话。 */
+  failDesktopViewOrNew(error) {
+    const tabs = useConversationTabsStore();
+    if (!tabs.enabled) return this.enterNewConversationPage();
+    this.leaveConversationView();
+    this.uiPushToast?.({
+      title: t('appMessages.loadConversationErrorTitle'),
+      message: String(error?.message || error || ''),
+      type: 'error'
+    });
+    return tabs.failView(String(error?.message || error || 'load_failed')).catch(() => {});
   },
   handlePopState(event) {
     const state = event.state || {};
@@ -243,7 +246,8 @@ export const routeMethods = {
     window.location.assign('/settings');
   },
   closeSettingsPage(fallback = '/new') {
-    if (useConversationTabsStore().enabled) return this.resumeDesktopTab();
+    // 桌面：页面标签常驻，「返回」= 激活 opener（否则右侧/左侧相邻），不关闭页面标签。
+    if (useConversationTabsStore().enabled) return this.leaveDesktopPage();
     if (new URLSearchParams(window.location.search).get('from') === 'chat') {
       window.location.assign('/chat/new');
       return;

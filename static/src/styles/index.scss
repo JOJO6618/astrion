@@ -5,6 +5,7 @@
 @use './layout/app-shell';
 @use './layout/panels';
 @use './components/chrome/tab-strip';
+@use './components/chrome/detached-view';
 @use './components/sidebar/conversation';
 @use './components/panels/right-panel';
 @use './components/panels/resource-panel';

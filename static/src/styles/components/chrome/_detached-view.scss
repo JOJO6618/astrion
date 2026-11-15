@@ -1,0 +1,59 @@
+// 独立对话窗口布局（docs/desktop_multi_view.md §5.4）：隐藏侧边栏，顶部 38px 自绘标题栏。
+// 根节点类 html.desktop-detached 由 DetachedTopBar.vue 随 placement 切换。
+:root {
+  --detached-bar-height: 38px;
+}
+
+.detached-top-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: var(--detached-bar-height);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--chrome-bar-bg);
+  color: var(--text-primary);
+  user-select: none;
+  // 整条作为窗口拖动区
+  -webkit-app-region: drag;
+}
+// macOS 红绿灯悬浮在左侧
+.detached-top-bar.is-mac {
+  padding-left: 84px;
+}
+// Windows 窗口控制叠加层在右侧
+.detached-top-bar.is-windows {
+  padding-right: 150px;
+}
+.detached-top-bar__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+html.desktop-detached {
+  // 视口高度变量在 .app-root 子树内整体减去顶栏：聊天区/输入栏/右侧面板/主容器
+  // 都用 var(--app-viewport) 定高，只加 padding 会把它们整体下推并溢出窗口底部。
+  .app-root {
+    --app-viewport: calc(100vh - var(--detached-bar-height));
+    box-sizing: border-box;
+    padding-top: var(--detached-bar-height);
+  }
+  // position:fixed; top:0 的面板不在 .app-root 的文档流里，需单独让出顶栏
+  // （浏览器面板的原生视图 rect 取自其 DOM 盒，随之正确下移）
+  .native-browser-panel,
+  .show-html-fullscreen {
+    top: var(--detached-bar-height);
+  }
+  .show-html-fullscreen {
+    height: var(--app-viewport);
+  }
+  // 没有侧边栏：不提供新建/切换对话入口
+  .conversation-sidebar {
+    display: none;
+  }
+}

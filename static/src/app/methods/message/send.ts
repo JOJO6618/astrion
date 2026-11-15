@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { debugLog } from '../common';
 import { t } from '@/locales';
 import { useModelStore } from '../../../stores/model';
@@ -19,7 +20,7 @@ export { createOwnedMessageTask, ensureMessageSession } from './ownership';
 export const sendMethods = {
   ...messageControlMethods,
   async sendMessage(options = {}) {
-    if ((window as any).__ASTRION_DESKTOP__ && !this.isDesktopNavigationReady?.()) return false;
+    if (useConversationTabsStore().enabled && !this.isDesktopNavigationReady?.()) return false;
     if (
       !options?.goalAction &&
       typeof options?.presetText !== 'string' &&
@@ -233,7 +234,6 @@ export const sendMethods = {
         }
         targetConversationId = createResult.conversation_id;
         if (creationTab) {
-          const { useConversationTabsStore } = await import('../../../stores/conversationTabs');
           const bound = await useConversationTabsStore().bindConversation(
             creationTab.key,
             creationTab.workspaceId,

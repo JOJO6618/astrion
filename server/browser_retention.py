@@ -9,6 +9,18 @@ from flask import jsonify, request
 from modules.native_browser.retention import browser_retention
 
 
+def foreground_scopes(state: dict) -> list:
+    """前台 = 主窗口 active 对话 + 所有已拖出到独立窗口的对话（独立页面标签不算对话）。"""
+    visible = []
+    for tab in state["tabs"]:
+        if tab["kind"] == "page" or not (tab["placement"] == "detached" or
+                                         tab["key"] == state["active_key"]):
+            continue
+        visible.append([tab.get("conversation_kind", "agent"), tab.get("workspace_id", ""),
+                        tab["conversation_id"] or tab["key"]])
+    return visible
+
+
 def retention_response():
     from server.auth_helpers import get_current_username
     from server.conversation_tabs import (
@@ -45,17 +57,13 @@ def retention_response():
 
     # Reading the navigation snapshot neither selects a workspace nor loads a conversation.
     state = navigation.snapshot(username)
-    current = next((tab for tab in state["tabs"] if tab["key"] == state["active_key"]), None)
-    visible = None
-    if current and not state.get("navigation", {}).get("page"):
-        visible = [current.get("conversation_kind", "agent"), current.get("workspace_id", ""),
-                   current.get("conversation_id") or current["key"]]
+    visible = foreground_scopes(state)
     active = _active_run_conversation_ids(username, sorted({scope[1] for scope in scopes if scope[0] == "agent"}))
     statuses = {}
     chat = chat_identity = None
     for key, (mode, workspace, conversation) in owners.items():
         viewed = payload.get("visits", {}).get(key, 0)
-        info = {"exists": True, "front": owners[key] == visible or key in presented_keys,
+        info = {"exists": True, "front": owners[key] in visible or key in presented_keys,
                 "viewed": viewed if isinstance(viewed, (int, float)) else 0}
         try:
             if conversation.startswith("conv_"):

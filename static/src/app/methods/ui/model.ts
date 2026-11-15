@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { t } from '@/locales';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
@@ -17,12 +18,12 @@ export const modelMethods = {
   },
   // 底部「管理模型」入口：整页跳设置页模型分区
   openManageModels() {
-    if ((window as any).__ASTRION_DESKTOP__) return this.openDesktopPage('/settings/models');
+    if (useConversationTabsStore().enabled) return this.openDesktopPage('/settings/models');
     window.location.assign('/settings/models');
   },
   // 模型菜单真空态引导：跳设置页提供商分区（未配置任何模型时使用）
   openSettingsProviders() {
-    if ((window as any).__ASTRION_DESKTOP__) return this.openDesktopPage('/settings/providers');
+    if (useConversationTabsStore().enabled) return this.openDesktopPage('/settings/providers');
     window.location.assign('/settings/providers');
   },
   toggleModelMenu() {

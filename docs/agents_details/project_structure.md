@@ -26,7 +26,7 @@
   - `modules/desktop_navigation/model.py` 定义稳定标签身份、迁移和关闭选后继；`service.py` 串行处理幂等命令及版本化持久化，`server/conversation_tabs.py` 做可信工作区解析、HTTP 装配与运行态富化，不创建执行实例。
   - `static/src/stores/conversationTabs.ts` 是服务端快照投影，`desktopNavigationTransport.ts` 负责串行命令及不重叠轮询；`app/methods/ui/desktopNavigation.ts` 是主页面唯一目标协调器，复用原 bootstrap/session 与工作区导航。完整契约见 `docs/desktop_navigation.md`。
 - **桌面内置浏览器验证版（macOS 2026-11-08 / Windows Electron 迁移 2026-11-13）**
-  - `desktop-electron/src/browser/` 由 macOS 与 Windows 共用，按管理器、策略、用户资料、原生标签和下载/权限分工，网页为独立安全 `WebContentsView`；`preload-main.cjs` 仅向主应用暴露可信桥。网站资料必须位于 sessionData 内，DOM 浮层走透明叠层与输入转发；Windows 元数据根另加 `electron/`，旧 WebView2 数据不迁移。
+  - `desktop-electron/src/browser/` 由 macOS 与 Windows 共用，按管理器、策略、用户资料、原生标签和下载/权限分工，网页为独立安全 `WebContentsView`；`preload-view.cjs` 仅向主应用内容视图暴露可信桥；`desktop-electron/src/views/` 的 ViewManager 管理主窗口内每标签一个内容视图与独立对话窗口（见 `docs/desktop_multi_view.md`）。网站资料必须位于 sessionData 内，DOM 浮层走透明叠层与输入转发；Windows 元数据根另加 `electron/`，旧 WebView2 数据不迁移。
   - `desktop-electron/src/windows/` 管理 Job guardian、WGC 调用和注册表 PATH；`native/windows-helper/` 直接复用 `desktop/src-tauri/src/quick/` 的 Rust 原生模块，编译成无 Tauri 依赖的 CLI。Windows 构建及数据边界见 `docs/windows_electron.md`。
   - `desktop/src-tauri/src/browser/` 保留旧 WebView2 实现，其原生区域裁剪与controller不用于Electron。例外是共用的 `chrome_worker.py`：Windows Electron 0.10.3通过固定私有管道复用其DPAPI/AES-GCM与CSV/JSON解析，按extraResources打包；目的端预览、冲突、密码库与Cookie提交在Electron模块内。此手动导入不等于自动迁移旧WebView2资料。
   - `static/src/components/browser/` 与 `stores/nativeBrowser.ts` 由 Agent / Chat、macOS / Windows 共用，通过 AppShell 挂载和 ConversationSidebar 进入。资料按用户共享，标签按稳定桌面对话标签 key 归属。边界和验证见 `docs/native_browser.md`。

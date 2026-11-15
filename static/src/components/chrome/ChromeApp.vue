@@ -9,6 +9,7 @@ import { useConversationTabsStore } from '@/stores/conversationTabs';
 
 const tabsStore = useConversationTabsStore();
 let themeTimer = 0;
+let removeShellRequests = () => {};
 
 function syncTheme() {
   try {
@@ -24,12 +25,14 @@ function syncTheme() {
 
 onMounted(() => {
   tabsStore.startPolling();
+  removeShellRequests = tabsStore.installShellRequests();
   syncTheme();
   themeTimer = window.setInterval(syncTheme, 2000);
   window.addEventListener('storage', syncTheme);
 });
 onBeforeUnmount(() => {
   tabsStore.stopPolling();
+  removeShellRequests();
   if (themeTimer) window.clearInterval(themeTimer);
   window.removeEventListener('storage', syncTheme);
 });
