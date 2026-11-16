@@ -16,7 +16,7 @@ export interface ConversationTab {
   awaitingHumanApproval: boolean;
   placement: 'main' | 'detached';
   /** 仅 page 标签。 */
-  pageType: '' | 'settings' | 'workflows' | 'git';
+  pageType: '' | 'settings' | 'workflows' | 'git' | 'schedules';
   route: string;
   openerKey: string;
 }

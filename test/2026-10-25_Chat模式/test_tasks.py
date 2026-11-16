@@ -139,5 +139,14 @@ class TaskTests(unittest.TestCase):
         self.assertIn("disk failure", record.error)
 
 
+class ChatSettingsEffortTests(unittest.TestCase):
+    def test_reasoning_effort_follows_runtime_levels(self):
+        from config.limits import REASONING_EFFORT_LEVELS
+        for effort in REASONING_EFFORT_LEVELS:
+            TaskParams(message="hi", task_type="chat", chat_settings={"reasoning_effort": effort}).validate()
+        with self.assertRaises(ValueError):
+            TaskParams(message="hi", task_type="chat", chat_settings={"reasoning_effort": "minimal"}).validate()
+
+
 if __name__ == "__main__":
     unittest.main()

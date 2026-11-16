@@ -106,6 +106,8 @@ class ToolsDefinitionMainMixin:
                 tools.extend(self._build_context_tools())
                 tools.extend(self._build_misc_tools())
                 tools.extend(self._build_workflow_tools())
+                from modules.scheduled_tasks.tools import definitions as schedule_definitions
+                tools.extend(schedule_definitions())
                 # macOS 内置浏览器：仅桌面版 Agent 主对话；开关关闭时也注入（保持工具数组稳定）。
                 tools.extend(self._build_browser_tools())
                 from modules.git_worktree import enabled, definitions

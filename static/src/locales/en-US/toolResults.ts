@@ -348,6 +348,9 @@ export default {
   // —— MCP tool fallback name ——
   mcpTool: 'MCP tool',
 
+  // —— Minimal category summary ——
+  summarySchedule: 'Performed {n} scheduled task actions',
+
   // —— Tool status texts (chatDisplay action label map): tool name → preparing / running / completed / failed ——
   preparingStatus: {
     enterWorktree: 'Preparing to enter worktree',
@@ -403,6 +406,9 @@ export default {
     triggerEasterEgg: 'Preparing easter egg',
     askUser: 'Preparing to ask',
     sleep: 'Preparing to wait',
+    submitSchedule: 'Preparing to submit scheduled task',
+    querySchedules: 'Preparing to query scheduled tasks',
+    manageSchedule: 'Preparing to manage scheduled task',
     mcpTool: 'Preparing to call MCP tool',
     fallback: 'Preparing to run tool'
   },
@@ -464,6 +470,9 @@ export default {
     triggerEasterEgg: 'Triggering easter egg...',
     askUser: 'Waiting for your answer...',
     sleep: 'Waiting...',
+    submitSchedule: 'Submitting scheduled task...',
+    querySchedules: 'Querying scheduled tasks...',
+    manageSchedule: 'Managing scheduled task...',
     mcpTool: 'Calling MCP tool...',
     fallback: 'Running tool...'
   },
@@ -523,6 +532,9 @@ export default {
     triggerEasterEgg: 'Easter egg triggered',
     askUser: 'Question answered',
     sleep: 'Wait complete',
+    submitSchedule: 'Scheduled task submitted',
+    querySchedules: 'Scheduled tasks queried',
+    manageSchedule: 'Scheduled task managed',
     mcpTool: 'MCP tool called',
     fallback: 'Tool executed'
   },
@@ -582,6 +594,9 @@ export default {
     triggerEasterEgg: 'Failed to trigger easter egg',
     askUser: 'Question failed',
     sleep: 'Wait interrupted',
+    submitSchedule: 'Failed to submit scheduled task',
+    querySchedules: 'Failed to query scheduled tasks',
+    manageSchedule: 'Failed to manage scheduled task',
     mcpTool: 'MCP tool call failed',
     fallback: 'Tool failed'
   }

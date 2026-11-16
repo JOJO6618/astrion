@@ -17,6 +17,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useScheduleNotifications } from '@/composables/useScheduleNotifications';
 import ConfirmDialog from '@/components/shell/ConfirmDialog.vue';
 import EasterEggOverlay from '@/components/shell/EasterEggOverlay.vue';
 import FileContextMenu from '@/components/shell/FileContextMenu.vue';
@@ -26,6 +27,7 @@ import ToastStack from '@/components/shell/ToastStack.vue';
 import NativeBrowserHost from '@/components/browser/NativeBrowserHost.vue';
 import { useNativeBrowserStore, nativeBrowserAvailable } from '@/stores/nativeBrowser';
 import { browserConversationPage } from '@/components/browser/browserScope';
+useScheduleNotifications();
 const browser = useNativeBrowserStore();
 const browserAvailable = nativeBrowserAvailable();
 const browserVisible = computed(

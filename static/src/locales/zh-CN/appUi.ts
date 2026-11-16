@@ -207,6 +207,7 @@ export default {
   tabStripPageWorkflows: '工作流',
   tabStripPageGit: 'Git',
   tabStripPageGitWorkspace: 'Git · {workspace}',
+  tabStripPageSchedules: '定时任务',
   tabStripSettingsHint: '设置',
   tabStripSyncFailed: '同步失败，重试',
   tabStripLoadFailed: '加载失败，点击重试',

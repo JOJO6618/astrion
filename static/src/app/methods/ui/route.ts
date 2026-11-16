@@ -80,6 +80,8 @@ export const routeMethods = {
         this.settingsRoute = path;
       } else if (path === 'git') {
         this.gitRoute = path;
+      } else if (path === 'schedules') {
+        this.schedulesRoute = path;
       } else {
         this.workflowDemoRoute = path;
       }
@@ -208,12 +210,18 @@ export const routeMethods = {
     const normalizedPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
     return (
       normalizedPath === 'git' ||
+      normalizedPath === 'schedules' ||
       normalizedPath === 'workflows' ||
       normalizedPath === 'workflow' ||
       normalizedPath.startsWith('workflow/') ||
       normalizedPath === 'settings' ||
       normalizedPath.startsWith('settings/')
     );
+  },
+  openSchedulesPage() {
+    if (useConversationTabsStore().enabled) return this.openDesktopPage('/schedules');
+    this.leaveConversationView();
+    window.location.assign('/schedules');
   },
   openWorkflowsPage() {
     if (useConversationTabsStore().enabled) return this.openDesktopPage('/workflows');

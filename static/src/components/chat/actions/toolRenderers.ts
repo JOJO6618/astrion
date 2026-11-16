@@ -103,6 +103,21 @@ function renderByTool(
       return renderListWorkflows(result, args);
     case 'save_workflow':
       return renderSaveWorkflow(result, args);
+    case 'submit_schedule':
+    case 'query_schedules':
+    case 'manage_schedule':
+      return (
+        meta(
+          ...Object.entries(args)
+            .filter(([key]) => key !== 'intent')
+            .map(([key, value]) =>
+              param(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''))
+            )
+        ) +
+        (result?.success
+          ? preBox(JSON.stringify(result.plan || result.plans || result.result || {}, null, 2))
+          : '')
+      );
     case 'vlm_analyze':
       return renderVlmAnalyze(result, args);
     case 'ocr_image':

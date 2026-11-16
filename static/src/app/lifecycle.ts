@@ -53,8 +53,8 @@ export async function mounted() {
   setupShowImageObserver();
   setupImagePreviewDelegation();
 
-  if (this.settingsRoute) {
-    // Settings load their own account data without initializing Agent resources.
+  if (this.settingsRoute || this.schedulesRoute) {
+    // Independent pages load account data without initializing Agent resources.
     await this.restoreConversationTabView?.();
     window.addEventListener('popstate', this.handlePopState);
     window.addEventListener('keydown', this.handleGlobalTabShortcut);

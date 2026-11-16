@@ -61,6 +61,7 @@ export const ICONS = Object.freeze({
   sparkles: '/static/icons/sparkles.svg',
   stickyNote: '/static/icons/sticky-note.svg',
   terminal: '/static/icons/terminal.svg',
+  timer: '/static/icons/timer.svg',
   trash: '/static/icons/trash.svg',
   triangleAlert: '/static/icons/triangle-alert.svg',
   bell: '/static/icons/bell.svg',
@@ -148,7 +149,11 @@ export const TOOL_ICON_MAP = Object.freeze({
   terminate_sub_agent: 'bot',
   send_message_to_sub_agent: 'bot',
   stop_sub_agent: 'bot',
-  answer_sub_agent_question: 'bot'
+  answer_sub_agent_question: 'bot',
+  // 定时任务工具统一使用 timer 图标
+  submit_schedule: 'timer',
+  query_schedules: 'timer',
+  manage_schedule: 'timer'
 });
 
 export const TOOL_CATEGORY_ICON_MAP = Object.freeze({

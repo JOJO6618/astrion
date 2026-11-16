@@ -94,6 +94,13 @@
     color 140ms ease;
 }
 
+/* 定时任务入口沿用导航按钮的 32px 热区，SVG 只占 18px 图形盒，
+   避免把 mask 图标本身当成按钮导致尺寸和 hover 区域与其它入口不一致。 */
+.schedules-icon .icon {
+  width: 18px;
+  height: 18px;
+}
+
 .conversation-sidebar.collapsed .sidebar-nav-row:hover,
 .conversation-sidebar.collapsed .sidebar-nav-row:focus-visible {
   background: transparent;

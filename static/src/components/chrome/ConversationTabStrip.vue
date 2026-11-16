@@ -134,7 +134,12 @@ import {
 const tabsStore = useConversationTabsStore();
 const { activeKey } = storeToRefs(tabsStore);
 const settingsIconStyle = { '--icon-src': `url(${ICONS.settings})` };
-const PAGE_ICONS = { settings: ICONS.settings, workflows: ICONS.workflow, git: ICONS.gitBranch };
+const PAGE_ICONS = {
+  settings: ICONS.settings,
+  workflows: ICONS.workflow,
+  git: ICONS.gitBranch,
+  schedules: ICONS.timer
+};
 function pageIconStyle(tab: ConversationTab) {
   return {
     '--icon-src': `url(${PAGE_ICONS[tab.pageType as keyof typeof PAGE_ICONS] || ICONS.settings})`
@@ -208,6 +213,7 @@ watch(activeKey, (key) => {
 function titleOf(tab: ConversationTab): string {
   if (tab.kind === 'page') {
     if (tab.pageType === 'workflows') return t('appUi.tabStripPageWorkflows');
+    if (tab.pageType === 'schedules') return t('appUi.tabStripPageSchedules');
     if (tab.pageType === 'git')
       return tab.workspaceLabel
         ? t('appUi.tabStripPageGitWorkspace', { workspace: tab.workspaceLabel })

@@ -42,6 +42,7 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
       { label: 'Astrion 快捷对话', enabled: config.enabled, click: () => void showQuickEntry() },
       ...(openMain ? [
         { label: '打开主窗口', click: () => openDesktop() },
+        { label: '定时任务', click: () => openDesktop('/schedules') },
         { label: '快捷对话设置', click: () => openDesktop('/settings/quick-chat') }
       ] : []),
       { type: 'separator' }, { label: '退出 Astrion', click: () => app.quit() }
@@ -177,7 +178,7 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
   if (process.platform === 'darwin') tray.setTitle('⬡');
   tray.setToolTip('Astrion');
   refreshTray();
-  tray.on('click', () => config.enabled ? void showQuickEntry() : openDesktop('/settings/quick-chat'));
+  tray.on('click', () => config.enabled ? void showQuickEntry() : openDesktop());
   if (!app.isPackaged) await fs.mkdir(path.resolve(here, '../../.cache'), { recursive: true });
   installListener();
   if (config.enabled) globalShortcut.register('CommandOrControl+Shift+Space', showQuickEntry);

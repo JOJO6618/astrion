@@ -1,0 +1,5 @@
+page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8192/schedules
+Call log:
+  - navigating to "http://127.0.0.1:8192/schedules", waiting until "load"
+
+    at /Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/astrion-scheduled-tasks-15db8070/test/2026-11-16_定时任务/browser-e2e.cjs:16:16

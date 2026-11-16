@@ -235,6 +235,7 @@ class MainTerminalToolsExecutionMixin:
         # 工作流只读查询（激活/推进/停用/保存等状态写操作仍禁止）
         "list_workflows",
         "get_workflow_status",
+        "query_schedules",
         # 工具动态加载入口（只读发现性质，各权限模式放行）
         "load_tools",
     }
@@ -250,6 +251,8 @@ class MainTerminalToolsExecutionMixin:
         "terminal_session",
         "create_skill",
         "save_workflow",
+        "submit_schedule",
+        "manage_schedule",
     }
 
     # 只读命令文本判定（启发式）：用于 approval/auto_approval 的「是否需要审批」决策。
@@ -1311,6 +1314,9 @@ class MainTerminalToolsExecutionMixin:
                         self._mark_file_read_from_result(tool_name, arguments, result)
                     elif tool_name == "create_skill":
                         result = self._handle_create_skill_tool(arguments)
+                    elif tool_name in {"submit_schedule", "query_schedules", "manage_schedule"}:
+                        from modules.scheduled_tasks.tools import execute as execute_schedule
+                        result = await asyncio.to_thread(execute_schedule, self, tool_name, arguments)
                     elif tool_name == "activate_workflow":
                         result = self._handle_activate_workflow_tool(arguments)
                     elif tool_name == "get_workflow_status":

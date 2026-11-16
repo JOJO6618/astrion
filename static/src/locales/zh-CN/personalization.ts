@@ -358,6 +358,7 @@ export default {
     '勾选的工具默认不注入上下文，模型需要时经 load_tools 按需获取完整定义，可省 token 并提高工具选择准确率；仅对新对话生效，已有对话以创建时的快照为准',
   toolLoadingEnabledTitle: '启用工具动态加载',
   toolLoadingCat: {
+    schedules: '定时任务',
     git_worktree: 'Git worktree',
     workflow: '工作流',
     sub_agent: '子智能体',

@@ -6,7 +6,7 @@ import re
 from uuid import uuid4
 
 MAX_TABS = 100
-PAGE_TYPES = {"settings", "workflows", "git"}
+PAGE_TYPES = {"settings", "workflows", "git", "schedules"}
 _KEY_RE = re.compile(r"[A-Za-z0-9_-]{1,100}")
 _TAB_STR_FIELDS = ("conversation_id", "workspace_id", "workspace_label", "title", "error")
 

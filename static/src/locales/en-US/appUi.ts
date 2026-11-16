@@ -215,6 +215,7 @@ export default {
   tabStripPageWorkflows: 'Workflows',
   tabStripPageGit: 'Git',
   tabStripPageGitWorkspace: 'Git · {workspace}',
+  tabStripPageSchedules: 'Scheduled tasks',
   tabStripSettingsHint: 'Settings',
   tabStripSyncFailed: 'Sync failed. Retry',
   tabStripLoadFailed: 'Could not load. Click to retry',

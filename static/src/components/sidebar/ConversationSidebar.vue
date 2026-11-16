@@ -122,6 +122,18 @@
           <span class="sidebar-nav-label">{{ $t('sidebar.workflows') }}</span>
         </button>
 
+        <button
+          v-if="!chatMode"
+          type="button"
+          class="sidebar-nav-row schedules-entry-btn"
+          :title="$t('sidebar.schedules')"
+          @click="$emit('open-schedules')"
+        >
+          <span class="sidebar-nav-icon schedules-icon" aria-hidden="true">
+            <span class="icon" :style="iconStyle('timer')"></span>
+          </span>
+          <span class="sidebar-nav-label">{{ $t('sidebar.schedules') }}</span>
+        </button>
         <button v-if="!chatMode" type="button" class="sidebar-nav-row" @click="$emit('open-git')">
           <span class="sidebar-nav-icon git-brand-icon" aria-hidden="true"></span>
           <span class="sidebar-nav-label">{{ $t('sidebar.git') }}</span>
@@ -344,6 +356,9 @@
                       <button type="button" @click="startRenameWorkspace(ws)">
                         <span>{{ $t('sidebar.rename') }}</span>
                       </button>
+                      <button type="button" @click="copyWorkspaceId(String(ws.workspace_id || ''))">
+                        <span>{{ $t('sidebar.copyId') }}</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -452,6 +467,20 @@
                                       aria-hidden="true"
                                     ></span>
                                     <span>{{ $t('common.copy') }}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    @click="
+                                      openActionMenuId = null;
+                                      copyConversationId(conv.id);
+                                    "
+                                  >
+                                    <span
+                                      class="icon icon-sm"
+                                      :style="iconStyle('clipboard')"
+                                      aria-hidden="true"
+                                    ></span>
+                                    <span>{{ $t('sidebar.copyId') }}</span>
                                   </button>
                                   <ConversationTransferMenu
                                     :chat-mode="chatMode"
@@ -614,6 +643,20 @@
                                 ></span>
                                 <span>{{ $t('common.copy') }}</span>
                               </button>
+                              <button
+                                type="button"
+                                @click="
+                                  openActionMenuId = null;
+                                  copyConversationId(conv.id);
+                                "
+                              >
+                                <span
+                                  class="icon icon-sm"
+                                  :style="iconStyle('clipboard')"
+                                  aria-hidden="true"
+                                ></span>
+                                <span>{{ $t('sidebar.copyId') }}</span>
+                              </button>
                               <ConversationTransferMenu
                                 :chat-mode="chatMode"
                                 :project="workspaceKind === 'project'"
@@ -763,6 +806,20 @@
                           aria-hidden="true"
                         ></span>
                         <span>{{ $t('common.copy') }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        @click="
+                          openActionMenuId = null;
+                          copyConversationId(conv.id);
+                        "
+                      >
+                        <span
+                          class="icon icon-sm"
+                          :style="iconStyle('clipboard')"
+                          aria-hidden="true"
+                        ></span>
+                        <span>{{ $t('sidebar.copyId') }}</span>
                       </button>
                       <ConversationTransferMenu
                         :chat-mode="chatMode"
@@ -1053,6 +1110,7 @@ defineOptions({ name: 'ConversationSidebar' });
 
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
 import { useConversationStore } from '@/stores/conversation';
 import { usePersonalizationStore } from '@/stores/personalization';
@@ -1142,12 +1200,31 @@ const emit = defineEmits<{
   (event: 'rename-workspace', payload: { workspaceId: string; label: string }): void;
   (event: 'pin-workspace', workspaceId: string): void;
   (event: 'open-workflows'): void;
+  (event: 'open-schedules'): void;
   (event: 'open-git'): void;
 }>();
 
 const uiStore = useUiStore();
 const conversationStore = useConversationStore();
 const personalizationStore = usePersonalizationStore();
+
+/** 复制标识（对话 ID / 工作区 ID）到剪贴板；失败时必须给可见反馈，不静默失败。 */
+const copyIdentifier = async (value: unknown) => {
+  const text = String(value ?? '');
+  if (!text) return;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(text);
+    uiStore.pushToast({ message: t('sidebar.copyIdSucceeded'), type: 'success' });
+  } catch (error) {
+    console.warn('复制 ID 失败:', error);
+    uiStore.pushToast({ message: t('sidebar.copyIdFailed'), type: 'error' });
+  }
+};
+
+const copyConversationId = (conversationId: unknown) => void copyIdentifier(conversationId);
+const copyWorkspaceId = (workspaceId: unknown) => void copyIdentifier(workspaceId);
+
 /** 桌面端软件更新（非桌面壳环境 isDesktop=false，入口不渲染、检查不发起） */
 const desktopUpdateStore = useDesktopUpdateStore();
 

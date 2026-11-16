@@ -355,6 +355,9 @@ export default {
   // —— MCP 工具兜底名 ——
   mcpTool: 'MCP 工具',
 
+  // —— 极简分类摘要 ——
+  summarySchedule: '执行了 {n} 次定时任务操作',
+
   // —— 工具状态文案（chatDisplay 动作标签映射）：工具名 → 准备 / 正在 / 完成 / 失败 四态 ——
   preparingStatus: {
     enterWorktree: '准备进入工作树',
@@ -410,6 +413,9 @@ export default {
     triggerEasterEgg: '准备触发彩蛋',
     askUser: '准备提问',
     sleep: '准备等待',
+    submitSchedule: '准备提交定时任务',
+    querySchedules: '准备查询定时任务',
+    manageSchedule: '准备管理定时任务',
     mcpTool: '准备调用 MCP 工具',
     fallback: '准备执行工具'
   },
@@ -470,6 +476,9 @@ export default {
     triggerEasterEgg: '正在触发彩蛋',
     askUser: '正在等待你的回答',
     sleep: '正在等待',
+    submitSchedule: '正在提交定时任务',
+    querySchedules: '正在查询定时任务',
+    manageSchedule: '正在管理定时任务',
     mcpTool: '正在调用 MCP 工具',
     fallback: '正在执行工具'
   },
@@ -528,6 +537,9 @@ export default {
     triggerEasterEgg: '触发了彩蛋',
     askUser: '提问完成',
     sleep: '等待完成',
+    submitSchedule: '已提交定时任务',
+    querySchedules: '已查询定时任务',
+    manageSchedule: '已管理定时任务',
     mcpTool: '调用了 MCP 工具',
     fallback: '执行了工具'
   },
@@ -586,6 +598,9 @@ export default {
     triggerEasterEgg: '触发彩蛋失败',
     askUser: '提问失败',
     sleep: '等待中断',
+    submitSchedule: '提交定时任务失败',
+    querySchedules: '查询定时任务失败',
+    manageSchedule: '管理定时任务失败',
     mcpTool: '调用 MCP 工具失败',
     fallback: '执行工具失败'
   }

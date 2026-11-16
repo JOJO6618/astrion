@@ -87,6 +87,9 @@ function getToolStatusTexts(): {
       trigger_easter_egg: t('toolResults.preparingStatus.triggerEasterEgg'),
       ask_user: t('toolResults.preparingStatus.askUser'),
       sleep: t('toolResults.preparingStatus.sleep'),
+      submit_schedule: t('toolResults.preparingStatus.submitSchedule'),
+      query_schedules: t('toolResults.preparingStatus.querySchedules'),
+      manage_schedule: t('toolResults.preparingStatus.manageSchedule'),
       mcpTool: t('toolResults.preparingStatus.mcpTool'),
       fallback: t('toolResults.preparingStatus.fallback')
     },
@@ -136,6 +139,9 @@ function getToolStatusTexts(): {
       trigger_easter_egg: t('toolResults.runningStatus.triggerEasterEgg'),
       ask_user: t('toolResults.runningStatus.askUser'),
       sleep: t('toolResults.runningStatus.sleep'),
+      submit_schedule: t('toolResults.runningStatus.submitSchedule'),
+      query_schedules: t('toolResults.runningStatus.querySchedules'),
+      manage_schedule: t('toolResults.runningStatus.manageSchedule'),
       mcpTool: t('toolResults.runningStatus.mcpTool'),
       fallback: t('toolResults.runningStatus.fallback')
     },
@@ -185,6 +191,9 @@ function getToolStatusTexts(): {
       trigger_easter_egg: t('toolResults.completedStatus.triggerEasterEgg'),
       ask_user: t('toolResults.completedStatus.askUser'),
       sleep: t('toolResults.completedStatus.sleep'),
+      submit_schedule: t('toolResults.completedStatus.submitSchedule'),
+      query_schedules: t('toolResults.completedStatus.querySchedules'),
+      manage_schedule: t('toolResults.completedStatus.manageSchedule'),
       mcpTool: t('toolResults.completedStatus.mcpTool'),
       fallback: t('toolResults.completedStatus.fallback')
     },
@@ -234,6 +243,9 @@ function getToolStatusTexts(): {
       trigger_easter_egg: t('toolResults.failedStatus.triggerEasterEgg'),
       ask_user: t('toolResults.failedStatus.askUser'),
       sleep: t('toolResults.failedStatus.sleep'),
+      submit_schedule: t('toolResults.failedStatus.submitSchedule'),
+      query_schedules: t('toolResults.failedStatus.querySchedules'),
+      manage_schedule: t('toolResults.failedStatus.manageSchedule'),
       mcpTool: t('toolResults.failedStatus.mcpTool'),
       fallback: t('toolResults.failedStatus.fallback')
     }

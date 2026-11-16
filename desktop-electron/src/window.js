@@ -194,7 +194,7 @@ export function focusMainWindow(route = '') {
   // Dock 点击（activate）/ 快捷对话的「打开桌面端」如果在这里把窗口拉回来，
   // ShipIt 就会判定仍有实例在运行并放弃本次安装。
   if (isUpdaterInstalling()) return;
-  const target = route === '/settings/quick-chat' ? route : '';
+  const target = ['/settings/quick-chat', '/schedules'].includes(route) ? route : '';
   if (!backendPort) { pendingMainRoute = target; return; }
   if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(backendPort, target || '/');
   else if (target) views?.requestPage(target);
@@ -343,7 +343,7 @@ export function createMainWindow(port, route = '/') {
     // 安装更新时必须放行关闭：quitAndInstall() 先关窗口、之后才发 before-quit，
     // 此刻 appQuitting 仍为 false；若这里 preventDefault，应用永远退不出去，
     // ShipIt 等不到「无运行实例」而放弃安装。
-    if (!appQuitting && !isUpdaterInstalling() && quickEnabled()) { event.preventDefault(); mainWindow.hide(); views?.hideDetached(); }
+    if (!appQuitting && !isUpdaterInstalling()) { event.preventDefault(); mainWindow.hide(); views?.hideDetached(); }
   });
 
   mainWindow.on('closed', () => {
@@ -355,7 +355,7 @@ export function createMainWindow(port, route = '/') {
     mainWindow = null;
     views = null;
     chromeView = null;
-    if (!appQuitting && !quickEnabled()) app.quit();
+    // 真正退出由应用/托盘菜单发起；意外关窗也保留后台调度。
   });
 
   return mainWindow;

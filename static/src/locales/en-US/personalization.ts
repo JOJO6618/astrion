@@ -382,6 +382,7 @@ export default {
     'Checked tools are not injected into context by default; the model fetches their full definitions on demand via load_tools, saving tokens and improving tool selection accuracy. Only affects new conversations; existing conversations keep the snapshot taken at creation',
   toolLoadingEnabledTitle: 'Enable dynamic tool loading',
   toolLoadingCat: {
+    schedules: 'Scheduled tasks',
     git_worktree: 'Git worktree',
     workflow: 'Workflows',
     sub_agent: 'Sub-agents',

@@ -2,6 +2,7 @@
 // DeepString<typeof zhCN> 强制 key 结构与 zh-CN 完全一致：en-US 缺 key / 多 key 都会 tsc 报错。
 import type zhCN from './zh-CN';
 import common from './en-US/common';
+import schedules from './en-US/schedules';
 import personalization from './en-US/personalization';
 import settings from './en-US/settings';
 import chatMode from './en-US/chatMode';
@@ -61,6 +62,7 @@ const enUS: DeepString<typeof zhCN> = {
   adminApi,
   adminCustomTools,
   appMessages,
+  schedules,
   appTasks,
   appUi,
   appCore,

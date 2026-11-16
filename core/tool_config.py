@@ -71,6 +71,9 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
     "git_worktree": ToolCategory(
         label="Git worktree", tools=["enter_worktree", "exit_worktree"],
     ),
+    "schedules": ToolCategory(
+        label="定时任务", tools=["submit_schedule", "query_schedules", "manage_schedule"],
+    ),
     "memory": ToolCategory(
         label="记忆",
         tools=["update_memory", "conversation_search", "conversation_review"],

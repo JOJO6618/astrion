@@ -27,6 +27,8 @@ def page_type_of(route: str) -> str:
         return "settings"
     if path in {"/workflows", "/workflow"} or path.startswith("/workflow/"):
         return "workflows"
+    if path == "/schedules":
+        return "schedules"
     if path == "/git":
         return "git"
     raise ValueError("Invalid desktop page")

@@ -1,6 +1,7 @@
 // zh-CN 聚合器（源语言，MessageSchema 的类型来源）
 // 新增命名空间：在 zh-CN/ 与 en-US/ 下各建同名文件后，在此与 en-US.ts 同步注册。
 import common from './zh-CN/common';
+import schedules from './zh-CN/schedules';
 import personalization from './zh-CN/personalization';
 import settings from './zh-CN/settings';
 import chatMode from './zh-CN/chatMode';
@@ -58,6 +59,7 @@ export default {
   adminApi,
   adminCustomTools,
   appMessages,
+  schedules,
   appTasks,
   appUi,
   appCore,

@@ -88,8 +88,9 @@ class TaskParams:
         if "chatgpt_fast_mode" in self.chat_settings:
             from utils.api_client.codex.service_tier import validate_fast_mode
             validate_fast_mode(self.chat_settings["chatgpt_fast_mode"])
+        from config.limits import REASONING_EFFORT_LEVELS
         effort = self.chat_settings.get("reasoning_effort")
-        if effort is not None and (not isinstance(effort, str) or effort not in {"minimal", "low", "medium", "high", "xhigh"}):
+        if effort is not None and (not isinstance(effort, str) or effort not in REASONING_EFFORT_LEVELS):
             raise ValueError("Invalid Chat reasoning effort")
         if "network_enabled" in self.chat_settings and not isinstance(self.chat_settings["network_enabled"], bool):
             raise ValueError("Chat network setting must be a boolean")
@@ -114,6 +115,8 @@ class InternalDirectives:
     auto_user_message_payload: Optional[Dict[str, Any]] = None
     # 本批通知池中除触发消息外的前置通知，随任务事件流回放
     preceding_user_notices: Optional[List[Dict[str, Any]]] = None
+    # 本轮附带的隐藏 user 消息（模型可见、前端不显示），紧跟触发消息写入历史
+    hidden_user_notice: Optional[str] = None
 
 
 @dataclass(frozen=True)

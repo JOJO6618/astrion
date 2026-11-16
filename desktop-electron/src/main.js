@@ -6,7 +6,7 @@
 //   3. 创建主窗口：BaseWindow + 双 WebContentsView——
 //      chrome 视图（顶部 46px 独立对话标签条，加载 /chrome，常驻不随主页面导航重载）
 //      + main 视图（加载 http://127.0.0.1:<port>/，前后端同源）
-//   4. 主窗口关闭 → 退出进程 → will-quit 时 kill 后端子进程
+//   4. 主窗口关闭 → 后台驻留；显式退出 → will-quit 时停止后端
 //
 // 换引擎动机：WKWebView 反复出现引擎级兼容问题（折叠动画瞬消、rAF 样式延迟、
 // virtua 首项不挂载、拖放被吞、上滚估值补偿可见抖动），统一 Chromium 后与
@@ -80,8 +80,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('window-all-closed', () => {
     // Rechecking can release the update gate before the normal window exists.
     if (updatePolicyTransitioning()) return;
-    // macOS 惯例是关窗不退 app，但本壳单窗口 + 内嵌后端，关窗即退出（对齐 Tauri 行为）
-    if (!quickDebug && !quickEnabled()) app.quit();
+    // 关窗保留调度；托盘菜单或应用菜单的显式退出仍走 will-quit。
+    // 更新策略窗口关闭流程由 updatePolicyTransitioning 管理。
   });
 
   app.on('will-quit', () => {

@@ -212,6 +212,9 @@
         <button type="button" :disabled="busy" @click="handleMenuAction('rename')">
           {{ $t('sidebar.rename') }}
         </button>
+        <button type="button" :disabled="busy" @click="handleMenuAction('copy-id')">
+          {{ $t('sidebar.copyId') }}
+        </button>
         <button type="button" :disabled="isProject || busy" @click="handleMenuAction('reveal')">
           {{ $t('sidebar.revealInFolder') }}
         </button>
@@ -227,6 +230,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { t } from '@/locales';
+import { useUiStore } from '@/stores/ui';
 
 defineOptions({ name: 'WorkspaceSwitcher' });
 
@@ -283,6 +287,7 @@ const createNameEl = ref<HTMLInputElement | null>(null);
 const renameInputEl = ref<HTMLInputElement[] | null>(null);
 
 const menuOpenId = ref<string | null>(null);
+const uiStore = useUiStore();
 const renamingId = ref<string | null>(null);
 const deletingId = ref<string | null>(null);
 const renameDraft = ref('');
@@ -358,7 +363,21 @@ const toggleMenu = async (item: WorkspaceItem) => {
   menuStyle.value = { left: `${Math.round(left)}px`, top: `${Math.round(top)}px` };
 };
 
-const handleMenuAction = (act: 'set-default' | 'rename' | 'reveal' | 'delete') => {
+/** 复制 ID 到剪贴板（「⋯」菜单入口）：失败时必须给可见反馈，不静默失败。 */
+const copyToClipboard = async (text: string) => {
+  const value = String(text || '');
+  if (!value) return;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(value);
+    uiStore.pushToast({ message: t('sidebar.copyIdSucceeded'), type: 'success' });
+  } catch (error) {
+    console.warn('复制 ID 失败:', error);
+    uiStore.pushToast({ message: t('sidebar.copyIdFailed'), type: 'error' });
+  }
+};
+
+const handleMenuAction = (act: 'set-default' | 'rename' | 'reveal' | 'copy-id' | 'delete') => {
   const id = menuOpenId.value;
   const item = props.workspaces.find((w) => w.workspace_id === id);
   closeMenu();
@@ -375,6 +394,8 @@ const handleMenuAction = (act: 'set-default' | 'rename' | 'reveal' | 'delete') =
     });
   } else if (act === 'reveal') {
     emit('reveal', item.workspace_id);
+  } else if (act === 'copy-id') {
+    void copyToClipboard(item.workspace_id);
   } else if (act === 'delete') {
     deletingId.value = item.workspace_id;
   }

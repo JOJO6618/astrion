@@ -267,6 +267,20 @@ async def handle_task_with_sender(
                     "skill_path": skill_path,
                 }
             )
+    hidden_user_notice = getattr(web_terminal, "_hidden_user_notice", None)
+    if is_agent and not auto_user_message_event and isinstance(hidden_user_notice, str) and hidden_user_notice:
+        # 内部派发方（如定时任务）附带的约束说明：只给模型看，不进前端时间线。
+        web_terminal.context_manager.add_conversation(
+            "user",
+            hidden_user_notice,
+            metadata={
+                "source": "runtime_notice",
+                "message_source": "runtime_notice",
+                "visibility": "hidden",
+                "starts_work": False,
+                "hidden": True,
+            }
+        )
     if is_agent and not auto_user_message_event:
         media_paths_message = _build_media_paths_message(images, videos)
         if media_paths_message:

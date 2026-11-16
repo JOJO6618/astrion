@@ -36,6 +36,7 @@ export function dataState() {
     // 设置页路由（'settings' | 'settings/<section>'，空串 = 不在设置视图）
     settingsRoute: '',
     gitRoute: '',
+    schedulesRoute: '',
     // 轮询模式标志（禁用 WebSocket 事件处理）
     usePollingMode: true,
     // 后台子智能体等待状态

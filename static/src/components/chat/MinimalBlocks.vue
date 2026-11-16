@@ -152,7 +152,10 @@ import { ref, computed, watch, nextTick, onBeforeUnmount, Component } from 'vue'
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useSummaryToolReel } from '@/composables/useSummaryToolReel';
-import { createElementScrollFollow, type ElementScrollFollow } from '@/composables/elementScrollFollow';
+import {
+  createElementScrollFollow,
+  type ElementScrollFollow
+} from '@/composables/elementScrollFollow';
 import SummarySweepText from './SummarySweepText.vue';
 import type { SummarySweepInput } from './summarySweepController';
 import { renderEnhancedToolResult } from './actions/toolRenderers';
@@ -436,6 +439,7 @@ type ToolCategory =
   | 'workflow'
   | 'todo_create'
   | 'todo_update'
+  | 'schedule'
   | 'memory_update'
   | 'memory_read'
   | 'conversation'
@@ -494,6 +498,11 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   todo_create: 'todo_create',
   todo_update_task: 'todo_update',
 
+  // 定时任务：三个工具共用极简分类
+  submit_schedule: 'schedule',
+  query_schedules: 'schedule',
+  manage_schedule: 'schedule',
+
   // 更新记忆
   update_memory: 'memory_update',
   update_project_memory: 'memory_update',
@@ -544,6 +553,7 @@ const CATEGORY_LABEL_KEYS: Record<ToolCategory, string> = {
   workflow: 'chat.summaryWorkflow',
   todo_create: 'chat.summaryTodoCreate',
   todo_update: 'chat.summaryTodoUpdate',
+  schedule: 'toolResults.summarySchedule',
   memory_update: 'chat.summaryMemoryUpdate',
   memory_read: 'chat.summaryMemoryRead',
   conversation: 'chat.summaryConversation',
@@ -575,6 +585,7 @@ const CATEGORY_ORDER: ToolCategory[] = [
   'workflow',
   'todo_create',
   'todo_update',
+  'schedule',
   'memory_update',
   'memory_read',
   'conversation',
@@ -795,14 +806,21 @@ const registerStepsWrapper = (groupId: string, el: Element | null) => {
   stepsWrapperFollowers.delete(groupId);
   if (el instanceof HTMLElement) {
     stepsWrapperRefs.set(groupId, el);
-    stepsWrapperFollowers.set(groupId, createElementScrollFollow(el, {
-      threshold: 20,
-      isCurrent: () => {
-        const group = blockGroups.value.find((item) => item.id === groupId);
-        return stepsWrapperRefs.get(groupId) === el && expandedGroups.value.has(groupId) &&
-          !!group?.actions && isSummaryRunning(group.actions, groupId);
-      }
-    }));
+    stepsWrapperFollowers.set(
+      groupId,
+      createElementScrollFollow(el, {
+        threshold: 20,
+        isCurrent: () => {
+          const group = blockGroups.value.find((item) => item.id === groupId);
+          return (
+            stepsWrapperRefs.get(groupId) === el &&
+            expandedGroups.value.has(groupId) &&
+            !!group?.actions &&
+            isSummaryRunning(group.actions, groupId)
+          );
+        }
+      })
+    );
   } else {
     stepsWrapperRefs.delete(groupId);
   }

@@ -18,6 +18,7 @@
     </transition>
 
     <SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />
+    <SchedulesShell v-else-if="schedulesRoute" @close="closeSettingsPage" />
     <div v-else-if="!isConnected && messages.length === 0" class="app-loading-state">
       <div class="loading-animation" aria-hidden="true">
         <!-- From Uiverse.io by Nawsome -->
@@ -96,6 +97,7 @@
           @rename-workspace="handleRenameWorkspaceFromSidebar"
           @pin-workspace="handlePinWorkspaceFromSidebar"
           @open-workflows="openWorkflowsPage"
+          @open-schedules="openSchedulesPage"
           @open-git="openGitPage"
         />
 
@@ -820,6 +822,7 @@
               @rename-workspace="handleRenameWorkspaceFromSidebar"
               @pin-workspace="handlePinWorkspaceFromSidebar"
               @open-workflows="openWorkflowsPage"
+              @open-schedules="openSchedulesPage"
               @open-git="openGitPage"
             />
           </div>

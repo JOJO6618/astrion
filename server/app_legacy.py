@@ -44,6 +44,7 @@ from server.tasks.web import get_tasks_blueprint
 from server.api_v1 import api_v1_bp
 from server.multi_agent import multi_agent_bp
 from server.workflow_page import workflow_page_bp
+from server.schedules import schedules_bp
 from server.workflow_runtime_api import workflow_runtime_bp
 from server.conversation_bootstrap import conversation_bootstrap_bp
 from server.conversation_tabs import conversation_tabs_bp
@@ -319,6 +320,7 @@ app.register_blueprint(get_tasks_blueprint())
 app.register_blueprint(api_v1_bp)
 app.register_blueprint(multi_agent_bp)
 app.register_blueprint(workflow_page_bp)
+app.register_blueprint(schedules_bp)
 app.register_blueprint(workflow_runtime_bp)
 app.register_blueprint(conversation_bootstrap_bp)
 app.register_blueprint(conversation_tabs_bp)
@@ -484,6 +486,11 @@ def start_background_jobs():
         start_conversation_terminal_reaper()
     except Exception as exc:
         debug_log(f"[ConvTerminalReaper] 启动失败: {exc}")
+    try:
+        from modules.scheduled_tasks import get_service
+        get_service().start()
+    except Exception as exc:
+        debug_log(f"[ScheduledTasks] 启动失败: {exc}")
 
 TITLE_DEBUG_DIR = Path(LOGS_DIR).expanduser().resolve() / "title_debug"
 TITLE_DEBUG_FILE = TITLE_DEBUG_DIR / "title_generation.log"
@@ -1104,7 +1111,8 @@ def run_server(path: str, thinking_mode: bool = False, port: int = DEFAULT_PORT,
         # 登录 Cookie 会互相覆盖，表现为两个端口无法同时保持登录。
         app.config['SESSION_COOKIE_NAME'] = f"agents_session_{port}"
     initialize_system(path, thinking_mode)
-    start_background_jobs()
+    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        start_background_jobs()
     # Socket.IO 已移除，直接使用 Werkzeug 内建服务器（threaded 以支持并发轮询）
     app.run(
         host=WEB_SERVER_HOST,

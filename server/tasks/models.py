@@ -982,6 +982,7 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
                     "_skill_context_messages",
                     list(rec.task_params.skill_context_messages or []),
                 )
+                setattr(terminal, "_hidden_user_notice", rec.directives.hidden_user_notice)
                 # 审批/提问等待超时透传（契约 §6）：None = 保持既有默认语义（3600s），
                 # 超时后的语义属阶段三产品决策，本阶段仅建立透传机制。
                 setattr(
@@ -1036,6 +1037,7 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
                     else:
                         setattr(terminal, "_skill_context_messages", [])
                     setattr(terminal, "_approval_timeout_seconds", None)
+                    setattr(terminal, "_hidden_user_notice", None)
                     if terminal and getattr(terminal, "context_manager", None):
                         terminal.context_manager.set_web_terminal_callback(previous_ctx_callback)
                 except Exception as exc:
