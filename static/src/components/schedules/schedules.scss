@@ -621,7 +621,7 @@
 
 .sch-detail-scroll::-webkit-scrollbar,
 .sch-plan-list::-webkit-scrollbar,
-.sch-popover::-webkit-scrollbar,
+.sch-popover-scroll::-webkit-scrollbar,
 .sch-model-list::-webkit-scrollbar,
 .sch-prompt-input::-webkit-scrollbar,
 .sch-modal-body::-webkit-scrollbar {
@@ -630,7 +630,7 @@
 
 .sch-detail-scroll::-webkit-scrollbar-thumb,
 .sch-plan-list::-webkit-scrollbar-thumb,
-.sch-popover::-webkit-scrollbar-thumb,
+.sch-popover-scroll::-webkit-scrollbar-thumb,
 .sch-model-list::-webkit-scrollbar-thumb,
 .sch-prompt-input::-webkit-scrollbar-thumb,
 .sch-modal-body::-webkit-scrollbar-thumb {
@@ -1167,13 +1167,17 @@
 }
 
 /* ---------- 弹层菜单：从触发按钮展开，关闭沿原路收回 ---------- */
+/* 外框只裁切不滚动；滚动由内层（.sch-popover-scroll / .sch-model-list）承担，
+   滚动条随内边距内缩，不会压在上下圆角上。 */
 .sch-popover {
   position: fixed;
   z-index: 2100;
+  display: flex;
+  flex-direction: column;
   max-height: min(320px, 65dvh);
   max-width: calc(100vw - 24px);
   padding: 6px;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--popover-surface);
   border: 1px solid var(--popover-border);
   border-radius: 12px;
@@ -1187,6 +1191,14 @@
 .sch-popover.is-leaving {
   pointer-events: none;
   animation: sch-popover-out 100ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.sch-popover-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sch-popover-option {
@@ -1234,12 +1246,6 @@
 }
 
 /* 模型选择：顶部搜索 + 提供商分组可折叠，结构同设置页模型下拉 */
-.sch-popover.sch-model-popover {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .sch-model-search {
   height: 32px;
   margin-bottom: 4px;

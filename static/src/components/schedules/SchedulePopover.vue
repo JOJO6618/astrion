@@ -71,7 +71,7 @@ function onEnter(element: Element) {
     el.querySelector<HTMLElement>('button:not(:disabled), input');
   target?.focus({ preventScroll: true });
   // 只滚动弹层自身的列表，把已选项带到可见区域；不触发外层滚动（外层滚动会关闭弹层）。
-  const box = target?.closest<HTMLElement>('.sch-model-list') || el;
+  const box = target?.closest<HTMLElement>('.sch-model-list, .sch-popover-scroll') || el;
   if (target && box.scrollHeight > box.clientHeight) {
     const offset =
       target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;

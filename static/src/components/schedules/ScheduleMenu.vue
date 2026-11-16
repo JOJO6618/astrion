@@ -37,25 +37,28 @@ function choose(item: ScheduleMenuItem) {
     :align-end="alignEnd"
     @close="emit('close', $event)"
   >
-    <button
-      v-for="item in props.items"
-      :key="item.value"
-      type="button"
-      class="sch-popover-option"
-      :class="{ 'is-danger': item.danger }"
-      :role="actions ? 'menuitem' : 'option'"
-      :aria-selected="actions ? undefined : String(item.value) === String(value)"
-      :disabled="item.disabled"
-      data-popover-item
-      @click="choose(item)"
-    >
-      <ScheduleIcon v-if="item.icon" :name="item.icon" />
-      <span class="sch-popover-label">{{ item.label }}</span>
-      <ScheduleIcon
-        v-if="!actions && String(item.value) === String(value)"
-        name="check"
-        class="sch-option-check"
-      />
-    </button>
+    <!-- 滚动放在内层：滚动条随面板内边距内缩，不压到外框圆角上 -->
+    <div class="sch-popover-scroll">
+      <button
+        v-for="item in props.items"
+        :key="item.value"
+        type="button"
+        class="sch-popover-option"
+        :class="{ 'is-danger': item.danger }"
+        :role="actions ? 'menuitem' : 'option'"
+        :aria-selected="actions ? undefined : String(item.value) === String(value)"
+        :disabled="item.disabled"
+        data-popover-item
+        @click="choose(item)"
+      >
+        <ScheduleIcon v-if="item.icon" :name="item.icon" />
+        <span class="sch-popover-label">{{ item.label }}</span>
+        <ScheduleIcon
+          v-if="!actions && String(item.value) === String(value)"
+          name="check"
+          class="sch-option-check"
+        />
+      </button>
+    </div>
   </SchedulePopover>
 </template>
