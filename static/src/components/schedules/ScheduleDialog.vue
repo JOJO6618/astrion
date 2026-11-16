@@ -60,34 +60,32 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <Teleport to="body">
-    <div class="sch-modal-scrim" @pointerdown.self="onScrimDown" @click.self="onScrimClick">
-      <div class="sch-modal-shell" :class="{ 'is-wide': wide }">
-        <section
-          ref="panel"
-          class="sch-modal sch-g3"
-          data-g3="18"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="title"
-          @keydown="trapFocus"
-        >
-          <header class="sch-modal-header">
-            <h2>{{ title }}</h2>
-            <button
-              type="button"
-              class="sch-icon-button sch-modal-close"
-              :aria-label="t('schedules.closeDialog')"
-              :disabled="busy"
-              @click="close"
-            >
-              <ScheduleIcon name="x" />
-            </button>
-          </header>
-          <div class="sch-modal-body"><slot /></div>
-          <footer class="sch-modal-actions"><slot name="actions" /></footer>
-        </section>
-      </div>
+  <div class="sch-modal-scrim" @pointerdown.self="onScrimDown" @click.self="onScrimClick">
+    <div class="sch-modal-shell" :class="{ 'is-wide': wide }">
+      <section
+        ref="panel"
+        class="sch-modal sch-g3"
+        data-g3="18"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="title"
+        @keydown="trapFocus"
+      >
+        <header class="sch-modal-header">
+          <h2>{{ title }}</h2>
+          <button
+            type="button"
+            class="sch-icon-button sch-modal-close"
+            :aria-label="t('schedules.closeDialog')"
+            :disabled="busy"
+            @click="close"
+          >
+            <ScheduleIcon name="x" />
+          </button>
+        </header>
+        <div class="sch-modal-body"><slot /></div>
+        <footer class="sch-modal-actions"><slot name="actions" /></footer>
+      </section>
     </div>
-  </Teleport>
+  </div>
 </template>

@@ -978,236 +978,238 @@ onBeforeUnmount(() => {
       @select="onMore"
     />
 
-    <Transition name="sch-modal" mode="out-in">
-      <ScheduleDialog
-        v-if="dialog?.kind === 'create'"
-        :title="t('schedules.create')"
-        @close="dialog = null"
-      >
-        <div class="sch-field">
-          <label for="sch-new-name">{{ t('schedules.planName') }}</label>
-          <input
-            id="sch-new-name"
-            ref="dialogInput"
-            v-model="dialog.name"
-            class="sch-input"
-            maxlength="80"
-            :placeholder="t('schedules.namePlaceholder')"
-            @keydown.enter.prevent="confirmCreate"
-          />
-        </div>
-        <div class="sch-field">
-          <span class="sch-field-label">{{ t('schedules.workspace') }}</span>
-          <ScheduleSelect
-            v-model="dialog.workspace"
-            :options="options.workspaces.map((item) => ({ value: item.id, label: item.label }))"
-            :label="t('schedules.workspace')"
-            icon="folder"
-          />
-        </div>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            @click="dialog = null"
-          >
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="sch-button sch-button-primary sch-g3"
-            data-g3="6"
-            @click="confirmCreate"
-          >
-            {{ t('schedules.createConfirm') }}
-          </button>
-        </template>
-      </ScheduleDialog>
+    <Teleport to="body">
+      <Transition name="sch-modal" mode="out-in">
+        <ScheduleDialog
+          v-if="dialog?.kind === 'create'"
+          :title="t('schedules.create')"
+          @close="dialog = null"
+        >
+          <div class="sch-field">
+            <label for="sch-new-name">{{ t('schedules.planName') }}</label>
+            <input
+              id="sch-new-name"
+              ref="dialogInput"
+              v-model="dialog.name"
+              class="sch-input"
+              maxlength="80"
+              :placeholder="t('schedules.namePlaceholder')"
+              @keydown.enter.prevent="confirmCreate"
+            />
+          </div>
+          <div class="sch-field">
+            <span class="sch-field-label">{{ t('schedules.workspace') }}</span>
+            <ScheduleSelect
+              v-model="dialog.workspace"
+              :options="options.workspaces.map((item) => ({ value: item.id, label: item.label }))"
+              :label="t('schedules.workspace')"
+              icon="folder"
+            />
+          </div>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              @click="dialog = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="button"
+              class="sch-button sch-button-primary sch-g3"
+              data-g3="6"
+              @click="confirmCreate"
+            >
+              {{ t('schedules.createConfirm') }}
+            </button>
+          </template>
+        </ScheduleDialog>
 
-      <ScheduleDialog
-        v-else-if="dialog?.kind === 'rename'"
-        :title="t('schedules.rename')"
-        @close="dialog = null"
-      >
-        <div class="sch-field">
-          <label for="sch-rename">{{ t('schedules.planName') }}</label>
-          <input
-            id="sch-rename"
-            v-model="dialog.name"
-            class="sch-input"
-            maxlength="80"
-            @keydown.enter.prevent="confirmRename"
-          />
-        </div>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            @click="dialog = null"
-          >
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="sch-button sch-button-primary sch-g3"
-            data-g3="6"
-            @click="confirmRename"
-          >
-            {{ t('common.confirm') }}
-          </button>
-        </template>
-      </ScheduleDialog>
+        <ScheduleDialog
+          v-else-if="dialog?.kind === 'rename'"
+          :title="t('schedules.rename')"
+          @close="dialog = null"
+        >
+          <div class="sch-field">
+            <label for="sch-rename">{{ t('schedules.planName') }}</label>
+            <input
+              id="sch-rename"
+              v-model="dialog.name"
+              class="sch-input"
+              maxlength="80"
+              @keydown.enter.prevent="confirmRename"
+            />
+          </div>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              @click="dialog = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="button"
+              class="sch-button sch-button-primary sch-g3"
+              data-g3="6"
+              @click="confirmRename"
+            >
+              {{ t('common.confirm') }}
+            </button>
+          </template>
+        </ScheduleDialog>
 
-      <ScheduleDialog
-        v-else-if="dialog?.kind === 'saveRun'"
-        :title="t('schedules.saveRunTitle')"
-        @close="dialog = null"
-      >
-        <p>{{ t('schedules.saveRunBody') }}</p>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            @click="dialog = null"
-          >
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="sch-button sch-button-primary sch-g3"
-            data-g3="6"
-            @click="confirmSaveRun"
-          >
-            {{ t('schedules.saveRun') }}
-          </button>
-        </template>
-      </ScheduleDialog>
+        <ScheduleDialog
+          v-else-if="dialog?.kind === 'saveRun'"
+          :title="t('schedules.saveRunTitle')"
+          @close="dialog = null"
+        >
+          <p>{{ t('schedules.saveRunBody') }}</p>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              @click="dialog = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="button"
+              class="sch-button sch-button-primary sch-g3"
+              data-g3="6"
+              @click="confirmSaveRun"
+            >
+              {{ t('schedules.saveRun') }}
+            </button>
+          </template>
+        </ScheduleDialog>
 
-      <ScheduleDialog
-        v-else-if="dialog?.kind === 'delete'"
-        :title="t('schedules.deleteTitle')"
-        :busy="dialog.busy"
-        @close="dialog = null"
-      >
-        <p>{{ t('schedules.deleteBody', { name: current?.name || t('schedules.untitled') }) }}</p>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            :disabled="dialog.busy"
-            @click="dialog = null"
-          >
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="sch-button sch-button-danger sch-g3"
-            data-g3="6"
-            :disabled="dialog.busy"
-            @click="confirmDelete"
-          >
-            {{ t('schedules.delete') }}
-          </button>
-        </template>
-      </ScheduleDialog>
+        <ScheduleDialog
+          v-else-if="dialog?.kind === 'delete'"
+          :title="t('schedules.deleteTitle')"
+          :busy="dialog.busy"
+          @close="dialog = null"
+        >
+          <p>{{ t('schedules.deleteBody', { name: current?.name || t('schedules.untitled') }) }}</p>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              :disabled="dialog.busy"
+              @click="dialog = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="button"
+              class="sch-button sch-button-danger sch-g3"
+              data-g3="6"
+              :disabled="dialog.busy"
+              @click="confirmDelete"
+            >
+              {{ t('schedules.delete') }}
+            </button>
+          </template>
+        </ScheduleDialog>
 
-      <ScheduleDialog
-        v-else-if="dialog?.kind === 'overwrite'"
-        :title="t('schedules.overwriteTitle')"
-        :busy="dialog.busy"
-        @close="dialog = null"
-      >
-        <p>{{ t('schedules.overwriteBody', { name: dialog.name }) }}</p>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            :disabled="dialog.busy"
-            @click="dialog = null"
-          >
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="sch-button sch-button-primary sch-g3"
-            data-g3="6"
-            :disabled="dialog.busy"
-            @click="confirmOverwrite"
-          >
-            {{ t('schedules.overwriteConfirm') }}
-          </button>
-        </template>
-      </ScheduleDialog>
+        <ScheduleDialog
+          v-else-if="dialog?.kind === 'overwrite'"
+          :title="t('schedules.overwriteTitle')"
+          :busy="dialog.busy"
+          @close="dialog = null"
+        >
+          <p>{{ t('schedules.overwriteBody', { name: dialog.name }) }}</p>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              :disabled="dialog.busy"
+              @click="dialog = null"
+            >
+              {{ t('common.cancel') }}
+            </button>
+            <button
+              type="button"
+              class="sch-button sch-button-primary sch-g3"
+              data-g3="6"
+              :disabled="dialog.busy"
+              @click="confirmOverwrite"
+            >
+              {{ t('schedules.overwriteConfirm') }}
+            </button>
+          </template>
+        </ScheduleDialog>
 
-      <ScheduleDialog
-        v-else-if="dialog?.kind === 'importError'"
-        :title="t('schedules.importFailed')"
-        @close="dialog = null"
-      >
-        <p>{{ dialog.message }}</p>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            @click="dialog = null"
-          >
-            {{ t('common.close') }}
-          </button>
-        </template>
-      </ScheduleDialog>
+        <ScheduleDialog
+          v-else-if="dialog?.kind === 'importError'"
+          :title="t('schedules.importFailed')"
+          @close="dialog = null"
+        >
+          <p>{{ dialog.message }}</p>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              @click="dialog = null"
+            >
+              {{ t('common.close') }}
+            </button>
+          </template>
+        </ScheduleDialog>
 
-      <ScheduleDialog
-        v-else-if="dialog?.kind === 'run'"
-        :title="runTitle(dialog.run)"
-        wide
-        @close="dialog = null"
-      >
-        <p>
-          {{
-            joinWide(
-              shortDate(
-                dialog.run.scheduled_for || dialog.run.created_at,
-                current?.schedule.timezone
-              ),
-              t(`schedules.state_${dialog.run.state}`),
-              runDuration(dialog.run)
-            )
-          }}
-        </p>
-        <div v-if="dialog.run.summary" class="sch-run-summary">
-          <h3>{{ t('schedules.runSummary') }}</h3>
-          <p>{{ dialog.run.summary }}</p>
-        </div>
-        <div v-if="dialog.run.reason" class="sch-run-summary">
-          <h3>{{ t('schedules.runReason') }}</h3>
-          <p>{{ dialog.run.reason }}</p>
-        </div>
-        <template #actions>
-          <button
-            type="button"
-            class="sch-button sch-button-quiet sch-g3"
-            data-g3="5"
-            @click="dialog = null"
-          >
-            {{ t('common.close') }}
-          </button>
-          <button
-            type="button"
-            class="sch-button sch-button-primary sch-g3"
-            data-g3="6"
-            :disabled="!dialog.run.conversation_id"
-            @click="openConversation(dialog.run)"
-          >
-            {{ t('schedules.openConversation') }}
-          </button>
-        </template>
-      </ScheduleDialog>
-    </Transition>
+        <ScheduleDialog
+          v-else-if="dialog?.kind === 'run'"
+          :title="runTitle(dialog.run)"
+          wide
+          @close="dialog = null"
+        >
+          <p>
+            {{
+              joinWide(
+                shortDate(
+                  dialog.run.scheduled_for || dialog.run.created_at,
+                  current?.schedule.timezone
+                ),
+                t(`schedules.state_${dialog.run.state}`),
+                runDuration(dialog.run)
+              )
+            }}
+          </p>
+          <div v-if="dialog.run.summary" class="sch-run-summary">
+            <h3>{{ t('schedules.runSummary') }}</h3>
+            <p>{{ dialog.run.summary }}</p>
+          </div>
+          <div v-if="dialog.run.reason" class="sch-run-summary">
+            <h3>{{ t('schedules.runReason') }}</h3>
+            <p>{{ dialog.run.reason }}</p>
+          </div>
+          <template #actions>
+            <button
+              type="button"
+              class="sch-button sch-button-quiet sch-g3"
+              data-g3="5"
+              @click="dialog = null"
+            >
+              {{ t('common.close') }}
+            </button>
+            <button
+              type="button"
+              class="sch-button sch-button-primary sch-g3"
+              data-g3="6"
+              :disabled="!dialog.run.conversation_id"
+              @click="openConversation(dialog.run)"
+            >
+              {{ t('schedules.openConversation') }}
+            </button>
+          </template>
+        </ScheduleDialog>
+      </Transition>
+    </Teleport>
   </div>
 </template>

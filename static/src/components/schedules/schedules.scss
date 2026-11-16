@@ -1333,6 +1333,7 @@
   justify-content: center;
   padding: 24px;
   background: var(--overlay-scrim);
+  backdrop-filter: blur(12px);
 }
 
 .sch-modal-shell {
@@ -1343,31 +1344,28 @@
 
 .sch-modal-enter-active,
 .sch-modal-leave-active {
-  transition: opacity 150ms ease;
+  transition:
+    opacity 250ms ease,
+    backdrop-filter 250ms ease;
 }
 
 .sch-modal-enter-active .sch-modal-shell,
 .sch-modal-leave-active .sch-modal-shell {
   transition:
-    opacity 150ms ease,
-    transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform 250ms ease,
+    opacity 250ms ease;
 }
 
 .sch-modal-enter-from,
 .sch-modal-leave-to {
   opacity: 0;
+  backdrop-filter: blur(0);
 }
 
 .sch-modal-enter-from .sch-modal-shell,
 .sch-modal-leave-to .sch-modal-shell {
   opacity: 0;
-  transform: scale(0.98) translateY(4px);
-}
-
-.sch-modal-enter-to .sch-modal-shell,
-.sch-modal-leave-from .sch-modal-shell {
-  opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: translateY(18px) scale(0.985);
 }
 
 .sch-modal-shell.is-wide {
