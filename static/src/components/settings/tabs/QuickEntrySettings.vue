@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
-import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { useModelStore } from '@/stores/model';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { t } from '@/locales';
@@ -15,6 +16,10 @@ const modifierLabel = (key: string) =>
   t(
     `quickEntry.${key === 'left-control' ? 'leftControl' : key === 'right-control' ? 'rightControl' : key}`
   );
+
+const modifierItems = computed(() =>
+  modifiers.map((key) => ({ value: key, label: modifierLabel(key) }))
+);
 
 interface QuickSettings {
   enabled: boolean;
@@ -56,12 +61,9 @@ const permissions = ref({
 const checkingPermissions = ref(false),
   authorizing = ref(false),
   permissionError = ref('');
-const workspaceOpen = ref(false),
-  error = ref(''),
+const error = ref(''),
   saving = ref(false),
   loaded = ref(false);
-const workspaceRoot = ref<HTMLElement>();
-const menuStyle = ref<Record<string, string>>({});
 const models = useModelStore();
 const personalization = usePersonalizationStore();
 const options = computed(() => models.visibleModels.filter((item) => item.supportsImage));
@@ -75,13 +77,13 @@ const inheritedModel = computed(
     models.allModels.find((item) => item.key === personalization.form.default_model)?.label ||
     t('common.unset')
 );
-const workspaceLabel = computed(() =>
-  config.value.workspace
-    ? workspaces.value.find((item) => item.workspace_id === config.value.workspace)?.label ||
-      config.value.workspace
-    : t('quickEntry.followGlobal')
-);
-const extraModels = computed(() => [{ key: '', label: t('quickEntry.followGlobal') }]);
+const workspaceItems = computed(() => [
+  { value: '', label: t('quickEntry.followGlobalValue', { value: inheritedWorkspace.value }) },
+  ...workspaces.value.map((item) => ({ value: item.workspace_id, label: item.label }))
+]);
+const extraModels = computed(() => [
+  { key: '', label: t('quickEntry.followGlobalValue', { value: inheritedModel.value }) }
+]);
 function permissionLabel(status: PermissionStatus) {
   if (windowsShell && !checkingPermissions.value) {
     return t(
@@ -152,42 +154,10 @@ async function update(patch: Partial<QuickSettings>) {
     saving.value = false;
   }
 }
-function toggleWorkspace() {
-  if (workspaceOpen.value) {
-    workspaceOpen.value = false;
-    return;
-  }
-  const bounds = workspaceRoot.value?.getBoundingClientRect();
-  if (!bounds) return;
-  const width = Math.min(300, window.innerWidth - 24);
-  const below = window.innerHeight - bounds.bottom - 16;
-  menuStyle.value = {
-    width: `${width}px`,
-    left: `${Math.max(12, Math.min(bounds.right - width, window.innerWidth - width - 12))}px`,
-    ...(below >= 140
-      ? { top: `${bounds.bottom + 6}px` }
-      : { bottom: `${window.innerHeight - bounds.top + 6}px` }),
-    maxHeight: `${Math.max(68, Math.min(240, below >= 140 ? below : bounds.top - 18))}px`
-  };
-  workspaceOpen.value = true;
-}
-function outside(event: PointerEvent) {
-  if (!workspaceRoot.value?.contains(event.target as Node)) workspaceOpen.value = false;
-}
-function closeWorkspace() {
-  workspaceOpen.value = false;
-}
-function keydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') closeWorkspace();
-}
 async function selectWorkspace(id: string) {
-  closeWorkspace();
   await update({ workspace: id });
 }
 onMounted(async () => {
-  document.addEventListener('pointerdown', outside);
-  document.addEventListener('keydown', keydown);
-  window.addEventListener('resize', closeWorkspace);
   window.addEventListener('focus', refreshPermissions);
   if (!bridge) return;
   void refreshPermissions();
@@ -207,168 +177,134 @@ onMounted(async () => {
   }
 });
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', outside);
-  document.removeEventListener('keydown', keydown);
-  window.removeEventListener('resize', closeWorkspace);
   window.removeEventListener('focus', refreshPermissions);
 });
 </script>
 
 <template>
-  <section v-if="bridge" class="settings-page quick-settings" :aria-busy="!loaded && !error">
+  <section v-if="bridge" class="stg-page quick-settings" :aria-busy="!loaded && !error">
     <p v-if="!loaded && !error" class="quick-settings-note" role="status">
       {{ t('common.loading') }}
     </p>
     <template v-if="loaded">
-      <button
-        type="button"
-        class="settings-toggle-row"
-        role="switch"
-        :aria-checked="config.enabled"
-        :disabled="!loaded || saving"
-        @click="update({ enabled: !config.enabled })"
-      >
-        <span class="settings-row-copy"
-          ><span class="settings-row-title">{{ t('quickEntry.enabled') }}</span
-          ><span class="settings-row-desc">{{ t('quickEntry.desktopHint') }}</span></span
+      <div class="stg-card">
+        <button
+          type="button"
+          class="stg-toggle-row"
+          role="switch"
+          :aria-checked="config.enabled"
+          :disabled="!loaded || saving"
+          @click="update({ enabled: !config.enabled })"
         >
-        <FancyCheck :checked="config.enabled" />
-      </button>
-      <div class="settings-select-row">
-        <span class="settings-row-copy"
-          ><span class="settings-row-title">{{ t('quickEntry.shortcut') }}</span></span
-        >
-        <div class="quick-settings-modifiers">
-          <button
-            v-for="key in modifiers"
-            :key="key"
-            type="button"
-            :disabled="!loaded || saving"
-            :aria-pressed="config.modifier === key"
-            @click="update({ modifier: key })"
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ t('quickEntry.enabled') }}</span
+            ><span class="stg-row-desc">{{ t('quickEntry.desktopHint') }}</span></span
           >
-            {{ modifierLabel(key) }}
-          </button>
+          <UiSwitch decorative :checked="config.enabled" />
+        </button>
+        <div class="stg-select-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ t('quickEntry.shortcut') }}</span
+            ><span class="stg-row-desc">{{ t('quickEntry.shortcutDesc') }}</span></span
+          >
+          <UiSelect
+            :model-value="config.modifier"
+            :options="modifierItems"
+            :disabled="!loaded || saving"
+            align-end
+            :label="t('quickEntry.shortcut')"
+            @update:model-value="(key) => update({ modifier: key })"
+          />
         </div>
-      </div>
-      <div class="settings-select-row">
-        <span class="settings-row-copy"
-          ><span class="settings-row-title">{{ t('quickEntry.defaultWorkspace') }}</span
-          ><span class="settings-row-desc">{{
-            t('quickEntry.globalWorkspaceValue', { value: inheritedWorkspace })
-          }}</span></span
-        >
-        <div ref="workspaceRoot" class="settings-select-wrap" :class="{ open: workspaceOpen }">
-          <button
-            type="button"
-            class="settings-select-button"
+        <div class="stg-select-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ t('quickEntry.defaultWorkspace') }}</span
+            ><span class="stg-row-desc">{{ t('quickEntry.defaultWorkspaceDesc') }}</span></span
+          >
+          <UiSelect
+            :model-value="config.workspace"
+            :options="workspaceItems"
             :disabled="!loaded || saving"
-            :aria-expanded="workspaceOpen"
-            @click="toggleWorkspace"
+            align-end
+            :label="t('quickEntry.defaultWorkspace')"
+            @update:model-value="selectWorkspace"
+          />
+        </div>
+        <div class="stg-select-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ t('quickEntry.defaultModel') }}</span
+            ><span class="stg-row-desc">{{ t('quickEntry.defaultModelDesc') }}</span></span
           >
-            <span class="quick-setting-value">{{ workspaceLabel }}</span
-            ><span class="select-chevron" aria-hidden="true" />
-          </button>
           <div
-            v-if="workspaceOpen"
-            class="settings-floating-menu quick-workspace-menu"
-            :style="menuStyle"
-            role="menu"
+            class="quick-model-control"
+            :class="{ inactive: !loaded || saving }"
+            :inert="!loaded || saving"
           >
-            <button
-              type="button"
-              class="settings-menu-option"
-              role="menuitemradio"
-              :aria-checked="!config.workspace"
-              @click="selectWorkspace('')"
-            >
-              <span>{{ t('quickEntry.followGlobal') }}</span
-              ><FancyCheck :checked="!config.workspace" :size="16" />
-            </button>
-            <button
-              v-for="item in workspaces"
-              :key="item.workspace_id"
-              type="button"
-              class="settings-menu-option"
-              role="menuitemradio"
-              :aria-checked="config.workspace === item.workspace_id"
-              @click="selectWorkspace(item.workspace_id)"
-            >
-              <span>{{ item.label }}</span
-              ><FancyCheck :checked="config.workspace === item.workspace_id" :size="16" />
-            </button>
+            <UiModelSelect
+              :model-value="config.model"
+              :options="options"
+              :extra-options="extraModels"
+              align-end
+              @update:model-value="(value) => update({ model: value })"
+            />
           </div>
         </div>
       </div>
-      <div class="settings-select-row">
-        <span class="settings-row-copy"
-          ><span class="settings-row-title">{{ t('quickEntry.defaultModel') }}</span
-          ><span class="settings-row-desc">{{
-            t('quickEntry.globalModelValue', { value: inheritedModel })
-          }}</span></span
-        >
+      <div class="stg-card">
         <div
-          class="quick-model-control"
-          :class="{ inactive: !loaded || saving }"
-          :inert="!loaded || saving"
+          v-for="kind in ['screenPermission', 'inputPermission'] as const"
+          :key="kind"
+          class="stg-select-row"
         >
-          <ModelSelectDropdown
-            :model-value="config.model"
-            :options="options"
-            :extra-options="extraModels"
-            @select="(value) => update({ model: value })"
-          />
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{
+              t(
+                windowsShell
+                  ? kind === 'screenPermission'
+                    ? 'quickEntry.screenCapability'
+                    : 'quickEntry.inputCapability'
+                  : kind === 'screenPermission'
+                    ? 'quickEntry.screenPermissionTitle'
+                    : 'quickEntry.inputPermissionTitle'
+              )
+            }}</span>
+            <span class="stg-row-desc">{{ permissionLabel(permissions[kind]) }}</span>
+          </span>
+          <button
+            v-if="!windowsShell"
+            type="button"
+            class="stg-secondary-button"
+            :disabled="checkingPermissions || authorizing || permissions[kind] === 'granted'"
+            @click="authorize(kind)"
+          >
+            {{
+              t(
+                kind === 'screenPermission'
+                  ? 'quickEntry.permission'
+                  : 'quickEntry.inputPermissionAction'
+              )
+            }}
+          </button>
         </div>
+        <p v-if="permissionError" class="quick-settings-error" role="status">
+          {{ permissionError }}
+        </p>
       </div>
-      <p class="quick-settings-note">{{ t('quickEntry.visionModelHint') }}</p>
-      <div
-        v-for="kind in ['screenPermission', 'inputPermission'] as const"
-        :key="kind"
-        class="settings-select-row"
-      >
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{
-            t(
-              windowsShell
-                ? kind === 'screenPermission'
-                  ? 'quickEntry.screenCapability'
-                  : 'quickEntry.inputCapability'
-                : kind === 'screenPermission'
-                  ? 'quickEntry.screenPermissionTitle'
-                  : 'quickEntry.inputPermissionTitle'
-            )
-          }}</span>
-          <span class="settings-row-desc">{{ permissionLabel(permissions[kind]) }}</span>
-        </span>
-        <button
-          v-if="!windowsShell"
-          type="button"
-          class="settings-select-button"
-          :disabled="checkingPermissions || authorizing || permissions[kind] === 'granted'"
-          @click="authorize(kind)"
-        >
-          {{
-            t(
-              kind === 'screenPermission'
-                ? 'quickEntry.permission'
-                : 'quickEntry.inputPermissionAction'
-            )
-          }}
-        </button>
-      </div>
-      <p class="quick-settings-note">
-        {{ t(windowsShell ? 'quickEntry.windowsCapabilityHint' : 'quickEntry.permissionHint') }}
-      </p>
-      <p v-if="permissionError" class="quick-settings-error" role="status">{{ permissionError }}</p>
-      <div class="quick-settings-actions">
-        <button
-          type="button"
-          class="settings-select-button"
-          :disabled="!loaded || !config.enabled"
-          @click="openQuickChat"
-        >
-          {{ t('quickEntry.openQuickChat') }}
-        </button>
+      <div class="stg-card">
+        <div class="stg-action-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ t('quickEntry.openQuickChat') }}</span
+            ><span class="stg-row-desc">{{ t('quickEntry.openQuickChatDesc') }}</span></span
+          >
+          <button
+            type="button"
+            class="stg-secondary-button"
+            :disabled="!loaded || !config.enabled"
+            @click="openQuickChat"
+          >
+            {{ t('quickEntry.open') }}
+          </button>
+        </div>
       </div>
     </template>
     <p v-if="error" class="quick-settings-error" role="status">{{ error }}</p>
@@ -376,7 +312,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.quick-settings > .settings-toggle-row {
+.quick-settings > .stg-toggle-row {
   width: 100%;
   text-align: left;
   color: var(--text-primary);
@@ -385,40 +321,10 @@ onBeforeUnmount(() => {
   font: inherit;
   cursor: pointer;
 }
-.quick-settings-modifiers {
-  display: flex;
-  gap: 4px;
-}
-.quick-settings-modifiers button {
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  cursor: pointer;
-}
-.quick-settings-modifiers button:hover,
-.quick-settings-modifiers button[aria-pressed='true'] {
-  background: var(--hover-bg);
-}
 .quick-setting-value {
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.quick-workspace-menu {
-  max-width: calc(100vw - 24px);
-}
-.quick-workspace-menu .settings-menu-option {
-  height: 34px;
-  min-height: 34px;
-}
-.quick-workspace-menu .settings-menu-option > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .quick-model-control {
   max-width: 300px;
@@ -433,12 +339,6 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 1.6;
   margin: 12px 0 20px;
-}
-.quick-settings-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-default);
 }
 .quick-settings-error {
   color: var(--state-danger);

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
-import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { t } from '@/locales';
 
 defineOptions({ name: 'ReviewAgentsTab' });
@@ -31,103 +31,91 @@ const defaultExtraOptions = computed(() => [
 </script>
 
 <template>
-  <section class="settings-page">
-    <div
-      class="settings-section-desc"
-      style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6"
-    >
-      {{ $t('personalization.reviewIntro') }}
-    </div>
-
+  <section class="stg-page">
     <template v-for="agent in reviewAgentDefs" :key="agent.key">
-      <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{ $t(agent.nameKey) }}</span>
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ $t(agent.nameKey) }}</span>
       </div>
-      <div
-        style="margin: -4px 0 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.5"
-      >
-        {{ $t(agent.descKey) }}
-      </div>
+      <p class="stg-section-desc">{{ $t(agent.descKey) }}</p>
 
-      <label v-if="agent.key === 'auto_approval'" class="settings-toggle-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{
-            $t('personalization.allowAutoFullAccessTitle')
-          }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.allowAutoFullAccessDesc') }}</span>
-        </span>
-        <input
-          type="checkbox"
-          :checked="form.allow_auto_approve_full_access"
-          @change="
-            personalization.updateField({
-              key: 'allow_auto_approve_full_access',
-              value: ($event.target as HTMLInputElement).checked
-            })
-          "
-        />
-        <FancyCheck :checked="form.allow_auto_approve_full_access" />
-      </label>
+      <div class="stg-card">
+        <label v-if="agent.key === 'auto_approval'" class="stg-toggle-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('personalization.allowAutoFullAccessTitle') }}</span>
+            <span class="stg-row-desc">{{ $t('personalization.allowAutoFullAccessDesc') }}</span>
+          </span>
+          <input
+            type="checkbox"
+            :checked="form.allow_auto_approve_full_access"
+            @change="
+              personalization.updateField({
+                key: 'allow_auto_approve_full_access',
+                value: ($event.target as HTMLInputElement).checked
+              })
+            "
+          />
+          <UiSwitch decorative :checked="form.allow_auto_approve_full_access" />
+        </label>
 
-      <div class="settings-select-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.modelTitle') }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.reviewModelEmptyDesc') }}</span>
-        </span>
-        <ModelSelectDropdown
-          :model-value="reviewAgentOf(agent.key).model"
-          :options="auxModelOptions"
-          :extra-options="defaultExtraOptions"
-          @select="(v) => updateReviewAgent(agent.key, { model: v })"
-        />
-      </div>
+        <div class="stg-select-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('personalization.modelTitle') }}</span>
+            <span class="stg-row-desc">{{ $t('personalization.reviewModelEmptyDesc') }}</span>
+          </span>
+          <UiModelSelect
+            :model-value="reviewAgentOf(agent.key).model"
+            :options="auxModelOptions"
+            :extra-options="defaultExtraOptions"
+            align-end
+            @update:model-value="(v) => updateReviewAgent(agent.key, { model: v })"
+          />
+        </div>
 
-      <div class="settings-select-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.maxRoundsTitle') }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.maxRoundsDesc') }}</span>
-        </span>
-        <input
-          type="number"
-          class="settings-number-input"
-          min="1"
-          max="50"
-          :value="reviewAgentOf(agent.key).max_rounds"
-          @change="
-            updateReviewAgentInt(
-              agent.key,
-              'max_rounds',
-              ($event.target as HTMLInputElement).value,
-              1,
-              50
-            )
-          "
-        />
+        <div class="stg-select-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('personalization.maxRoundsTitle') }}</span>
+            <span class="stg-row-desc">{{ $t('personalization.maxRoundsDesc') }}</span>
+          </span>
+          <input
+            type="number"
+            class="stg-number-input"
+            min="1"
+            max="50"
+            :value="reviewAgentOf(agent.key).max_rounds"
+            @change="
+              updateReviewAgentInt(
+                agent.key,
+                'max_rounds',
+                ($event.target as HTMLInputElement).value,
+                1,
+                50
+              )
+            "
+          />
+        </div>
       </div>
     </template>
 
     <!-- 目标模式（goal review 机制的运行参数，自「工作区与权限」迁入） -->
-    <div class="settings-section-divider">
-      <span class="settings-section-divider__label">{{
-        $t('personalization.goalModeDivider')
-      }}</span>
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('personalization.goalModeDivider') }}</span>
     </div>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.goalReviewActiveTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.goalReviewActiveDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.goal_review_mode === 'active'"
-        @change="
-          personalization.updateField({
-            key: 'goal_review_mode',
-            value: $event.target.checked ? 'active' : 'readonly'
-          })
-        " /><FancyCheck :checked="form.goal_review_mode === 'active'"
-    /></label>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.goalReviewActiveTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.goalReviewActiveDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.goal_review_mode === 'active'"
+          @change="
+            personalization.updateField({
+              key: 'goal_review_mode',
+              value: $event.target.checked ? 'active' : 'readonly'
+            })
+          " /><UiSwitch decorative :checked="form.goal_review_mode === 'active'"
+      /></label>
+    </div>
   </section>
 </template>

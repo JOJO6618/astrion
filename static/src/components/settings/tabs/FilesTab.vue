@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { inject } from 'vue';
+import { computed, inject } from 'vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import { t } from '@/locales';
 
 defineOptions({ name: 'FilesTab' });
 
@@ -8,49 +10,30 @@ defineOptions({ name: 'FilesTab' });
  * 解构出的名称与主文件 script 顶层绑定一致，模板可直接引用。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const {
-  form,
-  activeDropdown,
-  floatingMenuStyle,
-  imageCompressionLabel,
-  imageCompressionOptions,
-  selectImageCompression,
-  toggleDropdown,
-  activeTheme
-} = ctx;
+const { form, imageCompressionOptions, selectImageCompression } = ctx;
+const imageCompressionItems = computed(() =>
+  imageCompressionOptions.map((option: any) => ({
+    value: option.id,
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
 </script>
 
 <template>
-  <section class="settings-page" data-tutorial="personal-page-image">
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.imageCompressionTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.imageCompressionDesc')
-        }}</span></span
-      >
-      <div class="settings-select-wrap" :class="{ open: activeDropdown === 'image' }" @click.stop>
-        <button type="button" class="settings-select-button" @click="toggleDropdown('image')">
-          {{ imageCompressionLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
+  <section class="stg-page" data-tutorial="personal-page-image">
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.imageCompressionTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.imageCompressionDesc') }}</span></span
         >
-          <button
-            v-for="option in imageCompressionOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.image_compression === option.id }"
-            @click="selectImageCompression(option.id)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+        <UiSelect
+          :model-value="form.image_compression"
+          :options="imageCompressionItems"
+          align-end
+          @update:model-value="selectImageCompression"
+        />
       </div>
     </div>
   </section>

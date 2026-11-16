@@ -7,6 +7,9 @@ export default {
   title: 'Settings',
   backAriaLabel: 'Back to chats',
   navAriaLabel: 'Switch settings sections',
+  searchPlaceholder: 'Search settings',
+  searchClear: 'Clear search',
+  searchEmpty: 'No matching settings',
 
   // ── Nav groups ──
   groupModel: 'Model',
@@ -40,20 +43,12 @@ export default {
 
   // ── Section page headers (title + description) ──
   providersTitle: 'Providers',
-  providersDesc:
-    'Connect model providers. Enter an API key to automatically fetch all available models from that provider—no per-model setup required.',
   modelsTitle: 'Models',
-  modelsDesc:
-    'All registered models. Provider models update automatically with sync; you can also add fully custom models manually.',
   modelPrefTitle: 'Model Preferences',
-  modelPrefDesc: 'Default model, run mode, and reasoning effort.',
   codexTitle: 'Codex',
-  codexDesc: 'Codex subscription sign-in, proxy settings, and usage & credits management.',
   generalTitle: 'General',
-  generalDesc: 'Basic behavior for conversations and the app.',
   crosspetTitle: 'CrossPet integration',
-  crosspetDesc:
-    'Let the local CrossPet follow agent activity. This switch applies to all workspaces.',
+  crosspetDesc: "Lets the local CrossPet desktop pet follow the agent's status",
   crosspetError: 'CrossPet settings failed:',
   hostPasswordTitle: 'Host web password protection',
   hostPasswordEnabled: 'Enabled',
@@ -62,11 +57,9 @@ export default {
   hostPasswordConfirmHint: 'Enter the current Host password to restore password-free entry.',
   hostPasswordScriptHint: 'Enable or reset the password using the source script:',
   quickChatTitle: 'Quick Chat',
-  quickChatDesc:
-    'Summon a chat and capture screenshots with a shortcut. Unset workspace and model choices follow your global defaults.',
   runDataTitle: 'Runtime data directory',
-  runDataDesc:
-    'Choose where the desktop app stores conversations, user data, and runtime settings. After restart, data migration runs before the app opens and shows a progress window.',
+  runDataRestartTitle: 'Restart required',
+  runDataDesc: 'Where conversations, user data, and runtime config are stored',
   runDataEnvLocked:
     'ASTRION_DESKTOP_DATA_ROOT is set, so in-app directory changes are disabled. Change or remove this environment variable to use this setting.',
   runDataPathLabel: 'Data directory path',
@@ -106,31 +99,18 @@ export default {
   },
   workspaceTitle: 'Workspace',
   workspaceTitleProject: 'Project',
-  workspaceDesc: 'Default permissions, sandbox environment, and versioning defaults.',
   searchTitle: 'Web Search',
-  searchDesc: 'Tavily search API key and webpage extraction policy.',
   toolsTitle: 'Tools',
-  toolsDesc: 'Tool approvals, Skills, and tool loading policy.',
   contextTitle: 'Context & Memory',
-  contextDesc: 'Conversation context, project memory injection, and compression policy.',
   filesTitle: 'Files',
-  filesDesc: 'Image and file handling.',
   browserTitle: 'Browser',
-  browserDesc: 'Defaults for the agent using the built-in browser.',
   voiceTitle: 'Voice',
-  voiceDesc: 'Voice model download and status.',
   subAgentsTitle: 'Sub-agents',
-  subAgentsDesc: 'Sub-agent models, compression threshold, and role management.',
   reviewAgentsTitle: 'Review Agents',
-  reviewAgentsDesc: 'Models and runtime parameters for review agents.',
   usageTitle: 'Usage',
-  usageDesc: 'Daily model request usage and cost across workspaces and Chat, from the conversation cost ledgers.',
   storageTitle: 'Storage',
-  storageDesc: 'Disk usage of the Astrion data directory, with cleanup for logs and old conversation backups.',
   appearanceTitle: 'Appearance',
-  appearanceDesc: 'Theme, interface language, and display options.',
   adminTitle: 'Admin',
-  adminDesc: 'Deployment-level management entries (open in a new window).',
 
   // ── Providers section ──
   providersConnectedSection: 'Connected',
@@ -199,6 +179,9 @@ export default {
 
   // ── Models section ──
   addCustomModel: 'Add custom model',
+  providerActions: 'Actions for {name}',
+  customModelRowTitle: 'Custom models',
+  customModelRowDesc: 'Add models that do not come from a provider',
   addCustomProvider: 'Add custom provider',
   modelsEmpty: 'No registered models yet.',
   modelGroupProviderBadge: 'Provider synced',

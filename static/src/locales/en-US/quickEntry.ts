@@ -30,8 +30,10 @@ export default {
   retry: 'Retry',
   recent: 'Recent chats',
   defaultModel: 'Default model',
+  defaultModelDesc: 'Model used by quick chat; must support images',
   enabled: 'Enable Quick Chat',
   shortcut: 'Double-tap shortcut',
+  shortcutDesc: 'Double-press this key to open quick chat',
   option: 'Option ⌥',
   command: 'Command ⌘',
   control: 'Control ⌃',
@@ -46,11 +48,12 @@ export default {
   windowsCapabilityHint:
     'Start Astrion, then double-tap the selected key. When enabled, closing the main window keeps Astrion in the system tray.',
   followGlobal: 'Follow global preferences',
+  followGlobalValue: 'Follow global ({value})',
   defaultWorkspace: 'Default workspace',
+  defaultWorkspaceDesc: 'Workspace used by quick chat',
   globalWorkspaceValue: 'Global default: {value}',
   globalModelValue: 'Global default: {value}',
-  desktopHint:
-    'Start Astrion first, then use the shortcut. Closing the main window keeps Quick Chat available; subsequent launches open the main window on demand.',
+  desktopHint: 'Summon a chat window anytime with a shortcut',
   visionModelHint:
     'Quick Chat requires an image-capable model. Choose one here if your global default does not support images.',
   modelUnavailable:
@@ -58,6 +61,8 @@ export default {
   workspaceUnavailable:
     'The default workspace is unavailable. Choose another in Settings → Quick Chat.',
   openQuickChat: 'Open Quick Chat',
+  open: 'Open',
+  openQuickChatDesc: 'Open the quick chat window now',
   allow: 'Run',
   reject: 'Reject',
   approval: 'Confirmation required',

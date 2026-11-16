@@ -219,14 +219,14 @@ export default {
   aiSettingsTitle: '浏览器',
   aiSettingsDesc: '智能体使用内置浏览器时的默认行为（仅 macOS 桌面版）。',
   aiDefaultOn: '新对话默认开启浏览器工具',
-  aiDefaultOnDesc: '关闭时，每个对话可在输入栏「+」菜单里单独开启。',
+  aiDefaultOnDesc: '新对话中智能体能否操作浏览器',
   aiAutoOpen: '智能体操作时自动打开浏览器面板',
-  aiAutoOpenDesc: '仅在你正在查看的对话里触发。',
+  aiAutoOpenDesc: '智能体操作浏览器时自动显示浏览器面板',
   aiDownloadDir: '智能体下载目录',
-  aiDownloadDirDesc:
-    '留空使用工作区 .astrion/browser_downloads/；相对路径相对于工作区。你自己手动下载的文件仍保存到「下载/Astrion」。',
+  aiDownloadDirDesc: '智能体操作浏览器时下载内容的保存位置',
+  aiDownloadDirPlaceholder: '.astrion/browser_downloads（相对工作区）',
   aiSites: '已允许的站点',
-  aiSitesDesc: '这些站点上，智能体的点击、输入等操作不再逐次询问。',
+  aiSitesDesc: '智能体可以直接点击和输入、无需逐次确认的站点',
   aiSitesEmpty: '还没有允许任何站点',
   aiSiteRevoke: '撤销'
 };

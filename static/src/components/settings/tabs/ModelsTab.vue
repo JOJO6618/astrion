@@ -9,7 +9,7 @@ import { useProvidersStore } from '@/stores/providers';
 import type { CustomModelEntry } from '@/stores/providers';
 import { useSettingsStore } from '@/stores/settings';
 import { useUiStore } from '@/stores/ui';
-import PillSwitch from './providers/PillSwitch.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import CustomModelDialog from './providers/CustomModelDialog.vue';
 
 defineOptions({ name: 'ModelsTab' });
@@ -179,6 +179,10 @@ const toggleVisibility = (key: string) => {
   personalization.setHiddenModels([...current]);
 };
 
+// 模型名下方的标签信息（思考 · 图片 · 上下文长度）；没有能力标签时退回原副标题
+const rowTags = (row: { caps: string[]; sub: string }): string =>
+  row.caps.length ? row.caps.join(' · ') : row.sub;
+
 // ── 分组折叠 ──
 const isCollapsed = (id: string): boolean => collapsedGroups.value.includes(id);
 
@@ -201,25 +205,28 @@ const openEditCustom = (entry: CustomModelEntry) => {
   customDialogOpen.value = true;
 };
 
-const removeCustom = async (entry: CustomModelEntry) => {
+const removeCustom = async (entry: CustomModelEntry): Promise<boolean> => {
   const ok = await uiStore.requestConfirm({
     title: t('settings.customModelDeleteConfirmTitle'),
     message: t('settings.customModelDeleteConfirmMessage', { name: entry.model_name }),
     confirmText: t('common.delete'),
     confirmVariant: 'danger'
   });
-  if (!ok) return;
+  if (!ok) return false;
   const result = await providersStore.deleteCustomModel(entry.model_name);
   if (!result.ok) {
     // 后端错误原样展示
     uiStore.pushToast({ message: result.error || t('common.unknownError'), type: 'error' });
-    return;
+    return false;
   }
   uiStore.pushToast({ message: t('settings.customModelDeleted'), type: 'success' });
+  return true;
 };
 
-const gotoProviders = () => {
-  settingsStore.setActiveSection('providers');
+// 编辑弹窗里的「删除」：删除成功后关闭弹窗
+const deleteFromDialog = async () => {
+  const entry = customDialogInitial.value;
+  if (entry && (await removeCustom(entry))) customDialogOpen.value = false;
 };
 
 const loadModels = () => {
@@ -247,15 +254,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="settings-page">
+  <section class="stg-page">
     <!-- 操作行（仅管理员） -->
-    <div v-if="isAdmin" class="models-actions">
-      <button type="button" class="models-btn models-btn--primary" @click="openAddCustom">
-        {{ $t('settings.addCustomModel') }}
-      </button>
-      <button type="button" class="models-btn" @click="gotoProviders">
-        {{ $t('settings.addCustomProvider') }}
-      </button>
+    <div v-if="isAdmin" class="stg-card">
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('settings.customModelRowTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('settings.customModelRowDesc') }}</span>
+        </span>
+        <button type="button" class="stg-secondary-button" @click="openAddCustom">
+          {{ $t('settings.addCustomModel') }}
+        </button>
+      </div>
     </div>
 
     <div v-if="modelsLoading" class="models-state">{{ $t('common.loading') }}</div>
@@ -296,60 +306,30 @@ onMounted(() => {
           <span class="models-badge">{{ group.badge }}</span>
           <span class="models-group-count">{{ group.rows.length }}</span>
         </button>
-        <div v-show="!isCollapsed(group.id)" class="models-list">
+        <div v-show="!isCollapsed(group.id)" class="stg-card models-list">
           <div v-for="row in group.rows" :key="row.key" class="models-row">
-            <div class="models-row__main">
-              <div class="models-row__name">{{ row.name }}</div>
-              <div class="models-row__id">{{ row.sub }}</div>
+            <button
+              v-if="row.custom && isAdmin"
+              type="button"
+              class="models-row__main is-editable"
+              :title="$t('settings.editLabel')"
+              @click="openEditCustom(row.custom)"
+            >
+              <span class="models-row__name">{{ row.name }}</span>
+              <span class="models-row__tags">{{ rowTags(row) }}</span>
+            </button>
+            <div v-else class="models-row__main">
+              <span class="models-row__name">{{ row.name }}</span>
+              <span class="models-row__tags">{{ rowTags(row) }}</span>
             </div>
-            <div class="models-row__caps">
-              <span v-for="cap in row.caps" :key="cap" class="models-cap">{{ cap }}</span>
-            </div>
-            <PillSwitch
-              :on="isVisible(row.key)"
+            <UiSwitch
+              :checked="isVisible(row.key)"
               :label="$t('settings.modelVisibleSwitch')"
               @toggle="toggleVisibility(row.key)"
             />
-            <template v-if="row.custom && isAdmin">
-              <button
-                type="button"
-                class="models-icon-btn"
-                :title="$t('settings.editLabel')"
-                :aria-label="$t('settings.editLabel')"
-                @click="openEditCustom(row.custom)"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M11 2.5l2.5 2.5L5 13.5H2.5V11L11 2.5z"
-                    stroke="currentColor"
-                    stroke-width="1.3"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="models-icon-btn"
-                :title="$t('common.delete')"
-                :aria-label="$t('common.delete')"
-                @click="removeCustom(row.custom)"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M3 4.5h10M6.5 4V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </template>
           </div>
         </div>
       </div>
-
-      <div class="models-hint">{{ $t('settings.modelsEditHint') }}</div>
     </template>
 
     <CustomModelDialog
@@ -357,25 +337,21 @@ onMounted(() => {
       :mode="customDialogMode"
       :initial="customDialogInitial"
       @close="customDialogOpen = false"
+      @delete="deleteFromDialog"
     />
   </section>
 </template>
 
 <style scoped>
-.models-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 .models-btn {
   height: 32px;
-  padding: 0 14px;
-  border-radius: 6px;
+  padding: 0 12px;
+  border-radius: 8px;
   font-size: 13px;
-  border: 1px solid var(--border-default);
+  font-weight: 500;
+  border: 0;
   color: var(--text-primary);
-  background: var(--surface-raised);
+  background: var(--surface-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -386,23 +362,20 @@ onMounted(() => {
 }
 
 .models-btn:hover {
-  background: var(--surface-soft);
+  background: var(--surface-muted);
 }
 
 .models-btn--primary {
-  background: var(--accent);
-  border-color: transparent;
-  color: var(--on-accent);
+  background: var(--text-primary);
+  color: var(--surface-base);
 }
 
 .models-btn--primary:hover {
-  background: var(--accent-hover);
+  background: var(--text-secondary);
 }
 
 .models-state {
-  padding: 14px 2px;
-  border-top: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
+  padding: 14px 0;
   font-size: 13px;
   color: var(--text-tertiary);
   display: flex;
@@ -421,7 +394,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   height: 40px;
-  padding: 0 2px;
+  padding: 0 16px;
   margin-top: 10px;
   border: 0;
   background: transparent;
@@ -471,16 +444,52 @@ onMounted(() => {
 }
 
 /* ── 模型行 ── */
+.models-row__tags {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 自定义模型：点名称区域打开编辑（删除在编辑弹窗内） */
+.models-row__main.is-editable {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.models-row__main.is-editable:hover .models-row__name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.models-row__main.is-editable:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 列表卡片（DESIGN.md §6.9）：行间 2px；行内有开关，整行不做 hover（§3 禁止 hover 套 hover）；
+   卡片左右内边距 6 + 行内边距 10 = 文字距卡片边 16 */
 .models-list {
-  border-top: 1px solid var(--border-default);
+  display: grid;
+  gap: 2px;
+  padding: 4px 6px;
 }
 
 .models-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 2px;
-  border-bottom: 1px solid var(--border-default);
+  padding: 8px 10px;
   min-height: 56px;
 }
 
@@ -490,80 +499,11 @@ onMounted(() => {
 }
 
 .models-row__name {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.models-row__id {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 1px;
-}
-
-.models-row__caps {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.models-cap {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  padding: 0 5px;
-  line-height: 16px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.models-icon-btn {
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.models-row:hover .models-icon-btn,
-.models-icon-btn:focus-visible {
-  opacity: 1;
-}
-
-.models-icon-btn:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
-}
-
-.models-hint {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 12px;
-  line-height: 1.6;
-}
-
-/* 触屏无 hover：编辑按钮常显但弱化 */
-@media (hover: none) {
-  .models-icon-btn {
-    opacity: 0.6;
-  }
 }
 </style>

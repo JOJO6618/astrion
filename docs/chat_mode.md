@@ -29,7 +29,7 @@
 - 保留 Token 环与现有 hover 信息，Chat 点击不打开弹窗；圆环分母使用 Chat 独立深压缩阈值，不读取 Agent 的压缩设置。缺少最终 usage 的停止请求不得记作零消耗或虚构精确统计。
 - 原计划／询问／执行的位置改为联网开关，点击直接切换。
 - 共享账号、提供商凭证、模型目录、模型可见性、主题和语言；Chat 独立默认模型、思考／强度、联网默认值和专属个人指令。设置页移除「默认开启思考」选项，当前对话顶部思考切换保持独立。
-- Chat 设置页使用既有 `ModelSelectDropdown`、`FancyCheck` 和共享设置行／输入框／文本域／按钮／反馈样式，不维护专属样式。推理强度从 Agent 的 `ModelPrefTab` 提取为 `SettingsChoiceDropdown`，两边共用组件、原浮层定位和完整选项（默认、low、medium、high、xhigh、max），不额外添加 minimal 或过滤 max；Chat 默认设置、对话配置和任务受理的校验均引用 `config.limits.REASONING_EFFORT_LEVELS`。Chat 不借此创建 Agent 运行资源。
+- Chat 设置页使用既有 `ModelSelectDropdown`、`UiSwitch` 和设置页共享的设置行／输入框／文本域／按钮／反馈样式（`settings/settings.scss`），不维护专属样式。推理强度从 Agent 的 `ModelPrefTab` 提取为 `SettingsChoiceDropdown`，两边共用组件、原浮层定位和完整选项（默认、low、medium、high、xhigh、max），不额外添加 minimal 或过滤 max；Chat 默认设置、对话配置和任务受理的校验均引用 `config.limits.REASONING_EFFORT_LEVELS`。Chat 不借此创建 Agent 运行资源。
 - 全局记忆和专题记忆由智能体自行维护，不在用户设置页显示查看、添加、编辑或删除入口；设置页不请求记忆管理接口。既有记忆数据、内部工具和注入机制保持。
 - 默认配置影响新对话；当前对话的选项影响其后续请求。切换分支不回滚真实个人配置与记忆。
 - Chat 首轮复用 Agent 的后台标题生成，读取账号 `preferences_dir` 中的 `auto_generate_title`／`title_model`，尊重对话 `skip_auto_title_generation`。Chat 首条 user 已在受理时保存，需按首轮身份判定，不能套用 Agent 的空历史条件；重生成、分支续聊和压缩续接不重复起标题。标题客户端保留提供商静态头，并使用原 Chat 对话稳定会话 ID 与账号请求头开关，不读取 Chat 存储根偏好。

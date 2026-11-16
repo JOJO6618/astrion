@@ -2,8 +2,7 @@
 // Used by: static/src/components/personalization/PersonalizationDrawer.vue
 export default {
   gitWorktreeTitle: 'Enable Git worktree',
-  gitWorktreeDesc:
-    'Enable worktree tools and switching for new conversations; existing conversations keep their settings',
+  gitWorktreeDesc: 'Let new conversations edit code on separate worktrees and branches',
   // ── Personal space drawer: chrome ──
   closePersonalSpaceAriaLabel: 'Close personal space',
   tabAriaLabel: 'Switch personal space sections',
@@ -27,12 +26,12 @@ export default {
 
   // ── General ──
   autoTitleTitle: 'Auto-generate conversation titles',
-  autoTitleDesc: 'On by default; when off, the title uses the first message',
+  autoTitleDesc: 'Name conversations automatically from their content',
   tutorialTitle: 'Getting started',
   tutorialDesc: 'Learn key features and common settings through highlights and callouts',
   tutorialButton: 'Start tutorial',
   appUpdateTitle: 'App updates',
-  appUpdateDesc: 'Current version: {version} · {checked}',
+  appUpdateDesc: 'Version {version} · {state}',
   appCheckUpdate: 'Check for updates',
   appChecking: 'Checking...',
   appVersionUnknown: 'Unknown',
@@ -62,10 +61,9 @@ export default {
   considerationsDesc: 'Referenced as background before every answer',
   considerationsPlaceholder: 'e.g. The user owns a brown male teddy dog since 2014...',
   hideBlockBordersTitle: 'Hide block borders',
-  hideBlockBordersDesc: 'Remove dividers between stacked blocks for a cleaner look',
+  hideBlockBordersDesc: 'Remove dividers between stacked blocks',
   minimalExpandHeightTitle: 'Limit expanded height',
-  minimalExpandHeightDesc:
-    'In minimal mode, cap the height when expanding the summary line; scroll inside if it overflows',
+  minimalExpandHeightDesc: 'Caps the height of expanded content in minimal mode',
   communicationStyleTitle: 'Communication style',
   communicationStyleDesc: 'How the agent communicates with you',
   communicationDefault: 'Default',
@@ -97,12 +95,12 @@ export default {
 
   // ── Model & Thinking ──
   defaultModelTitle: 'Default model',
-  defaultModelDesc: 'Preferred model for new conversations and the first request after sign-in',
+  defaultModelDesc: 'Model used for new conversations',
   modelDisabled: 'Disabled by administrator',
   defaultThinkingModeTitle: 'Default thinking mode',
-  defaultThinkingModeDesc: 'Initial thinking mode on sign-in or when starting a new task',
+  defaultThinkingModeDesc: 'Whether new conversations start with thinking on',
   reasoningEffortTitle: 'Default reasoning effort',
-  reasoningEffortDesc: 'Reasoning effort level attached to model requests in thinking mode',
+  reasoningEffortDesc: 'Thinking effort for new conversations',
   runModeFast: 'Fast mode',
   runModeFastDesc: 'Prioritizes speed, skips the thinking model',
   runModeThinking: 'Thinking mode',
@@ -123,8 +121,6 @@ export default {
   badgeThinking: 'Thinking',
 
   // ── Codex subscription ──
-  codexIntro:
-    'Connect your ChatGPT account to use Codex models directly (uses your ChatGPT subscription quota, not API quota).',
   codexStatusTitle: 'Account status',
   codexConnected: 'Connected',
   codexNotConnected: 'Not connected',
@@ -132,8 +128,7 @@ export default {
   codexManageInProviders: 'Connect in Providers',
   codexAccountLine: 'Account {account}',
   codexAccountSelectorTitle: 'Viewing account',
-  codexAccountSelectorHint:
-    'Switches the account shown on this page only; running conversations are unaffected. Connect, disconnect and model refresh live in Providers.',
+  codexAccountSelectorHint: 'Which Codex account this page shows',
   codexAccountPrimaryBadge: 'Primary',
   codexAccountHashLabel: 'Hash {hash}',
   codexLoginInProgress: 'A sign-in flow is already in progress. Finish or cancel it first.',
@@ -157,8 +152,7 @@ export default {
   codexSourceEmpty: 'No models yet',
   codexProxyTitle: 'Network',
   codexProxyRowTitle: 'Proxy address',
-  codexProxyDesc:
-    'Fill in when a proxy is required to reach the ChatGPT backend, e.g. http://127.0.0.1:7897; leave empty to use system environment variables.',
+  codexProxyDesc: 'Proxy used to reach ChatGPT services',
   codexProxyPlaceholder: 'http://127.0.0.1:7897',
   codexProxySaved: 'Saved',
   codexLoadFailed: 'Failed to load Codex status',
@@ -193,43 +187,37 @@ export default {
   codexWeeklyApiValue: 'API value this period',
   codexWeeklyMaxValue: 'Estimated max API value',
   codexWeeklyHistory: 'Previous periods',
+  codexWeeklyHistoryDesc: 'View value from past periods',
   codexWeeklyLoading: 'Collecting…',
   codexWeeklyLoadFailed: 'Failed to load value stats',
 
   // ── Appearance & Display ──
   themeTitle: 'Theme',
-  themeDesc: 'Switch between Classic, Light and Dark',
+  themeDesc: 'Overall color scheme of the interface',
   groupByWorkspaceTitle: 'Group chats by project',
-  groupByWorkspaceDesc: 'Fold conversation history by workspace or project in the sidebar',
+  groupByWorkspaceDesc: 'Group sidebar conversations by project',
   useCustomNamesTitle: 'Use custom names',
   useCustomNamesDesc:
     'Use the self-name and user name from personalization in the conversation area',
   enhancedToolDisplayTitle: 'Enhanced tool display',
-  enhancedToolDisplayDesc: 'Show tool blocks as formatted content; off shows raw JSON',
+  enhancedToolDisplayDesc: 'Show tool arguments and results in a readable format',
   showStatusAvatarTitle: 'Show assistant status avatar',
-  showStatusAvatarDesc:
-    'Show idle, thinking, and tool-call status animations on the welcome page and at the end of conversations',
+  showStatusAvatarDesc: 'Show what the agent is doing with an animated avatar',
   showGitStatusBarTitle: 'Show Git status bar',
-  showGitStatusBarDesc:
-    'Show branch and change stats above the input when the workspace is a Git repo',
-  showGitStatusBarDescProject:
-    'Show branch and change stats above the input when the project is a Git repo',
+  showGitStatusBarDesc: 'Show the current branch and changes above the input bar',
+  showGitStatusBarDescProject: 'Show the current branch and changes above the input bar',
   autoOpenTerminalTitle: 'Auto-open terminal panel',
-  autoOpenTerminalDesc: 'Open the sidebar terminal panel automatically when a terminal is created',
+  autoOpenTerminalDesc: 'Open the terminal panel when the agent creates a terminal',
   quickDockAutoExpandTitle: 'Auto-expand quick dock',
-  quickDockAutoExpandDesc:
-    'Expand the quick dock automatically when it has content; when off, expand it only with the side button',
+  quickDockAutoExpandDesc: 'Expand the quick dock when it has new content',
   previewAutoOpenTitle: 'Auto-open preview panel',
-  previewAutoOpenDesc:
-    'Open the preview panel automatically when a new preview target (local server / HTML file) is detected; when off, only the dock counter lights up',
+  previewAutoOpenDesc: 'Open the preview panel when something can be previewed',
   editSummaryLiveTitle: 'Show edit summary live',
-  editSummaryLiveDesc:
-    'Show edited files in real time during a run; when off, show them only after the run completes',
+  editSummaryLiveDesc: 'List edited files live while the agent works',
   filePreviewWrapTitle: 'Wrap file preview lines',
-  filePreviewWrapDesc:
-    'Wrap file previews to the panel width; when off, long lines scroll horizontally',
+  filePreviewWrapDesc: 'Wrap long lines to the panel width in file previews',
   blockDisplayModeTitle: 'Block display mode',
-  blockDisplayModeDesc: 'How thinking and tool blocks are displayed',
+  blockDisplayModeDesc: 'How thinking and tool calls appear in conversations',
   blockDisplayTraditional: 'Traditional list',
   blockDisplayTraditionalDesc: 'Vertical list in chronological order, classic style',
   blockDisplayStacked: 'Stacked animation',
@@ -239,7 +227,7 @@ export default {
   badgeRecommended: 'Recommended',
   badgeNew: 'New',
   compactMessageTitle: 'Compact system messages',
-  compactMessageDesc: 'How compact system messages (review, sub-agents) are displayed',
+  compactMessageDesc: 'How system messages such as reviews appear in conversations',
   compactMessageFull: 'Full info',
   compactMessageFullDesc:
     'Show full original content for review, sub-agent and other system messages',
@@ -259,13 +247,13 @@ export default {
   localeEnglish: 'English',
   localeEnglishDesc: 'English (US)',
   currencyTitle: 'Display currency',
-  currencyDesc: 'Currency for costs; CNY uses a daily reference exchange rate',
+  currencyDesc: 'Currency used to display usage costs',
   currencyUSD: 'US dollar USD',
   currencyCNY: 'Renminbi CNY',
 
   // ── Workspace & Permissions ──
   defaultPermissionTitle: 'Default permission',
-  defaultPermissionDesc: 'Default permission mode for new conversations',
+  defaultPermissionDesc: 'What agents may do in new conversations',
   permissionReadonly: 'Read-only',
   permissionReadonlyDesc: 'Read/search tools only; modification operations are rejected',
   permissionApproval: 'Approval',
@@ -279,7 +267,7 @@ export default {
   permissionUnrestricted: 'Unrestricted',
   permissionUnrestrictedDesc: 'Tools execute directly through the normal flow',
   defaultWorkModeTitle: 'Default work mode',
-  workRunModeDesc: 'Default work mode for new conversations; locked to read-only in plan mode',
+  workRunModeDesc: 'How agents work in new conversations',
   workModePlan: 'Plan',
   workModePlanDesc: 'Only makes a plan and executes after approval',
   workModeAsk: 'Ask',
@@ -287,34 +275,21 @@ export default {
   workModeExecute: 'Execute',
   workModeExecuteDesc: 'Fills in details and starts directly',
   agentsMdInjectTitle: 'Auto-inject AGENTS.md',
-  agentsMdInjectDesc:
-    'Automatically inject system prompt when AGENTS.md exists in the workspace root',
-  agentsMdInjectDescProject:
-    'Automatically inject system prompt when AGENTS.md exists in the project root',
+  agentsMdInjectDesc: 'Give the agent the project conventions in AGENTS.md',
   claudeMdInjectTitle: 'Auto-inject CLAUDE.md',
-  claudeMdInjectDesc:
-    'Automatically inject system prompt when CLAUDE.md exists in the workspace root (off by default, injected alongside AGENTS.md)',
-  claudeMdInjectDescProject:
-    'Automatically inject system prompt when CLAUDE.md exists in the project root (off by default, injected alongside AGENTS.md)',
+  claudeMdInjectDesc: 'Give the agent the project conventions in CLAUDE.md',
+  claudeMdInjectDescProject: 'Give the agent the project conventions in CLAUDE.md',
   agentsSkillsScanTitle: 'Scan .agents/skills/ directory',
-  agentsSkillsScanDesc:
-    'Auto-scan industry skills under .agents/skills/ (Agent Skills open standard path) and list them with .astrion/skills/ skills; duplicates with the same name make read_skill error out and suggest reading by specific path',
-  agentsSkillsScanDescProject:
-    'Auto-scan industry skills under .agents/skills/ (Agent Skills open standard path) in the project and list them with .astrion/skills/ skills; duplicates with the same name make read_skill error out and suggest reading by specific path',
+  agentsSkillsScanDesc: 'Let agents use shared skills from .agents/skills/',
+  agentsSkillsScanDescProject: 'Let agents use shared skills from .agents/skills/',
   modifyHistoryTitle: 'Track file changes',
-  modifyHistoryDesc:
-    'After each task, save this round of write/edit file changes as diffs under .astrion/modify_history/ so accidental overwrites (e.g. by git checkout) can be recovered manually',
-  modifyHistoryDescProject:
-    'After each task, save this round of write/edit file changes as diffs under .astrion/modify_history/ in the project so accidental overwrites (e.g. by git checkout) can be recovered manually',
+  modifyHistoryDesc: "Keep each task's file changes so mistakes can be undone",
+  modifyHistoryDescProject: "Keep each task's file changes so mistakes can be undone",
   versionControlDivider: 'Version control',
   versioningByDefaultTitle: 'Enable versioning for new chats',
-  versioningByDefaultDesc:
-    'Turned on automatically when creating a new chat; can be disabled below the input',
+  versioningByDefaultDesc: 'New conversations track file versions so you can roll back',
   backupModeTitle: 'Backup mode',
-  backupModeDesc:
-    'Shallow backup only tracks AI-edited files; full backup snapshots the whole workspace',
-  backupModeDescProject:
-    'Shallow backup only tracks AI-edited files; full backup snapshots the whole project',
+  backupModeDesc: 'What version control saves',
   shallowBackup: 'Shallow',
   shallowBackupDesc: 'Fast, only restores edited files',
   fullBackup: 'Full',
@@ -322,8 +297,7 @@ export default {
   fullBackupDescProject: 'Full project snapshot; the first one may be slow',
   goalModeDivider: 'Goal mode',
   goalReviewActiveTitle: 'Review agent gathers evidence',
-  goalReviewActiveDesc:
-    'When on, runs read-only commands to verify goals; when off, judges from conversation only',
+  goalReviewActiveDesc: 'Let the review agent run read-only commands to verify goals',
   goalMaxTurnsTitle: 'Max auto-continuation turns',
   goalMaxTurnsDesc: 'Automatically continues up to 1-100 turns after the main model stops',
   goalTokenLimitTitle: 'Enable cumulative token limit',
@@ -333,54 +307,63 @@ export default {
 
   // ── Context ──
   recentConversationsTitle: 'Recent conversation hints',
-  recentConversationsDesc:
-    'Inject several recent non-empty conversations from the current workspace into the system prompt',
-  recentConversationsDescProject:
-    'Inject several recent non-empty conversations from the current project into the system prompt',
+  recentConversationsDesc: 'Give the agent your recent conversations as context',
+  recentConversationsDescProject: 'Give the agent your recent conversations as context',
   recentConversationsCountTitle: 'Recent conversations to inject',
+  recentConversationsCountDesc: 'How many recent conversations are provided',
   restoreDefault: 'Restore default',
   maxMemoryInjectTitle: 'Max memory injection',
+  maxMemoryInjectDesc: 'Maximum project memories included per conversation',
   noLimitPlaceholder: 'No limit',
   compressionStrategyTitle: 'Context compression strategy',
-  compressionStrategyDesc: 'Control auto shallow and deep compression separately',
+  compressionStrategyDesc: 'How older content is compressed when context gets long',
   autoShallowCompressTitle: 'Auto shallow compression',
+  autoShallowCompressDesc: 'Replace older tool results with summaries, keeping the conversation',
   autoDeepCompressTitle: 'Auto deep compression',
+  autoDeepCompressDesc: 'Summarize older parts of the conversation',
   adaptiveCompressTitle: 'Adaptive compression threshold',
-  adaptiveCompressDesc:
-    'Count fixed overhead such as the system prompt and tool definitions toward the trigger threshold so compression does not fire early. When off, the threshold above is used as-is.',
+  adaptiveCompressDesc: 'Decide when to compress based on actual available context',
   shallowTriggerTokens: 'Shallow compression trigger context',
+  shallowTriggerTokensDesc: 'Shallow compression runs at this context length',
   shallowKeepRecentTools: 'Recent tools kept in shallow compression',
+  shallowKeepRecentToolsDesc: 'Recent tool results kept intact by shallow compression',
   shallowKeepTurnTools: 'Tools kept for current turn (shallow)',
+  shallowKeepTurnToolsDesc: 'Tool results after the last few user messages stay intact',
   shallowMaxReplace: 'Max replacements per round',
+  shallowMaxReplaceDesc: 'Maximum tool results replaced per shallow compression',
   shallowToolInterval: 'Trigger on tool-call interval',
+  shallowToolIntervalDesc: 'Check for shallow compression every this many tool calls',
   deepTriggerTokens: 'Deep compression trigger context',
+  deepTriggerTokensDesc: 'Deep compression runs at this context length',
   restoreCompressionDefaults: 'Restore compression defaults',
+  restoreCompressionDefaultsDesc: 'Reset the compression parameters above',
 
   // ── Tools & Skills ──
   silentToolDisableTitle: 'Silently disable tools',
-  silentToolDisableDesc:
-    "No hint message when disabling tools; the model won't notice disabled items",
+  silentToolDisableDesc: "Don't tell the model when tools are disabled",
   toolIntentTitle: 'Tool intent hints',
-  toolIntentDesc: 'State briefly what a tool will do before calling it',
+  toolIntentDesc: 'Briefly state the intent before calling a tool',
   skillHintsTitle: 'Skill hint system',
-  skillHintsDesc: 'Suggest relevant skills to the model when specific keywords are detected',
+  skillHintsDesc: 'Remind the model to read relevant skills when appropriate',
   strictSkillTitle: 'Strict constraints',
-  strictSkillDesc: 'Applies only to skills enabled in personal space',
+  strictSkillDesc: 'Require reading the matching guide before using certain tools',
   terminalToolsTitle: 'Terminal tools',
+  terminalToolsDesc: 'Read the terminal guide before using terminal tools',
   subAgentToolsTitle: 'Sub-agent tools',
+  subAgentToolsDesc: 'Read the sub-agent guide before using sub-agent tools',
   runCommandFgTitle: 'run_command foreground',
+  runCommandFgDesc: 'Read the command guide before running foreground commands',
   runCommandBgTitle: 'run_command background',
+  runCommandBgDesc: 'Read the command guide before running background commands',
   availableSkillsTitle: 'Available skills',
-  availableSkillsDesc:
-    'Checked skills are injected into the system prompt and synced to .astrion/skills/ in the workspace',
-  availableSkillsDescProject:
-    'Checked skills are injected into the system prompt and synced to .astrion/skills/ in the project',
+  availableSkillsDesc: 'Skills the agent can use',
+  availableSkillsDescProject: 'Skills the agent can use',
   disabledToolCategoriesTitle: 'Default disabled tool categories',
-  disabledToolCategoriesDesc: 'These categories stay off in new tasks once selected',
+  disabledToolCategoriesDesc: 'Tool categories turned off in new conversations',
   toolLoadingTitle: 'On-demand tools (dynamic loading)',
-  toolLoadingDesc:
-    'Checked tools are not injected into context by default; the model fetches their full definitions on demand via load_tools, saving tokens and improving tool selection accuracy. Only affects new conversations; existing conversations keep the snapshot taken at creation',
+  toolLoadingDesc: 'Load tools only when the model needs them, saving context',
   toolLoadingEnabledTitle: 'Enable dynamic tool loading',
+  toolLoadingEnabledDesc: 'When on, the tools selected below load on demand',
   toolLoadingCat: {
     schedules: 'Scheduled tasks',
     git_worktree: 'Git worktree',
@@ -405,8 +388,7 @@ export default {
 
   // ── Search providers ──
   searchProviderTitle: 'Search engine',
-  searchProviderDesc:
-    'The search service used by the web_search tool. Bocha is China-direct; Exa/Parallel require international network access; SearXNG is a free self-hosted instance',
+  searchProviderDesc: 'Service the agent uses to search the web',
   searchProviderTavily: 'Tavily',
   searchProviderBocha: 'Bocha',
   searchProviderExa: 'Exa',
@@ -432,22 +414,20 @@ export default {
   searxngBaseUrlStatusEnv: 'Not configured — using the instance URL from the environment variable',
   // ── Webpage extraction provider ──
   extractProviderTitle: 'Webpage extraction',
-  extractProviderDesc:
-    'The cloud extraction service used when whitelist direct extraction misses or fails; a failure reports an error directly without falling back to other services. Tavily/Exa/Parallel reuse the corresponding keys above',
+  extractProviderDesc: 'Service the agent uses to read web pages',
   extractProviderJina: 'Jina Reader',
   extractProviderTavily: 'Tavily',
   extractProviderExa: 'Exa',
   extractProviderParallel: 'Parallel',
   jinaApiKeyTitle: 'Jina API key',
-  jinaApiKeyDesc:
-    'Optional. Get one at jina.ai for higher quota; leave empty for anonymous rate-limited calls or the server environment variable',
+  jinaApiKeyDesc: 'Optional, raises the rate limit',
   jinaApiKeyPlaceholder: 'jina_...',
   jinaApiKeyStatusAnonymous:
     'Not configured — anonymous rate-limited calls (or the key from the server environment variable)',
   webDirectExtractTitle: 'Direct extraction whitelist',
-  webDirectExtractDesc:
-    'Whitelisted sites are extracted locally (GitHub code files via CDN raw links, others via readability-style parsing) at no external quota cost; on failure or miss, the extraction provider selected above takes over',
+  webDirectExtractDesc: 'These sites are read locally, without an extraction service',
   webDirectExtractEnabledTitle: 'Enable whitelist direct extraction',
+  webDirectExtractEnabledDesc: 'Read allowlisted sites locally',
   webDirectExtractDomainsTitle: 'Additional whitelisted domains',
   webDirectExtractBuiltinBadge: 'Built-in',
   webDirectExtractDomainPlaceholder: 'Enter a domain, e.g. docs.python.org',
@@ -455,7 +435,7 @@ export default {
 
   // ── Files & Images ──
   imageCompressionTitle: 'Image compression',
-  imageCompressionDesc: 'Scale down images proportionally when sent or viewed via view_image',
+  imageCompressionDesc: 'Whether images sent to the model are downscaled',
   imageOriginal: 'Original',
   imageOriginalDesc: 'No compression',
   image1080p: '1080p',
@@ -485,9 +465,9 @@ export default {
   usageFetchFailed: 'Failed to fetch usage statistics',
 
   // ── Voice model ──
-  voiceModelIntro:
-    'On-device speech recognition model (SenseVoice int8) supporting mixed Chinese/English with automatic punctuation. The model is about 228MB and runs locally on the phone with no network needed.',
   voiceModelTitle: 'Speech recognition model',
+  voiceDeleteTitle: 'Delete voice model',
+  voiceDeleteDesc: 'Free the space used by the speech model',
   voiceModelReady: 'Downloaded (228MB)',
   voiceModelDownloading: 'Downloading {percent}% — {msg}',
   voiceModelPartial: 'Incomplete download, please download again',
@@ -499,22 +479,17 @@ export default {
   voicePreparing: 'Preparing...',
 
   // ── Sub-agents ──
-  subAgentsIntro:
-    'Configure sub-agent models, capacity and context compression. Sub-agents retain context and can resume after a working round.',
   subAgentMaxInstancesTitle: 'Maximum existing sub-agents',
-  subAgentMaxInstancesDesc:
-    'Counted per conversation, including idle agents. Terminating an agent frees a slot. Default: 20. Applies after saving.',
+  subAgentMaxInstancesDesc: 'Maximum sub-agents per conversation',
   subAgentMaxInstancesInvalid: 'The sub-agent limit must be a valid integer of at least 1.',
   subAgentCompressThresholdInvalid:
     'The compression threshold must be an integer of at least 10000.',
   subAgentSettingsLoadFailed: 'Could not load sub-agent settings. Reopen this page to retry.',
   subAgentSettingsSaveFailed: 'Could not save sub-agent settings. Please try again.',
   compressThresholdTitle: 'Context compression threshold',
-  compressThresholdDesc:
-    "Deep compression triggers when a sub-agent's context tokens exceed this value (default 250000)",
+  compressThresholdDesc: 'Sub-agent context is compressed at this length',
   subAgentModelTitle: 'Sub-agent intelligence',
-  subAgentModelDesc:
-    'Configure tiers based on actual model capability; tiers may use the same model. Same as current agent needs no configuration and suits collaborative coding. Unconfigured tiers return an error; use same as current agent instead. All tiers use thinking mode and inherit the main agent’s reasoning effort at creation; unsupported effort follows existing protocol handling.',
+  subAgentModelDesc: 'Models sub-agents use for tasks of different difficulty',
   subAgentModelUnconfigured: 'Not configured',
   subAgentIntelligence: {
     same: 'Same as current agent',
@@ -554,11 +529,9 @@ export default {
   roleModelEmptyDesc: 'Leave empty for automatic selection',
   defaultModelOption: 'Auto',
   subscriptionQuotaTitle: 'Show subscription quota',
-  subscriptionQuotaDesc:
-    'Show subscription quota in the token ring hover card and the usage drawer; turning it off restores the context usage hint.',
+  subscriptionQuotaDesc: 'See remaining subscription quota in the token ring',
   subscriptionQuotaSourceTitle: 'Quota source',
-  subscriptionQuotaSourceDesc:
-    'Auto follows the provider of the current model; a fixed choice always shows only that provider and marks it unavailable when it cannot be queried.',
+  subscriptionQuotaSourceDesc: 'Whose quota the token ring shows',
   subscriptionQuotaAuto: 'Auto',
   subscriptionQuotaOpencode: 'OpenCode Go',
   subscriptionQuotaChatgpt: 'ChatGPT',
@@ -570,12 +543,9 @@ export default {
   deleteRoleConfirm: 'Delete role "{name}"?',
 
   // ── Review agents ──
-  reviewIntro:
-    'Configure models and run parameters for the three review agents. Models come from the main model registry (including Codex); leave empty for automatic selection.',
   reviewAgentAutoApproval: 'Auto-approval agent',
   allowAutoFullAccessTitle: 'Allow automatic approval of one-time full access',
-  allowAutoFullAccessDesc:
-    'In auto-approval or unrestricted mode, one-time full-access requests execute immediately after approval by the review agent, without manual approval; goal mode also applies. Off by default; manual-approval mode is unaffected.',
+  allowAutoFullAccessDesc: 'Whether the review agent can approve one-time full access',
   reviewAgentAutoApprovalDesc:
     'Judges whether a tool call is out of scope or dangerous in auto-approval mode',
   reviewAgentGoalReview: 'Goal review agent',
@@ -583,40 +553,34 @@ export default {
   reviewAgentWorkflowReview: 'Workflow review agent',
   reviewAgentWorkflowReviewDesc:
     'Judges whether stage output meets the bar at workflow review nodes',
-  reviewModelEmptyDesc: 'Leave empty for automatic selection',
+  reviewModelEmptyDesc: 'Model used by the review agent',
   reviewDefaultModelDesc:
     'First available model in the registry; prefers a -luna fast model when only Codex models exist',
   titleModelTitle: 'Title generation model',
-  titleModelDesc:
-    'Choose the AI model used to generate conversation titles; leave empty for automatic selection',
+  titleModelDesc: 'Model used to generate titles',
   thinkingSummaryTitle: 'Thinking summaries',
-  thinkingSummaryDesc:
-    'Show brief thinking progress in minimal mode; Responses models use their native summaries',
+  thinkingSummaryDesc: 'Summarize what the model is thinking in one sentence',
   thinkingSummaryModelTitle: 'Thinking summary model',
-  thinkingSummaryModelDesc:
-    'Select a model before enabling; summaries use separate requests with thinking disabled',
+  thinkingSummaryModelDesc: 'Model used to summarize thinking',
   thinkingSummaryModelRequired: 'Select a model',
   thinkingSummaryIntervalTitle: 'Summary interval (seconds)',
-  thinkingSummaryIntervalDesc:
-    'Defaults to 20 seconds and requires 500 new characters; saved changes apply to the next task',
+  thinkingSummaryIntervalDesc: 'How often the thinking summary updates',
   externalSessionHeaderTitle: 'External session header',
-  externalSessionHeaderDesc:
-    'Send a stable per-conversation x-opencode-session header to OpenCode endpoints for session routing and cache optimization; disabled means no header is sent',
+  externalSessionHeaderDesc: 'Let OpenCode recognize requests from the same conversation',
   titleDefaultModelDesc:
     'First available model in the registry; prefers a -luna fast model when only Codex models exist',
   maxRoundsTitle: 'Max review rounds',
-  maxRoundsDesc:
-    'Applies the fallback when no conclusion is reached within this many rounds (1-50)',
+  maxRoundsDesc: 'Maximum rounds the review agent may take',
 
   // ── Admin ──
   mcpConfigTitle: 'MCP server management',
-  mcpConfigDesc: 'Configure MCP servers centrally to manage tool extensions',
+  mcpConfigDesc: 'Manage MCP servers available to agents',
   adminMonitorTitle: 'Admin monitor',
-  adminMonitorDesc: 'Quota trends, container status, project storage and upload security',
+  adminMonitorDesc: 'View quotas, containers, and storage usage',
   apiAdminTitle: 'API management',
-  apiAdminDesc: 'Manage API calls and account',
+  apiAdminDesc: 'Manage API credentials and accounts',
   customToolsAdminTitle: 'Custom tool management',
-  customToolsAdminDesc: 'Create and edit custom tool files online',
+  customToolsAdminDesc: 'Create and edit custom tools online',
   open: 'Open',
 
   // ── Alerts & errors (script: toast/confirm/Error) ──

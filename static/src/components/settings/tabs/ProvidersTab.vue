@@ -6,6 +6,9 @@ import { useProvidersStore } from '@/stores/providers';
 import type { ProviderCatalogEntry } from '@/stores/providers';
 import { useUiStore } from '@/stores/ui';
 import ProviderIcon from './providers/ProviderIcon.vue';
+import UiIconButton from '@/components/ui/UiIconButton.vue';
+import UiMenu from '@/components/ui/UiMenu.vue';
+import type { UiMenuItem } from '@/components/ui/UiMenu.vue';
 import ConnectDialog from './providers/ConnectDialog.vue';
 import CodexConnectDialog from './providers/CodexConnectDialog.vue';
 import CustomProviderDialog from './providers/CustomProviderDialog.vue';
@@ -129,34 +132,73 @@ const disconnect = async (entry: ProviderCatalogEntry) => {
 
 const busyOf = computed(() => busyMap.value);
 
-const formatSyncTime = (iso?: string | null): string => {
-  if (!iso) return '-';
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return String(iso);
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
 const isCredentialMissing = (entry: ProviderCatalogEntry): boolean =>
   entry.credential_missing === true ||
   entry.state === 'credential_missing' ||
   entry.connected === false;
 
 const connectedDesc = (entry: ProviderCatalogEntry): string => {
-  if (isCredentialMissing(entry)) {
-    const parts = [t('settings.providerCredentialMissing')];
-    if (entry.base_url) parts.push(entry.base_url);
-    return parts.join(' · ');
+  const busy = busyOf.value[entry.id];
+  let status: string;
+  if (busy === 'refresh') status = t('common.refreshing');
+  else if (busy === 'disconnect') status = t('settings.providerDisconnecting');
+  else if (isCredentialMissing(entry)) status = t('settings.providerCredentialMissing');
+  else if (typeof entry.models_count === 'number')
+    status = t('settings.providerModelsCount', { count: entry.models_count });
+  else status = t('settings.providerConnected');
+  return entry.base_url ? `${status} · ${entry.base_url}` : status;
+};
+
+// ── 已连接提供商的「⋯」操作菜单（刷新模型 / 断开）：每行右侧只保留一个按钮 ──
+const menuEntry = ref<ProviderCatalogEntry | null>(null);
+const menuAnchor = ref<HTMLElement | null>(null);
+
+const openMenu = (entry: ProviderCatalogEntry, event: MouseEvent) => {
+  if (menuEntry.value?.id === entry.id) {
+    menuEntry.value = null;
+    return;
   }
-  const parts = [entry.base_url];
-  if (entry.api_key_masked) {
-    parts.push(entry.api_key_masked);
-  }
-  if (entry.models_fetched_at) {
-    parts.push(t('settings.providerLastSync', { time: formatSyncTime(entry.models_fetched_at) }));
-  }
-  return parts.join(' · ');
+  menuAnchor.value = event.currentTarget as HTMLElement;
+  menuEntry.value = entry;
+};
+
+const closeMenu = (restoreFocus: boolean) => {
+  const anchor = menuAnchor.value;
+  menuEntry.value = null;
+  if (restoreFocus) anchor?.focus();
+};
+
+const menuItems = computed<UiMenuItem[]>(() => {
+  const entry = menuEntry.value;
+  if (!entry) return [];
+  const busy = !!busyOf.value[entry.id];
+  const missing = isCredentialMissing(entry);
+  return [
+    {
+      value: 'refresh',
+      label: t('settings.providerRefresh'),
+      icon: 'refresh-cw',
+      disabled: busy || missing
+    },
+    {
+      value: 'disconnect',
+      label: entry.custom
+        ? t('settings.providerDelete')
+        : missing
+          ? t('settings.providerRemoveAccount')
+          : t('settings.providerDisconnect'),
+      icon: entry.custom ? 'trash' : 'log-out',
+      danger: true,
+      disabled: busy
+    }
+  ];
+});
+
+const onMenuSelect = (value: string) => {
+  const entry = menuEntry.value;
+  if (!entry) return;
+  if (value === 'refresh') void refresh(entry);
+  else if (value === 'disconnect') void disconnect(entry);
 };
 
 onMounted(() => {
@@ -165,7 +207,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="settings-page">
+  <section class="stg-page">
     <div v-if="loading && !catalog.length" class="providers-state">{{ $t('common.loading') }}</div>
     <div v-else-if="loadError" class="providers-state providers-state--error">
       <span>{{ loadError }}</span>
@@ -177,7 +219,7 @@ onMounted(() => {
       <!-- 已连接 -->
       <div v-if="connectedEntries.length" class="providers-section">
         <div class="providers-section-title">{{ $t('settings.providersConnectedSection') }}</div>
-        <div class="providers-list">
+        <div class="stg-card providers-list">
           <div v-for="entry in connectedEntries" :key="entry.id" class="providers-row">
             <ProviderIcon :name="entry.name" :icon-url="entry.icon_url" :mono="!!entry.icon_mono" />
             <div class="providers-row__main">
@@ -213,64 +255,23 @@ onMounted(() => {
                   </span>
                 </span>
               </div>
-              <div class="providers-row__desc mono-url">{{ connectedDesc(entry) }}</div>
+              <div
+                class="providers-row__desc"
+                :class="{ 'is-warning': isCredentialMissing(entry) }"
+              >
+                {{ connectedDesc(entry) }}
+              </div>
               <div v-if="entry.models_error" class="providers-row__error">
                 {{ entry.models_error }}
               </div>
             </div>
-            <span
-              class="providers-status"
-              :class="{ 'providers-status--warning': isCredentialMissing(entry) }"
-              :title="
-                isCredentialMissing(entry)
-                  ? $t('settings.providerCredentialMissing')
-                  : $t('settings.providerConnected')
-              "
-            >
-              <span class="providers-status__dot" aria-hidden="true"></span>
-              <span v-if="isCredentialMissing(entry)" class="providers-status__count">
-                {{ $t('settings.providerCredentialMissing') }}
-              </span>
-              <span
-                v-else-if="typeof entry.models_count === 'number'"
-                class="providers-status__count"
-              >
-                {{ $t('settings.providerModelsCount', { count: entry.models_count }) }}
-              </span>
-              <span v-else class="providers-status__count">{{
-                $t('settings.providerConnected')
-              }}</span>
-            </span>
-            <button
-              type="button"
-              class="providers-btn"
-              :disabled="!!busyOf[entry.id] || isCredentialMissing(entry)"
-              @click="refresh(entry)"
-            >
-              {{
-                busyOf[entry.id] === 'refresh'
-                  ? $t('common.refreshing')
-                  : $t('settings.providerRefresh')
-              }}
-            </button>
-            <button
-              type="button"
-              class="providers-btn providers-btn--danger"
-              :disabled="!!busyOf[entry.id]"
-              @click="disconnect(entry)"
-            >
-              {{
-                busyOf[entry.id] === 'disconnect'
-                  ? entry.custom
-                    ? $t('settings.providerDeleting')
-                    : $t('settings.providerDisconnecting')
-                  : entry.custom
-                    ? $t('settings.providerDelete')
-                    : isCredentialMissing(entry)
-                      ? $t('settings.providerRemoveAccount')
-                      : $t('settings.providerDisconnect')
-              }}
-            </button>
+            <UiIconButton
+              icon="ellipsis"
+              :label="$t('settings.providerActions', { name: entry.name })"
+              :aria-expanded="menuEntry?.id === entry.id"
+              aria-haspopup="menu"
+              @click="openMenu(entry, $event)"
+            />
           </div>
         </div>
       </div>
@@ -279,7 +280,7 @@ onMounted(() => {
       <div class="providers-section">
         <div class="providers-section-title">{{ $t('settings.providersCatalogSection') }}</div>
         <div class="providers-section-desc">{{ $t('settings.providersCatalogDesc') }}</div>
-        <div class="providers-list">
+        <div class="stg-card providers-list">
           <div v-for="entry in catalogEntries" :key="entry.id" class="providers-row">
             <ProviderIcon :name="entry.name" :icon-url="entry.icon_url" :mono="!!entry.icon_mono" />
             <div class="providers-row__main">
@@ -346,6 +347,17 @@ onMounted(() => {
       </div>
     </template>
 
+    <UiMenu
+      :open="!!menuEntry"
+      :anchor="menuAnchor"
+      :items="menuItems"
+      actions
+      align-end
+      :label="menuEntry?.name"
+      @select="onMenuSelect"
+      @close="closeMenu"
+    />
+
     <!-- 弹窗 -->
     <ConnectDialog v-if="connectTarget" :entry="connectTarget" @close="connectTarget = null" />
     <CodexConnectDialog v-if="codexTarget" :entry="codexTarget" @close="codexTarget = null" />
@@ -355,9 +367,7 @@ onMounted(() => {
 
 <style scoped>
 .providers-state {
-  padding: 14px 2px;
-  border-top: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
+  padding: 14px 0;
   font-size: 13px;
   color: var(--text-tertiary);
   display: flex;
@@ -369,39 +379,43 @@ onMounted(() => {
   color: var(--state-danger);
 }
 
-.providers-section {
-  margin-bottom: 32px;
+.providers-section + .providers-section {
+  margin-top: 28px;
 }
 
+/* 分组小标题与说明：同设置页分组小标题（12/600），左缩进 16 与卡内文字对齐 */
 .providers-section-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
-  height: 22px;
-  line-height: 22px;
-  margin-bottom: 4px;
+  color: var(--text-secondary);
+  line-height: 24px;
+  padding: 0 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .providers-section-desc {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--text-tertiary);
-  margin-bottom: 12px;
+  padding: 0 16px;
 }
 
-/* ── 行式列表（分隔线，无卡片网格） ── */
+/* 列表卡片（DESIGN.md §6.9）：行间 2px；行内有按钮，整行不做 hover（§3 禁止 hover 套 hover）；
+   卡片左右内边距 6 + 行内边距 10 = 文字距卡片边 16 */
 .providers-list {
-  border-top: 1px solid var(--border-default);
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 4px 6px;
 }
 
 .providers-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 2px;
-  border-bottom: 1px solid var(--border-default);
+  padding: 10px;
   min-height: 64px;
 }
 
@@ -428,12 +442,16 @@ onMounted(() => {
 }
 
 .providers-row__desc {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
+}
+
+.providers-row__desc.is-warning {
+  color: var(--state-warning);
 }
 
 .providers-row__desc.mono-url {
@@ -497,45 +515,16 @@ onMounted(() => {
 }
 
 /* ── 右侧状态区 ── */
-.providers-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  flex-shrink: 0;
-}
-
-.providers-status__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--state-success);
-  flex-shrink: 0;
-}
-
-.providers-status__count {
-  font-size: 12px;
-  color: var(--state-success);
-  white-space: nowrap;
-}
-
-.providers-status--warning .providers-status__dot {
-  background: var(--state-warning);
-}
-
-.providers-status--warning .providers-status__count {
-  color: var(--state-warning);
-}
-
 /* ── 按钮（对齐设计稿 .btn.sm） ── */
 .providers-btn {
   height: 28px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
-  border: 1px solid var(--border-default);
+  font-weight: 500;
+  border: 0;
   color: var(--text-primary);
-  background: var(--surface-raised);
+  background: var(--surface-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -546,7 +535,7 @@ onMounted(() => {
 }
 
 .providers-btn:hover:not(:disabled) {
-  background: var(--surface-soft);
+  background: var(--surface-muted);
 }
 
 .providers-btn:disabled {

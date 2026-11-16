@@ -26,6 +26,9 @@ const status = ref<Record<string, any>>({});
 const proxyInput = ref('');
 const proxySaving = ref(false);
 const proxySaved = ref(false);
+// 已保存的代理值：输入与它不同时才出现「保存」
+const proxySavedValue = ref('');
+const proxyDirty = computed(() => proxyInput.value.trim() !== proxySavedValue.value);
 const usage = ref<Record<string, any> | null>(null);
 const usageError = ref('');
 const credits = ref<Record<string, any> | null>(null);
@@ -143,6 +146,7 @@ const fetchSettings = async () => {
     const data = await resp.json();
     if (data?.success) {
       proxyInput.value = data.proxy || '';
+      proxySavedValue.value = proxyInput.value;
     }
   } catch (_) {
     /* 代理设置读取失败不阻塞主界面 */
@@ -343,6 +347,7 @@ const saveProxy = async () => {
     const data = await resp.json();
     if (data?.success) {
       proxyInput.value = data.proxy || '';
+      proxySavedValue.value = proxyInput.value;
       proxySaved.value = true;
       setTimeout(() => (proxySaved.value = false), 2000);
     }
@@ -398,231 +403,228 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="settings-page">
-    <div
-      class="settings-section-desc"
-      style="margin: 0 0 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6"
-    >
-      {{ $t('personalization.codexIntro') }}
-    </div>
-
-    <div v-if="loading" class="settings-section-desc">
+  <section class="stg-page">
+    <div v-if="loading" class="stg-section-desc">
       {{ $t('personalization.loadingPersonalization') }}
     </div>
     <template v-else>
       <!-- 多账号查看选择器（仅影响本页查看，不影响运行对话） -->
       <template v-if="accounts.length">
-        <div class="settings-section-divider">
-          <span class="settings-section-divider__label">{{
-            $t('personalization.codexAccountSelectorTitle')
-          }}</span>
-        </div>
-        <div class="codex-account-bar">
-          <div ref="accountSelectRef" class="codex-account-select">
-            <button
-              type="button"
-              class="codex-account-select__button"
-              :aria-expanded="accountMenuOpen"
-              aria-haspopup="listbox"
-              @click.stop="accountMenuOpen = !accountMenuOpen"
-            >
-              <span class="codex-account-select__name">
-                {{ selectedAccount?.display_name || $t('personalization.codexNotConnected') }}
-              </span>
-              <span v-if="selectedAccount?.hash" class="codex-account-select__hash">
-                #{{ selectedAccount.hash }}
-              </span>
-              <svg
-                class="codex-account-select__chevron"
-                :class="{ 'codex-account-select__chevron--open': accountMenuOpen }"
-                width="12"
-                height="12"
-                viewBox="0 0 16 16"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M4 6l4 4 4-4"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </button>
-            <div v-if="accountMenuOpen" class="codex-account-menu" role="listbox">
+        <div class="stg-card">
+          <div class="stg-select-row">
+            <span class="stg-row-copy">
+              <span class="stg-row-title">{{
+                $t('personalization.codexAccountSelectorTitle')
+              }}</span>
+              <span class="stg-row-desc">{{ $t('personalization.codexAccountSelectorHint') }}</span>
+            </span>
+            <div ref="accountSelectRef" class="codex-account-select">
               <button
-                v-for="account in accounts"
-                :key="account.id"
                 type="button"
-                class="codex-account-menu__item"
-                :class="{ 'codex-account-menu__item--active': account.id === selectedAccountId }"
-                role="option"
-                :aria-selected="account.id === selectedAccountId"
-                @click.stop="selectAccount(account.id)"
+                class="codex-account-select__button"
+                :aria-expanded="accountMenuOpen"
+                aria-haspopup="listbox"
+                @click.stop="accountMenuOpen = !accountMenuOpen"
               >
-                <span class="codex-account-menu__main">
-                  <span class="codex-account-menu__name">{{ account.display_name }}</span>
-                  <span class="codex-account-menu__hash">#{{ account.hash }}</span>
+                <span class="codex-account-select__name">
+                  {{ selectedAccount?.display_name || $t('personalization.codexNotConnected') }}
                 </span>
-                <span v-if="account.is_primary" class="codex-account-menu__badge">
-                  {{ $t('personalization.codexAccountPrimaryBadge') }}
+                <span v-if="selectedAccount?.hash" class="codex-account-select__hash">
+                  #{{ selectedAccount.hash }}
                 </span>
+                <svg
+                  class="codex-account-select__chevron"
+                  :class="{ 'codex-account-select__chevron--open': accountMenuOpen }"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M4 6l4 4 4-4"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
               </button>
+              <div v-if="accountMenuOpen" class="codex-account-menu" role="listbox">
+                <button
+                  v-for="account in accounts"
+                  :key="account.id"
+                  type="button"
+                  class="codex-account-menu__item"
+                  :class="{ 'codex-account-menu__item--active': account.id === selectedAccountId }"
+                  role="option"
+                  :aria-selected="account.id === selectedAccountId"
+                  @click.stop="selectAccount(account.id)"
+                >
+                  <span class="codex-account-menu__main">
+                    <span class="codex-account-menu__name">{{ account.display_name }}</span>
+                    <span class="codex-account-menu__hash">#{{ account.hash }}</span>
+                  </span>
+                  <span v-if="account.is_primary" class="codex-account-menu__badge">
+                    {{ $t('personalization.codexAccountPrimaryBadge') }}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
-          <span class="codex-account-bar__hint">
-            {{ $t('personalization.codexAccountSelectorHint') }}
-          </span>
         </div>
       </template>
 
       <!-- 连接状态 -->
-      <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{
-          $t('personalization.codexStatusTitle')
-        }}</span>
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ $t('personalization.codexStatusTitle') }}</span>
       </div>
-      <div class="settings-input-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">
-            {{
-              connected
-                ? $t('personalization.codexConnected')
-                : $t('personalization.codexNotConnected')
-            }}
+      <div class="stg-card">
+        <div class="stg-input-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">
+              {{
+                connected
+                  ? $t('personalization.codexConnected')
+                  : $t('personalization.codexNotConnected')
+              }}
+            </span>
+            <span class="stg-row-desc">{{ statusLine }}</span>
           </span>
-          <span class="settings-row-desc">{{ statusLine }}</span>
-        </span>
-        <div v-if="!connected" class="settings-number-row">
-          <button type="button" @click="goToProviders">
-            {{ $t('personalization.codexManageInProviders') }}
-          </button>
+          <div v-if="!connected" class="stg-number-row">
+            <button type="button" @click="goToProviders">
+              {{ $t('personalization.codexManageInProviders') }}
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- 模型列表 -->
-      <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{
-          $t('personalization.codexModelsTitle')
-        }}</span>
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ $t('personalization.codexModelsTitle') }}</span>
       </div>
-      <div class="settings-input-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">
-            {{ $t('personalization.codexModelsRowTitle') }}
+      <div class="stg-card">
+        <div class="stg-input-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">
+              {{ $t('personalization.codexModelsRowTitle') }}
+            </span>
+            <span class="stg-row-desc">{{ modelsLine }}</span>
           </span>
-          <span class="settings-row-desc">{{ modelsLine }}</span>
-        </span>
+        </div>
       </div>
 
       <!-- 用量（wham/usage；仅已连接时显示） -->
       <template v-if="connected">
-        <div class="settings-section-divider">
-          <span class="settings-section-divider__label">{{
+        <div class="stg-section-divider">
+          <span class="stg-section-divider__label">{{
             $t('personalization.codexUsageTitle')
           }}</span>
         </div>
-        <div class="settings-input-row">
-          <span class="settings-row-copy">
-            <span class="settings-row-title">{{
-              usagePlanText || $t('personalization.codexUsageTitle')
-            }}</span>
-            <span class="settings-row-desc">
-              <template v-if="usageError">{{ usageError }}</template>
-              <template v-else-if="!usage">{{ $t('personalization.usageSyncing') }}</template>
+        <div class="stg-card">
+          <div class="stg-input-row">
+            <span class="stg-row-copy">
+              <span class="stg-row-title">{{
+                usagePlanText || $t('personalization.codexUsageTitle')
+              }}</span>
+              <span class="stg-row-desc">
+                <template v-if="usageError">{{ usageError }}</template>
+                <template v-else-if="!usage">{{ $t('personalization.usageSyncing') }}</template>
+              </span>
             </span>
-          </span>
-          <div class="settings-number-row">
-            <button
-              type="button"
-              :disabled="quotaStore.entries[selectedAccountId]?.loading"
-              @click="fetchUsage(true)"
-            >
-              {{ $t('personalization.usageRefresh') }}
-            </button>
-          </div>
-        </div>
-        <div v-if="usageWindows.length" class="codex-usage-windows">
-          <div v-for="w in usageWindows" :key="w.key" class="codex-usage-window">
-            <div class="codex-usage-window__head">
-              <span>{{ w.label }}</span>
-              <span
-                >{{ w.percent }}% ·
-                {{ $t('personalization.codexUsageResetIn', { time: w.resetText }) }}</span
+            <div class="stg-number-row">
+              <button
+                type="button"
+                :disabled="quotaStore.entries[selectedAccountId]?.loading"
+                @click="fetchUsage(true)"
               >
+                {{ $t('personalization.usageRefresh') }}
+              </button>
             </div>
-            <div class="codex-usage-bar">
-              <div
-                class="codex-usage-bar__fill"
-                :class="`codex-usage-bar__fill--${w.level}`"
-                :style="{ width: `${w.percent}%` }"
-              ></div>
+          </div>
+          <div v-if="usageWindows.length" class="codex-usage-windows">
+            <div v-for="w in usageWindows" :key="w.key" class="codex-usage-window">
+              <div class="codex-usage-window__head">
+                <span>{{ w.label }}</span>
+                <span
+                  >{{ w.percent }}% ·
+                  {{ $t('personalization.codexUsageResetIn', { time: w.resetText }) }}</span
+                >
+              </div>
+              <div class="codex-usage-bar">
+                <div
+                  class="codex-usage-bar__fill"
+                  :class="`codex-usage-bar__fill--${w.level}`"
+                  :style="{ width: `${w.percent}%` }"
+                ></div>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- 重置额度（banked resets：可用数 + 兑换 + 历史） -->
-        <div class="settings-section-divider">
-          <span class="settings-section-divider__label">{{
+        <div class="stg-section-divider">
+          <span class="stg-section-divider__label">{{
             $t('personalization.codexResetsTitle')
           }}</span>
         </div>
-        <div class="settings-input-row">
-          <span class="settings-row-copy">
-            <span class="settings-row-title">
-              {{ $t('personalization.codexResetsCount', { count: availableCredits.length }) }}
-            </span>
-            <span class="settings-row-desc">
-              <template v-if="creditsError">{{ creditsError }}</template>
-              <template v-else-if="!credits">{{ $t('personalization.usageSyncing') }}</template>
-              <template v-else-if="nextExpiryText">
-                {{ $t('personalization.codexResetsEarliestExpiry', { time: nextExpiryText }) }}
-              </template>
-              <template v-else>{{ $t('personalization.codexResetsNone') }}</template>
-            </span>
-          </span>
-        </div>
-        <div v-if="creditHistory.length" class="codex-credit-history">
-          <div v-for="c in creditHistory" :key="c.id" class="codex-credit-item">
-            <div class="codex-credit-item__main">
-              <span class="codex-credit-item__title">{{
-                c.title || $t('personalization.codexResetsTitle')
-              }}</span>
-              <span class="codex-credit-item__meta">
-                {{
-                  $t('personalization.codexResetGrantedAt', {
-                    time: formatCreditDate(c.granted_at)
-                  })
-                }}
-                <template v-if="c.redeemed_at">
-                  ·
-                  {{
-                    $t('personalization.codexResetRedeemedAt', {
-                      time: formatCreditDate(c.redeemed_at)
-                    })
-                  }}
-                </template>
-                <template v-else>
-                  ·
-                  {{
-                    $t('personalization.codexResetExpiresAt', {
-                      time: formatCreditDate(c.expires_at)
-                    })
-                  }}
-                </template>
+        <div class="stg-card">
+          <div class="stg-input-row">
+            <span class="stg-row-copy">
+              <span class="stg-row-title">
+                {{ $t('personalization.codexResetsCount', { count: availableCredits.length }) }}
               </span>
+              <span class="stg-row-desc">
+                <template v-if="creditsError">{{ creditsError }}</template>
+                <template v-else-if="!credits">{{ $t('personalization.usageSyncing') }}</template>
+                <template v-else-if="nextExpiryText">
+                  {{ $t('personalization.codexResetsEarliestExpiry', { time: nextExpiryText }) }}
+                </template>
+                <template v-else>{{ $t('personalization.codexResetsNone') }}</template>
+              </span>
+            </span>
+          </div>
+          <div v-if="creditHistory.length" class="codex-credit-history">
+            <div v-for="c in creditHistory" :key="c.id" class="codex-credit-item">
+              <div class="codex-credit-item__main">
+                <span class="codex-credit-item__title">{{
+                  c.title || $t('personalization.codexResetsTitle')
+                }}</span>
+                <span class="codex-credit-item__meta">
+                  {{
+                    $t('personalization.codexResetGrantedAt', {
+                      time: formatCreditDate(c.granted_at)
+                    })
+                  }}
+                  <template v-if="c.redeemed_at">
+                    ·
+                    {{
+                      $t('personalization.codexResetRedeemedAt', {
+                        time: formatCreditDate(c.redeemed_at)
+                      })
+                    }}
+                  </template>
+                  <template v-else>
+                    ·
+                    {{
+                      $t('personalization.codexResetExpiresAt', {
+                        time: formatCreditDate(c.expires_at)
+                      })
+                    }}
+                  </template>
+                </span>
+              </div>
+              <button
+                v-if="creditStatusKey(c) === 'personalization.codexResetStatusAvailable'"
+                type="button"
+                class="codex-credit-item__action"
+                :disabled="consumeBusy"
+                @click="consumeReset(c)"
+              >
+                {{ $t('personalization.codexResetsUseNow') }}
+              </button>
+              <span v-else class="codex-credit-item__status">{{ $t(creditStatusKey(c)) }}</span>
             </div>
-            <button
-              v-if="creditStatusKey(c) === 'personalization.codexResetStatusAvailable'"
-              type="button"
-              class="codex-credit-item__action"
-              :disabled="consumeBusy"
-              @click="consumeReset(c)"
-            >
-              {{ $t('personalization.codexResetsUseNow') }}
-            </button>
-            <span v-else class="codex-credit-item__status">{{ $t(creditStatusKey(c)) }}</span>
           </div>
         </div>
 
@@ -631,26 +633,34 @@ onMounted(async () => {
       </template>
 
       <!-- 代理设置 -->
-      <div class="settings-section-divider">
-        <span class="settings-section-divider__label">{{
-          $t('personalization.codexProxyTitle')
-        }}</span>
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ $t('personalization.codexProxyTitle') }}</span>
       </div>
-      <div class="settings-input-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.codexProxyRowTitle') }}</span>
-          <span class="settings-row-desc">{{ $t('personalization.codexProxyDesc') }}</span>
-        </span>
-        <div class="settings-number-row codex-proxy-row">
-          <input
-            v-model="proxyInput"
-            type="text"
-            :placeholder="$t('personalization.codexProxyPlaceholder')"
-            spellcheck="false"
-          />
-          <button type="button" :disabled="proxySaving" @click="saveProxy">
-            {{ proxySaved ? $t('personalization.codexProxySaved') : $t('common.save') }}
-          </button>
+      <div class="stg-card">
+        <div class="stg-textarea-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('personalization.codexProxyRowTitle') }}</span>
+            <span class="stg-row-desc">{{ $t('personalization.codexProxyDesc') }}</span>
+          </span>
+          <div class="stg-field">
+            <input
+              v-model="proxyInput"
+              type="text"
+              :placeholder="$t('personalization.codexProxyPlaceholder')"
+              :aria-label="$t('personalization.codexProxyRowTitle')"
+              spellcheck="false"
+              @keydown.enter.prevent="proxyDirty && saveProxy()"
+            />
+            <button
+              v-if="proxyDirty || proxySaved"
+              type="button"
+              class="stg-field-action is-text"
+              :disabled="proxySaving || !proxyDirty"
+              @click="saveProxy"
+            >
+              {{ proxySaved ? $t('personalization.codexProxySaved') : $t('common.save') }}
+            </button>
+          </div>
         </div>
       </div>
     </template>
@@ -658,19 +668,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.codex-proxy-row input {
-  min-width: 220px;
-}
-
 /* ── 多账号查看选择器 ── */
-.codex-account-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 16px;
-}
-
 .codex-account-select {
   position: relative;
   flex: 0 0 auto;
@@ -683,9 +681,9 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--theme-control-border);
-  border-radius: 6px;
-  background: var(--surface-raised);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
@@ -696,8 +694,8 @@ onMounted(async () => {
 }
 
 .codex-account-select__button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 2px;
 }
 
 .codex-account-select__name {
@@ -793,14 +791,6 @@ onMounted(async () => {
   line-height: 16px;
 }
 
-.codex-account-bar__hint {
-  flex: 1 1 220px;
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-tertiary);
-}
-
 .codex-usage-windows {
   display: flex;
   flex-direction: column;
@@ -853,11 +843,6 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-top: 1px solid var(--border-default);
-}
-
-.codex-credit-item:first-child {
-  border-top: none;
 }
 
 .codex-credit-item__main {
@@ -888,18 +873,19 @@ onMounted(async () => {
 
 .codex-credit-item__action {
   flex-shrink: 0;
-  border: 1px solid var(--theme-control-border);
-  border-radius: 999px;
-  padding: 5px 14px;
-  background: transparent;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--surface-soft);
   color: var(--text-primary);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .codex-credit-item__action:hover:not(:disabled) {
-  background: var(--hover-bg);
+  background: var(--surface-muted);
 }
 
 .codex-credit-item__action:disabled {

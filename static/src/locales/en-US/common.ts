@@ -31,7 +31,7 @@ export default {
   settings: 'Settings',
   back: 'Back',
   settingsLanguage: 'Language',
-  settingsLanguageDesc: 'Choose the display language',
+  settingsLanguageDesc: 'Language used for interface text',
 
   // ── Relative time (merged from chat/adminApi duplicates) ──
   justNow: 'Just now',

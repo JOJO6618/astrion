@@ -49,6 +49,7 @@ export default {
   installNow: 'Install Now',
   later: 'Not Now',
   neverAgain: "Don't ask again",
+  neverAgainTitle: 'Sandbox setup prompt',
   rebootDone: 'I have rebooted, continue setup',
   uacCancelledHint:
     'Administrator approval was cancelled. Enabling WSL2 requires administrator permission; please retry and choose "Yes" in the system prompt.',
@@ -59,8 +60,7 @@ export default {
   sectionMissing: 'Not installed',
   sectionChecking: 'Checking...',
   sectionUnavailable: 'Not applicable in this environment',
-  sectionDesc:
-    'Windows uses WSL2; Linux isolates commands through an administrator-installed helper.',
+  sectionDesc: 'WSL2 on Windows; a restricted helper on Linux',
   linuxIntro:
     'Install system dependencies and a restricted helper. Astrion and commands still run as an ordinary OS user.',
   linuxNetwork:

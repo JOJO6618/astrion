@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue';
+import { computed, ref } from 'vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
 import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
 import { formatBytes, parseTimestamp } from './format';
@@ -9,10 +10,6 @@ const props = defineProps<{ data: StorageData }>();
 const emit = defineEmits<{ (e: 'cleaned'): void }>();
 
 const uiStore = useUiStore();
-/** 下拉沿用设置页共享上下文（与其它分区同一套浮层定位与外部点击关闭） */
-const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const { activeDropdown, activeTheme, closeDropdown, floatingMenuStyle, toggleDropdown } = ctx;
-
 const KEEP_PRESETS = [7, 30, 90];
 const DEFAULT_KEEP_DAYS = 30;
 
@@ -23,14 +20,12 @@ const customError = ref('');
 const backupRunning = ref(false);
 const logsRunning = ref(false);
 
-const keepText = computed(() => t('storageStats.keepDays', { n: keepDays.value }));
-
 const keepOptions = computed(() => [
   ...KEEP_PRESETS.map((days) => ({
-    id: String(days),
+    value: String(days),
     label: t('storageStats.keepDays', { n: days })
   })),
-  { id: 'custom', label: t('storageStats.keepCustom') }
+  { value: 'custom', label: t('storageStats.keepCustom') }
 ]);
 
 const logsBytes = computed(
@@ -62,7 +57,6 @@ function pickKeep(id: string) {
     customMode.value = false;
     customError.value = '';
   }
-  closeDropdown();
 }
 
 function applyCustom(strict = true) {
@@ -183,98 +177,69 @@ async function runCleanLogs() {
 
 <template>
   <section class="storage-clean">
-    <div class="storage-clean-head">
-      <h3>{{ $t('storageStats.cleanupTitle') }}</h3>
-      <p>{{ $t('storageStats.cleanupDesc') }}</p>
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('storageStats.cleanupTitle') }}</span>
     </div>
 
-    <!-- 对话备份 -->
-    <div class="storage-clean-row">
-      <div class="storage-clean-info">
-        <div class="storage-clean-title">{{ $t('storageStats.backupRowTitle') }}</div>
-        <div class="storage-clean-desc">{{ $t('storageStats.backupRowDesc') }}</div>
-        <div class="storage-clean-hint" :class="{ 'is-empty': pending.count === 0 }">
-          {{
+    <!-- 对话备份：保留时长（下拉 / 自定义天数）与清理拆成两行，每行右侧只有一个控件 -->
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('storageStats.keepRowTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('storageStats.keepRowDesc') }}</span>
+        </span>
+        <input
+          v-if="customMode"
+          v-model="customInput"
+          class="stg-number-input"
+          type="text"
+          inputmode="numeric"
+          :placeholder="$t('storageStats.customPlaceholder')"
+          :aria-label="$t('storageStats.keepRowTitle')"
+          @keydown.enter.prevent="applyCustom(true)"
+          @keydown.esc="applyCustom(false)"
+          @blur="applyCustom(false)"
+        />
+        <UiSelect
+          v-else
+          :model-value="String(keepDays)"
+          :options="keepOptions"
+          align-end
+          @update:model-value="pickKeep"
+        />
+      </div>
+      <p v-if="customError" class="storage-custom-error">{{ customError }}</p>
+
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('storageStats.backupRowTitle') }}</span>
+          <span class="stg-row-desc">{{
             pending.count > 0
               ? $t('storageStats.willRemove', {
                   count: pending.count,
                   size: formatBytes(pending.bytes)
                 })
               : $t('storageStats.nothingToRemove')
-          }}
-        </div>
-      </div>
-      <div class="storage-clean-actions" @click.stop>
-        <div v-if="customMode" class="storage-custom">
-          <input
-            v-model="customInput"
-            class="storage-custom-input"
-            type="text"
-            inputmode="numeric"
-            :placeholder="$t('storageStats.customPlaceholder')"
-            @keydown.enter.prevent="applyCustom(true)"
-            @keydown.esc="applyCustom(false)"
-            @blur="applyCustom(false)"
-          />
-          <span class="storage-custom-unit">{{ $t('storageStats.keepDaysUnit') }}</span>
-        </div>
-        <div
-          v-else
-          class="settings-select-wrap"
-          :class="{ open: activeDropdown === 'storage-keep' }"
-        >
-          <button
-            type="button"
-            class="settings-select-button storage-select-button"
-            @click="toggleDropdown('storage-keep')"
-          >
-            <span class="storage-ellipsis">
-              {{ $t('storageStats.keepLabel') }} {{ keepText }}
-            </span>
-            <span class="select-chevron" aria-hidden="true"></span>
-          </button>
-          <div
-            class="settings-floating-menu"
-            :class="{ dark: activeTheme === 'dark' }"
-            :style="activeDropdown === 'storage-keep' ? floatingMenuStyle : undefined"
-          >
-            <button
-              v-for="option in keepOptions"
-              :key="option.id"
-              type="button"
-              class="settings-menu-option"
-              :class="{ selected: option.id === String(keepDays) }"
-              @click="pickKeep(option.id)"
-            >
-              <strong>{{ option.label }}</strong>
-              <svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-            </button>
-          </div>
-        </div>
+          }}</span>
+        </span>
         <button
           type="button"
-          class="storage-danger-button"
+          class="stg-secondary-button danger"
           :disabled="backupRunning || pending.count === 0"
           @click="runCleanBackups"
         >
           {{ backupRunning ? $t('storageStats.cleaning') : $t('storageStats.cleanButton') }}
         </button>
       </div>
-    </div>
 
-    <p v-if="customError" class="storage-custom-error">{{ customError }}</p>
-
-    <!-- 日志 -->
-    <div class="storage-clean-row">
-      <div class="storage-clean-info">
-        <div class="storage-clean-title">{{ $t('storageStats.logRowTitle') }}</div>
-        <div class="storage-clean-desc">{{ $t('storageStats.logRowDesc') }}</div>
-        <div class="storage-clean-hint">{{ formatBytes(logsBytes) }}</div>
-      </div>
-      <div class="storage-clean-actions">
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('storageStats.logRowTitle') }}</span>
+          <span class="stg-row-desc">{{ formatBytes(logsBytes) }}</span>
+        </span>
         <button
           type="button"
-          class="storage-danger-button"
+          class="stg-secondary-button danger"
           :disabled="logsRunning || logsBytes === 0"
           @click="runCleanLogs"
         >
@@ -288,137 +253,11 @@ async function runCleanLogs() {
 <style scoped>
 .storage-clean {
   margin-top: 10px;
-  padding-top: 22px;
-  border-top: 1px solid var(--border-default);
-}
-
-.storage-clean-head h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.storage-clean-head p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-tertiary);
-}
-
-.storage-clean-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  flex-wrap: wrap;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border-default);
-}
-
-.storage-clean-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.storage-clean-title {
-  font-size: 13px;
-}
-
-.storage-clean-desc {
-  margin-top: 3px;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-tertiary);
-}
-
-.storage-clean-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.storage-clean-hint.is-empty {
-  color: var(--text-tertiary);
-}
-
-.storage-clean-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.storage-select-button {
-  min-width: 136px;
-  border: 1px solid var(--border-default);
-}
-
-.storage-ellipsis {
-  max-width: 170px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.storage-custom {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.storage-custom-input {
-  width: 76px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--surface-base);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.storage-custom-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.storage-custom-unit {
-  font-size: 12px;
-  color: var(--text-tertiary);
 }
 
 .storage-custom-error {
-  margin: 8px 0 0;
+  margin: 0 0 8px;
   font-size: 12px;
   color: var(--state-danger);
-}
-
-.storage-danger-button {
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--surface-base);
-  color: var(--state-danger);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.storage-danger-button:hover:not(:disabled) {
-  background: var(--hover-bg);
-}
-
-.storage-danger-button:disabled {
-  color: var(--text-muted);
-  cursor: default;
-}
-
-.storage-danger-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 </style>

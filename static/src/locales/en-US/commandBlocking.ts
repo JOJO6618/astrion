@@ -3,12 +3,8 @@
 export default {
   // ── Settings row (GeneralTab) ──
   settingsTitle: 'Command blocking',
-  settingsDesc:
-    'When enabled, commands containing a blocking rule are stopped before execution. ' +
-    'Rules are personal and apply to all of your workspaces.',
-  settingsDescProject:
-    'When enabled, commands containing a blocking rule are stopped before execution. ' +
-    'Rules are personal and apply to all of your projects.',
+  settingsDesc: 'Stop agents from running commands that match your rules',
+  settingsDescProject: 'Stop agents from running commands that match your rules',
   manageRules: 'Manage rules',
 
   // ── Rules dialog (CommandBlockingDialog) ──
@@ -21,6 +17,7 @@ export default {
   sharedHint: 'Rules are personal and shared across all of your workspaces.',
   sharedHintProject: 'Rules are personal and shared across all of your projects.',
   rulesLabel: 'Blocking rules',
+  rulesDesc: 'Which command content gets blocked',
   rulesPlaceholder: 'One rule per line, e.g. rm -rf',
   useRecommended: 'Use recommended rules',
   recommendedHint:

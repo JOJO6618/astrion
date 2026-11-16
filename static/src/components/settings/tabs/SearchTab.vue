@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, reactive, unref, ref, watch } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
+import UiIcon from '@/components/ui/UiIcon.vue';
+import { t } from '@/locales';
 import { useSettingsStore } from '@/stores/settings';
 
 defineOptions({ name: 'SearchTab' });
@@ -10,8 +13,7 @@ defineOptions({ name: 'SearchTab' });
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const { form, personalization, activeDropdown, activeTheme, floatingMenuStyle, toggleDropdown } =
-  ctx;
+const { form, personalization } = ctx;
 
 const settingsStore = useSettingsStore();
 /** 服务端密钥可见性：host 单机模式不受限；docker/web 多用户模式仅管理员可见
@@ -35,13 +37,12 @@ const currentProvider = computed(() => {
   const value = String((unref(form) as any)?.search_provider || 'tavily');
   return providerOptions.some((o) => o.id === value) ? value : 'tavily';
 });
-const currentProviderOption = computed(
-  () => providerOptions.find((o) => o.id === currentProvider.value) || providerOptions[0]
+const providerItems = computed(() =>
+  providerOptions.map((option) => ({ value: option.id, label: t(option.labelKey) }))
 );
 
 const selectProvider = (id: string) => {
   personalization.updateField({ key: 'search_provider', value: id });
-  toggleDropdown('searchProvider');
 };
 
 /* ---------- 网页提取方式选择（白名单直提之后的云端提取商） ---------- */
@@ -56,15 +57,12 @@ const currentExtractProvider = computed(() => {
   const value = String((unref(form) as any)?.webpage_extract_provider || 'jina');
   return extractProviderOptions.some((o) => o.id === value) ? value : 'jina';
 });
-const currentExtractProviderOption = computed(
-  () =>
-    extractProviderOptions.find((o) => o.id === currentExtractProvider.value) ||
-    extractProviderOptions[0]
+const extractProviderItems = computed(() =>
+  extractProviderOptions.map((option) => ({ value: option.id, label: t(option.labelKey) }))
 );
 
 const selectExtractProvider = (id: string) => {
   personalization.updateField({ key: 'webpage_extract_provider', value: id });
-  toggleDropdown('extractProvider');
 };
 
 /* ---------- 凭证输入（当前服务商密钥 / SearXNG 地址 / Jina 密钥通用草稿机制） ---------- */
@@ -195,70 +193,67 @@ const removeDirectDomain = (domain: string) => {
 </script>
 
 <template>
-  <section class="settings-page">
-    <!-- 搜索引擎选择 + 当前服务商凭证（docker/web 模式仅管理员可见） -->
-    <div v-if="canEditSearchKeys" class="settings-group-block">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{ $t('personalization.searchProviderTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.searchProviderDesc') }}</span>
-      </div>
-      <div class="settings-select-row">
-        <span class="settings-row-copy"
-          ><span class="settings-row-title">{{ $t(currentProviderOption.labelKey) }}</span></span
-        >
-        <div
-          class="settings-select-wrap"
-          :class="{ open: activeDropdown === 'searchProvider' }"
-          @click.stop
-        >
-          <button
-            type="button"
-            class="settings-select-button"
-            @click="toggleDropdown('searchProvider')"
+  <section class="stg-page">
+    <!-- 搜索引擎 + 当前服务商凭证（docker/web 模式仅管理员可见） -->
+    <template v-if="canEditSearchKeys">
+      <div class="stg-card">
+        <div class="stg-select-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ $t('personalization.searchProviderTitle') }}</span
+            ><span class="stg-row-desc">{{ $t('personalization.searchProviderDesc') }}</span></span
           >
-            {{ $t(currentProviderOption.labelKey) }}
-            <span class="select-chevron" aria-hidden="true"></span>
-          </button>
-          <div
-            :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-            :style="activeDropdown ? floatingMenuStyle : undefined"
+          <UiSelect
+            :model-value="currentProvider"
+            :options="providerItems"
+            align-end
+            @update:model-value="selectProvider"
+          />
+        </div>
+        <div class="stg-textarea-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ $t(currentCredential.titleKey) }}</span
+            ><span class="stg-row-desc">{{
+              providerCredential.hasValue.value
+                ? $t(currentCredential.statusCustomKey)
+                : $t(currentCredential.statusEnvKey)
+            }}</span></span
           >
-            <button
-              v-for="option in providerOptions"
-              :key="option.id"
-              type="button"
-              class="settings-menu-option"
-              :class="{ selected: currentProvider === option.id }"
-              @click="selectProvider(option.id)"
-            >
-              <strong>{{ $t(option.labelKey) }}</strong
-              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 当前搜索引擎的密钥 / 实例地址 -->
-      <div class="settings-credential-block">
-        <div class="settings-group-title">
-          <span class="settings-row-title">{{ $t(currentCredential.titleKey) }}</span
-          ><span class="settings-row-desc">{{ $t(currentCredential.descKey) }}</span>
-        </div>
-        <div class="settings-add-row">
-          <div class="settings-key-input-wrap">
+          <div class="stg-field">
             <input
               v-model="providerCredential.state.draft"
               :type="providerCredential.state.visible ? 'text' : 'password'"
               :placeholder="$t(currentCredential.placeholderKey)"
+              :aria-label="$t(currentCredential.titleKey)"
               autocomplete="off"
               spellcheck="false"
               @input="providerCredential.state.dirty = true"
               @keydown.enter="providerCredential.save"
             />
             <button
+              v-if="providerCredential.state.dirty"
               type="button"
-              class="settings-key-toggle"
-              :class="{ active: providerCredential.state.visible }"
+              class="stg-field-action is-text"
+              @click="providerCredential.save"
+            >
+              {{ $t('common.save') }}
+            </button>
+            <button
+              v-else-if="providerCredential.hasValue.value"
+              type="button"
+              class="stg-field-action is-text"
+              @click="providerCredential.clear"
+            >
+              {{ $t('personalization.tavilyApiKeyClear') }}
+            </button>
+            <button
+              type="button"
+              class="stg-field-action"
+              :class="{ 'is-active': providerCredential.state.visible }"
+              :aria-label="
+                providerCredential.state.visible
+                  ? $t('personalization.tavilyApiKeyHide')
+                  : $t('personalization.tavilyApiKeyShow')
+              "
               :title="
                 providerCredential.state.visible
                   ? $t('personalization.tavilyApiKeyHide')
@@ -266,96 +261,71 @@ const removeDirectDomain = (domain: string) => {
               "
               @click="providerCredential.state.visible = !providerCredential.state.visible"
             >
-              <span class="icon icon-eye" aria-hidden="true"></span>
-            </button>
-          </div>
-          <button type="button" class="settings-secondary-button" @click="providerCredential.save">
-            {{ $t('common.save') }}
-          </button>
-          <button
-            v-if="providerCredential.hasValue.value"
-            type="button"
-            class="settings-secondary-button"
-            @click="providerCredential.clear"
-          >
-            {{ $t('personalization.tavilyApiKeyClear') }}
-          </button>
-        </div>
-        <div class="settings-row-desc settings-key-status">
-          {{
-            providerCredential.hasValue.value
-              ? $t(currentCredential.statusCustomKey)
-              : $t(currentCredential.statusEnvKey)
-          }}
-        </div>
-      </div>
-    </div>
-
-    <!-- 网页提取方式（本地直提之后的云端提取商；docker/web 模式仅管理员可见） -->
-    <div v-if="canEditSearchKeys" class="settings-group-block">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{ $t('personalization.extractProviderTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.extractProviderDesc') }}</span>
-      </div>
-      <div class="settings-select-row">
-        <span class="settings-row-copy"
-          ><span class="settings-row-title">{{
-            $t(currentExtractProviderOption.labelKey)
-          }}</span></span
-        >
-        <div
-          class="settings-select-wrap"
-          :class="{ open: activeDropdown === 'extractProvider' }"
-          @click.stop
-        >
-          <button
-            type="button"
-            class="settings-select-button"
-            @click="toggleDropdown('extractProvider')"
-          >
-            {{ $t(currentExtractProviderOption.labelKey) }}
-            <span class="select-chevron" aria-hidden="true"></span>
-          </button>
-          <div
-            :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-            :style="activeDropdown ? floatingMenuStyle : undefined"
-          >
-            <button
-              v-for="option in extractProviderOptions"
-              :key="option.id"
-              type="button"
-              class="settings-menu-option"
-              :class="{ selected: currentExtractProvider === option.id }"
-              @click="selectExtractProvider(option.id)"
-            >
-              <strong>{{ $t(option.labelKey) }}</strong
-              ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
+              <UiIcon name="eye" />
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Jina 密钥（仅当选定 Jina 时显示；匿名可用故为可选项） -->
-      <div v-if="currentExtractProvider === 'jina'" class="settings-credential-block">
-        <div class="settings-group-title">
-          <span class="settings-row-title">{{ $t('personalization.jinaApiKeyTitle') }}</span
-          ><span class="settings-row-desc">{{ $t('personalization.jinaApiKeyDesc') }}</span>
+      <!-- 网页提取方式（本地直提之后的云端提取商） -->
+      <div class="stg-card">
+        <div class="stg-select-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ $t('personalization.extractProviderTitle') }}</span
+            ><span class="stg-row-desc">{{ $t('personalization.extractProviderDesc') }}</span></span
+          >
+          <UiSelect
+            :model-value="currentExtractProvider"
+            :options="extractProviderItems"
+            align-end
+            @update:model-value="selectExtractProvider"
+          />
         </div>
-        <div class="settings-add-row">
-          <div class="settings-key-input-wrap">
+        <div v-if="currentExtractProvider === 'jina'" class="stg-textarea-row">
+          <span class="stg-row-copy"
+            ><span class="stg-row-title">{{ $t('personalization.jinaApiKeyTitle') }}</span
+            ><span class="stg-row-desc">{{
+              jinaCredential.hasValue.value
+                ? $t('personalization.tavilyApiKeyStatusCustom')
+                : $t('personalization.jinaApiKeyStatusAnonymous')
+            }}</span></span
+          >
+          <div class="stg-field">
             <input
               v-model="jinaCredential.state.draft"
               :type="jinaCredential.state.visible ? 'text' : 'password'"
               :placeholder="$t('personalization.jinaApiKeyPlaceholder')"
+              :aria-label="$t('personalization.jinaApiKeyTitle')"
               autocomplete="off"
               spellcheck="false"
               @input="jinaCredential.state.dirty = true"
               @keydown.enter="jinaCredential.save"
             />
             <button
+              v-if="jinaCredential.state.dirty"
               type="button"
-              class="settings-key-toggle"
-              :class="{ active: jinaCredential.state.visible }"
+              class="stg-field-action is-text"
+              @click="jinaCredential.save"
+            >
+              {{ $t('common.save') }}
+            </button>
+            <button
+              v-else-if="jinaCredential.hasValue.value"
+              type="button"
+              class="stg-field-action is-text"
+              @click="jinaCredential.clear"
+            >
+              {{ $t('personalization.tavilyApiKeyClear') }}
+            </button>
+            <button
+              type="button"
+              class="stg-field-action"
+              :class="{ 'is-active': jinaCredential.state.visible }"
+              :aria-label="
+                jinaCredential.state.visible
+                  ? $t('personalization.tavilyApiKeyHide')
+                  : $t('personalization.tavilyApiKeyShow')
+              "
               :title="
                 jinaCredential.state.visible
                   ? $t('personalization.tavilyApiKeyHide')
@@ -363,41 +333,27 @@ const removeDirectDomain = (domain: string) => {
               "
               @click="jinaCredential.state.visible = !jinaCredential.state.visible"
             >
-              <span class="icon icon-eye" aria-hidden="true"></span>
+              <UiIcon name="eye" />
             </button>
           </div>
-          <button type="button" class="settings-secondary-button" @click="jinaCredential.save">
-            {{ $t('common.save') }}
-          </button>
-          <button
-            v-if="jinaCredential.hasValue.value"
-            type="button"
-            class="settings-secondary-button"
-            @click="jinaCredential.clear"
-          >
-            {{ $t('personalization.tavilyApiKeyClear') }}
-          </button>
-        </div>
-        <div class="settings-row-desc settings-key-status">
-          {{
-            jinaCredential.hasValue.value
-              ? $t('personalization.tavilyApiKeyStatusCustom')
-              : $t('personalization.jinaApiKeyStatusAnonymous')
-          }}
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- 网页直提白名单（自工具页迁入） -->
-    <div class="settings-group-block">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{ $t('personalization.webDirectExtractTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.webDirectExtractDesc') }}</span>
+    <div class="stg-card stg-group-block">
+      <div class="stg-group-title">
+        <span class="stg-row-title">{{ $t('personalization.webDirectExtractTitle') }}</span
+        ><span class="stg-row-desc">{{ $t('personalization.webDirectExtractDesc') }}</span>
       </div>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{
-          $t('personalization.webDirectExtractEnabledTitle')
-        }}</span
+      <label class="stg-toggle-row inner"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{
+            $t('personalization.webDirectExtractEnabledTitle')
+          }}</span
+          ><span class="stg-row-desc">{{
+            $t('personalization.webDirectExtractEnabledDesc')
+          }}</span></span
         ><input
           type="checkbox"
           :checked="form.webpage_direct_extract_enabled"
@@ -406,35 +362,38 @@ const removeDirectDomain = (domain: string) => {
               key: 'webpage_direct_extract_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.webpage_direct_extract_enabled"
+          " /><UiSwitch decorative :checked="form.webpage_direct_extract_enabled"
       /></label>
       <template v-if="form.webpage_direct_extract_enabled">
-        <div class="settings-domain-list">
-          <div class="settings-domain-row">
-            <span class="settings-row-title">github.com</span
-            ><span class="settings-domain-badge">{{
+        <div class="stg-domain-list">
+          <div class="stg-domain-row">
+            <span class="stg-row-title">github.com</span
+            ><span class="stg-domain-badge">{{
               $t('personalization.webDirectExtractBuiltinBadge')
             }}</span>
           </div>
-          <div v-for="domain in directExtractDomains()" :key="domain" class="settings-domain-row">
-            <span class="settings-row-title">{{ domain }}</span
-            ><button
-              type="button"
-              class="settings-domain-remove"
-              @click="removeDirectDomain(domain)"
-            >
+          <div v-for="domain in directExtractDomains()" :key="domain" class="stg-domain-row">
+            <span class="stg-row-title">{{ domain }}</span
+            ><button type="button" class="stg-domain-remove" @click="removeDirectDomain(domain)">
               {{ $t('common.delete') }}
             </button>
           </div>
         </div>
-        <div class="settings-add-row">
+        <div class="stg-field stg-domain-add">
           <input
             v-model="newDirectDomain"
             type="text"
             :placeholder="$t('personalization.webDirectExtractDomainPlaceholder')"
+            :aria-label="$t('personalization.webDirectExtractDomainPlaceholder')"
+            spellcheck="false"
             @keydown.enter="addDirectDomain"
           />
-          <button type="button" class="settings-secondary-button" @click="addDirectDomain">
+          <button
+            v-if="newDirectDomain.trim()"
+            type="button"
+            class="stg-field-action is-text"
+            @click="addDirectDomain"
+          >
             {{ $t('personalization.webDirectExtractAdd') }}
           </button>
         </div>
@@ -444,72 +403,8 @@ const removeDirectDomain = (domain: string) => {
 </template>
 
 <style scoped>
-/* 密钥输入框：密码框 + 内嵌眼睛切换按钮 */
-.settings-key-input-wrap {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
-.settings-key-input-wrap input {
-  width: 100%;
-  padding-right: 34px;
-}
-
-.settings-key-toggle {
-  position: absolute;
-  right: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.settings-key-toggle:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg);
-}
-
-.settings-key-toggle .icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-  background: currentColor;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-}
-
-.settings-key-toggle .icon-eye {
-  -webkit-mask-image: url('/static/icons/eye.svg');
-  mask-image: url('/static/icons/eye.svg');
-}
-
-/* 明文可见状态：眼睛图标用主色高亮区分 */
-.settings-key-toggle.active {
-  color: var(--text-primary);
-  background: var(--hover-bg);
-}
-
-.settings-key-status {
-  margin-top: 6px;
-  font-size: 12px;
-}
-
-/* 当前服务商凭证区：与上方选择器保持间距，不再额外包卡片 */
-.settings-credential-block {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-default);
+/* 卡片最后一个元素：到卡片底边 16（12 + 卡片 4），与左右距离一致 */
+.stg-domain-add {
+  margin: 4px 0 12px;
 }
 </style>

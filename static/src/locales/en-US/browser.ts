@@ -224,15 +224,14 @@ export default {
   aiSettingsTitle: 'Browser',
   aiSettingsDesc: 'Defaults for the agent using the built-in browser (macOS desktop only).',
   aiDefaultOn: 'Enable browser tools in new conversations',
-  aiDefaultOnDesc: 'When off, turn it on per conversation from the + menu in the input bar.',
+  aiDefaultOnDesc: 'Whether agents can use the browser in new chats',
   aiAutoOpen: 'Open the browser panel when the agent operates it',
-  aiAutoOpenDesc: 'Only for the conversation you are viewing.',
+  aiAutoOpenDesc: 'Show the browser panel when the agent uses the browser',
   aiDownloadDir: 'Agent download folder',
-  aiDownloadDirDesc:
-    'Empty uses .astrion/browser_downloads/ in the workspace; relative paths are relative to the workspace. Downloads you start yourself still go to Downloads/Astrion.',
+  aiDownloadDirDesc: 'Where files downloaded by the agent are saved',
+  aiDownloadDirPlaceholder: '.astrion/browser_downloads (relative to workspace)',
   aiSites: 'Allowed sites',
-  aiSitesDesc:
-    'On these sites the agent no longer asks before clicking, typing and similar actions.',
+  aiSitesDesc: 'Sites where the agent can click and type without asking',
   aiSitesEmpty: 'No sites allowed yet',
   aiSiteRevoke: 'Revoke',
   permissionHint: 'Permission lasts only for this app session'

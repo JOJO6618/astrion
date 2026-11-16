@@ -46,6 +46,7 @@ export default {
   installNow: '立即安装',
   later: '暂不安装',
   neverAgain: '不再提示',
+  neverAgainTitle: '沙箱安装提示',
   rebootDone: '我已重启，继续安装',
   uacCancelledHint:
     '已取消管理员授权。启用 WSL2 需要管理员权限，请点击重试并在系统弹窗中选择"是"。',
@@ -56,7 +57,7 @@ export default {
   sectionMissing: '未安装',
   sectionChecking: '检测中…',
   sectionUnavailable: '当前环境不适用',
-  sectionDesc: 'Windows 使用 WSL2；Linux 使用管理员安装的受限助手隔离命令。',
+  sectionDesc: 'Windows 使用 WSL2，Linux 使用受限助手隔离命令',
   linuxIntro: '安装系统依赖和受限助手，Astrion 与命令仍以普通系统账户运行。',
   linuxNetwork: '受限网络可双向访问宿主 localhost；授权路径内的 Unix socket 可用。',
   linuxLocation: '助手安装到 {path}，配置和服务由管理员维护。',

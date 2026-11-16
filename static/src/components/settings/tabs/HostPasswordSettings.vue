@@ -69,41 +69,41 @@ async function disable() {
 </script>
 
 <template>
-  <div v-if="applicable" class="host-password-settings">
-    <div class="settings-action-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('settings.hostPasswordTitle') }}</span>
-        <span class="settings-row-desc">
+  <div v-if="applicable" class="stg-card host-password-settings">
+    <div class="stg-action-row">
+      <span class="stg-row-copy">
+        <span class="stg-row-title">{{ $t('settings.hostPasswordTitle') }}</span>
+        <span class="stg-row-desc">
           {{ $t(enabled ? 'settings.hostPasswordEnabled' : 'settings.hostPasswordDisabled') }}
         </span>
       </span>
       <button
-        v-if="enabled && !confirming"
+        v-if="enabled"
         type="button"
-        class="settings-secondary-button"
-        @click="confirming = true"
+        class="stg-secondary-button"
+        :disabled="busy"
+        @click="confirming ? cancel() : (confirming = true)"
       >
-        {{ $t('settings.hostPasswordDisable') }}
+        {{ confirming ? $t('common.cancel') : $t('settings.hostPasswordDisable') }}
       </button>
     </div>
     <div v-if="!enabled" class="host-password-command">
       <span>{{ $t('settings.hostPasswordScriptHint') }}</span>
       <code>{{ command }}</code>
     </div>
+    <!-- 关闭保护：标题行按钮切换为「取消」，下方长输入框输入当前密码，确认作为框内尾部操作 -->
     <form v-if="confirming" class="host-password-confirm" @submit.prevent="disable">
-      <label for="disable-host-password">{{ $t('settings.hostPasswordConfirmHint') }}</label>
-      <div class="host-password-controls">
+      <div class="stg-field">
         <input
           id="disable-host-password"
           v-model="password"
           type="password"
           autocomplete="current-password"
+          :placeholder="$t('settings.hostPasswordConfirmHint')"
+          :aria-label="$t('settings.hostPasswordConfirmHint')"
           :disabled="busy"
         />
-        <button type="button" class="settings-secondary-button" :disabled="busy" @click="cancel">
-          {{ $t('common.cancel') }}
-        </button>
-        <button type="submit" class="settings-secondary-button" :disabled="busy || !password">
+        <button v-if="password" type="submit" class="stg-field-action is-text" :disabled="busy">
           {{ $t('settings.hostPasswordDisable') }}
         </button>
       </div>
@@ -114,42 +114,15 @@ async function disable() {
 </template>
 
 <style scoped>
-.host-password-settings {
-  border-bottom: 1px solid var(--border-default);
-}
 .host-password-confirm,
 .host-password-command {
-  padding: 0 0 16px;
+  padding: 0 0 12px;
 }
-.host-password-confirm label,
 .host-password-command span {
   display: block;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-secondary);
-}
-.host-password-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 8px;
-}
-.host-password-controls input {
-  flex: 1;
-  min-width: 0;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--surface-base);
-  color: var(--text-primary);
-  outline: none;
-}
-.host-password-controls input:focus {
-  border-color: var(--accent);
-}
-.host-password-controls button {
-  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-tertiary);
 }
 .host-password-command code {
   display: block;
@@ -164,15 +137,7 @@ async function disable() {
 }
 .host-password-error {
   margin: 8px 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--state-danger);
-}
-@media (width <= 480px) {
-  .host-password-controls {
-    flex-wrap: wrap;
-  }
-  .host-password-controls input {
-    flex-basis: 100%;
-  }
 }
 </style>

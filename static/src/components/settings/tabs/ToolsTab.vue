@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, unref } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 
 defineOptions({ name: 'ToolsTab' });
 
@@ -62,58 +62,60 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
 </script>
 
 <template>
-  <section class="settings-page">
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.silentToolDisableTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.silentToolDisableDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.silent_tool_disable"
-        @change="
-          personalization.updateField({
-            key: 'silent_tool_disable',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.silent_tool_disable"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.toolIntentTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.toolIntentDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.tool_intent_enabled"
-        @change="
-          personalization.updateField({
-            key: 'tool_intent_enabled',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.tool_intent_enabled"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.skillHintsTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.skillHintsDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.skill_hints_enabled"
-        @change="
-          personalization.updateField({
-            key: 'skill_hints_enabled',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.skill_hints_enabled"
-    /></label>
-    <div class="settings-group-block">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{ $t('personalization.strictSkillTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.strictSkillDesc') }}</span>
+  <section class="stg-page">
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.silentToolDisableTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.silentToolDisableDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.silent_tool_disable"
+          @change="
+            personalization.updateField({
+              key: 'silent_tool_disable',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.silent_tool_disable"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.toolIntentTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.toolIntentDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.tool_intent_enabled"
+          @change="
+            personalization.updateField({
+              key: 'tool_intent_enabled',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.tool_intent_enabled"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.skillHintsTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.skillHintsDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.skill_hints_enabled"
+          @change="
+            personalization.updateField({
+              key: 'skill_hints_enabled',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.skill_hints_enabled"
+      /></label>
+    </div>
+    <div class="stg-card stg-group-block">
+      <div class="stg-group-title">
+        <span class="stg-row-title">{{ $t('personalization.strictSkillTitle') }}</span
+        ><span class="stg-row-desc">{{ $t('personalization.strictSkillDesc') }}</span>
       </div>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{ $t('personalization.terminalToolsTitle') }}</span
+      <label class="stg-toggle-row inner"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.terminalToolsTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.terminalToolsDesc') }}</span></span
         ><input
           type="checkbox"
           :checked="form.skill_strict_terminal_enabled"
@@ -122,10 +124,12 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
               key: 'skill_strict_terminal_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.skill_strict_terminal_enabled"
+          " /><UiSwitch decorative :checked="form.skill_strict_terminal_enabled"
       /></label>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{ $t('personalization.subAgentToolsTitle') }}</span
+      <label class="stg-toggle-row inner"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.subAgentToolsTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.subAgentToolsDesc') }}</span></span
         ><input
           type="checkbox"
           :checked="form.skill_strict_sub_agent_enabled"
@@ -134,10 +138,12 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
               key: 'skill_strict_sub_agent_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.skill_strict_sub_agent_enabled"
+          " /><UiSwitch decorative :checked="form.skill_strict_sub_agent_enabled"
       /></label>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{ $t('personalization.runCommandFgTitle') }}</span
+      <label class="stg-toggle-row inner"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.runCommandFgTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.runCommandFgDesc') }}</span></span
         ><input
           type="checkbox"
           :checked="form.skill_strict_run_command_foreground_enabled"
@@ -146,10 +152,12 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
               key: 'skill_strict_run_command_foreground_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.skill_strict_run_command_foreground_enabled"
+          " /><UiSwitch decorative :checked="form.skill_strict_run_command_foreground_enabled"
       /></label>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{ $t('personalization.runCommandBgTitle') }}</span
+      <label class="stg-toggle-row inner"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.runCommandBgTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.runCommandBgDesc') }}</span></span
         ><input
           type="checkbox"
           :checked="form.skill_strict_run_command_background_enabled"
@@ -158,57 +166,56 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
               key: 'skill_strict_run_command_background_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.skill_strict_run_command_background_enabled"
+          " /><UiSwitch decorative :checked="form.skill_strict_run_command_background_enabled"
       /></label>
     </div>
-    <div class="settings-group-block" v-if="skillsCatalog.length">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{ $t('personalization.availableSkillsTitle') }}</span
-        ><span class="settings-row-desc">{{
+    <div class="stg-card stg-group-block" v-if="skillsCatalog.length">
+      <div class="stg-group-title">
+        <span class="stg-row-title">{{ $t('personalization.availableSkillsTitle') }}</span
+        ><span class="stg-row-desc">{{
           $t(wsDescKey('personalization.availableSkillsDesc'))
         }}</span>
       </div>
-      <div class="settings-check-grid">
-        <label v-for="skill in skillsCatalog" :key="skill.id" class="settings-toggle-row inner"
-          ><span class="settings-row-title">{{ skill.label }}</span
+      <div class="stg-check-grid">
+        <label v-for="skill in skillsCatalog" :key="skill.id" class="stg-toggle-row inner"
+          ><span class="stg-row-title">{{ skill.label }}</span
           ><input
             type="checkbox"
             :checked="form.enabled_skills.includes(skill.id)"
-            @change="personalization.toggleSkill(skill.id)" /><FancyCheck
+            @change="personalization.toggleSkill(skill.id)" /><UiSwitch
+            decorative
             :checked="form.enabled_skills.includes(skill.id)"
         /></label>
       </div>
     </div>
-    <div class="settings-group-block" v-if="toolCategories.length">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{
-          $t('personalization.disabledToolCategoriesTitle')
-        }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.disabledToolCategoriesDesc')
-        }}</span>
+    <div class="stg-card stg-group-block" v-if="toolCategories.length">
+      <div class="stg-group-title">
+        <span class="stg-row-title">{{ $t('personalization.disabledToolCategoriesTitle') }}</span>
+        <span class="stg-row-desc">{{ $t('personalization.disabledToolCategoriesDesc') }}</span>
       </div>
-      <div class="settings-check-grid">
-        <label
-          v-for="category in toolCategories"
-          :key="category.id"
-          class="settings-toggle-row inner"
-          ><span class="settings-row-title">{{ category.label }}</span
+      <div class="stg-check-grid">
+        <label v-for="category in toolCategories" :key="category.id" class="stg-toggle-row inner"
+          ><span class="stg-row-title">{{ category.label }}</span
           ><input
             type="checkbox"
             :checked="form.disabled_tool_categories.includes(category.id)"
-            @change="toggleCategory(category.id)" /><FancyCheck
+            @change="toggleCategory(category.id)" /><UiSwitch
+            decorative
             :checked="form.disabled_tool_categories.includes(category.id)"
         /></label>
       </div>
     </div>
-    <div class="settings-group-block" v-if="toolLoadingRegistry.length">
-      <div class="settings-group-title">
-        <span class="settings-row-title">{{ $t('personalization.toolLoadingTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.toolLoadingDesc') }}</span>
+    <div class="stg-card stg-group-block" v-if="toolLoadingRegistry.length">
+      <div class="stg-group-title">
+        <span class="stg-row-title">{{ $t('personalization.toolLoadingTitle') }}</span
+        ><span class="stg-row-desc">{{ $t('personalization.toolLoadingDesc') }}</span>
       </div>
-      <label class="settings-toggle-row inner"
-        ><span class="settings-row-title">{{ $t('personalization.toolLoadingEnabledTitle') }}</span
+      <label class="stg-toggle-row inner"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.toolLoadingEnabledTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t('personalization.toolLoadingEnabledDesc')
+          }}</span></span
         ><input
           type="checkbox"
           :checked="form.tool_loading_enabled"
@@ -217,27 +224,27 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
               key: 'tool_loading_enabled',
               value: $event.target.checked
             })
-          " /><FancyCheck :checked="form.tool_loading_enabled"
+          " /><UiSwitch decorative :checked="form.tool_loading_enabled"
       /></label>
       <template v-if="form.tool_loading_enabled">
         <div v-for="cat in toolLoadingRegistry" :key="cat.key">
-          <label class="settings-toggle-row inner"
-            ><span class="settings-row-title">{{
-              $t(`personalization.toolLoadingCat.${cat.key}`)
-            }}</span
+          <label class="stg-toggle-row inner"
+            ><span class="stg-row-title">{{ $t(`personalization.toolLoadingCat.${cat.key}`) }}</span
             ><input
               type="checkbox"
               :checked="isCategoryFullyDeferred(cat)"
-              @change="toggleDeferredCategory(cat, $event.target.checked)" /><FancyCheck
+              @change="toggleDeferredCategory(cat, $event.target.checked)" /><UiSwitch
+              decorative
               :checked="isCategoryFullyDeferred(cat)"
           /></label>
-          <div class="settings-check-grid">
-            <label v-for="name in cat.tools" :key="name" class="settings-toggle-row inner"
-              ><span class="settings-row-title">{{ name }}</span
+          <div class="stg-check-grid">
+            <label v-for="name in cat.tools" :key="name" class="stg-toggle-row inner"
+              ><span class="stg-row-title">{{ name }}</span
               ><input
                 type="checkbox"
                 :checked="form.tool_loading_deferred.includes(name)"
-                @change="toggleDeferredTool(name, $event.target.checked)" /><FancyCheck
+                @change="toggleDeferredTool(name, $event.target.checked)" /><UiSwitch
+                decorative
                 :checked="form.tool_loading_deferred.includes(name)"
             /></label>
           </div>

@@ -20,7 +20,7 @@
 2. **挂载在 App.vue 的 Agent 加载门槛之前**：`<SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />`；后续加载页和 Agent 内容用 `v-else-if`／`v-else` 互斥。组件在 `app/components.ts` 异步注册。SettingsShell 自己加载账号／偏好／分区数据，`lifecycle.mounted` 在设置路由只恢复桌面导航和必要监听，不启动 Agent 连接、工作区运行态或轮询。禁止以 `isConnected` 阻挡设置页挂载，否则跳过 Agent 初始化会造成永久加载（2026-10-26 已实测复现并修复）。
 3. **URL 深链**：`/settings/<section>` 由 SettingsShell onMounted 解析（先 `await fetchSessionStatus()` 确保管理员判定就绪），非法分区、或非管理员访问管理员分区时不生效回默认。
 4. **两宿主互斥**：SettingsShell 与 PersonalizationDrawer 都 `provide('personalizationDrawer')` 同一份 context（`usePersonalizationContext.ts`，124 键）且各自注册全局监听——**禁止同时可见**（路由层已天然互斥：抽屉只在非 settings 路由渲染，注意保持）。
-5. **新增设置分区三处同步**：SettingsShell 的 NAV_GROUPS + SECTION_META、stores/settings.ts 的 SettingsSection 类型；文案走 `settings` 命名空间（zh-CN 为源）。
+5. **新增设置分区三处同步**：`settings/settingsNav.ts` 的 NAV_GROUPS + SECTION_TITLE_KEYS（新增设置行同时登记该文件的搜索索引）、SettingsShell 的 SECTION_COMPONENTS、stores/settings.ts 的 SettingsSection 类型；文案走 `settings` 命名空间（zh-CN 为源）。
 6. **管理员分区**：`SETTINGS_ADMIN_SECTIONS`（stores/settings.ts）= codex/admin/providers；导航过滤 + 运行时降级回退 general 由 SettingsShell 处理。
 7. **侧边栏个人入口**：用户名 + 上弹二级菜单（个人空间/个性化/设置/帮助-置灰），`ConversationSidebar.vue` emit `personal(tab?)` → `openPersonalPage(tab)` 透传 → `personalization.openDrawer(tab)`（'preferences'|'account'）。
 

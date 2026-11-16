@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { inject } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import { computed, inject } from 'vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
+import { t } from '@/locales';
 
 defineOptions({ name: 'AppearanceTab' });
 
@@ -10,387 +12,292 @@ defineOptions({ name: 'AppearanceTab' });
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  activeDropdown,
   activeTheme,
-  blockDisplayLabel,
   blockDisplayOptions,
-  compactMessageDisplayLabel,
   compactMessageDisplayOptions,
   currentBlockDisplayMode,
   currentCompactMessageDisplay,
-  floatingMenuStyle,
   form,
   handleMinimalExpandHeightLimitedChange,
   handleStackedHideBordersChange,
   locale,
-  localeLabel,
   localeOptions,
   minimalExpandHeightLimited,
   personalization,
   selectBlockDisplayMode,
   selectCompactMessageDisplay,
-  wsDescKey,
   selectLocaleOption,
   selectThemeOption,
   stackedHideBorders,
-  themeLabel,
   themeOptions,
-  toggleDropdown,
-  closeDropdown
+  wsDescKey
 } = ctx;
-const currencyOptions = [
-  { id: 'USD', label: 'personalization.currencyUSD' },
-  { id: 'CNY', label: 'personalization.currencyCNY' }
-] as const;
-const selectCurrency = (value: 'USD' | 'CNY') => {
+
+const themeItems = computed(() =>
+  themeOptions.map((option: any) => ({
+    value: option.id,
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
+const localeItems = computed(() =>
+  localeOptions.map((option: any) => ({
+    value: option.id,
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
+const currencyItems = computed(() => [
+  { value: 'USD', label: t('personalization.currencyUSD') },
+  { value: 'CNY', label: t('personalization.currencyCNY') }
+]);
+const blockDisplayItems = computed(() =>
+  blockDisplayOptions.map((option: any) => ({
+    value: option.value,
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
+const compactMessageItems = computed(() =>
+  compactMessageDisplayOptions.map((option: any) => ({
+    value: option.value,
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
+const updateTheme = (value: string) => selectThemeOption(value as any);
+const updateLocale = (value: string) => selectLocaleOption(value as any);
+const updateBlockDisplay = (value: string) => selectBlockDisplayMode(value as any);
+const updateCompactMessage = (value: string) => selectCompactMessageDisplay(value as any);
+const selectCurrency = (value: string) => {
   personalization.updateField({ key: 'display_currency', value });
-  closeDropdown();
 };
 </script>
 
 <template>
-  <section class="settings-page">
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.themeTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.themeDesc') }}</span></span
-      >
-      <div class="settings-select-wrap" :class="{ open: activeDropdown === 'theme' }" @click.stop>
-        <button type="button" class="settings-select-button" @click="toggleDropdown('theme')">
-          {{ themeLabel }} <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
+  <section class="stg-page">
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.themeTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.themeDesc') }}</span></span
         >
-          <button
-            v-for="option in themeOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: activeTheme === option.id }"
-            @click="selectThemeOption(option.id)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+        <UiSelect
+          :model-value="activeTheme"
+          :options="themeItems"
+          align-end
+          @update:model-value="updateTheme"
+        />
+      </div>
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('common.settingsLanguage') }}</span
+          ><span class="stg-row-desc">{{ $t('common.settingsLanguageDesc') }}</span></span
+        >
+        <UiSelect
+          :model-value="locale"
+          :options="localeItems"
+          align-end
+          @update:model-value="updateLocale"
+        />
+      </div>
+      <div class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.currencyTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.currencyDesc') }}</span>
+        </span>
+        <UiSelect
+          :model-value="form.display_currency"
+          :options="currencyItems"
+          align-end
+          @update:model-value="selectCurrency"
+        />
       </div>
     </div>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('common.settingsLanguage') }}</span
-        ><span class="settings-row-desc">{{ $t('common.settingsLanguageDesc') }}</span></span
-      >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'language' }"
-        @click.stop
-      >
-        <button type="button" class="settings-select-button" @click="toggleDropdown('language')">
-          {{ localeLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in localeOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: locale === option.id }"
-            @click="selectLocaleOption(option.id)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
-      </div>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.groupByWorkspaceTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.groupByWorkspaceDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.group_sidebar_by_workspace"
+          @change="
+            personalization.updateField({
+              key: 'group_sidebar_by_workspace',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.group_sidebar_by_workspace"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.enhancedToolDisplayTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t('personalization.enhancedToolDisplayDesc')
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.enhanced_tool_display"
+          @change="
+            personalization.updateField({
+              key: 'enhanced_tool_display',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.enhanced_tool_display"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.showStatusAvatarTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.showStatusAvatarDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.show_status_avatar"
+          @change="
+            personalization.updateField({
+              key: 'show_status_avatar',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.show_status_avatar"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.showGitStatusBarTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t(wsDescKey('personalization.showGitStatusBarDesc'))
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.show_git_status_bar"
+          @change="
+            personalization.updateField({
+              key: 'show_git_status_bar',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.show_git_status_bar"
+      /></label>
     </div>
-    <div class="settings-select-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.currencyTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.currencyDesc') }}</span>
-      </span>
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'currency' }"
-        @click.stop
-      >
-        <button type="button" class="settings-select-button" @click="toggleDropdown('currency')">
-          {{
-            $t(
-              form.display_currency === 'CNY'
-                ? 'personalization.currencyCNY'
-                : 'personalization.currencyUSD'
-            )
-          }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in currencyOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.display_currency === option.id }"
-            @click="selectCurrency(option.id)"
-          >
-            <strong>{{ $t(option.label) }}</strong>
-            <svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
-      </div>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.autoOpenTerminalTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.autoOpenTerminalDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.auto_open_terminal_panel"
+          @change="
+            personalization.updateField({
+              key: 'auto_open_terminal_panel',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.auto_open_terminal_panel"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.quickDockAutoExpandTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t('personalization.quickDockAutoExpandDesc')
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.quick_dock_auto_expand"
+          @change="
+            personalization.updateField({
+              key: 'quick_dock_auto_expand',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.quick_dock_auto_expand"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.previewAutoOpenTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.previewAutoOpenDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.preview_auto_open"
+          @change="
+            personalization.updateField({
+              key: 'preview_auto_open',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.preview_auto_open"
+      /></label>
     </div>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.groupByWorkspaceTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.groupByWorkspaceDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.group_sidebar_by_workspace"
-        @change="
-          personalization.updateField({
-            key: 'group_sidebar_by_workspace',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.group_sidebar_by_workspace"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.enhancedToolDisplayTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.enhancedToolDisplayDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.enhanced_tool_display"
-        @change="
-          personalization.updateField({
-            key: 'enhanced_tool_display',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.enhanced_tool_display"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.showStatusAvatarTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.showStatusAvatarDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.show_status_avatar"
-        @change="
-          personalization.updateField({
-            key: 'show_status_avatar',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.show_status_avatar"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.showGitStatusBarTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t(wsDescKey('personalization.showGitStatusBarDesc'))
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.show_git_status_bar"
-        @change="
-          personalization.updateField({
-            key: 'show_git_status_bar',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.show_git_status_bar"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.autoOpenTerminalTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.autoOpenTerminalDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.auto_open_terminal_panel"
-        @change="
-          personalization.updateField({
-            key: 'auto_open_terminal_panel',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.auto_open_terminal_panel"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.quickDockAutoExpandTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.quickDockAutoExpandDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.quick_dock_auto_expand"
-        @change="
-          personalization.updateField({
-            key: 'quick_dock_auto_expand',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.quick_dock_auto_expand"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.previewAutoOpenTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.previewAutoOpenDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.preview_auto_open"
-        @change="
-          personalization.updateField({
-            key: 'preview_auto_open',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.preview_auto_open"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.editSummaryLiveTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.editSummaryLiveDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.edit_summary_live_display"
-        @change="
-          personalization.updateField({
-            key: 'edit_summary_live_display',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.edit_summary_live_display"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.filePreviewWrapTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.filePreviewWrapDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.file_preview_auto_wrap"
-        @change="
-          personalization.updateField({
-            key: 'file_preview_auto_wrap',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.file_preview_auto_wrap"
-    /></label>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.blockDisplayModeTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.blockDisplayModeDesc')
-        }}</span></span
-      >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'block-display' }"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="settings-select-button"
-          @click="toggleDropdown('block-display')"
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.editSummaryLiveTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.editSummaryLiveDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.edit_summary_live_display"
+          @change="
+            personalization.updateField({
+              key: 'edit_summary_live_display',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.edit_summary_live_display"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.filePreviewWrapTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.filePreviewWrapDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.file_preview_auto_wrap"
+          @change="
+            personalization.updateField({
+              key: 'file_preview_auto_wrap',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.file_preview_auto_wrap"
+      /></label>
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.blockDisplayModeTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.blockDisplayModeDesc') }}</span></span
         >
-          {{ blockDisplayLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in blockDisplayOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: currentBlockDisplayMode === option.value }"
-            @click="selectBlockDisplayMode(option.value)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+        <UiSelect
+          :model-value="currentBlockDisplayMode"
+          :options="blockDisplayItems"
+          align-end
+          @update:model-value="updateBlockDisplay"
+        />
       </div>
-    </div>
-    <label v-if="currentBlockDisplayMode === 'stacked'" class="settings-toggle-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.hideBlockBordersTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.hideBlockBordersDesc') }}</span>
-      </span>
-      <input
-        type="checkbox"
-        :checked="stackedHideBorders"
-        @change="handleStackedHideBordersChange($event)"
-      />
-      <FancyCheck :checked="stackedHideBorders" />
-    </label>
-    <label v-if="currentBlockDisplayMode === 'minimal'" class="settings-toggle-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.minimalExpandHeightTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.minimalExpandHeightDesc') }}</span>
-      </span>
-      <input
-        type="checkbox"
-        :checked="minimalExpandHeightLimited"
-        @change="handleMinimalExpandHeightLimitedChange($event)"
-      />
-      <FancyCheck :checked="minimalExpandHeightLimited" />
-    </label>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.compactMessageTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.compactMessageDesc') }}</span></span
-      >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'compact-message' }"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="settings-select-button"
-          @click="toggleDropdown('compact-message')"
+      <label v-if="currentBlockDisplayMode === 'stacked'" class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.hideBlockBordersTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.hideBlockBordersDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="stackedHideBorders"
+          @change="handleStackedHideBordersChange($event)"
+        />
+        <UiSwitch decorative :checked="stackedHideBorders" />
+      </label>
+      <label v-if="currentBlockDisplayMode === 'minimal'" class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.minimalExpandHeightTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.minimalExpandHeightDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="minimalExpandHeightLimited"
+          @change="handleMinimalExpandHeightLimitedChange($event)"
+        />
+        <UiSwitch decorative :checked="minimalExpandHeightLimited" />
+      </label>
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.compactMessageTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.compactMessageDesc') }}</span></span
         >
-          {{ compactMessageDisplayLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in compactMessageDisplayOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: currentCompactMessageDisplay === option.value }"
-            @click="selectCompactMessageDisplay(option.value)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+        <UiSelect
+          :model-value="currentCompactMessageDisplay"
+          :options="compactMessageItems"
+          align-end
+          @update:model-value="updateCompactMessage"
+        />
       </div>
     </div>
   </section>

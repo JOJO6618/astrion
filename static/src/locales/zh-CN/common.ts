@@ -33,7 +33,7 @@ export default {
   settings: '设置',
   back: '返回',
   settingsLanguage: '界面语言',
-  settingsLanguageDesc: '选择界面显示语言',
+  settingsLanguageDesc: '界面文字使用的语言',
 
   // ── 相对时间（原 chat/adminApi 两处重复定义，已归并） ──
   justNow: '刚刚',

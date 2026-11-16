@@ -147,6 +147,11 @@
   --popover-surface: #ffffff;
   --popover-border: #e6dfd8;
   --popover-shadow: 0 6px 20px rgba(38, 28, 18, 0.08), 0 1px 3px rgba(38, 28, 18, 0.06);
+  /* 分组卡片页（设置页）：页面底色压暗一级，悬浮面板与卡片比页面亮；卡内控件底色另取一级 */
+  --group-page-bg: #f3efe7;
+  --group-card-bg: #fdfcf9;
+  --group-card-shadow: 0 4px 14px rgba(38, 28, 18, 0.05), 0 1px 2px rgba(38, 28, 18, 0.04);
+  --group-card-control: #f5f0e8;
   --popover-switch-track: #d8cfc4;
   --popover-switch-on: #cc785c;
   --popover-switch-knob: #ffffff;
@@ -243,6 +248,11 @@
   --popover-surface: #ffffff;
   --popover-border: rgba(13, 13, 13, 0.1);
   --popover-shadow: 0 6px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* 分组卡片页（设置页）：页面底色压暗一级，悬浮面板与卡片比页面亮；卡内控件底色另取一级 */
+  --group-page-bg: #f4f4f4;
+  --group-card-bg: #ffffff;
+  --group-card-shadow: 0 4px 14px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --group-card-control: #f3f3f3;
   --popover-switch-track: #ececec;
   --popover-switch-on: #181818;
   --popover-switch-knob: #ffffff;
@@ -340,6 +350,11 @@
   --popover-surface: #262626;
   --popover-border: rgba(255, 255, 255, 0.1);
   --popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  /* 分组卡片页（设置页）：页面底色压暗一级，悬浮面板与卡片比页面亮；卡内控件底色另取一级 */
+  --group-page-bg: #1a1a1a;
+  --group-card-bg: #212121;
+  --group-card-shadow: 0 6px 18px rgba(0, 0, 0, 0.26), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --group-card-control: #2b2b2b;
   --popover-switch-track: rgba(255, 255, 255, 0.16);
   --popover-switch-on: rgba(255, 255, 255, 0.55);
   --popover-switch-knob: #262626;
@@ -436,6 +451,11 @@
   --popover-surface: #ffffff;
   --popover-border: #e6dfd8;
   --popover-shadow: 0 6px 20px rgba(38, 28, 18, 0.08), 0 1px 3px rgba(38, 28, 18, 0.06);
+  /* 分组卡片页（设置页）：页面底色压暗一级，悬浮面板与卡片比页面亮；卡内控件底色另取一级 */
+  --group-page-bg: #f3efe7;
+  --group-card-bg: #fdfcf9;
+  --group-card-shadow: 0 4px 14px rgba(38, 28, 18, 0.05), 0 1px 2px rgba(38, 28, 18, 0.04);
+  --group-card-control: #f5f0e8;
   --popover-switch-track: #d8cfc4;
   --popover-switch-on: #cc785c;
   --popover-switch-knob: #ffffff;
@@ -468,6 +488,12 @@
   --storage-6: #c9a24a;
   --storage-7: #b07a4f;
   --storage-8: #a8a29a;
+}
+
+// 设置开关（UiSwitch）开启色：用户确认三主题一致的系统蓝，不随主题变化；关闭轨道走各主题 --switch-track。
+:root {
+  --switch-on: #0a84ff;
+  --switch-knob: #fff;
 }
 
 // Quick entry uses its own approved silver palette, independent of app themes.

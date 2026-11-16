@@ -4,6 +4,9 @@
 export default {
   // ── Source filter ──
   sourceAria: 'Scope',
+  sourceTitle: 'Scope',
+  sourceDesc: 'Workspace or Chat to include in the stats',
+  updatedTitle: 'Last updated',
   allSources: 'All workspaces',
   allSourcesMeta: 'Incl. Chat',
   chatSource: 'Chat',
@@ -85,7 +88,8 @@ export default {
   unpriced: 'Unpriced',
   partialPriced: 'Partly unpriced',
   noRequests: 'No requests in this range',
-  modelsNote: 'Speed covers the main agent only: Chat Completions includes reasoning output, Responses counts text and tool calls only. TTFT is the wait before the first content delta.',
+  modelsNote:
+    'Speed covers the main agent only: Chat Completions includes reasoning output, Responses counts text and tool calls only. TTFT is the wait before the first content delta.',
   compTitle: 'Breakdown',
   compByActor: 'By agent',
   compByMode: 'By mode',
@@ -98,7 +102,8 @@ export default {
   modeAgent: 'Agent',
   modeChat: 'Chat',
   cacheTitle: 'Cache hit rate',
-  cacheNote: 'Range average {pct}%. Hit rate = cached input ÷ all input; gaps are days without requests.',
+  cacheNote:
+    'Range average {pct}%. Hit rate = cached input ÷ all input; gaps are days without requests.',
   cacheEmpty: 'No requests in this range',
   punchTitle: 'Active hours',
   punchPeak: 'Busiest: {day} {from}–{to}',

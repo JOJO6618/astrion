@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue';
-import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
 import { t } from '@/locales';
 
 defineOptions({ name: 'SubAgentsTab' });
@@ -12,7 +12,6 @@ const {
   subAgentMaxInstances,
   subAgentCompressThreshold,
   subAgentModels,
-  subAgentSettingsSaving,
   subAgentSettingsLoading,
   subAgentSettingsLoaded,
   subAgentSettingsError
@@ -30,103 +29,81 @@ const intelligenceLevels = ['high', 'medium', 'low'] as const;
 </script>
 
 <template>
-  <section class="settings-page">
-    <p class="settings-section-desc">{{ $t('personalization.subAgentsIntro') }}</p>
-    <div class="settings-section-header">
-      <span class="settings-section-title">{{ $t('personalization.subAgentModelTitle') }}</span>
+  <section class="stg-page">
+    <div class="stg-card">
+      <div class="stg-group-block">
+        <div class="stg-group-title">
+          <span class="stg-row-title">{{ $t('personalization.subAgentModelTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.subAgentModelDesc') }}</span>
+        </div>
+        <div v-for="level in intelligenceLevels" :key="level" class="stg-select-row inner">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{
+              $t(`personalization.subAgentIntelligence.${level}`)
+            }}</span>
+            <span class="stg-row-desc">{{
+              $t(`personalization.subAgentIntelligenceDesc.${level}`)
+            }}</span>
+          </span>
+          <UiModelSelect
+            :model-value="form[`sub_agent_model_${level}`]"
+            :options="auxModelOptions"
+            :extra-options="defaultExtraOptions"
+            align-end
+            @update:model-value="
+              (value) => personalization.updateField({ key: `sub_agent_model_${level}`, value })
+            "
+          />
+        </div>
+      </div>
     </div>
-    <p class="settings-section-desc">{{ $t('personalization.subAgentModelDesc') }}</p>
-    <div
-      v-for="level in intelligenceLevels"
-      :key="level"
-      class="settings-select-row sub-agent-model-row"
-    >
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{
-          $t(`personalization.subAgentIntelligence.${level}`)
-        }}</span>
-        <span class="settings-row-desc">{{
-          $t(`personalization.subAgentIntelligenceDesc.${level}`)
-        }}</span>
-      </span>
-      <ModelSelectDropdown
-        :model-value="form[`sub_agent_model_${level}`]"
-        :options="auxModelOptions"
-        :extra-options="defaultExtraOptions"
-        @select="(value) => personalization.updateField({ key: `sub_agent_model_${level}`, value })"
-      />
-    </div>
-    <div class="settings-action-row">
-      <label class="settings-row-copy" for="sub-agent-max-instances">
-        <span class="settings-row-title">{{
-          $t('personalization.subAgentMaxInstancesTitle')
-        }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.subAgentMaxInstancesDesc') }}</span>
-      </label>
-      <input
-        id="sub-agent-max-instances"
-        v-model.number="subAgentMaxInstances"
-        type="number"
-        class="settings-number-input"
-        :min="1"
-        :step="1"
-        :disabled="subAgentSettingsLoading || subAgentSettingsSaving || !subAgentSettingsLoaded"
-      />
-    </div>
-    <div class="settings-action-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.compressThresholdTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.compressThresholdDesc') }}</span>
-      </span>
-      <div class="sub-agent-compression-controls">
+    <!-- 数量与压缩阈值：改动后失焦即保存（不放保存按钮） -->
+    <div class="stg-card">
+      <div class="stg-input-row">
+        <label class="stg-row-copy" for="sub-agent-max-instances">
+          <span class="stg-row-title">{{ $t('personalization.subAgentMaxInstancesTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.subAgentMaxInstancesDesc') }}</span>
+        </label>
         <input
+          id="sub-agent-max-instances"
+          v-model.number="subAgentMaxInstances"
+          type="number"
+          class="stg-number-input"
+          :min="1"
+          :step="1"
+          :disabled="subAgentSettingsLoading || !subAgentSettingsLoaded"
+          @change="saveSubAgentSettings"
+        />
+      </div>
+      <div class="stg-input-row">
+        <label class="stg-row-copy" for="sub-agent-compress-threshold">
+          <span class="stg-row-title">{{ $t('personalization.compressThresholdTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.compressThresholdDesc') }}</span>
+        </label>
+        <input
+          id="sub-agent-compress-threshold"
           v-model.number="subAgentCompressThreshold"
           type="number"
-          class="settings-number-input"
+          class="stg-number-input"
           :min="10000"
           :step="10000"
-          :disabled="subAgentSettingsLoading || subAgentSettingsSaving || !subAgentSettingsLoaded"
+          :disabled="subAgentSettingsLoading || !subAgentSettingsLoaded"
+          @change="saveSubAgentSettings"
         />
       </div>
     </div>
     <p v-if="subAgentSettingsError" class="sub-agent-settings-error" role="alert">
       {{ subAgentSettingsError }}
     </p>
-    <div class="sub-agent-settings-actions">
-      <button
-        type="button"
-        class="settings-secondary-button"
-        :disabled="subAgentSettingsSaving || subAgentSettingsLoading || !subAgentSettingsLoaded"
-        @click="saveSubAgentSettings"
-      >
-        {{ subAgentSettingsSaving ? $t('personalization.saving') : $t('common.save') }}
-      </button>
-    </div>
   </section>
 </template>
 
 <style scoped>
-.sub-agent-model-row {
-  height: 64px;
-  margin-bottom: 16px;
-}
-.sub-agent-compression-controls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.sub-agent-compression-controls input {
-  width: 120px;
-}
-.sub-agent-settings-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
 .sub-agent-settings-error {
   margin: 8px 0;
   max-height: 60px;
   overflow: auto;
   color: var(--state-danger);
+  font-size: 12px;
 }
 </style>

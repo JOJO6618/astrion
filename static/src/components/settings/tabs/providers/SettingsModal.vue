@@ -258,6 +258,12 @@ const onOverlayMouseDown = (event: MouseEvent) => {
   background: var(--accent-hover);
 }
 
+/* 编辑弹窗的删除：危险文字色，靠左与主操作分开 */
+.provider-form-btn.danger {
+  margin-right: auto;
+  color: var(--state-danger);
+}
+
 .provider-form-pair-row {
   display: flex;
   gap: 8px;

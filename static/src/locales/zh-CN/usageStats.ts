@@ -4,6 +4,9 @@
 export default {
   // ── 范围筛选 ──
   sourceAria: '统计范围',
+  sourceTitle: '统计范围',
+  sourceDesc: '选择要统计的工作区或 Chat',
+  updatedTitle: '数据更新',
   allSources: '全部工作区',
   allSourcesMeta: '含 Chat',
   chatSource: 'Chat 对话',
@@ -85,7 +88,8 @@ export default {
   unpriced: '未计价',
   partialPriced: '部分未计价',
   noRequests: '所选范围内没有请求',
-  modelsNote: '速度只统计主智能体：Chat Completions 含思考输出，Responses 只算正文与工具调用；首包为首个有内容增量前的等待时间。',
+  modelsNote:
+    '速度只统计主智能体：Chat Completions 含思考输出，Responses 只算正文与工具调用；首包为首个有内容增量前的等待时间。',
   compTitle: '构成',
   compByActor: '按执行者',
   compByMode: '按模式',

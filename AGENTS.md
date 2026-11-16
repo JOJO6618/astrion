@@ -464,7 +464,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 2. **挂载在 App.vue 的 Agent 加载门槛之前**，以 `settingsRoute` 独立互斥显示；组件在 `app/components.ts` 异步注册。设置页自己加载账号／偏好／分区数据，生命周期不启动 Agent 连接、工作区运行态或轮询；禁止用 `isConnected` 阻挡挂载。
 3. URL 深链由 SettingsShell onMounted 解析（先 `await fetchSessionStatus()` 确保管理员判定就绪）；非法分区或非管理员访问管理员分区时回默认。
 4. **SettingsShell 与 PersonalizationDrawer 禁止同时可见**（两者都 provide 同一份 `personalizationDrawer` context）。
-5. **新增设置分区三处同步**：SettingsShell 的 NAV_GROUPS + SECTION_META、`stores/settings.ts` 的 SettingsSection 类型；文案走 `settings` 命名空间。
+5. **新增设置分区三处同步**：`settings/settingsNav.ts` 的 NAV_GROUPS + SECTION_TITLE_KEYS（新增设置行同时登记该文件的搜索索引）、SettingsShell 的 SECTION_COMPONENTS、`stores/settings.ts` 的 SettingsSection 类型；文案走 `settings` 命名空间。设置页样式在 `settings/settings.scss`（`stg-` 前缀），不再复用个人空间抽屉的 `settings-*` 行样式。
 6. **管理员分区**：`SETTINGS_ADMIN_SECTIONS` = codex/admin/providers；导航过滤 + 运行时降级回退 general 由 SettingsShell 处理。
 
 **提供商体系**：
@@ -663,7 +663,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ## 28) 存储空间统计与清理（2026-11-15）
 
-- **入口**：设置页「账户 → 存储空间」（`/settings/storage`，与用量统计同宽列）；前端 `settings/tabs/StorageTab.vue` + `tabs/storage/`，文案命名空间 `storageStats`，分类色为新增 `--storage-1..8`（三主题＋首屏回退已补齐）。分区在 `SettingsShell` 的 NAV_GROUPS／SECTION_META／SECTION_COMPONENTS 与 `stores/settings.ts` 的 `SettingsSection` 同步登记。
+- **入口**：设置页「账户 → 存储空间」（`/settings/storage`，与用量统计同宽列）；前端 `settings/tabs/StorageTab.vue` + `tabs/storage/`，文案命名空间 `storageStats`，分类色为新增 `--storage-1..8`（三主题＋首屏回退已补齐）。分区在 `settingsNav.ts` 的 NAV_GROUPS／SECTION_TITLE_KEYS、`SettingsShell` 的 SECTION_COMPONENTS 与 `stores/settings.ts` 的 `SettingsSection` 同步登记。
 - **统计范围 = 数据根内**：`modules/storage_stats/scanner.py` 一次遍历 `DATA_DIR` + `LOGS_DIR`，按 `catalog.py` 的最长前缀规则归桶（8 类：备份与快照 / 日志 / 浏览器MCP / Agent 对话 / 对话媒体 / 子智能体 / Chat 对话 / 其他），未命中归「其他」，保证总和等于实际占用。**不遍历工作区项目目录里的 `.astrion/`**；沙箱不计（host 无持久目录，Windows WSL vhdx 属系统层）。符号链接跳过，字节数优先 `st_blocks`（与 du 同口径），Windows 回退 `st_size`。
 - **缓存 + 进入时刷新**：`<DATA_DIR>/storage_stats.json`（version 守卫）。`GET /api/storage-stats` 只读缓存（毫秒级）；无缓存时触发后台扫描。`POST /api/storage-stats/refresh` 启动单飞后台扫描（进程内锁，不排队）。前端进入页面先渲染缓存，再触发重扫并以 `scanned_at` 变化为轮询终点（30s 超时收口）。
 - **仅 host 模式开放**：统计口径是整个数据根，多用户部署会读到他人数据、清理会删他人文件；非 host 统一返回 `available=false`（前端显示不可用提示）。接口沿用 `@api_login_required`，前端 POST 依赖 `static/security.js` 的全局 CSRF 注入。

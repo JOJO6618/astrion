@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Component } from 'vue';
 import { storeToRefs } from 'pinia';
 import SettingsNavIcon from './SettingsNavIcon.vue';
@@ -10,7 +10,6 @@ import CodexTab from './tabs/CodexTab.vue';
 import GeneralTab from './tabs/GeneralTab.vue';
 import ChatTab from './tabs/ChatTab.vue';
 import QuickEntrySettings from './tabs/QuickEntrySettings.vue';
-import { isDesktopShell } from '@/utils/desktopPlatform';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ToolsTab from './tabs/ToolsTab.vue';
 import SearchTab from './tabs/SearchTab.vue';
@@ -24,13 +23,22 @@ import AppearanceTab from './tabs/AppearanceTab.vue';
 import AdminTab from './tabs/AdminTab.vue';
 import UsageStatsTab from './tabs/UsageStatsTab.vue';
 import StorageTab from './tabs/StorageTab.vue';
+import UiIconButton from '@/components/ui/UiIconButton.vue';
+import UiSearchField from '@/components/ui/UiSearchField.vue';
+import { isDesktopShell } from '@/utils/desktopPlatform';
+import { t } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore, SETTINGS_ADMIN_SECTIONS } from '@/stores/settings';
 import type { SettingsSection } from '@/stores/settings';
-import { SETTINGS_ADMIN_SECTIONS } from '@/stores/settings';
 import { usePersonalizationContext } from '@/components/personalization/usePersonalizationContext';
-// 复用个人空间的共享样式（settings-* 设置行 / 浮层 / 控件均为全局类）
-import '@/components/personalization/styles/settings-shared.css';
+import {
+  NAV_GROUPS,
+  SECTION_TITLE_KEYS,
+  findSettingRow,
+  searchSettings,
+  type SearchResult
+} from './settingsNav';
+import './settings.scss';
 
 defineOptions({ name: 'SettingsShell' });
 
@@ -48,84 +56,22 @@ const emit = defineEmits<{ (e: 'close'): void }>();
 const personalization = usePersonalizationStore();
 const settingsStore = useSettingsStore();
 const { activeSection } = storeToRefs(settingsStore);
+const { loaded, loading, error, status } = storeToRefs(personalization);
 
 // 向设置页子树提供与个人空间抽屉同一份上下文（tabs 零改动复用）。
 // 设置页由 App.vue v-if 挂载，存在即可见，hostVisible 恒为 true。
 const hostVisible = ref(true);
 usePersonalizationContext({ activeTab: activeSection, hostVisible });
 
-// ── 导航分组（顺序与 settings-demo 一致；admin 标记项仅管理员可见） ──
-interface NavItem {
-  id: SettingsSection;
-  labelKey: string;
-  icon: string;
-}
-interface NavGroup {
-  id: string;
-  titleKey: string;
-  items: NavItem[];
-}
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    id: 'account',
-    titleKey: 'settings.groupAccount',
-    items: [
-      { id: 'usage', labelKey: 'settings.navUsage', icon: 'usage' },
-      { id: 'storage', labelKey: 'settings.navStorage', icon: 'storage' }
-    ]
-  },
-  {
-    id: 'model',
-    titleKey: 'settings.groupModel',
-    items: [
-      { id: 'providers', labelKey: 'settings.navProviders', icon: 'providers' },
-      { id: 'models', labelKey: 'settings.navModels', icon: 'models' },
-      { id: 'model-pref', labelKey: 'settings.navModelPref', icon: 'model-pref' },
-      { id: 'codex', labelKey: 'settings.navCodex', icon: 'codex' }
-    ]
-  },
-  {
-    id: 'system',
-    titleKey: 'settings.groupSystem',
-    items: [
-      { id: 'general', labelKey: 'settings.navGeneral', icon: 'general' },
-      { id: 'chat', labelKey: 'chatMode.settings', icon: 'context' },
-      { id: 'quick-chat', labelKey: 'settings.navQuickChat', icon: 'quick-chat' },
-      { id: 'workspace', labelKey: 'settings.navWorkspace', icon: 'workspace' },
-      { id: 'search', labelKey: 'settings.navSearch', icon: 'search' },
-      { id: 'tools', labelKey: 'settings.navTools', icon: 'tools' },
-      { id: 'context', labelKey: 'settings.navContext', icon: 'context' },
-      { id: 'files', labelKey: 'settings.navFiles', icon: 'files' },
-      { id: 'voice', labelKey: 'settings.navVoice', icon: 'voice' },
-      { id: 'browser', labelKey: 'settings.navBrowser', icon: 'tools' }
-    ]
-  },
-  {
-    id: 'agents',
-    titleKey: 'settings.groupAgents',
-    items: [
-      { id: 'sub-agents', labelKey: 'settings.navSubAgents', icon: 'sub-agents' },
-      { id: 'review-agents', labelKey: 'settings.navReviewAgents', icon: 'review-agents' }
-    ]
-  },
-  {
-    id: 'interface',
-    titleKey: 'settings.groupInterface',
-    items: [{ id: 'appearance', labelKey: 'settings.navAppearance', icon: 'appearance' }]
-  },
-  {
-    id: 'admin',
-    titleKey: 'settings.groupAdmin',
-    items: [{ id: 'admin', labelKey: 'settings.navAdmin', icon: 'admin' }]
-  }
-];
-
+// ── 导航 ──
 const isAdmin = computed(() => settingsStore.isAdmin);
 const quickChatSupported = isDesktopShell() && Boolean(window.astrionQuickSettings);
 const canShowSection = (section: SettingsSection) =>
   (section !== 'quick-chat' || quickChatSupported) &&
   (!SETTINGS_ADMIN_SECTIONS.has(section) || isAdmin.value);
+
+const navLabelKey = (id: SettingsSection, labelKey: string) =>
+  id === 'workspace' && !settingsStore.isHostMode ? 'settings.navWorkspaceProject' : labelKey;
 
 /** 过滤管理员项后的可见导航（整组为空时隐藏组标题） */
 const visibleNavGroups = computed(() =>
@@ -133,13 +79,17 @@ const visibleNavGroups = computed(() =>
     ...group,
     items: group.items
       .filter((item) => canShowSection(item.id))
-      .map((item) =>
-        item.id === 'workspace' && !settingsStore.isHostMode
-          ? { ...item, labelKey: 'settings.navWorkspaceProject' }
-          : item
-      )
+      .map((item) => ({ ...item, labelKey: navLabelKey(item.id, item.labelKey) }))
   })).filter((group) => group.items.length > 0)
 );
+
+const NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
+const navIconOf = (section: SettingsSection) =>
+  NAV_ITEMS.find((item) => item.id === section)?.icon || 'general';
+const sectionLabel = (section: SettingsSection) => {
+  const item = NAV_ITEMS.find((entry) => entry.id === section);
+  return item ? t(navLabelKey(section, item.labelKey)) : section;
+};
 
 // 管理员身份变化导致当前分区不可见时，回退到默认分区
 watch(isAdmin, () => {
@@ -148,30 +98,7 @@ watch(isAdmin, () => {
   }
 });
 
-// ── 分区元信息（页标题/说明文案 key + 组件映射） ──
-const SECTION_META: Record<SettingsSection, { titleKey: string; descKey: string }> = {
-  usage: { titleKey: 'settings.usageTitle', descKey: 'settings.usageDesc' },
-  storage: { titleKey: 'settings.storageTitle', descKey: 'settings.storageDesc' },
-  providers: { titleKey: 'settings.providersTitle', descKey: 'settings.providersDesc' },
-  models: { titleKey: 'settings.modelsTitle', descKey: 'settings.modelsDesc' },
-  'model-pref': { titleKey: 'settings.modelPrefTitle', descKey: 'settings.modelPrefDesc' },
-  codex: { titleKey: 'settings.codexTitle', descKey: 'settings.codexDesc' },
-  general: { titleKey: 'settings.generalTitle', descKey: 'settings.generalDesc' },
-  chat: { titleKey: 'chatMode.settings', descKey: 'chatMode.instructions' },
-  'quick-chat': { titleKey: 'settings.quickChatTitle', descKey: 'settings.quickChatDesc' },
-  workspace: { titleKey: 'settings.workspaceTitle', descKey: 'settings.workspaceDesc' },
-  search: { titleKey: 'settings.searchTitle', descKey: 'settings.searchDesc' },
-  tools: { titleKey: 'settings.toolsTitle', descKey: 'settings.toolsDesc' },
-  context: { titleKey: 'settings.contextTitle', descKey: 'settings.contextDesc' },
-  files: { titleKey: 'settings.filesTitle', descKey: 'settings.filesDesc' },
-  voice: { titleKey: 'settings.voiceTitle', descKey: 'settings.voiceDesc' },
-  browser: { titleKey: 'settings.browserTitle', descKey: 'settings.browserDesc' },
-  'sub-agents': { titleKey: 'settings.subAgentsTitle', descKey: 'settings.subAgentsDesc' },
-  'review-agents': { titleKey: 'settings.reviewAgentsTitle', descKey: 'settings.reviewAgentsDesc' },
-  appearance: { titleKey: 'settings.appearanceTitle', descKey: 'settings.appearanceDesc' },
-  admin: { titleKey: 'settings.adminTitle', descKey: 'settings.adminDesc' }
-};
-
+// ── 分区内容 ──
 const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   usage: UsageStatsTab,
   storage: StorageTab,
@@ -195,27 +122,120 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   admin: AdminTab
 };
 
-const activeMeta = computed(() => {
-  const meta = SECTION_META[activeSection.value] || SECTION_META.general;
-  return activeSection.value === 'workspace' && !settingsStore.isHostMode
-    ? { ...meta, titleKey: 'settings.workspaceTitleProject' }
-    : meta;
-});
+const activeTitleKey = computed(() =>
+  activeSection.value === 'workspace' && !settingsStore.isHostMode
+    ? 'settings.workspaceTitleProject'
+    : SECTION_TITLE_KEYS[activeSection.value] || SECTION_TITLE_KEYS.general
+);
 const activeComponent = computed(
   () => SECTION_COMPONENTS[activeSection.value] || SECTION_COMPONENTS.general
 );
+const isWide = computed(() => activeSection.value === 'usage' || activeSection.value === 'storage');
 
 const selectSection = (section: SettingsSection) => {
   settingsStore.setActiveSection(section);
 };
 
-const { loaded, loading, error, status } = storeToRefs(personalization);
+// ── 顶部大标题：内容滚到即将与标题重叠时淡出 ──
+const scrollEl = ref<HTMLElement | null>(null);
+const innerEl = ref<HTMLElement | null>(null);
+const titleEl = ref<HTMLElement | null>(null);
+const titleOpacity = ref(1);
+const TITLE_FADE_DISTANCE = 28;
+let titleFrame = 0;
+
+const updateTitleOpacity = () => {
+  titleFrame = 0;
+  const scroller = scrollEl.value;
+  const inner = innerEl.value;
+  const title = titleEl.value;
+  if (!scroller || !inner || !title) return;
+  // 内容起点（内层上内边距）与标题底边之间的空隙滚完后开始淡出
+  const contentStart = parseFloat(getComputedStyle(inner).paddingTop) || 0;
+  const titleBottom = title.offsetTop + title.offsetHeight;
+  const overlap = scroller.scrollTop - (contentStart - titleBottom);
+  titleOpacity.value = Math.min(1, Math.max(0, 1 - overlap / TITLE_FADE_DISTANCE));
+};
+
+const onContentScroll = () => {
+  if (!titleFrame) titleFrame = requestAnimationFrame(updateTitleOpacity);
+};
 
 // 切换分区时内容区回到顶部（各分区语义独立，不继承上一页滚动位置）
-const contentEl = ref<HTMLElement | null>(null);
 watch(activeSection, () => {
-  contentEl.value?.scrollTo({ top: 0 });
+  scrollEl.value?.scrollTo({ top: 0 });
+  titleOpacity.value = 1;
 });
+
+// ── 搜索 ──
+const query = ref('');
+const focusIndex = ref(-1);
+const activeResultKey = ref('');
+const searching = computed(() => query.value.trim().length > 0);
+const results = computed<SearchResult[]>(() =>
+  searching.value ? searchSettings(query.value, sectionLabel, canShowSection) : []
+);
+const resultButtons = ref<HTMLElement[]>([]);
+
+watch(query, () => {
+  focusIndex.value = -1;
+  activeResultKey.value = '';
+});
+
+let highlightTimer = 0;
+let locateTimer = 0;
+
+const highlightRow = (anchor: string, attempt = 0) => {
+  const root = innerEl.value;
+  const row = root ? findSettingRow(root, anchor) : null;
+  if (!row) {
+    // 分区可能在异步加载数据后才渲染出目标行；最多等约 1 秒
+    if (attempt < 10) {
+      locateTimer = window.setTimeout(() => highlightRow(anchor, attempt + 1), 100);
+    }
+    return;
+  }
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  row.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+  row.classList.remove('stg-search-hit');
+  void row.offsetWidth;
+  row.classList.add('stg-search-hit');
+  window.clearTimeout(highlightTimer);
+  highlightTimer = window.setTimeout(() => row.classList.remove('stg-search-hit'), 1700);
+};
+
+const openResult = async (result: SearchResult) => {
+  activeResultKey.value = result.key;
+  window.clearTimeout(locateTimer);
+  if (activeSection.value !== result.section) {
+    selectSection(result.section);
+  }
+  if (!result.anchor) return;
+  await nextTick();
+  highlightRow(result.anchor);
+};
+
+const moveFocus = (delta: number) => {
+  const count = results.value.length;
+  if (!count) return;
+  focusIndex.value =
+    focusIndex.value < 0 ? (delta > 0 ? 0 : count - 1) : (focusIndex.value + delta + count) % count;
+  void nextTick(() => resultButtons.value[focusIndex.value]?.scrollIntoView({ block: 'nearest' }));
+};
+
+const onSearchKeydown = (event: KeyboardEvent) => {
+  if (!searching.value) return;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveFocus(event.key === 'ArrowDown' ? 1 : -1);
+  } else if (event.key === 'Enter') {
+    const target = results.value[focusIndex.value < 0 ? 0 : focusIndex.value];
+    if (target) {
+      event.preventDefault();
+      void openResult(target);
+    }
+  }
+};
 
 onMounted(() => {
   // 数据兜底：设置页可能是 personalization 数据的首个消费者（个人空间未打开过）
@@ -229,348 +249,124 @@ onMounted(() => {
     const match = window.location.pathname.match(/^\/settings\/([^/]+)\/?$/);
     if (!match) return;
     const target = match[1] as SettingsSection;
-    const exists = NAV_GROUPS.some((group) => group.items.some((item) => item.id === target));
-    if (exists && canShowSection(target)) {
+    if (NAV_ITEMS.some((item) => item.id === target) && canShowSection(target)) {
       settingsStore.setActiveSection(target);
     }
   })();
 });
+
+onBeforeUnmount(() => {
+  if (titleFrame) cancelAnimationFrame(titleFrame);
+  window.clearTimeout(highlightTimer);
+  window.clearTimeout(locateTimer);
+});
 </script>
 
 <template>
-  <!-- settings-redesign-card 是迁移 tab 的宿主契约：提供浮层背景变量
-       （--settings-floating-menu-bg，缺失时浅色/经典主题浮层透明）
-       与 @container settings-card 响应式上下文；
-       position: fixed 由下方 scoped 样式以更高特异性保持，不受该类 relative 影响 -->
-  <div class="settings-shell settings-redesign-card">
-    <!-- 顶栏：返回 + 标题 + 保存反馈 -->
-    <header class="settings-shell-topbar">
-      <button
-        type="button"
-        class="settings-shell-back"
-        :aria-label="$t('settings.backAriaLabel')"
-        :title="$t('settings.backAriaLabel')"
-        @click="emit('close')"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path
-            d="M10 3L5 8l5 5"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </button>
-      <span class="settings-shell-title">{{ $t('settings.title') }}</span>
-      <span class="settings-shell-spacer"></span>
-      <span v-if="status" class="settings-shell-status success">{{ status }}</span>
-      <span v-else-if="error && loaded" class="settings-shell-status error">{{ error }}</span>
-    </header>
-
-    <div class="settings-shell-layout">
-      <!-- 左侧分组导航 -->
-      <nav class="settings-shell-nav" :aria-label="$t('settings.navAriaLabel')">
-        <div v-for="group in visibleNavGroups" :key="group.id" class="settings-shell-nav-group">
-          <div class="settings-shell-nav-group-title">{{ $t(group.titleKey) }}</div>
-          <button
-            v-for="item in group.items"
-            :key="item.id"
-            type="button"
-            class="settings-shell-nav-item"
-            :class="{ active: activeSection === item.id }"
-            :aria-pressed="activeSection === item.id"
-            @click="selectSection(item.id)"
-          >
-            <SettingsNavIcon :name="item.icon" />
-            <span class="settings-shell-nav-label">{{ $t(item.labelKey) }}</span>
-          </button>
-        </div>
-      </nav>
-
-      <!-- 右内容区（独立滚动，760px 居中） -->
-      <main class="settings-shell-content" ref="contentEl">
-        <div
-          class="settings-shell-content-inner"
-          :class="{
-            'settings-shell-content-inner--wide':
-              activeSection === 'usage' || activeSection === 'storage'
-          }"
-          v-if="loaded"
+  <!-- settings-redesign-card 是设置页迁移 tab 的宿主契约，position: fixed 由 settings.scss 保持。 -->
+  <div class="stg-shell settings-redesign-card">
+    <!-- 左侧悬浮面板：返回 + 标题 + 搜索 + 导航 -->
+    <nav class="stg-nav-pane" :aria-label="$t('settings.navAriaLabel')">
+      <div class="stg-nav-heading">
+        <UiIconButton
+          icon="arrow-left"
+          :label="$t('settings.backAriaLabel')"
+          @click="emit('close')"
+        />
+        <h1>{{ $t('settings.title') }}</h1>
+        <span v-if="status" class="stg-nav-status" role="status">{{ status }}</span>
+        <span
+          v-else-if="error && loaded"
+          class="stg-nav-status is-error"
+          role="alert"
+          :title="error"
+          >{{ error }}</span
         >
-          <div class="settings-shell-page-title">{{ $t(activeMeta.titleKey) }}</div>
-          <div class="settings-shell-page-desc">{{ $t(activeMeta.descKey) }}</div>
-          <QuickEntrySettings v-if="quickChatSupported" v-show="activeSection === 'quick-chat'" />
-          <component
-            v-if="activeSection !== 'quick-chat'"
-            :is="activeComponent"
-            :key="activeSection"
-          />
+      </div>
+      <div class="stg-nav-search">
+        <UiSearchField
+          v-model="query"
+          :placeholder="$t('settings.searchPlaceholder')"
+          :clear-label="$t('settings.searchClear')"
+          @keydown="onSearchKeydown"
+        />
+      </div>
+      <div class="stg-nav-list" :class="{ 'is-searching': searching }">
+        <template v-if="searching">
+          <div v-if="results.length" class="stg-nav-items">
+            <button
+              v-for="(result, index) in results"
+              :key="result.key"
+              ref="resultButtons"
+              type="button"
+              class="stg-nav-item"
+              :class="{
+                'is-focused': index === focusIndex,
+                'is-active': result.key === activeResultKey
+              }"
+              @click="openResult(result)"
+            >
+              <SettingsNavIcon :name="navIconOf(result.section)" />
+              <span class="stg-nav-label">{{ result.title }}</span>
+              <span v-if="result.meta" class="stg-nav-item-meta">{{ result.meta }}</span>
+            </button>
+          </div>
+          <p v-else class="stg-nav-empty">{{ $t('settings.searchEmpty') }}</p>
+        </template>
+        <template v-else>
+          <section v-for="group in visibleNavGroups" :key="group.id" class="stg-nav-group">
+            <div class="stg-nav-group-title">{{ $t(group.titleKey) }}</div>
+            <div class="stg-nav-items">
+              <button
+                v-for="item in group.items"
+                :key="item.id"
+                type="button"
+                class="stg-nav-item"
+                :class="{ 'is-active': activeSection === item.id }"
+                :aria-current="activeSection === item.id ? 'page' : undefined"
+                @click="selectSection(item.id)"
+              >
+                <SettingsNavIcon :name="item.icon" />
+                <span class="stg-nav-label">{{ $t(item.labelKey) }}</span>
+              </button>
+            </div>
+          </section>
+        </template>
+      </div>
+    </nav>
+
+    <!-- 右侧平铺内容：大标题固定在顶部，内容滚到标题处时标题淡出 -->
+    <main class="stg-main" :class="{ 'is-wide': isWide }">
+      <div class="stg-page-heading" :style="{ opacity: titleOpacity }">
+        <div class="stg-page-heading-inner">
+          <h2 ref="titleEl" class="stg-page-title">{{ $t(activeTitleKey) }}</h2>
         </div>
-        <div class="settings-shell-content-inner settings-shell-placeholder" v-else-if="error">
-          <span class="settings-shell-loaderror">{{ error }}</span>
-          <button
-            type="button"
-            class="settings-secondary-button"
-            @click="personalization.fetchPersonalization()"
-          >
-            {{ $t('common.retry') }}
-          </button>
+      </div>
+      <div ref="scrollEl" class="stg-scroll" @scroll.passive="onContentScroll">
+        <div ref="innerEl" class="stg-scroll-inner">
+          <template v-if="loaded">
+            <QuickEntrySettings v-if="quickChatSupported" v-show="activeSection === 'quick-chat'" />
+            <component
+              v-if="activeSection !== 'quick-chat'"
+              :is="activeComponent"
+              :key="activeSection"
+            />
+          </template>
+          <div v-else-if="error" class="stg-placeholder">
+            <span class="stg-load-error">{{ error }}</span>
+            <button
+              type="button"
+              class="stg-secondary-button"
+              @click="personalization.fetchPersonalization()"
+            >
+              {{ $t('common.retry') }}
+            </button>
+          </div>
+          <div v-else class="stg-placeholder">
+            {{ $t('personalization.loadingPersonalization') }}
+          </div>
         </div>
-        <div class="settings-shell-content-inner settings-shell-placeholder" v-else>
-          {{ $t('personalization.loadingPersonalization') }}
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 </template>
-
-<style scoped>
-/* ===== 全屏壳（实体面板：不透明底，无磨砂） ===== */
-.settings-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 400;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-base);
-  color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-/* ===== 顶栏 ===== */
-.settings-shell-topbar {
-  height: 52px;
-  flex: 0 0 52px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-default);
-  background: var(--surface-panel);
-}
-
-.settings-shell-back {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.settings-shell-back:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
-}
-
-.settings-shell-title {
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.settings-shell-spacer {
-  flex: 1;
-  min-width: 0;
-}
-
-.settings-shell-status {
-  height: 52px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 12.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 40%;
-}
-
-.settings-shell-status.success {
-  color: var(--state-success);
-}
-
-.settings-shell-status.error {
-  color: var(--state-danger);
-}
-
-/* ===== 布局 ===== */
-.settings-shell-layout {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-/* ===== 左侧导航 ===== */
-.settings-shell-nav {
-  width: 232px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border-default);
-  background: var(--surface-rail);
-  padding: 12px 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.settings-shell-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-shell-nav-group {
-  margin-bottom: 16px;
-  /* 项间 4px 间距：hover/选中背景块之间留出空隙，不再上下相贴 */
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.settings-shell-nav-group-title {
-  height: 24px;
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  padding: 0 10px;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.settings-shell-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  font-size: 13px;
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.settings-shell-nav-item:hover {
-  background: var(--hover-bg);
-}
-
-.settings-shell-nav-item.active {
-  background: var(--tab-active);
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.settings-shell-nav-label {
-  min-width: 0;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ===== 内容区 ===== */
-.settings-shell-content {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.settings-shell-content::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-shell-content-inner {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 36px 48px 80px;
-}
-
-/* 用量统计：一年热力图约 830px，需要更宽的内容列（其余分区保持 760px） */
-.settings-shell-content-inner--wide {
-  max-width: 1040px;
-}
-
-.settings-shell-page-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.settings-shell-page-desc {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin-bottom: 28px;
-}
-
-.settings-shell-placeholder {
-  color: var(--text-tertiary);
-  font-size: 13px;
-}
-
-.settings-shell-loaderror {
-  display: block;
-  color: var(--state-danger);
-  margin-bottom: 12px;
-}
-
-/* ===== 窄屏（≤760px）：导航折叠为顶部横向滚动条 ===== */
-@media (max-width: 760px) {
-  .settings-shell {
-    z-index: 1700;
-  }
-
-  .settings-shell-layout {
-    flex-direction: column;
-  }
-
-  .settings-shell-nav {
-    width: 100%;
-    flex: 0 0 auto;
-    display: flex;
-    gap: 2px;
-    border-right: 0;
-    border-bottom: 1px solid var(--border-default);
-    padding: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-
-  .settings-shell-nav-group {
-    display: contents;
-  }
-
-  .settings-shell-nav-group-title {
-    display: none;
-  }
-
-  .settings-shell-nav-item {
-    width: auto;
-    flex: 0 0 auto;
-    padding: 0 12px;
-  }
-
-  .settings-shell-nav-label {
-    flex: 0 0 auto;
-  }
-
-  .settings-shell-content-inner {
-    padding: 24px 20px 64px;
-  }
-}
-</style>

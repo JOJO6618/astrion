@@ -113,29 +113,30 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootRef" class="codex-weekly">
-    <div class="settings-section-divider">
-      <span class="settings-section-divider__label">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">
         {{ t('personalization.codexWeeklySection') }}
       </span>
     </div>
 
-    <div v-if="hasData" class="codex-weekly__rows">
-      <div class="settings-input-row codex-weekly__row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ t('personalization.codexWeeklyApiValue') }}</span>
+    <div v-if="hasData" class="stg-card codex-weekly__rows">
+      <div class="stg-input-row codex-weekly__row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ t('personalization.codexWeeklyApiValue') }}</span>
+          <span class="stg-row-desc codex-weekly__amount">{{ currentValue }}</span>
         </span>
-        <span class="codex-weekly__amount">{{ currentValue }}</span>
       </div>
-      <div v-if="maxValue" class="settings-input-row codex-weekly__row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ t('personalization.codexWeeklyMaxValue') }}</span>
+      <div v-if="maxValue" class="stg-input-row codex-weekly__row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ t('personalization.codexWeeklyMaxValue') }}</span>
+          <span class="stg-row-desc codex-weekly__amount">{{ maxValue }}</span>
         </span>
-        <span class="codex-weekly__amount">{{ maxValue }}</span>
       </div>
 
-      <div v-if="history.length" class="settings-input-row codex-weekly__row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ t('personalization.codexWeeklyHistory') }}</span>
+      <div v-if="history.length" class="stg-input-row codex-weekly__row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ t('personalization.codexWeeklyHistory') }}</span>
+          <span class="stg-row-desc">{{ t('personalization.codexWeeklyHistoryDesc') }}</span>
         </span>
         <div class="codex-weekly__select">
           <button
@@ -200,10 +201,7 @@ onBeforeUnmount(() => {
 }
 
 .codex-weekly__amount {
-  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  color: var(--text-primary);
 }
 
 .codex-weekly__select {
@@ -218,9 +216,9 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--theme-control-border);
-  border-radius: 6px;
-  background: var(--surface-raised);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-primary);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -232,8 +230,8 @@ onBeforeUnmount(() => {
 }
 
 .codex-weekly__button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 2px;
 }
 
 .codex-weekly__button-label {

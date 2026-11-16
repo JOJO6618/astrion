@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue';
+import { computed } from 'vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
 import { t } from '@/locales';
 import UsageActivity from './usage/UsageActivity.vue';
 import UsageCacheChart from './usage/UsageCacheChart.vue';
@@ -18,10 +19,6 @@ import { useUsageStats } from './usage/useUsageStats';
 import type { UsageGranularity, UsageMetric, UsageRange } from './usage/types';
 
 defineOptions({ name: 'UsageStatsTab' });
-
-/** 下拉沿用设置页共享上下文（与其它分区同一套浮层定位与外部点击关闭） */
-const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const { activeDropdown, activeTheme, closeDropdown, floatingMenuStyle, toggleDropdown } = ctx;
 
 const {
   report,
@@ -71,13 +68,16 @@ const sourceOptions = computed(() => {
     }))
   ];
 });
-const sourceText = computed(
-  () => sourceOptions.value.find((item) => item.id === source.value)?.label || t('usageStats.allSources')
+const sourceItems = computed(() =>
+  sourceOptions.value.map((item) => ({
+    value: item.id,
+    label: item.label,
+    description: item.meta
+  }))
 );
 
 function pickSource(id: string) {
   source.value = id;
-  closeDropdown();
 }
 
 const activityTitle = computed(() =>
@@ -114,7 +114,9 @@ const overviewItems = computed(() => {
       key: 'active',
       label: t('usageStats.ovActive'),
       value: t('usageStats.days', { n: ov.active_days }),
-      sub: data.first_date ? t('usageStats.ovFirstDate', { date: formatDate(parseDay(data.first_date)) }) : '—',
+      sub: data.first_date
+        ? t('usageStats.ovFirstDate', { date: formatDate(parseDay(data.first_date)) })
+        : '—',
       note: false
     },
     {
@@ -145,47 +147,36 @@ const updatedText = computed(() =>
 </script>
 
 <template>
-  <section class="settings-page usage-page">
-    <!-- 范围筛选 + 刷新 -->
-    <div class="usage-toolbar">
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'usage-source' }"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="settings-select-button usage-source-button"
-          :aria-label="$t('usageStats.sourceAria')"
-          @click="toggleDropdown('usage-source')"
-        >
-          <span class="usage-ellipsis">{{ sourceText }}</span>
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown === 'usage-source' ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in sourceOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: source === option.id }"
-            @click="pickSource(option.id)"
-          >
-            <strong>{{ option.label }}</strong
-            ><span>{{ option.meta }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+  <section class="stg-page usage-page">
+    <!-- 统计范围（下拉）与刷新（状态 + 按钮）拆成两行，每行右侧一个控件 -->
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('usageStats.sourceTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('usageStats.sourceDesc') }}</span>
+        </span>
+        <UiSelect
+          :model-value="source"
+          :options="sourceItems"
+          :label="$t('usageStats.sourceAria')"
+          align-end
+          @update:model-value="pickSource"
+        />
       </div>
-      <span class="usage-toolbar-meta">
-        <template v-if="report">{{ updatedText }} · {{ $t('usageStats.timezone', { tz: report.timezone }) }}</template>
-      </span>
-      <button type="button" class="settings-secondary-button" :disabled="loading" @click="load">
-        {{ loading ? $t('usageStats.refreshing') : $t('usageStats.refresh') }}
-      </button>
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('usageStats.updatedTitle') }}</span>
+          <span class="stg-row-desc">
+            <template v-if="report"
+              >{{ updatedText }} ·
+              {{ $t('usageStats.timezone', { tz: report.timezone }) }}</template
+            >
+          </span>
+        </span>
+        <button type="button" class="stg-secondary-button" :disabled="loading" @click="load">
+          {{ loading ? $t('usageStats.refreshing') : $t('usageStats.refresh') }}
+        </button>
+      </div>
     </div>
 
     <p v-if="error" class="usage-error">{{ error }}</p>
@@ -195,7 +186,7 @@ const updatedText = computed(() =>
       <p v-if="!report.first_date" class="usage-placeholder">{{ $t('usageStats.empty') }}</p>
 
       <!-- 概览 -->
-      <div class="usage-overview">
+      <div class="stg-card usage-overview">
         <div v-for="item in overviewItems" :key="item.key" class="usage-stat">
           <span class="usage-stat-label">{{ item.label }}</span>
           <span class="usage-stat-value">{{ item.value }}</span>
@@ -204,7 +195,7 @@ const updatedText = computed(() =>
       </div>
 
       <!-- 活动 -->
-      <div class="usage-block">
+      <div class="stg-card usage-block">
         <div class="usage-block-head">
           <h3>{{ activityTitle }}</h3>
           <div class="usage-tabs" role="tablist" :aria-label="$t('usageStats.granAria')">
@@ -264,29 +255,37 @@ const updatedText = computed(() =>
       </div>
 
       <template v-if="breakdown">
-        <div class="usage-block">
-          <div class="usage-block-head"><h3>{{ $t('usageStats.modelsTitle') }}</h3></div>
+        <div class="stg-card usage-block">
+          <div class="usage-block-head">
+            <h3>{{ $t('usageStats.modelsTitle') }}</h3>
+          </div>
           <UsageModelTable :models="breakdown.models" :currency="currency" :rate="rate" />
           <p class="usage-note">{{ $t('usageStats.modelsNote') }}</p>
         </div>
 
         <div class="usage-columns">
-          <div class="usage-block">
-            <div class="usage-block-head"><h3>{{ $t('usageStats.compTitle') }}</h3></div>
+          <div class="stg-card usage-block">
+            <div class="usage-block-head">
+              <h3>{{ $t('usageStats.compTitle') }}</h3>
+            </div>
             <UsageComposition
               :breakdown="breakdown"
               :sources="report.sources"
               :show-sources="source === 'all'"
             />
           </div>
-          <div class="usage-block">
-            <div class="usage-block-head"><h3>{{ $t('usageStats.cacheTitle') }}</h3></div>
+          <div class="stg-card usage-block">
+            <div class="usage-block-head">
+              <h3>{{ $t('usageStats.cacheTitle') }}</h3>
+            </div>
             <UsageCacheChart :report="report" :range="range" />
           </div>
         </div>
 
-        <div class="usage-block">
-          <div class="usage-block-head"><h3>{{ $t('usageStats.punchTitle') }}</h3></div>
+        <div class="stg-card usage-block">
+          <div class="usage-block-head">
+            <h3>{{ $t('usageStats.punchTitle') }}</h3>
+          </div>
           <UsagePunchCard :punch="breakdown.punch" :timezone="report.timezone" />
         </div>
       </template>
@@ -301,16 +300,8 @@ const updatedText = computed(() =>
   flex-direction: column;
 }
 
-.usage-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 16px;
-}
-
 .usage-source-button {
   max-width: 240px;
-  border: 1px solid var(--border-default);
 }
 
 .usage-ellipsis {
@@ -318,16 +309,6 @@ const updatedText = computed(() =>
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.usage-toolbar-meta {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-tertiary);
 }
 
 .usage-error {
@@ -345,8 +326,6 @@ const updatedText = computed(() =>
 .usage-overview {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  border-top: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
 }
 
 .usage-stat {
@@ -359,7 +338,6 @@ const updatedText = computed(() =>
 
 .usage-stat + .usage-stat {
   padding-left: 14px;
-  border-left: 1px solid var(--border-default);
 }
 
 .usage-stat-label,
@@ -387,10 +365,10 @@ const updatedText = computed(() =>
   font-variant-numeric: tabular-nums;
 }
 
+/* 图表卡片：四周统一 16 */
 .usage-block {
   min-width: 0;
-  padding: 22px 0;
-  border-bottom: 1px solid var(--border-default);
+  padding: 16px;
 }
 
 .usage-block-head {
@@ -415,7 +393,7 @@ const updatedText = computed(() =>
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding-top: 26px;
+  padding: 28px 16px 8px;
 }
 
 .usage-details-head p {
@@ -483,12 +461,13 @@ const updatedText = computed(() =>
 .usage-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: 32px;
-  border-bottom: 1px solid var(--border-default);
+  gap: 12px;
+  margin: 12px 0;
 }
 
-.usage-columns > .usage-block {
-  border-bottom: 0;
+/* 并排两张卡片不吃「卡片 + 卡片」的上边距，间距由网格 gap 负责 */
+.usage-columns > .stg-card + .stg-card {
+  margin-top: 0;
 }
 
 .usage-note {
@@ -505,29 +484,14 @@ const updatedText = computed(() =>
   .usage-stat,
   .usage-stat + .usage-stat {
     padding: 12px 12px 12px 0;
-    border-left: 0;
-    border-bottom: 1px solid var(--border-default);
   }
 
   .usage-stat:nth-child(even) {
     padding-left: 14px;
-    border-left: 1px solid var(--border-default);
-  }
-
-  .usage-stat:last-child {
-    border-bottom: 0;
   }
 
   .usage-columns {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .usage-columns > .usage-block + .usage-block {
-    border-top: 1px solid var(--border-default);
-  }
-
-  .usage-toolbar-meta {
-    display: none;
   }
 }
 </style>

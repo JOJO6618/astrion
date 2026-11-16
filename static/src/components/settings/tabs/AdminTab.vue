@@ -12,40 +12,40 @@ const { openAdminPanel, openApiAdmin, openCustomTools, openMcpConfig, showMcpCon
 </script>
 
 <template>
-  <section class="settings-page admin-monitor-page">
-    <div class="settings-action-row" v-if="showMcpConfigEntry">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.mcpConfigTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.mcpConfigDesc') }}</span></span
-      ><button type="button" class="settings-secondary-button" @click="openMcpConfig">
-        {{ $t('personalization.open') }}
-      </button>
-    </div>
-    <div class="settings-action-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.adminMonitorTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.adminMonitorDesc') }}</span></span
-      ><button type="button" class="settings-secondary-button" @click="openAdminPanel">
-        {{ $t('personalization.open') }}
-      </button>
-    </div>
-    <div class="settings-action-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.apiAdminTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.apiAdminDesc') }}</span></span
-      ><button type="button" class="settings-secondary-button" @click="openApiAdmin">
-        {{ $t('personalization.open') }}
-      </button>
-    </div>
-    <div class="settings-action-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.customToolsAdminTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.customToolsAdminDesc')
-        }}</span></span
-      ><button type="button" class="settings-secondary-button" @click="openCustomTools">
-        {{ $t('personalization.open') }}
-      </button>
+  <section class="stg-page admin-monitor-page">
+    <div class="stg-card">
+      <div class="stg-action-row" v-if="showMcpConfigEntry">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.mcpConfigTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.mcpConfigDesc') }}</span></span
+        ><button type="button" class="stg-secondary-button" @click="openMcpConfig">
+          {{ $t('personalization.open') }}
+        </button>
+      </div>
+      <div class="stg-action-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.adminMonitorTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.adminMonitorDesc') }}</span></span
+        ><button type="button" class="stg-secondary-button" @click="openAdminPanel">
+          {{ $t('personalization.open') }}
+        </button>
+      </div>
+      <div class="stg-action-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.apiAdminTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.apiAdminDesc') }}</span></span
+        ><button type="button" class="stg-secondary-button" @click="openApiAdmin">
+          {{ $t('personalization.open') }}
+        </button>
+      </div>
+      <div class="stg-action-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.customToolsAdminTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.customToolsAdminDesc') }}</span></span
+        ><button type="button" class="stg-secondary-button" @click="openCustomTools">
+          {{ $t('personalization.open') }}
+        </button>
+      </div>
     </div>
   </section>
 </template>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, inject, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { useSandboxSetupStore } from '@/stores/sandboxSetup';
 
 defineOptions({ name: 'WorkspaceTab' });
@@ -32,299 +33,230 @@ const sandboxShowWizard = computed(() => {
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  activeDropdown,
-  floatingMenuStyle,
   form,
-  permissionModeLabel,
   personalization,
   selectDefaultPermissionMode,
   selectDefaultWorkMode,
   selectVersioningBackupMode,
-  toggleDropdown,
-  versioningBackupModeLabel,
-  workModeLabel,
   permissionModeOptions,
   permissionDescKey,
   wsDescKey,
-  workModeOptions,
-  activeTheme
+  workModeOptions
 } = ctx;
+
+const permissionItems = computed(() =>
+  permissionModeOptions.map((option: any) => ({
+    value: option.id,
+    label: t(option.labelKey),
+    description: t(permissionDescKey(option))
+  }))
+);
+const workModeItems = computed(() =>
+  workModeOptions.map((option: any) => ({
+    value: option.id,
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
+const backupModeItems = computed(() => [
+  {
+    value: 'shallow',
+    label: t('personalization.shallowBackup'),
+    description: t('personalization.shallowBackupDesc')
+  },
+  {
+    value: 'full',
+    label: t('personalization.fullBackup'),
+    description: t(wsDescKey('personalization.fullBackupDesc'))
+  }
+]);
 </script>
 
 <template>
-  <section class="settings-page" data-tutorial="personal-page-workspace">
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.defaultPermissionTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.defaultPermissionDesc')
-        }}</span></span
-      >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'permission' }"
-        @click.stop
-      >
-        <button type="button" class="settings-select-button" @click="toggleDropdown('permission')">
-          {{ permissionModeLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
+  <section class="stg-page" data-tutorial="personal-page-workspace">
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.defaultPermissionTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.defaultPermissionDesc') }}</span></span
         >
-          <button
-            v-for="option in permissionModeOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.default_permission_mode === option.id }"
-            @click="selectDefaultPermissionMode(option.id)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(permissionDescKey(option)) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+        <UiSelect
+          :model-value="form.default_permission_mode"
+          :options="permissionItems"
+          align-end
+          @update:model-value="selectDefaultPermissionMode"
+        />
+      </div>
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.defaultWorkModeTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.workRunModeDesc') }}</span></span
+        >
+        <UiSelect
+          :model-value="form.default_work_mode"
+          :options="workModeItems"
+          align-end
+          @update:model-value="selectDefaultWorkMode"
+        />
       </div>
     </div>
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.defaultWorkModeTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.workRunModeDesc') }}</span></span
-      >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'work-mode' }"
-        @click.stop
-      >
-        <button type="button" class="settings-select-button" @click="toggleDropdown('work-mode')">
-          {{ workModeLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            v-for="option in workModeOptions"
-            :key="option.id"
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.default_work_mode === option.id }"
-            @click="selectDefaultWorkMode(option.id)"
-          >
-            <strong>{{ $t(option.labelKey) }}</strong
-            ><span>{{ $t(option.descKey) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-    <div class="settings-action-row sandbox-env-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('sandbox.sectionTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('sandbox.sectionDesc') }}</span>
-      </span>
-      <div class="settings-inline-actions">
-        <span class="settings-mini-status" :class="{ warning: sandboxShowWizard }">{{
-          sandboxStatusText
-        }}</span>
-        <span v-if="sandboxSetup.neverAsk" class="settings-mini-status">{{
-          $t('sandbox.neverAgainSet')
-        }}</span>
+
+    <div class="stg-card">
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('sandbox.sectionTitle') }}</span>
+          <span class="stg-row-desc" :class="{ 'is-warning': sandboxShowWizard }">{{
+            sandboxStatusText
+          }}</span>
+        </span>
         <button
-          v-if="sandboxSetup.neverAsk"
+          v-if="sandboxShowWizard"
           type="button"
-          class="settings-secondary-button"
-          @click="sandboxSetup.resetNeverAsk()"
+          class="stg-primary-button"
+          @click="sandboxSetup.openWizard()"
         >
-          {{ $t('sandbox.resetNeverAgain') }}
+          {{ $t('sandbox.openWizard') }}
         </button>
         <button
+          v-else
           type="button"
-          class="settings-secondary-button"
+          class="stg-secondary-button"
           :disabled="sandboxSetup.checking"
           @click="sandboxSetup.recheck()"
         >
           {{ sandboxSetup.checking ? $t('common.refreshing') : $t('sandbox.recheck') }}
         </button>
-        <button
-          v-if="sandboxShowWizard"
-          type="button"
-          class="settings-primary-button"
-          @click="sandboxSetup.openWizard()"
-        >
-          {{ $t('sandbox.openWizard') }}
+      </div>
+      <div v-if="sandboxSetup.neverAsk" class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('sandbox.neverAgainTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('sandbox.neverAgainSet') }}</span>
+        </span>
+        <button type="button" class="stg-secondary-button" @click="sandboxSetup.resetNeverAsk()">
+          {{ $t('sandbox.resetNeverAgain') }}
         </button>
       </div>
     </div>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.agentsMdInjectTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t(wsDescKey('personalization.agentsMdInjectDesc'))
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.agents_md_auto_inject"
-        @change="
-          personalization.updateField({
-            key: 'agents_md_auto_inject',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.agents_md_auto_inject"
-    /></label>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.agentsMdInjectTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.agentsMdInjectDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.agents_md_auto_inject"
+          @change="
+            personalization.updateField({
+              key: 'agents_md_auto_inject',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.agents_md_auto_inject"
+      /></label>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.claudeMdInjectTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t(wsDescKey('personalization.claudeMdInjectDesc'))
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.claude_md_auto_inject"
-        @change="
-          personalization.updateField({
-            key: 'claude_md_auto_inject',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.claude_md_auto_inject"
-    /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.claudeMdInjectTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t(wsDescKey('personalization.claudeMdInjectDesc'))
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.claude_md_auto_inject"
+          @change="
+            personalization.updateField({
+              key: 'claude_md_auto_inject',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.claude_md_auto_inject"
+      /></label>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.agentsSkillsScanTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t(wsDescKey('personalization.agentsSkillsScanDesc'))
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.agents_skills_scan_enabled"
-        @change="
-          personalization.updateField({
-            key: 'agents_skills_scan_enabled',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.agents_skills_scan_enabled"
-    /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.agentsSkillsScanTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t(wsDescKey('personalization.agentsSkillsScanDesc'))
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.agents_skills_scan_enabled"
+          @change="
+            personalization.updateField({
+              key: 'agents_skills_scan_enabled',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.agents_skills_scan_enabled"
+      /></label>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.modifyHistoryTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t(wsDescKey('personalization.modifyHistoryDesc'))
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.modify_history_enabled"
-        @change="
-          personalization.updateField({
-            key: 'modify_history_enabled',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.modify_history_enabled"
-    /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.modifyHistoryTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t(wsDescKey('personalization.modifyHistoryDesc'))
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.modify_history_enabled"
+          @change="
+            personalization.updateField({
+              key: 'modify_history_enabled',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.modify_history_enabled"
+      /></label>
+    </div>
 
-    <div class="settings-section-divider">
-      <span class="settings-section-divider__label">{{
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{
         $t('personalization.versionControlDivider')
       }}</span>
     </div>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.versioningByDefaultTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t('personalization.versioningByDefaultDesc')
-        }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.versioning_enabled_by_default"
-        @change="
-          personalization.updateField({
-            key: 'versioning_enabled_by_default',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.versioning_enabled_by_default"
-    /></label>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.versioningByDefaultTitle') }}</span
+          ><span class="stg-row-desc">{{
+            $t('personalization.versioningByDefaultDesc')
+          }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.versioning_enabled_by_default"
+          @change="
+            personalization.updateField({
+              key: 'versioning_enabled_by_default',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.versioning_enabled_by_default"
+      /></label>
 
-    <div class="settings-select-row">
-      <span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.backupModeTitle') }}</span
-        ><span class="settings-row-desc">{{
-          $t(wsDescKey('personalization.backupModeDesc'))
-        }}</span></span
-      >
-      <div
-        class="settings-select-wrap"
-        :class="{ open: activeDropdown === 'versioning-backup-mode' }"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="settings-select-button"
-          @click="toggleDropdown('versioning-backup-mode')"
+      <div class="stg-select-row">
+        <span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.backupModeTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.backupModeDesc') }}</span></span
         >
-          {{ versioningBackupModeLabel }}
-          <span class="select-chevron" aria-hidden="true"></span>
-        </button>
-        <div
-          :class="['settings-floating-menu', { dark: activeTheme === 'dark' }]"
-          :style="activeDropdown ? floatingMenuStyle : undefined"
-        >
-          <button
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.versioning_backup_mode === 'shallow' }"
-            @click="selectVersioningBackupMode('shallow')"
-          >
-            <strong>{{ $t('personalization.shallowBackup') }}</strong
-            ><span>{{ $t('personalization.shallowBackupDesc') }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-          <button
-            type="button"
-            class="settings-menu-option"
-            :class="{ selected: form.versioning_backup_mode === 'full' }"
-            @click="selectVersioningBackupMode('full')"
-          >
-            <strong>{{ $t('personalization.fullBackup') }}</strong
-            ><span>{{ $t(wsDescKey('personalization.fullBackupDesc')) }}</span
-            ><svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7" /></svg>
-          </button>
-        </div>
+        <UiSelect
+          :model-value="form.versioning_backup_mode"
+          :options="backupModeItems"
+          align-end
+          @update:model-value="selectVersioningBackupMode"
+        />
       </div>
-    </div>
 
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('personalization.gitWorktreeTitle') }}</span
-        ><span class="settings-row-desc">{{ $t('personalization.gitWorktreeDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.git_worktree_enabled"
-        @change="
-          personalization.updateField({
-            key: 'git_worktree_enabled',
-            value: $event.target.checked
-          })
-        " /><FancyCheck :checked="form.git_worktree_enabled"
-    /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('personalization.gitWorktreeTitle') }}</span
+          ><span class="stg-row-desc">{{ $t('personalization.gitWorktreeDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.git_worktree_enabled"
+          @change="
+            personalization.updateField({
+              key: 'git_worktree_enabled',
+              value: $event.target.checked
+            })
+          " /><UiSwitch decorative :checked="form.git_worktree_enabled"
+      /></label>
+    </div>
   </section>
 </template>
-
-<style scoped>
-/* 沙箱环境区块：上下结构（标题描述在上，状态徽标与按钮组整行在下），
-   避免默认左右结构中右侧按钮组挤压左侧文案空间 */
-.sandbox-env-row {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-}
-
-.sandbox-env-row .settings-inline-actions {
-  justify-content: flex-start;
-}
-</style>

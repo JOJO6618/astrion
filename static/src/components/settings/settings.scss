@@ -1,0 +1,957 @@
+/*
+ * 全屏设置页样式（DESIGN.md §7 页面范式）。类名前缀 stg-。
+ * - 壳层：左侧悬浮导航面板（返回 + 标题 + 搜索 + 导航）＋ 右侧平铺内容；只有导航与内容内部滚动。
+ * - 分区行：不画横线，层级靠留白、字号字重；分组用小标题。
+ * 个人空间抽屉仍使用 personalization/styles/settings-shared.css（settings-* 类），两者互不覆盖；
+ * 设置页下拉统一使用 static/src/components/ui/ 下的公共组件。
+ */
+
+/* ---------- 壳层 ---------- */
+.stg-shell.settings-redesign-card {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: grid;
+  grid-template-columns: 278px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 20px;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--group-page-bg);
+  color: var(--text-primary);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(.stg-shell) {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  h1,
+  h2,
+  p {
+    margin: 0;
+  }
+}
+
+/* ---------- 左侧悬浮面板 ---------- */
+.stg-nav-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px;
+  background: var(--group-card-bg);
+  border-radius: 12px;
+  box-shadow: var(--popover-shadow);
+}
+
+.stg-nav-heading {
+  height: 54px;
+  padding: 0 6px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+
+  h1 {
+    height: 26px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 26px;
+    letter-spacing: -0.4px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.stg-nav-status {
+  margin-left: auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+}
+
+.stg-nav-status.is-error {
+  color: var(--state-danger);
+}
+
+.stg-nav-search {
+  flex: none;
+  padding: 0 5px 13px;
+}
+
+.stg-nav-list {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 2px 10px;
+  scrollbar-width: none;
+}
+
+.stg-nav-list::-webkit-scrollbar {
+  display: none;
+}
+
+.stg-nav-group + .stg-nav-group {
+  margin-top: 14px;
+}
+
+.stg-nav-group-title {
+  height: 28px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stg-nav-items {
+  display: grid;
+  gap: 2px;
+}
+
+.stg-nav-item {
+  height: 32px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.stg-nav-item:hover,
+.stg-nav-item.is-focused {
+  background: var(--hover-bg);
+}
+
+.stg-nav-item.is-active {
+  background: var(--tab-active);
+  font-weight: 500;
+}
+
+.stg-nav-item:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: -2px;
+}
+
+.stg-nav-item .settings-nav-icon {
+  color: var(--text-secondary);
+}
+
+.stg-nav-item:hover .settings-nav-icon,
+.stg-nav-item.is-active .settings-nav-icon,
+.stg-nav-item.is-focused .settings-nav-icon {
+  color: var(--text-primary);
+}
+
+.stg-nav-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 搜索结果：标题 + 右侧所属分区（@ 文件菜单同款次文字） */
+.stg-nav-item-meta {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stg-nav-empty {
+  padding: 8px 12px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* ---------- 右侧内容：平铺 + 顶部大标题，滚动时内容接近标题再淡出 ---------- */
+.stg-main {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  margin-block: -16px;
+  overflow: hidden;
+  container: stg-main / inline-size;
+}
+
+.stg-page-heading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.stg-page-heading-inner,
+.stg-scroll-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.stg-main.is-wide .stg-page-heading-inner,
+.stg-main.is-wide .stg-scroll-inner {
+  max-width: 1040px;
+}
+
+.stg-page-title {
+  height: 40px;
+  padding-top: 18px;
+  box-sizing: content-box;
+  overflow: hidden;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 40px;
+  letter-spacing: -0.6px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stg-scroll {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.stg-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.stg-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+.stg-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 标题区 18 + 40，下方留 22 再开始内容 */
+.stg-scroll-inner {
+  padding-top: 80px;
+  padding-bottom: 72px;
+}
+
+.stg-placeholder {
+  color: var(--text-tertiary);
+}
+
+.stg-load-error {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--state-danger);
+}
+
+/* 搜索跳转后短暂标出目标行 */
+.stg-search-hit {
+  border-radius: 8px;
+  animation: stg-search-hit 1600ms ease;
+}
+
+@keyframes stg-search-hit {
+  0%,
+  45% {
+    background: var(--hover-bg);
+    box-shadow: 0 0 0 8px var(--hover-bg);
+  }
+
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+/* ---------- 分区行 ---------- */
+.stg-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.stg-select-row,
+.stg-input-row,
+.stg-list-row,
+.stg-action-row,
+.stg-toggle-row {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 0;
+  color: var(--text-primary);
+}
+
+.stg-list-row.tall,
+.stg-input-row.stackable {
+  align-items: start;
+}
+
+.stg-list-row.tall {
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 360px);
+}
+
+.stg-row-copy {
+  min-width: 0;
+  display: block;
+}
+
+.stg-row-title {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.stg-row-desc {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* 状态写进说明时的提醒态（如沙箱未就绪） */
+.stg-row-desc.is-warning {
+  color: var(--state-warning);
+}
+
+.stg-toggle-row {
+  position: relative;
+  cursor: pointer;
+}
+
+.stg-toggle-row input[type='checkbox'] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 分组内的子行：随分组标题缩进，行高略低 */
+.stg-toggle-row.inner,
+.stg-input-row.inner,
+.stg-select-row.inner,
+.stg-action-row.inner {
+  min-height: 44px;
+  padding: 6px 0 6px 16px;
+}
+
+.stg-group-block {
+  padding: 0;
+}
+
+.stg-group-title {
+  min-height: 52px;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 分组小标题：不带横线，只靠字重与上方留白 */
+.stg-section-divider,
+.stg-section-header {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin: 28px 0 4px;
+}
+
+.stg-page > .stg-section-divider:first-child,
+.stg-page > .stg-section-header:first-child {
+  margin-top: 0;
+}
+
+.stg-section-divider__label,
+.stg-section-title {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stg-section-desc {
+  margin: 0 0 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* 分组卡片：同一类设置聚在一张卡片里；底色同左侧悬浮面板（都比页面亮），阴影比左侧淡；卡内不画分隔线 */
+.stg-card {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px;
+  background: var(--group-card-bg);
+  border-radius: 12px;
+  box-shadow: var(--group-card-shadow);
+}
+
+/* 卡内的按钮、输入框底色用 --group-card-control（深色下 --surface-soft 与卡片同色）；hover 在其上叠 --hover-bg */
+.stg-card {
+  .stg-secondary-button,
+  .stg-field,
+  .stg-textarea-row textarea,
+  .stg-input-row input,
+  .stg-add-row input,
+  .stg-number-row input,
+  .stg-number-input,
+  .stg-compression-grid input,
+  .stg-number-row button,
+  .stg-add-row button {
+    background: var(--group-card-control);
+  }
+
+  .stg-secondary-button:not(:disabled):hover,
+  .stg-field:hover,
+  .stg-input-row input:hover,
+  .stg-add-row input:hover,
+  .stg-number-row input:hover,
+  .stg-number-input:hover,
+  .stg-compression-grid input:hover,
+  .stg-number-row button:not(:disabled):hover,
+  .stg-add-row button:not(:disabled):hover {
+    background: linear-gradient(var(--hover-bg), var(--hover-bg)) var(--group-card-control);
+  }
+}
+
+/* 卡内下拉触发器（UiSelectTrigger）同卡内控件底色；hover 由组件自身叠层，不用改 */
+.stg-page .stg-card .ui-select-trigger {
+  background-color: var(--group-card-control);
+}
+
+.stg-card + .stg-card {
+  margin-top: 12px;
+}
+
+/* 卡片以长输入框收尾时，输入框到卡片底边的距离与左右一致（16 = 行 12 + 卡片 4） */
+.stg-card > .stg-textarea-row:last-child {
+  padding-bottom: 12px;
+}
+
+/* 卡片上方的分组小标题与组说明：文字与卡内行对齐 */
+.stg-page .stg-section-divider {
+  margin-bottom: 8px;
+  padding: 0 16px;
+}
+
+.stg-page .stg-section-desc {
+  padding: 0 16px;
+}
+
+/* 卡片之后紧跟的提示、错误文字：与卡片拉开距离，并与卡内文字对齐 */
+.stg-card + p {
+  margin-top: 8px;
+  padding: 0 16px;
+}
+
+.stg-check-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 标题下方的纵向列表（不再多列网格）；嵌在子开关下的列表再缩进一级 */
+.stg-toggle-row.inner + .stg-check-grid .stg-toggle-row.inner {
+  padding-left: 32px;
+}
+
+/* ---------- 控件 ---------- */
+.stg-input-row input,
+.stg-add-row input,
+.stg-number-row input,
+.stg-number-input,
+.stg-compression-grid input {
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  outline: none;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.stg-input-row input:hover,
+.stg-add-row input:hover,
+.stg-number-row input:hover,
+.stg-number-input:hover,
+.stg-compression-grid input:hover {
+  background: var(--surface-muted);
+}
+
+.stg-input-row input:focus,
+.stg-add-row input:focus,
+.stg-number-row input:focus,
+.stg-number-input:focus,
+.stg-compression-grid input:focus {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+:where(.stg-shell) input::placeholder,
+:where(.stg-shell) textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.stg-input-row > input {
+  width: min(220px, 100%);
+}
+
+.stg-number-input {
+  width: 120px;
+  text-align: right;
+}
+
+.stg-input-stack {
+  width: 280px;
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  justify-self: end;
+}
+
+.stg-input-stack.wide {
+  width: 240px;
+}
+
+.stg-input-stack input {
+  width: 100%;
+}
+
+.stg-add-row,
+.stg-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stg-add-row input,
+.stg-number-row input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.stg-compression-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 10px;
+}
+
+.stg-compression-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.stg-textarea-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--text-primary);
+}
+
+.stg-textarea-row textarea {
+  width: 100%;
+  min-height: 96px;
+  max-height: 320px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  outline: none;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: none;
+  overflow-y: auto;
+}
+
+.stg-textarea-row textarea:focus {
+  border-color: var(--border-strong);
+}
+
+.stg-textarea-row textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.stg-textarea-row textarea::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+/* 下方长输入框（第二种设置行形态）：尾部操作（浏览、显示密钥、应用）属于输入框本身，放在框内 */
+.stg-field {
+  height: 36px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 3px 0 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+
+  > input {
+    min-width: 0;
+    flex: 1;
+    height: 34px;
+    padding: 0 11px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+  }
+}
+
+.stg-field:hover {
+  background: var(--surface-muted);
+}
+
+.stg-field:focus-within {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.stg-field-action {
+  height: 28px;
+  min-width: 28px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.stg-field .stg-field-action .ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.stg-field-action.is-text {
+  padding: 0 8px;
+  color: var(--text-primary);
+}
+
+.stg-field-action.is-active {
+  color: var(--text-primary);
+}
+
+.stg-field-action:not(:disabled):hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.stg-field-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stg-field-action:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: -2px;
+}
+
+/* 按钮（DESIGN.md §6.1）：次按钮 quiet、主按钮墨色，无描边 */
+.stg-number-row button,
+.stg-add-row button,
+.stg-secondary-button,
+.stg-primary-button {
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.stg-number-row button:not(:disabled):hover,
+.stg-add-row button:not(:disabled):hover,
+.stg-secondary-button:not(:disabled):hover {
+  background: var(--surface-muted);
+}
+
+.stg-primary-button {
+  background: var(--text-primary);
+  color: var(--surface-base);
+}
+
+.stg-primary-button:not(:disabled):hover {
+  background: var(--text-secondary);
+}
+
+.stg-secondary-button.danger {
+  color: var(--state-danger);
+}
+
+.stg-number-row button:disabled,
+.stg-add-row button:disabled,
+.stg-secondary-button:disabled,
+.stg-primary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stg-number-row button:focus-visible,
+.stg-add-row button:focus-visible,
+.stg-secondary-button:focus-visible,
+.stg-primary-button:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 2px;
+}
+
+.stg-inline-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stg-inline-actions.right {
+  margin-top: 10px;
+}
+
+.stg-mini-status {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.stg-mini-status.warning {
+  color: var(--state-warning);
+}
+
+/* 列表行（DESIGN.md §6.9）：平铺，行间 2px；行内有删除按钮，整行不做 hover（§3 禁止 hover 套 hover） */
+.stg-domain-list {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 10px;
+}
+
+.stg-domain-row {
+  height: 32px;
+  padding: 0 4px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stg-domain-row .stg-row-title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stg-domain-badge {
+  flex: none;
+  margin-right: 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.stg-domain-remove {
+  height: 26px;
+  flex: none;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.stg-domain-remove:hover {
+  background: var(--hover-bg);
+  color: var(--state-danger);
+}
+
+/* ---------- 内容区变窄：输入类行上下堆叠，开关行保持同行 ---------- */
+@container stg-main (max-width: 520px) {
+  .stg-page-heading-inner,
+  .stg-scroll-inner {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .stg-select-row,
+  .stg-input-row,
+  .stg-list-row,
+  .stg-action-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .stg-input-stack,
+  .stg-input-stack.wide,
+  .stg-input-row > input {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .stg-compression-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- 窄屏：单列重排，导航面板收为顶部区块 ---------- */
+@media (max-width: 1100px) {
+  .stg-shell.settings-redesign-card {
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 10px;
+    padding-right: 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  .stg-shell.settings-redesign-card {
+    z-index: 1700;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 0;
+  }
+
+  .stg-nav-pane {
+    flex: none;
+    max-height: 46dvh;
+    padding: 5px 8px 8px;
+  }
+
+  .stg-nav-heading {
+    height: 44px;
+  }
+
+  .stg-nav-search {
+    padding-bottom: 8px;
+  }
+
+  /* 非搜索状态：导航改为横向滚动的一行 */
+  .stg-nav-list:not(.is-searching) {
+    display: flex;
+    gap: 2px;
+    padding-bottom: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    .stg-nav-group,
+    .stg-nav-items {
+      display: contents;
+    }
+
+    .stg-nav-group-title {
+      display: none;
+    }
+
+    .stg-nav-item {
+      width: auto;
+      flex: none;
+    }
+
+    .stg-nav-label {
+      flex: none;
+    }
+  }
+
+  .stg-main {
+    flex: 1;
+    margin-block: 0;
+  }
+
+  .stg-page-title {
+    font-size: 24px;
+    padding-top: 10px;
+  }
+
+  .stg-scroll-inner {
+    padding-top: 66px;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stg-nav-item {
+    transition: none;
+  }
+
+  .stg-search-hit {
+    animation: none;
+    background: var(--hover-bg);
+  }
+}

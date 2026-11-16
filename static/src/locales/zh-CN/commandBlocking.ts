@@ -7,10 +7,8 @@
 export default {
   // ── 设置行（GeneralTab） ──
   settingsTitle: '指令拦截',
-  settingsDesc:
-    '开启后，包含拦截规则的指令会在执行前被拦截。规则为个人设置，对你的所有工作区生效。',
-  settingsDescProject:
-    '开启后，包含拦截规则的指令会在执行前被拦截。规则为个人设置，对你的所有项目生效。',
+  settingsDesc: '阻止智能体执行命中拦截规则的命令',
+  settingsDescProject: '阻止智能体执行命中拦截规则的命令',
   manageRules: '管理规则',
 
   // ── 规则管理窗口（CommandBlockingDialog） ──
@@ -22,6 +20,7 @@ export default {
   sharedHint: '规则为个人级设置，对你的所有工作区共享生效。',
   sharedHintProject: '规则为个人级设置，对你的所有项目共享生效。',
   rulesLabel: '拦截规则',
+  rulesDesc: '哪些命令内容会被拦截',
   rulesPlaceholder: '每行一条规则，例如：rm -rf',
   useRecommended: '使用推荐的规则',
   recommendedHint: '推荐规则仅追加到草稿，点击保存后才会生效。',

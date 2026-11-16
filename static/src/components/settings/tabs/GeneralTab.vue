@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, ref } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
-import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
+import UiIcon from '@/components/ui/UiIcon.vue';
 import HostPasswordSettings from './HostPasswordSettings.vue';
 import CrossPetSettings from './CrossPetSettings.vue';
 import { t } from '@/locales';
@@ -24,7 +26,6 @@ const {
   form,
   isAppShell,
   appCurrentVersionText,
-  appUpdateCheckedText,
   appHasUpdate,
   appUpdateStateText,
   appUpdateChecking,
@@ -52,6 +53,11 @@ const runDataErrorDetail = ref('');
 const restartPending = ref(false);
 const restarting = ref(false);
 
+const runDataDirty = computed(() => {
+  const next = runDataPath.value.trim();
+  return Boolean(next) && next !== (runDataInfo.value?.active_path || '');
+});
+
 const auxModelOptions = computed(() =>
   (subAgentModels.value || []).map((m: any) => ({ key: m.key, label: m.name || m.key }))
 );
@@ -60,11 +66,11 @@ const defaultExtraOptions = computed(() => [
 ]);
 
 // 订阅额度来源：自动跟随当前模型所属提供商；也可固定只显示某一家的额度。
-const quotaSourceOptions = [
-  { id: 'auto', labelKey: 'personalization.subscriptionQuotaAuto' },
-  { id: 'opencode', labelKey: 'personalization.subscriptionQuotaOpencode' },
-  { id: 'chatgpt', labelKey: 'personalization.subscriptionQuotaChatgpt' }
-] as const;
+const quotaSourceItems = [
+  { value: 'auto', label: t('personalization.subscriptionQuotaAuto') },
+  { value: 'opencode', label: t('personalization.subscriptionQuotaOpencode') },
+  { value: 'chatgpt', label: t('personalization.subscriptionQuotaChatgpt') }
+];
 
 function updateThinkingSummaryInterval(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -216,126 +222,133 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="settings-page">
+  <section class="stg-page">
     <HostPasswordSettings />
     <CrossPetSettings />
-    <label class="settings-toggle-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.subscriptionQuotaTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.subscriptionQuotaDesc') }}</span>
-      </span>
-      <input
-        type="checkbox"
-        :checked="form.subscription_quota_enabled"
-        @change="
-          personalization.updateField({
-            key: 'subscription_quota_enabled',
-            value: ($event.target as HTMLInputElement).checked
-          })
-        "
-      />
-      <FancyCheck :checked="form.subscription_quota_enabled" />
-    </label>
+    <div class="stg-card">
+      <label class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.subscriptionQuotaTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.subscriptionQuotaDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="form.subscription_quota_enabled"
+          @change="
+            personalization.updateField({
+              key: 'subscription_quota_enabled',
+              value: ($event.target as HTMLInputElement).checked
+            })
+          "
+        />
+        <UiSwitch decorative :checked="form.subscription_quota_enabled" />
+      </label>
 
-    <div v-if="form.subscription_quota_enabled" class="settings-select-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.subscriptionQuotaSourceTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.subscriptionQuotaSourceDesc') }}</span>
-      </span>
-      <div
-        class="subscription-quota-choices"
-        role="radiogroup"
-        :aria-label="$t('personalization.subscriptionQuotaSourceTitle')"
-      >
-        <button
-          v-for="option in quotaSourceOptions"
-          :key="option.id"
-          type="button"
-          role="radio"
-          class="subscription-quota-choice"
-          :class="{ selected: form.subscription_quota_source === option.id }"
-          :aria-checked="form.subscription_quota_source === option.id"
-          @click="personalization.updateField({ key: 'subscription_quota_source', value: option.id })"
-        >
-          {{ $t(option.labelKey) }}
-        </button>
+      <div v-if="form.subscription_quota_enabled" class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{
+            $t('personalization.subscriptionQuotaSourceTitle')
+          }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.subscriptionQuotaSourceDesc') }}</span>
+        </span>
+        <UiSelect
+          :model-value="form.subscription_quota_source || 'auto'"
+          :options="quotaSourceItems"
+          align-end
+          @update:model-value="
+            (value) =>
+              personalization.updateField({
+                key: 'subscription_quota_source',
+                value: value || 'auto'
+              })
+          "
+        />
       </div>
     </div>
 
-    <label class="settings-toggle-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.autoTitleTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.autoTitleDesc') }}</span>
-      </span>
-      <input
-        type="checkbox"
-        :checked="form.auto_generate_title"
-        @change="
-          personalization.updateField({
-            key: 'auto_generate_title',
-            value: ($event.target as HTMLInputElement).checked
-          })
-        "
-      />
-      <FancyCheck :checked="form.auto_generate_title" />
-    </label>
+    <div class="stg-card">
+      <label class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.autoTitleTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.autoTitleDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="form.auto_generate_title"
+          @change="
+            personalization.updateField({
+              key: 'auto_generate_title',
+              value: ($event.target as HTMLInputElement).checked
+            })
+          "
+        />
+        <UiSwitch decorative :checked="form.auto_generate_title" />
+      </label>
 
-    <div v-if="form.auto_generate_title" class="settings-select-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.titleModelTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.titleModelDesc') }}</span>
-      </span>
-      <ModelSelectDropdown
-        :model-value="form.title_model"
-        :options="auxModelOptions"
-        :extra-options="defaultExtraOptions"
-        @select="(v) => personalization.updateField({ key: 'title_model', value: v })"
-      />
+      <div v-if="form.auto_generate_title" class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.titleModelTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.titleModelDesc') }}</span>
+        </span>
+        <UiModelSelect
+          :model-value="form.title_model"
+          :options="auxModelOptions"
+          :extra-options="defaultExtraOptions"
+          align-end
+          @update:model-value="(v) => personalization.updateField({ key: 'title_model', value: v })"
+        />
+      </div>
     </div>
 
-    <div class="settings-select-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.thinkingSummaryModelTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.thinkingSummaryModelDesc') }}</span>
-      </span>
-      <ModelSelectDropdown
-        :model-value="form.thinking_summary_model"
-        :options="auxModelOptions"
-        :placeholder="$t('personalization.thinkingSummaryModelRequired')"
-        @select="(v) => personalization.updateField({ key: 'thinking_summary_model', value: v })"
-      />
-    </div>
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.thinkingSummaryModelTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.thinkingSummaryModelDesc') }}</span>
+        </span>
+        <UiModelSelect
+          :model-value="form.thinking_summary_model"
+          :options="auxModelOptions"
+          :placeholder="$t('personalization.thinkingSummaryModelRequired')"
+          align-end
+          @update:model-value="
+            (v) => personalization.updateField({ key: 'thinking_summary_model', value: v })
+          "
+        />
+      </div>
 
-    <label
-      class="settings-toggle-row thinking-summary-toggle"
-      :aria-disabled="!form.thinking_summary_model"
-    >
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.thinkingSummaryTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.thinkingSummaryDesc') }}</span>
-      </span>
-      <input
-        type="checkbox"
-        :checked="form.thinking_summary_enabled"
-        :disabled="!form.thinking_summary_model"
-        @change="
-          personalization.updateField({
-            key: 'thinking_summary_enabled',
-            value: ($event.target as HTMLInputElement).checked && !!form.thinking_summary_model
-          })
-        "
-      />
-      <FancyCheck :checked="form.thinking_summary_enabled" />
-    </label>
+      <label
+        class="stg-toggle-row thinking-summary-toggle"
+        :aria-disabled="!form.thinking_summary_model"
+      >
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.thinkingSummaryTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.thinkingSummaryDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="form.thinking_summary_enabled"
+          :disabled="!form.thinking_summary_model"
+          @change="
+            personalization.updateField({
+              key: 'thinking_summary_enabled',
+              value: ($event.target as HTMLInputElement).checked && !!form.thinking_summary_model
+            })
+          "
+        />
+        <UiSwitch decorative :checked="form.thinking_summary_enabled" />
+      </label>
 
-    <div v-if="form.thinking_summary_enabled" class="settings-input-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.thinkingSummaryIntervalTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('personalization.thinkingSummaryIntervalDesc') }}</span>
-      </span>
-      <div class="settings-number-row">
+      <div v-if="form.thinking_summary_enabled" class="stg-input-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{
+            $t('personalization.thinkingSummaryIntervalTitle')
+          }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.thinkingSummaryIntervalDesc') }}</span>
+        </span>
         <input
           type="number"
+          class="stg-number-input"
           min="1"
           max="3600"
           step="1"
@@ -343,119 +356,93 @@ onMounted(() => {
           :value="form.thinking_summary_interval_seconds"
           @change="updateThinkingSummaryInterval"
         />
+      </div>
+    </div>
+
+    <div class="stg-card">
+      <label class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('commandBlocking.settingsTitle') }}</span>
+          <span class="stg-row-desc">{{ $t(wsDescKey('commandBlocking.settingsDesc')) }}</span>
+          <span
+            v-if="commandBlocking.error && !commandBlocking.dialogOpen"
+            class="command-blocking-error"
+            role="alert"
+          >
+            {{ $t('commandBlocking.toggleFailed') }}
+            <span class="command-blocking-error-detail">{{ commandBlocking.error }}</span>
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="commandBlocking.enabled"
+          :disabled="
+            commandBlocking.toggling ||
+            commandBlocking.saving ||
+            commandBlocking.loading ||
+            !commandBlocking.loaded ||
+            commandBlocking.loadFailed
+          "
+          @change="commandBlocking.setEnabled(($event.target as HTMLInputElement).checked)"
+        />
+        <UiSwitch decorative :checked="commandBlocking.enabled" />
+      </label>
+
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('commandBlocking.rulesLabel') }}</span>
+          <span class="stg-row-desc">{{ $t('commandBlocking.rulesDesc') }}</span>
+        </span>
         <button
           type="button"
-          @click="personalization.updateField({ key: 'thinking_summary_interval_seconds', value: 20 })"
+          class="stg-secondary-button"
+          :disabled="commandBlocking.saving || commandBlocking.toggling"
+          @click="commandBlocking.openDialog()"
         >
-          {{ $t('personalization.restoreDefault') }}
+          {{ $t('commandBlocking.manageRules') }}
         </button>
       </div>
     </div>
 
-    <label class="settings-toggle-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('commandBlocking.settingsTitle') }}</span>
-        <span class="settings-row-desc">{{ $t(wsDescKey('commandBlocking.settingsDesc')) }}</span>
-        <span
-          v-if="commandBlocking.error && !commandBlocking.dialogOpen"
-          class="command-blocking-error"
-          role="alert"
-        >
-          {{ $t('commandBlocking.toggleFailed') }}
-          <span class="command-blocking-error-detail">{{ commandBlocking.error }}</span>
-        </span>
-      </span>
-      <input
-        type="checkbox"
-        :checked="commandBlocking.enabled"
-        :disabled="
-          commandBlocking.toggling ||
-          commandBlocking.saving ||
-          commandBlocking.loading ||
-          !commandBlocking.loaded ||
-          commandBlocking.loadFailed
-        "
-        @change="commandBlocking.setEnabled(($event.target as HTMLInputElement).checked)"
-      />
-      <FancyCheck :checked="commandBlocking.enabled" />
-    </label>
-
-    <div class="settings-action-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('commandBlocking.rulesLabel') }}</span>
-        <span class="settings-row-desc">{{ $t('commandBlocking.sharedHint') }}</span>
-      </span>
-      <button
-        type="button"
-        class="settings-secondary-button"
-        :disabled="commandBlocking.saving || commandBlocking.toggling"
-        @click="commandBlocking.openDialog()"
-      >
-        {{ $t('commandBlocking.manageRules') }}
-      </button>
-    </div>
-
-    <div v-if="runDataSupported" class="settings-action-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('settings.runDataTitle') }}</span>
-        <span class="settings-row-desc">{{ $t('settings.runDataDesc') }}</span>
-      </span>
-      <div class="run-data-settings">
-        <div v-if="runDataInfo?.env_locked" class="run-data-notice">
-          <span>{{ $t('settings.runDataEnvLocked') }}</span>
-          <code>{{ runDataInfo.env_path }}</code>
-        </div>
-        <template v-else>
-          <div class="run-data-path-row">
-            <input
-              v-model="runDataPath"
-              class="run-data-path-input"
-              type="text"
-              :placeholder="runDataInfo?.default_path || $t('settings.runDataPathPlaceholder')"
-              :disabled="runDataBusy || restartPending"
-              :aria-label="$t('settings.runDataPathLabel')"
-              spellcheck="false"
-            />
-            <button
-              type="button"
-              class="settings-secondary-button"
-              :disabled="runDataBusy || restartPending"
-              @click="chooseRunDataFolder"
-            >
-              {{ $t('settings.runDataBrowse') }}
-            </button>
-          </div>
-          <div class="run-data-apply-row">
-            <span class="run-data-current-path">
-              {{ $t('settings.runDataCurrentPath') }} <code>{{ runDataInfo?.active_path }}</code>
-            </span>
-            <button
-              type="button"
-              class="settings-primary-button"
-              :disabled="
-                runDataBusy ||
-                restartPending ||
-                !runDataPath.trim() ||
-                runDataPath.trim() === runDataInfo?.active_path
-              "
-              @click="openRunDataDialog"
-            >
-              {{ $t('settings.runDataApply') }}
-            </button>
-          </div>
-        </template>
-
-        <div v-if="restartPending" class="run-data-restart-row">
-          <span class="settings-mini-status warning">{{
-            $t('settings.runDataRestartRequired')
+    <div v-if="runDataSupported" class="stg-card">
+      <div v-if="runDataSupported" class="stg-textarea-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('settings.runDataTitle') }}</span>
+          <span class="stg-row-desc">{{
+            runDataInfo?.env_locked ? $t('settings.runDataEnvLocked') : $t('settings.runDataDesc')
           }}</span>
+        </span>
+        <code v-if="runDataInfo?.env_locked" class="run-data-env-path">{{
+          runDataInfo.env_path
+        }}</code>
+        <div v-else class="stg-field">
+          <input
+            v-model="runDataPath"
+            type="text"
+            :placeholder="runDataInfo?.default_path || $t('settings.runDataPathPlaceholder')"
+            :disabled="runDataBusy || restartPending"
+            :aria-label="$t('settings.runDataPathLabel')"
+            spellcheck="false"
+            @keydown.enter.prevent="runDataDirty && openRunDataDialog()"
+          />
+          <button
+            v-if="runDataDirty"
+            type="button"
+            class="stg-field-action is-text"
+            :disabled="runDataBusy || restartPending"
+            @click="openRunDataDialog"
+          >
+            {{ $t('settings.runDataApply') }}
+          </button>
           <button
             type="button"
-            class="settings-primary-button"
-            :disabled="restarting"
-            @click="restartDesktop"
+            class="stg-field-action"
+            :disabled="runDataBusy || restartPending"
+            :aria-label="$t('settings.runDataBrowse')"
+            :title="$t('settings.runDataBrowse')"
+            @click="chooseRunDataFolder"
           >
-            {{ restarting ? $t('settings.runDataRestarting') : $t('settings.runDataRestartNow') }}
+            <UiIcon name="folder" />
           </button>
         </div>
         <p v-if="runDataError && !runDataDialogOpen" class="run-data-error" role="alert">
@@ -464,6 +451,21 @@ onMounted(() => {
             runDataErrorDetail
           }}</span>
         </p>
+      </div>
+
+      <div v-if="runDataSupported && restartPending" class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('settings.runDataRestartTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('settings.runDataRestartRequired') }}</span>
+        </span>
+        <button
+          type="button"
+          class="stg-primary-button"
+          :disabled="restarting"
+          @click="restartDesktop"
+        >
+          {{ restarting ? $t('settings.runDataRestarting') : $t('settings.runDataRestartNow') }}
+        </button>
       </div>
     </div>
 
@@ -528,7 +530,7 @@ onMounted(() => {
           <div class="run-data-dialog-actions">
             <button
               type="button"
-              class="settings-secondary-button"
+              class="stg-secondary-button"
               :disabled="runDataBusy"
               @click="closeRunDataDialog"
             >
@@ -536,7 +538,7 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="settings-primary-button"
+              class="stg-primary-button"
               :disabled="runDataBusy || !runDataPath.trim()"
               @click="applyRunDataChange"
             >
@@ -547,23 +549,29 @@ onMounted(() => {
       </div>
     </Teleport>
 
-    <div v-if="isAppShell" class="settings-action-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('personalization.appUpdateTitle') }}</span>
-        <span class="settings-row-desc">{{
-          $t('personalization.appUpdateDesc', {
-            version: appCurrentVersionText,
-            checked: appUpdateCheckedText
-          })
-        }}</span>
-      </span>
-      <div class="settings-inline-actions">
-        <span class="settings-mini-status" :class="{ warning: appHasUpdate }">{{
-          appUpdateStateText
-        }}</span>
+    <div v-if="isAppShell" class="stg-card">
+      <div v-if="isAppShell" class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.appUpdateTitle') }}</span>
+          <span class="stg-row-desc">{{
+            $t('personalization.appUpdateDesc', {
+              version: appCurrentVersionText,
+              state: appUpdateStateText
+            })
+          }}</span>
+        </span>
         <button
+          v-if="appHasUpdate"
           type="button"
-          class="settings-secondary-button"
+          class="stg-primary-button"
+          @click="downloadLatestApp"
+        >
+          {{ $t('common.download') }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="stg-secondary-button"
           :disabled="appUpdateChecking"
           @click="checkAppUpdate"
         >
@@ -572,14 +580,6 @@ onMounted(() => {
               ? $t('personalization.appChecking')
               : $t('personalization.appCheckUpdate')
           }}
-        </button>
-        <button
-          v-if="appHasUpdate"
-          type="button"
-          class="settings-primary-button"
-          @click="downloadLatestApp"
-        >
-          {{ $t('common.download') }}
         </button>
       </div>
     </div>
@@ -607,63 +607,10 @@ onMounted(() => {
   word-break: break-all;
 }
 
-.run-data-settings {
-  grid-column: 1 / -1;
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.run-data-path-row,
-.run-data-apply-row,
-.run-data-restart-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.run-data-apply-row {
-  justify-content: space-between;
-}
-
-.run-data-current-path {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
+.run-data-env-path {
+  overflow-wrap: anywhere;
   color: var(--text-secondary);
   font-size: 12px;
-}
-
-.run-data-current-path code {
-  overflow-wrap: anywhere;
-  color: var(--text-primary);
-}
-
-.run-data-path-input {
-  flex: 1 1 auto;
-  min-width: 120px;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border-default);
-  border-radius: 7px;
-  background: var(--surface-base);
-  color: var(--text-primary);
-  font: inherit;
-}
-
-.run-data-path-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.settings-secondary-button.selected {
-  border-color: var(--border-strong);
-  background: var(--surface-muted);
-  color: var(--text-primary);
 }
 
 .run-data-error {
@@ -684,25 +631,6 @@ onMounted(() => {
 
 .run-data-error {
   color: var(--state-danger);
-}
-
-.run-data-notice {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.run-data-notice code {
-  overflow-wrap: anywhere;
-  color: var(--text-primary);
-}
-
-.run-data-restart-row {
-  justify-content: flex-end;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-default);
 }
 
 .run-data-dialog-backdrop {
@@ -828,52 +756,8 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
-  .run-data-path-row {
-    align-items: stretch;
-    flex-wrap: wrap;
-  }
-
-  .run-data-path-input {
-    flex-basis: 100%;
-  }
-
   .run-data-dialog {
     padding: 18px;
   }
-}
-
-/* 订阅额度来源三选一：固定高度的分段按钮，避免文字撑高 */
-.subscription-quota-choices {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--border-default);
-  border-radius: 9px;
-  background: var(--surface-base);
-}
-
-.subscription-quota-choice {
-  height: 28px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  line-height: 28px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.subscription-quota-choice.selected {
-  background: var(--surface-muted);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.subscription-quota-choice:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 </style>

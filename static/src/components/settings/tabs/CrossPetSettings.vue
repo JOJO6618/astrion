@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { t } from '@/locales';
 
 const supported = ref(false);
@@ -64,20 +64,25 @@ async function setEnabled(value: boolean) {
 </script>
 
 <template>
-  <label v-if="supported" class="settings-toggle-row">
-    <span class="settings-row-copy">
-      <span class="settings-row-title">{{ $t('settings.crosspetTitle') }}</span>
-      <span class="settings-row-desc">{{ $t('settings.crosspetDesc') }}</span>
-    </span>
-    <input
-      type="checkbox"
-      :checked="enabled"
-      :disabled="busy"
-      @change="setEnabled(($event.target as HTMLInputElement).checked)"
-    />
-    <FancyCheck :checked="enabled" />
-  </label>
-  <p v-if="error" class="crosspet-settings-error" role="alert">
+  <div v-if="supported" class="stg-card">
+    <label class="stg-toggle-row">
+      <span class="stg-row-copy">
+        <span class="stg-row-title">{{ $t('settings.crosspetTitle') }}</span>
+        <span class="stg-row-desc">{{ $t('settings.crosspetDesc') }}</span>
+      </span>
+      <input
+        type="checkbox"
+        :checked="enabled"
+        :disabled="busy"
+        @change="setEnabled(($event.target as HTMLInputElement).checked)"
+      />
+      <UiSwitch decorative :checked="enabled" />
+    </label>
+    <p v-if="error" class="crosspet-settings-error" role="alert">
+      {{ $t('settings.crosspetError') }} {{ error }}
+    </p>
+  </div>
+  <p v-else-if="error" class="crosspet-settings-error" role="alert">
     {{ $t('settings.crosspetError') }} {{ error }}
   </p>
 </template>

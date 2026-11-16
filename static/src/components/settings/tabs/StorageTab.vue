@@ -29,17 +29,23 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="settings-page storage-page">
-    <div class="storage-toolbar">
-      <span class="storage-toolbar-meta">{{ scannedText }}</span>
-      <button
-        type="button"
-        class="settings-secondary-button"
-        :disabled="busy"
-        @click="load"
-      >
-        {{ busy ? $t('storageStats.scanning') : $t('storageStats.refresh') }}
-      </button>
+  <section class="stg-page storage-page">
+    <!-- 总占用：状态写进说明，右侧只放「刷新」 -->
+    <div class="stg-card">
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title"
+            >{{ $t('storageStats.totalUsed')
+            }}<template v-if="data?.available"> {{ totalText }}</template></span
+          >
+          <span class="stg-row-desc">{{
+            data?.root ? `${data.root} · ${scannedText}` : scannedText
+          }}</span>
+        </span>
+        <button type="button" class="stg-secondary-button" :disabled="busy" @click="load">
+          {{ busy ? $t('storageStats.scanning') : $t('storageStats.refresh') }}
+        </button>
+      </div>
     </div>
 
     <p v-if="error" class="storage-error">
@@ -51,20 +57,14 @@ onMounted(load);
     <p v-else-if="!data" class="storage-placeholder">{{ $t('storageStats.loading') }}</p>
 
     <template v-else-if="data.available">
-      <div class="storage-total">
-        <div class="storage-total-line">
-          <span class="storage-total-label">{{ $t('storageStats.totalUsed') }}</span>
-          <span class="storage-total-value">{{ totalText }}</span>
-        </div>
-        <div class="storage-root" v-if="data.root">{{ data.root }}</div>
+      <div class="stg-card storage-overview">
+        <StorageBar :categories="data.categories" :total="data.total_bytes" />
+        <StorageLegend :categories="data.categories" :total="data.total_bytes" />
+
+        <p v-if="data.total_bytes === 0 && !loading" class="storage-placeholder">
+          {{ $t('storageStats.empty') }}
+        </p>
       </div>
-
-      <StorageBar :categories="data.categories" :total="data.total_bytes" />
-      <StorageLegend :categories="data.categories" :total="data.total_bytes" />
-
-      <p v-if="data.total_bytes === 0 && !loading" class="storage-placeholder">
-        {{ $t('storageStats.empty') }}
-      </p>
 
       <StorageCleanup :data="data" @cleaned="reload" />
     </template>
@@ -77,21 +77,9 @@ onMounted(load);
   flex-direction: column;
 }
 
-.storage-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 16px;
-}
-
-.storage-toolbar-meta {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-tertiary);
+/* 占用条与图例：图形内容四周统一 16 */
+.storage-overview {
+  padding: 16px;
 }
 
 .storage-error {
@@ -104,36 +92,5 @@ onMounted(load);
   margin: 0 0 16px;
   font-size: 13px;
   color: var(--text-tertiary);
-}
-
-.storage-total {
-  padding: 2px 0 18px;
-}
-
-.storage-total-line {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.storage-total-label {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.storage-total-value {
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-}
-
-.storage-root {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  word-break: break-all;
 }
 </style>

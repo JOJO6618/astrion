@@ -23,12 +23,10 @@ export default {
   catOther: 'Other',
   // ── Cleanup ──
   cleanupTitle: 'Clean up',
-  cleanupDesc: 'You will be asked to confirm. Only logs and old conversation backups can be cleaned; other categories are read-only.',
   backupRowTitle: 'Conversation backups & snapshots',
-  backupRowDesc: 'Removes whole conversation backups. Chats stay intact; only their historical checkpoints are removed.',
   logRowTitle: 'Logs',
-  logRowDesc: 'Clears every log file in the data directory; logs still being written are truncated.',
-  keepLabel: 'Keep last',
+  keepRowTitle: 'Keep backups for',
+  keepRowDesc: 'Conversation backups older than this are cleaned',
   keepDays: '{n} days',
   keepCustom: 'Custom…',
   keepDaysUnit: 'days',
@@ -42,8 +40,10 @@ export default {
   cleaning: 'Cleaning…',
   // ── Confirmation ──
   confirmBackupTitle: 'Clean old conversation backups',
-  confirmBackupMessage: 'This removes {count} conversation backups last updated more than {days} days ago, freeing about {size}.',
-  confirmBackupWarning: 'This cannot be undone. Chat messages are not affected; only historical checkpoints are removed.',
+  confirmBackupMessage:
+    'This removes {count} conversation backups last updated more than {days} days ago, freeing about {size}.',
+  confirmBackupWarning:
+    'This cannot be undone. Chat messages are not affected; only historical checkpoints are removed.',
   confirmLogsTitle: 'Clear logs',
   confirmLogsMessage: 'This clears all log files, freeing about {size}.',
   confirmLogsWarning: 'Logs still being written will be truncated; the backend keeps running.',

@@ -1,104 +1,148 @@
 <template>
-  <section class="settings-page">
+  <section class="stg-page">
     <template v-if="settings">
-      <div class="settings-select-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('chatMode.defaultModel') }}</span>
-        </span>
-        <ModelSelectDropdown
-          :model-value="settings.chat_default_model"
-          :options="models"
-          @select="settings.chat_default_model = $event"
-        />
-      </div>
-      <div class="settings-select-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('chatMode.effort') }}</span>
-        </span>
-        <SettingsChoiceDropdown
-          :model-value="settings.chat_default_reasoning_effort"
-          dropdown-id="chat-reasoning-effort"
-          :options="efforts"
-          :disabled="busy"
-          @select="settings.chat_default_reasoning_effort = $event"
-        />
-      </div>
-      <label class="settings-toggle-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('chatMode.defaultNetwork') }}</span>
-        </span>
-        <input v-model="settings.chat_network_enabled" type="checkbox" :disabled="busy" />
-        <FancyCheck :checked="settings.chat_network_enabled" />
-      </label>
-      <label class="settings-input-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('personalization.deepTriggerTokens') }}</span>
-          <span class="settings-row-desc">{{ $t('chatMode.deepCompressionContextDesc') }}</span>
-        </span>
-        <input
-          v-model.number="settings.chat_deep_compress_trigger_tokens"
-          type="number"
-          min="1000"
-          max="2000000"
-          step="1000"
-          :aria-label="$t('personalization.deepTriggerTokens')"
-          :disabled="busy"
-        />
-      </label>
-      <label class="settings-textarea-row">
-        <span class="settings-row-copy">
-          <span class="settings-row-title">{{ $t('chatMode.instructions') }}</span>
-        </span>
-        <textarea
-          v-model="settings.chat_instructions"
-          rows="6"
-          maxlength="20000"
-          :aria-label="$t('chatMode.instructions')"
-          :disabled="busy"
-        />
-      </label>
-      <div class="settings-inline-actions right">
-        <button type="button" class="settings-primary-button" :disabled="busy" @click="save">
-          {{ busy ? $t('common.saving') : $t('common.save') }}
-        </button>
+      <div class="stg-card">
+        <div class="stg-select-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('chatMode.defaultModel') }}</span>
+            <span class="stg-row-desc">{{ $t('chatMode.defaultModelDesc') }}</span>
+          </span>
+          <UiModelSelect
+            :model-value="settings.chat_default_model"
+            :options="models"
+            align-end
+            @update:model-value="settings.chat_default_model = $event"
+          />
+        </div>
+        <div class="stg-select-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('chatMode.effort') }}</span>
+            <span class="stg-row-desc">{{ $t('chatMode.effortDesc') }}</span>
+          </span>
+          <UiSelect
+            :model-value="settings.chat_default_reasoning_effort || ''"
+            :options="effortItems"
+            align-end
+            @update:model-value="updateEffort"
+          />
+        </div>
+        <label class="stg-toggle-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('chatMode.defaultNetwork') }}</span>
+            <span class="stg-row-desc">{{ $t('chatMode.defaultNetworkDesc') }}</span>
+          </span>
+          <input v-model="settings.chat_network_enabled" type="checkbox" />
+          <UiSwitch decorative :checked="settings.chat_network_enabled" />
+        </label>
+        <label class="stg-input-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('personalization.deepTriggerTokens') }}</span>
+            <span class="stg-row-desc">{{ $t('chatMode.deepCompressionContextDesc') }}</span>
+          </span>
+          <input
+            v-model.number="settings.chat_deep_compress_trigger_tokens"
+            type="number"
+            class="stg-number-input"
+            min="1000"
+            max="2000000"
+            step="1000"
+            :aria-label="$t('personalization.deepTriggerTokens')"
+          />
+        </label>
+        <label class="stg-textarea-row">
+          <span class="stg-row-copy">
+            <span class="stg-row-title">{{ $t('chatMode.instructions') }}</span>
+            <span class="stg-row-desc">{{ $t('chatMode.instructionsDesc') }}</span>
+          </span>
+          <textarea
+            v-model="settings.chat_instructions"
+            rows="6"
+            maxlength="20000"
+            :aria-label="$t('chatMode.instructions')"
+          />
+        </label>
       </div>
     </template>
-    <div class="personal-status-group" role="status" aria-live="polite">
-      <span v-if="error" class="status error">{{ error }}</span>
-      <span v-else-if="saved" class="status success">{{ $t('chatMode.saved') }}</span>
-    </div>
+    <p v-if="error" class="chat-settings-error" role="alert">{{ error }}</p>
   </section>
 </template>
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, unref } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, unref, watch } from 'vue';
 import { chatApi, command } from '@/chat/api';
 import type { ChatDefaults, ChatSettings } from '@/chat/types';
 import type { ModelGroupOption } from '@/utils/modelGroups';
-import FancyCheck from '@/components/common/FancyCheck.vue';
-import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
-import SettingsChoiceDropdown from '@/components/personalization/SettingsChoiceDropdown.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
+import { t } from '@/locales';
 
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const settings = ref<ChatDefaults | null>(null);
 const models = ref<ModelGroupOption[]>([]);
 const busy = ref(false);
 const error = ref('');
-const saved = ref(false);
 const efforts = computed(() => unref(ctx.reasoningEffortOptions));
+const effortItems = computed(() =>
+  efforts.value.map((option: any) => ({
+    value: option.value || '',
+    label: t(option.labelKey),
+    description: t(option.descKey)
+  }))
+);
+function updateEffort(value: string) {
+  if (settings.value) settings.value.chat_default_reasoning_effort = value || null;
+}
+// 改动后自动保存（与其他分区一致，不放保存按钮）：停止输入 600ms 后提交；
+// 保存进行中又有改动时，结束后再补一次。
+let saveTimer = 0;
+let pendingSave = false;
 async function save() {
-  if (busy.value) return;
+  if (!settings.value) return;
+  if (busy.value) {
+    pendingSave = true;
+    return;
+  }
   busy.value = true;
   error.value = '';
-  saved.value = false;
   try {
     await command('/settings', { ...settings.value }, 'PATCH');
-    saved.value = true;
   } catch (cause) {
     error.value = String((cause as Error).message || cause);
   } finally {
     busy.value = false;
+    if (pendingSave) {
+      pendingSave = false;
+      void save();
+    }
   }
 }
+function scheduleSave() {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = 0;
+    void save();
+  }, 600);
+}
+let loadedOnce = false;
+watch(
+  settings,
+  () => {
+    // 首次加载赋值不触发保存
+    if (!loadedOnce) {
+      loadedOnce = true;
+      return;
+    }
+    scheduleSave();
+  },
+  { deep: true }
+);
+onBeforeUnmount(() => {
+  // 离开分区时立即提交尚未保存的改动
+  if (saveTimer) {
+    window.clearTimeout(saveTimer);
+    void save();
+  }
+});
 onMounted(async () => {
   try {
     const result = await chatApi<ChatSettings>('/settings');
@@ -114,3 +158,11 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+.chat-settings-error {
+  margin: 8px 0 0;
+  color: var(--state-danger);
+  font-size: 12px;
+}
+</style>

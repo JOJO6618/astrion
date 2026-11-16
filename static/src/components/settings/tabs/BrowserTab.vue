@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, onMounted, ref } from 'vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { workspaceScopedFetch as fetch } from '@/app/methods/workspaceRequestScope';
 
 defineOptions({ name: 'BrowserTab' });
@@ -47,81 +47,80 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="settings-page">
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('browser.aiDefaultOn') }}</span
-        ><span class="settings-row-desc">{{ $t('browser.aiDefaultOnDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.browser_tools_default"
-        @change="
-          personalization.updateField({
-            key: 'browser_tools_default',
-            value: ($event.target as HTMLInputElement).checked
-          })
-        " /><FancyCheck :checked="form.browser_tools_default"
-    /></label>
-    <label class="settings-toggle-row"
-      ><span class="settings-row-copy"
-        ><span class="settings-row-title">{{ $t('browser.aiAutoOpen') }}</span
-        ><span class="settings-row-desc">{{ $t('browser.aiAutoOpenDesc') }}</span></span
-      ><input
-        type="checkbox"
-        :checked="form.browser_auto_open"
-        @change="
-          personalization.updateField({
-            key: 'browser_auto_open',
-            value: ($event.target as HTMLInputElement).checked
-          })
-        " /><FancyCheck :checked="form.browser_auto_open"
-    /></label>
-    <label class="settings-input-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ $t('browser.aiDownloadDir') }}</span>
-        <span class="settings-row-desc">{{ $t('browser.aiDownloadDirDesc') }}</span>
-      </span>
-      <input
-        type="text"
-        :value="form.browser_download_dir"
-        placeholder=".astrion/browser_downloads"
-        :aria-label="$t('browser.aiDownloadDir')"
-        @input="
-          personalization.updateField({
-            key: 'browser_download_dir',
-            value: ($event.target as HTMLInputElement).value
-          })
-        "
-      />
-    </label>
-    <div class="settings-row-copy browser-sites-head">
-      <span class="settings-row-title">{{ $t('browser.aiSites') }}</span>
-      <span class="settings-row-desc">{{ $t('browser.aiSitesDesc') }}</span>
+  <section class="stg-page">
+    <div class="stg-card">
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('browser.aiDefaultOn') }}</span
+          ><span class="stg-row-desc">{{ $t('browser.aiDefaultOnDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.browser_tools_default"
+          @change="
+            personalization.updateField({
+              key: 'browser_tools_default',
+              value: ($event.target as HTMLInputElement).checked
+            })
+          " /><UiSwitch decorative :checked="form.browser_tools_default"
+      /></label>
+      <label class="stg-toggle-row"
+        ><span class="stg-row-copy"
+          ><span class="stg-row-title">{{ $t('browser.aiAutoOpen') }}</span
+          ><span class="stg-row-desc">{{ $t('browser.aiAutoOpenDesc') }}</span></span
+        ><input
+          type="checkbox"
+          :checked="form.browser_auto_open"
+          @change="
+            personalization.updateField({
+              key: 'browser_auto_open',
+              value: ($event.target as HTMLInputElement).checked
+            })
+          " /><UiSwitch decorative :checked="form.browser_auto_open"
+      /></label>
+      <label class="stg-textarea-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('browser.aiDownloadDir') }}</span>
+          <span class="stg-row-desc">{{ $t('browser.aiDownloadDirDesc') }}</span>
+        </span>
+        <span class="stg-field">
+          <input
+            type="text"
+            :value="form.browser_download_dir"
+            :placeholder="$t('browser.aiDownloadDirPlaceholder')"
+            :aria-label="$t('browser.aiDownloadDir')"
+            spellcheck="false"
+            @input="
+              personalization.updateField({
+                key: 'browser_download_dir',
+                value: ($event.target as HTMLInputElement).value
+              })
+            "
+          />
+        </span>
+      </label>
     </div>
-    <div v-if="!sites.length" class="settings-row-desc browser-sites-empty">
-      {{ $t('browser.aiSitesEmpty') }}
-    </div>
-    <div v-for="item in sites" :key="item.site" class="settings-action-row">
-      <span class="settings-row-copy">
-        <span class="settings-row-title">{{ item.site }}</span>
-      </span>
-      <button
-        type="button"
-        class="settings-secondary-button"
-        :disabled="busy"
-        @click="revoke(item.site)"
-      >
-        {{ $t('browser.aiSiteRevoke') }}
-      </button>
+    <div class="stg-card">
+      <div class="stg-textarea-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('browser.aiSites') }}</span>
+          <span class="stg-row-desc">{{
+            sites.length ? $t('browser.aiSitesDesc') : $t('browser.aiSitesEmpty')
+          }}</span>
+        </span>
+        <div v-if="sites.length" class="stg-domain-list">
+          <div v-for="item in sites" :key="item.site" class="stg-domain-row">
+            <span class="stg-row-title">{{ item.site }}</span>
+            <button
+              type="button"
+              class="stg-domain-remove"
+              :disabled="busy"
+              @click="revoke(item.site)"
+            >
+              {{ $t('browser.aiSiteRevoke') }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 </template>
-
-<style scoped>
-.browser-sites-head {
-  margin-top: 16px;
-}
-.browser-sites-empty {
-  padding: 8px 0;
-}
-</style>

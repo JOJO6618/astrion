@@ -5,7 +5,7 @@ import { useProvidersStore } from '@/stores/providers';
 import type { CustomModelEntry } from '@/stores/providers';
 import { useUiStore } from '@/stores/ui';
 import SettingsModal from './SettingsModal.vue';
-import PillSwitch from './PillSwitch.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 
 /**
  * 自定义模型添加/编辑对话框（等价于手写 custom_models.json 的一个条目）。
@@ -20,7 +20,7 @@ const props = withDefaults(
   { initial: null }
 );
 
-const emit = defineEmits<{ (e: 'close'): void }>();
+const emit = defineEmits<{ (e: 'close'): void; (e: 'delete'): void }>();
 
 const providersStore = useProvidersStore();
 const uiStore = useUiStore();
@@ -239,8 +239,8 @@ const submit = async () => {
     <div class="provider-form-field">
       <div class="custom-model-switch-row">
         <span class="provider-form-switch-line">
-          <PillSwitch
-            :on="reasoningEffort"
+          <UiSwitch
+            :checked="reasoningEffort"
             :label="$t('settings.fieldReasoningEffort')"
             :disabled="submitting"
             @toggle="reasoningEffort = !reasoningEffort"
@@ -248,8 +248,8 @@ const submit = async () => {
           {{ $t('settings.fieldReasoningEffort') }}
         </span>
         <span class="provider-form-switch-line">
-          <PillSwitch
-            :on="visible"
+          <UiSwitch
+            :checked="visible"
             :label="$t('settings.fieldModelEnabled')"
             :disabled="submitting"
             @toggle="visible = !visible"
@@ -288,6 +288,15 @@ const submit = async () => {
     <div v-if="errorText" class="provider-form-error">{{ errorText }}</div>
 
     <div class="provider-form-actions">
+      <button
+        v-if="mode === 'edit'"
+        type="button"
+        class="provider-form-btn danger"
+        :disabled="submitting"
+        @click="emit('delete')"
+      >
+        {{ $t('common.delete') }}
+      </button>
       <button
         type="button"
         class="provider-form-btn primary"
