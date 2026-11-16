@@ -160,6 +160,7 @@ export default {
   copyId: 'Copy schedule ID',
   download: 'Download YAML',
   delete: 'Delete schedule',
+  backToConversation: 'Back to conversation',
   backToSettings: 'Back to schedule settings',
   recentRuns: 'Last {count} runs',
   noRuns: 'No runs yet',

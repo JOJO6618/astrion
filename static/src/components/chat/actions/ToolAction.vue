@@ -257,6 +257,103 @@ function renderToolResult(): string {
   line-height: 1.6;
 }
 
+/* 定时任务结果：计划和运行记录使用平铺条目与分隔线，保持结果区单层结构 */
+.schedule-result-plan {
+  position: relative;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.schedule-result-plan:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.schedule-result-plan:last-child {
+  padding-bottom: 0;
+}
+
+.schedule-result-plan-title {
+  max-width: 100%;
+  padding-right: 92px;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.schedule-result-plan-state {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.schedule-result-plan:first-child > .schedule-result-plan-state {
+  top: 0;
+}
+
+.schedule-result-plan-state.is-enabled,
+.schedule-result-run-state.is-success {
+  color: var(--state-success);
+}
+
+.schedule-result-plan-state.is-paused,
+.schedule-result-run-state.is-skipped {
+  color: var(--text-tertiary);
+}
+
+.schedule-result-run {
+  position: relative;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.schedule-result-run + .schedule-result-run {
+  margin-top: 8px;
+}
+
+.schedule-result-run-heading {
+  margin-bottom: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.schedule-result-run-title {
+  max-width: 100%;
+  padding-right: 92px;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.schedule-result-run-state {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.schedule-result-run-state.is-failed,
+.schedule-result-run-state.is-interrupted {
+  color: var(--state-danger);
+}
+
+.schedule-result-run-state.is-running,
+.schedule-result-run-state.is-waiting,
+.schedule-result-run-state.is-starting,
+.schedule-result-run-state.is-stopping,
+.schedule-result-run-state.is-queued {
+  color: var(--state-info);
+}
+
+.schedule-result-run-list {
+  margin-top: 8px;
+}
+
 /* 错误与提醒：只用文字颜色区分，不加底色块（保持与其余内容同一左边缘） */
 .tool-result-error,
 .tool-result-warning {

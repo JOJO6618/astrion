@@ -160,6 +160,7 @@ export default {
   copyId: '复制计划 ID',
   download: '下载 YAML',
   delete: '删除计划',
+  backToConversation: '返回对话',
   backToSettings: '返回计划设置',
   recentRuns: '最近 {count} 次',
   noRuns: '暂无运行记录',

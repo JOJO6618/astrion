@@ -8,6 +8,7 @@ import { t } from '@/locales';
 import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import { renderSubAgentResult } from './subAgentResults';
 import { renderEditFileDiff } from './editFileDiff';
+import { renderScheduleResult } from './scheduleResults';
 import {
   body,
   box,
@@ -106,18 +107,7 @@ function renderByTool(
     case 'submit_schedule':
     case 'query_schedules':
     case 'manage_schedule':
-      return (
-        meta(
-          ...Object.entries(args)
-            .filter(([key]) => key !== 'intent')
-            .map(([key, value]) =>
-              param(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''))
-            )
-        ) +
-        (result?.success
-          ? preBox(JSON.stringify(result.plan || result.plans || result.result || {}, null, 2))
-          : '')
-      );
+      return renderScheduleResult(name, result, args);
     case 'vlm_analyze':
       return renderVlmAnalyze(result, args);
     case 'ocr_image':

@@ -351,6 +351,49 @@ export default {
   // —— Minimal category summary ——
   summarySchedule: 'Performed {n} scheduled task actions',
 
+  // —— Scheduled task tool results ——
+  schedule: {
+    filePath: 'Configuration file:',
+    overwrite: 'Overwrite:',
+    scheduleId: 'Schedule ID:',
+    workspaceId: 'Workspace:',
+    enabledFilter: 'Enabled filter:',
+    includeRuns: 'Include run history:',
+    fields: 'Fields:',
+    action: 'Action:',
+    revision: 'Revision:',
+    runId: 'Run ID:',
+    requestId: 'Request ID:',
+    name: 'Schedule name:',
+    rule: 'Schedule rule:',
+    timezone: 'Time zone:',
+    nextRun: 'Next run:',
+    message: 'Instructions:',
+    activeRun: 'Active run',
+    lastRun: 'Last run',
+    scheduledFor: 'Scheduled for:',
+    duration: 'Duration:',
+    conversationId: 'Conversation ID:',
+    reason: 'Reason:',
+    status: 'Status:',
+    enabled: 'Enabled',
+    paused: 'Paused',
+    deleted: 'Deleted',
+    submitted: 'Scheduled task submitted',
+    actionCompleted: '{action} completed',
+    planCount: 'Found {n} schedules',
+    noPlans: 'No schedules found.',
+    noRun: 'No run record returned.',
+    none: 'None',
+    actions: {
+      enable: 'Enable schedule',
+      pause: 'Pause schedule',
+      delete: 'Delete schedule',
+      run: 'Run schedule',
+      stop: 'Stop run'
+    }
+  },
+
   // —— Tool status texts (chatDisplay action label map): tool name → preparing / running / completed / failed ——
   preparingStatus: {
     enterWorktree: 'Preparing to enter worktree',

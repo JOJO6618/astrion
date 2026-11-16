@@ -358,6 +358,49 @@ export default {
   // —— 极简分类摘要 ——
   summarySchedule: '执行了 {n} 次定时任务操作',
 
+  // —— 定时任务工具结果 ——
+  schedule: {
+    filePath: '配置文件：',
+    overwrite: '覆盖：',
+    scheduleId: '计划 ID：',
+    workspaceId: '工作区：',
+    enabledFilter: '启用状态筛选：',
+    includeRuns: '包含运行记录：',
+    fields: '字段：',
+    action: '操作：',
+    revision: '版本：',
+    runId: '运行 ID：',
+    requestId: '请求 ID：',
+    name: '计划名称：',
+    rule: '调度规则：',
+    timezone: '时区：',
+    nextRun: '下次运行：',
+    message: '任务指令：',
+    activeRun: '当前运行',
+    lastRun: '上次运行',
+    scheduledFor: '计划时间：',
+    duration: '耗时：',
+    conversationId: '对话 ID：',
+    reason: '原因：',
+    status: '状态：',
+    enabled: '已启用',
+    paused: '已暂停',
+    deleted: '已删除',
+    submitted: '已提交定时任务',
+    actionCompleted: '{action}完成',
+    planCount: '找到 {n} 个计划',
+    noPlans: '没有找到计划。',
+    noRun: '没有返回运行记录。',
+    none: '无',
+    actions: {
+      enable: '启用计划',
+      pause: '暂停计划',
+      delete: '删除计划',
+      run: '运行计划',
+      stop: '停止运行'
+    }
+  },
+
   // —— 工具状态文案（chatDisplay 动作标签映射）：工具名 → 准备 / 正在 / 完成 / 失败 四态 ——
   preparingStatus: {
     enterWorktree: '准备进入工作树',
