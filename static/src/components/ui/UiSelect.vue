@@ -4,6 +4,7 @@
  * 选项带 description 时为「主文字 + 次文字」两行模板，否则为单行主文字模板。
  */
 import { computed, ref } from 'vue';
+import { useUiStore } from '@/stores/ui';
 import UiMenu, { type UiMenuItem } from './UiMenu.vue';
 import UiSelectTrigger from './UiSelectTrigger.vue';
 
@@ -13,12 +14,23 @@ const props = withDefaults(
     options: UiMenuItem[];
     placeholder?: string;
     label?: string;
+    icon?: string;
     disabled?: boolean;
+    /** 规则锁定时点击只提示原因，不展开。 */
+    lockedReason?: string;
     /** 触发器靠右（设置行右列）时菜单右缘对齐触发器 */
     alignEnd?: boolean;
   }>(),
-  { placeholder: '', label: '', disabled: false, alignEnd: false }
+  {
+    placeholder: '',
+    label: '',
+    icon: '',
+    disabled: false,
+    lockedReason: '',
+    alignEnd: false
+  }
 );
+const ui = useUiStore();
 const emit = defineEmits<{ (event: 'update:modelValue', value: string): void }>();
 
 const trigger = ref<InstanceType<typeof UiSelectTrigger> | null>(null);
@@ -29,6 +41,13 @@ function close(restoreFocus: boolean) {
   open.value = false;
   if (restoreFocus) trigger.value?.el?.focus({ preventScroll: true });
 }
+function toggle() {
+  if (props.lockedReason) {
+    ui.pushToast({ message: props.lockedReason, type: 'info' });
+    return;
+  }
+  open.value = !open.value;
+}
 </script>
 
 <template>
@@ -37,9 +56,10 @@ function close(restoreFocus: boolean) {
     :text="selected?.label || placeholder"
     :placeholder="!selected"
     :open="open"
+    :icon="icon"
     :disabled="disabled"
     :label="label"
-    @click="open = !open"
+    @click="toggle"
   />
   <UiMenu
     :open="open"

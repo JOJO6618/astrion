@@ -47,15 +47,15 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 9px;
+  padding: 16px;
   background: var(--group-card-bg);
   border-radius: 12px;
   box-shadow: var(--popover-shadow);
 }
 
 .stg-nav-heading {
-  height: 54px;
-  padding: 0 6px 0 6px;
+  height: 32px;
+  padding: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -91,7 +91,7 @@
 
 .stg-nav-search {
   flex: none;
-  padding: 0 5px 13px;
+  padding: 16px 0 13px;
 }
 
 .stg-nav-list {
@@ -100,7 +100,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 2px 10px;
+  padding: 0 0 10px;
   scrollbar-width: none;
 }
 
@@ -899,7 +899,7 @@
   }
 
   .stg-nav-search {
-    padding-bottom: 8px;
+    padding: 0 0 8px;
   }
 
   /* 非搜索状态：导航改为横向滚动的一行 */

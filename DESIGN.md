@@ -130,7 +130,7 @@
 
 **主按钮 = 墨色**：底色 `--text-primary`、文字 `--surface-base`、hover `--text-secondary`。`--accent` 只用于状态与品牌元素。
 
-**分组卡片页**（设置页，`_tokens.scss` 各主题块）：`--group-page-bg` 页面底色（比 `--surface-base` 压暗一级）、`--group-card-bg` 悬浮面板与分组卡片底色（比页面亮）、`--group-card-shadow` 卡片阴影（比 `--popover-shadow` 淡）、`--group-card-control` 卡片内按钮与输入框底色。
+**分组卡片页**（设置页、定时任务页，`_tokens.scss` 各主题块）：`--group-page-bg` 页面底色（比 `--surface-base` 压暗一级）、`--group-card-bg` 悬浮面板与分组卡片底色（比页面亮）、`--group-card-shadow` 卡片阴影（比 `--popover-shadow` 淡）、`--group-card-control` 卡片内按钮与输入框底色。
 
 | 主题 | 页面    | 面板／卡片 | 卡内控件 |
 | ---- | ------- | ---------- | -------- |
@@ -280,6 +280,15 @@
 - 典型布局：左侧悬浮列表面板（约 278px）+ 右侧详情，间距 16，外边距 16 / 20；只有列表与详情内部滚动。
 - 区块之间靠留白与表面色差，不用横线切分。
 - 窄屏改为单列重排。
+
+**定时任务页变体**（`components/schedules/`，2026-11-17）：
+
+- 页面底色使用 `--group-page-bg`；左侧计划列表和右侧详情使用同级卡片表面 `--group-card-bg` + `--group-card-shadow`，R12，无描边。
+- 外边距沿用 16px（上下）／20px（左右），左右面板间距 16px；面板内部的标题栏、搜索区、详情标题、滚动区和底部操作区以 16px 为主要内边距轨道，不嵌套第二层卡片。
+- 左侧标题栏高 32px，标题栏与搜索区之间保留 16px；右侧详情的标题、内容滚动区和 footer 保持同一水平内边线，底部保存操作不脱离详情卡片。
+- 表单和操作统一复用 `UiMenu`、`UiSearchField`、`UiSelect`、`UiModelSelect`、`UiSwitch`；页面不得重新维护定时任务专用的下拉、菜单、模型选择或开关组件。
+- 对齐以完整可见热区为准：包括图标按钮的 hover 背景、搜索框外框、Select 触发器、Switch 轨道和卡片阴影边界；不能只按图标或文字的几何位置判断对齐。
+- 窄屏保留紧凑覆盖值并改为单列重排，不能用桌面端的 16px 轨道直接覆盖移动布局。
 
 **设置页变体**（`components/settings/`，2026-11-16）：
 

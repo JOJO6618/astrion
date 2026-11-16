@@ -3,10 +3,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
+import UiMenu from '@/components/ui/UiMenu.vue';
+import UiSearchField from '@/components/ui/UiSearchField.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import ScheduleIcon from './ScheduleIcon.vue';
-import ScheduleMenu from './ScheduleMenu.vue';
-import ScheduleSelect from './ScheduleSelect.vue';
-import ScheduleSwitch from './ScheduleSwitch.vue';
 import ScheduleDialog from './ScheduleDialog.vue';
 import ScheduleSettings from './ScheduleSettings.vue';
 import ScheduleHistory from './ScheduleHistory.vue';
@@ -70,7 +71,7 @@ const yamlError = ref('');
 const yamlApplying = ref(false);
 let retired = false;
 
-const searchInput = ref<HTMLInputElement>();
+const searchInput = ref<InstanceType<typeof UiSearchField>>();
 const createButton = ref<HTMLButtonElement>();
 const filterButton = ref<HTMLButtonElement>();
 const moreButton = ref<HTMLButtonElement>();
@@ -665,10 +666,6 @@ function onKeydown(event: KeyboardEvent) {
 function onSearchKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') search.value = '';
 }
-function clearSearch() {
-  search.value = '';
-  searchInput.value?.focus();
-}
 function closeMenu(restoreFocus: boolean) {
   const anchor = { create: createButton, filter: filterButton, more: moreButton, '': null }[
     menu.value
@@ -735,25 +732,13 @@ onBeforeUnmount(() => {
           />
         </div>
         <div class="sch-list-toolbar">
-          <div class="sch-search-field">
-            <ScheduleIcon name="search" />
-            <input
-              ref="searchInput"
-              v-model="search"
-              :placeholder="t('schedules.search')"
-              :aria-label="t('schedules.search')"
-              @keydown="onSearchKeydown"
-            />
-            <button
-              v-if="search"
-              type="button"
-              class="sch-search-clear"
-              :aria-label="t('schedules.clearSearch')"
-              @click="clearSearch"
-            >
-              <ScheduleIcon name="x" />
-            </button>
-          </div>
+          <UiSearchField
+            ref="searchInput"
+            v-model="search"
+            :placeholder="t('schedules.search')"
+            :clear-label="t('schedules.clearSearch')"
+            @keydown="onSearchKeydown"
+          />
           <button
             ref="filterButton"
             type="button"
@@ -855,7 +840,7 @@ onBeforeUnmount(() => {
               <span>{{
                 current.enabled ? t('schedules.enabledOn') : t('schedules.enabledOff')
               }}</span>
-              <ScheduleSwitch
+              <UiSwitch
                 :checked="current.enabled"
                 :label="t('schedules.enablePlan')"
                 @toggle="edit((draft) => (draft.enabled = !draft.enabled))"
@@ -946,7 +931,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <ScheduleMenu
+    <UiMenu
       :open="menu === 'create'"
       :anchor="createButton"
       :items="[
@@ -959,7 +944,7 @@ onBeforeUnmount(() => {
       @close="closeMenu"
       @select="onCreateMenu"
     />
-    <ScheduleMenu
+    <UiMenu
       :open="menu === 'filter'"
       :anchor="filterButton"
       :items="filterItems"
@@ -968,7 +953,7 @@ onBeforeUnmount(() => {
       @close="closeMenu"
       @select="workspaceFilter = $event"
     />
-    <ScheduleMenu
+    <UiMenu
       :open="menu === 'more'"
       :anchor="moreButton"
       :items="moreItems"
@@ -999,7 +984,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="sch-field">
             <span class="sch-field-label">{{ t('schedules.workspace') }}</span>
-            <ScheduleSelect
+            <UiSelect
               v-model="dialog.workspace"
               :options="options.workspaces.map((item) => ({ value: item.id, label: item.label }))"
               :label="t('schedules.workspace')"

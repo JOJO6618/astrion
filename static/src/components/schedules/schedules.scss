@@ -3,7 +3,6 @@
 
 /* ---------- 基础 ---------- */
 .schedules-page,
-.sch-popover,
 .sch-modal-scrim {
   color: var(--text-primary);
   font-family:
@@ -13,7 +12,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-:where(.schedules-page, .sch-popover, .sch-modal-scrim) {
+:where(.schedules-page, .sch-modal-scrim) {
   *,
   *::before,
   *::after {
@@ -86,7 +85,7 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  background: var(--surface-base);
+  background: var(--group-page-bg);
 
   h1 {
     height: 26px;
@@ -125,7 +124,7 @@
   gap: 7px;
   padding: 0 12px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
 
@@ -136,12 +135,12 @@
 }
 
 .sch-button-primary {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--text-primary);
+  color: var(--surface-base);
 }
 
 .sch-button-primary:not(:disabled):hover {
-  background: var(--accent-hover);
+  background: var(--text-secondary);
 }
 
 .sch-button-quiet {
@@ -192,15 +191,15 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 9px;
-  background: var(--surface-sidebar);
+  padding: 16px;
+  background: var(--group-card-bg);
   border-radius: 12px;
-  box-shadow: var(--popover-shadow);
+  box-shadow: var(--group-card-shadow);
 }
 
 .sch-panel-heading {
-  height: 54px;
-  padding: 0 9px 0 12px;
+  height: 32px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -221,7 +220,7 @@
 }
 
 .sch-back-trigger {
-  margin-left: -6px;
+  margin-left: 0;
 }
 
 .sch-create-trigger {
@@ -234,14 +233,14 @@
 }
 
 .sch-list-toolbar {
-  padding: 0 5px 13px;
+  padding: 16px 0 13px;
   display: grid;
   gap: 7px;
   flex: none;
 }
 
 .sch-list-tool {
-  height: 34px;
+  height: 32px;
   width: 100%;
   min-width: 0;
   padding: 0 9px;
@@ -249,7 +248,7 @@
   align-items: center;
   gap: 7px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
   white-space: nowrap;
 
@@ -277,59 +276,9 @@
   color: var(--text-primary);
 }
 
-.sch-search-field {
-  height: 34px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 8px;
-  background: var(--surface-base);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-
-  > .sch-icon {
-    width: 14px;
-    height: 14px;
-    color: var(--text-tertiary);
-  }
-
-  input {
-    min-width: 0;
-    width: 100%;
-    height: 30px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    color: var(--text-primary);
-    box-shadow: none;
-    font-size: 12px;
-  }
-}
-
-.sch-search-clear {
-  width: 23px;
-  height: 23px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  color: var(--text-tertiary);
-  border-radius: 5px;
-
-  .sch-icon {
-    width: 12px;
-    height: 12px;
-  }
-}
-
-.sch-search-clear:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
-}
-
 .sch-list-error {
   flex: none;
-  padding: 0 12px 10px;
+  padding: 0 0 10px;
   color: var(--state-danger);
   font-size: 11px;
   white-space: pre-wrap;
@@ -340,7 +289,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 2px 10px;
+  padding: 0 0 10px;
 }
 
 .sch-plan-group + .sch-plan-group {
@@ -372,8 +321,7 @@
   transition: transform 160ms ease;
 }
 
-.sch-group-heading[aria-expanded='false'] .sch-group-chevron,
-.sch-model-group-heading[aria-expanded='false'] .sch-group-chevron {
+.sch-group-heading[aria-expanded='false'] .sch-group-chevron {
   transform: rotate(-90deg);
 }
 
@@ -490,11 +438,14 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  background: var(--group-card-bg);
+  border-radius: 12px;
+  box-shadow: var(--group-card-shadow);
 }
 
 .sch-detail-heading {
-  height: 78px;
-  padding: 13px 24px 10px;
+  height: 84px;
+  padding: 16px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -561,7 +512,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-top: 3px;
   flex: none;
 }
 
@@ -576,43 +526,10 @@
   white-space: nowrap;
 }
 
-/* 开关：滑块位置与轨道颜色同时过渡 */
-.sch-switch {
-  position: relative;
-  width: 28px;
-  height: 17px;
-  flex: none;
-  border-radius: 12px;
-  background: var(--popover-switch-track);
-  transition: background-color 180ms ease;
-}
-
-.sch-switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  display: block;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--popover-switch-knob);
-  box-shadow: 0 1px 2px var(--shadow-color);
-  transform: translateX(0);
-  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.sch-switch[aria-checked='true'] {
-  background: var(--popover-switch-on);
-}
-
-.sch-switch[aria-checked='true'] .sch-switch-thumb {
-  transform: translateX(11px);
-}
-
 .sch-detail-scroll {
   flex: 1;
   min-height: 0;
-  padding: 0 24px;
+  padding: 0 16px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -621,8 +538,6 @@
 
 .sch-detail-scroll::-webkit-scrollbar,
 .sch-plan-list::-webkit-scrollbar,
-.sch-popover-scroll::-webkit-scrollbar,
-.sch-model-list::-webkit-scrollbar,
 .sch-prompt-input::-webkit-scrollbar,
 .sch-modal-body::-webkit-scrollbar {
   width: 4px;
@@ -630,8 +545,6 @@
 
 .sch-detail-scroll::-webkit-scrollbar-thumb,
 .sch-plan-list::-webkit-scrollbar-thumb,
-.sch-popover-scroll::-webkit-scrollbar-thumb,
-.sch-model-list::-webkit-scrollbar-thumb,
 .sch-prompt-input::-webkit-scrollbar-thumb,
 .sch-modal-body::-webkit-scrollbar-thumb {
   background: var(--border-strong);
@@ -679,8 +592,8 @@
 .sch-field > label,
 .sch-field-label {
   display: block;
-  height: 17px;
-  font-size: 11px;
+  height: 18px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -689,50 +602,27 @@
   height: 36px;
   min-width: 0;
   padding: 0 11px;
-  background: var(--surface-soft);
+  background: var(--group-card-control);
   color: var(--text-primary);
   border: 1px solid transparent;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
-.sch-select-trigger {
+.sch-field > .ui-select-trigger {
   width: 100%;
-  height: 36px;
-  min-width: 0;
-  padding: 0 11px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-align: left;
-  background: var(--surface-soft);
-  border: 1px solid transparent;
-  border-radius: 8px;
-  font-size: 12px;
-
-  > .sch-icon {
-    width: 14px;
-    height: 14px;
-    color: var(--text-secondary);
-  }
-
-  .sch-select-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sch-select-chevron {
-    width: 12px;
-    height: 12px;
-    margin-left: auto;
-    color: var(--text-tertiary);
-  }
+  max-width: none;
+  background-color: var(--group-card-control);
+  font-size: 13px;
 }
 
-.sch-select-trigger:hover {
-  background: var(--surface-muted);
+.sch-list-toolbar .ui-search-field {
+  background: var(--group-card-control);
+  border-color: transparent;
+}
+
+.sch-list-toolbar .ui-search-field:hover {
+  background-image: linear-gradient(var(--hover-bg), var(--hover-bg));
 }
 
 .sch-schedule-fields {
@@ -875,12 +765,12 @@
   padding: 11px 13px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--surface-soft);
+  background: var(--group-card-control);
   color: var(--text-primary);
   border: 1px solid transparent;
   border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.85;
+  font-size: 13px;
+  line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   cursor: text;
@@ -987,8 +877,8 @@
 }
 
 .sch-detail-footer {
-  height: 52px;
-  padding: 0 24px;
+  height: 64px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1166,169 +1056,6 @@
   }
 }
 
-/* ---------- 弹层菜单：从触发按钮展开，关闭沿原路收回 ---------- */
-/* 外框只裁切不滚动；滚动由内层（.sch-popover-scroll / .sch-model-list）承担，
-   滚动条随内边距内缩，不会压在上下圆角上。 */
-.sch-popover {
-  position: fixed;
-  z-index: 2100;
-  display: flex;
-  flex-direction: column;
-  max-height: min(320px, 65dvh);
-  max-width: calc(100vw - 24px);
-  padding: 6px;
-  overflow: hidden;
-  background: var(--popover-surface);
-  border: 1px solid var(--popover-border);
-  border-radius: 12px;
-  box-shadow: var(--popover-shadow);
-}
-
-.sch-popover.is-entering {
-  animation: sch-popover-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.sch-popover.is-leaving {
-  pointer-events: none;
-  animation: sch-popover-out 100ms cubic-bezier(0.4, 0, 1, 1) both;
-}
-
-.sch-popover-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.sch-popover-option {
-  width: 100%;
-  height: 32px;
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  color: var(--text-primary);
-  border-radius: 8px;
-  font-size: 12px;
-  white-space: nowrap;
-
-  .sch-icon {
-    width: 16px;
-    height: 16px;
-    color: var(--text-secondary);
-  }
-
-  .sch-option-check {
-    margin-left: auto;
-  }
-}
-
-.sch-popover-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sch-popover-option + .sch-popover-option {
-  margin-top: 2px;
-}
-
-.sch-popover-option:not(:disabled):hover,
-.sch-popover-option:focus-visible {
-  background: var(--hover-bg);
-}
-
-.sch-popover-option.is-danger,
-.sch-popover-option.is-danger .sch-icon {
-  color: var(--state-danger);
-}
-
-/* 模型选择：顶部搜索 + 提供商分组可折叠，结构同设置页模型下拉 */
-.sch-model-search {
-  height: 32px;
-  margin-bottom: 4px;
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex: none;
-  background: var(--surface-base);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-
-  > .sch-icon {
-    width: 14px;
-    height: 14px;
-    color: var(--text-tertiary);
-  }
-
-  input {
-    min-width: 0;
-    width: 100%;
-    height: 28px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    color: var(--text-primary);
-    font-size: 12px;
-  }
-}
-
-.sch-model-list {
-  flex: 1;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.sch-model-group-heading {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  width: 100%;
-  height: 28px;
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--popover-surface);
-  color: var(--text-secondary);
-  font-size: 11px;
-  text-align: left;
-  border-radius: 7px;
-}
-
-.sch-model-group-heading:hover {
-  color: var(--text-primary);
-}
-
-.sch-model-group-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sch-model-options {
-  display: grid;
-  gap: 2px;
-  padding: 2px 0 4px;
-
-  .sch-popover-option + .sch-popover-option {
-    margin-top: 0;
-  }
-}
-
-.sch-model-empty {
-  padding: 18px 8px;
-  color: var(--text-tertiary);
-  font-size: 12px;
-  text-align: center;
-}
-
 /* ---------- 弹窗：G3 连续曲率轮廓 ---------- */
 .sch-modal-scrim {
   position: fixed;
@@ -1459,7 +1186,7 @@
   }
 
   .sch-input,
-  .sch-select-trigger {
+  .ui-select-trigger {
     height: 40px;
     padding: 0 12px;
     border-radius: 10px;
@@ -1546,39 +1273,8 @@
   }
 }
 
-/* ---------- 经典主题：输入框与下拉触发器沿用主页面输入栏配色 ---------- */
-:root[data-theme='classic'],
-:root:not([data-theme]) {
-  .sch-input,
-  .sch-select-trigger,
-  .sch-search-field,
-  .sch-model-search,
-  .sch-prompt-input,
-  .sch-yaml-editor {
-    background: var(--surface-raised);
-    border-color: var(--border-default);
-  }
-
-  .sch-select-trigger:hover {
-    background: var(--surface-raised);
-    border-color: var(--border-strong);
-  }
-
-  .sch-input:focus,
-  .sch-prompt-input:focus,
-  .sch-yaml-editor:focus,
-  .sch-search-field:focus-within,
-  .sch-model-search:focus-within {
-    border-color: var(--border-strong);
-  }
-}
-
 /* 深色下保持同样的表面层级，不压成近黑面板 */
 :root[data-theme='dark'] {
-  .sch-list-pane {
-    background: var(--surface-soft);
-  }
-
   .sch-plan-row.is-selected {
     background: var(--surface-muted);
   }
@@ -1596,30 +1292,6 @@
   }
 }
 
-@keyframes sch-popover-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--popover-offset)) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes sch-popover-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(var(--popover-offset)) scale(0.98);
-  }
-}
-
 /* ---------- 窄屏：重排而非缩小 ---------- */
 @media (max-width: 1100px) {
   .sch-planner {
@@ -1631,8 +1303,8 @@
   .sch-detail-heading,
   .sch-detail-footer,
   .sch-detail-scroll {
-    padding-left: 18px;
-    padding-right: 18px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 
@@ -1703,11 +1375,11 @@
   }
 
   .sch-list-toolbar {
-    padding-bottom: 7px;
+    padding: 0 0 7px;
     gap: 3px;
   }
 
-  .sch-search-field,
+  .sch-list-toolbar .ui-search-field,
   .sch-list-tool {
     height: 30px;
   }
@@ -1766,8 +1438,6 @@
   .schedules-page *,
   .schedules-page *::before,
   .schedules-page *::after,
-  .sch-popover,
-  .sch-popover *,
   .sch-modal-scrim,
   .sch-modal-shell {
     transition: none;

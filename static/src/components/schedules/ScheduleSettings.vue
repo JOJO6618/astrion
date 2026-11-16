@@ -3,9 +3,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { t } from '@/locales';
 import { useModelStore } from '@/stores/model';
 import ScheduleIcon from './ScheduleIcon.vue';
-import ScheduleSelect from './ScheduleSelect.vue';
-import ScheduleModelSelect from './ScheduleModelSelect.vue';
-import ScheduleSwitch from './ScheduleSwitch.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { shortDate } from './scheduleFormat';
 import type { ScheduleConversation, ScheduleDefinition, ScheduleOptions } from './useSchedules';
 
@@ -51,6 +51,9 @@ const monthDays = computed(() => [
 const weekdays = [1, 2, 3, 4, 5, 6, 0];
 const workspaces = computed(() =>
   props.options.workspaces.map((item) => ({ value: item.id, label: item.label }))
+);
+const modelOptions = computed(() =>
+  props.options.models.map((item) => ({ key: item.value, label: item.label }))
 );
 const conversationOptions = computed(() => {
   const list = (props.conversations || []).map((item) => ({ value: item.id, label: item.title }));
@@ -278,7 +281,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
     <div class="sch-schedule-fields">
       <div class="sch-field">
         <span class="sch-field-label">{{ t('schedules.frequency') }}</span>
-        <ScheduleSelect
+        <UiSelect
           :model-value="s.type"
           :options="frequencies"
           :label="t('schedules.frequency')"
@@ -298,7 +301,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       </div>
       <div class="sch-field">
         <span class="sch-field-label">{{ t('schedules.timezone') }}</span>
-        <ScheduleSelect
+        <UiSelect
           :model-value="s.timezone"
           :options="timezones"
           :label="t('schedules.timezone')"
@@ -326,7 +329,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
     <div v-else-if="s.type === 'monthly'" class="sch-schedule-extra">
       <div class="sch-field">
         <span class="sch-field-label">{{ t('schedules.monthDay') }}</span>
-        <ScheduleSelect
+        <UiSelect
           :model-value="String(s.day ?? 1)"
           :options="monthDays"
           :label="t('schedules.monthDay')"
@@ -357,7 +360,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       </div>
       <div class="sch-field">
         <span class="sch-field-label">{{ t('schedules.unit') }}</span>
-        <ScheduleSelect
+        <UiSelect
           :model-value="s.unit"
           :options="[option('minutes'), option('hours')]"
           :label="t('schedules.unit')"
@@ -412,7 +415,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
     <div class="sch-field-grid">
       <div class="sch-field">
         <span class="sch-field-label">{{ t('schedules.workspace') }}</span>
-        <ScheduleSelect
+        <UiSelect
           :model-value="d.target.workspace_id"
           :options="workspaces"
           :label="t('schedules.workspace')"
@@ -451,7 +454,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
     <div class="sch-conversation-field" :class="{ 'is-collapsed': !existing }" :inert="!existing">
       <div class="sch-conversation-clip">
         <div class="sch-conversation-inner">
-          <ScheduleSelect
+          <UiSelect
             :model-value="d.target.conversation.id || ''"
             :options="conversationOptions"
             :label="t('schedules.chooseConversation')"
@@ -490,7 +493,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       </h3>
       <span class="sch-inherit-label">
         {{ existing ? t('schedules.inheritConversation') : t('schedules.inheritDefault') }}
-        <ScheduleSwitch
+        <UiSwitch
           :checked="inherit"
           :label="existing ? t('schedules.inheritConversation') : t('schedules.inheritDefault')"
           @toggle="toggleInherit"
@@ -501,16 +504,16 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       <div class="sch-configuration-fields sch-field-grid">
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.model') }}</span>
-          <ScheduleModelSelect
+          <UiModelSelect
             :model-value="c.model_key || ''"
-            :models="options.models"
+            :options="modelOptions"
             :label="t('schedules.model')"
             @update:model-value="setConfig('model_key', $event)"
           />
         </div>
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.effort') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="c.reasoning_effort || ''"
             :options="efforts"
             :label="t('schedules.effort')"
@@ -519,7 +522,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.thinking') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="c.thinking === false ? 'fast' : 'thinking'"
             :options="thinkingModes"
             :label="t('schedules.thinking')"
@@ -528,7 +531,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div v-if="options.host_admin" class="sch-field">
           <span class="sch-field-label">{{ t('schedules.network') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="c.network_enabled ? 'online' : 'local'"
             :options="networkModes"
             :label="t('schedules.network')"
@@ -537,7 +540,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.workMode') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="c.work_mode || 'execute'"
             :options="workModes"
             :label="t('schedules.workMode')"
@@ -547,7 +550,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.permission') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="c.permission_mode || 'approval'"
             :options="permissions"
             :label="t('schedules.permission')"
@@ -557,7 +560,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div v-if="options.host_admin" class="sch-field">
           <span class="sch-field-label">{{ t('schedules.environment') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="c.execution_mode || 'sandbox'"
             :options="environments"
             :label="t('schedules.environment')"
@@ -567,7 +570,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.worktree') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="worktreeMode"
             :options="worktreeModes"
             :label="t('schedules.worktree')"
@@ -591,7 +594,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       <div v-if="showAskUser" class="sch-configuration-summary">
         <span class="sch-inherit-label">
           {{ t('schedules.askUser') }}
-          <ScheduleSwitch
+          <UiSwitch
             :checked="!!c.ask_user"
             :label="t('schedules.askUser')"
             @toggle="setConfig('ask_user', !c.ask_user)"
@@ -604,12 +607,12 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
   <section class="sch-form-section">
     <div class="sch-goal-row">
       <div class="sch-goal-title">{{ t('schedules.goal') }}</div>
-      <ScheduleSwitch :checked="goalOn" :label="t('schedules.goal')" @toggle="toggleGoal" />
+      <UiSwitch :checked="goalOn" :label="t('schedules.goal')" @toggle="toggleGoal" />
     </div>
     <div v-if="goalOn" class="sch-goal-fields">
       <div v-if="existing" class="sch-field sch-goal-action">
         <span class="sch-field-label">{{ t('schedules.goalAction') }}</span>
-        <ScheduleSelect
+        <UiSelect
           :model-value="d.goal.mode"
           :options="goalActions"
           :label="t('schedules.goalAction')"
@@ -657,7 +660,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       <div class="sch-field-grid">
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.busy') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="d.policies.busy"
             :options="busyOptions"
             :label="t('schedules.busy')"
@@ -666,7 +669,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
         </div>
         <div class="sch-field">
           <span class="sch-field-label">{{ t('schedules.missed') }}</span>
-          <ScheduleSelect
+          <UiSelect
             :model-value="d.policies.missed"
             :options="missedOptions"
             :label="t('schedules.missed')"
@@ -676,7 +679,7 @@ function setGoalLimit(key: 'max_turns' | 'max_tokens', text: string) {
       </div>
       <div class="sch-notification-row">
         <span>{{ t('schedules.notify') }}</span>
-        <ScheduleSwitch
+        <UiSwitch
           :checked="d.notifications.enabled"
           :label="t('schedules.notifyAria')"
           @toggle="edit((draft) => (draft.notifications.enabled = !draft.notifications.enabled))"

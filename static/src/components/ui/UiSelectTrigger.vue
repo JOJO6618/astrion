@@ -12,6 +12,8 @@ defineProps<{
   open: boolean;
   /** 未选值时以占位色显示 */
   placeholder?: boolean;
+  /** 可选的前置图标 */
+  icon?: string;
   disabled?: boolean;
   label?: string;
   haspopup?: 'listbox' | 'dialog';
@@ -32,6 +34,7 @@ defineExpose({ el });
     :aria-expanded="open"
     :aria-label="label || undefined"
   >
+    <UiIcon v-if="icon" :name="icon" class="ui-select-icon" />
     <span class="ui-select-text">{{ text }}</span>
     <UiIcon name="chevron-down" class="ui-select-chevron" />
   </button>
@@ -72,6 +75,13 @@ defineExpose({ el });
 .ui-select-trigger:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.ui-select-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--text-secondary);
 }
 
 .ui-select-text {
