@@ -21,7 +21,7 @@
 | 测试现状与执行方式 | `docs/agents_details/testing.md` | 写测试、跑回归 |
 | 公共执行层 | `docs/execution_contract.md` | 执行后端、文件／进程／终端、环境、媒体、后台通知及远程执行边界 |
 | 对话级 Git worktree | `docs/git_worktree.md` | 工作树、执行根、主子环境通知、分支入口与新对话预选 |
-| 前端设计风格统一规范 | `DESIGN.md` + `docs/agents_details/frontend_design_style.md` | 写/改任何 UI；新增与后续修改必须遵循设计理念，存量界面随相关改动逐步对齐 |
+| 前端设计规范（唯一） | `DESIGN.md` | 写/改任何 UI：设计语言、硬约束、字体、token、组件范式与动画；存量界面随相关改动逐步对齐 |
 | 定时任务 | `docs/scheduled_tasks.md` | 计划配置、时间计算、持久调度、运行记录、后台驻留、管理工具及定时任务页面 |
 | 独立 Chat 与消息树 | `docs/chat_mode.md` | Chat 页面、分支、九工具、无工作区运行、媒体记忆或 Agent 交接；前端必须复用 Agent 组件 |
 | 对话导出／导入与迁移 | `docs/conversation_transfer.md` | 内部直接迁移、跨机器 ZIP、历史不改写、媒体／摘要映射、迁移回执及默认交接工作区 |
@@ -166,31 +166,18 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 > CLI 完整分层映射（各层对应文件）、运行命令、验证方式与交互细节（含按键、token 路径、spawn 入口）见 `docs/agents_details/cli_workflow.md`。
 
-## 5.5) 前端设计风格统一规范（强制）
+## 5.5) 前端设计规范（强制）
 
-**设计理念同为硬约束**：新增、修改与评审 UI 前必须阅读根目录 [DESIGN.md](DESIGN.md)，遵循有效显示区域、任务布局、文字克制、圆角与留边、层级阴影、方向一致的收放动画和有间距的 hover 等原则。已有界面在相关改动中逐步对齐；后续经验继续合并更新该文档，不另造互相冲突的规范。
+**唯一规范是根目录 [DESIGN.md](DESIGN.md)**：设计语言、理念、硬约束、字体字号、token、组件范式（按钮／菜单／弹层／弹窗／输入／开关）与出现消失动画都只在那里维护。新增、修改与评审 UI 前必须阅读；新的设计决定直接修订 DESIGN.md 对应条目，不在本文或其他文档另写平行规则。
 
-> 适用所有前端 UI（`static/src` 为主，`cli/src` 视觉可类比处同样适用）；写/改 UI 必须遵守，遇到存量违规在最小改动内顺手修正。
-> 配色基建：两层 token 定义在 `static/src/styles/base/_tokens.scss`，切换见 `utils/theme.ts`；`.stylelintrc.cjs` 三条防回退栏杆，`build` 含 stylelint。
-> **配色作用域**：颜色 Token 与字面量限制用于应用本体源码。回复内 `show_ui`／`show_html` 可视化内容遵循 `prompts/show_ui.txt`／`prompts/show_html.txt`：基础界面适配主题，状态、分类、数据系列与事物固有颜色允许使用有意义的自定义配色；不要将源码配色限制扩展为内容只能使用几种主题色。
-
-1. **禁止边缘光晕**：不用任何 glow／外发光／彩色光晕（大范围彩色 `box-shadow`、`filter: drop-shadow` 光晕、模糊伪元素）。只允许中性克制的投影（沿用 `--shadow-*` token），仅在用户明确允许时才可用光晕。
-2. **禁止原生浏览器组件**：`<select>`、`<input type=checkbox/radio/range/date/color>`、`alert/confirm/prompt`、原生右键菜单、原生 tooltip 一律换成项目统一的自定义组件。
-3. **禁止圆角套娃**：不允许「圆角矩形套圆角矩形套圆角矩形」；容器层级要扁平，优先用分隔线／留白／底色区分。
-4. **图标外框对齐**：同组图标按钮的外框（热区/容器）必须统一对齐与尺寸，不能一会居中一会左/右对齐。
-5. **图标视觉对齐而非理论对齐**：按视觉重心对齐，对偏移图标（三角/播放/放大镜）微调，使其「看起来居中」。
-6. **颜色走三模式 + 两层 Token**：禁止写死颜色字面量（裸 hex/`rgb()`/`hsl()`/`var(--x,#hex)` 兜底），一律用中性语义变量（`--surface-*`/`--text-*`/`--border-*`/`--accent*`/`--state-*`）。三主题：经典=Claude 亮色盘、浅色=ChatGPT 亮色盘、深色=自研中性灰阶；亮色靠灰阶拉层次，不许全塌成白；primary 克制（CTA-only）。半透明 tint 用 `color-mix(in srgb, var(--token) N%, transparent)`。`--claude-*`/`--theme-*` 是过时别名，勿用。新增颜色必须三主题（含首屏回退）补齐。
-7. **带文字容器固定高度**：含文字的选项/按钮/标签/容器固定高度，不被文字撑高；过长用省略号或内部滚动。
-8. **窗口设最大尺寸 + 内部滚动**：弹窗/面板/列表设 `max-height`/`max-width`，超出由内部容器滚动；滚动条隐藏或做样式适配。
-9. **实体面板禁止半透明**：实体 UI 容器背景必须不透明，且不加 `backdrop-filter` 磨砂。唯一例外：遮罩 scrim（`--overlay-scrim`）与刻意玻璃质感装饰。
-10. **主题变体与基础定义同文件（禁止跨文件补丁覆盖）**：组件的 dark/light/classic 变体写在该组件自己的样式文件里；`!important` 只准用于遮盖第三方库样式，禁止用于压过项目自有定义。审计脚本 `python3 cache/style_audit.py` + `python3 cache/theme_diff.py`（本地脚本，未随仓库发布）。
-11. **大面积色块禁止纯黑/近黑**：窗口 hover、头部、背景等大面积色块禁止 `#000` 及肉眼近黑（`#0a0a0a`/`#0f0f0f` 一档），深色模式同理；深色层次靠中性灰阶（hover 用 `--hover-bg`，面板头部优先用分隔线而非深色衬底）。纯黑只允许小范围强调（如行内代码衬底）。
-
-> 逐条细则与配色示例见 `docs/agents_details/frontend_design_style.md`。
+- 适用所有前端 UI（`static/src` 为主，`cli/src` 视觉可类比处同样适用）；存量违规在相关改动的最小范围内顺手修正。
+- 模板页面：定时任务页（`components/schedules/`）与输入栏 + 菜单（`components/input/QuickMenu.vue`）；反例：项目 Git 页（DESIGN.md §8）。
+- 硬约束速查（细则见 DESIGN.md §3）：禁光晕；禁原生外观控件；禁圆角套娃；图标热区统一、按视觉重心对齐；颜色只走三主题语义 token；带文字容器固定高度；最大尺寸 + 内层滚动；实体面板不透明；主题变体与基础定义同文件、禁 `!important` 压自有样式；大面积色块禁纯黑／近黑。
+- 配色基建：token 在 `static/src/styles/base/_tokens.scss`，切换见 `utils/theme.ts`；`.stylelintrc.cjs` 防回退，`build` 含 stylelint。`show_ui`／`show_html` 内容配色遵循 `prompts/show_ui.txt`／`prompts/show_html.txt`，不受源码配色限制。
 
 ## 5.6) 工具结果显示规范（强制）
 
-适用所有用 `tool-result-meta`／`tool-result-content` 渲染的工具结果。
+适用所有用 `tool-result-meta`／`tool-result-content` 渲染的工具结果。本节是工具结果的结构与渲染机制；视觉层面同时遵循 DESIGN.md。
 
 1. **meta 只放参数**：状态、ID、路径、任务描述、超时等元信息。**禁止**在 meta 放执行结果、统计摘要、输出内容。
 2. **content 只放结果**：文件内容、命令输出、搜索命中、执行统计、最终回复摘要等。**禁止**在 content 重复展示工具参数。

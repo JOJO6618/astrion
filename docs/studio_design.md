@@ -159,7 +159,7 @@ Astrion 当前有两种模式：
 
 - [Chat 模式与共享边界](chat_mode.md)
 - [预览面板与隔离边界](agents_details/preview_panel.md)
-- [前端设计规范](agents_details/frontend_design_style.md)
+- [前端设计规范](../DESIGN.md)
 - [公共运行时契约](runtime_contract.md)
 
 继续设计时应优先共用模型协议、智能体／工具循环、任务受理和通用界面能力；模式差异通过明确的资源与交互边界表达。
