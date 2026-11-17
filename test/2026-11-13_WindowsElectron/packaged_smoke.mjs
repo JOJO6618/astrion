@@ -52,11 +52,28 @@ try {
   gateway = await until(async () => JSON.parse(await fs.readFile(gatewayFile, 'utf8')));
   check('packaged backend becomes ready using isolated bundled runtime', gateway.port > 0 && gateway.pid === child.pid, { port: gateway.port, shellPid: child.pid });
   check('guardian is unpacked beside app.asar', !!(await fs.stat(path.join(path.dirname(executable), 'resources/app.asar.unpacked/src/windows/backend-guardian.py'))));
-  browser = await until(() => chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`, { timeout: 2000 }));
+  // 先探测 /json/version，确认调试端点就绪后再连接；从启动瞬间反复 connectOverCDP
+  // 会在 Chromium 尚未监听时留下失败状态，之后的重试同样超时（0.10.3 后每次冒烟都卡在此处）。
+  browser = await until(async () => {
+    try {
+      const probe = await fetch(`http://127.0.0.1:${debugPort}/json/version`, { signal: AbortSignal.timeout(2000) });
+      if (!probe.ok) return null;
+    } catch { return null; }
+    return chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`, { timeout: 10000 });
+  });
   const context = browser.contexts()[0];
+  let triedNewTab = false;
   main = await until(async () => {
     const pages = context.pages();
     for (const page of pages) if (await page.evaluate(() => !!window.astrionQuickSettings && !!window.astrionBrowser).catch(() => false)) return page;
+    // 0.10.3 起初始无标签时不创建内容视图：先经 chrome 顶部按钮新建一个标签，
+    // 主页面才会被创建（否则永远等不到内容视图）。
+    if (!triedNewTab) {
+      triedNewTab = true;
+      const chromePage = pages.find(p => p.url().includes('/chrome'));
+      if (chromePage) await chromePage.locator('.new-tab-btn').click({ timeout: 8000 }).catch(() => {});
+    }
+    return null;
   });
   main.on('pageerror', e => errors.push(e.message));
   await main.waitForFunction(() => document.querySelector('#app')?.__vue_app__ && document.body.innerText.length > 10, null, { timeout: 60000 });
