@@ -14,6 +14,8 @@ export interface UiMenuItem {
   icon?: string;
   /** 次文字：显示在主文字下方（设置项下拉，§6.4） */
   description?: string;
+  /** 右侧次文字：12px --text-tertiary（如仓库的相对路径，§6.4） */
+  hint?: string;
   danger?: boolean;
   disabled?: boolean;
 }
@@ -79,6 +81,7 @@ function choose(item: UiMenuItem) {
           <span class="ui-menu-desc">{{ item.description }}</span>
         </span>
         <span v-else class="ui-menu-label">{{ item.label }}</span>
+        <span v-if="item.hint" class="ui-menu-hint">{{ item.hint }}</span>
         <UiIcon v-if="!actions && item.value === value" name="check" class="ui-menu-check" />
       </button>
     </div>
@@ -179,6 +182,20 @@ function choose(item: UiMenuItem) {
   color: var(--text-tertiary);
   font-size: 12px;
   line-height: 18px;
+}
+
+.ui-menu-hint {
+  flex: none;
+  max-width: 45%;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.ui-menu-hint + .ui-menu-check {
+  margin-left: 0;
 }
 
 .ui-menu-check {

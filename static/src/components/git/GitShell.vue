@@ -1,16 +1,23 @@
 <script setup lang="ts">
+/**
+ * 项目 Git 页（DESIGN.md §7「项目 Git 页变体」，设计稿 _experiments/2026-11-16_设计统一demo/git-page.html）：
+ * 左侧卡片 = 返回 + 标题 + 刷新 → 仓库下拉 → 变更文件；右侧卡片 = 比较范围与操作 → 提交摘要 → 当前文件 → diff。
+ */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { t } from '@/locales';
 import { useUiStore } from '@/stores/ui';
-import GitSelect from './GitSelect.vue';
+import UiIcon from '@/components/ui/UiIcon.vue';
+import UiIconButton from '@/components/ui/UiIconButton.vue';
+import UiMenu from '@/components/ui/UiMenu.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSelectTrigger from '@/components/ui/UiSelectTrigger.vue';
 import GitDiff from './GitDiff.vue';
-import GitIcon from './GitIcon.vue';
 import GitCommitMessage from './GitCommitMessage.vue';
 import GitReviewMenu from './GitReviewMenu.vue';
 import GitFileNavigation from './GitFileNavigation.vue';
 import GitHistoryPanel from './GitHistoryPanel.vue';
 import { useGitHistory } from './useGitHistory';
-import type { Commit } from './api';
+import { shortDate, type Commit } from './api';
 const props = defineProps<{ workspaceId: string }>();
 const emit = defineEmits<{ (event: 'close'): void }>();
 const {
@@ -44,25 +51,38 @@ const {
   selectFile,
   startReview
 } = useGitHistory(() => props.workspaceId);
-const historyOpen = ref(false);
-const historyLeaving = ref(false);
-const historyPending = ref(false);
+
+const ui = useUiStore();
 const repositoryOpen = ref(false);
-const repositoryPending = ref(false);
-const historyTrigger = ref<HTMLButtonElement>();
+const repositoryTrigger = ref<InstanceType<typeof UiSelectTrigger> | null>(null);
+const historyOpen = ref(false);
+const historyTrigger = ref<InstanceType<typeof UiSelectTrigger> | null>(null);
 const branchMode = ref(false);
-const filesOpen = ref(true);
 const noticesOpen = ref(false);
 const mode = ref<'unified' | 'split'>('unified');
+
+// 窄屏单列：文件列表默认收起，选中文件后自动收起，避免挤占 diff
+const narrowQuery = window.matchMedia('(max-width: 760px)');
+const narrow = ref(narrowQuery.matches);
+const filesOpen = ref(!narrow.value);
+function onNarrowChange(event: MediaQueryListEvent) {
+  narrow.value = event.matches;
+  filesOpen.value = !event.matches;
+}
+onMounted(() => narrowQuery.addEventListener('change', onNarrowChange));
+onBeforeUnmount(() => narrowQuery.removeEventListener('change', onNarrowChange));
+
+const relativePath = (id: string) =>
+  discovery.value.repositories
+    .find((repo) => repo.id === id)
+    ?.workspaces.find((w) => w.workspace_id === workspaceId.value)?.relative_path || '.';
 const repositoryOptions = computed(() =>
   discovery.value.repositories.map((repo) => ({
     value: repo.id,
     label: repo.name,
-    secondary:
-      repo.workspaces.find((w) => w.workspace_id === workspaceId.value)?.relative_path || '.'
+    hint: relativePath(repo.id)
   }))
 );
-const workspaceLabel = computed(() => discovery.value.workspaces[0]?.label || props.workspaceId);
 const branchOptions = computed(() => [
   { value: '', label: currentBranch.value ? `${currentBranch.value} · HEAD` : 'HEAD' },
   ...branches.value.map((b) => ({ value: b.ref, label: b.name }))
@@ -81,45 +101,36 @@ const subject = computed(() => {
 const authorInitial = computed(
   () => compare.value?.commit?.author.trim().slice(0, 1).toUpperCase() || ''
 );
-const ui = useUiStore();
-function date(value: string) {
-  return new Date(value).toLocaleString();
+const currentFile = computed(
+  () => diff.value?.file || compare.value?.files.find((file) => file.path === selectedFile.value)
+);
+const emptyText = computed(() =>
+  scanning.value || loading.value || comparing.value || !workspaceId.value
+    ? t('common.loading')
+    : !repository.value
+      ? t('git.noRepositories')
+      : t('git.noCommits')
+);
+
+function toggleRepositories() {
+  repositoryOpen.value = !repositoryOpen.value;
 }
-function closeHistory(restoreFocus = false) {
-  historyPending.value = false;
-  if (historyOpen.value) historyLeaving.value = true;
-  historyOpen.value = false;
-  if (restoreFocus) historyTrigger.value?.focus();
-}
-function toggleHistory() {
-  repositoryPending.value = false;
+function closeRepositories(restoreFocus: boolean) {
   repositoryOpen.value = false;
-  if (historyLeaving.value) {
-    historyPending.value = !historyPending.value;
-    return;
-  }
-  if (historyOpen.value) closeHistory();
-  else historyOpen.value = true;
-}
-function requestRepositories(open: boolean) {
-  historyPending.value = false;
-  repositoryPending.value = false;
-  if (open && (historyOpen.value || historyLeaving.value)) {
-    repositoryPending.value = true;
-    closeHistory();
-  } else repositoryOpen.value = open;
-}
-function historyClosed() {
-  historyLeaving.value = false;
-  if (historyPending.value) historyOpen.value = true;
-  else if (repositoryPending.value) repositoryOpen.value = true;
-  historyPending.value = false;
-  repositoryPending.value = false;
+  if (restoreFocus) repositoryTrigger.value?.el?.focus({ preventScroll: true });
 }
 function pickRepository(id: string) {
-  repositoryOpen.value = false;
   const selected = discovery.value.repositories.find((repo) => repo.id === id);
-  if (selected) void selectRepository(selected, workspaceId.value);
+  if (selected && selected.id !== repository.value?.id)
+    void selectRepository(selected, workspaceId.value);
+}
+function toggleHistory() {
+  if (!historyOpen.value) branchMode.value = false;
+  historyOpen.value = !historyOpen.value;
+}
+function closeHistory(restoreFocus: boolean) {
+  historyOpen.value = false;
+  if (restoreFocus) historyTrigger.value?.el?.focus({ preventScroll: true });
 }
 function pickCommit(commit: Commit) {
   closeHistory(true);
@@ -128,6 +139,10 @@ function pickCommit(commit: Commit) {
 async function pickComparison() {
   await compareBranches();
   if (compare.value) closeHistory(true);
+}
+function pickFile(path: string) {
+  void selectFile(path);
+  if (narrow.value) filesOpen.value = false;
 }
 async function copySha() {
   if (!compare.value) return;
@@ -138,205 +153,214 @@ async function copySha() {
     ui.pushToast({ message: String(exc), type: 'error' });
   }
 }
-function escape(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return;
-  repositoryOpen.value = false;
-  repositoryPending.value = false;
-  closeHistory(true);
-}
-onMounted(() => document.addEventListener('keydown', escape));
-onBeforeUnmount(() => document.removeEventListener('keydown', escape));
 </script>
 
 <template>
-  <section class="git-shell" :aria-label="$t('git.title')">
-    <header class="git-shell__top">
-      <button
-        type="button"
-        class="git-icon-button"
-        :aria-label="$t('common.back')"
-        @click="emit('close')"
-      >
-        <GitIcon name="back" />
-      </button>
-      <span class="git-shell__workspace-label">{{ workspaceLabel }}</span>
-      <span class="git-shell__separator" aria-hidden="true">/</span>
-      <div class="git-shell__repository-picker">
-        <GitIcon name="folder" />
-        <GitSelect
-          :model-value="repository?.id || ''"
+  <main class="git-page" :class="{ 'is-files-closed': !filesOpen }" :aria-label="$t('git.title')">
+    <!-- 左：返回 + 标题 + 刷新 → 仓库 → 变更文件 -->
+    <aside class="git-card git-side" :inert="(!filesOpen && !narrow) || undefined">
+      <header class="git-side__head">
+        <div class="git-side__title">
+          <UiIconButton icon="arrow-left" :label="$t('common.back')" @click="emit('close')" />
+          <h1>{{ $t('git.title') }}</h1>
+        </div>
+        <UiIconButton
+          icon="refresh-cw"
+          :label="$t('git.refresh')"
+          :disabled="scanning || reviewing || !workspaceId"
+          @click="scan(true)"
+        />
+      </header>
+      <div class="git-side__repository">
+        <UiSelectTrigger
+          ref="repositoryTrigger"
+          icon="folder"
+          :text="repository?.name || $t('git.repositories')"
+          :placeholder="!repository"
+          :hint="repository ? relativePath(repository.id) : ''"
           :open="repositoryOpen"
           :label="$t('git.repositories')"
-          :options="repositoryOptions"
-          :disabled="scanning || reviewing"
-          @update:open="requestRepositories"
-          @update:model-value="pickRepository"
+          :disabled="scanning || reviewing || !repositoryOptions.length"
+          @click="toggleRepositories"
+        />
+        <UiMenu
+          :open="repositoryOpen"
+          :anchor="repositoryTrigger?.el"
+          :items="repositoryOptions"
+          :value="repository?.id"
+          :label="$t('git.repositories')"
+          @select="pickRepository"
+          @close="closeRepositories"
         />
       </div>
-      <button
-        ref="historyTrigger"
-        type="button"
-        class="git-button git-button--quiet"
-        :disabled="!repository || reviewing"
-        :aria-expanded="historyOpen"
-        aria-controls="git-history-panel"
-        @click="toggleHistory"
-      >
-        <GitIcon name="history" /><span>{{ $t('git.chooseCommit') }}</span
-        ><GitIcon name="chevron" />
-      </button>
-      <div class="git-shell__top-actions">
+      <div v-if="discovery.warnings.length" class="git-side__notices">
+        <button type="button" :aria-expanded="noticesOpen" @click="noticesOpen = !noticesOpen">
+          <UiIcon name="triangle-alert" />{{ $t('git.discoveryIssues') }}
+          <UiIcon name="chevron-down" class="git-side__notices-chevron" />
+        </button>
+        <p v-for="(notice, index) in noticesOpen ? discovery.warnings : []" :key="index">
+          {{ notice.error }}
+        </p>
+      </div>
+      <GitFileNavigation
+        v-if="compare?.files.length"
+        :files="compare.files"
+        :selected="selectedFile"
+        :additions="compare.additions"
+        :deletions="compare.deletions"
+        @select="pickFile"
+      />
+    </aside>
+
+    <!-- 右：比较范围 + 操作 → 提交摘要 → 当前文件 → diff -->
+    <section class="git-card git-main">
+      <header class="git-main__head">
+        <UiIconButton
+          icon="panel-left"
+          :label="$t('git.toggleFiles')"
+          :aria-expanded="filesOpen"
+          aria-controls="git-file-navigation"
+          @click="filesOpen = !filesOpen"
+        />
+        <UiSelectTrigger
+          ref="historyTrigger"
+          class="git-commit-trigger"
+          icon="git-commit-vertical"
+          haspopup="dialog"
+          :text="subject || $t('git.chooseCommit')"
+          :open="historyOpen"
+          :label="$t('git.chooseCommit')"
+          :disabled="!repository || reviewing"
+          @click="toggleHistory"
+        >
+          <template v-if="compare?.kind === 'commit'"
+            ><code>{{ compare.head_sha.slice(0, 8) }}</code
+            >&nbsp; {{ subject }}</template
+          >
+          <template v-else-if="compare"
+            ><code>{{ compare.base_ref }}</code> → <code>{{ compare.head_ref }}</code></template
+          >
+          <template v-else>{{ $t('git.chooseCommit') }}</template>
+        </UiSelectTrigger>
+        <span class="git-main__grow"></span>
+        <GitReviewMenu
+          v-if="compare"
+          :key="`${compare.head_sha}:${compare.base_sha}`"
+          :reviews="matchingReviews"
+        />
         <button
-          v-if="discovery.warnings.length"
+          v-if="compare"
+          type="button"
+          class="git-button git-button--primary"
+          :disabled="comparing || reviewing"
+          @click="startReview()"
+        >
+          {{ reviewing ? $t('git.reviewing') : $t('git.review') }}
+        </button>
+      </header>
+      <GitHistoryPanel
+        v-model:branch="branch"
+        v-model:base-branch="baseBranch"
+        v-model:head-branch="headBranch"
+        v-model:search="search"
+        v-model:branch-mode="branchMode"
+        :open="historyOpen"
+        :anchor="historyTrigger?.el"
+        :commits="commits"
+        :selected-sha="compare?.kind === 'commit' ? compare.head_sha : ''"
+        :loading="loading"
+        :comparing="comparing"
+        :has-more="hasMore"
+        :reviewing="reviewing"
+        :branch-options="branchOptions"
+        :ref-options="refOptions"
+        :head-options="headOptions"
+        @close="closeHistory"
+        @select="pickCommit"
+        @history="loadHistory($event)"
+        @compare="pickComparison"
+      />
+      <div v-if="error" class="git-alert" role="alert">
+        <span>{{ error }}</span>
+        <button
           type="button"
           class="git-button git-button--quiet"
-          :aria-expanded="noticesOpen"
-          @click="noticesOpen = !noticesOpen"
+          @click="repository ? loadHistory() : scan(true)"
         >
-          {{ $t('git.discoveryIssues') }}
-        </button>
-        <button
-          type="button"
-          class="git-icon-button"
-          :disabled="scanning || reviewing || !workspaceId"
-          :aria-label="$t('git.refresh')"
-          @click="scan(true)"
-        >
-          <GitIcon name="refresh" />
+          {{ $t('common.retry') }}
         </button>
       </div>
-    </header>
-    <div v-if="noticesOpen" class="git-shell__notices">
-      <p v-for="(notice, index) in discovery.warnings" :key="index">{{ notice.error }}</p>
-    </div>
-    <div v-if="error" class="git-shell__error" role="alert">
-      {{ error
-      }}<button type="button" class="git-button" @click="repository ? loadHistory() : scan(true)">
-        {{ $t('common.retry') }}
-      </button>
-    </div>
-    <main class="git-shell__main">
-      <Transition
-        name="git-history"
-        @after-leave="historyClosed"
-        @leave-cancelled="historyLeaving = false"
-      >
-        <GitHistoryPanel
-          v-if="historyOpen"
-          v-model:branch="branch"
-          v-model:base-branch="baseBranch"
-          v-model:head-branch="headBranch"
-          v-model:search="search"
-          v-model:branch-mode="branchMode"
-          :commits="commits"
-          :selected-sha="compare?.kind === 'commit' ? compare.head_sha : ''"
-          :loading="loading"
-          :comparing="comparing"
-          :has-more="hasMore"
-          :reviewing="reviewing"
-          :branch-options="branchOptions"
-          :ref-options="refOptions"
-          :head-options="headOptions"
-          @close="closeHistory(true)"
-          @select="pickCommit"
-          @history="loadHistory($event)"
-          @compare="pickComparison"
-        />
-      </Transition>
-      <div v-if="!compare" class="git-empty git-shell__empty">
-        {{
-          scanning || loading || comparing || !workspaceId
-            ? $t('common.loading')
-            : !repository
-              ? $t('git.noRepositories')
-              : $t('git.noCommits')
-        }}
-      </div>
+      <div v-if="!compare" class="git-empty git-main__empty">{{ emptyText }}</div>
       <template v-else>
-        <header class="git-shell__selection">
-          <div class="git-shell__selection-content">
-            <GitCommitMessage :subject="subject" :message="compare.commit?.message" />
-            <div class="git-shell__byline">
-              <template v-if="compare.commit"
-                ><span class="git-shell__avatar" aria-hidden="true">{{ authorInitial }}</span
-                ><span class="git-shell__author">{{ compare.commit.author }}</span
-                ><time :datetime="compare.commit.date">{{
-                  date(compare.commit.date)
-                }}</time></template
-              >
-              <GitIcon v-else name="branch" />
-              <button
-                type="button"
-                class="git-shell__sha"
-                :aria-label="$t('git.copySha')"
-                @click="copySha"
-              >
-                <code>{{ compare.head_sha.slice(0, 8) }}</code
-                ><GitIcon name="copy" />
-              </button>
-              <span class="git-shell__base"
-                ><span>{{ $t('git.baseline') }}</span
-                ><code>{{ compare.base_sha.slice(0, 8) }}</code></span
-              >
-              <GitSelect
-                v-if="parentOptions.length > 1"
-                :model-value="compare.base_sha"
-                :label="$t('git.parent')"
-                :options="parentOptions"
-                @update:model-value="selectCommit(compare!.commit!, $event)"
+        <div class="git-summary">
+          <GitCommitMessage :subject="subject" :message="compare.commit?.message" />
+          <div class="git-byline">
+            <template v-if="compare.commit"
+              ><span class="git-byline__avatar" aria-hidden="true">{{ authorInitial }}</span
+              ><span class="git-byline__author">{{ compare.commit.author }}</span
+              ><time :datetime="compare.commit.date">{{
+                shortDate(compare.commit.date)
+              }}</time></template
+            >
+            <UiIcon v-else name="git-branch" class="git-byline__icon" />
+            <button
+              type="button"
+              class="git-byline__sha"
+              :aria-label="$t('git.copySha')"
+              @click="copySha"
+            >
+              <code>{{ compare.head_sha.slice(0, 8) }}</code
+              ><UiIcon name="copy" />
+            </button>
+            <span class="git-byline__base"
+              >{{ $t('git.baseline') }}
+              <code v-if="parentOptions.length <= 1">{{ compare.base_sha.slice(0, 8) }}</code></span
+            >
+            <UiSelect
+              v-if="parentOptions.length > 1"
+              :model-value="compare.base_sha"
+              :label="$t('git.parent')"
+              :options="parentOptions"
+              @update:model-value="selectCommit(compare!.commit!, $event)"
+            />
+          </div>
+        </div>
+        <div v-if="!compare.files.length" class="git-empty git-main__empty">
+          {{ $t('git.noChanges') }}
+        </div>
+        <template v-else>
+          <div class="git-file-bar">
+            <span class="git-file-bar__path"
+              ><template v-if="currentFile?.status === 'R'">{{ currentFile.old_path }} → </template
+              >{{ currentFile?.path || selectedFile }}</span
+            >
+            <template v-if="currentFile"
+              ><span class="git-added">+{{ currentFile.additions }}</span
+              ><span class="git-deleted">−{{ currentFile.deletions }}</span></template
+            >
+            <div class="git-file-bar__modes" role="group" :aria-label="$t('git.diffMode')">
+              <UiIconButton
+                icon="diff-unified"
+                :label="$t('git.unified')"
+                :aria-pressed="mode === 'unified'"
+                @click="mode = 'unified'"
+              />
+              <UiIconButton
+                icon="diff-split"
+                :label="$t('git.split')"
+                :aria-pressed="mode === 'split'"
+                @click="mode = 'split'"
               />
             </div>
           </div>
-          <div class="git-shell__review-actions">
-            <button
-              type="button"
-              class="git-button git-button--primary"
-              :disabled="comparing || reviewing"
-              @click="startReview()"
-            >
-              {{ reviewing ? $t('git.reviewing') : $t('git.review') }}
-            </button>
-          </div>
-        </header>
-        <div class="git-shell__changes-toolbar">
-          <div class="git-shell__file-summary">
-            <button
-              type="button"
-              class="git-icon-button git-shell__files-toggle"
-              :aria-label="$t('git.toggleFiles')"
-              :aria-expanded="filesOpen"
-              aria-controls="git-file-navigation"
-              @click="filesOpen = !filesOpen"
-            >
-              <GitIcon name="folder" /></button
-            ><span>{{ $t('git.files', { count: compare.files.length }) }}</span
-            ><span class="git-added">+{{ compare.additions }}</span
-            ><span class="git-deleted">−{{ compare.deletions }}</span>
-          </div>
-          <GitReviewMenu
-            :key="`${compare.head_sha}:${compare.base_sha}`"
-            :reviews="matchingReviews"
-          />
-          <div class="git-shell__modes" role="group" :aria-label="$t('git.diffMode')">
-            <button type="button" :aria-pressed="mode === 'unified'" @click="mode = 'unified'">
-              {{ $t('git.unified') }}</button
-            ><button type="button" :aria-pressed="mode === 'split'" @click="mode = 'split'">
-              {{ $t('git.split') }}
-            </button>
-          </div>
-        </div>
-        <div v-if="!compare.files.length" class="git-empty">{{ $t('git.noChanges') }}</div>
-        <div v-else class="git-shell__reader">
-          <GitFileNavigation
-            v-if="filesOpen"
-            :files="compare.files"
-            :selected="selectedFile"
-            @select="selectFile($event)"
-          />
-          <section class="git-shell__diff">
-            <div v-if="diffError" class="git-shell__error" role="alert">
-              {{ diffError
-              }}<button type="button" class="git-button" @click="selectFile(selectedFile)">
+          <div class="git-diff">
+            <div v-if="diffError" class="git-alert" role="alert">
+              <span>{{ diffError }}</span>
+              <button
+                type="button"
+                class="git-button git-button--quiet"
+                @click="selectFile(selectedFile)"
+              >
                 {{ $t('common.retry') }}
               </button>
             </div>
@@ -349,11 +373,11 @@ onBeforeUnmount(() => document.removeEventListener('keydown', escape));
               :loading="loadingDiff"
               @more="selectFile(selectedFile, true)"
             />
-          </section>
-        </div>
+          </div>
+        </template>
       </template>
-    </main>
-  </section>
+    </section>
+  </main>
 </template>
 
 <style src="./git.scss" lang="scss"></style>

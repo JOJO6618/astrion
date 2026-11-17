@@ -119,3 +119,17 @@ export function openReview(review: Pick<Review, 'conversation_id' | 'workspace_i
     `/${encodeURIComponent(id)}?workspace_id=${encodeURIComponent(review.workspace_id)}`
   );
 }
+
+/** 列表与署名行用的短时间：今年省略年份，例如「11-17 04:38」 */
+export function shortDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleString(undefined, {
+    year: sameYear ? undefined : 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}

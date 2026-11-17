@@ -39,16 +39,6 @@ const splitRows = computed(() => {
 
 <template>
   <section class="git-patch">
-    <header class="git-patch__header">
-      <span class="git-patch__name"
-        ><span v-if="diff.file.status === 'R'">{{ diff.file.old_path }} → </span
-        >{{ diff.file.path }}</span
-      >
-      <span class="git-patch__stat"
-        ><span class="git-added">+{{ diff.file.additions }}</span
-        ><span class="git-deleted">−{{ diff.file.deletions }}</span></span
-      >
-    </header>
     <div v-if="diff.file.binary" class="git-empty">{{ $t('git.binary') }}</div>
     <div v-else-if="!diff.lines.length" class="git-empty">{{ $t('git.noPatch') }}</div>
     <div v-else class="git-patch__scroll">
@@ -112,35 +102,13 @@ const splitRows = computed(() => {
 </template>
 
 <style scoped lang="scss">
+/* diff 区（DESIGN.md §7 项目 Git 页变体）：等宽 12/20，行号 --text-tertiary，hunk 行只用次文字不铺底色 */
 .git-patch {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-.git-patch__header {
-  height: 38px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 16px;
-  background: var(--surface-soft);
-}
-.git-patch__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-}
-.git-patch__stat {
-  display: flex;
-  gap: 10px;
-  flex-shrink: 0;
-  font-size: 11px;
 }
 .git-patch__scroll {
   flex: 1;
@@ -149,73 +117,84 @@ const splitRows = computed(() => {
   scrollbar-width: thin;
 }
 .git-patch__table {
-  width: 100%;
+  min-width: 100%;
   border-spacing: 0;
-  font-family: var(--font-mono, monospace);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12px;
-  line-height: 22px;
+  line-height: 20px;
 }
 .git-patch__table td {
   vertical-align: top;
 }
 .git-patch__number {
-  min-width: 40px;
-  width: 40px;
+  min-width: 44px;
+  width: 1%;
   padding: 0 8px;
   text-align: right;
   user-select: none;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
 }
 .git-patch__marker {
   width: 18px;
+  padding: 0;
   user-select: none;
   text-align: center;
+  color: var(--text-tertiary);
 }
 .git-patch__code {
-  padding: 0 12px;
+  padding: 0 16px 0 0;
 }
 .git-patch__code pre {
   margin: 0;
   font: inherit;
   white-space: pre;
-  min-height: 22px;
+  min-height: 20px;
 }
 .git-patch__add {
   background: var(--diff-add-bg);
 }
+.git-patch__add .git-patch__marker {
+  color: var(--state-success);
+}
 .git-patch__delete {
   background: var(--diff-del-bg);
 }
-.git-patch__hunk {
-  background: var(--surface-muted);
-  color: var(--text-secondary);
+.git-patch__delete .git-patch__marker {
+  color: var(--state-danger);
 }
+.git-patch__hunk,
 .git-patch__meta {
-  color: var(--text-muted);
+  color: var(--text-tertiary);
+}
+.git-patch__hunk > td,
+td.git-patch__hunk {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 .git-patch__split {
+  width: 100%;
   table-layout: fixed;
+}
+.git-patch__split .git-patch__code {
+  padding-left: 8px;
 }
 .git-patch__split .git-patch__code pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .git-patch__number-col {
-  width: 48px;
+  width: 52px;
 }
 .git-patch__divider {
-  border-left: 1px solid var(--border-default);
+  border-left: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 .git-patch__more {
-  margin: 12px 16px;
+  align-self: center;
+  margin: 8px 0;
 }
-@media (width <= 700px) {
-  .git-patch__header {
-    padding: 0 10px;
-  }
+@media (max-width: 760px) {
   .git-patch__number {
     min-width: 30px;
-    width: 30px;
     padding: 0 4px;
   }
 }

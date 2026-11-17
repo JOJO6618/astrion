@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import CloseButton from '@/components/common/CloseButton.vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
-import GitSelect from '@/components/git/GitSelect.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
 import { t } from '@/locales';
 import { useGitWorktreeStore, type WorktreeTarget } from '@/stores/gitWorktree';
 
@@ -240,7 +240,7 @@ function trapFocus(event: KeyboardEvent) {
             <!-- 不能用 label 包裹：label 会把点击再转发给内部按钮，下拉会开了立刻又关 -->
             <div class="worktree-field">
               <span class="worktree-label">{{ $t('input.worktreeTarget') }}</span>
-              <GitSelect
+              <UiSelect
                 v-model="mode"
                 :options="options"
                 :label="$t('input.worktreeTarget')"
@@ -354,7 +354,7 @@ function trapFocus(event: KeyboardEvent) {
   background: var(--overlay-scrim);
 }
 
-/* 弹窗本身不滚动：内容固定且短，内嵌 GitSelect 下拉需要能溢出到弹窗外 */
+/* 弹窗本身不滚动：内容固定且短 */
 .worktree-dialog {
   width: 100%;
   max-width: 420px;
@@ -409,7 +409,9 @@ function trapFocus(event: KeyboardEvent) {
 }
 
 .worktree-field input[type='text'],
-.worktree-dialog :deep(.git-select__trigger) {
+.worktree-dialog :deep(.ui-select-trigger) {
+  width: 100%;
+  max-width: none;
   height: 34px;
   min-width: 0;
   padding: 0 10px;

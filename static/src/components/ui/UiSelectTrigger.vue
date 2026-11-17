@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
  * 下拉触发器（DESIGN.md §6.5）：32 高 / R8 / 13px，左右 11／10，右侧向下箭头 12。
+ * 默认插槽可替换主文字（如「短 SHA + 提交标题」），hint 为箭头前的右侧次文字。
  * 底色 --surface-soft（分组卡片内由设置页样式改为 --group-card-control），无边框；
  * hover 与展开时在底色上叠一层 --hover-bg，键盘焦点时边框变 --border-strong。
  */
@@ -14,6 +15,8 @@ defineProps<{
   placeholder?: boolean;
   /** 可选的前置图标 */
   icon?: string;
+  /** 右侧次文字（12px --text-tertiary），如仓库的相对路径 */
+  hint?: string;
   disabled?: boolean;
   label?: string;
   haspopup?: 'listbox' | 'dialog';
@@ -35,7 +38,10 @@ defineExpose({ el });
     :aria-label="label || undefined"
   >
     <UiIcon v-if="icon" :name="icon" class="ui-select-icon" />
-    <span class="ui-select-text">{{ text }}</span>
+    <span class="ui-select-text"
+      ><slot>{{ text }}</slot></span
+    >
+    <span v-if="hint" class="ui-select-hint">{{ hint }}</span>
     <UiIcon name="chevron-down" class="ui-select-chevron" />
   </button>
 </template>
@@ -93,6 +99,21 @@ defineExpose({ el });
 
 .ui-select-trigger.is-placeholder .ui-select-text {
   color: var(--text-tertiary);
+}
+
+.ui-select-hint {
+  flex: none;
+  max-width: 40%;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.ui-select-hint + .ui-select-chevron {
+  margin-left: 0;
 }
 
 .ui-select-chevron {

@@ -1,6 +1,11 @@
 <script lang="ts">
-// 同一时刻只保留一个弹层：打开新弹层时先让旧弹层沿原路收回（DESIGN.md §6.3）。
-let closeActive: (() => void) | null = null;
+// 同一时刻只保留一条弹层链（DESIGN.md §6.3）：打开新弹层时，不相干的旧弹层沿原路收回；
+// 触发器位于某个已打开弹层内部时（如提交面板里的分支下拉），新弹层作为它的子层叠在上面。
+interface PopoverEntry {
+  close: () => void;
+  panel: () => HTMLElement | undefined;
+}
+const stack: PopoverEntry[] = [];
 </script>
 
 <script setup lang="ts">
@@ -23,6 +28,8 @@ const props = withDefaults(
     alignEnd?: boolean;
     /** 面板内边距：菜单 4；带搜索框的模型选择 6 */
     padding?: number;
+    /** 最大高度上限（默认 320），实际还受 65dvh 与可用空间限制 */
+    maxHeight?: number;
   }>(),
   {
     anchor: null,
@@ -30,7 +37,8 @@ const props = withDefaults(
     label: '',
     minWidth: 165,
     alignEnd: false,
-    padding: 4
+    padding: 4,
+    maxHeight: 320
   }
 );
 const emit = defineEmits<{ (event: 'close', restoreFocus: boolean): void }>();
@@ -57,7 +65,7 @@ function place(element: HTMLElement) {
   const above = rect.top - 12;
   const up = below < height && above > below;
   const available = Math.max(32, (up ? above : below) - 5);
-  element.style.maxHeight = `${Math.min(320, window.innerHeight * 0.65, available)}px`;
+  element.style.maxHeight = `${Math.min(props.maxHeight, window.innerHeight * 0.65, available)}px`;
   const finalHeight = element.offsetHeight;
   element.style.top = `${up ? Math.max(12, rect.top - finalHeight - 5) : rect.bottom + 5}px`;
   element.style.setProperty('--ui-popover-offset', up ? '4px' : '-4px');
@@ -97,14 +105,24 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+const entry: PopoverEntry = { close: closeSelf, panel: () => panel.value };
+
+/** 自身面板或叠在上面的子弹层内的目标，都不算「外部」 */
+function insideChain(target: Node) {
+  if (panel.value?.contains(target)) return true;
+  const index = stack.indexOf(entry);
+  return index >= 0 && stack.slice(index + 1).some((child) => child.panel()?.contains(target));
+}
+
 function onPointerDown(event: PointerEvent) {
   const target = event.target as Node;
-  if (panel.value?.contains(target) || props.anchor?.contains(target)) return;
+  if (insideChain(target) || props.anchor?.contains(target)) return;
   requestClose(false);
 }
 
 function onDocumentKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return;
+  // 只有最上层的弹层消费 Escape，子弹层关闭后父弹层保留
+  if (event.key !== 'Escape' || stack[stack.length - 1] !== entry) return;
   // 弹层优先消费 Escape，不连带关闭所在页面或弹窗
   event.stopPropagation();
   event.preventDefault();
@@ -112,7 +130,7 @@ function onDocumentKeydown(event: KeyboardEvent) {
 }
 
 function onScroll(event: Event) {
-  if (!panel.value?.contains(event.target as Node)) requestClose(false);
+  if (!insideChain(event.target as Node)) requestClose(false);
 }
 
 function attach() {
@@ -129,15 +147,33 @@ function detach() {
   window.removeEventListener('resize', closeSelf);
 }
 
+function leaveStack() {
+  const index = stack.indexOf(entry);
+  if (index < 0) return;
+  // 父弹层关闭时，叠在上面的子弹层一起收回
+  const children = stack.splice(index);
+  children.slice(1).forEach((child) => child.close());
+}
+
 watch(
   () => props.open,
   (open) => {
     if (open) {
-      if (closeActive && closeActive !== closeSelf) closeActive();
-      closeActive = closeSelf;
+      if (!stack.includes(entry)) {
+        const anchor = props.anchor;
+        let parent = -1;
+        for (let i = stack.length - 1; i >= 0; i--) {
+          if (anchor && stack[i].panel()?.contains(anchor)) {
+            parent = i;
+            break;
+          }
+        }
+        stack.splice(parent + 1).forEach((other) => other.close());
+        stack.push(entry);
+      }
       attach();
     } else {
-      if (closeActive === closeSelf) closeActive = null;
+      leaveStack();
       detach();
     }
   },
@@ -145,7 +181,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  if (closeActive === closeSelf) closeActive = null;
+  leaveStack();
   detach();
 });
 </script>

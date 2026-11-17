@@ -171,7 +171,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 **唯一规范是根目录 [DESIGN.md](DESIGN.md)**：设计语言、理念、硬约束、字体字号、token、组件范式（按钮／菜单／弹层／弹窗／输入／开关）与出现消失动画都只在那里维护。新增、修改与评审 UI 前必须阅读；新的设计决定直接修订 DESIGN.md 对应条目，不在本文或其他文档另写平行规则。
 
 - 适用所有前端 UI（`static/src` 为主，`cli/src` 视觉可类比处同样适用）；存量违规在相关改动的最小范围内顺手修正。
-- 模板页面：定时任务页（`components/schedules/`）与输入栏 + 菜单（`components/input/QuickMenu.vue`）；反例：项目 Git 页（DESIGN.md §8）。
+- 模板页面：定时任务页（`components/schedules/`）与输入栏 + 菜单（`components/input/QuickMenu.vue`）；项目 Git 页已按定时任务页变体改造（DESIGN.md §7），旧实现的禁用做法见 §8。
 - 硬约束速查（细则见 DESIGN.md §3）：禁光晕；禁原生外观控件；禁圆角套娃；图标热区统一、按视觉重心对齐；颜色只走三主题语义 token；带文字容器固定高度；最大尺寸 + 内层滚动；实体面板不透明；主题变体与基础定义同文件、禁 `!important` 压自有样式；大面积色块禁纯黑／近黑。
 - 配色基建：token 在 `static/src/styles/base/_tokens.scss`，切换见 `utils/theme.ts`；`.stylelintrc.cjs` 防回退，`build` 含 stylelint。`show_ui`／`show_html` 内容配色遵循 `prompts/show_ui.txt`／`prompts/show_html.txt`，不受源码配色限制。
 
