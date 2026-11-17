@@ -196,6 +196,11 @@ const removeDirectDomain = (domain: string) => {
   <section class="stg-page">
     <!-- 搜索引擎 + 当前服务商凭证（docker/web 模式仅管理员可见） -->
     <template v-if="canEditSearchKeys">
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">
+          {{ $t('personalization.searchProviderTitle') }}
+        </span>
+      </div>
       <div class="stg-card">
         <div class="stg-select-row">
           <span class="stg-row-copy"
@@ -268,6 +273,11 @@ const removeDirectDomain = (domain: string) => {
       </div>
 
       <!-- 网页提取方式（本地直提之后的云端提取商） -->
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">
+          {{ $t('personalization.extractProviderTitle') }}
+        </span>
+      </div>
       <div class="stg-card">
         <div class="stg-select-row">
           <span class="stg-row-copy"
@@ -341,12 +351,13 @@ const removeDirectDomain = (domain: string) => {
     </template>
 
     <!-- 网页直提白名单（自工具页迁入） -->
-    <div class="stg-card stg-group-block">
-      <div class="stg-group-title">
-        <span class="stg-row-title">{{ $t('personalization.webDirectExtractTitle') }}</span
-        ><span class="stg-row-desc">{{ $t('personalization.webDirectExtractDesc') }}</span>
-      </div>
-      <label class="stg-toggle-row inner"
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('personalization.webDirectExtractTitle') }}
+      </span>
+    </div>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{
             $t('personalization.webDirectExtractEnabledTitle')

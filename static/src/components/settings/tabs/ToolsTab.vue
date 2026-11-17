@@ -63,6 +63,9 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
 
 <template>
   <section class="stg-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.toolsTitle') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row"
         ><span class="stg-row-copy"
@@ -107,12 +110,11 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
           " /><UiSwitch decorative :checked="form.skill_hints_enabled"
       /></label>
     </div>
-    <div class="stg-card stg-group-block">
-      <div class="stg-group-title">
-        <span class="stg-row-title">{{ $t('personalization.strictSkillTitle') }}</span
-        ><span class="stg-row-desc">{{ $t('personalization.strictSkillDesc') }}</span>
-      </div>
-      <label class="stg-toggle-row inner"
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('personalization.strictSkillTitle') }}</span>
+    </div>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.terminalToolsTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.terminalToolsDesc') }}</span></span
@@ -126,7 +128,7 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
             })
           " /><UiSwitch decorative :checked="form.skill_strict_terminal_enabled"
       /></label>
-      <label class="stg-toggle-row inner"
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.subAgentToolsTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.subAgentToolsDesc') }}</span></span
@@ -140,7 +142,7 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
             })
           " /><UiSwitch decorative :checked="form.skill_strict_sub_agent_enabled"
       /></label>
-      <label class="stg-toggle-row inner"
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.runCommandFgTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.runCommandFgDesc') }}</span></span
@@ -154,7 +156,7 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
             })
           " /><UiSwitch decorative :checked="form.skill_strict_run_command_foreground_enabled"
       /></label>
-      <label class="stg-toggle-row inner"
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.runCommandBgTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.runCommandBgDesc') }}</span></span
@@ -169,15 +171,14 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
           " /><UiSwitch decorative :checked="form.skill_strict_run_command_background_enabled"
       /></label>
     </div>
-    <div class="stg-card stg-group-block" v-if="skillsCatalog.length">
-      <div class="stg-group-title">
-        <span class="stg-row-title">{{ $t('personalization.availableSkillsTitle') }}</span
-        ><span class="stg-row-desc">{{
-          $t(wsDescKey('personalization.availableSkillsDesc'))
-        }}</span>
-      </div>
+    <div v-if="skillsCatalog.length" class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('personalization.availableSkillsTitle') }}
+      </span>
+    </div>
+    <div class="stg-card" v-if="skillsCatalog.length">
       <div class="stg-check-grid">
-        <label v-for="skill in skillsCatalog" :key="skill.id" class="stg-toggle-row inner"
+        <label v-for="skill in skillsCatalog" :key="skill.id" class="stg-toggle-row"
           ><span class="stg-row-title">{{ skill.label }}</span
           ><input
             type="checkbox"
@@ -188,13 +189,14 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
         /></label>
       </div>
     </div>
-    <div class="stg-card stg-group-block" v-if="toolCategories.length">
-      <div class="stg-group-title">
-        <span class="stg-row-title">{{ $t('personalization.disabledToolCategoriesTitle') }}</span>
-        <span class="stg-row-desc">{{ $t('personalization.disabledToolCategoriesDesc') }}</span>
-      </div>
+    <div v-if="toolCategories.length" class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('personalization.disabledToolCategoriesTitle') }}
+      </span>
+    </div>
+    <div class="stg-card" v-if="toolCategories.length">
       <div class="stg-check-grid">
-        <label v-for="category in toolCategories" :key="category.id" class="stg-toggle-row inner"
+        <label v-for="category in toolCategories" :key="category.id" class="stg-toggle-row"
           ><span class="stg-row-title">{{ category.label }}</span
           ><input
             type="checkbox"
@@ -205,12 +207,13 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
         /></label>
       </div>
     </div>
-    <div class="stg-card stg-group-block" v-if="toolLoadingRegistry.length">
-      <div class="stg-group-title">
-        <span class="stg-row-title">{{ $t('personalization.toolLoadingTitle') }}</span
-        ><span class="stg-row-desc">{{ $t('personalization.toolLoadingDesc') }}</span>
-      </div>
-      <label class="stg-toggle-row inner"
+    <div v-if="toolLoadingRegistry.length" class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('personalization.toolLoadingTitle') }}
+      </span>
+    </div>
+    <div class="stg-card" v-if="toolLoadingRegistry.length">
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.toolLoadingEnabledTitle') }}</span
           ><span class="stg-row-desc">{{
@@ -228,7 +231,7 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
       /></label>
       <template v-if="form.tool_loading_enabled">
         <div v-for="cat in toolLoadingRegistry" :key="cat.key">
-          <label class="stg-toggle-row inner"
+          <label class="stg-toggle-row"
             ><span class="stg-row-title">{{ $t(`personalization.toolLoadingCat.${cat.key}`) }}</span
             ><input
               type="checkbox"
@@ -238,7 +241,7 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
               :checked="isCategoryFullyDeferred(cat)"
           /></label>
           <div class="stg-check-grid">
-            <label v-for="name in cat.tools" :key="name" class="stg-toggle-row inner"
+            <label v-for="name in cat.tools" :key="name" class="stg-toggle-row"
               ><span class="stg-row-title">{{ name }}</span
               ><input
                 type="checkbox"

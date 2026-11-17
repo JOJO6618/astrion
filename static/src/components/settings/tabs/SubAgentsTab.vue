@@ -30,13 +30,13 @@ const intelligenceLevels = ['high', 'medium', 'low'] as const;
 
 <template>
   <section class="stg-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('personalization.subAgentModelTitle') }}
+      </span>
+    </div>
     <div class="stg-card">
-      <div class="stg-group-block">
-        <div class="stg-group-title">
-          <span class="stg-row-title">{{ $t('personalization.subAgentModelTitle') }}</span>
-          <span class="stg-row-desc">{{ $t('personalization.subAgentModelDesc') }}</span>
-        </div>
-        <div v-for="level in intelligenceLevels" :key="level" class="stg-select-row inner">
+      <div v-for="level in intelligenceLevels" :key="level" class="stg-select-row">
           <span class="stg-row-copy">
             <span class="stg-row-title">{{
               $t(`personalization.subAgentIntelligence.${level}`)
@@ -55,7 +55,11 @@ const intelligenceLevels = ['high', 'medium', 'low'] as const;
             "
           />
         </div>
-      </div>
+    </div>
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('settings.subAgentsTitle') }}
+      </span>
     </div>
     <!-- 数量与压缩阈值：改动后失焦即保存（不放保存按钮） -->
     <div class="stg-card">

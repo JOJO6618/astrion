@@ -112,6 +112,23 @@ export default {
   appearanceTitle: 'Appearance',
   adminTitle: 'Admin',
 
+  // ── Card titles ──
+  cardAppearanceTheme: 'Theme & language',
+  cardAppearanceWorkspace: 'Sidebar & tool display',
+  cardAppearancePanels: 'Panel behavior',
+  cardAppearanceMessages: 'Message display',
+  cardQuickBasics: 'Quick Chat settings',
+  cardQuickPermissions: 'System permissions',
+  cardQuickActions: 'Quick window',
+  cardGeneralQuota: 'Subscription & quota',
+  cardGeneralTitle: 'Conversation titles',
+  cardGeneralThinking: 'Thinking summaries',
+  cardGeneralSecurity: 'Command safety',
+  cardStorageSummary: 'Storage overview',
+  cardStorageDetails: 'Storage breakdown',
+  cardUsageScope: 'Report scope',
+  cardUsageOverview: 'Overview',
+
   // ── Providers section ──
   providersConnectedSection: 'Connected',
   providersCatalogSection: 'Add provider',

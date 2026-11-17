@@ -225,6 +225,9 @@ onMounted(() => {
   <section class="stg-page">
     <HostPasswordSettings />
     <CrossPetSettings />
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardGeneralQuota') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row">
         <span class="stg-row-copy">
@@ -266,6 +269,9 @@ onMounted(() => {
       </div>
     </div>
 
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardGeneralTitle') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row">
         <span class="stg-row-copy">
@@ -300,6 +306,9 @@ onMounted(() => {
       </div>
     </div>
 
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardGeneralThinking') }}</span>
+    </div>
     <div class="stg-card">
       <div class="stg-select-row">
         <span class="stg-row-copy">
@@ -359,6 +368,9 @@ onMounted(() => {
       </div>
     </div>
 
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardGeneralSecurity') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row">
         <span class="stg-row-copy">
@@ -404,6 +416,9 @@ onMounted(() => {
       </div>
     </div>
 
+    <div v-if="runDataSupported" class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.runDataTitle') }}</span>
+    </div>
     <div v-if="runDataSupported" class="stg-card">
       <div v-if="runDataSupported" class="stg-textarea-row">
         <span class="stg-row-copy">
@@ -549,6 +564,9 @@ onMounted(() => {
       </div>
     </Teleport>
 
+    <div v-if="isAppShell" class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('personalization.appUpdateTitle') }}</span>
+    </div>
     <div v-if="isAppShell" class="stg-card">
       <div v-if="isAppShell" class="stg-action-row">
         <span class="stg-row-copy">

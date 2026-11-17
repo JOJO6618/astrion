@@ -36,7 +36,6 @@ const defaultExtraOptions = computed(() => [
       <div class="stg-section-divider">
         <span class="stg-section-divider__label">{{ $t(agent.nameKey) }}</span>
       </div>
-      <p class="stg-section-desc">{{ $t(agent.descKey) }}</p>
 
       <div class="stg-card">
         <label v-if="agent.key === 'auto_approval'" class="stg-toggle-row">

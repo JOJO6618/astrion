@@ -50,7 +50,7 @@
   padding: 16px;
   background: var(--group-card-bg);
   border-radius: 12px;
-  box-shadow: var(--popover-shadow);
+  box-shadow: var(--group-card-shadow);
 }
 
 .stg-nav-heading {
@@ -386,13 +386,13 @@
   justify-content: center;
 }
 
-/* 分组小标题：不带横线，只靠字重与上方留白 */
+/* 卡片标题：置于卡片外侧，与卡片外边缘对齐，和卡内设置行形成明确层级 */
 .stg-section-divider,
 .stg-section-header {
   display: flex;
   align-items: center;
-  min-height: 24px;
-  margin: 28px 0 4px;
+  min-height: 20px;
+  margin: 28px 0 8px;
 }
 
 .stg-page > .stg-section-divider:first-child,
@@ -402,9 +402,11 @@
 
 .stg-section-divider__label,
 .stg-section-title {
-  color: var(--text-secondary);
-  font-size: 12px;
+  color: var(--text-primary);
+  font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.1px;
 }
 
 .stg-section-desc {
@@ -466,10 +468,10 @@
   padding-bottom: 12px;
 }
 
-/* 卡片上方的分组小标题与组说明：文字与卡内行对齐 */
+/* 卡片标题与卡片外边缘对齐；说明文字仍与卡内内容对齐 */
 .stg-page .stg-section-divider {
   margin-bottom: 8px;
-  padding: 0 16px;
+  padding: 0;
 }
 
 .stg-page .stg-section-desc {
@@ -480,6 +482,13 @@
 .stg-card + p {
   margin-top: 8px;
   padding: 0 16px;
+}
+
+.stg-card-empty {
+  margin: 8px 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .stg-check-grid {

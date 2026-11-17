@@ -26,6 +26,9 @@ const {
 
 <template>
   <section class="stg-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.contextTitle') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row"
         ><span class="stg-row-copy"
@@ -78,12 +81,14 @@ const {
         />
       </div>
     </div>
-    <div class="stg-card stg-group-block">
-      <div class="stg-group-title">
-        <span class="stg-row-title">{{ $t('personalization.compressionStrategyTitle') }}</span>
-        <span class="stg-row-desc">{{ $t('personalization.compressionStrategyDesc') }}</span>
-      </div>
-      <label class="stg-toggle-row inner"
+
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">
+        {{ $t('personalization.compressionStrategyTitle') }}
+      </span>
+    </div>
+    <div class="stg-card">
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.autoShallowCompressTitle') }}</span
           ><span class="stg-row-desc">{{
@@ -99,7 +104,7 @@ const {
             })
           " /><UiSwitch decorative :checked="form.auto_shallow_compress_enabled"
       /></label>
-      <label class="stg-toggle-row inner"
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.autoDeepCompressTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.autoDeepCompressDesc') }}</span></span
@@ -113,7 +118,7 @@ const {
             })
           " /><UiSwitch decorative :checked="form.auto_deep_compress_enabled"
       /></label>
-      <label class="stg-toggle-row inner"
+      <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.adaptiveCompressTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.adaptiveCompressDesc') }}</span></span
@@ -127,7 +132,7 @@ const {
             })
           " /><UiSwitch decorative :checked="form.adaptive_compress_enabled"
       /></label>
-      <div class="stg-input-row inner">
+      <div class="stg-input-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('personalization.shallowTriggerTokens') }}</span>
           <span class="stg-row-desc">{{ $t('personalization.shallowTriggerTokensDesc') }}</span>
@@ -140,7 +145,7 @@ const {
           @input="handleCompressionNumberInput('shallow_compress_trigger_tokens', $event)"
         />
       </div>
-      <div class="stg-input-row inner">
+      <div class="stg-input-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('personalization.shallowKeepRecentTools') }}</span>
           <span class="stg-row-desc">{{ $t('personalization.shallowKeepRecentToolsDesc') }}</span>
@@ -153,7 +158,7 @@ const {
           @input="handleCompressionNumberInput('shallow_compress_keep_recent_tools', $event)"
         />
       </div>
-      <div class="stg-input-row inner">
+      <div class="stg-input-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('personalization.shallowKeepTurnTools') }}</span>
           <span class="stg-row-desc">{{ $t('personalization.shallowKeepTurnToolsDesc') }}</span>
@@ -166,7 +171,7 @@ const {
           @input="handleCompressionNumberInput('shallow_compress_keep_user_turn_tools', $event)"
         />
       </div>
-      <div class="stg-input-row inner">
+      <div class="stg-input-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('personalization.shallowMaxReplace') }}</span>
           <span class="stg-row-desc">{{ $t('personalization.shallowMaxReplaceDesc') }}</span>
@@ -179,7 +184,7 @@ const {
           @input="handleCompressionNumberInput('shallow_compress_max_replace_per_round', $event)"
         />
       </div>
-      <div class="stg-input-row inner">
+      <div class="stg-input-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('personalization.shallowToolInterval') }}</span>
           <span class="stg-row-desc">{{ $t('personalization.shallowToolIntervalDesc') }}</span>
@@ -194,7 +199,7 @@ const {
           "
         />
       </div>
-      <div class="stg-input-row inner">
+      <div class="stg-input-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('personalization.deepTriggerTokens') }}</span>
           <span class="stg-row-desc">{{ $t('personalization.deepTriggerTokensDesc') }}</span>

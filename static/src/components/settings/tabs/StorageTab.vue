@@ -30,6 +30,9 @@ onMounted(load);
 
 <template>
   <section class="stg-page storage-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardStorageSummary') }}</span>
+    </div>
     <!-- 总占用：状态写进说明，右侧只放「刷新」 -->
     <div class="stg-card">
       <div class="stg-action-row">
@@ -57,6 +60,9 @@ onMounted(load);
     <p v-else-if="!data" class="storage-placeholder">{{ $t('storageStats.loading') }}</p>
 
     <template v-else-if="data.available">
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ $t('settings.cardStorageDetails') }}</span>
+      </div>
       <div class="stg-card storage-overview">
         <StorageBar :categories="data.categories" :total="data.total_bytes" />
         <StorageLegend :categories="data.categories" :total="data.total_bytes" />

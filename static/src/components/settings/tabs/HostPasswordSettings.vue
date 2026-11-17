@@ -69,11 +69,13 @@ async function disable() {
 </script>
 
 <template>
+  <div v-if="applicable" class="stg-section-divider">
+    <span class="stg-section-divider__label">{{ $t('settings.hostPasswordTitle') }}</span>
+  </div>
   <div v-if="applicable" class="stg-card host-password-settings">
     <div class="stg-action-row">
       <span class="stg-row-copy">
-        <span class="stg-row-title">{{ $t('settings.hostPasswordTitle') }}</span>
-        <span class="stg-row-desc">
+        <span class="stg-row-title">
           {{ $t(enabled ? 'settings.hostPasswordEnabled' : 'settings.hostPasswordDisabled') }}
         </span>
       </span>

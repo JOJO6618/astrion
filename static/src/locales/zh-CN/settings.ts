@@ -107,6 +107,23 @@ export default {
   appearanceTitle: '外观',
   adminTitle: '管理员',
 
+  // ── 卡片标题 ──
+  cardAppearanceTheme: '主题与语言',
+  cardAppearanceWorkspace: '侧栏与工具显示',
+  cardAppearancePanels: '面板行为',
+  cardAppearanceMessages: '消息显示',
+  cardQuickBasics: '快捷对话设置',
+  cardQuickPermissions: '系统权限',
+  cardQuickActions: '快捷窗口',
+  cardGeneralQuota: '订阅与额度',
+  cardGeneralTitle: '对话标题',
+  cardGeneralThinking: '思考摘要',
+  cardGeneralSecurity: '命令安全',
+  cardStorageSummary: '存储概览',
+  cardStorageDetails: '占用明细',
+  cardUsageScope: '统计范围',
+  cardUsageOverview: '概览',
+
   // ── 提供商分区 ──
   providersConnectedSection: '已连接',
   providersCatalogSection: '添加提供商',

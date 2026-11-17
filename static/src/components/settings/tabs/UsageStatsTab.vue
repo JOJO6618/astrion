@@ -148,6 +148,9 @@ const updatedText = computed(() =>
 
 <template>
   <section class="stg-page usage-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardUsageScope') }}</span>
+    </div>
     <!-- 统计范围（下拉）与刷新（状态 + 按钮）拆成两行，每行右侧一个控件 -->
     <div class="stg-card">
       <div class="stg-select-row">
@@ -186,6 +189,9 @@ const updatedText = computed(() =>
       <p v-if="!report.first_date" class="usage-placeholder">{{ $t('usageStats.empty') }}</p>
 
       <!-- 概览 -->
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ $t('settings.cardUsageOverview') }}</span>
+      </div>
       <div class="stg-card usage-overview">
         <div v-for="item in overviewItems" :key="item.key" class="usage-stat">
           <span class="usage-stat-label">{{ item.label }}</span>
@@ -195,9 +201,11 @@ const updatedText = computed(() =>
       </div>
 
       <!-- 活动 -->
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ activityTitle }}</span>
+      </div>
       <div class="stg-card usage-block">
         <div class="usage-block-head">
-          <h3>{{ activityTitle }}</h3>
           <div class="usage-tabs" role="tablist" :aria-label="$t('usageStats.granAria')">
             <button
               v-for="item in GRANULARITIES"
@@ -255,37 +263,41 @@ const updatedText = computed(() =>
       </div>
 
       <template v-if="breakdown">
+        <div class="stg-section-divider">
+          <span class="stg-section-divider__label">{{ $t('usageStats.modelsTitle') }}</span>
+        </div>
         <div class="stg-card usage-block">
-          <div class="usage-block-head">
-            <h3>{{ $t('usageStats.modelsTitle') }}</h3>
-          </div>
           <UsageModelTable :models="breakdown.models" :currency="currency" :rate="rate" />
           <p class="usage-note">{{ $t('usageStats.modelsNote') }}</p>
         </div>
 
         <div class="usage-columns">
-          <div class="stg-card usage-block">
-            <div class="usage-block-head">
-              <h3>{{ $t('usageStats.compTitle') }}</h3>
+          <div class="usage-column">
+            <div class="stg-section-divider">
+              <span class="stg-section-divider__label">{{ $t('usageStats.compTitle') }}</span>
             </div>
-            <UsageComposition
-              :breakdown="breakdown"
-              :sources="report.sources"
-              :show-sources="source === 'all'"
-            />
+            <div class="stg-card usage-block">
+              <UsageComposition
+                :breakdown="breakdown"
+                :sources="report.sources"
+                :show-sources="source === 'all'"
+              />
+            </div>
           </div>
-          <div class="stg-card usage-block">
-            <div class="usage-block-head">
-              <h3>{{ $t('usageStats.cacheTitle') }}</h3>
+          <div class="usage-column">
+            <div class="stg-section-divider">
+              <span class="stg-section-divider__label">{{ $t('usageStats.cacheTitle') }}</span>
             </div>
-            <UsageCacheChart :report="report" :range="range" />
+            <div class="stg-card usage-block">
+              <UsageCacheChart :report="report" :range="range" />
+            </div>
           </div>
         </div>
 
+        <div class="stg-section-divider">
+          <span class="stg-section-divider__label">{{ $t('usageStats.punchTitle') }}</span>
+        </div>
         <div class="stg-card usage-block">
-          <div class="usage-block-head">
-            <h3>{{ $t('usageStats.punchTitle') }}</h3>
-          </div>
           <UsagePunchCard :punch="breakdown.punch" :timezone="report.timezone" />
         </div>
       </template>
@@ -465,9 +477,8 @@ const updatedText = computed(() =>
   margin: 12px 0;
 }
 
-/* 并排两张卡片不吃「卡片 + 卡片」的上边距，间距由网格 gap 负责 */
-.usage-columns > .stg-card + .stg-card {
-  margin-top: 0;
+.usage-column {
+  min-width: 0;
 }
 
 .usage-note {

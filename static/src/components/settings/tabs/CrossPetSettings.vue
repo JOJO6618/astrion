@@ -64,10 +64,12 @@ async function setEnabled(value: boolean) {
 </script>
 
 <template>
+  <div v-if="supported" class="stg-section-divider">
+    <span class="stg-section-divider__label">{{ $t('settings.crosspetTitle') }}</span>
+  </div>
   <div v-if="supported" class="stg-card">
     <label class="stg-toggle-row">
       <span class="stg-row-copy">
-        <span class="stg-row-title">{{ $t('settings.crosspetTitle') }}</span>
         <span class="stg-row-desc">{{ $t('settings.crosspetDesc') }}</span>
       </span>
       <input

@@ -74,6 +74,9 @@ const backupModeItems = computed(() => [
 
 <template>
   <section class="stg-page" data-tutorial="personal-page-workspace">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.workspaceTitle') }}</span>
+    </div>
     <div class="stg-card">
       <div class="stg-select-row">
         <span class="stg-row-copy"
@@ -101,6 +104,9 @@ const backupModeItems = computed(() => [
       </div>
     </div>
 
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('sandbox.sectionTitle') }}</span>
+    </div>
     <div class="stg-card">
       <div class="stg-action-row">
         <span class="stg-row-copy">
@@ -138,6 +144,9 @@ const backupModeItems = computed(() => [
       </div>
     </div>
 
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.workspaceTitleProject') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row"
         ><span class="stg-row-copy"

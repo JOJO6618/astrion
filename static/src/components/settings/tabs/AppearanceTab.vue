@@ -76,6 +76,9 @@ const selectCurrency = (value: string) => {
 
 <template>
   <section class="stg-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardAppearanceTheme') }}</span>
+    </div>
     <div class="stg-card">
       <div class="stg-select-row">
         <span class="stg-row-copy"
@@ -113,6 +116,9 @@ const selectCurrency = (value: string) => {
           @update:model-value="selectCurrency"
         />
       </div>
+    </div>
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardAppearanceWorkspace') }}</span>
     </div>
     <div class="stg-card">
       <label class="stg-toggle-row"
@@ -176,6 +182,9 @@ const selectCurrency = (value: string) => {
           " /><UiSwitch decorative :checked="form.show_git_status_bar"
       /></label>
     </div>
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardAppearancePanels') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row"
         ><span class="stg-row-copy"
@@ -221,6 +230,9 @@ const selectCurrency = (value: string) => {
             })
           " /><UiSwitch decorative :checked="form.preview_auto_open"
       /></label>
+    </div>
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardAppearanceMessages') }}</span>
     </div>
     <div class="stg-card">
       <label class="stg-toggle-row"

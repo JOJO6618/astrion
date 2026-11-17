@@ -48,6 +48,9 @@ onMounted(load);
 
 <template>
   <section class="stg-page">
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.browserTitle') }}</span>
+    </div>
     <div class="stg-card">
       <label class="stg-toggle-row"
         ><span class="stg-row-copy"
@@ -99,28 +102,25 @@ onMounted(load);
         </span>
       </label>
     </div>
+
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('browser.aiSites') }}</span>
+    </div>
     <div class="stg-card">
-      <div class="stg-textarea-row">
-        <span class="stg-row-copy">
-          <span class="stg-row-title">{{ $t('browser.aiSites') }}</span>
-          <span class="stg-row-desc">{{
-            sites.length ? $t('browser.aiSitesDesc') : $t('browser.aiSitesEmpty')
-          }}</span>
-        </span>
-        <div v-if="sites.length" class="stg-domain-list">
-          <div v-for="item in sites" :key="item.site" class="stg-domain-row">
-            <span class="stg-row-title">{{ item.site }}</span>
-            <button
-              type="button"
-              class="stg-domain-remove"
-              :disabled="busy"
-              @click="revoke(item.site)"
-            >
-              {{ $t('browser.aiSiteRevoke') }}
-            </button>
-          </div>
+      <div v-if="sites.length" class="stg-domain-list">
+        <div v-for="item in sites" :key="item.site" class="stg-domain-row">
+          <span class="stg-row-title">{{ item.site }}</span>
+          <button
+            type="button"
+            class="stg-domain-remove"
+            :disabled="busy"
+            @click="revoke(item.site)"
+          >
+            {{ $t('browser.aiSiteRevoke') }}
+          </button>
         </div>
       </div>
+      <p v-else class="stg-card-empty">{{ $t('browser.aiSitesEmpty') }}</p>
     </div>
   </section>
 </template>

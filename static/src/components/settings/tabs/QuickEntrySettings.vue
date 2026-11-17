@@ -187,6 +187,9 @@ onBeforeUnmount(() => {
       {{ t('common.loading') }}
     </p>
     <template v-if="loaded">
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ t('settings.cardQuickBasics') }}</span>
+      </div>
       <div class="stg-card">
         <button
           type="button"
@@ -250,6 +253,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ t('settings.cardQuickPermissions') }}</span>
+      </div>
       <div class="stg-card">
         <div
           v-for="kind in ['screenPermission', 'inputPermission'] as const"
@@ -289,6 +295,9 @@ onBeforeUnmount(() => {
         <p v-if="permissionError" class="quick-settings-error" role="status">
           {{ permissionError }}
         </p>
+      </div>
+      <div class="stg-section-divider">
+        <span class="stg-section-divider__label">{{ t('settings.cardQuickActions') }}</span>
       </div>
       <div class="stg-card">
         <div class="stg-action-row">
