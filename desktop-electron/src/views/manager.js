@@ -102,6 +102,15 @@ export class ViewManager {
       wc.send('shell:tabs-state', state);
     }
   }
+  /** 主题变更广播：隐藏视图挂着不卸载，必须主动通知它们重设 data-theme。 */
+  broadcastTheme(theme, except = null) {
+    const targets = [this.chromeView, ...[...this.entries.values()].map((entry) => entry.view)];
+    for (const view of targets) {
+      const wc = view?.webContents;
+      if (!wc || wc.isDestroyed() || wc === except) continue;
+      wc.send('shell:theme-changed', theme);
+    }
+  }
 
   // ---- 收敛 ----
   reconcile() {

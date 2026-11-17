@@ -127,10 +127,14 @@ ipcMain.on('window:surface', (event, color) => {
   if (!fromContentView(event)) return;
   applySurfaceColor(color);
 });
-// 当前主题键 → 壳层记忆（页面 applyTheme 时上报），供下次启动首帧使用。
+// 当前主题键 → 壳层记忆（页面 applyTheme 时上报），供下次启动首帧使用；
+// 值真的变化时再广播给其余受管视图（标签条 + 内容视图），让挂在后台的视图跟着换色。
 ipcMain.on('shell:theme', (event, key) => {
   if (!fromContentView(event) && !fromChrome(event)) return;
-  if (typeof key === 'string') saveThemeKey(key);
+  if (typeof key !== 'string' || !THEME_KEYS.has(key)) return;
+  const changed = key !== currentThemeKey();
+  saveThemeKey(key);
+  if (changed) views?.broadcastTheme(key, event.sender);
 });
 // preload 在页面脚本执行前同步取首帧主题；主题不是凭据，任一顶层 frame 可读。
 ipcMain.on('shell:theme-get', (event) => {

@@ -2,6 +2,7 @@
 import { debugLog } from '../common';
 import { trackStreamAttempt } from './aiStream';
 import { currentConversationSession, ownsConversationSession } from '../conversation/session';
+import { applyThemeKey } from '../../../utils/theme';
 
 const toolAliases = (data: any) =>
   [
@@ -297,14 +298,13 @@ export const toolMethods = {
             /* ignore */
           }
         }
-        // 处理主题变更
+        // 处理主题变更（DOM 应用 + 桌面跨视图同步统一走 utils/theme）
         if (result?.theme_changed === true && result.new_theme) {
           const theme = result.new_theme;
           if (typeof window !== 'undefined' && window.localStorage) {
             window.localStorage.setItem('agents_ui_theme', theme);
           }
-          document.documentElement.setAttribute('data-theme', theme);
-          document.body.setAttribute('data-theme', theme);
+          applyThemeKey(theme);
         }
         // 任何字段更新后都刷新个人空间数据
         (async () => {

@@ -13,10 +13,20 @@ const isThemeKey = (value: unknown): value is ThemeKey =>
 interface DesktopThemeBridge {
   surface?: (color: string) => void;
   theme?: (theme: ThemeKey) => void;
+  onThemeChange?: (callback: (theme: string) => void) => () => void;
 }
 
 const desktopBridge = (): DesktopThemeBridge | undefined =>
   (window as { astrionWindow?: DesktopThemeBridge }).astrionWindow;
+
+/** 内容视图走 astrionWindow，标签条（chrome 视图）只有 astrionShell。 */
+const themeChangeSource = (): DesktopThemeBridge | undefined => {
+  const host = window as {
+    astrionWindow?: DesktopThemeBridge;
+    astrionShell?: DesktopThemeBridge;
+  };
+  return host.astrionWindow?.onThemeChange ? host.astrionWindow : host.astrionShell;
+};
 
 /** Desktop shell: 上报主题键（壳层记住，下次启动首帧直接用），并在下一帧同步窗口底色。 */
 const syncDesktopTheme = (theme: ThemeKey) => {
@@ -36,11 +46,12 @@ const syncDesktopTheme = (theme: ThemeKey) => {
   });
 };
 
-const applyTheme = (theme: ThemeKey) => {
+const applyTheme = (theme: ThemeKey, fromShell = false) => {
   const root = document.documentElement;
   root.setAttribute('data-theme', theme);
   document.body.setAttribute('data-theme', theme);
-  syncDesktopTheme(theme);
+  // 收到壳层广播时不回报，避免多个视图来回触发 IPC。
+  if (!fromShell) syncDesktopTheme(theme);
 };
 
 const loadTheme = (): ThemeKey => {
@@ -58,9 +69,26 @@ const persistTheme = (theme: ThemeKey) => {
   window.localStorage.setItem(THEME_STORAGE_KEY, theme);
 };
 
+/** 桌面多视图：隐藏视图挂着不卸载，靠壳层广播把主题变更追上去（只订阅一次）。 */
+let themeBroadcastSubscribed = false;
+const subscribeThemeBroadcast = () => {
+  if (themeBroadcastSubscribed) return;
+  const source = themeChangeSource();
+  if (!source?.onThemeChange) return;
+  themeBroadcastSubscribed = true;
+  try {
+    source.onThemeChange((theme) => {
+      if (isThemeKey(theme)) applyTheme(theme, true);
+    });
+  } catch {
+    // 桥不可用时只影响跨视图同步。
+  }
+};
+
 export const installTheme = () => {
   const theme = loadTheme();
   applyTheme(theme);
+  subscribeThemeBroadcast();
 };
 
 export const useTheme = () => {
@@ -79,3 +107,13 @@ export const useTheme = () => {
 };
 
 export type { ThemeKey };
+
+/**
+ * 统一主题应用入口：个人偏好与智能体工具改主题都必须走这里，
+ * 否则只改当前视图的 DOM，桌面其它标签仍是旧配色。
+ */
+export const applyThemeKey = (theme: unknown) => {
+  if (!isThemeKey(theme)) return false;
+  applyTheme(theme);
+  return true;
+};

@@ -15,7 +15,13 @@ contextBridge.exposeInMainWorld('__ASTRION_DESKTOP__', true);
 // 前端主题底色/主题键 → 壳层（启动与拉伸时未绘制区域的颜色，兼下次启动的首帧主题）。
 contextBridge.exposeInMainWorld('astrionWindow', {
   surface: color => ipcRenderer.send('window:surface', color),
-  theme: key => ipcRenderer.send('shell:theme', key)
+  theme: key => ipcRenderer.send('shell:theme', key),
+  // 其他标签/窗口切换主题后由壳层广播；返回取消函数。
+  onThemeChange: callback => {
+    const listener = (_event, theme) => callback(theme);
+    ipcRenderer.on('shell:theme-changed', listener);
+    return () => ipcRenderer.removeListener('shell:theme-changed', listener);
+  }
 });
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
 

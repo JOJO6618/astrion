@@ -84,6 +84,24 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 **验证**：后端 test_client 实测：未登录 `GET /api/conversation-tabs` → 401「登录状态已过期」；`GET /api/csrf-token` → 200；带 token `POST /host-login` → 200 `success`；再取快照 → 200。壳层 GUI（端口复用、首帧配色）需实机启动验收。
 
+## 主题跨视图同步（2026-11-17）
+
+**症状**：设置页切换主题后，从标签条切到别的对话，那个视图仍是旧配色，必须重新加载页面才更新。
+
+**根因**：每个标签是独立 `WebContentsView`，隐藏视图只隐藏、不卸载（`views/manager.js`）。主题是纯文档级操作（`document.documentElement[data-theme]`）；`shell:theme` 原先只把主题键存进 `userData/theme.json` 供下次启动首帧使用，**没有任何广播**，前端也没有跨视图监听。
+
+**实现（壳层广播链）**：
+
+- `window.js`：`shell:theme` 校验主题键后，值真的变化时调用 `views.broadcastTheme(key, event.sender)`。
+- `views/manager.js::broadcastTheme`：向 chrome 视图与所有内容视图 `send('shell:theme-changed', theme)`，跳过上报者。
+- `preload-view.cjs` 暴露 `astrionWindow.onThemeChange`，`preload-chrome.cjs` 暴露 `astrionShell.onThemeChange`，均返回取消函数。
+- 前端 `utils/theme.ts`：`installTheme()` 只订阅一次；收到广播走 `applyTheme(theme, fromShell=true)`——只改 DOM，不再回报壳层，避免多视图来回触发 IPC。`themeChangeSource()` 兼容内容视图与 chrome 两种桥。
+- **统一入口**：`utils/theme.ts::applyThemeKey` 是唯一的 DOM 应用入口；`stores/personalization.ts::applyTheme` 与 `app/methods/taskPolling/tool.ts`（智能体经 `manage_personalization` 改主题）都改走它，否则只改当前视图。
+
+**边界**：`quick` 快捷对话窗口与内置浏览器窗口各有 preload，未接 `onThemeChange`（打开时从 localStorage 取主题，不做运行期同步）；内容视图内个人偏好 store 的 `form.theme` 不随广播更新。
+
+**验证**：`tsc --noEmit`、ESLint、`node --check`（壳层 4 个文件）、`npm run build` 通过；2026-11-17 用 `--dir` 测试包（同一数据根 `~/.astrion/astrion-desktop`）实测：设置页切换主题后切到其余标签，配色即时跟随，无需重新加载。
+
 ## 人工审批黄点（2026-11-05，仍适用）
 
 `conversation_tabs.py` 在快照中富化 `awaiting_human_approval`（只投影不落盘）：`human_approval_required=true` 且人工未裁决为等待态，终态/取消/过期下次快照清除；黄点优先于运行点。回归 `test/2026-11-05_完全访问审批/`。

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { t, currentLocale, setLocale } from '@/locales';
 import { useModelStore } from './model';
+import { applyThemeKey } from '@/utils/theme';
 
 // 语气预设：模块顶层禁止调 t()，这里只存 key，由 getter tonePresets 在读取时 t(key) 求值（随语言切换刷新）
 const TONE_PRESET_KEYS = [
@@ -843,10 +844,8 @@ export const usePersonalizationStore = defineStore('personalization', {
       if (typeof window === 'undefined') return;
       // 同步到localStorage
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-      // 应用主题
-      const root = document.documentElement;
-      root.setAttribute('data-theme', theme);
-      document.body.setAttribute('data-theme', theme);
+      // DOM 应用与桌面跨视图同步统一由 utils/theme 负责
+      applyThemeKey(theme);
     },
     normalizeCompressionNumber(value: any): number | null {
       if (value === null || typeof value === 'undefined' || value === '') {

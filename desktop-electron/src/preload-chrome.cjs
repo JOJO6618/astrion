@@ -51,5 +51,7 @@ contextBridge.exposeInMainWorld('astrionShell', {
   // 用户关闭独立窗口，壳层已把视图放回主窗口，请 chrome 发 dock 命令：{ key }。
   onRequestDock: callback => subscribe('shell:request-dock', callback),
   // 独立窗口或主窗口获得焦点，请 chrome 发 focus 命令：{ key }（主窗口为当前 active key）。
-  onWindowFocus: callback => subscribe('shell:window-focus', callback)
+  onWindowFocus: callback => subscribe('shell:window-focus', callback),
+  // 内容视图切换主题后由壳层广播，标签条跟随换色。
+  onThemeChange: callback => subscribe('shell:theme-changed', callback)
 });
