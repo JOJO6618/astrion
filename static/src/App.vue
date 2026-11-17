@@ -372,8 +372,13 @@
              常驻挂载（内部由 previewPath 驱动显隐），保证移动端悬浮层之上可再叠加预览 -->
         <FilePreviewPanel />
         <!-- 预览面板（预览窗口的展开视图）：服务器 / HTML 文件的内嵌 iframe 预览。
-             workspace-id 用于同源回退 URL 与运行时补拉，不能依赖 session 选中工作区 -->
-        <PreviewPanel :host-mode="versioningHostMode" :workspace-id="currentHostWorkspaceId" />
+             workspace-id 用于同源回退 URL 与运行时补拉，不能依赖 session 选中工作区。
+             桌面端已停用预览窗口（网页链接改走内置浏览器），不再挂载该面板。 -->
+        <PreviewPanel
+          v-if="!desktopShell"
+          :host-mode="versioningHostMode"
+          :workspace-id="currentHostWorkspaceId"
+        />
         <CitationPopover :host-mode="versioningHostMode" />
         <div
           v-if="!isMobileViewport && (terminalPanelOpen || gitChangesPanelOpen)"
@@ -889,7 +894,11 @@ import PreviewPanel from './components/chat/quickdock/PreviewPanel.vue';
 import CitationPopover from './components/chat/CitationPopover.vue';
 import { useTutorialStore } from './stores/tutorial';
 import { usePersonalizationStore } from './stores/personalization';
-import { usePreviewStore } from './stores/preview';
+import { useNativeBrowserStore, nativeBrowserAvailable } from './stores/nativeBrowser';
+import { useConversationTabsStore } from './stores/conversationTabs';
+import { browserScopeForNavigation } from './components/browser/browserScope';
+import { openExternal } from './utils/openExternal';
+import { isDesktopShell } from './utils/desktopPlatform';
 import { useDesktopUpdateStore } from './stores/desktopUpdate';
 import { useCommandBlockingStore } from './stores/commandBlocking';
 
@@ -921,16 +930,46 @@ const detectAppShell = () => {
 };
 const isAppShell = ref(detectAppShell());
 
-// 桌面端：界面里的 localhost/127.0.0.1 链接点击 → 窗口内预览面板，
-// 而不是被壳的 on_navigation 拦去系统浏览器（预览功能的本机预览语义）。
-// 同源（后端自身端口）链接是应用内部导航，必须放行。
-const onDesktopLocalhostLinkClick = (event: MouseEvent) => {
+// 桌面端：正文里的网页链接统一交给 Astrion 内置浏览器打开（预览面板已在桌面端停用）。
+// 同源（后端自身端口）链接是应用内部导航，必须放行；内置浏览器不可用时退回系统浏览器。
+const desktopShell = isDesktopShell();
+
+const waitForBrowserLease = async (timeoutMs = 3500): Promise<boolean> => {
+  const browser = useNativeBrowserStore();
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (browser.snapshot?.lease) return true;
+    if (browser.error) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, 60));
+  }
+  return false;
+};
+
+const openInNativeBrowser = async (url: string) => {
+  if (!nativeBrowserAvailable()) {
+    void openExternal(url);
+    return;
+  }
+  const browser = useNativeBrowserStore();
+  const scope = browserScopeForNavigation(useConversationTabsStore(), window.location.pathname);
+  // 非对话页（设置/Git/工作流）没有浏览器作用域，退回系统浏览器
+  if (!scope) {
+    void openExternal(url);
+    return;
+  }
+  // 展开面板后由 NativeBrowserHost 建立连接，拿到 lease 才能下发导航
+  browser.open = true;
+  if (await waitForBrowserLease()) await browser.navigate(url);
+  else void openExternal(url);
+};
+
+const onDesktopExternalLinkClick = (event: MouseEvent) => {
   if (event.defaultPrevented || event.button !== 0) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]');
   if (!anchor) return;
   const raw = anchor.getAttribute('href') || '';
-  if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(raw)) return;
+  if (!/^https?:\/\//i.test(raw)) return;
   try {
     if (new URL(raw).host === window.location.host) return;
   } catch {
@@ -938,7 +977,7 @@ const onDesktopLocalhostLinkClick = (event: MouseEvent) => {
   }
   event.preventDefault();
   event.stopPropagation();
-  usePreviewStore().openServerUrl(raw);
+  void openInNativeBrowser(raw);
 };
 
 onMounted(() => {
@@ -947,14 +986,14 @@ onMounted(() => {
     isAppShell.value = detectAppShell();
   }, 300);
   if ((window as any).__ASTRION_DESKTOP__) {
-    document.addEventListener('click', onDesktopLocalhostLinkClick, true);
+    document.addEventListener('click', onDesktopExternalLinkClick, true);
     // 桌面壳：应用入口静默检查一次更新（任何路由进入都覆盖，store 内部只跑一次）；
     // 有新版本只亮侧边栏红点，不弹窗打扰
     useDesktopUpdateStore().checkStartupUpdate();
   }
 });
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onDesktopLocalhostLinkClick, true);
+  document.removeEventListener('click', onDesktopExternalLinkClick, true);
 });
 
 defineOptions(appOptions);

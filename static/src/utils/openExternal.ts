@@ -38,8 +38,15 @@ export async function openExternal(url: string): Promise<void> {
  * 失败返回 false，由调用方决定是否退回代理地址。
  */
 export async function openWorkspaceFile(path: string): Promise<boolean> {
+  return (await openWorkspaceFileResult(path)).ok;
+}
+
+/** 同 openWorkspaceFile，但带出后端错误文案（host 文件链接点击需要提示失败原因）。 */
+export async function openWorkspaceFileResult(
+  path: string
+): Promise<{ ok: boolean; error: string }> {
   const clean = String(path || '').trim();
-  if (!clean) return false;
+  if (!clean) return { ok: false, error: '' };
   try {
     const resp = await fetch('/api/system/open-file', {
       method: 'POST',
@@ -47,8 +54,9 @@ export async function openWorkspaceFile(path: string): Promise<boolean> {
       body: JSON.stringify({ path: clean })
     });
     const payload = await resp.json().catch(() => ({}));
-    return !!(resp.ok && payload && payload.success);
-  } catch {
-    return false;
+    const ok = !!(resp.ok && payload && payload.success);
+    return { ok, error: ok ? '' : String(payload?.error || '') };
+  } catch (error) {
+    return { ok: false, error: String((error as Error)?.message || '') };
   }
 }

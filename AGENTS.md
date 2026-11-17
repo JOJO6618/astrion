@@ -512,7 +512,8 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - store `stores/preview.ts`；dock 第六窗 `PreviewWindow.vue`；展开面板 `PreviewPanel.vue`。
 - 自动展开：personalization `preview_auto_open`（默认 false）；规则 = 最新目标优先、同目标更新不重弹、用户手动关闭后本次任务内不再自动展开；对话区放不下（<300px）时不自动展开。
 - **窄布局自动折叠（2026-11-12）**：桌面对话区宽度<300px 时按“快捷面板组（快捷面板＋文件内容预览＋预览窗口，三者绑定）→右侧终端/Git”顺序自动折叠；手动打开的也折叠，空间不足时手动展开则强制保留至该组被关闭；单向，变宽不自动展开；终端自动打开同受限。规则、代码与验收见 `test/2026-11-12_窄布局自动折叠/README.md`。
-- **桌面端 localhost 链接拦截**：桌面壳 `on_navigation` 会把非后端同源导航拦去系统浏览器，与「窗口内预览」语义冲突——App.vue 注册 document 级 capture 点击拦截（仅 `__ASTRION_DESKTOP__`），回环 http(s) 链接 `preventDefault` 后走 `preview store 的 openServerUrl()`；**同源（后端端口）链接必须放行**，否则会断应用内导航。
+- **桌面端预览窗口已停用（2026-11-17）**：桌面壳内不渲染 dock 的 `PreviewWindow.vue` 与展开视图 `PreviewPanel.vue`，`preview_auto_open` 不再自动展开，预览目标也不计入快捷面板内容判定（否则只有预览目标的对话会撑开空 dock）；**后端照常记录 `metadata.preview_targets`，只是不展示**。正文里的 http(s) 链接（含 localhost）由 App.vue 的 document 级 capture 点击拦截（仅 `__ASTRION_DESKTOP__`）转给 **Astrion 内置浏览器**：先置 `nativeBrowserStore.open = true`，等 `NativeBrowserHost` 连接拿到 lease 后 `navigate`；超时或无浏览器作用域（设置/Git/工作流等非对话页、无 `astrionShell` 桥）回退 `openExternal` 系统浏览器。**同源（后端端口）链接必须放行**，否则会断应用内导航。
+- **正文文件链接点击分流（2026-11-17）**：`a.md-download-link` / `a[data-download="1"]` 在 **host 模式**改为调 `/api/system/open-file` 用系统默认程序打开真实文件（失败 toast 后端文案），**docker/web/Android 保持下载**；判定走 `settings.isHostMode`（未拉到会话状态时先触发一次 `/api/session-status`）。`<show_file>` 卡片自带下载按钮不受影响。
 
 ### 16.4 Prompt
 

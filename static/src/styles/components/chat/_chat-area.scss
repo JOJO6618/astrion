@@ -2830,6 +2830,28 @@ a.md-download-link {
   }
 }
 
+// ===== 正文网页链接（http/https） =====
+// 与文件链接同一套色彩/下划线语言：正文色 + 点状下划线，hover 变强调色，
+// 不再走浏览器默认的蓝紫色实线。排除已有专门样式的文件链接、技能/文件引用、
+// 脚注回跳与引用胶囊。
+.messages-area a[href]:not(.md-download-link):not([data-download='1']):not(.user-file-link):not(
+    .user-skill-link
+  ):not([data-footnote-backref]):not(.md-citation-chip) {
+  color: var(--text-primary);
+  text-decoration: underline dotted;
+  text-decoration-color: var(--text-tertiary);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    text-decoration-color 0.15s;
+
+  &:hover {
+    color: var(--accent);
+    text-decoration-color: var(--accent);
+  }
+}
+
 // ===== 行内引用胶囊（citation chip） =====
 // 交互约定：hover / 展开态只变色，不动边框；弹层交互见 CitationPopover.vue
 .md-citation-chip {

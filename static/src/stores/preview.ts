@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { usePersonalizationStore } from './personalization';
 import { useQuickDockStore } from './quickDock';
+import { isDesktopShell } from '../utils/desktopPlatform';
 import { getStoredPreviewWidth, hasRoomFor } from '../components/chat/quickdock/narrowLayout';
 
 /**
@@ -98,6 +99,8 @@ export const usePreviewStore = defineStore('preview', {
       }
     },
     maybeAutoOpen(target: PreviewTarget) {
+      // 桌面端预览窗口已停用（网页链接改走内置浏览器）：目标仍回填，但不自动展开
+      if (isDesktopShell()) return;
       const personalization = usePersonalizationStore();
       if (personalization.form.preview_auto_open !== true) return;
       if (this.autoOpenSuppressed) return;

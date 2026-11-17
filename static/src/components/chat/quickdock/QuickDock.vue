@@ -19,7 +19,8 @@
       <RunnerWindow kind="agent" data-quick-dock-section="agents" />
       <RunnerWindow kind="cmd" />
       <FileWindow />
-      <PreviewWindow />
+      <!-- 预览窗口：桌面端已停用（网页链接改走内置浏览器），不展示也不计入内容判定 -->
+      <PreviewWindow v-if="!desktopShell" />
     </div>
 
     <!-- 详情面板（fixed 浮在列左侧） -->
@@ -92,6 +93,7 @@ import { usePersonalizationStore, hasCachedQuickDockAutoExpand } from '@/stores/
 import { useFileStore } from '@/stores/file';
 import { useWorkflowStore } from '@/stores/workflow';
 import { usePreviewStore } from '@/stores/preview';
+import { isDesktopShell } from '@/utils/desktopPlatform';
 import TodoWindow from './TodoWindow.vue';
 import WorkflowWindow from './WorkflowWindow.vue';
 import RunnerWindow from './RunnerWindow.vue';
@@ -123,6 +125,8 @@ const { isMobileViewport } = storeToRefs(uiStore);
 const fileStore = useFileStore();
 const workflowStore = useWorkflowStore();
 const personalizationStore = usePersonalizationStore();
+/** 桌面壳内预览窗口整体停用（数据仍回填，只是不渲染） */
+const desktopShell = isDesktopShell();
 
 // hasContent / userCollapsed 提升到 store：App.vue 的展开收起按钮共用同一判定
 const { menu, hasContent, userCollapsed } = storeToRefs(quickDock);

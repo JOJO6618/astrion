@@ -12,6 +12,8 @@ import {
   type ShowHtmlFullscreenPayload
 } from '../utils/showHtmlFullscreen';
 import { downloadWorkspaceFile } from '../utils/downloadFile';
+import { openWorkspaceFileResult } from '../utils/openExternal';
+import { useSettingsStore } from '@/stores/settings';
 import { withWorkspaceScope } from './methods/workspaceRequestScope';
 
 let showImageRenderSeq = 0;
@@ -1512,7 +1514,20 @@ function renderShowFileCard(node: Element) {
 /**
  * 绑定 download:// 链接的点击事件。
  * markdown 里的 [文件](download:///path) 会被渲染为 <a class="md-download-link" href="download://..." data-path="/path">。
+ * 点击行为按执行模式分流：host = 用系统默认程序打开真实文件；其余模式（docker/web/Android）= 下载。
  */
+
+/** host 模式判定（与设置页同一来源）；未拉到会话状态时先补一次，避免启动瞬间误判为下载 */
+function usesHostMode(): boolean {
+  try {
+    const store = useSettingsStore();
+    if (!store.sessionStatusLoaded) void store.fetchSessionStatus();
+    return store.isHostMode;
+  } catch {
+    return false;
+  }
+}
+
 function bindDownloadLinks(root: ParentNode) {
   // 优先用 data-download 属性选择（不被 sanitize 影响），
   // md-download-link class 作为兼容回退
@@ -1525,9 +1540,18 @@ function bindDownloadLinks(root: ParentNode) {
       e.preventDefault();
       e.stopPropagation();
       const path = link.getAttribute('data-path') || '';
-      if (path && allowWorkspaceContent) {
-        dispatchShowFileDownload(path);
+      if (!path || !allowWorkspaceContent) return;
+      if (usesHostMode()) {
+        void openWorkspaceFileResult(path).then((result) => {
+          if (result.ok) return;
+          useUiStore().pushToast({
+            message: result.error || t('shell.openFileFailed'),
+            type: 'error'
+          });
+        });
+        return;
       }
+      dispatchShowFileDownload(path);
     });
   });
 }
