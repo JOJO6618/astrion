@@ -357,6 +357,15 @@
 .stg-toggle-row {
   position: relative;
   cursor: pointer;
+  /* 该行既可能是 <label>（隐藏 checkbox），也可能是 <button role="switch">：
+     统一去掉原生外观，避免 buttonface 底色、UA 描边与居中文字。 */
+  appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  width: 100%;
+  font: inherit;
+  text-align: start;
 }
 
 .stg-toggle-row input[type='checkbox'] {

@@ -321,15 +321,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.quick-settings > .stg-toggle-row {
-  width: 100%;
-  text-align: left;
-  color: var(--text-primary);
-  background: transparent;
-  border: 0;
-  font: inherit;
-  cursor: pointer;
-}
+/* 开关行的布局与原生外观重置统一由 settings.scss 的 .stg-toggle-row 提供，
+   这里不再重复：卡片层级变化时直接子选择器会静默失效。 */
 .quick-setting-value {
   max-width: 240px;
   overflow: hidden;
