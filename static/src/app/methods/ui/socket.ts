@@ -73,8 +73,12 @@ export const socketMethods = {
     if (this.statusRefreshTimer) return;
     this.statusRefreshTimer = window.setInterval(() => {
       if (!this.isConnected || !isViewVisible()) return;
+      // 外部来源（定时任务／工作流等）启动的任务不会推送到前端，空闲期靠索引轮询发现。
+      this.refreshWorkspaceTaskIndexIdle?.();
       if (typeof this.isOutputActive === 'function' && this.isOutputActive()) return;
       this.fetchStatusSnapshot();
+      // 兜底：任务索引已清理或列表变化过晚时，低频静默对齐一次对话列表。
+      this.refreshConversationListSilently?.('idle');
     }, 5000);
   },
   stopStatusIdleRefresh() {

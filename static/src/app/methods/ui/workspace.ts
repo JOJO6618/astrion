@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { isViewVisible } from './viewVisibility';
 import { t } from '@/locales';
+import { useConversationStore } from '../../../stores/conversation';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 
 // The task index covers every workspace; navigation does not retire its requests.
@@ -121,6 +122,8 @@ export const workspaceMethods = {
           running_task_count: Number(counts[item.workspace_id] || 0)
         }));
       }
+      // 定时任务／工作流等外部来源创建的对话不会推送到前端；发现列表缺失就补拉。
+      this.maybeRefreshConversationListFromTasks?.(tasks);
       return true;
     } catch (error) {
       if (!owns()) return false;
@@ -160,5 +163,82 @@ export const workspaceMethods = {
       this.acknowledgeCompletedWorkspaceTask(taskId);
     }
     // enterConversation already hydrated the snapshot and attached its cursor.
+  },
+  /** 空闲轮询入口：已有索引请求在飞或刚刷新过就跳过，避免打断内部续排。 */
+  refreshWorkspaceTaskIndexIdle() {
+    if (retiredHosts.has(this)) return;
+    if (!(this.versioningHostMode || this.dockerProjectMode)) return;
+    if (requests.get(this)) return;
+    const now = Date.now();
+    if (now - Number(this.workspaceTaskIndexRefreshedAt || 0) < 4000) return;
+    this.workspaceTaskIndexRefreshedAt = now;
+    void this.refreshRunningWorkspaceTasks();
+  },
+  /**
+   * 任务索引里出现侧边栏列表没有的对话（定时任务／工作流／项目 Git 等外部来源新建）时，
+   * 静默重拉列表，避免必须关标签重开才能看到新对话。
+   */
+  maybeRefreshConversationListFromTasks(tasks) {
+    if (!Array.isArray(tasks) || !tasks.length) return;
+    if (!(this.versioningHostMode || this.dockerProjectMode)) return;
+    if (this.searchActive) return;
+    const store = useConversationStore();
+    // 侧边栏只有在分组开启且确实有工作区时才渲染分组列表。
+    const grouped =
+      !!this.isGroupedSidebarSearch?.() &&
+      Array.isArray(this.hostWorkspaces) &&
+      this.hostWorkspaces.length > 0;
+    const currentWorkspaceId = String(this.currentHostWorkspaceId || '');
+    const listHasConversation = (workspaceId, conversationId) => {
+      const cache = store.getWorkspaceCache(workspaceId);
+      return (
+        Array.isArray(cache?.list) &&
+        cache.list.some((item: any) => String(item?.id || '') === conversationId)
+      );
+    };
+    const missing = tasks.some((task: any) => {
+      const conversationId = String(task?.conversation_id || '');
+      if (!conversationId) return false;
+      // 只处理活跃任务与刚结束的任务，避免已删除对话让轮询长期反复拉列表。
+      const status = String(task?.status || '');
+      const ageMs = Date.now() - Number(task?.updated_at || 0) * 1000;
+      if (!activeStatuses.has(status) && !(terminalStatuses.has(status) && ageMs < 300000)) {
+        return false;
+      }
+      const workspaceId = String(task?.workspace_id || '');
+      if (grouped) {
+        // 未展开的分组没有列表缓存，展开时会自行加载；这里只补已存在的分组。
+        if (!store.workspaceGroups.some((group: any) => group.workspaceId === workspaceId))
+          return false;
+      } else if (workspaceId !== currentWorkspaceId) {
+        return false;
+      }
+      return !listHasConversation(workspaceId, conversationId);
+    });
+    if (missing) this.refreshConversationListSilently('task-index');
+  },
+  /** 静默重拉对话列表：任务驱动最短间隔 5s，空闲兜底最短间隔 30s。 */
+  refreshConversationListSilently(reason = 'idle') {
+    if (retiredHosts.has(this)) return;
+    if (!(this.versioningHostMode || this.dockerProjectMode)) return;
+    if (!isViewVisible()) return;
+    if (this.searchActive) return;
+    const minInterval = reason === 'idle' ? 30000 : 5000;
+    const now = Date.now();
+    if (now - Number(this.silentConversationListRefreshAt || 0) < minInterval) return;
+    this.silentConversationListRefreshAt = now;
+    const grouped =
+      !!this.isGroupedSidebarSearch?.() &&
+      Array.isArray(this.hostWorkspaces) &&
+      this.hostWorkspaces.length > 0;
+    if (grouped) {
+      const store = useConversationStore();
+      for (const group of store.workspaceGroups || []) {
+        if (!group?.workspaceId) continue;
+        void store.loadWorkspaceConversations(group.workspaceId, { refresh: true });
+      }
+      return;
+    }
+    void this.loadConversationsList({ background: true, autoEnter: false, silent: true });
   }
 };

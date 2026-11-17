@@ -61,6 +61,9 @@ export function dataState() {
     runningStateReconcileTimer: null,
     // 宿主机多工作区任务列表后台刷新定时器（用于当前未查看运行对话时同步完成态）
     runningWorkspaceTasksRefreshTimer: null,
+    // 空闲轮询水位：任务索引最近一次发起时间、对话列表最近一次静默刷新时间
+    workspaceTaskIndexRefreshedAt: 0,
+    silentConversationListRefreshAt: 0,
     projectGitSummary: null,
     projectGitSummaryRefreshTimer: null,
     terminalCountRefreshTimer: null,

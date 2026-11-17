@@ -24,7 +24,10 @@ export const loadMethods = {
       this.conversations = cache.list;
       this.hasMoreConversations = cache.hasMore;
       this.conversationsOffset = cache.offset;
-      if (this.currentConversationId) this.promoteConversationToTop(this.currentConversationId);
+      // 静默刷新（定时任务等外部来源）不重排列表，避免用户没操作时顺序乱跳。
+      if (this.currentConversationId && !options.silent) {
+        this.promoteConversationToTop(this.currentConversationId);
+      }
       if (
         options.autoEnter !== false &&
         !options.background &&

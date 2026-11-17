@@ -26,6 +26,7 @@ export async function startDesktopView(host) {
     if (!visible || control.disposed) return;
     void host.fetchStatusSnapshot?.();
     void host.refreshRunningWorkspaceTasks?.();
+    void host.refreshConversationListSilently?.('visible');
     void host.reconcileRunningStateOnce?.();
     void host.refreshProjectGitSummary?.({ idleFallback: true });
     void host.fetchTerminalCount?.();
