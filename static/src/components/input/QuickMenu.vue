@@ -688,15 +688,15 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
-/* ===== 开关（纯展示，点击整行切换） ===== */
+/* ===== 开关（纯展示，点击整行切换）：浮层紧凑开关 28×17、滑块 13、位移 11（DESIGN.md §6.8） ===== */
 .quick-menu__switch {
   position: relative;
   flex: none;
-  width: 26px;
-  height: 16px;
+  width: 28px;
+  height: 17px;
   border-radius: 999px;
   background: var(--popover-switch-track);
-  transition: background 0.15s ease;
+  transition: background 0.18s ease;
 }
 
 .quick-menu__switch::after {
@@ -704,12 +704,12 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--popover-switch-knob);
   box-shadow: 0 1px 2px var(--shadow-color);
-  transition: transform 0.15s ease;
+  transition: transform 0.18s ease;
 }
 
 .quick-menu__switch.is-on {
@@ -717,7 +717,7 @@ onBeforeUnmount(() => {
 }
 
 .quick-menu__switch.is-on::after {
-  transform: translateX(10px);
+  transform: translateX(11px);
 }
 
 .quick-menu__item.is-locked .quick-menu__switch {
@@ -814,5 +814,21 @@ onBeforeUnmount(() => {
 .qm-view-back-enter-from {
   opacity: 0;
   transform: translateX(-12px);
+}
+
+/* 减少动画：所有进出与开关直接到终态（DESIGN.md §6.10） */
+@media (prefers-reduced-motion: reduce) {
+  .qm-pop-enter-active,
+  .qm-pop-leave-active,
+  .qm-sub-enter-active,
+  .qm-sub-leave-active,
+  .quick-menu:not(.is-mobile).qm-pop-leave-active .quick-submenu,
+  .qm-view-fwd-enter-active,
+  .qm-view-back-enter-active,
+  .quick-menu__item,
+  .quick-menu__switch,
+  .quick-menu__switch::after {
+    transition: none;
+  }
 }
 </style>

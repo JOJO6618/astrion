@@ -98,8 +98,9 @@ watch(
 const scrollActiveIntoView = (index: number) => {
   const list = fileAtList.value;
   if (!list) return;
-  const rowHeight = 31;
-  const targetTop = index * rowHeight;
+  // 行高 32 + 行间 2（DESIGN.md §6.4）
+  const rowHeight = 32;
+  const targetTop = index * (rowHeight + 2);
   const targetBottom = targetTop + rowHeight;
   if (targetTop < list.scrollTop) {
     list.scrollTop = targetTop;
@@ -123,36 +124,37 @@ defineExpose(publicApi);
 </script>
 
 <style scoped>
+/* @ 文件菜单（DESIGN.md §6.3／§6.4「@ 文件菜单」）：浮层基座 R12、内边距 4；
+   选项 32 高、R8、行间 2，无图标，文件名 13px + 右侧路径次文字 12px。
+   定位由 InputComposer 按光标计算（上下方向与动画共用 --file-at-offset）。 */
 .file-at-menu-wrapper {
-  --file-at-row-height: 28px;
-  --file-at-gap: 3px;
-  --file-at-radius: 9px;
-  --file-at-pad-x: 4px;
-  --file-at-pad-y: 4px;
   position: fixed;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
   min-width: 240px;
-  max-width: min(840px, calc(100vw - 24px));
-  max-height: calc(
-    ((var(--file-at-row-height) * 7) + (var(--file-at-gap) * 8) + (var(--file-at-pad-y) * 2)) * 1.5
-  );
-  border: 1px solid var(--border-default);
-  border-radius: var(--file-at-radius);
-  background: var(--surface-soft);
-  box-shadow: 0 8px 24px var(--shadow-color);
+  max-width: calc(100vw - 24px);
+  max-height: min(320px, 65dvh);
+  padding: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
+  box-shadow: var(--popover-shadow);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   pointer-events: auto;
   overflow: hidden;
 }
 
 .file-at-menu {
-  height: 100%;
-  max-height: inherit;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: none;
-  padding: var(--file-at-pad-y) var(--file-at-pad-x) 6px;
   display: flex;
   flex-direction: column;
-  gap: var(--file-at-gap);
+  gap: 2px;
 }
 
 .file-at-menu::-webkit-scrollbar {
@@ -162,38 +164,31 @@ defineExpose(publicApi);
 
 .file-at-item {
   width: 100%;
-  height: var(--file-at-row-height);
-  min-height: var(--file-at-row-height);
-  flex: 0 0 var(--file-at-row-height);
+  height: 32px;
+  flex: 0 0 32px;
   display: flex;
   align-items: center;
   gap: 10px;
   border: none;
-  border-radius: 7px;
-  padding: 3px 9px;
+  border-radius: 8px;
+  padding: 0 8px;
   background: transparent;
   color: var(--text-primary);
+  font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 120ms ease;
 }
 
-.file-at-item:first-child {
-  border-top-left-radius: calc(var(--file-at-radius) - var(--file-at-gap));
-  border-top-right-radius: calc(var(--file-at-radius) - var(--file-at-gap));
-}
-
-.file-at-item:hover,
 .file-at-item--active {
   background: var(--hover-bg);
-  box-shadow: 0 1px 2px var(--shadow-color);
 }
 
 .file-at-item__name {
   flex: 0 1 auto;
   min-width: 0;
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -202,40 +197,48 @@ defineExpose(publicApi);
 .file-at-item__description {
   flex: 1 1 auto;
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-size: 12px;
+  text-align: right;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .file-at-empty {
-  height: var(--file-at-row-height);
-  min-height: var(--file-at-row-height);
-  flex: 0 0 var(--file-at-row-height);
+  height: 32px;
+  flex: 0 0 32px;
   display: flex;
   align-items: center;
-  padding: 3px 9px;
-  color: var(--text-secondary);
-  font-size: 11px;
+  padding: 0 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
 }
 
-body[data-theme='dark'] .file-at-menu-wrapper {
-  background: var(--badge-bg);
-  border-color: var(--border-default);
+/* 出现 140ms、消失 100ms 精确反向；位移朝向光标（§6.10） */
+.file-at-menu-motion-enter-active {
+  transition:
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.file-at-menu-motion-enter-active,
 .file-at-menu-motion-leave-active {
   transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-  transform-origin: bottom left;
+    opacity 100ms cubic-bezier(0.4, 0, 1, 1),
+    transform 100ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
 }
 
 .file-at-menu-motion-enter-from,
 .file-at-menu-motion-leave-to {
   opacity: 0;
-  transform: translateY(6px) scale(0.98);
+  transform: translateY(var(--file-at-offset, 4px)) scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-at-menu-motion-enter-active,
+  .file-at-menu-motion-leave-active {
+    transition: none;
+  }
 }
 </style>

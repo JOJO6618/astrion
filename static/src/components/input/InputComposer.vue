@@ -119,18 +119,21 @@
                 >
                   {{ projectGitSummaryForRender.projectName }}
                 </button>
-                <div
-                  v-if="projectGitMenuOpen === 'project'"
-                  class="floating-project-status__submenu floating-project-status__submenu--project"
-                  @click.stop
-                >
-                  <button type="button" @click.stop="openProjectInFileManager">
-                    {{ $t('input.openInFileManager') }}
-                  </button>
-                  <button type="button" @click.stop="copyProjectPath">
-                    {{ $t('input.copyPath') }}
-                  </button>
-                </div>
+                <transition name="composer-pop-down">
+                  <div
+                    v-if="projectGitMenuOpen === 'project'"
+                    class="floating-project-status__submenu floating-project-status__submenu--project"
+                    role="menu"
+                    @click.stop
+                  >
+                    <button type="button" role="menuitem" @click.stop="openProjectInFileManager">
+                      {{ $t('input.openInFileManager') }}
+                    </button>
+                    <button type="button" role="menuitem" @click.stop="copyProjectPath">
+                      {{ $t('input.copyPath') }}
+                    </button>
+                  </div>
+                </transition>
               </span>
               <span class="floating-project-status__menu-wrap">
                 <button
@@ -143,19 +146,22 @@
                 >
                   {{ projectGitSummaryForRender.branch }}
                 </button>
-                <div
-                  v-if="projectGitMenuOpen === 'branch'"
-                  class="floating-project-status__submenu floating-project-status__submenu--branch"
-                  @click.stop
-                >
-                  <button type="button" @click.stop="copyProjectBranch">
-                    {{ $t('input.copyBranchName') }}
-                  </button>
-                  <WorktreeMenu
-                    :busy="streamingMessage || compressing"
-                    @open="openWorktreeDialog"
-                  />
-                </div>
+                <transition name="composer-pop-down">
+                  <div
+                    v-if="projectGitMenuOpen === 'branch'"
+                    class="floating-project-status__submenu floating-project-status__submenu--branch"
+                    role="menu"
+                    @click.stop
+                  >
+                    <button type="button" role="menuitem" @click.stop="copyProjectBranch">
+                      {{ $t('input.copyBranchName') }}
+                    </button>
+                    <WorktreeMenu
+                      :busy="streamingMessage || compressing"
+                      @open="openWorktreeDialog"
+                    />
+                  </div>
+                </transition>
               </span>
             </span>
             <span class="floating-project-status__right">
@@ -368,6 +374,7 @@
                 :class="{ 'is-disabled': workModeLocked }"
               >
                 <button
+                  ref="workModeTriggerEl"
                   type="button"
                   class="agent-type-switcher__btn"
                   @click.stop="$emit('toggle-work-mode-menu')"
@@ -395,25 +402,15 @@
                     />
                   </svg>
                 </button>
-                <div
-                  v-if="workModeMenuOpen && !workModeLocked"
-                  class="agent-type-switcher__menu"
-                  @click.stop
-                >
-                  <button
-                    v-for="option in workModeOptions"
-                    :key="option.value"
-                    type="button"
-                    class="agent-type-switcher__menu-item"
-                    :class="{ 'is-active': option.value === currentWorkMode }"
-                    @click.stop="$emit('change-work-mode', option.value)"
-                  >
-                    <span class="agent-type-switcher__menu-label">{{ $t(option.labelKey) }}</span>
-                    <span class="agent-type-switcher__menu-desc">{{
-                      $t(option.descriptionKey)
-                    }}</span>
-                  </button>
-                </div>
+                <UiMenu
+                  :open="!!workModeMenuOpen && !workModeLocked"
+                  :anchor="workModeTriggerEl"
+                  :items="workModeMenuItems"
+                  :value="currentWorkMode"
+                  :label="$t('input.workModeTitle')"
+                  @select="$emit('change-work-mode', $event)"
+                  @close="$emit('close-work-mode-menu')"
+                />
               </div>
             </div>
             <div class="input-actions-right">
@@ -518,6 +515,8 @@
             type="button"
             class="permission-switcher__btn"
             :disabled="!isConnected"
+            aria-haspopup="true"
+            :aria-expanded="permissionMenuOpen"
             :title="
               permissionLockedByPlan
                 ? $t('input.permissionLockedByPlanTitle')
@@ -567,104 +566,127 @@
               />
             </svg>
           </button>
-          <div
-            v-if="permissionMenuOpen"
-            ref="permissionMenuEl"
-            class="permission-switcher__menu"
-            :class="{
-              'permission-switcher__menu--split': executionModeEnabled,
-              'permission-switcher__menu--centered': permissionMenuCentered
-            }"
-            :style="
-              permissionMenuCentered
-                ? { left: permissionMenuCenteredLeft, right: 'auto' }
-                : undefined
-            "
-          >
+          <transition name="composer-pop-up">
             <div
-              class="permission-switcher__group"
-              :class="{ 'permission-switcher__group--disabled': permissionLockedByPlan }"
+              v-if="permissionMenuOpen"
+              ref="permissionMenuEl"
+              class="permission-switcher__menu"
+              :class="{
+                'permission-switcher__menu--split': executionModeEnabled,
+                'permission-switcher__menu--centered': permissionMenuCentered
+              }"
+              :style="
+                permissionMenuCentered
+                  ? { left: permissionMenuCenteredLeft, right: 'auto' }
+                  : undefined
+              "
             >
-              <div class="permission-switcher__group-title">
-                {{ $t('input.permissionGroup')
-                }}<span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{
-                  $t('input.planModeLocked')
-                }}</span>
-              </div>
-              <button
-                v-for="option in permissionOptions"
-                :key="`permission-${option.value}`"
-                type="button"
-                class="permission-switcher__item"
-                :class="{ active: option.value === currentPermissionMode }"
-                :disabled="permissionLockedByPlan"
-                @click="$emit('change-permission-mode', option.value)"
+              <div
+                class="permission-switcher__group"
+                :class="{ 'permission-switcher__group--disabled': permissionLockedByPlan }"
               >
-                <span class="permission-switcher__item-label">{{ $t(option.labelKey) }}</span>
-                <span class="permission-switcher__item-desc">{{
-                  $t(permissionDescKey(option))
-                }}</span>
-              </button>
-            </div>
-            <div
-              v-if="executionModeEnabled"
-              class="permission-switcher__group"
-              :class="{ 'permission-switcher__group--disabled': executionModeLocked }"
-            >
-              <div class="permission-switcher__group-title">
-                {{ $t('input.executionEnv') }}
-                <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{
-                  $t('input.planModeLocked')
-                }}</span>
-                <span
-                  v-else-if="executionLockedByRestricted"
-                  class="permission-switcher__group-lock"
-                  >{{ $t('input.restrictedModeLocked') }}</span
+                <div class="permission-switcher__group-title">
+                  {{ $t('input.permissionGroup')
+                  }}<span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{
+                    $t('input.planModeLocked')
+                  }}</span>
+                </div>
+                <button
+                  v-for="option in permissionOptions"
+                  :key="`permission-${option.value}`"
+                  type="button"
+                  class="permission-switcher__item"
+                  :class="{ active: option.value === currentPermissionMode }"
+                  :disabled="permissionLockedByPlan"
+                  @click="$emit('change-permission-mode', option.value)"
                 >
+                  <span class="permission-switcher__item-label">{{ $t(option.labelKey) }}</span>
+                  <span class="permission-switcher__item-desc">{{
+                    $t(permissionDescKey(option))
+                  }}</span>
+                  <UiIcon
+                    v-if="option.value === currentPermissionMode"
+                    name="check"
+                    class="permission-switcher__item-check"
+                  />
+                </button>
               </div>
-              <button
-                v-for="option in executionModeOptions"
-                :key="`execution-${option.value}`"
-                type="button"
-                class="permission-switcher__item"
-                :class="{ active: option.value === currentExecutionMode }"
-                :disabled="executionModeLocked"
-                @click="$emit('change-execution-mode', option.value)"
+              <div
+                v-if="executionModeEnabled"
+                class="permission-switcher__group"
+                :class="{ 'permission-switcher__group--disabled': executionModeLocked }"
               >
-                <span
-                  class="permission-switcher__item-label"
-                  :class="{ 'permission-switcher__item-label--warn': option.value === 'direct' }"
-                  >{{ $t(option.labelKey) }}</span
+                <div class="permission-switcher__group-title">
+                  {{ $t('input.executionEnv') }}
+                  <span v-if="permissionLockedByPlan" class="permission-switcher__group-lock">{{
+                    $t('input.planModeLocked')
+                  }}</span>
+                  <span
+                    v-else-if="executionLockedByRestricted"
+                    class="permission-switcher__group-lock"
+                    >{{ $t('input.restrictedModeLocked') }}</span
+                  >
+                </div>
+                <button
+                  v-for="option in executionModeOptions"
+                  :key="`execution-${option.value}`"
+                  type="button"
+                  class="permission-switcher__item"
+                  :class="{ active: option.value === currentExecutionMode }"
+                  :disabled="executionModeLocked"
+                  @click="$emit('change-execution-mode', option.value)"
                 >
-                <span class="permission-switcher__item-desc">{{ $t(option.descriptionKey) }}</span>
-              </button>
-            </div>
-            <div
-              v-if="networkPermissionEnabled"
-              class="permission-switcher__group"
-              :class="{ 'permission-switcher__group--disabled': currentExecutionMode === 'direct' }"
-            >
-              <div class="permission-switcher__group-title">
-                {{ $t('input.networkPermission') }}
+                  <span
+                    class="permission-switcher__item-label"
+                    :class="{ 'permission-switcher__item-label--warn': option.value === 'direct' }"
+                    >{{ $t(option.labelKey) }}</span
+                  >
+                  <span class="permission-switcher__item-desc">{{
+                    $t(option.descriptionKey)
+                  }}</span>
+                  <UiIcon
+                    v-if="option.value === currentExecutionMode"
+                    name="check"
+                    class="permission-switcher__item-check"
+                  />
+                </button>
               </div>
-              <button
-                v-for="option in networkPermissionOptions"
-                :key="`network-${option.value}`"
-                type="button"
-                class="permission-switcher__item"
-                :class="{ active: option.value === currentNetworkPermission }"
-                :disabled="currentExecutionMode === 'direct'"
-                @click="$emit('change-network-permission', option.value)"
+              <div
+                v-if="networkPermissionEnabled"
+                class="permission-switcher__group"
+                :class="{
+                  'permission-switcher__group--disabled': currentExecutionMode === 'direct'
+                }"
               >
-                <span
-                  class="permission-switcher__item-label"
-                  :class="{ 'permission-switcher__item-label--warn': option.value === 'full' }"
-                  >{{ $t(option.labelKey) }}</span
+                <div class="permission-switcher__group-title">
+                  {{ $t('input.networkPermission') }}
+                </div>
+                <button
+                  v-for="option in networkPermissionOptions"
+                  :key="`network-${option.value}`"
+                  type="button"
+                  class="permission-switcher__item"
+                  :class="{ active: option.value === currentNetworkPermission }"
+                  :disabled="currentExecutionMode === 'direct'"
+                  @click="$emit('change-network-permission', option.value)"
                 >
-                <span class="permission-switcher__item-desc">{{ $t(option.descriptionKey) }}</span>
-              </button>
+                  <span
+                    class="permission-switcher__item-label"
+                    :class="{ 'permission-switcher__item-label--warn': option.value === 'full' }"
+                    >{{ $t(option.labelKey) }}</span
+                  >
+                  <span class="permission-switcher__item-desc">{{
+                    $t(option.descriptionKey)
+                  }}</span>
+                  <UiIcon
+                    v-if="option.value === currentNetworkPermission"
+                    name="check"
+                    class="permission-switcher__item-check"
+                  />
+                </button>
+              </div>
             </div>
-          </div>
+          </transition>
         </div>
       </div>
       <div
@@ -768,6 +790,8 @@ import {
   type ApprovalReviewRecord
 } from '@/components/input/approvalModel';
 import FileAtMenu, { type FileAtItem } from '@/components/input/FileAtMenu.vue';
+import UiMenu, { type UiMenuItem } from '@/components/ui/UiMenu.vue';
+import UiIcon from '@/components/ui/UiIcon.vue';
 import FileChips from '@/components/chat/FileChips.vue';
 import RollingNumber from '@/components/input/RollingNumber.vue';
 import StatusAvatar from '@/components/avatar/StatusAvatar.vue';
@@ -834,6 +858,7 @@ const emit = defineEmits([
   'workflow-activated',
   'open-git-changes-panel',
   'toggle-work-mode-menu',
+  'close-work-mode-menu',
   'change-work-mode',
   'new-conversation',
   'switch-host-workspace',
@@ -1383,7 +1408,7 @@ const closeFileAtMenu = () => {
   fileAtActiveIndex.value = 0;
   fileAtItems.value = [];
   fileAtLoading.value = false;
-  fileAtMenuStyle.value = {};
+  // 不清空定位：退出动画期间菜单仍需停在原位收回（下次打开会重新计算）
   if (fileAtSearchTimer !== null) {
     window.clearTimeout(fileAtSearchTimer);
     fileAtSearchTimer = null;
@@ -1417,30 +1442,28 @@ const updateFileAtMenuPosition = (tokenEnd: number) => {
       const coords = instance.view.coordsAtPos(tokenEnd);
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const menuWidth = 280;
-      const menuHeight = 250;
-      const gap = 4;
-
-      // 默认：菜单左下角贴着 @ 后面文字的右上角
-      let left = coords.right;
-      let top = coords.top - menuHeight;
-
-      if (left + menuWidth > viewportWidth - gap) {
-        left = Math.max(gap, viewportWidth - menuWidth - gap);
-      }
-
-      if (top < gap) {
-        top = coords.bottom;
-      }
-      if (top + menuHeight > viewportHeight - gap) {
-        top = Math.max(gap, viewportHeight - menuHeight - gap);
-      }
-
+      // 弹层基座数值（DESIGN.md §6.3）：距光标 5px、离视口 12px，最大高度 min(320, 65dvh)
+      const menuWidth = Math.min(320, viewportWidth - 24);
+      const gap = 5;
+      const edge = 12;
+      const preferredHeight = Math.min(320, viewportHeight * 0.65);
+      const left = Math.min(Math.max(edge, coords.right), viewportWidth - menuWidth - edge);
+      const above = coords.top - edge - gap;
+      const below = viewportHeight - coords.bottom - edge - gap;
+      // 输入栏在底部，默认向上展开；上方放不下且下方更宽裕时才翻到下方
+      const up = above >= Math.min(preferredHeight, 160) || above >= below;
+      const maxHeight = Math.max(64, Math.min(preferredHeight, up ? above : below));
+      const originX = Math.min(menuWidth, Math.max(0, coords.right - left));
       fileAtMenuStyle.value = {
         left: `${left}px`,
-        top: `${top}px`,
         width: `${menuWidth}px`,
-        maxHeight: `${menuHeight}px`
+        maxHeight: `${maxHeight}px`,
+        ...(up
+          ? { bottom: `${viewportHeight - coords.top + gap}px` }
+          : { top: `${coords.bottom + gap}px` }),
+        // 定位与动画共用同一方向结果：向上展开时从下方 4px 升起，向下时反之（§6.10）
+        '--file-at-offset': up ? '4px' : '-4px',
+        transformOrigin: `${originX}px ${up ? 'bottom' : 'top'}`
       };
     } catch {
       fileAtMenuStyle.value = {};
@@ -3239,6 +3262,17 @@ const workModeLabel = computed(() => {
   return matched ? t(matched.labelKey) : props.currentWorkMode || t('input.workModePlanFallback');
 });
 
+/** 运行模式菜单：设置项下拉模板（主文字 + 下方次文字 + 选中勾，DESIGN.md §6.4） */
+const workModeTriggerEl = ref<HTMLElement | null>(null);
+const workModeMenuItems = computed<UiMenuItem[]>(() => {
+  void currentLocale.value;
+  return (props.workModeOptions || []).map((option) => ({
+    value: option.value,
+    label: t(option.labelKey),
+    description: t(option.descriptionKey)
+  }));
+});
+
 /** 计划模式下权限被锁定为只读（UI 禁用 + 后端强制） */
 const permissionLockedByPlan = computed(() => props.currentWorkMode === 'plan');
 
@@ -3886,10 +3920,8 @@ onBeforeUnmount(() => {
 .floating-project-status__button--active,
 .floating-project-status__notice--button:hover,
 .floating-project-status__stats:hover,
-.floating-project-status__terminal:hover,
-.floating-project-status__submenu button:hover {
-  background: var(--tab-active);
-  box-shadow: 0 0 2px var(--shadow-color);
+.floating-project-status__terminal:hover {
+  background: var(--hover-bg);
 }
 
 .floating-project-status__button--project {
@@ -3941,57 +3973,94 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
+/* 项目／分支菜单：浮层基座与操作菜单数值（DESIGN.md §6.3／§6.4），从状态行向下展开 */
 .floating-project-status__submenu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 5px);
   left: 0;
   z-index: 46;
   width: max-content;
-  min-width: 160px;
+  min-width: 165px;
   max-width: min(260px, 72vw);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--border-default);
-  border-radius: 14px;
-  background: var(--surface-soft);
-  box-shadow: none;
+  padding: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
+  box-shadow: var(--popover-shadow);
   overflow: hidden;
+  transform-origin: 24px top;
 }
 
 .floating-project-status__submenu button {
   width: 100%;
-  min-width: 148px;
-  height: 36px;
-  padding: 0 10px;
+  height: 32px;
+  flex: none;
+  padding: 0 8px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1.2;
+  font: inherit;
+  font-size: 13px;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.floating-project-status__submenu button:hover:not(:disabled),
+.floating-project-status__submenu button:focus-visible {
+  outline: none;
+  background: var(--hover-bg);
+}
+
+.floating-project-status__submenu button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 :global(html[data-theme='dark'] .floating-project-status),
-:global(body[data-theme='dark'] .floating-project-status),
-:global(html[data-theme='dark'] .floating-project-status__submenu),
-:global(body[data-theme='dark'] .floating-project-status__submenu) {
+:global(body[data-theme='dark'] .floating-project-status) {
   background: var(--badge-bg);
   border-color: var(--border-card-strong);
 }
 
-/* 经典主题：git 状态栏及子菜单与输入栏壳体使用同一 --surface-raised。 */
+/* 经典主题：git 状态栏与输入栏壳体使用同一 --surface-raised。 */
 :global(html[data-theme='classic'] .floating-project-status),
-:global(body[data-theme='classic'] .floating-project-status),
-:global(html[data-theme='classic'] .floating-project-status__submenu),
-:global(body[data-theme='classic'] .floating-project-status__submenu) {
+:global(body[data-theme='classic'] .floating-project-status) {
   background: var(--surface-raised);
+}
+
+/* 出现：从触发按钮下方展开；消失：沿原路收回（DESIGN.md §6.10） */
+.composer-pop-down-enter-active {
+  transition:
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.composer-pop-down-leave-active {
+  transition:
+    opacity 100ms cubic-bezier(0.4, 0, 1, 1),
+    transform 100ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
+}
+
+.composer-pop-down-enter-from,
+.composer-pop-down-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-pop-down-enter-active,
+  .composer-pop-down-leave-active {
+    transition: none;
+  }
 }
 
 .floating-status-motion-enter-active,

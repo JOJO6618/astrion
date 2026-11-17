@@ -81,7 +81,7 @@ function openMenu(e: MouseEvent, row: Row) {
     type: 'file',
     key: row.path,
     left: rect.left, // 与按钮左对齐、向下展开
-    top: rect.bottom + 6,
+    top: rect.bottom + 5,
     btnTop: rect.top,
     alignRight: false
   });

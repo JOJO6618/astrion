@@ -7,7 +7,7 @@
 .qd-detail,
 .qd-preview,
 .qd-menu {
-  --qd-row-h: 36px;
+  --qd-row-h: 32px; /* 列表行 32、R8、行间 2（DESIGN.md §6.9） */
   --qd-width: 270px;
   --qd-ease-out: cubic-bezier(0.22, 0.9, 0.28, 1);
   --qd-ease-strike: cubic-bezier(0.55, 0.06, 0.35, 1);
@@ -74,13 +74,14 @@
 
 /* ---------------- 窗口通用 ---------------- */
 
+/* 窗口按分组卡片：比页面亮的卡片表面 + 淡阴影，R12、无描边（DESIGN.md §5.1 / §7 主对话页） */
 .qd-window {
   flex: none; /* 禁止被列 flex 压缩变矮 */
   width: var(--qd-width);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
+  background: var(--group-card-bg);
+  border: none;
   border-radius: 12px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--group-card-shadow);
   overflow: hidden;
 }
 
@@ -115,42 +116,44 @@
   }
 }
 
+/* 标题行不画分隔线，靠留白与下方列表区分；标题与行内文字同在 12px 内边线上 */
 .qd-window__header {
-  height: 38px;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--border-default);
 }
 
 .qd-window__icon {
   width: 15px;
   height: 15px;
-  color: var(--accent);
+  color: var(--text-secondary);
   flex: none;
 }
 
 .qd-window__title {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  letter-spacing: 0.02em;
 }
 
 .qd-window__counter {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
-/* 列表：固定 5 行，无上下 padding（首行紧贴标题分隔线），滚动条隐藏 */
+/* 列表：固定 5 行（行 32 + 行间 2），左右下内缩 4，行 hover 为 R8 圆角块；滚动条隐藏 */
 .qd-list {
   list-style: none;
   margin: 0;
-  padding: 0;
-  height: calc(var(--qd-row-h) * 5);
+  padding: 0 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: calc(var(--qd-row-h) * 5 + 2px * 4 + 4px);
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -218,11 +221,13 @@
 /* ---------------- 待办行 ---------------- */
 
 .qd-todo-item {
+  flex: none;
   height: var(--qd-row-h);
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0 12px;
+  padding: 0 8px;
+  border-radius: 8px;
   overflow: hidden; /* 配合移出动画的高度收拢 */
 }
 
@@ -313,12 +318,15 @@
 
 /* ---------------- 子智能体 / 后台指令行 ---------------- */
 
+/* 行内 ⋯ 为 30×30 隐形热区，距行右缘 1px（DESIGN.md §6.2 行内操作） */
 .qd-run-item {
+  flex: none;
   height: var(--qd-row-h);
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 0 8px 0 12px;
+  padding: 0 1px 0 8px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   transition: background 0.12s ease;
@@ -329,7 +337,7 @@
 }
 
 .qd-run-item.is-active {
-  background: var(--hover-bg);
+  background: var(--tab-active);
 }
 
 .qd-run-status {
@@ -389,23 +397,21 @@
   color: var(--text-tertiary);
 }
 
-/* ⋯ 按钮（行内） */
+/* ⋯ 按钮（行内）：整行已有 hover，按钮自身 hover 不铺底色、只变图标颜色（§3 第 14 条） */
 .qd-row-menu-btn {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   background: none;
   border: none;
-  border-radius: 5px;
+  border-radius: 7px;
   color: var(--text-tertiary);
   cursor: pointer;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
+  transition: color 0.12s ease;
 }
 
 .qd-row-menu-btn svg {
@@ -413,19 +419,23 @@
   height: 14px;
 }
 
-.qd-row-menu-btn:hover {
-  background: var(--tab-active);
-  color: var(--text-secondary);
+.qd-row-menu-btn:hover,
+.qd-row-menu-btn:focus-visible {
+  outline: none;
+  color: var(--text-primary);
 }
 
 /* ---------------- 文件行 ---------------- */
 
+/* 文件行 ⋯ 在左侧：热区距行左缘 1px */
 .qd-file-item {
+  flex: none;
   height: var(--qd-row-h);
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 10px 0 6px;
+  gap: 6px;
+  padding: 0 8px 0 1px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   transition: background 0.12s ease;
@@ -436,7 +446,7 @@
 }
 
 .qd-file-item.is-active {
-  background: var(--hover-bg);
+  background: var(--tab-active);
 }
 
 .qd-file-name {
@@ -461,10 +471,10 @@
   max-width: calc(100vw - 360px);
   height: 460px;
   max-height: calc(100vh - 40px);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
+  background: var(--group-card-bg);
+  border: none;
   border-radius: 12px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--group-card-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -499,12 +509,11 @@
 
 .qd-detail__header {
   flex: none;
-  height: 42px;
+  height: 44px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border-default);
+  padding: 0 12px 0 16px;
 }
 
 .qd-detail__dot {
@@ -791,10 +800,10 @@
 .qd-preview__panel {
   flex: 1;
   min-height: 0;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
+  background: var(--group-card-bg);
+  border: none;
   border-radius: 12px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--group-card-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -829,14 +838,13 @@
   align-items: center;
   gap: 8px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--border-default);
 }
 
 .qd-preview__header > svg {
   flex: none;
   width: 15px;
   height: 15px;
-  color: var(--accent);
+  color: var(--text-secondary);
 }
 
 .qd-preview__name {
@@ -982,25 +990,38 @@
 
 /* ---------------- 全局 ⋯ 菜单（fixed 单例） ---------------- */
 
+/* 浮层基座与操作菜单数值（DESIGN.md §6.3／§6.4）：R12、内边距 4，选项 32 高 R8、行间 2 */
 .qd-menu {
   position: fixed;
   z-index: 300;
-  min-width: 116px;
+  min-width: 165px;
   padding: 4px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--popover-surface);
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  box-shadow: var(--popover-shadow);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-/* 进入/离开：淡入淡出 + 从按钮一侧滑入——菜单在按钮下方展开时从上到下（默认），
-   翻转到按钮上方时从下到上（--above），动画始终以按钮为起点 */
-.qd-menu-enter-active,
+/* 进入 140ms、退出 100ms 精确反向：在按钮下方展开时从上方 4px 进入并向上收回，
+   翻到按钮上方（--above）时反之（§6.10） */
+.qd-menu-enter-active {
+  transition:
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-origin: top center;
+}
+
 .qd-menu-leave-active {
   transition:
-    opacity 0.16s ease-out,
-    transform 0.16s ease-out;
+    opacity 100ms cubic-bezier(0.4, 0, 1, 1),
+    transform 100ms cubic-bezier(0.4, 0, 1, 1);
   transform-origin: top center;
+  pointer-events: none;
 }
 
 .qd-menu--above.qd-menu-enter-active,
@@ -1008,61 +1029,55 @@
   transform-origin: bottom center;
 }
 
-.qd-menu-leave-active {
-  transition-duration: 0.13s;
-  transition-timing-function: ease-in;
-  pointer-events: none;
-}
-
-.qd-menu-enter-from {
+.qd-menu-enter-from,
+.qd-menu-leave-to {
   opacity: 0;
   transform: translateY(-4px) scale(0.98);
 }
 
-.qd-menu--above.qd-menu-enter-from {
-  transform: translateY(4px) scale(0.98);
-}
-
-.qd-menu-leave-to {
-  opacity: 0;
-  transform: translateY(-3px) scale(0.98);
-}
-
+.qd-menu--above.qd-menu-enter-from,
 .qd-menu--above.qd-menu-leave-to {
-  transform: translateY(3px) scale(0.98);
+  transform: translateY(4px) scale(0.98);
 }
 
 .qd-menu__item {
   display: flex;
   align-items: center;
   width: 100%;
-  height: 30px;
-  padding: 0 10px;
+  height: 32px;
+  flex: none;
+  padding: 0 8px;
   background: none;
   border: none;
-  border-radius: 5px;
-  font-size: 12.5px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
   text-align: left;
   color: var(--text-primary);
   cursor: pointer;
   transition: background 0.12s ease;
 }
 
-.qd-menu__item:hover:not(:disabled) {
-  background: var(--surface-soft);
+.qd-menu__item:hover:not(:disabled),
+.qd-menu__item:focus-visible {
+  outline: none;
+  background: var(--hover-bg);
 }
 
 .qd-menu__item--danger {
   color: var(--state-danger);
 }
 
-.qd-menu__item--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--state-danger) 8%, transparent);
+.qd-menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
-.qd-menu__item:disabled {
-  color: var(--text-tertiary);
-  cursor: default;
+@media (prefers-reduced-motion: reduce) {
+  .qd-menu-enter-active,
+  .qd-menu-leave-active {
+    transition: none;
+  }
 }
 
 /* ---------------- 展开/收起悬浮按钮（App.vue 零宽锚点） ---------------- */
@@ -1366,7 +1381,6 @@
 
 /* 工作流状态脚注条（审核中/驳回/完成等瞬时事件） */
 .wf-footnote {
-  border-top: 1px solid var(--border-default);
   height: 30px;
   display: flex;
   align-items: center;
@@ -1423,7 +1437,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 
 /* ============================================================
    移动端适配（max-width: 768px，2026-09-24 移动端改造）
