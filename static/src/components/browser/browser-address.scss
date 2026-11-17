@@ -1,31 +1,38 @@
 .nb-address {
   position: relative;
 }
+/* 地址建议：弹层基座（DESIGN.md §6.3）；浏览器内浮层按用户要求不加投影 */
 .nb-address-suggestions {
   position: absolute;
   z-index: 12;
-  top: calc(100% + 7px);
-  left: -1px;
-  right: -1px;
-  max-height: 330px;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  max-height: min(330px, 65dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--surface-base);
+  padding: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
   box-shadow: none;
 }
+/* 主要文字 + 次要文字两行选项（§6.5）：13/20 与 12/18，上下内边距 6，行间 2 */
 .nb-address-suggestions > button {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 54px;
-  padding: 0 10px;
+  min-height: 50px;
+  padding: 6px 8px;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-primary);
   text-align: left;
+}
+.nb-address-suggestions > button + button {
+  margin-top: 2px;
 }
 .nb-address-suggestions > button:hover,
 .nb-address-suggestions > button[aria-selected='true'] {
@@ -33,14 +40,13 @@
 }
 .nb-address-suggestions > button > .nb-icon {
   flex: none;
-  width: 15px;
+  width: 16px;
   color: var(--text-secondary);
 }
 .nb-address-suggestions > button > span {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
   min-width: 0;
 }
 .nb-address-suggestions strong,
@@ -51,12 +57,14 @@
   white-space: nowrap;
 }
 .nb-address-suggestions strong {
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 20px;
   font-weight: 400;
 }
 .nb-address-suggestions small {
-  color: var(--text-secondary);
-  font-size: 11px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
 }
 .nb-address-suggestions::-webkit-scrollbar {
   width: 4px;

@@ -66,18 +66,18 @@ function bytes(value: number) {
   font-size: 12px;
 }
 .nb-download-row {
-  height: 70px;
+  height: 56px;
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--border-default);
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+}
+.nb-download-row + .nb-download-row {
+  margin-top: 2px;
 }
 .nb-download-row.compact {
-  height: 58px;
-  padding: 0 10px;
-}
-.nb-download-row:last-child {
-  border-bottom: 0;
+  height: 52px;
 }
 .nb-download-row > .nb-icon {
   color: var(--text-secondary);
@@ -87,7 +87,7 @@ function bytes(value: number) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .nb-download-main span,
 .nb-download-main small {
@@ -96,10 +96,12 @@ function bytes(value: number) {
   text-overflow: ellipsis;
 }
 .nb-download-main span {
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 20px;
 }
 .nb-download-main small {
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--text-tertiary);
 }
 </style>

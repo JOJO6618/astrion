@@ -10,7 +10,7 @@
         @click="configure('save')"
       >
         <span>{{ $t('browser.offerSave') }}</span
-        ><FancyCheck :checked="settings.save" :size="18" />
+        ><UiSwitch decorative :checked="settings.save" />
       </button>
       <button
         class="nb-setting"
@@ -20,7 +20,7 @@
         @click="configure('autofill')"
       >
         <span>{{ $t('browser.autoFill') }}</span
-        ><FancyCheck :checked="settings.autofill" :size="18" />
+        ><UiSwitch decorative :checked="settings.autofill" />
       </button>
     </div>
     <div class="nb-credential-toolbar">
@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import BrowserIcon from './BrowserIcon.vue';
 import BrowserButton from './BrowserButton.vue';
 import BrowserSiteIcon from './BrowserSiteIcon.vue';

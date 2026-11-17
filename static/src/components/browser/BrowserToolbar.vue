@@ -99,16 +99,15 @@
       aria-haspopup="dialog"
       @click="toggleDownloads"
     />
-    <button
+    <BrowserButton
+      name="ellipsis"
       class="nb-more"
-      :aria-label="$t('browser.more')"
+      :label="$t('browser.more')"
       aria-haspopup="menu"
       :aria-expanded="store.menu"
       :disabled="!store.snapshot"
       @click="toggleMenu"
-    >
-      ···
-    </button>
+    />
   </nav>
 
   <div v-if="store.device && !store.section" class="nb-devicebar">

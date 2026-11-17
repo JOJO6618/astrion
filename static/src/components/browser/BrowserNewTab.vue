@@ -21,7 +21,11 @@
         class="nb-shortcut"
         :class="{ 'menu-open': menuFor === tile.url }"
       >
-        <button class="nb-shortcut-open" :title="tile.url" @click="store.navigate(tile.url)">
+        <button
+          class="nb-shortcut-open"
+          :aria-label="`${tile.title} · ${tile.url}`"
+          @click="store.navigate(tile.url)"
+        >
           <span class="nb-shortcut-icon"
             ><BrowserSiteIcon :src="tile.favicon" :url="tile.url" initial /></span
           ><span class="nb-shortcut-title">{{ tile.title }}</span>
@@ -35,35 +39,37 @@
         >
           <BrowserIcon name="ellipsis" />
         </button>
-        <div v-if="menuFor === tile.url" class="nb-popover nb-shortcut-menu" role="menu">
-          <template v-if="tile.pinned">
-            <button class="nb-menu-row" role="menuitem" @click="startEdit(tile)">
-              <BrowserIcon name="pencil" /><span>{{ $t('browser.shortcutEdit') }}</span>
+        <Transition name="nb-popover"
+          ><div v-if="menuFor === tile.url" class="nb-popover nb-shortcut-menu" role="menu">
+            <template v-if="tile.pinned">
+              <button class="nb-menu-row" role="menuitem" @click="startEdit(tile)">
+                <BrowserIcon name="pencil" /><span>{{ $t('browser.shortcutEdit') }}</span>
+              </button>
+              <button class="nb-menu-row" role="menuitem" @click="unpin(tile)">
+                <BrowserIcon name="x" /><span>{{ $t('browser.shortcutUnpin') }}</span>
+              </button>
+            </template>
+            <button
+              v-else
+              class="nb-menu-row"
+              role="menuitem"
+              :disabled="pinnedFull"
+              @click="pin(tile)"
+            >
+              <BrowserIcon name="plus" /><span>{{ $t('browser.shortcutPin') }}</span>
             </button>
-            <button class="nb-menu-row" role="menuitem" @click="unpin(tile)">
-              <BrowserIcon name="x" /><span>{{ $t('browser.shortcutUnpin') }}</span>
+            <button class="nb-menu-row" role="menuitem" @click="remove(tile)">
+              <BrowserIcon name="trash" /><span>{{ $t('browser.shortcutRemove') }}</span>
             </button>
-          </template>
-          <button
-            v-else
-            class="nb-menu-row"
-            role="menuitem"
-            :disabled="pinnedFull"
-            @click="pin(tile)"
-          >
-            <BrowserIcon name="plus" /><span>{{ $t('browser.shortcutPin') }}</span>
-          </button>
-          <button class="nb-menu-row" role="menuitem" @click="remove(tile)">
-            <BrowserIcon name="trash" /><span>{{ $t('browser.shortcutRemove') }}</span>
-          </button>
-        </div>
+          </div></Transition
+        >
       </div>
       <div class="nb-shortcut nb-shortcut-add-tile">
         <button
           class="nb-shortcut-open"
           type="button"
-          :disabled="pinnedFull"
-          :title="pinnedFull ? $t('browser.shortcutLimit') : undefined"
+          :class="{ 'is-locked': pinnedFull }"
+          :aria-disabled="pinnedFull"
           @click="startAdd"
         >
           <span class="nb-shortcut-icon nb-shortcut-add"><BrowserIcon name="plus" /></span
@@ -111,6 +117,7 @@
 </template>
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { t } from '@/locales';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import BrowserButton from './BrowserButton.vue';
 import BrowserIcon from './BrowserIcon.vue';
@@ -171,6 +178,11 @@ async function openEditor(value: { original: string; title: string; url: string 
   urlInput.value?.focus();
 }
 function startAdd() {
+  // 已达上限时不禁用磁贴、不用原生 title：点击给出原因（同 UiSelect 的 lockedReason）。
+  if (pinnedFull.value) {
+    store.error = t('browser.shortcutLimit');
+    return;
+  }
   void openEditor({ original: '', title: '', url: '' });
 }
 function startEdit(tile: ShortcutTile) {

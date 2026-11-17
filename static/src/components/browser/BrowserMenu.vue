@@ -118,56 +118,68 @@ onMounted(() => {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   z-index: 12;
-  padding: 6px;
-  border: 1px solid var(--border-default);
-  border-radius: 9px;
-  background: var(--surface-base);
+  padding: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
 }
 .nb-menu > button {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   width: 100%;
-  height: 35px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-primary);
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
 }
 .nb-menu > button:hover,
 .nb-menu button:focus-visible {
-  background: var(--surface-muted);
+  background: var(--hover-bg);
   outline: none;
+}
+.nb-menu > button + button,
+.nb-menu > * + .nb-menu-zoom,
+.nb-menu > .nb-menu-zoom + button,
+.nb-menu > .nb-device-choices + button {
+  margin-top: 2px;
 }
 .nb-menu > button > span:not(.nb-icon) {
   flex: 1;
 }
 .nb-menu :deep(.nb-icon) {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  flex: none;
   color: var(--text-secondary);
+}
+.nb-menu > button:hover :deep(.nb-icon),
+.nb-menu > button:focus-visible :deep(.nb-icon) {
+  color: var(--text-primary);
 }
 .nb-menu kbd {
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 .nb-menu-divider {
   height: 1px;
-  background: var(--border-default);
-  margin: 5px 0;
+  background: var(--popover-border);
+  margin: 2px 8px;
 }
+/* 缩放行与设备选项没有图标，文字缩进到选项文字线：内边距 8 + 图标 16 + 间距 10 = 34 */
 .nb-menu-zoom {
-  height: 39px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 0 7px 0 36px;
-  font-size: 12px;
+  gap: 2px;
+  padding: 0 2px 0 34px;
+  font-size: 13px;
 }
 .nb-menu-zoom > span {
   flex: 1;
@@ -176,31 +188,38 @@ onMounted(() => {
   border: 0;
   background: transparent;
   color: var(--text-primary);
-  height: 27px;
-  min-width: 25px;
-  border-radius: 4px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 8px;
   cursor: pointer;
 }
 .nb-menu-zoom button:hover {
-  background: var(--surface-muted);
+  background: var(--hover-bg);
 }
 .nb-menu-zoom output {
-  min-width: 38px;
+  min-width: 40px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .nb-device-choices {
   display: flex;
-  padding: 3px 10px 5px 36px;
-  gap: 5px;
+  padding: 2px 4px 2px 34px;
+  gap: 4px;
 }
 .nb-device-choices button {
-  height: 28px;
+  height: 32px;
   flex: 1;
   background: var(--surface-soft);
   color: var(--text-primary);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  font-size: 11px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.nb-device-choices button:hover {
+  background: var(--surface-muted);
+}
+.nb-menu {
+  transform-origin: top right;
 }
 </style>

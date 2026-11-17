@@ -69,7 +69,9 @@
         <BrowserFloatingStatus />
         <BrowserPasswordPrompt />
       </div>
-      <BrowserMenu v-if="store.menu" @action="menuAction" />
+      <Transition name="nb-popover">
+        <BrowserMenu v-if="store.menu" @action="menuAction" />
+      </Transition>
       <BrowserPopovers />
     </template>
   </aside>

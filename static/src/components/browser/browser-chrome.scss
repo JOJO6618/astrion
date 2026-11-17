@@ -87,12 +87,12 @@
   font-size: 12px;
 }
 .nb-tab-close {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
   flex: none;
   border: 0;
   background: transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   display: grid;
   place-items: center;
   opacity: 0.65;
@@ -102,9 +102,13 @@
   width: 12px;
   height: 12px;
 }
+/* 非激活标签整块已有 hover 底色（DESIGN.md §3 第 14 条）：关闭按钮只提亮；激活标签无 hover，才给关闭按钮底色 */
 .nb-tab-close:hover {
-  background: var(--surface-muted);
   opacity: 1;
+  color: var(--text-primary);
+}
+.nb-tab.active .nb-tab-close:hover {
+  background: var(--hover-bg);
 }
 .nb-tab.dragging {
   opacity: 0.4;
@@ -116,9 +120,11 @@
 .nb-tabbar > .nb-button:hover {
   background: var(--chrome-bar-hover);
 }
+/* 标签栏图标按钮统一 28×28 正方热区，不做宽窄不一的长条 */
 .nb-tabbar > .nb-button {
-  width: 27px;
-  flex-basis: 27px;
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
 }
 .nb-toolbar {
   height: 46px;
@@ -127,7 +133,6 @@
   align-items: center;
   gap: 8px;
   padding: 0 9px 0 7px;
-  border-bottom: 1px solid var(--border-default);
   z-index: 2;
 }
 .nb-navigation {
@@ -139,31 +144,34 @@
   transform: rotate(180deg);
 }
 .nb-address {
-  height: 32px;
+  height: 36px;
   flex: 1;
   min-width: 0;
   display: flex;
   gap: 4px;
   align-items: center;
   padding: 0 3px;
-  background: var(--surface-muted);
+  /* 输入栏底色同设置页控件（DESIGN.md §3 第 17 条）：经典 #f5f0e8，不用 --surface-muted 的深米色 */
+  background: var(--group-card-control);
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 .nb-address:focus-within {
   background: var(--surface-base);
-  border-color: var(--text-tertiary);
+  border-color: var(--border-strong);
 }
 .nb-address input {
   height: 100%;
   width: 100%;
   flex: 1;
-  font-size: 12px;
+  font-size: 13px;
 }
+/* 框内按钮离外框 4px（1 描边 + 3 内边距），圆角同心：8 − 4 = 4 */
 .nb-address .nb-button {
-  width: 24px;
-  height: 24px;
-  flex-basis: 24px;
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
+  border-radius: 4px;
 }
 .nb-address .nb-icon {
   width: 14px;
@@ -175,18 +183,8 @@
 .nb-address:focus-within .nb-clear-address {
   display: flex;
 }
-.nb-more {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  font-size: 22px;
-  line-height: 1;
-  letter-spacing: 1px;
-}
-.nb-more:hover,
-.nb-more[aria-expanded='true'] {
-  background: var(--surface-muted);
+/* 「⋯」与其他工具栏按钮同为 BrowserButton 图标按钮（32×32、图标 17），展开时保持 hover 态 */
+.nb-toolbar .nb-more[aria-expanded='true'] {
+  background: var(--hover-bg);
+  color: var(--text-primary);
 }

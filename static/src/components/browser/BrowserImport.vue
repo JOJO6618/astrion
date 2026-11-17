@@ -17,49 +17,26 @@
       @error="error = $event"
     />
     <template v-if="!fileMode && !preview && !report">
-      <label class="nb-credential-label">{{ $t('browser.chromeProfile') }}</label>
-      <button
-        class="nb-source-button"
-        :disabled="busy || !sources.length"
-        :aria-expanded="sourceOpen"
-        @click="sourceOpen = !sourceOpen"
-      >
-        <span>{{ selectedSource?.name || $t('browser.noChromeProfiles') }}</span
-        ><small>{{ selectedSource?.id }}</small
-        ><BrowserIcon name="chevronDown" />
-      </button>
-      <div
-        v-if="sourceOpen"
-        class="nb-source-options"
-        role="listbox"
-        :aria-label="$t('browser.chromeProfile')"
-      >
-        <button
-          v-for="item in sources"
-          :key="item.id"
-          role="option"
-          :aria-selected="source === item.id"
-          @click="
-            source = item.id;
-            sourceOpen = false;
-          "
-        >
-          <span
-            >{{ item.name }}<small>{{ item.id }}</small></span
-          ><FancyCheck :checked="source === item.id" :size="18" />
-        </button>
+      <div class="nb-source-row">
+        <label class="nb-credential-label">{{ $t('browser.chromeProfile') }}</label>
+        <UiSelect
+          v-model="source"
+          :options="sourceOptions"
+          :label="$t('browser.chromeProfile')"
+          :disabled="busy || !sources.length"
+        />
       </div>
       <button
         v-for="type in kinds"
         :key="type"
         class="nb-setting"
-        role="checkbox"
+        role="switch"
         :aria-checked="selection[type]"
         :disabled="busy"
         @click="selection[type] = !selection[type]"
       >
         <span>{{ $t(labels[type]) }}</span
-        ><FancyCheck :checked="selection[type]" :size="18" />
+        ><UiSwitch decorative :checked="selection[type]" />
       </button>
     </template>
     <p v-if="busy" class="nb-credential-note" role="status">{{ $t(stageLabel) }}</p>
@@ -183,8 +160,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
-import BrowserIcon from './BrowserIcon.vue';
 import BrowserImportFile from './BrowserImportFile.vue';
 import { browserBridge } from './types';
 import { t } from '@/locales';
@@ -193,8 +171,7 @@ import type { ChromePreview, CredentialResponse, ImportKind } from './credential
 const store = useNativeBrowserStore(),
   { request, valid } = useCredentialRequest();
 const sources = ref<{ id: string; name: string }[]>([]),
-  source = ref(''),
-  sourceOpen = ref(false);
+  source = ref('');
 const selection = ref({ passwords: true, cookies: true, history: true });
 const fileSupported = browserBridge()?.credentialFileImport === true;
 const fileMode = ref(fileSupported);
@@ -208,7 +185,9 @@ const labels = {
 const selectedKinds = computed(() =>
   fileMode.value ? [fileKind.value] : kinds.filter((type) => selection.value[type])
 );
-const selectedSource = computed(() => sources.value.find((item) => item.id === source.value));
+const sourceOptions = computed(() =>
+  sources.value.map((item) => ({ value: item.id, label: item.name, description: item.id }))
+);
 const error = ref(''),
   busy = ref(false),
   committing = ref(false),

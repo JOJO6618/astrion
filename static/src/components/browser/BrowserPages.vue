@@ -32,31 +32,25 @@
     </template>
     <BrowserDownloadList v-else-if="store.section === 'downloads'" />
     <template v-else-if="store.section === 'settings'">
-      <div class="nb-setting">
+      <div class="nb-setting nb-setting-wrap">
         <span>{{ $t('browser.theme') }}</span>
-        <div class="nb-theme-options">
-          <button
-            v-for="theme in themes"
-            :key="theme"
-            :aria-pressed="currentTheme === theme"
-            @click="chooseTheme(theme)"
-          >
-            {{ $t(`browser.${theme}`) }}
-          </button>
-        </div>
+        <UiSelect
+          :model-value="currentTheme"
+          :options="themeOptions"
+          :label="$t('browser.theme')"
+          align-end
+          @update:model-value="chooseTheme"
+        />
       </div>
       <div class="nb-setting nb-setting-wrap">
         <span>{{ $t('browser.searchEngine') }}</span>
-        <div class="nb-theme-options">
-          <button
-            v-for="engine in searchEngines"
-            :key="engine.key"
-            :aria-pressed="currentEngine === engine.key"
-            @click="store.command('search-engine', engine.key)"
-          >
-            {{ $t(`browser.${engine.label}`) }}
-          </button>
-        </div>
+        <UiSelect
+          :model-value="currentEngine"
+          :options="searchEngineOptions"
+          :label="$t('browser.searchEngine')"
+          align-end
+          @update:model-value="(value) => store.command('search-engine', value)"
+        />
       </div>
       <button class="nb-setting nb-setting-link" @click="store.showSection('import')">
         <span>{{ $t('browser.importTitle') }}</span
@@ -76,13 +70,13 @@
       <button
         v-for="option in clearOptions"
         :key="option.key"
-        role="checkbox"
-        class="nb-setting nb-check"
+        role="switch"
+        class="nb-setting"
         :aria-checked="clearSelection[option.key]"
         @click="clearSelection[option.key] = !clearSelection[option.key]"
       >
         <span>{{ $t(`browser.${option.label}`) }}</span
-        ><FancyCheck :checked="clearSelection[option.key]" :size="18" />
+        ><UiSwitch decorative :checked="clearSelection[option.key]" />
       </button>
       <div class="nb-page-footer">
         <button class="nb-text-button" @click="store.showSection('')">
@@ -105,7 +99,8 @@ import { computed, ref } from 'vue';
 import { t } from '@/locales';
 import { useNativeBrowserStore } from '@/stores/nativeBrowser';
 import { useTheme, type ThemeKey } from '@/utils/theme';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import BrowserIcon from './BrowserIcon.vue';
 import BrowserButton from './BrowserButton.vue';
 import BrowserSiteIcon from './BrowserSiteIcon.vue';
@@ -130,10 +125,17 @@ const searchEngines: { key: BrowserSearchEngine; label: string }[] = [
   { key: 'bing', label: 'searchEngineBing' },
   { key: 'baidu', label: 'searchEngineBaidu' }
 ];
+const themeOptions = computed(() =>
+  themes.map((theme) => ({ value: theme, label: t(`browser.${theme}`) }))
+);
+const searchEngineOptions = computed(() =>
+  searchEngines.map((engine) => ({ value: engine.key, label: t(`browser.${engine.label}`) }))
+);
 const currentEngine = computed(() => store.snapshot?.settings?.searchEngine || 'google');
 const { setTheme, loadTheme } = useTheme();
 const currentTheme = ref(loadTheme());
-function chooseTheme(theme: ThemeKey) {
+function chooseTheme(value: string) {
+  const theme = value as ThemeKey;
   setTheme(theme);
   currentTheme.value = theme;
 }

@@ -37,12 +37,12 @@ onBeforeUnmount(hide);
 <style scoped>
 .nb-button {
   position: relative;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   display: inline-flex;
   justify-content: center;
   align-items: center;
@@ -51,7 +51,7 @@ onBeforeUnmount(hide);
   cursor: pointer;
 }
 .nb-button:hover:not(:disabled) {
-  background: var(--surface-muted);
+  background: var(--hover-bg);
   color: var(--text-primary);
 }
 .nb-button--active,
@@ -61,11 +61,11 @@ onBeforeUnmount(hide);
   background: transparent;
 }
 .nb-button:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 .nb-button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text-secondary);
   outline-offset: -2px;
 }
 .nb-tooltip {
@@ -77,12 +77,12 @@ onBeforeUnmount(hide);
   display: flex;
   align-items: center;
   padding: 0 8px;
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 8px;
   color: var(--text-primary);
-  background: var(--surface-base);
+  background: var(--popover-surface);
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
   pointer-events: none;
 }
 </style>

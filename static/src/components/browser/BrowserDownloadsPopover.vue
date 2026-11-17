@@ -25,22 +25,18 @@ const { menuAction } = inject(browserControlsKey)!;
   right: 43px;
   width: 350px;
   max-width: calc(100% - 52px);
-  padding: 0;
 }
+/* 标题行与下方列表靠留白区分，不画分隔线；标题与行内文字同在 8px 文字线 */
 .nb-recent-downloads header {
-  height: 42px;
-  padding: 0 12px;
+  height: 40px;
+  padding: 0 0 0 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  border-bottom: 1px solid var(--border-default);
 }
 .nb-recent-downloads strong {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-}
-.nb-recent-downloads header button {
-  font-size: 11px;
 }
 </style>

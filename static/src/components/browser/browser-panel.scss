@@ -17,7 +17,11 @@
   background: var(--surface-base);
   color: var(--text-primary);
   border-left: 1px solid var(--border-default);
+  /* 界面外框统一系统无衬线（DESIGN.md §4），不继承对话正文的 Iowan 衬线 */
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 13px;
+  -webkit-font-smoothing: antialiased;
 }
 // macOS 对话浏览器独立窗口：面板铺满窗口，红绿灯悬浮在标签栏左侧，标签栏空白处拖动窗口。
 .native-browser-panel--window {
@@ -94,7 +98,7 @@
   outline: none;
 }
 .native-browser-panel button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text-secondary);
   outline-offset: -2px;
 }
 .nb-resizer {
@@ -137,8 +141,7 @@
   justify-content: center;
   gap: 7px;
   background: var(--surface-soft);
-  border-bottom: 1px solid var(--border-default);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-devicebar label {
   display: flex;
@@ -147,12 +150,15 @@
   color: var(--text-secondary);
 }
 .nb-devicebar input {
-  width: 42px;
-  height: 23px;
+  width: 48px;
+  height: 26px;
   border: 1px solid var(--border-default);
   background: var(--surface-base);
   text-align: center;
-  border-radius: 3px;
+  border-radius: 6px;
+}
+.native-browser-panel .nb-devicebar input:focus {
+  border-color: var(--border-strong);
 }
 .nb-empty {
   padding: 65px 20px;
@@ -171,7 +177,7 @@
 }
 .nb-wordmark {
   font-size: 35px;
-  font-weight: 550;
+  font-weight: 600;
   letter-spacing: -1.5px;
   margin-bottom: 30px;
 }
@@ -179,13 +185,21 @@
   width: 100%;
   max-width: 520px;
   height: 46px;
-  padding: 0 12px 0 17px;
-  border: 1px solid var(--border-default);
+  padding: 0 6px 0 17px;
+  border: 1px solid transparent;
   border-radius: 24px;
   display: flex;
   align-items: center;
   gap: 12px;
   background: var(--surface-soft);
+}
+.nb-newtab-search:focus-within {
+  border-color: var(--border-strong);
+}
+/* 药丸搜索框内的「前往」按钮用圆形热区与 hover，与外框同心：
+   按钮 32 距外框上下 (46 − 2 − 32) / 2 + 1 = 7，右侧 6 + 1 = 7，四周等距 */
+.nb-newtab .nb-newtab-search .nb-button {
+  border-radius: 50%;
 }
 .nb-newtab-search input {
   flex: 1;
@@ -213,17 +227,17 @@
   height: 86px;
   padding: 10px 4px 6px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-shortcut-open:hover,
 .nb-shortcut.menu-open .nb-shortcut-open {
-  background: var(--surface-soft);
+  background: var(--hover-bg);
 }
 .nb-shortcut-title {
   max-width: 100%;
@@ -238,14 +252,15 @@
   overflow: visible;
   text-overflow: clip;
 }
-.nb-shortcut-add-tile .nb-shortcut-open:disabled {
+/* 已达上限：外观减弱但仍可点击，点击提示原因 */
+.nb-shortcut-add-tile .nb-shortcut-open.is-locked {
   color: var(--text-tertiary);
   cursor: default;
 }
-.nb-shortcut-add-tile .nb-shortcut-open:disabled:hover {
+.nb-shortcut-add-tile .nb-shortcut-open.is-locked:hover {
   background: transparent;
 }
-.nb-shortcut-add-tile .nb-shortcut-open:disabled .nb-icon {
+.nb-shortcut-add-tile .nb-shortcut-open.is-locked .nb-icon {
   color: var(--text-tertiary);
 }
 .nb-shortcut-more {
@@ -273,7 +288,8 @@
   opacity: 1;
 }
 .nb-shortcut-more:hover {
-  background: var(--surface-muted);
+  /* 磁贴整块已有 hover 底色（DESIGN.md §3 第 14 条），这里只变图标颜色 */
+  color: var(--text-primary);
 }
 /* Must beat .nb-popover (declared later), whose max-height is relative to the 86px tile. */
 .nb-popover.nb-shortcut-menu {
@@ -317,40 +333,48 @@
   box-sizing: border-box;
   width: 340px;
   max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-  background: var(--surface-base);
+  gap: 16px;
+  padding: 20px;
+  background: var(--surface-raised);
   border: 1px solid var(--border-default);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 .nb-shortcut-editor strong {
-  font-size: 14px;
+  font-size: 17px;
+  line-height: 26px;
   font-weight: 600;
+  letter-spacing: -0.4px;
 }
 .nb-shortcut-editor label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-secondary);
 }
 .nb-shortcut-editor input {
-  height: 34px;
-  padding: 0 9px;
-  border: 1px solid var(--border-default);
-  border-radius: 5px;
-  background: var(--surface-base);
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface-soft);
   color: var(--text-primary);
   font-size: 13px;
+}
+.nb-shortcut-editor input:focus {
+  border-color: var(--border-strong);
 }
 .nb-shortcut-editor input[aria-invalid='true'] {
   border-color: var(--state-danger);
 }
 .nb-shortcut-error {
+  margin-top: -8px;
   color: var(--state-danger);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-shortcut-editor footer {
   display: flex;
@@ -371,7 +395,9 @@
 }
 .nb-load-error h2 {
   font-size: 20px;
-  font-weight: 550;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
   margin: 0;
 }
 .nb-load-error p {
@@ -379,30 +405,46 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+/* 文字按钮（DESIGN.md §6.1）：默认 quiet，.primary 墨色，.danger 危险色；无描边 */
 .nb-text-button {
   height: 32px;
-  padding: 0 13px;
-  border: 1px solid var(--border-default);
-  border-radius: 5px;
-  background: var(--surface-base);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-soft);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
-.nb-text-button:hover {
+.nb-text-button:hover:not(:disabled) {
   background: var(--surface-muted);
 }
 .nb-text-button.primary {
   background: var(--text-primary);
   color: var(--surface-base);
-  border-color: transparent;
+}
+.nb-text-button.primary:hover:not(:disabled) {
+  background: var(--text-secondary);
+}
+.nb-text-button.danger {
+  background: var(--state-danger);
+  color: var(--on-accent);
+}
+.nb-text-button.danger:hover:not(:disabled) {
+  background: var(--state-danger-strong);
 }
 .nb-popover {
   position: absolute;
   z-index: 14;
-  padding: 6px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--surface-base);
+  padding: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
   max-height: calc(100% - 100px);
   overflow: auto;
   scrollbar-width: thin;
@@ -415,47 +457,54 @@
   max-width: calc(100% - 16px);
 }
 .nb-tab-picker .nb-search {
-  margin: 3px 3px 6px;
+  height: 32px;
+  margin-bottom: 4px;
 }
 .nb-site-info {
   top: 88px;
   left: 110px;
   max-width: calc(100% - 122px);
   width: 320px;
-  padding: 17px;
-  font-size: 12px;
+  padding: 12px;
+  font-size: 13px;
 }
 .nb-site-info strong {
-  font-weight: 550;
+  font-weight: 600;
 }
 .nb-site-info p {
   overflow-wrap: anywhere;
   color: var(--text-secondary);
-  margin: 9px 0;
+  font-size: 12px;
+  margin: 8px 0;
 }
 .nb-site-info small {
   color: var(--state-warning);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-context {
   width: 210px;
 }
 .nb-menu-row {
-  height: 35px;
+  height: 32px;
   width: 100%;
   display: flex;
-  gap: 9px;
+  gap: 10px;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-primary);
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
 }
-.nb-menu-row:hover {
-  background: var(--surface-muted);
+.nb-menu-row + .nb-menu-row {
+  margin-top: 2px;
+}
+.nb-menu-row:hover,
+.nb-menu-row:focus-visible {
+  background: var(--hover-bg);
+  color: var(--text-primary);
 }
 .nb-menu-row span:not(.nb-icon) {
   flex: 1;
@@ -464,18 +513,26 @@
   white-space: nowrap;
 }
 .nb-menu-row .nb-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--text-secondary);
+}
+.nb-menu-row:hover .nb-icon {
+  color: var(--text-primary);
 }
 .nb-search {
-  height: 35px;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 10px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: var(--surface-soft);
+}
+.nb-search:focus-within {
+  border-color: var(--border-strong);
 }
 .nb-search input {
   height: 100%;
@@ -493,22 +550,24 @@
   place-items: center;
   background: var(--overlay-scrim);
   z-index: 25;
-  padding: 22px;
+  padding: 20px;
 }
 .nb-permission {
   width: 350px;
   max-width: 100%;
   max-height: 100%;
   overflow: auto;
-  padding: 23px;
-  background: var(--surface-base);
+  padding: 20px;
+  background: var(--surface-raised);
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .nb-permission h2 {
   font-size: 17px;
+  line-height: 26px;
   font-weight: 600;
-  margin: 12px 0;
+  letter-spacing: -0.4px;
+  margin: 12px 0 8px;
 }
 .nb-permission p {
   color: var(--text-secondary);
@@ -524,13 +583,39 @@
 .nb-permission small {
   display: block;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-permission footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 20px;
+}
+/* 一级弹层进出（DESIGN.md §6.10）：浏览器浮层都在触发按钮下方展开，从上方 −4px 进入、向上收回 */
+.nb-popover-enter-active {
+  transition:
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.nb-popover-leave-active {
+  transition:
+    opacity 100ms cubic-bezier(0.4, 0, 1, 1),
+    transform 100ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
+}
+.nb-popover-enter-from,
+.nb-popover-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+.nb-tab-picker,
+.nb-recent-downloads {
+  transform-origin: top right;
+}
+.nb-site-info,
+.nb-context,
+.nb-shortcut-menu {
+  transform-origin: top left;
 }
 .nb-spinning {
   animation: nb-spin 0.8s linear infinite;
@@ -543,5 +628,9 @@
 @media (prefers-reduced-motion: reduce) {
   .nb-spinning {
     animation: none;
+  }
+  .nb-popover-enter-active,
+  .nb-popover-leave-active {
+    transition: none;
   }
 }

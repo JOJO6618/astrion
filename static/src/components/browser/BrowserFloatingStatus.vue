@@ -44,18 +44,19 @@ const { store, findInput, find, closeFind } = inject(browserControlsKey)!;
   gap: 8px;
   pointer-events: none;
 }
+/* 悬浮条：弹层底色与描边；内部 32px 按钮离外框 4px，外框圆角同心 = 8 + 4 = 12 */
 .nb-findbar,
 .nb-error {
   box-sizing: border-box;
-  height: 40px;
+  height: 42px;
   max-width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px 0 12px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--surface-base);
+  gap: 2px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
   pointer-events: auto;
 }
 .nb-findbar {
@@ -64,11 +65,14 @@ const { store, findInput, find, closeFind } = inject(browserControlsKey)!;
 .nb-findbar input {
   height: 100%;
   flex: 1;
-  font-size: 12px;
+  margin-left: 6px;
+  font-size: 13px;
 }
 .nb-findbar output {
+  margin-right: 6px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .nb-findbar > .nb-icon {
   width: 14px;
@@ -77,7 +81,7 @@ const { store, findInput, find, closeFind } = inject(browserControlsKey)!;
 .nb-error {
   width: max-content;
   color: var(--state-danger);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-error span {
   flex: 1;

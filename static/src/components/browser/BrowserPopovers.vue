@@ -1,45 +1,50 @@
 <template>
-  <BrowserDownloadsPopover v-if="downloadsOpen" />
-  <div v-if="picker" class="nb-popover nb-tab-picker">
-    <label class="nb-search"
-      ><BrowserIcon name="search" /><input
-        v-model="tabQuery"
-        :placeholder="$t('browser.tabSearch')"
-        :aria-label="$t('browser.tabSearch')" /></label
-    ><button
-      v-for="tab in filteredTabs"
-      :key="tab.id"
-      class="nb-menu-row"
-      @click="selectTab(tab.id)"
-    >
-      <BrowserIcon v-if="tab.section" :name="internalPageIcons[tab.section]" />
-      <BrowserSiteIcon v-else :src="tab.favicon" :url="tab.url" /><span>{{
-        browserTabLabel(tab)
-      }}</span
-      ><BrowserIcon v-if="tab.id === store.active?.id" name="check" />
-    </button>
-  </div>
-  <div v-if="siteInfo" class="nb-popover nb-site-info">
-    <strong>{{ $t('browser.connection') }}</strong>
-    <p>{{ store.active?.url }}</p>
-    <small v-if="!store.active?.url.startsWith('https:')">{{ $t('browser.unverified') }}</small>
-  </div>
-  <div
-    v-if="context"
-    class="nb-popover nb-context"
-    role="menu"
-    :style="{ left: `${context.x}px`, top: `${context.y}px` }"
+  <Transition name="nb-popover"><BrowserDownloadsPopover v-if="downloadsOpen" /></Transition>
+  <Transition name="nb-popover"
+    ><div v-if="picker" class="nb-popover nb-tab-picker">
+      <label class="nb-search"
+        ><BrowserIcon name="search" /><input
+          v-model="tabQuery"
+          :placeholder="$t('browser.tabSearch')"
+          :aria-label="$t('browser.tabSearch')" /></label
+      ><button
+        v-for="tab in filteredTabs"
+        :key="tab.id"
+        class="nb-menu-row"
+        @click="selectTab(tab.id)"
+      >
+        <BrowserIcon v-if="tab.section" :name="internalPageIcons[tab.section]" />
+        <BrowserSiteIcon v-else :src="tab.favicon" :url="tab.url" /><span>{{
+          browserTabLabel(tab)
+        }}</span
+        ><BrowserIcon v-if="tab.id === store.active?.id" name="check" />
+      </button></div
+  ></Transition>
+  <Transition name="nb-popover"
+    ><div v-if="siteInfo" class="nb-popover nb-site-info">
+      <strong>{{ $t('browser.connection') }}</strong>
+      <p>{{ store.active?.url }}</p>
+      <small v-if="!store.active?.url.startsWith('https:')">{{ $t('browser.unverified') }}</small>
+    </div></Transition
   >
-    <button
-      v-for="item in contextActions"
-      :key="item.action"
-      role="menuitem"
-      class="nb-menu-row"
-      @click="contextAction(item.action)"
+  <Transition name="nb-popover"
+    ><div
+      v-if="context"
+      class="nb-popover nb-context"
+      role="menu"
+      :style="{ left: `${context.x}px`, top: `${context.y}px` }"
     >
-      {{ $t(`browser.${item.label}`) }}
-    </button>
-  </div>
+      <button
+        v-for="item in contextActions"
+        :key="item.action"
+        role="menuitem"
+        class="nb-menu-row"
+        @click="contextAction(item.action)"
+      >
+        {{ $t(`browser.${item.label}`) }}
+      </button>
+    </div></Transition
+  >
   <div v-if="permission" class="nb-permission-scrim">
     <section
       class="nb-permission"
