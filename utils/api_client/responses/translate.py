@@ -23,7 +23,9 @@ codex 子包改 re-export 保持存量导入路径不变）。适用对象：Cha
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 from .speed import ResponsesOutputTimer
 
@@ -212,6 +214,68 @@ def chat_request_to_input(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
 
 _NULL_HINT = "不需要时填 null，系统会视为未提供"
 
+# OpenAI 的 schema 编译器不接受的 JSON Schema 关键字（2026-11-19）。
+# 实测：Playwright MCP 的 browser_drop.data 带 "propertyNames"，gpt-6.1 放行、
+# gpt-6.2 直接 400（invalid_json_schema: Unimplemented keys）。MCP 服务的
+# inputSchema 是各家自写的，必须统一剥掉再转发。
+#
+# 注意：只删「schema 关键字位置」的键；properties / $defs / definitions 里
+# 同名的属性定义不能删（否则会误删名为 if / then 的工具参数）。
+_UNSUPPORTED_SCHEMA_KEYS = frozenset({
+    "propertyNames",
+    "patternProperties",
+    "unevaluatedProperties",
+    "unevaluatedItems",
+    "dependentSchemas",
+    "dependentRequired",
+    "dependencies",
+    "if",
+    "then",
+    "else",
+    "contains",
+    "minContains",
+    "maxContains",
+    "contentEncoding",
+    "contentMediaType",
+    "contentSchema",
+    "$schema",
+    "$id",
+    "$anchor",
+    "$comment",
+    "$vocabulary",
+    "$dynamicRef",
+    "$dynamicAnchor",
+    "$recursiveRef",
+    "$recursiveAnchor",
+})
+
+# 值本身是 {名称: schema} 的映射键：内层 key 是用户数据，不能当关键字删。
+_SCHEMA_MAP_KEYS = frozenset({"properties", "$defs", "definitions"})
+
+
+def sanitize_json_schema(node: Any) -> Any:
+    """递归剥除 OpenAI schema 编译器不支持的关键字。
+
+    仅做减法：被删的关键字要么纯元信息（$schema / $id / $comment），要么是
+    收紧校验的约束（propertyNames / patternProperties / if-then-else）。删掉
+    后校验变宽松，而参数合法性本来由工具自身再校验，不会造成错误接受。
+    """
+    if isinstance(node, list):
+        return [sanitize_json_schema(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    cleaned: Dict[str, Any] = {}
+    for key, value in node.items():
+        if key in _UNSUPPORTED_SCHEMA_KEYS:
+            continue
+        if key in _SCHEMA_MAP_KEYS and isinstance(value, dict):
+            cleaned[key] = {
+                name: sanitize_json_schema(spec) for name, spec in value.items()
+            }
+        else:
+            cleaned[key] = sanitize_json_schema(value)
+    return cleaned
+
 
 def _optional_params_nullable(params: Dict[str, Any]) -> Dict[str, Any]:
     """把非 required 参数改为 nullable 联合类型并追加 null 提示。
@@ -265,7 +329,9 @@ def flatten_tools(tools: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]
             "name": fn["name"],
             "description": fn.get("description") or "",
             "parameters": _optional_params_nullable(
-                fn.get("parameters") or {"type": "object", "properties": {}}
+                sanitize_json_schema(
+                    fn.get("parameters") or {"type": "object", "properties": {}}
+                )
             ),
         }
         if fn.get("strict") is not None:
@@ -323,6 +389,77 @@ def _clean_summary_text(text: str) -> str:
     return text.replace("**", "").strip()
 
 
+# ---------------------------------------------------------------------------
+# instructions 位置策略（2026-11-19，gpt-6.2 缓存回归）
+# ---------------------------------------------------------------------------
+
+# OpenAI 自家模型名：gpt-*（排除开源 gpt-oss）、chatgpt-*、o1/o3/o4 系列
+_OPENAI_MODEL_RE = re.compile(r"^(?:gpt-(?!oss)|chatgpt-|o[1-9](?:-|$))")
+
+# 第一方 OpenAI 端点（含 Azure / Cloudflare AI Gateway 转发）
+_OPENAI_HOSTS = (
+    "openai.com",
+    "openai.azure.com",
+    "gateway.ai.cloudflare.com",
+)
+
+
+def _host_matches(host: str, candidates: Tuple[str, ...]) -> bool:
+    return any(host == c or host.endswith("." + c) for c in candidates)
+
+
+def _base_host(base_url: Optional[str]) -> str:
+    try:
+        return (urlparse(str(base_url or "")).netloc or "").lower().split(":")[0]
+    except Exception:
+        return ""
+
+
+def should_use_developer_prompt(
+    *,
+    model_id: Optional[str] = None,
+    base_url: Optional[str] = None,
+    provider_id: Optional[str] = None,
+    responses_auth: Optional[str] = None,
+) -> bool:
+    """是否把 system 提示作为 input 首条 developer 消息发送（不再用 instructions 字段）。
+
+    背景：gpt-6.2 系起，后端不把 ``instructions`` 字段写入/读取 prompt 缓存，
+    缓存缺口恒等于 system prompt 大小（实测缺口 64–72K，与 71,014 token 的
+    system 估算吻合），而 ``input`` 前缀照常缓存。改为 developer 消息后整段
+    前缀进入缓存（opencode PR #64542 已跨 7 模型 + Azure + Cloudflare 验证）。
+
+    判定按「OpenAI 自家模型或第一方端点」，第三方网关上的非 OpenAI 模型
+    （xAI / Meta 等的 Responses 路由）保持原 instructions 形状。
+    """
+    if str(responses_auth or "") == "codex_oauth":
+        return True
+    if str(provider_id or "") in ("openai-api", "openai-codex"):
+        return True
+    model = str(model_id or "").strip().lower()
+    if model and _OPENAI_MODEL_RE.match(model):
+        return True
+    return _host_matches(_base_host(base_url), _OPENAI_HOSTS)
+
+
+def should_send_prompt_cache_key(
+    *,
+    base_url: Optional[str] = None,
+    provider_id: Optional[str] = None,
+    responses_auth: Optional[str] = None,
+) -> bool:
+    """是否下发 ``prompt_cache_key``（缓存亲和）。
+
+    仅第一方 OpenAI 端点与订阅通道下发；第三方中转保持现状，避免严格校验
+    网关因未知字段直接 400。
+    """
+    if str(responses_auth or "") == "codex_oauth":
+        return True
+    if str(provider_id or "") in ("openai-api", "openai-codex"):
+        return True
+    return _host_matches(_base_host(base_url), _OPENAI_HOSTS)
+
+
 def build_responses_body(
     *,
     messages: List[Dict[str, Any]],
@@ -334,21 +471,37 @@ def build_responses_body(
     max_output_tokens: Optional[int] = None,
     verbosity: Optional[str] = None,
     session_id: Optional[str] = None,
+    use_developer_prompt: bool = False,
 ) -> Dict[str, Any]:
-    """组装 Responses 请求体（含全部强制约束）。"""
+    """组装 Responses 请求体（含全部强制约束）。
+
+    ``use_developer_prompt=True`` 时 system 文本改作 input 首条 developer
+    消息，并省略 ``instructions`` 字段（gpt-6.2 缓存回归的规避，见
+    :func:`should_use_developer_prompt`）。
+    """
     system_text, rest = split_system_messages(messages)
     if system_text:
         from modules.system_prompt_snapshot import has_frozen_system
         instructions = system_text if has_frozen_system(messages) else f"{instructions}\n\n{system_text}"
 
+    input_items = chat_request_to_input(rest)
     body: Dict[str, Any] = {
         "model": model_id,
-        "instructions": instructions,
-        "input": chat_request_to_input(rest),
+        "input": input_items,
         "store": False,
         "stream": True,
         "include": ["reasoning.encrypted_content"],
     }
+    if use_developer_prompt and instructions:
+        body["input"] = [
+            {
+                "type": "message",
+                "role": "developer",
+                "content": [{"type": "input_text", "text": instructions}],
+            }
+        ] + input_items
+    else:
+        body["instructions"] = instructions
     flat_tools = flatten_tools(tools)
     if flat_tools:
         body["tools"] = flat_tools

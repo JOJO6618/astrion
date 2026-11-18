@@ -31,6 +31,8 @@ from utils.api_client.responses.translate import (
     _ReasoningCollector,
     build_responses_body,
     responses_sse_to_chat_chunks,
+    should_send_prompt_cache_key,
+    should_use_developer_prompt,
     tool_required_map,
 )
 
@@ -179,6 +181,20 @@ class APIClientResponsesMixin:
         from modules.system_prompt_snapshot import has_frozen_system
         instructions = "" if has_frozen_system(messages) else self._build_responses_instructions(model_id)
 
+        # gpt-6.2 起 instructions 字段不进 prompt 缓存，OpenAI 系模型改走 input
+        # 前缀（translate.should_use_developer_prompt）。属性一律 getattr 读，
+        # 保持测试里 SimpleNamespace client 可用。
+        _provider_id = getattr(self, "provider_id", None)
+        use_developer_prompt = should_use_developer_prompt(
+            model_id=model_id,
+            base_url=base_url,
+            provider_id=_provider_id,
+            responses_auth=getattr(self, "responses_auth", None),
+        )
+        send_cache_key = codex_oauth or should_send_prompt_cache_key(
+            base_url=base_url, provider_id=_provider_id
+        )
+
         body = build_responses_body(
             messages=messages,
             instructions=instructions,
@@ -187,7 +203,8 @@ class APIClientResponsesMixin:
             effort=effort,
             summary="detailed",
             max_output_tokens=max_tokens,
-            session_id=self._responses_session_id() if codex_oauth else None,
+            session_id=self._responses_session_id() if send_cache_key else None,
+            use_developer_prompt=use_developer_prompt,
         )
 
         # Fast is a service tier, not a reasoning mode. Resolve per account/model.
