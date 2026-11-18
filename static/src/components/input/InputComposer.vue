@@ -1668,19 +1668,7 @@ const currentModelSupportsVideo = computed(() => {
 const applySlashTheme = async (theme: 'classic' | 'light' | 'dark') => {
   personalizationStore.applyTheme(theme);
   personalizationStore.updateField({ key: 'theme', value: theme });
-  try {
-    const resp = await fetch('/api/personalization', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ theme })
-    });
-    const result = await resp.json().catch(() => ({}));
-    if (!resp.ok || !result.success) {
-      console.warn('保存主题到后端失败:', result?.error);
-    }
-  } catch (error) {
-    console.warn('保存主题到后端失败:', error);
-  }
+  await personalizationStore.flushAutoSave();
 };
 
 const executeSlashAction = (action: () => void) => {
@@ -1873,14 +1861,8 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       action: () => {
         const currentValue = personalizationStore?.form?.show_git_status_bar !== false;
         const newValue = !currentValue;
-        if (personalizationStore?.form) {
-          personalizationStore.form.show_git_status_bar = newValue;
-        }
-        fetch('/api/personalization', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ show_git_status_bar: newValue })
-        }).catch(() => {});
+        personalizationStore.updateField({ key: 'show_git_status_bar', value: newValue });
+        void personalizationStore.flushAutoSave();
       }
     },
     {

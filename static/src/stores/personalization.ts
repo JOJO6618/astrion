@@ -2,6 +2,8 @@ import { defineStore } from 'pinia';
 import { t, currentLocale, setLocale } from '@/locales';
 import { useModelStore } from './model';
 import { applyThemeKey } from '@/utils/theme';
+import { createSaveQueue } from '@/utils/saveQueue';
+import type { SaveQueue, SaveRunContext } from '@/utils/saveQueue';
 
 // 语气预设：模块顶层禁止调 t()，这里只存 key，由 getter tonePresets 在读取时 t(key) 求值（随语言切换刷新）
 const TONE_PRESET_KEYS = [
@@ -224,8 +226,6 @@ const DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT = 10;
 const DEFAULT_RECENT_CONVERSATIONS_PROMPT_LIMIT_RANGE = { min: 1, max: 30 };
 const DEFAULT_PROJECT_MEMORY_INJECT_LIMIT = 20;
 const PROJECT_MEMORY_INJECT_LIMIT_MIN = 5;
-const DEFAULT_SHALLOW_COMPRESS_TRIGGER_TOKENS = 80000;
-const DEFAULT_DEEP_COMPRESS_TRIGGER_TOKENS = 250000;
 const RUN_MODE_OPTIONS: RunMode[] = ['fast', 'thinking'];
 const REASONING_EFFORT_OPTIONS: ReasoningEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 const EXPERIMENT_STORAGE_KEY = 'agents_personalization_experiments';
@@ -485,8 +485,48 @@ const loadExperimentState = (): ExperimentState => {
   }
 };
 
-// 防抖自动保存计时器（非响应式，避免触发不必要的重渲染）
-let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+/** 一次自动保存的结果（toggleEnabled 等需要即时反馈的入口据此提示/回滚） */
+interface AutoSaveOutcome {
+  ok: boolean;
+  result?: any;
+  error?: string;
+}
+
+// keepalive 请求体浏览器上限 64KB，留余量；超限时退化为普通请求
+const KEEPALIVE_BODY_LIMIT = 60 * 1024;
+
+// 自动保存合并队列（非响应式，避免触发不必要的重渲染）：停手 1s 保存、连续修改最长 3s 一次、
+// 同时最多一个请求在途。所有写 /api/personalization 的前端入口统一走这里，避免并发整表写互相覆盖。
+let autoSaveQueue: SaveQueue<AutoSaveOutcome> | null = null;
+let autoSaveLifecycleBound = false;
+
+/** 离开页面／切到后台立即保存；输入框失焦时保存积压修改 */
+const bindAutoSaveLifecycle = (queue: SaveQueue<AutoSaveOutcome>) => {
+  if (autoSaveLifecycleBound || typeof window === 'undefined') {
+    return;
+  }
+  autoSaveLifecycleBound = true;
+  const flushForUnload = () => {
+    if (queue.hasPending()) {
+      void queue.flush({ keepalive: true });
+    }
+  };
+  window.addEventListener('pagehide', flushForUnload);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      flushForUnload();
+    }
+  });
+  document.addEventListener(
+    'focusout',
+    () => {
+      if (queue.hasPending()) {
+        void queue.flush();
+      }
+    },
+    true
+  );
+};
 
 export const usePersonalizationStore = defineStore('personalization', {
   state: (): PersonalizationState => ({
@@ -531,6 +571,7 @@ export const usePersonalizationStore = defineStore('personalization', {
     closeDrawer() {
       this.visible = false;
       this.overlayPressActive = false;
+      void this.flushAutoSave();
     },
     handleOverlayPressStart(event: Event) {
       // 只有直接按在遮罩上才算有效按压；按在卡片内部（如输入框）时重置状态，
@@ -825,7 +866,7 @@ export const usePersonalizationStore = defineStore('personalization', {
       const cachedCompact = this.experiments.compactMessageDisplay;
       if (this.form.compact_message_display === 'full' && cachedCompact === 'brief') {
         this.form = { ...this.form, compact_message_display: 'brief' };
-        void this.persistCompactMessageDisplay('brief');
+        this.scheduleAutoSave();
       }
       // 一次性迁移：堆叠块显示模式旧版仅在 localStorage 保存，后端默认 minimal 时回写本地缓存值。
       const cachedBlockMode = this.experiments.blockDisplayMode;
@@ -965,19 +1006,13 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.error = '';
       this.form.enabled = newValue;
       try {
-        const resp = await fetch('/api/personalization', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled: newValue })
-        });
-        const result = await resp.json();
-        if (!resp.ok || !result.success) {
-          throw new Error(result.error || t('stores.updateFailed'));
+        // 并入统一保存队列并立即发出：与积压的其它修改合并为一次整表保存，避免并发写互相覆盖
+        this.scheduleAutoSave();
+        const outcome = await this.flushAutoSave();
+        if (!outcome || !outcome.ok) {
+          throw new Error(outcome?.error || t('stores.updateFailed'));
         }
-        if (result.data) {
-          this.applyPersonalizationData(result.data);
-        }
-        this.applyPersonalizationMeta(result);
+        this.applyPersonalizationMeta(outcome.result);
         const statusLabel = newValue ? t('stores.enabled') : t('stores.disabled');
         this.status = statusLabel;
         setTimeout(() => {
@@ -990,47 +1025,6 @@ export const usePersonalizationStore = defineStore('personalization', {
         this.error = error?.message || t('stores.updateFailed');
       } finally {
         this.toggleUpdating = false;
-      }
-    },
-    async save() {
-      if (this.saving) {
-        return;
-      }
-      this.saving = true;
-      this.status = '';
-      this.error = '';
-      try {
-        const shallowTrigger =
-          this.normalizeCompressionNumber(this.form.shallow_compress_trigger_tokens) ??
-          DEFAULT_SHALLOW_COMPRESS_TRIGGER_TOKENS;
-        const deepTrigger =
-          this.normalizeCompressionNumber(this.form.deep_compress_trigger_tokens) ??
-          DEFAULT_DEEP_COMPRESS_TRIGGER_TOKENS;
-        if (deepTrigger <= shallowTrigger) {
-          throw new Error(t('stores.deepCompressMustExceedShallow'));
-        }
-        const resp = await fetch('/api/personalization', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.form)
-        });
-        const result = await resp.json();
-        if (!resp.ok || !result.success) {
-          throw new Error(result.error || t('stores.saveFailed'));
-        }
-        this.applyPersonalizationData(result.data || {});
-        this.applyPersonalizationMeta(result);
-        const savedStatus = t('stores.saved');
-        this.status = savedStatus;
-        setTimeout(() => {
-          if (this.status === savedStatus) {
-            this.status = '';
-          }
-        }, 3000);
-      } catch (error: any) {
-        this.error = error?.message || t('stores.saveFailed');
-      } finally {
-        this.saving = false;
       }
     },
     updateField(payload: { key: keyof PersonalForm; value: any }) {
@@ -1050,35 +1044,44 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.clearFeedback();
       this.scheduleAutoSave();
     },
-    /** 防抖自动保存：500ms 内多次调用只执行最后一次 */
+    /** 记一次修改，按「停手 1s / 连续修改最长 3s」合并保存（见 utils/saveQueue.ts） */
     scheduleAutoSave() {
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
+      if (!autoSaveQueue) {
+        autoSaveQueue = createSaveQueue<AutoSaveOutcome>({
+          run: (context) => this.performAutoSave(context)
+        });
+        bindAutoSaveLifecycle(autoSaveQueue);
       }
-      autoSaveTimer = setTimeout(() => {
-        autoSaveTimer = null;
-        this.autoSave();
-      }, 500);
+      autoSaveQueue.schedule();
     },
-    /** 静默自动保存，成功不显示提示，失败显示错误 */
-    async autoSave() {
-      if (this.saving) {
-        return;
-      }
+    /** 立即发出积压修改（关闭抽屉、即时生效的开关等）；无积压时返回 undefined */
+    flushAutoSave(): Promise<AutoSaveOutcome | undefined> {
+      return autoSaveQueue ? autoSaveQueue.flush() : Promise.resolve(undefined);
+    },
+    /** 整表静默保存：每次读取当前最新表单；成功不提示、不回写表单（避免打断编辑），失败显示错误 */
+    async performAutoSave(context: SaveRunContext): Promise<AutoSaveOutcome> {
       this.saving = true;
       try {
+        const body = JSON.stringify(this.form);
         const resp = await fetch('/api/personalization', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.form)
+          body,
+          keepalive:
+            context.keepalive && new TextEncoder().encode(body).length <= KEEPALIVE_BODY_LIMIT
         });
         const result = await resp.json();
         if (!resp.ok || !result.success) {
           throw new Error(result.error || t('stores.autoSaveFailed'));
         }
-        // 静默成功，不刷新表单（避免打断用户编辑）
+        if (this.error) {
+          this.error = '';
+        }
+        return { ok: true, result };
       } catch (error: any) {
-        this.error = error?.message || t('stores.autoSaveFailed');
+        const message = error?.message || t('stores.autoSaveFailed');
+        this.error = message;
+        return { ok: false, error: message };
       } finally {
         this.saving = false;
       }
@@ -1331,23 +1334,9 @@ export const usePersonalizationStore = defineStore('personalization', {
       };
       this.persistExperiments();
       this.clearFeedback();
-      // 持久化到后端配置文件（即时保存，参照主题/默认隐藏工作区）
-      void this.persistCompactMessageDisplay(target);
-    },
-    async persistCompactMessageDisplay(mode: CompactMessageDisplay) {
-      try {
-        const resp = await fetch('/api/personalization', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ compact_message_display: mode })
-        });
-        const result = await resp.json();
-        if (!resp.ok || !result.success) {
-          console.warn('保存简略消息显示失败:', result?.error);
-        }
-      } catch (error) {
-        console.warn('保存简略消息显示失败:', error);
-      }
+      // 持久化到后端配置文件（即时保存，并入统一保存队列）
+      this.scheduleAutoSave();
+      void this.flushAutoSave();
     },
     setCommunicationStyle(style: CommunicationStyle) {
       this.form = {

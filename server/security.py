@@ -8,6 +8,9 @@ from typing import Dict, Any, Optional, Tuple
 from flask import current_app, g, request, session, jsonify
 from functools import wraps
 
+from config import IS_HOST_MODE
+from modules.i18n import tr
+
 from . import state
 
 
@@ -98,15 +101,31 @@ def gc_failure_trackers() -> None:
         trackers.clear()
 
 
-def rate_limited(action: str, limit: int, window_seconds: int, scope: str = "ip", error_message: Optional[str] = None):
-    """装饰器：为路由增加速率限制。"""
+def rate_limited(
+    action: str,
+    limit: int,
+    window_seconds: int,
+    scope: str = "ip",
+    error_message: Optional[str] = None,
+    host_exempt: bool = True,
+):
+    """装饰器：为路由增加速率限制。
+
+    host 模式（单机自用，桌面端恒为 host）默认放行：能通过认证的就是机器主人，
+    对其业务接口限频挡不住任何攻击，只会把正常的高频操作误报成 429。
+    登录前入口（登录/注册/Host 密码/未认证调试日志）直接调用 check_rate_limit，不受此影响；
+    认证后仍属「猜密码」性质的接口（如管理员二次验证）须传 host_exempt=False。
+    """
     def decorator(func):
+        if host_exempt and IS_HOST_MODE:
+            return func
+
         @wraps(func)
         def wrapped(*args, **kwargs):
             identifier = resolve_identifier(scope, kwargs=kwargs)
             limited, retry_after = check_rate_limit(action, limit, window_seconds, identifier)
             if limited:
-                message = error_message or "请求过于频繁，请稍后再试。"
+                message = error_message or tr("legacy.rate_limited")
                 return jsonify({
                     "success": False,
                     "error": message,

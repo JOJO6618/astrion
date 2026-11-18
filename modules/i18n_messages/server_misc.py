@@ -42,6 +42,7 @@ MESSAGES = {
     },
 
     # ── server/app_legacy.py ──
+    # legacy.rate_limited 现由 server/security.py 的 @rate_limited 使用（键名沿用）
     "legacy.rate_limited": {
         "zh-CN": "请求过于频繁，请稍后再试。",
         "en-US": "Too many requests. Please try again later.",

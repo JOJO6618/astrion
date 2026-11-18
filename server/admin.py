@@ -118,7 +118,7 @@ def admin_secondary_status():
 @admin_bp.route('/api/admin/secondary/verify', methods=['POST'])
 @login_required
 @admin_required
-@rate_limited("admin_secondary_verify", 5, 300, scope="user")
+@rate_limited("admin_secondary_verify", 5, 300, scope="user", host_exempt=False)
 def admin_secondary_verify():
     payload = request.get_json() or {}
     password = str(payload.get("password") or "").strip()

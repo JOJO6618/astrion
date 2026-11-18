@@ -434,7 +434,7 @@ def get_personalization_settings(terminal: Optional[WebTerminal], workspace: Opt
 @chat_bp.route('/api/personalization', methods=['POST'])
 @api_login_or_host_token_required
 @with_terminal(allow_no_workspace=True)
-@rate_limited("personalization_update", 20, 300, scope="user")
+@rate_limited("personalization_update", 60, 60, scope="user")
 def update_personalization_settings(terminal: Optional[WebTerminal], workspace: Optional[UserWorkspace], username: str):
     """更新个性化配置（无工作区时也可写入——配置模型不要求先建工作区）"""
     payload = request.get_json() or {}

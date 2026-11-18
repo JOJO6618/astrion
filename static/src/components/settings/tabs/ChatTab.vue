@@ -1,5 +1,5 @@
 <template>
-  <section class="stg-page">
+  <section class="stg-page" @focusout="flushSave">
     <template v-if="settings">
       <div class="stg-card">
         <div class="stg-select-row">
@@ -68,7 +68,8 @@
 </template>
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, ref, unref, watch } from 'vue';
-import { chatApi, command } from '@/chat/api';
+import { chatApi } from '@/chat/api';
+import { createSaveQueue } from '@/utils/saveQueue';
 import type { ChatDefaults, ChatSettings } from '@/chat/types';
 import type { ModelGroupOption } from '@/utils/modelGroups';
 import UiModelSelect from '@/components/ui/UiModelSelect.vue';
@@ -92,37 +93,34 @@ const effortItems = computed(() =>
 function updateEffort(value: string) {
   if (settings.value) settings.value.chat_default_reasoning_effort = value || null;
 }
-// 改动后自动保存（与其他分区一致，不放保存按钮）：停止输入 600ms 后提交；
-// 保存进行中又有改动时，结束后再补一次。
-let saveTimer = 0;
-let pendingSave = false;
-async function save() {
-  if (!settings.value) return;
-  if (busy.value) {
-    pendingSave = true;
-    return;
-  }
-  busy.value = true;
-  error.value = '';
-  try {
-    await command('/settings', { ...settings.value }, 'PATCH');
-  } catch (cause) {
-    error.value = String((cause as Error).message || cause);
-  } finally {
-    busy.value = false;
-    if (pendingSave) {
-      pendingSave = false;
-      void save();
+// 改动后自动保存（与其他分区一致，不放保存按钮），统一走 utils/saveQueue：
+// 停手 1s 保存、连续修改最长 3s 一次、同时最多一个请求在途；失焦／离开分区／关闭页面立即保存。
+const saveQueue = createSaveQueue<void>({
+  run: async ({ keepalive }) => {
+    if (!settings.value) return;
+    busy.value = true;
+    error.value = '';
+    try {
+      await chatApi('/settings', {
+        method: 'PATCH',
+        keepalive,
+        body: JSON.stringify({ ...settings.value })
+      });
+    } catch (cause) {
+      error.value = String((cause as Error).message || cause);
+    } finally {
+      busy.value = false;
     }
   }
-}
-function scheduleSave() {
-  window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => {
-    saveTimer = 0;
-    void save();
-  }, 600);
-}
+});
+const scheduleSave = () => saveQueue.schedule();
+const flushSave = () => {
+  if (saveQueue.hasPending()) void saveQueue.flush();
+};
+const flushForUnload = () => {
+  if (saveQueue.hasPending()) void saveQueue.flush({ keepalive: true });
+};
+window.addEventListener('pagehide', flushForUnload);
 let loadedOnce = false;
 watch(
   settings,
@@ -138,10 +136,8 @@ watch(
 );
 onBeforeUnmount(() => {
   // 离开分区时立即提交尚未保存的改动
-  if (saveTimer) {
-    window.clearTimeout(saveTimer);
-    void save();
-  }
+  window.removeEventListener('pagehide', flushForUnload);
+  flushSave();
 });
 onMounted(async () => {
   try {

@@ -253,7 +253,17 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
   onBeforeUnmount(() => {
     window.removeEventListener('resize', updateFloatingMenuPosition);
     window.removeEventListener('scroll', updateFloatingMenuPosition, true);
+    // 离开设置页／个人空间：立即发出积压的自动保存
+    void personalization.flushAutoSave();
   });
+
+  // 切换分区或宿主隐藏：立即发出积压的自动保存（Drawer 与设置页共用）
+  watch(
+    () => [activeTab.value, hostVisible.value],
+    () => {
+      void personalization.flushAutoSave();
+    }
+  );
 
   type RunModeValue = 'fast' | 'thinking' | null;
   type ReasoningEffortValue = 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -1213,22 +1223,9 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     activeTheme.value = theme;
     setTheme(theme);
 
-    // 同步更新到store并保存到后端配置文件
+    // 同步更新到store并立即保存到后端配置文件（统一保存队列）
     personalization.updateField({ key: 'theme', value: theme });
-
-    try {
-      const resp = await fetch('/api/personalization', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme })
-      });
-      const result = await resp.json();
-      if (!resp.ok || !result.success) {
-        console.warn('保存主题到后端失败:', result.error);
-      }
-    } catch (error) {
-      console.warn('保存主题到后端失败:', error);
-    }
+    await personalization.flushAutoSave();
   };
 
   // ──── 向拆分出的 tab 子组件（tabs/*.vue）提供共享上下文 ────
