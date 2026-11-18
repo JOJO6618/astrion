@@ -85,6 +85,8 @@ export default {
   // —— 推理强度滑块（EffortSlider） ——
   effortTitle: '推理强度',
   effortDefault: '默认',
+  effortNone: '无',
+  effortThinking: '思考',
   effortMoreEfficient: '更高效',
   effortMoreIntelligent: '更智能',
 

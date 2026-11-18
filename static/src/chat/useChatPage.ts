@@ -15,6 +15,7 @@ import { usePersonalizationStore } from '@/stores/personalization';
 import { useModelStore } from '@/stores/model';
 import { startDesktopView, stopDesktopView } from '@/app/methods/ui/desktopView';
 import { filterModelGroups, groupModelOptions } from '@/utils/modelGroups';
+import { reasoningCapabilityFor, type ReasoningChange } from '@/utils/reasoningStops';
 
 export function useChatPage() {
   const ui = useUiStore();
@@ -84,10 +85,8 @@ export function useChatPage() {
       modelMenuSearchQuery.value
     )
   );
-  const modeOptions = computed(() => [
-    { value: 'fast', label: t('appCore.fastMode'), desc: t('appCore.fastModeDesc') },
-    { value: 'thinking', label: t('input.thinkingMode'), desc: t('appCore.thinkingModeDesc') }
-  ]);
+  // 顶栏模型弹窗推理滑块：最左「无」= 不思考，其余为思考强度
+  const reasoning = computed(() => reasoningCapabilityFor(currentModel.value));
   const suggestions = computed(() => visibleHandoffs(chat.document, chat.path));
   const retryTurn = computed(() => {
     const turn = chat.document?.metadata.chat.turns.find(
@@ -120,6 +119,11 @@ export function useChatPage() {
     }
   }
   const configure = (patch: Record<string, unknown>) => run(() => chat.configure(patch));
+  const setReasoning = (change: ReasoningChange) =>
+    configure({
+      thinking_mode: change.thinking,
+      ...(change.effort !== undefined ? { reasoning_effort: change.effort } : {})
+    });
   function openSettings(section = 'chat') {
     const path = `/settings/${section}`;
     if (tabs.enabled) void run(() => tabs.openPage(path));
@@ -359,7 +363,7 @@ export function useChatPage() {
     modelOptions,
     currentModel,
     groups,
-    modeOptions,
+    reasoning,
     suggestions,
     retryTurn,
     contextTokens,
@@ -369,6 +373,7 @@ export function useChatPage() {
     removeMedia,
     run,
     configure,
+    setReasoning,
     openSettings,
     messageForAction,
     versions,

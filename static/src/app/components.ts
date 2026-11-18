@@ -6,7 +6,6 @@ import TerminalPanel from '../components/panels/TerminalPanel.vue';
 import TokenDrawer from '../components/token/TokenDrawer.vue';
 import QuickMenu from '../components/input/QuickMenu.vue';
 import InputComposer from '../components/input/InputComposer.vue';
-import EffortSlider from '../components/input/EffortSlider.vue';
 import AppShell from '../components/shell/AppShell.vue';
 import StatusAvatar from '../components/avatar/StatusAvatar.vue';
 
@@ -64,7 +63,6 @@ export const appComponents = {
   PersonalizationDrawer,
   QuickMenu,
   InputComposer,
-  EffortSlider,
   AppShell,
   StatusAvatar,
   ImagePicker,

@@ -11,7 +11,6 @@ export default {
   // ── 头部下拉 / 移动端导航（App.vue） ──
   // TODO(common): 候选公共词
   model: '模型',
-  runMode: '运行模式',
   collapseQuickDock: '收起快捷窗口',
   expandQuickDock: '展开快捷窗口',
   switchWorkspace: '切换工作区',
@@ -32,11 +31,10 @@ export default {
   showFileMissingPath: '[show_file: 缺少 path 属性]',
 
   // ── 头部运行模式 / 模型（computed.ts） ──
-  fastMode: '快速模式',
-  fastModeDesc: '无思考，响应更快',
-  thinkingModeDesc: '持续推理，适合复杂任务',
   chatgptFastMode: 'ChatGPT高速模式',
   chatgptFastModeDesc: '模型输出更快，但会消耗更多额度',
+  chatgptFastModeShort: '高速模式',
+  defaultReasoning: '默认推理',
   modelNotSelected: '未选择模型',
   // 复数：英文用管道（调用方需同时传 {n} 与 {count}）；中文不区分
   backgroundCommandCount: '{n} 个后台指令',

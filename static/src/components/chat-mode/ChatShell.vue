@@ -61,14 +61,10 @@
             :has-any-models="!!modelOptions.length"
             :open-settings-providers="() => openSettings('providers')"
             :open-manage-models="() => openSettings('chat')"
-            :header-run-mode-options="modeOptions"
-            :resolved-run-mode="chat.thinking ? 'thinking' : 'fast'"
-            :handle-header-run-mode-select="
-              (mode) => configure({ thinking_mode: mode === 'thinking' })
-            "
-            :show-effort-slider="chat.thinking && !!currentModel?.supportsThinking"
+            :reasoning="reasoning"
+            :thinking="chat.thinking"
             :reasoning-effort="chat.effort"
-            :set-reasoning-effort="(value) => configure({ reasoning_effort: value })"
+            :set-reasoning="setReasoning"
             :is-chatgpt-model="!!currentModel?.isChatgptModel"
             :supports-chatgpt-fast-mode="!!currentModel?.supportsChatgptFastMode"
             :chatgpt-fast-mode="chat.fastMode"
@@ -404,7 +400,7 @@ const {
   modelOptions,
   currentModel,
   groups,
-  modeOptions,
+  reasoning,
   suggestions,
   retryTurn,
   contextTokens,
@@ -416,6 +412,7 @@ const {
   removeMedia,
   run,
   configure,
+  setReasoning,
   openSettings,
   messageForAction,
   versions,

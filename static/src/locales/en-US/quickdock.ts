@@ -78,6 +78,8 @@ export default {
   // —— Effort slider ——
   effortTitle: 'Reasoning effort',
   effortDefault: 'Default',
+  effortNone: 'None',
+  effortThinking: 'On',
   effortMoreEfficient: 'More efficient',
   effortMoreIntelligent: 'Smarter',
 

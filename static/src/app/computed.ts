@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { t, currentLocale } from '@/locales';
 import { groupModelOptions, filterModelGroups } from '@/utils/modelGroups';
+import { reasoningCapabilityFor } from '@/utils/reasoningStops';
 import { mapState, mapWritableState } from 'pinia';
 import { useConnectionStore } from '../stores/connection';
 import { useFileStore } from '../stores/file';
@@ -121,12 +122,9 @@ export const computed = {
     }
     return this.thinkingMode ? 'thinking' : 'fast';
   },
-  headerRunModeOptions() {
-    void currentLocale.value;
-    return [
-      { value: 'fast', label: t('appCore.fastMode'), desc: t('appCore.fastModeDesc') },
-      { value: 'thinking', label: t('input.thinkingMode'), desc: t('appCore.thinkingModeDesc') }
-    ];
+  // 顶栏模型弹窗的推理滑块能力（最左「无」= fast，其余为思考强度）
+  headerReasoning() {
+    return reasoningCapabilityFor(useModelStore().currentModel);
   },
   // 推理强度滑块 + 顶部栏强度标签：仅思考模式 + 当前模型支持推理强度参数时显示
   showEffortSlider() {

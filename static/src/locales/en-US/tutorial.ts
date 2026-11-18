@@ -25,12 +25,13 @@ export default {
   workspaceConnectionIndicatorTitle: 'Connection indicator',
   workspaceConnectionIndicatorDesc:
     'Green means connected; red means disconnected from the backend.',
-  headerModelSelectorTitle: 'Model & mode selector',
-  headerModelSelectorDesc: 'The next step will open the model and run mode popup.',
+  headerModelSelectorTitle: 'Model & reasoning effort',
+  headerModelSelectorDesc: 'The next step will open the model and reasoning effort popup.',
   modelListTitle: 'Model list',
   headerModelOptionsDesc: 'Here are the available models.',
-  headerRunmodeOptionsTitle: 'Run mode list',
-  headerRunmodeOptionsDesc: 'Switch between Quick and Thinking here.',
+  headerRunmodeOptionsTitle: 'Reasoning effort',
+  headerRunmodeOptionsDesc:
+    'Drag to set reasoning effort; None on the far left skips thinking for faster replies.',
   headerMenuCloseTitle: 'Close model menu',
   headerMenuCloseDesc: 'The next step will click outside to close the menu.',
 
@@ -53,11 +54,13 @@ export default {
   mobileWorkspaceCloseDesc: 'The next step will close the workspace files panel.',
   mobileMenuOpenNewchatDesc: 'The next step will open the menu.',
   mobileMenuNewChatDesc: 'The next step will start a new chat.',
-  mobileModelSelectorOpenTitle: 'Model & thinking mode',
-  mobileModelSelectorOpenDesc: 'The next step will open the mobile model/thinking mode picker.',
+  mobileModelSelectorOpenTitle: 'Model & reasoning effort',
+  mobileModelSelectorOpenDesc:
+    'The next step will open the mobile model and reasoning effort picker.',
   mobileModelOptionsDesc: 'Here are the available models on mobile.',
-  mobileRunmodeOptionsTitle: 'Thinking mode list',
-  mobileRunmodeOptionsDesc: 'Switch between Quick and Thinking here.',
+  mobileRunmodeOptionsTitle: 'Reasoning effort',
+  mobileRunmodeOptionsDesc:
+    'Drag to set reasoning effort; None on the far left skips thinking for faster replies.',
   mobileModelSelectorCloseTitle: 'Close the picker',
   mobileModelSelectorCloseDesc: 'The next step will click outside to close the menu.',
 

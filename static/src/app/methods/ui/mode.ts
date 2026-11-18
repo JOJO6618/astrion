@@ -119,9 +119,17 @@ export const modeMethods = {
     }
     await this.setRunMode(mode);
   },
-  async handleHeaderRunModeSelect(mode) {
-    await this.handleModeSelect(mode);
-    this.closeHeaderMenu();
+  /**
+   * 顶栏模型弹窗的推理滑块 / 「默认推理」开关：一次变更同时描述思考开关与强度。
+   * 强度先乐观更新（随后 debounce 保存），运行模式按需切换；弹窗保持打开。
+   */
+  async setHeaderReasoning(change) {
+    if (!this.isConnected || this.streamingMessage) return;
+    if (change.effort !== undefined && change.effort !== this.reasoningEffort) {
+      this.setReasoningEffort(change.effort);
+    }
+    const mode = change.thinking ? 'thinking' : 'fast';
+    if (mode !== this.resolvedRunMode) await this.setRunMode(mode);
   },
   async handleCycleRunMode() {
     const modes: Array<'fast' | 'thinking'> = ['fast', 'thinking'];

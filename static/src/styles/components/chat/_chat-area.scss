@@ -556,318 +556,62 @@
 }
 
 .model-mode-dropdown {
+  /* 顶栏模型弹窗外框（DESIGN.md §6.3 / §7 主对话页）：浮层表面、R12、内边距 4，
+     距触发器 5px（顶栏 44 高、触发器 28 居中 → 底边 36）；内容由 ModelEffortPanel 渲染，
+     只有其中的模型列表滚动 */
   position: absolute;
-  top: 48px;
+  top: 41px;
   left: 16px;
-  display: grid;
-  grid-template-columns: minmax(0, 300px) minmax(220px, 1fr);
-  gap: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border-default); /* 与输入栏 .stadium-shell 外边线一致 */
-  background: var(--surface-soft);
-  box-shadow: none;
-  pointer-events: auto;
-  width: min(720px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
   z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  max-height: min(580px, calc(100dvh - 56px));
+  padding: 4px;
+  border: 1px solid var(--popover-border);
+  border-radius: 12px;
+  background: var(--popover-surface);
+  box-shadow: var(--popover-shadow);
+  overflow: hidden;
+  pointer-events: auto;
+  transform-origin: top left;
 }
 
 .model-mode-dropdown--mobile {
   position: fixed;
   top: 52px;
   left: 12px;
-  right: auto;
-  width: min(480px, calc(100vw - 24px));
-  min-width: 0;
-  max-width: min(480px, calc(100vw - 24px));
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
   z-index: 1600;
+  max-height: min(580px, calc(100dvh - 64px));
 }
 
-.model-mode-dropdown--mobile .dropdown-item {
-  grid-template-columns: 1fr auto;
-}
-
-.model-mode-dropdown--mobile .item-desc {
-  display: none;
-}
-
-.dropdown-column {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* 运行模式列内的推理强度滑块：与上方选项用分隔线区分 */
-.dropdown-effort {
-  margin-top: 8px;
-  padding: 10px 4px 2px;
-  border-top: 1px solid var(--border-default);
-}
-
-.dropdown-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.dropdown-list--models {
-  max-height: 320px; /* 紧凑单项约 32px，约 9 个模型可见 */
-  gap: 2px; /* 项间距（覆盖 .dropdown-list 的 6px） */
-  overflow-y: auto;
-  /* 显示细滚动条（样式适配，不暴露原生粗滚动条） */
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 32%, transparent) transparent;
-}
-
-/* 模型项紧凑化：单项只显名称，压缩上下空白（hover 背景随项高收缩）；
-   仅作用模型列，右列运行模式项保留原 padding（仍有 desc 小字） */
-.dropdown-list--models .dropdown-item {
-  padding: 6px 12px;
-}
-
-.dropdown-list--models::-webkit-scrollbar {
-  width: 6px;
-}
-
-.dropdown-list--models::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-secondary) 32%, transparent);
-  border-radius: 3px;
-}
-
-.dropdown-list--models::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* 提供商组容器：组头 sticky 的约束盒——组内容滚完时组头被下一组自然推走
-   （挤压从「下一组顶边接触当前组头底边」开始，而非完全重合） */
-.model-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.model-group + .model-group {
-  margin-top: 4px;
-}
-
-/* 组内容展开/收起动画：grid 行高 1fr↔0fr 过渡（可动画 auto 高度的标准技巧）；
-   DOM 常驻（不用 v-if），收起时 inner overflow 裁切 */
-.model-group-body {
-  display: grid;
-  grid-template-rows: 1fr;
-  /* visibility 随行动画：收起结束后隐藏（防 Tab 聚焦进折叠区），展开立即可见 */
+/* 进出（§6.10）：140ms 进入 / 100ms 退出，从触发器方向（上方）升起、收回；
+   transform-origin 由 ModelEffortPanel 挂载时对准触发器中心 */
+.header-menu-enter-active {
   transition:
-    grid-template-rows 0.2s ease,
-    visibility 0.2s ease;
+    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.model-group-body.collapsed {
-  grid-template-rows: 0fr;
-  visibility: hidden;
-}
-
-.model-group-body__inner {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* 搜索框行（取代原「模型」标题行）：浅底圆角条，放大镜 + 无边框输入；
-   尺寸/圆角与底部管理行一致（30px 高、12px 圆角 = 模型行 hover 圆角） */
-.dropdown-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
-}
-
-.dropdown-search:focus-within {
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
-}
-
-.dropdown-search-icon {
-  flex: none;
-  color: var(--text-secondary);
-}
-
-.dropdown-search-input {
-  min-width: 0;
-  flex: 1;
-  height: 100%;
-  border: 0;
-  outline: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.dropdown-search-input::placeholder {
-  color: var(--text-secondary);
-}
-
-/* 提供商组头（opencode 式分组）：sticky 锁定滚动容器顶部，被下一组挤走；
-   点击折叠/展开该组。背景与弹窗同色不透明，遮盖滚过的模型行 */
-.dropdown-group-header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 12px 4px;
-  border: none;
-  background: var(--surface-soft);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.4;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-}
-
-.dropdown-group-header:hover .group-name {
-  color: var(--text-primary);
-}
-
-.group-chevron {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  color: var(--text-secondary);
-  transition: transform 0.15s ease;
-}
-
-.group-chevron.collapsed {
-  transform: rotate(-90deg);
-}
-
-.dropdown-empty-hint {
-  padding: 14px 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-align: center;
-
-  .empty-hint-action {
-    display: inline-block;
-    margin-top: 8px;
-    padding: 4px 12px;
-    height: 26px;
-    font-size: 12px;
-    color: var(--accent);
-    background: transparent;
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--hover-bg);
-    }
-  }
-}
-
-.model-mode-dropdown--mobile .dropdown-list--models {
-  max-height: 260px;
-}
-
-.dropdown-title {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  line-height: 1.4;
-  color: var(--text-secondary);
-  padding: 2px 12px;
-}
-
-.dropdown-item {
-  text-align: left;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  color: var(--text-primary);
-}
-
-.dropdown-item:hover:not(.disabled) {
-  background: var(--hover-bg);
-}
-
-.dropdown-item.disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* 底部「管理模型」入口行：位于滚动列表之外的文档流中（滚动容器兄弟节点），
-   列表滚动时始终钉在菜单底部且不遮挡模型行。
-   尺寸与顶部搜索框一致（30px 高、0 10px padding、12px 圆角走 .dropdown-item 基础值），
-   无独立底色、无分隔线；图标内嵌 label（grid item 块级化为 flex），内容垂直居中。
-   ⚠️ 本块必须位于 .dropdown-item 基础块之后——同特异性下 padding 覆盖依赖源码顺序 */
-.dropdown-item--manage {
-  height: 30px;
-  margin-top: 2px;
-  padding: 0 10px;
-}
-
-.dropdown-item--manage .item-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dropdown-item--manage .manage-icon {
-  width: 13px;
-  height: 13px;
-  color: var(--text-secondary);
-}
-
-.item-label {
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.item-desc {
-  grid-column: 1 / 2;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.item-check {
-  align-self: center;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.header-menu-enter-active,
 .header-menu-leave-active {
+  pointer-events: none;
   transition:
-    all 0.16s ease,
-    opacity 0.16s ease;
-  transform-origin: top left;
+    opacity 100ms cubic-bezier(0.4, 0, 1, 1),
+    transform 100ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 .header-menu-enter-from,
 .header-menu-leave-to {
   opacity: 0;
-  transform: translateY(-6px) scale(0.98);
+  transform: translateY(-4px) scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-menu-enter-active,
+  .header-menu-leave-active {
+    transition: none;
+  }
 }
 
 .scroll-lock-btn {
@@ -3060,22 +2804,6 @@ body[data-theme='dark'] {
 
   .conversation-ribbon::after {
     background: var(--surface-panel) !important;
-  }
-
-  /* 模型选择下拉菜单 - 和输入栏一样的底色 */
-  .model-mode-dropdown {
-    background: var(--badge-bg) !important;
-    box-shadow: none !important;
-  }
-
-  /* sticky 提供商组头底色同步弹窗（遮盖滚过的模型行，不有色差） */
-  .model-mode-dropdown .dropdown-group-header {
-    background: var(--badge-bg) !important;
-  }
-
-  /* hover 与输入栏按钮一致（--hover-bg），与菜单底色拉开对比 */
-  .dropdown-item:hover:not(.disabled) {
-    background: var(--hover-bg) !important;
   }
 }
 

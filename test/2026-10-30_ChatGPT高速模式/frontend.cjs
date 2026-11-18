@@ -127,22 +127,28 @@ function component(file, overrides = {}) {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS
   } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(key) {
+  vm.runInNewContext(code, { module, exports: module.exports, document: { querySelectorAll: () => [] }, require(key) {
     if (key === 'vue') return vue;
-    if (key in overrides) return { default: overrides[key] };
+    if (key in overrides) return overrides[key].__module ? overrides[key].__module : { default: overrides[key] };
     throw Error(`Unexpected import: ${key}`);
   } });
   return module.exports.default;
 }
-test('real shared menu renders section only for OAuth, beneath effort, with one switch', async () => {
-  const pill = component('static/src/components/settings/tabs/providers/PillSwitch.vue');
-  const section = component('static/src/components/chat/ChatgptFastModeSection.vue', {
-    '@/components/settings/tabs/providers/PillSwitch.vue': pill
-  });
+// 2026-11-18：高速模式开关并入顶栏模型弹窗底部（ModelEffortPanel），位于推理滑块之下、右侧；
+// 左侧为「默认推理」。两个开关都是 UiSwitch。
+test('real shared menu renders fast switch only for OAuth, beneath effort, beside default toggle', async () => {
+  const uiSwitch = component('static/src/components/ui/UiSwitch.vue');
+  const icon = vue.defineComponent({ render: () => vue.h('span') });
   const effort = vue.defineComponent({ render: () => vue.h('div', { class: 'effort-marker' }) });
-  const header = component('static/src/components/chat/ConversationModelHeader.vue', {
-    '@/components/input/EffortSlider.vue': effort, './ChatgptFastModeSection.vue': section
+  const stops = { __module: compile('static/src/utils/reasoningStops.ts') };
+  const panel = component('static/src/components/chat/ModelEffortPanel.vue', {
+    '@/components/input/EffortSlider.vue': effort, '@/components/ui/UiIcon.vue': icon,
+    '@/components/ui/UiSwitch.vue': uiSwitch, '@/utils/reasoningStops': stops
   });
+  const header = component('static/src/components/chat/ConversationModelHeader.vue', {
+    './ModelEffortPanel.vue': panel
+  });
+  const reasoning = { canThink: true, canSkipThinking: true, levels: ['low', 'medium', 'high'] };
   for (const mobile of [false, true]) for (const isChatgptModel of [false, true]) {
     const noop = () => {};
     const props = { mobile, headerMenuOpen: true, isConnected: true, currentModelLabel: 'Model',
@@ -150,18 +156,20 @@ test('real shared menu renders section only for OAuth, beneath effort, with one 
       filteredGroupedModelOptions: [], isModelGroupCollapsed: () => false, toggleModelGroup: noop,
       currentModelKey: 'synthetic', streamingMessage: false, toggleHeaderMenu: noop,
       handleHeaderModelSelect: noop, hasAnyModels: true, openSettingsProviders: noop,
-      openManageModels: noop, headerRunModeOptions: [], resolvedRunMode: 'thinking',
-      handleHeaderRunModeSelect: noop, showEffortSlider: true, reasoningEffort: 'high',
-      setReasoningEffort: noop, isChatgptModel, supportsChatgptFastMode: true,
+      openManageModels: noop, reasoning, thinking: true, reasoningEffort: 'high',
+      setReasoning: noop, isChatgptModel, supportsChatgptFastMode: true,
       chatgptFastMode: true, toggleChatgptFastMode: noop };
     const app = vue.createSSRApp(header, props);
     app.config.globalProperties.$t = key => ({ 'appCore.chatgptFastMode': 'ChatGPT高速模式',
+      'appCore.chatgptFastModeShort': '高速模式', 'appCore.defaultReasoning': '默认推理',
       'appCore.chatgptFastModeDesc': '模型输出更快，但会消耗更多额度' })[key] || key;
     const html = await renderToString(app);
-    assert.equal(html.includes('ChatGPT高速模式'), isChatgptModel);
-    assert.equal((html.match(/role="switch"/g) || []).length, isChatgptModel ? 1 : 0);
+    assert.equal(html.includes('高速模式'), isChatgptModel);
+    assert.ok(html.includes('默认推理'));
+    assert.equal((html.match(/role="switch"/g) || []).length, isChatgptModel ? 2 : 1);
     if (isChatgptModel) {
-      assert.ok(html.indexOf('effort-marker') < html.indexOf('chatgpt-fast-mode'));
+      assert.ok(html.indexOf('effort-marker') < html.indexOf('高速模式'));
+      assert.ok(html.indexOf('默认推理') < html.indexOf('高速模式'));
       assert.ok(html.includes('aria-checked="true"'));
       assert.ok(html.includes('模型输出更快，但会消耗更多额度'));
     }
