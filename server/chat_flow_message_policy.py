@@ -25,7 +25,11 @@ def _user_message_ui_defaults(source: str, *, auto_user_message_event: bool = Fa
     normalized = str(source or "").strip().lower()
     if normalized in {"skill", "goal_prompt", "permission", "sandbox"}:
         return {"visibility": "hidden", "starts_work": False}
-    if normalized in {"guidance", "notify"}:
+    # 运行期引导按普通用户消息呈现（不进入简略消息的完整/简略/隐藏分档），
+    # 但它是当前工作段的补充，不开启新的回复头与计时器。
+    if normalized == "guidance":
+        return {"visibility": "chat", "starts_work": False}
+    if normalized == "notify":
         return {"visibility": "compact", "starts_work": False}
     # 后台完成通知 / 运行期压缩续接：本质属于当前这轮工作的延续，
     # 不应暂停上一轮计时器、也不应开启新的工作头与计时器。

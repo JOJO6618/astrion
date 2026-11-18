@@ -50,7 +50,10 @@ def _runtime_message_ui_defaults(src: str, *, inline: bool = False) -> Dict[str,
     normalized = str(src or "").strip().lower()
     if normalized in {"skill", "goal_prompt", "permission", "sandbox", "file_paths", "media_paths"}:
         return {"visibility": "hidden", "starts_work": False}
-    if normalized in {"guidance", "notify"}:
+    # 运行期引导按普通用户消息呈现，与 task_main 的 _user_message_ui_defaults 保持一致。
+    if normalized == "guidance":
+        return {"visibility": "chat", "starts_work": False}
+    if normalized == "notify":
         return {"visibility": "compact", "starts_work": False}
     # 运行期模式（权限/执行环境/网络权限/运行模式）切换通知：仅通知，不开启新一轮工作。
     if normalized in {"permission_change", "execution_change", "network_change", "work_mode_change", "browser_change"}:

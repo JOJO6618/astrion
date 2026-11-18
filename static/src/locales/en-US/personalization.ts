@@ -235,7 +235,7 @@ export default {
   compactMessageBriefDesc: 'Replace system messages with a one-line summary',
   compactMessageHidden: 'Hide',
   compactMessageHiddenDesc:
-    'Hide notices, guidance and compression messages; keep regular user messages and multi-agent communication',
+    'Hide notices, compression and other system messages; keep user messages and sub-agent messages',
   themeClassic: 'Classic',
   themeClassicDesc: 'Beige tones, soft and high-contrast',
   themeLight: 'Light',

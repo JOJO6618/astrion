@@ -129,14 +129,15 @@ const hidden = componentFunctions('static/src/components/chat/ChatArea.vue',
     compactMessageDisplay: preference
   });
 
-test('hide notices and guidance, retain user messages and Team Leader communication', () => {
-  for (const source of ['guidance', 'compression', 'compression_handoff', 'sub_agent',
+test('hide notices, keep user messages, guidance and Team Leader communication', () => {
+  // 引导消息按普通用户消息呈现，不再参与「不显示」分档。
+  for (const source of ['compression', 'compression_handoff', 'sub_agent',
     'background_command', 'goal_review', 'workflow', 'notify']) {
     assert.equal(hidden.isHiddenUserMessage({ role: 'user', metadata: {
       message_source: source, visibility: 'chat'
     }}), true, source);
   }
-  for (const source of ['user', 'presend']) {
+  for (const source of ['user', 'presend', 'guidance']) {
     assert.equal(hidden.isHiddenUserMessage({ role: 'user', metadata: { message_source: source } }), false);
   }
   assert.equal(hidden.isHiddenUserMessage({ role: 'user', metadata: {

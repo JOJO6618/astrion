@@ -1182,7 +1182,7 @@
 }
 
 .user-message.user-message--compact {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .user-message .message-header,
@@ -1259,15 +1259,9 @@
 }
 
 .user-message.user-message--compact .message-text {
-  --user-bubble-bg: var(--surface-card);
-  max-width: min(760px, 88%);
-  align-self: center;
-  padding: 10px 14px;
-  border-radius: 14px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: var(--user-bubble-bg);
-  border: 1px solid var(--border-default);
+  /* 通知类消息（压缩/审核/后台完成等）与子智能体消息一致：左侧气泡，
+     沿用普通用户气泡的底色、字号与圆角，不再使用居中的小卡片。 */
+  align-self: flex-start;
 }
 
 /* 简略信息：以横跨显示区域的横线包裹一行概要文字（类似 markdown 的 --- 分隔线）。 */
@@ -2993,7 +2987,7 @@ body[data-theme='dark'] {
   .user-message .message-text {
     /* 只覆写唯一背景变量：气泡本体、底部竖向渐隐与展开行水平渐变都引用
        --user-bubble-bg，同步该变量即可消除深色下背景与渐变来源分叉。
-       compact 气泡原本取 --surface-card，此处随之统一为 --badge-bg。 */
+       通知类消息（--compact）与子智能体消息共用同一个气泡背景变量。 */
     --user-bubble-bg: var(--badge-bg);
     background: var(--user-bubble-bg);
     box-shadow: none;

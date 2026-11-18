@@ -142,7 +142,10 @@
                       ></button>
                     </div>
                   </div>
-                  <div v-if="!isMultiAgentMessage(msg)" class="user-bubble-actions">
+                  <div
+                    v-if="!isMultiAgentMessage(msg) && getMessageVisibility(msg) !== 'compact'"
+                    class="user-bubble-actions"
+                  >
                     <slot name="user-actions" :message="msg">
                       <button
                         class="user-bubble-action-btn copy"
@@ -1361,7 +1364,10 @@ const isHiddenUserMessage = (message: any) => {
   )
     .trim()
     .toLowerCase();
-  return getMessageVisibility(message) === 'compact' || !['user', 'presend'].includes(source);
+  // 引导消息等同用户消息：即使选了「不显示」系统消息也保留。
+  return (
+    getMessageVisibility(message) === 'compact' || !['user', 'presend', 'guidance'].includes(source)
+  );
 };
 const isEmptyAssistantMessage = (message: any) => {
   if (!message || message.role !== 'assistant') {
@@ -2729,9 +2735,7 @@ function userHeaderSource(msg: any): string {
 function userHeaderLabel(msg: any): string {
   void currentLocale.value;
   const source = userHeaderSource(msg);
-  if (source === 'guidance') {
-    return t('chat.userHeaderGuide');
-  }
+  // 引导（guidance）按普通用户消息渲染：头部显示用户名，不再标注「引导」。
   if (source === 'goal') {
     return t('chat.userHeaderGoal');
   }
@@ -2749,9 +2753,6 @@ function userHeaderLabel(msg: any): string {
 
 function userHeaderIconKey(msg: any): string {
   const source = userHeaderSource(msg);
-  if (source === 'guidance') {
-    return 'navigation';
-  }
   if (source === 'goal') {
     return 'flag';
   }

@@ -5,7 +5,6 @@ const VALID_VISIBILITY = new Set(['chat', 'compact', 'hidden']);
 // 后台完成通知（sub_agent/background_command）属于当前工作的延续，不在此列。
 const LEGACY_STARTS_WORK_SOURCES = new Set(['user', 'presend']);
 const COMPACT_FALLBACK_SOURCES = new Set([
-  'guidance',
   'goal_review',
   'compression',
   'compression_handoff',
@@ -48,6 +47,20 @@ function isLegacyGoalReview(message: any): boolean {
 
 export function getMessageVisibility(message: any): MessageVisibility {
   const meta = message?.metadata || {};
+  const source = normalizeSource(
+    meta.message_source || meta.source || message?.message_source || message?.source
+  );
+  // 运行期引导按普通用户消息呈现：不参与「简略消息显示」的完整/简略/隐藏分档。
+  // 历史会话里已落盘的 visibility:'compact' 也按 chat 处理，避免同一类消息出现两套样式。
+  if (
+    source === 'guidance' &&
+    meta.hidden !== true &&
+    !meta.system_injected_image &&
+    !meta.system_injected_video
+  ) {
+    return 'chat';
+  }
+
   const explicit = normalizeSource(meta.visibility || meta.ui?.visibility || message?.visibility);
   if (VALID_VISIBILITY.has(explicit)) {
     return explicit as MessageVisibility;
@@ -56,10 +69,6 @@ export function getMessageVisibility(message: any): MessageVisibility {
   if (meta.hidden === true || meta.system_injected_image || meta.system_injected_video) {
     return 'hidden';
   }
-
-  const source = normalizeSource(
-    meta.message_source || meta.source || message?.message_source || message?.source
-  );
   if (source === 'skill' || source === 'goal_prompt' || isLegacyGoalPrompt(message)) {
     return 'hidden';
   }
