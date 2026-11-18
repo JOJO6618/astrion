@@ -44,7 +44,7 @@ function compileComponent(file, overrides={}) {
     if(key in overrides) return overrides[key];
     if(key.endsWith('.vue')) return {default:vue.defineComponent({name:path.basename(key,'.vue'),setup(_,ctx){return ()=>vue.h('section',{'data-component':path.basename(key,'.vue')},ctx.slots.default?.());}})};
     if(key==='@/utils/chatDisplay') return new Proxy({},{get:()=>()=>''});
-    if(key==='@/utils/icons') return {ICONS:{menu:'/menu.svg',chatBubble:'/chat.svg'}};
+    if(key==='@/utils/icons') return {ICONS:{menu:'var(--svg-menu)',chatBubble:'var(--svg-chat-bubble)'},iconSrcStyle:k=>({'--icon-src':`var(--svg-${k})`})};
     if(key==='@/app/bootstrap') return {};
     if(key==='@/app/methods/ui/system') return {systemMethods:{handleCopyCodeClick(){}}};
     throw Error(`Unexpected import ${key}`);

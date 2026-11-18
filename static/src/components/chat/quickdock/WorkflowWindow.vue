@@ -5,24 +5,11 @@
     :class="{ 'qd-window-enter': windowEntering, 'qd-window-exit': windowExiting }"
   >
     <header class="qd-window__header">
-      <!-- 图形与 /static/icons/workflow.svg 保持一致 -->
-      <svg
-        class="qd-window__icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.8"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <circle cx="12" cy="4.6" r="2.6" />
-        <path d="M12 7.2 V10.1" />
-        <path d="M8.5 12.3 L12 10.1 L15.5 12.3 L12 14.5 Z" stroke-linejoin="miter" />
-        <path d="M8.5 12.3 H6.1 Q4.5 12.3 4.5 13.9 V16.3" />
-        <path d="M15.5 12.3 H17.9 Q19.5 12.3 19.5 13.9 V16.3" />
-        <rect x="2.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
-        <rect x="17.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
-      </svg>
+      <span
+        class="icon qd-window__icon"
+        :style="iconSrcStyle('workflow')"
+        aria-hidden="true"
+      ></span>
       <span class="qd-window__title">{{ snapshot.name }}</span>
     </header>
     <div ref="viewportRef" class="wf-viewport">
@@ -54,6 +41,7 @@
 import { nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
+import { iconSrcStyle } from '@/utils/icons';
 import { useWorkflowStore } from '@/stores/workflow';
 import type { WorkflowFootnote, WorkflowSnapshot } from '@/stores/workflow';
 

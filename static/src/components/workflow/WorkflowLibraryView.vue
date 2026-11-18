@@ -2,7 +2,7 @@
   <div class="wf-library">
     <header class="wf-library__topbar">
       <button type="button" class="wf-btn wf-btn--ghost" @click="$emit('exit')">
-        <span class="icon" :style="iconSrc(ICONS.arrowLeft)" aria-hidden="true"></span>
+        <span class="icon" :style="iconSrcStyle('arrowLeft')" aria-hidden="true"></span>
         <span>{{ $t('workflow.backToConversation') }}</span>
       </button>
     </header>
@@ -16,7 +16,7 @@
           </p>
         </div>
         <button type="button" class="wf-btn wf-btn--primary" @click="$emit('create')">
-          <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
+          <span class="icon" :style="iconSrcStyle('plus')" aria-hidden="true"></span>
           <span>{{ $t('workflow.newWorkflow') }}</span>
         </button>
       </div>
@@ -24,7 +24,7 @@
       <div v-if="workflows.length" class="wf-library__list">
         <div v-for="wf in workflows" :key="wf.name" class="wf-row" @click="$emit('open', wf.name)">
           <div class="wf-row__icon">
-            <span class="icon icon-md" :style="iconSrc(ICONS.workflow)" aria-hidden="true"></span>
+            <span class="icon icon-md" :style="iconSrcStyle('workflow')" aria-hidden="true"></span>
           </div>
           <div class="wf-row__main">
             <div class="wf-row__name">{{ wf.name }}</div>
@@ -47,7 +47,7 @@
               :title="$t('workflow.edit')"
               @click="$emit('open', wf.name)"
             >
-              <span class="icon" :style="iconSrc(ICONS.pencil)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('pencil')" aria-hidden="true"></span>
             </button>
             <button
               type="button"
@@ -56,7 +56,7 @@
               :title="$t('common.copy')"
               @click="$emit('duplicate', wf.name)"
             >
-              <span class="icon" :style="iconSrc(ICONS.copy)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('copy')" aria-hidden="true"></span>
             </button>
             <button
               v-if="confirmingDelete !== wf.name"
@@ -66,7 +66,7 @@
               :title="$t('common.delete')"
               @click="confirmingDelete = wf.name"
             >
-              <span class="icon" :style="iconSrc(ICONS.trash)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('trash')" aria-hidden="true"></span>
             </button>
             <button
               v-else
@@ -81,11 +81,11 @@
       </div>
 
       <div v-else class="wf-library__empty">
-        <span class="icon icon-xl" :style="iconSrc(ICONS.workflow)" aria-hidden="true"></span>
+        <span class="icon icon-xl" :style="iconSrcStyle('workflow')" aria-hidden="true"></span>
         <p class="wf-library__empty-title">{{ $t('workflow.emptyTitle') }}</p>
         <p class="wf-library__empty-hint">{{ $t('workflow.emptyHint') }}</p>
         <button type="button" class="wf-btn wf-btn--primary" @click="$emit('create')">
-          <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
+          <span class="icon" :style="iconSrcStyle('plus')" aria-hidden="true"></span>
           <span>{{ $t('workflow.newWorkflow') }}</span>
         </button>
       </div>
@@ -95,7 +95,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle } from '@/utils/icons';
 import type { WorkflowListItem } from './api';
 
 defineProps<{
@@ -115,10 +115,6 @@ const confirmingDelete = ref('');
 function onConfirmDelete(name: string) {
   emit('delete', name);
   confirmingDelete.value = '';
-}
-
-function iconSrc(url: string) {
-  return { '--icon-src': `url(${url})` } as Record<string, string>;
 }
 </script>
 

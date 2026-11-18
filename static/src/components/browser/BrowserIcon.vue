@@ -1,5 +1,5 @@
 <template>
-  <span class="nb-icon" :style="{ '--nb-icon': `url(${ICONS[name]})` }" aria-hidden="true"></span>
+  <span class="nb-icon" :style="{ '--nb-icon': ICONS[name] }" aria-hidden="true"></span>
 </template>
 <script setup lang="ts">
 import { ICONS } from '@/utils/icons';

@@ -116,7 +116,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t } from '@/locales';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle, type IconKey } from '@/utils/icons';
 import { isWindowsDesktopShell } from '@/utils/desktopPlatform';
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/stores/ui';
 import { useConversationTabsStore, type ConversationTab } from '@/stores/conversationTabs';
@@ -133,17 +133,15 @@ import {
 
 const tabsStore = useConversationTabsStore();
 const { activeKey } = storeToRefs(tabsStore);
-const settingsIconStyle = { '--icon-src': `url(${ICONS.settings})` };
-const PAGE_ICONS = {
-  settings: ICONS.settings,
-  workflows: ICONS.workflow,
-  git: ICONS.gitBranch,
-  schedules: ICONS.timer
+const settingsIconStyle = iconSrcStyle('settings');
+const PAGE_ICONS: Record<string, IconKey> = {
+  settings: 'settings',
+  workflows: 'workflow',
+  git: 'gitBranch',
+  schedules: 'timer'
 };
 function pageIconStyle(tab: ConversationTab) {
-  return {
-    '--icon-src': `url(${PAGE_ICONS[tab.pageType as keyof typeof PAGE_ICONS] || ICONS.settings})`
-  };
+  return iconSrcStyle(PAGE_ICONS[tab.pageType as string] || 'settings');
 }
 const isWindows = isWindowsDesktopShell();
 const modKey = isWindows ? 'Ctrl' : '⌘';

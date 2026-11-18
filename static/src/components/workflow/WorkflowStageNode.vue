@@ -22,13 +22,13 @@
       <span
         v-if="data.isEntry"
         class="icon stage-node__flag stage-node__flag--entry"
-        :style="iconSrc(ICONS.flag)"
+        :style="iconSrcStyle('flag')"
         :aria-label="$t('workflow.entryStageAriaLabel')"
       ></span>
       <span
         v-else-if="data.isTerminal"
         class="icon stage-node__flag stage-node__flag--terminal"
-        :style="iconSrc(ICONS.octagon)"
+        :style="iconSrcStyle('octagon')"
         :aria-label="$t('workflow.terminalStageAriaLabel')"
       ></span>
       <span v-else class="stage-node__dot" aria-hidden="true"></span>
@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle } from '@/utils/icons';
 import type { WorkflowStageDef } from './workflowModel';
 
 interface StageNodeData {
@@ -60,10 +60,6 @@ defineProps<{
   data: StageNodeData;
   selected?: boolean;
 }>();
-
-function iconSrc(url: string) {
-  return { '--icon-src': `url(${url})` } as Record<string, string>;
-}
 </script>
 
 <style scoped lang="scss">

@@ -1563,9 +1563,8 @@
   flex-shrink: 0;
 }
 
-.mobile-panel-fab img {
-  width: 22px;
-  height: 22px;
+.mobile-panel-fab .icon {
+  --icon-size: 22px;
 }
 
 /* 顶栏右侧快捷窗口展开按钮：与桌面端 qd-toggle 同款同尺寸线条图标（16px / 线宽 1.8），
@@ -1589,11 +1588,6 @@
   .mobile-panel-fab {
     width: 30px;
     height: 30px;
-  }
-
-  .mobile-panel-fab img {
-    width: 22px;
-    height: 22px;
   }
 }
 

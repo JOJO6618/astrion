@@ -4,11 +4,7 @@ const props = defineProps<{ name: keyof typeof ICONS }>();
 </script>
 
 <template>
-  <span
-    class="quick-icon"
-    aria-hidden="true"
-    :style="{ '--quick-icon-url': `url(${ICONS[props.name]})` }"
-  />
+  <span class="quick-icon" aria-hidden="true" :style="{ '--quick-icon-url': ICONS[props.name] }" />
 </template>
 
 <style scoped>

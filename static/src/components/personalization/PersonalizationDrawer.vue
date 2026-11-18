@@ -137,7 +137,7 @@ import PreferencesTab from './tabs/PreferencesTab.vue';
 import AccountTab from './tabs/AccountTab.vue';
 import { usePersonalizationStore } from '@/stores/personalization';
 import type { PersonalDrawerTab } from '@/stores/personalization';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle, type IconKey } from '@/utils/icons';
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationContext } from './usePersonalizationContext';
 import './styles/settings-shared.css';
@@ -156,8 +156,6 @@ const { visible, loading, activeTab, status, error } = storeToRefs(personalizati
 const drawerContext = usePersonalizationContext({ activeTab, hostVisible: visible });
 const { closeDropdown } = drawerContext;
 
-type IconKey = keyof typeof ICONS;
-
 const personalTabs = [
   { id: 'preferences', labelKey: 'personalization.tabPreferences', icon: 'userPen' },
   { id: 'account', labelKey: 'personalization.tabAccount', icon: 'user' }
@@ -169,9 +167,7 @@ const activeTabLabel = computed(() => {
   return tab ? t(tab.labelKey) : t('personalization.tabPreferences');
 });
 
-const settingsTabIconStyle = (icon: IconKey) => ({
-  '--icon-src': `url(${ICONS[icon]})`
-});
+const settingsTabIconStyle = (icon: IconKey) => iconSrcStyle(icon);
 
 // ---- 窄屏（≤760px）iOS 设置式「列表 → 子页」导航 ----
 const mobileInSubPage = ref(false);

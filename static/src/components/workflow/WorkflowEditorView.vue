@@ -9,11 +9,11 @@
           :title="$t('workflow.backToLibrary')"
           @click="$emit('back')"
         >
-          <span class="icon" :style="iconSrc(ICONS.arrowLeft)" aria-hidden="true"></span>
+          <span class="icon" :style="iconSrcStyle('arrowLeft')" aria-hidden="true"></span>
         </button>
         <span
           class="icon wf-editor__logo"
-          :style="iconSrc(ICONS.workflow)"
+          :style="iconSrcStyle('workflow')"
           aria-hidden="true"
         ></span>
         <span class="wf-editor__name">{{ workflow.name }}</span>
@@ -33,7 +33,7 @@
           >
             <span
               class="icon"
-              :style="iconSrc(errorCount > 0 ? ICONS.circleAlert : ICONS.check)"
+              :style="iconSrcStyle(errorCount > 0 ? 'circleAlert' : 'check')"
               aria-hidden="true"
             ></span>
             <span>{{ issueLabel }}</span>
@@ -48,7 +48,7 @@
             >
               <span
                 class="icon"
-                :style="iconSrc(issue.level === 'error' ? ICONS.circleAlert : ICONS.triangleAlert)"
+                :style="iconSrcStyle(issue.level === 'error' ? 'circleAlert' : 'triangleAlert')"
                 aria-hidden="true"
               ></span>
               <span>{{ issue.message }}</span>
@@ -61,7 +61,7 @@
           :title="$t('workflow.autoLayout')"
           @click="onAutoLayout"
         >
-          <span class="icon" :style="iconSrc(ICONS.layoutGrid)" aria-hidden="true"></span>
+          <span class="icon" :style="iconSrcStyle('layoutGrid')" aria-hidden="true"></span>
           <span>{{ $t('workflow.autoLayout') }}</span>
         </button>
         <div class="wf-select wf-select--toolbar" ref="addNodeSelectRef">
@@ -71,44 +71,44 @@
             :title="$t('workflow.addNodeTitle')"
             @click.stop="addNodeMenuOpen = !addNodeMenuOpen"
           >
-            <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
+            <span class="icon" :style="iconSrcStyle('plus')" aria-hidden="true"></span>
             <span>{{ $t('workflow.addNode') }}</span>
             <span
               class="icon wf-select__caret"
-              :style="iconSrc(ICONS.chevronDown)"
+              :style="iconSrcStyle('chevronDown')"
               aria-hidden="true"
             ></span>
           </button>
           <div v-if="addNodeMenuOpen" class="wf-select__menu">
             <button type="button" class="wf-select__option" @click="onAddNodeAtCenter('stage')">
-              <span class="icon" :style="iconSrc(ICONS.plus)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('plus')" aria-hidden="true"></span>
               <span class="wf-select__option-name">{{ $t('workflow.stage') }}</span>
               <span class="wf-select__option-desc">{{ $t('workflow.stageDesc') }}</span>
             </button>
             <button type="button" class="wf-select__option" @click="onAddNodeAtCenter('review')">
-              <span class="icon" :style="iconSrc(ICONS.eye)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('eye')" aria-hidden="true"></span>
               <span class="wf-select__option-name">{{ $t('workflow.review') }}</span>
               <span class="wf-select__option-desc">{{ $t('workflow.reviewDesc') }}</span>
             </button>
             <button type="button" class="wf-select__option" @click="onAddNodeAtCenter('branch')">
-              <span class="icon" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('gitBranch')" aria-hidden="true"></span>
               <span class="wf-select__option-name">{{ $t('workflow.branch') }}</span>
               <span class="wf-select__option-desc">{{ $t('workflow.branchDesc') }}</span>
             </button>
             <button type="button" class="wf-select__option" @click="onAddNodeAtCenter('start')">
-              <span class="icon" :style="iconSrc(ICONS.play)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('play')" aria-hidden="true"></span>
               <span class="wf-select__option-name">{{ $t('workflow.start') }}</span>
               <span class="wf-select__option-desc">{{ $t('workflow.startDesc') }}</span>
             </button>
             <button type="button" class="wf-select__option" @click="onAddNodeAtCenter('end')">
-              <span class="icon" :style="iconSrc(ICONS.octagon)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('octagon')" aria-hidden="true"></span>
               <span class="wf-select__option-name">{{ $t('workflow.end') }}</span>
               <span class="wf-select__option-desc">{{ $t('workflow.endDesc') }}</span>
             </button>
           </div>
         </div>
         <button type="button" class="wf-btn wf-btn--primary" :disabled="saving" @click="onSave">
-          <span class="icon" :style="iconSrc(ICONS.save)" aria-hidden="true"></span>
+          <span class="icon" :style="iconSrcStyle('save')" aria-hidden="true"></span>
           <span>{{ saving ? $t('common.saving') : $t('common.save') }}</span>
         </button>
       </div>
@@ -264,7 +264,7 @@
             <div class="wf-panel__heading">{{ $t('workflow.forwardRoute') }}</div>
             <div v-if="selectedStage.next" class="wf-route-list">
               <div class="wf-route-row">
-                <span class="icon" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+                <span class="icon" :style="iconSrcStyle('gitBranch')" aria-hidden="true"></span>
                 <span class="wf-route-row__name">{{ nodeNameOf(selectedStage.next) }}</span>
                 <button
                   type="button"
@@ -274,7 +274,7 @@
                   "
                   @click="onRemoveSelectedRoute"
                 >
-                  <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
+                  <span class="icon" :style="iconSrcStyle('x')" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
@@ -288,7 +288,7 @@
               class="wf-btn wf-btn--danger-outline"
               @click="confirmingStageDelete = true"
             >
-              <span class="icon" :style="iconSrc(ICONS.trash)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('trash')" aria-hidden="true"></span>
               <span>{{ $t('workflow.deleteNode') }}</span>
             </button>
             <div v-else class="wf-confirm-row">
@@ -338,7 +338,7 @@
               <div class="wf-route-row">
                 <span
                   class="icon wf-route-row__icon--pass"
-                  :style="iconSrc(ICONS.gitBranch)"
+                  :style="iconSrcStyle('gitBranch')"
                   aria-hidden="true"
                 ></span>
                 <span class="wf-route-row__name">{{ nodeNameOf(selectedReview.next) }}</span>
@@ -352,7 +352,7 @@
                   "
                   @click="onRemoveSelectedRoute"
                 >
-                  <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
+                  <span class="icon" :style="iconSrcStyle('x')" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
@@ -365,7 +365,7 @@
               <div class="wf-route-row">
                 <span
                   class="icon wf-route-row__icon--back"
-                  :style="iconSrc(ICONS.gitBranch)"
+                  :style="iconSrcStyle('gitBranch')"
                   aria-hidden="true"
                 ></span>
                 <span class="wf-route-row__name">{{ nodeNameOf(selectedReview.rejectTo) }}</span>
@@ -379,7 +379,7 @@
                   "
                   @click="onRemoveRejectRoute"
                 >
-                  <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
+                  <span class="icon" :style="iconSrcStyle('x')" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
@@ -395,7 +395,7 @@
               class="wf-btn wf-btn--danger-outline"
               @click="confirmingStageDelete = true"
             >
-              <span class="icon" :style="iconSrc(ICONS.trash)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('trash')" aria-hidden="true"></span>
               <span>{{ $t('workflow.deleteNode') }}</span>
             </button>
             <div v-else class="wf-confirm-row">
@@ -426,7 +426,7 @@
             <div v-if="selectedBranch.next.length" class="wf-route-list">
               <div v-for="route in selectedBranch.next" :key="route.target" class="wf-route-item">
                 <div class="wf-route-row">
-                  <span class="icon" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+                  <span class="icon" :style="iconSrcStyle('gitBranch')" aria-hidden="true"></span>
                   <span class="wf-route-row__name">{{ nodeNameOf(route.target) }}</span>
                   <button
                     type="button"
@@ -436,7 +436,7 @@
                     "
                     @click="onRemoveRoute(route.target)"
                   >
-                    <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
+                    <span class="icon" :style="iconSrcStyle('x')" aria-hidden="true"></span>
                   </button>
                 </div>
                 <input
@@ -457,7 +457,7 @@
               class="wf-btn wf-btn--danger-outline"
               @click="confirmingStageDelete = true"
             >
-              <span class="icon" :style="iconSrc(ICONS.trash)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('trash')" aria-hidden="true"></span>
               <span>{{ $t('workflow.deleteNode') }}</span>
             </button>
             <div v-else class="wf-confirm-row">
@@ -489,7 +489,7 @@
             <div class="wf-panel__heading">{{ $t('workflow.entryRoute') }}</div>
             <div v-if="selectedBoundary.next" class="wf-route-list">
               <div class="wf-route-row">
-                <span class="icon" :style="iconSrc(ICONS.gitBranch)" aria-hidden="true"></span>
+                <span class="icon" :style="iconSrcStyle('gitBranch')" aria-hidden="true"></span>
                 <span class="wf-route-row__name">{{ nodeNameOf(selectedBoundary.next) }}</span>
                 <button
                   type="button"
@@ -501,7 +501,7 @@
                   "
                   @click="onRemoveSelectedRoute"
                 >
-                  <span class="icon" :style="iconSrc(ICONS.x)" aria-hidden="true"></span>
+                  <span class="icon" :style="iconSrcStyle('x')" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
@@ -517,7 +517,7 @@
               class="wf-btn wf-btn--danger-outline"
               @click="confirmingStageDelete = true"
             >
-              <span class="icon" :style="iconSrc(ICONS.trash)" aria-hidden="true"></span>
+              <span class="icon" :style="iconSrcStyle('trash')" aria-hidden="true"></span>
               <span>{{ $t('workflow.deleteNode') }}</span>
             </button>
             <div v-else class="wf-confirm-row">
@@ -553,7 +553,7 @@ import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
 import '@vue-flow/controls/dist/style.css';
 import '@vue-flow/minimap/dist/style.css';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle } from '@/utils/icons';
 import WorkflowStageNode from './WorkflowStageNode.vue';
 import WorkflowBoundaryNode from './WorkflowBoundaryNode.vue';
 import WorkflowReviewNode from './WorkflowReviewNode.vue';
@@ -908,10 +908,6 @@ function onDocumentClick(event: MouseEvent) {
   ) {
     issuesOpen.value = false;
   }
-}
-
-function iconSrc(url: string) {
-  return { '--icon-src': `url(${url})` } as Record<string, string>;
 }
 
 onMounted(() => {

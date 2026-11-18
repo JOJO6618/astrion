@@ -31,7 +31,7 @@
               :title="item.path"
             >
               <div class="video-thumb">
-                <span class="icon icon-sm">🎞️</span>
+                <span class="video-thumb-emoji" aria-hidden="true">🎞️</span>
                 <span class="ext">{{ fileExt(item.name) }}</span>
               </div>
               <div class="name">{{ item.name }}</div>
@@ -236,6 +236,11 @@ onMounted(() => {
   color: var(--text-primary);
   gap: 6px;
   font-size: 28px;
+}
+/* 纯文本 emoji，不走 .icon 的 mask 机制（无 --icon-src 会变成实心方块） */
+.video-thumb-emoji {
+  font-size: 28px;
+  line-height: 1;
 }
 .video-thumb .ext {
   font-size: 12px;

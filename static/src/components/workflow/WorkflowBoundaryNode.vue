@@ -23,7 +23,7 @@
     </template>
     <span
       class="icon boundary-node__icon"
-      :style="iconSrc(data.node.kind === 'start' ? ICONS.play : ICONS.octagon)"
+      :style="iconSrcStyle(data.node.kind === 'start' ? 'play' : 'octagon')"
       aria-hidden="true"
     ></span>
     <span class="boundary-node__label">{{
@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle } from '@/utils/icons';
 import type { WorkflowEndDef, WorkflowStartDef } from './workflowModel';
 
 interface BoundaryNodeData {
@@ -51,10 +51,6 @@ defineProps<{
   data: BoundaryNodeData;
   selected?: boolean;
 }>();
-
-function iconSrc(url: string) {
-  return { '--icon-src': `url(${url})` } as Record<string, string>;
-}
 </script>
 
 <style scoped lang="scss">

@@ -1,86 +1,155 @@
-export const ICONS = Object.freeze({
-  alignLeft: '/static/icons/align-left.svg',
-  arrowLeft: '/static/icons/arrow-left.svg',
-  atom: '/static/icons/atom.svg',
-  bot: '/static/icons/bot.svg',
-  browser: '/static/icons/browser.svg',
-  brain: '/static/icons/brain.svg',
-  brainCog: '/static/icons/brain-cog.svg',
-  camera: '/static/icons/camera.svg',
-  check: '/static/icons/check.svg',
-  chartColumn: '/static/icons/chart-column.svg',
-  chatBubble: '/static/icons/chat-bubble.svg',
-  messageCircleMore: '/static/icons/message-circle-more.svg',
-  messageQuestion: '/static/icons/message-circle-question-mark.svg',
-  checkbox: '/static/icons/checkbox.svg',
-  chevronDown: '/static/icons/chevron-down.svg',
-  circleAlert: '/static/icons/circle-alert.svg',
-  clipboard: '/static/icons/clipboard.svg',
-  clipboardCheck: '/static/icons/clipboard-check.svg',
-  cloud: '/static/icons/cloud.svg',
-  codex: '/static/icons/codex.svg',
-  clock: '/static/icons/clock.svg',
-  crosshair: '/static/icons/crosshair.svg',
-  download: '/static/icons/download.svg',
-  ellipsis: '/static/icons/ellipsis.svg',
-  eye: '/static/icons/eye.svg',
-  eyeCheck: '/static/icons/eye-check.svg',
-  file: '/static/icons/file.svg',
-  filePen: '/static/icons/file-pen.svg',
-  flag: '/static/icons/flag.svg',
-  folder: '/static/icons/folder.svg',
-  folderClosed: '/static/icons/folder-closed.svg',
-  folderOpen: '/static/icons/folder-open.svg',
-  gitBranch: '/static/icons/git-branch.svg',
-  globe: '/static/icons/globe.svg',
-  hammer: '/static/icons/hammer.svg',
-  hash: '/static/icons/hash.svg',
-  info: '/static/icons/info.svg',
-  laptop: '/static/icons/laptop.svg',
-  layers: '/static/icons/layers.svg',
-  keyboard: '/static/icons/keyboard.svg',
-  layoutGrid: '/static/icons/layout-grid.svg',
-  listTodo: '/static/icons/list-todo.svg',
-  logOut: '/static/icons/log-out.svg',
-  menu: '/static/icons/menu.svg',
-  mic: '/static/icons/mic.svg',
-  mcpLogo: '/static/icons/mcp-logo.svg',
-  monitor: '/static/icons/monitor.svg',
-  navigation: '/static/icons/navigation.svg',
-  notebook: '/static/icons/notebook.svg',
-  notebookPen: '/static/icons/notebook-pen.svg',
-  notebookSearch: '/static/icons/notebook-search.svg',
-  octagon: '/static/icons/octagon.svg',
-  palette: '/static/icons/palette.svg',
-  panelLeft: '/static/icons/panel-left.svg',
-  panelRight: '/static/icons/panel-right.svg',
-  pencil: '/static/icons/pencil.svg',
-  play: '/static/icons/play.svg',
-  popOut: '/static/icons/square-arrow-out-up-right.svg',
-  plus: '/static/icons/plus.svg',
-  puzzle: '/static/icons/puzzle.svg',
-  python: '/static/icons/python.svg',
-  recycle: '/static/icons/recycle.svg',
-  refreshCw: '/static/icons/refresh-cw.svg',
-  save: '/static/icons/save.svg',
-  scan: '/static/icons/scan.svg',
-  search: '/static/icons/search.svg',
-  settings: '/static/icons/settings.svg',
-  shield: '/static/icons/shield.svg',
-  sparkles: '/static/icons/sparkles.svg',
-  stickyNote: '/static/icons/sticky-note.svg',
-  terminal: '/static/icons/terminal.svg',
-  timer: '/static/icons/timer.svg',
-  trash: '/static/icons/trash.svg',
-  triangleAlert: '/static/icons/triangle-alert.svg',
-  bell: '/static/icons/bell.svg',
-  user: '/static/icons/user.svg',
-  userPen: '/static/icons/user-pen.svg',
-  workflow: '/static/icons/workflow.svg',
-  wrench: '/static/icons/wrench.svg',
-  x: '/static/icons/x.svg',
-  zap: '/static/icons/zap.svg'
+/**
+ * 通用图标注册表（唯一入口）。
+ *
+ * `static/icons/*.svg`（不含 providers/ 子目录）在构建期整体内嵌进 JS，模块加载时
+ * 向 <head> 注入一份 `:root { --svg-<文件名>: url("data:…") }`，各处图标只引用
+ * 这些变量——图标随主脚本同时就绪，不再按需走网络请求，避免进入页面后晚出现。
+ *
+ * 渲染方式统一为 mask + `background: currentColor`（颜色随文字/主题）：
+ * - 模板：`<span class="icon" :style="iconStyle('terminal')">`，或 `<UiIcon name="copy" />`
+ * - SCSS：`mask-image: var(--svg-copy)`（变量名 = 文件名去扩展名）
+ * - TS：`ICONS.copy` / `iconVar('copy')` 得到的是 CSS 值 `var(--svg-copy)`，直接赋给
+ *   `--icon-src` 等自定义属性，**不要再包 `url()`**。
+ *
+ * 新增图标：把 svg 放进 `static/icons/` 即可被内嵌；需要驼峰别名再补到 ICONS。
+ * 禁止在代码里再写 `/static/icons/xxx.svg` 地址（提供商 logo 除外）。
+ */
+const RAW_SVGS = import.meta.glob('../../icons/*.svg', {
+  query: '?raw',
+  import: 'default',
+  eager: true
+}) as Record<string, string>;
+
+const SVG_DATA: Record<string, string> = {};
+for (const [path, svg] of Object.entries(RAW_SVGS)) {
+  const stem = path.slice(path.lastIndexOf('/') + 1, -'.svg'.length);
+  SVG_DATA[stem] = `url("data:image/svg+xml,${encodeURIComponent(svg.trim())}")`;
+}
+
+const STYLE_ELEMENT_ID = 'astrion-icon-vars';
+
+function installIconVars(): void {
+  if (typeof document === 'undefined' || document.getElementById(STYLE_ELEMENT_ID)) return;
+  const decls = Object.entries(SVG_DATA)
+    .map(([stem, value]) => `--svg-${stem}:${value};`)
+    .join('');
+  const style = document.createElement('style');
+  style.id = STYLE_ELEMENT_ID;
+  style.textContent = `:root{${decls}}`;
+  document.head.prepend(style);
+}
+
+installIconVars();
+
+/** 图标文件名（不含扩展名）→ 可直接作为 mask 图像的 CSS 值。 */
+export function iconVar(stem: string): string {
+  if (import.meta.env.DEV && !SVG_DATA[stem]) {
+    console.warn(`[icons] static/icons/${stem}.svg 不存在`);
+  }
+  return `var(--svg-${stem})`;
+}
+
+/** 驼峰别名 → 文件名（不含扩展名）。 */
+const ICON_FILES = Object.freeze({
+  alignLeft: 'align-left',
+  arrowLeft: 'arrow-left',
+  atom: 'atom',
+  book: 'book',
+  bot: 'bot',
+  browser: 'browser',
+  brain: 'brain',
+  brainCog: 'brain-cog',
+  camera: 'camera',
+  check: 'check',
+  chartColumn: 'chart-column',
+  chatBubble: 'chat-bubble',
+  messageCircleMore: 'message-circle-more',
+  messageQuestion: 'message-circle-question-mark',
+  checkbox: 'checkbox',
+  chevronDown: 'chevron-down',
+  circleAlert: 'circle-alert',
+  clipboard: 'clipboard',
+  clipboardCheck: 'clipboard-check',
+  cloud: 'cloud',
+  codex: 'codex',
+  clock: 'clock',
+  copy: 'copy',
+  crosshair: 'crosshair',
+  download: 'download',
+  ellipsis: 'ellipsis',
+  eye: 'eye',
+  eyeCheck: 'eye-check',
+  file: 'file',
+  filePen: 'file-pen',
+  flag: 'flag',
+  folder: 'folder',
+  folderClosed: 'folder-closed',
+  folderOpen: 'folder-open',
+  git: 'git',
+  gitBranch: 'git-branch',
+  globe: 'globe',
+  hammer: 'hammer',
+  hash: 'hash',
+  info: 'info',
+  laptop: 'laptop',
+  layers: 'layers',
+  keyboard: 'keyboard',
+  layoutGrid: 'layout-grid',
+  listTodo: 'list-todo',
+  logOut: 'log-out',
+  menu: 'menu',
+  mic: 'mic',
+  mcpLogo: 'mcp-logo',
+  monitor: 'monitor',
+  navigation: 'navigation',
+  notebook: 'notebook',
+  notebookPen: 'notebook-pen',
+  notebookSearch: 'notebook-search',
+  octagon: 'octagon',
+  palette: 'palette',
+  panelLeft: 'panel-left',
+  panelRight: 'panel-right',
+  pencil: 'pencil',
+  play: 'play',
+  popOut: 'square-arrow-out-up-right',
+  plus: 'plus',
+  puzzle: 'puzzle',
+  python: 'python',
+  recycle: 'recycle',
+  refreshCw: 'refresh-cw',
+  save: 'save',
+  scan: 'scan',
+  search: 'search',
+  settings: 'settings',
+  shield: 'shield',
+  sparkles: 'sparkles',
+  stickyNote: 'sticky-note',
+  terminal: 'terminal',
+  timer: 'timer',
+  trash: 'trash',
+  triangleAlert: 'triangle-alert',
+  bell: 'bell',
+  user: 'user',
+  userPen: 'user-pen',
+  workflow: 'workflow',
+  wrench: 'wrench',
+  x: 'x',
+  zap: 'zap'
 });
+
+export type IconKey = keyof typeof ICON_FILES;
+
+/** 驼峰别名 → CSS 值 `var(--svg-<文件名>)`。 */
+export const ICONS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(ICON_FILES).map(([key, stem]) => [key, iconVar(stem)])
+  ) as Record<IconKey, string>
+);
+
+/** 给 `.icon` 等读取 `--icon-src` 的元素用的 style 对象。 */
+export function iconSrcStyle(key: IconKey): Record<string, string> {
+  return { '--icon-src': ICONS[key] };
+}
 
 export const TOOL_ICON_MAP = Object.freeze({
   load_tools: 'wrench',
@@ -163,7 +232,7 @@ export const TOOL_ICON_MAP = Object.freeze({
   submit_schedule: 'timer',
   query_schedules: 'timer',
   manage_schedule: 'timer'
-});
+} satisfies Record<string, keyof typeof ICONS>);
 
 export const TOOL_CATEGORY_ICON_MAP = Object.freeze({
   network: 'globe',
@@ -179,4 +248,4 @@ export const TOOL_CATEGORY_ICON_MAP = Object.freeze({
   todo: 'listTodo',
   sub_agent: 'bot',
   easter_egg: 'sparkles'
-});
+} satisfies Record<string, keyof typeof ICONS>);

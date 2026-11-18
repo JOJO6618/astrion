@@ -18,7 +18,7 @@
  * `<span class="icon icon-sm" :style="iconStyle('x')" />`），通过在组件内直接由 ICONS
  * 构造 `--icon-src` 的 style 对象实现，无需依赖父组件透传 iconStyle prop。
  */
-import { ICONS } from '../../utils/icons';
+import { iconSrcStyle } from '../../utils/icons';
 
 withDefaults(
   defineProps<{
@@ -38,8 +38,8 @@ defineEmits<{
   (e: 'click', evt: MouseEvent): void;
 }>();
 
-// 等价 iconStyle('x')：mask 使用 --icon-src 指向 x.svg，字形即图标
-const iconStyle = { '--icon-src': `url(${ICONS.x})` };
+// 等价 iconStyle('x')：mask 使用 --icon-src 指向内嵌的 x 图标，字形即图标
+const iconStyle = iconSrcStyle('x');
 </script>
 
 <template>

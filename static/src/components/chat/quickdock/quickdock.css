@@ -132,6 +132,11 @@
   flex: none;
 }
 
+/* 注册表 mask 图标（.icon 以 --icon-size 定尺寸）与内联 svg 同为 15px */
+.qd-window__icon.icon {
+  --icon-size: 15px;
+}
+
 .qd-window__title {
   font-size: 12px;
   font-weight: 600;

@@ -19,7 +19,7 @@
       :style="{ height: `${moreVisible ? moreHeight : 0}px` }"
       @click="toggleMore"
     >
-      <img class="more-icon" src="/static/icons/align-left.svg" :alt="$t('chat.expand')" />
+      <span class="icon more-icon" :style="iconStyle('alignLeft')" aria-hidden="true"></span>
       <div class="more-copy">
         <span class="more-title">{{ moreTitle }}</span>
         <span class="more-desc">{{ moreDesc }}</span>

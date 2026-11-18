@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * 设置页左导航图标：统一使用 /static/icons/ 项目正式图标（Lucide 风格），
+ * 设置页左导航图标：统一使用 static/icons/ 项目正式图标（Lucide 风格，经 utils/icons 内嵌），
  * CSS mask 渲染（alpha 通道取形），颜色 = currentColor 随主题/选中态自动适配。
  * 命中外框 15×15，与文字基线对齐由导航行 flex 布局保证。
  */
 import { computed } from 'vue';
+import { iconVar } from '@/utils/icons';
 
 defineOptions({ name: 'SettingsNavIcon' });
 
@@ -35,11 +36,10 @@ const ICON_FILES: Record<string, string> = {
 };
 
 const iconStyle = computed(() => {
-  const file = ICON_FILES[props.name] || 'settings';
-  const url = `/static/icons/${file}.svg`;
+  const src = iconVar(ICON_FILES[props.name] || 'settings');
   return {
-    '-webkit-mask-image': `url('${url}')`,
-    'mask-image': `url('${url}')`
+    '-webkit-mask-image': src,
+    'mask-image': src
   };
 });
 </script>
