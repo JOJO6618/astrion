@@ -73,7 +73,10 @@ def evaluate_policy(document: dict, client: dict, latest_version: str,
     if client.get('platform') not in ('win32', 'darwin') or client.get('arch') not in ('x64', 'arm64'):
         raise ValueError('unsupported_client')
     compare_versions(client['version'], client['version'])
-    if not re.fullmatch(r'[A-Za-z0-9._+-]{1,128}', client.get('build_id', '')):
+    # macOS 0.10.4–0.10.9 的 electron-builder.yml 不会展开 extraMetadata 里的环境变量，
+    # 包内 astrionBuildId 落成字面量 ${env.ASTRION_BUILD_ID}；这些已经发出去的客户端
+    # 只有放行该字面量才能被策略覆盖，所以字符集额外允许 $ { }。
+    if not re.fullmatch(r'[A-Za-z0-9._+${}-]{1,128}', client.get('build_id', '')):
         raise ValueError('invalid_build_id')
     ttl = document.get('ttl_seconds', 86400)
     if isinstance(ttl, bool) or not isinstance(ttl, int) or not 60 <= ttl <= 604800:

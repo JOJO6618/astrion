@@ -5,9 +5,9 @@ appId: com.astrion.desktop
 productName: Astrion
 copyright: Copyright © 2026
 
-extraMetadata:
-  astrionBuildId: ${env.ASTRION_BUILD_ID}
-
+# 注意：electron-builder 不会展开 extraMetadata 里的环境变量（会把 ${env.X} 原样写进包），
+# build id 改由 scripts/run_builder.mjs 通过 -c.extraMetadata.astrionBuildId=<id> 注入。
+# 0.10.4–0.10.9 的 macOS 包因此写入了字面量，服务端已兼容该字面量。
 directories:
   output: dist
   buildResources: build

@@ -141,7 +141,8 @@ location = /downloads/update-policy {
 `desktop-electron/build/build-id.cjs` 为每次构建提供 UUID。可用 `ASTRION_BUILD_ID` 显式指定 1–128 字符标识，字符仅限字母、数字、`.`、`_`、`+`、`-`；不同构建应唯一，并随发布记录保存。
 
 - Windows：`scripts/build_windows.mjs` 生成并透传编号，`electron-builder.win.cjs` 写入打包元数据 `astrionBuildId`，构建回执记录 `build_id`。
-- macOS：`npm run build` / `npm run build:dir` 经 `scripts/run_builder.mjs` 生成并传递环境变量，`electron-builder.yml` 将其写入相同元数据。
+- macOS：`npm run build` / `npm run build:dir` 经 `scripts/run_builder.mjs` 生成编号，再以 `-c.extraMetadata.astrionBuildId=<uuid>` 传入 electron-builder 写入打包元数据。**不要写回 `electron-builder.yml` 的 `extraMetadata`**：electron-builder 不展开该字段里的 `${env.X}`，会把这个字面量原样写进包内 `package.json`（0.10.4–0.10.9 的 macOS 包就是这么坏的）。
+- **历史包遗留**：已发出的 macOS 0.10.4–0.10.9 包里 `astrionBuildId` 是字面量 `${env.ASTRION_BUILD_ID}`，服务端 `evaluate_policy` 的 build_id 字符校验已额外允许 `$` `{` `}`；否则这些客户端永远拿 503、按「策略不可用」放行，强制更新对它们完全不生效。新构建已用 `--dir` 验证包内为真实 UUID。
 - 壳读取已打包元数据，将身份通过 `ASTRION_DESKTOP_BUILD_ID`、`ASTRION_DESKTOP_PLATFORM`、`ASTRION_DESKTOP_ARCH` 交给内嵌后端，以 `ASTRION_DESKTOP_POLICY_PROTOCOL=1` 声明桥端协议支持。
 
 本次修改涉及主进程、共享文案、前端和内嵌后端，必须完整重建相应平台的客户端。不能沿用旧 `win-unpacked` 仅通过 `--prepackaged` 重编 NSIS 来声称包含策略能力；前轮仅安装器补包的交付方式不适用于本次改动。
