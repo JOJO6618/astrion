@@ -1,45 +1,36 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
-import ts from 'typescript';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const require = createRequire(resolve(root, 'package.json'));
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const rendererPath = resolve(root, 'static/src/composables/useMarkdownRenderer.ts');
 
-// Load the real TS renderer without a browser or a generated build. Translation
-// only supplies code-copy labels; Markdown and all parser plugins stay intact.
-function moduleUrl(path, replacements = []) {
-  let source = readFileSync(resolve(root, path), 'utf8');
-  for (const [pattern, replacement] of replacements) {
-    source = source.replace(pattern, replacement);
-  }
-  const javascript = ts
-    .transpileModule(source, {
-      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
-    })
-    .outputText.replace(/from ['"]([^.'"][^'"]*)['"]/g, (match, name) => {
-      if (name.startsWith('data:')) return match;
-      return `from ${JSON.stringify(pathToFileURL(require.resolve(name)).href)}`;
-    });
-  return `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`;
+async function loadRenderer(useCjkStrong) {
+  const source = readFileSync(rendererPath, 'utf8');
+  const hook = '  .use(remarkCjkStrong)\n';
+  assert.ok(source.includes(hook));
+  const { outputFiles } = await build({
+    bundle: true,
+    write: false,
+    platform: 'node',
+    format: 'esm',
+    alias: { '@': resolve(root, 'static/src') },
+    stdin: {
+      contents: useCjkStrong ? source : source.replace(hook, ''),
+      loader: 'ts',
+      resolveDir: dirname(rendererPath)
+    }
+  });
+  return import(
+    `data:text/javascript;base64,${Buffer.from(outputFiles[0].contents).toString('base64')}`
+  );
 }
 
-const extensionUrl = moduleUrl('static/src/utils/remarkCjkStrong.ts');
-const rendererImports = [
-  [/import \{ t \} from ['"]@\/locales['"];?/, 'const t = (key) => key;'],
-  [
-    /import remarkCjkStrong from ['"]@\/utils\/remarkCjkStrong['"];?/,
-    `import remarkCjkStrong from ${JSON.stringify(extensionUrl)};`
-  ]
-];
-const rendererPath = 'static/src/composables/useMarkdownRenderer.ts';
-const rendererUrl = moduleUrl(rendererPath, rendererImports);
-const baselineUrl = moduleUrl(rendererPath, [...rendererImports, [/\.use\(remarkCjkStrong\)/, '']]);
-const { renderMarkdownText, parseMarkdownSegments } = await import(rendererUrl);
-const { renderMarkdownText: renderBaseline } = await import(baselineUrl);
+const [{ renderMarkdownText, parseMarkdownSegments }, { renderMarkdownText: renderBaseline }] =
+  await Promise.all([loadRenderer(true), loadRenderer(false)]);
 const render = (source, streaming = false) => renderMarkdownText(source, streaming, true);
 
 for (const [source, expected] of [
