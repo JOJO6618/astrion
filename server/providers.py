@@ -70,6 +70,18 @@ def providers_refresh(provider_id: str):
     return jsonify(result), status
 
 
+@providers_bp.route("/api/providers/refresh-all", methods=["POST"])
+@api_login_required
+@admin_api_required
+def providers_refresh_all():
+    """自动刷新入口：刷新全部已连接提供商与 ChatGPT 账号的模型目录。
+
+    前端在进入应用与每小时各调用一次；进程内每小时最多真正执行一次，
+    多视图/多标签的重复调用直接返回 ``skipped``（不重复请求外部接口）。
+    """
+    return jsonify(get_provider_manager().refresh_all_throttled())
+
+
 @providers_bp.route("/api/providers/<provider_id>", methods=["DELETE"])
 @api_login_required
 @admin_api_required

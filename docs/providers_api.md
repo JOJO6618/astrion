@@ -154,6 +154,19 @@ ChatGPT 订阅连接行额外带 `account_hash`，`auth="codex_oauth"`。
 > 响应同样携带 `models_count`（含 ETag 304 路径，取当前缓存原始总数），
 > 前端「提供商」分区统一按 `models_count` 展示「已刷新，共 N 个模型」。
 
+### POST /api/providers/refresh-all
+
+自动刷新入口：一次刷新**全部已连接提供商 + 全部可用 ChatGPT/Codex 账号**的模型目录。
+前端在进入应用时与每小时各调用一次（`static/src/composables/useModelCatalogAutoRefresh.ts`）。
+
+- 进程内**每小时最多真正执行一次**（`ProviderManager._AUTO_REFRESH_MIN_GAP_SECONDS`）：
+  多视图/多标签的重复调用返回 `{"success": true, "skipped": true, "reason": "throttled"}`，
+  不重复请求外部接口；上一轮仍在执行时返回 `reason: "in_progress"`（前端看到后延迟补拉一次模型列表）。
+- 时间戳只存内存：进程重启（= 应用重启）后首次调用必定执行，即「进入应用一次」。
+- 真正执行时返回 `{success, skipped: false, count, failed, results:[{kind: provider|codex, id, success, models_count, error}]}`；
+  单个目标失败只计入 `failed`，不影响其余目标；Codex 账号中 `state != ready`（凭证暂缺/已断开）直接跳过。
+- 仅登录 + 管理员可用；非管理员前端调用返回 403，前端静默忽略（仍会重拉 `/api/v1/models`）。
+
 ### DELETE /api/providers/<connection_id>
 
 断开该连接（删凭证+模型缓存）。`{ "success": true }`；不存在 404。断开后其模型立即从注册表消失；其它连接不受影响，剩余连接的展示序号不变。ChatGPT 订阅连接断开走 `POST /api/codex/logout`（body `{"account_id": ...}`）。

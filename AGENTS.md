@@ -482,6 +482,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 11. **models.dev 数据源**：`config/modelsdev_snapshot.json`（`scripts/update_modelsdev_snapshot.py` 生成）+ 在线缓存 6h 节流刷新；`protocol_source` 门控必须存在（无脑按 npm 裁决会误判单协议 provider）。
 12. **Responses 互切锁 = 协议级二分**：chat↔responses 跨协议切换 409；responses 跨 provider 自由切（加密 reasoning 块按 `_same_responses_provider()` 判定，非同 provider 时剥离回插）；老对话 profile 查不到（`api_protocol=None`）不锁放行。
 13. **codex 身份已彻底泛化（无向后兼容）**：`provider_type="codex"` 消亡，身份标识改 `responses_auth="codex_oauth"`；老对话 `codex/xxx` model_key 失效需重选。
+14. **模型目录自动刷新（2026-11-18）**：`POST /api/providers/refresh-all` 一次刷新全部已连接提供商 + 可用 Codex 账号，前端在进入应用与每小时各调用一次（`static/src/composables/useModelCatalogAutoRefresh.ts`，挂在 `app/lifecycle.ts` 的 settingsRoute 分支之前，设置页也覆盖）。进程内每小时最多真正执行一次（`ProviderManager.refresh_all_throttled`），多视图/多标签重复调用返回 `skipped`；时间戳只存内存，重启后首次必刷。**不要在 `start_background_jobs` 里加后端定时器**（会变成「应用关着也刷」）；单目标失败不中断整轮。手动刷新按钮走既有单提供商端点，不受该节流影响。
 
 > 完整分区清单与目录字段见 `docs/agents_details/settings_and_providers.md`。
 

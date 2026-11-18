@@ -47,8 +47,10 @@ const emit = defineEmits<{
 
 function choose(item: UiMenuItem) {
   if (item.disabled) return;
-  emit('close', true);
+  // 先派发动作再关闭：父组件的 close 处理通常会清空「当前目标」状态（如
+  // ProvidersTab 的 menuEntry），先 close 会让 select 读不到目标而静默失效。
   emit('select', item.value);
+  emit('close', true);
 }
 </script>
 

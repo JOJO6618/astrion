@@ -39,6 +39,7 @@ import json
 import os
 import re
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -51,6 +52,8 @@ _CATALOG_PATH = Path(__file__).resolve().parent.parent / "config" / "providers_c
 _STORE_FILENAME = "providers.json"
 _STORE_VERSION = 2
 _FETCH_TIMEOUT = 20
+# 自动刷新最小间隔（进入应用一次 + 每小时一次；多视图重复调用在此节流）
+_AUTO_REFRESH_MIN_GAP_SECONDS = 60 * 60
 # /models 返回中明显不是聊天模型的 id 片段（embedding/tts/图像/审核等），发现时剔除
 _NON_CHAT_ID_PATTERN = re.compile(
     r"(embed|embedding|tts|whisper|dall-e|moderation|transcri|speech|rerank|babbage|davinci|clip)",
@@ -135,6 +138,10 @@ class ProviderManager:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._memory: Optional[Dict[str, Any]] = None
+        # 自动刷新节流状态（进程内）：运行标记 + 上次真正刷新完成的时间
+        self._auto_refresh_lock = threading.Lock()
+        self._auto_refresh_running = False
+        self._last_auto_refresh_at = 0.0
 
     # ------------------------------------------------------------ 存储
 
@@ -661,6 +668,104 @@ class ProviderManager:
         }
         if error:
             result["models_error"] = error
+        return result
+
+    def refresh_all(self) -> Dict[str, Any]:
+        """刷新全部已连接提供商的模型列表（含 ChatGPT/Codex 账号）。
+
+        单个提供商/账号失败不影响其余目标；结果逐项返回，供日志与调试查看。
+        外部网络请求全部在本方法内完成，调用方不再持任何锁。
+        """
+        try:
+            records = self._load()["providers"]
+            # 与模型注册表同口径：enabled=False 的连接不参与发现，也不白打网络
+            provider_ids = [
+                pid for pid, record in records.items() if record.get("enabled", True)
+            ]
+        except Exception:
+            provider_ids = []
+        results: List[Dict[str, Any]] = []
+        for provider_id in provider_ids:
+            try:
+                res = self.refresh_models(provider_id)
+            except Exception as exc:  # 单个提供商异常不得中断整轮刷新
+                res = {"success": False, "error": f"refresh_failed: {exc}"}
+            results.append(
+                {
+                    "kind": "provider",
+                    "id": provider_id,
+                    "success": bool(res.get("success")),
+                    "models_count": res.get("models_count"),
+                    "error": res.get("error") or res.get("models_error") or "",
+                }
+            )
+        results.extend(self._refresh_codex_accounts())
+        return {
+            "success": True,
+            "count": len(results),
+            "failed": sum(1 for item in results if not item.get("success")),
+            "results": results,
+        }
+
+    @staticmethod
+    def _refresh_codex_accounts() -> List[Dict[str, Any]]:
+        """刷新所有已登记 ChatGPT/Codex 账号的模型目录（凭证缺失账号跳过）。"""
+        try:
+            from utils.api_client.codex.accounts import get_codex_account_store
+            from utils.api_client.codex.models import get_models_manager
+
+            accounts = get_codex_account_store().list_accounts()
+        except Exception as exc:
+            return [{"kind": "codex", "id": "", "success": False, "error": str(exc)}]
+        out: List[Dict[str, Any]] = []
+        for account in accounts:
+            account_id = str(account.get("id") or "")
+            # credential_missing / disconnected 账号不发请求（结果必然失败且拖慢整轮）
+            if not account_id or str(account.get("state") or "") != "ready":
+                continue
+            try:
+                result = get_models_manager(account_id).refresh_sync()
+            except Exception as exc:
+                out.append({"kind": "codex", "id": account_id, "success": False, "error": str(exc)})
+                continue
+            out.append(
+                {
+                    "kind": "codex",
+                    "id": account_id,
+                    "success": not result.get("error"),
+                    "models_count": result.get("count"),
+                    "error": result.get("error") or "",
+                }
+            )
+        return out
+
+    def refresh_all_throttled(self) -> Dict[str, Any]:
+        """自动刷新入口：每小时最多真正刷新一次（多视图/多标签重复调用被挡）。
+
+        时间戳只存内存：进程重启（= 应用重新启动）后的首次调用一定执行，
+        与「进入应用时刷新一次 + 每小时一次」的语义一致。
+        """
+        now = time.time()
+        with self._auto_refresh_lock:
+            if self._auto_refresh_running:
+                return {"success": True, "skipped": True, "reason": "in_progress"}
+            last = self._last_auto_refresh_at
+            if last and now - last < _AUTO_REFRESH_MIN_GAP_SECONDS:
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "throttled",
+                    "last_refresh_at": last,
+                    "next_refresh_at": last + _AUTO_REFRESH_MIN_GAP_SECONDS,
+                }
+            self._auto_refresh_running = True
+        try:
+            result = self.refresh_all()
+        finally:
+            with self._auto_refresh_lock:
+                self._auto_refresh_running = False
+                self._last_auto_refresh_at = time.time()
+        result["skipped"] = False
         return result
 
     # ------------------------------------------------------------ 模型发现

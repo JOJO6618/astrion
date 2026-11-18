@@ -3,6 +3,10 @@ import { useChatActionStore } from '../stores/chatActions';
 import { useSandboxSetupStore } from '../stores/sandboxSetup';
 import { normalizeScrollLock } from '../composables/useScrollControl';
 import {
+  startModelCatalogAutoRefresh,
+  stopModelCatalogAutoRefresh
+} from '../composables/useModelCatalogAutoRefresh';
+import {
   setupShowImageObserver,
   teardownShowImageObserver,
   setupImagePreviewDelegation
@@ -52,6 +56,10 @@ export async function mounted() {
   });
   setupShowImageObserver();
   setupImagePreviewDelegation();
+
+  // 提供商模型目录自动刷新：进入应用一次 + 每小时一次（后端负责节流与拉取）。
+  // 放在 settingsRoute 分支之前，任何入口（主界面/设置页）进入都覆盖。
+  startModelCatalogAutoRefresh();
 
   if (this.settingsRoute || this.schedulesRoute) {
     // Independent pages load account data without initializing Agent resources.
@@ -119,6 +127,7 @@ export async function mounted() {
 
 export function beforeUnmount() {
   mountedHosts.delete(this);
+  stopModelCatalogAutoRefresh();
   if (this._todoRefreshTimer) {
     clearTimeout(this._todoRefreshTimer);
     this._todoRefreshTimer = null;
