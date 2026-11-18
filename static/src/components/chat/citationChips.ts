@@ -28,22 +28,32 @@ export interface CitationAnnotation {
   snippet?: string;
 }
 
-/** popover 全局状态（单例；同一时间只存在一个引用弹层） */
+/** 一次打开的悬停卡。每次打开都换新 id：切换引用时旧卡片沿原路收回、新卡片在新引用处展开，
+ *  两者是不同的 DOM 实例，旧卡片不会被复用成新卡片（DESIGN.md §6.10「单例」）。 */
+export interface CitationCardState {
+  id: number;
+  anchor: HTMLElement;
+  annotations: CitationAnnotation[];
+  pinned: boolean;
+}
+
+/** 悬停卡全局状态：同一时间只有一张活动卡片（退出动画中的旧卡片由 Transition 保留） */
 export const citationPopover = reactive({
-  visible: false,
-  pinned: false,
-  anchor: null as HTMLElement | null,
-  annotations: [] as CitationAnnotation[]
+  current: null as CitationCardState | null
 });
 
-const HOVER_OPEN_DELAY = 250; // 悬停多久后打开
-const HOVER_CLOSE_DELAY = 300; // 移出多久后关闭（留出移到弹层上的余量）
+const HOVER_OPEN_DELAY = 250; // 冷启动：悬停多久后打开
+const HOVER_OPEN_DELAY_WARM = 80; // 已有卡片（或刚收起）时移到另一个引用的打开延迟
+const WARM_WINDOW = 400; // 卡片收起后多久内仍算热状态
+const HOVER_CLOSE_DELAY = 300; // 移出多久后关闭（留出移到卡片上的余量）
 
 /** chip 元素上挂的当前 annotations（final 到达后可被富化替换，触发器事件时读取） */
 type ChipWithAnnotations = HTMLElement & { _citationAnnotations?: CitationAnnotation[] };
 
 let openTimer: ReturnType<typeof setTimeout> | undefined;
 let closeTimer: ReturnType<typeof setTimeout> | undefined;
+let cardSeq = 0;
+let lastClosedAt = -Infinity;
 
 function clearPopoverTimers() {
   clearTimeout(openTimer);
@@ -52,70 +62,92 @@ function clearPopoverTimers() {
   closeTimer = undefined;
 }
 
+function isWarm() {
+  return !!citationPopover.current || performance.now() - lastClosedAt < WARM_WINDOW;
+}
+
 export function openCitationPopover(
   anchor: HTMLElement,
   annotations: CitationAnnotation[],
   pinned: boolean
 ) {
-  closeCitationPopover();
-  citationPopover.anchor = anchor;
-  citationPopover.annotations = annotations;
-  citationPopover.pinned = pinned;
-  citationPopover.visible = true;
+  clearPopoverTimers();
+  citationPopover.current?.anchor.classList.remove('is-open');
+  citationPopover.current = { id: ++cardSeq, anchor, annotations, pinned };
   anchor.classList.add('is-open');
 }
 
 export function closeCitationPopover() {
   clearPopoverTimers();
-  if (citationPopover.anchor) {
-    citationPopover.anchor.classList.remove('is-open');
-  }
-  citationPopover.visible = false;
-  citationPopover.pinned = false;
-  citationPopover.anchor = null;
-  citationPopover.annotations = [];
+  const card = citationPopover.current;
+  if (!card) return;
+  card.anchor.classList.remove('is-open');
+  citationPopover.current = null;
+  lastClosedAt = performance.now();
 }
 
 function schedulePopoverClose() {
   clearTimeout(closeTimer);
   closeTimer = setTimeout(() => {
-    if (!citationPopover.pinned) closeCitationPopover();
+    if (!citationPopover.current?.pinned) closeCitationPopover();
   }, HOVER_CLOSE_DELAY);
 }
 
-/** popover 自身 hover 进入时取消关闭（CitationPopover 组件调用） */
+/** 指针进入卡片：取消关闭，并取消途中扫过其他引用排下的打开（CitationCard 调用） */
 export function keepCitationPopover() {
   clearTimeout(closeTimer);
+  clearTimeout(openTimer);
 }
 
-/** popover 自身 hover 离开时按延迟关闭（未固定时） */
+/** 指针离开卡片：未固定时按延迟关闭 */
 export function leaveCitationPopover() {
-  if (!citationPopover.pinned) schedulePopoverClose();
+  if (citationPopover.current && !citationPopover.current.pinned) schedulePopoverClose();
+}
+
+/** 指针进入引用。注意不取消旧卡片的关闭计时：旧卡片按自己的节奏收起，
+ *  新卡片打开时再替换它；从引用移向卡片途中扫过的引用在进入卡片时被取消。 */
+export function hoverCitationChip(chip: ChipWithAnnotations) {
+  const card = citationPopover.current;
+  if (card?.pinned) return; // 固定期间悬停其他引用不替换
+  if (card?.anchor === chip) {
+    clearTimeout(closeTimer);
+    return;
+  }
+  clearTimeout(openTimer);
+  openTimer = setTimeout(
+    () => openCitationPopover(chip, chip._citationAnnotations || [], false),
+    isWarm() ? HOVER_OPEN_DELAY_WARM : HOVER_OPEN_DELAY
+  );
+}
+
+export function leaveCitationChip(chip: ChipWithAnnotations) {
+  clearTimeout(openTimer);
+  const card = citationPopover.current;
+  if (card?.anchor === chip && !card.pinned) schedulePopoverClose();
+}
+
+/** 点击引用：悬停打开的原地固定；再点已固定的收起；点其他引用切换并固定 */
+export function clickCitationChip(chip: ChipWithAnnotations) {
+  const card = citationPopover.current;
+  if (card?.anchor === chip) {
+    if (card.pinned) {
+      closeCitationPopover();
+    } else {
+      clearPopoverTimers();
+      card.pinned = true;
+    }
+    return;
+  }
+  openCitationPopover(chip, chip._citationAnnotations || [], true);
 }
 
 function attachChipTriggers(chip: ChipWithAnnotations) {
   // 事件时从元素上读最新 annotations（final 富化替换后无需重绑监听器）
-  const current = () => chip._citationAnnotations || [];
-  chip.addEventListener('mouseenter', () => {
-    clearTimeout(closeTimer);
-    if (citationPopover.anchor === chip && citationPopover.visible) return;
-    clearTimeout(openTimer);
-    openTimer = setTimeout(() => openCitationPopover(chip, current(), false), HOVER_OPEN_DELAY);
-  });
-  chip.addEventListener('mouseleave', () => {
-    clearTimeout(openTimer);
-    if (citationPopover.visible && citationPopover.anchor === chip && !citationPopover.pinned) {
-      schedulePopoverClose();
-    }
-  });
+  chip.addEventListener('mouseenter', () => hoverCitationChip(chip));
+  chip.addEventListener('mouseleave', () => leaveCitationChip(chip));
   chip.addEventListener('click', (e) => {
     e.stopPropagation();
-    clearPopoverTimers();
-    if (citationPopover.anchor === chip && citationPopover.visible && citationPopover.pinned) {
-      closeCitationPopover(); // 再点已固定的弹层 → 收起
-    } else {
-      openCitationPopover(chip, current(), true); // 点击 = 固定
-    }
+    clickCitationChip(chip);
   });
 }
 

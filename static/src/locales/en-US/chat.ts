@@ -41,9 +41,11 @@ export default {
   thoughtSummary: 'Thought summary',
 
   // —— Inline citations (citation chip / popover) ——
-  citationOpenSource: 'Open source',
   citationPrev: 'Previous source',
   citationNext: 'Next source',
+  citationLine: 'Line {line}',
+  citationLines: 'Lines {start}–{end}',
+  citationPage: 'Page {page}',
 
   // —— File append (append / append_payload) ——
   targetFile: 'target file',

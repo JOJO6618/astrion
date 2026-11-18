@@ -378,7 +378,7 @@
           :host-mode="versioningHostMode"
           :workspace-id="currentHostWorkspaceId"
         />
-        <CitationPopover :host-mode="versioningHostMode" />
+        <CitationPopover />
         <div
           v-if="!isMobileViewport && (terminalPanelOpen || gitChangesPanelOpen)"
           class="resize-handle resize-handle--right-panels"

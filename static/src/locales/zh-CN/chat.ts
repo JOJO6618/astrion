@@ -51,9 +51,11 @@ export default {
   thoughtSummary: '思考摘要',
 
   // —— 行内引用（citation chip / popover） ——
-  citationOpenSource: '打开来源',
   citationPrev: '上一个来源',
   citationNext: '下一个来源',
+  citationLine: '第 {line} 行',
+  citationLines: '第 {start}–{end} 行',
+  citationPage: '第 {page} 页',
 
   // —— 文件追加（append / append_payload） ——
   targetFile: '目标文件',

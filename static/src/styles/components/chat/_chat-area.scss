@@ -2586,7 +2586,7 @@ a.md-download-link {
 }
 
 // ===== 行内引用胶囊（citation chip） =====
-// 交互约定：hover / 展开态只变色，不动边框；弹层交互见 CitationPopover.vue
+// 交互约定：hover / 展开态只变色，不动边框；悬停卡交互见 citationChips.ts 与 CitationCard.vue
 .md-citation-chip {
   display: inline-flex;
   align-items: center;
@@ -2655,8 +2655,9 @@ a.md-download-link {
     flex: none;
     font-size: 8px;
     font-weight: 700;
-    color: var(--on-accent);
-    background: var(--accent);
+    // 字母兜底走中性灰阶，与悬停卡来源图标一致（accent 只用于状态与品牌元素）
+    color: var(--text-primary);
+    background: var(--border-strong);
   }
 
   .chip-label {
