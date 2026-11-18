@@ -2,6 +2,7 @@ export const ICONS = Object.freeze({
   alignLeft: '/static/icons/align-left.svg',
   arrowLeft: '/static/icons/arrow-left.svg',
   atom: '/static/icons/atom.svg',
+  book: '/static/icons/book.svg',
   bot: '/static/icons/bot.svg',
   browser: '/static/icons/browser.svg',
   brain: '/static/icons/brain.svg',
@@ -20,6 +21,7 @@ export const ICONS = Object.freeze({
   cloud: '/static/icons/cloud.svg',
   codex: '/static/icons/codex.svg',
   clock: '/static/icons/clock.svg',
+  copy: '/static/icons/copy.svg',
   crosshair: '/static/icons/crosshair.svg',
   download: '/static/icons/download.svg',
   ellipsis: '/static/icons/ellipsis.svg',
@@ -163,7 +165,7 @@ export const TOOL_ICON_MAP = Object.freeze({
   submit_schedule: 'timer',
   query_schedules: 'timer',
   manage_schedule: 'timer'
-});
+} satisfies Record<string, keyof typeof ICONS>);
 
 export const TOOL_CATEGORY_ICON_MAP = Object.freeze({
   network: 'globe',
@@ -179,4 +181,4 @@ export const TOOL_CATEGORY_ICON_MAP = Object.freeze({
   todo: 'listTodo',
   sub_agent: 'bot',
   easter_egg: 'sparkles'
-});
+} satisfies Record<string, keyof typeof ICONS>);
