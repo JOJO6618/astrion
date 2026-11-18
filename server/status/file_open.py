@@ -56,6 +56,58 @@ def _open_path_in_file_manager(path: Path) -> bool:
         return False
     return False
 
+def _resolve_workspace_file_for_open(terminal, raw_path: str) -> tuple[str, str, Path | None]:
+    """把请求路径解析成工作区内的真实文件，返回 (状态, 错误信息, 完整路径)。
+
+    状态取值：``ok`` / ``invalid``（越界或非法路径）/ ``not_found``（合法但文件不存在）。
+
+    为什么需要回退：前端渲染 markdown 文件链接时，会把任何不以 ``//`` 开头、
+    也没有 scheme 的 href 当成工作区相对路径，并剥掉开头的 ``/``
+    （``static/src/composables/useMarkdownRenderer.ts`` 的 ``extractWorkspacePath``）。
+    因此宿主绝对路径 ``/Users/me/proj/a.html`` 传到后端时已经变成
+    ``Users/me/proj/a.html``，按相对路径拼出来必然不存在。
+    这里在相对解释拿不到文件时，补回根斜杠再按绝对路径解释一次，
+    但结果必须仍然落在工作区目录内，不扩大可打开范围。
+    """
+    valid, error, full_path = terminal.file_manager._validate_path(raw_path)
+    try:
+        project_root = Path(getattr(terminal, "project_path", "") or "").expanduser().resolve()
+    except (OSError, RuntimeError, ValueError):
+        project_root = None
+
+    def _inside_project(path: Path) -> bool:
+        if project_root is None:
+            return False
+        try:
+            path.resolve().relative_to(project_root)
+            return True
+        except (OSError, RuntimeError, ValueError):
+            return False
+
+    if valid and full_path is not None and full_path.is_file() and _inside_project(full_path):
+        return "ok", "", full_path
+
+    normalized = (raw_path or "").strip()
+    looks_relative = bool(normalized) and not normalized.startswith(("/", "\\")) \
+        and not (len(normalized) > 1 and normalized[1] == ":")
+    if looks_relative:
+        try:
+            candidate = (Path("/") / normalized).expanduser().resolve()
+        except (OSError, RuntimeError):
+            candidate = None
+        if candidate is not None and candidate.is_file():
+            if _inside_project(candidate):
+                return "ok", "", candidate
+            # 补回根斜杠后确实是工作区外的真实文件：按越界拒绝，
+            # 不要报成「文件不存在」误导调用方
+            return "invalid", "", None
+
+    if not valid or full_path is None:
+        return "invalid", error, None
+    if not _inside_project(full_path):
+        return "invalid", "", None
+    return "not_found", "", full_path
+
 def _resolve_project_git_file(workspace, rel_path: str) -> tuple[Path | None, str]:
     project_path = Path(getattr(workspace, "project_path", "") or "").expanduser().resolve()
     ok, root_text = _run_project_git(project_path, ["rev-parse", "--show-toplevel"])
@@ -816,18 +868,11 @@ def open_workspace_file(terminal, workspace, username):
     if not path:
         return jsonify({"success": False, "error": tr("status_file_open.invalid_path")}), 400
 
-    valid, error, full_path = terminal.file_manager._validate_path(path)
-    if not valid or full_path is None:
+    status, error, full_path = _resolve_workspace_file_for_open(terminal, path)
+    if status != "ok" or full_path is None:
+        if status == "not_found":
+            return jsonify({"success": False, "error": tr("status_file_open.file_not_found")}), 404
         return jsonify({"success": False, "error": error or tr("status_file_open.invalid_path")}), 400
-    # host 模式的 _validate_path 不做包含性检查（读边界由沙箱另外兜），
-    # 这里必须自己收紧到工作区内：预览目标只会是工作区文件，不开放主机任意文件。
-    try:
-        project_root = Path(getattr(terminal, "project_path", "") or "").expanduser().resolve()
-        full_path.resolve().relative_to(project_root)
-    except Exception:
-        return jsonify({"success": False, "error": tr("status_file_open.invalid_path")}), 400
-    if not full_path.exists() or not full_path.is_file():
-        return jsonify({"success": False, "error": tr("status_file_open.file_not_found")}), 404
     if not _open_path_in_file_manager(full_path):
         return jsonify({"success": False, "error": tr("status_file_open.open_file_failed")}), 500
     return jsonify({"success": True, "data": {"path": str(full_path)}})

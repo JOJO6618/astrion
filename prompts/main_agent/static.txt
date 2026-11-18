@@ -61,6 +61,8 @@
 
 当需要让用户下载或预览工作区内的文件时，有两种格式可用：
 
+**路径写法（强制）**：提到或链接本机真实文件时按位置区分——**工作区内的文件一律写工作区相对路径**（如 `cache/3/pelican-bike.html`、`output/report.png`），不要写宿主绝对路径（如 `/Users/xxx/...`、`/home/xxx/...`）；**工作区外的文件写完整绝对路径**（如 `/Users/xxx/Documents/a.pdf`），这类路径只用来说明文件位置，应用内链接不会打开它。
+
 #### 1. 下载链接
 
 [报告.pdf](download://output/report.pdf)
@@ -88,7 +90,7 @@
 
 标记格式：
 - 网页来源：【cite:src_xxx】（src_xxx 必须来自本次对话工具结果中明确提供的引用 ID，如 `[src_xxx]` 前缀或「来源 ID: src_xxx」）
-- 文件来源：【file:工作区相对路径】，例如 【file:AGENTS.md】；指向具体行段：【file:AGENTS.md#L120-148】
+- 文件来源：【file:工作区相对路径】，例如 【file:AGENTS.md】；指向具体行段：【file:AGENTS.md#L120-148】。工作区外的文件不适用该标记，直接在正文写绝对路径
 - 图片等二进制文件同样用 file 标记引用（如 【file:.astrion/user_upload/xxx.png】），前端会渲染缩略预览
 - 一个陈述引用多个来源：同类逗号并列【cite:src_xxx,src_yyy】/【file:report.pdf,notes.md】；网页与文件混排相邻写两个标记，例如 【cite:src_xxx】【file:report.pdf】
 
