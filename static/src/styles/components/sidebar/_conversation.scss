@@ -94,11 +94,14 @@
     color 140ms ease;
 }
 
-/* 定时任务入口沿用导航按钮的 32px 热区，SVG 只占 18px 图形盒，
-   避免把 mask 图标本身当成按钮导致尺寸和 hover 区域与其它入口不一致。 */
-.schedules-icon .icon {
-  width: 18px;
-  height: 18px;
+/* 顶部导航入口统一：.sidebar-nav-icon 是 32px 热区，内部 .icon（内嵌 mask 图标）
+   只占 18px 图形盒；项目 Git 官方图形视觉偏大，按 17px。 */
+.conversation-primary-actions .sidebar-nav-icon > .icon {
+  --icon-size: 18px;
+}
+
+.conversation-primary-actions .sidebar-nav-icon > .git-brand-icon {
+  --icon-size: 17px;
 }
 
 .conversation-sidebar.collapsed .sidebar-nav-row:hover,
@@ -176,33 +179,6 @@
 .chat-icon svg {
   width: 23px;
   height: 23px;
-}
-
-.pencil-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.layers-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.workflow-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.browser-icon .icon {
-  --icon-size: 18px;
-}
-
-.git-brand-icon::before {
-  content: '';
-  width: 17px;
-  height: 17px;
-  background: currentColor;
-  mask: url('/static/icons/git.svg') center / contain no-repeat;
 }
 
 .monitor-mode-btn.blocked {
@@ -554,8 +530,8 @@ body[data-theme='dark'] .conversation-sidebar .conversation-item.active:focus-wi
   height: 18px;
   display: inline-block;
   background: var(--text-secondary);
-  mask: url('/static/icons/check.svg') center / contain no-repeat;
-  -webkit-mask: url('/static/icons/check.svg') center / contain no-repeat;
+  mask: var(--svg-check) center / contain no-repeat;
+  -webkit-mask: var(--svg-check) center / contain no-repeat;
 }
 
 @keyframes conversation-running-rotation {

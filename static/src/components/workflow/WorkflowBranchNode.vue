@@ -38,7 +38,7 @@
     <div class="branch-node__body">
       <span
         class="icon branch-node__icon"
-        :style="iconSrc(ICONS.gitBranch)"
+        :style="iconSrcStyle('gitBranch')"
         aria-hidden="true"
       ></span>
       <span class="branch-node__name">{{ data.node.name || data.node.id }}</span>
@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Handle, Position } from '@vue-flow/core';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle } from '@/utils/icons';
 import type { WorkflowBranchDef } from './workflowModel';
 
 interface BranchNodeData {
@@ -76,10 +76,6 @@ const bodyHeight = computed(() => {
   const rows = Math.max(props.data.inCount + 1, props.data.outCount + 1, 2);
   return Math.max(64, rows * 22 + 28);
 });
-
-function iconSrc(url: string) {
-  return { '--icon-src': `url(${url})` } as Record<string, string>;
-}
 </script>
 
 <style scoped lang="scss">

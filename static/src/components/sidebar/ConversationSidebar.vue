@@ -17,7 +17,7 @@
         >
           <span
             class="icon"
-            :style="personalMenuIconStyle(collapsed ? 'panelLeft' : 'panelRight')"
+            :style="iconSrcStyle(collapsed ? 'panelLeft' : 'panelRight')"
             aria-hidden="true"
           ></span>
         </button>
@@ -29,27 +29,8 @@
           :title="$t('sidebar.newConversation')"
           @click="$emit('create')"
         >
-          <span
-            class="sidebar-nav-icon pencil-icon"
-            data-tutorial="quick-new-conversation"
-            aria-hidden="true"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
-              />
-              <path d="m15 5 4 4" />
-            </svg>
+          <span class="sidebar-nav-icon" data-tutorial="quick-new-conversation" aria-hidden="true">
+            <span class="icon" :style="iconSrcStyle('pencil')"></span>
           </span>
           <span class="sidebar-nav-label">{{ $t('sidebar.newConversation') }}</span>
         </button>
@@ -64,25 +45,8 @@
           ref="workspaceEntryBtn"
           @click="toggleWorkspaceSwitcher"
         >
-          <span class="sidebar-nav-icon layers-icon" aria-hidden="true">
-            <!-- 与其他导航按钮统一：内联 layers 图标，CSS 限到 18px 与铅笔一致，避免 mask 图标异步加载闪烁 -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
-              />
-              <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
-              <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
-            </svg>
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <span class="icon" :style="iconSrcStyle('layers')"></span>
           </span>
           <span class="sidebar-nav-label">{{
             workspaceKind === 'project' ? $t('sidebar.project') : $t('sidebar.workspace')
@@ -96,28 +60,8 @@
           v-if="!chatMode"
           @click="$emit('open-workflows')"
         >
-          <span class="sidebar-nav-icon workflow-icon" aria-hidden="true">
-            <!-- 与其他导航按钮统一：内联 workflow 图标，避免 mask 图标异步加载闪烁；
-                 图形与 /static/icons/workflow.svg 保持一致 -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="4.6" r="2.6" />
-              <path d="M12 7.2 V10.1" />
-              <path d="M8.5 12.3 L12 10.1 L15.5 12.3 L12 14.5 Z" stroke-linejoin="miter" />
-              <path d="M8.5 12.3 H6.1 Q4.5 12.3 4.5 13.9 V16.3" />
-              <path d="M15.5 12.3 H17.9 Q19.5 12.3 19.5 13.9 V16.3" />
-              <rect x="2.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
-              <rect x="17.4" y="16.3" width="4.2" height="4.2" rx="1.1" />
-            </svg>
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <span class="icon" :style="iconSrcStyle('workflow')"></span>
           </span>
           <span class="sidebar-nav-label">{{ $t('sidebar.workflows') }}</span>
         </button>
@@ -129,13 +73,15 @@
           :title="$t('sidebar.schedules')"
           @click="$emit('open-schedules')"
         >
-          <span class="sidebar-nav-icon schedules-icon" aria-hidden="true">
-            <span class="icon" :style="iconStyle('timer')"></span>
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <span class="icon" :style="iconSrcStyle('timer')"></span>
           </span>
           <span class="sidebar-nav-label">{{ $t('sidebar.schedules') }}</span>
         </button>
         <button v-if="!chatMode" type="button" class="sidebar-nav-row" @click="$emit('open-git')">
-          <span class="sidebar-nav-icon git-brand-icon" aria-hidden="true"></span>
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <span class="icon git-brand-icon" :style="iconSrcStyle('git')"></span>
+          </span>
           <span class="sidebar-nav-label">{{ $t('sidebar.git') }}</span>
         </button>
 
@@ -148,8 +94,8 @@
           :aria-pressed="nativeBrowser.open"
           @click="nativeBrowser.toggle()"
         >
-          <span class="sidebar-nav-icon browser-icon" aria-hidden="true">
-            <span class="icon" :style="{ '--icon-src': `url(${ICONS.globe})` }"></span>
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <span class="icon" :style="iconSrcStyle('globe')"></span>
           </span>
           <span class="sidebar-nav-label">{{ $t('browser.title') }}</span>
         </button>
@@ -162,23 +108,8 @@
           :title="$t('appCore.refreshPage')"
           @click="$emit('refresh')"
         >
-          <span class="sidebar-nav-icon refresh-icon" aria-hidden="true">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-              <path d="M8 16H3v5" />
-            </svg>
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <span class="icon" :style="iconSrcStyle('refreshCw')"></span>
           </span>
           <span class="sidebar-nav-label">{{ $t('appCore.refreshPage') }}</span>
         </button>
@@ -1012,7 +943,7 @@
               >
                 <span
                   class="icon personal-menu-icon"
-                  :style="personalMenuIconStyle('user')"
+                  :style="iconSrcStyle('user')"
                   aria-hidden="true"
                 ></span>
                 <span class="personal-menu-label">{{ $t('sidebar.personalSpace') }}</span>
@@ -1025,7 +956,7 @@
               >
                 <span
                   class="icon personal-menu-icon"
-                  :style="personalMenuIconStyle('userPen')"
+                  :style="iconSrcStyle('userPen')"
                   aria-hidden="true"
                 ></span>
                 <span class="personal-menu-label">{{ $t('sidebar.preferences') }}</span>
@@ -1038,7 +969,7 @@
               >
                 <span
                   class="icon personal-menu-icon"
-                  :style="personalMenuIconStyle('settings')"
+                  :style="iconSrcStyle('settings')"
                   aria-hidden="true"
                 ></span>
                 <span class="personal-menu-label">{{ $t('common.settings') }}</span>
@@ -1051,7 +982,7 @@
               >
                 <span
                   class="icon personal-menu-icon"
-                  :style="personalMenuIconStyle('messageQuestion')"
+                  :style="iconSrcStyle('messageQuestion')"
                   aria-hidden="true"
                 ></span>
                 <span class="personal-menu-label">{{ $t('sidebar.help') }}</span>
@@ -1066,7 +997,7 @@
               >
                 <span
                   class="icon personal-menu-icon"
-                  :style="personalMenuIconStyle('refreshCw')"
+                  :style="iconSrcStyle('refreshCw')"
                   aria-hidden="true"
                 ></span>
                 <span class="personal-menu-label">{{ $t('update.entryTitle') }}</span>
@@ -1085,7 +1016,7 @@
               >
                 <span
                   class="icon personal-menu-icon"
-                  :style="personalMenuIconStyle('logOut')"
+                  :style="iconSrcStyle('logOut')"
                   aria-hidden="true"
                 ></span>
                 <span class="personal-menu-label">{{ $t('personalization.logoutTitle') }}</span>
@@ -1116,7 +1047,8 @@ import { useConversationStore } from '@/stores/conversation';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useDesktopUpdateStore } from '@/stores/desktopUpdate';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
-import { ICONS } from '@/utils/icons';
+// 导航与菜单图标直接用注册表（不依赖父级可选 prop iconStyle，任何宿主下都有图标）
+import { iconSrcStyle } from '@/utils/icons';
 import { openExternal } from '@/utils/openExternal';
 import ModeSwitcher from '@/components/chat-mode/ModeSwitcher.vue';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
@@ -1234,12 +1166,6 @@ const sessionUsername = ref('');
 const personalEntryBtn = ref<HTMLElement | null>(null);
 /* 菜单 Teleport 到 body 后的 fixed 定位（向上弹出）：bottom 锚定按钮顶缘 */
 const personalMenuPosition = ref<{ bottom: number; left: number }>({ bottom: 0, left: 0 });
-
-/* 菜单项图标：本地直接查 ICONS 注册表（与 PersonalizationDrawer 同款），
-   不依赖父级可选 prop iconStyle，保证菜单在任何宿主下都有图标 */
-const personalMenuIconStyle = (key: keyof typeof ICONS) => ({
-  '--icon-src': `url(${ICONS[key]})`
-});
 
 function updatePersonalMenuPosition() {
   const el = personalEntryBtn.value;

@@ -33,7 +33,7 @@
       class="review-node__reject-out"
     />
     <div class="review-node__body">
-      <span class="icon review-node__eye" :style="iconSrc(ICONS.eye)" aria-hidden="true"></span>
+      <span class="icon review-node__eye" :style="iconSrcStyle('eye')" aria-hidden="true"></span>
       <span class="review-node__name">{{ data.node.name || data.node.id }}</span>
       <span class="review-node__meta">{{
         $t('workflow.rejectLimitMeta', { n: data.node.maxRejects })
@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core';
-import { ICONS } from '@/utils/icons';
+import { iconSrcStyle } from '@/utils/icons';
 import type { WorkflowReviewDef } from './workflowModel';
 
 interface ReviewNodeData {
@@ -58,10 +58,6 @@ defineProps<{
   data: ReviewNodeData;
   selected?: boolean;
 }>();
-
-function iconSrc(url: string) {
-  return { '--icon-src': `url(${url})` } as Record<string, string>;
-}
 </script>
 
 <style scoped lang="scss">

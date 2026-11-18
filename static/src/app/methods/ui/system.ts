@@ -113,7 +113,7 @@ export const systemMethods = {
     if (!iconPath) {
       return {};
     }
-    const style = { '--icon-src': `url(${iconPath})` };
+    const style = { '--icon-src': iconPath };
     if (size) {
       style['--icon-size'] = size;
     }

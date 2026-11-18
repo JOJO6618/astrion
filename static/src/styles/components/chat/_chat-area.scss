@@ -1537,18 +1537,18 @@
 }
 
 .user-bubble-action-btn.copy::before {
-  mask-image: url('/static/icons/copy.svg');
-  -webkit-mask-image: url('/static/icons/copy.svg');
+  mask-image: var(--svg-copy);
+  -webkit-mask-image: var(--svg-copy);
 }
 
 .user-bubble-action-btn.copy.copied::before {
-  mask-image: url('/static/icons/check.svg');
-  -webkit-mask-image: url('/static/icons/check.svg');
+  mask-image: var(--svg-check);
+  -webkit-mask-image: var(--svg-check);
 }
 
 .user-bubble-action-btn.branch::before {
-  mask-image: url('/static/icons/git-fork.svg');
-  -webkit-mask-image: url('/static/icons/git-fork.svg');
+  mask-image: var(--svg-git-fork);
+  -webkit-mask-image: var(--svg-git-fork);
 }
 
 .user-bubble-action-btn.user-bubble-expand-btn::before {
@@ -1882,14 +1882,9 @@ body[data-theme='dark'] .collapsible-header:hover {
 }
 
 .more-icon {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-  object-fit: contain;
-}
-
-body[data-theme='dark'] .more-icon {
-  filter: brightness(0) invert(1);
+  --icon-size: 18px;
+  flex: none;
+  color: var(--text-primary);
 }
 
 .more-copy {
@@ -2693,8 +2688,8 @@ show-html[data-rendered='1'] {
   display: block;
   margin: auto;
   background: currentColor;
-  mask: url('/static/icons/copy.svg') center / contain no-repeat;
-  -webkit-mask: url('/static/icons/copy.svg') center / contain no-repeat;
+  mask: var(--svg-copy) center / contain no-repeat;
+  -webkit-mask: var(--svg-copy) center / contain no-repeat;
 }
 
 .copy-code-btn:hover {
@@ -2703,8 +2698,8 @@ show-html[data-rendered='1'] {
 }
 
 .copy-code-btn.copied::before {
-  mask-image: url('/static/icons/check.svg');
-  -webkit-mask-image: url('/static/icons/check.svg');
+  mask-image: var(--svg-check);
+  -webkit-mask-image: var(--svg-check);
 }
 
 .code-block-wrapper pre {

@@ -82,7 +82,7 @@
                 :aria-label="$t('chatMode.showSidebar')"
                 @click="mobileOpen = !mobileOpen"
               >
-                <img :src="ICONS.alignLeft" alt="" aria-hidden="true" />
+                <span class="icon" :style="iconStyle('alignLeft')" aria-hidden="true"></span>
               </button>
             </template>
           </ConversationModelHeader>
@@ -336,7 +336,7 @@ import ChatBranchActions from './ChatBranchActions.vue';
 import ChatMessageEditor from './ChatMessageEditor.vue';
 import HandoffCard from './HandoffCard.vue';
 import { useChatPage } from '@/chat/useChatPage';
-import { ICONS } from '@/utils/icons';
+import { ICONS, iconSrcStyle, type IconKey } from '@/utils/icons';
 import {
   getToolIcon,
   getToolStatusText as baseGetToolStatusText,
@@ -431,9 +431,7 @@ const {
 const area = ref<InstanceType<typeof ChatArea>>();
 const composer = ref<InstanceType<typeof InputComposer>>();
 const ribbon = ref<HTMLElement>();
-const iconStyle = (key: string) => ({
-  '--icon-src': `url(${ICONS[key as keyof typeof ICONS] || ICONS.chatBubble})`
-});
+const iconStyle = (key: string) => iconSrcStyle(key in ICONS ? (key as IconKey) : 'chatBubble');
 const noop = () => {};
 const emptyMarkdown = () => '';
 const unavailableDownload = async () => {};

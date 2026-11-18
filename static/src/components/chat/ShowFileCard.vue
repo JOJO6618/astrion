@@ -440,8 +440,8 @@ onMounted(() => {
   width: 16px;
   height: 16px;
   background-color: var(--text-secondary);
-  -webkit-mask: url('/static/icons/file-down.svg') no-repeat center / contain;
-  mask: url('/static/icons/file-down.svg') no-repeat center / contain;
+  -webkit-mask: var(--svg-file-down) no-repeat center / contain;
+  mask: var(--svg-file-down) no-repeat center / contain;
 }
 
 .sfc-name {

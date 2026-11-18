@@ -569,7 +569,7 @@
             :aria-label="$t('appCore.conversationHistory')"
             @click="openMobileOverlay('conversation')"
           >
-            <img :src="mobilePanelIcon" alt="" aria-hidden="true" />
+            <span class="icon" :style="mobilePanelIconStyle" aria-hidden="true"></span>
           </button>
           <button
             type="button"
@@ -899,6 +899,7 @@ import { useNativeBrowserStore, nativeBrowserAvailable } from './stores/nativeBr
 import { useConversationTabsStore } from './stores/conversationTabs';
 import { browserScopeForNavigation } from './components/browser/browserScope';
 import { openExternal } from './utils/openExternal';
+import { iconSrcStyle } from './utils/icons';
 import { isDesktopShell } from './utils/desktopPlatform';
 import { useDesktopUpdateStore } from './stores/desktopUpdate';
 import { useCommandBlockingStore } from './stores/commandBlocking';
@@ -920,7 +921,7 @@ const openCommandBlockingDialog = () => commandBlockingStore.openDialog();
 const tutorialStore = useTutorialStore();
 const personalizationStore = usePersonalizationStore();
 
-const mobilePanelIcon = new URL('../icons/align-left.svg', import.meta.url).href;
+const mobilePanelIconStyle = iconSrcStyle('alignLeft');
 const detectAppShell = () => {
   if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);

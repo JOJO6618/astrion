@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * 通用图标：/static/icons/<name>.svg 以 mask 渲染，颜色 = currentColor。
- * 尺寸由使用方通过 width/height 控制（默认 16）。
+ * 通用图标：name 为 static/icons/ 下的文件名（不含扩展名），经 utils/icons 内嵌，
+ * 以 mask 渲染，颜色 = currentColor。尺寸由使用方通过 width/height 控制（默认 16）。
  */
 import { computed } from 'vue';
+import { iconVar } from '@/utils/icons';
 
 const props = defineProps<{ name: string }>();
-const style = computed(() => ({ '--ui-icon-src': `url('/static/icons/${props.name}.svg')` }));
+const style = computed(() => ({ '--ui-icon-src': iconVar(props.name) }));
 </script>
 
 <template><span class="ui-icon" :style="style" aria-hidden="true" /></template>

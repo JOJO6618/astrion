@@ -5,6 +5,9 @@
 // 标签唯一写者在后端 modules/desktop_navigation；两个页面均提交幂等命令，
 // 并消费 GET /api/conversation-tabs 的版本快照。本页不修改结构或执行主页面 JS。
 // 主页面协调器收到目标后，复用既有 bootstrap 并确认提交显示。
+
+// 内嵌图标变量（--svg-*）须在任何组件渲染前注入，见 utils/icons.ts
+import './utils/icons';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import ChromeApp from './components/chrome/ChromeApp.vue';

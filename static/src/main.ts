@@ -1,3 +1,5 @@
+// 内嵌图标变量（--svg-*）须在任何组件渲染前注入，见 utils/icons.ts
+import './utils/icons';
 import { createApp, defineAsyncComponent } from 'vue';
 import { createPinia } from 'pinia';
 import 'katex/dist/katex.min.css';

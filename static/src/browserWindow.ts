@@ -3,6 +3,9 @@
 // 本页运行在主进程为某个对话创建的独立 BaseWindow 中（/browser-window，同源），
 // 只挂载共享 BrowserPanel；网页本身是主进程挪进本窗口的原生 WebContentsView。
 // 对话归属由主进程固定，URL 查询参数只用于显示对话标题。
+
+// 内嵌图标变量（--svg-*）须在任何组件渲染前注入，见 utils/icons.ts
+import './utils/icons';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import BrowserWindowApp from './components/browser/BrowserWindowApp.vue';

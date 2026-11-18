@@ -20,8 +20,8 @@
   .code-block-header { display: flex; align-items: center; justify-content: space-between; height: 32px; border-bottom: 1px solid var(--border-default); }
   .code-language { font-size: 11px; color: var(--text-secondary); }
   .copy-code-btn { position: relative; width: 28px; padding: 0; color: var(--text-secondary); }
-  .copy-code-btn::before { content: ''; position: absolute; width: 13px; height: 13px; inset: 0; margin: auto; background: currentColor; mask: url('/static/icons/copy.svg') center / contain no-repeat; }
-  .copy-code-btn.copied::before { mask-image: url('/static/icons/check.svg'); }
+  .copy-code-btn::before { content: ''; position: absolute; width: 13px; height: 13px; inset: 0; margin: auto; background: currentColor; mask: var(--svg-copy) center / contain no-repeat; }
+  .copy-code-btn.copied::before { mask-image: var(--svg-check); }
   pre { margin: 0; padding: 8px 0; overflow-x: auto; white-space: pre; scrollbar-width: thin; }
   pre code { padding: 0; background: transparent; }
 }
