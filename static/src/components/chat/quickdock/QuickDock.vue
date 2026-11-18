@@ -292,9 +292,10 @@ const CMD_TERMINAL = new Set(['completed', 'failed', 'timeout', 'cancelled']);
 
 /* ---------------- 菜单定位与目标状态 ---------------- */
 
-const MENU_ITEM_HEIGHT = 30;
+const MENU_ITEM_HEIGHT = 32; // 选项 32 高、行间 2（DESIGN.md §6.4）
+const MENU_ITEM_GAP = 2;
 const MENU_CHROME = 10; // 上下 padding 4×2 + border 1×2
-const MENU_GAP = 6;
+const MENU_GAP = 5; // 距触发器 5px（§6.3），与 FileWindow／RunnerWindow 写入的 top 一致
 const VIEWPORT_MARGIN = 8;
 
 /** 离开动画期间沿用的最后一份菜单快照（menu 关闭即 null，直接读会让位置/内容在动画中跳变） */
@@ -310,16 +311,18 @@ watch(
 );
 const effectiveMenu = computed(() => menu.value || lastMenu.value);
 
-/** 菜单高度估算：行高固定 30px，按类型精确到项数，翻转时才能贴住按钮 */
+/** 菜单高度估算：行高固定 32px、行间 2，按类型精确到项数，翻转时才能贴住按钮 */
+const menuHeightFor = (count: number) =>
+  count * MENU_ITEM_HEIGHT + (count - 1) * MENU_ITEM_GAP + MENU_CHROME;
 const menuEstimatedHeight = computed(() => {
   const m = effectiveMenu.value;
   if (!m) {
     return 0;
   }
   if (m.type === 'runner') {
-    return (m.kind === 'agent' ? 2 : 1) * MENU_ITEM_HEIGHT + MENU_CHROME;
+    return menuHeightFor(m.kind === 'agent' ? 2 : 1);
   }
-  return (props.hostMode ? 3 : 2) * MENU_ITEM_HEIGHT + MENU_CHROME;
+  return menuHeightFor(props.hostMode ? 3 : 2);
 });
 
 /** 菜单是否翻转到按钮上方展开（下方放不下且上方更宽裕）；

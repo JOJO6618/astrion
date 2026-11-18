@@ -329,6 +329,7 @@
               @toggle-goal-mode="handleToggleGoalMode"
               @workflow-activated="handleWorkflowActivated"
               @toggle-work-mode-menu="toggleWorkModeMenu"
+              @close-work-mode-menu="closeWorkModeMenu"
               @change-work-mode="changeWorkMode"
               @new-conversation="createNewConversation"
               @switch-host-workspace="handleHostWorkspaceSwitch"

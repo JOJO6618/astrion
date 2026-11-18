@@ -57,7 +57,7 @@ const retryTime = computed(() =>
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 .goal-window__details:hover {
@@ -82,7 +82,7 @@ const retryTime = computed(() =>
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 18px;
   color: var(--text-secondary);
   overflow-wrap: anywhere;
@@ -90,7 +90,7 @@ const retryTime = computed(() =>
 .goal-window__retry {
   height: 24px;
   padding: 0 12px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 .goal-window__actions {
@@ -103,20 +103,23 @@ const retryTime = computed(() =>
 .goal-window__actions:empty {
   display: none;
 }
+/* 卡内按钮：卡片控件底色、无描边、R8（DESIGN.md §6.1／§6.9） */
 .goal-window__actions button {
   height: 28px;
-  padding: 0 8px;
+  padding: 0 10px;
   font: inherit;
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--surface-base);
-  border: 1px solid var(--border-default);
-  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--group-card-control);
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
+  transition: background-color 140ms ease;
 }
 .goal-window__actions button:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg);
+  /* 在卡内控件底色上叠一层 --hover-bg */
+  background-image: linear-gradient(var(--hover-bg), var(--hover-bg));
 }
 .goal-window__actions button:disabled {
   opacity: 0.45;
