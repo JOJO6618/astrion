@@ -1,0 +1,48 @@
+{
+  "size": "long",
+  "requests": [
+    2.9392,
+    7.866
+  ],
+  "elapsed": 12.162,
+  "events": [
+    {
+      "event": "ai_message_start",
+      "at": 2.8541
+    },
+    {
+      "event": "api_request_start",
+      "at": 2.9328
+    },
+    {
+      "event": "api_request_start",
+      "at": 7.8617
+    },
+    {
+      "event": "task_complete",
+      "at": 12.1587
+    }
+  ],
+  "storage": {
+    "read_conversation": {
+      "calls": 13,
+      "seconds": 1.6796
+    },
+    "_atomic_write_json": {
+      "calls": 22,
+      "seconds": 6.3424
+    },
+    "save_conversation": {
+      "calls": 6,
+      "seconds": 4.4661
+    },
+    "get_token_statistics": {
+      "calls": 13,
+      "seconds": 0.0093
+    },
+    "update_conversation_metadata": {
+      "calls": 4,
+      "seconds": 2.6907
+    }
+  }
+}

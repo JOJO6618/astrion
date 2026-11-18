@@ -1,0 +1,26 @@
+[
+  {
+    "stage": "copy_backups",
+    "seconds": 0.6453
+  },
+  {
+    "stage": "manager_init",
+    "seconds": 0.0435
+  },
+  {
+    "stage": "file_diff_stats",
+    "seconds": 1.4857
+  },
+  {
+    "stage": "aggregate_diff_stats",
+    "seconds": 0.6181
+  },
+  {
+    "stage": "make_snapshot",
+    "seconds": 0.9163
+  },
+  {
+    "stage": "modify_history_render",
+    "seconds": 0.0111
+  }
+]
