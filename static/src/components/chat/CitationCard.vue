@@ -70,6 +70,11 @@ const currentIndex = ref(0);
 /** 最近一次翻页方向（-1 / 1）；0 表示刚打开，不播放滑入 */
 const pageDir = ref(0);
 const resizing = ref(false);
+/** 仍在离场动画中的旧正文数量（连续翻页时可能不止一个） */
+const leavingBodies = ref(0);
+/** 高度过渡或旧正文离场期间盒子与内容高度不一致：暂停纵向滚动，避免闪出滚动条 */
+const lockScroll = computed(() => resizing.value || leavingBodies.value > 0);
+const scrollEl = ref<HTMLElement | null>(null);
 let endResize: (() => void) | null = null;
 
 const annotations = computed(() => props.card.annotations);
@@ -243,13 +248,14 @@ async function stepPager(delta: number) {
   endResize?.();
   pageDir.value = delta > 0 ? 1 : -1;
   currentIndex.value = next;
+  // 本次 flush 内旧正文进入离场（onBodyBeforeLeave 锁住滚动），新正文已在文档流中，下面量到的就是新高度
   await nextTick();
   if (rootEl.value !== el) return;
+  if (scrollEl.value) scrollEl.value.scrollTop = 0;
   place();
   upgradeCitationFavicons(el);
   const to = el.offsetHeight;
   if (prefersReducedMotion() || Math.abs(from - to) < 1) return;
-  // 过渡期间盒子与内容高度不一致，暂停纵向滚动，避免闪出滚动条
   resizing.value = true;
   el.style.height = `${from}px`;
   void el.offsetHeight; // 先落定起点再开过渡
@@ -268,6 +274,19 @@ async function stepPager(delta: number) {
   el.addEventListener('transitionend', onEnd);
 }
 
+/** 旧正文离场：脱离文档流叠在原位（不影响新高度的测量），朝翻页反方向滑出淡出，
+ *  与新正文滑入、卡片高度过渡同时进行。方向在离场时写到元素自身，连续反向翻页也不会错向。 */
+function onBodyBeforeLeave(element: Element) {
+  const body = element as HTMLElement;
+  leavingBodies.value += 1;
+  body.style.top = `${body.offsetTop - (scrollEl.value?.scrollTop ?? 0)}px`;
+  body.style.setProperty('--cp-page-dir', `${pageDir.value * 8}px`);
+}
+
+function onBodyLeft() {
+  leavingBodies.value = Math.max(0, leavingBodies.value - 1);
+}
+
 onMounted(() => {
   annotations.value.forEach((ann) => void maybeFetchSnippet(ann));
   place();
@@ -281,7 +300,7 @@ onBeforeUnmount(() => endResize?.());
   <div
     ref="rootEl"
     class="citation-popover"
-    :class="{ 'is-up': up, 'is-resizing': resizing }"
+    :class="{ 'is-up': up, 'is-resizing': lockScroll }"
     role="dialog"
     @mouseenter="keepCitationPopover"
     @mouseleave="leaveCitationPopover"
@@ -346,31 +365,39 @@ onBeforeUnmount(() => endResize?.());
       </span>
     </div>
 
-    <div class="cp-scroll">
-      <div
-        v-if="current"
-        :key="currentIndex"
-        class="cp-body"
-        :class="{ 'is-paging': pageDir !== 0 }"
-        :style="pageDir !== 0 ? { '--cp-page-dir': `${pageDir * 8}px` } : undefined"
+    <div ref="scrollEl" class="cp-scroll">
+      <!-- 翻页：旧正文滑出与新正文滑入同时进行（默认模式），首次打开不播放 -->
+      <Transition
+        enter-active-class="is-paging-in"
+        leave-active-class="is-paging-out"
+        @before-leave="onBodyBeforeLeave"
+        @after-leave="onBodyLeft"
+        @leave-cancelled="onBodyLeft"
       >
-        <div class="cp-title">{{ titleText(current) }}</div>
-        <div v-if="metaText(current)" class="cp-meta">{{ metaText(current) }}</div>
-        <img
-          v-if="isImageFile(current)"
-          class="cp-image"
-          :src="fileContentUrl(current)"
-          :alt="current.file_name || ''"
-          loading="lazy"
-          @click.stop="openImagePreview(current)"
-        />
         <div
-          v-else-if="displaySnippet(current)"
-          class="cp-snippet"
-          :class="{ 'is-code': isCodeSnippet(current) }"
-          v-text="displaySnippet(current)"
-        ></div>
-      </div>
+          v-if="current"
+          :key="currentIndex"
+          class="cp-body"
+          :style="pageDir !== 0 ? { '--cp-page-dir': `${pageDir * 8}px` } : undefined"
+        >
+          <div class="cp-title">{{ titleText(current) }}</div>
+          <div v-if="metaText(current)" class="cp-meta">{{ metaText(current) }}</div>
+          <img
+            v-if="isImageFile(current)"
+            class="cp-image"
+            :src="fileContentUrl(current)"
+            :alt="current.file_name || ''"
+            loading="lazy"
+            @click.stop="openImagePreview(current)"
+          />
+          <div
+            v-else-if="displaySnippet(current)"
+            class="cp-snippet"
+            :class="{ 'is-code': isCodeSnippet(current) }"
+            v-text="displaySnippet(current)"
+          ></div>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -562,6 +589,7 @@ onBeforeUnmount(() => endResize?.());
 
 /* 正文：只有这里滚动，4px 细滚动条；横向必须 hidden（翻页滑入的 ±8px 不能触发横向滚动条） */
 .cp-scroll {
+  position: relative; /* 离场中的旧正文绝对定位叠在原位 */
   flex: 0 1 auto;
   min-height: 0;
   overflow: hidden auto;
@@ -589,11 +617,20 @@ onBeforeUnmount(() => endResize?.());
   padding: 8px 8px 2px;
 }
 
-.cp-body.is-paging {
-  animation: cp-page 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+/* 翻页：新正文从翻页方向滑入、旧正文朝反方向滑出，与卡片高度过渡同为 120ms 进入缓动 */
+.cp-body.is-paging-in {
+  animation: cp-page-in 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-@keyframes cp-page {
+.cp-body.is-paging-out {
+  position: absolute;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  animation: cp-page-out 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes cp-page-in {
   from {
     opacity: 0;
     transform: translateX(var(--cp-page-dir));
@@ -602,6 +639,18 @@ onBeforeUnmount(() => endResize?.());
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes cp-page-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--cp-page-dir) * -1));
   }
 }
 
@@ -681,7 +730,8 @@ onBeforeUnmount(() => endResize?.());
 @media (prefers-reduced-motion: reduce) {
   .citation-popover.is-entering,
   .citation-popover.is-leaving,
-  .cp-body.is-paging {
+  .cp-body.is-paging-in,
+  .cp-body.is-paging-out {
     animation: none;
   }
 }
