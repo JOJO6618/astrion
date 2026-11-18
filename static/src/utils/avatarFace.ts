@@ -18,7 +18,7 @@ const TOOL_FACE_MAP: Record<string, string> = {
   trigger_easter_egg: 'skill',
   terminal_session: 'monitor',
   terminal_input: 'keyboard',
-  terminal_snapshot: 'clipboard',
+  terminal_snapshot: 'camera',
   sleep: 'sleep',
   run_command: 'command',
   update_memory: 'brain',

@@ -3,7 +3,7 @@
     <div class="summary-header icon-label">
       <span
         class="icon icon-sm"
-        :style="iconStyle(action.type === 'apply' ? 'pencil' : 'clipboard')"
+        :style="iconStyle(action.type === 'apply' ? 'pencil' : 'file-pen')"
         aria-hidden="true"
       ></span>
       <span>{{

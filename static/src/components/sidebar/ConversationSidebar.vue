@@ -477,7 +477,7 @@
                                   >
                                     <span
                                       class="icon icon-sm"
-                                      :style="iconStyle('clipboard')"
+                                      :style="iconStyle('hash')"
                                       aria-hidden="true"
                                     ></span>
                                     <span>{{ $t('sidebar.copyId') }}</span>
@@ -652,7 +652,7 @@
                               >
                                 <span
                                   class="icon icon-sm"
-                                  :style="iconStyle('clipboard')"
+                                  :style="iconStyle('hash')"
                                   aria-hidden="true"
                                 ></span>
                                 <span>{{ $t('sidebar.copyId') }}</span>
@@ -816,7 +816,7 @@
                       >
                         <span
                           class="icon icon-sm"
-                          :style="iconStyle('clipboard')"
+                          :style="iconStyle('hash')"
                           aria-hidden="true"
                         ></span>
                         <span>{{ $t('sidebar.copyId') }}</span>

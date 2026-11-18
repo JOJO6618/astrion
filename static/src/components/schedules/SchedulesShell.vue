@@ -381,7 +381,7 @@ const moreItems = computed<ScheduleMenuItem[]>(() =>
         { value: 'history', label: t('schedules.history'), icon: 'clock' },
         { value: 'yaml', label: t('schedules.yaml'), icon: 'file' },
         { value: 'duplicate', label: t('schedules.duplicate'), icon: 'copy' },
-        { value: 'copy-id', label: t('schedules.copyId'), icon: 'clipboard' },
+        { value: 'copy-id', label: t('schedules.copyId'), icon: 'hash' },
         { value: 'download', label: t('schedules.download'), icon: 'download' },
         { value: 'delete', label: t('schedules.delete'), icon: 'trash', danger: true }
       ]

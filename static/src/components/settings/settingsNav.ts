@@ -45,7 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: 'settings.groupSystem',
     items: [
       { id: 'general', labelKey: 'settings.navGeneral', icon: 'general' },
-      { id: 'chat', labelKey: 'chatMode.settings', icon: 'context' },
+      { id: 'chat', labelKey: 'chatMode.settings', icon: 'chat' },
       { id: 'quick-chat', labelKey: 'settings.navQuickChat', icon: 'quick-chat' },
       { id: 'workspace', labelKey: 'settings.navWorkspace', icon: 'workspace' },
       { id: 'search', labelKey: 'settings.navSearch', icon: 'search' },
@@ -53,7 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'context', labelKey: 'settings.navContext', icon: 'context' },
       { id: 'files', labelKey: 'settings.navFiles', icon: 'files' },
       { id: 'voice', labelKey: 'settings.navVoice', icon: 'voice' },
-      { id: 'browser', labelKey: 'settings.navBrowser', icon: 'tools' }
+      { id: 'browser', labelKey: 'settings.navBrowser', icon: 'browser' }
     ]
   },
   {

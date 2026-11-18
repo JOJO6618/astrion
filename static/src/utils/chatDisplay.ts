@@ -284,7 +284,7 @@ export function getToolIcon(tool: any): string {
   if (typeof toolName === 'string' && toolName.startsWith('mcp__')) {
     return 'mcpLogo';
   }
-  return TOOL_ICON_MAP[toolName as keyof typeof TOOL_ICON_MAP] || 'settings';
+  return TOOL_ICON_MAP[toolName as keyof typeof TOOL_ICON_MAP] || 'puzzle';
 }
 
 export function getToolAnimationClass(tool: any): string {

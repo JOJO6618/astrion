@@ -321,8 +321,8 @@ const assets = {
     terminal: new URL('../../../icons/laptop.svg', import.meta.url).href,
     command: new URL('../../../icons/terminal.svg', import.meta.url).href,
     python: new URL('../../../icons/python.svg', import.meta.url).href,
-    memory: new URL('../../../icons/sticky-note.svg', import.meta.url).href,
-    todo: new URL('../../../icons/clipboard.svg', import.meta.url).href,
+    memory: new URL('../../../icons/brain.svg', import.meta.url).href,
+    todo: new URL('../../../icons/list-todo.svg', import.meta.url).href,
     subagent: new URL('../../../icons/bot.svg', import.meta.url).href
   }
 };

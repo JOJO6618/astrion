@@ -14,22 +14,24 @@ const props = defineProps<{ name: string }>();
 const ICON_FILES: Record<string, string> = {
   usage: 'chart-column',
   storage: 'hard-drive',
-  providers: 'layers',
-  models: 'layout-grid',
+  providers: 'cloud',
+  models: 'atom',
   'model-pref': 'brain-cog',
   codex: 'codex',
   general: 'settings',
+  chat: 'message-circle-more',
   'quick-chat': 'zap',
-  workspace: 'folder-git-2',
+  workspace: 'folder-open',
   search: 'globe',
   tools: 'wrench',
   context: 'notebook',
   files: 'file',
   voice: 'mic',
+  browser: 'browser',
   'sub-agents': 'bot',
-  'review-agents': 'eye',
-  appearance: 'sparkles',
-  admin: 'user-pen'
+  'review-agents': 'eye-check',
+  appearance: 'palette',
+  admin: 'shield'
 };
 
 const iconStyle = computed(() => {
