@@ -325,7 +325,11 @@ class ModeMixin:
         """网络档位说明行（两平台共用）。"""
         net = getattr(self, "host_network_permission", "restricted")
         if net == "restricted":
-            return "- 网络：受限（仅允许 localhost，外部网络不可达）"
+            # 必须保持单行：Windows 切换通知会把它截成编号列表的一项
+            return (
+                "- 网络：受限（仅允许 localhost，外部网络不可达）；启动本地服务时显式监听 127.0.0.1"
+                "（如 --host 127.0.0.1），不要监听 0.0.0.0 或 ::，以免暴露到局域网"
+            )
         if net == "full":
             return "- 网络：完全开放"
         if net == "none":

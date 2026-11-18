@@ -187,7 +187,7 @@ def _build_macos_whitelist_read_rules(paths: List[str]) -> str:
 
 
 # 宿主机网络权限档位
-NETWORK_PERMISSION_RESTRICTED = "restricted"   # macOS: 仅本地回环；Linux/Windows: 暂不隔离
+NETWORK_PERMISSION_RESTRICTED = "restricted"   # 仅本地回环（出站 + 本机监听）；平台细节见各自实现
 NETWORK_PERMISSION_FULL = "full"               # 完全开放
 NETWORK_PERMISSION_NONE = "none"               # 完全禁止网络（后端保留）
 _NETWORK_PERMISSION_VALUES = {
@@ -213,15 +213,38 @@ def _normalize_network_permission(value: Optional[str]) -> str:
     return NETWORK_PERMISSION_RESTRICTED
 
 
-def _build_macos_network_policy(network_permission: str) -> str:
-    """根据网络权限档位生成 macOS sandbox-exec 网络规则片段。"""
+def _build_macos_network_policy(
+    network_permission: str,
+    unix_socket_paths: Optional[List[str]] = None,
+) -> str:
+    """根据网络权限档位生成 macOS sandbox-exec 网络规则片段。
+
+    restricted 档（2026-11-18 起）除回环出站外，还放行本机监听，使沙箱内能起
+    localhost 开发服务器；unix_socket_paths 给出时，再放行这些目录内的 Unix
+    socket（bind + connect），调用方传可写目录，只读 profile 不传。
+
+    真机实测（macOS 15.6.1）的已知边界：Seatbelt 只在 listen() 时检查
+    network-inbound，不按连接来源过滤；且 IP 过滤器只有 localhost / * 两种主机
+    写法，localhost 也会放行 0.0.0.0 / :: 的绑定。因此服务若监听全部地址，
+    局域网可访问——profile 层无法禁止，靠提示词要求显式监听 127.0.0.1。
+    出站仍只限回环，受限档的核心语义（外部网络不可达）不变。
+    """
     permission = _normalize_network_permission(network_permission)
     if permission == NETWORK_PERMISSION_NONE:
         return ""
     if permission == NETWORK_PERMISSION_FULL:
         return "(allow network-outbound)\n(allow network-inbound)\n"
-    # restricted: 仅允许本地回环出站（涵盖 127.0.0.1 / ::1 的实际效果）
-    return '(allow network-outbound (remote ip "localhost:*"))\n'
+    # restricted：bind 与 inbound 缺一不可（只放 bind 时 listen() 仍 EPERM）
+    rules = [
+        '(allow network-outbound (remote ip "localhost:*"))',
+        '(allow network-bind (local ip "localhost:*"))',
+        '(allow network-inbound (local ip "localhost:*"))',
+    ]
+    for path in unix_socket_paths or []:
+        quoted = _sb_quote(path)
+        rules.append(f'(allow network-bind (local unix-socket (subpath {quoted})))')
+        rules.append(f'(allow network-outbound (remote unix-socket (subpath {quoted})))')
+    return "\n".join(rules) + "\n"
 
 
 def build_host_sandbox_plan(
@@ -448,7 +471,11 @@ def _macos_profile_for_workspace(
         else:
             write_rules.append(f'(subpath {_sb_quote(entry)})')
     write_expr = " ".join(write_rules)
-    network_policy = _build_macos_network_policy(network_permission)
+    # Unix socket 只放行在可写目录内（socket 文件本身就要在可写处创建）
+    network_policy = _build_macos_network_policy(
+        network_permission,
+        unix_socket_paths=[p for p in writable_paths if p != "/dev/null"],
+    )
     # 可写沙箱（2026-08-30 起）与只读沙箱共用同一白名单读模型：
     # 默认拒绝全部读取，仅系统路径白名单 + 路径授权（可写+仅可读）+ 工作区可读。
     # 权限模式只管工作区内读写——unrestricted 也不例外；工作区外读取的唯一途径

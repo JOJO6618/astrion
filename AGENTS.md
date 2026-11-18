@@ -341,7 +341,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 只读的强制由各平台原生机制兜底；`config/limits.py` 的命令文本白名单只是**审批决策的启发式**，**不再是安全边界**（已知可绕过，如 `find . -delete`；绕过后果只是多走一次审批）。
 
 - **docker/web 模式 = 非特权 uid 执行角色 + Landlock 进程级只读域**（`modules/docker_readonly_exec.py`）：容器主进程保持 root；只读通道以 `-u 10001:10001` 运行。第一层强制力是内核 DAC（工作区属主为宿主 root，非属主无写权）；第二层 Landlock（`modules/landlock_launcher.py`）封死「工作区内历史遗留 777/o+w 路径仍可写」的残留洞。launcher 自检失败自动降级纯 DAC 并 warning 标注；`DOCKER_READONLY_LANDLOCK=0` 可整体停用。**注意不能写「/ 授全量 + ro 授空」的交集规则**（空授权规则被内核拒绝）。macOS Docker Desktop 双重不适用，仅 Linux 宿主生效。
-- **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：只读/可写两个 profile **共用同一白名单读模型**，唯一区别是写权限。要点：缺祖先目录 literal allow 会让进程 exec 直接 Abort trap；**deny 规则必须位于所有 allow 之后**（Seatbelt 后规则覆盖先规则，曾致工作区 `.env` 实际可读）；`/usr/bin` 下 python3/git/clang 是 xcselect 垫片，需放行 `MACOS_BASE_MACH_RULES` 与 `/Library/Preferences`；可写 profile 已白名单化（代价：祖先目录顶层文件名可列出，内容仍被拒）；原生文件工具读 roots 与沙箱白名单同源（`file_manager/path_mixin.py`）。
+- **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：只读/可写两个 profile **共用同一白名单读模型**，唯一区别是写权限。要点：缺祖先目录 literal allow 会让进程 exec 直接 Abort trap；**deny 规则必须位于所有 allow 之后**（Seatbelt 后规则覆盖先规则，曾致工作区 `.env` 实际可读）；`/usr/bin` 下 python3/git/clang 是 xcselect 垫片，需放行 `MACOS_BASE_MACH_RULES` 与 `/Library/Preferences`；可写 profile 已白名单化（代价：祖先目录顶层文件名可列出，内容仍被拒）；原生文件工具读 roots 与沙箱白名单同源（`file_manager/path_mixin.py`）；受限网络档允许本机监听与可写目录内 Unix socket，但 Seatbelt 挡不住监听 `0.0.0.0` 后的局域网入站（2026-11-18）。
 - **Linux 宿主机 = 管理员安装的受限助手**：bwrap 最小文件系统 + seccomp + AppArmor + systemd/cgroup IP 过滤，不挂载宿主 `/`；最后降到真实普通 UID 并清能力。见 §20。
 - **Windows = WSL2 最小根文件系统（白名单）**，命名空间内只有系统目录 + 工作区，天然符合。
 
