@@ -390,8 +390,10 @@ def _clean_summary_text(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# instructions 位置策略（2026-11-19，gpt-6.2 缓存回归）
+# instructions 位置策略（2026-11-19）
 # ---------------------------------------------------------------------------
+#
+# Fuck OpenAI：gpt-6.2 不缓存 instructions 字段，让我在半个小时内耗完了 20% 的周额度。
 
 # OpenAI 自家模型名：gpt-*（排除开源 gpt-oss）、chatgpt-*、o1/o3/o4 系列
 _OPENAI_MODEL_RE = re.compile(r"^(?:gpt-(?!oss)|chatgpt-|o[1-9](?:-|$))")
