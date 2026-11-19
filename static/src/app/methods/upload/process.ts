@@ -80,10 +80,7 @@ export const processMethods = {
     uploaded.forEach((item) => {
       if (!item?.path) return;
       this.inputAddSelectedImage(item.path);
-      this.upsertImageEntry(item.path, item.filename);
     });
-    // 上传完成后自动关闭选择窗口
-    this.closeImagePicker();
   },
   // 普通文件上传后附加到输入栏（与图片/视频并列，随消息一同发送）
   async handleLocalGenericFiles(files) {
@@ -189,6 +186,5 @@ export const processMethods = {
     }
     this.inputSetSelectedVideos([item.path]);
     this.inputClearSelectedImages();
-    this.upsertVideoEntry(item.path, item.filename);
   }
 };

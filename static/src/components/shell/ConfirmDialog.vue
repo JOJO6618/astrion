@@ -1,68 +1,59 @@
 <template>
-  <transition name="confirm-dialog-fade">
-    <div
-      class="confirm-overlay"
-      v-if="dialog?.visible"
-      @click.self="dialog?.closeOnBackdrop !== false && resolve(false)"
-    >
-      <div
-        class="confirm-modal"
-        :class="{ 'confirm-modal--with-checkbox': dialog.checkboxLabel }"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="dialog.title || $t('shell.confirmOperation')"
-        @keydown.esc.stop="resolve(false)"
+  <UiDialog
+    :open="open"
+    :title="shown.title || $t('shell.confirmOperation')"
+    :close-on-scrim="shown.closeOnBackdrop !== false"
+    @close="resolve(false)"
+  >
+    <p class="ui-dialog-text">{{ shown.message }}</p>
+    <p v-if="shown.warningText" class="confirm-warning">
+      <UiIcon name="triangle-alert" />
+      <span>{{ shown.warningText }}</span>
+    </p>
+    <label v-if="shown.checkboxLabel" class="ui-dialog-switch-row">
+      <span>{{ shown.checkboxLabel }}</span>
+      <input type="checkbox" :checked="checked" @change="toggleCheckbox" />
+      <UiSwitch decorative :checked="checked" />
+    </label>
+    <template #actions>
+      <UiDialogButton @click="resolve(false)">
+        {{ shown.cancelText || $t('common.cancel') }}
+      </UiDialogButton>
+      <UiDialogButton
+        :variant="shown.confirmVariant === 'danger' ? 'danger' : 'primary'"
+        @click="resolve(true)"
       >
-        <div class="confirm-title">{{ dialog.title || $t('shell.confirmOperation') }}</div>
-        <div class="confirm-message">{{ dialog.message }}</div>
-        <div v-if="dialog.warningText" class="confirm-warning">{{ dialog.warningText }}</div>
-        <button
-          v-if="dialog.checkboxLabel"
-          type="button"
-          class="confirm-checkbox"
-          role="checkbox"
-          :aria-checked="dialog.checkboxChecked"
-          @click="toggleCheckbox"
-        >
-          <FancyCheck :checked="dialog.checkboxChecked" />
-          <span>{{ dialog.checkboxLabel }}</span>
-        </button>
-        <div
-          class="confirm-actions"
-          :class="{ 'confirm-actions--confirm-left': dialog.confirmOnLeft }"
-        >
-          <button
-            type="button"
-            class="confirm-button confirm-button--cancel"
-            @click="resolve(false)"
-          >
-            {{ dialog.cancelText || $t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="confirm-button confirm-button--confirm"
-            :class="
-              dialog.confirmVariant === 'danger'
-                ? 'confirm-button--danger'
-                : 'confirm-button--primary'
-            "
-            @click="resolve(true)"
-          >
-            {{ dialog.confirmText || $t('common.confirm') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </transition>
+        {{ shown.confirmText || $t('common.confirm') }}
+      </UiDialogButton>
+    </template>
+  </UiDialog>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useUiStore } from '@/stores/ui';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import UiDialog from '@/components/ui/UiDialog.vue';
+import UiDialogButton from '@/components/ui/UiDialogButton.vue';
+import UiIcon from '@/components/ui/UiIcon.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 
 const uiStore = useUiStore();
 const { confirmDialog: dialog } = storeToRefs(uiStore);
+
+/** resolveConfirm 会立即清空 store；保留最后一次内容，退出动画期间文字不消失 */
+const shown = ref<NonNullable<typeof dialog.value> | Record<string, never>>({});
+watch(
+  dialog,
+  (value) => {
+    if (value) shown.value = value;
+  },
+  { immediate: true }
+);
+
+const open = computed(() => Boolean(dialog.value?.visible));
+const checked = computed(() => Boolean(dialog.value?.checkboxChecked));
+
 const resolve = (choice: boolean) => uiStore.resolveConfirm(choice);
 const toggleCheckbox = () => {
   if (!dialog.value) return;
@@ -72,21 +63,21 @@ const toggleCheckbox = () => {
 </script>
 
 <style scoped>
-.confirm-checkbox {
+/* 警告只用图标颜色区分，不铺底、不加框 */
+.confirm-warning {
+  margin: 0;
   display: flex;
-  align-items: center;
   gap: 8px;
-  height: 36px;
-  margin: 12px 0 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 22px;
 }
-.confirm-checkbox:focus-visible {
-  outline: 2px solid var(--border-strong);
-  outline-offset: 3px;
+
+.confirm-warning .ui-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  flex: none;
+  color: var(--state-warning);
 }
 </style>

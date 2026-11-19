@@ -16,6 +16,7 @@ export default {
   migrateConversationProject: '迁移到项目',
   transferTarget: '选择目标工作区',
   transferTargetProject: '选择目标项目',
+  transferModelLabel: '对话模型',
   transferKeepModel: '保留原对话模型',
   transferWorking: '正在处理…',
   transferExporting: '正在导出对话…',

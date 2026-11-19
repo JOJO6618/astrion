@@ -103,8 +103,6 @@ export const computed = {
     'quickMenuOpen',
     'toolMenuOpen',
     'settingsOpen',
-    'imagePickerOpen',
-    'videoPickerOpen',
     'selectedImages',
     'selectedVideos',
     'selectedFiles',

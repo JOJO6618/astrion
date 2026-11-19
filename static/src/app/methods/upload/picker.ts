@@ -4,6 +4,31 @@ import { useModelStore } from '../../../stores/model';
 import './shared';
 import { t } from '@/locales';
 
+const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
+
+/**
+ * 打开系统文件选择。input 挂在 body 上（Android WebView 的 onShowFileChooser 需要在文档内的 input），
+ * 选完或下次打开前移除；必须在用户点击的同步调用栈里执行，不能放在 await 之后。
+ */
+let pendingInput: HTMLInputElement | null = null;
+function openSystemFilePicker(accept: string, multiple: boolean, onFiles: (files: File[]) => void) {
+  pendingInput?.remove();
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.multiple = multiple;
+  input.hidden = true;
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files || []);
+    input.remove();
+    if (pendingInput === input) pendingInput = null;
+    if (files.length) onFiles(files);
+  });
+  document.body.appendChild(input);
+  pendingInput = input;
+  input.click();
+}
+
 export const pickerMethods = {
   triggerFileUpload() {
     if (this.uploading) {
@@ -31,7 +56,8 @@ export const pickerMethods = {
     if (!list.length) return;
     this.processDroppedFiles(list);
   },
-  async openImagePicker() {
+  /** 发送图片：校验模型后直接打开系统文件选择（不再有工作区图片选择窗口） */
+  pickLocalImages() {
     const modelStore = useModelStore();
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (
@@ -47,13 +73,10 @@ export const pickerMethods = {
       return;
     }
     this.closeQuickMenu();
-    this.inputSetImagePickerOpen(true);
-    await this.loadWorkspaceImages();
+    openSystemFilePicker(IMAGE_ACCEPT, true, (files) => this.handleLocalImageFiles(files));
   },
-  closeImagePicker() {
-    this.inputSetImagePickerOpen(false);
-  },
-  async openVideoPicker() {
+  /** 发送视频：同上，单选 */
+  pickLocalVideo() {
     const modelStore = useModelStore();
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (!currentModel?.supportsVideo) {
@@ -65,10 +88,6 @@ export const pickerMethods = {
       return;
     }
     this.closeQuickMenu();
-    this.inputSetVideoPickerOpen(true);
-    await this.loadWorkspaceVideos();
-  },
-  closeVideoPicker() {
-    this.inputSetVideoPickerOpen(false);
+    openSystemFilePicker('video/*', false, (files) => this.handleLocalVideoFiles(files));
   }
 };

@@ -21,6 +21,7 @@
 2. **邮箱按智能体取**：
    - `Astrion` → `<astrion-agent@users.noreply.github.com>`
    - `Codex` → `<codex@example.com>`（openai/codex 官方仓库默认 git 身份，用户拍板）
+   - `Claude Code` → `<claude-code@example.com>`（同 Codex 做法，不指向真实账号）
    - 新增智能体时沿用同一模式，并使用不指向外部真实账号的邮箱。
 
 3. **哪些智能体参与就挂哪条**；多个智能体协作可挂**多条** `Co-authored-by`。

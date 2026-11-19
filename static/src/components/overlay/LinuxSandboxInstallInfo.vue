@@ -41,58 +41,30 @@ async function copyCommand(command: string) {
     <p v-if="status?.install_command">
       {{ status?.can_install ? $t('sandbox.linuxAdmin') : $t('sandbox.linuxTerminal') }}
     </p>
-    <template v-if="status?.install_command">
-      <div class="linux-sandbox-command-label">
-        <span>{{ $t('sandbox.linuxCommand') }}</span>
-        <button type="button" @click="copyCommand(status.install_command)">
-          {{ $t(`common.${copyState}`) }}
-        </button>
-      </div>
-      <pre ref="commandEl" class="linux-sandbox-command" tabindex="0">{{
-        status.install_command
-      }}</pre>
-    </template>
+  </div>
+  <div v-if="status?.install_command" class="ui-dialog-field">
+    <div class="ui-dialog-label">
+      <span>{{ $t('sandbox.linuxCommand') }}</span>
+      <button type="button" class="ui-dialog-link" @click="copyCommand(status.install_command)">
+        {{ $t(`common.${copyState}`) }}
+      </button>
+    </div>
+    <pre ref="commandEl" class="ui-dialog-code" tabindex="0">{{ status.install_command }}</pre>
   </div>
 </template>
 
 <style scoped>
+/* 放在 UiDialog 正文里：与弹窗正文同为 14/22，段落间 6 */
 .linux-sandbox-info {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-.linux-sandbox-info p {
-  margin: 0 0 10px;
-}
-.linux-sandbox-command-label {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 32px;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 22px;
 }
-.linux-sandbox-command-label button {
-  height: 28px;
-  padding: 0 10px;
-  color: var(--text-primary);
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  cursor: pointer;
-}
-.linux-sandbox-command-label button:hover {
-  background: var(--hover-bg);
-}
-.linux-sandbox-command {
-  max-height: 96px;
-  margin: 4px 0 0;
-  padding: 10px 0;
-  border-top: 1px solid var(--border-default);
-  border-bottom: 1px solid var(--border-default);
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  overflow: auto;
-  user-select: text;
-  scrollbar-width: thin;
+
+.linux-sandbox-info p {
+  margin: 0;
 }
 </style>

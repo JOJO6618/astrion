@@ -1195,7 +1195,7 @@
 }
 
 .sch-modal-header {
-  padding: 24px 24px 0;
+  padding: 20px 20px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1203,22 +1203,22 @@
   flex: none;
 }
 
+/* 32 热区上下 −2，头部高度只由 28 标题决定；热区右缘落在 E = 20 */
 .sch-modal-close {
-  margin-top: -8px;
-  margin-right: -8px;
+  margin: -2px 0;
   color: var(--text-secondary);
 }
 
 .sch-modal-body {
   min-height: 0;
-  padding: 20px 24px 0;
+  padding: 20px 20px 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
 }
 
-/* 右侧与底部留边统一为 16px；按钮统一高度，长文案只增加宽度 */
+/* 一个边距 E = 20（DESIGN.md §6.7）；按钮统一高度，长文案只增加宽度 */
 .sch-modal-actions {
-  padding: 24px 16px 16px;
+  padding: 20px;
   display: flex;
   align-items: center;
   justify-content: flex-end;

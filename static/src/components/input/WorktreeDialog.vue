@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
-import CloseButton from '@/components/common/CloseButton.vue';
-import FancyCheck from '@/components/common/FancyCheck.vue';
+import { computed, ref, watch } from 'vue';
+import UiDialog from '@/components/ui/UiDialog.vue';
+import UiDialogButton from '@/components/ui/UiDialogButton.vue';
 import UiSelect from '@/components/ui/UiSelect.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { t } from '@/locales';
 import { useGitWorktreeStore, type WorktreeTarget } from '@/stores/gitWorktree';
 
@@ -20,7 +21,6 @@ const props = defineProps<{
 const emit = defineEmits<{ (event: 'close'): void; (event: 'changed'): void }>();
 
 const store = useGitWorktreeStore();
-const panel = ref<HTMLElement | null>(null);
 const mode = ref('main');
 const branch = ref('');
 const startRef = ref('HEAD');
@@ -124,8 +124,6 @@ watch(
       startRef.value = store.draftTarget.start_ref;
       includeUncommitted.value = store.draftTarget.include_uncommitted;
     }
-    await nextTick();
-    panel.value?.focus();
     await store.refresh(props.conversationId, props.workspaceId);
     syncMode();
   }
@@ -191,322 +189,180 @@ async function save() {
     emit('changed');
   }
 }
-
-function trapFocus(event: KeyboardEvent) {
-  if (event.key !== 'Tab') return;
-  const nodes = Array.from(
-    panel.value?.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
-    ) || []
-  );
-  const first = nodes[0];
-  const last = nodes[nodes.length - 1];
-  if (
-    event.shiftKey &&
-    (document.activeElement === first || document.activeElement === panel.value)
-  ) {
-    event.preventDefault();
-    last?.focus();
-  } else if (
-    !event.shiftKey &&
-    (document.activeElement === last || document.activeElement === panel.value)
-  ) {
-    event.preventDefault();
-    first?.focus();
-  }
-}
 </script>
 
 <template>
-  <Teleport to="body">
-    <!-- @click.stop：阻断到 document 的冒泡，避免点弹窗时收起背后的项目/分支菜单 -->
-    <div v-if="open && store.enabled" class="worktree-overlay" @click.stop @click.self="close">
-      <section
-        ref="panel"
-        class="worktree-dialog"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="$t('input.worktreeSwitch')"
-        tabindex="-1"
-        @keydown.esc.stop="close"
-        @keydown="trapFocus"
-      >
-        <div class="worktree-header">
-          <span class="worktree-title">{{ $t('input.worktreeSwitch') }}</span>
-          <CloseButton :label="$t('common.close')" :disabled="store.busy" @click="close" />
+  <UiDialog :open="open" :title="$t('input.worktreeSwitch')" :busy="store.busy" @close="close">
+    <form id="worktree-form" class="worktree-form" @submit.prevent="save">
+      <div class="ui-dialog-field">
+        <span class="ui-dialog-label">{{ $t('input.worktreeTarget') }}</span>
+        <UiSelect
+          v-model="mode"
+          :options="options"
+          :label="$t('input.worktreeTarget')"
+          :disabled="disabled"
+        />
+      </div>
+      <template v-if="mode === 'create'">
+        <label class="ui-dialog-field">
+          <span class="ui-dialog-label">{{ $t('input.worktreeBranch') }}</span>
+          <input
+            v-model="branch"
+            class="ui-dialog-input"
+            type="text"
+            :disabled="disabled"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          />
+        </label>
+        <label class="ui-dialog-field">
+          <span class="ui-dialog-label">{{ $t('input.worktreeStart') }}</span>
+          <input
+            v-model="startRef"
+            class="ui-dialog-input"
+            type="text"
+            :disabled="disabled"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          />
+        </label>
+        <label class="ui-dialog-switch-row">
+          <span>{{ $t('input.worktreeCarry') }}</span>
+          <input v-model="includeUncommitted" type="checkbox" :disabled="disabled" />
+          <UiSwitch decorative :checked="includeUncommitted" :disabled="disabled" />
+        </label>
+      </template>
+      <div v-if="mode === 'path'" class="ui-dialog-field">
+        <label class="ui-dialog-label" for="worktree-path-input">{{
+          $t('input.worktreePath')
+        }}</label>
+        <!-- 「在文件管理器中选择」属于输入框本身，放在框内尾部（DESIGN.md §7 下方长输入框） -->
+        <div class="worktree-path" :class="{ 'is-disabled': disabled }">
+          <input
+            id="worktree-path-input"
+            v-model="manualPath"
+            type="text"
+            :disabled="disabled"
+            :placeholder="$t('input.worktreePathPlaceholder')"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          />
+          <button
+            type="button"
+            class="worktree-pick"
+            :disabled="disabled || picking"
+            @click="pickFolder"
+          >
+            {{ picking ? $t('input.worktreePickingFolder') : $t('input.worktreePickFolder') }}
+          </button>
         </div>
-        <form class="worktree-form" @submit.prevent="save">
-          <div class="worktree-body">
-            <!-- 不能用 label 包裹：label 会把点击再转发给内部按钮，下拉会开了立刻又关 -->
-            <div class="worktree-field">
-              <span class="worktree-label">{{ $t('input.worktreeTarget') }}</span>
-              <UiSelect
-                v-model="mode"
-                :options="options"
-                :label="$t('input.worktreeTarget')"
-                :disabled="disabled"
-              />
-            </div>
-            <template v-if="mode === 'create'">
-              <label class="worktree-field">
-                <span class="worktree-label">{{ $t('input.worktreeBranch') }}</span>
-                <input
-                  v-model="branch"
-                  type="text"
-                  :disabled="disabled"
-                  autocomplete="off"
-                  spellcheck="false"
-                  required
-                />
-              </label>
-              <label class="worktree-field">
-                <span class="worktree-label">{{ $t('input.worktreeStart') }}</span>
-                <input
-                  v-model="startRef"
-                  type="text"
-                  :disabled="disabled"
-                  autocomplete="off"
-                  spellcheck="false"
-                  required
-                />
-              </label>
-              <button
-                type="button"
-                class="worktree-carry"
-                role="switch"
-                :aria-checked="includeUncommitted"
-                :disabled="disabled"
-                @click="includeUncommitted = !includeUncommitted"
-              >
-                <FancyCheck :checked="includeUncommitted" :size="18" />
-                <span>{{ $t('input.worktreeCarry') }}</span>
-              </button>
-            </template>
-            <template v-if="mode === 'path'">
-              <label class="worktree-field">
-                <span class="worktree-label">{{ $t('input.worktreePath') }}</span>
-                <input
-                  v-model="manualPath"
-                  type="text"
-                  :disabled="disabled"
-                  :placeholder="$t('input.worktreePathPlaceholder')"
-                  autocomplete="off"
-                  spellcheck="false"
-                  required
-                />
-              </label>
-              <button
-                type="button"
-                class="worktree-carry"
-                :disabled="disabled || picking"
-                @click="pickFolder"
-              >
-                <span>{{
-                  picking ? $t('input.worktreePickingFolder') : $t('input.worktreePickFolder')
-                }}</span>
-              </button>
-              <p v-if="pickError" class="worktree-error" role="alert">{{ pickError }}</p>
-              <p v-else-if="pathChecking" class="worktree-hint">
-                {{ $t('input.worktreeCheckingPath') }}
-              </p>
-              <p v-else-if="pathInfo && !pathInfo.valid" class="worktree-error" role="alert">
-                {{ pathInfo.error }}
-              </p>
-              <p v-else-if="pathInfo?.valid" class="worktree-hint">
-                {{
-                  $t('input.worktreePathReady', {
-                    target:
-                      pathInfo.branch ||
-                      $t('input.worktreeDetached', { sha: (pathInfo.head || '').slice(0, 7) })
-                  })
-                }}
-              </p>
-            </template>
-            <p v-if="store.error" class="worktree-error" role="alert">{{ store.error }}</p>
-          </div>
-          <div class="worktree-actions">
-            <button type="button" class="worktree-btn" :disabled="store.busy" @click="close">
-              {{ $t('common.cancel') }}
-            </button>
-            <button
-              type="submit"
-              class="worktree-btn worktree-btn--primary"
-              :disabled="disabled || !valid"
-            >
-              {{ $t('common.save') }}
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  </Teleport>
+        <p v-if="pickError" class="ui-dialog-error" role="alert">{{ pickError }}</p>
+        <p v-else-if="pathChecking" class="ui-dialog-note">
+          {{ $t('input.worktreeCheckingPath') }}
+        </p>
+        <p v-else-if="pathInfo && !pathInfo.valid" class="ui-dialog-error" role="alert">
+          {{ pathInfo.error }}
+        </p>
+        <p v-else-if="pathInfo?.valid" class="ui-dialog-note">
+          {{
+            $t('input.worktreePathReady', {
+              target:
+                pathInfo.branch ||
+                $t('input.worktreeDetached', { sha: (pathInfo.head || '').slice(0, 7) })
+            })
+          }}
+        </p>
+      </div>
+      <p v-if="store.error" class="ui-dialog-error" role="alert">{{ store.error }}</p>
+    </form>
+    <template #actions>
+      <UiDialogButton :disabled="store.busy" @click="close">
+        {{ $t('common.cancel') }}
+      </UiDialogButton>
+      <UiDialogButton
+        type="submit"
+        form="worktree-form"
+        variant="primary"
+        :disabled="disabled || !valid"
+      >
+        {{ $t('common.save') }}
+      </UiDialogButton>
+    </template>
+  </UiDialog>
 </template>
 
 <style scoped>
-.worktree-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--overlay-scrim);
-}
-
-/* 弹窗本身不滚动：内容固定且短 */
-.worktree-dialog {
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
-  border-radius: 10px;
-  box-shadow: var(--shadow-card);
-  outline: none;
-}
-
-.worktree-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 48px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-default);
-}
-
-.worktree-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
 .worktree-form {
   display: flex;
   flex-direction: column;
+  gap: 20px;
 }
 
-.worktree-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px;
-}
-
-.worktree-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.worktree-label {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-secondary);
-}
-
-.worktree-field input[type='text'],
-.worktree-dialog :deep(.ui-select-trigger) {
-  width: 100%;
-  max-width: none;
-  height: 34px;
-  min-width: 0;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  background: var(--surface-soft);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-}
-
-.worktree-field input[type='text']:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.worktree-carry {
+/* 输入框外观在外层：内部 input 透明，尾部文字操作随文案变宽 */
+.worktree-path {
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
+  gap: 4px;
+  padding: 0 6px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  transition: border-color 140ms ease;
+}
+
+.worktree-path:focus-within {
+  border-color: var(--border-strong);
+}
+
+.worktree-path.is-disabled {
+  opacity: 0.5;
+}
+
+.worktree-path input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.worktree-carry:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.worktree-carry span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.worktree-error {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--state-danger);
-  overflow-wrap: anywhere;
-}
-
-.worktree-hint {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  overflow-wrap: anywhere;
-}
-
-.worktree-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-default);
-}
-
-.worktree-btn {
-  height: 32px;
-  padding: 0 14px;
-  border: 1px solid var(--border-default);
-  border-radius: 7px;
-  background: var(--surface-soft);
   color: var(--text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.worktree-path input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* 28 高，距框上下右各 6 */
+.worktree-pick {
+  height: 28px;
+  flex: none;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
 }
 
-.worktree-btn:hover:not(:disabled) {
+.worktree-pick:not(:disabled):hover {
   background: var(--hover-bg);
+  color: var(--text-primary);
 }
 
-.worktree-btn:disabled {
-  opacity: 0.5;
+.worktree-pick:disabled {
   cursor: default;
-}
-
-.worktree-btn--primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.worktree-btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
 }
 </style>

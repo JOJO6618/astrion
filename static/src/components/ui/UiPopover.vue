@@ -207,7 +207,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .ui-popover {
   position: fixed;
-  z-index: 2100;
+  /* 高于弹窗（UiDialog 2200 起）：弹窗里的下拉要压在遮罩之上 */
+  z-index: 2500;
   display: flex;
   flex-direction: column;
   max-height: min(320px, 65dvh);

@@ -263,12 +263,6 @@ export const composerDraftMethods = {
   clearComposerDraftState() {
     const submission = this.captureComposerDraftSubmission();
     this.completeComposerDraftSubmission(submission);
-    this.inputSetImagePickerOpen?.(false);
-    this.inputSetVideoPickerOpen?.(false);
-    this.imageEntries = [];
-    this.videoEntries = [];
-    this.imageLoading = false;
-    this.videoLoading = false;
     this.mediaUploading = false;
   }
 };

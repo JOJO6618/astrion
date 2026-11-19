@@ -1,199 +1,101 @@
 <template>
-  <transition name="sandbox-setup-fade" appear>
-    <div v-if="store.dialogVisible" class="sandbox-setup-overlay">
-      <section
-        class="sandbox-setup-card"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="$t('sandbox.setupAriaLabel')"
+  <UiDialog
+    :open="store.dialogVisible"
+    :title="$t('sandbox.setupTitle')"
+    size="wide"
+    @close="onClose"
+  >
+    <!-- 未开始：状态说明 + 要点 -->
+    <template v-if="!progress">
+      <p class="ui-dialog-text">{{ stateDescription || $t('sandbox.stateChecking') }}</p>
+      <LinuxSandboxInstallInfo v-if="isLinux" :status="store.status" />
+      <ul v-else class="sandbox-facts">
+        <li>{{ $t('sandbox.introWhat') }}</li>
+        <li>{{ $t('sandbox.introEffect') }}</li>
+        <li>{{ $t('sandbox.introDisk', { path: installPathHint }) }}</li>
+        <li>{{ $t('sandbox.introUninstall', { distro: distroName }) }}</li>
+        <li>{{ $t('sandbox.introSecure') }}</li>
+      </ul>
+      <label class="ui-dialog-switch-row">
+        <span>{{ $t('sandbox.neverAgain') }}</span>
+        <input v-model="neverChecked" type="checkbox" />
+        <UiSwitch decorative :checked="neverChecked" />
+      </label>
+    </template>
+
+    <!-- 安装中 / 终态：阶段 + 进度 + 步骤 + 日志 -->
+    <template v-else>
+      <div class="sandbox-progress-head">
+        <span class="sandbox-headline" :class="progress.phase" role="status">{{ headline }}</span>
+        <span class="sandbox-percent">{{ progressPercent }}%</span>
+      </div>
+      <div class="ui-dialog-progress sandbox-progress">
+        <span :style="{ width: progressPercent + '%' }" />
+      </div>
+      <p
+        v-if="progress.phase === 'error' && progress.error_kind === 'uac_cancelled'"
+        class="ui-dialog-note"
       >
-        <header class="sandbox-setup-windowbar">
-          <div class="sandbox-setup-window-title">{{ $t('sandbox.setupTitle') }}</div>
-          <span class="sandbox-setup-close">
-            <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="onClose" />
+        {{ $t('sandbox.uacCancelledHint') }}
+      </p>
+      <ol class="sandbox-steps">
+        <li v-for="(step, i) in steps" :key="i" :class="stepStatus(i + 1)">
+          <span class="sandbox-step-icon" aria-hidden="true">
+            <UiIcon v-if="stepStatus(i + 1) === 'done'" name="check" />
+            <UiIcon v-else-if="stepStatus(i + 1) === 'error'" name="x" />
+            <span v-else-if="stepStatus(i + 1) === 'active'" class="sandbox-spinner" />
+            <span v-else class="sandbox-dot" />
           </span>
-        </header>
+          <span class="sandbox-step-title">{{ step }}</span>
+          <span
+            v-if="i + 1 === 3 && progress.step_index === 3 && downloadText"
+            class="sandbox-step-extra"
+          >
+            {{ downloadText }}
+          </span>
+        </li>
+      </ol>
+      <div v-if="progress.log_tail.length" class="ui-dialog-field">
+        <span class="ui-dialog-label">{{ $t('sandbox.logLabel') }}</span>
+        <pre ref="logEl" class="ui-dialog-code sandbox-log">{{ progress.log_tail.join('\n') }}</pre>
+      </div>
+    </template>
 
-        <div class="sandbox-setup-body">
-          <!-- ── 未开始：说明 + 状态描述 ── -->
-          <template v-if="!progress">
-            <div class="sandbox-setup-hero">
-              <svg
-                viewBox="0 0 24 24"
-                width="34"
-                height="34"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z" />
-                <path d="M9 12l2 2 4-4" />
-              </svg>
-            </div>
-            <p v-if="stateDescription" class="sandbox-setup-state-desc">{{ stateDescription }}</p>
-            <p v-else class="sandbox-setup-state-desc">{{ $t('sandbox.stateChecking') }}</p>
-            <LinuxSandboxInstallInfo v-if="isLinux" :status="store.status" />
-            <ul v-else class="sandbox-setup-facts">
-              <li>{{ $t('sandbox.introWhat') }}</li>
-              <li>{{ $t('sandbox.introEffect') }}</li>
-              <li>{{ $t('sandbox.introDisk', { path: installPathHint }) }}</li>
-              <li>{{ $t('sandbox.introUninstall', { distro: distroName }) }}</li>
-              <li>{{ $t('sandbox.introSecure') }}</li>
-            </ul>
-          </template>
-
-          <!-- ── 安装中 / 终态：阶段 + 步骤进度 ── -->
-          <template v-else>
-            <div v-if="phaseLineText" class="sandbox-setup-phase-line">
-              <span class="sandbox-setup-spinner" aria-hidden="true"></span>
-              {{ phaseLineText }}
-            </div>
-
-            <ul class="sandbox-setup-steps">
-              <li
-                v-for="(step, i) in steps"
-                :key="i"
-                class="sandbox-setup-step"
-                :class="stepStatus(i + 1)"
-              >
-                <span class="sandbox-setup-step-icon" aria-hidden="true">
-                  <svg
-                    v-if="stepStatus(i + 1) === 'done'"
-                    viewBox="0 0 20 20"
-                    width="13"
-                    height="13"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.4"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M4 10.5l4 4 8-9" />
-                  </svg>
-                  <span
-                    v-else-if="stepStatus(i + 1) === 'active'"
-                    class="sandbox-setup-spinner small"
-                  ></span>
-                  <svg
-                    v-else-if="stepStatus(i + 1) === 'error'"
-                    viewBox="0 0 20 20"
-                    width="13"
-                    height="13"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.4"
-                    stroke-linecap="round"
-                  >
-                    <path d="M5 5l10 10M15 5L5 15" />
-                  </svg>
-                  <span v-else class="sandbox-setup-step-dot"></span>
-                </span>
-                <span class="sandbox-setup-step-title">{{ step }}</span>
-                <span
-                  v-if="i + 1 === 3 && progress.step_index === 3 && downloadText"
-                  class="sandbox-setup-step-extra"
-                >
-                  {{ downloadText }}
-                </span>
-              </li>
-            </ul>
-
-            <div class="sandbox-setup-progress">
-              <div
-                class="sandbox-setup-progress-fill"
-                :style="{ width: progressPercent + '%' }"
-              ></div>
-            </div>
-
-            <div v-if="progress.phase === 'done'" class="sandbox-setup-result ok">
-              {{ $t('sandbox.phaseDone') }}
-            </div>
-            <div v-else-if="progress.phase === 'needs_reboot'" class="sandbox-setup-result warn">
-              {{ $t('sandbox.phaseNeedsReboot') }}
-            </div>
-            <div v-else-if="progress.phase === 'error'" class="sandbox-setup-result error">
-              <p class="sandbox-setup-error-line">
-                {{ progress.error || $t('sandbox.phaseError') }}
-              </p>
-              <p v-if="progress.error_kind === 'uac_cancelled'" class="sandbox-setup-error-hint">
-                {{ $t('sandbox.uacCancelledHint') }}
-              </p>
-            </div>
-
-            <div v-if="progress.log_tail.length" class="sandbox-setup-log-block">
-              <div class="sandbox-setup-log-label">{{ $t('sandbox.logLabel') }}</div>
-              <pre ref="logEl" class="sandbox-setup-log">{{ progress.log_tail.join('\n') }}</pre>
-            </div>
-          </template>
-        </div>
-
-        <footer v-if="!progress || !progress.active" class="sandbox-setup-footer">
-          <!-- 未开始 -->
-          <template v-if="!progress">
-            <label class="sandbox-setup-never">
-              <input
-                type="checkbox"
-                :checked="neverChecked"
-                @change="neverChecked = ($event.target as HTMLInputElement).checked"
-              />
-              <FancyCheck :checked="neverChecked" :size="16" />
-              <span>{{ $t('sandbox.neverAgain') }}</span>
-            </label>
-            <div class="sandbox-setup-spacer"></div>
-            <button
-              v-if="isLinux"
-              type="button"
-              class="sandbox-setup-btn ghost"
-              :disabled="store.checking"
-              @click="store.recheck()"
-            >
-              {{ $t('sandbox.recheck') }}
-            </button>
-            <button type="button" class="sandbox-setup-btn ghost" @click="onClose">
-              {{ $t('sandbox.later') }}
-            </button>
-            <button
-              type="button"
-              class="sandbox-setup-btn primary"
-              v-if="!isLinux || store.status?.can_install"
-              :disabled="store.starting || store.checking || !store.status"
-              @click="store.startSetup()"
-            >
-              {{ store.starting ? $t('common.loading') : $t('sandbox.installNow') }}
-            </button>
-          </template>
-          <!-- 终态 -->
-          <template v-else>
-            <div class="sandbox-setup-spacer"></div>
-            <button
-              v-if="progress.phase === 'error' || progress.phase === 'needs_reboot'"
-              type="button"
-              class="sandbox-setup-btn primary"
-              :disabled="store.starting"
-              @click="store.retrySetup()"
-            >
-              {{
-                progress.phase === 'needs_reboot' ? $t('sandbox.rebootDone') : $t('common.retry')
-              }}
-            </button>
-            <button type="button" class="sandbox-setup-btn ghost" @click="onClose">
-              {{ $t('common.close') }}
-            </button>
-          </template>
-        </footer>
-      </section>
-    </div>
-  </transition>
+    <template v-if="!progress || !progress.active" #actions>
+      <template v-if="!progress">
+        <UiDialogButton v-if="isLinux" :disabled="store.checking" @click="store.recheck()">
+          {{ $t('sandbox.recheck') }}
+        </UiDialogButton>
+        <UiDialogButton @click="onClose">{{ $t('sandbox.later') }}</UiDialogButton>
+        <UiDialogButton
+          v-if="!isLinux || store.status?.can_install"
+          variant="primary"
+          :disabled="store.starting || store.checking || !store.status"
+          @click="store.startSetup()"
+        >
+          {{ store.starting ? $t('common.loading') : $t('sandbox.installNow') }}
+        </UiDialogButton>
+      </template>
+      <template v-else-if="progress.phase === 'error' || progress.phase === 'needs_reboot'">
+        <UiDialogButton @click="onClose">{{ $t('common.close') }}</UiDialogButton>
+        <UiDialogButton variant="primary" :disabled="store.starting" @click="store.retrySetup()">
+          {{ progress.phase === 'needs_reboot' ? $t('sandbox.rebootDone') : $t('common.retry') }}
+        </UiDialogButton>
+      </template>
+      <UiDialogButton v-else variant="primary" @click="onClose">
+        {{ $t('common.close') }}
+      </UiDialogButton>
+    </template>
+  </UiDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import FancyCheck from '@/components/common/FancyCheck.vue';
-import CloseButton from '@/components/common/CloseButton.vue';
+import UiDialog from '@/components/ui/UiDialog.vue';
+import UiDialogButton from '@/components/ui/UiDialogButton.vue';
+import UiIcon from '@/components/ui/UiIcon.vue';
+import UiSwitch from '@/components/ui/UiSwitch.vue';
 import LinuxSandboxInstallInfo from './LinuxSandboxInstallInfo.vue';
 import { useSandboxSetupStore } from '@/stores/sandboxSetup';
 
@@ -296,6 +198,16 @@ const progressPercent = computed(() => {
   }
 });
 
+/** 进度区标题：终态写结果，过程中写当前阶段或步骤 */
+const headline = computed(() => {
+  const p = progress.value;
+  if (!p) return '';
+  if (p.phase === 'done') return t('sandbox.phaseDone');
+  if (p.phase === 'needs_reboot') return t('sandbox.phaseNeedsReboot');
+  if (p.phase === 'error') return p.error || t('sandbox.phaseError');
+  return phaseLineText.value || steps.value[Math.max(0, p.step_index - 1)] || '';
+});
+
 const phaseLineText = computed(() => {
   const p = progress.value;
   if (!p) return '';
@@ -329,5 +241,161 @@ function onClose() {
   store.closeDialog(neverChecked.value);
 }
 </script>
+<style scoped>
+.sandbox-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
 
-<style scoped src="./SandboxSetupDialog.scss"></style>
+.sandbox-facts li {
+  position: relative;
+  padding-left: 14px;
+}
+
+.sandbox-facts li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 9px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.sandbox-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.sandbox-headline {
+  min-width: 0;
+}
+
+.sandbox-headline.error {
+  color: var(--state-danger);
+}
+
+.sandbox-percent {
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 进度条紧贴阶段行：同一组信息，间距 8 而非区块间距 20 */
+.ui-dialog-body > .sandbox-progress {
+  margin-top: 8px;
+}
+
+.sandbox-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sandbox-steps li {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.sandbox-steps li.done {
+  color: var(--text-secondary);
+}
+
+.sandbox-steps li.active {
+  color: var(--text-primary);
+}
+
+.sandbox-steps li.error {
+  color: var(--state-danger);
+}
+
+.sandbox-step-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.sandbox-step-icon .ui-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sandbox-step-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sandbox-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.sandbox-spinner {
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: sandbox-spin 800ms linear infinite;
+}
+
+.sandbox-step-extra {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.sandbox-log {
+  max-height: 160px;
+  overflow-y: auto;
+  overscroll-behavior: none;
+}
+
+.sandbox-log::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sandbox-log::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+
+@keyframes sandbox-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sandbox-spinner {
+    animation-duration: 2s;
+  }
+}
+</style>

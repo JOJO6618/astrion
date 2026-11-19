@@ -8,9 +8,7 @@ interface InputState {
   quickMenuOpen: boolean;
   toolMenuOpen: boolean;
   settingsOpen: boolean;
-  imagePickerOpen: boolean;
   selectedImages: string[];
-  videoPickerOpen: boolean;
   selectedVideos: string[];
   // 待发送的附加文件（工作区相对路径，随消息一同发送，上限 9 个）
   selectedFiles: string[];
@@ -30,9 +28,7 @@ export const useInputStore = defineStore('input', {
     quickMenuOpen: false,
     toolMenuOpen: false,
     settingsOpen: false,
-    imagePickerOpen: false,
     selectedImages: [],
-    videoPickerOpen: false,
     selectedVideos: [],
     selectedFiles: [],
     goalModeArmed: false,
@@ -89,12 +85,6 @@ export const useInputStore = defineStore('input', {
     },
     setSettingsOpen(open: boolean) {
       this.settingsOpen = open;
-    },
-    setImagePickerOpen(open: boolean) {
-      this.imagePickerOpen = open;
-    },
-    setVideoPickerOpen(open: boolean) {
-      this.videoPickerOpen = open;
     },
     setSelectedImages(list: string[]) {
       this.selectedImages = list.slice(0, 9);

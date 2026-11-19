@@ -311,8 +311,8 @@
               @reject-tool-approval="rejectToolApproval"
               @file-selected="handleFileSelected"
               @paste-files="handlePastedFiles"
-              @pick-images="openImagePicker"
-              @pick-video="openVideoPicker"
+              @pick-images="pickLocalImages"
+              @pick-video="pickLocalVideo"
               @remove-image="handleRemoveImage"
               @remove-video="handleRemoveVideo"
               @remove-file="handleRemoveFile"
@@ -436,32 +436,6 @@
       />
       <!-- 指令拦截规则窗口：store 驱动，与设置页共用同一实例（settingsRoute 下也可见） -->
       <CommandBlockingDialog />
-      <transition name="overlay-fade">
-        <ImagePicker
-          v-if="imagePickerOpen"
-          :open="imagePickerOpen"
-          :entries="imageEntries"
-          :initial-selected="selectedImages"
-          :loading="imageLoading"
-          :uploading="mediaUploading"
-          @close="closeImagePicker"
-          @confirm="handleImagesConfirmed"
-          @local-files="handleLocalImageFiles"
-        />
-      </transition>
-      <transition name="overlay-fade">
-        <VideoPicker
-          v-if="videoPickerOpen"
-          :open="videoPickerOpen"
-          :entries="videoEntries"
-          :initial-selected="selectedVideos"
-          :loading="videoLoading"
-          :uploading="mediaUploading"
-          @close="closeVideoPicker"
-          @confirm="handleVideosConfirmed"
-          @local-files="handleLocalVideoFiles"
-        />
-      </transition>
       <ImageLightbox />
       <transition name="overlay-fade">
         <ConversationReviewDialog
@@ -752,7 +726,6 @@ import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import appOptions from './app';
 import ConversationModelHeader from './components/chat/ConversationModelHeader.vue';
 import ModelEffortPanel from './components/chat/ModelEffortPanel.vue';
-import VideoPicker from './components/overlay/VideoPicker.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
 import ProjectMemoryMigrationDialog from './components/overlay/ProjectMemoryMigrationDialog.vue';
 import QuickDock from './components/chat/quickdock/QuickDock.vue';

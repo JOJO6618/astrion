@@ -12,6 +12,7 @@ export default {
   migrateConversationProject: 'Move to project',
   transferTarget: 'Choose target workspace',
   transferTargetProject: 'Choose target project',
+  transferModelLabel: 'Model',
   transferKeepModel: 'Keep original model',
   transferWorking: 'Processing…',
   transferExporting: 'Exporting conversation…',

@@ -12,7 +12,6 @@ import StatusAvatar from '../components/avatar/StatusAvatar.vue';
 const PersonalizationDrawer = defineAsyncComponent(
   () => import('../components/personalization/PersonalizationDrawer.vue')
 );
-const ImagePicker = defineAsyncComponent(() => import('../components/overlay/ImagePicker.vue'));
 const ConversationReviewDialog = defineAsyncComponent(
   () => import('../components/overlay/ConversationReviewDialog.vue')
 );
@@ -65,7 +64,6 @@ export const appComponents = {
   InputComposer,
   AppShell,
   StatusAvatar,
-  ImagePicker,
   ConversationReviewDialog,
   SubAgentActivityDialog,
   BackgroundCommandDialog,

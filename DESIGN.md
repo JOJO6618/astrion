@@ -7,7 +7,7 @@
 - **主对话页**（输入栏、输入栏弹层、快捷窗口）已于 2026-11-17 按 §7「主对话页」改造；顶栏模型弹窗 2026-11-18 改造（设计稿 `_experiments/2026-11-18_模型选择弹窗demo/model-picker.html`）；消息区的行内引用悬停卡 2026-11-18 改造（设计稿 `_experiments/2026-11-18_引用悬停卡demo/citation-hovercard.html`）；顶栏触发器与消息区其余部分尚未改造。
 - 原则冲突时先围绕用户任务判断，再记录依据；不能用个人审美或“现代化”推翻已确认的设计。
 
-> 状态（2026-11-17）：本版为统一规范草稿。§5 的非颜色 token 尚未落地；§6 的公共组件（`static/src/components/ui/`）随页面改造逐步提取，已落地 `UiIcon`、`UiIconButton`（§6.2）、`UiPopover`（§6.3）、`UiMenu`（§6.4）、`UiSearchField`、`UiSwitch`（§6.8）、`UiSelect`、`UiSelectTrigger`、`UiModelSelect`（§6.5）。
+> 状态（2026-11-17）：本版为统一规范草稿。§5 的非颜色 token 尚未落地；§6 的公共组件（`static/src/components/ui/`）随页面改造逐步提取，已落地 `UiIcon`、`UiIconButton`（§6.2）、`UiPopover`（§6.3）、`UiMenu`（§6.4）、`UiSearchField`、`UiSwitch`（§6.8）、`UiSelect`、`UiSelectTrigger`、`UiModelSelect`（§6.5）、`UiDialog`、`UiDialogButton`（§6.7）。
 
 ---
 
@@ -235,7 +235,9 @@
 
 ### 6.7 Dialog（大弹窗）
 
-- 宽度两档：480／590（wide），`max-height: min(85dvh, 100dvh − 48px)`，正文区内部滚动。
+- **公共组件**：`ui/UiDialog.vue`（外框、骨架、动画与交互全包，弹窗只写正文和按钮）+ `ui/UiDialogButton.vue`；正文积木类 `.ui-dialog-text`／`-field`／`-label`／`-input`／`-textarea`／`-code`／`-note`／`-error`／`-switch-row`／`-progress`／`-link` 由 `UiDialog` 提供。设计稿 `_experiments/2026-11-19_弹窗统一demo/`。2026-11-19 已接入：通用确认框、对话转移、沙箱安装、项目记忆迁移、路径授权、指令拦截、切换工作树。
+- 宽度三档：480（默认）／590（wide）／1040（xl，列表 + 详情或大内容）；`max-height: min(85dvh, 100dvh − 48px)`，正文区内部滚动且不回弹（`overscroll-behavior: none`），弹窗打开期间页面根节点不滚动、不回弹。
+- 层级：弹窗 2200 起，后打开的叠在上面（按打开顺序，不按挂载顺序）；弹层 `UiPopover` 2500，弹窗里的下拉压在遮罩之上。
 - 外框 G3（参数 18），底色 `--surface-raised`，描边与投影跟随 G3 轮廓。
 - **一个边距 E = 20 管所有边与区块间距**：
   - 水平：标题、字段标签、正文的左缘，输入框左右两侧，关闭按钮热区右缘，底部按钮右缘，全部距弹窗边缘 20。
@@ -244,7 +246,8 @@
 - 字段：标签 13/20，标签与输入间距 8，字段之间 20。
 - 底部按钮：默认高 34、最小宽 60、左右内边距 14、字号 13／500、按钮间距 8；G3 参数 次 5／主 6；主按钮墨色，次按钮 `--surface-raised` + 跟随轮廓的描边。主按钮在文案较长或需要更强调时可按场景调整，默认 34。
 - 遮罩 `--overlay-scrim`，允许 `backdrop-filter: blur(12px)`。进出动画见 §6.10。
-- 打开时聚焦首个输入，否则聚焦首个按钮；Tab 焦点圈在弹窗内；Esc 和点击遮罩关闭（按下与抬起都在遮罩上才算）；忙碌时禁止关闭；关闭后恢复原焦点。
+- 二态选项用「文字 + 右侧 `UiSwitch`」行（`.ui-dialog-switch-row`），不用打勾框，也不放进底部按钮行。
+- 打开时聚焦首个输入，否则聚焦底部首个按钮（不落到关闭按钮）；Tab 焦点圈在弹窗内；Esc 和点击遮罩关闭（按下与抬起都在遮罩上才算）；忙碌时禁止关闭；关闭后恢复原焦点。
 - 通用确认／表单弹窗结构：标题、内容、可选警告、次按钮／主按钮。数据目录迁移、路径授权等有专属交互的弹窗按语义单独保留。
 
 ### 6.8 Switch

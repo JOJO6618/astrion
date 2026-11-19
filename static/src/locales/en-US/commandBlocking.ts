@@ -12,17 +12,15 @@ export default {
   statusOn: 'Enabled',
   statusOff: 'Disabled',
   loading: 'Loading...',
-  matchHint:
-    'Matching: case-insensitive text containment. A command is blocked when it contains any rule.',
-  sharedHint: 'Rules are personal and shared across all of your workspaces.',
-  sharedHintProject: 'Rules are personal and shared across all of your projects.',
+  summary:
+    '{status}. Rules apply to all of your workspaces; a command is blocked when it contains any rule (case-insensitive).',
+  summaryProject:
+    '{status}. Rules apply to all of your projects; a command is blocked when it contains any rule (case-insensitive).',
   rulesLabel: 'Blocking rules',
   rulesDesc: 'Which command content gets blocked',
   rulesPlaceholder: 'One rule per line, e.g. rm -rf',
-  useRecommended: 'Use recommended rules',
-  recommendedHint:
-    'Recommended rules are only appended to the draft and take effect after you save.',
-  noRecommended: 'No recommended rules available',
+  useRecommended: 'Add recommended rules',
+  recommendedHint: 'Added {n} recommended rules. They take effect after you save.',
 
   // ── Errors (kept and shown inline, no alert/confirm) ──
   loadFailedHint: 'Failed to load. Saving is unavailable.',

@@ -154,11 +154,13 @@ export const useCommandBlockingStore = defineStore('commandBlocking', {
       void this.fetchState(true);
     },
 
-    /** 关闭窗口（取消）：丢弃草稿，保留服务端状态与错误记录 */
+    /**
+     * 关闭窗口（取消）：草稿作废（下次 openDialog 重置），保留服务端状态与错误记录。
+     * 这里不清空 draft：弹窗退出动画期间文本域内容保持不变。
+     */
     closeDialog(): void {
       if (this.saving) return;
       this.dialogOpen = false;
-      this.draft = '';
       if (this.loading) {
         ++this.fetchSeq;
         this.loading = false;

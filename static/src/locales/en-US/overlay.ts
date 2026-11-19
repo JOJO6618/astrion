@@ -60,13 +60,6 @@ export default {
   imagePreview: 'Image preview',
   closePreview: 'Close preview',
 
-  // ── ImagePicker ──
-  imagePickerTitle: 'Select images (up to 9)',
-  uploading: 'Uploading...',
-  sendFromLocal: 'Send from local',
-  noImages: 'No image files found',
-  imageSelectedCount: 'Selected {n} / 9',
-
   // ── NewUserTutorialPrompt ──
   tutorialPromptAriaLabel: 'New user tutorial prompt',
   welcome: 'Welcome',
@@ -84,12 +77,13 @@ export default {
   pathAuthWorkspaceHint:
     'Applies to this workspace only, on top of the global grants. Effective set = global + the entries above.',
   pathAuthGlobalHint: 'Applies to all workspaces.',
+  pathAuthScopeLabel: 'Scope',
+  pathAuthModeLabel: 'Access',
+  pathAuthPathsLabel: 'Paths',
   writableMode: 'Read & write',
   readableMode: 'Read-only',
-  writableHint:
-    'Read-write paths are writable in the writable sandbox and read-only in the read-only sandbox.',
-  readableHint:
-    'Read-only paths join the read whitelist of the read-only sandbox (which denies all reads by default except system dirs, the workspace, and authorized paths).',
+  writableModeDesc: 'Writable in the writable sandbox, read-only in the read-only sandbox',
+  readableModeDesc: 'Added to the read-only sandbox read whitelist',
   writablePlaceholder: 'One path per line, e.g. ~/Desktop/agents-export',
   readablePlaceholder: 'One path per line, e.g. ~/Documents/reference',
 
@@ -158,10 +152,5 @@ export default {
   modeOverwrite: 'Overwrite current conversation',
   modeCopy: 'Copy conversation',
   restoring: 'Restoring...',
-  confirmRestore: 'Confirm restore',
-
-  // ── VideoPicker ──
-  videoPickerTitle: 'Select video (1 at a time)',
-  noVideos: 'No video files found',
-  videoSelectedCount: 'Selected {n} / 1'
+  confirmRestore: 'Confirm restore'
 } as const;

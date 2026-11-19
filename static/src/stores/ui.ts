@@ -34,7 +34,6 @@ interface ConfirmDialogOptions {
   warningText?: string;
   closeOnBackdrop?: boolean;
   confirmVariant?: 'primary' | 'danger';
-  confirmOnLeft?: boolean;
   checkboxLabel?: string;
   onCheckboxChange?: (checked: boolean) => void;
 }
@@ -270,7 +269,6 @@ export const useUiStore = defineStore('ui', {
           warningText: options.warningText || '',
           closeOnBackdrop: options.closeOnBackdrop !== false,
           confirmVariant: options.confirmVariant === 'danger' ? 'danger' : 'primary',
-          confirmOnLeft: options.confirmOnLeft === true,
           checkboxLabel: options.checkboxLabel,
           checkboxChecked: false,
           onCheckboxChange: options.onCheckboxChange

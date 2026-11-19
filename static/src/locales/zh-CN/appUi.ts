@@ -157,12 +157,6 @@ export default {
   dockerModeFilesChanged: 'Docker 模式下文件区已改为项目列表',
 
   // ── 上传（entries.ts / picker.ts / process.ts / quick.ts） ──
-  noImagesFound: '未找到图片',
-  noImagesInWorkspace: '工作区内没有可用的图片文件',
-  loadImagesFailed: '加载图片失败',
-  noVideosFound: '未找到视频',
-  noVideosInWorkspace: '工作区内没有可用的视频文件',
-  loadVideosFailed: '加载视频失败',
   uploadingTitle: '上传中',
   waitImageUploadDone: '请等待当前图片上传完成',
   waitFileUploadDone: '请等待当前文件上传完成',

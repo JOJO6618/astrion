@@ -76,9 +76,6 @@ export const stateMethods = {
     this.inputClearMessage();
     this.composerReservedHeight = 80;
     this.inputClearSelectedImages();
-    this.inputSetImagePickerOpen(false);
-    this.imageEntries = [];
-    this.imageLoading = false;
     this.conversationHasImages = false;
     this.conversationHasVideos = false;
     this.toolSetSettingsLoading(false);

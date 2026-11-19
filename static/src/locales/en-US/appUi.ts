@@ -163,12 +163,6 @@ export default {
   dockerModeFilesChanged: 'In Docker mode the files area now shows the project list',
 
   // ── Upload (entries.ts / picker.ts / process.ts / quick.ts) ──
-  noImagesFound: 'No images found',
-  noImagesInWorkspace: 'No image files available in the workspace',
-  loadImagesFailed: 'Failed to load images',
-  noVideosFound: 'No videos found',
-  noVideosInWorkspace: 'No video files available in the workspace',
-  loadVideosFailed: 'Failed to load videos',
   uploadingTitle: 'Uploading',
   waitImageUploadDone: 'Wait for the current image upload to finish',
   waitFileUploadDone: 'Wait for the current file upload to finish',

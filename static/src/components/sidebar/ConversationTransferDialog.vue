@@ -6,64 +6,56 @@
     accept=".zip,application/zip"
     @change="selectedFile"
   />
-  <Teleport to="body">
-    <div v-if="visible" class="confirm-overlay" @click.self="close" @keydown.esc.stop="close">
-      <section
-        ref="panel"
-        class="confirm-modal transfer-dialog"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="heading"
-        tabindex="-1"
-      >
-        <div class="confirm-title">{{ heading }}</div>
-        <div v-if="file" class="transfer-file-name">{{ file.name }}</div>
-        <ChatChoice
-          v-if="mode === 'migrate'"
-          v-model="target"
-          :disabled="busy"
-          :label="isProject ? $t('sidebar.transferTargetProject') : $t('sidebar.transferTarget')"
-          :options="targets"
-        />
-        <ModelSelectDropdown
-          v-if="mode === 'import'"
-          :model-value="selectedModel"
-          :options="models.models"
-          :placeholder="$t('sidebar.transferKeepModel')"
-          :extra-options="[{ key: '', label: $t('sidebar.transferKeepModel') }]"
-          @select="selectedModel = $event"
-        />
-        <p v-if="error" class="transfer-error" role="alert">{{ error }}</p>
-        <div class="confirm-actions">
-          <button
-            type="button"
-            class="confirm-button confirm-button--cancel"
-            :disabled="busy"
-            @click="close"
-          >
-            {{ $t('common.cancel') }}
-          </button>
-          <button
-            type="button"
-            class="confirm-button confirm-button--confirm"
-            :disabled="busy || (mode === 'migrate' && !target)"
-            @click="submit"
-          >
-            {{ busy ? $t('sidebar.transferWorking') : heading }}
-          </button>
-        </div>
-      </section>
+  <UiDialog :open="visible" :title="heading" :busy="busy" @close="close">
+    <p v-if="file" class="ui-dialog-text transfer-file-name">{{ file.name }}</p>
+    <div v-if="mode === 'migrate'" class="ui-dialog-field">
+      <span class="ui-dialog-label">{{
+        isProject ? $t('sidebar.transferTargetProject') : $t('sidebar.transferTarget')
+      }}</span>
+      <UiSelect
+        :model-value="target || ''"
+        :options="targets"
+        :label="isProject ? $t('sidebar.transferTargetProject') : $t('sidebar.transferTarget')"
+        :placeholder="
+          isProject ? $t('sidebar.transferTargetProject') : $t('sidebar.transferTarget')
+        "
+        :disabled="busy || !targets.length"
+        @update:model-value="target = $event || null"
+      />
     </div>
-  </Teleport>
+    <div v-if="mode === 'import'" class="ui-dialog-field">
+      <span class="ui-dialog-label">{{ $t('sidebar.transferModelLabel') }}</span>
+      <UiModelSelect
+        v-model="selectedModel"
+        :options="models.models"
+        :label="$t('sidebar.transferModelLabel')"
+        :placeholder="$t('sidebar.transferKeepModel')"
+        :extra-options="[{ key: '', label: $t('sidebar.transferKeepModel') }]"
+      />
+    </div>
+    <p v-if="error" class="ui-dialog-error transfer-error" role="alert">{{ error }}</p>
+    <template #actions>
+      <UiDialogButton :disabled="busy" @click="close">{{ $t('common.cancel') }}</UiDialogButton>
+      <UiDialogButton
+        variant="primary"
+        :disabled="busy || (mode === 'migrate' && !target)"
+        @click="submit"
+      >
+        {{ busy ? $t('sidebar.transferWorking') : heading }}
+      </UiDialogButton>
+    </template>
+  </UiDialog>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useModelStore } from '@/stores/model';
 import { useConversationStore } from '@/stores/conversation';
-import ChatChoice from '@/components/chat-mode/ChatChoice.vue';
-import ModelSelectDropdown from '@/components/personalization/ModelSelectDropdown.vue';
+import UiDialog from '@/components/ui/UiDialog.vue';
+import UiDialogButton from '@/components/ui/UiDialogButton.vue';
+import UiModelSelect from '@/components/ui/UiModelSelect.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
 import {
   exportConversationFile,
   transferRequest,
@@ -81,7 +73,6 @@ const { t } = useI18n();
 const ui = useUiStore();
 const models = useModelStore();
 const conversations = useConversationStore();
-const panel = ref<HTMLElement>();
 const fileInput = ref<HTMLInputElement>();
 const visible = ref(false);
 const busy = ref(false);
@@ -105,26 +96,21 @@ let conversationId = '';
 let sourceScope: TransferScope = {};
 let pendingImportScope: TransferScope = {};
 let operationId = '';
-let returnFocus: HTMLElement | null = null;
 
 function begin(
   scope: TransferScope = { chatMode: props.chatMode, workspaceId: props.workspaceId }
 ) {
-  returnFocus = document.activeElement as HTMLElement | null;
   operationId = crypto.randomUUID();
   sourceScope = { ...scope };
   error.value = '';
   target.value = null;
   selectedModel.value = '';
   visible.value = true;
-  void nextTick(() => panel.value?.focus());
 }
 function close() {
   if (busy.value) return;
   requestGeneration++;
   visible.value = false;
-  file.value = null;
-  returnFocus?.focus();
 }
 function pickImport(workspaceId?: string) {
   if (busy.value) return;
@@ -244,25 +230,14 @@ defineExpose({ pickImport, openMigration, startExport });
 .transfer-file-input {
   display: none;
 }
-.transfer-dialog {
-  width: 440px;
-  max-width: calc(100vw - 32px);
-  max-height: min(560px, calc(100dvh - 48px));
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
+
 .transfer-file-name {
-  height: 32px;
-  line-height: 32px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--text-secondary);
-  margin-bottom: 12px;
 }
+
 .transfer-error {
-  color: var(--state-danger);
-  font-size: 13px;
   max-height: 120px;
   overflow-y: auto;
   overflow-wrap: anywhere;

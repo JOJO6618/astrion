@@ -1471,13 +1471,6 @@ const updateFileAtMenuPosition = (tokenEnd: number) => {
   });
 };
 
-const isImageFile = (path: string): boolean => {
-  if (!path) return false;
-  const ext = path.split('.').pop()?.toLowerCase() || '';
-  // svg 不走图片链路（模型图片输入与 view 工具均不支持），按普通文件处理
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico'].includes(ext);
-};
-
 const fetchProjectFileSearch = async (query: string) => {
   fileAtLoading.value = true;
   try {
@@ -1565,11 +1558,7 @@ const selectFileAtItemByIndex = (index: number) => {
   const fileIndex = hasPicker ? index - 1 : index;
   const item = fileAtItems.value[fileIndex];
   if (!item) return;
-  if (item.type === 'file' && isImageFile(item.path)) {
-    closeFileAtMenu();
-    emit('pick-images');
-    return;
-  }
+  // 图片与其它文件一样插入引用；工作区图片选择窗口已移除（发送图片只走本机选择）
   insertFileAtMention(item);
 };
 

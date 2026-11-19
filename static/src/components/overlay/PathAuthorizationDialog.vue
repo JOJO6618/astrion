@@ -1,208 +1,135 @@
-<template>
-  <transition name="path-auth-fade">
-    <div v-if="open" class="overlay-backdrop">
-      <div class="overlay-card">
-        <div class="overlay-header">
-          <h3>{{ $t('overlay.pathAuthTitle') }}</h3>
-          <CloseButton :label="$t('common.close')" @click="$emit('close')" />
-        </div>
-        <div class="mode-switch">
-          <button
-            type="button"
-            class="mode-btn"
-            :class="{ active: scope === 'workspace' }"
-            @click="$emit('update:scope', 'workspace')"
-          >
-            {{ $t('overlay.pathAuthScopeWorkspace') }}
-          </button>
-          <button
-            type="button"
-            class="mode-btn"
-            :class="{ active: scope === 'global' }"
-            @click="$emit('update:scope', 'global')"
-          >
-            {{ $t('overlay.pathAuthScopeGlobal') }}
-          </button>
-        </div>
-        <p v-if="scope === 'workspace' && workspacePath" class="scope-path">{{ workspacePath }}</p>
-        <div class="mode-switch">
-          <button
-            type="button"
-            class="mode-btn"
-            :class="{ active: mode === 'writable' }"
-            @click="$emit('update:mode', 'writable')"
-          >
-            {{ $t('overlay.writableMode') }}
-          </button>
-          <button
-            type="button"
-            class="mode-btn"
-            :class="{ active: mode === 'readable' }"
-            @click="$emit('update:mode', 'readable')"
-          >
-            {{ $t('overlay.readableMode') }}
-          </button>
-        </div>
-        <p class="hint">
-          {{ mode === 'writable' ? $t('overlay.writableHint') : $t('overlay.readableHint') }}
-        </p>
-        <textarea
-          class="path-input"
-          :value="value"
-          @input="$emit('update:value', ($event.target as HTMLTextAreaElement).value)"
-          :placeholder="
-            mode === 'writable'
-              ? $t('overlay.writablePlaceholder')
-              : $t('overlay.readablePlaceholder')
-          "
-        />
-        <p class="hint scope-hint">
-          {{
-            scope === 'workspace'
-              ? $t('overlay.pathAuthWorkspaceHint')
-              : $t('overlay.pathAuthGlobalHint')
-          }}
-        </p>
-        <div class="actions">
-          <button type="button" class="btn" @click="$emit('save')" :disabled="saving">
-            {{ $t('common.save') }}
-          </button>
-          <button type="button" class="btn btn-muted" @click="$emit('close')">
-            {{ $t('common.cancel') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </transition>
-</template>
-
 <script setup lang="ts">
-import CloseButton from '@/components/common/CloseButton.vue';
+/**
+ * 路径授权（DESIGN.md §6.7：专属交互按语义保留）：生效范围、权限、路径列表。
+ * 范围与权限用弹窗规格 UiSelect，选项说明放在次文字里。
+ */
+import { computed } from 'vue';
+import { t } from '@/locales';
+import UiDialog from '@/components/ui/UiDialog.vue';
+import UiDialogButton from '@/components/ui/UiDialogButton.vue';
+import UiSelect from '@/components/ui/UiSelect.vue';
 
-defineProps<{
+type Mode = 'writable' | 'readable';
+type Scope = 'workspace' | 'global';
+
+const props = defineProps<{
   open: boolean;
   value: string;
-  mode: 'writable' | 'readable';
-  scope: 'workspace' | 'global';
+  mode: Mode;
+  scope: Scope;
   workspacePath?: string;
   saving?: boolean;
 }>();
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'save'): void;
   (e: 'update:value', v: string): void;
-  (e: 'update:mode', v: 'writable' | 'readable'): void;
-  (e: 'update:scope', v: 'workspace' | 'global'): void;
+  (e: 'update:mode', v: Mode): void;
+  (e: 'update:scope', v: Scope): void;
 }>();
+
+const scopeOptions = computed(() => [
+  {
+    value: 'workspace',
+    label: t('overlay.pathAuthScopeWorkspace'),
+    description: props.workspacePath || undefined
+  },
+  {
+    value: 'global',
+    label: t('overlay.pathAuthScopeGlobal'),
+    description: t('overlay.pathAuthGlobalHint')
+  }
+]);
+const modeOptions = computed(() => [
+  {
+    value: 'writable',
+    label: t('overlay.writableMode'),
+    description: t('overlay.writableModeDesc')
+  },
+  {
+    value: 'readable',
+    label: t('overlay.readableMode'),
+    description: t('overlay.readableModeDesc')
+  }
+]);
 </script>
 
+<template>
+  <UiDialog
+    :open="open"
+    :title="$t('overlay.pathAuthTitle')"
+    size="wide"
+    :busy="saving"
+    @close="emit('close')"
+  >
+    <div class="path-auth-grid">
+      <div class="ui-dialog-field">
+        <span class="ui-dialog-label">{{ $t('overlay.pathAuthScopeLabel') }}</span>
+        <UiSelect
+          :model-value="scope"
+          :options="scopeOptions"
+          :label="$t('overlay.pathAuthScopeLabel')"
+          :disabled="saving"
+          @update:model-value="emit('update:scope', $event as Scope)"
+        />
+      </div>
+      <div class="ui-dialog-field">
+        <span class="ui-dialog-label">{{ $t('overlay.pathAuthModeLabel') }}</span>
+        <UiSelect
+          :model-value="mode"
+          :options="modeOptions"
+          :label="$t('overlay.pathAuthModeLabel')"
+          :disabled="saving"
+          @update:model-value="emit('update:mode', $event as Mode)"
+        />
+      </div>
+    </div>
+    <div class="ui-dialog-field">
+      <label class="ui-dialog-label" for="path-authorization-input">{{
+        $t('overlay.pathAuthPathsLabel')
+      }}</label>
+      <textarea
+        id="path-authorization-input"
+        class="ui-dialog-textarea is-mono"
+        :value="value"
+        :placeholder="
+          mode === 'writable'
+            ? $t('overlay.writablePlaceholder')
+            : $t('overlay.readablePlaceholder')
+        "
+        :disabled="saving"
+        spellcheck="false"
+        @input="emit('update:value', ($event.target as HTMLTextAreaElement).value)"
+      />
+      <p class="ui-dialog-note">
+        {{
+          scope === 'workspace'
+            ? $t('overlay.pathAuthWorkspaceHint')
+            : $t('overlay.pathAuthGlobalHint')
+        }}
+      </p>
+    </div>
+    <template #actions>
+      <UiDialogButton :disabled="saving" @click="emit('close')">
+        {{ $t('common.cancel') }}
+      </UiDialogButton>
+      <UiDialogButton variant="primary" :disabled="saving" @click="emit('save')">
+        {{ $t('common.save') }}
+      </UiDialogButton>
+    </template>
+  </UiDialog>
+</template>
+
 <style scoped>
-.overlay-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay-scrim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.overlay-card {
-  width: min(680px, 92vw);
-  background: var(--theme-surface-soft);
-  border: 1px solid var(--theme-control-border);
-  border-radius: 12px;
-  padding: 12px;
-}
-.overlay-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.overlay-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: var(--text-primary);
-}
-.hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0 0 8px 0;
-}
-.scope-path {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: -4px 0 8px 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.scope-hint {
-  margin-top: 8px;
-}
-.mode-switch {
-  display: inline-flex;
-  border: 1px solid var(--theme-control-border);
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.mode-btn {
-  border: none;
-  background: transparent;
-  padding: 6px 10px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.mode-btn.active {
-  background: var(--theme-tab-active);
-  font-weight: 600;
-}
-.path-input {
-  width: 100%;
-  min-height: 220px;
-  resize: vertical;
-  border: 1px solid var(--theme-control-border);
-  border-radius: 8px;
-  padding: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-.btn {
-  border: 1px solid var(--theme-control-border);
-  background: var(--theme-tab-active);
-  padding: 6px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.btn-muted {
-  background: transparent;
+.path-auth-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
 }
 
-.path-auth-fade-enter-active,
-.path-auth-fade-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.path-auth-fade-enter-from,
-.path-auth-fade-leave-to {
-  opacity: 0;
-}
-
-.path-auth-fade-enter-from .overlay-card,
-.path-auth-fade-leave-to .overlay-card {
-  transform: translateY(8px) scale(0.98);
-}
-
-.overlay-card {
-  transition: transform 0.2s ease;
+@media (max-width: 520px) {
+  .path-auth-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

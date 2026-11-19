@@ -1,0 +1,23 @@
+/* G3 连续曲率轮廓（同 schedules.scss 的 .sch-g3）：外形由遮罩裁出，描边跟随同一轮廓。 */
+.ui-g3 {
+  --g3-border: var(--border-default);
+  position: relative;
+  visibility: hidden;
+}
+
+.ui-g3[data-g3-ready='true'] {
+  visibility: visible;
+  -webkit-mask: var(--g3-mask) 0 0 / 100% 100% no-repeat;
+  mask: var(--g3-mask) 0 0 / 100% 100% no-repeat;
+}
+
+.ui-g3[data-g3-ready='true']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--g3-border);
+  -webkit-mask: var(--g3-outline) 0 0 / 100% 100% no-repeat;
+  mask: var(--g3-outline) 0 0 / 100% 100% no-repeat;
+}

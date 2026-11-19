@@ -61,13 +61,6 @@ export default {
   imagePreview: '图片预览',
   closePreview: '关闭预览',
 
-  // ── ImagePicker：图片选择 ──
-  imagePickerTitle: '选择图片（最多9张）',
-  uploading: '上传中...',
-  sendFromLocal: '从本地发送',
-  noImages: '未找到图片文件',
-  imageSelectedCount: '已选 {n} / 9',
-
   // ── NewUserTutorialPrompt：新手教程提示 ──
   tutorialPromptAriaLabel: '新手教程提示',
   welcome: '欢迎',
@@ -84,11 +77,13 @@ export default {
   pathAuthScopeGlobal: '全局',
   pathAuthWorkspaceHint: '仅对当前工作区生效，叠加在全局授权之上；实际生效 = 全局 + 以上条目。',
   pathAuthGlobalHint: '对所有工作区生效。',
+  pathAuthScopeLabel: '生效范围',
+  pathAuthModeLabel: '权限',
+  pathAuthPathsLabel: '路径',
   writableMode: '可读可写',
   readableMode: '仅可读',
-  writableHint: '可读可写路径在可写沙箱中可写入，在只读沙箱中仅可读。',
-  readableHint:
-    '仅可读路径会加入只读沙箱的读取白名单（只读沙箱默认拒绝所有读取，仅系统目录、工作区与授权路径可读）。',
+  writableModeDesc: '可写沙箱中可写入，只读沙箱中仅可读',
+  readableModeDesc: '加入只读沙箱的读取白名单',
   writablePlaceholder: '每行一个路径，例如：~/Desktop/agents-export',
   readablePlaceholder: '每行一个路径，例如：~/Documents/reference',
 
@@ -156,10 +151,5 @@ export default {
   modeOverwrite: '覆盖当前对话',
   modeCopy: '复制对话',
   restoring: '回溯中...',
-  confirmRestore: '确认回溯',
-
-  // ── VideoPicker：视频选择 ──
-  videoPickerTitle: '选择视频（一次最多 1 个）',
-  noVideos: '未找到视频文件',
-  videoSelectedCount: '已选 {n} / 1'
+  confirmRestore: '确认回溯'
 } as const;
