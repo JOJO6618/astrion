@@ -11,7 +11,7 @@
         type="button"
         class="conversation-notification-body"
         :aria-label="`${t('appUi.conversationNotification.open', { title: titleOf(banner) })} · ${statusOf(banner)}`"
-        @click="bridge.open(banner.id)"
+        @click="openConversation(banner.id)"
       >
         <span class="conversation-notification-copy">
           <span class="conversation-notification-title">{{ titleOf(banner) }}</span>
@@ -48,6 +48,13 @@ const titleOf = (banner: ConversationBanner) =>
   banner.title || t('appUi.conversationNotification.untitled');
 const statusOf = (banner: ConversationBanner) => t(`appUi.conversationNotification.${banner.type}`);
 const dismissTimers = reactive(new Map<string, number | null>());
+
+function openConversation(id: string) {
+  if (dismissTimers.has(id)) return;
+  bridge.open(id);
+  dismiss(id);
+}
+
 function dismiss(id: string) {
   if (dismissTimers.has(id)) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
