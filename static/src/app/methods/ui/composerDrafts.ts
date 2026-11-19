@@ -30,12 +30,14 @@ function record(
 function capture(host) {
   const entry = visible.get(host) || record(host);
   if (applying.has(host)) return entry;
-  const meta = host.getInputComposerRef?.()?.getComposerDraftMeta?.() || {};
+  const content = host.inputMessage || '';
+  // The parent can observe empty text before the editor processes its prop update.
+  const meta = content ? host.getInputComposerRef?.()?.getComposerDraftMeta?.() : null;
   return updateDraft(entry, {
     ...entry.payload,
-    content: host.inputMessage || '',
-    skill_refs: meta.skill_refs || [],
-    editor_json: meta.editor_json || null,
+    content,
+    skill_refs: meta?.skill_refs || [],
+    editor_json: meta?.editor_json || null,
     files: [...(host.selectedFiles || [])],
     images: [...(host.selectedImages || [])],
     videos: [...(host.selectedVideos || [])]
@@ -108,6 +110,10 @@ export const composerDraftMethods = {
   applyComposerDraftState(entry, workspaceId, session) {
     if (!entry || (session && !ownsConversationSession(this, session))) return;
     if (String(this.currentHostWorkspaceId || '') !== String(workspaceId || '')) return;
+    // Repair previously saved copies of an empty draft with stale editor metadata.
+    if (!entry.payload.content && (entry.payload.editor_json || entry.payload.skill_refs.length)) {
+      updateDraft(entry, { ...entry.payload, editor_json: null, skill_refs: [] });
+    }
     visible.set(this, entry);
     const application = {};
     const epoch = conversationViewEpoch(this);

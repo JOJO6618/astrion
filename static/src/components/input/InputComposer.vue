@@ -3192,17 +3192,16 @@ const getComposerDraftMeta = () => ({
 });
 
 const restoreComposerDraftMeta = (
-  meta?: { skill_refs?: SkillItem[]; editor_json?: JSONContent } | null
+  meta?: { content?: string; editor_json?: JSONContent | null } | null
 ) => {
   const instance = editor.value;
-  if (!instance) return;
-  if (meta?.editor_json && typeof meta.editor_json === 'object') {
-    syncingEditorFromProps = true;
-    instance.commands.setContent(meta.editor_json);
-    syncingEditorFromProps = false;
-    emit('update:input-message', getEditorPlainText());
-    nextTick(adjustTextareaSize);
-  }
+  const editorDocument = meta?.content === '' ? textToTiptapContent() : meta?.editor_json;
+  if (!instance || !editorDocument || typeof editorDocument !== 'object') return;
+  syncingEditorFromProps = true;
+  instance.commands.setContent(editorDocument);
+  syncingEditorFromProps = false;
+  emit('update:input-message', getEditorPlainText());
+  nextTick(adjustTextareaSize);
 };
 
 const triggerQuickUpload = () => {

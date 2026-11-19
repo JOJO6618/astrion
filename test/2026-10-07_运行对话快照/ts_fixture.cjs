@@ -31,7 +31,7 @@ function compile(file, imports = {}, globals = {}) {
       // 未显式 mock 时标签 store 视为网页端（未启用）
       if (key.endsWith('/stores/conversationTabs')) return { useConversationTabsStore: () => ({ enabled: false }) };
       if (key === '@/stores/browserTools') return { useBrowserToolsStore: () => ({ reset: noop, $patch: noop }) };
-      if (key === '@/stores/gitWorktree') return { useGitWorktreeStore: () => ({ reset: noop, $patch: noop }) };
+      if (key === '@/stores/gitWorktree') return { useGitWorktreeStore: () => ({ reset: noop, $patch: noop, hydrate: noop }) };
       if (key === './draftStorage') return compile('static/src/app/methods/ui/draftStorage.ts', {}, globals);
       if (key.endsWith('/workspaceRequestScope')) return {
         bindWorkspaceRequestHost: noop, workspaceScopedFetch: (...args) => globals.fetch(...args)
