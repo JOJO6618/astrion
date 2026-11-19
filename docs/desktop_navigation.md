@@ -102,9 +102,12 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 **验证**：`tsc --noEmit`、ESLint、`node --check`（壳层 4 个文件）、`npm run build` 通过；2026-11-17 用 `--dir` 测试包（同一数据根 `~/.astrion/astrion-desktop`）实测：设置页切换主题后切到其余标签，配色即时跟随，无需重新加载。
 
-## 人工审批黄点（2026-11-05，仍适用）
+## 人工等待黄点与桌面对话通知
 
-`conversation_tabs.py` 在快照中富化 `awaiting_human_approval`（只投影不落盘）：`human_approval_required=true` 且人工未裁决为等待态，终态/取消/过期下次快照清除；黄点优先于运行点。回归 `test/2026-11-05_完全访问审批/`。
+- 快照投影 `awaiting_human_approval` 和 `awaiting_user_answer`，黄点优先于运行点。工具审批只计算仍需人工决定的请求。计划审批和问答通过活动任务 ID 绑定原工作区和对话，纯自动审核不触发。请求处理后下一次快照更新黄点。
+- Electron 主进程轮询 `GET /api/conversation-tabs/activity`。该接口通过任务注册表发现已关标签和其他工作区的对话，用与标签相同的主任务、门闸和后台活动判定。两次确认空闲后才通知成功完成，冷启动不补发历史完成通知。待审批和待回答按请求或问题批次去重。
+- 前台是其他应用时显示横幅。Astrion 主窗口在前台时只显示应用内状态。前台是独立对话窗口时，只抑制该对话自身的横幅。横幅不抢焦点，点正文仍保留，点「忽略」关闭。macOS 提交一次 Dock 提醒，Windows 任务栏闪烁最多约 1.8 秒，切回应用时提前收起图标提醒。
+- 点击由 chrome 视图提交现有 `open` 命令。壳层按当下实际窗口前置目标，主窗口切到对应标签，独立窗口直接前置。已关闭的标签由 `open` 重新打开。横幅复用 `/chrome` 前端入口、三主题 token 及中英文文案，仅其专用 preload 提供通知 IPC。
 
 ## 验证
 

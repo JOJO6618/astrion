@@ -110,6 +110,15 @@ export default {
   fullAccessWarningCancel: 'Return to sandbox',
   fullAccessWarningRemember: 'Do not show again',
   tabStripAwaitingApproval: 'Waiting for manual approval',
+  tabStripAwaitingAnswer: 'Waiting for your answer',
+  conversationNotification: {
+    completed: 'Conversation finished',
+    approval: 'Needs your approval',
+    question: 'Waiting for your answer',
+    dismiss: 'Dismiss',
+    open: 'Open conversation {title}',
+    untitled: 'Untitled conversation'
+  },
   switchNetworkPermissionFailed: 'Failed to switch network permission',
   networkPermissionUpdated: 'Network permission updated',
   networkRestricted: 'Restricted',

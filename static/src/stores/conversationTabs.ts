@@ -14,6 +14,7 @@ export interface ConversationTab {
   error: string;
   running: boolean;
   awaitingHumanApproval: boolean;
+  awaitingUserAnswer: boolean;
   placement: 'main' | 'detached';
   /** 仅 page 标签。 */
   pageType: '' | 'settings' | 'workflows' | 'git' | 'schedules';
@@ -46,6 +47,15 @@ export interface ShellBridge {
   onRequestDock?: (callback: (payload: { key: string }) => void) => () => void;
   onWindowFocus?: (callback: (payload: { key: string }) => void) => () => void;
   onRequestPage?: (callback: (payload: { route: string }) => void) => () => void;
+  onNotificationOpen?: (callback: (payload: ConversationTabTarget) => void) => () => void;
+  focusNotificationTab?: (key: string) => void;
+}
+
+interface ConversationTabTarget {
+  conversationId: string;
+  workspaceId: string;
+  conversationKind?: 'chat' | 'agent';
+  title?: string;
 }
 
 export function shellBridge(): ShellBridge | null {
@@ -73,6 +83,7 @@ export function normalizeTab(raw: any): ConversationTab {
     error: String(raw.error || ''),
     running: Boolean(raw.running),
     awaitingHumanApproval: Boolean(raw.awaiting_human_approval),
+    awaitingUserAnswer: Boolean(raw.awaiting_user_answer),
     placement: raw.placement === 'detached' ? 'detached' : 'main',
     pageType: raw.kind === 'page' ? raw.page_type || '' : '',
     route: String(raw.route || ''),
@@ -236,7 +247,15 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         shell.onRequestDetach?.((p) => p?.key && run('detach', { key: p.key })),
         shell.onRequestDock?.((p) => p?.key && run('dock', { key: p.key })),
         shell.onWindowFocus?.((p) => p?.key && run('focus', { key: p.key })),
-        shell.onRequestPage?.((p) => p?.route && run('page', { page: p.route }))
+        shell.onRequestPage?.((p) => p?.route && run('page', { page: p.route })),
+        shell.onNotificationOpen?.((target) => {
+          if (!target?.conversationId) return;
+          void this.openConversationTab(target)
+            .then((outcome) => {
+              if (outcome?.key) shell.focusNotificationTab?.(outcome.key);
+            })
+            .catch(() => {});
+        })
       ];
       return () => offs.forEach((off) => off?.());
     },
@@ -321,10 +340,11 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         workspace_label: payload.workspaceLabel || ''
       });
     },
-    openConversationTab(payload: { conversationId: string; workspaceId: string; title?: string }) {
+    openConversationTab(payload: ConversationTabTarget) {
       return this.command('open', {
         key: `tab_${navigationId()}`,
         conversation_id: payload.conversationId,
+        conversation_kind: payload.conversationKind || 'agent',
         workspace_id: payload.workspaceId,
         title: payload.title || ''
       });

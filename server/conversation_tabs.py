@@ -124,16 +124,21 @@ def _conversation_is_running(
     if terminal is None:
         return False
     try:
+        from server.chat_flow_notice_state import _has_pending_workflow_notices
         from server.context import _conversation_terminal_has_running_work
+        from server.main_task_gate import is_main_task_gate_busy
 
-        return any(
-            _conversation_terminal_has_running_work(
-                username, workspace_id or "", conv_id, terminal
-            )
-            for conv_id in variants
-        )
+        if is_main_task_gate_busy(terminal):
+            return True
+        for conv_id in variants:
+            if _conversation_terminal_has_running_work(username, workspace_id or "", conv_id, terminal):
+                return True
+            if _has_pending_workflow_notices(web_terminal=terminal, conversation_id=conv_id):
+                return True
+        # Background results may be claimed while the runtime status is being read.
+        return is_main_task_gate_busy(terminal)
     except Exception:
-        return False
+        return True
 
 
 def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
@@ -142,7 +147,10 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
     title_maps = {ws: _load_index_titles(ws) for ws in ws_ids}
     active_runs = _active_run_conversation_ids(username, ws_ids)
     from pathlib import Path
+    from server.desktop_conversation_activity import pending_conversation_requests
     from server.state import tool_approval_manager
+
+    pending_requests = pending_conversation_requests(username) if ws_ids else {}
     pending_human = {
         (str(row.get("workspace_root") or ""), conv_id)
         for row in tool_approval_manager.list_pending(username)
@@ -160,6 +168,7 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
                 continue
     for tab in tabs:
         tab["awaiting_human_approval"] = False
+        tab["awaiting_user_answer"] = False
         if tab.get("kind") != "conv":
             tab["running"] = False
             continue
@@ -174,9 +183,13 @@ def _enrich_tabs(username: str, tabs: List[Dict[str, Any]]) -> None:
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 tab["error"] = str(exc)
             continue
-        tab["awaiting_human_approval"] = any(
+        candidates = _normalized_conversation_ids(conv_id)
+        scope = ("agent", tab.get("workspace_id") or "", candidates[-1] if candidates else "")
+        waiting = pending_requests.get(scope, {})
+        tab["awaiting_user_answer"] = bool(waiting.get("question"))
+        tab["awaiting_human_approval"] = bool(waiting.get("approval")) or any(
             (roots.get(tab.get("workspace_id")), candidate) in pending_human
-            for candidate in _normalized_conversation_ids(conv_id)
+            for candidate in candidates
         )
         fresh = title_maps.get(tab.get("workspace_id") or "", {}).get(conv_id)
         if fresh:
@@ -242,6 +255,18 @@ def get_conversation_tabs():
         return jsonify(success=True, **_public(username, navigation.snapshot(username, _lookup(username))))
     except Exception as exc:
         return jsonify(success=False, error=str(exc)), 503
+
+
+@conversation_tabs_bp.route("/api/conversation-tabs/activity", methods=["GET"])
+@api_login_required
+def get_desktop_conversation_activity():
+    if not IS_HOST_MODE or not request_identity().host_mode:
+        return jsonify(success=True, data=[])
+    from server.desktop_conversation_activity import conversation_activity
+
+    return jsonify(success=True, data=conversation_activity(
+        get_current_username() or "", _conversation_is_running, _load_index_titles,
+    ))
 
 
 @conversation_tabs_bp.route("/api/conversation-tabs/commands", methods=["POST"])

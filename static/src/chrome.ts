@@ -11,14 +11,22 @@ import './utils/icons';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import ChromeApp from './components/chrome/ChromeApp.vue';
+import ConversationNotificationStack from './components/chrome/ConversationNotificationStack.vue';
+import type { ConversationNotificationsBridge } from './components/chrome/conversationNotificationBridge';
 import './styles/chrome.scss';
 import { installTheme } from './utils/theme';
 import { installI18n } from './locales';
 
-const app = createApp(ChromeApp);
-const pinia = createPinia();
+const notifications = (
+  window as Window & {
+    astrionConversationNotifications?: ConversationNotificationsBridge;
+  }
+).astrionConversationNotifications;
+if (notifications) document.documentElement.classList.add('conversation-notification-window');
 
-app.use(pinia);
+const app = notifications
+  ? createApp(ConversationNotificationStack, { bridge: notifications })
+  : createApp(ChromeApp).use(createPinia());
 installI18n(app);
 installTheme();
 app.mount('#chrome-app');
