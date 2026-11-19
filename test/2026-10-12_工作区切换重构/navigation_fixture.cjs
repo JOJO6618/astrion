@@ -80,7 +80,13 @@ function fixture({ realSnapshot = true, automaticSelection = false, desktopTabs 
       '../../../stores/conversation': { useConversationStore: () => store },
       '../../../stores/conversationTabs': { useConversationTabsStore: () => tabs },
       '../../../stores/file': { useFileStore: () => ({ setTodoList: noop }) },
-      '../../../stores/resource': { useResourceStore: () => ({ setCurrentContextTokens: noop }) },
+      '../../../stores/resource': {
+        useResourceStore: () => ({
+          setCurrentContextTokens: noop,
+          setContextBaselineTokens: noop,
+          setCompressLimit: noop
+        })
+      },
       '../../../stores/quickDock': { useQuickDockStore: () => ({ setEditedFiles: noop }) },
       '../../../stores/preview': { usePreviewStore: () => ({ setRuntime: noop, setTargets: noop }) },
       '../../../stores/workflow': { useWorkflowStore: () => ({ setWorkflow: noop }) },
