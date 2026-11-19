@@ -4,6 +4,8 @@ import { useModelStore } from './model';
 import { applyThemeKey } from '@/utils/theme';
 import { createSaveQueue } from '@/utils/saveQueue';
 import type { SaveQueue, SaveRunContext } from '@/utils/saveQueue';
+import { DEFAULT_SEND_SHORTCUT, normalizeSendShortcut } from '@/utils/sendShortcut';
+import type { SendShortcut } from '@/utils/sendShortcut';
 
 // 语气预设：模块顶层禁止调 t()，这里只存 key，由 getter tonePresets 在读取时 t(key) 求值（随语言切换刷新）
 const TONE_PRESET_KEYS = [
@@ -133,6 +135,7 @@ interface PersonalForm {
   block_display_mode: BlockDisplayMode;
   show_status_avatar: boolean;
   show_git_status_bar: boolean;
+  send_shortcut: SendShortcut;
   git_worktree_enabled: boolean;
   auto_open_terminal_panel: boolean;
   quick_dock_auto_expand: boolean;
@@ -377,6 +380,7 @@ const defaultForm = (): PersonalForm => ({
   block_display_mode: loadCachedBlockDisplayMode(),
   show_status_avatar: true,
   show_git_status_bar: true,
+  send_shortcut: DEFAULT_SEND_SHORTCUT,
   git_worktree_enabled: false,
   auto_open_terminal_panel: true,
   quick_dock_auto_expand: loadCachedQuickDockAutoExpand(),
@@ -717,6 +721,7 @@ export const usePersonalizationStore = defineStore('personalization', {
             : 'minimal',
         show_status_avatar: data.show_status_avatar !== false,
         show_git_status_bar: data.show_git_status_bar !== false,
+        send_shortcut: normalizeSendShortcut(data.send_shortcut),
         git_worktree_enabled: data.git_worktree_enabled === true,
         auto_open_terminal_panel: data.auto_open_terminal_panel !== false,
         quick_dock_auto_expand: data.quick_dock_auto_expand !== false,

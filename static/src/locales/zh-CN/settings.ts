@@ -139,6 +139,7 @@ export default {
   cardQuickBasics: '快捷对话设置',
   cardQuickPermissions: '系统权限',
   cardQuickActions: '快捷窗口',
+  cardGeneralShortcuts: '快捷键',
   cardGeneralQuota: '订阅与额度',
   cardGeneralTitle: '对话标题',
   cardGeneralThinking: '思考摘要',

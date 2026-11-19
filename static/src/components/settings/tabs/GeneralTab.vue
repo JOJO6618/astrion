@@ -9,6 +9,7 @@ import CrossPetSettings from './CrossPetSettings.vue';
 import { t } from '@/locales';
 import { useCommandBlockingStore } from '@/stores/commandBlocking';
 import { desktopPlatform, isDesktopShell } from '@/utils/desktopPlatform';
+import { modEnterLabel, normalizeSendShortcut } from '@/utils/sendShortcut';
 
 defineOptions({ name: 'GeneralTab' });
 
@@ -70,6 +71,13 @@ const quotaSourceItems = [
   { value: 'auto', label: t('personalization.subscriptionQuotaAuto') },
   { value: 'opencode', label: t('personalization.subscriptionQuotaOpencode') },
   { value: 'chatgpt', label: t('personalization.subscriptionQuotaChatgpt') }
+];
+
+// 发送快捷键：主输入框与快捷窗口共用；修饰键按平台显示（Mac ⌘ / 其它 Ctrl）
+const modKeyLabel = modEnterLabel().replace('+Enter', '');
+const sendShortcutItems = [
+  { value: 'mod_enter', label: t('personalization.sendShortcutModEnter', { mod: modKeyLabel }) },
+  { value: 'enter', label: t('personalization.sendShortcutEnter') }
 ];
 
 function updateThinkingSummaryInterval(event: Event) {
@@ -225,6 +233,31 @@ onMounted(() => {
   <section class="stg-page">
     <HostPasswordSettings />
     <CrossPetSettings />
+    <div class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.cardGeneralShortcuts') }}</span>
+    </div>
+    <div class="stg-card">
+      <div class="stg-select-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.sendShortcutTitle') }}</span>
+          <span class="stg-row-desc">{{
+            $t('personalization.sendShortcutDesc', { mod: modKeyLabel })
+          }}</span>
+        </span>
+        <UiSelect
+          :model-value="normalizeSendShortcut(form.send_shortcut)"
+          :options="sendShortcutItems"
+          align-end
+          @update:model-value="
+            (value) =>
+              personalization.updateField({
+                key: 'send_shortcut',
+                value: normalizeSendShortcut(value)
+              })
+          "
+        />
+      </div>
+    </div>
     <div class="stg-section-divider">
       <span class="stg-section-divider__label">{{ $t('settings.cardGeneralQuota') }}</span>
     </div>

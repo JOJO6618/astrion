@@ -515,6 +515,11 @@ export default {
   subscriptionQuotaTitle: '显示订阅额度',
   subscriptionQuotaDesc: '在 Token 圆环中查看订阅套餐的剩余额度',
   subscriptionQuotaSourceTitle: '额度来源',
+  sendShortcutTitle: '发送消息',
+  sendShortcutDesc:
+    '选 Enter 发送时，Shift+Enter 或 {mod}+Enter 换行。主输入框与快捷窗口共用，触屏设备上回车始终换行',
+  sendShortcutModEnter: '{mod}+Enter 发送',
+  sendShortcutEnter: 'Enter 发送',
   subscriptionQuotaSourceDesc: 'Token 圆环中显示哪家服务商的额度',
   subscriptionQuotaAuto: '自动',
   subscriptionQuotaOpencode: 'OpenCode Go',

@@ -456,7 +456,9 @@
               <button
                 type="button"
                 class="stadium-btn send-btn"
-                @click="$emit('send-or-stop')"
+                :title="sendButtonTitle"
+                :aria-label="sendButtonTitle"
+                @click="requestSendOrStop"
                 :disabled="sendButtonDisabled"
               >
                 <span v-if="showStopIcon" class="stop-icon"></span>
@@ -805,6 +807,13 @@ import { useUiStore } from '@/stores/ui';
 import { useWorkflowStore } from '@/stores/workflow';
 import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import { t, currentLocale } from '@/locales';
+import { pickComposerPlaceholderKey } from '@/utils/composerPlaceholders';
+import {
+  hasEnterModifier,
+  modEnterLabel,
+  normalizeSendShortcut,
+  resolveEnterIntent
+} from '@/utils/sendShortcut';
 
 defineOptions({ name: 'InputComposer' });
 
@@ -2529,6 +2538,37 @@ const editorJsonToMessage = (json?: JSONContent | null) => {
   return { message, skillRefs };
 };
 
+/* ═══════════════════ 占位文案与发送快捷键 ═══════════════════ */
+
+const sendShortcut = computed(() => normalizeSendShortcut(personalizationStore.form.send_shortcut));
+const placeholderKey = ref(pickComposerPlaceholderKey());
+// 发送后等输入框被清空再换一句；手动删空不换，避免边打边删时文字跳动
+let placeholderRefreshPending = false;
+
+const sendButtonTitle = computed(() => {
+  void currentLocale.value;
+  if (showStopIcon.value) return t('input.stopButtonTitle');
+  const shortcut = sendShortcut.value === 'enter' ? 'Enter' : modEnterLabel();
+  return t('input.sendButtonTitle', { shortcut });
+});
+
+const requestSendOrStop = () => {
+  if (!showStopIcon.value) placeholderRefreshPending = true;
+  emit('send-or-stop');
+};
+
+const refreshPlaceholder = () => {
+  const instance = editor.value;
+  if (!instance || instance.isDestroyed) return;
+  // 空事务触发 Placeholder 装饰重算
+  instance.view.dispatch(instance.state.tr);
+};
+
+const repickPlaceholder = () => {
+  placeholderKey.value = pickComposerPlaceholderKey(placeholderKey.value);
+  refreshPlaceholder();
+};
+
 const editor = useEditor({
   content: textToTiptapContent(props.inputMessage || ''),
   editable: props.isConnected && !props.inputLocked,
@@ -2543,7 +2583,8 @@ const editor = useEditor({
       horizontalRule: false
     }),
     Placeholder.configure({
-      placeholder: t('input.messagePlaceholder')
+      // 函数形式：每次装饰重算时求值，配合 refreshPlaceholder 支持换句与切换语言
+      placeholder: () => t(placeholderKey.value)
     }),
     Mention.configure({
       HTMLAttributes: {
@@ -2579,16 +2620,31 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: {
-      class: 'stadium-input-editor',
-      'data-placeholder': t('input.messagePlaceholder')
+      class: 'stadium-input-editor'
     },
     handleKeyDown(_view, event) {
-      if (event.ctrlKey && event.key === 'Enter') {
+      const intent = resolveEnterIntent(event, sendShortcut.value);
+      const modified = hasEnterModifier(event);
+      // 带修饰键的发送（Ctrl/⌘+Enter）优先于斜杠 / @ 菜单，保持原行为
+      if (intent === 'send' && modified) {
         event.preventDefault();
-        emit('send-or-stop');
+        requestSendOrStop();
         return true;
       }
-      return onKeydown(event);
+      // 菜单打开时 Enter 先用于选中条目
+      if (onKeydown(event)) return true;
+      if (intent === 'send') {
+        event.preventDefault();
+        requestSendOrStop();
+        return true;
+      }
+      // 带修饰键的换行统一插入软换行（Mac 上 Ctrl+Enter 没有编辑器默认绑定）
+      if (intent === 'newline' && modified) {
+        event.preventDefault();
+        editor.value?.commands.setHardBreak();
+        return true;
+      }
+      return false;
     },
     handlePaste(_view, event) {
       // 剪贴板包含文件（截图/复制的图片等）时接管粘贴，走上传流程；
@@ -3587,7 +3643,11 @@ defineExpose({
 
 watch(
   () => props.inputMessage,
-  async () => {
+  async (message) => {
+    if (placeholderRefreshPending && !(message || '').trim()) {
+      placeholderRefreshPending = false;
+      repickPlaceholder();
+    }
     const instance = editor.value;
     if (
       instance &&
@@ -3603,6 +3663,8 @@ watch(
     refreshSkillSlashState();
   }
 );
+
+watch(currentLocale, refreshPlaceholder);
 
 watch(
   () => props.isConnected,
@@ -3626,6 +3688,8 @@ watch(
 watch(
   () => props.currentConversationId,
   async () => {
+    placeholderRefreshPending = false;
+    repickPlaceholder();
     baselineComposerVisualHeight.value = 0;
     await nextTick();
     emitComposerHeight();

@@ -22,6 +22,7 @@ const {
   workspaces,
   sessions,
   config,
+  sendShortcut,
   approvals,
   collapsed,
   streaming,
@@ -478,7 +479,12 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <QuickPrompt ref="prompt" v-model="draft" @submit="state.send()" />
+        <QuickPrompt
+          ref="prompt"
+          v-model="draft"
+          :send-shortcut="sendShortcut"
+          @submit="state.send()"
+        />
         <button
           ref="chatButton"
           class="meta-button conversation-button menu-trigger"

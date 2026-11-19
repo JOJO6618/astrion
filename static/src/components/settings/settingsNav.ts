@@ -133,6 +133,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
   ...entries('general', [
     'settings.hostPasswordTitle',
     ['settings.crosspetTitle', 'settings.crosspetDesc'],
+    `${P}sendShortcutTitle`,
     [`${P}subscriptionQuotaTitle`, `${P}subscriptionQuotaDesc`],
     `${P}subscriptionQuotaSourceTitle`,
     `${P}autoTitleTitle`,

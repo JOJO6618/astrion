@@ -31,6 +31,7 @@ ALLOWED_GOAL_REVIEW_MODES = {"readonly", "active"}
 ALLOWED_GOAL_END_CONDITIONS = {"max_turns", "max_tokens"}
 ALLOWED_BLOCK_DISPLAY_MODES = {"traditional", "stacked", "minimal"}
 ALLOWED_UI_LOCALES = {"zh-CN", "en-US"}
+ALLOWED_SEND_SHORTCUTS = {"mod_enter", "enter"}
 GOAL_MAX_TURNS_MIN = 1
 GOAL_MAX_TURNS_MAX = 100
 GOAL_MAX_TURNS_DEFAULT = 5
@@ -178,6 +179,7 @@ DEFAULT_PERSONALIZATION_CONFIG: Dict[str, Any] = {
     "stacked_hide_borders": False,  # 堆叠块隐藏边线
     "minimal_expand_height_limited": True,  # 极简模式展开摘要行时限制最大高度
     "show_git_status_bar": True,  # 是否显示输入栏上方 Git 状态栏
+    "send_shortcut": "mod_enter",  # 发送快捷键：mod_enter-Ctrl/⌘+Enter 发送 / enter-Enter 发送（主输入框与快捷窗口共用）
     "versioning_enabled_by_default": True,  # 新对话是否默认开启版本控制
     "versioning_backup_mode": "shallow",  # 文件备份方式：shallow-浅备份（只备份AI编辑的文件）/ full-完全备份（整个工作区）
     "versioning_restore_mode": "overwrite",  # 版本回溯模式固定为 overwrite
@@ -739,6 +741,10 @@ def sanitize_personalization_payload(
         base["compact_message_display"] = compact_msg.strip().lower()
     else:
         base["compact_message_display"] = "full"
+
+    # 发送快捷键：mod_enter（Ctrl/⌘+Enter 发送）/ enter（Enter 发送）；非法值回落 mod_enter
+    send_shortcut = data.get("send_shortcut", base.get("send_shortcut"))
+    base["send_shortcut"] = send_shortcut if send_shortcut in ALLOWED_SEND_SHORTCUTS else "mod_enter"
 
     # 堆叠块显示模式：traditional（传统列表）/ stacked（堆叠动画）/ minimal（极简模式）
     block_display_mode = data.get("block_display_mode", base.get("block_display_mode"))

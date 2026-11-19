@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
 import { t } from '@/locales';
+import { resolveEnterIntent } from '@/utils/sendShortcut';
+import type { SendShortcut } from '@/utils/sendShortcut';
 
-const props = defineProps<{ modelValue: string }>();
+const props = defineProps<{ modelValue: string; sendShortcut: SendShortcut }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>();
 const input = ref<HTMLTextAreaElement>(),
   marker = ref<HTMLElement>(),
@@ -48,11 +50,25 @@ function change(event: Event) {
   void syncCaret();
 }
 function keydown(event: KeyboardEvent) {
-  if (event.isComposing || composing.value || event.keyCode === 229) return;
-  if (event.key === 'Enter' && !event.shiftKey) {
+  if (composing.value) return;
+  const intent = resolveEnterIntent(event, props.sendShortcut);
+  if (intent === 'send') {
     event.preventDefault();
     emit('submit');
+    return;
   }
+  // textarea 默认只有纯 Enter 会换行，带修饰键的换行手动插入
+  if (intent === 'newline' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    insertNewline(event.target as HTMLTextAreaElement);
+  }
+}
+function insertNewline(element: HTMLTextAreaElement) {
+  const { selectionStart, selectionEnd, value } = element;
+  element.value = `${value.slice(0, selectionStart)}\n${value.slice(selectionEnd)}`;
+  element.selectionStart = element.selectionEnd = selectionStart + 1;
+  emit('update:modelValue', element.value);
+  void syncCaret();
 }
 function selectionChanged() {
   if (document.activeElement === input.value) void syncCaret();

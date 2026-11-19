@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue';
 import { t } from '@/locales';
 import { saveDraft, loadDraft } from './drafts';
+import { DEFAULT_SEND_SHORTCUT, normalizeSendShortcut } from '@/utils/sendShortcut';
+import type { SendShortcut } from '@/utils/sendShortcut';
 
 export interface QuickBridge {
   request(route: string, method?: string, body?: any, workspace?: string): Promise<any>;
@@ -42,6 +44,8 @@ export function useQuickRuntime() {
   const workspaces = ref<any[]>([]),
     models = ref<any[]>([]),
     sessions = ref<any[]>([]);
+  // 发送快捷键跟随账号设置（与主输入框共用 personalization.send_shortcut），每次唤出窗口刷新
+  const sendShortcut = ref<SendShortcut>(DEFAULT_SEND_SHORTCUT);
   const config = ref<any>({}),
     approvals = ref<any[]>([]);
   const collapsed = ref(false),
@@ -129,6 +133,7 @@ export function useQuickRuntime() {
     if (changeWorkspace && initialized && workspace.value) await save();
     if (ticket !== generation) return;
     config.value = nextConfig;
+    sendShortcut.value = normalizeSendShortcut(settings.send_shortcut);
     workspaces.value = availableWorkspaces;
     models.value = availableModels;
     model.value = availableModels.some((item: any) => item.model_key === desiredModel)
@@ -567,6 +572,7 @@ export function useQuickRuntime() {
     models,
     sessions,
     config,
+    sendShortcut,
     approvals,
     collapsed,
     streaming,

@@ -531,6 +531,11 @@ export default {
   subscriptionQuotaTitle: 'Show subscription quota',
   subscriptionQuotaDesc: 'See remaining subscription quota in the token ring',
   subscriptionQuotaSourceTitle: 'Quota source',
+  sendShortcutTitle: 'Send message',
+  sendShortcutDesc:
+    'With Enter to send, Shift+Enter or {mod}+Enter adds a new line. Applies to the main input and the quick window; on touch devices Enter always adds a new line',
+  sendShortcutModEnter: '{mod}+Enter to send',
+  sendShortcutEnter: 'Enter to send',
   subscriptionQuotaSourceDesc: 'Whose quota the token ring shows',
   subscriptionQuotaAuto: 'Auto',
   subscriptionQuotaOpencode: 'OpenCode Go',

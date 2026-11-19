@@ -74,3 +74,9 @@
 ## 主 Agent 完整 system 冻结（2026-11-12）
 
 主 Agent 在应用当前模型配置后，首次构建时将提供商基础指令和 Codex 桥接纳入 `frozen_system_prompt`。Responses 通过内部消息标记识别已有完整快照，不在每轮请求中重新加载或重复前置指令；该标记不外发。辅助模型、独立 Chat、子智能体维持原有路径。压缩允许整体重建，普通运行禁止改写。见 `docs/system_prompt_snapshot.md`。
+
+### 发送快捷键与输入框占位文案（2026-11-19）
+
+- **设置**：用户级 `personalization.send_shortcut`，`mod_enter`（默认，Ctrl/⌘+Enter 发送，Enter／Shift+Enter 换行）或 `enter`（Enter 发送，Shift+Enter／Ctrl/⌘+Enter 换行）；后端默认值与 sanitize 在 `modules/personalization_manager.py`，非法值回落 `mod_enter`。入口为设置页「通用 → 快捷键 → 发送消息」。
+- **唯一判定实现** `static/src/utils/sendShortcut.ts`：主输入框（InputComposer，Chat／Agent 共用）与桌面快捷窗口（`quick/QuickPrompt.vue`，每次唤出经 `quick/runtime.ts` 读 `/api/personalization` 刷新）共用，**禁止各自再写 Enter 判定**。输入法组字中的 Enter 不处理；触屏设备上 `enter` 模式不生效（回车换行，按钮发送）；Mac 上 ⌘ 与 Ctrl 等价。主输入框中带修饰键的发送优先于斜杠／@ 菜单，纯 Enter 先交给菜单选中条目。
+- **占位文案**：`static/src/utils/composerPlaceholders.ts` 的 16 条 Astrion 口吻文案池（i18n `input.placeholder*`），切换对话、发送后输入框清空时随机换一句，不定时轮换；快捷键提示移到发送按钮悬停提示。回归 `test/2026-11-19_发送快捷键与输入框文案/`。

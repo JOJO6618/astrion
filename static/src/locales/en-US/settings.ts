@@ -145,6 +145,7 @@ export default {
   cardQuickBasics: 'Quick Chat settings',
   cardQuickPermissions: 'System permissions',
   cardQuickActions: 'Quick window',
+  cardGeneralShortcuts: 'Keyboard shortcuts',
   cardGeneralQuota: 'Subscription & quota',
   cardGeneralTitle: 'Conversation titles',
   cardGeneralThinking: 'Thinking summaries',
