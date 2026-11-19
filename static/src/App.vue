@@ -17,6 +17,7 @@
       </div>
     </transition>
 
+    <ProjectMemoryMigrationDialog />
     <SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />
     <SchedulesShell v-else-if="schedulesRoute" @close="closeSettingsPage" />
     <div v-else-if="!isConnected && messages.length === 0" class="app-loading-state">
@@ -753,6 +754,7 @@ import ConversationModelHeader from './components/chat/ConversationModelHeader.v
 import ModelEffortPanel from './components/chat/ModelEffortPanel.vue';
 import VideoPicker from './components/overlay/VideoPicker.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
+import ProjectMemoryMigrationDialog from './components/overlay/ProjectMemoryMigrationDialog.vue';
 import QuickDock from './components/chat/quickdock/QuickDock.vue';
 import FilePreviewPanel from './components/chat/quickdock/FilePreviewPanel.vue';
 import PreviewPanel from './components/chat/quickdock/PreviewPanel.vue';

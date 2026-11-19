@@ -49,6 +49,7 @@ class ContainerHandle:
     container_id: Optional[str] = None
     sandbox_bin: Optional[str] = None
     memory_directory: Optional[str] = None
+    topic_memory_directory: Optional[str] = None
     created_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
 
@@ -141,15 +142,24 @@ class UserContainerManager:
         # 安全模式：当 LINUX_SAFETY 开启且要求 host 时，强制回退 docker
         if mode == "host" and LINUX_SAFETY:
             mode = "docker"
-        memory_directory = None
-        if mode == "docker":
-            from modules.workspace_memory import location, prepare_directory
-            target = location(workspace, data_dir or str(Path(workspace).parent / "data"), docker=True)
-            prepare_directory(target)
-            memory_directory = str(target.directory)
-
+        memory_directory = topic_memory_directory = None
         with self._lock:
             handle = self._containers.get(key)
+            running_docker = bool(handle and handle.mode == "docker" and self._is_container_running(handle))
+            if mode == "docker":
+                from modules.project_memory import docker_bind_directory
+                from modules.workspace_memory import location, prepare_directory
+
+                data_dir = data_dir or str(Path(workspace).parent / "data")
+                target = location(workspace, data_dir, docker=True)
+                prepare_directory(target)
+                memory_directory = str(target.directory)
+                if running_docker:
+                    # Only the migration service may retire a live legacy container.
+                    topic_memory_directory = handle.topic_memory_directory
+                else:
+                    topics = docker_bind_directory(workspace, data_dir)
+                    topic_memory_directory = str(topics) if topics else None
             if handle:
                 # 模式不同或 docker 挂掉时重建
                 if handle.mode != mode:
@@ -157,7 +167,7 @@ class UserContainerManager:
                     if handle.mode == "docker":
                         self._kill_container(handle.container_name, handle.sandbox_bin)
                     handle = None
-                elif handle.mode == "docker" and not self._is_container_running(handle):
+                elif handle.mode == "docker" and not running_docker:
                     self._containers.pop(key, None)
                     self._kill_container(handle.container_name, handle.sandbox_bin)
                     handle = None
@@ -189,10 +199,29 @@ class UserContainerManager:
                         raise RuntimeError(tr("container_mgr.per_user_quota_exhausted", limit=per_user_limit))
 
             # Important: create container using the cache key so each workspace gets its own container name.
-            handle = (self._create_handle(key, workspace, mode, memory_directory=memory_directory)
+            handle = (self._create_handle(key, workspace, mode, memory_directory=memory_directory,
+                                          topic_memory_directory=topic_memory_directory)
                       if mode == "docker" else self._create_handle(key, workspace, mode))
             self._containers[key] = handle
             return handle
+
+    def migrate_topic_mount(self, container_key: str, project: Path, apply):
+        """Retire the idle legacy view and publish the verified mount under the same lock."""
+        key = self._normalize_username(container_key)
+        with self._lock:
+            handle = self._containers.get(key)
+            if handle and handle.mode == "docker":
+                if Path(handle.workspace_path) != project:
+                    raise RuntimeError("容器的工作区与待迁移的工作区不一致。")
+                if handle.container_name and not handle.topic_memory_directory:
+                    result = subprocess.run(
+                        [handle.sandbox_bin, "rm", "-f", handle.container_id or handle.container_name],
+                        capture_output=True, text=True, timeout=30, check=False,
+                    )
+                    if result.returncode and "No such container" not in result.stderr:
+                        raise RuntimeError("无法切换工作区容器的项目记忆挂载。")
+                    self._containers.pop(key, None)
+            apply()
 
     def release_container(self, container_key: str, reason: str = "logout"):
         key = self._normalize_username(container_key)
@@ -319,7 +348,8 @@ class UserContainerManager:
         return (docker_total - existing) < self.max_containers
 
     def _create_handle(self, username: str, workspace: str, mode: str,
-                       memory_directory: Optional[str] = None) -> ContainerHandle:
+                       memory_directory: Optional[str] = None,
+                       topic_memory_directory: Optional[str] = None) -> ContainerHandle:
         if mode != "docker":
             return self._host_handle(username, workspace)
 
@@ -366,6 +396,14 @@ class UserContainerManager:
                     raise PermissionError("私有记忆挂载点不能是符号链接")
                 component.mkdir(parents=True, exist_ok=True)
             cmd += ["-v", f"{memory_directory}:{self.mount_path.rstrip('/')}/{RELATIVE_DIRECTORY}"]
+        if topic_memory_directory:
+            from config import WORKSPACE_MEMORY_DIRNAME
+            # A nested bind preserves the original container-visible path.
+            marker = Path(workspace) / WORKSPACE_MEMORY_DIRNAME
+            if marker.parent.is_symlink() or marker.is_symlink():
+                raise PermissionError("专题记忆挂载点不能是符号链接")
+            marker.mkdir(parents=True, exist_ok=True)
+            cmd += ["-v", f"{topic_memory_directory}:{self.mount_path.rstrip('/')}/{WORKSPACE_MEMORY_DIRNAME}"]
         if self.network:
             cmd += ["--network", self.network]
         if self.cpus:
@@ -418,6 +456,7 @@ class UserContainerManager:
             container_id=container_id,
             sandbox_bin=docker_path,
             memory_directory=memory_directory,
+            topic_memory_directory=topic_memory_directory,
         )
 
     def _host_handle(self, username: str, workspace: str) -> ContainerHandle:

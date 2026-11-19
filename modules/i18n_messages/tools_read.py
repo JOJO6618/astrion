@@ -93,8 +93,8 @@ MESSAGES = {
         "en-US": "Found {count} matching project memories (keywords: {keywords}):",
     },
     "tools_read.search_result_item": {
-        "zh-CN": "[{rank}] {name}（.astrion/memory/{file}）",
-        "en-US": "[{rank}] {name} (.astrion/memory/{file})",
+        "zh-CN": "[{rank}] {name}（{file}）",
+        "en-US": "[{rank}] {name} ({file})",
     },
     "tools_read.search_result_desc": {
         "zh-CN": "    描述：{description}",

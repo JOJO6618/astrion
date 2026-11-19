@@ -186,11 +186,11 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "recall_project_memory",
-            "description": "读取指定的项目记忆文件，返回完整内容（含 frontmatter）。项目记忆存储在 .astrion/memory/ 目录下。通常在 search_project_memory 检索定位后使用；若不确定记忆名称，先检索再读取。",
+            "description": "读取指定的项目记忆文件，返回完整内容（含 frontmatter）。工具自动定位当前工作区的项目记忆。通常在 search_project_memory 检索定位后使用；若不确定记忆名称，先检索再读取。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "记忆名称，对应 .astrion/memory/{name}.md 文件名"},
+                    "name": {"type": "string", "description": "专题记忆名称（不带 .md 后缀）"},
                 },
                 "required": ["name"],
             },
@@ -200,7 +200,7 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "search_project_memory",
-            "description": "检索索引式项目记忆（.astrion/memory/*.md）。需要补充项目约定、历史决策或已知问题的专题背景时调用；MEMORY.md 已全文注入的内容无需再次检索。用2~5个精确关键词，未命中不换同义词重试，命中后用 recall_project_memory 读取全文。",
+            "description": "检索当前工作区的索引式项目记忆。需要补充项目约定、历史决策或已知问题的专题背景时调用；MEMORY.md 已全文注入的内容无需再次检索。用2~5个精确关键词，未命中不换同义词重试，命中后用 recall_project_memory 读取全文。",
             "parameters": {
                 "type": "object",
                 "properties": {

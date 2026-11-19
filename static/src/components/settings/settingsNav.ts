@@ -186,6 +186,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     [`${P}toolLoadingTitle`, `${P}toolLoadingDesc`]
   ]),
   ...entries('context', [
+    'settings.memoryMigration.hostEntry',
     [`${P}recentConversationsTitle`, `${P}recentConversationsDesc`],
     `${P}recentConversationsCountTitle`,
     `${P}maxMemoryInjectTitle`,
@@ -232,6 +233,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     `${P}compactMessageTitle`
   ]),
   ...entries('admin', [
+    'settings.memoryMigration.dockerEntry',
     `${P}mcpConfigTitle`,
     `${P}adminMonitorTitle`,
     `${P}apiAdminTitle`,
@@ -259,7 +261,8 @@ const normalize = (value: string) => value.toLocaleLowerCase().replace(/\s+/g, '
 export function searchSettings(
   query: string,
   labelOf: (section: SettingsSection) => string,
-  canShow: (section: SettingsSection) => boolean
+  canShow: (section: SettingsSection) => boolean,
+  canShowEntry: (titleKey: string) => boolean = () => true
 ): SearchResult[] {
   const q = normalize(query);
   if (!q) return [];
@@ -281,7 +284,7 @@ export function searchSettings(
   }
 
   for (const entry of SEARCH_ENTRIES) {
-    if (!canShow(entry.section)) continue;
+    if (!canShow(entry.section) || !canShowEntry(entry.titleKey)) continue;
     const title = t(entry.titleKey);
     const name = normalize(title);
     let score = -1;

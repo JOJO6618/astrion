@@ -43,7 +43,6 @@ from modules.host_sandbox_policy import (
     get_macos_deny_read_regexes,
 )
 from modules.host_sandbox_runner import MACOS_MINIMAL_READABLE_PATHS, LINUX_MINIMAL_READABLE_PATHS
-from utils.logger import setup_logger
 from modules.i18n import tr
 from modules.execution_scope import current_execution_scope
 from modules.scoped_execution_policy import fixed_workspace_root, require_scoped_docker_support
@@ -54,32 +53,38 @@ if TYPE_CHECKING:
 # 临时禁用长度检查
 DISABLE_LENGTH_CHECK = True
 
-logger = setup_logger(__name__)
-
 class PathMixin:
     """FileManager path mixin 能力 mixin。"""
 
-    def _get_project_size(self) -> int:
-        """计算项目目录的总大小（字节），遇到异常时记录并抛出。"""
-        if not self._is_docker_mode():
-            return 0
-        total = 0
-        if not self.project_path.exists():
+    def _topic_mount(self):
+        from config import WORKSPACE_MEMORY_DIRNAME
+
+        source = getattr(self.container_session, "topic_memory_directory", None)
+        if not source:
+            return None
+        return Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME, Path(source)
+
+    def _quota_file_size(self, path: Path) -> int:
+        mount = self._topic_mount()
+        if mount and path.is_relative_to(mount[0]):
+            path = mount[1] / path.relative_to(mount[0])
+        try:
+            return path.stat().st_size
+        except FileNotFoundError:
             return 0
 
-        for path in self.project_path.rglob('*'):
-            if not path.is_file():
-                continue
-            try:
-                total += path.stat().st_size
-            except Exception as exc:
-                logger.error(
-                    "Failed to stat %s while calculating project size: %s",
-                    path,
-                    exc,
-                    exc_info=True,
-                )
-                raise
+    def _get_project_size(self) -> int:
+        """Count the project contents as seen by the container's workspace bind."""
+        if not self._is_docker_mode() or not self.project_path.exists():
+            return 0
+        mount = self._topic_mount()
+        total = 0
+        for root in (self.project_path, mount[1]) if mount else (self.project_path,):
+            for path in root.rglob('*'):
+                if mount and root == self.project_path and path.is_relative_to(mount[0]):
+                    continue
+                if path.is_file():
+                    total += self._quota_file_size(path)
         return total
 
     def _validate_path(self, path: str) -> Tuple[bool, str, Path]:
@@ -99,6 +104,13 @@ class PathMixin:
             return False, str(exc), None
         if scope is None and project_root != self.project_path:
             self.project_path = project_root
+
+        if self._is_docker_mode():
+            mount = str(getattr(self.container_session, "mount_path", None) or "/workspace").rstrip("/")
+            for prefix in (mount, "/workspace"):
+                if path == prefix or (path or "").startswith(prefix + "/"):
+                    path = str(project_root) + path[len(prefix):]
+                    break
 
         if (scope is not None and scope.is_sub_agent) or self._is_host_mode():
             from modules.scoped_execution_policy import fixed_execution_root

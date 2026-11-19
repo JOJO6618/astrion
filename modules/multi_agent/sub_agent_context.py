@@ -21,7 +21,6 @@ try:
     from config import (
         PROMPTS_DIR,
         WORKSPACE_SKILLS_DIRNAME,
-        WORKSPACE_MEMORY_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
         TERMINAL_SANDBOX_MODE,
     )
@@ -35,7 +34,6 @@ except ImportError:
     from config import (
         PROMPTS_DIR,
         WORKSPACE_SKILLS_DIRNAME,
-        WORKSPACE_MEMORY_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
         TERMINAL_SANDBOX_MODE,
     )
@@ -126,11 +124,9 @@ def _build_astrion_dir_section(workspace_path: str) -> str:
         f"## 工作区数据目录（.astrion/）\n\n"
         f"工作区内的 `.astrion/` 目录存储以下内容：\n"
         f"- `{WORKSPACE_SKILLS_DIRNAME}/`：可用技能（skill）目录，每个 skill 含 SKILL.md 说明\n"
-        f"- `{WORKSPACE_MEMORY_DIRNAME}/`：项目记忆，以 Markdown 文件形式存放项目约定/决策/调试坑\n"
         f"- `{WORKSPACE_REVIEW_DIRNAME}/`：对话回顾文件\n"
         f"- `user_upload/`：用户上传的文件\n\n"
         f"用户上传的文件位于 `.astrion/user_upload/` 目录下。"
-        f"项目记忆以文件形式存放在 `{WORKSPACE_MEMORY_DIRNAME}/` 下。"
         f"技能（skill）存放在 `{WORKSPACE_SKILLS_DIRNAME}/` 下。\n"
     )
 
@@ -224,52 +220,6 @@ def _build_skills_section(workspace_path: str, data_dir: str = "") -> str:
         return ""
 
 
-def _build_project_memory_section(workspace_path: str) -> str:
-    """构建项目记忆索引段（只列索引，不展开内容）。"""
-    try:
-        memory_dir = Path(workspace_path) / WORKSPACE_MEMORY_DIRNAME
-        if not memory_dir.exists() or not memory_dir.is_dir():
-            return ""
-        entries: List[str] = []
-        for md_file in sorted(memory_dir.glob("*.md")):
-            try:
-                text = _context_read_text(md_file)
-                name = None
-                description = None
-                if text.startswith("---"):
-                    end = text.find("---", 3)
-                    if end > 0:
-                        frontmatter = text[3:end]
-                        for line in frontmatter.strip().split("\n"):
-                            ls = line.strip()
-                            if ls.startswith("name:"):
-                                name = ls.split(":", 1)[1].strip()
-                            elif ls.startswith("description:"):
-                                description = ls.split(":", 1)[1].strip()
-                file_name = md_file.name
-                display_name = name or md_file.stem
-                desc = description or ""
-                if desc:
-                    entries.append(f".astrion/memory/{file_name}：{desc}")
-                else:
-                    entries.append(f".astrion/memory/{file_name}：当需要{display_name}时，应该索引本记忆")
-            except Exception:
-                pass
-        if not entries:
-            return ""
-        return (
-            f"## 项目记忆\n\n"
-            f"项目记忆以文件形式存放在 `.astrion/memory/` 下。\n"
-            f"开始涉及项目约定、历史决策或已知问题的任务前，先检查项目记忆索引，"
-            f"不确定时先用 search_project_memory 检索正文，定位后用 recall_project_memory 读取。\n\n"
-            f"### 项目记忆索引\n\n"
-            + "\n".join(entries)
-            + "\n"
-        )
-    except Exception:
-        return ""
-
-
 def build_sub_agent_dynamic_context(
     workspace_path: str,
     *,
@@ -310,10 +260,5 @@ def build_sub_agent_dynamic_context(
     skills = _build_skills_section(workspace_path, data_dir=data_dir)
     if skills:
         sections.append(skills)
-
-    # 6. 项目记忆索引
-    memory = _build_project_memory_section(workspace_path)
-    if memory:
-        sections.append(memory)
 
     return "\n".join(sections)

@@ -34,7 +34,6 @@ try:
         READONLY_RUN_COMMAND_ALLOWED_GIT_SUBCOMMANDS,
         READONLY_RUN_COMMAND_BLOCKED_TOKENS,
         WORKSPACE_SKILLS_DIRNAME,
-        WORKSPACE_MEMORY_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
     )
 except ImportError:
@@ -60,7 +59,6 @@ except ImportError:
         READONLY_RUN_COMMAND_ALLOWED_GIT_SUBCOMMANDS,
         READONLY_RUN_COMMAND_BLOCKED_TOKENS,
         WORKSPACE_SKILLS_DIRNAME,
-        WORKSPACE_MEMORY_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
     )
 
@@ -731,22 +729,27 @@ class MainTerminalToolsExecutionMixin:
                 return result
 
     def _handle_update_project_memory(self, name: str, description: str, content: str) -> Dict[str, Any]:
-                """处理 update_project_memory：写入 .astrion/memory/{name}.md"""
+                """Write a topic in the bound workspace memory store."""
+                from modules.project_memory import memory_filename, prepare_tool_write, tool_directory
+
                 safe_name = str(name).strip()
-                if not safe_name or "/" in safe_name or "\\" in safe_name:
+                filename = f"{safe_name}.md"
+                if not memory_filename(filename) or not safe_name or "/" in safe_name or "\\" in safe_name:
                     return {"success": False, "error": tr("tools_exec.memory_name_invalid", name=name)}
 
                 from .workspace_output import write_workspace_text
                 files = get_execution_backend(self).files
-                from modules.git_worktree.paths import result_path
-                directory = result_path(self, WORKSPACE_MEMORY_DIRNAME).replace("\\", "/")
-                target = f"{directory}/{safe_name}.md"
+                directory = tool_directory(self)
+                target = f"{directory}/{filename}"
                 before = files.inspect_path(target, access="write")
                 if not before.get("success"):
                     return before
+                if before.get("is_symlink"):
+                    return {"success": False, "error": "项目记忆文件不能是符号链接。"}
                 full_content = f"---\nname: {safe_name}\ndescription: {description}\n---\n\n{content}\n"
                 try:
-                    written = write_workspace_text(files, directory, f"{safe_name}.md", full_content)
+                    prepare_tool_write(self)
+                    written = write_workspace_text(files, directory, filename, full_content)
                 except Exception as exc:
                     return {"success": False, "error": tr("tools_exec.memory_file_write_failed", error=str(exc))}
                 if not written.get("success"):

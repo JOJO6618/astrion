@@ -173,7 +173,17 @@ const focusIndex = ref(-1);
 const activeResultKey = ref('');
 const searching = computed(() => query.value.trim().length > 0);
 const results = computed<SearchResult[]>(() =>
-  searching.value ? searchSettings(query.value, sectionLabel, canShowSection) : []
+  searching.value
+    ? searchSettings(query.value, sectionLabel, canShowSection, (key) => {
+        if (key === 'settings.memoryMigration.hostEntry') return settingsStore.sessionHostMode;
+        if (key === 'settings.memoryMigration.dockerEntry') {
+          return (
+            settingsStore.sessionStatusLoaded && !settingsStore.sessionHostMode && isAdmin.value
+          );
+        }
+        return true;
+      })
+    : []
 );
 const resultButtons = ref<HTMLElement[]>([]);
 

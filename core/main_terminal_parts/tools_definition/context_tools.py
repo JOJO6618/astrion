@@ -109,13 +109,13 @@ class ToolsDefinitionContextToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "recall_project_memory",
-                            "description": "读取指定的项目记忆文件，返回完整内容（含 frontmatter）。项目记忆存储在 .astrion/memory/ 目录下。通常在 search_project_memory 检索定位后使用；若不确定记忆名称，先检索再读取。",
+                            "description": "读取指定的项目记忆文件，返回完整内容（含 frontmatter）。工具自动定位当前工作区的项目记忆。通常在 search_project_memory 检索定位后使用；若不确定记忆名称，先检索再读取。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
                                     "name": {
                                         "type": "string",
-                                        "description": "记忆名称，对应 .astrion/memory/{name}.md 文件名"
+                                        "description": "专题记忆名称（不带 .md 后缀）"
                                     }
                                 }),
                                 "required": ["name"]
@@ -127,7 +127,7 @@ class ToolsDefinitionContextToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "search_project_memory",
-                            "description": "检索索引式项目记忆（.astrion/memory/*.md）的正文和描述。涉及项目约定、历史决策或已知问题且需要补充专题背景时调用；MEMORY.md 已全文注入的内容无需再次检索。提取2~5个精确关键词，优先模块名、文件名、报错文本。与项目无关的问题不要调用；未命中不要更换同义词重复尝试。命中后用 recall_project_memory 读取全文。",
+                            "description": "检索当前工作区的索引式项目记忆的正文和描述。涉及项目约定、历史决策或已知问题且需要补充专题背景时调用；MEMORY.md 已全文注入的内容无需再次检索。提取2~5个精确关键词，优先模块名、文件名、报错文本。与项目无关的问题不要调用；未命中不要更换同义词重复尝试。命中后用 recall_project_memory 读取全文。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -158,7 +158,7 @@ class ToolsDefinitionContextToolsMixin:
                                 "properties": self._inject_intent({
                                     "name": {
                                         "type": "string",
-                                        "description": "记忆名称，同时作为文件名 .astrion/memory/{name}.md。建议英文+下划线，如 docker_compose"
+                                        "description": "记忆名称，同时作为文件名 {name}.md。建议英文+下划线，如 docker_compose"
                                     },
                                     "description": {
                                         "type": "string",

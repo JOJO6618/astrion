@@ -19,7 +19,6 @@ try:
         TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
-        WORKSPACE_MEMORY_DIRNAME,
     )
 except ImportError:
     import sys
@@ -40,7 +39,6 @@ except ImportError:
         TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
-        WORKSPACE_MEMORY_DIRNAME,
     )
 
 from modules.file_manager import FileManager
@@ -103,40 +101,8 @@ class MemoryMixin:
     """MainTerminalContextMixin memory 能力 mixin。"""
 
     def _scan_project_memories(self):
-            """扫描 .astrion/memory/*.md 并解析 frontmatter 中的 name 和 description，按最近修改时间倒序返回"""
-            try:
-                memory_dir = Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME
-            except Exception:
-                return []
-            if not memory_dir.exists() or not memory_dir.is_dir():
-                return []
-            results = []
-            for md_file in sorted(memory_dir.glob("*.md")):
-                try:
-                    text = md_file.read_text(encoding="utf-8")
-                    name = None
-                    description = None
-                    if text.startswith("---"):
-                        end = text.find("---", 3)
-                        if end > 0:
-                            frontmatter = text[3:end]
-                            for line in frontmatter.strip().split("\n"):
-                                line_stripped = line.strip()
-                                if line_stripped.startswith("name:"):
-                                    name = line_stripped.split(":", 1)[1].strip()
-                                elif line_stripped.startswith("description:"):
-                                    description = line_stripped.split(":", 1)[1].strip()
-                    results.append({
-                        "file": md_file.name,
-                        "name": name or md_file.stem,
-                        "description": description or "",
-                        "mtime": md_file.stat().st_mtime,
-                    })
-                except Exception:
-                    pass
-            # 最近修改的排前面；mtime 相同时保持文件名顺序（sorted 基数 + 稳定排序）
-            results.sort(key=lambda item: item.get("mtime", 0), reverse=True)
-            return results
+        from modules.project_memory import scan_index
+        return scan_index(self)
 
     def _build_memory_system_content(self, template_name: str = "memory_system") -> str:
             """构建记忆内容；主 Agent 的固定规则集中在静态模板。"""
@@ -164,17 +130,8 @@ class MemoryMixin:
             truncated = inject_limit is not None and total_count > inject_limit
             shown_memories = project_memories[:inject_limit] if truncated else project_memories
 
-            if shown_memories:
-                lines = []
-                for m in shown_memories:
-                    desc = m.get("description", "")
-                    if desc:
-                        lines.append(f".astrion/memory/{m['file']}：{desc}")
-                    else:
-                        lines.append(f".astrion/memory/{m['file']}")
-                project_memory_list = "\n".join(lines)
-            else:
-                project_memory_list = ""
+            from modules.project_memory import index_lines
+            project_memory_list = index_lines(shown_memories)
 
             result = template
             result = result.replace("{global_memory}", global_memory_text)

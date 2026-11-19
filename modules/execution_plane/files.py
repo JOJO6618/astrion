@@ -141,6 +141,13 @@ class LocalFileSystem(MetadataFileSystemMixin):
     # ------------------------------------------------------------------
     # 内容读写：显式转发，不改变现有 FileManager 行为
     # ------------------------------------------------------------------
+    def container_project_memory_index(self, path: str, ignore: str) -> Dict[str, Any] | None:
+        if not self._is_container_mode():
+            return None
+        return self._call_container("project_memory_index", {
+            "path": self._container_relative(path), "ignore": ignore,
+        })
+
     def read_file(self, path: str) -> Dict[str, Any]:
         return self._file_manager.read_file(path)
 

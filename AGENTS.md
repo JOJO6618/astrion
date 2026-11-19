@@ -83,6 +83,7 @@
 - **`config/*.json` 分两类**：程序能力类（`docker_risk_markers`/`skill_hints`/`command_blocking_recommended`）锚定源码树；部署级配置（`custom_models`/`host_workspaces`/`auto_approval`/`goal_review`/`host_sandbox_policy`）外置到 `DEPLOY_CONFIG_DIR`（走 `config.resolve_deploy_config`）
 - host 模式同时加载 `host/` 与 `web/` 的用户/工作区，**写操作一律落 host**；API dump 默认关闭（`AGENT_API_DUMP_ENABLED`），轮转见 `utils/log_rotation.py`；迁移脚本 `scripts/migrate_runtime_data.py`（先 `--dry-run`）
 - **私有项目常驻记忆**：Host 存 `<DATA_DIR>/memory/<目录名>-<路径摘要>/MEMORY.md`，Docker 存工作区 `data/memory/MEMORY.md`（挂载到 `.astrion/astrion-memory/`）。**只在新建对话与压缩后全文加载**，正常发送与恢复沿用持久快照；只对已注入的那个文件免预读，readonly/plan 守门不变。契约 `docs/workspace_memory.md`
+- **索引式项目记忆**：专题存入工作区记忆目录的 `topics/`。Host 启动提示迁移并在核验后留说明，Docker 仅由管理员迁移，核验后挂到容器原 `.astrion/memory/`。老对话冻结提示词不回写。契约 `docs/workspace_memory.md`。
 
 > 路径解析细节、个人指令拦截 `command_blocking` 语义见 `AD/runtime_data_paths.md`。
 

@@ -20,7 +20,6 @@ try:
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
         WORKSPACE_SKILLS_DIRNAME,
-        WORKSPACE_MEMORY_DIRNAME,
         PROJECT_AGENTS_SKILLS_DIRNAME,
     )
 except ImportError:
@@ -43,7 +42,6 @@ except ImportError:
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
         WORKSPACE_SKILLS_DIRNAME,
-        WORKSPACE_MEMORY_DIRNAME,
         PROJECT_AGENTS_SKILLS_DIRNAME,
     )
 
@@ -348,12 +346,14 @@ class MainTerminalToolsReadMixin:
                 }
 
     def _handle_recall_project_memory(self, name: str) -> Dict:
-                """处理 recall_project_memory：读取 .astrion/memory/{name}.md"""
+                """Read a topic by its workspace-local name."""
+                from modules.project_memory import memory_filename, tool_directory
+
                 safe_name = str(name).strip()
-                if not safe_name or "/" in safe_name or "\\" in safe_name:
+                filename = f"{safe_name}.md"
+                if not memory_filename(filename) or not safe_name or "/" in safe_name or "\\" in safe_name:
                     return {"success": False, "error": tr("tools_read.memory_name_invalid", name=name)}
-                from modules.git_worktree.paths import result_path
-                file_path = result_path(self, f'{WORKSPACE_MEMORY_DIRNAME}/{safe_name}.md')
+                file_path = f"{tool_directory(self)}/{filename}"
                 read_args = {
                     "path": file_path,
                     "type": "read",
@@ -364,7 +364,7 @@ class MainTerminalToolsReadMixin:
                 return result
 
     def _handle_search_project_memory(self, keywords: List[str], max_results: int = 5) -> Dict:
-                """处理 search_project_memory：在 .astrion/memory/*.md 中做关键词全文检索。
+                """在当前工作区的专题记忆中做关键词全文检索。
 
                 评分：名称命中 +10，描述命中 +5，正文每行命中 +1（单关键词最多计 5 行）。
                 返回 top-N 结果，附匹配行片段（行号基于完整文件，可直接配合 read_file extract 使用）。
@@ -382,8 +382,8 @@ class MainTerminalToolsReadMixin:
                 # 项目记忆目录的列举与内容读取均经执行后端（不再对本机 Path 做
                 # resolve/exists/glob）。
                 files_access = files_for_owner(self)
-                from modules.git_worktree.paths import result_path
-                memory_directory = result_path(self, WORKSPACE_MEMORY_DIRNAME)
+                from modules.project_memory import memory_filename, tool_directory
+                memory_directory = tool_directory(self)
                 memory_meta = inspect_meta(files_access, memory_directory)
                 if not memory_meta.get("success"):
                     return {
@@ -409,7 +409,8 @@ class MainTerminalToolsReadMixin:
                     }
                 memory_files = [
                     item for item in (listing.get("files") or [])
-                    if str(item.get("name") or "").endswith(".md")
+                    if memory_filename(str(item.get("name") or ""))
+                    and item.get("type") in (None, "file")
                 ]
 
                 lowered = [(kw, kw.lower()) for kw in clean_keywords]
@@ -418,17 +419,14 @@ class MainTerminalToolsReadMixin:
                     memory_files, key=lambda item: str(item.get("name") or "")
                 ):
                     file_name = str(memory_file.get("name") or "")
-                    file_path = str(
-                        memory_file.get("path")
-                        or f"{WORKSPACE_MEMORY_DIRNAME}/{file_name}"
-                    )
-                    file_path = result_path(self, file_path)
+                    file_path = f"{memory_directory}/{file_name}"
                     text = read_text(files_access, file_path)
                     if text is None:
                         continue
 
                     lines = text.split("\n")
-                    name = file_name[:-3] if file_name.endswith(".md") else file_name
+                    memory_name = file_name[:-3]
+                    name = memory_name
                     description = ""
                     body_start_idx = 0  # 0-based，正文起始行（跳过 frontmatter）
                     if lines and lines[0].strip() == "---":
@@ -443,7 +441,7 @@ class MainTerminalToolsReadMixin:
                                 body_start_idx = i + 1
                                 break
 
-                    name_lower = name.lower()
+                    searchable_names = (name.lower(), memory_name.lower())
                     desc_lower = description.lower()
                     body_lines = lines[body_start_idx:]
 
@@ -451,7 +449,7 @@ class MainTerminalToolsReadMixin:
                     matched_keywords: List[str] = []
                     for kw, kw_lower in lowered:
                         kw_score = 0
-                        if kw_lower in name_lower:
+                        if any(kw_lower in value for value in searchable_names):
                             kw_score += 10
                         if kw_lower in desc_lower:
                             kw_score += 5
@@ -479,6 +477,7 @@ class MainTerminalToolsReadMixin:
                     scored.append({
                         "file": file_name,
                         "name": name,
+                        "memory_name": memory_name,
                         "description": description,
                         "score": score,
                         "matched_keywords": matched_keywords,
