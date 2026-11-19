@@ -109,7 +109,9 @@ class TabApprovalTests(unittest.TestCase):
         exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), 'tabs', 'exec'), namespace)
         tabs = [dict(kind='conv', workspace_id=ws, conversation_id='conv_same') for ws in ('a', 'b')]
         fake_state = SimpleNamespace(tool_approval_manager=SimpleNamespace(list_pending=lambda _: rows))
-        with patch.dict(sys.modules, {'server.state': fake_state}):
+        with patch.dict(sys.modules, {'server.state': fake_state}), patch(
+            'server.desktop_conversation_activity.pending_conversation_requests', return_value={},
+        ):
             namespace['_enrich_tabs']('user', tabs)
         return tabs
 

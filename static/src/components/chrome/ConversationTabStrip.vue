@@ -43,13 +43,7 @@
           role="tab"
           tabindex="0"
           :aria-selected="tab.key === tabsStore.activeKey"
-          :aria-label="
-            tab.awaitingHumanApproval
-              ? `${titleOf(tab)}: ${t('appUi.tabStripAwaitingApproval')}`
-              : tab.error
-                ? `${titleOf(tab)}: ${t('appUi.tabStripLoadFailed')}`
-                : titleOf(tab)
-          "
+          :aria-label="accessibleTabTitle(tab)"
           @keydown.enter.prevent="onTabClick(tab)"
           @keydown.space.prevent="onTabClick(tab)"
           @click="onTabClick(tab)"
@@ -182,7 +176,7 @@ const prevRunning = new Map<string, boolean>();
 // 切换过程中不渲染任何临时标记：状态点参与 flex 排版，临时点会把标题推右再弹回
 // （0.6.4 的 loading 环即如此）。切换进度由标签的 aria-busy 表达，见模板。
 function statusOf(tab: ConversationTab): 'awaiting' | 'running' | 'done' | 'error' | null {
-  if (tab.awaitingHumanApproval) return 'awaiting';
+  if (tab.awaitingHumanApproval || tab.awaitingUserAnswer) return 'awaiting';
   if (tab.error) return 'error';
   if (tab.running) return 'running';
   return tab.key !== tabsStore.activeKey && donePending.value.has(tab.key) ? 'done' : null;
@@ -219,6 +213,13 @@ function titleOf(tab: ConversationTab): string {
     return t('appUi.tabStripPageSettings');
   }
   return tab.kind === 'new' ? t('appUi.tabStripNewTab') : tab.title || t('appUi.tabStripNewTab');
+}
+function accessibleTabTitle(tab: ConversationTab): string {
+  const states = [];
+  if (tab.awaitingHumanApproval) states.push(t('appUi.tabStripAwaitingApproval'));
+  if (tab.awaitingUserAnswer) states.push(t('appUi.tabStripAwaitingAnswer'));
+  if (!states.length && tab.error) states.push(t('appUi.tabStripLoadFailed'));
+  return [titleOf(tab), ...states].join(' · ');
 }
 function retrySync() {
   tabsStore.commandError = '';

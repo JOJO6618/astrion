@@ -105,6 +105,15 @@ export default {
   fullAccessWarningCancel: '返回沙箱模式',
   fullAccessWarningRemember: '不再提示',
   tabStripAwaitingApproval: '等待人工审批',
+  tabStripAwaitingAnswer: '等待你回答',
+  conversationNotification: {
+    completed: '对话已完成',
+    approval: '需要你审批',
+    question: '有问题等你回答',
+    dismiss: '忽略',
+    open: '打开对话 {title}',
+    untitled: '未命名对话'
+  },
   switchNetworkPermissionFailed: '切换网络权限失败',
   networkPermissionUpdated: '网络权限已更新',
   networkRestricted: '受限',

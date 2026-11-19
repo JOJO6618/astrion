@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('astrionShell', {
   onTabsState: callback => subscribe('shell:tabs-state', callback),
   // 壳层请求打开某个页面（如 /settings/quick-chat）：{ route }，chrome 据此发后端 `page` 命令。
   onRequestPage: callback => subscribe('shell:request-page', callback),
+  onNotificationOpen: callback => subscribe('shell:notification-open', callback),
+  focusNotificationTab: key => ipcRenderer.send('shell:notification-focus-tab', key),
   // 所有显示器的 bounds（含菜单栏区域）：{ displays: [{x,y,width,height}] }，供向上拖出计算屏幕上沿余量。
   dragInfo: () => ipcRenderer.invoke('shell:drag-info'),
   // 拖出（浏览器式）：{ key, phase:'tear'|'move'|'drop'|'cancel', screenX, screenY, offsetX?, offsetY? }。

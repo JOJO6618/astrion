@@ -27,6 +27,8 @@ import { desktopSupported, windowChromeOptions } from './platform.js';
 import { ViewManager } from './views/manager.js';
 import { createDetachedWindow, applyDetachedChromeTheme } from './views/detached-window.js';
 import { CHROME_STRIP_HEIGHT } from './views/layout.js';
+import { conversationKey } from './conversation-activity.js';
+import { broadcastConversationNotificationTheme } from './conversation-notifications.js';
 
 export { CHROME_STRIP_HEIGHT };
 
@@ -134,7 +136,10 @@ ipcMain.on('shell:theme', (event, key) => {
   if (typeof key !== 'string' || !THEME_KEYS.has(key)) return;
   const changed = key !== currentThemeKey();
   saveThemeKey(key);
-  if (changed) views?.broadcastTheme(key, event.sender);
+  if (changed) {
+    views?.broadcastTheme(key, event.sender);
+    broadcastConversationNotificationTheme(key);
+  }
 });
 // preload 在页面脚本执行前同步取首帧主题；主题不是凭据，任一顶层 frame 可读。
 ipcMain.on('shell:theme-get', (event) => {
@@ -171,6 +176,45 @@ ipcMain.on('shell:focus-tab', (event, key) => {
   if (!fromContentView(event) || typeof key !== 'string') return;
   try { views.focusTab(key); } catch (err) { console.error('[astrion-desktop] focusTab 失败:', err); }
 });
+
+// The existing open command resolves the tab at click time. Use its current window
+// rather than the placement from when the notification was displayed.
+ipcMain.on('shell:notification-focus-tab', (event, key) => {
+  if (!fromChrome(event) || typeof key !== 'string' || isUpdaterInstalling()) return;
+  try {
+    if (views.detachedWindowOf(key) && views.focusTab(key)) return;
+    if (views.activeKey === key || views.focusTab(key)) focusMainWindow();
+  } catch (error) {
+    console.error('[astrion-desktop] Notification focus:', error);
+  }
+});
+
+export const conversationNotificationWindows = {
+  focusedWindow() {
+    const focused = BaseWindow.getFocusedWindow();
+    if (!focused) return { kind: 'external' };
+    for (const [key, window] of views?.detachedWindows || []) {
+      if (window !== focused) continue;
+      const tab = views.snapshot?.tabs.find((row) => row.key === key);
+      return { kind: 'detached', conversationKey: tab ? conversationKey(tab) : null };
+    }
+    return { kind: 'astrion' };
+  },
+  targetWindow(row) {
+    const tab = views?.snapshot?.tabs.find((candidate) =>
+      candidate.kind === 'conv' && conversationKey(candidate) === conversationKey(row));
+    return (tab && views.detachedWindowOf(tab.key)) || mainWindow;
+  },
+  openConversation(row) {
+    if (isUpdaterInstalling()) return;
+    views?.sendChrome('shell:notification-open', {
+      conversationId: row.conversation_id,
+      conversationKind: row.conversation_kind,
+      workspaceId: row.workspace_id,
+      title: row.title,
+    });
+  },
+};
 
 let pendingMainRoute = null;
 
