@@ -53,7 +53,7 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
     ),
     "skills": ToolCategory(
         label="Skills",
-        tools=["read_skill", "create_skill"],
+        tools=["read_skill", "search_skills", "create_skill"],
     ),
     "terminal_realtime": ToolCategory(
         label="实时终端",

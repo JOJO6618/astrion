@@ -459,6 +459,7 @@ const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   // 读取文件 / 技能 / 视觉内容（分档统计：看图与读技能不再计入“读文件”）
   read_file: 'read',
   read_skill: 'skill_read',
+  search_skills: 'search',
   vlm_analyze: 'vision',
   view_image: 'vision',
   view_video: 'vision',

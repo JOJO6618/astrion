@@ -192,6 +192,7 @@ export const TOOL_ICON_MAP = Object.freeze({
   ocr_image: 'camera',
   read_file: 'book',
   read_skill: 'book',
+  search_skills: 'search',
   rename_file: 'pencil',
   run_command: 'terminal',
   save_webpage: 'save',

@@ -367,6 +367,10 @@ MESSAGES = {
         "zh-CN": "search_project_memory 需要 keywords 参数（至少 1 个关键词）",
         "en-US": "search_project_memory requires the keywords argument (at least 1 keyword)",
     },
+    "tools_exec.search_skills_needs_keywords": {
+        "zh-CN": "search_skills 需要 keywords 参数（至少 1 个关键词）",
+        "en-US": "search_skills requires the keywords argument (at least 1 keyword)",
+    },
     "tools_exec.update_memory_needs_name": {
         "zh-CN": "update_project_memory 需要 name 参数",
         "en-US": "update_project_memory requires the name argument",

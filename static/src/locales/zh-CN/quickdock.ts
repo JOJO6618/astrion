@@ -48,6 +48,7 @@ export default {
   toolWriteFile: '写入文件',
   toolAppendFile: '追加文件',
   toolReadSkill: '读取技能',
+  toolSearchSkills: '检索技能',
   toolSearch: '搜索网页',
   toolExtract: '提取网页',
   toolSaveWebpage: '保存网页',

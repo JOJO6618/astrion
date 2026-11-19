@@ -1,6 +1,6 @@
 """Message pack: tools_read (core/main_terminal_parts/tools_read.py).
 
-read_file / read_skill / search_project_memory / recall_project_memory 等工具
+read_file / read_skill / search_skills / search_project_memory / recall_project_memory 等工具
 handler 返回 dict 的用户可见消息（error/message/content/summary，显示在前端工具块）。
 纯数据模块：禁止 import modules.i18n；由 modules/i18n.py import 时自动聚合。
 插值用 str.format 命名参数：tr("tools_read.<key>", name=value)。
@@ -23,6 +23,48 @@ MESSAGES = {
     "tools_read.skill_not_found": {
         "zh-CN": "未找到技能: {name}",
         "en-US": "Skill not found: {name}",
+    },
+
+    # ── search_skills ──
+    "tools_read.search_skills_needs_keywords": {
+        "zh-CN": "search_skills 需要至少 1 个关键词",
+        "en-US": "search_skills requires at least 1 keyword",
+    },
+    "tools_read.skills_catalog_unavailable": {
+        "zh-CN": "无法通过执行后端读取技能目录，请改用 read_file 按具体路径查看",
+        "en-US": "Unable to read the skills directory through the execution backend; use read_file with an exact path instead",
+    },
+    "tools_read.skills_none_available": {
+        "zh-CN": "当前没有可用的技能，请按常规方式完成任务。",
+        "en-US": "No skills are currently available; complete the task in the usual way.",
+    },
+    "tools_read.skills_search_no_match_content": {
+        "zh-CN": "未找到匹配的技能（关键词：{keywords}）。不要更换同义词重复检索，请按常规方式完成任务。",
+        "en-US": "No matching skills found (keywords: {keywords}). Do not re-run the search with synonyms; complete the task in the usual way.",
+    },
+    "tools_read.skills_search_no_match_summary": {
+        "zh-CN": "未找到匹配的技能",
+        "en-US": "No matching skills found",
+    },
+    "tools_read.skills_search_found_header": {
+        "zh-CN": "技能检索（关键词：{keywords}）共命中 {count} 个：",
+        "en-US": "Skill search (keywords: {keywords}) matched {count}:",
+    },
+    "tools_read.skills_search_result_item": {
+        "zh-CN": "[{rank}] {skill_id} — {path}（命中：{matched}）",
+        "en-US": "[{rank}] {skill_id} — {path} (matched: {matched})",
+    },
+    "tools_read.skills_search_result_conflict": {
+        "zh-CN": "    ⚠️ 同名重复：{conflict_path} 也存在，read_skill 会报错，请用 read_file 按具体路径读取",
+        "en-US": "    ⚠️ Name conflict: {conflict_path} also exists; read_skill will fail, use read_file with the exact path",
+    },
+    "tools_read.skills_search_read_full_hint": {
+        "zh-CN": "如需完整内容，使用 read_skill 读取对应技能，再按其指引执行。",
+        "en-US": "For the full content, use read_skill to read the matching skill, then follow its instructions.",
+    },
+    "tools_read.skills_search_found_summary": {
+        "zh-CN": "找到 {count} 个匹配的技能",
+        "en-US": "Found {count} matching skills",
     },
 
     # ── 项目记忆工具 ──

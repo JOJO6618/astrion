@@ -41,6 +41,7 @@ export default {
   toolWriteFile: 'Write file',
   toolAppendFile: 'Append to file',
   toolReadSkill: 'Read skill',
+  toolSearchSkills: 'Search skills',
   toolSearch: 'Search web',
   toolExtract: 'Extract webpage',
   toolSaveWebpage: 'Save webpage',

@@ -20,6 +20,28 @@ from modules.i18n import tr
 logger = setup_logger(__name__)
 
 SKILL_FILE_NAME = "SKILL.md"
+
+# search_skills 工具定义（主智能体与子智能体共用；执行见 tools_read._handle_search_skills）
+SEARCH_SKILLS_DESCRIPTION = (
+    "检索可用技能：在 .astrion/skills/ 与 .agents/skills/ 下各 SKILL.md 的名称、description 与正文中做关键词匹配。"
+    "系统提示词只列技能名称，任务可能有对应技能、或名称不足以判断用途时调用。"
+    "提取 2~5 个精确关键词，优先文件格式、工具或库名、领域术语，并带上英文词（技能正文多为英文）。"
+    "任一关键词命中即算匹配，命中越多排名越靠前。返回技能名、description 与命中片段；"
+    "命中后用 read_skill 读取全文再执行，不要仅凭片段操作。未命中不要更换同义词重复尝试。"
+)
+SEARCH_SKILLS_PARAMETERS: Dict[str, Dict[str, object]] = {
+    "keywords": {
+        "type": "array",
+        "description": "搜索关键词列表，建议 2~5 个，含英文术语；任一关键词命中即算匹配，命中数越多排名越靠前",
+        "items": {"type": "string"},
+        "minItems": 1,
+        "maxItems": 5,
+    },
+    "max_results": {
+        "type": "integer",
+        "description": "最多返回多少个技能，默认 5，最大 10",
+    },
+}
 SKILL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _SYNC_LOCK_GUARD = threading.Lock()
 _SYNC_LOCKS: Dict[str, threading.Lock] = {}
@@ -402,40 +424,30 @@ def build_skills_list(
     catalog: Sequence[Dict[str, str]],
     enabled_skill_ids: Sequence[str],
 ) -> List[str]:
-    """Build skills list lines / 生成 skills 列表行。
+    """Build names-only skills list lines / 生成仅含名称的 skills 列表行。
 
-    列表行直接使用该 skill 在工作区内的真实路径前缀（.astrion/skills/ 或 .agents/skills/）；
-    .agents/skills/ 来源与同名冲突会在列表尾部附说明行。
+    只注入技能名称（不含 description），按工作区内真实目录前缀分组，
+    一组一行：``.astrion/skills/：a, b, c``；用途说明由 search_skills 检索获得。
+    同名冲突在末尾单独列出一行，提示改用 read_file 按具体路径读取。
     """
     if not enabled_skill_ids:
         return []
     lookup = {item.get("id"): item for item in catalog if item.get("id")}
-    lines: List[str] = []
-    has_agents_source = False
-    has_conflict = False
+    groups: Dict[str, List[str]] = {}
+    conflicts: List[str] = []
     for skill_id in enabled_skill_ids:
         meta = lookup.get(skill_id)
         if not meta:
             continue
         display_dir = (meta.get("display_dir") or WORKSPACE_SKILLS_DIRNAME).strip("/")
-        if meta.get("source") == "agents":
-            has_agents_source = True
-        description = (meta.get("description") or "").strip()
-        line = f"{display_dir}/{skill_id}：{description}" if description else f"{display_dir}/{skill_id}"
+        groups.setdefault(display_dir, []).append(skill_id)
         conflict_dir = (meta.get("conflict_dir") or "").strip("/")
         if conflict_dir:
-            has_conflict = True
-            line += f"（⚠️ 同名重复：{conflict_dir}/{skill_id} 也存在，read_skill 会报错，请改用 read_file 按具体路径读取）"
-        lines.append(line)
-    if has_agents_source:
+            conflicts.append(f"{skill_id}（{display_dir}/ 与 {conflict_dir}/ 各一份）")
+    lines = [f"{display_dir}/：{', '.join(names)}" for display_dir, names in groups.items()]
+    if conflicts:
         lines.append(
-            f"注：以 {PROJECT_AGENTS_SKILLS_DIRNAME}/ 开头的技能来自工作区 {PROJECT_AGENTS_SKILLS_DIRNAME}/ 目录"
-            "（行业通用技能目录，由项目仓库提供，非 Astrion 管理），同样可用 read_skill 读取。"
-        )
-    if has_conflict:
-        lines.append(
-            f"注：标注同名重复的技能在 {WORKSPACE_SKILLS_DIRNAME}/ 与 {PROJECT_AGENTS_SKILLS_DIRNAME}/ 各有一份，"
-            "内容可能不同；read_skill 对重复名会报错，此时请改用 read_file 读取具体路径查看。"
+            "同名重复（read_skill 会报错，请用 read_file 按具体路径读取）：" + "，".join(conflicts)
         )
     return lines
 

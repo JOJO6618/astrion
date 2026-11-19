@@ -111,11 +111,8 @@ class MainTerminalToolsReadMixin:
                     normalized = normalized[: -len("/SKILL.md")]
                 return normalized.strip()
 
-    def _resolve_skill_id(self, skill_name: Any) -> Dict[str, Any]:
-                normalized_input = self._normalize_skill_name(skill_name)
-                if not normalized_input:
-                    return {"success": False, "error": tr("tools_read.skill_name_empty")}
-
+    def _enabled_skills_catalog(self) -> Optional[List[Dict[str, str]]]:
+                """read_skill 与 search_skills 共用的可用技能目录；None 表示执行后端读取失败。"""
                 try:
                     personalization = load_personalization_config(self.data_dir)
                 except Exception:
@@ -133,17 +130,23 @@ class MainTerminalToolsReadMixin:
                     files_access, scan_project_agents=scan_project_agents
                 )
                 if catalog is None:
-                    return {
-                        "success": False,
-                        "error": "无法通过执行后端读取技能目录，请改用 read_file 按具体路径查看",
-                    }
+                    return None
                 enabled_skills = merge_enabled_skills(
                     personalization.get("enabled_skills") if isinstance(personalization, dict) else None,
                     catalog,
                     personalization.get("skills_catalog_snapshot") if isinstance(personalization, dict) else None,
                 )
                 enabled_set = set(enabled_skills or [])
-                filtered_catalog = [item for item in catalog if item.get("id") in enabled_set] if enabled_set else list(catalog)
+                return [item for item in catalog if item.get("id") in enabled_set] if enabled_set else list(catalog)
+
+    def _resolve_skill_id(self, skill_name: Any) -> Dict[str, Any]:
+                normalized_input = self._normalize_skill_name(skill_name)
+                if not normalized_input:
+                    return {"success": False, "error": tr("tools_read.skill_name_empty")}
+
+                filtered_catalog = self._enabled_skills_catalog()
+                if filtered_catalog is None:
+                    return {"success": False, "error": tr("tools_read.skills_catalog_unavailable")}
 
                 normalized_lower = normalized_input.lower()
 
@@ -205,6 +208,144 @@ class MainTerminalToolsReadMixin:
                 result["skill_id"] = skill_id
                 result["skill_name"] = skill_name
                 return result
+
+    SKILL_SEARCH_DESC_MAX_CHARS = 300
+
+    def _handle_search_skills(self, keywords: List[str], max_results: int = 5) -> Dict:
+                """处理 search_skills：在可用技能的 SKILL.md（名称/描述/正文）中做关键词检索。
+
+                检索范围与 read_skill 一致（_enabled_skills_catalog）。评分：id/名称命中 +10，
+                描述命中 +5，正文每行命中 +1（单关键词最多计 5 行）。描述截断到 300 字，
+                片段行号基于完整 SKILL.md，可直接配合 read_file 使用。
+                """
+                clean_keywords: List[str] = []
+                for kw in keywords or []:
+                    kw_text = str(kw or "").strip()
+                    if kw_text and kw_text not in clean_keywords:
+                        clean_keywords.append(kw_text)
+                clean_keywords = clean_keywords[:5]
+                if not clean_keywords:
+                    return {"success": False, "error": tr("tools_read.search_skills_needs_keywords")}
+                max_results = self._clamp_int(max_results, 5, 1, 10)
+
+                catalog = self._enabled_skills_catalog()
+                if catalog is None:
+                    return {"success": False, "error": tr("tools_read.skills_catalog_unavailable")}
+                if not catalog:
+                    empty_text = tr("tools_read.skills_none_available")
+                    return {
+                        "success": True, "count": 0, "keywords": clean_keywords,
+                        "results": [], "content": empty_text, "summary": empty_text,
+                    }
+
+                from modules.git_worktree.paths import result_path
+                files_access = files_for_owner(self)
+                lowered = [(kw, kw.lower()) for kw in clean_keywords]
+                scored: List[Dict[str, Any]] = []
+                for item in catalog:
+                    skill_id = str(item.get("id") or "")
+                    if not skill_id:
+                        continue
+                    display_dir = str(item.get("display_dir") or WORKSPACE_SKILLS_DIRNAME).strip("/")
+                    rel_path = f"{display_dir}/{skill_id}/SKILL.md"
+                    text = read_text(files_access, result_path(self, rel_path))
+                    if text is None:
+                        continue
+                    lines = text.split("\n")
+                    body_start_idx = 0
+                    if lines and lines[0].strip() == "---":
+                        for i in range(1, len(lines)):
+                            if lines[i].strip() == "---":
+                                body_start_idx = i + 1
+                                break
+                    body_lines = lines[body_start_idx:]
+                    name_lower = f"{skill_id}\n{item.get('label') or ''}".lower()
+                    description = str(item.get("description") or "").strip()
+                    desc_lower = description.lower()
+
+                    score = 0
+                    matched_keywords: List[str] = []
+                    for kw, kw_lower in lowered:
+                        kw_score = 0
+                        if kw_lower in name_lower:
+                            kw_score += 10
+                        if kw_lower in desc_lower:
+                            kw_score += 5
+                        body_hits = sum(1 for line in body_lines if kw_lower in line.lower())
+                        kw_score += min(body_hits, 5)
+                        if kw_score > 0:
+                            score += kw_score
+                            matched_keywords.append(kw)
+                    if score <= 0:
+                        continue
+
+                    snippets: List[Dict[str, Any]] = []
+                    for idx in range(body_start_idx, len(lines)):
+                        line_stripped = lines[idx].strip()
+                        if not line_stripped:
+                            continue
+                        line_lower = line_stripped.lower()
+                        if any(kw_lower in line_lower for _, kw_lower in lowered):
+                            snippet_text = line_stripped if len(line_stripped) <= 120 else line_stripped[:117] + "..."
+                            snippets.append({"line": idx + 1, "text": snippet_text})
+                        if len(snippets) >= 3:
+                            break
+
+                    limit = self.SKILL_SEARCH_DESC_MAX_CHARS
+                    if len(description) > limit:
+                        description = description[: limit - 3] + "..."
+                    conflict_dir = str(item.get("conflict_dir") or "").strip("/")
+                    scored.append({
+                        "skill_id": skill_id,
+                        "path": result_path(self, rel_path),
+                        "description": description,
+                        "conflict_path": (
+                            result_path(self, f"{conflict_dir}/{skill_id}/SKILL.md") if conflict_dir else ""
+                        ),
+                        "score": score,
+                        "matched_keywords": matched_keywords,
+                        "snippets": snippets,
+                    })
+
+                scored.sort(key=lambda entry: (-entry["score"], -len(entry["matched_keywords"]), entry["skill_id"]))
+                top = scored[:max_results]
+                keywords_text = ", ".join(clean_keywords)
+                if not top:
+                    return {
+                        "success": True, "count": 0, "keywords": clean_keywords, "results": [],
+                        "content": tr("tools_read.skills_search_no_match_content", keywords=keywords_text),
+                        "summary": tr("tools_read.skills_search_no_match_summary"),
+                    }
+
+                content_lines = [
+                    tr("tools_read.skills_search_found_header", count=len(top), keywords=keywords_text),
+                    "",
+                ]
+                for rank, entry in enumerate(top, start=1):
+                    content_lines.append(tr(
+                        "tools_read.skills_search_result_item", rank=rank, skill_id=entry["skill_id"],
+                        path=entry["path"], matched=", ".join(entry["matched_keywords"]),
+                    ))
+                    if entry["conflict_path"]:
+                        content_lines.append(tr(
+                            "tools_read.skills_search_result_conflict", conflict_path=entry["conflict_path"],
+                        ))
+                    if entry["description"]:
+                        content_lines.append(tr("tools_read.search_result_desc", description=entry["description"]))
+                    if entry["snippets"]:
+                        content_lines.append(tr("tools_read.search_result_snippets_label"))
+                        for snippet in entry["snippets"]:
+                            content_lines.append(f"      L{snippet['line']}: {snippet['text']}")
+                    content_lines.append("")
+                content_lines.append(tr("tools_read.skills_search_read_full_hint"))
+                return {
+                    "success": True,
+                    "count": len(top),
+                    "keywords": clean_keywords,
+                    "results": top,
+                    "content": "\n".join(content_lines).strip(),
+                    "summary": tr("tools_read.skills_search_found_summary", count=len(top)),
+                }
 
     def _handle_recall_project_memory(self, name: str) -> Dict:
                 """处理 recall_project_memory：读取 .astrion/memory/{name}.md"""

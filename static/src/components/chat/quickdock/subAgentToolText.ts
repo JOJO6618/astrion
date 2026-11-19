@@ -93,6 +93,11 @@ export function buildSubAgentToolParts(entry: SubAgentToolEntry): SubAgentToolPa
       return { label: t('quickdock.toolReadMedia'), detail: str(args.path) || str(args.file_path) };
     case 'read_skill':
       return { label: t('quickdock.toolReadSkill'), detail: str(args.skill_name) };
+    case 'search_skills':
+      return {
+        label: t('quickdock.toolSearchSkills'),
+        detail: Array.isArray(args.keywords) ? args.keywords.join(' / ') : str(args.keywords)
+      };
     case 'recall_project_memory':
       return { label: t('quickdock.toolRecallMemory'), detail: str(args.name) };
     case 'search_project_memory':

@@ -60,6 +60,8 @@ from modules.skills_manager import (
     build_skills_list,
     merge_enabled_skills,
     build_skills_prompt,
+    SEARCH_SKILLS_DESCRIPTION,
+    SEARCH_SKILLS_PARAMETERS,
 )
 from modules.custom_tool_registry import CustomToolRegistry, build_default_tool_category
 from modules.custom_tool_executor import CustomToolExecutor
@@ -119,7 +121,7 @@ class ToolsDefinitionFileToolsMixin:
                         "type": "function",
                         "function": {
                             "name": "read_skill",
-                            "description": "按 skill 名称读取 SKILL.md 内容（.astrion/skills/<name>/ 或 .agents/skills/<name>/）；内部等价于 read_file 的 read 模式，并返回解析后的 path。若技能在 .astrion/skills/ 与 .agents/skills/ 同名重复，会报错并提示改用 read_file 按具体路径读取。",
+                            "description": "按 skill 名称读取 SKILL.md 全文。名称来自系统提示词中的技能名列表或 search_skills 结果。路径为 .astrion/skills/<name>/ 或 .agents/skills/<name>/；内部等价于 read_file 的 read 模式，并返回解析后的 path。若技能在 .astrion/skills/ 与 .agents/skills/ 同名重复，会报错并提示改用 read_file 按具体路径读取。",
                             "parameters": {
                                 "type": "object",
                                 "properties": self._inject_intent({
@@ -129,6 +131,19 @@ class ToolsDefinitionFileToolsMixin:
                                     }
                                 }),
                                 "required": ["skill_name"]
+                            }
+                        }
+                    },
+
+                                    {
+                        "type": "function",
+                        "function": {
+                            "name": "search_skills",
+                            "description": SEARCH_SKILLS_DESCRIPTION,
+                            "parameters": {
+                                "type": "object",
+                                "properties": self._inject_intent(dict(SEARCH_SKILLS_PARAMETERS)),
+                                "required": ["keywords"]
                             }
                         }
                     },

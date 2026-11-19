@@ -214,10 +214,11 @@ def _build_skills_section(workspace_path: str, data_dir: str = "") -> str:
             return ""
         return (
             "## 可用 AgentSkill\n\n"
-            "agent skills 系统已启用，以下是可用的 skills（含简要说明）：\n\n"
+            "agent skills 系统已启用，以下仅列出可用技能名称（不含用途说明）：\n\n"
             + "\n".join(skills_list)
-            + "\n\n使用技能时，优先用 read_skill 通过技能名读取 SKILL.md；"
-            "需要阅读 skill 目录中的其他文件时再使用 read_file\n"
+            + "\n\n任务可能有对应技能时，先用 search_skills 检索（2~5 个关键词，带英文术语），"
+            "命中后用 read_skill 读取 SKILL.md 全文再执行；需要 skill 目录中的其他文件时用 read_file。"
+            "未命中不要换词反复重试。\n"
         )
     except Exception:
         return ""

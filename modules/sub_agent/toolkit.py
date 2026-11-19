@@ -6,6 +6,8 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from modules.skills_manager import SEARCH_SKILLS_DESCRIPTION, SEARCH_SKILLS_PARAMETERS
+
 # 子智能体可用工具定义（与前端进度展示兼容）
 SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
     {
@@ -158,13 +160,25 @@ SUB_AGENT_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "read_skill",
-            "description": "按 skill 名称读取 SKILL.md 内容（.astrion/skills/<name>/ 或 .agents/skills/<name>/）；内部等价于 read_file 的 read 模式，并返回解析后的 path。若技能在 .astrion/skills/ 与 .agents/skills/ 同名重复，会报错并提示改用 read_file 按具体路径读取。",
+            "description": "按 skill 名称读取 SKILL.md 全文。名称来自系统提示词中的技能名列表或 search_skills 结果。路径为 .astrion/skills/<name>/ 或 .agents/skills/<name>/；内部等价于 read_file 的 read 模式，并返回解析后的 path。若技能在 .astrion/skills/ 与 .agents/skills/ 同名重复，会报错并提示改用 read_file 按具体路径读取。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "skill_name": {"type": "string", "description": "skill 名称（支持 skill id 或技能名称）"},
                 },
                 "required": ["skill_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_skills",
+            "description": SEARCH_SKILLS_DESCRIPTION,
+            "parameters": {
+                "type": "object",
+                "properties": dict(SEARCH_SKILLS_PARAMETERS),
+                "required": ["keywords"],
             },
         },
     },
@@ -326,8 +340,8 @@ def _format_tool_result(name: str, raw: Any) -> str:
         if raw.get("content"):
             return raw.get("content")
         return raw.get("message") or raw.get("error") or "记忆已读取"
-    if name == "search_project_memory":
-        # search_project_memory 返回预格式化的检索结果文本
+    if name in {"search_project_memory", "search_skills"}:
+        # search_project_memory / search_skills 返回预格式化的检索结果文本
         if raw.get("content"):
             return raw.get("content")
         return raw.get("message") or raw.get("error") or "检索完成"

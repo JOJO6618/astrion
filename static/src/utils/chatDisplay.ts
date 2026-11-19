@@ -7,6 +7,7 @@ const RUNNING_ANIMATIONS: Record<string, string> = {
   create_file: 'file-animation',
   read_file: 'read-animation',
   read_skill: 'read-animation',
+  search_skills: 'search-animation',
   create_skill: 'file-animation',
   delete_file: 'file-animation',
   rename_file: 'file-animation',
@@ -44,6 +45,7 @@ function getToolStatusTexts(): {
     preparing: {
       read_file: t('toolResults.preparingStatus.readFile'),
       read_skill: t('toolResults.preparingStatus.readSkill'),
+      search_skills: t('toolResults.preparingStatus.searchSkills'),
       view_image: t('toolResults.preparingStatus.viewImage'),
       view_video: t('toolResults.preparingStatus.viewVideo'),
       vlm_analyze: t('toolResults.preparingStatus.vlmAnalyze'),
@@ -96,6 +98,7 @@ function getToolStatusTexts(): {
     running: {
       read_file: t('toolResults.runningStatus.readFile'),
       read_skill: t('toolResults.runningStatus.readSkill'),
+      search_skills: t('toolResults.runningStatus.searchSkills'),
       view_image: t('toolResults.runningStatus.viewImage'),
       view_video: t('toolResults.runningStatus.viewVideo'),
       vlm_analyze: t('toolResults.runningStatus.vlmAnalyze'),
@@ -148,6 +151,7 @@ function getToolStatusTexts(): {
     completed: {
       read_file: t('toolResults.completedStatus.readFile'),
       read_skill: t('toolResults.completedStatus.readSkill'),
+      search_skills: t('toolResults.completedStatus.searchSkills'),
       view_image: t('toolResults.completedStatus.viewImage'),
       view_video: t('toolResults.completedStatus.viewVideo'),
       vlm_analyze: t('toolResults.completedStatus.vlmAnalyze'),
@@ -200,6 +204,7 @@ function getToolStatusTexts(): {
     failed: {
       read_file: t('toolResults.failedStatus.readFile'),
       read_skill: t('toolResults.failedStatus.readSkill'),
+      search_skills: t('toolResults.failedStatus.searchSkills'),
       view_image: t('toolResults.failedStatus.viewImage'),
       view_video: t('toolResults.failedStatus.viewVideo'),
       vlm_analyze: t('toolResults.failedStatus.vlmAnalyze'),

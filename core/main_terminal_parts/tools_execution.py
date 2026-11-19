@@ -201,6 +201,7 @@ class MainTerminalToolsExecutionMixin:
         "extract_webpage",
         "read_file",
         "read_skill",
+        "search_skills",
         "view_image",
         "view_video",
         "vlm_analyze",
@@ -1312,6 +1313,24 @@ class MainTerminalToolsExecutionMixin:
                         result = self._handle_read_skill_tool(arguments)
                         self._mark_skill_read_from_result(tool_name, arguments, result)
                         self._mark_file_read_from_result(tool_name, arguments, result)
+                    elif tool_name == "search_skills":
+                        raw_keywords = arguments.get("keywords")
+                        if isinstance(raw_keywords, list):
+                            keywords = [
+                                str(item).strip()
+                                for item in raw_keywords
+                                if str(item or "").strip()
+                            ][:5]
+                        else:
+                            keywords = []
+                        if not keywords:
+                            result = {"success": False, "error": tr("tools_exec.search_skills_needs_keywords")}
+                        else:
+                            try:
+                                max_results = int(arguments.get("max_results") or 5)
+                            except Exception:
+                                max_results = 5
+                            result = self._handle_search_skills(keywords, max_results)
                     elif tool_name == "create_skill":
                         result = self._handle_create_skill_tool(arguments)
                     elif tool_name in {"submit_schedule", "query_schedules", "manage_schedule"}:

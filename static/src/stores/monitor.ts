@@ -116,6 +116,7 @@ const TOOL_SCENE_MAP: Record<string, string> = {
   update_memory: 'memoryUpdate',
   recall_project_memory: 'reader',
   search_project_memory: 'reader',
+  search_skills: 'reader',
   update_project_memory: 'memoryUpdate',
   todo_create: 'todoCreate',
   todo_update_task: 'todoUpdate',

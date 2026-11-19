@@ -1,2 +1,2 @@
-agent skills系统已启用，以下是可用的skills（含简要说明）
+agent skills 系统已启用，以下仅列出可用技能名称（不含用途说明，需要时用 search_skills 检索）：
 {skills_list}

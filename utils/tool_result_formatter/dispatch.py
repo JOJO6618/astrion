@@ -99,7 +99,7 @@ def format_tool_result_for_context(function_name: str, result_data: Any, raw_tex
     if function_name in {"read_file", "read_skill", "recall_project_memory"} and isinstance(result_data, dict):
         return format_read_file_result(result_data)
 
-    if function_name == "search_project_memory" and isinstance(result_data, dict):
+    if function_name in {"search_project_memory", "search_skills"} and isinstance(result_data, dict):
         content_text = str(result_data.get("content") or "").strip()
         if content_text:
             return content_text

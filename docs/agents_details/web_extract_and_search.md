@@ -25,7 +25,7 @@
 7. **Exa/Parallel 提取契约**：Exa `POST https://api.exa.ai/contents`（body `{"urls":[url],"text":{"maxCharacters":N}}`，取 `results[0].text`）；Parallel `POST https://api.parallel.ai/v1/extract`（`advanced_settings.full_content` 需显式开启，响应优先 `full_content`、否则拼接 `excerpts`，HTTP 200 可能部分成功——目标 URL 进 `errors` 视为失败）。两家均为付费端点（约 $1/1k），x-api-key 认证。
 8. **新增 personalization 键必须双注册**（`DEFAULT_PERSONALIZATION_CONFIG` + `sanitize_personalization_payload`），否则保存后被静默丢弃（见 .astrion/memory/personalization_config_whitelist.md）。
 9. **返回格式**沿用 `🌐 网页内容 (N 字符)` 骨架，附 `[提取方式: ...]` 标注（i18n key `webpage.method_label` / `webpage.method_*`），模型侧无感知。
-10. **read-before-edit 已读白名单**含 `recall_project_memory`（recall 返回记忆文件全文，视为已读）；`search_project_memory` 只回片段，刻意不标记。
+10. **read-before-edit 已读白名单**含 `recall_project_memory`（recall 返回记忆文件全文，视为已读）；`search_project_memory`、`search_skills` 只回片段，刻意不标记。
 
 ### 14.3 搜索多服务商（2026-09-26 新增）
 

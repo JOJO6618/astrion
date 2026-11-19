@@ -9,6 +9,7 @@ const TOOL_FACE_MAP: Record<string, string> = {
   edit_file: 'write',
   read_file: 'read',
   read_skill: 'read',
+  search_skills: 'search',
   conversation_review: 'read',
   vlm_analyze: 'camera',
   ocr_image: 'camera',

@@ -98,6 +98,8 @@ function renderByTool(
     case 'read_file':
     case 'read_skill':
       return renderReadFile(result, args);
+    case 'search_skills':
+      return renderSearchSkills(result, args);
     case 'create_skill':
       return renderCreateSkill(result, args);
     case 'list_workflows':
@@ -647,6 +649,38 @@ function renderSearchProjectMemory(result: any, args: any): string {
       }
       const snippets = Array.isArray(item.snippets) ? item.snippets : [];
       // 每条匹配片段独立成行，过长直接省略号截断
+      snippets.forEach((snippet: any) => {
+        entry += `<div class="search-match-snippet">${escapeHtml(`L${snippet.line ?? '?'}: ${snippet.text || ''}`)}</div>`;
+      });
+      return entry + '</div>';
+    })
+    .join('');
+  return html + box(`<div class="search-result-list">${items}</div>`);
+}
+
+function renderSearchSkills(result: any, args: any): string {
+  const keywords = Array.isArray(result?.keywords)
+    ? result.keywords
+    : Array.isArray(args?.keywords)
+      ? args.keywords
+      : [];
+  const results = Array.isArray(result?.results) ? result.results : [];
+
+  let html = meta(
+    param(L('keywords'), keywords.join(' / ') || t('toolResults.values.notSpecified')),
+    pendingStatus(result)
+  );
+  if (!result?.success) return html;
+  if (!results.length) return html + empty(t('toolResults.sentences.noMatchesSkill'));
+
+  html += summary(t('toolResults.counts.skillHits', { n: results.length }));
+  const items = results
+    .map((item: any) => {
+      let entry = `<div class="search-result-item"><div class="search-result-title">${escapeHtml(item.skill_id || '')}</div>`;
+      if (item.description) {
+        entry += `<div class="search-result-detail">${escapeHtml(item.description)}</div>`;
+      }
+      const snippets = Array.isArray(item.snippets) ? item.snippets : [];
       snippets.forEach((snippet: any) => {
         entry += `<div class="search-match-snippet">${escapeHtml(`L${snippet.line ?? '?'}: ${snippet.text || ''}`)}</div>`;
       });

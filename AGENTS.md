@@ -54,6 +54,7 @@
 | CrossPet 本机接入 | `crosspet_integration.md` |
 | 用量统计页 | `AD/usage_stats.md` |
 | 存储空间统计与清理 | `AD/storage_stats.md` |
+| 技能名称注入与 search_skills 检索 | `AD/skills_search.md` |
 | 主 Agent 系统提示词快照 | `system_prompt_snapshot.md` |
 | Android 发布联动 | `AD/android_release.md` |
 | 自动审核策略 | `auto_approval_review.md` |
@@ -347,7 +348,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 3. `trafilatura` 是可选依赖：import 失败时通用直提静默失效（GitHub 直链仍可用），白名单不报错。blob URL 的 branch 按单段解析（`[^/?#]+`），含斜杠分支名会自然降级。
 4. 域名匹配 = 精确或子域名后缀，输入经 `_normalize_domain` 清洗；提取商凭证复用 `resolve_search_credential()`，选定家无 key 返回明确错误，**不静默换家**。
 5. **新增 personalization 键必须双注册**（`DEFAULT_PERSONALIZATION_CONFIG` + `sanitize_personalization_payload`），否则保存后被静默丢弃。
-6. 返回格式 `🌐 网页内容 (N 字符)` + `[提取方式: ...]`。**read-before-edit 已读白名单**含 `recall_project_memory`（返回全文视为已读），`search_project_memory` 只回片段、刻意不标记。
+6. 返回格式 `🌐 网页内容 (N 字符)` + `[提取方式: ...]`。**read-before-edit 已读白名单**含 `recall_project_memory`（返回全文视为已读），`search_project_memory`、`search_skills` 只回片段、刻意不标记。
 7. **配置分离**：`personalization.json` 只存 UI/行为偏好，搜索/提取服务配置存 `service_config.json`，API 密钥存 `secrets.json`（0600、原子写）；三者统一由 `personalization_manager.py` 读写。
 8. **搜索适配器**：`search_engine.py` 只做校验/归一化、凭证解析、结果包装；适配器出参 `{"ok","results","answer","dropped"}`，**`dropped` 必须透传**到 `filters.provider_dropped`；前端 `filters`/`results[]` 结构对所有服务商一致。
 
@@ -532,6 +533,15 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **清理只覆盖两类**：`clean/logs`（活动 `*.log` **截断为 0 字节**——用截断而非 unlink，活动句柄会让空间无法及时释放；归档与非日志文件删除、递归子目录）与 `clean/backups`（`keep_days` 1–3650，按 `save/<conv_*>/meta.json.updated_at`，缺失回退目录 mtime，整份删除；只处理 `conv_*` 并复校验父目录身份，符号链接与非 `conv_` 跳过）。**其余类别只统计不清理。**
 - **前端**：清理前走 `uiStore.requestConfirm`（danger），显示份数与预计释放；成功后 `pushToast` 并强制重载（先收口旧轮询）；「保留最近」= 7/30/90/自定义（行内数字输入，Enter 严格校验、Esc/失焦静默退出），预计删除量由扫描缓存 `backups` 明细实时计算。
 - 回归 `test/2026-11-15_存储空间统计/`；Windows 数据根、三主题视觉与真实清理后的后端连续性需实机验收。
+
+## 29) 技能名称注入与检索
+
+> 细则见 `AD/skills_search.md`（2026-11-19 新增）。
+
+- **只注入名称**：主／子系统提示词的技能段只列名称（`skills_manager.build_skills_list` 按目录分组），不含 description；用途靠常驻工具 `search_skills` 检索 SKILL.md（名称/描述/正文），命中后 `read_skill` 读全文。无开关，不要恢复全量描述注入。
+- **检索范围 = read_skill 可读范围**：两者共用 `tools_read._enabled_skills_catalog()`；执行后端读取失败即报错，不回退本机遍历。工具定义文案唯一来源 `skills_manager.SEARCH_SKILLS_DESCRIPTION/PARAMETERS`（主子共用）。
+- 纯子串匹配，中文关键词搜不到英文正文；静态规则「关键词带英文词」不可删。`search_skills` 只回片段，不进已读白名单。
+- 回归 `test/2026-11-19_技能检索/`。
 
 ---
 
