@@ -1,6 +1,6 @@
-# 私有项目常驻记忆 MEMORY.md
+# 私有工作区记忆
 
-2026-11-07。与全局记忆、公开 AGENTS.md、`.astrion/memory/` 专题索引并存。正文全文注入，不自动摘要或按行截断。主 Agent 固定维护规则集中在 `prompts/main_agent/static.txt`，实际正文由 `main_agent/dynamic/memory.txt`、`workspace_memory.txt` 渲染；子智能体仍使用原 `prompts/workspace_memory.txt`／`memory_system.txt` 模板。四类记忆的保存分工和工具描述保持一致。
+常驻 `MEMORY.md` 与索引式专题记忆共用工作区的数据目录。`MEMORY.md` 全文注入，专题记忆通过 `search_project_memory`、`recall_project_memory` 和 `update_project_memory` 维护。主 Agent 的固定规则见 `prompts/main_agent/static.txt`，专题索引和常驻正文由各自的动态模板装配。
 
 ## 存储与身份
 
@@ -38,6 +38,15 @@
 - 子创建与压缩：`modules/sub_agent/named.py`、`modules/sub_agent/history.py`。
 - 内容与元数据通过已绑定后端文件接口读取，后端拒绝不得改读服务端源码镜像。当前外置位置解析仅支持受信任 Local 后端，绑定其它后端会明确报不支持，不能暗中回落本地。
 - 冻结正文会像其它系统提示词一样进入对话记录；“私有”指不存入代码仓库，不意味着不向模型发送或自动从对话导出中剔除。
+
+## 索引式专题记忆与存量迁移
+
+- Host 的专题放在 `MEMORY.md` 同级的 `topics/` 子目录，复用该工作区精确授权。Docker 的后端目录是 `<当前用户当前工作区 data_dir>/memory/topics/`，迁移核验后绑定到容器项目根的 `.astrion/memory/`。两个环境均按工作区身份定位，Git 工作树及子智能体目录只影响执行位置。主子索引用相同的专题名称，Docker 从容器视图读取索引。
+- Host 启动检查该用户的已登记工作区，每个后端进程至多主动提示一次。暂缓后可在「设置 → 上下文与记忆」继续。Docker 仅在「设置 → 管理员」提供「迁移所有用户的项目记忆」，由登录管理员确认，范围包含普通 Web 用户和 API 用户。只枚举现有路径，无需启动容器。
+- Host 运行时直接使用新位置。Docker 待迁移工作区保留原容器视图，管理员执行迁移后才切换。工作区有活动任务、后台工作或持久终端时，保留旧容器并报告可重试项。
+- 每个工作区先无覆盖复制并保留修改时间，再逐文件核验内容和源身份。目标同名同内容可复用，内容不同则按内容摘要另存。Host 在清理前写入 `00_READ_ME_项目记忆已迁移.md`，Docker 在清理前激活同路径挂载。只清理已核验的一级 Markdown 记忆；遇到变更、权限错误或中断，可对剩余文件重试。
+- 迁移不更新已有对话的 `frozen_system_prompt` 或子智能体已保存的系统提示词。专题名称读取在运行时解析，本轮不会要求用户重建对话。
+- 实现入口为 `modules/project_memory.py`、`modules/project_memory_migration.py`、`server/project_memory_migration.py` 和 `ProjectMemoryMigrationDialog.vue`。
 
 ## 验证
 

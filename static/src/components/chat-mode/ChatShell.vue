@@ -1,5 +1,6 @@
 <template>
   <AppShell :download-file="unavailableDownload" :download-folder="unavailableDownload">
+    <ProjectMemoryMigrationDialog />
     <div class="main-container">
       <ConversationSidebar
         v-if="!isMobile"
@@ -312,6 +313,7 @@
   </AppShell>
 </template>
 <script setup lang="ts">
+import ProjectMemoryMigrationDialog from '@/components/overlay/ProjectMemoryMigrationDialog.vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import AppShell from '@/components/shell/AppShell.vue';
 import ConversationSidebar from '@/components/sidebar/ConversationSidebar.vue';

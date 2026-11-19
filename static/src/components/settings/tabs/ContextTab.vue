@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { inject } from 'vue';
+import { useSettingsStore } from '@/stores/settings';
+import { useProjectMemoryMigrationStore } from '@/stores/projectMemoryMigration';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 
 defineOptions({ name: 'ContextTab' });
+
+const settings = useSettingsStore();
+const migration = useProjectMemoryMigrationStore();
 
 /**
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
@@ -79,6 +84,17 @@ const {
           @input="handleProjectMemoryInjectLimitInput"
           @blur="commitProjectMemoryInjectLimitInput"
         />
+      </div>
+    </div>
+
+    <div v-if="settings.sessionHostMode" class="stg-card">
+      <div class="stg-action-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('settings.memoryMigration.hostEntry') }}</span>
+        </span>
+        <button type="button" class="stg-secondary-button" @click="migration.show()">
+          {{ $t('personalization.open') }}
+        </button>
       </div>
     </div>
 

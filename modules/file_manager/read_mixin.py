@@ -101,20 +101,18 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
+        if self._is_docker_mode():
+            return self._container_call("read_file", {
+                "path": self._relative_path(full_path),
+                "size_limit": MAX_FILE_SIZE
+            })
+
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
             return {"success": False, "error": tr("file_manager.not_a_file")}
         
-        if self._use_container():
-            relative_path = self._relative_path(full_path)
-            result = self._container_call("read_file", {
-                "path": relative_path,
-                "size_limit": MAX_FILE_SIZE
-            })
-            return result
-
         result = self._read_text_lines(full_path, size_limit=MAX_FILE_SIZE)
         if not result["success"]:
             return result
@@ -143,41 +141,20 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
+        if self._is_docker_mode():
+            return self._container_call("read_text_segment", {
+                "path": self._relative_path(full_path),
+                "start_line": start_line,
+                "end_line": end_line,
+                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE,
+            })
+
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
         if not full_path.is_file():
             return {"success": False, "error": tr("file_manager.not_a_file")}
         
-        if self._use_container():
-            relative_path = self._relative_path(full_path)
-            result = self._container_call("read_text_segment", {
-                "path": relative_path,
-                "start_line": start_line,
-                "end_line": end_line,
-                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE
-            })
-            return result
-
-        if self._use_container():
-            relative_path = self._relative_path(full_path)
-            return self._container_call("search_text", {
-                "path": relative_path,
-                "query": query,
-                "max_matches": max_matches,
-                "context_before": context_before,
-                "context_after": context_after,
-                "case_sensitive": case_sensitive,
-            })
-
-        if self._use_container():
-            relative_path = self._relative_path(full_path)
-            return self._container_call("extract_segments", {
-                "path": relative_path,
-                "segments": segments,
-                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE
-            })
-
         result = self._read_text_lines(
             full_path,
             size_limit=size_limit or READ_TOOL_MAX_FILE_SIZE
@@ -240,6 +217,17 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
+        if self._is_docker_mode():
+            return self._container_call("search_text", {
+                "path": self._relative_path(full_path),
+                "query": query,
+                "max_matches": max_matches,
+                "context_before": context_before,
+                "context_after": context_after,
+                "case_sensitive": case_sensitive,
+                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE,
+            })
+
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
@@ -310,6 +298,13 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
+        if self._is_docker_mode():
+            return self._container_call("extract_segments", {
+                "path": self._relative_path(full_path),
+                "segments": segments,
+                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE,
+            })
+
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         

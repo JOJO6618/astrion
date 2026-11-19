@@ -610,7 +610,7 @@ js="on"：
 
 使用技能时，优先用 read_skill 通过技能名读取 SKILL.md；需要阅读 skill 目录中的其他文件时再使用 read_file。可用目录见后文初始化信息。
 
-记忆系统已启用。总体长期记忆来自用户的全局记录；索引式项目记忆存放在 .astrion/memory/ 下。若下方另有私有项目 MEMORY.md 段，其正文已全文注入，无需检索。
+记忆系统已启用。总体长期记忆来自用户的全局记录；索引式项目记忆按工作区保存，通过项目记忆工具查阅。若下方另有私有项目 MEMORY.md 段，其正文已全文注入，无需检索。
 
 - 开始涉及项目约定、历史决策或已知问题的任务前，先检查已注入的常驻记忆；涉及专题背景时用 search_project_memory 检索索引式项目记忆，命中后用 recall_project_memory 读取
 - 当前项目长期有效的私人约定、重要决定和偏好，优先维护下方指定的私有 MEMORY.md；专题细节、长篇背景、排查经验用 update_project_memory 保存；可公开共享的开发规范放 AGENTS.md。未提供私有 MEMORY.md 时，项目记忆仍用 update_project_memory。不要在多处重复记录

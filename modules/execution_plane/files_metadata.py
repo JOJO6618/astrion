@@ -207,10 +207,13 @@ class MetadataFileSystemMixin:
         text = (path or "").strip()
         if not text:
             text = "."
-        if text == "/workspace":
+        session = getattr(self._file_manager, "container_session", None)
+        mount = str(getattr(session, "mount_path", None) or "/workspace").rstrip("/")
+        if text in (mount, "/workspace"):
             return "."
-        if text.startswith("/workspace/"):
-            return text[len("/workspace/"):]
+        for prefix in (mount, "/workspace"):
+            if text.startswith(prefix + "/"):
+                return text[len(prefix) + 1:]
         looks_absolute = (
             text.startswith("/")
             or text.startswith("\\")

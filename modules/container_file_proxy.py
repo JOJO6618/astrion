@@ -171,14 +171,18 @@ def _search_text(root, payload):
     err = _ensure_file(target)
     if err:
         return err
+    limit = payload.get("size_limit")
+    size = target.stat().st_size
+    if limit and size > limit:
+        return {"success": False, "error": f"文件太大 ({size} 字节)，超过限制"}
     data, lines = _read_text(target)
     total = len(lines)
     query = payload.get("query") or ""
     if not query:
         return {"success": False, "error": "缺少搜索关键词"}
     max_matches = payload.get("max_matches") or 10
-    before = payload.get("context_before") or 2
-    after = payload.get("context_after") or 2
+    before = payload.get("context_before", 2)
+    after = payload.get("context_after", 2)
     case_sensitive = bool(payload.get("case_sensitive"))
     query_cmp = query if case_sensitive else query.lower()
 
@@ -220,6 +224,10 @@ def _extract_segments(root, payload):
     err = _ensure_file(target)
     if err:
         return err
+    limit = payload.get("size_limit")
+    size = target.stat().st_size
+    if limit and size > limit:
+        return {"success": False, "error": f"文件太大 ({size} 字节)，超过限制"}
     segments = payload.get("segments") or []
     if not segments:
         return {"success": False, "error": "缺少要提取的行区间"}
@@ -650,6 +658,38 @@ def _list_files(root, payload):
     except (ValueError, OSError, RuntimeError) as exc:
         return {"success": False, "error": str(exc)}
 
+def _project_memory_index(root, payload):
+    directory = _resolve(root, _normal_rel(payload))
+    ignored = payload.get("ignore")
+    entries = []
+    with os.scandir(directory) as files:
+        for entry in files:
+            if not entry.name.endswith(".md") or entry.name == ignored:
+                continue
+            try:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                fd = os.open(entry.path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(fd, encoding="utf-8") as stream:
+                    info = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(info.st_mode):
+                        continue
+                    description = ""
+                    if stream.readline(8192).strip() == "---":
+                        for _ in range(20):
+                            line = stream.readline(8192)
+                            if not line or line.strip() == "---":
+                                break
+                            key, _, value = line.partition(":")
+                            if key.strip() == "description":
+                                description = value.strip()
+                                break
+                    entries.append({"file": entry.name, "name": pathlib.Path(entry.name).stem,
+                                    "description": description, "mtime": info.st_mtime})
+            except (OSError, UnicodeError):
+                continue
+    return {"success": True, "entries": entries}
+
 def _resolve_path(root, payload):
     try:
         access = _access_of(payload)
@@ -692,6 +732,7 @@ HANDLERS = {
     "inspect_path": _inspect_path,
     "get_file_info": _get_file_info,
     "list_files": _list_files,
+    "project_memory_index": _project_memory_index,
     "resolve_path": _resolve_path,
     "read_binary": _read_binary,
     "write_binary": _write_binary,

@@ -67,6 +67,31 @@ export default {
   runDataBrowse: 'Choose in Finder',
   runDataCurrentPath: 'Current directory',
   runDataModeLabel: 'Directory switch method',
+  memoryMigration: {
+    title: 'Move workspace project memories',
+    hostEntry: 'Move workspace project memories',
+    dockerEntry: 'Move project memories for all users',
+    hostIntro:
+      'Astrion needs to move project memories to the data directory. Found {memories} memories in {workspaces} workspaces.',
+    dockerIntro:
+      'Found {memories} project memories in {workspaces} workspaces across {users} user accounts.',
+    destination: 'Move to',
+    showTargets: 'Show workspace destinations',
+    hideTargets: 'Hide workspace destinations',
+    defer: 'Not now',
+    start: 'Move now',
+    deferHint:
+      'Astrion can read and update these project memories after the move. Reopen this dialog in Settings → Context and Memory.',
+    copying: 'Moving memories',
+    verifying: 'Verifying integrity',
+    done: 'Migration complete',
+    failed: 'Some project memories could not be moved',
+    retry: 'Retry',
+    empty: 'There are no project memories to move.',
+    requestFailed: 'Could not read the migration status. Try again.',
+    summary: 'Moved {memories} project memories from {workspaces} workspaces.',
+    conflict: '{source} in {workspace} had a name conflict and was saved as {target}.'
+  },
   runDataConfirmTitle: 'Confirm data directory change',
   runDataCancel: 'Cancel',
   runDataConfirm: 'Confirm',

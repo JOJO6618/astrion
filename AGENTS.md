@@ -85,6 +85,7 @@
 - 日志：API dump 默认关闭（`AGENT_API_DUMP_ENABLED`）；混合轮转见 `utils/log_rotation.py`
 - 迁移脚本 `scripts/migrate_runtime_data.py`（先 `--dry-run`）
 - **私有项目常驻记忆（2026-11-07）**：Host 存 `<DATA_DIR>/memory/<目录名>-<路径摘要>/MEMORY.md`；Docker 存当前工作区 `data/memory/MEMORY.md`，目录独立挂载到项目内 `.astrion/astrion-memory/`，附专用 Git 忽略。主／子只在新建和压缩后全文加载，正常发送与恢复沿用持久快照；老主对话下次压缩才启用。只对已注入的那个文件免预读，普通文件守门及 readonly/plan 不变；同进程工具写入检测版本冲突。Host 当前工作区专属目录自动授权，不回写用户路径设置；子默认向主汇报记忆变更。完整契约与验证范围见 `docs/workspace_memory.md`。
+- **索引式项目记忆（2026-11-19）**：专题存入同一工作区记忆目录下的 `topics/`。Host 启动提示迁移，可从「设置 → 上下文与记忆」再次打开，迁移核验后清理旧文件并留下说明。Docker 由管理员在设置中迁移 Web 和 API 用户的工作区，核验后挂到容器原 `.astrion/memory/`，保留忙碌工作区待重试。主子索引与专题工具共用工作区身份，老对话冻结提示词不回写。流程见 `docs/workspace_memory.md`。
 
 > 细节（含个人指令拦截 `command_blocking` 语义）见 `docs/agents_details/runtime_data_paths.md`。
 

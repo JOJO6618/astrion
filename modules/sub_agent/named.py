@@ -113,7 +113,15 @@ def create_named(manager: Any, terminal: Any, arguments: dict) -> dict:
             child_execution_root = str(checked_root(terminal, binding))
             prompt += '\n' + child_environment(child_execution_root, binding.get('branch'),
                                                access_level=access, working_dir=working_dir)
+        from modules.project_memory import index_lines, scan_index
         from modules.workspace_memory_context import child_prompt
+        from modules.personalization_manager import resolve_project_memory_inject_limit
+
+        entries = scan_index(terminal)
+        limit = resolve_project_memory_inject_limit(prefs)
+        displayed = index_lines(entries[:limit])
+        if displayed:
+            prompt += "\n\n## 索引式项目记忆\n\n" + displayed
         prompt += "\n" + child_prompt(terminal)
         result = manager.create_sub_agent(
             agent_id=agent_id, summary=summary, task=task,

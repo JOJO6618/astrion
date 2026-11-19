@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { inject } from 'vue';
+import { useSettingsStore } from '@/stores/settings';
+import { useProjectMemoryMigrationStore } from '@/stores/projectMemoryMigration';
 
 defineOptions({ name: 'AdminTab' });
+
+const settings = useSettingsStore();
+const migration = useProjectMemoryMigrationStore();
 
 /**
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
@@ -13,6 +18,21 @@ const { openAdminPanel, openApiAdmin, openCustomTools, openMcpConfig, showMcpCon
 
 <template>
   <section class="stg-page admin-monitor-page">
+    <div
+      v-if="
+        settings.sessionStatusLoaded &&
+        !settings.sessionHostMode &&
+        settings.sessionRole === 'admin'
+      "
+      class="stg-card"
+    >
+      <div class="stg-action-row">
+        <button type="button" class="stg-secondary-button stg-row-title" @click="migration.show()">
+          {{ $t('settings.memoryMigration.dockerEntry') }}
+        </button>
+      </div>
+    </div>
+
     <div class="stg-card">
       <div class="stg-action-row" v-if="showMcpConfigEntry">
         <span class="stg-row-copy"

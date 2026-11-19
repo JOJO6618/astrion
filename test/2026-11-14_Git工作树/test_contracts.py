@@ -67,12 +67,14 @@ class ContractTests(unittest.TestCase):
         asyncio.run(Worktrees(owner).change(None, exit=True))
         self.assertFalse(owner._has_read_file_in_conversation('file.txt'), 'a worktree read must not authorize overwriting the main checkout')
 
-    def test_skill_and_project_memory_remain_in_workspace(self):
+    def test_skill_and_project_memory_remain_bound_to_original_workspace(self):
+        from modules.project_memory import topic_directory
+
         owner = self.tool_owner()
         skill = self.root / '.astrion/skills/fixture/SKILL.md'
         skill.parent.mkdir(parents=True)
         skill.write_text('---\nname: fixture\ndescription: fixture skill\n---\nworkspace skill')
-        memory = self.root / '.astrion/memory/fixture.md'
+        memory = topic_directory(str(self.root), str(owner.data_dir)) / 'fixture.md'
         memory.parent.mkdir(parents=True)
         memory.write_text('---\nname: fixture\ndescription: unique workspace note\n---\nworkspace memory')
         catalog = build_skills_catalog(files_for_owner(owner), scan_project_agents=False)

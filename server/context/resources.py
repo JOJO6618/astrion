@@ -1,6 +1,7 @@
 """Execution resources, separate from workspace storage/display queries."""
 from __future__ import annotations
 
+from contextlib import nullcontext
 import threading
 import time
 from pathlib import Path
@@ -143,7 +144,8 @@ def get_user_resources(username=None, workspace_id=None, update_session=True,
     key = _make_terminal_key(owner, workspace.workspace_id, conversation_id)
     # Creation and initial policy/skills/restoration are one acquisition. Parallel
     # requests cannot observe a half-initialized runtime or construct a duplicate.
-    with _resource_lock(key):
+    workspace_guard = nullcontext() if host else _resource_lock(_make_terminal_key(owner, workspace.workspace_id))
+    with workspace_guard, _resource_lock(key):
         terminal = find_runtime(username, workspace, conversation_id)
         previous = state.user_terminals.get(key)
         if terminal is None and previous is not None:

@@ -171,7 +171,7 @@ class FileManagerBase:
             relative_path = self._relative_path(full_path)
             if PROJECT_MAX_STORAGE_BYTES and self._is_docker_mode():
                 current_size = self._get_project_size()
-                existing_size = full_path.stat().st_size if full_path.exists() else 0
+                existing_size = self._quota_file_size(full_path)
                 projected_total = current_size - existing_size + len(data)
                 if projected_total > PROJECT_MAX_STORAGE_BYTES:
                     return {
