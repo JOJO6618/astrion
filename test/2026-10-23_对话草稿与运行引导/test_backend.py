@@ -128,9 +128,10 @@ class GuidanceTests(unittest.TestCase):
             ['extract_media_path', 'normalize_attached_files', 'build_media_paths_message', 'build_file_paths_message'])
         support = load_functions('server/chat_flow_task_support.py', ['_runtime_message_ui_defaults', 'inject_runtime_user_message'],
             _VALID_SOURCES={'guidance', 'notify', 'media_paths', 'file_paths'}, datetime=datetime, uuid=uuid)
+        self.build_media_paths_message = paths.build_media_paths_message
         self.inject = load_functions('server/runtime_guidance.py', ['inject_pending_guidance'],
             inject_runtime_user_message=support.inject_runtime_user_message,
-            build_media_paths_message=paths.build_media_paths_message,
+            build_media_paths_message=self.build_media_paths_message,
             build_file_paths_message=paths.build_file_paths_message).inject_pending_guidance
         self.history, self.messages, self.events = [], [], []
         def add(role, content, **extra):
@@ -151,8 +152,16 @@ class GuidanceTests(unittest.TestCase):
         self.assertEqual(self.consume(), 1)
         self.assertEqual(len(self.messages), 3)
         self.assertTrue(all(isinstance(message['content'], str) for message in self.messages))
-        self.assertIn('[系统通知|media_paths]', self.messages[1]['content'])
-        self.assertIn('diagram.png', self.messages[1]['content'])
+        media_notice = self.messages[1]['content']
+        self.assertIn('[系统通知|media_paths]', media_notice)
+        self.assertIn('本次引导仅提供媒体文件路径', media_notice)
+        self.assertIn('请调用 view_image', media_notice)
+        self.assertIn('diagram.png', media_notice)
+        self.assertNotIn('这些媒体已随本次消息一并发送', media_notice)
+        self.assertEqual(self.history[1]['content'], media_notice)
+        ordinary_notice = self.build_media_paths_message(['diagram.png'], [])
+        self.assertIn('这些媒体已随本次消息一并发送', ordinary_notice)
+        self.assertNotIn('本次引导仅提供媒体文件路径', ordinary_notice)
         self.assertIn('[系统通知|file_paths]', self.messages[2]['content'])
         self.assertEqual(self.history[0]['images'], ['diagram.png'])
         self.assertTrue(self.history[0]['metadata']['media_paths_only'])
@@ -161,7 +170,13 @@ class GuidanceTests(unittest.TestCase):
 
     def test_attachment_only_and_atomic_close(self):
         self.assertTrue(self.manager.enqueue_runtime_guidance('synthetic', 'task', '', files=['file.md'], media_paths_only=True)['success'])
-        self.assertEqual(self.consume(close=True), 1)
+        self.assertTrue(self.manager.enqueue_runtime_guidance('synthetic', 'task', '', images=['diagram.png'], media_paths_only=True)['success'])
+        self.assertEqual(self.consume(close=True), 2)
+        self.assertIn('[系统通知|file_paths]', self.messages[1]['content'])
+        self.assertIn('请查看本次附带的附件。', self.messages[2]['content'])
+        self.assertIn('本次引导仅提供媒体文件路径', self.messages[3]['content'])
+        self.assertIn('diagram.png', self.messages[3]['content'])
+        self.context._build_content_with_images.assert_not_called()
         self.assertFalse(self.rec.runtime_guidance_closed)
         self.assertEqual(self.consume(close=True), 0)
         self.assertTrue(self.rec.runtime_guidance_closed)
