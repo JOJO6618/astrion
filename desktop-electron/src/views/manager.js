@@ -55,6 +55,10 @@ export class ViewManager {
     this.snapshot = null;
     this.revision = -1;
     this.activeKey = '';
+    this.sidebarWidth = 0;
+    this.chromeOverlay = false;
+    this.waitingForLogin = false;
+    this.browserPanels = new Map();
     /** 首个快照到达前收到的“打开页面”请求（如快捷对话设置）；之后经 chrome 发 `page` 命令。 */
     this.queuedRoutes = [];
     this.disposed = false;
@@ -86,9 +90,11 @@ export class ViewManager {
   // ---- 快照 ----
   /** 接受快照（仅 revision 更大者）、收敛并广播；source 为转发者 webContents（不回显给它）。 */
   handleSnapshot(state, source = null) {
-    if (this.disposed || !acceptSnapshot(this.revision, state)) return false;
+    if (this.disposed || this.waitingForLogin || !acceptSnapshot(this.revision, state)) return false;
     this.revision = state.revision;
     this.snapshot = state;
+    const retained = new Set(state.tabs.map((tab) => tab.key));
+    for (const key of this.browserPanels.keys()) if (!retained.has(key)) this.browserPanels.delete(key);
     this.reconcile();
     this.broadcast(state, source);
     this.flushQueuedRoutes();
@@ -171,7 +177,7 @@ export class ViewManager {
     const switched = this.activeKey !== entry.key;
     const wasShown = entry.shown;
     this.activeKey = entry.key;
-    entry.view.setBounds(mainContentBounds(this.contentSize()));
+    entry.view.setBounds(this.mainBounds(entry.kind));
     entry.view.setVisible(true);
     if (!entry.shown || switched) {
       entry.lastShown = this.now();
@@ -181,8 +187,9 @@ export class ViewManager {
     if (!entry.shown) this.setShown(entry, true);
     // 键盘焦点只在“切换到它/刚显示”时移入，且仅当所在窗口已是焦点窗口：
     // display 会在每次快照收敛时调用，WebContents.focus() 在 macOS 上还会激活窗口/应用（抢焦点）。
-    if (focus && (switched || !wasShown) && alive(entry.view) && entry.window?.isFocused?.()) entry.view.webContents.focus();
+    if (focus && !this.chromeOverlay && (switched || !wasShown) && alive(entry.view) && entry.window?.isFocused?.()) entry.view.webContents.focus();
     this.hooks.onPresentationChanged?.();
+    this.restoreChromeOverlay();
   }
   hideEntry(entry) {
     if (!entry) return;
@@ -205,7 +212,7 @@ export class ViewManager {
   attachView({ key, kind, url, lastShown }) {
     const view = this.createView({ key, url, legacy: kind === 'legacy' });
     view.setVisible(false);
-    view.setBounds(mainContentBounds(this.contentSize()));
+    view.setBounds(this.mainBounds(kind));
     this.window.contentView.addChildView(view);
     const entry = createEntry({ key, kind, view, window: this.window, url, lastShown });
     this.entries.set(key, entry);
@@ -274,7 +281,7 @@ export class ViewManager {
     entry.window = this.window;
     entry.placement = 'main';
     entry.lastShown = this.now(); // 刚被查看过：放回后不应立刻成为 LRU 淘汰对象
-    entry.view.setBounds(mainContentBounds(this.contentSize()));
+    entry.view.setBounds(this.mainBounds(entry.kind));
     entry.view.setVisible(false);
     if (entry.shown) this.setShown(entry, false);
     this.notifyPlacement(entry);
@@ -295,7 +302,7 @@ export class ViewManager {
     entry.window = this.window;
     entry.placement = 'main';
     entry.lastShown = this.now(); // 刚被查看过：放回后不应立刻成为 LRU 淘汰对象
-    entry.view.setBounds(mainContentBounds(this.contentSize()));
+    entry.view.setBounds(this.mainBounds(entry.kind));
     entry.view.setVisible(false);
     if (entry.shown) this.setShown(entry, false);
     this.pendingDock.set(key, this.now() + PENDING_PLACEMENT_MS);
@@ -540,14 +547,26 @@ export class ViewManager {
   }
 
   // ---- legacy 兜底：未收到任何快照时的单页 `/`（前端尚未升级时避免空窗口） ----
-  showLegacy() {
+  showLegacy(path = '') {
     this.legacyTimer = null;
     if (this.disposed || this.revision >= 0 || this.entries.has(LEGACY_KEY)) return;
-    // legacy 兜底页没有标签绑定，可直接用请求的路由（旧前端不处理 request-page）。
-    const path = this.queuedRoutes.pop() || '/';
+    const target = path || this.queuedRoutes.pop() || '/';
     this.queuedRoutes = [];
-    const entry = this.attachView({ key: LEGACY_KEY, kind: 'legacy', url: `${this.origin}${path}`, lastShown: 0 });
+    const entry = this.attachView({ key: LEGACY_KEY, kind: 'legacy', url: `${this.origin}${target}`, lastShown: 0 });
     this.display(entry);
+    return entry.view;
+  }
+  beginLogin(path) {
+    if (this.waitingForLogin || this.disposed) return null;
+    this.waitingForLogin = true;
+    this.setChromeOverlay(false);
+    this.dropLegacy();
+    this.revision = -1;
+    this.snapshot = null;
+    this.optimistic = null;
+    this.browserPanels.clear();
+    for (const key of this.entries.keys()) this.destroyEntry(key);
+    return this.showLegacy(path);
   }
   dropLegacy() {
     if (this.legacyTimer) { this.timers.clear(this.legacyTimer); this.timerIds.delete(this.legacyTimer); this.legacyTimer = null; }
@@ -591,11 +610,66 @@ export class ViewManager {
 
   // ---- 布局与生命周期 ----
   contentSize() { return this.window.getContentBounds(); }
+  mainBounds(kind, size = this.contentSize()) {
+    return mainContentBounds(size, kind === 'legacy' ? 0 : this.sidebarWidth);
+  }
+  setSidebarWidth(width) {
+    if (!Number.isInteger(width) || width < 0 || width > 600 || this.sidebarWidth === width) return false;
+    this.sidebarWidth = width;
+    this.layout();
+    return true;
+  }
+  setChromeOverlay(raised) {
+    if (this.chromeOverlay === raised || !alive(this.chromeView) || this.window.isDestroyed()) return;
+    this.chromeOverlay = raised;
+    if (raised) {
+      this.chromeOverlayStartKey = this.activeKey;
+      this.restoreChromeOverlay();
+      return;
+    }
+    const root = this.window.contentView;
+    // Re-adding an existing child always raises it. Detach it before inserting at index 0.
+    root.removeChildView(this.chromeView);
+    root.addChildView(this.chromeView, 0);
+    const content = this.getActiveView();
+    if (this.activeKey !== this.chromeOverlayStartKey && this.window.isFocused() && alive(content)) {
+      content.webContents.focus();
+    }
+  }
+  restoreChromeOverlay() {
+    if (!this.chromeOverlay || !alive(this.chromeView) || this.window.isDestroyed()) return;
+    const root = this.window.contentView;
+    if (root.children.at(-1) !== this.chromeView) root.addChildView(this.chromeView);
+  }
+  browserPanelReady(contents) {
+    const entry = this.entryForContents(contents);
+    if (!entry || !['conv', 'new'].includes(entry.kind)) return;
+    if (this.browserPanels.has(entry.key)) contents.send('shell:browser-panel-open', this.browserPanels.get(entry.key));
+  }
+  reportBrowserPanel(contents, open) {
+    const entry = this.entryForContents(contents);
+    if (entry && ['conv', 'new'].includes(entry.kind)) this.setBrowserPanel(entry.key, open);
+  }
+  toggleBrowserPanel(key) {
+    const entry = this.getActiveEntry();
+    if (!entry || entry.key !== key || !['conv', 'new'].includes(entry.kind) || !alive(entry.view)) return;
+    const open = !this.browserPanels.get(key);
+    this.setBrowserPanel(key, open);
+    entry.view.webContents.send('shell:browser-panel-open', open);
+  }
+  setBrowserPanel(key, open) {
+    if (this.browserPanels.get(key) === open) return;
+    this.browserPanels.set(key, open);
+    this.sendChrome('shell:browser-panel-state', { key, open });
+  }
   layout() {
     if (this.disposed || this.window.isDestroyed()) return;
     const size = this.contentSize();
-    this.chromeView?.setBounds(chromeBounds(size));
-    for (const entry of this.entries.values()) if (entry.placement !== 'detached' && alive(entry.view)) entry.view.setBounds(mainContentBounds(size));
+    this.chromeView?.setBounds(chromeBounds(size, this.sidebarWidth));
+    for (const entry of this.entries.values()) {
+      if (entry.placement !== 'detached' && alive(entry.view)) entry.view.setBounds(this.mainBounds(entry.kind, size));
+    }
+    this.restoreChromeOverlay();
     // 独立窗口的视图由各自窗口的 resize 驱动（layoutDetached）。
   }
   after(ms, fn) {

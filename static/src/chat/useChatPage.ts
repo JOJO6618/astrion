@@ -14,6 +14,7 @@ import { useUiStore } from '@/stores/ui';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useModelStore } from '@/stores/model';
 import { startDesktopView, stopDesktopView } from '@/app/methods/ui/desktopView';
+import { hasDesktopSidebar } from '@/components/chrome/desktopSidebarBridge';
 import { filterModelGroups, groupModelOptions } from '@/utils/modelGroups';
 import { reasoningCapabilityFor, type ReasoningChange } from '@/utils/reasoningStops';
 
@@ -34,7 +35,7 @@ export function useChatPage() {
   const saving = ref(false);
   const expandedBlocks = reactive(new Set<string>());
   const mobileOpen = ref(false);
-  const isMobile = ref(window.innerWidth <= 768);
+  const isMobile = ref(!hasDesktopSidebar() && window.innerWidth <= 768);
   let alive = true;
   let searchTimer = 0;
   const displayIdentities = new Map<string, string>();
@@ -316,12 +317,12 @@ export function useChatPage() {
     void run(() => load(id && id !== 'new' ? `conv_${id.replace(/^conv_/, '')}` : ''));
   }
   function resize() {
-    isMobile.value = window.innerWidth <= 768;
+    isMobile.value = !hasDesktopSidebar() && window.innerWidth <= 768;
   }
   onMounted(async () => {
-    conversations.conversationsLoading = true;
+    conversations.conversationsLoading = !hasDesktopSidebar();
     await run(async () => {
-      await chat.initialize();
+      await chat.initialize({ loadHistory: !hasDesktopSidebar() });
       personalization.applyPersonalizationData(chat.settings?.personalization || {});
       personalization.loaded = true;
       models.setModels(modelOptions.value);

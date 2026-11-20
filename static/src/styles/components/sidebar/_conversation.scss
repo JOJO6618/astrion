@@ -13,8 +13,8 @@
   position: relative;
   flex-shrink: 0;
   width: var(--conversation-expanded-width);
-  height: var(--app-viewport) !important;
-  min-height: var(--app-viewport) !important;
+  height: var(--sidebar-viewport, var(--app-viewport)) !important;
+  min-height: var(--sidebar-viewport, var(--app-viewport)) !important;
   overflow: hidden;
   background: var(--surface-rail);
   border-right: 0;

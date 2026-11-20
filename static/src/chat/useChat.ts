@@ -75,10 +75,10 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   function cancelList() {
     listSequence++;
   }
-  async function initialize() {
+  async function initialize({ loadHistory = true } = {}) {
     settings.value = await chatApi<ChatSettings>('/settings');
     resetSettings();
-    await list();
+    if (loadHistory) await list();
   }
   function resetSettings() {
     const defaults = settings.value?.settings;

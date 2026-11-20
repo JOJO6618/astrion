@@ -1,12 +1,16 @@
 <template>
   <ConversationTabStrip />
+  <DesktopSidebar v-if="sidebarAvailable" />
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue';
+import { defineAsyncComponent, onBeforeUnmount, onMounted } from 'vue';
 import ConversationTabStrip from '@/components/chrome/ConversationTabStrip.vue';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
+import { desktopSidebarBridge } from './desktopSidebarBridge';
 
+const DesktopSidebar = defineAsyncComponent(() => import('./DesktopSidebar.vue'));
+const sidebarAvailable = Boolean(desktopSidebarBridge()?.setSidebarWidth);
 const tabsStore = useConversationTabsStore();
 let themeTimer = 0;
 let removeShellRequests = () => {};
