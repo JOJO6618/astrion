@@ -191,6 +191,12 @@ export default {
   cardGeneralTitle: '对话标题',
   cardGeneralThinking: '思考摘要',
   cardGeneralSecurity: '命令安全',
+  notificationsTitle: '通知',
+  conversationNotificationsTitle: 'Astrion 弹窗通知',
+  conversationNotificationsDesc:
+    '对话完成或需要你处理时，在屏幕右上角显示横幅，并提醒 Dock 或任务栏。',
+  notificationsLoadFailed: '无法读取通知设置。',
+  notificationsSaveFailed: '保存通知设置失败，请重试。',
   cardStorageSummary: '存储概览',
   cardStorageDetails: '占用明细',
   cardUsageScope: '统计范围',

@@ -143,6 +143,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     `${P}thinkingSummaryIntervalTitle`,
     ['commandBlocking.settingsTitle', 'commandBlocking.settingsDesc'],
     'commandBlocking.rulesLabel',
+    ['settings.conversationNotificationsTitle', 'settings.conversationNotificationsDesc'],
     ['settings.runDataTitle', 'settings.runDataDesc']
   ]),
   ...entries('chat', [

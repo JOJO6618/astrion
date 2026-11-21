@@ -15,7 +15,7 @@
   background: var(--chrome-bar-bg);
   color: var(--text-primary);
   user-select: none;
-  // 整条作为窗口拖动区
+  // 整条作为窗口拖动区；按钮等控件自行退出拖动区
   -webkit-app-region: drag;
 }
 // macOS 红绿灯悬浮在左侧
@@ -27,12 +27,47 @@
   padding-right: 150px;
 }
 .detached-top-bar__title {
+  // 长标题可省略：允许收缩，把剩余宽度让给右侧控件
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
+}
+
+// 浏览器开关（与 chrome 标签条图标按钮同一形态：透明底、hover 才出底色）
+.detached-top-bar__browser {
+  flex: none;
+  // Windows 紧跟标题右侧，留一点间距避免文字贴着图标
+  margin-left: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s;
+}
+.detached-top-bar__browser:hover,
+.detached-top-bar__browser.is-open {
+  background: var(--chrome-bar-hover);
+}
+.detached-top-bar__browser:focus-visible {
+  outline: 1px solid var(--text-secondary);
+  outline-offset: -2px;
+}
+// macOS：红绿灯在左，开关贴顶栏最右侧
+.detached-top-bar.is-mac .detached-top-bar__browser {
+  margin-left: auto;
 }
 
 html.desktop-detached {

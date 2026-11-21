@@ -74,6 +74,21 @@ test('placement events switch the detached layout live for this view only', asyn
     state: f.state(1, [tab('tab_A', 'A', 'ws1', { placement: 'detached' }), tab('m', 'M')], 'm') } });
   await born.store.init(); assert.equal(born.store.detached, true);
   const chrome = fixture({ chrome: true }); await chrome.store.init(); assert.equal(chrome.store.detached, false);
+  // 拖出已开窗、后端尚未 detach：轮询广播的快照仍报 main，不得把独立窗口布局改回主窗口
+  handlers.onPlacement({ key: 'tab_A', placement: 'detached' });
+  f.store.applyServerSnapshot(f.state(1, [tab('tab_A', 'A'), tab('m', 'M')], 'm'));
+  assert.equal(f.store.detached, true);
+  // 后端确认 detach 后保持；取消/拖回（主动恢复）才回到主窗口布局
+  f.store.applyServerSnapshot(f.state(2, [tab('tab_A', 'A', 'ws1', { placement: 'detached' }), tab('m', 'M')], 'm'));
+  assert.equal(f.store.detached, true);
+  handlers.onPlacement({ key: 'tab_A', placement: 'main' });
+  assert.equal(f.store.detached, false);
+  // 身份请求尚未返回时先到本标签的拖出通知：随后返回的旧身份不得把布局改回去
+  const racing = fixture({ identity: { key: 'tab_A', placement: 'main', visible: true, legacy: false, state: null } });
+  const racingBridge = bridge(racing);
+  const pending = racing.store.init();
+  racingBridge.handlers.onPlacement({ key: 'tab_A', placement: 'detached' });
+  await pending; assert.equal(racing.store.detached, true);
 });
 
 test('open returning focus:detached raises that window; page from a detached view focuses main', async () => {

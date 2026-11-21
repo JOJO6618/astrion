@@ -11,7 +11,7 @@ import { BrowserCredentials } from './passwords/service.js';
 import { BrowserContextMenu, contextMenuLabels } from './context-menu.js';
 import { relayBrowserInput } from './input.js';
 import { browserBounds, browserViewport, setBrowserSurfaceColor } from './geometry.js';
-import { scopeKey, scopeAlias, safeFilename, manualNavigationURL } from './policy.js';
+import { scopeKey, scopeAlias, safeFilename, manualNavigationURL, profileKey, popoutScopeId, ownerScopeId } from './policy.js';
 import { BrowserHost } from './host.js';
 import { followAiTarget } from './follow.js';
 import { createPopoutWindow, focusPopoutWindow } from './popout-window.js';
@@ -115,6 +115,78 @@ export class NativeBrowser {
     if (popout) return popout;
     const rows = [...this.viewHosts.values()].filter(host => host.owner === owner);
     return rows.find(host => this.isViewPresented(host.view)) || rows[0] || null;
+  }
+  /** 该对话当前登录用户对应的浏览器资料；冷视图（尚未 browser:connect）用 session-status 验证当前 session。
+   *  只返回 NativeBrowser 已持有的资料，不创建新 profile。 */
+  async profileForView(view) {
+    const wc = view?.webContents;
+    if (!wc || wc.isDestroyed()) return null;
+    try {
+      const response = await wc.session.fetch(`${this.origin}/api/session-status`, { credentials: 'include', cache: 'no-store' });
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (!data.success || !data.session?.logged_in || !data.session.username) return null;
+      return this.profiles.get(profileKey(String(data.session.username))) || null;
+    } catch {
+      return null;
+    }
+  }
+  /** 该标签对应对话的浏览器独立窗口：连接中的视图用宿主已验证 owner（profile + 对话作用域精确匹配），
+   *  冷/重建视图经 session-status 验证当前用户后精确查 owner（不按 scope 宽泛回退，避免跨资料命中）。
+   *  isCurrent：异步验证期间 active/placement/标签是否仍然有效。 */
+  async popoutForTab(tab, view, isCurrent = () => true) {
+    const scopeId = popoutScopeId(tab);
+    if (!scopeId || !view || !this.popouts.size) return null;
+    // 该作用域没有任何独立窗口时直接返回（仅用于跳过身份请求，不作为命中依据）：
+    // 普通首次打开内嵌面板不必多等一次 session 请求。
+    let candidate = false;
+    for (const popout of this.popouts.values()) {
+      if (!popout.window?.isDestroyed?.() && ownerScopeId(popout.owner) === scopeId) { candidate = true; break; }
+    }
+    if (!candidate) return null;
+    const host = this.viewHosts.get(view);
+    let owner = '';
+    if (host?.lease && host.profile && host.owner === `${host.profile.key}:${scopeId}`) owner = host.owner;
+    else {
+      const profile = await this.profileForView(view);
+      if (!profile || view.webContents.isDestroyed()) return null;
+      // 异步期间视图可能已连到别的资料/对话：以宿主最新状态为准，冲突则放弃。
+      if (host?.lease && host.owner && host.owner !== `${profile.key}:${scopeId}`) return null;
+      owner = `${profile.key}:${scopeId}`;
+    }
+    const popout = this.popouts.get(owner);
+    if (!popout || popout.owner !== owner || popout.window?.isDestroyed?.()) return null;
+    if (!isCurrent()) return null;
+    return popout;
+  }
+  /** 前置该对话的浏览器独立窗口（含恢复最小化）；无法安全确认时返回 false 交给内嵌面板。 */
+  async focusPopoutForTab(tab, view, isCurrent = () => true) {
+    const popout = await this.popoutForTab(tab, view, isCurrent);
+    // await 边界后再确认调用方状态与窗口归属（收回/关闭/active 变化后不得误前置）。
+    if (!popout || !isCurrent() || popout.window?.isDestroyed?.() || this.popouts.get(popout.owner) !== popout) return false;
+    focusPopoutWindow(popout);
+    return true;
+  }
+  async openConversationLink(event, value) {
+    if (typeof value !== 'string' || value.length > 8192 || !/^https?:\/\//i.test(value)) return false;
+    const url = URL.parse(value);
+    if (!url || url.origin === this.origin || url.username || url.password) return false;
+    const host = this.check(event);
+    if (host.popout || !this.views) return false;
+    const view = host.view;
+    const entry = this.views.entryForContents(view.webContents);
+    if (!entry?.shown) return false;
+    const tab = this.views.tabForKey(entry.key);
+    const scope = popoutScopeId(tab);
+    if (!scope) return false;
+    const isCurrent = () => !this.disposed && entry.shown && host.trusted(event)
+      && this.views.entryForContents(view.webContents) === entry
+      && popoutScopeId(this.views.tabForKey(entry.key)) === scope;
+    const popout = await this.popoutForTab(tab, view, isCurrent);
+    if (!popout || !isCurrent() || popout.window.isDestroyed() || this.popouts.get(popout.owner) !== popout) return false;
+    focusPopoutWindow(popout);
+    await this.command(popout, { action: 'navigate', value: url.href });
+    return true;
   }
   /** 该对话网页视图应挂载的窗口：已弹出 → 弹出窗口；否则 → 持有该对话视图的窗口；
    *  视图已被淘汰（或不在任何窗口）→ 主窗口，隐藏停放。 */
@@ -362,6 +434,7 @@ export class NativeBrowser {
   }
   register() {
     ipcMain.handle('browser:connect', async (event, scope, labels) => this.connect(event, scope, labels));
+    ipcMain.handle('browser:open-conversation-link', (event, url) => this.openConversationLink(event, url));
     ipcMain.on('browser:theme', this.themeHandler = (event, theme) => {
       try { const host = this.check(event); setBrowserSurfaceColor(this, theme, host.window); this.layout(); } catch { /* Only trusted host renderers own the theme. */ }
     });
@@ -406,6 +479,7 @@ export class NativeBrowser {
     ipcMain.removeListener('browser:input', this.inputHandler);
     ipcMain.removeListener('browser:theme', this.themeHandler);
     ipcMain.removeHandler('browser:connect'); ipcMain.removeHandler('browser:command'); ipcMain.removeListener('browser:layout', this.layoutHandler);
+    ipcMain.removeHandler('browser:open-conversation-link');
     for (const host of this.viewHosts.values()) this.unwatchHost(host);
     this.features.forEach(feature => feature.dispose());
     this.credentials.dispose();

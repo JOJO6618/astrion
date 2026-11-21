@@ -23,12 +23,14 @@ import { quickEnabled } from './quick/controller.js';
 import { isUpdaterInstalling } from './updater-state.js';
 import { NativeBrowser } from './browser/index.js';
 import { setBrowserSurfaceColor } from './browser/geometry.js';
+import { popoutScopeId } from './browser/policy.js';
 import { desktopSupported, windowChromeOptions } from './platform.js';
 import { ViewManager } from './views/manager.js';
 import { createDetachedWindow, applyDetachedChromeTheme } from './views/detached-window.js';
 import { CHROME_STRIP_HEIGHT } from './views/layout.js';
 import { conversationKey } from './conversation-activity.js';
-import { broadcastConversationNotificationTheme } from './conversation-notifications.js';
+import { broadcastConversationNotificationTheme, watchConversationNotificationFocus } from './conversation-notifications.js';
+import { registerNotificationSettingsIpc } from './notification-settings.js';
 
 export { CHROME_STRIP_HEIGHT };
 
@@ -123,6 +125,21 @@ const fromMainFrame = (event) => event.senderFrame === event.sender.mainFrame;
 const fromContentView = (event) => !!views && fromMainFrame(event) && views.isManagedView(event.sender);
 const fromChrome = (event) => !!views && fromMainFrame(event) && views.isChrome(event.sender);
 
+// 设置页专用通道：受管内容视图 + 顶层 frame + 后端同源 /settings 路由。
+// preload 会把读写桥暴露给所有内容视图，这里再收窄到设置页，避免对话页/子 frame 改壳层开关。
+const fromSettingsView = (event) => {
+  if (!fromContentView(event)) return false;
+  let url;
+  try {
+    url = new URL(event.senderFrame.url);
+  } catch {
+    return false;
+  }
+  if (!backendPort || url.origin !== `http://127.0.0.1:${backendPort}`) return false;
+  return url.pathname === '/settings' || url.pathname.startsWith('/settings/');
+};
+registerNotificationSettingsIpc(fromSettingsView);
+
 // 只接受受管内容视图（应用自身页面）的上报；网页与 chrome 条都没有这个通道。
 ipcMain.on('window:surface', (event, color) => {
   if (!fromContentView(event)) return;
@@ -159,8 +176,48 @@ ipcMain.on('shell:chrome-overlay', (event, raised) => {
   if (fromChrome(event) && typeof raised === 'boolean') views.setChromeOverlay(raised);
 });
 ipcMain.handle('shell:browser-panel-states', (event) => fromChrome(event) ? Object.fromEntries(views.browserPanels) : {});
+/** 浏览器切换（主侧边栏与内容视图共用）：该对话已有独立浏览器窗口则直接前置（含恢复最小化），
+ *  否则切换内嵌面板。tab/view 由调用方按可信 sender / chrome active key 解析；
+ *  独立窗口按已验证资料的 owner 精确匹配，isCurrent 拦截异步验证期间的 active/placement 变化。 */
+async function toggleBrowserForTab(tab, view, isCurrent, toggleEmbedded) {
+  if (!tab || (tab.kind !== 'conv' && tab.kind !== 'new')) return false;
+  if (!nativeBrowser) return false;
+  let focused = false;
+  try {
+    focused = await nativeBrowser.focusPopoutForTab(tab, view, isCurrent);
+  } catch (err) {
+    console.error('[astrion-desktop] 前置浏览器独立窗口失败:', err);
+  }
+  if (focused) return true;
+  if (!isCurrent()) return false;
+  return toggleEmbedded();
+}
 ipcMain.on('shell:browser-panel-toggle', (event, key) => {
-  if (fromChrome(event) && nativeBrowser && typeof key === 'string') views.toggleBrowserPanel(key);
+  if (!views || !nativeBrowser) return;
+  if (fromChrome(event)) {
+    if (typeof key !== 'string') return;
+    const entry = views.getActiveEntry();
+    if (!entry || entry.key !== key) return;
+    const tab = views.tabForKey(key);
+    const scope = popoutScopeId(tab);
+    void toggleBrowserForTab(tab, entry.view, () => {
+      return views?.getActiveEntry() === entry && entry.placement === 'main'
+        && popoutScopeId(views.tabForKey(key)) === scope;
+    }, () => views.toggleBrowserPanel(key)).catch((err) => console.error('[astrion-desktop] 浏览器切换失败:', err));
+    return;
+  }
+  if (!fromContentView(event)) return;
+  // 内容视图只认 sender 自身：忽略页面自报的 key，按受管视图与快照确定对话；
+  // 该入口只服务独立对话窗口里的视图（主窗口已有侧栏入口），归属不符一律不动。
+  const entry = views.entryForContents(event.sender);
+  if (!entry || entry.placement !== 'detached' || views.detachedWindowOf(entry.key) !== entry.window) return;
+  const tab = views.tabForKey(entry.key);
+  const scope = popoutScopeId(tab);
+  void toggleBrowserForTab(tab, entry.view, () => {
+    return views?.entryForContents(event.sender) === entry && entry.placement === 'detached'
+      && views.detachedWindowOf(entry.key) === entry.window
+      && popoutScopeId(views.tabForKey(entry.key)) === scope;
+  }, () => views.toggleBrowserPanelFrom(event.sender)).catch((err) => console.error('[astrion-desktop] 浏览器切换失败:', err));
 });
 ipcMain.on('shell:browser-panel-ready', (event) => {
   if (fromContentView(event)) views.browserPanelReady(event.sender);
@@ -417,6 +474,8 @@ export function createMainWindow(port, route = '/') {
     const key = views?.activeKey;
     if (key) views.sendChrome('shell:window-focus', { key });
   });
+  // 主窗口是 BaseWindow，不在 app 的 browser-window-focus 覆盖范围：单独登记通知焦点清除。
+  watchConversationNotificationFocus(mainWindow);
   mainWindow.on('resize', layoutViews);
   mainWindow.on('enter-full-screen', layoutViews);
   mainWindow.on('leave-full-screen', layoutViews);

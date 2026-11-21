@@ -77,6 +77,8 @@ export class ViewManager {
   entryForContents(wc) { return [...this.entries.values()].find((entry) => entry.view.webContents === wc) || null; }
   isManagedView(wc) { return !!this.entryForContents(wc); }
   isChrome(wc) { return !!this.chromeView && this.chromeView.webContents === wc; }
+  /** 当前快照中指定 key 的标签（不存在返回 null）。 */
+  tabForKey(key) { return this.snapshot?.tabs.find((tab) => tab.key === key) || null; }
   isShown(view) { return [...this.entries.values()].some((entry) => entry.view === view && entry.shown); }
   detachedWindowOf(key) { return this.detachedWindows.get(key) || null; }
   windowOf(view) { return [...this.entries.values()].find((entry) => entry.view === view)?.window || null; }
@@ -650,12 +652,23 @@ export class ViewManager {
     const entry = this.entryForContents(contents);
     if (entry && ['conv', 'new'].includes(entry.kind)) this.setBrowserPanel(entry.key, open);
   }
+  /** 主侧边栏入口：只切换当前显示标签的内嵌面板（active 防陈旧点击）。 */
   toggleBrowserPanel(key) {
     const entry = this.getActiveEntry();
-    if (!entry || entry.key !== key || !['conv', 'new'].includes(entry.kind) || !alive(entry.view)) return;
-    const open = !this.browserPanels.get(key);
-    this.setBrowserPanel(key, open);
+    if (!entry || entry.key !== key) return false;
+    return this.toggleEntryBrowserPanel(entry);
+  }
+  /** 内容视图自报入口（壳层已按可信 sender 校定其受管视图身份）：只作用于该视图自己的标签，
+   *  不受主窗口 active 限制（独立对话窗口里的视图也能切换）。 */
+  toggleBrowserPanelFrom(contents) {
+    return this.toggleEntryBrowserPanel(this.entryForContents(contents));
+  }
+  toggleEntryBrowserPanel(entry) {
+    if (!entry || !['conv', 'new'].includes(entry.kind) || !alive(entry.view)) return false;
+    const open = !this.browserPanels.get(entry.key);
+    this.setBrowserPanel(entry.key, open);
     entry.view.webContents.send('shell:browser-panel-open', open);
+    return true;
   }
   setBrowserPanel(key, open) {
     if (this.browserPanels.get(key) === open) return;

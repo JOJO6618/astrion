@@ -196,6 +196,12 @@ export default {
   cardGeneralTitle: 'Conversation titles',
   cardGeneralThinking: 'Thinking summaries',
   cardGeneralSecurity: 'Command safety',
+  notificationsTitle: 'Notifications',
+  conversationNotificationsTitle: 'Astrion banner notifications',
+  conversationNotificationsDesc:
+    'Show a banner in the top-right corner and alert the Dock or taskbar when a conversation finishes or needs your attention.',
+  notificationsLoadFailed: 'Could not load the notification setting.',
+  notificationsSaveFailed: 'Could not save the notification setting. Try again.',
   cardStorageSummary: 'Storage overview',
   cardStorageDetails: 'Storage breakdown',
   cardUsageScope: 'Report scope',

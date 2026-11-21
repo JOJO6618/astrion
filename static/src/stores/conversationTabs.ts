@@ -164,10 +164,17 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       const shell = shellBridge();
       shell?.onTabsState?.((state) => this.applyServerSnapshot(state, this.responseSequence));
       if (this.role === 'chrome') return;
+      // 身份返回前收到的 placement 通知（viewKey 尚未确定，先按 key 记下；只用于 init 内的竞态）。
+      const earlyPlacements = new Map<string, 'main' | 'detached'>();
       // 拖出/放回时壳层即时通知，页面就地切换布局（不重载）。
+      // 这是本文档归属的本地权威：拖出期间后端快照仍是 main，轮询广播会在 500ms 内改回 placement；
+      // 照抄快照会让标题栏在拖出途中消失，因此 placement 只由通知与初始身份决定。
       shell?.onPlacement?.((payload) => {
-        if (payload?.key === this.viewKey)
-          this.placement = payload.placement === 'detached' ? 'detached' : 'main';
+        if (!payload?.key) return;
+        const key = String(payload.key);
+        const placement = payload.placement === 'detached' ? 'detached' : 'main';
+        if (key === this.viewKey) this.placement = placement;
+        else if (!this.viewKey) earlyPlacements.set(key, placement);
       });
       let identity = null;
       try {
@@ -180,7 +187,10 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         return;
       }
       this.viewKey = String(identity.key);
-      this.placement = identity.placement === 'detached' ? 'detached' : 'main';
+      // 身份请求可能在拖出事件之前发出：期间收到过本标签的 placement 通知时以通知为准，
+      // 否则残留的旧身份会把刚出现的独立窗口布局改回主窗口。
+      const early = earlyPlacements.get(this.viewKey);
+      this.placement = early ?? (identity.placement === 'detached' ? 'detached' : 'main');
       setViewVisible(identity.visible !== false);
       if (identity.state) this.applyServerSnapshot(identity.state, this.responseSequence);
     },
@@ -203,8 +213,8 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         hydrated: true,
         syncError: ''
       });
-      const own = this.viewKey && this.tabs.find((tab) => tab.key === this.viewKey);
-      if (own) this.placement = own.placement;
+      // placement 只由壳层通知/初始身份决定：快照里的后端归属会滞后（拖出已开窗但尚未 detach 时仍报 main），
+      // 由它改写会让独立窗口的标题栏在拖拽途中闪回主窗口布局。
       return true;
     },
     /** 把本文档拿到的更新快照转交壳层（壳层只接受更高 revision 并广播给其他视图）。 */

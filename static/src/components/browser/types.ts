@@ -129,6 +129,7 @@ export interface BrowserBridge {
   /** 独立窗口桥：本页就是对话浏览器的独立窗口。 */
   window?: 'popout';
   connect: (scope: BrowserScope, labels?: Record<string, string>) => Promise<BrowserSnapshot>;
+  openConversationLink?: (url: string) => Promise<boolean>;
   theme: (theme: BrowserTheme) => void;
   credentials: (payload: CredentialRequest & { lease: string }) => Promise<CredentialResponse>;
   onCredentialProgress: (callback: (event: { lease: string; stage: string }) => void) => () => void;

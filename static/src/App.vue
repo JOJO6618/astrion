@@ -723,6 +723,7 @@ import { usePersonalizationStore } from './stores/personalization';
 import { useNativeBrowserStore, nativeBrowserAvailable } from './stores/nativeBrowser';
 import { useConversationTabsStore } from './stores/conversationTabs';
 import { browserScopeForNavigation } from './components/browser/browserScope';
+import { browserBridge } from './components/browser/types';
 import { openExternal } from './utils/openExternal';
 import { iconSrcStyle } from './utils/icons';
 import { isDesktopShell } from './utils/desktopPlatform';
@@ -777,6 +778,11 @@ const openInNativeBrowser = async (url: string) => {
     void openExternal(url);
     return;
   }
+  // 独立窗口由主进程按发送方对话查找，内嵌面板收起时也能直接导航。
+  const openedInPopout = await browserBridge()
+    ?.openConversationLink?.(url)
+    .catch(() => false);
+  if (openedInPopout) return;
   // 展开面板后由 NativeBrowserHost 建立连接，拿到 lease 才能下发导航
   browser.open = true;
   if (await waitForBrowserLease()) await browser.navigate(url);

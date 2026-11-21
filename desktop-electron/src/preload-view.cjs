@@ -25,6 +25,15 @@ contextBridge.exposeInMainWorld('astrionWindow', {
 });
 contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
 
+// 壳层通知偏好（仅当前支持对话弹窗的桌面平台暴露）：设置页「通用 → 通知」读写。
+// 通知由主进程产生，这里只做开关通道；Tauri 壳无此桥，设置页据此隐藏该分组。
+if (['darwin', 'win32'].includes(process.platform)) {
+  contextBridge.exposeInMainWorld('astrionNotificationSettings', {
+    get: () => ipcRenderer.invoke('notification-settings:get'),
+    set: patch => ipcRenderer.invoke('notification-settings:set', patch)
+  });
+}
+
 // 首帧主题：后端端口可能变，新 origin 的 localStorage 是空的，
 // 从壳层记忆同步取一次，让页面内联脚本在样式生效前就能画对颜色。
 {
@@ -56,6 +65,9 @@ contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
     browserPanelReady: () => ipcRenderer.send('shell:browser-panel-ready'),
     reportBrowserPanel: open => ipcRenderer.send('shell:browser-panel-report', open),
     onBrowserPanelOpen: callback => subscribe('shell:browser-panel-open', callback),
+    // 独立对话窗口里的浏览器开关：已有独立窗口则前置，否则开关内嵌面板；
+    // 主进程按 sender 自定对话并校验该视图确实在该对话的独立窗口中。
+    toggleBrowserPanel: () => ipcRenderer.send('shell:browser-panel-toggle'),
     // → { key, placement: 'main'|'detached', visible, legacy, state }；legacy 兜底页 key 为空。
     identity: () => ipcRenderer.invoke('shell:identity'),
     // 壳层广播的导航快照（revision 更大者才会被广播；转发者自己不会收到回显）。
@@ -87,6 +99,7 @@ if (['darwin', 'win32'].includes(process.platform)) {
     followAi: true,
     credentialFileImport: process.platform === 'win32',
     connect: (scope, labels) => ipcRenderer.invoke('browser:connect', scope, labels),
+    openConversationLink: url => ipcRenderer.invoke('browser:open-conversation-link', url),
     theme: theme => ipcRenderer.send('browser:theme', theme),
     command: payload => ipcRenderer.invoke('browser:command', payload),
     credentials: payload => ipcRenderer.invoke('browser:credentials', payload),

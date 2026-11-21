@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BaseWindow, WebContentsView, screen } from 'electron';
 import { BrowserHost, POPOUT_ROUTE } from './host.js';
 import { popoutChromeOptions } from '../platform.js';
+import { watchConversationNotificationFocus } from '../conversation-notifications.js';
 
 const preload = fileURLToPath(new URL('../preload-browser-window.cjs', import.meta.url));
 const DEFAULT_SIZE = { width: 1100, height: 780 };
@@ -86,6 +87,8 @@ export function createPopoutWindow(manager, { owner, profile }) {
   window.on('resized', remember);
   window.on('close', () => { remember(); manager.undock(host); });
   window.on('closed', () => { if (!view.webContents.isDestroyed()) view.webContents.close(); });
+  // BaseWindow 不在 app 的 browser-window-focus 覆盖范围：独立浏览器窗口获得焦点也清除通知横幅。
+  watchConversationNotificationFocus(window);
 
   const wc = view.webContents;
   // 可信界面页不导航、不开新窗口；对话标题由页面 document.title 提供。

@@ -56,7 +56,7 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 **页面标签**：设置/工作流/Git 页面作为标签常驻（Git 每工作区一个）；页内「返回」= `activate` opener（不在 main 则右侧/左侧相邻），不关闭页面标签；设置分区切换就地进行，`route` 仅在 `page` 命令时更新。
 
-**独立对话窗口（placement=detached）**：`DetachedTopBar.vue` 随 `onPlacement`/快照就地切换（`html.desktop-detached`）：隐藏侧边栏，顶部 38px 栏（标题，`-webkit-app-region: drag`，macOS 左让红绿灯、Windows 右让窗口控制），无新建/切换对话入口；设置/Git/工作流按钮发 `page` 后 `focusMain()`。放回主窗口恢复正常布局，不重载。
+**独立对话窗口**：`DetachedTopBar.vue` 随 Electron 的实际窗口归属就地切换（`html.desktop-detached`）。拖出时即切到独立窗口布局，松手后持久化标签归属，取消或放回主窗口时恢复布局。独立窗口隐藏侧边栏，顶部 38px 栏包含对话标题和浏览器按钮。macOS 左侧留红绿灯位置、浏览器按钮靠右，Windows 浏览器按钮紧跟标题右侧、顶栏右端保留系统窗口控制。主窗口侧边栏和独立对话顶栏的浏览器按钮都优先前置该对话已有的独立浏览器窗口，否则开关当前窗口内的浏览器面板。
 
 **隐藏视图降频**（`ui/viewVisibility.ts`，订阅 `onVisibility`，网页端恒可见）：隐藏时暂停 `/api/status` 空闲刷新、运行态对账、Git 摘要与终端数刷新。任务事件轮询降到约 1 秒，重新可见立即补查并恢复到 250 毫秒。跨对话任务索引由常驻侧栏轮询。
 
@@ -108,7 +108,8 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 - 快照投影 `awaiting_human_approval` 和 `awaiting_user_answer`，黄点优先于运行点。工具审批只计算仍需人工决定的请求。计划审批和问答通过活动任务 ID 绑定原工作区和对话，纯自动审核不触发。请求处理后下一次快照更新黄点。
 - Electron 主进程轮询 `GET /api/conversation-tabs/activity`。该接口通过任务注册表发现已关标签和其他工作区的对话，用与标签相同的主任务、门闸和后台活动判定。两次确认空闲后才通知成功完成，冷启动不补发历史完成通知。待审批和待回答按请求或问题批次去重。
-- 前台是其他应用时显示横幅。Astrion 主窗口在前台时只显示应用内状态。前台是独立对话窗口时，只抑制该对话自身的横幅。横幅展示时不抢焦点，点正文跳转并收起横幅，点「忽略」只收起横幅。两种操作都沿屏幕右缘退出。macOS 提交一次 Dock 提醒，Windows 任务栏闪烁最多约 1.8 秒，切回应用时提前收起图标提醒。
+- 设置 → 通用 → 通知中的「Astrion 弹窗通知」默认开启，同时控制右上角横幅与 Dock／任务栏提醒。关闭时收起已有横幅、停止当前提醒。关闭期间继续跟踪事件，重新开启时只提醒新事件。
+- 前台是其他应用时显示横幅。Astrion 主窗口在前台时只显示应用内状态。前台是独立对话窗口时，只抑制该对话自身的横幅。Astrion 窗口获得焦点时立即结束图标提醒，并留 300ms 让横幅点击完成后清除已有横幅。横幅展示时不抢焦点，点正文跳转并沿屏幕右缘收起，点「忽略」只收起单条横幅。macOS 提交一次 Dock 提醒，Windows 任务栏闪烁最多约 1.8 秒。
 - 正文点击由 chrome 视图提交现有 `open` 命令。壳层按当下实际窗口前置目标，主窗口切到对应标签，独立窗口直接前置。已关闭的标签由 `open` 重新打开。横幅复用 `/chrome` 前端入口、三主题 token 及中英文文案，仅其专用 preload 提供通知 IPC。
 
 ## 验证

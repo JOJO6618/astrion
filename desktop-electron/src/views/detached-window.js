@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { app, BaseWindow, screen } from 'electron';
 import { popoutChromeOptions, applyPopoutChromeTheme } from '../platform.js';
+import { watchConversationNotificationFocus } from '../conversation-notifications.js';
 import { DETACHED_BAR_HEIGHT, toInt } from './layout.js';
 
 const DEFAULT_SIZE = { width: 980, height: 740 };
@@ -86,6 +87,8 @@ export function createDetachedWindow({ key, point, offset = null, focus = true, 
   window.on('moved', save);
   window.on('resized', save);
   window.on('focus', () => callbacks.onFocus?.());
+  // BaseWindow 不在 app 的 browser-window-focus 覆盖范围：独立对话窗口获得焦点也清除通知横幅。
+  watchConversationNotificationFocus(window);
   const visibility = () => callbacks.onVisibility?.(!window.isDestroyed() && window.isVisible() && !window.isMinimized());
   for (const event of ['show', 'hide', 'minimize', 'restore']) window.on(event, visibility);
   window.on('close', () => { save(); callbacks.onClose?.(); });

@@ -17,6 +17,51 @@ defineOptions({ name: 'GeneralTab' });
 // 开关立即 POST 单字段 { enabled }；规则编辑走统一窗口（App.vue 挂载的 CommandBlockingDialog）
 const commandBlocking = useCommandBlockingStore();
 
+// Astrion 弹窗通知：通知由 Electron 主进程产生，开关通过壳层 preload 桥读写；
+// 只有支持对话弹窗的桌面平台会暴露该桥（Tauri/网页版没有，整个分组不显示）。
+type NotificationSettingsBridge = {
+  get: () => Promise<{ conversationNotifications: boolean }>;
+  set: (patch: {
+    conversationNotifications: boolean;
+  }) => Promise<{ conversationNotifications: boolean }>;
+};
+const notificationSettingsBridge = (
+  window as unknown as { astrionNotificationSettings?: NotificationSettingsBridge }
+).astrionNotificationSettings;
+const notificationSettingsSupported = Boolean(notificationSettingsBridge);
+const conversationNotifications = ref(true);
+const notificationSettingsBusy = ref(false);
+const notificationSettingsError = ref('');
+
+async function loadNotificationSettings() {
+  if (!notificationSettingsBridge) return;
+  try {
+    const settings = await notificationSettingsBridge.get();
+    conversationNotifications.value = settings?.conversationNotifications !== false;
+    notificationSettingsError.value = '';
+  } catch {
+    notificationSettingsError.value = t('settings.notificationsLoadFailed');
+  }
+}
+
+async function toggleConversationNotifications(event: Event) {
+  if (!notificationSettingsBridge) return;
+  const next = (event.target as HTMLInputElement).checked;
+  const previous = conversationNotifications.value;
+  conversationNotifications.value = next;
+  notificationSettingsBusy.value = true;
+  notificationSettingsError.value = '';
+  try {
+    const settings = await notificationSettingsBridge.set({ conversationNotifications: next });
+    conversationNotifications.value = settings?.conversationNotifications !== false;
+  } catch {
+    conversationNotifications.value = previous;
+    notificationSettingsError.value = t('settings.notificationsSaveFailed');
+  } finally {
+    notificationSettingsBusy.value = false;
+  }
+}
+
 /**
  * 设置页「通用」分区：标题生成设置、应用更新与桌面运行数据目录。
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
@@ -212,6 +257,7 @@ async function restartDesktop() {
 
 onMounted(() => {
   if (runDataSupported) void loadRunDataInfo();
+  if (notificationSettingsSupported) void loadNotificationSettings();
   // 进入通用页签时拉取一次拦截开关状态（失败保留 error，开关仍可重试）
   if (!commandBlocking.loaded) void commandBlocking.fetchState();
 });
@@ -435,6 +481,28 @@ onMounted(() => {
           {{ $t('commandBlocking.manageRules') }}
         </button>
       </div>
+    </div>
+
+    <div v-if="notificationSettingsSupported" class="stg-section-divider">
+      <span class="stg-section-divider__label">{{ $t('settings.notificationsTitle') }}</span>
+    </div>
+    <div v-if="notificationSettingsSupported" class="stg-card">
+      <label class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('settings.conversationNotificationsTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('settings.conversationNotificationsDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="conversationNotifications"
+          :disabled="notificationSettingsBusy"
+          @change="toggleConversationNotifications"
+        />
+        <UiSwitch decorative :checked="conversationNotifications" />
+      </label>
+      <p v-if="notificationSettingsError" class="run-data-error" role="alert">
+        {{ notificationSettingsError }}
+      </p>
     </div>
 
     <div v-if="runDataSupported" class="stg-section-divider">

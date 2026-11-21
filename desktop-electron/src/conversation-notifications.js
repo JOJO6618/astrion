@@ -1,14 +1,30 @@
 import { app, BrowserWindow, ipcMain, screen, session } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { createConversationActivityTracker, notificationBounds, shouldShowConversationNotification } from './conversation-activity.js';
+import { getNotificationSettings, onNotificationSettingsChange } from './notification-settings.js';
 import { configureWorkspaceVisibility } from './quick/workspace-visibility.js';
 
 const preload = fileURLToPath(new URL('./preload-conversation-notifications.cjs', import.meta.url));
 const POLL_MS = 1500;
+// 聚焦后撤横幅前留一个点击手势的宽限：点击横幅本身会先激活应用（mousedown 即可能触发
+// 主窗口 focus），若立刻卸载横幅，这次点击的 click 事件会随按钮卸载而丢失。
+const FOCUS_CLEAR_MS = 300;
 let updateBannerTheme;
+let windowFocused;
 
 export function broadcastConversationNotificationTheme(theme) {
   updateBannerTheme?.(theme);
+}
+
+/**
+ * 任一 Astrion 窗口获得焦点即视为用户回到应用（撤掉残留横幅、停止提醒）。
+ * 主窗口、独立对话窗口、独立浏览器窗口都是 BaseWindow，而 Electron 的 app 级
+ * `browser-window-focus` 只覆盖 BrowserWindow，所以这几类窗口在各自创建处登记一次。
+ * 这里只转发事件，不反向依赖 views/browser，避免循环初始化。
+ */
+export function watchConversationNotificationFocus(window) {
+  if (!window || window.isDestroyed?.()) return;
+  window.on('focus', () => windowFocused?.(window));
 }
 
 export function startConversationNotifications(port, { focusedWindow, openConversation, targetWindow }) {
@@ -25,6 +41,8 @@ export function startConversationNotifications(port, { focusedWindow, openConver
   let flashingWindow;
   let bounceId;
   let pollFailed = false;
+  // Astrion 弹窗通知开关（设置页「通用 → 通知」）：关闭后只停横幅与 Dock/任务栏提醒。
+  let notificationsEnabled = getNotificationSettings().conversationNotifications !== false;
 
   function stopAttention() {
     clearTimeout(attentionTimer);
@@ -35,7 +53,33 @@ export function startConversationNotifications(port, { focusedWindow, openConver
     flashingWindow = undefined;
   }
 
+  // 用户回到应用（任意 Astrion 窗口获得焦点）：停止提醒，并撤掉已显示的横幅。
+  // 撤除略延一个点击宽限（FOCUS_CLEAR_MS）：点击横幅本身会先激活应用（mousedown 即可能
+  // 触发主窗口 focus），若立刻卸载横幅，这次点击的 click 事件会随按钮卸载而丢失。
+  // 宽限内只清理聚焦时已存在的横幅，期间新到的通知不受影响。
+  let focusClearTimer;
+  const focusExpired = new Set();
+  function onWindowFocused(window) {
+    if (stopped || window === panel) return;
+    stopAttention();
+    if (!notices.size) return;
+    for (const id of notices.keys()) focusExpired.add(id);
+    if (focusClearTimer) return;
+    focusClearTimer = setTimeout(() => {
+      focusClearTimer = undefined;
+      if (stopped) { focusExpired.clear(); return; }
+      let dismissed = false;
+      for (const id of focusExpired) {
+        if (notices.delete(id)) dismissed = true;
+      }
+      focusExpired.clear();
+      if (dismissed) render();
+    }, FOCUS_CLEAR_MS);
+  }
+  windowFocused = onWindowFocused;
+
   function requestAttention(row) {
+    if (!notificationsEnabled) return;
     if (attentionTimer) return;
     if (process.platform === 'darwin') {
       bounceId = app.dock?.bounce('informational');
@@ -75,6 +119,23 @@ export function startConversationNotifications(port, { focusedWindow, openConver
       }
     });
   }
+
+  // 关闭时立即收起现有横幅并停止 Dock/任务栏提醒；轮询仍在跑 updateActivity，
+  // 关闭期间的事件被视为已跟踪，重新开启后不会补弹。
+  function applyNotificationsEnabled(enabled) {
+    if (enabled === notificationsEnabled) return;
+    notificationsEnabled = enabled;
+    if (enabled) return;
+    stopAttention();
+    if (notices.size) {
+      notices.clear();
+      render();
+    }
+  }
+  const stopNotificationSettings = onNotificationSettingsChange((settings) => {
+    if (!stopped) applyNotificationsEnabled(settings.conversationNotifications !== false);
+  });
+  app.once('before-quit', stopNotificationSettings);
 
   function render() {
     if (stopped) return;
@@ -119,7 +180,10 @@ export function startConversationNotifications(port, { focusedWindow, openConver
   ipcMain.on('conversation-notification:ready', onReady);
   ipcMain.on('conversation-notification:open', onOpen);
   ipcMain.on('conversation-notification:dismiss', onDismiss);
-  app.on('browser-window-focus', stopAttention);
+  // BrowserWindow 类窗口（快捷对话、迁移/更新策略窗口等）由 app 事件覆盖；面板 focusable:false
+  // 不会被自己聚焦。BaseWindow 类窗口见 watchConversationNotificationFocus。
+  const onAppWindowFocused = (_event, window) => onWindowFocused(window);
+  app.on('browser-window-focus', onAppWindowFocused);
   screen.on('display-removed', render);
   screen.on('display-metrics-changed', render);
 
@@ -135,6 +199,8 @@ export function startConversationNotifications(port, { focusedWindow, openConver
       if (stopped) return;
       let attentionTarget;
       for (const event of updateActivity(data)) {
+        // 关闭期间也执行 updateActivity（在上方），只是不展示、不提醒。
+        if (!notificationsEnabled) continue;
         if (!shouldShowConversationNotification(focusedWindow(), event.row)) continue;
         const id = String(++noticeSequence);
         notices.set(id, { ...event, id });
@@ -153,8 +219,10 @@ export function startConversationNotifications(port, { focusedWindow, openConver
   app.once('before-quit', () => {
     stopped = true;
     clearTimeout(timer);
+    clearTimeout(focusClearTimer);
     stopAttention();
-    app.off('browser-window-focus', stopAttention);
+    windowFocused = undefined;
+    app.off('browser-window-focus', onAppWindowFocused);
     screen.off('display-removed', render);
     screen.off('display-metrics-changed', render);
     ipcMain.off('conversation-notification:ready', onReady);

@@ -22,6 +22,21 @@ export function scopeAlias(scope) {
   if (scope.key.length > 256 || /[\x00-\x1f]/.test(scope.key)) throw new Error('invalid_browser_scope');
   return JSON.stringify([scope.mode, scope.workspace || '', scope.key]);
 }
+/** 浏览器 owner（`${profileKey}:${scopeId}`）中的对话作用域；格式不符返回空串。 */
+export function ownerScopeId(owner) {
+  if (typeof owner !== 'string') return '';
+  const index = owner.indexOf(':');
+  return index > 0 ? owner.slice(index + 1) : '';
+}
+/** 对话标签（导航快照行）对应的浏览器 owner 作用域；与 renderer 的 scope 推导一致，页面标签返回空串。 */
+export function popoutScopeId(tab) {
+  if (!tab || (tab.kind !== 'conv' && tab.kind !== 'new')) return '';
+  try {
+    return scopeKey({ mode: tab.conversation_kind, workspace: tab.workspace_id || '', conversation: tab.conversation_id || tab.key });
+  } catch {
+    return '';
+  }
+}
 // Keep in sync with desktop/src-tauri/src/browser/policy.rs SEARCH_ENGINES.
 export const SEARCH_ENGINES = {
   google: 'https://www.google.com/search?q=',
