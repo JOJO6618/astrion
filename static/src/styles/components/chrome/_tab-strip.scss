@@ -28,6 +28,7 @@
   // 左侧预留 macOS 红绿灯悬浮区（Overlay 标题栏，红绿灯于 x=20 起约 52px 宽）
   padding: 0 10px 0 84px;
   gap: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   user-select: none;
   // 融合色渐变时长/缓动对齐侧边栏展开动画（_conversation.scss 的 width 320ms），
   // 使首标签变色与侧边栏展开「同期进行」而非事后跳变
@@ -227,7 +228,7 @@
   mask-image: linear-gradient(to right, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
   font-size: 12.5px;
-  line-height: 1;
+  line-height: 18px;
 }
 
 // 状态点：固定色，不随主题变化（项目惯例：蓝=运行中，绿=已完成）

@@ -4,14 +4,14 @@
  *  改动需三处同步。 */
 export const CHROME_STRIP_HEIGHT = 46;
 
-/** chrome 条：钉在顶部，全宽 × 46px。 */
-export function chromeBounds({ width }) {
-  return { x: 0, y: 0, width, height: CHROME_STRIP_HEIGHT };
+/** 常驻侧栏就绪后，窗口外壳覆盖整窗，内容视图叠在其右侧。 */
+export function chromeBounds({ width, height }, sidebarWidth = 0) {
+  return { x: 0, y: 0, width, height: sidebarWidth ? height : CHROME_STRIP_HEIGHT };
 }
 
-/** 主窗口内容区：chrome 条之下的剩余区域（y = 46）。 */
-export function mainContentBounds({ width, height }) {
-  return { x: 0, y: CHROME_STRIP_HEIGHT, width, height: Math.max(0, height - CHROME_STRIP_HEIGHT) };
+export function mainContentBounds({ width, height }, sidebarWidth = 0) {
+  const x = Math.min(width, sidebarWidth);
+  return { x, y: CHROME_STRIP_HEIGHT, width: width - x, height: Math.max(0, height - CHROME_STRIP_HEIGHT) };
 }
 
 /** TODO(P2) 独立对话窗口：铺满窗口（y = 0），顶部栏由页面自己绘制。 */

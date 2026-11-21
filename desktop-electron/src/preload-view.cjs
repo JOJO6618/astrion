@@ -52,6 +52,10 @@ contextBridge.exposeInMainWorld('__ASTRION_PLATFORM__', process.platform);
     return () => ipcRenderer.removeListener(channel, listener);
   };
   contextBridge.exposeInMainWorld('astrionShell', {
+    persistentSidebar: true,
+    browserPanelReady: () => ipcRenderer.send('shell:browser-panel-ready'),
+    reportBrowserPanel: open => ipcRenderer.send('shell:browser-panel-report', open),
+    onBrowserPanelOpen: callback => subscribe('shell:browser-panel-open', callback),
     // → { key, placement: 'main'|'detached', visible, legacy, state }；legacy 兜底页 key 为空。
     identity: () => ipcRenderer.invoke('shell:identity'),
     // 壳层广播的导航快照（revision 更大者才会被广播；转发者自己不会收到回显）。

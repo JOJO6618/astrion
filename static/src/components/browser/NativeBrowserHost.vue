@@ -3,6 +3,10 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useNativeBrowserStore, nativeBrowserAvailable } from '@/stores/nativeBrowser';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
+import {
+  desktopSidebarBridge,
+  useDesktopBrowserPanelBridge
+} from '@/components/chrome/desktopSidebarBridge';
 import { browserBridge } from './types';
 import { browserConversationPage, browserScopeForNavigation } from './browserScope';
 import BrowserPanel from './BrowserPanel.vue';
@@ -26,6 +30,27 @@ const subscriptions: Array<() => void> = [];
 onMounted(() => {
   const bridge = browserBridge();
   if (!bridge) return;
+  if (conversationPage.value) {
+    let applyingShellState = false;
+    const unsubscribe = useDesktopBrowserPanelBridge((open) => {
+      applyingShellState = true;
+      if (open) store.open = true;
+      else store.hide();
+      applyingShellState = false;
+    });
+    if (unsubscribe) {
+      subscriptions.push(
+        unsubscribe,
+        watch(
+          () => store.open,
+          (open) => {
+            if (!applyingShellState) desktopSidebarBridge()?.reportBrowserPanel?.(open);
+          },
+          { flush: 'sync' }
+        )
+      );
+    }
+  }
   subscriptions.push(bridge.onState((snapshot) => store.apply(snapshot)));
   subscriptions.push(
     bridge.onShortcut((event) => {

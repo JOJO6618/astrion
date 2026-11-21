@@ -62,7 +62,7 @@
     <template v-else>
       <div class="main-container">
         <ConversationSidebar
-          v-if="!isMobileViewport"
+          v-if="!persistentDesktopSidebar && !isMobileViewport"
           :icon-style="iconStyle"
           :format-time="formatTime"
           :running-tasks="runningWorkspaceTasks"
@@ -740,6 +740,7 @@ import { browserScopeForNavigation } from './components/browser/browserScope';
 import { openExternal } from './utils/openExternal';
 import { iconSrcStyle } from './utils/icons';
 import { isDesktopShell } from './utils/desktopPlatform';
+import { hasDesktopSidebar } from './components/chrome/desktopSidebarBridge';
 import { useDesktopUpdateStore } from './stores/desktopUpdate';
 import { useCommandBlockingStore } from './stores/commandBlocking';
 
@@ -774,6 +775,7 @@ const isAppShell = ref(detectAppShell());
 // 桌面端：正文里的网页链接统一交给 Astrion 内置浏览器打开（预览面板已在桌面端停用）。
 // 同源（后端自身端口）链接是应用内部导航，必须放行；内置浏览器不可用时退回系统浏览器。
 const desktopShell = isDesktopShell();
+const persistentDesktopSidebar = hasDesktopSidebar();
 
 const waitForBrowserLease = async (timeoutMs = 3500): Promise<boolean> => {
   const browser = useNativeBrowserStore();
@@ -828,9 +830,8 @@ onMounted(() => {
   }, 300);
   if ((window as any).__ASTRION_DESKTOP__) {
     document.addEventListener('click', onDesktopExternalLinkClick, true);
-    // 桌面壳：应用入口静默检查一次更新（任何路由进入都覆盖，store 内部只跑一次）；
-    // 有新版本只亮侧边栏红点，不弹窗打扰
-    useDesktopUpdateStore().checkStartupUpdate();
+    // 旧壳与 legacy 页面仍由本视图显示软件更新入口。
+    if (!persistentDesktopSidebar) useDesktopUpdateStore().checkStartupUpdate();
   }
 });
 onBeforeUnmount(() => {

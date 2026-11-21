@@ -3,7 +3,7 @@
     <ProjectMemoryMigrationDialog />
     <div class="main-container">
       <ConversationSidebar
-        v-if="!isMobile"
+        v-if="!persistentDesktopSidebar && !isMobile"
         chat-mode
         :icon-style="iconStyle"
         :current-conversation-id="chat.cid"
@@ -18,7 +18,7 @@
         @search-submit="search"
         @select-workspace-conversation="navigate($event.conversationId)"
         @personal="openPersonalPage"
-        @delete="deleteConversation"
+        @delete="deleteConversation(typeof $event === 'string' ? $event : $event.id)"
         @duplicate="duplicateConversation"
       />
       <main
@@ -304,7 +304,7 @@
             @search-submit="search"
             @personal="openPersonalPage"
             @select-workspace-conversation="navigate($event.conversationId)"
-            @delete="deleteConversation"
+            @delete="deleteConversation(typeof $event === 'string' ? $event : $event.id)"
             @duplicate="duplicateConversation"
           />
         </div>
@@ -334,6 +334,7 @@ import ChatBranchActions from './ChatBranchActions.vue';
 import ChatMessageEditor from './ChatMessageEditor.vue';
 import HandoffCard from './HandoffCard.vue';
 import { useChatPage } from '@/chat/useChatPage';
+import { hasDesktopSidebar } from '@/components/chrome/desktopSidebarBridge';
 import { ICONS, iconSrcStyle, type IconKey } from '@/utils/icons';
 import {
   getToolIcon,
@@ -344,6 +345,7 @@ import {
   formatSearchTime,
   formatSearchDomains
 } from '@/utils/chatDisplay';
+const persistentDesktopSidebar = hasDesktopSidebar();
 const page = reactive(useChatPage());
 const { chat, draft, ui, personalization, collapsedGroups, expandedBlocks } = page;
 

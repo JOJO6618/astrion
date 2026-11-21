@@ -1,6 +1,6 @@
 # 桌面标签导航契约（v3 多视图）
 
-2026-11-14：适用于 Electron 桌面壳（macOS + Windows）。每个标签一个独立 `WebContentsView`（完整前端页面），顶部 chrome 视图只画标签条。导航状态在后端。设计与取舍见 `docs/desktop_multi_view.md`；修改标签身份、关闭、恢复、绑定、页面标签、拖出/放回前必读本文。网页端与 Android 不启用，保持单页行为。
+适用于 Electron 桌面壳（macOS + Windows）。主窗口的 chrome 视图常驻顶部标签栏和左侧栏，每个标签有独立的内容 `WebContentsView`。导航状态在后端。`docs/desktop_multi_view.md` 记录多视图设计沿革。网页端和 Android 继续使用单页布局。
 
 ## 唯一写者与状态
 
@@ -46,7 +46,9 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 - ViewManager 持有每标签一个视图；只接受 revision 更大的快照并广播给 chrome 与所有视图（不回显给转发者）。最多 6 个 conv/new 视图常驻（LRU），page 与独立窗口视图不淘汰；淘汰视图再次激活冷加载。
 - **chrome 视图**：唯一轮询 `GET`（500ms）并转发每个更新快照；点击标签 `astrionShell.show(key)` 后发 `activate`；拖拽排序发 `reorder`；拖出对话标签或空白新对话标签在指针离开标签条 >40px 后发 `dragTab`（tear/move/drop），壳层建独立窗口并回调 `onRequestDetach`→`detach`；独立窗口关闭 `onRequestDock`→`dock`；窗口聚焦 `onWindowFocus`→`focus`；`onRequestPage`→`page`（快捷入口设置深链）。页面标签不可拖出，Esc 取消。
 - **内容视图**：`astrionShell.identity()` 取得固定 `key/placement/visible/state`，`attach {key, renderer_id}`，此后不再切换标签；不轮询标签快照，订阅 `onTabsState`；每个命令响应都 `forwardTabsState`。legacy 兜底页（key 为空）整体降级为网页行为。
-- 前端实现：`stores/conversationTabs.ts`（role chrome/view、`ownsView`、`installShellRequests`）、`app/methods/ui/desktopView.ts`、`conversationTabs.ts`（命令封装与发送守卫）、`components/chrome/ConversationTabStrip.vue`＋`tabReorder.ts`。
+- **常驻侧栏**：`DesktopSidebar.vue` 挂在 chrome 视图，复用 `ConversationSidebar.vue`，独立加载工作区目录、搜索、分页和任务摘要。设置、工作流、定时任务、项目 Git 在同一右侧区域打开。侧栏读取当前标签快照，独立页面以 opener 推导列表模式，按实际活动标签显示高亮。内容视图的侧栏初载及轮询由外壳接管。
+- **原生布局与弹层**：外壳提供侧栏宽度，右侧内容视图从该宽度起排。侧栏浮层打开时，外壳临时抬到内容和原生网页层上方，关闭后恢复。浏览器按钮按当前标签转发，面板和 AI 操作沿用对话作用域。独立对话窗口使用本窗口的完整内容区域。
+- 前端实现见 `stores/conversationTabs.ts`、`app/methods/ui/desktopView.ts` 与 `components/chrome/`。
 
 **所有权与发送守卫**：`isDesktopNavigationReady` = 已 attach ∧ `renderers[key]` 是本文档 ∧ 标签仍在 ∧ 标签身份等于可见 session（new↔无对话，conv↔同对话＋工作区）；页面标签不可发送。首条消息用本视图 key `bind`。侧边栏点击本视图已显示的对话为空操作，其余发 `open`/`workspace`/`create`；`focus:"detached"` 时调用 `astrionShell.focusTab(key)`。加载失败只 `fail` 本标签，不另开标签。
 
@@ -56,7 +58,7 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 **独立对话窗口（placement=detached）**：`DetachedTopBar.vue` 随 `onPlacement`/快照就地切换（`html.desktop-detached`）：隐藏侧边栏，顶部 38px 栏（标题，`-webkit-app-region: drag`，macOS 左让红绿灯、Windows 右让窗口控制），无新建/切换对话入口；设置/Git/工作流按钮发 `page` 后 `focusMain()`。放回主窗口恢复正常布局，不重载。
 
-**隐藏视图降频**（`ui/viewVisibility.ts`，订阅 `onVisibility`，网页端恒可见）：隐藏时暂停 `/api/status` 空闲刷新、`/api/tasks` 索引后续轮询、运行态对账、Git 摘要与终端数刷新；任务事件轮询降到约 1s（从不完全停止）。重新可见立即各补一次并恢复 250ms。
+**隐藏视图降频**（`ui/viewVisibility.ts`，订阅 `onVisibility`，网页端恒可见）：隐藏时暂停 `/api/status` 空闲刷新、运行态对账、Git 摘要与终端数刷新。任务事件轮询降到约 1 秒，重新可见立即补查并恢复到 250 毫秒。跨对话任务索引由常驻侧栏轮询。
 
 ## 关闭、删除与恢复
 

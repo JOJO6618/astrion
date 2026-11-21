@@ -13,8 +13,8 @@
   position: relative;
   flex-shrink: 0;
   width: var(--conversation-expanded-width);
-  height: var(--app-viewport) !important;
-  min-height: var(--app-viewport) !important;
+  height: var(--sidebar-viewport, var(--app-viewport)) !important;
+  min-height: var(--sidebar-viewport, var(--app-viewport)) !important;
   overflow: hidden;
   background: var(--surface-rail);
   border-right: 0;
@@ -495,6 +495,7 @@ body[data-theme='dark'] .conversation-sidebar .conversation-item.active:focus-wi
   padding-left: 12px;
   padding-right: 4px;
   color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 13px;
   line-height: 1.25;
   letter-spacing: -0.01em;

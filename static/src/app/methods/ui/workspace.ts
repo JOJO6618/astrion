@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { isViewVisible } from './viewVisibility';
 import { t } from '@/locales';
+import { hasDesktopSidebar } from '@/components/chrome/desktopSidebarBridge';
 import { useConversationStore } from '../../../stores/conversation';
 import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 
@@ -23,6 +24,7 @@ export const workspaceMethods = {
   },
   async refreshRunningWorkspaceTasks() {
     if (retiredHosts.has(this)) return false;
+    const desktopContent = hasDesktopSidebar();
     const previous = requests.get(this);
     const controller = new AbortController();
     requests.set(this, controller);
@@ -41,7 +43,12 @@ export const workspaceMethods = {
     let waitingForTitle = false;
     const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      const resp = await fetch('/api/tasks', { signal: controller.signal, cache: 'no-store' });
+      // The composer still verifies its own workspace before sending.
+      const workspace = desktopContent ? this.currentHostWorkspaceId : '';
+      const url = workspace
+        ? `/api/tasks?workspace_id=${encodeURIComponent(workspace)}`
+        : '/api/tasks';
+      const resp = await fetch(url, { signal: controller.signal, cache: 'no-store' });
       const payload = await resp.json();
       if (!owns()) return false;
       if (!resp.ok || !payload?.success || !Array.isArray(payload.data)) {
@@ -65,11 +72,13 @@ export const workspaceMethods = {
           waitingForTitle = true;
         }
       }
-      const trackedTaskIds = this.getStoredWorkspaceTaskIdSet?.('tracked') || new Set();
+      const trackedTaskIds =
+        (!desktopContent && this.getStoredWorkspaceTaskIdSet?.('tracked')) || new Set();
       const acknowledged = new Set(
         Array.isArray(this.acknowledgedCompletedTaskIds) ? this.acknowledgedCompletedTaskIds : []
       );
-      const storedAcknowledged = this.getStoredWorkspaceTaskIdSet?.('acknowledged') || new Set();
+      const storedAcknowledged =
+        (!desktopContent && this.getStoredWorkspaceTaskIdSet?.('acknowledged')) || new Set();
       storedAcknowledged.forEach((id: string) => acknowledged.add(id));
       this.acknowledgedCompletedTaskIds = Array.from(acknowledged);
       const previousVisibleIds = new Set(
@@ -107,8 +116,10 @@ export const workspaceMethods = {
         if (taskId) trackedTaskIds.add(taskId);
       });
       acknowledged.forEach((id: string) => trackedTaskIds.delete(id));
-      this.setStoredWorkspaceTaskIdSet?.('tracked', trackedTaskIds);
-      this.setStoredWorkspaceTaskIdSet?.('acknowledged', acknowledged);
+      if (!desktopContent) {
+        this.setStoredWorkspaceTaskIdSet?.('tracked', trackedTaskIds);
+        this.setStoredWorkspaceTaskIdSet?.('acknowledged', acknowledged);
+      }
       if (Array.isArray(this.hostWorkspaces)) {
         const counts = visibleTasks.reduce((acc: Record<string, number>, task: any) => {
           const ws = String(task?.workspace_id || '');
@@ -219,7 +230,7 @@ export const workspaceMethods = {
   },
   /** 静默重拉对话列表：任务驱动最短间隔 5s，空闲兜底最短间隔 30s。 */
   refreshConversationListSilently(reason = 'idle') {
-    if (retiredHosts.has(this)) return;
+    if (retiredHosts.has(this) || hasDesktopSidebar()) return;
     if (!(this.versioningHostMode || this.dockerProjectMode)) return;
     if (!isViewVisible()) return;
     if (this.searchActive) return;

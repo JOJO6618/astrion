@@ -89,10 +89,11 @@
           v-if="browserAvailable"
           type="button"
           class="sidebar-nav-row"
-          :class="{ active: nativeBrowser.open }"
+          :class="{ active: browserOpen }"
           :aria-label="$t('browser.title')"
-          :aria-pressed="nativeBrowser.open"
-          @click="nativeBrowser.toggle()"
+          :aria-pressed="browserOpen"
+          :disabled="props.desktopBrowser?.enabled === false"
+          @click="toggleBrowser"
         >
           <span class="sidebar-nav-icon" aria-hidden="true">
             <span class="icon" :style="iconSrcStyle('globe')"></span>
@@ -389,7 +390,7 @@
                                     type="button"
                                     @click="
                                       openActionMenuId = null;
-                                      $emit('duplicate', conv.id);
+                                      $emit('duplicate', conv.id, String(ws.workspace_id || ''));
                                     "
                                   >
                                     <span
@@ -564,7 +565,7 @@
                                 type="button"
                                 @click="
                                   openActionMenuId = null;
-                                  $emit('duplicate', conv.id);
+                                  $emit('duplicate', conv.id, String(group.workspace_id || ''));
                                 "
                               >
                                 <span
@@ -1057,12 +1058,18 @@ import ConversationTransferDialog from './ConversationTransferDialog.vue';
 import ConversationTransferMenu from './ConversationTransferMenu.vue';
 import { useNativeBrowserStore, nativeBrowserAvailable } from '@/stores/nativeBrowser';
 const nativeBrowser = useNativeBrowserStore();
-const browserAvailable = nativeBrowserAvailable();
+const browserAvailable = computed(() => Boolean(props.desktopBrowser) || nativeBrowserAvailable());
+const browserOpen = computed(() => props.desktopBrowser?.open ?? nativeBrowser.open);
+function toggleBrowser() {
+  if (props.desktopBrowser) emit('toggle-browser');
+  else nativeBrowser.toggle();
+}
 
 const transferDialog = ref<InstanceType<typeof ConversationTransferDialog>>();
 const props = withDefaults(
   defineProps<{
     chatMode?: boolean;
+    desktopBrowser?: { enabled: boolean; open: boolean };
     /** 手机抽屉显式展开；桌面未传时沿用全局折叠状态。 */
     collapsed?: boolean;
     formatTime?: (input: unknown) => string;
@@ -1109,6 +1116,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (event: 'toggle'): void;
+  (event: 'toggle-browser'): void;
   (event: 'create'): void;
   (event: 'refresh'): void;
   (event: 'search', value: string): void;
@@ -1117,8 +1125,8 @@ const emit = defineEmits<{
   (event: 'load-more'): void;
   (event: 'search-more'): void;
   (event: 'personal', tab?: string): void;
-  (event: 'delete', id: string): void;
-  (event: 'duplicate', id: string): void;
+  (event: 'delete', id: string | { id: string; workspaceId: string }): void;
+  (event: 'duplicate', id: string, workspaceId?: string): void;
   (event: 'switch-workspace', workspaceId: string): void;
   (event: 'create-workspace', payload: { path: string; label: string }): void;
   (event: 'delete-workspace', item: any): void;

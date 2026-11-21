@@ -1,9 +1,14 @@
 // @ts-nocheck
 import { useQuickDockStore } from '../../../stores/quickDock';
+import { hasDesktopSidebar } from '@/components/chrome/desktopSidebarBridge';
 
 export const mobileMethods = {
   setupMobileViewportWatcher() {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    if (
+      typeof window === 'undefined' ||
+      hasDesktopSidebar() ||
+      typeof window.matchMedia !== 'function'
+    ) {
       this.updateMobileViewportState(false);
       return;
     }

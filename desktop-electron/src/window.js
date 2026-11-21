@@ -98,7 +98,6 @@ function applySurfaceColor(color) {
   color = color.toLowerCase();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.setBackgroundColor(color);
-  chromeView?.setBackgroundColor(color);
   // 内置浏览器管理内容视图的透明叠层（网页显示时宿主视图必须透明），交给它统一设置。
   // 先记录并落盘，再给各视图着色：视图异常不得让窗口底色缓存停在旧值。
   if (color !== surfaceColor) {
@@ -152,6 +151,23 @@ ipcMain.on('shell:tabs-forward', (event, state) => {
   if (!fromContentView(event) && !fromChrome(event)) return;
   try { views.handleSnapshot(state, event.sender); } catch (err) { console.error('[astrion-desktop] 快照处理失败:', err); }
 });
+ipcMain.on('shell:sidebar-width', (event, width) => {
+  if (!fromChrome(event) || !Number.isFinite(width)) return;
+  if (views.setSidebarWidth(Math.round(width * event.sender.getZoomFactor()))) nativeBrowser?.resize();
+});
+ipcMain.on('shell:chrome-overlay', (event, raised) => {
+  if (fromChrome(event) && typeof raised === 'boolean') views.setChromeOverlay(raised);
+});
+ipcMain.handle('shell:browser-panel-states', (event) => fromChrome(event) ? Object.fromEntries(views.browserPanels) : {});
+ipcMain.on('shell:browser-panel-toggle', (event, key) => {
+  if (fromChrome(event) && nativeBrowser && typeof key === 'string') views.toggleBrowserPanel(key);
+});
+ipcMain.on('shell:browser-panel-ready', (event) => {
+  if (fromContentView(event)) views.browserPanelReady(event.sender);
+});
+ipcMain.on('shell:browser-panel-report', (event, open) => {
+  if (fromContentView(event) && typeof open === 'boolean') views.reportBrowserPanel(event.sender, open);
+});
 // 乐观切换：仅 chrome 标签条可用。
 ipcMain.on('shell:show', (event, key) => {
   if (!fromChrome(event)) return;
@@ -173,7 +189,7 @@ ipcMain.handle('shell:drag-info', (event) => {
 });
 // 页面（open/workspace 返回 focus:"detached"）请求前置持有某标签的窗口。
 ipcMain.on('shell:focus-tab', (event, key) => {
-  if (!fromContentView(event) || typeof key !== 'string') return;
+  if ((!fromContentView(event) && !fromChrome(event)) || typeof key !== 'string') return;
   try { views.focusTab(key); } catch (err) { console.error('[astrion-desktop] focusTab 失败:', err); }
 });
 
@@ -326,7 +342,7 @@ export function createMainWindow(port, route = '/') {
       preload: path.join(__dirname, 'preload-chrome.cjs')
     }
   });
-  chromeView.setBackgroundColor(surfaceColor);
+  chromeView.setBackgroundColor('#00000000');
   mainWindow.contentView.addChildView(chromeView);
 
   // 内容视图工厂：每个标签一个视图，默认 backgroundThrottling（隐藏视图自动降频，P0 实测 1Hz）。
@@ -371,9 +387,28 @@ export function createMainWindow(port, route = '/') {
   layoutViews();
 
   installNavigationGuards(chromeView);
-  chromeView.webContents.loadURL(chromeUrl);
-  // chrome 异常退出时若正在拖出：按 drop 处理（不丢标签）。
-  chromeView.webContents.on('render-process-gone', () => { views?.endDragAsDrop(); });
+  const chromeContents = chromeView.webContents;
+  chromeContents.on('will-navigate', (event, url) => {
+    const target = new URL(url);
+    if (target.origin !== origin || !['/login', '/logout'].includes(target.pathname)) return;
+    event.preventDefault();
+    const manager = views;
+    const loginView = manager?.beginLogin(target.pathname + target.search);
+    if (!loginView) return;
+    const resume = () => {
+      if (views !== manager || chromeContents.isDestroyed()) return;
+      void chromeContents.loadURL(chromeUrl).catch(() => {}).finally(() => {
+        manager.waitingForLogin = false;
+      });
+    };
+    loginView.webContents.once('did-stop-loading', resume);
+  });
+  chromeContents.loadURL(chromeUrl);
+  chromeContents.on('render-process-gone', () => {
+    views?.endDragAsDrop();
+    views?.setChromeOverlay(false);
+    if (mainWindow && !mainWindow.isDestroyed() && !appQuitting) chromeView?.webContents.reload();
+  });
   // 打开特定路由（快捷对话设置）：经 chrome 发 `page` 命令；首个快照前排队。
   if (route && route !== '/') views.requestPage(route);
 

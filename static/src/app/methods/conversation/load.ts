@@ -1,9 +1,11 @@
 // @ts-nocheck
 import { useConversationStore } from '../../../stores/conversation';
 import { fetchConversationPage } from '../../../stores/workspaceConversationCache';
+import { hasDesktopSidebar } from '@/components/chrome/desktopSidebarBridge';
 
 export const loadMethods = {
   async loadConversationsList(options = {}) {
+    if (hasDesktopSidebar()) return;
     const store = useConversationStore();
     const workspaceId = String(this.currentHostWorkspaceId || 'default');
     store.activateWorkspaceCache(workspaceId);

@@ -243,6 +243,7 @@ export class BrowserTabs {
       }
     }
     for (const host of hosts) host.stacking.apply(actives.get(host));
+    manager.views?.restoreChromeOverlay?.();
     manager.contextMenu.closeStale();
   }
 }

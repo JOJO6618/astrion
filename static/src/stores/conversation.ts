@@ -262,10 +262,11 @@ export const useConversationStore = defineStore('conversation', {
       }
       if (group.loading || group.loadingMore || (paging.loaded && !refresh && !reset)) return;
       const fetchOffset = refresh ? 0 : paging.offset;
+      const limit = refresh ? Math.max(group.fetchLimit, listCache.length) : group.fetchLimit;
       group.loading = true;
       try {
         const response = await fetch(
-          `/api/conversations?workspace_id=${encodeURIComponent(workspaceId)}&limit=${group.fetchLimit}&offset=${fetchOffset}`
+          `/api/conversations?workspace_id=${encodeURIComponent(workspaceId)}&limit=${limit}&offset=${fetchOffset}`
         );
         const data = await response.json();
         if (data.success) {
@@ -276,20 +277,12 @@ export const useConversationStore = defineStore('conversation', {
             total_messages: conv.total_messages,
             total_tools: conv.total_tools
           }));
-          /* 原地写入缓存数组，保持 group.conversations 引用一致 */
-          if (refresh) {
-            const tail = listCache.slice(items.length);
-            listCache.splice(0, listCache.length, ...items, ...tail);
-          } else if (fetchOffset === 0) {
-            listCache.splice(0, listCache.length, ...items);
-          } else {
-            listCache.push(...items);
-          }
+          /* 原地更新，刷新时以服务端返回的完整已加载区间为准。 */
+          if (fetchOffset === 0) listCache.splice(0, listCache.length, ...items);
+          else listCache.push(...items);
           paging.hasMore = !!data.data?.has_more;
           paging.loaded = true;
-          if (!refresh) {
-            paging.offset = fetchOffset + items.length;
-          }
+          paging.offset = fetchOffset + items.length;
           // 同步分页。
           group.hasMore = paging.hasMore;
           group.offset = paging.offset;

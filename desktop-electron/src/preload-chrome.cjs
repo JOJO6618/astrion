@@ -31,6 +31,12 @@ const subscribe = (channel, callback) => {
   return () => ipcRenderer.removeListener(channel, listener);
 };
 contextBridge.exposeInMainWorld('astrionShell', {
+  setSidebarWidth: width => ipcRenderer.send('shell:sidebar-width', width),
+  setChromeOverlay: raised => ipcRenderer.send('shell:chrome-overlay', raised),
+  toggleBrowserPanel: key => ipcRenderer.send('shell:browser-panel-toggle', key),
+  browserPanels: () => ipcRenderer.invoke('shell:browser-panel-states'),
+  onBrowserPanelState: callback => subscribe('shell:browser-panel-state', callback),
+  focusTab: key => ipcRenderer.send('shell:focus-tab', key),
   // 乐观切换：壳层立即显示该标签的视图（缺失则创建），随后以后端快照为准。
   show: key => ipcRenderer.send('shell:show', key),
   // chrome 轮询到（或命令响应得到）的快照转交壳层；壳层只接受更高 revision 并广播。
